@@ -30,6 +30,7 @@ app/.godot/
 *.aab
 app/android/
 app/export.log
+app/shots/
 
 # ── The full game database is derived from owned game files → copyright, never
 # committed. The synthetic app/data/sample_db.json fallback IS committed.

@@ -39,6 +39,41 @@ func _ready() -> void:
 		GameDB.database_loaded.connect(_show_home, CONNECT_ONE_SHOT)
 	else:
 		_show_home()
+	if OS.has_environment("PM98_SHOT_DIR"):
+		_devshot()
+
+
+# ---- dev screenshot harness (inert unless PM98_SHOT_DIR is set) -----------
+# Boots the app, walks home -> squad -> player capturing each, then quits.
+# Run under a real/virtual display: PM98_SHOT_DIR=... godot --rendering-driver opengl3 .
+
+func _devshot() -> void:
+	var dir := OS.get_environment("PM98_SHOT_DIR")
+	if GameDB.loaded_path == "":
+		await GameDB.database_loaded
+	await _settle()
+	_save_shot(dir, "home.png")
+	if not GameDB.leagues.is_empty() or not GameDB.countries().is_empty():
+		_on_item(0)            # first competition -> its clubs
+		await _settle()
+		_on_item(0)            # first club -> squad
+		await _settle()
+		_save_shot(dir, "squad.png")
+		_on_item(0)            # first player -> attributes
+		await _settle()
+		_save_shot(dir, "player.png")
+	print("DEVSHOT done")
+	get_tree().quit()
+
+func _settle() -> void:
+	for _i in 8:
+		await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+
+func _save_shot(dir: String, fname: String) -> void:
+	var img := get_viewport().get_texture().get_image()
+	var err := img.save_png(dir.path_join(fname))
+	print("DEVSHOT %s -> %s (err %d)" % [fname, dir, err])
 
 
 func _style() -> void:

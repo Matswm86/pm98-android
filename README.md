@@ -4,20 +4,26 @@ A classic-style **football management game for Android** — an English remake o
 the late-90s manager classic: pick a club, sign players, set tactics, run the
 season, climb the divisions.
 
-> **Status: in development (pre-alpha).** No playable build yet — see the roadmap
-> below. The download link and screenshots appear here with the first release.
+> **Status: in development (pre-alpha).** First build is up: a browsable database
+> of leagues, clubs and squads. The match engine and the rest of the management
+> layer are next, see the roadmap below.
 
 ## Download
 
-📦 **[Releases](https://github.com/Matswm86/pm98-android/releases)** — the Android
-APK will be published here when the first playable build is ready. Sideload it on
-your phone (enable "install from unknown sources").
+📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98.apk)**
+&nbsp;·&nbsp; [all releases](https://github.com/Matswm86/pm98-android/releases)
 
-*No release yet.*
+Sideload on your phone: open the link, tap the APK, allow "install from this
+source" if prompted. This pre-alpha ships with sample data so it runs out of the
+box.
 
 ## Screenshots
 
-*Coming with the first build.*
+<p>
+  <img src="screenshots/home.png" alt="Competitions" width="240"/>
+  <img src="screenshots/squad.png" alt="Squad list" width="240"/>
+  <img src="screenshots/player.png" alt="Player attributes" width="240"/>
+</p>
 
 ## Features (planned)
 
@@ -37,9 +43,9 @@ your phone (enable "install from unknown sources").
 
 ## Building from source
 
-The Android app lives in `app/` (Kotlin) and is built in CI — see
-`.github/workflows/`. The `tools/` folder holds the Python scripts that prepare
-the game's data. Both are work-in-progress.
+The game lives in `app/` (Godot 4 / GDScript) and the APK is built in CI — see
+`.github/workflows/build-android.yml`. The `tools/` folder holds the Python
+scripts that prepare the game's data. Both are work-in-progress.
 
 ## License
 
