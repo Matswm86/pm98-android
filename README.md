@@ -1,64 +1,48 @@
-# PM98 Android — reverse-engineering toolkit
+# PM98
 
-Tools and file-format documentation for reverse-engineering **Premier Manager 98**
-(Dinamic Multimedia, the PC Fútbol / "OPTIMUM" engine family), with the goal of a
-native **English Android clone** that reads the original game's own data and
-reproduces its gameplay.
+A classic-style **football management game for Android** — an English remake of
+the late-90s manager classic: pick a club, sign players, set tactics, run the
+season, climb the divisions.
 
-> **This repository contains code and format notes only — no game content.**
-> No game files, no extracted data, no copyrighted assets are included or
-> redistributed here (see `.gitignore`). To use the tools you must supply your own
-> legally-owned copy of the game; everything under `extracted/` and `assets/` is
-> derived locally for personal use and is never committed. This is a personal
-> preservation / interoperability project for the author's own copy.
+> **Status: in development (pre-alpha).** No playable build yet — see the roadmap
+> below. The download link and screenshots appear here with the first release.
 
-## What's been figured out
+## Download
 
-Full detail in [`docs/FORMATS.md`](docs/FORMATS.md); plan in
-[`docs/ROADMAP.md`](docs/ROADMAP.md). Highlights:
+📦 **[Releases](https://github.com/Matswm86/pm98-android/releases)** — the Android
+APK will be published here when the first playable build is ready. Sideload it on
+your phone (enable "install from unknown sources").
 
-- **`.30` string tables** (countries, first names, surnames) — cipher solved, decode
-  to clean English.
-- **`EQUIPOS.PKF` team + squad records** — fully decoded. Every detailed team record
-  is marked by a `Copyright (c)1996 Dinamic Multimedia` string (476 of them). The
-  per-player record carries two name fields (common + legal, with accents), birth
-  year, an overall rating, and 10 attributes (VE RE AG CA RM RG PA TI EN PO).
-- The **name cipher** (pair-swapped alphabet) and the **accent byte map**
-  (Á Ç É Í Ï Ñ Ó Ú Ö Ü ª) are documented and verified against real 1997-98 rosters.
+*No release yet.*
 
-The extractor reproduces, for the author's own copy, the 20 Spanish Primera squads
-(533 players, verified against reality) and 281 club squads across the European /
-South-American leagues (5654 players). Output JSON is gitignored.
+## Screenshots
 
-## Tools
+*Coming with the first build.*
 
-All standalone Python 3, run from the repo root with your own game files placed
-under `extracted/Premier Manager 98/`:
+## Features (planned)
 
-| script | purpose |
-|--------|---------|
-| `tools/pm98_strings.py`   | decode the `.30` string tables → JSON |
-| `tools/extract_squads.py` | decode team headers + full squads from `EQUIPOS.PKF` |
-| `tools/parse_equipos.py`  | low-level team-record index walker (research) |
-| `tools/extract_clubs.py`  | English club-name census (research) |
-| `tools/equipos_dump.py`   | raw cipher-string dump (research) |
-| `tools/decode30.py`       | early `.30` brute-forcer (superseded) |
+- Full English league pyramid — Premier + Divisions 1, 2 and 3
+- Hundreds of real-world clubs and squads
+- Match engine, league tables, promotion/relegation and cups
+- Transfers, scouting, youth development and contracts
+- Stadium expansion, finances, training and morale
+- Touch-friendly UI, fully offline, no ads
 
-## Status
+## Roadmap
 
-Asset reverse-engineering is well underway (strings + team/squad data done). Still
-to do: English-league squad framing, image (PKF) decompression, audio, then the
-clone engine + UI. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
+1. **Data** — build the club/player database *(in progress)*
+2. **Engine** — headless season simulation (match, league, transfers, finances)
+3. **App** — Android UI on top of the engine → first APK
+4. **Polish** — match presentation, audio, balancing
 
-## Legal
+## Building from source
 
-*Premier Manager 98*, *PC Fútbol*, all club/player data, names, graphics, audio and
-trademarks are property of their respective rights holders (Dinamic Multimedia and
-others). This project is not affiliated with or endorsed by them. The code here is
-original work; it ships no game data. Use it only with a copy of the game you own.
+The Android app lives in `app/` (Kotlin) and is built in CI — see
+`.github/workflows/`. The `tools/` folder holds the Python scripts that prepare
+the game's data. Both are work-in-progress.
 
 ## License
 
-Code is released under the MIT License (see [`LICENSE`](LICENSE)). The license
-covers the original code and documentation in this repository only — not the game
-or any of its data.
+Code is released under the MIT License (see [`LICENSE`](LICENSE)). This is a
+fan-made, non-commercial project and is not affiliated with or endorsed by any
+real football club, league or rights holder.
