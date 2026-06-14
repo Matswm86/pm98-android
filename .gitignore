@@ -1,0 +1,20 @@
+# ── Copyrighted game data — Dinamic Multimedia. Personal use only, NEVER committed.
+extracted/
+assets/
+*.iso
+*.rar
+*.PKF
+*.pkf
+*.DBC
+*.30
+
+# ── Third-party community materials (PC Fútbol editor manuals/help) — not ours to ship.
+docs/refs/
+docs/shots/
+
+# ── Wine / scratch / Python
+.wineprefix/
+**/__pycache__/
+*.pyc
+*.pyo
+.DS_Store
