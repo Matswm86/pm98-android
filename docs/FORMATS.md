@@ -41,15 +41,27 @@ Byte 0 = `0x01` (version).
 Entropy (bits/byte) tells the story — none are encrypted:
 | file            | entropy | nature |
 |-----------------|---------|--------|
-| EQUIPOS.PKF     | 5.26    | team/player DB, lightly packed, **cipher text fields inline** |
-| IMG.PKF         | 5.74    | RLE/LZ indexed-color sprites |
+| EQUIPOS.PKF     | 5.26    | team/player DB, plain records, **cipher text fields inline** |
+| IMG.PKF         | 5.74    | indexed-color sprites (plain, per S4) |
 | RECURSOS.PKF    | 6.33    | UI graphics/resources |
 | BANDERAS.PKF    | 6.34    | flag sprites |
-| DAT.PKF         | 7.77    | match-sim data (most packed) |
+| DATSIM.PKF      | 4.41    | **match-VIEW sprites, PLAIN** (H 2.7-4.4, ~50% 0x00, 00/FF runs) |
+| DAT.PKF         | 7.77    | **the ONE genuinely packed file** (uniform H~7.5, zero strings) = packed gfx/resources |
 
-Image PKFs use **indexed color + external palettes** (`DatSim/paletas/*.dat`
-referenced in the EXE). Decompression algo (likely a simple LZ/RLE) still to be
-reverse-engineered from sample sprites or from `Dbasewin.exe`.
+CORRECTION (S6 2026-06-15, verified vs bytes): earlier notes called DAT.PKF
+"match-sim data" and assumed an LZ packer for the image PKFs. Wrong on both:
+- The image/badge/photo PKFs are **plain indexed bitmaps** (S4 cracked them); no
+  LZ involved. `paletas/*.dat` don't exist as loose files (palette is inline,
+  DAT.PKF@0x5ca).
+- `DATSIM.PKF` ("DAT-SIM") is **not compressed** (entropy 2.7-4.4) — plain match-
+  view sprite data, decodable like EQUIPOS.
+- `DAT.PKF` is the only file with uniform ~7.5 entropy + no ASCII = genuinely
+  packed, but it holds **graphics/resources, not match formulas**.
+- The **match engine is compiled x86 code in `MANAGER.EXE`** (2.5MB PE32), with
+  embedded constants in plaintext (e.g. "255.000 for every draw match / 510.000
+  for every match won", `img\partido\*`, `img\goleadores\*`, "MAN OF THE MATCH").
+  There is NO decodable "match math" data file. Engine fidelity = behavioral
+  replication and/or static RE of MANAGER.EXE, NOT unpacking a PKF.
 
 ## 3. `EQUIPOS.PKF` record layout — IN PROGRESS
 Contains clubs, leagues, squads, player attributes + an English bio/commentary
