@@ -3,11 +3,13 @@ extends Control
 ## UI is built in code so it validates headless and has no fragile .tscn wiring.
 ## Match engine, save/load and the rest of the management layer land on top of this.
 
-const BG := Color("0c1a12")        # dark pitch green
-const PANEL := Color("12241a")
-const ACCENT := Color("39ff88")    # phosphor green
-const TEXT := Color("cfe8d8")
-const DIM := Color("7fae93")
+# Float-form Color(r,g,b) only — the Color("hex") string constructor renders
+# transparent/black on the Android runtime (see godot-android reference, gotcha #9).
+const BG := Color(0.047, 0.102, 0.071)     # #0c1a12 dark pitch green
+const PANEL := Color(0.071, 0.141, 0.102)  # #12241a
+const ACCENT := Color(0.224, 1.0, 0.533)   # #39ff88 phosphor green
+const TEXT := Color(0.812, 0.910, 0.847)   # #cfe8d8
+const DIM := Color(0.498, 0.682, 0.576)    # #7fae93
 
 # Spanish attribute codes -> readable English labels (same semantics as the file).
 const ATTR_LABELS := {
