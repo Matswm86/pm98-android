@@ -1,0 +1,55 @@
+{
+ "meta": {
+  "game": "PM98 (sample data)",
+  "season": "SAMPLE",
+  "source": "synthetic placeholder data, fully original, ships with the public build",
+  "note": "No copyrighted game data. Side-load a real game_db.json to browse the full database.",
+  "counts": {"leagues": 1, "clubs": 4, "players": 24}
+ },
+ "leagues": [
+  {"id": "demo_prem", "name": "Sample Premier", "country": "Sampleland", "tier": 1,
+   "clubIds": [1, 2, 3, 4]}
+ ],
+ "clubs": [
+  {"id": 1, "name": "Riverside Rovers", "fullName": "Riverside Rovers FC",
+   "stadium": "The Weir", "manager": "A. Hollis", "country": "Sampleland",
+   "leagueId": "demo_prem", "capacity": 28500, "foundingYear": 1894, "players": [
+    {"id": 1, "clubId": 1, "name": "T. Marsh", "legalName": "Thomas Marsh", "birthYear": 1968, "age": 29, "isGK": true, "media": 6, "attrs": {"VE": 22, "RE": 70, "AG": 40, "CA": 84, "RM": 12, "RG": 14, "PA": 55, "TI": 20, "EN": 18, "PO": 88}},
+    {"id": 2, "clubId": 1, "name": "D. Okafor", "legalName": "Daniel Okafor", "birthYear": 1972, "age": 25, "isGK": false, "media": 7, "attrs": {"VE": 78, "RE": 80, "AG": 74, "CA": 82, "RM": 70, "RG": 60, "PA": 72, "TI": 64, "EN": 85, "PO": 9}},
+    {"id": 3, "clubId": 1, "name": "S. Bright", "legalName": "Samuel Bright", "birthYear": 1974, "age": 23, "isGK": false, "media": 8, "attrs": {"VE": 88, "RE": 76, "AG": 55, "CA": 86, "RM": 80, "RG": 84, "PA": 78, "TI": 88, "EN": 30, "PO": 11}},
+    {"id": 4, "clubId": 1, "name": "L. Penn", "legalName": "Liam Penn", "birthYear": 1970, "age": 27, "isGK": false, "media": 6, "attrs": {"VE": 66, "RE": 82, "AG": 70, "CA": 79, "RM": 60, "RG": 66, "PA": 84, "TI": 58, "EN": 62, "PO": 10}},
+    {"id": 5, "clubId": 1, "name": "M. Yardley", "legalName": "Marcus Yardley", "birthYear": 1977, "age": 20, "isGK": false, "media": 5, "attrs": {"VE": 82, "RE": 70, "AG": 48, "CA": 74, "RM": 72, "RG": 80, "PA": 66, "TI": 76, "EN": 24, "PO": 8}},
+    {"id": 6, "clubId": 1, "name": "R. Cole", "legalName": "Ryan Cole", "birthYear": 1969, "age": 28, "isGK": false, "media": 6, "attrs": {"VE": 60, "RE": 84, "AG": 80, "CA": 77, "RM": 64, "RG": 50, "PA": 70, "TI": 48, "EN": 88, "PO": 12}}
+   ]},
+  {"id": 2, "name": "Kingsford City", "fullName": "Kingsford City FC",
+   "stadium": "Crown Park", "manager": "P. Vance", "country": "Sampleland",
+   "leagueId": "demo_prem", "capacity": 41200, "foundingYear": 1881, "players": [
+    {"id": 7, "clubId": 2, "name": "G. Halvorsen", "legalName": "Gustav Halvorsen", "birthYear": 1971, "age": 26, "isGK": true, "media": 7, "attrs": {"VE": 26, "RE": 68, "AG": 38, "CA": 86, "RM": 10, "RG": 16, "PA": 60, "TI": 18, "EN": 14, "PO": 90}},
+    {"id": 8, "clubId": 2, "name": "F. Dubois", "legalName": "Florian Dubois", "birthYear": 1973, "age": 24, "isGK": false, "media": 8, "attrs": {"VE": 84, "RE": 78, "AG": 60, "CA": 88, "RM": 76, "RG": 86, "PA": 82, "TI": 80, "EN": 40, "PO": 10}},
+    {"id": 9, "clubId": 2, "name": "A. Ricci", "legalName": "Andrea Ricci", "birthYear": 1970, "age": 27, "isGK": false, "media": 7, "attrs": {"VE": 70, "RE": 82, "AG": 66, "CA": 83, "RM": 68, "RG": 70, "PA": 88, "TI": 62, "EN": 58, "PO": 9}},
+    {"id": 10, "clubId": 2, "name": "B. Storm", "legalName": "Benedict Storm", "birthYear": 1975, "age": 22, "isGK": false, "media": 7, "attrs": {"VE": 90, "RE": 74, "AG": 52, "CA": 85, "RM": 84, "RG": 82, "PA": 70, "TI": 90, "EN": 28, "PO": 11}},
+    {"id": 11, "clubId": 2, "name": "C. Webb", "legalName": "Connor Webb", "birthYear": 1968, "age": 29, "isGK": false, "media": 6, "attrs": {"VE": 58, "RE": 86, "AG": 82, "CA": 78, "RM": 62, "RG": 48, "PA": 74, "TI": 50, "EN": 90, "PO": 13}},
+    {"id": 12, "clubId": 2, "name": "N. Aalto", "legalName": "Niko Aalto", "birthYear": 1978, "age": 19, "isGK": false, "media": 5, "attrs": {"VE": 80, "RE": 66, "AG": 44, "CA": 72, "RM": 70, "RG": 78, "PA": 64, "TI": 72, "EN": 22, "PO": 8}}
+   ]},
+  {"id": 3, "name": "Ashbourne Town", "fullName": "Ashbourne Town AFC",
+   "stadium": "Mill Lane", "manager": "E. Sharpe", "country": "Sampleland",
+   "leagueId": "demo_prem", "capacity": 19800, "foundingYear": 1903, "players": [
+    {"id": 13, "clubId": 3, "name": "J. Frost", "legalName": "Jacob Frost", "birthYear": 1969, "age": 28, "isGK": true, "media": 5, "attrs": {"VE": 24, "RE": 66, "AG": 36, "CA": 78, "RM": 12, "RG": 14, "PA": 50, "TI": 16, "EN": 16, "PO": 82}},
+    {"id": 14, "clubId": 3, "name": "O. Mwangi", "legalName": "Oscar Mwangi", "birthYear": 1974, "age": 23, "isGK": false, "media": 6, "attrs": {"VE": 80, "RE": 76, "AG": 58, "CA": 76, "RM": 66, "RG": 72, "PA": 68, "TI": 70, "EN": 44, "PO": 10}},
+    {"id": 15, "clubId": 3, "name": "H. Lindqvist", "legalName": "Henrik Lindqvist", "birthYear": 1972, "age": 25, "isGK": false, "media": 6, "attrs": {"VE": 64, "RE": 80, "AG": 70, "CA": 75, "RM": 58, "RG": 60, "PA": 80, "TI": 54, "EN": 66, "PO": 9}},
+    {"id": 16, "clubId": 3, "name": "T. Reyes", "legalName": "Tomas Reyes", "birthYear": 1976, "age": 21, "isGK": false, "media": 6, "attrs": {"VE": 86, "RE": 72, "AG": 50, "CA": 78, "RM": 74, "RG": 80, "PA": 66, "TI": 78, "EN": 26, "PO": 8}},
+    {"id": 17, "clubId": 3, "name": "W. Becker", "legalName": "Wolfgang Becker", "birthYear": 1967, "age": 30, "isGK": false, "media": 5, "attrs": {"VE": 54, "RE": 84, "AG": 80, "CA": 74, "RM": 58, "RG": 46, "PA": 70, "TI": 46, "EN": 86, "PO": 12}},
+    {"id": 18, "clubId": 3, "name": "K. Adeyemi", "legalName": "Kwame Adeyemi", "birthYear": 1979, "age": 18, "isGK": false, "media": 4, "attrs": {"VE": 84, "RE": 64, "AG": 42, "CA": 70, "RM": 68, "RG": 76, "PA": 60, "TI": 70, "EN": 20, "PO": 7}}
+   ]},
+  {"id": 4, "name": "Harborne United", "fullName": "Harborne United FC",
+   "stadium": "Dockside", "manager": "R. Quaid", "country": "Sampleland",
+   "leagueId": "demo_prem", "capacity": 33000, "foundingYear": 1888, "players": [
+    {"id": 19, "clubId": 4, "name": "V. Sokolov", "legalName": "Viktor Sokolov", "birthYear": 1970, "age": 27, "isGK": true, "media": 7, "attrs": {"VE": 28, "RE": 70, "AG": 42, "CA": 85, "RM": 10, "RG": 18, "PA": 58, "TI": 20, "EN": 16, "PO": 89}},
+    {"id": 20, "clubId": 4, "name": "E. Santos", "legalName": "Eduardo Santos", "birthYear": 1973, "age": 24, "isGK": false, "media": 8, "attrs": {"VE": 86, "RE": 78, "AG": 56, "CA": 87, "RM": 78, "RG": 88, "PA": 80, "TI": 84, "EN": 36, "PO": 10}},
+    {"id": 21, "clubId": 4, "name": "M. Fielding", "legalName": "Matthew Fielding", "birthYear": 1971, "age": 26, "isGK": false, "media": 7, "attrs": {"VE": 68, "RE": 82, "AG": 64, "CA": 81, "RM": 66, "RG": 68, "PA": 86, "TI": 60, "EN": 56, "PO": 9}},
+    {"id": 22, "clubId": 4, "name": "D. Novak", "legalName": "David Novak", "birthYear": 1975, "age": 22, "isGK": false, "media": 7, "attrs": {"VE": 88, "RE": 74, "AG": 50, "CA": 83, "RM": 82, "RG": 80, "PA": 68, "TI": 86, "EN": 30, "PO": 11}},
+    {"id": 23, "clubId": 4, "name": "G. Pereira", "legalName": "Gabriel Pereira", "birthYear": 1968, "age": 29, "isGK": false, "media": 6, "attrs": {"VE": 56, "RE": 86, "AG": 84, "CA": 79, "RM": 60, "RG": 50, "PA": 72, "TI": 48, "EN": 88, "PO": 13}},
+    {"id": 24, "clubId": 4, "name": "S. Kovac", "legalName": "Stefan Kovac", "birthYear": 1977, "age": 20, "isGK": false, "media": 5, "attrs": {"VE": 82, "RE": 68, "AG": 46, "CA": 73, "RM": 70, "RG": 78, "PA": 62, "TI": 74, "EN": 24, "PO": 8}}
+   ]}
+ ]
+}

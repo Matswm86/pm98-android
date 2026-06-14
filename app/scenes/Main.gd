@@ -158,7 +158,8 @@ func _show_squad(club: Dictionary) -> void:
 		var age: Variant = p.get("age")
 		rows.append("%-16s %s  CA %2d  %s" % [
 			p["name"], pos, ca, ("age " + str(age)) if age != null else ""])
-	var sub := club.get("stadium", "")
+	var stadium: Variant = club.get("stadium")
+	var sub: String = stadium if stadium is String else ""
 	if club.get("capacity") != null:
 		sub = "%s  (%s)" % [sub, _fmt_int(int(club["capacity"]))]
 	_set_view(club["name"], sub, rows, players, _show_player_from)
