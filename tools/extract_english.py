@@ -17,10 +17,12 @@ use an EXTENDED per-player layout, NOT the compact Spanish/Italian one:
 
 This differs from the Spanish compact record `[year][flag][media][10 attrs][01]`
 where the 10 attributes sit at Y+4. For English records Y+4 is the *birthplace*
-string, so the 10-attribute block is NOT recovered here (see docs/FORMATS.md
-"English attribute block" - still an open problem). Names, birth years and ages
-ARE recovered and cross-validated (the full Manchester United 97-98 squad -
-Beckham/Scholes/Giggs/Keane/Schmeichel/etc. - comes out exact).
+string; the attribute row instead sits in a per-player block at the END of each
+record (after the career section, GKs sorted first - see docs/FORMATS.md "English
+attribute block - LOCATED"). That decode is not wired in yet, so this tool emits
+`attrs: null` for now (NOT because attrs are absent - they are present). Names,
+birth years and ages ARE recovered and cross-validated (the full Manchester United
+97-98 squad - Beckham/Scholes/Giggs/Keane/Schmeichel/etc. - comes out exact).
 
 Output: assets/squads_english.json
 """
@@ -196,7 +198,8 @@ def parse_club(d: bytes, off: int, end: int):
                 "legalName": legal,
                 "birthYear": year,
                 "age": 1998 - year,
-                # attrs not stored at a recovered offset for English records
+                # attrs ARE present (per-player block at record end, GKs first;
+                # see docs/FORMATS.md) - decode not wired into this tool yet.
                 "attrs": None,
             }
         )
@@ -227,11 +230,12 @@ def main():
             {
                 "note": "92 English-league club squads (Premier + Div 1/2/3) from "
                 "EQUIPOS.PKF, extended-layout records. Per player: name, legalName, "
-                "birthYear, age. `attrs` is null - "
-                "the 10-attribute block is NOT stored at a recovered offset for "
-                "English records (Y+4 is the birthplace string, not attributes; see "
-                "docs/FORMATS.md). Names + birth years cross-validated vs the real "
-                "97-98 squads (full Man Utd incl. Beckham/Scholes/Giggs/Keane exact).",
+                "birthYear, age. `attrs` is null because the attribute decode is not "
+                "wired into this tool YET - the attributes ARE present (per-player "
+                "block at the end of each record, after the career section, GKs first; "
+                "see docs/FORMATS.md 'English attribute block - LOCATED'). Names + birth "
+                "years cross-validated vs the real 97-98 squads (full Man Utd incl. "
+                "Beckham/Scholes/Giggs/Keane exact).",
                 "clubs": clubs,
             },
             indent=2,

@@ -244,15 +244,26 @@ years cross-validated (the full Man Utd 97-98 squad incl. Beckham/Scholes/Giggs/
 Keane/Schmeichel is exact; Liverpool, Arsenal verified). Output:
 `assets/squads_english.json`.
 
-### OPEN: English attribute block
-The 10-attribute block is **not yet located** for English records (Y+4..Y+13 is
-birthplace text, not attrs; no clean 10-byte GK-vs-outfield signature appears at a
-consistent offset, and the bio sections dominate). Verified that Beckham/Scholes/
-Giggs have **zero** birth-year+attr anchors anywhere (they exist only as cipher
-prose). Hypotheses to test next: attrs derived in-engine from position + career
-appearances; or a separate per-club attribute table; or the career-history fields
-(`|pos|apps|`) encode the rating inputs. Until resolved, `squads_english.json`
-ships `attrs: null` per player (do NOT fabricate — derive in-engine for now).
+### English attribute block — LOCATED ✅ (decode being wired in)
+Earlier claim that English attrs "aren't stored" was WRONG. They are stored, just
+NOT at Y+4 (that's birthplace). The attribute row sits in a **per-player numeric
+block at the END of each record**, after the career section, introduced by a
+`6c 6b` season marker (in the youth pool it follows empty `2f 25 4d` = "ND|" career
+placeholders; in senior records it follows the real career history). ~9-10 bytes,
+values 1-99, **GKs sorted first** — same semantics as the Spanish row (VE RE AG CA
+RM RG PA TI EN PO). Proven in the youth pool (last Copyright record, EOF): of 51
+youth blocks, the first ~12 are unmistakable GK profiles (first 4 bytes 70-91 =
+VE/RE/AG/CA, next bytes 16-25 = low outfield skills); the rest are outfielders
+(high outfield-skill bytes). Each block differs per player (the `[01 00 76][01 00
+76][01 00 25]×5` *triplet* block earlier in the record is a shared TEMPLATE, not the
+attrs — verified identical across Andrew Lee + Lee Campbell).
+
+Ground truth used (from Mats): youth recruits **Andrew Lee** (b.1979, Sheffield),
+**Lee Campbell** (b.1980, Mansfield), Shepherd, Wall — all present at file end.
+TODO: (1) confirm the exact ±1 offset + the 10th byte (PO) and field order against a
+known senior GK (Schmeichel/Van der Gouw, PO must be high); (2) generalise the
+locator from the youth pool to the 92 senior squads; (3) wire into
+`extract_english.py` and drop the `attrs: null`.
 
 ### Still remaining
 - The ~876 teams in the 1352-team directory beyond these 476 detailed records
