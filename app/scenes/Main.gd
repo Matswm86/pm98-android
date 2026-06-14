@@ -68,6 +68,14 @@ func _devshot() -> void:
 		_on_item(0)            # first player -> attributes
 		await _settle()
 		_save_shot(dir, "player.png")
+		# match engine: simulate the first league and shoot the final table
+		_show_home()
+		await _settle()
+		_on_item(0)            # first competition -> league view
+		await _settle()
+		_on_item(0)            # "Simulate season" row -> final table
+		await _settle()
+		_save_shot(dir, "table.png")
 	print("DEVSHOT done")
 	get_tree().quit()
 
@@ -159,10 +167,39 @@ func _activate_home(item: Dictionary) -> void:
 func _show_league(league: Dictionary) -> void:
 	var cl := GameDB.clubs_in_league(league["id"])
 	cl.sort_custom(func(a, b): return a["name"] < b["name"])
-	var rows: Array = []
+	var rows: Array = ["▶  Simulate season"]
+	var payload: Array = [{"_sim": league}]
 	for c in cl:
 		rows.append("%-22s %2d" % [c["name"], (c.get("players", []) as Array).size()])
-	_set_view(league["name"], "%d clubs" % cl.size(), rows, cl, _show_squad_from)
+		payload.append(c)
+	_set_view(league["name"], "%d clubs  -  tap a club for its squad" % cl.size(),
+		rows, payload, _activate_league_row)
+
+func _activate_league_row(item: Dictionary) -> void:
+	if item.has("_sim"):
+		var lg: Dictionary = item["_sim"]
+		var rng := RandomNumberGenerator.new()
+		rng.randomize()   # a fresh season each time
+		var res := SeasonSim.simulate_season(rng, GameDB.clubs_in_league(lg["id"]))
+		_push(_show_table.bind(lg, res["table"]))
+	else:
+		_push(_show_squad.bind(item))
+
+func _show_table(league: Dictionary, table: Array) -> void:
+	var tier: int = int(league.get("tier", 0))
+	var rows: Array = []
+	var payload: Array = []
+	var n := table.size()
+	for pos in n:
+		var r: Dictionary = table[pos]
+		var mark := SeasonSim.zone_marker(tier, pos, n)
+		rows.append("%2d%s %-15s %2d-%2d-%2d %+3d %3d" % [
+			pos + 1, (mark if mark != "" else " "), r["name"],
+			r["W"], r["D"], r["L"], r["GD"], r["Pts"]])
+		payload.append(GameDB.club(int(r["id"])))
+	_set_view("%s  -  final table" % league["name"],
+		"%s  -  W-D-L  GD  Pts   (P promo / R releg)" % GameDB.season(),
+		rows, payload, _show_squad_from)
 
 func _show_intl() -> void:
 	var rows: Array = []

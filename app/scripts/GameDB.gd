@@ -2,9 +2,9 @@ extends Node
 ## Autoload singleton: loads the PM98 game database (leagues + clubs + players).
 ##
 ## Load order (first that exists wins):
-##   res://data/game_db.json    - the full database, built by tools/build_db.py from
-##                                the owned game files. Gitignored (copyright); present
-##                                in personal/local builds, absent from the public CI APK.
+##   res://data/game_db.json    - the full real database (1997-98 clubs/players),
+##                                built by tools/build_db.py from the owned game files
+##                                and committed so the app ships the real game.
 ##   user://game_db.json        - side-loaded by the owner onto the device.
 ##   res://data/sample_db.json  - tiny synthetic fallback so the app always runs.
 

@@ -32,10 +32,19 @@ verifiable and nothing is wasted.
 
 Deliverable: `assets/` full of clean JSON + PNG + audio, plus a documented schema.
 
-## Phase 1 — Data model + engine core (headless, testable)
+## Phase 1 — Data model + engine core (headless, testable)  [STARTED]
 SCOPE (Mats, 2026-06-14): **replicate ALL original PC gameplay mechanics and
 behaviours**, not a subset. Confirmed in-scope (each matches the original):
-- Match simulation engine (port the original's logic/ratings using the 10 attrs)
+- [~] Match simulation engine — **plausible v1 shipped** (`scripts/MatchEngine.gd`
+  + `scripts/SeasonSim.gd`): squad 10-attrs -> ATT/DEF/GK ratings -> per-match
+  Poisson scoreline -> double round-robin season -> league table (3/1/0, GD/GF,
+  promo/releg zones). Validated headless over 300 Premier seasons
+  (`tests/test_engine.gd`): goals/game 2.57, home-win 46%, draw 25%, away 28%,
+  champion ~76 / bottom ~32 pts, strong clubs finish high. NOT the original
+  DAT.PKF math (still LZ-packed); tune toward it once cracked. Lower divisions
+  pass the structural smoke (`tests/test_divisions.gd`) but their points spread
+  is not yet calibrated (a 24-team champ can run hot ~110+). Wired into the UI
+  (league view -> "Simulate season" -> final table).
 - League structure: fixtures, tables, promotion/relegation, cups
 - Transfers + transfer market behaviour
 - **Scouting + recruitment** (scout reports, player discovery)
