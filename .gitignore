@@ -32,6 +32,7 @@ app/android/
 app/export.log
 app/shots/
 
-# ── The full game database is derived from owned game files → copyright, never
-# committed. The synthetic app/data/sample_db.json fallback IS committed.
-app/data/game_db.json
+# NOTE: the game database (app/data/game_db.json) and the decoded crests/photos/
+# audio under app/ ARE committed on purpose — this is a public full-game clone of
+# Mats's own PM98 (per owner decision 2026-06-14). Only the raw source game files
+# (extracted/, *.rar, *.iso, *.PKF) stay out of git.
