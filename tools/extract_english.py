@@ -147,10 +147,12 @@ ATTR_NAMES = ["VE", "RE", "AG", "CA", "RM", "RG", "PA", "TI", "EN", "PO"]
 
 def find_attr_blocks(d: bytes, lo: int, hi: int):
     """Per-player attribute rows. Each is a `6c 6b` (season) marker followed by the
-    10 attribute bytes (VE RE AG CA RM RG PA TI EN PO, all 1-99) then a 0x01
-    terminator then a record-id byte. One block per player, after the player's bio.
-    Validated: senior GKs (Schmeichel PO=91, Van der Gouw PO=77) vs outfielders
-    (PO 8-21); youth GKs PO 80-85. Same VE..PO order as the Spanish compact record."""
+    10 attribute bytes (VE RE AG CA RM RG PA TI EN PO, all 1-99) then a terminator:
+    `0x01` + a record-id byte for normal players, or `0x00` for the LAST player in a
+    record (no id - the next club's Copyright marker follows). One block per player,
+    after the player's bio. Validated: senior GKs (Schmeichel PO=91, Van der Gouw 77,
+    Seaman 92) vs outfielders (PO 8-21); youth GKs PO 80-85; Beckham (last in Man Utd,
+    0x00 term) = [90,85,85,90,86,95,90,88,72,11]. Same VE..PO order as the Spanish row."""
     out = []
     i = lo
     while True:
@@ -158,8 +160,13 @@ def find_attr_blocks(d: bytes, lo: int, hi: int):
         if j < 0:
             break
         w = list(d[j + 2 : j + 12])
-        if len(w) == 10 and all(1 <= b <= 99 for b in w) and d[j + 12] == 0x01:
-            out.append((j, w))
+        term = d[j + 12] if j + 12 < len(d) else 0xFF
+        # 0x01 = normal player (record-id byte follows). 0x00 = LAST player in the
+        # record - only legitimate when the block abuts the next club's marker (hi);
+        # accepting 0x00 anywhere lets stray bio-text `6c 6b` runs false-positive.
+        if len(w) == 10 and all(1 <= b <= 99 for b in w):
+            if term == 0x01 or (term == 0x00 and j + 13 >= hi - 1):
+                out.append((j, w))
         i = j + 2
     return out
 
