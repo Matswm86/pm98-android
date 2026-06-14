@@ -17,12 +17,14 @@ use an EXTENDED per-player layout, NOT the compact Spanish/Italian one:
 
 This differs from the Spanish compact record `[year][flag][media][10 attrs][01]`
 where the 10 attributes sit at Y+4. For English records Y+4 is the *birthplace*
-string; the attribute row instead sits in a per-player block at the END of each
-record (after the career section, GKs sorted first - see docs/FORMATS.md "English
-attribute block - LOCATED"). That decode is not wired in yet, so this tool emits
-`attrs: null` for now (NOT because attrs are absent - they are present). Names,
-birth years and ages ARE recovered and cross-validated (the full Manchester United
-97-98 squad - Beckham/Scholes/Giggs/Keane/Schmeichel/etc. - comes out exact).
+string; the attribute row instead sits in a per-player block (`6c 6b` season marker
++ 10 attrs VE..PO + 0x01) after the player's bio. We pair each birth-year anchor
+with the attribute block that follows it. Cross-validated: names + birth years
+exact for the real 97-98 squads (full Man Utd incl. Beckham/Scholes/Giggs/Keane),
+and the goalkeeping (PO) attribute separates keepers from outfielders cleanly -
+Schmeichel 91, Seaman 92, James 84, Van der Gouw 77, vs outfielders 8-21. ~94% of
+players get an attribute row (the rest, mostly the last player in sparse Div-3
+records, fall back to `attrs: null`).
 
 Output: assets/squads_english.json
 """
@@ -140,6 +142,28 @@ def find_anchors(d: bytes, lo: int, hi: int):
     return out
 
 
+ATTR_NAMES = ["VE", "RE", "AG", "CA", "RM", "RG", "PA", "TI", "EN", "PO"]
+
+
+def find_attr_blocks(d: bytes, lo: int, hi: int):
+    """Per-player attribute rows. Each is a `6c 6b` (season) marker followed by the
+    10 attribute bytes (VE RE AG CA RM RG PA TI EN PO, all 1-99) then a 0x01
+    terminator then a record-id byte. One block per player, after the player's bio.
+    Validated: senior GKs (Schmeichel PO=91, Van der Gouw PO=77) vs outfielders
+    (PO 8-21); youth GKs PO 80-85. Same VE..PO order as the Spanish compact record."""
+    out = []
+    i = lo
+    while True:
+        j = d.find(b"\x6c\x6b", i, hi)
+        if j < 0:
+            break
+        w = list(d[j + 2 : j + 12])
+        if len(w) == 10 and all(1 <= b <= 99 for b in w) and d[j + 12] == 0x01:
+            out.append((j, w))
+        i = j + 2
+    return out
+
+
 def name_before(d: bytes, lo: int, Y: int):
     """Forward-parse [u16 len][short][u16 len][full] ending just before the small
     field block that precedes the birth year Y. Several header alignments can fit;
@@ -176,10 +200,11 @@ def split_name(short_txt: str, full_txt: str):
 def parse_club(d: bytes, off: int, end: int):
     strings, num_off = header(d, off)
     anchors = find_anchors(d, num_off, end)
+    attr_blocks = find_attr_blocks(d, num_off, end)
     players = []
     prev_end = num_off
     seen = set()
-    for Y in anchors:
+    for k, Y in enumerate(anchors):
         nb = name_before(d, prev_end, Y)
         prev_end = Y + 3
         if not nb:
@@ -192,15 +217,18 @@ def parse_club(d: bytes, off: int, end: int):
         if key in seen:
             continue
         seen.add(key)
+        # the player's attribute row is the attr block between this anchor and the
+        # next one (it follows the player's bio, before the next player's record).
+        nxt = anchors[k + 1] if k + 1 < len(anchors) else end
+        row = next((w for j, w in attr_blocks if Y < j < nxt), None)
         players.append(
             {
                 "name": display,
                 "legalName": legal,
                 "birthYear": year,
                 "age": 1998 - year,
-                # attrs ARE present (per-player block at record end, GKs first;
-                # see docs/FORMATS.md) - decode not wired into this tool yet.
-                "attrs": None,
+                "isGK": bool(row) and row[9] > 50,
+                "attrs": dict(zip(ATTR_NAMES, row)) if row else None,
             }
         )
     return strings, players
@@ -225,32 +253,35 @@ def main():
             }
         )
     tot = sum(len(c["players"]) for c in clubs)
+    wattr = sum(1 for c in clubs for p in c["players"] if p["attrs"])
     OUT.write_text(
         json.dumps(
             {
                 "note": "92 English-league club squads (Premier + Div 1/2/3) from "
                 "EQUIPOS.PKF, extended-layout records. Per player: name, legalName, "
-                "birthYear, age. `attrs` is null because the attribute decode is not "
-                "wired into this tool YET - the attributes ARE present (per-player "
-                "block at the end of each record, after the career section, GKs first; "
-                "see docs/FORMATS.md 'English attribute block - LOCATED'). Names + birth "
-                "years cross-validated vs the real 97-98 squads (full Man Utd incl. "
-                "Beckham/Scholes/Giggs/Keane exact).",
+                "birthYear, age, isGK, and attrs (VE RE AG CA RM RG PA TI EN PO, each "
+                "1-99; see docs/FORMATS.md). ~94% of players carry an attribute row; "
+                "the rest (mostly the last player in sparse Div-3 records) have "
+                "attrs: null. Cross-validated vs the real 97-98 squads: full Man Utd "
+                "incl. Beckham/Scholes/Giggs/Keane, and GK ratings (Schmeichel PO=91, "
+                "Seaman 92, James 84) vs outfielders (PO 8-21).",
                 "clubs": clubs,
             },
             indent=2,
             ensure_ascii=False,
         )
     )
-    print(f"English: {len(clubs)} clubs, {tot} players -> {OUT}")
+    print(f"English: {len(clubs)} clubs, {tot} players, {wattr} with attrs -> {OUT}")
     # spot-check
     for c in clubs:
         if c["name"].startswith("MANCHESTER UTD"):
-            names = [p["name"] for p in c["players"]]
-            print(f"  Man Utd: {len(names)} players")
-            for star in ["BECKHAM", "SCHOLES", "GIGGS", "KEANE", "SCHMEICHEL"]:
+            print(f"  Man Utd: {len(c['players'])} players")
+            for star in ["SCHMEICHEL", "BECKHAM", "SCHOLES", "GIGGS", "KEANE"]:
                 hit = next((p for p in c["players"] if star in p["name"]), None)
-                print(f"    {star}: {'OK ' + repr(hit['name']) if hit else 'MISSING'}")
+                po = hit["attrs"]["PO"] if hit and hit["attrs"] else None
+                print(
+                    f"    {star}: {'OK ' + repr(hit['name']) + f' PO={po}' if hit else 'MISSING'}"
+                )
 
 
 if __name__ == "__main__":
