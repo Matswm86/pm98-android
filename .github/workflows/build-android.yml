@@ -99,23 +99,9 @@ jobs:
           echo "Wrote $SETTINGS_FILE"
           cat "$SETTINGS_FILE"
 
-      - name: Install Godot Gradle build template
-        working-directory: app
-        run: |
-          set -e
-          TPL_DIR="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
-          mkdir -p android/build
-          unzip -q "$TPL_DIR/android_source.zip" -d android/build
-          # Mark template as properly installed (mimics editor's "Install Build Template").
-          # Content must be "X.Y.Z.stable" — without the .official.<hash> suffix.
-          touch android/build/.gdignore
-          VERSION_STR="${GODOT_VERSION}.stable"
-          echo -n "$VERSION_STR" > android/.build_version
-          echo -n "$VERSION_STR" > android/build/version.txt
-          echo "--- android/ contents ---"
-          ls -la android/
-          cat android/.build_version; echo
-          cat android/build/version.txt; echo
+      # Using the prebuilt export template (gradle_build/use_gradle_build=false),
+      # so no Android Gradle build template install is needed — the bundled
+      # android_debug.apk template is repackaged and signed with the debug keystore.
 
       - name: Pre-import project resources
         working-directory: app
@@ -134,12 +120,26 @@ jobs:
           echo "--- export templates dir ---"
           ls -la "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/" || true
 
+      - name: Diagnose export config
+        working-directory: app
+        run: |
+          echo "--- export_presets.cfg (head) ---"; head -20 export_presets.cfg
+          echo "--- export templates dir ---"
+          ls "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/" | grep -i android || true
+          echo "--- keystore ---"; ls -la "$GITHUB_WORKSPACE/debug.keystore" || true
+          echo "--- SDK build-tools (apksigner/zipalign) ---"
+          ls "$ANDROID_HOME/build-tools/" 2>/dev/null || true
+
       - name: Export Android debug APK
         working-directory: app
         run: |
-          set -e
+          set -o pipefail
           "$GITHUB_WORKSPACE/godot" --headless --verbose --export-debug "Android" "${EXPORT_NAME}.apk" 2>&1 | tee export.log
+          rc=$?
+          echo "--- export.log error/warning lines ---"
+          grep -iE "error|warning|template|keystore|sdk|missing|invalid|config|not found|valid" export.log | head -60 || true
           ls -la "${EXPORT_NAME}.apk"
+          exit $rc
 
       - name: Upload APK as workflow artifact
         uses: actions/upload-artifact@v4
