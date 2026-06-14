@@ -8,7 +8,7 @@ config_version=5
 config/name="PM98"
 config/description="Premier Manager 98 — native clone (personal project)"
 run/main_scene="res://scenes/Main.tscn"
-config/features=PackedStringArray("4.3", "GL Compatibility")
+config/features=PackedStringArray("4.6", "GL Compatibility")
 config/icon="res://icon.svg"
 
 [autoload]
