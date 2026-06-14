@@ -54,9 +54,15 @@ func _devshot() -> void:
 	await _settle()
 	_save_shot(dir, "home.png")
 	if not GameDB.leagues.is_empty() or not GameDB.countries().is_empty():
-		_on_item(0)            # first competition -> its clubs
+		_on_item(0)            # first competition (Premier League)
 		await _settle()
-		_on_item(0)            # first club -> squad
+		var idx := 0       # marquee club for the shot, fallback to first listed
+		for i in _payload.size():
+			var c: Variant = _payload[i]
+			if c is Dictionary and c.get("name", "") == "MANCHESTER UTD.":
+				idx = i
+				break
+		_on_item(idx)          # club -> squad
 		await _settle()
 		_save_shot(dir, "squad.png")
 		_on_item(0)            # first player -> attributes
@@ -194,7 +200,7 @@ func _show_squad(club: Dictionary) -> void:
 		var pos := "GK" if p.get("isGK") else "  "
 		var age: Variant = p.get("age")
 		rows.append("%-16s %s  CA %2d  %s" % [
-			p["name"], pos, ca, ("age " + str(age)) if age != null else ""])
+			p["name"], pos, ca, ("age " + str(int(age))) if age != null else ""])
 	var stadium: Variant = club.get("stadium")
 	var sub: String = stadium if stadium is String else ""
 	if club.get("capacity") != null:
@@ -217,7 +223,7 @@ func _show_player(player: Dictionary) -> void:
 	var sub := legal
 	var by: Variant = player.get("birthYear")
 	if by != null:
-		sub = "%s  -  b.%s%s" % [legal, str(by),
+		sub = "%s  -  b.%s%s" % [legal, str(int(by)),
 			("  GK" if player.get("isGK") else "")]
 	_set_view(player["name"], sub, rows, [], func(_x): pass)
 
