@@ -3,9 +3,9 @@
 An Android remake of **Premier Manager 98**, rebuilt from the original game's own
 data. Take over a club, build your squad, run the season.
 
-> **Early build.** You can browse the complete original database right now: every
-> league, club and player from the 1997-98 season. The match engine and the rest
-> of the management layer are in progress.
+> **Early build.** Browse the complete original database, then simulate a full
+> season and read the final table. The rest of the management layer (transfers,
+> finances, save/load) is in progress.
 
 ## Download
 
@@ -22,6 +22,8 @@ prompted. Reinstalling over an older build? Uninstall the old one first.
 - 384 more clubs from leagues across Europe and South America.
 - ~8,000 players with their original ratings, keepers and squads as shipped.
 - Browse League → Club → Squad → Player, with each player's attributes.
+- Simulate a full season from any English division: every fixture played from the
+  real squads, with a final table (form, goal difference, promotion/relegation).
 
 ## Screenshots
 
@@ -29,13 +31,16 @@ prompted. Reinstalling over an older build? Uninstall the old one first.
   <img src="screenshots/home.png" alt="Competitions" width="240"/>
   <img src="screenshots/squad.png" alt="Squad" width="240"/>
   <img src="screenshots/player.png" alt="Player ratings" width="240"/>
+  <img src="screenshots/table.png" alt="Simulated league table" width="240"/>
 </p>
 
 ## Coming next
 
-Club crests, player photos and the original music are already decoded from the
-game files and are being wired into the app, then the match engine and a full
-playable season.
+Match-day detail, transfers, finances and save/load. Club crests, player photos
+and the original music are decoded from the game files and are being wired in.
+The season simulation is an honest first model tuned to realistic football
+results; it will be refined toward the original game's own match math as more of
+the game data is decoded.
 
 ## Built with
 
