@@ -223,8 +223,38 @@ media is NOT stored → emit null and derive in-engine. This subtype is rare in 
 top leagues (La Liga 0, Serie A few) but common in lower/foreign leagues (~30% of
 the 5654). Attrs stay correct for every player (e.g. Benfica GK Ovchinnikov PO=77).
 
+### English-league squads — FRAMING SOLVED ✅ (`tools/extract_english.py`)
+The 92 English clubs are Copyright-records **idx 38-129** (Premier + Div 1/2/3;
+idx 38 Blackburn where the gap jumps 2 KB→71 KB, through idx 129 Wigan, then idx
+130 Borussia D. drops back to ~1.5 KB dense continental records). Their squads are
+NOT missing or scattered — they were just rejected by the Spanish anchor's
+`attrs<=99 + terminator` gate. English player records use an **extended layout**:
+```
+[career history |SEASON|CLUB|pos|apps| ...]
+[u16 len][shortname][u16 len][fullname]
+[small field block ~6-14 bytes]
+[u16 birthYear 1940-1985][flag >=0x80]
+[birthplace][prev club][nationality][bio prose]
+```
+The key difference vs the Spanish compact record (`[year][flag][media][10 attrs]
+[01]`): for English records **Y+4 is the birthplace string, not the attributes**.
+Anchoring on (year 1940-1985, flag>=0x80) + a length-prefixed short+full name
+ending just before Y recovers **all 92 squads = 1948 players**, names + birth
+years cross-validated (the full Man Utd 97-98 squad incl. Beckham/Scholes/Giggs/
+Keane/Schmeichel is exact; Liverpool, Arsenal verified). Output:
+`assets/squads_english.json`.
+
+### OPEN: English attribute block
+The 10-attribute block is **not yet located** for English records (Y+4..Y+13 is
+birthplace text, not attrs; no clean 10-byte GK-vs-outfield signature appears at a
+consistent offset, and the bio sections dominate). Verified that Beckham/Scholes/
+Giggs have **zero** birth-year+attr anchors anywhere (they exist only as cipher
+prose). Hypotheses to test next: attrs derived in-engine from position + career
+appearances; or a separate per-club attribute table; or the career-history fields
+(`|pos|apps|`) encode the rating inputs. Until resolved, `squads_english.json`
+ships `attrs: null` per player (do NOT fabricate — derive in-engine for now).
+
 ### Still remaining
-- **English-league squad framing** (see above) — unlocks the English clubs' players.
 - The ~876 teams in the 1352-team directory beyond these 476 detailed records
   (likely a more compact record elsewhere, or directory-only stubs).
 
