@@ -167,8 +167,8 @@ func _activate_home(item: Dictionary) -> void:
 func _show_league(league: Dictionary) -> void:
 	var cl := GameDB.clubs_in_league(league["id"])
 	cl.sort_custom(func(a, b): return a["name"] < b["name"])
-	var rows: Array = ["▶  Simulate season"]
-	var payload: Array = [{"_sim": league}]
+	var rows: Array = ["▶  Simulate season", "▶  Watch a match"]
+	var payload: Array = [{"_sim": league}, {"_match": league}]
 	for c in cl:
 		rows.append("%-22s %2d" % [c["name"], (c.get("players", []) as Array).size()])
 		payload.append(c)
@@ -182,8 +182,48 @@ func _activate_league_row(item: Dictionary) -> void:
 		rng.randomize()   # a fresh season each time
 		var res := SeasonSim.simulate_season(rng, GameDB.clubs_in_league(lg["id"]))
 		_push(_show_table.bind(lg, res["table"]))
+	elif item.has("_match"):
+		_push(_show_match_pick.bind(item["_match"], null))
 	else:
 		_push(_show_squad.bind(item))
+
+
+# ---- match commentary feed ----------------------------------------------
+
+## Club picker for a match. `home` null = pick the home side, else pick away.
+func _show_match_pick(league: Dictionary, home: Variant) -> void:
+	var cl := GameDB.clubs_in_league(league["id"])
+	cl.sort_custom(func(a, b): return a["name"] < b["name"])
+	var rows: Array = []
+	var payload: Array = []
+	for c in cl:
+		if home != null and int(c["id"]) == int((home as Dictionary)["id"]):
+			continue   # can't play yourself
+		rows.append(c["name"])
+		payload.append(c)
+	if home == null:
+		_set_view(league["name"], "Pick the HOME side", rows, payload,
+			func(c): _push(_show_match_pick.bind(league, c)))
+	else:
+		_set_view((home as Dictionary)["name"] + "  v  ?", "Pick the AWAY side", rows, payload,
+			func(c): _push(_show_match_feed.bind(home, c)))
+
+func _show_match_feed(home: Dictionary, away: Dictionary) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var m := MatchCommentary.timeline(rng, home, away)
+	var rows: Array = []
+	for ln in m["lines"]:
+		var side: int = ln["side"]
+		if side == -1:
+			rows.append("------  %s" % ln["text"])           # phase marker
+		else:
+			var tag := "H" if side == 0 else "A"
+			var goal := "  *GOAL*" if ln.get("goal") else ""
+			rows.append("%2d' [%s] %s%s" % [ln["minute"], tag, ln["text"], goal])
+	_set_view("%s %d : %d %s" % [home["name"], m["home_goals"], m["away_goals"], away["name"]],
+		"Full time  -  H home / A away  -  Back to pick again",
+		rows, [], func(_x): pass)
 
 func _show_table(league: Dictionary, table: Array) -> void:
 	var tier: int = int(league.get("tier", 0))
