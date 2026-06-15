@@ -439,6 +439,74 @@ func _show_transfer_screen() -> void:
 		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
 			scr.queue_free())
 
+## The original-art BOARD OF DIRECTORS (DIRECTIVA) screen as a full-screen overlay:
+## the three confidence/rating meters + the board's objective + your record, at the
+## coordinates reversed from MANAGER.EXE (docs/re/directiva_screen_re.md). The meter
+## values are derived from real career state (position vs board objective + form) —
+## the Career model has no stored confidence stat. Display-only; tap to dismiss.
+func _show_directiva_screen() -> void:
+	var c := _career
+	var bp := _board_panel()
+	var scr: DirectivaScreen = load("res://scenes/DirectivaScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(c.club_name, "", c.season, c.cash, bp["directors"], bp["supporters"],
+		bp["rating"], c.objective_text, bp["record"], bp["position"])
+	scr.gui_input.connect(func(e: InputEvent) -> void:
+		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
+			scr.queue_free())
+
+## Derive the board view from real career state: directors confidence tracks the
+## league position against the board objective; supporters confidence blends recent
+## form with standing; manager rating is the position percentile blended with form.
+## All clamped 0..100 and damped toward 50 before ~8 games are played. Also returns
+## the cumulative W-D-L record and ordinal position string.
+func _board_panel() -> Dictionary:
+	var standings := _career.standings()
+	var total := maxi(1, standings.size())
+	var pos := _career.position()
+	var obj := _career.objective_pos
+	var played: int = (_career.results as Array).size()
+
+	var w := 0
+	var d := 0
+	var l := 0
+	for r in _career.results:
+		var mine: int = int(r["hg"]) if bool(r["home"]) else int(r["ag"])
+		var theirs: int = int(r["ag"]) if bool(r["home"]) else int(r["hg"])
+		if mine > theirs:
+			w += 1
+		elif mine == theirs:
+			d += 1
+		else:
+			l += 1
+
+	var n := mini(5, played)
+	var form_pts := 0
+	for i in range(played - n, played):
+		var r: Dictionary = _career.results[i]
+		var mine: int = int(r["hg"]) if bool(r["home"]) else int(r["ag"])
+		var theirs: int = int(r["ag"]) if bool(r["home"]) else int(r["hg"])
+		form_pts += 3 if mine > theirs else (1 if mine == theirs else 0)
+	var form := (float(form_pts) / 15.0) if n > 0 else 0.5
+	var pct := float(total - pos) / float(maxi(1, total - 1))
+
+	var directors := 55.0 + float(obj - pos) * 6.0
+	var supporters := 30.0 + form * 55.0 + pct * 15.0
+	var rating := pct * 70.0 + form * 30.0
+	var weight := clampf(float(played) / 8.0, 0.0, 1.0)
+	directors = lerp(50.0, directors, weight)
+	supporters = lerp(50.0, supporters, weight)
+	rating = lerp(50.0, rating, weight)
+
+	return {
+		"directors": clampi(int(round(directors)), 0, 100),
+		"supporters": clampi(int(round(supporters)), 0, 100),
+		"rating": clampi(int(round(rating)), 0, 100),
+		"record": "%d-%d-%d" % [w, d, l],
+		"position": "%d%s" % [pos, _ord_suffix(pos)],
+	}
+
 ## The original-art MAIN MENU (MENUPRINCIPAL) screen as a full-screen overlay: the
 ## 12 management icons + the EXIT/SAVE/NEWS/CONTINUE control bar at the coordinates
 ## reversed from MANAGER.EXE (docs/re/menu_screen_re.md). Interactive: tapping an
@@ -463,7 +531,6 @@ func _menu_action(action: String, scr: MenuScreen) -> void:
 		"news": _toast("No news this week")
 		"staff": _toast("Staff management is not in this build yet")
 		"stadium": _toast("Stadium screen coming soon")
-		"board": _toast("Board: %s" % _career.objective_text)
 		"opponent", "fixtures": _toast(_menu_next_match())
 		"continue":
 			scr.queue_free()
@@ -474,6 +541,7 @@ func _menu_action(action: String, scr: MenuScreen) -> void:
 				"table": _show_league_table_screen()
 				"lineup": _show_lineup_screen()
 				"finance": _show_finance_screen()
+				"board": _show_directiva_screen()
 				"buy": _show_transfer_screen()
 				"tactics": _push(_show_tactics)
 				"sell": _push(_show_transfers)
