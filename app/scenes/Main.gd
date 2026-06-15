@@ -327,7 +327,7 @@ func _activate_career(item: Dictionary) -> void:
 	match item["act"]:
 		"advance": _career_advance()
 		"end": _push(_show_end_of_season)
-		"table": _push(_show_career_table)
+		"table": _show_league_table_screen()
 		"tactics": _push(_show_tactics)
 		"squad": _push(_show_squad.bind(_mgr_club()))
 		"transfers": _push(_show_transfers)
@@ -368,6 +368,20 @@ func _show_match_result(res: Dictionary) -> void:
 	var verdict := _result_word(int(res["hg"]), int(res["ag"]), you_h)
 	_set_view("%s %d : %d %s" % [home["name"], res["hg"], res["ag"], away["name"]],
 		"%s  -  Back to the dugout" % verdict, rows, [], func(_x): pass)
+
+## The original-art LEAGUE TABLES screen as a full-screen overlay over the hub,
+## driven by the live career standings. Tap to dismiss. (First screen of the
+## graphics reskin; see scenes/LeagueTableScreen.gd for asset provenance.)
+func _show_league_table_screen() -> void:
+	var scr: LeagueTableScreen = load("res://scenes/LeagueTableScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(_career.standings(), _career.club_name, _career.season,
+		"Week %d" % mini(_career.week + 1, _career.total_weeks()),
+		_career.tier, _career.club_id)
+	scr.gui_input.connect(func(e: InputEvent) -> void:
+		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
+			scr.queue_free())
 
 func _show_career_table() -> void:
 	var rows: Array = []

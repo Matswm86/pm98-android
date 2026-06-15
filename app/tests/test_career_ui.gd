@@ -46,6 +46,20 @@ func _run() -> void:
 	main._show_career_table()                   # render standings view
 	await process_frame
 
+	# Original-art LEAGUE TABLES overlay (graphics reskin, S-graphics-1).
+	main._show_league_table_screen()
+	await process_frame
+	var overlay: Node = null
+	for ch in main.get_children():
+		if ch is LeagueTableScreen:
+			overlay = ch
+	ok = _assert(overlay != null, "LEAGUE TABLES screen overlay mounted") and ok
+	if overlay != null:
+		ok = _assert(overlay._rows.size() == main._career.standings().size(),
+			"overlay shows the live standings") and ok
+		overlay.queue_free()
+	await process_frame
+
 	# Drive the tactics screens through the real UI (catches wiring bugs).
 	main._push(main._show_tactics)
 	await process_frame
