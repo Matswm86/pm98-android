@@ -22,6 +22,7 @@ const ATTR_ORDER := ["CA", "VE", "RE", "AG", "RM", "RG", "PA", "TI", "EN", "PO"]
 var _nav: Array[Callable] = []          # view stack; top is re-invoked on Back
 var _payload: Array = []                # parallel data for the current list rows
 var _on_activate: Callable
+var _career: Career = null              # active managed career, null on the menu
 
 @onready var _title: Label = $Root/TopBar/Title
 @onready var _subtitle: Label = $Root/TopBar/Subtitle
@@ -149,6 +150,11 @@ func _show_home() -> void:
 		_nav.append(_show_home)
 	var rows: Array = []
 	var payload: Array = []
+	if Career.has_save():
+		rows.append("▶  Continue career")
+		payload.append({"type": "career_continue"})
+	rows.append("🎮  Start a new career")
+	payload.append({"type": "career_new"})
 	for lg in GameDB.leagues:
 		rows.append("%s  (%d clubs)" % [lg["name"], (lg["clubIds"] as Array).size()])
 		payload.append({"type": "league", "league": lg})
@@ -156,13 +162,20 @@ func _show_home() -> void:
 	if not intl.is_empty():
 		rows.append("International  (%d countries)" % intl.size())
 		payload.append({"type": "intl"})
-	_set_view("PM98", "Select a competition", rows, payload, _activate_home)
+	_set_view("PM98", "Manage a club, or browse the database", rows, payload, _activate_home)
 
 func _activate_home(item: Dictionary) -> void:
-	if item["type"] == "league":
-		_push(_show_league.bind(item["league"]))
-	else:
-		_push(_show_intl)
+	match item["type"]:
+		"career_continue":
+			_career = Career.load_save()
+			if _career != null:
+				_enter_career()
+		"career_new":
+			_push(_show_career_pick_league)
+		"league":
+			_push(_show_league.bind(item["league"]))
+		_:
+			_push(_show_intl)
 
 func _show_league(league: Dictionary) -> void:
 	var cl := GameDB.clubs_in_league(league["id"])
@@ -224,6 +237,162 @@ func _show_match_feed(home: Dictionary, away: Dictionary) -> void:
 	_set_view("%s %d : %d %s" % [home["name"], m["home_goals"], m["away_goals"], away["name"]],
 		"Full time  -  H home / A away  -  Back to pick again",
 		rows, [], func(_x): pass)
+
+
+# ---- career mode ---------------------------------------------------------
+
+func _show_career_pick_league() -> void:
+	var rows: Array = []
+	var payload: Array = []
+	for lg in GameDB.leagues:
+		rows.append("%s  (%d clubs)" % [lg["name"], (lg["clubIds"] as Array).size()])
+		payload.append(lg)
+	_set_view("New career", "Choose a division to manage in", rows, payload,
+		func(lg): _push(_show_career_pick_club.bind(lg)))
+
+func _show_career_pick_club(league: Dictionary) -> void:
+	var cl := GameDB.clubs_in_league(league["id"])
+	cl.sort_custom(func(a, b): return a["name"] < b["name"])
+	var rows: Array = []
+	for c in cl:
+		rows.append(c["name"])
+	_set_view(league["name"], "Choose the club to take over", rows, cl,
+		func(c): _begin_career(league, c))
+
+func _begin_career(league: Dictionary, club: Dictionary) -> void:
+	var league_clubs := GameDB.clubs_in_league(league["id"])
+	_career = Career.create(club, league, league_clubs, GameDB.leagues)
+	_career.save()
+	_enter_career()
+
+## Reset the nav so the hub sits one level under Home (Back from hub -> menu).
+func _enter_career() -> void:
+	_nav = [_show_home]
+	_push(_show_career)
+
+func _clubs_by_id(league_id: String) -> Dictionary:
+	var out: Dictionary = {}
+	for c in GameDB.clubs_in_league(league_id):
+		out[int(c["id"])] = c
+	return out
+
+## The management hub. Re-reads _career each time so it refreshes after a match.
+func _show_career() -> void:
+	var c := _career
+	var rows: Array = []
+	var payload: Array = []
+	if c.season_over():
+		rows.append("▶  End of season")
+		payload.append({"act": "end"})
+	else:
+		var fx := c.manager_fixture()
+		var opp_label := "bye"
+		if not fx.is_empty():
+			var home: bool = int(fx[0]) == c.club_id
+			var opp_id: int = int(fx[1]) if home else int(fx[0])
+			var opp: Dictionary = GameDB.club(opp_id)
+			opp_label = "%s %s" % ["vs" if home else "at", opp.get("name", "?")]
+		rows.append("▶  Play week %d  (%s)" % [c.week + 1, opp_label])
+		payload.append({"act": "advance"})
+	rows.append("League table")
+	payload.append({"act": "table"})
+	rows.append("Squad")
+	payload.append({"act": "squad"})
+	rows.append("Finances")
+	payload.append({"act": "finance"})
+	rows.append("Save game")
+	payload.append({"act": "save"})
+	var sub := "Week %d/%d  -  %d%s  -  £%s  -  obj: %s" % [
+		mini(c.week + 1, c.total_weeks()), c.total_weeks(), c.position(),
+		_ord_suffix(c.position()), _fmt_int(c.cash), c.objective_text]
+	_set_view("%s  -  %s" % [c.club_name, c.season], sub, rows, payload, _activate_career)
+
+func _activate_career(item: Dictionary) -> void:
+	match item["act"]:
+		"advance": _career_advance()
+		"end": _push(_show_end_of_season)
+		"table": _push(_show_career_table)
+		"squad": _push(_show_squad.bind(GameDB.club(_career.club_id)))
+		"finance": _push(_show_finance.bind(GameDB.club(_career.club_id)))
+		"save":
+			_career.save()
+			_toast("Game saved")
+
+func _career_advance() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var res := _career.advance_week(rng, _clubs_by_id(_career.league_id))
+	_career.save()   # autosave each week
+	if res.is_empty():
+		_show_career()   # bye / season just ended; refresh in place
+		return
+	_push(_show_match_result.bind(res))
+
+func _show_match_result(res: Dictionary) -> void:
+	var home_id: int = res["home_id"]
+	var away_id: int = res["away_id"]
+	var home := GameDB.club(home_id)
+	var away := GameDB.club(away_id)
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	# Narrate the EXACT stored scoreline so feed and table agree.
+	var m := MatchCommentary.narrate(rng, home, away, int(res["hg"]), int(res["ag"]))
+	var rows: Array = []
+	for ln in m["lines"]:
+		var side: int = ln["side"]
+		if side == -1:
+			rows.append("------  %s" % ln["text"])
+		else:
+			var tag := "H" if side == 0 else "A"
+			var goal := "  *GOAL*" if ln.get("goal") else ""
+			rows.append("%2d' [%s] %s%s" % [ln["minute"], tag, ln["text"], goal])
+	var you_h: bool = res["manager_home"]
+	var verdict := _result_word(int(res["hg"]), int(res["ag"]), you_h)
+	_set_view("%s %d : %d %s" % [home["name"], res["hg"], res["ag"], away["name"]],
+		"%s  -  Back to the dugout" % verdict, rows, [], func(_x): pass)
+
+func _show_career_table() -> void:
+	var rows: Array = []
+	var standings := _career.standings()
+	var n := standings.size()
+	for pos in n:
+		var r: Dictionary = standings[pos]
+		var me := "*" if int(r["id"]) == _career.club_id else " "
+		rows.append("%2d%s %-15s %2d-%2d-%2d %+3d %3d" % [
+			pos + 1, me, r["name"], r["W"], r["D"], r["L"],
+			int(r["GF"]) - int(r["GA"]), r["Pts"]])
+	_set_view("%s  -  table" % _career.league_name,
+		"Week %d/%d  -  * = you  -  W-D-L GD Pts" % [mini(_career.week + 1, n), _career.total_weeks()],
+		rows, [], func(_x): pass)
+
+func _show_end_of_season() -> void:
+	var pos := _career.position()
+	var met := _career.objective_met()
+	var rows: Array = []
+	rows.append("Final position: %d%s of %d" % [pos, _ord_suffix(pos), _career.standings().size()])
+	rows.append("Board objective: %s" % _career.objective_text)
+	rows.append("Verdict: %s" % ("ACHIEVED - you keep your job" if met else "MISSED - the board is unhappy"))
+	rows.append("")
+	rows.append("▶  Start next season" if met else "▶  Start next season (last chance)")
+	var payload: Array = [{}, {}, {}, {}, {"act": "next"}]
+	_set_view("End of %s" % _career.season, "%s" % _career.club_name, rows, payload,
+		_activate_end_of_season)
+
+func _activate_end_of_season(item: Dictionary) -> void:
+	if item.get("act") == "next":
+		_next_season()
+
+func _next_season() -> void:
+	var club := GameDB.club(_career.club_id)
+	var league: Dictionary = {}
+	for lg in GameDB.leagues:
+		if lg.get("id") == _career.league_id:
+			league = lg
+	var prev_year := _career.year
+	_career = Career.create(club, league, GameDB.clubs_in_league(_career.league_id), GameDB.leagues)
+	_career.year = prev_year + 1
+	_career.save()
+	_enter_career()
 
 func _show_table(league: Dictionary, table: Array) -> void:
 	var tier: int = int(league.get("tier", 0))
@@ -343,6 +512,29 @@ func _show_player(player: Dictionary) -> void:
 
 
 # ---- helpers -------------------------------------------------------------
+
+## Brief footer feedback (no toast widget; we reuse the footer label).
+func _toast(msg: String) -> void:
+	_footer.text = msg
+
+func _ord_suffix(n: int) -> String:
+	if n % 100 in [11, 12, 13]:
+		return "th"
+	match n % 10:
+		1: return "st"
+		2: return "nd"
+		3: return "rd"
+		_: return "th"
+
+## Result word from the manager's perspective.
+func _result_word(hg: int, ag: int, manager_home: bool) -> String:
+	var mine := hg if manager_home else ag
+	var theirs := ag if manager_home else hg
+	if mine > theirs:
+		return "WIN"
+	if mine == theirs:
+		return "DRAW"
+	return "LOSS"
 
 func _fmt_int(n: int) -> String:
 	var s := str(n)

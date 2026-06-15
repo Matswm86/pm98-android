@@ -58,7 +58,8 @@ static func _pick(prng: MatchEngine.Pm98Rng, players: Array, codes: Array) -> Di
 	var weights: Array = []
 	var total := 0
 	for p in players:
-		var attrs: Dictionary = p.get("attrs", {})
+		var av: Variant = p.get("attrs", {})       # some players have attrs == null
+		var attrs: Dictionary = av if av is Dictionary else {}
 		var w := 1
 		for c in codes:
 			w += int(attrs.get(c, 0))
@@ -92,15 +93,20 @@ static func _minute(prng: MatchEngine.Pm98Rng) -> int:
 	return 1 + (prng.next() % 90)
 
 
-## Build the full timed commentary for one fixture.
-## home/away are full club dicts (with "players" and "name").
+## Build the full timed commentary for one fixture, computing the scoreline from
+## the engine. home/away are full club dicts (with "players" and "name").
 ## Returns {home_goals, away_goals, lines:[{minute:int, side:int(-1 phase/0 home/1 away), text}]}.
 static func timeline(rng: RandomNumberGenerator, home: Dictionary, away: Dictionary) -> Dictionary:
 	var hr := MatchEngine.team_ratings(home)
 	var ar := MatchEngine.team_ratings(away)
 	var res := MatchEngine.simulate(rng, hr, ar)
-	var prng := MatchEngine.Pm98Rng.new(rng.randi())
+	return narrate(rng, home, away, int(res["home_goals"]), int(res["away_goals"]))
 
+
+## Narrate a PREDETERMINED scoreline (used by career mode so the league table and
+## the highlights feed always agree). Same output shape as timeline().
+static func narrate(rng: RandomNumberGenerator, home: Dictionary, away: Dictionary, home_goals: int, away_goals: int) -> Dictionary:
+	var prng := MatchEngine.Pm98Rng.new(rng.randi())
 	var hp := _outfield(home)
 	var ap := _outfield(away)
 	var hn: String = home.get("name", "Home")
@@ -108,19 +114,19 @@ static func timeline(rng: RandomNumberGenerator, home: Dictionary, away: Diction
 	var events: Array = []   # {minute, side, text}
 
 	# Goals -> scorer weighted by finishing (RM heading/finishing + TI shooting + CA).
-	for _g in res["home_goals"]:
+	for _g in home_goals:
 		var s := _pick(prng, hp, ["RM", "TI", "CA"])
-		events.append({"minute": _minute(prng), "side": 0, "text": T_GOAL % [s["name"], hn], "goal": true})
-	for _g in res["away_goals"]:
+		events.append({"minute": _minute(prng), "side": 0, "text": T_GOAL % [s.get("name", "?"), hn], "goal": true})
+	for _g in away_goals:
 		var s := _pick(prng, ap, ["RM", "TI", "CA"])
-		events.append({"minute": _minute(prng), "side": 1, "text": T_GOAL % [s["name"], an], "goal": true})
+		events.append({"minute": _minute(prng), "side": 1, "text": T_GOAL % [s.get("name", "?"), an], "goal": true})
 
 	# Ancillary events: alternate-ish between sides via the roll.
 	var both := [[0, hp, hn], [1, ap, an]]
-	_sprinkle(prng, events, both, RATE_YELLOWS, func(side, p, nm): return T_YELLOW % [p["name"], nm], ["AG", "EN"])
-	_sprinkle(prng, events, both, RATE_FOULS, func(side, p, nm): return T_FOUL % [p["name"], nm], ["AG"])
-	_sprinkle(prng, events, both, RATE_OFFSIDES, func(side, p, nm): return T_OFFSIDE % [p["name"], nm], ["VE"])
-	_sprinkle(prng, events, both, RATE_CORNERS, func(side, p, nm): return T_CORNER % p["name"], ["PA"])
+	_sprinkle(prng, events, both, RATE_YELLOWS, func(side, p, nm): return T_YELLOW % [p.get("name", "?"), nm], ["AG", "EN"])
+	_sprinkle(prng, events, both, RATE_FOULS, func(side, p, nm): return T_FOUL % [p.get("name", "?"), nm], ["AG"])
+	_sprinkle(prng, events, both, RATE_OFFSIDES, func(side, p, nm): return T_OFFSIDE % [p.get("name", "?"), nm], ["VE"])
+	_sprinkle(prng, events, both, RATE_CORNERS, func(side, p, nm): return T_CORNER % p.get("name", "?"), ["PA"])
 
 	# Saves name the DEFENDING keeper (side flips to the goalkeeper's team).
 	var keepers := [[0, _keeper(home), hn], [1, _keeper(away), an]]
@@ -141,9 +147,9 @@ static func timeline(rng: RandomNumberGenerator, home: Dictionary, away: Diction
 	if not half_done:
 		lines.append({"minute": 45, "side": -1, "text": P_HALF_TIME})
 	lines.append({"minute": 90, "side": -1,
-		"text": "%s  -  %s %d : %d %s" % [P_FULL_TIME, hn, res["home_goals"], res["away_goals"], an]})
+		"text": "%s  -  %s %d : %d %s" % [P_FULL_TIME, hn, home_goals, away_goals, an]})
 
-	return {"home_goals": res["home_goals"], "away_goals": res["away_goals"], "lines": lines}
+	return {"home_goals": home_goals, "away_goals": away_goals, "lines": lines}
 
 
 static func _sprinkle(prng: MatchEngine.Pm98Rng, events: Array, both: Array, count: int, fmt: Callable, codes: Array) -> void:
