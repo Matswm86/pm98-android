@@ -47,12 +47,22 @@ prompted. Reinstalling over an older build? Uninstall the old one first.
 
 ## Screenshots
 
+The original management screens, rebuilt at the exact pixel coordinates reversed out
+of the game's executable, from its own icons, fonts and backgrounds:
+
 <p>
-  <img src="screenshots/home.png" alt="Competitions" width="240"/>
-  <img src="screenshots/squad.png" alt="Squad" width="240"/>
-  <img src="screenshots/player.png" alt="Player ratings" width="240"/>
-  <img src="screenshots/table.png" alt="Simulated league table" width="240"/>
+  <img src="screenshots/menu.png" alt="Main menu hub" width="240"/>
+  <img src="screenshots/league_table.png" alt="League table" width="240"/>
+  <img src="screenshots/lineup.png" alt="Line-up and formation" width="240"/>
 </p>
+<p>
+  <img src="screenshots/squad.png" alt="Squad management" width="240"/>
+  <img src="screenshots/finance.png" alt="Club finances" width="240"/>
+  <img src="screenshots/transfer.png" alt="Transfer market" width="240"/>
+</p>
+
+<sub>Rendered from the reconstruction renderers (`tools/re/preview_*.py`), which mirror
+the in-game scenes pixel-for-pixel; each runs in landscape with a marble bezel on-device.</sub>
 
 ## Coming next
 
