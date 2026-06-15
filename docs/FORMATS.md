@@ -33,10 +33,16 @@ Decoder + JSON export: `tools/pm98_strings.py` → `assets/strings.json`
 Known cosmetic quirk: byte `0x4f` in two multiword country labels renders as `N`
 ("REP. OF IRELAND", "NORTH. IRELAND") — fix in post.
 
-## 2. `.PKF` packed files — NOT encrypted, decode pending
-16-byte header: `01 XX XX XX XX XX XX XX [30 94|63 1f] 2a 43 f8 b4 1e f1`.
-The `2a 43 f8 b4 1e f1` tail is constant across all PKFs (format signature).
-Byte 0 = `0x01` (version).
+## 2. `.PKF` archive files — CRACKED (session 4) → full spec in [`re/pkf_format.md`](re/pkf_format.md)
+The `.PKF` container is the **PC Fútbol 5 (PCF5)** archive format and is **NOT
+compressed and NOT encrypted**. Directory = a stream of tag-tagged records (parser
+`FUN_005e81c0`); type-2 records are FILE entries carrying `u32 offset` + `u32 size`,
+so each payload is a plain slice `buf[off:off+size]`. The 20-byte name field is
+XOR-obfuscated (`name[i] ^= ((i-0x21)*(i+1)) & 0xFF`, `FUN_005e6500`). The
+`2a 43 f8 b4 1e f1` "tail" earlier called a signature is just XOR-ciphertext inside
+the first record's obfuscated name, NOT a format marker. Working parser + extractor:
+`tools/re/pkf_unpack.py` (walks all 4 archives to a clean END, extracts byte-exact
+RIFF `PAL` / Windows `BMP`). Old per-file entropy notes below kept for reference.
 
 Entropy (bits/byte) tells the story — none are encrypted:
 | file            | entropy | nature |
