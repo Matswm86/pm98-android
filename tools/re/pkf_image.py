@@ -13,6 +13,7 @@ parses the DIB, re-apply the shared VGA palette, make index 0 transparent.
 Usage: pkf_image.py <PKF> <ENTRY_NAME> <out.png> [scale]
   e.g. pkf_image.py IMG.PKF "LEAGUE BIG.BMP" docs/img/pl-trophy.png 2
 """
+
 from __future__ import annotations
 
 import io
@@ -20,10 +21,9 @@ import sys
 from pathlib import Path
 
 from PIL import Image, ImageFile
-
 from pkf_unpack import GAME, files_of
 
-ImageFile.LOAD_TRUNCATED_IMAGES = True   # PCF5 DIBs omit a few trailing pad bytes
+ImageFile.LOAD_TRUNCATED_IMAGES = True  # PCF5 DIBs omit a few trailing pad bytes
 PAL_OFFSET = 0x5CA
 
 
@@ -31,7 +31,7 @@ def vga_palette() -> list[int]:
     b = (GAME / "DAT.PKF").read_bytes()[PAL_OFFSET : PAL_OFFSET + 1024]
     pal: list[int] = []
     for i in range(256):
-        pal += [b[i * 4 + 2], b[i * 4 + 1], b[i * 4]]   # B,G,R,0 -> R,G,B
+        pal += [b[i * 4 + 2], b[i * 4 + 1], b[i * 4]]  # B,G,R,0 -> R,G,B
     return pal
 
 
@@ -46,7 +46,7 @@ def entry_bytes(pkf: str, name: str) -> bytes:
 def render(pkf: str, name: str, scale: int = 1) -> Image.Image:
     raw = bytearray(entry_bytes(pkf, name))
     if raw[:2] == b"DM":
-        raw[0] = ord("B")          # DM -> BM: now a valid Windows BMP/DIB
+        raw[0] = ord("B")  # DM -> BM: now a valid Windows BMP/DIB
     im = Image.open(io.BytesIO(bytes(raw)))
     im.load()
     im = im.convert("P")
