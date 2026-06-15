@@ -14,7 +14,7 @@ func _run() -> void:
 	var ok := true
 
 	# Real assets must import + load.
-	for path in ["res://art/screens/fondo_blue.png", "res://art/screens/barra0.png",
+	for path in ["res://art/screens/fondo_marble.png", "res://art/screens/barra0.png",
 			"res://art/fonts/proman24.fnt", "res://art/fonts/proman18.fnt",
 			"res://art/fonts/proman12.fnt"]:
 		ok = _assert(ResourceLoader.exists(path), "asset present: %s" % path) and ok

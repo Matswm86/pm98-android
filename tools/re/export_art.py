@@ -79,7 +79,7 @@ def _has_palette(im: Image.Image) -> bool:
 
 def render(pkf: str, name: str, pal_name: str = "MANAGER.PAL",
            force_vga: bool = False, transparent: bool | None = None,
-           scale: int = 1) -> Image.Image:
+           scale: int = 1, force_pal: bool = False) -> Image.Image:
     raw = bytearray(_entry(pkf, name))
     is_dm = raw[:2] == b"DM"
     if is_dm:
@@ -88,9 +88,11 @@ def render(pkf: str, name: str, pal_name: str = "MANAGER.PAL",
     im.load()
     im = im.convert("P")
     # Palette: DM -> shared VGA; BM -> embedded if present else external RIFF.
+    # Some full-screen BM screens (FONDO*) carry a JUNK embedded palette and the real
+    # colours live in an external RIFF pal -- --force-pal overrides the embedded one.
     if is_dm or force_vga:
         im.putpalette(vga_palette())
-    elif not _has_palette(im):
+    elif force_pal or not _has_palette(im):
         im.putpalette(riff_palette(pal_name))
     rgba = im.convert("RGBA")
     # Sprites (DM) treat index 0 as transparent; screen backgrounds keep it.
@@ -168,6 +170,7 @@ def main() -> None:
 
     pal = opt("--pal", "MANAGER.PAL")
     vga = "--vga" in a
+    force_pal = "--force-pal" in a
     transparent = True if "--transparent" in a else (False if "--opaque" in a else None)
     cmd = a[0]
     if cmd == "list":
@@ -175,7 +178,7 @@ def main() -> None:
     elif cmd == "dump":
         cmd_dump(a[1], a[2], pal, vga, transparent)
     elif cmd == "one":
-        img = render(a[1], a[2], pal, vga, transparent, int(opt("--scale", "1")))
+        img = render(a[1], a[2], pal, vga, transparent, int(opt("--scale", "1")), force_pal)
         Path(a[3]).parent.mkdir(parents=True, exist_ok=True)
         img.save(a[3])
         print(f"wrote {a[3]} ({img.width}x{img.height})")

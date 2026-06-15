@@ -93,7 +93,7 @@ def draw_kit(canvas, cid, x, y, box_w, box_h):
 
 
 def background() -> Image.Image:
-    bg = Image.open(ART / "screens" / "fondo_blue.png").convert("RGB")
+    bg = Image.open(ART / "screens" / "fondo_marble.png").convert("RGB")
     return bg.resize((640, 480), Image.NEAREST)
 
 

@@ -48,7 +48,7 @@ var _my_id: int = -1
 
 
 func _ready() -> void:
-	_bg = load("res://art/screens/fondo_blue.png")
+	_bg = load("res://art/screens/fondo_marble.png")
 	_bar = load("res://art/screens/barra0.png")
 	_f24 = load("res://art/fonts/proman24.fnt")
 	_f18 = load("res://art/fonts/proman18.fnt")
