@@ -5,11 +5,14 @@ extends RefCounted
 ## Turns two squads into a scoreline using the 10 decoded attributes.
 ##
 ## IMPORTANT: this is a *plausible* football model, NOT a port of the original
-## PM98 match math. The original ratings/formulas live in DAT.PKF (the one
-## genuinely LZ-packed region, not yet reverse-engineered). When that is cracked
-## we tune toward it; until then this is a self-consistent model whose aggregate
-## output (goals/game, home edge, points spread) is validated against real
-## football ranges in tests/test_engine.gd. Do not claim it matches the original.
+## PM98 match math. The original is an event-based, minute-by-minute simulation
+## compiled into MANAGER.EXE (.text ~0x58e000-0x5b4000), NOT data in any PKF.
+## It generates discrete events (GOAL=type 7, cards, penalties, corners, shots)
+## onto a per-match event queue. Reverse-engineering map + addresses:
+## docs/re/match_engine_re.md. Per-event probability/RNG not yet reconstructed;
+## when extracted we tune toward it. Until then this is a self-consistent model
+## whose aggregate output (goals/game, home edge, points spread) is validated
+## against real football ranges in tests/test_engine.gd. Do not claim fidelity.
 ##
 ## Attribute codes (Spanish in the file) -> meaning:
 ##   VE pace · RE stamina · AG aggression · CA ability(quality) · RM heading/finishing
