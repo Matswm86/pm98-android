@@ -329,7 +329,7 @@ func _activate_career(item: Dictionary) -> void:
 		"end": _push(_show_end_of_season)
 		"table": _show_league_table_screen()
 		"tactics": _push(_show_tactics)
-		"squad": _push(_show_squad.bind(_mgr_club()))
+		"squad": _show_squad_screen()
 		"transfers": _push(_show_transfers)
 		"finance": _push(_show_finance.bind(_mgr_club()))
 		"save":
@@ -391,6 +391,18 @@ func _show_lineup_screen() -> void:
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
 	scr.setup(_mgr_club(), _tactics(), "", _career.league_name)
+	scr.gui_input.connect(func(e: InputEvent) -> void:
+		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
+			scr.queue_free())
+
+## The original-art SQUAD MANAGEMENT (PLANTILLA) screen as a full-screen overlay:
+## the roster grouped (goalkeepers / outfield) with the player-grid columns, at the
+## coordinates reversed from MANAGER.EXE (docs/re/squad_screen_re.md). Tap to dismiss.
+func _show_squad_screen() -> void:
+	var scr: SquadScreen = load("res://scenes/SquadScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(_mgr_club(), "", "£%s" % _fmt_int(_career.cash))
 	scr.gui_input.connect(func(e: InputEvent) -> void:
 		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
 			scr.queue_free())
