@@ -383,6 +383,18 @@ func _show_league_table_screen() -> void:
 		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
 			scr.queue_free())
 
+## The original-art LINE-UP (ALINEACIÓN) screen as a full-screen overlay: the squad
+## list + the CAMPO mini-pitch with the chosen XI in formation, at the coordinates
+## reversed from MANAGER.EXE (docs/re/lineup_screen_re.md). Tap to dismiss.
+func _show_lineup_screen() -> void:
+	var scr: LineupScreen = load("res://scenes/LineupScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(_mgr_club(), _tactics(), "", _career.league_name)
+	scr.gui_input.connect(func(e: InputEvent) -> void:
+		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
+			scr.queue_free())
+
 func _show_career_table() -> void:
 	var rows: Array = []
 	var standings := _career.standings()
@@ -425,6 +437,7 @@ func _show_tactics() -> void:
 	var valid := t.validate(club) == ""
 	var rows: Array = []
 	var payload: Array = []
+	rows.append("VIEW LINE-UP   (the pitch)"); payload.append({"a": "lineup_view"})
 	rows.append("Formation:   %s" % t.formation); payload.append({"a": "formation"})
 	rows.append("LINE-UP   (choose your XI)"); payload.append({"a": "lineup"})
 	rows.append("Marking:   %s" % t.marking); payload.append({"a": "marking"})
@@ -441,6 +454,7 @@ func _show_tactics() -> void:
 
 func _activate_tactics(item: Dictionary) -> void:
 	match item["a"]:
+		"lineup_view": _show_lineup_screen()
 		"formation": _push(_show_formation_pick)
 		"lineup": _push(_show_lineup)
 		"takers": _push(_show_takers)

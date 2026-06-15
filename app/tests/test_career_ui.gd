@@ -60,6 +60,22 @@ func _run() -> void:
 		overlay.queue_free()
 	await process_frame
 
+	# Original-art LINE-UP overlay (graphics reskin, S-graphics-4): squad list + pitch.
+	main._show_lineup_screen()
+	await process_frame
+	var lu: Node = null
+	for ch in main.get_children():
+		if ch is LineupScreen:
+			lu = ch
+	ok = _assert(lu != null, "LINE-UP screen overlay mounted") and ok
+	if lu != null:
+		ok = _assert(lu._by_id.size() == main._career.squad_of(main._career.club_id).size(),
+			"line-up overlay indexed the live roster") and ok
+		ok = _assert((lu._slot_positions() as Array).size() == 11,
+			"line-up overlay placed 11 formation markers") and ok
+		lu.queue_free()
+	await process_frame
+
 	# Drive the tactics screens through the real UI (catches wiring bugs).
 	main._push(main._show_tactics)
 	await process_frame
