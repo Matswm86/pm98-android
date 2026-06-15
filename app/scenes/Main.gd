@@ -331,7 +331,7 @@ func _activate_career(item: Dictionary) -> void:
 		"tactics": _push(_show_tactics)
 		"squad": _show_squad_screen()
 		"transfers": _push(_show_transfers)
-		"finance": _push(_show_finance.bind(_mgr_club()))
+		"finance": _show_finance_screen()
 		"save":
 			_career.save()
 			_toast("Game saved")
@@ -403,6 +403,20 @@ func _show_squad_screen() -> void:
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
 	scr.setup(_mgr_club(), "", "£%s" % _fmt_int(_career.cash))
+	scr.gui_input.connect(func(e: InputEvent) -> void:
+		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
+			scr.queue_free())
+
+## The original-art FINANCES ("INCOME + EXPENSES") screen as a full-screen overlay:
+## the income/expense ledger + totals at the coordinates reversed from MANAGER.EXE
+## (docs/re/finance_screen_re.md), driven by FinanceModel. Tap to dismiss.
+func _show_finance_screen() -> void:
+	var club := _mgr_club()
+	var sm := FinanceModel.summary(club, FinanceModel.tier_of(club, GameDB.leagues))
+	var scr: FinanceScreen = load("res://scenes/FinanceScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(sm, _career.club_name, "", _career.season)
 	scr.gui_input.connect(func(e: InputEvent) -> void:
 		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
 			scr.queue_free())

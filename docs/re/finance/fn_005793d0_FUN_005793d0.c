@@ -1,4 +1,5 @@
 // FUN_005793d0  entry=005793d0  size=22 bytes
+// callers/callees expanded one level from seeds
 
 undefined4 __fastcall FUN_005793d0(int param_1)
 

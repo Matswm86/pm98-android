@@ -1,4 +1,5 @@
 // CRect  entry=00436240  size=32 bytes
+// callers/callees expanded one level from seeds
 
 /* Library Function - Single Match
     public: __thiscall CRect::CRect(int,int,int,int)
