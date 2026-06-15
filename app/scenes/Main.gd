@@ -421,6 +421,21 @@ func _show_finance_screen() -> void:
 		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
 			scr.queue_free())
 
+## The original-art TRANSFER MARKET (FICHAR) screen as a full-screen overlay: the
+## buyable players (dearest first) in the reversed list panel + the right-hand nav
+## column, at the coordinates reversed from MANAGER.EXE (docs/re/transfer_screen_re.md).
+## Display-only (bid via the text menu); tap to dismiss.
+func _show_transfer_screen() -> void:
+	var c := _career
+	var win := "OPEN" if c.transfers_open() else "CLOSED"
+	var scr: TransferScreen = load("res://scenes/TransferScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(c.market(), c.club_name, "", c.season, c.cash, win, c.offers_left)
+	scr.gui_input.connect(func(e: InputEvent) -> void:
+		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
+			scr.queue_free())
+
 func _show_career_table() -> void:
 	var rows: Array = []
 	var standings := _career.standings()
@@ -644,6 +659,7 @@ func _show_transfers() -> void:
 	var c := _career
 	var rows: Array = []
 	var payload: Array = []
+	rows.append("VIEW TRANSFER MARKET   (the screen)"); payload.append({"t": "screen"})
 	rows.append("TRANSFER MARKET"); payload.append({"t": "market"})
 	rows.append("MY SQUAD   (sell / RENEW)"); payload.append({"t": "squad"})
 	rows.append("Shortlist   (%d)" % c.shortlist.size()); payload.append({"t": "shortlist"})
@@ -655,6 +671,7 @@ func _show_transfers() -> void:
 
 func _activate_transfers(which: String) -> void:
 	match which:
+		"screen": _show_transfer_screen()
 		"market": _push(_show_market)
 		"squad": _push(_show_transfer_squad)
 		"shortlist": _push(_show_shortlist)
