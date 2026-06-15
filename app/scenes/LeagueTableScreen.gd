@@ -111,6 +111,8 @@ func _cell(x: int, y: int, w: int, h: int, base: Color, hi: Color, lo: Color) ->
 func _draw() -> void:
 	# Scale the 640x480 native layout to whatever box we're given.
 	var s: float = min(size.x / W, size.y / H) if size.x > 0 and size.y > 0 else 1.0
+	if _bg != null:
+		draw_texture_rect(_bg, Rect2(Vector2.ZERO, size), false, Color(0.4, 0.4, 0.46))
 	draw_set_transform(Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5), 0.0, Vector2(s, s))
 
 	if _bg != null:

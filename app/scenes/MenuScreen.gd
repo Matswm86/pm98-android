@@ -54,6 +54,7 @@ const CX0 := 214
 const CX1 := 426
 
 var _bg: Texture2D
+var _bezel: Texture2D            # marble fill for the landscape letterbox margins
 var _f14: Font
 var _f12: Font
 
@@ -67,6 +68,7 @@ var _press: String = ""        # action currently held down (for the highlight)
 
 func _ready() -> void:
 	_bg = load("res://art/screens/menu_bg.png")
+	_bezel = load("res://art/screens/fondo_marble.png")
 	_f14 = load("res://art/fonts/proman14.fnt")
 	_f12 = load("res://art/fonts/proman12.fnt")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -151,6 +153,10 @@ func _txt(f: Font, x: int, y_top: int, s: String, col: Color, sz: int, cw := 0) 
 
 
 func _draw() -> void:
+	# Marble bezel behind the letterboxed 640x480 content (landscape margins).
+	if _bezel != null:
+		draw_texture_rect(_bezel, Rect2(Vector2.ZERO, size), false, Color(0.4, 0.4, 0.46))
+
 	var s := _scale()
 	draw_set_transform(_origin(s), 0.0, Vector2(s, s))
 

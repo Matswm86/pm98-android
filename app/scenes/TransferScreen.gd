@@ -155,6 +155,8 @@ func _cell(r: Rect2, base: Color, hi: Color, lo: Color) -> void:
 
 func _draw() -> void:
 	var s: float = min(size.x / W, size.y / H) if size.x > 0 and size.y > 0 else 1.0
+	if _bg != null:
+		draw_texture_rect(_bg, Rect2(Vector2.ZERO, size), false, Color(0.4, 0.4, 0.46))
 	draw_set_transform(Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5), 0.0, Vector2(s, s))
 
 	if _bg != null:
