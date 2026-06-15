@@ -296,6 +296,8 @@ func _show_career() -> void:
 		payload.append({"act": "advance"})
 	rows.append("League table")
 	payload.append({"act": "table"})
+	rows.append("Team & tactics")
+	payload.append({"act": "tactics"})
 	rows.append("Squad")
 	payload.append({"act": "squad"})
 	rows.append("Finances")
@@ -312,6 +314,7 @@ func _activate_career(item: Dictionary) -> void:
 		"advance": _career_advance()
 		"end": _push(_show_end_of_season)
 		"table": _push(_show_career_table)
+		"tactics": _push(_show_tactics)
 		"squad": _push(_show_squad.bind(GameDB.club(_career.club_id)))
 		"finance": _push(_show_finance.bind(GameDB.club(_career.club_id)))
 		"save":
@@ -365,6 +368,204 @@ func _show_career_table() -> void:
 		"Week %d/%d  -  * = you  -  W-D-L GD Pts" % [mini(_career.week + 1, n), _career.total_weeks()],
 		rows, [], func(_x): pass)
 
+# ---- team selection + tactics (S6) ---------------------------------------
+# LINE-UP / formation / marking / set-piece takers, persisted on the career and
+# fed into the match engine for the manager's own club. PM98 surface; see
+# Tactics.gd for the binary-string provenance.
+
+func _tactics() -> Tactics:
+	if _career.tactics.is_empty():
+		_career.tactics = Tactics.auto_pick(GameDB.club(_career.club_id)).to_dict()
+	return Tactics.from_dict(_career.tactics)
+
+func _save_tactics(t: Tactics) -> void:
+	_career.tactics = t.to_dict()
+	_career.save()
+
+func _slot_stat(role: String, attrs: Dictionary) -> String:
+	if role == "GK":
+		return "PO %d" % int(attrs.get("PO", 0))
+	if role == "DEF":
+		return "DEF %d" % roundi(MatchEngine.def_score(attrs))
+	return "ATT %d" % roundi(MatchEngine.atk_score(attrs))
+
+func _show_tactics() -> void:
+	var club := GameDB.club(_career.club_id)
+	var t := _tactics()
+	var r := t.ratings(club)
+	var valid := t.validate(club) == ""
+	var rows: Array = []
+	var payload: Array = []
+	rows.append("Formation:   %s" % t.formation); payload.append({"a": "formation"})
+	rows.append("LINE-UP   (choose your XI)"); payload.append({"a": "lineup"})
+	rows.append("Marking:   %s" % t.marking); payload.append({"a": "marking"})
+	rows.append("Set-piece takers"); payload.append({"a": "takers"})
+	rows.append("Auto-pick best XI"); payload.append({"a": "auto"})
+	rows.append("SAVE TACTICS"); payload.append({"a": "save"})
+	rows.append("LOAD TACTICS"); payload.append({"a": "load"})
+	if not valid:
+		rows.append("⚠  %s" % Tactics.LINEUP_BAD); payload.append({"a": "noop"})
+	var sub := "ATT %d  -  DEF %d  -  GK %d   (%s)" % [
+		roundi(r["att"]), roundi(r["def"]), roundi(r["gk"]),
+		"line-up OK" if valid else "invalid: auto-filled"]
+	_set_view("%s  -  TEAM TACTICS" % _career.club_name, sub, rows, payload, _activate_tactics)
+
+func _activate_tactics(item: Dictionary) -> void:
+	match item["a"]:
+		"formation": _push(_show_formation_pick)
+		"lineup": _push(_show_lineup)
+		"takers": _push(_show_takers)
+		"load": _push(_show_load_tactics)
+		"marking":
+			var t := _tactics()
+			t.cycle_marking()
+			_save_tactics(t)
+			_show_tactics()
+		"auto":
+			var t := Tactics.auto_pick(GameDB.club(_career.club_id), _tactics().formation)
+			_save_tactics(t)
+			_show_tactics()
+		"save":
+			var t := _tactics()
+			t.save_preset("%s %s" % [t.formation, t.marking])
+			_toast("Tactics saved")
+
+func _show_formation_pick() -> void:
+	var t := _tactics()
+	var rows: Array = []
+	var payload: Array = []
+	for form in Tactics.FORMATION_ORDER:
+		var lines: Array = Tactics.FORMATIONS[form]
+		var mark := "   <- current" if form == t.formation else ""
+		rows.append("%s   (%d def / %d mid / %d fwd)%s" % [form, lines[0], lines[1], lines[2], mark])
+		payload.append(form)
+	_set_view("Formation", "Pick a shape  -  the XI re-fills to fit", rows, payload, _activate_formation)
+
+func _activate_formation(form: String) -> void:
+	var t := _tactics()
+	t.set_formation(form, GameDB.club(_career.club_id))
+	_save_tactics(t)
+	_go_back()
+
+func _show_lineup() -> void:
+	var club := GameDB.club(_career.club_id)
+	var t := _tactics()
+	var by_id := _squad_by_id(club)
+	var rs := t.roles()
+	var rows: Array = []
+	var payload: Array = []
+	for i in t.xi.size():
+		var p: Variant = by_id.get(int(t.xi[i]))
+		var nm: String = (p as Dictionary).get("name", "?") if p != null else "(empty)"
+		var attrs: Dictionary = (p as Dictionary).get("attrs", {}) if p != null else {}
+		var cap := "  (C)" if p != null and int(t.xi[i]) == t.captain_id else ""
+		rows.append("%-4s %-15s %-7s%s" % [rs[i], nm, _slot_stat(rs[i], attrs), cap])
+		payload.append({"slot": i})
+	_set_view("%s  -  LINE-UP" % t.formation, "Tap a slot to change that player",
+		rows, payload, func(it): _push(_show_pick_player.bind(int(it["slot"]))))
+
+func _show_pick_player(slot: int) -> void:
+	var club := GameDB.club(_career.club_id)
+	var t := _tactics()
+	var role: String = t.roles()[slot]
+	var want_gk := role == "GK"
+	var in_xi: Dictionary = {}
+	for id in t.xi:
+		in_xi[int(id)] = true
+	var cands: Array = []
+	for p in club.get("players", []):
+		if bool(p.get("isGK", false)) == want_gk:
+			cands.append(p)
+	cands.sort_custom(func(a, b): return _cand_key(role, a) > _cand_key(role, b))
+	var rows: Array = []
+	var payload: Array = []
+	for p in cands:
+		var attrs: Dictionary = p.get("attrs", {})
+		var here := "  * in XI" if in_xi.has(int(p["id"])) else ""
+		rows.append("%-15s %-7s%s" % [p.get("name", "?"), _slot_stat(role, attrs), here])
+		payload.append(int(p["id"]))
+	_set_view("Pick %s" % role, "Slot %d  -  tap a player" % (slot + 1),
+		rows, payload, func(pid): _assign_slot(slot, int(pid)))
+
+func _assign_slot(slot: int, pid: int) -> void:
+	var t := _tactics()
+	t.assign(slot, pid)
+	_save_tactics(t)
+	_go_back()
+
+func _show_takers() -> void:
+	var club := GameDB.club(_career.club_id)
+	var t := _tactics()
+	var by_id := _squad_by_id(club)
+	var defs := [
+		["Captain", t.captain_id, "cap"], ["Penalty taker", t.pk_taker_id, "pk"],
+		["Corner taker", t.ck_taker_id, "ck"], ["Free-kick taker", t.fk_taker_id, "fk"],
+	]
+	var rows: Array = []
+	var payload: Array = []
+	for rl in defs:
+		var nm: String = (by_id.get(int(rl[1]), {}) as Dictionary).get("name", "(none)")
+		rows.append("%-16s %s" % [rl[0], nm])
+		payload.append({"role": rl[2]})
+	_set_view("Set-piece takers", "Tap to choose from your XI", rows, payload,
+		func(it): _push(_show_pick_taker.bind(it["role"])))
+
+func _show_pick_taker(role_key: String) -> void:
+	var club := GameDB.club(_career.club_id)
+	var t := _tactics()
+	var by_id := _squad_by_id(club)
+	var first := 0 if role_key == "cap" else 1   # takers are outfield; captain can be the GK
+	var rows: Array = []
+	var payload: Array = []
+	for i in range(first, t.xi.size()):
+		var p: Variant = by_id.get(int(t.xi[i]))
+		if p == null:
+			continue
+		rows.append((p as Dictionary).get("name", "?"))
+		payload.append(int(t.xi[i]))
+	_set_view("Choose taker", "From your starting XI", rows, payload,
+		func(pid): _assign_taker(role_key, int(pid)))
+
+func _assign_taker(role_key: String, pid: int) -> void:
+	var t := _tactics()
+	match role_key:
+		"cap": t.captain_id = pid
+		"pk": t.pk_taker_id = pid
+		"ck": t.ck_taker_id = pid
+		"fk": t.fk_taker_id = pid
+	_save_tactics(t)
+	_go_back()
+
+func _show_load_tactics() -> void:
+	var rows: Array = []
+	var payload: Array = []
+	for pr in Tactics.list_presets():
+		var tag := "[predef]" if pr.get("builtin") else "[saved]"
+		rows.append("%-18s %-10s %s" % [pr.get("name", "?"), pr.get("marking", "Zonal"), tag])
+		payload.append(pr)
+	_set_view("LOAD TACTICS", "Apply a saved or predefined shape", rows, payload, _activate_load)
+
+func _activate_load(preset: Dictionary) -> void:
+	var t := _tactics()
+	t.apply_preset(preset, GameDB.club(_career.club_id))
+	_save_tactics(t)
+	_go_back()
+
+func _cand_key(role: String, p: Dictionary) -> float:
+	var attrs: Dictionary = p.get("attrs", {})
+	if role == "GK":
+		return float(attrs.get("PO", 0))
+	if role == "DEF":
+		return MatchEngine.def_score(attrs)
+	return MatchEngine.atk_score(attrs)
+
+func _squad_by_id(club: Dictionary) -> Dictionary:
+	var out: Dictionary = {}
+	for p in club.get("players", []):
+		out[int(p.get("id", -1))] = p
+	return out
+
+
 func _show_end_of_season() -> void:
 	var pos := _career.position()
 	var met := _career.objective_met()
@@ -389,8 +590,14 @@ func _next_season() -> void:
 		if lg.get("id") == _career.league_id:
 			league = lg
 	var prev_year := _career.year
+	var prev_tactics: Dictionary = _career.tactics
 	_career = Career.create(club, league, GameDB.clubs_in_league(_career.league_id), GameDB.leagues)
 	_career.year = prev_year + 1
+	# Keep the manager's shape across seasons; the XI is re-filled for the squad.
+	if not prev_tactics.is_empty():
+		var t := Tactics.from_dict(prev_tactics)
+		t.set_formation(t.formation, club)
+		_career.tactics = t.to_dict()
 	_career.save()
 	_enter_career()
 

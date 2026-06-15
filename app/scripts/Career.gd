@@ -24,6 +24,7 @@ var weekly_net: int = 0           # per-week finance delta (from FinanceModel)
 var objective_pos: int = 17       # board wants: finish at least this high (1-based)
 var objective_text: String = ""
 var finished: bool = false        # season complete + objective resolved
+var tactics: Dictionary = {}      # manager's Tactics.to_dict(): XI + shape + marking
 
 
 # ---- construction --------------------------------------------------------
@@ -45,6 +46,7 @@ static func create(club: Dictionary, league: Dictionary, league_clubs: Array, le
 	var fin := FinanceModel.summary(club, FinanceModel.tier_of(club, leagues))
 	c.weekly_net = int(fin["weekly_balance"])
 	c.cash = int(fin.get("total_income", 0)) / 4   # opening balance ~ a quarter's income
+	c.tactics = Tactics.auto_pick(club, Tactics.DEFAULT_FORMATION).to_dict()
 	return c
 
 
@@ -116,9 +118,9 @@ func advance_week(rng: RandomNumberGenerator, clubs_by_id: Dictionary) -> Dictio
 		var h := int(m[0])
 		var a := int(m[1])
 		if not ratings.has(h):
-			ratings[h] = MatchEngine.team_ratings(clubs_by_id.get(h, {}))
+			ratings[h] = _ratings_for(h, clubs_by_id)
 		if not ratings.has(a):
-			ratings[a] = MatchEngine.team_ratings(clubs_by_id.get(a, {}))
+			ratings[a] = _ratings_for(a, clubs_by_id)
 		var res := MatchEngine.simulate(rng, ratings[h], ratings[a])
 		var hg := int(res["home_goals"])
 		var ag := int(res["away_goals"])
@@ -136,6 +138,16 @@ func advance_week(rng: RandomNumberGenerator, clubs_by_id: Dictionary) -> Dictio
 	if season_over():
 		finished = true
 	return manager_res
+
+
+## Ratings for a club: the manager's own club uses the chosen XI + shape; every
+## other (AI) club uses the auto-best-XI. This is the S6 hook -- who you pick and
+## the formation you play now drive your own results.
+func _ratings_for(id: int, clubs_by_id: Dictionary) -> Dictionary:
+	var club: Dictionary = clubs_by_id.get(id, {})
+	if id == club_id and not tactics.is_empty():
+		return Tactics.from_dict(tactics).ratings(club)
+	return MatchEngine.team_ratings(club)
 
 
 func _apply(s: Dictionary, gf: int, ga: int) -> void:
@@ -192,6 +204,7 @@ func to_dict() -> Dictionary:
 		"fixtures": fixtures, "table": tbl, "results": results, "cash": cash,
 		"weekly_net": weekly_net, "objective_pos": objective_pos,
 		"objective_text": objective_text, "finished": finished,
+		"tactics": tactics,
 	}
 
 static func from_dict(d: Dictionary) -> Career:
@@ -210,6 +223,7 @@ static func from_dict(d: Dictionary) -> Career:
 	c.objective_pos = int(d.get("objective_pos", 17))
 	c.objective_text = d.get("objective_text", "")
 	c.finished = bool(d.get("finished", false))
+	c.tactics = d.get("tactics", {})
 	c.table = {}
 	for k in d.get("table", {}):
 		c.table[int(k)] = d["table"][k]

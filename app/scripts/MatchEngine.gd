@@ -85,6 +85,15 @@ static func _score(attrs: Dictionary, weights: Dictionary) -> float:
 	return s
 
 
+## Public per-player attacking / defending scores (same weights team_ratings uses),
+## so Tactics can rate a hand-picked XI on the identical scale.
+static func atk_score(attrs: Dictionary) -> float:
+	return _score(attrs, _ATK)
+
+static func def_score(attrs: Dictionary) -> float:
+	return _score(attrs, _DEF)
+
+
 ## Derive {att, def, gk, name} ratings for a club from its squad.
 ## Picks the strongest GK and the best 10 outfielders (by a balanced overall),
 ## then averages their attacking / defending scores. Robust to short or

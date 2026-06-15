@@ -45,6 +45,29 @@ func _run() -> void:
 
 	main._show_career_table()                   # render standings view
 	await process_frame
+
+	# Drive the tactics screens through the real UI (catches wiring bugs).
+	main._push(main._show_tactics)
+	await process_frame
+	main._show_lineup()                         # render LINE-UP
+	await process_frame
+	main._activate_formation("4-3-3")           # change shape (pops back to tactics)
+	await process_frame
+	ok = _assert(Tactics.from_dict(main._career.tactics).formation == "4-3-3",
+		"UI formation change persisted") and ok
+	main._push(main._show_lineup)
+	await process_frame
+	main._assign_slot(10, _bench_outfielder(gamedb, main))   # swap a forward
+	await process_frame
+	ok = _assert(Tactics.from_dict(main._career.tactics).validate(
+		gamedb.club(main._career.club_id)) == "", "UI line-up still valid after swap") and ok
+	main._activate_tactics({"a": "marking"})    # toggle marking in place
+	await process_frame
+	main._show_takers()
+	await process_frame
+	main._show_load_tactics()
+	await process_frame
+
 	main._show_career()                         # back to hub
 	await process_frame
 	main._activate_career({"act": "save"})      # save path
@@ -52,6 +75,19 @@ func _run() -> void:
 
 	print("\n%s" % ("ALL PASS" if ok else "FAILURES ABOVE"))
 	quit(0 if ok else 1)
+
+
+## A squad outfielder not currently in the manager's XI (to test a swap).
+func _bench_outfielder(gamedb: Node, main: Node) -> int:
+	var club: Dictionary = gamedb.club(main._career.club_id)
+	var t := Tactics.from_dict(main._career.tactics)
+	var in_xi: Dictionary = {}
+	for id in t.xi:
+		in_xi[int(id)] = true
+	for p in club.get("players", []):
+		if not p.get("isGK") and not in_xi.has(int(p["id"])):
+			return int(p["id"])
+	return t.xi[10]
 
 
 func _assert(cond: bool, label: String) -> bool:
