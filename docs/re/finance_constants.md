@@ -50,8 +50,57 @@ Ticketing / sponsorship controls: `TICKET PRICE` (0x65b66c),
 Weekly balance: `WEEKLY BALANCE TABLE` (0x659b34), `BALANCE` (0x659b4c),
 `INCOME + EXPENSES` (0x6595e0).
 
-## Still to extract (next pass)
-- Domestic league **position prize money** table (numeric block, not string-encoded).
-- Numeric values for ticket price defaults, board prices, loan interest %, insurance
-  group payouts, win/scoring bonus defaults (these live as imm32 in the screens above —
-  follow the xref'd code at e.g. `0x50ccc0` "Win bonus", `0x52c0f7` "Scoring bonus").
+## Finance data model — the weekly ledger record (VERIFIED, session 4)
+
+The two open hypotheses from session 2/3 ("a static domestic position-prize table"
+and "numeric defaults sitting as imm32 in the finance screens") are now **resolved,
+and both were wrong about being static**. The finance system is a **dynamic per-club
+float ledger**, not a constant table.
+
+Traced from the `LOANS AND INTEREST` summary screen `FUN_00508be4` (VA `0x508be4`,
+references `0x659a78`) and its 26 line-item accessor callees `FUN_0057fd60`–`FUN_005806e0`:
+
+- The club object holds an **array of weekly finance records** at `*(club + 0x1e4)`.
+- Each weekly record is **`0x20c` = 524 bytes**.
+- A season is **`0x34` = 52 weeks**; the summary screen sums a line item across all
+  52 records (season-to-date) in the `if` branch, or shows one week in the `else`.
+- Each line-item getter is a **pure accumulator**: seed `_DAT_00638dd8 = 0.0f`, then
+  sum a contiguous run of `float` sub-fields at a fixed offset inside the week record.
+  Examples (offset within the 524-byte record, run length):
+  `FUN_005804d0` +0x8c ×14 · `FUN_00580540` +0xc4 ×14 · `FUN_0057fd60` +0x14 strided×4.
+  These are summed/subtracted in `FUN_00508be4` to build the income/expense rows whose
+  labels are the ledger strings in the section above (TICKETS, SPONSORS, STAFF WAGES…).
+
+**Consequence for fidelity work:** there is **no closed-form domestic prize/income
+formula and no static default table to extract**. Domestic income (gate receipts, TV,
+sponsorship) and expenses (wages, transfers, loans+interest) are accumulated as
+80-bit x87 floats into this per-week record by the simulation as the season runs.
+The *initial* values (opening ticket price, board price, loan terms, etc.) are
+**loaded from the club database at new-game**, not hardcoded as code immediates — so
+they live in the data files, consistent with PM98's database-driven design, not in
+`MANAGER.EXE`. The only **static, code-resident** prize schedule is the European/UEFA
+one in the section above.
+
+## Finance SCREEN structure (VERIFIED — render functions decompiled)
+
+The finance/management screens are vtable-dispatched render methods (so they have no
+direct `call` xref; Ghidra needed forced function creation at the label-push sites).
+Decompiles in `docs/re/finance/`. Confirmed screen fields:
+
+- **Prices screen** (`FUN_00520083` TICKET PRICE / `FUN_0052000b` PRICE OF BOARD):
+  rows for `TICKET PRICE`, `PRICE OF BOARD`, `SPONSOR BOARDS`, plus a conditional
+  "You have an offer to sell all the [sponsor boards]" prompt
+  (`s_You_have_an_offer_to_sell_all_th_0065b608`) gated on club flags at `+0x1e0`.
+- **Win bonus screen** (`FUN_0050ccc0`): renders `Win bonus` + `for %s`
+  (`s_for__s_0065a4b8`) — i.e. a **per-player** win bonus, not a club-wide constant.
+- **Scoring bonus screen** (`FUN_0052c0f7`): offers `Scoring bonus` with a
+  `House and car` (`0x65be1c`) alternative vs a cash `OFFER` — a contract-incentive
+  chooser, again per-player, no static amount in code.
+
+Note: the integer operands in these render calls (e.g. `0xe6, 0x35, 0x19e, 0x42`) are
+**screen-layout coordinates** (x, y, w, h, colour) passed to the text widgets
+`FUN_005d9d80`/`FUN_005da180`, NOT money values — verified by their reuse as identical
+geometry across unrelated labels. Do not mine them as finance constants.
+
+`'Prizes'` (`0x653000`) is returned by the 6-byte stub getter `FUN_004425d0` and is a
+UI column label only (confirmed: no `call` xref, address-taken into a vtable).
