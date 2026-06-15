@@ -271,21 +271,58 @@ func _show_squad(club: Dictionary) -> void:
 		if ak != bk:
 			return ak > bk
 		return int(a.get("attrs", {}).get("CA", 0)) > int(b.get("attrs", {}).get("CA", 0)))
-	var rows: Array = []
+	var rows: Array = ["💷  Finances"]
+	var payload: Array = [{"_fin": club}]
 	for p in players:
 		var ca: int = int((p.get("attrs", {}) as Dictionary).get("CA", 0))
 		var pos := "GK" if p.get("isGK") else "  "
 		var age: Variant = p.get("age")
 		rows.append("%-16s %s  CA %2d  %s" % [
 			p["name"], pos, ca, ("age " + str(int(age))) if age != null else ""])
+		payload.append(p)
 	var stadium: Variant = club.get("stadium")
 	var sub: String = stadium if stadium is String else ""
 	if club.get("capacity") != null:
 		sub = "%s  (%s)" % [sub, _fmt_int(int(club["capacity"]))]
-	_set_view(club["name"], sub, rows, players, _show_player_from)
+	_set_view(club["name"], sub, rows, payload, _activate_squad_row)
 
-func _show_player_from(player: Dictionary) -> void:
-	_push(_show_player.bind(player))
+func _activate_squad_row(item: Dictionary) -> void:
+	if item.has("_fin"):
+		_push(_show_finance.bind(item["_fin"]))
+	else:
+		_push(_show_player.bind(item))
+
+
+# ---- club finances (PCF5 ledger structure, projected figures) ------------
+
+func _show_finance(club: Dictionary) -> void:
+	var f := FinanceModel.summary(club, FinanceModel.tier_of(club, GameDB.leagues))
+	var rows: Array = []
+	rows.append("INCOME + EXPENSES   (%d-week season)" % FinanceModel.SEASON_WEEKS)
+	rows.append("")
+	for line in f["income_lines"]:
+		rows.append("  %-22s £%s" % [line[0], _fmt_int(int(line[1]))])
+	rows.append("  %-22s £%s" % ["TOTAL INCOME", _fmt_int(int(f["total_income"]))])
+	rows.append("")
+	for line in f["expense_lines"]:
+		rows.append("  %-22s -£%s" % [line[0], _fmt_int(int(line[1]))])
+	rows.append("")
+	var bal: int = int(f["season_balance"])
+	var sign := "+" if bal >= 0 else "-"
+	rows.append("  %-22s %s£%s" % ["BALANCE", sign, _fmt_int(abs(bal))])
+	rows.append("  %-22s %s£%s/wk" % ["WEEKLY BALANCE",
+		"+" if int(f["weekly_balance"]) >= 0 else "-", _fmt_int(abs(int(f["weekly_balance"])))])
+	rows.append("")
+	rows.append("CONTROLS")
+	rows.append("  %-22s £%d" % ["TICKET PRICE", int(f["ticket_price"])])
+	rows.append("  %-22s £%s" % ["PRICE OF BOARD", _fmt_int(int(f["board_price"]))])
+	var cap_note := "" if f["capacity_known"] else " (est.)"
+	rows.append("  %-22s %s%s @ %d%% att." % ["STADIUM",
+		_fmt_int(int(f["capacity"])), cap_note, int(round(100.0 * f["attendance"] / float(f["capacity"])))])
+	var div_names := {1: "Premier League", 2: "Division One", 3: "Division Two", 4: "Division Three"}
+	_set_view("%s  -  finances" % club["name"],
+		"%s  -  projected from squad + stadium" % div_names.get(int(f["tier"]), "League"),
+		rows, [], func(_x): pass)
 
 func _show_player(player: Dictionary) -> void:
 	var attrs: Dictionary = player.get("attrs", {})
