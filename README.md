@@ -1,11 +1,17 @@
 # PM98
 
+<img src="docs/img/pm98-pl-trophy.png" alt="Premier League trophy, rendered from the original PM98 game files" width="150" align="right"/>
+
 An Android remake of **Premier Manager 98**, rebuilt from the original game's own
 data. Take over a club, build your squad, run the season.
 
-> **Early build.** Browse the complete original database, then simulate a full
-> season and read the final table. The rest of the management layer (transfers,
-> finances, save/load) is in progress.
+> **Early build.** Browse the complete original database, simulate a full season
+> and read the final table, watch a match commentary feed, and view club finances.
+> The career loop (save/load, transfers, tactics) is in progress.
+
+<sub>The trophy above is decoded straight from the original game's archives by
+`tools/re/pkf_image.py` (see the reverse-engineering notes in `docs/re/`). Original
+game art © Dinamic Multimedia; shown here for this non-commercial fan remake.</sub>
 
 ## Download
 
@@ -24,6 +30,10 @@ prompted. Reinstalling over an older build? Uninstall the old one first.
 - Browse League → Club → Squad → Player, with each player's attributes.
 - Simulate a full season from any English division: every fixture played from the
   real squads, with a final table (form, goal difference, promotion/relegation).
+- **Watch a match:** a minute-by-minute commentary feed (goals, cards, saves,
+  corners) using the original game's own English match text, with real scorers.
+- **Club finances:** income and expenses over a 52-week season, structured on the
+  original game's finance ledger (tickets, TV, sponsors, wages).
 
 ## Screenshots
 
@@ -36,11 +46,13 @@ prompted. Reinstalling over an older build? Uninstall the old one first.
 
 ## Coming next
 
-Match-day detail, transfers, finances and save/load. Club crests, player photos
-and the original music are decoded from the game files and are being wired in.
-The season simulation is an honest first model tuned to realistic football
-results; it will be refined toward the original game's own match math as more of
-the game data is decoded.
+A full career: pick a club and play week-by-week through the season with save/load,
+then team selection and tactics, transfers and contracts, training, the cups and
+Europe, injuries and suspensions, and board objectives. Club crests, player photos
+and a 2D match view are decoded from the game files (the archive format is fully
+cracked, see `docs/re/pkf_format.md`) and are being wired in. The season simulation
+uses the original game's verified random-number generator and a per-shot model tuned
+to realistic football results.
 
 ## Built with
 
