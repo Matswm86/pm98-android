@@ -44,6 +44,13 @@ static func _player_wage(attrs: Dictionary, base: int) -> int:
 	return int(round(base * mult / 100.0)) * 100
 
 
+## Public weekly wage (£/wk) for one player at a division tier (1-4). Single source
+## of truth shared by the finance ledger (STAFF WAGES) and the transfer market
+## (YEARLY WAGE = this x SEASON_WEEKS), so a signing's wage and the books agree.
+static func weekly_wage(attrs: Dictionary, tier: int) -> int:
+	return _player_wage(attrs, int(_WAGE_BASE.get(tier, _WAGE_BASE[2])))
+
+
 ## Full finance summary for one club at a given division tier (1-4). Returns a dict
 ## of season + weekly figures and the line-item breakdown, keyed by the authentic
 ## PM98 ledger labels. Use tier_of(club, leagues) to resolve the tier.

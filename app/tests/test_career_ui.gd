@@ -68,6 +68,35 @@ func _run() -> void:
 	main._show_load_tactics()
 	await process_frame
 
+	# Drive the transfer screens (S7): market -> bid -> squad -> RENEW -> news.
+	main._push(main._show_transfers)
+	await process_frame
+	main._show_market()
+	await process_frame
+	var mkt: Array = main._career.market()
+	ok = _assert(not mkt.is_empty(), "UI market populated (%d players)" % mkt.size()) and ok
+	var row: Dictionary = mkt[0]
+	main._push(main._show_market_player.bind(row))
+	await process_frame
+	main._career.cash = 100_000_000             # fund a guaranteed (force-price) signing
+	var before: int = main._career.my_squad().size()
+	main._market_action(row, {"bid": int(row["fee"]) * 3})
+	await process_frame
+	ok = _assert(main._career.my_squad().size() == before + 1, "UI signing added a player") and ok
+	main._push(main._show_transfer_squad)
+	await process_frame
+	var p0: Dictionary = main._career.my_squad()[0]
+	main._push(main._show_player_deal.bind(p0))
+	await process_frame
+	main._player_deal_action(p0, "renew")
+	await process_frame
+	ok = _assert(int(main._career._find_in(main._career.club_id, int(p0["id"])).get("contract_years", 0))
+		== TransferMarket.NEW_CONTRACT_YEARS, "UI RENEW set a fresh contract") and ok
+	main._show_shortlist()
+	await process_frame
+	main._show_transfer_news()
+	await process_frame
+
 	main._show_career()                         # back to hub
 	await process_frame
 	main._activate_career({"act": "save"})      # save path

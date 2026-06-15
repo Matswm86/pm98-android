@@ -26,6 +26,21 @@ var objective_text: String = ""
 var finished: bool = false        # season complete + objective resolved
 var tactics: Dictionary = {}      # manager's Tactics.to_dict(): XI + shape + marking
 
+# Live transfer state: the division's squads mutate as players move, and persist
+# in the save -- the career, not GameDB, is the source of truth once you're managing.
+var tier: int = 1                       # division tier (all clubs here share it)
+var rosters: Dictionary = {}            # club_id:int -> Array[player dict] (live squads)
+var club_names: Dictionary = {}         # club_id:int -> String
+var transfer_listed: Dictionary = {}    # pid:int -> true (your players up for sale)
+var shortlist: Array = []               # pid:int targets you're tracking
+var transfer_log: Array = []            # newest-first transfer news lines
+var offers_left: int = OFFERS_PER_WEEK  # signings the board still allows this week
+
+# "The Directors will only let you make %u offer%s to sign a player per week."
+const OFFERS_PER_WEEK := 3
+# Transfer window shuts this many rounds before the season ends (deadline day).
+const DEADLINE_TAIL := 6
+
 
 # ---- construction --------------------------------------------------------
 
@@ -37,17 +52,32 @@ static func create(club: Dictionary, league: Dictionary, league_clubs: Array, le
 	c.club_name = club.get("name", "?")
 	c.league_id = str(league.get("id", ""))
 	c.league_name = league.get("name", "League")
+	c.tier = FinanceModel.tier_of(club, leagues)
 	var ids: Array = []
 	for lc in league_clubs:
 		ids.append(int(lc["id"]))
+		c.club_names[int(lc["id"])] = lc.get("name", "?")
+		c.rosters[int(lc["id"])] = c._seed_squad(lc)
 	c.fixtures = SeasonSim.fixtures(ids)
 	c._init_table(league_clubs)
 	c._set_objective(league, league_clubs, leagues)
-	var fin := FinanceModel.summary(club, FinanceModel.tier_of(club, leagues))
+	var fin := FinanceModel.summary(club, c.tier)
 	c.weekly_net = int(fin["weekly_balance"])
 	c.cash = int(fin.get("total_income", 0)) / 4   # opening balance ~ a quarter's income
 	c.tactics = Tactics.auto_pick(club, Tactics.DEFAULT_FORMATION).to_dict()
 	return c
+
+
+## Deep-copy a club's squad into a live roster, stamping a contract length on each
+## player (younger players are tied down longer). Never aliases GameDB's data.
+func _seed_squad(club_dict: Dictionary) -> Array:
+	var out: Array = []
+	for p in club_dict.get("players", []):
+		var dup: Dictionary = (p as Dictionary).duplicate(true)
+		var age := int(dup.get("age", 26))
+		dup["contract_years"] = 3 if age <= 29 else (2 if age <= 32 else 1)
+		out.append(dup)
+	return out
 
 
 func _init_table(league_clubs: Array) -> void:
@@ -109,18 +139,22 @@ func manager_fixture() -> Array:
 ## Play the current round: simulate every fixture, update the table, accrue cash.
 ## `clubs_by_id` maps id -> full club dict (for ratings). Returns the manager's
 ## result {home_id, away_id, hg, ag, manager_home} or {} on a bye / season end.
-func advance_week(rng: RandomNumberGenerator, clubs_by_id: Dictionary) -> Dictionary:
+func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -> Dictionary:
 	if season_over():
 		return {}
+	# Rival clubs trade in the background while the window is open.
+	if transfers_open() and not rosters.is_empty():
+		for line in TransferMarket.ai_round(rng, rosters, club_names, club_id, tier):
+			_log(line)
 	var ratings: Dictionary = {}
 	var manager_res: Dictionary = {}
 	for m in fixtures[week]:
 		var h := int(m[0])
 		var a := int(m[1])
 		if not ratings.has(h):
-			ratings[h] = _ratings_for(h, clubs_by_id)
+			ratings[h] = _ratings_for(h, clubs_override)
 		if not ratings.has(a):
-			ratings[a] = _ratings_for(a, clubs_by_id)
+			ratings[a] = _ratings_for(a, clubs_override)
 		var res := MatchEngine.simulate(rng, ratings[h], ratings[a])
 		var hg := int(res["home_goals"])
 		var ag := int(res["away_goals"])
@@ -130,6 +164,7 @@ func advance_week(rng: RandomNumberGenerator, clubs_by_id: Dictionary) -> Dictio
 			manager_res = {"home_id": h, "away_id": a, "hg": hg, "ag": ag, "manager_home": h == club_id}
 	cash += weekly_net
 	week += 1
+	offers_left = OFFERS_PER_WEEK   # the board's weekly signing allowance resets
 	if not manager_res.is_empty():
 		results.append({
 			"week": week, "opp_id": manager_res["away_id"] if manager_res["manager_home"] else manager_res["home_id"],
@@ -141,13 +176,25 @@ func advance_week(rng: RandomNumberGenerator, clubs_by_id: Dictionary) -> Dictio
 
 
 ## Ratings for a club: the manager's own club uses the chosen XI + shape; every
-## other (AI) club uses the auto-best-XI. This is the S6 hook -- who you pick and
-## the formation you play now drive your own results.
-func _ratings_for(id: int, clubs_by_id: Dictionary) -> Dictionary:
-	var club: Dictionary = clubs_by_id.get(id, {})
+## other (AI) club uses the auto-best-XI. Reads the live roster (so signings move
+## results); `clubs_override` is a fallback for clubs not in the roster (e.g. an
+## old save built before rosters existed).
+func _ratings_for(id: int, clubs_override: Dictionary = {}) -> Dictionary:
+	var club: Dictionary = club_view(id) if rosters.has(id) else clubs_override.get(id, {})
 	if id == club_id and not tactics.is_empty():
 		return Tactics.from_dict(tactics).ratings(club)
 	return MatchEngine.team_ratings(club)
+
+
+# ---- live squad access ---------------------------------------------------
+
+## A club dict view backed by the live roster: {id, name, players}. This is what
+## tactics, ratings, the squad screen and finances read once you're managing.
+func club_view(id: int) -> Dictionary:
+	return {"id": id, "name": club_names.get(id, "?"), "players": rosters.get(id, [])}
+
+func squad_of(id: int) -> Array:
+	return rosters.get(id, [])
 
 
 func _apply(s: Dictionary, gf: int, ga: int) -> void:
@@ -191,20 +238,209 @@ func objective_met() -> bool:
 	return position() <= objective_pos
 
 
+# ---- transfer market -----------------------------------------------------
+
+const _LOG_CAP := 40
+
+func _log(line: String) -> void:
+	transfer_log.push_front(line)
+	if transfer_log.size() > _LOG_CAP:
+		transfer_log.resize(_LOG_CAP)
+
+## True while the transfer window is open (before deadline day).
+func transfers_open() -> bool:
+	return week < maxi(0, total_weeks() - DEADLINE_TAIL)
+
+## Rounds until the deadline (0 once it has passed).
+func deadline_weeks_left() -> int:
+	return maxi(0, (total_weeks() - DEADLINE_TAIL) - week)
+
+func my_squad() -> Array:
+	return rosters.get(club_id, [])
+
+## The buyable market: every other club's players, dearest first.
+func market() -> Array:
+	return TransferMarket.market(rosters, club_names, tier, club_id)
+
+func _find_in(id: int, pid: int) -> Dictionary:
+	for p in rosters.get(id, []):
+		if int(p.get("id", -1)) == pid:
+			return p
+	return {}
+
+## Bid `offer` for player `pid` at `from_club_id`. Mutates squads + cash on success.
+## Returns {ok: bool, msg: String}. Enforces the board caps (deadline, weekly offer
+## allowance, squad size, cash) before the selling club even considers the bid.
+func sign_player(pid: int, from_club_id: int, offer: int, rng: RandomNumberGenerator) -> Dictionary:
+	if not transfers_open():
+		return {"ok": false, "msg": "The transfer deadline has passed."}
+	if offers_left <= 0:
+		return {"ok": false, "msg": "The Directors will only let you make %d offers to sign a player per week." % OFFERS_PER_WEEK}
+	if my_squad().size() >= TransferMarket.SQUAD_MAX:
+		return {"ok": false, "msg": "Your squad is full (%d), the maximum allowed. You can not sign more." % TransferMarket.SQUAD_MAX}
+	if offer > cash:
+		return {"ok": false, "msg": "You do not have enough money to make this offer."}
+	var player := _find_in(from_club_id, pid)
+	if player.is_empty():
+		return {"ok": false, "msg": "That player is no longer available."}
+	offers_left -= 1   # an offer counts whether or not it is accepted
+	var is_key := TransferMarket.is_key_player(club_view(from_club_id), pid)
+	var verdict := TransferMarket.evaluate_offer(player, offer, is_key, tier, rng)
+	var seller_name: String = club_names.get(from_club_id, "?")
+	if not verdict["accepted"]:
+		return {"ok": false, "msg": "%s have rejected your offer for %s." % [seller_name, player.get("name", "?")]}
+	rosters[from_club_id].erase(player)
+	player["clubId"] = club_id
+	player["contract_years"] = TransferMarket.NEW_CONTRACT_YEARS
+	rosters[club_id].append(player)
+	cash -= offer
+	transfer_listed.erase(pid)
+	shortlist.erase(pid)
+	_log("You have signed %s from %s for £%s." % [player.get("name", "?"), seller_name, _money(offer)])
+	return {"ok": true, "msg": "You have signed %s." % player.get("name", "?")}
+
+func is_listed(pid: int) -> bool:
+	return transfer_listed.has(pid)
+
+func toggle_listed(pid: int) -> void:
+	if transfer_listed.has(pid):
+		transfer_listed.erase(pid)
+	else:
+		transfer_listed[pid] = true
+
+## The best AI offer for one of your players (used by the SALE screen). {} if none.
+func solicit_sale(pid: int, rng: RandomNumberGenerator) -> Dictionary:
+	var player := _find_in(club_id, pid)
+	if player.is_empty():
+		return {}
+	return TransferMarket.solicit_offer(player, rosters, club_names, tier, club_id, rng)
+
+## Accept an AI offer for your player. Mutates squads + cash. {ok, msg}. Guards the
+## squad floor so you can't sell yourself unable to field a side.
+func accept_sale(pid: int, buyer_id: int, offer: int) -> Dictionary:
+	var player := _find_in(club_id, pid)
+	if player.is_empty():
+		return {"ok": false, "msg": "That player is no longer here."}
+	var squad := my_squad()
+	if squad.size() <= TransferMarket.SQUAD_MIN:
+		return {"ok": false, "msg": "Your squad is too small to sell (min %d)." % TransferMarket.SQUAD_MIN}
+	if player.get("isGK") and TransferMarket._count_keepers(squad) <= TransferMarket.MIN_KEEPERS:
+		return {"ok": false, "msg": "You must keep at least %d goalkeepers." % TransferMarket.MIN_KEEPERS}
+	rosters[club_id].erase(player)
+	player["clubId"] = buyer_id
+	player["contract_years"] = TransferMarket.NEW_CONTRACT_YEARS
+	if rosters.has(buyer_id):
+		rosters[buyer_id].append(player)
+	cash += offer
+	transfer_listed.erase(pid)
+	var buyer_name: String = club_names.get(buyer_id, "?")
+	_log("%s has been signed by %s for £%s." % [player.get("name", "?"), buyer_name, _money(offer)])
+	return {"ok": true, "msg": "Sold %s to %s for £%s." % [player.get("name", "?"), buyer_name, _money(offer)]}
+
+## Renew a squad player's contract (RENEW), resetting his term. {ok, msg}.
+func renew(pid: int) -> Dictionary:
+	var player := _find_in(club_id, pid)
+	if player.is_empty():
+		return {"ok": false, "msg": "That player is not in your squad."}
+	player["contract_years"] = TransferMarket.NEW_CONTRACT_YEARS
+	_log("%s has renewed his contract." % player.get("name", "?"))
+	return {"ok": true, "msg": "%s has renewed his contract." % player.get("name", "?")}
+
+func toggle_shortlist(pid: int) -> void:
+	if shortlist.has(pid):
+		shortlist.erase(pid)
+	else:
+		shortlist.append(pid)
+
+func _money(n: int) -> String:
+	var s := str(n)
+	var out := ""
+	var c := 0
+	for i in range(s.length() - 1, -1, -1):
+		out = s[i] + out
+		c += 1
+		if c % 3 == 0 and i > 0:
+			out = "," + out
+	return out
+
+
+# ---- season rollover -----------------------------------------------------
+
+## Roll the career into the next season, KEEPING the live rosters, cash and tactics.
+## Contracts tick down; any of your players who hit zero and weren't renewed leave on
+## a free. Fixtures, table and objective are rebuilt from the current squads.
+func advance_season(leagues: Array) -> void:
+	var leavers: Array = []
+	for p in rosters.get(club_id, []):
+		var yrs := int(p.get("contract_years", 1)) - 1
+		p["contract_years"] = yrs
+		if yrs <= 0:
+			leavers.append(p)
+	for p in leavers:
+		rosters[club_id].erase(p)
+		_log("%s has left your club as his contract was not renewed." % p.get("name", "?"))
+	# AI contracts tick but auto-renew, so rival squads stay stable across years.
+	for cid in rosters:
+		if int(cid) == club_id:
+			continue
+		for p in rosters[cid]:
+			p["contract_years"] = maxi(1, int(p.get("contract_years", 2)) - 1) + 1
+
+	year += 1
+	season = _season_label(year)
+	week = 0
+	finished = false
+	results.clear()
+	transfer_listed.clear()
+	offers_left = OFFERS_PER_WEEK
+	_log("--- %s season ---" % season)
+
+	var ids: Array = rosters.keys()
+	var views: Array = []
+	for id in ids:
+		views.append(club_view(id))
+	fixtures = SeasonSim.fixtures(ids)
+	_init_table(views)
+	var league := {"id": league_id, "name": league_name, "tier": tier}
+	_set_objective(league, views, leagues)
+	var fin := FinanceModel.summary(club_view(club_id), tier)
+	weekly_net = int(fin["weekly_balance"])
+	# Refit the XI to the (possibly changed) squad while keeping the shape.
+	if not tactics.is_empty():
+		var t := Tactics.from_dict(tactics)
+		t.set_formation(t.formation, club_view(club_id))
+		tactics = t.to_dict()
+
+func _season_label(yr: int) -> String:
+	var start := 1996 + yr   # year 1 -> 1997-98
+	return "%d-%02d" % [start, (start + 1) % 100]
+
+
 # ---- persistence ---------------------------------------------------------
 
 func to_dict() -> Dictionary:
-	# JSON keys must be strings; store the table with string keys.
+	# JSON keys must be strings; store int-keyed dicts with string keys.
 	var tbl: Dictionary = {}
 	for id in table:
 		tbl[str(id)] = table[id]
+	var ros: Dictionary = {}
+	for id in rosters:
+		ros[str(id)] = rosters[id]
+	var nms: Dictionary = {}
+	for id in club_names:
+		nms[str(id)] = club_names[id]
+	var listed: Dictionary = {}
+	for pid in transfer_listed:
+		listed[str(pid)] = true
 	return {
 		"club_id": club_id, "club_name": club_name, "league_id": league_id,
 		"league_name": league_name, "season": season, "year": year, "week": week,
 		"fixtures": fixtures, "table": tbl, "results": results, "cash": cash,
 		"weekly_net": weekly_net, "objective_pos": objective_pos,
 		"objective_text": objective_text, "finished": finished,
-		"tactics": tactics,
+		"tactics": tactics, "tier": tier, "rosters": ros, "club_names": nms,
+		"transfer_listed": listed, "shortlist": shortlist, "transfer_log": transfer_log,
+		"offers_left": offers_left,
 	}
 
 static func from_dict(d: Dictionary) -> Career:
@@ -224,9 +460,24 @@ static func from_dict(d: Dictionary) -> Career:
 	c.objective_text = d.get("objective_text", "")
 	c.finished = bool(d.get("finished", false))
 	c.tactics = d.get("tactics", {})
+	c.tier = int(d.get("tier", 1))
+	c.shortlist = []
+	for v in d.get("shortlist", []):
+		c.shortlist.append(int(v))
+	c.transfer_log = d.get("transfer_log", [])
+	c.offers_left = int(d.get("offers_left", OFFERS_PER_WEEK))
 	c.table = {}
 	for k in d.get("table", {}):
 		c.table[int(k)] = d["table"][k]
+	c.rosters = {}
+	for k in d.get("rosters", {}):
+		c.rosters[int(k)] = d["rosters"][k]
+	c.club_names = {}
+	for k in d.get("club_names", {}):
+		c.club_names[int(k)] = d["club_names"][k]
+	c.transfer_listed = {}
+	for k in d.get("transfer_listed", {}):
+		c.transfer_listed[int(k)] = true
 	return c
 
 static func has_save(path: String = SAVE_PATH) -> bool:
