@@ -292,6 +292,8 @@ func _show_career() -> void:
 	var c := _career
 	var rows: Array = []
 	var payload: Array = []
+	rows.append("🖥  MAIN MENU (the screen)")
+	payload.append({"act": "menu"})
 	if c.season_over():
 		rows.append("▶  End of season")
 		payload.append({"act": "end"})
@@ -325,6 +327,7 @@ func _show_career() -> void:
 
 func _activate_career(item: Dictionary) -> void:
 	match item["act"]:
+		"menu": _show_menu_screen()
 		"advance": _career_advance()
 		"end": _push(_show_end_of_season)
 		"table": _show_league_table_screen()
@@ -435,6 +438,56 @@ func _show_transfer_screen() -> void:
 	scr.gui_input.connect(func(e: InputEvent) -> void:
 		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
 			scr.queue_free())
+
+## The original-art MAIN MENU (MENUPRINCIPAL) screen as a full-screen overlay: the
+## 12 management icons + the EXIT/SAVE/NEWS/CONTINUE control bar at the coordinates
+## reversed from MANAGER.EXE (docs/re/menu_screen_re.md). Interactive: tapping an
+## icon routes to the matching function. Driven by the live career chrome.
+func _show_menu_screen() -> void:
+	var c := _career
+	var scr: MenuScreen = load("res://scenes/MenuScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(c.club_name, c.league_name, c.season, c.cash,
+		"%d%s" % [c.position(), _ord_suffix(c.position())])
+	scr.action_selected.connect(_menu_action.bind(scr))
+
+## Route a MENUPRINCIPAL icon tap to the matching function. Navigations free the
+## menu overlay first; lightweight info actions toast and leave it open.
+func _menu_action(action: String, scr: MenuScreen) -> void:
+	match action:
+		"exit": scr.queue_free()
+		"save":
+			_career.save()
+			_toast("Game saved")
+		"news": _toast("No news this week")
+		"staff": _toast("Staff management is not in this build yet")
+		"stadium": _toast("Stadium screen coming soon")
+		"board": _toast("Board: %s" % _career.objective_text)
+		"opponent", "fixtures": _toast(_menu_next_match())
+		"continue":
+			scr.queue_free()
+			_career_advance()
+		_:
+			scr.queue_free()
+			match action:
+				"table": _show_league_table_screen()
+				"lineup": _show_lineup_screen()
+				"finance": _show_finance_screen()
+				"buy": _show_transfer_screen()
+				"tactics": _push(_show_tactics)
+				"sell": _push(_show_transfers)
+				"results": _push(_show_career_table)
+
+## "vs Arsenal" / "at Chelsea" / "bye" for the manager's next match.
+func _menu_next_match() -> String:
+	var fx := _career.manager_fixture()
+	if fx.is_empty():
+		return "No match this week (bye)"
+	var home: bool = int(fx[0]) == _career.club_id
+	var opp_id: int = int(fx[1]) if home else int(fx[0])
+	var opp := GameDB.club(opp_id)
+	return "Next: %s %s" % ["vs" if home else "at", opp.get("name", "?")]
 
 func _show_career_table() -> void:
 	var rows: Array = []
