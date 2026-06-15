@@ -1,29 +1,70 @@
 class_name MatchEngine
 extends RefCounted
-## PM98 match engine (Phase 1, plausible v1).
+## PM98 match engine (Phase 2: per-shot model, structurally derived from MANAGER.EXE).
 ##
 ## Turns two squads into a scoreline using the 10 decoded attributes.
 ##
-## IMPORTANT: this is a *plausible* football model, NOT a port of the original
-## PM98 match math. The original is an event-based, minute-by-minute simulation
-## compiled into MANAGER.EXE (.text ~0x58e000-0x5b4000), NOT data in any PKF.
-## It generates discrete events (GOAL=type 7, cards, penalties, corners, shots)
-## onto a per-match event queue. Reverse-engineering map + addresses:
-## docs/re/match_engine_re.md. Per-event probability/RNG not yet reconstructed;
-## when extracted we tune toward it. Until then this is a self-consistent model
-## whose aggregate output (goals/game, home edge, points spread) is validated
-## against real football ranges in tests/test_engine.gd. Do not claim fidelity.
+## The original PM98 match result is an event-based positional simulation in
+## MANAGER.EXE (.text ~0x58e000-0x5b4000): a per-tick driver (FUN_00598740)
+## advances a 22-player ball-physics sim; a shot/tackle resolver (FUN_005aeda0)
+## converts chances using player attributes + RNG rolls; a dispatcher
+## (FUN_005966d0) emits GOAL=type7 / card / corner events onto a 16-byte event
+## queue. Full RE map + verified addresses: docs/re/match_engine_re.md.
+##
+## FAITHFUL here (lifted from the binary, verified against bytes):
+##   * PRNG = the Microsoft C LCG used throughout the sim (FUN_005ec250 @
+##     0x5ec250): state = state*214013 + 2531011; roll = (state>>16) & 0x7FFF.
+##     Probability gates in the binary are `(roll*N)>>15 < threshold`, a per-N
+##     uniform compare. Pm98Rng below reproduces this exactly. (The *214013 is
+##     strength-reduced to lea/shl/sub in the binary, which is why an earlier
+##     byte-grep for 0x343FD found nothing and wrongly ruled out MSVC rand().)
+##   * Scoring is per-SHOT Bernoulli resolution (not one scoreline draw): each
+##     chance converts with a probability LINEAR in finishing skill, the shape
+##     of FUN_005aeda0's outcome gates (e.g. permil threshold (skill+fwd*K)).
+##
+## ABSTRACTED (NOT a 1:1 port -- do not claim full fidelity):
+##   * The positional ball physics that decides *how many* chances each side
+##     gets. Chance VOLUME is modelled from the attack-vs-defence gap; the scale
+##     and base conversion are calibrated to real-football aggregates (validated
+##     in tests/test_engine.gd). The per-shot FORM is PM98's; the volume model
+##     and the numeric constants are ours, tuned to the same output windows.
 ##
 ## Attribute codes (Spanish in the file) -> meaning:
 ##   VE pace · RE stamina · AG aggression · CA ability(quality) · RM heading/finishing
 ##   RG dribbling · PA passing · TI shooting · EN tackling · PO goalkeeping
 
+
+## Microsoft C runtime LCG -- the exact PRNG in PM98's match sim (FUN_005ec250).
+## Verified against MANAGER.EXE at 0x5ec250. GDScript ints are 64-bit so the
+## multiply does not overflow before the 32-bit mask.
+class Pm98Rng extends RefCounted:
+	var state: int
+
+	func _init(seed_: int) -> void:
+		state = seed_ & 0xFFFFFFFF
+
+	## One 15-bit draw in [0, 32767] -- identical to PM98's rand().
+	func next() -> int:
+		state = (state * 214013 + 2531011) & 0xFFFFFFFF
+		return (state >> 16) & 0x7FFF
+
+	## PM98's probability idiom `(rand()*1000)>>15 < permil`: true w.p. permil/1000.
+	func chance_permil(permil: int) -> bool:
+		return ((next() * 1000) >> 15) < permil
+
+
 # --- tunables (set in tests/test_engine.gd against real-football targets) -----
-const BASE_HOME := 1.50   # expected home goals between evenly matched sides
-const BASE_AWAY := 1.10   # expected away goals between evenly matched sides
-const SCALE := 20.0       # attribute-gap -> goal-rate sensitivity (bigger = flatter)
-const GK_WEIGHT := 0.35   # share of a side's defensive resistance from the keeper
-const LAMBDA_CAP := 6.0   # safety clamp on expected goals
+# Per-shot model: chances ~ base + gap*slope, each converts at conv permil.
+const BASE_SHOTS_HOME := 12.5   # chances for an evenly matched home side
+const BASE_SHOTS_AWAY := 11.0   # chances for an evenly matched away side
+const SHOT_SLOPE := 0.30        # extra chances per point of att-vs-defence gap
+const SHOTS_MIN := 2            # floor on chances per side
+const BASE_CONV_HOME := 118     # home conversion (permil) at zero gap
+const BASE_CONV_AWAY := 102     # away conversion (permil) at zero gap
+const CONV_SLOPE := 4.0         # conversion permil per point of gap
+const CONV_LO := 25             # clamp: a hopeless chance still converts ~2.5%
+const CONV_HI := 350            # clamp: even a sitter is not a certainty
+const GK_WEIGHT := 0.35         # share of a side's defensive resistance from the keeper
 
 # Outfield attacking score weights (sum 1.0).
 const _ATK := {"CA": 0.28, "RM": 0.18, "TI": 0.16, "RG": 0.16, "PA": 0.12, "VE": 0.10}
@@ -91,33 +132,49 @@ static func _resistance(r: Dictionary) -> float:
 	return (1.0 - GK_WEIGHT) * float(r["def"]) + GK_WEIGHT * float(r["gk"])
 
 
-## Expected goals for a side with ratings `att_side` against `def_side`.
-static func _expected(att_side: Dictionary, def_side: Dictionary, base: float) -> float:
-	var gap: float = float(att_side["att"]) - _resistance(def_side)
-	return clampf(base * exp(gap / SCALE), 0.05, LAMBDA_CAP)
+## Attack-vs-defence gap driving both chance volume and conversion for a side.
+static func _gap(att_side: Dictionary, def_side: Dictionary) -> float:
+	return float(att_side["att"]) - _resistance(def_side)
 
 
-## Knuth Poisson sampler (lambda is small here, so this is cheap).
-static func _poisson(rng: RandomNumberGenerator, lam: float) -> int:
-	if lam <= 0.0:
-		return 0
-	var l := exp(-lam)
-	var k := 0
-	var p := 1.0
-	while p > l:
-		k += 1
-		p *= rng.randf()
-	return k - 1
+## Number of clear chances a side creates (PM98 abstracts these out of the
+## positional sim; we model the count from the strength gap).
+static func _chances(gap: float, base: float) -> int:
+	return maxi(SHOTS_MIN, roundi(base + gap * SHOT_SLOPE))
+
+
+## Per-shot conversion probability (permil) -- PM98's finishing gate is linear
+## in skill; here the skill term is the att-vs-resistance gap off a venue base.
+static func _conv_permil(gap: float, base: int) -> int:
+	return clampi(roundi(base + gap * CONV_SLOPE), CONV_LO, CONV_HI)
+
+
+## Resolve one side's goals: roll each chance through PM98's MSVC-LCG permil gate.
+static func _resolve(prng: Pm98Rng, chances: int, conv: int) -> int:
+	var goals := 0
+	for _i in chances:
+		if prng.chance_permil(conv):
+			goals += 1
+	return goals
 
 
 ## Simulate one match. `home`/`away` are team_ratings() dicts.
-## Returns {home_goals, away_goals, lambda_home, lambda_away}.
+## Returns {home_goals, away_goals, shots_home, shots_away, conv_home, conv_away}.
 static func simulate(rng: RandomNumberGenerator, home: Dictionary, away: Dictionary) -> Dictionary:
-	var lh := _expected(home, away, BASE_HOME)
-	var la := _expected(away, home, BASE_AWAY)
+	# Seed PM98's LCG from the season RNG so a fixed test seed stays reproducible
+	# while the per-shot rolls run on the authentic PM98 PRNG sequence.
+	var prng := Pm98Rng.new(rng.randi())
+	var gh := _gap(home, away)
+	var ga := _gap(away, home)
+	var sh := _chances(gh, BASE_SHOTS_HOME)
+	var sa := _chances(ga, BASE_SHOTS_AWAY)
+	var ch := _conv_permil(gh, BASE_CONV_HOME)
+	var ca := _conv_permil(ga, BASE_CONV_AWAY)
 	return {
-		"home_goals": _poisson(rng, lh),
-		"away_goals": _poisson(rng, la),
-		"lambda_home": lh,
-		"lambda_away": la,
+		"home_goals": _resolve(prng, sh, ch),
+		"away_goals": _resolve(prng, sa, ca),
+		"shots_home": sh,
+		"shots_away": sa,
+		"conv_home": ch,
+		"conv_away": ca,
 	}

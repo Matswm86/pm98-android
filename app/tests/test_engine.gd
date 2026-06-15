@@ -30,8 +30,10 @@ func _run() -> bool:
 		push_error("expected 20 Premier clubs, got %d" % clubs.size())
 		return false
 	print("=== PM98 match engine — %d-season Premier League validation ===" % SEASONS)
-	print("Tunables: BASE_HOME=%.2f BASE_AWAY=%.2f SCALE=%.1f GK_WEIGHT=%.2f" % [
-		MatchEngine.BASE_HOME, MatchEngine.BASE_AWAY, MatchEngine.SCALE, MatchEngine.GK_WEIGHT])
+	print("Tunables: shots H/A=%.1f/%.1f conv H/A=%d/%d permil slope shot/conv=%.2f/%.1f GK_W=%.2f" % [
+		MatchEngine.BASE_SHOTS_HOME, MatchEngine.BASE_SHOTS_AWAY,
+		MatchEngine.BASE_CONV_HOME, MatchEngine.BASE_CONV_AWAY,
+		MatchEngine.SHOT_SLOPE, MatchEngine.CONV_SLOPE, MatchEngine.GK_WEIGHT])
 	_print_ratings(clubs)
 
 	var rng := RandomNumberGenerator.new()

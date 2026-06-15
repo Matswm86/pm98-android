@@ -1,7 +1,8 @@
 # PM98 match engine — reverse-engineering map (Path 2)
 
-Status: **engine located and architecturally mapped**; per-event probability
-formulas + RNG not yet reconstructed (next session). All addresses are virtual
+Status: **engine located, mapped, RNG reconstructed (verified), scoring path
+decoded, faithful per-shot model folded into `app/scripts/MatchEngine.gd`.**
+All addresses are virtual
 addresses in `extracted/Premier Manager 98/MANAGER.EXE`, derived from the Ghidra
 12.1.2 analysis at `~/ghidra-projects/pm98` (decompiled C dumps under
 `docs/re/{decompiled,sim,flow}/`). Tooling: `tools/re/*.py` + `tools/re/ghidra_scripts/*.java`.
@@ -79,15 +80,92 @@ The original "MATCH RESULT" anchor (string 0x653e48 pushed at 0x46a338) lives in
 the display method `0x46a110`, reached only via vtable `0x627f9c` (virtual method,
 no direct caller — why the call-xref heuristic first mislocated it).
 
-## RNG — still open
-Not the MSVC CRT `rand()` (LCG multiplier 214013/0x343FD is absent from the whole
-image). The lone `0x269EC3` at 0x5ec268 is in a string/resource helper, not a PRNG.
-Custom PRNG location is the next-session target (search the 9 generators for the
-common arithmetic-only seed-mutating callee).
+## RNG — SOLVED (it IS MSVC `rand()`; prior "absent" claim was wrong)
 
-## Next session (precise entry points)
-1. Decompile the GOAL generator: of the 9 generators, find the one that enqueues
-   `type=7`; read its probability gate (team-strength + attribute inputs + RNG roll).
-2. Identify the RNG by its callers inside the generators.
-3. Map the match loop `0x5983f0/0x598690/0x598740` (minute progression, possession).
-4. Extract the scoreline distribution and fold a faithful model into `MatchEngine.gd`.
+`FUN_005ec250` @ **0x5ec250** is the PRNG, the standard Microsoft C runtime LCG:
+
+```
+state = state*214013 + 2531011        // global state @ 0x6d3184
+return (state >> 16) & 0x7FFF          // 15-bit, [0, 32767]
+```
+
+The earlier "multiplier 214013/0x343FD absent → not MSVC rand()" conclusion was a
+**byte-grep artefact**: the compiler strength-reduced `*214013` into a lea/shl/sub
+chain, so `0x343FD` never appears as a literal. Verified against the real bytes at
+file-offset 0x1eb650:
+```
+a1 84 31 6d 00        mov  eax,[0x6d3184]
+8d 0c 40              lea  ecx,[eax+eax*2]      ; 3*eax
+8d 14 88              lea  edx,[eax+ecx*4]      ; 13*eax
+c1 e2 04  03 d0       shl  edx,4 ; add edx,eax  ; 209*eax
+c1 e2 08  2b d0       shl  edx,8 ; sub edx,eax  ; 53503*eax
+8d 84 90 c3 9e 26 00  lea  eax,[eax+edx*4+0x269ec3] ; (1+4*53503)*eax + inc = 214013*eax + 2531011
+a3 84 31 6d 00        mov  [0x6d3184],eax
+c1 f8 10  25 ff 7f..  sar  eax,16 ; and eax,0x7fff
+c3                    ret
+```
+`53503*4 + 1 = 214013 = 0x343FD`; increment `0x269ec3 = 2531011` is the lea
+displacement (the `0x269EC3 @ 0x5ec268` the prior note dismissed). A GDScript port
+of this LCG reproduces the canonical `srand(1)` sequence `41, 18467, 6334, 26500,
+19169` exactly.
+
+**Probability idiom:** the sim never uses the raw roll; it scales it, e.g.
+`(int)(roll*1000) >> 15  <  threshold` → uniform compare in [0,1000), i.e. a
+**per-mil** probability. `(roll*N)>>15` generalises to a uniform integer in [0,N).
+`005ec240`/`005ec230` are a save/restore pair that brackets every *commentary*
+roll so cosmetic text does not perturb the deterministic match seed.
+
+## Scoring path — DECODED
+
+`FUN_00598740` (per-tick driver, "minute loop") classifies the live ball/play state
+with predicates `FUN_0058f100 / 0058ede0 / 0058fbe0 / 0058f140` (shot-on-goal,
+goal-scored, corner, throw-in) and calls the **resolution dispatcher**
+`FUN_005966d0(outcome)` where `outcome` is a category 1-7:
+
+| outcome | meaning | event(s) enqueued |
+|---|---|---|
+| 6 | **goal scored** | `8 - (team!=defending)` = **7 (GOAL)** or 8 (own goal) |
+| 5 / 7 | foul / penalty conceded | yellow 3, red 4/5, normal 1, offside 0xb, pen 9 |
+| 4 | corner | 0xc |
+| 1 | phase / kick-off | 0x1c-0x20 |
+| 2,3 | restart / buildup | 0 |
+
+The actual goal/no-goal decision is upstream of the dispatcher, in
+`FUN_005aeda0` (per-player **shot/tackle/save resolver**, 23 RNG calls — the
+heaviest user). Its outcome gates are **linear in player attributes** thresholded
+against the per-mil LCG roll. Player object layout used: `+0x384` skill, `+0x40`
+position (9 = forward, gets a bonus), `+0x60` engaged-flag, `+0x18c` → match obj.
+Representative gates (permil):
+- shot proceeds to resolution: `roll < 900` (90%)
+- good-facing goal gate: `(skill + (pos==9?20:0))*5 − (engaged?200:0) + 200`
+- medium/poor facing: `skill*2` / `skill` / `skill/2` (± forward bonus)
+- it writes the outcome class into `match+0x461` bits {0:team,1,2} which the
+  dispatcher then reads to pick commentary.
+
+So the engine is a **deterministic positional ball-physics sim** (player/ball
+fixed-point coords like 0x134000); a closed-form scoreline formula does NOT exist
+to extract. Goals emerge from per-shot Bernoulli resolution over chances the
+positional sim creates.
+
+## Folded into the GDScript engine (done)
+
+`app/scripts/MatchEngine.gd` (Phase 2) now uses:
+- `Pm98Rng` = the exact MSVC LCG above (bit-verified).
+- a **per-shot Bernoulli** scoreline: each side gets N chances (modelled from the
+  attack-vs-defence gap, since chance *volume* is an emergent property of the
+  positional physics we do not port), each converted by a permil gate linear in
+  the strength gap — the *form* of `FUN_005aeda0`'s finishing gate.
+- Calibrated to real-football windows: 300-season PL harness ALL PASS
+  (goals 2.54, home 45.1%, draw 25.3%, away 29.6%, champ 79.9, bottom 30.3);
+  `test_divisions` OK. Honest framing in the file header: form is PM98's, the
+  volume model + constants are ours.
+
+## Open / next session (optional, lower priority)
+1. Decompile predicates `FUN_0058ede0 / 0058f100 / 0058fbe0` (NOT yet in the dump)
+   to read the positional goal-line / shot-on-target geometry, if a closer port of
+   chance *volume* is ever wanted.
+2. Map the other generators (`58f3c0` shots 0x17-0x20, `5a7260`/`5ab5a0`/`5b41c0`
+   shot-miss types 0xf/0x10/0x11) for richer event commentary if the app ever
+   shows a live match feed.
+3. Path 3: domestic league position-prize table + numeric defaults (see
+   `finance_constants.md`).
