@@ -7,14 +7,15 @@ fidelity against the original screenshot before/while wiring the engine UI.
 All chrome is real game art (RECURSOS FONDO/BARRA + WINFONTS PROMAN). Layout + the
 beveled stat cells are reconstructed to match the original LEAGUE TABLES screen.
 """
+
 from __future__ import annotations
 
 import json
 import sys
 from pathlib import Path
 
-from PIL import Image
 from fnt_to_bmfont import WINFONTS, Fnt
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[2]
 ART = ROOT / "app" / "art"
@@ -23,10 +24,10 @@ ART = ROOT / "app" / "art"
 C_TITLE = (232, 240, 255)
 C_TEXT = (220, 230, 245)
 C_DIM = (150, 175, 210)
-C_CELL = (40, 70, 120)      # blue stat cell
+C_CELL = (40, 70, 120)  # blue stat cell
 C_CELL_HI = (70, 110, 165)  # top-left bevel
-C_CELL_LO = (20, 40, 80)    # bottom-right bevel
-C_PTS = (150, 40, 30)       # points cell (red)
+C_CELL_LO = (20, 40, 80)  # bottom-right bevel
+C_PTS = (150, 40, 30)  # points cell (red)
 C_PTS_HI = (200, 80, 60)
 C_ROW_A = (28, 44, 78)
 C_ROW_B = (22, 36, 66)
@@ -45,13 +46,15 @@ def text(canvas: Image.Image, fnt: Fnt, s: str, x: int, y: int, col, right=False
         if 0 <= i < len(fnt.entries) - 1:
             w, im = fnt.glyph(i)
         else:
-            w, im = fnt.pix_height // 3, Image.new("L", (max(1, fnt.pix_height // 3), fnt.pix_height), 0)
+            w, im = (
+                fnt.pix_height // 3,
+                Image.new("L", (max(1, fnt.pix_height // 3), fnt.pix_height), 0),
+            )
         widths.append(w)
         ims.append(im)
     total = sum(widths) + max(0, len(widths) - 1)
     if right:
         x -= total
-    solid = Image.new("RGB", (1, 1), col)
     for w, im in zip(widths, ims):
         if w > 0:
             tile = Image.new("RGB", (w, fnt.pix_height), col)
@@ -66,6 +69,27 @@ def cell(canvas, x, y, w, h, base, hi, lo):
     canvas.paste(Image.new("RGB", (1, h), hi), (x, y))
     canvas.paste(Image.new("RGB", (w, 1), lo), (x, y + h - 1))
     canvas.paste(Image.new("RGB", (1, h), lo), (x + w - 1, y))
+
+
+KIT_SRC = (0, 0, 31, 64)  # home kit = left crop of the 48x64 MINIESC PNG
+_KIT_CACHE: dict[int, Image.Image | None] = {}
+
+
+def kit(cid: int):
+    if cid not in _KIT_CACHE:
+        p = ROOT / "app" / "art" / "kits" / f"{cid}.png"
+        _KIT_CACHE[cid] = Image.open(p).convert("RGBA").crop(KIT_SRC) if p.exists() else None
+    return _KIT_CACHE[cid]
+
+
+def draw_kit(canvas, cid, x, y, box_w, box_h):
+    im = kit(cid)
+    if im is None:
+        return
+    s = min(box_w / im.width, box_h / im.height)
+    w, h = max(1, round(im.width * s)), max(1, round(im.height * s))
+    im2 = im.resize((w, h), Image.NEAREST)
+    canvas.paste(im2, (int(x + (box_w - w) / 2), int(y + (box_h - h) / 2)), im2)
 
 
 def background() -> Image.Image:
@@ -97,8 +121,20 @@ def standings(seed: int = 7):
         return (sum(t[0] for t in xi) / len(xi), sum(t[1] for t in xi) / len(xi), gk)
 
     rng = __import__("random").Random(seed)
-    tbl = {c["id"]: {"name": c["name"], "P": 0, "W": 0, "D": 0, "L": 0, "GF": 0, "GA": 0, "Pts": 0}
-           for c in prem}
+    tbl = {
+        c["id"]: {
+            "id": c["id"],
+            "name": c["name"],
+            "P": 0,
+            "W": 0,
+            "D": 0,
+            "L": 0,
+            "GF": 0,
+            "GA": 0,
+            "Pts": 0,
+        }
+        for c in prem
+    }
     R = {c["id"]: rating(c) for c in prem}
     ids = [c["id"] for c in prem]
     for h in ids:  # single round-robin = a real half-season table (~19 games)
@@ -118,7 +154,9 @@ def standings(seed: int = 7):
                 t["W"] += gf > gaa
                 t["D"] += gf == gaa
                 t["L"] += gf < gaa
-    rows = sorted(tbl.values(), key=lambda r: (-r["Pts"], -(r["GF"] - r["GA"]), -r["GF"], r["name"]))
+    rows = sorted(
+        tbl.values(), key=lambda r: (-r["Pts"], -(r["GF"] - r["GA"]), -r["GF"], r["name"])
+    )
     return rows
 
 
@@ -130,7 +168,7 @@ def compose(out: str):
     f18 = load_font("PROMAN18.FNT")
     f12 = load_font("PROMAN12.FNT")
 
-    text(cv, f24, "LEAGUE TABLES", 215, 14, C_TITLE)
+    text(cv, f24, "LEAGUE TABLES", 200, 14, C_TITLE)
     text(cv, f12, "Manager", 12, 10, C_TEXT)
     text(cv, f12, "MANCHESTER UTD.", 12, 26, C_DIM)
     text(cv, f12, "Premier", 560, 10, C_TEXT)
@@ -138,39 +176,56 @@ def compose(out: str):
 
     # Panel header
     text(cv, f18, "PREMIER LEAGUE", 16, 70, C_TITLE)
-    text(cv, f12, "1997-98", 470, 76, C_DIM)
+    text(cv, f12, "1997-98", 410, 76, C_DIM)
 
-    # Column headers
-    cols = [("P", 348), ("W", 380), ("D", 412), ("L", 444), ("GF", 480), ("GA", 516), ("PTS", 560)]
+    # Column headers (compressed left of the LEADER panel)
+    cols = [("P", 320), ("W", 348), ("D", 376), ("L", 404), ("GF", 438), ("GA", 472), ("PTS", 532)]
     hy = 96
     text(cv, f12, "POS", 16, hy, C_DIM)
-    text(cv, f12, "TEAM", 60, hy, C_DIM)
+    text(cv, f12, "TEAM", 64, hy, C_DIM)
     for label, x in cols:
         text(cv, f12, label, x, hy, C_DIM, right=True)
 
     rows = standings()
     n = len(rows)
-    y0, rh = 112, 17
+    y0, rh, row_w = 112, 17, 524
     for i, r in enumerate(rows):
         y = y0 + i * rh
-        cv.paste(Image.new("RGB", (612, rh - 1), C_ROW_A if i % 2 == 0 else C_ROW_B), (14, y))
+        cv.paste(Image.new("RGB", (row_w, rh - 1), C_ROW_A if i % 2 == 0 else C_ROW_B), (14, y))
         # zone tag
         if i < 5:
             cv.paste(Image.new("RGB", (3, rh - 1), C_PROMO), (14, y))
         elif i >= n - 3:
             cv.paste(Image.new("RGB", (3, rh - 1), C_RELEG), (14, y))
         text(cv, f12, str(i + 1), 36, y + 2, C_TEXT, right=True)
-        text(cv, f12, r["name"][:18], 60, y + 2, C_TEXT)
-        for (key, x), val in zip([("P", 348), ("W", 380), ("D", 412), ("L", 444),
-                                  ("GF", 480), ("GA", 516)], [r["P"], r["W"], r["D"], r["L"], r["GF"], r["GA"]]):
-            cell(cv, x - 26, y + 1, 24, rh - 3, C_CELL, C_CELL_HI, C_CELL_LO)
-            text(cv, f12, str(val), x - 4, y + 2, C_TEXT, right=True)
-        cell(cv, 560 - 28, y + 1, 28, rh - 3, C_PTS, C_PTS_HI, C_CELL_LO)
-        text(cv, f12, str(r["Pts"]), 560 - 4, y + 2, (255, 235, 220), right=True)
+        draw_kit(cv, r.get("id", -1), 42, y, 16, rh - 1)
+        text(cv, f12, r["name"][:16], 64, y + 2, C_TEXT)
+        for x, val in zip(
+            [320, 348, 376, 404, 438, 472], [r["P"], r["W"], r["D"], r["L"], r["GF"], r["GA"]]
+        ):
+            cell(cv, x - 24, y + 1, 22, rh - 3, C_CELL, C_CELL_HI, C_CELL_LO)
+            text(cv, f12, str(val), x - 3, y + 2, C_TEXT, right=True)
+        cell(cv, 508, y + 1, 28, rh - 3, C_PTS, C_PTS_HI, C_CELL_LO)
+        text(cv, f12, str(r["Pts"]), 532, y + 2, (255, 235, 220), right=True)
 
-    # RETURN button (green) bottom-right
-    cell(cv, 548, 452, 84, 22, C_PROMO, (70, 150, 100), (20, 60, 40))
-    text(cv, f12, "RETURN", 560, 457, (235, 255, 240))
+    # LEADER panel (right strip): leader kit + name, division tabs, GOAL SCORERS, RETURN.
+    px, pw = 548, 84
+    cell(cv, px, 92, pw, 110, C_CELL, C_CELL_HI, C_CELL_LO)
+    text(cv, f12, "LEADER", px + pw // 2 + 24, 96, C_TITLE, right=True)
+    if rows:
+        draw_kit(cv, rows[0].get("id", -1), px + 18, 112, 48, 70)
+        text(cv, f12, rows[0]["name"][:13], px + 4, 186, C_DIM)
+    for t, name in enumerate(["Premier", "First", "Second", "Third"]):
+        ty = 214 + t * 26
+        sel = t == 0
+        cell(
+            cv, px, ty, pw, 22, C_PTS if sel else C_CELL, C_PTS_HI if sel else C_CELL_HI, C_CELL_LO
+        )
+        text(cv, f12, name, px + 8, ty + 4, (255, 235, 220) if sel else C_TEXT)
+    cell(cv, px, 422, pw, 22, C_CELL, C_CELL_HI, C_CELL_LO)
+    text(cv, f12, "GOAL SCORERS", px + 8, 426, C_TEXT)
+    cell(cv, px, 452, pw, 22, C_PROMO, (70, 150, 100), (20, 60, 40))
+    text(cv, f12, "RETURN", px + 12, 457, (235, 255, 240))
 
     cv.save(out)
     print(f"wrote {out} (640x480) from real assets + live table")

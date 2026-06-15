@@ -3,9 +3,10 @@
 
 The image entries (IMG/RECURSOS/...) are Windows DIBs with the file-header magic
 changed from "BM" to "DM" (Dinamic) and an EMPTY embedded palette: the real colours
-come from the shared 256-colour VGA palette stored as RGBQUAD (B,G,R,0) at
-DAT.PKF offset 0x5ca (same palette extract_badges.py uses for the crests). Index 0
-is the transparent background.
+come from the shared 256-colour VGA palette stored as 4-byte entries R,G,B,0 (VGA-DAC
+order, NOT BMP RGBQUAD B,G,R,0) at DAT.PKF offset 0x5ca. Index 0 is the transparent
+background. (Verified by ground truth: the PL trophy crown is gold and Man Utd/Arsenal
+kits red, Blackburn/Chelsea blue, only under R,G,B order; B,G,R swaps red<->blue.)
 
 So rendering = locate the entry (tools/re/pkf_unpack), patch "DM"->"BM" so Pillow
 parses the DIB, re-apply the shared VGA palette, make index 0 transparent.
@@ -31,7 +32,7 @@ def vga_palette() -> list[int]:
     b = (GAME / "DAT.PKF").read_bytes()[PAL_OFFSET : PAL_OFFSET + 1024]
     pal: list[int] = []
     for i in range(256):
-        pal += [b[i * 4 + 2], b[i * 4 + 1], b[i * 4]]  # B,G,R,0 -> R,G,B
+        pal += [b[i * 4], b[i * 4 + 1], b[i * 4 + 2]]  # stored R,G,B,0 (VGA-DAC order)
     return pal
 
 

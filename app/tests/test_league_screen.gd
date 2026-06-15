@@ -50,6 +50,15 @@ func _run() -> void:
 	await process_frame
 	ok = _assert(screen._rows.size() == 20, "screen received 20 standings rows") and ok
 
+	# Real club kits (extracted from MINIESC.PKF, id-named) must load for every row.
+	var kits_ok := true
+	for c in prem:
+		var id := int(c["id"])
+		var kpath := "res://art/kits/%d.png" % id
+		kits_ok = kits_ok and ResourceLoader.exists(kpath) and screen._kit(id) != null
+	ok = _assert(kits_ok, "all 20 Premier club kits load (res://art/kits/<id>.png)") and ok
+	ok = _assert(screen._kit(-1) == null, "missing-kit id resolves to null (no crash)") and ok
+
 	# Force a paint pass (RenderingServer is the dummy driver headless, but _draw
 	# running without error still catches null-deref / API-misuse bugs).
 	screen.queue_redraw()

@@ -5,8 +5,9 @@ Builds on the reversed PCF5 container (pkf_unpack) + image format (pkf_image). T
 game stores two bitmap kinds:
 
   * "DM" entries  -- Dinamic DIBs (the "BM" magic patched to "DM"), drawn with the
-    SHARED 256-colour VGA palette at DAT.PKF+0x5ca. Index 0 = transparent. These are
-    crests, trophies, icons, sprites. (Same path pkf_image.py proved on the trophy.)
+    SHARED 256-colour VGA palette at DAT.PKF+0x5ca (4-byte entries R,G,B,0 -- VGA-DAC
+    order, NOT BMP B,G,R,0). Index 0 = transparent. These are crests, kits, trophies,
+    icons, sprites. (Same path pkf_image.py proved on the trophy + the EQ96 kits.)
   * "BM" entries  -- standard / OS/2-core Windows DIBs used for full screens
     (FONDO*, ESTADIO*, CAMPO, BARRA*). Many OMIT their palette (bfOffBits points
     straight past the header), so their real colours come from an external RIFF
@@ -41,7 +42,7 @@ def vga_palette() -> list[int]:
     b = (GAME / "DAT.PKF").read_bytes()[VGA_OFFSET : VGA_OFFSET + 1024]
     pal: list[int] = []
     for i in range(256):
-        pal += [b[i * 4 + 2], b[i * 4 + 1], b[i * 4]]  # stored B,G,R,0
+        pal += [b[i * 4], b[i * 4 + 1], b[i * 4 + 2]]  # stored R,G,B,0 (VGA-DAC order)
     return pal
 
 
