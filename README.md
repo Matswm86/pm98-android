@@ -1,6 +1,6 @@
 # PM98
 
-<img src="docs/img/pm98-pl-trophy.png?v=2" alt="Premier League trophy, rendered from the original PM98 game files" width="150" align="right"/>
+<img src="docs/img/pm98-match-header.png" alt="The PM98 2D match view — original DATSIM sprites on a 3/4 broadcast pitch" width="320" align="right"/>
 
 An Android remake of **Premier Manager 98**, rebuilt from the original game's own
 data. Take over a club, build your squad, run the season.
@@ -9,9 +9,10 @@ data. Take over a club, build your squad, run the season.
 > save/load, line-up and tactics, and a transfer market, alongside the original
 > management screens rebuilt pixel-for-pixel from the game's own art.
 
-<sub>The trophy above is decoded straight from the original game's archives by
-`tools/re/pkf_image.py` (see the reverse-engineering notes in `docs/re/`). Original
-game art © Dinamic Multimedia; shown here for this non-commercial fan remake.</sub>
+<sub>The match view above is a real capture from the running build: the original game's own
+DATSIM player sprites on a 3/4 broadcast pitch, driven by the reverse-engineered match engine
+(see the reverse-engineering notes in `docs/re/`). Original game art © Dinamic Multimedia;
+shown here for this non-commercial fan remake.</sub>
 
 ## Download
 
