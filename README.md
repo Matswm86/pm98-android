@@ -40,38 +40,57 @@ prompted. Reinstalling over an older build? Uninstall the old one first.
   corners) using the original game's own English match text, with real scorers.
 - **Club finances:** income and expenses over a 52-week season, structured on the
   original game's finance ledger (tickets, TV, sponsors, wages).
-- **The original screens, rebuilt:** the Main Menu hub, League Tables, Line-Up,
-  Squad, Finances and Transfer Market are reconstructed at the exact pixel
-  coordinates reversed out of the game's executable, using its own icons, fonts
-  and backgrounds (see `docs/re/`). Runs in landscape, scaled to fit any phone.
+- **The original screens, rebuilt:** the Title / front-door menu, the Main Menu hub,
+  League Tables, Line-Up, Squad, Finances, Transfer Market, the Board of Directors and
+  the Stadium are reconstructed at the exact pixel coordinates reversed out of the
+  game's executable, using its own icons, fonts and backgrounds (see `docs/re/`). The
+  app opens on the real PREMIER MANAGER 98 title screen. Runs in landscape, scaled to
+  fit any phone.
 
 ## Screenshots
 
-The original management screens, rebuilt at the exact pixel coordinates reversed out
-of the game's executable, from its own icons, fonts and backgrounds:
+The original screens, rebuilt at the exact pixel coordinates reversed out of the
+game's executable, from its own icons, fonts and backgrounds:
 
 <p>
+  <img src="screenshots/title.png" alt="Title / front-door menu" width="240"/>
   <img src="screenshots/menu.png" alt="Main menu hub" width="240"/>
   <img src="screenshots/league_table.png" alt="League table" width="240"/>
-  <img src="screenshots/lineup.png" alt="Line-up and formation" width="240"/>
 </p>
 <p>
+  <img src="screenshots/lineup.png" alt="Line-up and formation" width="240"/>
   <img src="screenshots/squad.png" alt="Squad management" width="240"/>
-  <img src="screenshots/finance.png" alt="Club finances" width="240"/>
   <img src="screenshots/transfer.png" alt="Transfer market" width="240"/>
 </p>
+<p>
+  <img src="screenshots/finance.png" alt="Club finances" width="240"/>
+  <img src="screenshots/directiva.png" alt="Board of Directors" width="240"/>
+  <img src="screenshots/stadium.png" alt="Stadium" width="240"/>
+</p>
 
-<sub>Rendered from the reconstruction renderers (`tools/re/preview_*.py`), which mirror
-the in-game scenes pixel-for-pixel; each runs in landscape with a marble bezel on-device.</sub>
+<sub>These are reference renders from the reconstruction renderers
+(`tools/re/preview_*.py`), which mirror each rebuilt scene pixel-for-pixel from the
+exact coordinates and assets the in-engine screens use. They are not live device
+captures (see the note below); on a phone each screen runs in landscape with a marble
+bezel in the side margins.</sub>
+
+## Status
+
+This is an early build. The original-art screens above are reached as full-screen
+overlays from within the app, which opens on the title screen; the surrounding
+navigation (browsing the database, picking a club, the week-to-week career hub and the
+match feed) currently uses a simpler functional UI rather than the original art. Making
+the whole app look like PM98 end-to-end, with the original Main Menu hub as the live
+career screen, is the next direction.
 
 ## Coming next
 
-More of the original screens (the stadium, the boardroom), then training, the cups
-and Europe, injuries and suspensions, and player contracts. Club crests, player
-photos and a 2D match view are decoded from the game files (the archive format is
-fully cracked, see `docs/re/pkf_format.md`) and are being wired in. The season
-simulation uses the original game's verified random-number generator and a per-shot
-model tuned to realistic football results.
+The original Main Menu as the live in-game hub, then training, the cups and Europe,
+injuries and suspensions, and player contracts. Club crests, player photos and a 2D
+match view are decoded from the game files (the archive format is fully cracked, see
+`docs/re/pkf_format.md`) and are being wired in. The season simulation uses the
+original game's verified random-number generator and a per-shot model tuned to
+realistic football results.
 
 ## Built with
 
