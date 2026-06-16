@@ -88,9 +88,12 @@ stays on-pitch every minute, scoreboard counts goals, ticker tracks lines) and b
   broadcast pitch (drawn vectorially) instead of reversing that tile-projection/scroll
   engine — the same pragmatic call made for the STADIUM pre-render. Reversing the scroll
   camera + tile layout is the next refinement.
-- Player **kit recolour** approximates the original `PAL*.DAT` LUT swap with a hue shift
-  of the kit ramp; the exact per-team LUT (incl. `JUGCAM.IND` shirt selection) is a
-  refinement. The skin/boots pass through unchanged.
+- Player **kit colour** is now REAL per-club: the sprite is split into a true-colour base
+  layer (skin/boots/detail) + a kit-luma layer that MatchScreen tints to each club's actual
+  kit colour, derived from the game's own kit art `app/art/kits/<club-id>.png` (the dominant
+  saturated colour of the home/away shirt half). Clashing fixtures fall back to a contrasting
+  colour. Still a refinement: pulling a club's SECONDARY colour for a better clash fallback,
+  shirt-vs-shorts as two colours, and the original `PAL*.DAT` LUT / `JUGCAM.IND` shirt path.
 - The 8-direction facing uses the JUG group-of-8 layout with a tunable `DIR_ANGLE` map;
   fine-tune the column→angle mapping against the real CI render.
 - Player **leg animation** cycles the 3 exported anim rows; the full JUG animation
