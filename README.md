@@ -57,6 +57,14 @@ prompted. Reinstalling over an older build? Uninstall the old one first.
   season's **league champions** and **F.A. Cup winners** (the league runners-up step up if
   one club did the Double), a single neutral-venue match settled on penalties if level,
   around the game's own Charity Shield art.
+- **European competitions:** finish high and you qualify for Europe the next season,
+  the same way the original does: the **European Cup** (champions), the **U.E.F.A. Cup**
+  (runners-up) and the **Cup Winners' Cup** (F.A. Cup winners). Each is a two-legged
+  knockout (home and away, settled on aggregate then penalties) against a field of strong
+  foreign clubs from the game's own database, with prize money on the reversed **UEFA
+  schedule** (1M to compete, 510k a win, bonuses for reaching the last 8 and last 4), and
+  its own original trophy. Watch every competition through to its final even when you're
+  not in it.
 - **Watch a match:** a minute-by-minute commentary feed (goals, cards, saves,
   corners) using the original game's own English match text, with real scorers.
 - **Club finances:** income and expenses over a 52-week season, structured on the
@@ -124,6 +132,15 @@ winners around the game's own shield art. Captured from the running build:
 
 <p>
   <img src="screenshots/charity_shield.png" alt="Charity Shield screen — champions v F.A. Cup winners, around the real shield art" width="420"/>
+</p>
+
+**European competitions** — qualify from last season's finish into the European Cup, the
+U.E.F.A. Cup or the Cup Winners' Cup: two-legged knockouts against strong foreign clubs,
+each around its own original trophy, with the reversed UEFA prize money. Captured from the
+running build (the manager's Cup Winners' Cup run):
+
+<p>
+  <img src="screenshots/european_cup.png" alt="European competition screen — a two-legged knockout run against foreign clubs, around the real trophy" width="420"/>
 </p>
 
 The database and the new-career club picker, all in PM98 chrome (the green data-browser

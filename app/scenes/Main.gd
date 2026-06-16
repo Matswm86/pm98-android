@@ -304,7 +304,12 @@ func _cup_shot() -> void:
 		return
 	var lg: Dictionary = GameDB.leagues[0]
 	var clubs := GameDB.clubs_in_league(lg["id"])
-	clubs.sort_custom(func(a, b): return a["name"] < b["name"])
+	# Manage the strongest club in the division: most likely to win the league and so
+	# play in the European Cup, giving the European capture a real manager's run.
+	clubs.sort_custom(func(a, b):
+		var ra := MatchEngine.team_ratings(a)
+		var rb := MatchEngine.team_ratings(b)
+		return (ra["att"] + ra["def"] + ra["gk"]) > (rb["att"] + rb["def"] + rb["gk"]))
 	_begin_career(lg, clubs[0])
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 717171            # fixed seed -> reproducible capture
@@ -333,15 +338,42 @@ func _cup_shot() -> void:
 			c.queue_free()
 	while not _career.season_over():
 		_career.advance_week(rng)
-	_career.advance_season(GameDB.leagues, rng)
+	_career.advance_season(GameDB.leagues, rng, _euro_pool())
 	_show_charity_shield()
 	await _settle()
 	_save_shot(dir, "charity_shield.png")
 	var cs: Dictionary = _career.charity_shield
-	print("CUP-SHOT done facup_rounds=%d champ=%d | lcup_rounds=%d champ=%d | charity winner=%d club=%s" % [
+	# Into the new season far enough for European rounds to have been drawn + played,
+	# then capture the European Cup screen around its real trophy art.
+	for c in get_children():
+		if c is CupScreen:
+			c.queue_free()
+	for _j in 30:
+		if _career.season_over():
+			break
+		_career.advance_week(rng)
+	_show_career()
+	await _settle()
+	# Showcase the European competition the manager actually qualified for (a real run,
+	# even if knocked out, reads better than a not-qualified comp). By qualification:
+	# champions -> European Cup, runners-up -> UEFA Cup, F.A. Cup winners -> Cup Winners'.
+	var show_key := "european_cup"
+	var mid: int = _career.club_id
+	if _career.last_champion_id == mid:
+		show_key = "european_cup"
+	elif _career.last_runners_up.slice(0, Career.UEFA_SPOTS).has(mid):
+		show_key = "uefa_cup"
+	elif _career._cwc_seed() == mid:
+		show_key = "cup_winners_cup"
+	var ec: Dictionary = _career.euro.get(show_key, {})
+	_show_cup_screen(ec, str(ec.get("name", "EUROPEAN CUP")).to_upper(), _euro_emblem(show_key))
+	await _settle()
+	_save_shot(dir, "european_cup.png")
+	print("CUP-SHOT done facup_rounds=%d champ=%d | lcup_rounds=%d champ=%d | charity winner=%d | euro_comps=%d show=%s ec_rounds=%d club=%s" % [
 		(b.get("rounds", []) as Array).size(), int(b.get("champion_id", -1)),
 		(lc.get("rounds", []) as Array).size(), int(lc.get("champion_id", -1)),
-		int(cs.get("winner_id", -1)), _career.club_name])
+		int(cs.get("winner_id", -1)), _career.euro.size(), show_key,
+		(ec.get("rounds", []) as Array).size(), _career.club_name])
 	get_tree().quit()
 
 
@@ -981,8 +1013,8 @@ func _show_stadium_screen() -> void:
 ## PM98-chrome browse listing the two domestic cups, each routing to its CupScreen. The
 ## next-match readout stays on the RIVAL/opponent icon; a full fixture calendar is future.
 func _show_competitions() -> void:
-	# Build the list dynamically: the Charity Shield only appears once it has been
-	# contested (from the second season on), so route by an action tag, not a fixed index.
+	# Build the list dynamically: the Charity Shield + European comps only appear once
+	# qualified for (from the second season on), so route by an action tag, not an index.
 	var rows: Array = []
 	var acts: Array = []
 	if not _career.charity_shield.is_empty():
@@ -992,17 +1024,59 @@ func _show_competitions() -> void:
 	acts.append("facup")
 	rows.append({"text": "COCA-COLA CUP", "value": _cup_status_word(_career.league_cup), "accent": CupScreen.C_GOLD})
 	acts.append("lcup")
-	_mount_browse("%s  -  COMPETITIONS" % _career.club_name, "Cups & shield", rows,
+	for key in ["european_cup", "uefa_cup", "cup_winners_cup"]:
+		if _career.euro.has(key):
+			var b: Dictionary = _career.euro[key]
+			rows.append({"text": str(b.get("name", "Europe")).to_upper(),
+				"value": _cup_status_word(b), "accent": CupScreen.C_GOLD})
+			acts.append("euro:" + key)
+	_mount_browse("%s  -  COMPETITIONS" % _career.club_name, "Cups, shield & Europe", rows,
 		func(i: int) -> void:
 			_dismiss_career_browse()
-			var act: String = acts[i]
-			if act == "charity":
-				_show_charity_shield()
-			elif act == "facup":
-				_show_cup_screen(_career.fa_cup, "F.A. CUP", "res://art/screens/cup/trophy.png")
-			else:
-				_show_cup_screen(_career.league_cup, "COCA-COLA CUP", "res://art/screens/cup/cocacola.png"),
+			_open_competition(acts[i]),
 		func() -> void: _dismiss_career_browse())
+
+## Route a COMPETITIONS chooser pick to its screen (each is a Cup.gd bracket on CupScreen,
+## bar the single-match Charity Shield), around the competition's own trophy art.
+func _open_competition(act: String) -> void:
+	if act == "charity":
+		_show_charity_shield()
+	elif act == "facup":
+		_show_cup_screen(_career.fa_cup, "F.A. CUP", "res://art/screens/cup/trophy.png")
+	elif act == "lcup":
+		_show_cup_screen(_career.league_cup, "COCA-COLA CUP", "res://art/screens/cup/cocacola.png")
+	elif act.begins_with("euro:"):
+		var key := act.substr(5)
+		var b: Dictionary = _career.euro.get(key, {})
+		_show_cup_screen(b, str(b.get("name", "EUROPE")).to_upper(), _euro_emblem(key))
+
+## The trophy art path for a European competition.
+func _euro_emblem(key: String) -> String:
+	match key:
+		"european_cup":
+			return "res://art/screens/cup/ligacamp.png"
+		"uefa_cup":
+			return "res://art/screens/cup/uefa.png"
+		_:
+			return "res://art/screens/cup/recopa.png"
+
+## Strong foreign clubs (outside the English pyramid) to fill the European fields. The
+## international set in game_db has no leagueId; rate each and take the strongest, frozen
+## into the Career at draw time. Passed to advance_season at each rollover.
+func _euro_pool() -> Array:
+	var scored: Array = []
+	for c in GameDB.clubs:
+		if c.get("leagueId") != null:
+			continue                       # English/league clubs aren't the foreign pool
+		if (c.get("players", []) as Array).is_empty():
+			continue
+		var r := MatchEngine.team_ratings(c)
+		scored.append({"c": c, "s": float(r["att"]) + float(r["def"]) + float(r["gk"])})
+	scored.sort_custom(func(a, b): return a["s"] > b["s"])
+	var out: Array = []
+	for e in scored.slice(0, 48):
+		out.append(e["c"])
+	return out
 
 ## A one-word status of the Charity Shield for the competitions list.
 func _charity_status_word() -> String:
@@ -1149,7 +1223,17 @@ func _cup_view(b: Dictionary) -> Dictionary:
 
 	# Status line.
 	var champ := int(b.get("champion_id", -1))
-	if champ == cid:
+	# A competition the manager never entered (European comps he didn't qualify for): no
+	# run, not a survivor. Domestic cups always include the whole division, so this never
+	# fires there. Still show the trophy + the draw, just flagged as not qualified.
+	if not Cup.still_in(b, cid) and run_rows.is_empty():
+		out["status"] = "NOT QUALIFIED"
+		out["status_col"] = CupScreen.C_DIM
+		if champ != -1:
+			out["sub"] = "%s won the %s." % [_cup_name(champ), cup_nm]
+		else:
+			out["sub"] = "You did not qualify. %d clubs remain." % (b.get("survivors", []) as Array).size()
+	elif champ == cid:
 		out["status"] = "WINNERS!"
 		out["status_col"] = CupScreen.C_GOLD
 		out["sub"] = "You have won the %s." % cup_nm
@@ -1771,7 +1855,7 @@ func _next_season() -> void:
 	# down and unrenewed players leave on a free (handled in Career.advance_season).
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
-	_career.advance_season(GameDB.leagues, rng)
+	_career.advance_season(GameDB.leagues, rng, _euro_pool())
 	_career.save()
 	_enter_career()
 

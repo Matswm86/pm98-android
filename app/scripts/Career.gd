@@ -47,6 +47,14 @@ var last_fa_winner_id: int = -1         # last season's F.A. Cup winners
 var last_runners_up: Array = []         # last season's league places 2.. (for UEFA spots)
 var charity_shield: Dictionary = {}     # the season-opener result; {} = not played
 
+# European competitions (qualified into from last season's domestic finish). Each is a
+# two-legged knockout (Cup.gd) over a field of this division's qualifier(s) + strong
+# foreign clubs. euro = {comp_key -> bracket}; the foreign entrants' ratings + names are
+# FROZEN here at draw time so the brackets resolve + save without GameDB.
+var euro: Dictionary = {}               # {"european_cup"/"uefa_cup"/"cup_winners_cup" -> bracket}
+var euro_ratings: Dictionary = {}       # foreign club id:int -> {att,def,gk}
+var euro_names: Dictionary = {}         # foreign club id:int -> String
+
 # Coca-Cola Cup options: two-legged rounds, a single-leg final, sequential round labels
 # (Round 1 -> Round 2 -> Qtr Finals -> Semifinals -> Final), a smaller purse than the F.A.
 # Cup, and a schedule that finishes earlier in the season (so the two finals don't clash).
@@ -59,6 +67,25 @@ const LEAGUE_CUP_OPTS := {
 # Charity Shield (champions v F.A. Cup winners, the season's curtain-raiser). A modest,
 # documented prize -- NOT a reversed PM98 figure (only the UEFA schedule is code-resident).
 const CHARITY_PRIZE := 250_000
+
+# European competitions. Three two-legged knockouts seeded from last season's domestic
+# finish; the field is filled to EURO_FIELD clubs with strong foreign sides from game_db.
+const EURO_FIELD := 16                  # 16-club knockout = R16 -> QF -> SF -> Final
+const UEFA_SPOTS := 2                   # league places below the champions that enter the UEFA Cup
+const EURO_OPTS := {
+	"european_cup": {"name": "European Cup", "emblem": "ligacamp"},
+	"uefa_cup": {"name": "U.E.F.A. Cup", "emblem": "uefa"},
+	"cup_winners_cup": {"name": "Cup Winners' Cup", "emblem": "recopa"},
+}
+# UEFA prize schedule -- the ONLY code-resident prize figures (reversed from MANAGER.EXE,
+# docs/re/finance_constants.md). Per-match draw/win is collapsed to per-tie (legs are
+# abstracted into one tie), so a tie won pays the "win" figure; milestones pay on reaching
+# the round. EURO_WINNER (lifting it) is a documented bonus, not a reversed figure.
+const EURO_ENTRY := 1_000_000           # "1 million from UEFA for competing"
+const EURO_WIN := 510_000               # "510.000 for every match won"
+const EURO_QF := 1_500_000              # "1.5 million ... qualification" (reach the last 8)
+const EURO_SF := 1_625_000              # "1.625 million ... qualification" (reach the last 4)
+const EURO_WINNER := 2_000_000
 
 # "The Directors will only let you make %u offer%s to sign a player per week."
 const OFFERS_PER_WEEK := 3
@@ -230,7 +257,10 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 ## been reached. The bracket dicts mutate in place, so this writes straight to the save.
 func _play_due_cup_rounds(rng: RandomNumberGenerator, clubs_override: Dictionary) -> void:
 	var ratings_fn := func(id: int) -> Dictionary: return _ratings_for(id, clubs_override)
-	var names_fn := func(id: int) -> String: return str(club_names.get(int(id), "?"))
+	var names_fn := func(id: int) -> String:
+		if club_names.has(int(id)):
+			return str(club_names[int(id)])
+		return str(euro_names.get(int(id), "?"))
 	for cup in [fa_cup, league_cup]:
 		if cup.is_empty():
 			continue
@@ -240,6 +270,39 @@ func _play_due_cup_rounds(rng: RandomNumberGenerator, clubs_override: Dictionary
 				_news(n["kind"], n["text"])
 			if int(cr["prize"]) > 0:
 				cash += int(cr["prize"])
+	# European competitions: same chassis, but prizes follow the reversed UEFA schedule
+	# (per-tie, with QF/SF milestones) rather than the domestic per-round model.
+	for key in euro:
+		var eb: Dictionary = euro[key]
+		if eb.is_empty():
+			continue
+		while Cup.round_due(eb, week):
+			var in_before := Cup.still_in(eb, club_id)
+			var er := Cup.play_round(eb, rng, ratings_fn, club_id, names_fn)
+			for n in er["news"]:
+				_news(n["kind"], n["text"])
+			if in_before:
+				cash += _euro_prize(eb, er)
+
+
+## The manager's UEFA prize for a European round just played (he was in it beforehand):
+## the per-tie "win" figure plus the milestone bonus for reaching the last 8 / last 4, and
+## a trophy bonus for lifting it. A lost tie (manager_out) or a bye pays nothing.
+func _euro_prize(bracket: Dictionary, result: Dictionary) -> int:
+	var prize := 0
+	var won_tie: bool = not bool(result.get("manager_out", false)) \
+		and not (result.get("manager_tie", {}) as Dictionary).get("bye", false) \
+		and not (result.get("manager_tie", {}) as Dictionary).is_empty()
+	if won_tie:
+		prize += EURO_WIN
+		match (bracket.get("survivors", []) as Array).size():
+			8:
+				prize += EURO_QF        # winning the round of 16 -> into the last 8
+			4:
+				prize += EURO_SF        # winning the quarter-final -> into the last 4
+	if bool(result.get("champion", false)):
+		prize += EURO_WINNER
+	return prize
 
 
 ## Ratings for a club: the manager's own club uses the chosen XI + shape; every
@@ -252,6 +315,11 @@ func _ratings_for(id: int, clubs_override: Dictionary = {}) -> Dictionary:
 		# injured/suspended player, so absences actually weaken the side.
 		var fit := _fit_view(id)
 		return Tactics.from_dict(tactics).repaired(fit).ratings(fit)
+	if not rosters.has(id) and euro_ratings.has(id):
+		# A foreign European opponent: its frozen ratings (plus a name for the feed).
+		var r: Dictionary = (euro_ratings[id] as Dictionary).duplicate()
+		r["name"] = str(euro_names.get(id, "?"))
+		return r
 	var club: Dictionary = club_view(id) if rosters.has(id) else clubs_override.get(id, {})
 	return MatchEngine.team_ratings(club)
 
@@ -490,7 +558,7 @@ func _money(n: int) -> String:
 ## Roll the career into the next season, KEEPING the live rosters, cash and tactics.
 ## Contracts tick down; any of your players who hit zero and weren't renewed leave on
 ## a free. Fixtures, table and objective are rebuilt from the current squads.
-func advance_season(leagues: Array, rng: RandomNumberGenerator = null) -> void:
+func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool: Array = []) -> void:
 	# Capture this season's honours BEFORE the table is rebuilt -- they seed next
 	# season's Charity Shield and European qualification.
 	_capture_honours()
@@ -546,6 +614,8 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null) -> void:
 		rng = RandomNumberGenerator.new()
 		rng.randomize()
 	_play_charity_shield(rng)
+	# European competitions for the new season, seeded from last season's honours.
+	mint_european_cups(euro_pool, rng)
 
 
 ## Record the just-finished season's league champion, runners-up order and F.A. Cup
@@ -594,6 +664,68 @@ func _play_charity_shield(rng: RandomNumberGenerator) -> void:
 		_news("cup", "Charity Shield: %s beat %s%s." % [wn, ln, pens])
 
 
+## Build this season's European competitions from last season's honours. `euro_pool` is
+## an array of foreign club dicts ({id,name,players}) the caller draws from GameDB; their
+## ratings + names are FROZEN here so the brackets resolve and save without GameDB. Each
+## comp's field = the domestic qualifier(s) + a draw of foreign clubs (distinct across our
+## three competitions). No-op until a first season has produced honours, or if the pool is
+## too small to fill a field. Called from advance_season after the new fixtures are set.
+func mint_european_cups(euro_pool: Array, rng: RandomNumberGenerator) -> void:
+	euro = {}
+	euro_ratings = {}
+	euro_names = {}
+	if last_champion_id == -1 or euro_pool.is_empty():
+		return
+	var bag: Array = []
+	for club in euro_pool:
+		var id := int(club.get("id", -1))
+		if id == -1 or rosters.has(id) or euro_ratings.has(id):
+			continue                       # skip our own clubs + duplicates
+		euro_ratings[id] = MatchEngine.team_ratings(club)
+		euro_names[id] = str(club.get("name", "?"))
+		bag.append(id)
+	if bag.size() < EURO_FIELD - UEFA_SPOTS:
+		return                             # not enough foreign clubs to fill even one field
+	# Shuffle the foreign pool once, then deal distinct clubs to each competition.
+	for i in range(bag.size() - 1, 0, -1):
+		var j := rng.randi() % (i + 1)
+		var tmp: Variant = bag[i]
+		bag[i] = bag[j]
+		bag[j] = tmp
+	var seeds := {
+		"european_cup": [last_champion_id],
+		"uefa_cup": last_runners_up.slice(0, UEFA_SPOTS),
+		"cup_winners_cup": [_cwc_seed()],
+	}
+	var cursor := 0
+	for key in EURO_OPTS:
+		var field: Array = []
+		for s in seeds[key]:
+			if int(s) != -1 and not field.has(int(s)):
+				field.append(int(s))
+		var need := EURO_FIELD - field.size()
+		if cursor + need > bag.size():
+			break                          # foreign pool exhausted; remaining comps skipped
+		field += bag.slice(cursor, cursor + need)
+		cursor += need
+		var opts := {"name": str(EURO_OPTS[key]["name"]), "legs": 2,
+			"two_legged_final": false, "label_scheme": "sequential",
+			"qtr_label": "Quarter Finals", "prize_round": 0, "prize_winner": 0}
+		euro[key] = Cup.create(field, fixtures.size(), opts)
+		if field.has(club_id):
+			cash += EURO_ENTRY
+			_news("cup", "Your club has entered the %s (1 million from UEFA for competing)."
+				% str(EURO_OPTS[key]["name"]))
+
+
+## The Cup Winners' Cup seed: last season's F.A. Cup winners, or the league runners-up if
+## the F.A. Cup wasn't decided (defensive -- it always is in a full season).
+func _cwc_seed() -> int:
+	if last_fa_winner_id != -1:
+		return last_fa_winner_id
+	return int(last_runners_up[0]) if not last_runners_up.is_empty() else -1
+
+
 func _season_label(yr: int) -> String:
 	var start := 1996 + yr   # year 1 -> 1997-98
 	return "%d-%02d" % [start, (start + 1) % 100]
@@ -628,7 +760,17 @@ func to_dict() -> Dictionary:
 		"league_cup": league_cup,
 		"last_champion_id": last_champion_id, "last_fa_winner_id": last_fa_winner_id,
 		"last_runners_up": last_runners_up, "charity_shield": charity_shield,
+		"euro": euro, "euro_ratings": _str_keyed(euro_ratings),
+		"euro_names": _str_keyed(euro_names),
 	}
+
+
+## Re-key an int-keyed dict to string keys for JSON storage.
+func _str_keyed(d: Dictionary) -> Dictionary:
+	var out: Dictionary = {}
+	for k in d:
+		out[str(k)] = d[k]
+	return out
 
 static func from_dict(d: Dictionary) -> Career:
 	var c := Career.new()
@@ -665,6 +807,13 @@ static func from_dict(d: Dictionary) -> Career:
 	for v in d.get("last_runners_up", []):
 		c.last_runners_up.append(int(v))
 	c.charity_shield = d.get("charity_shield", {})
+	c.euro = d.get("euro", {})
+	c.euro_ratings = {}
+	for k in d.get("euro_ratings", {}):
+		c.euro_ratings[int(k)] = d["euro_ratings"][k]
+	c.euro_names = {}
+	for k in d.get("euro_names", {}):
+		c.euro_names[int(k)] = d["euro_names"][k]
 	c.table = {}
 	for k in d.get("table", {}):
 		c.table[int(k)] = d["table"][k]
