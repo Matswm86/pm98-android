@@ -37,11 +37,19 @@ func _ready() -> void:
 	_list.item_activated.connect(_on_item)
 	_list.item_selected.connect(_on_item)   # single tap activates on touch
 	if GameDB.loaded_path == "":
-		GameDB.database_loaded.connect(_show_home, CONNECT_ONE_SHOT)
+		GameDB.database_loaded.connect(_boot, CONNECT_ONE_SHOT)
 	else:
-		_show_home()
+		_boot()
 	if OS.has_environment("PM98_SHOT_DIR"):
 		_devshot()
+
+
+## Build the base home view, then raise the original-art TITLE front door over it
+## (skipped under the screenshot harness, which drives the data views directly).
+func _boot() -> void:
+	_show_home()
+	if not OS.has_environment("PM98_SHOT_DIR"):
+		_show_title_screen()
 
 
 # ---- dev screenshot harness (inert unless PM98_SHOT_DIR is set) -----------
@@ -371,6 +379,29 @@ func _show_match_result(res: Dictionary) -> void:
 	var verdict := _result_word(int(res["hg"]), int(res["ag"]), you_h)
 	_set_view("%s %d : %d %s" % [home["name"], res["hg"], res["ag"], away["name"]],
 		"%s  -  Back to the dugout" % verdict, rows, [], func(_x): pass)
+
+## The original-art TITLE / FRONT-DOOR screen as a full-screen overlay raised at boot:
+## the PREMIER MANAGER 98 title (FONDO7) with DATA BASE / MANAGER LEAGUE /
+## PRO-MANAGER LEAGUE + EXIT at the coordinates reversed from MANAGER.EXE
+## (FUN_00545180; docs/re/title_screen_re.md). Taps route the front-door choice.
+func _show_title_screen() -> void:
+	var scr: TitleScreen = load("res://scenes/TitleScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.action_selected.connect(_title_action.bind(scr))
+
+## Route a front-door tap: EXIT quits; DATA BASE drops to the home/database browser
+## beneath; either league mode starts a new career (the pro/league split isn't modelled
+## in this build, so both enter the same new-career flow).
+func _title_action(action: String, scr: TitleScreen) -> void:
+	match action:
+		"exit":
+			get_tree().quit()
+		"database":
+			scr.queue_free()
+		_:
+			scr.queue_free()
+			_push(_show_career_pick_league)
 
 ## The original-art LEAGUE TABLES screen as a full-screen overlay over the hub,
 ## driven by the live career standings. Tap to dismiss. (First screen of the
