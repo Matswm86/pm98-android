@@ -24,9 +24,24 @@ UEFA prize-money strings (`"1 million from UEFA for competing in this championsh
 `"255.000 for every draw match"`, `"1.5 million … to the quarter finals"`, etc.) confirm
 cup runs pay out in the original.
 
-**This change implements the F.A. Cup.** The Coca-Cola Cup (two-legged) and the European
-competitions (which depend on a high league finish — a multi-season hook) are the next
-cup steps, on the same `Cup.gd` chassis.
+**Implemented: the F.A. Cup and the Coca-Cola (League) Cup**, both on the one `Cup.gd`
+chassis (`Cup.create(ids, weeks, opts)` selects the competition). The European competitions
+(which depend on a high league finish — a multi-season hook) and the Charity Shield
+(champions v F.A. Cup winners — a cross-season single match) are the remaining cup steps.
+
+### Coca-Cola (League) Cup specifics (faithful)
+
+* **Two-legged ties** (home-and-away, advance on aggregate) for every round EXCEPT the
+  Final, which is a single match — exactly the binary's `Round 1 - 1st`/`- 2nd` …
+  `Semifinals - 1st`/`- 2nd` set plus a lone `Final`. A level aggregate goes to penalties
+  (`legs: 2, two_legged_final: false`).
+* **Sequential round labels**: `Round 1 → Round 2 → Qtr Finals → Semifinals → Final`
+  (`label_scheme: "sequential"`, and note `Qtr Finals` with no period, vs the F.A. Cup's
+  `Qtr. Finals` — both spellings are in the EXE).
+* Finishes **earlier** in the season than the F.A. Cup (`span_hi: 0.7`) so the two finals
+  don't coincide — the League Cup final lands ~week 22, the F.A. Cup's ~week 32.
+* A **smaller purse** than the F.A. Cup (`prize_round`/`prize_winner`).
+* Art: `IMG.PKF: COCACOLA BIG.BMP` → `app/art/screens/cup/cocacola.png`.
 
 ## Faithful (lifted from the game)
 
