@@ -53,6 +53,10 @@ prompted. Reinstalling over an older build? Uninstall the old one first.
   Final); the League Cup is **two-legged** (home and away, settled on aggregate then
   penalties) with a single-leg final (Round 1 → Round 2 → Qtr Finals → Semifinals →
   Final). Track each run on its own original cup screen, around the game's own trophy art.
+- **The Charity Shield:** each new season opens with the curtain-raiser between last
+  season's **league champions** and **F.A. Cup winners** (the league runners-up step up if
+  one club did the Double), a single neutral-venue match settled on penalties if level,
+  around the game's own Charity Shield art.
 - **Watch a match:** a minute-by-minute commentary feed (goals, cards, saves,
   corners) using the original game's own English match text, with real scorers.
 - **Club finances:** income and expenses over a 52-week season, structured on the
@@ -113,6 +117,13 @@ Captured from the running build:
 <p>
   <img src="screenshots/fa_cup.png" alt="F.A. Cup screen — the manager's run, the latest draw, and the trophy" width="420"/>
   <img src="screenshots/coca_cola_cup.png" alt="Coca-Cola Cup screen — two-legged aggregate scorelines and the trophy" width="420"/>
+</p>
+
+**The Charity Shield** — the season's curtain-raiser, last season's champions v F.A. Cup
+winners around the game's own shield art. Captured from the running build:
+
+<p>
+  <img src="screenshots/charity_shield.png" alt="Charity Shield screen — champions v F.A. Cup winners, around the real shield art" width="420"/>
 </p>
 
 The database and the new-career club picker, all in PM98 chrome (the green data-browser

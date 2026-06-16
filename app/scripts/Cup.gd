@@ -337,6 +337,25 @@ static func _play_two_leg_tie(rng: RandomNumberGenerator, h: int, a: int, rh: Di
 		"winner_id": w, "loser_id": (a if w == h else h), "decided": decided, "bye": false}
 
 
+## A one-off neutral-venue match (the Charity Shield curtain-raiser; later the European
+## Supercup / Intercontinental Cup). One match, no replay -- a level result goes straight
+## to penalties. `h` is nominally the home/first-named side (e.g. the league champions).
+## Returns a tie-shaped dict so the cup UI can render it like any other tie.
+static func single_neutral_match(rng: RandomNumberGenerator, h: int, a: int, ratings_fn: Callable) -> Dictionary:
+	var rh: Dictionary = ratings_fn.call(h)
+	var ra: Dictionary = ratings_fn.call(a)
+	var res := MatchEngine.simulate(rng, rh, ra)
+	var hg := int(res["home_goals"])
+	var ag := int(res["away_goals"])
+	if hg != ag:
+		var w := h if hg > ag else a
+		return {"home_id": h, "away_id": a, "hg": hg, "ag": ag,
+			"winner_id": w, "loser_id": (a if w == h else h), "decided": "", "bye": false}
+	var wp := _penalties(rng, h, a, rh, ra)
+	return {"home_id": h, "away_id": a, "hg": hg, "ag": ag,
+		"winner_id": wp, "loser_id": (a if wp == h else h), "decided": "pens", "bye": false}
+
+
 ## Penalty shootout: a rating-weighted coin flip (stronger sides edge it, never a lock).
 static func _penalties(rng: RandomNumberGenerator, h: int, a: int, rh: Dictionary, ra: Dictionary) -> int:
 	var oh := float(rh.get("att", 50)) + float(rh.get("def", 50)) + float(rh.get("gk", 50))

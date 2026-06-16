@@ -40,6 +40,13 @@ var training_intensity: String = Training.DEFAULT_INTENSITY   # Light/Normal/Int
 var fa_cup: Dictionary = {}             # the F.A. Cup bracket (Cup.gd); {} = not running
 var league_cup: Dictionary = {}         # the Coca-Cola (League) Cup bracket; {} = not running
 
+# Cross-season honours, captured at the end of each season (drive the next season's
+# Charity Shield + European qualification). -1 / [] until a first season completes.
+var last_champion_id: int = -1          # last season's league champions
+var last_fa_winner_id: int = -1         # last season's F.A. Cup winners
+var last_runners_up: Array = []         # last season's league places 2.. (for UEFA spots)
+var charity_shield: Dictionary = {}     # the season-opener result; {} = not played
+
 # Coca-Cola Cup options: two-legged rounds, a single-leg final, sequential round labels
 # (Round 1 -> Round 2 -> Qtr Finals -> Semifinals -> Final), a smaller purse than the F.A.
 # Cup, and a schedule that finishes earlier in the season (so the two finals don't clash).
@@ -48,6 +55,10 @@ const LEAGUE_CUP_OPTS := {
 	"label_scheme": "sequential", "qtr_label": "Qtr Finals",
 	"prize_round": 120_000, "prize_winner": 900_000, "span_lo": 0.0, "span_hi": 0.7,
 }
+
+# Charity Shield (champions v F.A. Cup winners, the season's curtain-raiser). A modest,
+# documented prize -- NOT a reversed PM98 figure (only the UEFA schedule is code-resident).
+const CHARITY_PRIZE := 250_000
 
 # "The Directors will only let you make %u offer%s to sign a player per week."
 const OFFERS_PER_WEEK := 3
@@ -479,7 +490,10 @@ func _money(n: int) -> String:
 ## Roll the career into the next season, KEEPING the live rosters, cash and tactics.
 ## Contracts tick down; any of your players who hit zero and weren't renewed leave on
 ## a free. Fixtures, table and objective are rebuilt from the current squads.
-func advance_season(leagues: Array) -> void:
+func advance_season(leagues: Array, rng: RandomNumberGenerator = null) -> void:
+	# Capture this season's honours BEFORE the table is rebuilt -- they seed next
+	# season's Charity Shield and European qualification.
+	_capture_honours()
 	var leavers: Array = []
 	for p in rosters.get(club_id, []):
 		var yrs := int(p.get("contract_years", 1)) - 1
@@ -527,6 +541,58 @@ func advance_season(leagues: Array) -> void:
 		var t := Tactics.from_dict(tactics)
 		t.set_formation(t.formation, club_view(club_id))
 		tactics = t.to_dict()
+	# The Charity Shield opens the new season: last season's champions v F.A. Cup winners.
+	if rng == null:
+		rng = RandomNumberGenerator.new()
+		rng.randomize()
+	_play_charity_shield(rng)
+
+
+## Record the just-finished season's league champion, runners-up order and F.A. Cup
+## winner. Called at the top of advance_season, before the table is rebuilt.
+func _capture_honours() -> void:
+	var s := standings()
+	if not s.is_empty():
+		last_champion_id = int(s[0].get("id", -1))
+		last_runners_up = []
+		for i in range(1, s.size()):
+			last_runners_up.append(int(s[i].get("id", -1)))
+	last_fa_winner_id = Cup.champion_id(fa_cup)
+
+
+## Play the Charity Shield (champions v F.A. Cup winners) as the season's curtain-raiser.
+## If one club holds both honours (the Double), the league runners-up take the second
+## berth -- PM98 fills the vacancy the same way. Stores the result, pays the manager a
+## modest prize if his club lifts it, and writes a news line either way. No-ops in a
+## first season (no prior honours to contest).
+func _play_charity_shield(rng: RandomNumberGenerator) -> void:
+	charity_shield = {}
+	var champ := last_champion_id
+	var fa := last_fa_winner_id
+	if champ == -1:
+		return
+	if fa == -1 or fa == champ:
+		# Double winners (or no F.A. Cup last year): the league runners-up step up.
+		fa = int(last_runners_up[0]) if not last_runners_up.is_empty() else -1
+	if fa == -1 or fa == champ:
+		return
+	var ratings_fn := func(id: int) -> Dictionary: return _ratings_for(id)
+	var tie := Cup.single_neutral_match(rng, champ, fa, ratings_fn)
+	tie["champ_id"] = champ
+	tie["fa_id"] = fa
+	tie["season"] = season
+	charity_shield = tie
+	var w := int(tie["winner_id"])
+	var l := int(tie["loser_id"])
+	var wn := str(club_names.get(w, "?"))
+	var ln := str(club_names.get(l, "?"))
+	var pens := " (on penalties)" if tie.get("decided", "") == "pens" else ""
+	if w == club_id:
+		cash += CHARITY_PRIZE
+		_news("cup", "%s have won the Charity Shield, beating %s%s." % [wn, ln, pens])
+	else:
+		_news("cup", "Charity Shield: %s beat %s%s." % [wn, ln, pens])
+
 
 func _season_label(yr: int) -> String:
 	var start := 1996 + yr   # year 1 -> 1997-98
@@ -560,6 +626,8 @@ func to_dict() -> Dictionary:
 		"offers_left": offers_left, "news_log": news_log,
 		"training_intensity": training_intensity, "fa_cup": fa_cup,
 		"league_cup": league_cup,
+		"last_champion_id": last_champion_id, "last_fa_winner_id": last_fa_winner_id,
+		"last_runners_up": last_runners_up, "charity_shield": charity_shield,
 	}
 
 static func from_dict(d: Dictionary) -> Career:
@@ -591,6 +659,12 @@ static func from_dict(d: Dictionary) -> Career:
 	# season (round_due is false on an empty dict) and are rebuilt at the next rollover.
 	c.fa_cup = d.get("fa_cup", {})
 	c.league_cup = d.get("league_cup", {})
+	c.last_champion_id = int(d.get("last_champion_id", -1))
+	c.last_fa_winner_id = int(d.get("last_fa_winner_id", -1))
+	c.last_runners_up = []
+	for v in d.get("last_runners_up", []):
+		c.last_runners_up.append(int(v))
+	c.charity_shield = d.get("charity_shield", {})
 	c.table = {}
 	for k in d.get("table", {}):
 		c.table[int(k)] = d["table"][k]

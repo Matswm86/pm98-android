@@ -326,9 +326,22 @@ func _cup_shot() -> void:
 	_save_shot(dir, "league_cup.png")
 	var b: Dictionary = _career.fa_cup
 	var lc: Dictionary = _career.league_cup
-	print("CUP-SHOT done facup_rounds=%d champ=%d | lcup_rounds=%d champ=%d club=%s" % [
+	# Finish the season and roll over so the Charity Shield (champions v F.A. Cup winners)
+	# is contested, then capture it around the real CHARITY shield art.
+	for c in get_children():
+		if c is CupScreen:
+			c.queue_free()
+	while not _career.season_over():
+		_career.advance_week(rng)
+	_career.advance_season(GameDB.leagues, rng)
+	_show_charity_shield()
+	await _settle()
+	_save_shot(dir, "charity_shield.png")
+	var cs: Dictionary = _career.charity_shield
+	print("CUP-SHOT done facup_rounds=%d champ=%d | lcup_rounds=%d champ=%d | charity winner=%d club=%s" % [
 		(b.get("rounds", []) as Array).size(), int(b.get("champion_id", -1)),
-		(lc.get("rounds", []) as Array).size(), int(lc.get("champion_id", -1)), _career.club_name])
+		(lc.get("rounds", []) as Array).size(), int(lc.get("champion_id", -1)),
+		int(cs.get("winner_id", -1)), _career.club_name])
 	get_tree().quit()
 
 
@@ -968,18 +981,82 @@ func _show_stadium_screen() -> void:
 ## PM98-chrome browse listing the two domestic cups, each routing to its CupScreen. The
 ## next-match readout stays on the RIVAL/opponent icon; a full fixture calendar is future.
 func _show_competitions() -> void:
-	var rows := [
-		{"text": "F.A. CUP", "value": _cup_status_word(_career.fa_cup), "accent": CupScreen.C_GOLD},
-		{"text": "COCA-COLA CUP", "value": _cup_status_word(_career.league_cup), "accent": CupScreen.C_GOLD},
-	]
-	_mount_browse("%s  -  COMPETITIONS" % _career.club_name, "Domestic cups", rows,
+	# Build the list dynamically: the Charity Shield only appears once it has been
+	# contested (from the second season on), so route by an action tag, not a fixed index.
+	var rows: Array = []
+	var acts: Array = []
+	if not _career.charity_shield.is_empty():
+		rows.append({"text": "CHARITY SHIELD", "value": _charity_status_word(), "accent": CupScreen.C_GOLD})
+		acts.append("charity")
+	rows.append({"text": "F.A. CUP", "value": _cup_status_word(_career.fa_cup), "accent": CupScreen.C_GOLD})
+	acts.append("facup")
+	rows.append({"text": "COCA-COLA CUP", "value": _cup_status_word(_career.league_cup), "accent": CupScreen.C_GOLD})
+	acts.append("lcup")
+	_mount_browse("%s  -  COMPETITIONS" % _career.club_name, "Cups & shield", rows,
 		func(i: int) -> void:
 			_dismiss_career_browse()
-			if i == 0:
+			var act: String = acts[i]
+			if act == "charity":
+				_show_charity_shield()
+			elif act == "facup":
 				_show_cup_screen(_career.fa_cup, "F.A. CUP", "res://art/screens/cup/trophy.png")
 			else:
 				_show_cup_screen(_career.league_cup, "COCA-COLA CUP", "res://art/screens/cup/cocacola.png"),
 		func() -> void: _dismiss_career_browse())
+
+## A one-word status of the Charity Shield for the competitions list.
+func _charity_status_word() -> String:
+	var cs: Dictionary = _career.charity_shield
+	if cs.is_empty():
+		return "not played"
+	var w := int(cs.get("winner_id", -1))
+	if w == _career.club_id:
+		return "WINNERS"
+	return "won by %s" % _cup_name(w).substr(0, 14)
+
+## The Charity Shield as a CupScreen overlay: the season's curtain-raiser (champions v
+## F.A. Cup winners), a single neutral-venue match around the real CHARITY shield art.
+func _show_charity_shield() -> void:
+	var cs: Dictionary = _career.charity_shield
+	var scr: CupScreen = load("res://scenes/CupScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	var cid: int = _career.club_id
+	var status := "NOT PLAYED"
+	var status_col: Color = CupScreen.C_DIM
+	var run_rows: Array = []
+	var draw_rows: Array = []
+	if not cs.is_empty():
+		var w := int(cs.get("winner_id", -1))
+		var champ := int(cs.get("champ_id", -1))
+		var fa := int(cs.get("fa_id", -1))
+		var pens: String = "  (pens)" if cs.get("decided", "") == "pens" else ""
+		var score := "%d-%d" % [int(cs.get("hg", 0)), int(cs.get("ag", 0))]
+		draw_rows = [{"line": "%s  v  %s   %s%s" % [
+			_cup_name(champ), _cup_name(fa), score, pens],
+			"mine": cid == champ or cid == fa}]
+		if w == cid:
+			status = "WINNERS!"
+			status_col = CupScreen.C_GOLD
+		elif cid == champ or cid == fa:
+			status = "RUNNERS-UP"
+			status_col = CupScreen.C_LOSS
+		else:
+			status = "WON BY %s" % _cup_name(w).substr(0, 12).to_upper()
+			status_col = CupScreen.C_TEXT
+		if cid == champ or cid == fa:
+			var opp := fa if cid == champ else champ
+			var won := w == cid
+			run_rows = [{"round": "Charity Shield",
+				"line": "%s %s  %s%s" % ["bt" if won else "lost to",
+					_cup_name(opp).substr(0, 16), score, pens],
+				"accent": CupScreen.C_WIN if won else CupScreen.C_LOSS}]
+	scr.setup(_career.club_name, "", str(cs.get("season", _career.season)), status, status_col,
+		"Champions v F.A. Cup winners", run_rows, "Charity Shield", draw_rows, 0,
+		"CHARITY SHIELD", "res://art/screens/cup/charity.png")
+	scr.gui_input.connect(func(e: InputEvent) -> void:
+		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
+			scr.queue_free())
 
 ## A one-word status of the manager's run in a cup, for the competitions list.
 func _cup_status_word(b: Dictionary) -> String:
@@ -1692,7 +1769,9 @@ func _activate_end_of_season(item: Dictionary) -> void:
 func _next_season() -> void:
 	# Carry the live squads, cash and tactics into the new season; contracts tick
 	# down and unrenewed players leave on a free (handled in Career.advance_season).
-	_career.advance_season(GameDB.leagues)
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	_career.advance_season(GameDB.leagues, rng)
 	_career.save()
 	_enter_career()
 

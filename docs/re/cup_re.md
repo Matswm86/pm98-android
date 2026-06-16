@@ -95,3 +95,32 @@ chassis (`Cup.create(ids, weeks, opts)` selects the competition). The European c
   future work). The screen shows the trophy + the manager's status, YOUR CUP RUN (the
   manager's tie each round), and THE DRAW (the latest round, the manager's tie in gold).
 * Cup results also surface in the CLUB NEWS feed (gold, `_news_colour("cup")`).
+
+## Cross-season honours + the Charity Shield (2026-06-16)
+
+`MANAGER.EXE` carries the strings `CHARITY SHIELD` / `CHARITY SHIELD CHAMPION`, and the
+art `IMG.PKF: CHARITY BIG.BMP` (a DM bitmap, shared VGA palette idx0-transparent; the
+left shield cropped from the two-state sprite -> `app/art/screens/cup/charity.png`).
+
+The Charity Shield is the **season curtain-raiser**: last season's **league champions** v
+last season's **F.A. Cup winners**, a single neutral-venue match (no replay; level ->
+penalties, via `Cup.single_neutral_match`). If one club did the **Double** (champions also
+won the F.A. Cup), the league **runners-up** take the vacant berth — PM98 fills it the
+same way.
+
+To drive this, `Career.advance_season` first captures the finished season's honours
+(`last_champion_id`, ordered `last_runners_up`, `last_fa_winner_id`) before the table is
+rebuilt, then plays the shield as the new season opens. These honours are the same hook
+the **European competitions** use (champion -> European Cup, high finishers -> U.E.F.A.
+Cup, F.A. Cup winners -> Cup Winners' Cup) — next work. A first season has no prior
+honours, so the shield (and Europe) start from the second season on; pre-honours saves
+load inert (`charity_shield == {}`).
+
+* Prize: `Career.CHARITY_PRIZE` (250k) credited if the manager lifts it — a documented
+  figure, NOT a reversed PM98 amount (only the UEFA schedule in `finance_constants.md` is
+  code-resident).
+* UI: the hub **COMPETITIONS** chooser lists the shield (once played) alongside the two
+  cups; it opens on a `CupScreen` rendered as a single tie. Result also hits CLUB NEWS.
+* Tests: `app/tests/test_charity.gd` (single-match unit, honours capture, the shield,
+  the Double->runners-up substitution, news, save/load). Verified by a real in-engine
+  render: `screenshots/charity_shield.png` (Newcastle Utd v Manchester Utd, 0-0 pens).
