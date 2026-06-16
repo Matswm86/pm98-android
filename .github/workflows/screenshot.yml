@@ -67,6 +67,13 @@ jobs:
             timeout 90 "$GITHUB_WORKSPACE/godot" --rendering-driver opengl3 \
             --resolution 2400x1080 . 2>&1 | tee hub.log || true
           echo "--- HUB diagnostics ---"; grep -iE "HUB-SHOT|SCRIPT ERROR|error" hub.log | head -20 || true
+          # Track-B FAITHFUL browse repro: walk the real nav (home/database, new-career
+          # pickers, league browse, a watched match) capturing the PM98-chrome screens.
+          PM98_SHOT_DIR="$PWD/shots" PM98_BROWSE_SHOT=1 LIBGL_ALWAYS_SOFTWARE=1 \
+            xvfb-run -a -s "-screen 0 2400x1080x24" \
+            timeout 90 "$GITHUB_WORKSPACE/godot" --rendering-driver opengl3 \
+            --resolution 2400x1080 . 2>&1 | tee browse.log || true
+          echo "--- BROWSE diagnostics ---"; grep -iE "BROWSE-SHOT|SHOT .*png|SCRIPT ERROR|error" browse.log | head -20 || true
           # Direct art-screen render for comparison.
           PM98_SHOT_DIR="$PWD/shots" LIBGL_ALWAYS_SOFTWARE=1 \
             xvfb-run -a -s "-screen 0 1280x720x24" \

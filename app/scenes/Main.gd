@@ -24,6 +24,7 @@ var _payload: Array = []                # parallel data for the current list row
 var _on_activate: Callable
 var _career: Career = null              # active managed career, null on the menu
 var _hub: MenuScreen = null             # persistent MENUPRINCIPAL hub while in a career
+var _browse: BrowseScreen = null        # active PM98-chrome browse/select overlay (Track B)
 
 @onready var _title: Label = $Root/TopBar/Title
 @onready var _subtitle: Label = $Root/TopBar/Subtitle
@@ -41,7 +42,11 @@ func _ready() -> void:
 		GameDB.database_loaded.connect(_boot, CONNECT_ONE_SHOT)
 	else:
 		_boot()
-	if OS.has_environment("PM98_SHOT_DIR") and not OS.has_environment("PM98_BOOT_SHOT"):
+	# The devshot walk is the fallback capture; the targeted boot shots (BOOT/HUB/BROWSE)
+	# drive their own capture from _boot, so they must not also trigger the walk (it would
+	# race them on get_tree().quit()).
+	if OS.has_environment("PM98_SHOT_DIR") and not OS.has_environment("PM98_BOOT_SHOT") \
+			and not OS.has_environment("PM98_HUB_SHOT") and not OS.has_environment("PM98_BROWSE_SHOT"):
 		_devshot()
 
 
@@ -52,6 +57,9 @@ func _boot() -> void:
 	_show_home()
 	if OS.has_environment("PM98_HUB_SHOT"):
 		_hub_shot()
+		return
+	if OS.has_environment("PM98_BROWSE_SHOT"):
+		_browse_shot()
 		return
 	var boot_shot := OS.has_environment("PM98_BOOT_SHOT")
 	if boot_shot or not OS.has_environment("PM98_SHOT_DIR"):
@@ -111,6 +119,38 @@ func _hub_shot() -> void:
 	get_tree().quit()
 
 
+## Faithful real-render of the Track-B browse flow: walk the REAL nav (database home ->
+## new-career division + club pickers -> database league browse -> a watched match) and
+## capture each frame, so the PNGs prove the PM98-chrome screens (not the green list) the
+## device shows. Run as the NORMAL app under Xvfb+GL: PM98_BROWSE_SHOT=1.
+func _browse_shot() -> void:
+	var dir := OS.get_environment("PM98_SHOT_DIR")
+	if GameDB.leagues.is_empty():
+		print("BROWSE-SHOT no leagues loaded")
+		get_tree().quit()
+		return
+	await _settle()
+	_save_shot(dir, "home.png")            # _boot already mounted the home/database browse
+	_show_career_pick_league()
+	await _settle()
+	_save_shot(dir, "pick_league.png")
+	var lg: Dictionary = GameDB.leagues[0]
+	_show_career_pick_club(lg)
+	await _settle()
+	_save_shot(dir, "pick_club.png")
+	_show_db_league(lg)
+	await _settle()
+	_save_shot(dir, "db_league.png")
+	var cl := GameDB.clubs_in_league(lg["id"])
+	cl.sort_custom(func(a, b): return a["name"] < b["name"])
+	if cl.size() >= 2:
+		_play_watch_match(cl[0], cl[1], lg)
+		await _settle()
+		_save_shot(dir, "match.png")
+	print("BROWSE-SHOT done browse_mounted=%s" % str(_browse != null and is_instance_valid(_browse)))
+	get_tree().quit()
+
+
 # ---- dev screenshot harness (inert unless PM98_SHOT_DIR is set) -----------
 # Boots the app, walks home -> squad -> player capturing each, then quits.
 # Run under a real/virtual display: PM98_SHOT_DIR=... godot --rendering-driver opengl3 .
@@ -162,9 +202,10 @@ func _settle() -> void:
 	await RenderingServer.frame_post_draw
 
 func _save_shot(dir: String, fname: String) -> void:
-	var img := get_viewport().get_texture().get_image()
-	var err := img.save_png(dir.path_join(fname))
-	print("DEVSHOT %s -> %s (err %d)" % [fname, dir, err])
+	var tex := get_viewport().get_texture()
+	var img := tex.get_image() if tex != null else null
+	var err := img.save_png(dir.path_join(fname)) if img != null else -1
+	print("SHOT %s -> %s (err %d)" % [fname, dir, err])
 
 
 func _style() -> void:
@@ -224,121 +265,234 @@ func _total_players() -> int:
 	return n
 
 
+# ---- PM98-chrome browse / overlay plumbing (Track B) ---------------------
+# The green data-browser is replaced by BrowseScreen overlays for the connective
+# list/select flows (home / database browse / new-career pickers / match feed), and
+# the existing reversed art screens (SQUAD, LEAGUE TABLES, FINANCES) for the leaves.
+
+## Mount a fresh PM98-chrome browse list, freeing any previous one (a drill-down
+## replaces its parent). `on_select` gets the tapped row index; `on_back` the RETURN tap.
+func _mount_browse(title: String, subtitle: String, rows: Array,
+		on_select: Callable, on_back: Callable, opts: Dictionary = {}) -> void:
+	if _browse != null and is_instance_valid(_browse):
+		_browse.queue_free()
+	_browse = load("res://scenes/BrowseScreen.gd").new()
+	_browse.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_browse)
+	_browse.setup(title, subtitle, rows, opts)
+	_browse.row_selected.connect(on_select)
+	_browse.back_pressed.connect(on_back)
+
+## Free every front-of-house overlay (browse + title) before the career hub takes over.
+func _clear_front_overlays() -> void:
+	for c in get_children():
+		if c is BrowseScreen or c is TitleScreen:
+			c.queue_free()
+	_browse = null
+
+## Add a full-rect art overlay that frees on any tap (the display-only screen pattern).
+func _mount_tap_overlay(scr: Control) -> void:
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.gui_input.connect(func(e: InputEvent) -> void:
+		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
+			scr.queue_free())
+
+## Reversed SQUAD overlay for any club dict (career roster or a GameDB club).
+func _open_squad(club: Dictionary, manager: String, cash: String) -> void:
+	var scr: SquadScreen = load("res://scenes/SquadScreen.gd").new()
+	scr.setup(club, manager, cash)
+	_mount_tap_overlay(scr)
+
+## Reversed LEAGUE TABLES overlay for any standings array (career or a SeasonSim table).
+func _open_table(rows: Array, title_left: String, season: String, week_label: String,
+		tier: int, my_id: int) -> void:
+	var scr: LeagueTableScreen = load("res://scenes/LeagueTableScreen.gd").new()
+	scr.setup(rows, title_left, season, week_label, tier, my_id)
+	_mount_tap_overlay(scr)
+
+## Reversed FINANCES overlay for any club dict.
+func _open_finance(club: Dictionary, club_name: String, season: String) -> void:
+	var sm := FinanceModel.summary(club, FinanceModel.tier_of(club, GameDB.leagues))
+	var scr: FinanceScreen = load("res://scenes/FinanceScreen.gd").new()
+	scr.setup(sm, club_name, "", season)
+	_mount_tap_overlay(scr)
+
+## PM98-chrome match read-out (B4): the scoreline in the BARRA, the commentary feed
+## as non-selectable rows (goals gold, phase markers dim), RETURN runs `on_back`.
+func _open_match(home: Dictionary, away: Dictionary, hg: int, ag: int,
+		lines: Array, sub: String, on_back: Callable) -> void:
+	var rows: Array = []
+	for ln in lines:
+		var side: int = ln["side"]
+		if side == -1:
+			rows.append({"text": "- - -  %s" % ln["text"], "enabled": false,
+				"accent": Color(0.59, 0.69, 0.82)})
+		else:
+			var tag := "H" if side == 0 else "A"
+			var g := false
+			if ln.get("goal"):
+				g = true
+			rows.append({
+				"text": "%2d'  [%s]  %s%s" % [ln["minute"], tag, ln["text"], "   GOAL!" if g else ""],
+				"enabled": false,
+				"accent": Color(1.0, 0.87, 0.0) if g else null,
+			})
+	var scr: BrowseScreen = load("res://scenes/BrowseScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup("%s  %d : %d  %s" % [home.get("name", "?"), hg, ag, away.get("name", "?")],
+		sub, rows, {"back_label": "RETURN"})
+	scr.back_pressed.connect(func() -> void:
+		scr.queue_free()
+		if on_back.is_valid():
+			on_back.call())
+
+
 # ---- views ---------------------------------------------------------------
 
+## The database root (B3): the original-art browse hub. Continue / new career at the top,
+## then every league + International. A BrowseScreen overlay; TITLE re-raises the front door.
 func _show_home() -> void:
 	if _nav.is_empty():
 		_nav.append(_show_home)
 	var rows: Array = []
 	var payload: Array = []
 	if Career.has_save():
-		rows.append("▶  Continue career")
-		payload.append({"type": "career_continue"})
-	rows.append("🎮  Start a new career")
-	payload.append({"type": "career_new"})
+		rows.append({"text": "Continue career", "accent": Color(0.27, 1.0, 0.53)})
+		payload.append({"type": "continue"})
+	rows.append({"text": "Start a new career", "accent": Color(0.27, 1.0, 0.53)})
+	payload.append({"type": "new"})
 	for lg in GameDB.leagues:
-		rows.append("%s  (%d clubs)" % [lg["name"], (lg["clubIds"] as Array).size()])
+		rows.append({"text": lg["name"], "value": "%d clubs" % (lg["clubIds"] as Array).size()})
 		payload.append({"type": "league", "league": lg})
 	var intl := GameDB.countries()
 	if not intl.is_empty():
-		rows.append("International  (%d countries)" % intl.size())
+		rows.append({"text": "International", "value": "%d nations" % intl.size()})
 		payload.append({"type": "intl"})
-	_set_view("PM98", "Manage a club, or browse the database", rows, payload, _activate_home)
+	_mount_browse("PREMIER MANAGER 98", "Database  -  manage or browse", rows,
+		func(i: int) -> void: _home_select(payload[i]),
+		func() -> void: _show_title_screen(),
+		{"back_label": "TITLE"})
 
-func _activate_home(item: Dictionary) -> void:
+func _home_select(item: Dictionary) -> void:
 	match item["type"]:
-		"career_continue":
-			_career = Career.load_save()
-			if _career != null:
-				_enter_career()
-		"career_new":
-			_push(_show_career_pick_league)
-		"league":
-			_push(_show_league.bind(item["league"]))
-		_:
-			_push(_show_intl)
+		"continue": _continue_career()
+		"new": _show_career_pick_league()
+		"league": _show_db_league(item["league"])
+		_: _show_db_intl()
 
-func _show_league(league: Dictionary) -> void:
+func _continue_career() -> void:
+	_career = Career.load_save()
+	if _career != null:
+		_enter_career()
+
+## Database browse of one league (B3): simulate / watch options, then the clubs. Tap a
+## club for its reversed SQUAD screen; simulate -> reversed LEAGUE TABLES; watch -> match.
+func _show_db_league(league: Dictionary) -> void:
 	var cl := GameDB.clubs_in_league(league["id"])
 	cl.sort_custom(func(a, b): return a["name"] < b["name"])
-	var rows: Array = ["▶  Simulate season", "▶  Watch a match"]
-	var payload: Array = [{"_sim": league}, {"_match": league}]
+	var rows: Array = []
+	var payload: Array = []
+	rows.append({"text": "Simulate the season", "accent": Color(0.27, 1.0, 0.53)})
+	payload.append({"act": "sim"})
+	rows.append({"text": "Watch a match", "accent": Color(0.27, 1.0, 0.53)})
+	payload.append({"act": "watch"})
 	for c in cl:
-		rows.append("%-22s %2d" % [c["name"], (c.get("players", []) as Array).size()])
-		payload.append(c)
-	_set_view(league["name"], "%d clubs  -  tap a club for its squad" % cl.size(),
-		rows, payload, _activate_league_row)
+		rows.append({"text": c["name"], "value": "%d" % (c.get("players", []) as Array).size()})
+		payload.append({"act": "club", "club": c})
+	_mount_browse(league["name"], "%d clubs  -  tap for the squad" % cl.size(), rows,
+		func(i: int) -> void: _db_league_select(league, payload[i]),
+		func() -> void: _show_home())
 
-func _activate_league_row(item: Dictionary) -> void:
-	if item.has("_sim"):
-		var lg: Dictionary = item["_sim"]
-		var rng := RandomNumberGenerator.new()
-		rng.randomize()   # a fresh season each time
-		var res := SeasonSim.simulate_season(rng, GameDB.clubs_in_league(lg["id"]))
-		_push(_show_table.bind(lg, res["table"]))
-	elif item.has("_match"):
-		_push(_show_match_pick.bind(item["_match"], null))
-	else:
-		_push(_show_squad.bind(item))
+func _db_league_select(league: Dictionary, item: Dictionary) -> void:
+	match item["act"]:
+		"sim":
+			var rng := RandomNumberGenerator.new()
+			rng.randomize()
+			var res := SeasonSim.simulate_season(rng, GameDB.clubs_in_league(league["id"]))
+			_open_table(res["table"], league["name"], GameDB.season(), "Final",
+				int(league.get("tier", 1)), -1)
+		"watch":
+			_show_match_pick(league, null)
+		"club":
+			_open_squad(item["club"], "", "")
+
+## Database browse of the international clubs by nation (B3).
+func _show_db_intl() -> void:
+	var rows: Array = []
+	var names: Array = []
+	for ctry in GameDB.countries():
+		rows.append({"text": str(ctry), "value": "%d" % GameDB.clubs_in_country(ctry).size()})
+		names.append(ctry)
+	_mount_browse("INTERNATIONAL", "%d nations" % names.size(), rows,
+		func(i: int) -> void: _show_db_country(str(names[i])),
+		func() -> void: _show_home())
+
+func _show_db_country(country: String) -> void:
+	var cl := GameDB.clubs_in_country(country)
+	cl.sort_custom(func(a, b): return a["name"] < b["name"])
+	var rows: Array = []
+	for c in cl:
+		rows.append({"text": c["name"], "value": "%d" % (c.get("players", []) as Array).size()})
+	_mount_browse(country.to_upper(), "%d clubs  -  tap for the squad" % cl.size(), rows,
+		func(i: int) -> void: _open_squad(cl[i], "", ""),
+		func() -> void: _show_db_intl())
 
 
 # ---- match commentary feed ----------------------------------------------
 
-## Club picker for a match. `home` null = pick the home side, else pick away.
+## Club picker for a watched (non-career) match. `home` null = pick home, else pick away.
 func _show_match_pick(league: Dictionary, home: Variant) -> void:
 	var cl := GameDB.clubs_in_league(league["id"])
 	cl.sort_custom(func(a, b): return a["name"] < b["name"])
 	var rows: Array = []
-	var payload: Array = []
+	var clubs: Array = []
 	for c in cl:
 		if home != null and int(c["id"]) == int((home as Dictionary)["id"]):
 			continue   # can't play yourself
-		rows.append(c["name"])
-		payload.append(c)
+		rows.append({"text": c["name"]})
+		clubs.append(c)
 	if home == null:
-		_set_view(league["name"], "Pick the HOME side", rows, payload,
-			func(c): _push(_show_match_pick.bind(league, c)))
+		_mount_browse(league["name"], "Pick the HOME side", rows,
+			func(i: int) -> void: _show_match_pick(league, clubs[i]),
+			func() -> void: _show_db_league(league))
 	else:
-		_set_view((home as Dictionary)["name"] + "  v  ?", "Pick the AWAY side", rows, payload,
-			func(c): _push(_show_match_feed.bind(home, c)))
+		_mount_browse("%s  v  ?" % str((home as Dictionary).get("name", "?")), "Pick the AWAY side", rows,
+			func(i: int) -> void: _play_watch_match(home, clubs[i], league),
+			func() -> void: _show_match_pick(league, null))
 
-func _show_match_feed(home: Dictionary, away: Dictionary) -> void:
+func _play_watch_match(home: Dictionary, away: Dictionary, league: Dictionary) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
 	var m := MatchCommentary.timeline(rng, home, away)
-	var rows: Array = []
-	for ln in m["lines"]:
-		var side: int = ln["side"]
-		if side == -1:
-			rows.append("------  %s" % ln["text"])           # phase marker
-		else:
-			var tag := "H" if side == 0 else "A"
-			var goal := "  *GOAL*" if ln.get("goal") else ""
-			rows.append("%2d' [%s] %s%s" % [ln["minute"], tag, ln["text"], goal])
-	_set_view("%s %d : %d %s" % [home["name"], m["home_goals"], m["away_goals"], away["name"]],
-		"Full time  -  H home / A away  -  Back to pick again",
-		rows, [], func(_x): pass)
+	_open_match(home, away, int(m["home_goals"]), int(m["away_goals"]), m["lines"],
+		"Full time", func() -> void: _show_match_pick(league, null))
 
 
 # ---- career mode ---------------------------------------------------------
 
+## New-career division picker (B2): original-art select list. Back -> the database root.
 func _show_career_pick_league() -> void:
 	var rows: Array = []
-	var payload: Array = []
+	var leagues: Array = []
 	for lg in GameDB.leagues:
-		rows.append("%s  (%d clubs)" % [lg["name"], (lg["clubIds"] as Array).size()])
-		payload.append(lg)
-	_set_view("New career", "Choose a division to manage in", rows, payload,
-		func(lg): _push(_show_career_pick_club.bind(lg)))
+		rows.append({"text": lg["name"], "value": "%d clubs" % (lg["clubIds"] as Array).size()})
+		leagues.append(lg)
+	_mount_browse("NEW CAREER", "Choose a division to manage in", rows,
+		func(i: int) -> void: _show_career_pick_club(leagues[i]),
+		func() -> void: _show_home())
 
+## New-career club picker (B2): original-art select list. Back -> the division picker.
 func _show_career_pick_club(league: Dictionary) -> void:
 	var cl := GameDB.clubs_in_league(league["id"])
 	cl.sort_custom(func(a, b): return a["name"] < b["name"])
 	var rows: Array = []
 	for c in cl:
-		rows.append(c["name"])
-	_set_view(league["name"], "Choose the club to take over", rows, cl,
-		func(c): _begin_career(league, c))
+		rows.append({"text": c["name"], "value": "%d" % (c.get("players", []) as Array).size()})
+	_mount_browse(str(league["name"]).to_upper(), "Choose the club to take over", rows,
+		func(i: int) -> void: _begin_career(league, cl[i]),
+		func() -> void: _show_career_pick_league())
 
 func _begin_career(league: Dictionary, club: Dictionary) -> void:
 	var league_clubs := GameDB.clubs_in_league(league["id"])
@@ -346,8 +500,10 @@ func _begin_career(league: Dictionary, club: Dictionary) -> void:
 	_career.save()
 	_enter_career()
 
-## Reset the nav so the hub sits one level under Home (Back from hub -> menu).
+## Enter the career: drop the front-of-house browse/title overlays, reset nav so the hub
+## sits one level under Home (Back from a green sub-flow -> hub), and raise the hub.
 func _enter_career() -> void:
+	_clear_front_overlays()
 	_nav = [_show_home]
 	_push(_show_career)
 
@@ -411,32 +567,21 @@ func _career_advance() -> void:
 	var res := _career.advance_week(rng)   # ratings come from the live roster
 	_career.save()   # autosave each week
 	if res.is_empty():
-		_show_career()   # bye / season just ended; refresh in place
+		_show_career()   # bye / season just ended; refresh the hub in place
 		return
-	_push(_show_match_result.bind(res))
+	_show_match_result(res)
 
+## The manager's match as a PM98-chrome read-out (B4): RETURN refreshes + raises the hub.
 func _show_match_result(res: Dictionary) -> void:
-	var home_id: int = res["home_id"]
-	var away_id: int = res["away_id"]
-	var home := GameDB.club(home_id)
-	var away := GameDB.club(away_id)
+	var home := GameDB.club(int(res["home_id"]))
+	var away := GameDB.club(int(res["away_id"]))
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
 	# Narrate the EXACT stored scoreline so feed and table agree.
 	var m := MatchCommentary.narrate(rng, home, away, int(res["hg"]), int(res["ag"]))
-	var rows: Array = []
-	for ln in m["lines"]:
-		var side: int = ln["side"]
-		if side == -1:
-			rows.append("------  %s" % ln["text"])
-		else:
-			var tag := "H" if side == 0 else "A"
-			var goal := "  *GOAL*" if ln.get("goal") else ""
-			rows.append("%2d' [%s] %s%s" % [ln["minute"], tag, ln["text"], goal])
-	var you_h: bool = res["manager_home"]
-	var verdict := _result_word(int(res["hg"]), int(res["ag"]), you_h)
-	_set_view("%s %d : %d %s" % [home["name"], res["hg"], res["ag"], away["name"]],
-		"%s  -  Back to the dugout" % verdict, rows, [], func(_x): pass)
+	var verdict := _result_word(int(res["hg"]), int(res["ag"]), bool(res["manager_home"]))
+	_open_match(home, away, int(res["hg"]), int(res["ag"]), m["lines"],
+		"%s  -  back to the dugout" % verdict, func() -> void: _show_career())
 
 ## The original-art TITLE / FRONT-DOOR screen as a full-screen overlay raised at boot:
 ## the PREMIER MANAGER 98 title (FONDO7) with DATA BASE / MANAGER LEAGUE /
@@ -456,24 +601,19 @@ func _title_action(action: String, scr: TitleScreen) -> void:
 		"exit":
 			get_tree().quit()
 		"database":
-			scr.queue_free()
+			scr.queue_free()        # reveal the home browse mounted beneath
+			if _browse == null or not is_instance_valid(_browse):
+				_show_home()
 		_:
 			scr.queue_free()
-			_push(_show_career_pick_league)
+			_show_career_pick_league()
 
-## The original-art LEAGUE TABLES screen as a full-screen overlay over the hub,
-## driven by the live career standings. Tap to dismiss. (First screen of the
-## graphics reskin; see scenes/LeagueTableScreen.gd for asset provenance.)
+## The original-art LEAGUE TABLES screen over the hub, driven by the live career
+## standings. Tap to dismiss. (See scenes/LeagueTableScreen.gd for asset provenance.)
 func _show_league_table_screen() -> void:
-	var scr: LeagueTableScreen = load("res://scenes/LeagueTableScreen.gd").new()
-	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(scr)
-	scr.setup(_career.standings(), _career.club_name, _career.season,
+	_open_table(_career.standings(), _career.club_name, _career.season,
 		"Week %d" % mini(_career.week + 1, _career.total_weeks()),
 		_career.tier, _career.club_id)
-	scr.gui_input.connect(func(e: InputEvent) -> void:
-		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
-			scr.queue_free())
 
 ## The original-art LINE-UP (ALINEACIÓN) screen as a full-screen overlay: the squad
 ## list + the CAMPO mini-pitch with the chosen XI in formation, at the coordinates
@@ -487,31 +627,15 @@ func _show_lineup_screen() -> void:
 		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
 			scr.queue_free())
 
-## The original-art SQUAD MANAGEMENT (PLANTILLA) screen as a full-screen overlay:
-## the roster grouped (goalkeepers / outfield) with the player-grid columns, at the
-## coordinates reversed from MANAGER.EXE (docs/re/squad_screen_re.md). Tap to dismiss.
+## The original-art SQUAD MANAGEMENT (PLANTILLA) screen for the managed club. Tap to
+## dismiss. (docs/re/squad_screen_re.md; the database browse reuses _open_squad too.)
 func _show_squad_screen() -> void:
-	var scr: SquadScreen = load("res://scenes/SquadScreen.gd").new()
-	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(scr)
-	scr.setup(_mgr_club(), "", "£%s" % _fmt_int(_career.cash))
-	scr.gui_input.connect(func(e: InputEvent) -> void:
-		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
-			scr.queue_free())
+	_open_squad(_mgr_club(), "", "£%s" % _fmt_int(_career.cash))
 
-## The original-art FINANCES ("INCOME + EXPENSES") screen as a full-screen overlay:
-## the income/expense ledger + totals at the coordinates reversed from MANAGER.EXE
-## (docs/re/finance_screen_re.md), driven by FinanceModel. Tap to dismiss.
+## The original-art FINANCES ("INCOME + EXPENSES") screen for the managed club. Tap to
+## dismiss. (docs/re/finance_screen_re.md, driven by FinanceModel.)
 func _show_finance_screen() -> void:
-	var club := _mgr_club()
-	var sm := FinanceModel.summary(club, FinanceModel.tier_of(club, GameDB.leagues))
-	var scr: FinanceScreen = load("res://scenes/FinanceScreen.gd").new()
-	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(scr)
-	scr.setup(sm, _career.club_name, "", _career.season)
-	scr.gui_input.connect(func(e: InputEvent) -> void:
-		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
-			scr.queue_free())
+	_open_finance(_mgr_club(), _career.club_name, _career.season)
 
 ## The original-art TRANSFER MARKET (FICHAR) screen as a full-screen overlay: the
 ## buyable players (dearest first) in the reversed list panel + the right-hand nav
@@ -647,7 +771,7 @@ func _menu_action(action: String, scr: MenuScreen) -> void:
 		"buy": _show_transfer_screen()
 		"tactics": _push(_show_tactics)
 		"sell": _push(_show_transfers)
-		"results": _push(_show_career_table)
+		"results": _show_results_screen()
 
 ## "vs Arsenal" / "at Chelsea" / "bye" for the manager's next match.
 func _menu_next_match() -> String:
@@ -659,19 +783,35 @@ func _menu_next_match() -> String:
 	var opp := GameDB.club(opp_id)
 	return "Next: %s %s" % ["vs" if home else "at", opp.get("name", "?")]
 
-func _show_career_table() -> void:
+## The MENUPRINCIPAL RESULTS view (B-track): the manager's match history this season as
+## a PM98-chrome browse over the hub (win green / draw white / loss red). RETURN -> hub.
+func _show_results_screen() -> void:
 	var rows: Array = []
-	var standings := _career.standings()
-	var n := standings.size()
-	for pos in n:
-		var r: Dictionary = standings[pos]
-		var me := "*" if int(r["id"]) == _career.club_id else " "
-		rows.append("%2d%s %-15s %2d-%2d-%2d %+3d %3d" % [
-			pos + 1, me, r["name"], r["W"], r["D"], r["L"],
-			int(r["GF"]) - int(r["GA"]), r["Pts"]])
-	_set_view("%s  -  table" % _career.league_name,
-		"Week %d/%d  -  * = you  -  W-D-L GD Pts" % [mini(_career.week + 1, n), _career.total_weeks()],
-		rows, [], func(_x): pass)
+	var res: Array = _career.results
+	if res.is_empty():
+		rows.append({"text": "No matches played yet", "enabled": false})
+	for r in res:
+		var opp: String = str(GameDB.club(int(r["opp_id"])).get("name", "?"))
+		var mine: int = int(r["hg"]) if bool(r["home"]) else int(r["ag"])
+		var theirs: int = int(r["ag"]) if bool(r["home"]) else int(r["hg"])
+		var wdl := "W" if mine > theirs else ("D" if mine == theirs else "L")
+		var acc := Color(0.27, 1.0, 0.53) if wdl == "W" else (
+			Color(0.86, 0.90, 0.96) if wdl == "D" else Color(0.85, 0.45, 0.42))
+		rows.append({
+			"text": "Wk %2d   %s %s   %d - %d" % [
+				int(r["week"]), "v" if bool(r["home"]) else "@", opp, mine, theirs],
+			"value": wdl, "accent": acc, "enabled": false,
+		})
+	_mount_browse("%s  -  RESULTS" % _career.club_name, "Season %s" % _career.season, rows,
+		func(_i: int) -> void: pass,
+		func() -> void: _dismiss_career_browse())
+
+## Dismiss a browse overlay shown from the hub (results) and re-raise the hub beneath it.
+func _dismiss_career_browse() -> void:
+	if _browse != null and is_instance_valid(_browse):
+		_browse.queue_free()
+	_browse = null
+	_show_career()
 
 # ---- team selection + tactics (S6) ---------------------------------------
 # LINE-UP / formation / marking / set-piece takers, persisted on the career and
@@ -1090,123 +1230,6 @@ func _next_season() -> void:
 	_career.advance_season(GameDB.leagues)
 	_career.save()
 	_enter_career()
-
-func _show_table(league: Dictionary, table: Array) -> void:
-	var tier: int = int(league.get("tier", 0))
-	var rows: Array = []
-	var payload: Array = []
-	var n := table.size()
-	for pos in n:
-		var r: Dictionary = table[pos]
-		var mark := SeasonSim.zone_marker(tier, pos, n)
-		rows.append("%2d%s %-15s %2d-%2d-%2d %+3d %3d" % [
-			pos + 1, (mark if mark != "" else " "), r["name"],
-			r["W"], r["D"], r["L"], r["GD"], r["Pts"]])
-		payload.append(GameDB.club(int(r["id"])))
-	_set_view("%s  -  final table" % league["name"],
-		"%s  -  W-D-L  GD  Pts   (P promo / R releg)" % GameDB.season(),
-		rows, payload, _show_squad_from)
-
-func _show_intl() -> void:
-	var rows: Array = []
-	var payload: Array = []
-	for ctry in GameDB.countries():
-		var n := GameDB.clubs_in_country(ctry).size()
-		rows.append("%-20s %3d" % [ctry, n])
-		payload.append(ctry)
-	_set_view("International", "%d countries" % rows.size(), rows, payload,
-		func(ctry): _push(_show_country.bind(ctry)))
-
-func _show_country(country: String) -> void:
-	var cl := GameDB.clubs_in_country(country)
-	cl.sort_custom(func(a, b): return a["name"] < b["name"])
-	var rows: Array = []
-	for c in cl:
-		rows.append("%-22s %2d" % [c["name"], (c.get("players", []) as Array).size()])
-	_set_view(country, "%d clubs" % cl.size(), rows, cl, _show_squad_from)
-
-func _show_squad_from(club: Dictionary) -> void:
-	_push(_show_squad.bind(club))
-
-func _show_squad(club: Dictionary) -> void:
-	var players: Array = (club.get("players", []) as Array).duplicate()
-	# keepers first, then by ability descending (the file already roughly does this)
-	players.sort_custom(func(a, b):
-		var ak: int = 1 if a.get("isGK") else 0
-		var bk: int = 1 if b.get("isGK") else 0
-		if ak != bk:
-			return ak > bk
-		return int(a.get("attrs", {}).get("CA", 0)) > int(b.get("attrs", {}).get("CA", 0)))
-	var rows: Array = ["💷  Finances"]
-	var payload: Array = [{"_fin": club}]
-	for p in players:
-		var ca: int = int((p.get("attrs", {}) as Dictionary).get("CA", 0))
-		var pos := "GK" if p.get("isGK") else "  "
-		var age: Variant = p.get("age")
-		rows.append("%-16s %s  CA %2d  %s" % [
-			p["name"], pos, ca, ("age " + str(int(age))) if age != null else ""])
-		payload.append(p)
-	var stadium: Variant = club.get("stadium")
-	var sub: String = stadium if stadium is String else ""
-	if club.get("capacity") != null:
-		sub = "%s  (%s)" % [sub, _fmt_int(int(club["capacity"]))]
-	_set_view(club["name"], sub, rows, payload, _activate_squad_row)
-
-func _activate_squad_row(item: Dictionary) -> void:
-	if item.has("_fin"):
-		_push(_show_finance.bind(item["_fin"]))
-	else:
-		_push(_show_player.bind(item))
-
-
-# ---- club finances (PCF5 ledger structure, projected figures) ------------
-
-func _show_finance(club: Dictionary) -> void:
-	var f := FinanceModel.summary(club, FinanceModel.tier_of(club, GameDB.leagues))
-	var rows: Array = []
-	rows.append("INCOME + EXPENSES   (%d-week season)" % FinanceModel.SEASON_WEEKS)
-	rows.append("")
-	for line in f["income_lines"]:
-		rows.append("  %-22s £%s" % [line[0], _fmt_int(int(line[1]))])
-	rows.append("  %-22s £%s" % ["TOTAL INCOME", _fmt_int(int(f["total_income"]))])
-	rows.append("")
-	for line in f["expense_lines"]:
-		rows.append("  %-22s -£%s" % [line[0], _fmt_int(int(line[1]))])
-	rows.append("")
-	var bal: int = int(f["season_balance"])
-	var sign := "+" if bal >= 0 else "-"
-	rows.append("  %-22s %s£%s" % ["BALANCE", sign, _fmt_int(abs(bal))])
-	rows.append("  %-22s %s£%s/wk" % ["WEEKLY BALANCE",
-		"+" if int(f["weekly_balance"]) >= 0 else "-", _fmt_int(abs(int(f["weekly_balance"])))])
-	rows.append("")
-	rows.append("CONTROLS")
-	rows.append("  %-22s £%d" % ["TICKET PRICE", int(f["ticket_price"])])
-	rows.append("  %-22s £%s" % ["PRICE OF BOARD", _fmt_int(int(f["board_price"]))])
-	var cap_note := "" if f["capacity_known"] else " (est.)"
-	rows.append("  %-22s %s%s @ %d%% att." % ["STADIUM",
-		_fmt_int(int(f["capacity"])), cap_note, int(round(100.0 * f["attendance"] / float(f["capacity"])))])
-	var div_names := {1: "Premier League", 2: "Division One", 3: "Division Two", 4: "Division Three"}
-	_set_view("%s  -  finances" % club["name"],
-		"%s  -  projected from squad + stadium" % div_names.get(int(f["tier"]), "League"),
-		rows, [], func(_x): pass)
-
-func _show_player(player: Dictionary) -> void:
-	var attrs: Dictionary = player.get("attrs", {})
-	var rows: Array = []
-	if attrs.is_empty():
-		rows.append("(no attribute row in the file for this player)")
-	else:
-		for code in ATTR_ORDER:
-			if attrs.has(code):
-				rows.append("%-20s %3d" % [ATTR_LABELS.get(code, code), int(attrs[code])])
-	var legal: String = player.get("legalName", player["name"])
-	var sub := legal
-	var by: Variant = player.get("birthYear")
-	if by != null:
-		sub = "%s  -  b.%s%s" % [legal, str(int(by)),
-			("  GK" if player.get("isGK") else "")]
-	_set_view(player["name"], sub, rows, [], func(_x): pass)
-
 
 # ---- helpers -------------------------------------------------------------
 
