@@ -172,15 +172,27 @@ func _match_shot() -> void:
 		print("MATCH-SHOT need two clubs")
 		get_tree().quit()
 		return
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 424242        # fixed seed -> reproducible capture
-	var m := MatchCommentary.timeline(rng, cl[0], cl[1])
 	var scr: MatchScreen = load("res://scenes/MatchScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
-	scr.setup(str(cl[0].get("name", "?")), str(cl[1].get("name", "?")),
+	# showcase the per-club kits: pair the home club with the opponent whose REAL kit
+	# colour contrasts most (so the capture shows two distinct real kits, not a clash fallback).
+	var home: Dictionary = cl[0]
+	var hcol := scr._kit_colour(int(home.get("id", -1)), true, Color(0.85, 0.18, 0.18))
+	var away: Dictionary = cl[1]
+	var best := -1.0
+	for i in range(1, mini(cl.size(), 12)):
+		var acol := scr._kit_colour(int(cl[i].get("id", -1)), false, Color(0.18, 0.30, 0.85))
+		var d := scr._col_dist(hcol, acol)
+		if d > best:
+			best = d
+			away = cl[i]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 424242        # fixed seed -> reproducible capture
+	var m := MatchCommentary.timeline(rng, home, away)
+	scr.setup(str(home.get("name", "?")), str(away.get("name", "?")),
 		int(m["home_goals"]), int(m["away_goals"]), m["lines"],
-		int(cl[0].get("id", -1)), int(cl[1].get("id", -1)))
+		int(home.get("id", -1)), int(away.get("id", -1)))
 	scr.set_process(false)   # freeze the clock so seek() controls the captured minute
 	# pick a goal minute if any, else mid-match
 	var goal_min := 35
@@ -192,8 +204,8 @@ func _match_shot() -> void:
 		scr.seek(shot[1])
 		await _settle()
 		_save_shot(dir, shot[0])
-	print("MATCH-SHOT done %s %d:%d goal@%d" % [str(cl[0].get("name", "?")),
-		int(m["home_goals"]), int(m["away_goals"]), goal_min])
+	print("MATCH-SHOT done %s v %s %d:%d goal@%d" % [str(home.get("name", "?")),
+		str(away.get("name", "?")), int(m["home_goals"]), int(m["away_goals"]), goal_min])
 	get_tree().quit()
 
 
