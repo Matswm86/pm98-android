@@ -40,16 +40,34 @@ func _ready() -> void:
 		GameDB.database_loaded.connect(_boot, CONNECT_ONE_SHOT)
 	else:
 		_boot()
-	if OS.has_environment("PM98_SHOT_DIR"):
+	if OS.has_environment("PM98_SHOT_DIR") and not OS.has_environment("PM98_BOOT_SHOT"):
 		_devshot()
 
 
 ## Build the base home view, then raise the original-art TITLE front door over it
-## (skipped under the screenshot harness, which drives the data views directly).
+## (skipped under the data-walk screenshot harness). Under PM98_BOOT_SHOT the title IS
+## raised the normal way and the booted frame is captured — the faithful device repro.
 func _boot() -> void:
 	_show_home()
-	if not OS.has_environment("PM98_SHOT_DIR"):
+	var boot_shot := OS.has_environment("PM98_BOOT_SHOT")
+	if boot_shot or not OS.has_environment("PM98_SHOT_DIR"):
 		_show_title_screen()
+	if boot_shot:
+		_boot_shot()
+
+
+## Capture the real booted frame (the title overlay exactly as _show_title_screen
+## mounts it) through the live renderer, then quit. Run as the NORMAL app (no --script)
+## so the main scene, stretch and viewport are the real ones the device uses.
+func _boot_shot() -> void:
+	var dir := OS.get_environment("PM98_SHOT_DIR")
+	for _i in 20:
+		await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var img := get_viewport().get_texture().get_image()
+	var err := img.save_png(dir.path_join("boot.png"))
+	print("BOOT-SHOT err=%d %dx%d" % [err, img.get_width(), img.get_height()])
+	get_tree().quit()
 
 
 # ---- dev screenshot harness (inert unless PM98_SHOT_DIR is set) -----------
