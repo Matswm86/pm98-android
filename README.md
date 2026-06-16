@@ -46,6 +46,12 @@ prompted. Reinstalling over an older build? Uninstall the old one first.
   by age (youngsters climb, veterans fade), and training **intensity** is the lever:
   harder training develops them faster but risks more injuries. Squads age a year
   each season, so a career has a real arc.
+- **The F.A. Cup:** the domestic knockout runs alongside the league. A fresh open
+  draw each round (as the real cup does), level ties replayed then settled on
+  penalties, the original game's own round names (Round 4 → Round 5 → Qtr. Finals →
+  Semifinals → Final), and prize money for every round you survive plus a bonus for
+  lifting the cup. Track your run on the original F.A. Cup screen, around the game's
+  own trophy art.
 - **Watch a match:** a minute-by-minute commentary feed (goals, cards, saves,
   corners) using the original game's own English match text, with real scorers.
 - **Club finances:** income and expenses over a 52-week season, structured on the
@@ -98,6 +104,14 @@ staff icon. Captured from the running build:
   <img src="screenshots/training.png" alt="Training screen — intensity lever and squad development trend" width="420"/>
 </p>
 
+**The F.A. Cup** — the domestic knockout alongside the league, here with ARSENAL through
+to the final (Round 4 → Round 5 → Qtr. Finals → Semifinals, two ties settled on penalties),
+the latest draw and the game's own trophy. Captured from the running build:
+
+<p>
+  <img src="screenshots/cup.png" alt="F.A. Cup screen — the manager's run, the latest draw, and the trophy" width="560"/>
+</p>
+
 The database and the new-career club picker, all in PM98 chrome (the green data-browser
 is gone), captured from the running build:
 
@@ -121,7 +135,7 @@ out of the game's executable, from its own icons, fonts and backgrounds:
   <img src="screenshots/stadium.png" alt="Stadium" width="240"/>
 </p>
 
-<sub>The title, hub, match view, squad-with-injuries, club news, training, database, club picker and
+<sub>The title, hub, match view, squad-with-injuries, club news, training, the F.A. Cup, database, club picker and
 league table are real captures from the Godot build (Xvfb + GL in CI). The last six are reference renders from
 the reconstruction renderers (`tools/re/preview_*.py`), which mirror each rebuilt scene
 pixel-for-pixel from the same coordinates and assets the in-engine screens use; real
@@ -139,8 +153,9 @@ couple of deep menus (team tactics, the transfer desk) are still a simpler funct
 
 ## Coming next
 
-The cups and Europe, youth development, a full staff team and deeper player contracts
-(injuries, suspensions, the club news feed and training/player development are now in). The 2D
+The League Cup and European competitions, youth development, a full staff team and deeper
+player contracts (injuries, suspensions, the club news feed, training/player development and
+the F.A. Cup are now in). The 2D
 match view now renders the original game's own sprites on a 3/4 broadcast pitch (the
 `.PGF` sprite format is fully cracked, see `docs/re/match_view_re.md`); next for it are
 the original scrolling tile-camera and per-team kit recolours. Club crests and player
