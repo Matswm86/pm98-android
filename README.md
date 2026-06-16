@@ -82,17 +82,19 @@ prompted. Reinstalling over an older build? Uninstall the old one first.
 
 ## Screenshots
 
-The app on a phone-aspect screen, opening on the original PREMIER MANAGER 98 title,
-captured from the running game (not a mock-up):
+> Re-rendered 2026-06-16 at the game's native 4:3 (640×480) — full screen, nothing cut off.
 
-<p><img src="screenshots/boot_phone.png?v=2" alt="PM98 running on a phone — the title screen" width="640"/></p>
+The app, opening on the original PREMIER MANAGER 98 title, captured from the running game
+(not a mock-up):
+
+<p><img src="screens/boot_phone.png" alt="PM98 running on a phone — the title screen" width="640"/></p>
 
 The Title and the original Main Menu as the live career hub (here managing ARSENAL),
 captured from the actual Godot build:
 
 <p>
-  <img src="screenshots/title.png?v=2" alt="Title / front-door menu" width="320"/>
-  <img src="screenshots/hub.png?v=2" alt="Main Menu as the live career hub" width="320"/>
+  <img src="screens/title.png" alt="Title / front-door menu" width="320"/>
+  <img src="screens/hub.png" alt="Main Menu as the live career hub" width="320"/>
 </p>
 
 The **2D match view** — the iconic DATSIM sprite match — with the original game's own
@@ -100,8 +102,8 @@ player sprites on a 3/4 broadcast pitch, driven by the reverse-engineered match 
 (real scoreline, minute-by-minute events). Captured from the running Godot build:
 
 <p>
-  <img src="screenshots/match.png?v=2" alt="2D match view — kick-off" width="420"/>
-  <img src="screenshots/match_goals.png?v=2" alt="2D match view — late on, ARSENAL 2:4" width="420"/>
+  <img src="screens/match.png" alt="2D match view — kick-off" width="420"/>
+  <img src="screens/match_goals.png" alt="2D match view — late on, ARSENAL 2:4" width="420"/>
 </p>
 
 **Injuries, suspensions and the club news feed** — the squad screen flags who's out
@@ -109,8 +111,8 @@ player sprites on a 3/4 broadcast pitch, driven by the reverse-engineered match 
 returns and results, colour-coded and newest-first. Captured from the running build:
 
 <p>
-  <img src="screenshots/squad_injuries.png?v=2" alt="Squad screen with injured/suspended players flagged" width="420"/>
-  <img src="screenshots/news.png?v=2" alt="Club news feed — injuries, suspensions, returns, results" width="420"/>
+  <img src="screens/squad_injuries.png" alt="Squad screen with injured/suspended players flagged" width="420"/>
+  <img src="screens/news.png" alt="Club news feed — injuries, suspensions, returns, results" width="420"/>
 </p>
 
 **Training & player development** — set the training intensity and watch your squad's
@@ -118,7 +120,7 @@ development trend (young players improving in green, veterans fading), on the Ma
 staff icon. Captured from the running build:
 
 <p>
-  <img src="screenshots/training.png?v=2" alt="Training screen — intensity lever and squad development trend" width="420"/>
+  <img src="screens/training.png" alt="Training screen — intensity lever and squad development trend" width="420"/>
 </p>
 
 **The domestic cups** — the F.A. Cup (single-leg, replays then penalties) and the
@@ -127,15 +129,15 @@ the game's own trophy: the manager's run round-by-round, the latest draw, and th
 Captured from the running build:
 
 <p>
-  <img src="screenshots/fa_cup.png?v=2" alt="F.A. Cup screen — the manager's run, the latest draw, and the trophy" width="420"/>
-  <img src="screenshots/coca_cola_cup.png?v=2" alt="Coca-Cola Cup screen — two-legged aggregate scorelines and the trophy" width="420"/>
+  <img src="screens/fa_cup.png" alt="F.A. Cup screen — the manager's run, the latest draw, and the trophy" width="420"/>
+  <img src="screens/coca_cola_cup.png" alt="Coca-Cola Cup screen — two-legged aggregate scorelines and the trophy" width="420"/>
 </p>
 
 **The Charity Shield** — the season's curtain-raiser, last season's champions v F.A. Cup
 winners around the game's own shield art. Captured from the running build:
 
 <p>
-  <img src="screenshots/charity_shield.png?v=2" alt="Charity Shield screen — champions v F.A. Cup winners, around the real shield art" width="420"/>
+  <img src="screens/charity_shield.png" alt="Charity Shield screen — champions v F.A. Cup winners, around the real shield art" width="420"/>
 </p>
 
 **European competitions** — qualify from last season's finish into the European Cup, the
@@ -144,30 +146,30 @@ each around its own original trophy, with the reversed UEFA prize money. Capture
 running build (the manager's Cup Winners' Cup run):
 
 <p>
-  <img src="screenshots/european_cup.png?v=2" alt="European competition screen — a two-legged knockout run against foreign clubs, around the real trophy" width="420"/>
+  <img src="screens/european_cup.png" alt="European competition screen — a two-legged knockout run against foreign clubs, around the real trophy" width="420"/>
 </p>
 
 The database and the new-career club picker, all in PM98 chrome (the green data-browser
 is gone), captured from the running build:
 
 <p>
-  <img src="screenshots/home.png?v=2" alt="Database browse" width="240"/>
-  <img src="screenshots/pick_club.png?v=2" alt="Pick a club" width="240"/>
-  <img src="screenshots/league_table.png?v=2" alt="League table" width="240"/>
+  <img src="screens/home.png" alt="Database browse" width="240"/>
+  <img src="screens/pick_club.png" alt="Pick a club" width="240"/>
+  <img src="screens/league_table.png" alt="League table" width="240"/>
 </p>
 
 The rest of the rebuilt screens, reconstructed at the exact pixel coordinates reversed
 out of the game's executable, from its own icons, fonts and backgrounds:
 
 <p>
-  <img src="screenshots/lineup.png?v=2" alt="Line-up and formation" width="240"/>
-  <img src="screenshots/squad.png?v=2" alt="Squad management" width="240"/>
-  <img src="screenshots/transfer.png?v=2" alt="Transfer market" width="240"/>
+  <img src="screens/lineup.png" alt="Line-up and formation" width="240"/>
+  <img src="screens/squad.png" alt="Squad management" width="240"/>
+  <img src="screens/transfer.png" alt="Transfer market" width="240"/>
 </p>
 <p>
-  <img src="screenshots/finance.png?v=2" alt="Club finances" width="240"/>
-  <img src="screenshots/directiva.png?v=2" alt="Board of Directors" width="240"/>
-  <img src="screenshots/stadium.png?v=2" alt="Stadium" width="240"/>
+  <img src="screens/finance.png" alt="Club finances" width="240"/>
+  <img src="screens/directiva.png" alt="Board of Directors" width="240"/>
+  <img src="screens/stadium.png" alt="Stadium" width="240"/>
 </p>
 
 <sub>Every screenshot here is a real capture from the running Godot build (Xvfb + GL in CI) —
