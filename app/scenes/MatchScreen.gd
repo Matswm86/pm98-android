@@ -470,6 +470,10 @@ func _draw_scoreboard(ball: Dictionary) -> void:
 	var clock := "%2d'" % int(_minute) if _minute < 90.0 else "FT"
 	_txt(_f14, 14, 6, _home.substr(0, 16), C_HOME, 15)
 	_txt(_f14, W - 14, 6, _away.substr(0, 16), C_HOME, 15, true)
+	# dark pill behind the score+clock so they stay legible over the BARRA ball/pitch emblem
+	var pill := Rect2(CENTER_X - 44, 3, 88, 42)
+	draw_rect(pill, Color(0.04, 0.07, 0.12, 0.82), true)
+	draw_rect(Rect2(pill.position, Vector2(pill.size.x, 1)), Color(0.5, 0.6, 0.75, 0.6), true)
 	var score := "%d : %d" % [sc.x, sc.y]
 	_txt(_f14, 0, 6, score, C_TITLE, 18, false, W)
 	_txt(_f10, 0, 30, clock, C_GOLD, 12, false, W)
