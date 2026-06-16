@@ -96,10 +96,12 @@ static func tick_week(squad: Array) -> Array:
 ## the fit XI that played). Mutates their counters and returns news items
 ## {kind:"injury"|"suspension", text}. A player can pick up at most one of
 ## injury / red / yellow per match (checked in that order of severity).
-static func roll_match(rng: RandomNumberGenerator, featured: Array) -> Array:
+## `injury_mult` scales the injury chance (training intensity feeds this in).
+static func roll_match(rng: RandomNumberGenerator, featured: Array, injury_mult := 1.0) -> Array:
 	var news: Array = []
+	var inj_chance := INJ_CHANCE * injury_mult
 	for p in featured:
-		if rng.randf() < INJ_CHANCE:
+		if rng.randf() < inj_chance:
 			var wk := _injury_weeks(rng)
 			p["injured_weeks"] = maxi(int(p.get("injured_weeks", 0)), wk)
 			news.append({"kind": "injury",

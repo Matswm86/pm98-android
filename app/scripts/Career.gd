@@ -36,6 +36,7 @@ var shortlist: Array = []               # pid:int targets you're tracking
 var transfer_log: Array = []            # newest-first transfer news lines
 var offers_left: int = OFFERS_PER_WEEK  # signings the board still allows this week
 var news_log: Array = []                # newest-first club news {week,kind,text}
+var training_intensity: String = Training.DEFAULT_INTENSITY   # Light/Normal/Intensive
 
 # "The Directors will only let you make %u offer%s to sign a player per week."
 const OFFERS_PER_WEEK := 3
@@ -80,6 +81,7 @@ func _seed_squad(club_dict: Dictionary) -> Array:
 		dup["injured_weeks"] = 0       # availability state (Availability.gd)
 		dup["suspended_weeks"] = 0
 		dup["yellows"] = 0
+		dup["dev_progress"] = 0.0      # development carry-over (Training.gd)
 		out.append(dup)
 	return out
 
@@ -180,11 +182,16 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 		_log_result(manager_res)
 	# Injuries & suspensions: a matchday elapsed (recoveries tick), then this match's
 	# knocks and bookings are rolled on the side that featured. Manager's club only.
+	# Training intensity scales the injury risk (harder training = more knocks).
 	for n in Availability.tick_week(my_squad()):
 		_news(n["kind"], n["text"])
 	if not manager_res.is_empty():
-		for n in Availability.roll_match(rng, featured):
+		var inj_mult := Training.injury_multiplier(training_intensity)
+		for n in Availability.roll_match(rng, featured, inj_mult):
 			_news(n["kind"], n["text"])
+	# Player development for the training week just completed.
+	for n in Training.train_week(rng, my_squad(), training_intensity):
+		_news(n["kind"], n["text"])
 	if season_over():
 		finished = true
 	return manager_res
@@ -310,6 +317,11 @@ func _log_result(res: Dictionary) -> void:
 	var theirs := ag if home else hg
 	var verdict := "a win" if mine > theirs else ("a draw" if mine == theirs else "a defeat")
 	_news("result", "Matchday %d: %s %d-%d %s -- %s." % [week, home_name, hg, ag, away_name, verdict])
+
+## Cycle the training intensity Light -> Normal -> Intensive -> Light.
+func cycle_training() -> void:
+	var i := Training.INTENSITIES.find(training_intensity)
+	training_intensity = Training.INTENSITIES[(i + 1) % Training.INTENSITIES.size()]
 
 ## True while the transfer window is open (before deadline day).
 func transfers_open() -> bool:
@@ -438,6 +450,7 @@ func advance_season(leagues: Array) -> void:
 	for p in rosters.get(club_id, []):
 		var yrs := int(p.get("contract_years", 1)) - 1
 		p["contract_years"] = yrs
+		p["age"] = int(p.get("age", 26)) + 1   # your squad ages a year (drives training)
 		if yrs <= 0:
 			leavers.append(p)
 	for p in leavers:
@@ -449,8 +462,10 @@ func advance_season(leagues: Array) -> void:
 			continue
 		for p in rosters[cid]:
 			p["contract_years"] = maxi(1, int(p.get("contract_years", 2)) - 1) + 1
-	# Fresh season = clean slate: bans don't carry over and everyone reports fit.
+	# Fresh season = clean slate: bans don't carry over, everyone reports fit, and the
+	# development carry-over is zeroed (ages just ticked, so trends re-evaluate).
 	Availability.reset(rosters.get(club_id, []))
+	Training.reset_progress(rosters.get(club_id, []))
 
 	year += 1
 	season = _season_label(year)
@@ -507,6 +522,7 @@ func to_dict() -> Dictionary:
 		"tactics": tactics, "tier": tier, "rosters": ros, "club_names": nms,
 		"transfer_listed": listed, "shortlist": shortlist, "transfer_log": transfer_log,
 		"offers_left": offers_left, "news_log": news_log,
+		"training_intensity": training_intensity,
 	}
 
 static func from_dict(d: Dictionary) -> Career:
@@ -533,6 +549,7 @@ static func from_dict(d: Dictionary) -> Career:
 	c.transfer_log = d.get("transfer_log", [])
 	c.offers_left = int(d.get("offers_left", OFFERS_PER_WEEK))
 	c.news_log = d.get("news_log", [])
+	c.training_intensity = d.get("training_intensity", Training.DEFAULT_INTENSITY)
 	c.table = {}
 	for k in d.get("table", {}):
 		c.table[int(k)] = d["table"][k]

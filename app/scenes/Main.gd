@@ -47,7 +47,8 @@ func _ready() -> void:
 	# race them on get_tree().quit()).
 	if OS.has_environment("PM98_SHOT_DIR") and not OS.has_environment("PM98_BOOT_SHOT") \
 			and not OS.has_environment("PM98_HUB_SHOT") and not OS.has_environment("PM98_BROWSE_SHOT") \
-			and not OS.has_environment("PM98_MATCH_SHOT") and not OS.has_environment("PM98_NEWS_SHOT"):
+			and not OS.has_environment("PM98_MATCH_SHOT") and not OS.has_environment("PM98_NEWS_SHOT") \
+			and not OS.has_environment("PM98_TRAIN_SHOT"):
 		_devshot()
 
 
@@ -67,6 +68,9 @@ func _boot() -> void:
 		return
 	if OS.has_environment("PM98_NEWS_SHOT"):
 		_news_shot()
+		return
+	if OS.has_environment("PM98_TRAIN_SHOT"):
+		_train_shot()
 		return
 	var boot_shot := OS.has_environment("PM98_BOOT_SHOT")
 	if boot_shot or not OS.has_environment("PM98_SHOT_DIR"):
@@ -255,6 +259,29 @@ func _news_shot() -> void:
 	await _settle()
 	_save_shot(dir, "news.png")
 	print("NEWS-SHOT done news=%d club=%s" % [(_career.news_log as Array).size(), _career.club_name])
+	get_tree().quit()
+
+
+## Faithful real-render of the TRAINING screen (player development). Begins a career,
+## sets intensity to Intensive, and captures the TRAINING browse (intensity row +
+## the squad's development trend). Run as the NORMAL app under Xvfb+GL: PM98_TRAIN_SHOT=1.
+func _train_shot() -> void:
+	var dir := OS.get_environment("PM98_SHOT_DIR")
+	if GameDB.leagues.is_empty():
+		print("TRAIN-SHOT no leagues loaded")
+		get_tree().quit()
+		return
+	var lg: Dictionary = GameDB.leagues[0]
+	var clubs := GameDB.clubs_in_league(lg["id"])
+	clubs.sort_custom(func(a, b): return a["name"] < b["name"])
+	_begin_career(lg, clubs[0])
+	_career.training_intensity = "Intensive"
+	_show_career()               # raise the hub
+	await _settle()
+	_show_training()
+	await _settle()
+	_save_shot(dir, "training.png")
+	print("TRAIN-SHOT done intensity=%s squad=%d" % [_career.training_intensity, _career.my_squad().size()])
 	get_tree().quit()
 
 
@@ -849,7 +876,7 @@ func _menu_action(action: String, scr: MenuScreen) -> void:
 			_career.save()
 			scr.toast("Game saved")
 		"news": _show_club_news()
-		"staff": scr.toast("Staff management is not in this build yet")
+		"staff": _show_training()
 		"opponent", "fixtures": scr.toast(_menu_next_match())
 		"continue":
 			if _career.season_over():
@@ -919,6 +946,50 @@ func _show_club_news() -> void:
 		func(_i: int) -> void: pass,
 		func() -> void: _dismiss_career_browse())
 
+## The TRAINING screen on the hub's staff (EMPLE) icon. Tap the top row to cycle the
+## training intensity (Light/Normal/Intensive -- the lever that trades faster player
+## development against injury risk); the rest is the squad's development trend
+## (improving / holding / declining by age + ability). Interim PM98-chrome BrowseScreen.
+## NB: EMPLE is the original game's employees/staff slot; a full staff screen is deferred,
+## training is the interim occupant of this icon (flagged in the handoff).
+func _show_training() -> void:
+	var c := _career
+	var rows: Array = []
+	var payload: Array = []
+	rows.append({"text": "Training intensity:   %s" % c.training_intensity,
+		"value": "tap to change", "accent": Color(1.0, 0.87, 0.0)})
+	payload.append({"a": "cycle"})
+
+	# Squad development, improving players first, then by ability.
+	var squad: Array = c.my_squad().duplicate()
+	var order := {"up": 0, "hold": 1, "down": 2}
+	squad.sort_custom(func(a, b):
+		var ta := Training.trend(a)
+		var tb := Training.trend(b)
+		if order[ta["dir"]] != order[tb["dir"]]:
+			return order[ta["dir"]] < order[tb["dir"]]
+		return int(ta["ability"]) > int(tb["ability"]))
+	if squad.is_empty():
+		rows.append({"text": "No players to develop yet.", "enabled": false})
+		payload.append({"a": "noop"})
+	for p in squad:
+		var t := Training.trend(p)
+		var word := "improving" if t["dir"] == "up" else ("declining" if t["dir"] == "down" else "at his peak")
+		rows.append({
+			"text": "%s  %-16s  CA %d" % [t["arrow"], str(t["name"]).substr(0, 16), int(t["ability"])],
+			"value": word, "accent": t["colour"], "enabled": false,
+		})
+		payload.append({"a": "noop"})
+
+	_mount_browse("%s  -  TRAINING" % c.club_name,
+		"Intensive develops faster but risks more injuries", rows,
+		func(i: int) -> void:
+			if i < payload.size() and payload[i]["a"] == "cycle":
+				_career.cycle_training()
+				_career.save()
+				_show_training(),
+		func() -> void: _dismiss_career_browse())
+
 ## Row accent for a news item by kind: injury red, suspension orange, return green,
 ## result/other a neutral light.
 func _news_colour(kind: String) -> Color:
@@ -926,6 +997,8 @@ func _news_colour(kind: String) -> Color:
 		"injury": return Availability.C_INJURY
 		"suspension": return Availability.C_SUSPENSION
 		"return": return Availability.C_RETURN
+		"develop": return Color(0.45, 0.82, 0.98)   # blue -- a player improved
+		"decline": return Color(0.78, 0.62, 0.42)   # bronze -- a player slipped
 		_: return Color(0.86, 0.90, 0.96)
 
 ## Dismiss a browse overlay shown from the hub (results) and re-raise the hub beneath it.
