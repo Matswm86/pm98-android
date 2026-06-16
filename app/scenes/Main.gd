@@ -48,7 +48,8 @@ func _ready() -> void:
 	if OS.has_environment("PM98_SHOT_DIR") and not OS.has_environment("PM98_BOOT_SHOT") \
 			and not OS.has_environment("PM98_HUB_SHOT") and not OS.has_environment("PM98_BROWSE_SHOT") \
 			and not OS.has_environment("PM98_MATCH_SHOT") and not OS.has_environment("PM98_NEWS_SHOT") \
-			and not OS.has_environment("PM98_TRAIN_SHOT") and not OS.has_environment("PM98_CUP_SHOT"):
+			and not OS.has_environment("PM98_TRAIN_SHOT") and not OS.has_environment("PM98_CUP_SHOT") \
+			and not OS.has_environment("PM98_SCREENS_SHOT"):
 		_devshot()
 
 
@@ -74,6 +75,9 @@ func _boot() -> void:
 		return
 	if OS.has_environment("PM98_CUP_SHOT"):
 		_cup_shot()
+		return
+	if OS.has_environment("PM98_SCREENS_SHOT"):
+		_screens_shot()
 		return
 	var boot_shot := OS.has_environment("PM98_BOOT_SHOT")
 	if boot_shot or not OS.has_environment("PM98_SHOT_DIR"):
@@ -326,6 +330,59 @@ func _cup_shot() -> void:
 		(b.get("rounds", []) as Array).size(), int(b.get("champion_id", -1)),
 		(lc.get("rounds", []) as Array).size(), int(lc.get("champion_id", -1)), _career.club_name])
 	get_tree().quit()
+
+
+## Faithful real-render of the reconstructed art overlays (league table / line-up / squad
+## / finances / transfer / board / stadium) as REAL in-engine captures, so the README no
+## longer leans on the PIL preview mirrors for these. Begins a career, plays a few weeks
+## for live data, then mounts each overlay over the hub and captures it. Run as the NORMAL
+## app under Xvfb+GL: PM98_SCREENS_SHOT=1.
+func _screens_shot() -> void:
+	var dir := OS.get_environment("PM98_SHOT_DIR")
+	if GameDB.leagues.is_empty():
+		print("SCREENS-SHOT no leagues loaded")
+		get_tree().quit()
+		return
+	var lg: Dictionary = GameDB.leagues[0]
+	var clubs := GameDB.clubs_in_league(lg["id"])
+	clubs.sort_custom(func(a, b): return a["name"] < b["name"])
+	_begin_career(lg, clubs[0])
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 313131            # fixed seed -> reproducible captures
+	for _i in 8:                 # a few weeks so the table + finances have data
+		if _career.season_over():
+			break
+		_career.advance_week(rng)
+	_show_career()               # raise the hub beneath the overlays
+	await _settle()
+	var shots := [
+		["_show_league_table_screen", "league_table.png"],
+		["_show_lineup_screen", "lineup.png"],
+		["_show_squad_screen", "squad.png"],
+		["_show_finance_screen", "finance.png"],
+		["_show_transfer_screen", "transfer.png"],
+		["_show_directiva_screen", "directiva.png"],
+		["_show_stadium_screen", "stadium.png"],
+	]
+	for s in shots:
+		call(s[0])
+		await _settle()
+		_save_shot(dir, s[1])
+		_free_overlays()
+		await _settle()
+	print("SCREENS-SHOT done club=%s week=%d" % [_career.club_name, _career.week])
+	get_tree().quit()
+
+## Free any mounted art-overlay child (everything except the persistent hub), so the next
+## capture starts clean. Used by _screens_shot between shots.
+func _free_overlays() -> void:
+	for c in get_children():
+		if c == _hub:
+			continue
+		if c is LeagueTableScreen or c is LineupScreen or c is SquadScreen \
+				or c is FinanceScreen or c is TransferScreen or c is DirectivaScreen \
+				or c is StadiumScreen or c is CupScreen:
+			c.queue_free()
 
 
 # ---- dev screenshot harness (inert unless PM98_SHOT_DIR is set) -----------

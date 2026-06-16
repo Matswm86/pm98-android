@@ -103,6 +103,13 @@ jobs:
             timeout 90 "$GITHUB_WORKSPACE/godot" --rendering-driver opengl3 \
             --resolution 2400x1080 . 2>&1 | tee cup.log || true
           echo "--- CUP diagnostics ---"; grep -iE "CUP-SHOT|SHOT .*png|SCRIPT ERROR|error" cup.log | head -20 || true
+          # Reconstructed art overlays (league table / line-up / squad / finances /
+          # transfer / board / stadium) as REAL in-engine captures (replacing the PIL mirrors).
+          PM98_SHOT_DIR="$PWD/shots" PM98_SCREENS_SHOT=1 LIBGL_ALWAYS_SOFTWARE=1 \
+            xvfb-run -a -s "-screen 0 2400x1080x24" \
+            timeout 120 "$GITHUB_WORKSPACE/godot" --rendering-driver opengl3 \
+            --resolution 2400x1080 . 2>&1 | tee screens.log || true
+          echo "--- SCREENS diagnostics ---"; grep -iE "SCREENS-SHOT|SHOT .*png|SCRIPT ERROR|error" screens.log | head -20 || true
           # Direct art-screen render for comparison.
           PM98_SHOT_DIR="$PWD/shots" LIBGL_ALWAYS_SOFTWARE=1 \
             xvfb-run -a -s "-screen 0 1280x720x24" \
