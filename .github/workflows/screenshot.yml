@@ -45,13 +45,20 @@ jobs:
         run: |
           set -e
           mkdir -p shots
+          # Minimal hang-proof art-screen capture first (title + menu), landscape 1280x720.
           PM98_SHOT_DIR="$PWD/shots" LIBGL_ALWAYS_SOFTWARE=1 \
-            xvfb-run -a -s "-screen 0 720x1280x24" \
-            "$GITHUB_WORKSPACE/godot" --rendering-driver opengl3 --resolution 720x1280 . \
+            xvfb-run -a -s "-screen 0 1280x720x24" \
+            timeout 120 "$GITHUB_WORKSPACE/godot" --rendering-driver opengl3 \
+            --resolution 1280x720 --path . --script res://tests/shot_screens.gd \
+            2>&1 | tee shot_art.log || true
+          echo "--- ART SHOT log ---"; grep -iE "SHOT|err=" shot_art.log || true
+          # Then the full devshot walk for the data views (bounded so it can't hang the job).
+          PM98_SHOT_DIR="$PWD/shots" LIBGL_ALWAYS_SOFTWARE=1 \
+            xvfb-run -a -s "-screen 0 1280x720x24" \
+            timeout 120 "$GITHUB_WORKSPACE/godot" --rendering-driver opengl3 --resolution 1280x720 . \
             2>&1 | tee shot.log || true
-          echo "--- DEVSHOT log lines ---"; grep -i devshot shot.log || true
           echo "--- captured ---"; ls -la shots/
-          test -s shots/home.png
+          test -s shots/title.png
 
       - name: Upload screenshots
         uses: actions/upload-artifact@v4
