@@ -82,6 +82,13 @@ jobs:
             timeout 90 "$GITHUB_WORKSPACE/godot" --rendering-driver opengl3 \
             --resolution 2400x1080 . 2>&1 | tee match.log || true
           echo "--- MATCH diagnostics ---"; grep -iE "MATCH-SHOT|SHOT .*png|SCRIPT ERROR|error" match.log | head -20 || true
+          # Injuries/suspensions + NEWS feed: play a few weeks, force a visible injury +
+          # suspension, capture the SQUAD screen (INJ/SUS markers) and the CLUB NEWS feed.
+          PM98_SHOT_DIR="$PWD/shots" PM98_NEWS_SHOT=1 LIBGL_ALWAYS_SOFTWARE=1 \
+            xvfb-run -a -s "-screen 0 2400x1080x24" \
+            timeout 90 "$GITHUB_WORKSPACE/godot" --rendering-driver opengl3 \
+            --resolution 2400x1080 . 2>&1 | tee news.log || true
+          echo "--- NEWS diagnostics ---"; grep -iE "NEWS-SHOT|SHOT .*png|SCRIPT ERROR|error" news.log | head -20 || true
           # Direct art-screen render for comparison.
           PM98_SHOT_DIR="$PWD/shots" LIBGL_ALWAYS_SOFTWARE=1 \
             xvfb-run -a -s "-screen 0 1280x720x24" \

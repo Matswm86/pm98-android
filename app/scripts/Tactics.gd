@@ -330,3 +330,59 @@ func save_preset(name: String) -> void:
 func apply_preset(preset: Dictionary, club: Dictionary) -> void:
 	marking = preset.get("marking", "Zonal")
 	set_formation(preset.get("formation", DEFAULT_FORMATION), club)
+
+
+# ---- availability repair -------------------------------------------------
+# When players are unavailable (injured/suspended/sold), `club` is passed in as a
+# fit-only view. Any XI slot whose player is missing from that view is refilled
+# with the best available player of that slot's role, keeping the manager's other
+# picks intact. The result rates + validates against the same fit view, so losing
+# one player reshuffles only his slot rather than auto-picking the whole side.
+
+## A copy of these tactics with every vacated slot (player absent from `club`)
+## refilled by the best available player of that role. Slots stay -1 if no fit
+## player of the role remains (a depleted squad), which trips validate() ->
+## team_ratings fallback in ratings(). Re-derives captain + set-piece takers.
+func repaired(club: Dictionary) -> Tactics:
+	var t := Tactics.from_dict(to_dict())
+	var by_id := _players_by_id(club)
+	var rs := t.roles()
+	var used: Dictionary = {}
+	for pid in t.xi:
+		if by_id.has(int(pid)):
+			used[int(pid)] = true
+
+	# Replacement pools: fit players not already kept in the XI.
+	var keepers: Array = []
+	var outfield: Array = []
+	for p in club.get("players", []):
+		var pid := int(p.get("id", -1))
+		if pid < 0 or used.has(pid):
+			continue
+		var attrs: Variant = p.get("attrs", {})
+		var has: bool = (attrs is Dictionary) and not (attrs as Dictionary).is_empty()
+		if p.get("isGK"):
+			var po: float = float((attrs as Dictionary).get("PO", _NEUTRAL_GK)) if has else _NEUTRAL_GK
+			keepers.append({"id": pid, "po": po})
+		else:
+			var atk := MatchEngine.atk_score(attrs) if has else _NEUTRAL_SCORE
+			var dfn := MatchEngine.def_score(attrs) if has else _NEUTRAL_SCORE
+			outfield.append({"id": pid, "atk": atk, "def": dfn, "ovr": 0.5 * atk + 0.5 * dfn})
+	keepers.sort_custom(func(a, b): return a["po"] > b["po"])
+
+	for i in t.xi.size():
+		if by_id.has(int(t.xi[i])):
+			continue   # this pick is still available
+		var role: String = rs[i] if i < rs.size() else "MID"
+		var repl := -1
+		if role == "GK":
+			if not keepers.is_empty():
+				repl = int((keepers.pop_front() as Dictionary)["id"])
+		else:
+			var key := "def" if role == "DEF" else ("atk" if role == "FWD" else "ovr")
+			outfield.sort_custom(func(a, b): return a[key] > b[key])
+			if not outfield.is_empty():
+				repl = int((outfield.pop_front() as Dictionary)["id"])
+		t.xi[i] = repl
+	t._derive_roles(club)
+	return t

@@ -36,6 +36,12 @@ prompted. Reinstalling over an older build? Uninstall the old one first.
   marking and set-piece takers, all fed into the match engine.
 - **Transfer market:** buy and sell players (valued from their real ratings),
   with AI clubs bidding back.
+- **Injuries & suspensions:** your players pick up knocks and bookings as they
+  play, sit out while they recover, and come back. An injured or suspended player
+  can't be selected, so the XI reshuffles and the side is weaker until he returns.
+  Five bookings earn a one-match ban; reds sit a player down on the spot.
+- **Club news:** a live feed of injuries, suspensions, returns to fitness and the
+  weekly result, newest first and colour-coded, on the original Main Menu's NEWS.
 - **Watch a match:** a minute-by-minute commentary feed (goals, cards, saves,
   corners) using the original game's own English match text, with real scorers.
 - **Club finances:** income and expenses over a 52-week season, structured on the
@@ -71,6 +77,15 @@ player sprites on a 3/4 broadcast pitch, driven by the reverse-engineered match 
   <img src="screenshots/match_goals.png" alt="2D match view — late on, ARSENAL 2:4" width="420"/>
 </p>
 
+**Injuries, suspensions and the club news feed** — the squad screen flags who's out
+(INJ/SUS, in red/orange), and the Main Menu's NEWS carries the week's injuries, bans,
+returns and results, colour-coded and newest-first. Captured from the running build:
+
+<p>
+  <img src="screenshots/squad_injuries.png" alt="Squad screen with injured/suspended players flagged" width="420"/>
+  <img src="screenshots/news.png" alt="Club news feed — injuries, suspensions, returns, results" width="420"/>
+</p>
+
 The database and the new-career club picker, all in PM98 chrome (the green data-browser
 is gone), captured from the running build:
 
@@ -94,8 +109,8 @@ out of the game's executable, from its own icons, fonts and backgrounds:
   <img src="screenshots/stadium.png" alt="Stadium" width="240"/>
 </p>
 
-<sub>The title, hub, match view, database, club picker and league table are real
-captures from the Godot build (Xvfb + GL in CI). The last six are reference renders from
+<sub>The title, hub, match view, squad-with-injuries, club news, database, club picker and
+league table are real captures from the Godot build (Xvfb + GL in CI). The last six are reference renders from
 the reconstruction renderers (`tools/re/preview_*.py`), which mirror each rebuilt scene
 pixel-for-pixel from the same coordinates and assets the in-engine screens use; real
 captures of those are being added. On a phone each screen runs in landscape with a marble
@@ -112,7 +127,8 @@ couple of deep menus (team tactics, the transfer desk) are still a simpler funct
 
 ## Coming next
 
-Training, the cups and Europe, injuries and suspensions, and player contracts. The 2D
+Training, the cups and Europe, youth development, and deeper player contracts (injuries,
+suspensions and the club news feed are now in). The 2D
 match view now renders the original game's own sprites on a 3/4 broadcast pitch (the
 `.PGF` sprite format is fully cracked, see `docs/re/match_view_re.md`); next for it are
 the original scrolling tile-camera and per-team kit recolours. Club crests and player

@@ -35,6 +35,7 @@ var transfer_listed: Dictionary = {}    # pid:int -> true (your players up for s
 var shortlist: Array = []               # pid:int targets you're tracking
 var transfer_log: Array = []            # newest-first transfer news lines
 var offers_left: int = OFFERS_PER_WEEK  # signings the board still allows this week
+var news_log: Array = []                # newest-first club news {week,kind,text}
 
 # "The Directors will only let you make %u offer%s to sign a player per week."
 const OFFERS_PER_WEEK := 3
@@ -76,6 +77,9 @@ func _seed_squad(club_dict: Dictionary) -> Array:
 		var dup: Dictionary = (p as Dictionary).duplicate(true)
 		var age := int(dup.get("age", 26))
 		dup["contract_years"] = 3 if age <= 29 else (2 if age <= 32 else 1)
+		dup["injured_weeks"] = 0       # availability state (Availability.gd)
+		dup["suspended_weeks"] = 0
+		dup["yellows"] = 0
 		out.append(dup)
 	return out
 
@@ -146,6 +150,9 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 	if transfers_open() and not rosters.is_empty():
 		for line in TransferMarket.ai_round(rng, rosters, club_names, club_id, tier):
 			_log(line)
+	# The fit XI that actually featured this week (captured before the match so its
+	# injury/card rolls land on the players who played, not this week's recoveries).
+	var featured := _mgr_featured_xi()
 	var ratings: Dictionary = {}
 	var manager_res: Dictionary = {}
 	for m in fixtures[week]:
@@ -170,6 +177,14 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 			"week": week, "opp_id": manager_res["away_id"] if manager_res["manager_home"] else manager_res["home_id"],
 			"home": manager_res["manager_home"], "hg": manager_res["hg"], "ag": manager_res["ag"],
 		})
+		_log_result(manager_res)
+	# Injuries & suspensions: a matchday elapsed (recoveries tick), then this match's
+	# knocks and bookings are rolled on the side that featured. Manager's club only.
+	for n in Availability.tick_week(my_squad()):
+		_news(n["kind"], n["text"])
+	if not manager_res.is_empty():
+		for n in Availability.roll_match(rng, featured):
+			_news(n["kind"], n["text"])
 	if season_over():
 		finished = true
 	return manager_res
@@ -180,10 +195,39 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 ## results); `clubs_override` is a fallback for clubs not in the roster (e.g. an
 ## old save built before rosters existed).
 func _ratings_for(id: int, clubs_override: Dictionary = {}) -> Dictionary:
-	var club: Dictionary = club_view(id) if rosters.has(id) else clubs_override.get(id, {})
 	if id == club_id and not tactics.is_empty():
-		return Tactics.from_dict(tactics).ratings(club)
+		# Field only the available players: the chosen XI is repaired around any
+		# injured/suspended player, so absences actually weaken the side.
+		var fit := _fit_view(id)
+		return Tactics.from_dict(tactics).repaired(fit).ratings(fit)
+	var club: Dictionary = club_view(id) if rosters.has(id) else clubs_override.get(id, {})
 	return MatchEngine.team_ratings(club)
+
+
+# ---- availability --------------------------------------------------------
+
+## Players in `id`'s squad who can be selected this week (injury/ban aside).
+func available_squad(id: int = club_id) -> Array:
+	return Availability.available_players(squad_of(id))
+
+## A club view backed by only the fit players (what selection/ratings field).
+func _fit_view(id: int) -> Dictionary:
+	return {"id": id, "name": club_names.get(id, "?"), "players": available_squad(id)}
+
+## The manager's fit XI for this week: the saved tactics repaired around absences,
+## resolved back to the live roster player dicts (so injury/card rolls write through).
+func _mgr_featured_xi() -> Array:
+	var fit := _fit_view(club_id)
+	var t: Tactics = Tactics.from_dict(tactics).repaired(fit) if not tactics.is_empty() \
+		else Tactics.auto_pick(fit)
+	var by_id: Dictionary = {}
+	for p in fit["players"]:
+		by_id[int(p.get("id", -1))] = p
+	var out: Array = []
+	for pid in t.xi:
+		if by_id.has(int(pid)):
+			out.append(by_id[int(pid)])
+	return out
 
 
 # ---- live squad access ---------------------------------------------------
@@ -241,11 +285,31 @@ func objective_met() -> bool:
 # ---- transfer market -----------------------------------------------------
 
 const _LOG_CAP := 40
+const _NEWS_CAP := 50
 
 func _log(line: String) -> void:
 	transfer_log.push_front(line)
 	if transfer_log.size() > _LOG_CAP:
 		transfer_log.resize(_LOG_CAP)
+
+## Push a club-news item (injuries/suspensions/returns + the matchday headline).
+## Newest first, stamped with the week just played; capped.
+func _news(kind: String, text: String) -> void:
+	news_log.push_front({"week": week, "kind": kind, "text": text})
+	if news_log.size() > _NEWS_CAP:
+		news_log.resize(_NEWS_CAP)
+
+## A "Matchday N: ARSENAL 2-1 CHELSEA -- a win" headline from the manager's result.
+func _log_result(res: Dictionary) -> void:
+	var hg := int(res["hg"])
+	var ag := int(res["ag"])
+	var home: bool = bool(res["manager_home"])
+	var home_name: String = club_names.get(int(res["home_id"]), "?")
+	var away_name: String = club_names.get(int(res["away_id"]), "?")
+	var mine := hg if home else ag
+	var theirs := ag if home else hg
+	var verdict := "a win" if mine > theirs else ("a draw" if mine == theirs else "a defeat")
+	_news("result", "Matchday %d: %s %d-%d %s -- %s." % [week, home_name, hg, ag, away_name, verdict])
 
 ## True while the transfer window is open (before deadline day).
 func transfers_open() -> bool:
@@ -385,6 +449,8 @@ func advance_season(leagues: Array) -> void:
 			continue
 		for p in rosters[cid]:
 			p["contract_years"] = maxi(1, int(p.get("contract_years", 2)) - 1) + 1
+	# Fresh season = clean slate: bans don't carry over and everyone reports fit.
+	Availability.reset(rosters.get(club_id, []))
 
 	year += 1
 	season = _season_label(year)
@@ -440,7 +506,7 @@ func to_dict() -> Dictionary:
 		"objective_text": objective_text, "finished": finished,
 		"tactics": tactics, "tier": tier, "rosters": ros, "club_names": nms,
 		"transfer_listed": listed, "shortlist": shortlist, "transfer_log": transfer_log,
-		"offers_left": offers_left,
+		"offers_left": offers_left, "news_log": news_log,
 	}
 
 static func from_dict(d: Dictionary) -> Career:
@@ -466,6 +532,7 @@ static func from_dict(d: Dictionary) -> Career:
 		c.shortlist.append(int(v))
 	c.transfer_log = d.get("transfer_log", [])
 	c.offers_left = int(d.get("offers_left", OFFERS_PER_WEEK))
+	c.news_log = d.get("news_log", [])
 	c.table = {}
 	for k in d.get("table", {}):
 		c.table[int(k)] = d["table"][k]

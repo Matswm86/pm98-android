@@ -46,7 +46,8 @@ func _ready() -> void:
 	# drive their own capture from _boot, so they must not also trigger the walk (it would
 	# race them on get_tree().quit()).
 	if OS.has_environment("PM98_SHOT_DIR") and not OS.has_environment("PM98_BOOT_SHOT") \
-			and not OS.has_environment("PM98_HUB_SHOT") and not OS.has_environment("PM98_BROWSE_SHOT"):
+			and not OS.has_environment("PM98_HUB_SHOT") and not OS.has_environment("PM98_BROWSE_SHOT") \
+			and not OS.has_environment("PM98_MATCH_SHOT") and not OS.has_environment("PM98_NEWS_SHOT"):
 		_devshot()
 
 
@@ -63,6 +64,9 @@ func _boot() -> void:
 		return
 	if OS.has_environment("PM98_MATCH_SHOT"):
 		_match_shot()
+		return
+	if OS.has_environment("PM98_NEWS_SHOT"):
+		_news_shot()
 		return
 	var boot_shot := OS.has_environment("PM98_BOOT_SHOT")
 	if boot_shot or not OS.has_environment("PM98_SHOT_DIR"):
@@ -206,6 +210,51 @@ func _match_shot() -> void:
 		_save_shot(dir, shot[0])
 	print("MATCH-SHOT done %s v %s %d:%d goal@%d" % [str(home.get("name", "?")),
 		str(away.get("name", "?")), int(m["home_goals"]), int(m["away_goals"]), goal_min])
+	get_tree().quit()
+
+
+## Faithful real-render of the injuries/suspensions + NEWS feature. Begins a career,
+## plays a few weeks so results + any knocks accrue, then guarantees one visible injury
+## and one suspension so the SQUAD capture shows the INJ/SUS markers, and captures the
+## CLUB NEWS browse. Proves the feature renders in-engine (the grey-screen lesson). Run
+## as the NORMAL app under Xvfb+GL: PM98_NEWS_SHOT=1.
+func _news_shot() -> void:
+	var dir := OS.get_environment("PM98_SHOT_DIR")
+	if GameDB.leagues.is_empty():
+		print("NEWS-SHOT no leagues loaded")
+		get_tree().quit()
+		return
+	var lg: Dictionary = GameDB.leagues[0]
+	var clubs := GameDB.clubs_in_league(lg["id"])
+	clubs.sort_custom(func(a, b): return a["name"] < b["name"])
+	_begin_career(lg, clubs[0])
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 909090            # fixed seed -> reproducible capture
+	for _i in 6:
+		if _career.season_over():
+			break
+		_career.advance_week(rng)
+	# Guarantee a visible injury + suspension in the squad capture (random rolls may
+	# not have hit in only a few weeks).
+	var sq: Array = _career.my_squad()
+	if sq.size() >= 2:
+		sq[0]["injured_weeks"] = 3
+		sq[1]["suspended_weeks"] = 1
+		_career._news("injury", "%s injured in training -- out for 3 matches." % sq[0].get("name", "?"))
+		_career._news("suspension", "%s suspended for the next match." % sq[1].get("name", "?"))
+	_show_career()               # raise the hub
+	await _settle()
+	_open_squad(_mgr_club(), "", "£%s" % _fmt_int(_career.cash))
+	await _settle()
+	_save_shot(dir, "squad_injuries.png")
+	for c in get_children():
+		if c is SquadScreen:
+			c.queue_free()
+	await _settle()
+	_show_club_news()
+	await _settle()
+	_save_shot(dir, "news.png")
+	print("NEWS-SHOT done news=%d club=%s" % [(_career.news_log as Array).size(), _career.club_name])
 	get_tree().quit()
 
 
@@ -799,7 +848,7 @@ func _menu_action(action: String, scr: MenuScreen) -> void:
 		"save":
 			_career.save()
 			scr.toast("Game saved")
-		"news": scr.toast("No news this week")
+		"news": _show_club_news()
 		"staff": scr.toast("Staff management is not in this build yet")
 		"opponent", "fixtures": scr.toast(_menu_next_match())
 		"continue":
@@ -849,6 +898,35 @@ func _show_results_screen() -> void:
 	_mount_browse("%s  -  RESULTS" % _career.club_name, "Season %s" % _career.season, rows,
 		func(_i: int) -> void: pass,
 		func() -> void: _dismiss_career_browse())
+
+## The MENUPRINCIPAL NEWS view: the club's news feed (injuries, suspensions, returns
+## and the weekly result headline) as a PM98-chrome browse over the hub, newest first,
+## colour-coded by kind. Driven by Career.news_log. RETURN -> hub.
+func _show_club_news() -> void:
+	var rows: Array = []
+	var feed: Array = _career.news_log
+	if feed.is_empty():
+		rows.append({"text": "No club news yet -- play a week.", "enabled": false})
+	for n in feed:
+		var kind: String = str(n.get("kind", "")) if n is Dictionary else ""
+		var text: String = str(n.get("text", n)) if n is Dictionary else str(n)
+		var wk: int = int(n.get("week", 0)) if n is Dictionary else 0
+		rows.append({
+			"text": ("Wk %2d  %s" % [wk, text]) if wk > 0 else text,
+			"accent": _news_colour(kind), "enabled": false,
+		})
+	_mount_browse("%s  -  CLUB NEWS" % _career.club_name, "Latest first", rows,
+		func(_i: int) -> void: pass,
+		func() -> void: _dismiss_career_browse())
+
+## Row accent for a news item by kind: injury red, suspension orange, return green,
+## result/other a neutral light.
+func _news_colour(kind: String) -> Color:
+	match kind:
+		"injury": return Availability.C_INJURY
+		"suspension": return Availability.C_SUSPENSION
+		"return": return Availability.C_RETURN
+		_: return Color(0.86, 0.90, 0.96)
 
 ## Dismiss a browse overlay shown from the hub (results) and re-raise the hub beneath it.
 func _dismiss_career_browse() -> void:

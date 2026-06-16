@@ -182,7 +182,13 @@ func _row_player(p: Dictionary, number: int, y: int) -> void:
 			"_avg":
 				_txt(_f8, x + 18, ty, str(_avg_of(p)), C_TEXT, 11, true)
 			"_pos":
-				_txt(_f8, x, ty, "GK" if p.get("isGK") else "OUT", C_DIM, 11)
+				# Availability takes the POS cell when a player is out: INJ/SUS in its
+				# status colour, else the GK/OUT we can derive faithfully from the data.
+				var st := Availability.status(p)
+				if st["state"] == "FIT":
+					_txt(_f8, x, ty, "GK" if p.get("isGK") else "OUT", C_DIM, 11)
+				else:
+					_txt(_f8, x, ty, "%s %dw" % [st["state"], int(st["weeks"])], st["colour"], 11)
 			_:
 				var v: Variant = attrs.get(key)
 				_txt(_f8, x + 18, ty, str(int(v)) if v != null else "-", C_TEXT, 11, true)
