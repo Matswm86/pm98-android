@@ -186,7 +186,7 @@ func _leader_panel() -> void:
 		_txt(_f12, px + 8, ty + 4, tabs[t], C_PTS_TXT if sel else C_TEXT, 13)
 
 	_cell(px, 422, pw, 22, C_CELL, C_CELL_HI, C_CELL_LO)
-	_txt(_f12, px + 8, 426, "GOAL SCORERS", C_TEXT, 11)
+	_txt(_f12, px + 8, 427, "SCORERS", C_TEXT, 11)   # fits the 84px panel (full label clipped)
 	_cell(px, 452, pw, 22, C_EURO, Color(0.27, 0.59, 0.39), Color(0.08, 0.24, 0.16))
 	_txt(_f12, px + 12, 457, "RETURN", Color(0.92, 1.0, 0.94), 13)
 

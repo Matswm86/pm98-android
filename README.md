@@ -65,6 +65,10 @@ prompted. Reinstalling over an older build? Uninstall the old one first.
   schedule** (1M to compete, 510k a win, bonuses for reaching the last 8 and last 4), and
   its own original trophy. Watch every competition through to its final even when you're
   not in it.
+- **The winners-of-winners finals:** each new season also opens the **European Supercup**
+  (last season's European Cup winners v Cup Winners' Cup winners) and the **Intercontinental
+  Cup** (European Cup winners v the South American champions), one-off matches around their
+  own original trophies.
 - **Watch a match:** a minute-by-minute commentary feed (goals, cards, saves,
   corners) using the original game's own English match text, with real scorers.
 - **Club finances:** income and expenses over a 52-week season, structured on the

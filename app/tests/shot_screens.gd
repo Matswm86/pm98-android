@@ -20,11 +20,19 @@ func _run() -> void:
 		["res://scenes/TitleScreen.gd", "title.png"],
 		["res://scenes/MenuScreen.gd", "menu.png"],
 	]
+	# Render at the game's native 640x480 so each screen draws at scale 1, origin 0 (full,
+	# centred, uncut). Pinning the window + node to 640x480 avoids the FULL_RECT-vs-window
+	# race that drew screens offset/zoomed when sized to the OS window.
+	get_root().size = Vector2i(640, 480)
 	for s in screens:
 		var node: Control = load(s[0]).new()
-		node.set_anchors_preset(Control.PRESET_FULL_RECT)
 		get_root().add_child(node)
-		node.size = get_root().size
+		node.anchor_left = 0.0
+		node.anchor_top = 0.0
+		node.anchor_right = 0.0
+		node.anchor_bottom = 0.0
+		node.position = Vector2.ZERO
+		node.size = Vector2(640, 480)
 		if node.has_method("setup") and s[1] == "menu.png":
 			node.setup("SAMPLE FC", "Premier League", "1997-98", 1_000_000, "1st")
 		for _i in 14:

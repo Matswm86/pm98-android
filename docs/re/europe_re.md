@@ -65,9 +65,24 @@ per-tie (our legs are abstracted into one tie), so a tie won pays the "win" figu
   develop -- same scope as "AI clubs don't develop").
 * **Two legs collapsed to one tie** (as the domestic two-legged cup already does), so the
   per-match UEFA draw/win money is credited per-tie.
-* **European Supercup + Intercontinental Cup** (winners-of-winners) are **not yet built**
-  -- they need this season's European winners carried forward, a further cross-season
-  layer. `Cup.single_neutral_match` (built for the Charity Shield) is the chassis for them.
+## Winners-of-winners finals (2026-06-16)
+
+The **European Supercup** (last season's European Cup winners v Cup Winners' Cup winners)
+and the **Intercontinental Cup** (European Cup winners v the South American champions) are
+contested at the start of the new season, like the Charity Shield -- single neutral
+matches via `Cup.single_neutral_match` (level -> penalties), around their own trophies
+(`IMG.PKF` `SUPERCOPA_EUROPA BI` / `INTERCONTINENTAL BI`, shared VGA palette).
+
+To survive the rollover (which rebuilds `euro_ratings`), `_capture_euro_honours` reads
+last season's European Cup + Cup Winners' Cup winners and FREEZES their ratings into
+`euro_winner_ratings` BEFORE the reset; `_play_euro_supercups` then contests both finals
+off those frozen ratings. The South American champion is supplied by the caller
+(`Main._sa_champion`) -- the strongest South American club in game_db (country tags
+`Argentina`/`Brasil`/`Uruguay`/... -- a documented stand-in, since we don't simulate the
+Copa Libertadores; the European fields exclude South American clubs, who play here instead).
+Prizes (`SUPERCUP_PRIZE` / `INTERCONTINENTAL_PRIZE`) are documented, not reversed. Both
+persist in the save and surface in CLUB NEWS + the COMPETITIONS chooser. Tests:
+`app/tests/test_supercups.gd`; real render `screenshots/european_supercup.png`.
 
 ## UI
 

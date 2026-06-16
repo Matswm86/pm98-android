@@ -55,6 +55,16 @@ var euro: Dictionary = {}               # {"european_cup"/"uefa_cup"/"cup_winner
 var euro_ratings: Dictionary = {}       # foreign club id:int -> {att,def,gk}
 var euro_names: Dictionary = {}         # foreign club id:int -> String
 
+# Winners-of-winners finals (season-openers from LAST season's European winners). The
+# European Cup winner + Cup Winners' Cup winner are captured at rollover, their ratings
+# frozen so the finals resolve after euro_ratings is rebuilt.
+var euro_winner_cup: int = -1           # last season's European Cup winner
+var euro_winner_cwc: int = -1           # last season's Cup Winners' Cup winner
+var euro_winner_ratings: Dictionary = {}  # winner/SA-champ id:int -> {att,def,gk}
+var euro_winner_names: Dictionary = {}    # winner/SA-champ id:int -> String
+var supercup: Dictionary = {}           # European Supercup result; {} = not played
+var intercontinental: Dictionary = {}   # Intercontinental Cup result; {} = not played
+
 # Coca-Cola Cup options: two-legged rounds, a single-leg final, sequential round labels
 # (Round 1 -> Round 2 -> Qtr Finals -> Semifinals -> Final), a smaller purse than the F.A.
 # Cup, and a schedule that finishes earlier in the season (so the two finals don't clash).
@@ -86,6 +96,9 @@ const EURO_WIN := 510_000               # "510.000 for every match won"
 const EURO_QF := 1_500_000              # "1.5 million ... qualification" (reach the last 8)
 const EURO_SF := 1_625_000              # "1.625 million ... qualification" (reach the last 4)
 const EURO_WINNER := 2_000_000
+# Winners-of-winners one-off finals. Documented prizes (not reversed figures).
+const SUPERCUP_PRIZE := 500_000         # European Supercup (Euro Cup winner v Cup Winners' winner)
+const INTERCONTINENTAL_PRIZE := 750_000 # Intercontinental Cup (Euro Cup winner v S. American champion)
 
 # "The Directors will only let you make %u offer%s to sign a player per week."
 const OFFERS_PER_WEEK := 3
@@ -558,10 +571,13 @@ func _money(n: int) -> String:
 ## Roll the career into the next season, KEEPING the live rosters, cash and tactics.
 ## Contracts tick down; any of your players who hit zero and weren't renewed leave on
 ## a free. Fixtures, table and objective are rebuilt from the current squads.
-func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool: Array = []) -> void:
-	# Capture this season's honours BEFORE the table is rebuilt -- they seed next
-	# season's Charity Shield and European qualification.
+func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool: Array = [],
+		sa_champion: Dictionary = {}) -> void:
+	# Capture this season's honours BEFORE the table + European brackets are rebuilt --
+	# they seed next season's Charity Shield, European qualification, and the
+	# Supercup/Intercontinental (which need this season's European winners + ratings).
 	_capture_honours()
+	_capture_euro_honours()
 	var leavers: Array = []
 	for p in rosters.get(club_id, []):
 		var yrs := int(p.get("contract_years", 1)) - 1
@@ -616,6 +632,8 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	_play_charity_shield(rng)
 	# European competitions for the new season, seeded from last season's honours.
 	mint_european_cups(euro_pool, rng)
+	# Winners-of-winners curtain-raisers from last season's European champions.
+	_play_euro_supercups(sa_champion, rng)
 
 
 ## Record the just-finished season's league champion, runners-up order and F.A. Cup
@@ -726,6 +744,81 @@ func _cwc_seed() -> int:
 	return int(last_runners_up[0]) if not last_runners_up.is_empty() else -1
 
 
+## Capture last season's European Cup + Cup Winners' Cup winners and FREEZE their ratings
+## before the brackets (and euro_ratings) are rebuilt, so the Supercup + Intercontinental
+## can be contested at the start of the new season. Called at the top of advance_season,
+## while the finished season's `euro` brackets + ratings are still live.
+func _capture_euro_honours() -> void:
+	euro_winner_cup = -1
+	euro_winner_cwc = -1
+	euro_winner_ratings = {}
+	euro_winner_names = {}
+	if euro.is_empty():
+		return
+	euro_winner_cup = Cup.champion_id(euro.get("european_cup", {}))
+	euro_winner_cwc = Cup.champion_id(euro.get("cup_winners_cup", {}))
+	for id in [euro_winner_cup, euro_winner_cwc]:
+		if int(id) != -1:
+			_freeze_winner(int(id))
+
+
+## Freeze a club's current rating + name into the winners store (resolves via the live
+## roster / euro_ratings BEFORE they are rebuilt).
+func _freeze_winner(id: int) -> void:
+	var r := _ratings_for(id)
+	euro_winner_ratings[id] = {"att": r.get("att", 50), "def": r.get("def", 50), "gk": r.get("gk", 50)}
+	euro_winner_names[id] = str(r.get("name", "?"))
+
+
+## Play the winners-of-winners finals as the new season opens: the European Supercup
+## (last season's European Cup winner v Cup Winners' Cup winner) and the Intercontinental
+## Cup (European Cup winner v the South American champion -- `sa_champion`, a club dict the
+## caller supplies from game_db; approximated by the strongest South American club). Both
+## are single neutral matches (level -> penalties). No-op until a first European season has
+## produced winners. Pays the manager a documented prize + a news line if his club is in.
+func _play_euro_supercups(sa_champion: Dictionary, rng: RandomNumberGenerator) -> void:
+	supercup = {}
+	intercontinental = {}
+	if euro_winner_cup == -1:
+		return
+	var r_fn := func(id: int) -> Dictionary:
+		if euro_winner_ratings.has(int(id)):
+			var r: Dictionary = (euro_winner_ratings[int(id)] as Dictionary).duplicate()
+			r["name"] = str(euro_winner_names.get(int(id), "?"))
+			return r
+		return _ratings_for(int(id))
+	# European Supercup: needs both winners, and distinct (else no fixture).
+	if euro_winner_cwc != -1 and euro_winner_cwc != euro_winner_cup:
+		var tie := Cup.single_neutral_match(rng, euro_winner_cup, euro_winner_cwc, r_fn)
+		tie["season"] = season
+		supercup = tie
+		_record_supercup_news(tie, "European Supercup", SUPERCUP_PRIZE)
+	# Intercontinental Cup: European Cup winner v the South American champion.
+	if not sa_champion.is_empty():
+		var sid := int(sa_champion.get("id", -1))
+		if sid != -1 and sid != euro_winner_cup:
+			euro_winner_ratings[sid] = MatchEngine.team_ratings(sa_champion)
+			euro_winner_names[sid] = str(sa_champion.get("name", "?"))
+			var t2 := Cup.single_neutral_match(rng, euro_winner_cup, sid, r_fn)
+			t2["season"] = season
+			intercontinental = t2
+			_record_supercup_news(t2, "Intercontinental Cup", INTERCONTINENTAL_PRIZE)
+
+
+## Bank the manager's prize (if his club lifted it) + a news line for a one-off final.
+func _record_supercup_news(tie: Dictionary, comp: String, prize: int) -> void:
+	var w := int(tie["winner_id"])
+	var l := int(tie["loser_id"])
+	var wn := str(euro_winner_names.get(w, club_names.get(w, "?")))
+	var ln := str(euro_winner_names.get(l, club_names.get(l, "?")))
+	var pens := " (on penalties)" if tie.get("decided", "") == "pens" else ""
+	if w == club_id:
+		cash += prize
+		_news("cup", "%s have won the %s, beating %s%s." % [wn, comp, ln, pens])
+	else:
+		_news("cup", "%s: %s beat %s%s." % [comp, wn, ln, pens])
+
+
 func _season_label(yr: int) -> String:
 	var start := 1996 + yr   # year 1 -> 1997-98
 	return "%d-%02d" % [start, (start + 1) % 100]
@@ -762,6 +855,10 @@ func to_dict() -> Dictionary:
 		"last_runners_up": last_runners_up, "charity_shield": charity_shield,
 		"euro": euro, "euro_ratings": _str_keyed(euro_ratings),
 		"euro_names": _str_keyed(euro_names),
+		"euro_winner_cup": euro_winner_cup, "euro_winner_cwc": euro_winner_cwc,
+		"euro_winner_ratings": _str_keyed(euro_winner_ratings),
+		"euro_winner_names": _str_keyed(euro_winner_names),
+		"supercup": supercup, "intercontinental": intercontinental,
 	}
 
 
@@ -814,6 +911,16 @@ static func from_dict(d: Dictionary) -> Career:
 	c.euro_names = {}
 	for k in d.get("euro_names", {}):
 		c.euro_names[int(k)] = d["euro_names"][k]
+	c.euro_winner_cup = int(d.get("euro_winner_cup", -1))
+	c.euro_winner_cwc = int(d.get("euro_winner_cwc", -1))
+	c.euro_winner_ratings = {}
+	for k in d.get("euro_winner_ratings", {}):
+		c.euro_winner_ratings[int(k)] = d["euro_winner_ratings"][k]
+	c.euro_winner_names = {}
+	for k in d.get("euro_winner_names", {}):
+		c.euro_winner_names[int(k)] = d["euro_winner_names"][k]
+	c.supercup = d.get("supercup", {})
+	c.intercontinental = d.get("intercontinental", {})
 	c.table = {}
 	for k in d.get("table", {}):
 		c.table[int(k)] = d["table"][k]

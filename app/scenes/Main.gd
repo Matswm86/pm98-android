@@ -338,7 +338,7 @@ func _cup_shot() -> void:
 			c.queue_free()
 	while not _career.season_over():
 		_career.advance_week(rng)
-	_career.advance_season(GameDB.leagues, rng, _euro_pool())
+	_career.advance_season(GameDB.leagues, rng, _euro_pool(), _sa_champion())
 	_show_charity_shield()
 	await _settle()
 	_save_shot(dir, "charity_shield.png")
@@ -369,11 +369,26 @@ func _cup_shot() -> void:
 	_show_cup_screen(ec, str(ec.get("name", "EUROPEAN CUP")).to_upper(), _euro_emblem(show_key))
 	await _settle()
 	_save_shot(dir, "european_cup.png")
-	print("CUP-SHOT done facup_rounds=%d champ=%d | lcup_rounds=%d champ=%d | charity winner=%d | euro_comps=%d show=%s ec_rounds=%d club=%s" % [
+	# Finish this European season and roll over once more so the winners-of-winners finals
+	# (European Supercup + Intercontinental Cup) are contested, then capture the Supercup.
+	for c in get_children():
+		if c is CupScreen:
+			c.queue_free()
+	while not _career.season_over():
+		_career.advance_week(rng)
+	_career.advance_season(GameDB.leagues, rng, _euro_pool(), _sa_champion())
+	_show_one_off_final(_career.supercup, "EUROPEAN SUPERCUP",
+		"res://art/screens/cup/supercopa.png", "European Supercup",
+		"European Cup winners v Cup Winners' Cup winners")
+	await _settle()
+	_save_shot(dir, "european_supercup.png")
+	print("CUP-SHOT done facup_rounds=%d champ=%d | lcup_rounds=%d champ=%d | charity winner=%d | euro_comps=%d show=%s ec_rounds=%d | supercup=%d intercont=%d club=%s" % [
 		(b.get("rounds", []) as Array).size(), int(b.get("champion_id", -1)),
 		(lc.get("rounds", []) as Array).size(), int(lc.get("champion_id", -1)),
 		int(cs.get("winner_id", -1)), _career.euro.size(), show_key,
-		(ec.get("rounds", []) as Array).size(), _career.club_name])
+		(ec.get("rounds", []) as Array).size(),
+		int(_career.supercup.get("winner_id", -1)), int(_career.intercontinental.get("winner_id", -1)),
+		_career.club_name])
 	get_tree().quit()
 
 
@@ -1030,6 +1045,14 @@ func _show_competitions() -> void:
 			rows.append({"text": str(b.get("name", "Europe")).to_upper(),
 				"value": _cup_status_word(b), "accent": CupScreen.C_GOLD})
 			acts.append("euro:" + key)
+	if not _career.supercup.is_empty():
+		rows.append({"text": "EUROPEAN SUPERCUP", "value": _oneoff_status_word(_career.supercup),
+			"accent": CupScreen.C_GOLD})
+		acts.append("supercup")
+	if not _career.intercontinental.is_empty():
+		rows.append({"text": "INTERCONTINENTAL CUP", "value": _oneoff_status_word(_career.intercontinental),
+			"accent": CupScreen.C_GOLD})
+		acts.append("intercont")
 	_mount_browse("%s  -  COMPETITIONS" % _career.club_name, "Cups, shield & Europe", rows,
 		func(i: int) -> void:
 			_dismiss_career_browse()
@@ -1049,6 +1072,14 @@ func _open_competition(act: String) -> void:
 		var key := act.substr(5)
 		var b: Dictionary = _career.euro.get(key, {})
 		_show_cup_screen(b, str(b.get("name", "EUROPE")).to_upper(), _euro_emblem(key))
+	elif act == "supercup":
+		_show_one_off_final(_career.supercup, "EUROPEAN SUPERCUP",
+			"res://art/screens/cup/supercopa.png", "European Supercup",
+			"European Cup winners v Cup Winners' Cup winners")
+	elif act == "intercont":
+		_show_one_off_final(_career.intercontinental, "INTERCONTINENTAL CUP",
+			"res://art/screens/cup/intercont.png", "Intercontinental Cup",
+			"European Cup winners v the South American champions")
 
 ## The trophy art path for a European competition.
 func _euro_emblem(key: String) -> String:
@@ -1068,6 +1099,8 @@ func _euro_pool() -> Array:
 	for c in GameDB.clubs:
 		if c.get("leagueId") != null:
 			continue                       # English/league clubs aren't the foreign pool
+		if str(c.get("country", "")) in SA_COUNTRIES:
+			continue                       # South American clubs play the Intercontinental, not Europe
 		if (c.get("players", []) as Array).is_empty():
 			continue
 		var r := MatchEngine.team_ratings(c)
@@ -1078,12 +1111,36 @@ func _euro_pool() -> Array:
 		out.append(e["c"])
 	return out
 
+## South American country tags in game_db (Spanish), for the Intercontinental Cup.
+const SA_COUNTRIES := ["Argentina", "Brasil", "Uruguay", "Chile", "Colombia", "Perú",
+	"Bolivia", "Paraguay", "Ecuador", "Venezuela"]
+
+## The South American champion for the Intercontinental Cup: the strongest South American
+## club in game_db (a documented stand-in -- we don't simulate the Copa Libertadores).
+func _sa_champion() -> Dictionary:
+	var best: Dictionary = {}
+	var best_s := -1.0
+	for c in GameDB.clubs:
+		if not (str(c.get("country", "")) in SA_COUNTRIES):
+			continue
+		if (c.get("players", []) as Array).is_empty():
+			continue
+		var r := MatchEngine.team_ratings(c)
+		var s := float(r["att"]) + float(r["def"]) + float(r["gk"])
+		if s > best_s:
+			best_s = s
+			best = c
+	return best
+
 ## A one-word status of the Charity Shield for the competitions list.
 func _charity_status_word() -> String:
-	var cs: Dictionary = _career.charity_shield
-	if cs.is_empty():
+	return _oneoff_status_word(_career.charity_shield)
+
+## A one-word status of any single-match final (shield / supercup / intercontinental).
+func _oneoff_status_word(res: Dictionary) -> String:
+	if res.is_empty():
 		return "not played"
-	var w := int(cs.get("winner_id", -1))
+	var w := int(res.get("winner_id", -1))
 	if w == _career.club_id:
 		return "WINNERS"
 	return "won by %s" % _cup_name(w).substr(0, 14)
@@ -1091,7 +1148,15 @@ func _charity_status_word() -> String:
 ## The Charity Shield as a CupScreen overlay: the season's curtain-raiser (champions v
 ## F.A. Cup winners), a single neutral-venue match around the real CHARITY shield art.
 func _show_charity_shield() -> void:
-	var cs: Dictionary = _career.charity_shield
+	_show_one_off_final(_career.charity_shield, "CHARITY SHIELD",
+		"res://art/screens/cup/charity.png", "Charity Shield", "Champions v F.A. Cup winners")
+
+## A single-match final (Charity Shield / European Supercup / Intercontinental Cup) as a
+## CupScreen overlay: the manager's result if his club is in it, else who lifted it, around
+## the competition's own trophy. `res` is a Cup.single_neutral_match dict (home_id/away_id/
+## winner_id). Display-only, tap-to-dismiss.
+func _show_one_off_final(res: Dictionary, title: String, emblem: String,
+		round_label: String, sub: String) -> void:
 	var scr: CupScreen = load("res://scenes/CupScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
@@ -1100,34 +1165,33 @@ func _show_charity_shield() -> void:
 	var status_col: Color = CupScreen.C_DIM
 	var run_rows: Array = []
 	var draw_rows: Array = []
-	if not cs.is_empty():
-		var w := int(cs.get("winner_id", -1))
-		var champ := int(cs.get("champ_id", -1))
-		var fa := int(cs.get("fa_id", -1))
-		var pens: String = "  (pens)" if cs.get("decided", "") == "pens" else ""
-		var score := "%d-%d" % [int(cs.get("hg", 0)), int(cs.get("ag", 0))]
+	if not res.is_empty():
+		var w := int(res.get("winner_id", -1))
+		var home := int(res.get("home_id", -1))
+		var away := int(res.get("away_id", -1))
+		var pens: String = "  (pens)" if res.get("decided", "") == "pens" else ""
+		var score := "%d-%d" % [int(res.get("hg", 0)), int(res.get("ag", 0))]
 		draw_rows = [{"line": "%s  v  %s   %s%s" % [
-			_cup_name(champ), _cup_name(fa), score, pens],
-			"mine": cid == champ or cid == fa}]
+			_cup_name(home), _cup_name(away), score, pens],
+			"mine": cid == home or cid == away}]
 		if w == cid:
 			status = "WINNERS!"
 			status_col = CupScreen.C_GOLD
-		elif cid == champ or cid == fa:
+		elif cid == home or cid == away:
 			status = "RUNNERS-UP"
 			status_col = CupScreen.C_LOSS
 		else:
 			status = "WON BY %s" % _cup_name(w).substr(0, 12).to_upper()
 			status_col = CupScreen.C_TEXT
-		if cid == champ or cid == fa:
-			var opp := fa if cid == champ else champ
+		if cid == home or cid == away:
+			var opp := away if cid == home else home
 			var won := w == cid
-			run_rows = [{"round": "Charity Shield",
+			run_rows = [{"round": round_label,
 				"line": "%s %s  %s%s" % ["bt" if won else "lost to",
 					_cup_name(opp).substr(0, 16), score, pens],
 				"accent": CupScreen.C_WIN if won else CupScreen.C_LOSS}]
-	scr.setup(_career.club_name, "", str(cs.get("season", _career.season)), status, status_col,
-		"Champions v F.A. Cup winners", run_rows, "Charity Shield", draw_rows, 0,
-		"CHARITY SHIELD", "res://art/screens/cup/charity.png")
+	scr.setup(_career.club_name, "", str(res.get("season", _career.season)), status, status_col,
+		sub, run_rows, round_label, draw_rows, 0, title, emblem)
 	scr.gui_input.connect(func(e: InputEvent) -> void:
 		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
 			scr.queue_free())
@@ -1855,7 +1919,7 @@ func _next_season() -> void:
 	# down and unrenewed players leave on a free (handled in Career.advance_season).
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
-	_career.advance_season(GameDB.leagues, rng, _euro_pool())
+	_career.advance_season(GameDB.leagues, rng, _euro_pool(), _sa_champion())
 	_career.save()
 	_enter_career()
 

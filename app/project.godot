@@ -17,14 +17,19 @@ GameDB="*res://scripts/GameDB.gd"
 
 [display]
 
-window/size/viewport_width=1280
-window/size/viewport_height=720
+; Native PM98 resolution (640x480, 4:3). stretch "keep" letterboxes the whole game
+; uniformly to any device with dark margins -- the full screen is ALWAYS shown,
+; nothing is ever cropped or distorted (faithful to the PC game in a window).
+window/size/viewport_width=640
+window/size/viewport_height=480
 window/handheld/orientation=0
 window/stretch/mode="canvas_items"
-window/stretch/aspect="expand"
+window/stretch/aspect="keep"
 
 [rendering]
 
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 textures/vram_compression/import_etc2_astc=true
+; Dark letterbox margins around the 4:3 game area.
+environment/defaults/default_clear_color=Color(0.04, 0.05, 0.08, 1)
