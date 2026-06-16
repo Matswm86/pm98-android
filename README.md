@@ -49,39 +49,47 @@ prompted. Reinstalling over an older build? Uninstall the old one first.
 
 ## Screenshots
 
-The original screens, rebuilt at the exact pixel coordinates reversed out of the
-game's executable, from its own icons, fonts and backgrounds:
+The app on a phone-aspect screen, opening on the original PREMIER MANAGER 98 title,
+captured from the running game (not a mock-up):
+
+<p><img src="screenshots/boot_phone.png" alt="PM98 running on a phone — the title screen" width="640"/></p>
+
+The Title and Main Menu, captured from the actual Godot build:
 
 <p>
-  <img src="screenshots/title.png" alt="Title / front-door menu" width="240"/>
-  <img src="screenshots/menu.png" alt="Main menu hub" width="240"/>
-  <img src="screenshots/league_table.png" alt="League table" width="240"/>
+  <img src="screenshots/title.png" alt="Title / front-door menu" width="320"/>
+  <img src="screenshots/menu.png" alt="Main menu hub" width="320"/>
 </p>
+
+The rest of the rebuilt screens, reconstructed at the exact pixel coordinates reversed
+out of the game's executable, from its own icons, fonts and backgrounds:
+
 <p>
+  <img src="screenshots/league_table.png" alt="League table" width="240"/>
   <img src="screenshots/lineup.png" alt="Line-up and formation" width="240"/>
   <img src="screenshots/squad.png" alt="Squad management" width="240"/>
-  <img src="screenshots/transfer.png" alt="Transfer market" width="240"/>
 </p>
 <p>
+  <img src="screenshots/transfer.png" alt="Transfer market" width="240"/>
   <img src="screenshots/finance.png" alt="Club finances" width="240"/>
   <img src="screenshots/directiva.png" alt="Board of Directors" width="240"/>
   <img src="screenshots/stadium.png" alt="Stadium" width="240"/>
 </p>
 
-<sub>These are reference renders from the reconstruction renderers
-(`tools/re/preview_*.py`), which mirror each rebuilt scene pixel-for-pixel from the
-exact coordinates and assets the in-engine screens use. They are not live device
-captures (see the note below); on a phone each screen runs in landscape with a marble
-bezel in the side margins.</sub>
+<sub>The first three are real captures from the Godot build (Xvfb + GL in CI). The
+remaining six are reference renders from the reconstruction renderers
+(`tools/re/preview_*.py`), which mirror each rebuilt scene pixel-for-pixel from the same
+coordinates and assets the in-engine screens use; real captures of those are being added.
+On a phone each screen runs in landscape with a marble bezel in the side margins.</sub>
 
 ## Status
 
-This is an early build. The original-art screens above are reached as full-screen
-overlays from within the app, which opens on the title screen; the surrounding
-navigation (browsing the database, picking a club, the week-to-week career hub and the
-match feed) currently uses a simpler functional UI rather than the original art. Making
-the whole app look like PM98 end-to-end, with the original Main Menu hub as the live
-career screen, is the next direction.
+This is an early build. It opens on the original title screen; from there the
+original-art screens are reached as full-screen overlays. The surrounding navigation
+(browsing the database, picking a club, the week-to-week career hub and the match feed)
+currently uses a simpler functional UI rather than the original art. Making the whole app
+look like PM98 end-to-end, with the original Main Menu hub as the live career screen, is
+the next direction.
 
 ## Coming next
 
