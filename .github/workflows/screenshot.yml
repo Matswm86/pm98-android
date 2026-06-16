@@ -74,6 +74,14 @@ jobs:
             timeout 90 "$GITHUB_WORKSPACE/godot" --rendering-driver opengl3 \
             --resolution 2400x1080 . 2>&1 | tee browse.log || true
           echo "--- BROWSE diagnostics ---"; grep -iE "BROWSE-SHOT|SHOT .*png|SCRIPT ERROR|error" browse.log | head -20 || true
+          # A1 FAITHFUL match-view repro: build a real fixture timeline, mount the live
+          # MatchScreen, capture it at kick-off / a goal minute / late on (proves the DATSIM
+          # sprite pitch renders in the engine, not just the PIL mirror).
+          PM98_SHOT_DIR="$PWD/shots" PM98_MATCH_SHOT=1 LIBGL_ALWAYS_SOFTWARE=1 \
+            xvfb-run -a -s "-screen 0 2400x1080x24" \
+            timeout 90 "$GITHUB_WORKSPACE/godot" --rendering-driver opengl3 \
+            --resolution 2400x1080 . 2>&1 | tee match.log || true
+          echo "--- MATCH diagnostics ---"; grep -iE "MATCH-SHOT|SHOT .*png|SCRIPT ERROR|error" match.log | head -20 || true
           # Direct art-screen render for comparison.
           PM98_SHOT_DIR="$PWD/shots" LIBGL_ALWAYS_SOFTWARE=1 \
             xvfb-run -a -s "-screen 0 1280x720x24" \

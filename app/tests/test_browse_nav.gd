@@ -78,14 +78,14 @@ func _run() -> void:
 		tb.queue_free()
 	await process_frame
 
-	# Watch a match (B4): a PM98-chrome match read-out with a scoreline title.
+	# Watch a match (A1): the 2D MATCH VIEW (MatchScreen) mounts, fed the two clubs + a timeline.
 	main._play_watch_match(cl[0], cl[1], lg)
 	await process_frame
 	var matched := false
 	for ch in main.get_children():
-		if ch is BrowseScreen and ":" in str(ch._title):
+		if ch is MatchScreen and str(ch._home) != "" and str(ch._away) != "" and not (ch._lines as Array).is_empty():
 			matched = true
-	ok = _assert(matched, "watch -> PM98 match overlay with a scoreline") and ok
+	ok = _assert(matched, "watch -> 2D MATCH VIEW overlay with a timeline") and ok
 
 	# Enter a career -> the front-of-house browse is dropped and the hub is raised.
 	main._begin_career(lg, cl[0])

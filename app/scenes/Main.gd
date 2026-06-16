@@ -61,6 +61,9 @@ func _boot() -> void:
 	if OS.has_environment("PM98_BROWSE_SHOT"):
 		_browse_shot()
 		return
+	if OS.has_environment("PM98_MATCH_SHOT"):
+		_match_shot()
+		return
 	var boot_shot := OS.has_environment("PM98_BOOT_SHOT")
 	if boot_shot or not OS.has_environment("PM98_SHOT_DIR"):
 		_show_title_screen()
@@ -148,6 +151,48 @@ func _browse_shot() -> void:
 		await _settle()
 		_save_shot(dir, "match.png")
 	print("BROWSE-SHOT done browse_mounted=%s" % str(_browse != null and is_instance_valid(_browse)))
+	get_tree().quit()
+
+
+## Faithful real-render of A1 — the 2D MATCH VIEW. Builds a real fixture timeline,
+## mounts the live MatchScreen, and captures it at kick-off, a goal minute, and late on,
+## so the PNGs prove the DATSIM sprite pitch renders in the engine (not just the PIL
+## mirror — the grey-screen incident lesson). Run as the NORMAL app under Xvfb+GL:
+## PM98_MATCH_SHOT=1.
+func _match_shot() -> void:
+	var dir := OS.get_environment("PM98_SHOT_DIR")
+	if GameDB.leagues.is_empty():
+		print("MATCH-SHOT no leagues loaded")
+		get_tree().quit()
+		return
+	var lg: Dictionary = GameDB.leagues[0]
+	var cl := GameDB.clubs_in_league(lg["id"])
+	cl.sort_custom(func(a, b): return a["name"] < b["name"])
+	if cl.size() < 2:
+		print("MATCH-SHOT need two clubs")
+		get_tree().quit()
+		return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 424242        # fixed seed -> reproducible capture
+	var m := MatchCommentary.timeline(rng, cl[0], cl[1])
+	var scr: MatchScreen = load("res://scenes/MatchScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(str(cl[0].get("name", "?")), str(cl[1].get("name", "?")),
+		int(m["home_goals"]), int(m["away_goals"]), m["lines"])
+	scr.set_process(false)   # freeze the clock so seek() controls the captured minute
+	# pick a goal minute if any, else mid-match
+	var goal_min := 35
+	for ln in m["lines"]:
+		if ln.get("goal") == true:
+			goal_min = int(ln["minute"])
+			break
+	for shot in [["match_kickoff.png", 2.0], ["match_goal.png", float(goal_min)], ["match_late.png", 82.0]]:
+		scr.seek(shot[1])
+		await _settle()
+		_save_shot(dir, shot[0])
+	print("MATCH-SHOT done %s %d:%d goal@%d" % [str(cl[0].get("name", "?")),
+		int(m["home_goals"]), int(m["away_goals"]), goal_min])
 	get_tree().quit()
 
 
@@ -318,31 +363,16 @@ func _open_finance(club: Dictionary, club_name: String, season: String) -> void:
 	scr.setup(sm, club_name, "", season)
 	_mount_tap_overlay(scr)
 
-## PM98-chrome match read-out (B4): the scoreline in the BARRA, the commentary feed
-## as non-selectable rows (goals gold, phase markers dim), RETURN runs `on_back`.
+## A1 — the 2D MATCH VIEW (iconic DATSIM): real DATSIM sprites on a 3/4 broadcast
+## pitch, animated to the engine's minute-by-minute event timeline. The verbatim
+## commentary still rides the live ticker; RETURN runs `on_back`. (`sub` unused now
+## that the scoreline + clock live in the BARRA scoreboard.)
 func _open_match(home: Dictionary, away: Dictionary, hg: int, ag: int,
-		lines: Array, sub: String, on_back: Callable) -> void:
-	var rows: Array = []
-	for ln in lines:
-		var side: int = ln["side"]
-		if side == -1:
-			rows.append({"text": "- - -  %s" % ln["text"], "enabled": false,
-				"accent": Color(0.59, 0.69, 0.82)})
-		else:
-			var tag := "H" if side == 0 else "A"
-			var g := false
-			if ln.get("goal"):
-				g = true
-			rows.append({
-				"text": "%2d'  [%s]  %s%s" % [ln["minute"], tag, ln["text"], "   GOAL!" if g else ""],
-				"enabled": false,
-				"accent": Color(1.0, 0.87, 0.0) if g else null,
-			})
-	var scr: BrowseScreen = load("res://scenes/BrowseScreen.gd").new()
+		lines: Array, _sub: String, on_back: Callable) -> void:
+	var scr: MatchScreen = load("res://scenes/MatchScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
-	scr.setup("%s  %d : %d  %s" % [home.get("name", "?"), hg, ag, away.get("name", "?")],
-		sub, rows, {"back_label": "RETURN"})
+	scr.setup(str(home.get("name", "?")), str(away.get("name", "?")), hg, ag, lines)
 	scr.back_pressed.connect(func() -> void:
 		scr.queue_free()
 		if on_back.is_valid():
