@@ -109,6 +109,21 @@ jobs:
           "$GITHUB_WORKSPACE/godot" --headless --import . || true
           "$GITHUB_WORKSPACE/godot" --headless --import .
 
+      - name: Script compile guard (never ship a grey/broken APK)
+        working-directory: app
+        run: |
+          # Boot the real project headless (autoloads registered, main scene loaded) and
+          # fail the build if ANY script fails to parse/compile. A broken main script
+          # loads as a grey screen on device, which an import-only check does not catch.
+          set -e
+          LOG="$("$GITHUB_WORKSPACE/godot" --headless --quit-after 60 . 2>&1 || true)"
+          echo "$LOG" | tail -30
+          if echo "$LOG" | grep -qiE "SCRIPT ERROR|Parse Error|Compile Error|Failed to load script"; then
+            echo "::error::GDScript parse/compile error detected — refusing to build a broken APK"
+            exit 1
+          fi
+          echo "Scripts compile clean."
+
       - name: Diagnostic dump
         run: |
           echo "--- ~/.config/godot listing ---"

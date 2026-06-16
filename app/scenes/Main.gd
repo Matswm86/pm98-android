@@ -66,7 +66,15 @@ func _boot_shot() -> void:
 	await RenderingServer.frame_post_draw
 	var img := get_viewport().get_texture().get_image()
 	var err := img.save_png(dir.path_join("boot.png"))
-	print("BOOT-SHOT err=%d %dx%d" % [err, img.get_width(), img.get_height()])
+	# Diagnose: is the title mounted, sized, and are its textures actually loaded?
+	var t: TitleScreen = null
+	for c in get_children():
+		if c is TitleScreen:
+			t = c
+	var diag := "no-title"
+	if t != null:
+		diag = "size=%s bg=%s bezel=%s" % [str(t.size), str(t._bg != null), str(t._bezel != null)]
+	print("BOOT-SHOT err=%d %dx%d %s" % [err, img.get_width(), img.get_height(), diag])
 	get_tree().quit()
 
 
@@ -81,7 +89,7 @@ func _devshot() -> void:
 	await _settle()
 	# The TITLE front door (the boot overlay): mount it explicitly, capture a REAL
 	# render of it, then free it so the rest of the walk sees the views beneath.
-	var title := load("res://scenes/TitleScreen.gd").new()
+	var title: TitleScreen = load("res://scenes/TitleScreen.gd").new()
 	title.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(title)
 	await _settle()
