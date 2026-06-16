@@ -64,6 +64,7 @@ var _season: String = ""
 var _cash: int = 0
 var _position: String = ""
 var _press: String = ""        # action currently held down (for the highlight)
+var _toast_msg: String = ""    # transient feedback (save / news / next match)
 
 
 func _ready() -> void:
@@ -85,6 +86,21 @@ func setup(club: String, manager := "", season := "", cash := 0, position := "")
 	_season = season
 	_cash = cash
 	_position = position
+	queue_redraw()
+
+
+## Flash a transient line in the centre panel (save / news / next-match feedback) since
+## the hub has no green footer to write to. Auto-clears after a couple of seconds.
+func toast(msg: String) -> void:
+	_toast_msg = msg
+	queue_redraw()
+	var tree := get_tree()
+	if tree != null:
+		tree.create_timer(2.5).timeout.connect(_clear_toast)
+
+
+func _clear_toast() -> void:
+	_toast_msg = ""
 	queue_redraw()
 
 
@@ -181,6 +197,11 @@ func _draw() -> void:
 		var r: Rect2 = ICON_HITS.get(_press, CTRL_HITS.get(_press, Rect2()))
 		if r.size != Vector2.ZERO:
 			draw_rect(r, C_HILITE, true)
+
+	# Transient toast in the centre gap (save / news / next-match feedback).
+	if _toast_msg != "":
+		draw_rect(Rect2(120, 190, 400, 22), Color(0.0, 0.0, 0.0, 0.66), true)
+		_txt(_f12, 120, 193, _toast_msg, Color(1.0, 0.95, 0.6), 13, 400)
 
 
 static func _fmt(v: int) -> String:

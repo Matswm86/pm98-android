@@ -78,6 +78,12 @@ func _run() -> void:
 	scr._on_input(_touch(Vector2(320, 180), false))
 	ok = _assert(got.is_empty(), "drag-off cancels (%s)" % str(got)) and ok
 
+	# Transient toast (used by the persistent hub for save / news / next-match feedback).
+	scr.toast("Game saved")
+	ok = _assert(scr._toast_msg == "Game saved", "toast sets the message") and ok
+	scr._clear_toast()
+	ok = _assert(scr._toast_msg == "", "toast clears") and ok
+
 	scr.queue_free()
 	print("\n%s" % ("ALL PASS" if ok else "FAILURES ABOVE"))
 	quit(0 if ok else 1)

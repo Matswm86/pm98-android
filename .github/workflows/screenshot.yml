@@ -59,6 +59,14 @@ jobs:
             --resolution 2400x1080 . 2>&1 | tee bootphone.log || true
           cp -f shots/boot.png shots/boot_phone.png 2>/dev/null || true
           echo "--- BOOT diagnostics ---"; grep -iE "BOOT-SHOT|SCRIPT ERROR|error" boot720.log bootphone.log | head -20 || true
+          # B1 FAITHFUL hub repro: run the NORMAL app with PM98_HUB_SHOT so _boot begins a
+          # career through the real nav and captures the persistent MENUPRINCIPAL hub (proves
+          # the career hub is the original art, not the old green list). Phone res.
+          PM98_SHOT_DIR="$PWD/shots" PM98_HUB_SHOT=1 LIBGL_ALWAYS_SOFTWARE=1 \
+            xvfb-run -a -s "-screen 0 2400x1080x24" \
+            timeout 90 "$GITHUB_WORKSPACE/godot" --rendering-driver opengl3 \
+            --resolution 2400x1080 . 2>&1 | tee hub.log || true
+          echo "--- HUB diagnostics ---"; grep -iE "HUB-SHOT|SCRIPT ERROR|error" hub.log | head -20 || true
           # Direct art-screen render for comparison.
           PM98_SHOT_DIR="$PWD/shots" LIBGL_ALWAYS_SOFTWARE=1 \
             xvfb-run -a -s "-screen 0 1280x720x24" \

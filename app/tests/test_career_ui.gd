@@ -36,6 +36,10 @@ func _run() -> void:
 	ok = _assert(main._career != null and main._career.club_id == int(club["id"]),
 		"career created for %s" % club.get("name", "?")) and ok
 	ok = _assert(main._career.week == 0, "starts at week 0") and ok
+	# B1: the career hub IS the original-art MENUPRINCIPAL, mounted + visible (not green).
+	ok = _assert(main._hub != null and is_instance_valid(main._hub) and main._hub.visible,
+		"MENUPRINCIPAL hub mounted as the persistent career hub") and ok
+	ok = _assert(main._hub is MenuScreen, "hub is a MenuScreen") and ok
 
 	# Advance three weeks through the real UI path.
 	for _w in 3:
@@ -127,10 +131,20 @@ func _run() -> void:
 	main._show_transfer_news()
 	await process_frame
 
-	main._show_career()                         # back to hub
+	main._show_career()                         # back to the hub (re-raised)
 	await process_frame
-	main._activate_career({"act": "save"})      # save path
+	ok = _assert(main._hub != null and main._hub.visible, "hub re-raised on return to career") and ok
+	main._menu_action("save", main._hub)        # MENUPRINCIPAL SAVE button -> save path
 	ok = _assert(Career.has_save(), "career saved to disk") and ok
+	main._menu_action("news", main._hub)        # info action -> hub toast (no crash, no nav)
+	await process_frame
+	ok = _assert(main._hub._toast_msg != "", "hub toast shows info feedback") and ok
+	# CONTINUE plays the week through the hub router (no green hub left).
+	var wk: int = main._career.week
+	main._menu_action("continue", main._hub)
+	await process_frame
+	ok = _assert(main._career.week == wk + 1, "hub CONTINUE advanced a week (%d->%d)" % [
+		wk, main._career.week]) and ok
 
 	print("\n%s" % ("ALL PASS" if ok else "FAILURES ABOVE"))
 	quit(0 if ok else 1)

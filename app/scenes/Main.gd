@@ -23,6 +23,7 @@ var _nav: Array[Callable] = []          # view stack; top is re-invoked on Back
 var _payload: Array = []                # parallel data for the current list rows
 var _on_activate: Callable
 var _career: Career = null              # active managed career, null on the menu
+var _hub: MenuScreen = null             # persistent MENUPRINCIPAL hub while in a career
 
 @onready var _title: Label = $Root/TopBar/Title
 @onready var _subtitle: Label = $Root/TopBar/Subtitle
@@ -49,6 +50,9 @@ func _ready() -> void:
 ## raised the normal way and the booted frame is captured — the faithful device repro.
 func _boot() -> void:
 	_show_home()
+	if OS.has_environment("PM98_HUB_SHOT"):
+		_hub_shot()
+		return
 	var boot_shot := OS.has_environment("PM98_BOOT_SHOT")
 	if boot_shot or not OS.has_environment("PM98_SHOT_DIR"):
 		_show_title_screen()
@@ -75,6 +79,35 @@ func _boot_shot() -> void:
 	if t != null:
 		diag = "size=%s bg=%s bezel=%s" % [str(t.size), str(t._bg != null), str(t._bezel != null)]
 	print("BOOT-SHOT err=%d %dx%d %s" % [err, img.get_width(), img.get_height(), diag])
+	get_tree().quit()
+
+
+## Faithful real-render of the B1 career hub: begin a career in the first league with
+## the first club through the REAL nav (_begin_career -> _enter_career -> _show_career),
+## so the captured frame is the persistent MENUPRINCIPAL hub the device shows, then quit.
+## Run as the NORMAL app under Xvfb+GL. Proves the hub mounts and renders (not the green
+## list) the only way that counts here, with no display: PM98_HUB_SHOT=1.
+func _hub_shot() -> void:
+	var dir := OS.get_environment("PM98_SHOT_DIR")
+	if GameDB.leagues.is_empty():
+		print("HUB-SHOT no leagues loaded")
+		get_tree().quit()
+		return
+	var lg: Dictionary = GameDB.leagues[0]
+	var clubs := GameDB.clubs_in_league(lg["id"])
+	clubs.sort_custom(func(a, b): return a["name"] < b["name"])
+	_begin_career(lg, clubs[0])
+	for _i in 20:
+		await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	# get_image() is null under the headless dummy renderer; guard so the diagnostic always
+	# prints (real PNG is captured only under Xvfb+GL in screenshot.yml).
+	var img := get_viewport().get_texture().get_image() if get_viewport().get_texture() != null else null
+	var err := img.save_png(dir.path_join("hub.png")) if img != null else -1
+	var w := img.get_width() if img != null else 0
+	var h := img.get_height() if img != null else 0
+	var mounted := _hub != null and is_instance_valid(_hub) and _hub.visible
+	print("HUB-SHOT err=%d %dx%d hub_mounted=%s club=%s" % [err, w, h, str(mounted), _career.club_name])
 	get_tree().quit()
 
 
@@ -163,6 +196,11 @@ func _go_back() -> void:
 		_nav.back().call()
 
 func _set_view(title: String, subtitle: String, rows: Array, payload: Array, on_activate: Callable) -> void:
+	# Any green data-browser view hides the persistent MENUPRINCIPAL hub (it sits on top
+	# of $Root); _show_career re-raises it. Lets the still-green sub-flows (tactics,
+	# transfer text menus, match feed, end-of-season) show beneath the hub overlay.
+	if _hub != null and is_instance_valid(_hub):
+		_hub.visible = false
 	_title.text = title
 	_subtitle.text = subtitle
 	_list.clear()
@@ -330,57 +368,42 @@ func _club_with_roster(id: int) -> Dictionary:
 	base["players"] = _career.squad_of(id)
 	return base
 
-## The management hub. Re-reads _career each time so it refreshes after a match.
+## The management hub IS the original-art MENUPRINCIPAL (B1): a persistent overlay raised
+## once on entering the career and re-shown whenever nav returns here, instead of the old
+## green data-browser list. Mount-or-refresh: re-reads _career each call so the centre
+## panel (club / cash / position) updates after a match or signing.
 func _show_career() -> void:
-	var c := _career
-	var rows: Array = []
-	var payload: Array = []
-	rows.append("🖥  MAIN MENU (the screen)")
-	payload.append({"act": "menu"})
-	if c.season_over():
-		rows.append("▶  End of season")
-		payload.append({"act": "end"})
-	else:
-		var fx := c.manager_fixture()
-		var opp_label := "bye"
-		if not fx.is_empty():
-			var home: bool = int(fx[0]) == c.club_id
-			var opp_id: int = int(fx[1]) if home else int(fx[0])
-			var opp: Dictionary = GameDB.club(opp_id)
-			opp_label = "%s %s" % ["vs" if home else "at", opp.get("name", "?")]
-		rows.append("▶  Play week %d  (%s)" % [c.week + 1, opp_label])
-		payload.append({"act": "advance"})
-	rows.append("League table")
-	payload.append({"act": "table"})
-	rows.append("Team & tactics")
-	payload.append({"act": "tactics"})
-	rows.append("Squad")
-	payload.append({"act": "squad"})
-	var win := "open, deadline in %dw" % c.deadline_weeks_left() if c.transfers_open() else "closed"
-	rows.append("Transfers   (window %s)" % win)
-	payload.append({"act": "transfers"})
-	rows.append("Finances")
-	payload.append({"act": "finance"})
-	rows.append("Save game")
-	payload.append({"act": "save"})
-	var sub := "Week %d/%d  -  %d%s  -  £%s  -  obj: %s" % [
-		mini(c.week + 1, c.total_weeks()), c.total_weeks(), c.position(),
-		_ord_suffix(c.position()), _fmt_int(c.cash), c.objective_text]
-	_set_view("%s  -  %s" % [c.club_name, c.season], sub, rows, payload, _activate_career)
+	if _nav.is_empty():
+		_nav.append(_show_home)
+	_mount_hub()
 
-func _activate_career(item: Dictionary) -> void:
-	match item["act"]:
-		"menu": _show_menu_screen()
-		"advance": _career_advance()
-		"end": _push(_show_end_of_season)
-		"table": _show_league_table_screen()
-		"tactics": _push(_show_tactics)
-		"squad": _show_squad_screen()
-		"transfers": _push(_show_transfers)
-		"finance": _show_finance_screen()
-		"save":
-			_career.save()
-			_toast("Game saved")
+## Create the persistent MENUPRINCIPAL hub on first entry (wiring its taps to _menu_action
+## once), or raise + refresh the existing one. Kept on top of $Root so the green sub-flows
+## hide cleanly behind it (see _set_view) and art overlays mount above it.
+func _mount_hub() -> void:
+	var c := _career
+	if _hub == null or not is_instance_valid(_hub):
+		_hub = load("res://scenes/MenuScreen.gd").new()
+		_hub.set_anchors_preset(Control.PRESET_FULL_RECT)
+		add_child(_hub)
+		_hub.action_selected.connect(_menu_action.bind(_hub))
+	else:
+		move_child(_hub, get_child_count() - 1)
+	_hub.visible = true
+	_hub.setup(c.club_name, c.league_name, c.season, c.cash,
+		"%d%s" % [c.position(), _ord_suffix(c.position())])
+
+## Leave the career back to the database/home browser (MENUPRINCIPAL EXIT). Saves first,
+## frees the hub, clears the active career.
+func _leave_career() -> void:
+	if _career != null:
+		_career.save()
+	if _hub != null and is_instance_valid(_hub):
+		_hub.queue_free()
+	_hub = null
+	_career = null
+	_nav = [_show_home]
+	_show_home()
 
 func _career_advance() -> void:
 	var rng := RandomNumberGenerator.new()
@@ -597,45 +620,34 @@ func _show_stadium_screen() -> void:
 		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
 			scr.queue_free())
 
-## The original-art MAIN MENU (MENUPRINCIPAL) screen as a full-screen overlay: the
-## 12 management icons + the EXIT/SAVE/NEWS/CONTINUE control bar at the coordinates
-## reversed from MANAGER.EXE (docs/re/menu_screen_re.md). Interactive: tapping an
-## icon routes to the matching function. Driven by the live career chrome.
-func _show_menu_screen() -> void:
-	var c := _career
-	var scr: MenuScreen = load("res://scenes/MenuScreen.gd").new()
-	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(scr)
-	scr.setup(c.club_name, c.league_name, c.season, c.cash,
-		"%d%s" % [c.position(), _ord_suffix(c.position())])
-	scr.action_selected.connect(_menu_action.bind(scr))
-
-## Route a MENUPRINCIPAL icon tap to the matching function. Navigations free the
-## menu overlay first; lightweight info actions toast and leave it open.
+## Route a MENUPRINCIPAL icon/button tap from the persistent hub. The hub stays mounted:
+## art overlays (table/line-up/finance/board/stadium/buy) mount ABOVE it and tap-dismiss
+## back to it; still-green sub-flows (tactics/sell/results) are pushed and hide the hub
+## via _set_view (re-shown on Back); info actions toast on the hub itself; CONTINUE plays
+## the week (or opens end-of-season when the campaign is over); EXIT leaves the career.
 func _menu_action(action: String, scr: MenuScreen) -> void:
 	match action:
-		"exit": scr.queue_free()
+		"exit": _leave_career()
 		"save":
 			_career.save()
-			_toast("Game saved")
-		"news": _toast("No news this week")
-		"staff": _toast("Staff management is not in this build yet")
-		"opponent", "fixtures": _toast(_menu_next_match())
+			scr.toast("Game saved")
+		"news": scr.toast("No news this week")
+		"staff": scr.toast("Staff management is not in this build yet")
+		"opponent", "fixtures": scr.toast(_menu_next_match())
 		"continue":
-			scr.queue_free()
-			_career_advance()
-		_:
-			scr.queue_free()
-			match action:
-				"table": _show_league_table_screen()
-				"lineup": _show_lineup_screen()
-				"finance": _show_finance_screen()
-				"board": _show_directiva_screen()
-				"stadium": _show_stadium_screen()
-				"buy": _show_transfer_screen()
-				"tactics": _push(_show_tactics)
-				"sell": _push(_show_transfers)
-				"results": _push(_show_career_table)
+			if _career.season_over():
+				_push(_show_end_of_season)
+			else:
+				_career_advance()
+		"table": _show_league_table_screen()
+		"lineup": _show_lineup_screen()
+		"finance": _show_finance_screen()
+		"board": _show_directiva_screen()
+		"stadium": _show_stadium_screen()
+		"buy": _show_transfer_screen()
+		"tactics": _push(_show_tactics)
+		"sell": _push(_show_transfers)
+		"results": _push(_show_career_table)
 
 ## "vs Arsenal" / "at Chelsea" / "bye" for the manager's next match.
 func _menu_next_match() -> String:

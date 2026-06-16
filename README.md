@@ -84,17 +84,17 @@ On a phone each screen runs in landscape with a marble bezel in the side margins
 
 ## Status
 
-This is an early build. It opens on the original title screen; from there the
-original-art screens are reached as full-screen overlays. The surrounding navigation
-(browsing the database, picking a club, the week-to-week career hub and the match feed)
-currently uses a simpler functional UI rather than the original art. Making the whole app
-look like PM98 end-to-end, with the original Main Menu hub as the live career screen, is
-the next direction.
+This is an early build. It opens on the original title screen, and **the career hub is
+now the original PREMIER MANAGER 98 Main Menu**: take over a club and you land on the
+real menu, with its icons routing to each rebuilt screen and CONTINUE playing the week.
+Some deeper flows (picking a club, team tactics, the transfer desk and the match feed)
+still use a simpler functional UI; replacing those with original art is the next
+direction.
 
 ## Coming next
 
-The original Main Menu as the live in-game hub, then training, the cups and Europe,
-injuries and suspensions, and player contracts. Club crests, player photos and a 2D
+Original art for the remaining flows (club/league select, transfers, the match feed),
+then training, the cups and Europe, injuries and suspensions, and player contracts. Club crests, player photos and a 2D
 match view are decoded from the game files (the archive format is fully cracked, see
 `docs/re/pkf_format.md`) and are being wired in. The season simulation uses the
 original game's verified random-number generator and a per-shot model tuned to
