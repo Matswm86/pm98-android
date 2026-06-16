@@ -179,7 +179,8 @@ func _match_shot() -> void:
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
 	scr.setup(str(cl[0].get("name", "?")), str(cl[1].get("name", "?")),
-		int(m["home_goals"]), int(m["away_goals"]), m["lines"])
+		int(m["home_goals"]), int(m["away_goals"]), m["lines"],
+		int(cl[0].get("id", -1)), int(cl[1].get("id", -1)))
 	scr.set_process(false)   # freeze the clock so seek() controls the captured minute
 	# pick a goal minute if any, else mid-match
 	var goal_min := 35
@@ -372,7 +373,8 @@ func _open_match(home: Dictionary, away: Dictionary, hg: int, ag: int,
 	var scr: MatchScreen = load("res://scenes/MatchScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
-	scr.setup(str(home.get("name", "?")), str(away.get("name", "?")), hg, ag, lines)
+	scr.setup(str(home.get("name", "?")), str(away.get("name", "?")), hg, ag, lines,
+		int(home.get("id", -1)), int(away.get("id", -1)))
 	scr.back_pressed.connect(func() -> void:
 		scr.queue_free()
 		if on_back.is_valid():

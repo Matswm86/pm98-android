@@ -58,37 +58,38 @@ def pgf_frames(name):
 KIT_IDX = set(range(16, 43)) | {1, 2, 4, 5, 6, 9}
 
 
-def kit_rgb(idx, rgb, team):
-    """Recolour kit-ramp pixels to a team kit, preserving luma. Skin/boots/grays pass through."""
-    if idx not in KIT_IDX:
-        return rgb
+def _kit_luma(rgb):
+    """Kit-ramp pixel -> a luma the match view tints per club (modulate x club colour)."""
     r, g, b = rgb
-    luma = int(0.30 * r + 0.59 * g + 0.11 * b)
-    if team == "home":                       # red
-        return (min(255, int(luma * 1.55) + 40), int(luma * 0.22), int(luma * 0.22))
-    return (int(luma * 0.30), int(luma * 0.45), min(255, int(luma * 1.55) + 40))  # blue
+    luma = min(255, int(0.30 * r + 0.59 * g + 0.11 * b) + 60)   # lift so dark kit shades still read
+    return (luma, luma, luma)
 
 
-def player_sheet(team, pal):
-    sheet = Image.new("RGBA", (CELL_W * DIRS, CELL_H * ANIM_ROWS), (0, 0, 0, 0))
+def player_layers(pal):
+    """Split JUG into a true-colour BASE (skin/boots/detail) + a kit-LUMA layer, so the
+    match view can tint the kit to each club's real colour at runtime (no shader)."""
+    base = Image.new("RGBA", (CELL_W * DIRS, CELL_H * ANIM_ROWS), (0, 0, 0, 0))
+    kit = Image.new("RGBA", (CELL_W * DIRS, CELL_H * ANIM_ROWS), (0, 0, 0, 0))
+    bp, kp = base.load(), kit.load()
     fr = pgf_frames("JUG.PGF")
     for row in range(ANIM_ROWS):
         for d in range(DIRS):
             W, H, ax, px = fr[row * 8 + d]
-            cell = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-            cp = cell.load()
+            dst_x = d * CELL_W + (CELL_W - W) // 2
+            dst_y = row * CELL_H + (CELL_H - H)          # bottom-align (feet on cell floor)
             for y in range(H):
                 for x in range(W):
                     v = px[y * W + x]
-                    if v:
-                        cp[x, y] = (*kit_rgb(v, pal[v], team), 255)
-            ox = row and 0  # noqa: keep row/col mapping explicit below
-            dst_x = d * CELL_W + (CELL_W - W) // 2
-            dst_y = row * CELL_H + (CELL_H - H)          # bottom-align (feet on cell floor)
-            sheet.alpha_composite(cell, (dst_x, dst_y))
-    p = OUT / f"player_{team}.png"
-    sheet.save(p)
-    return p
+                    if not v:
+                        continue
+                    if v in KIT_IDX:
+                        kp[dst_x + x, dst_y + y] = (*_kit_luma(pal[v]), 255)
+                    else:
+                        bp[dst_x + x, dst_y + y] = (*pal[v], 255)
+    pb, pk = OUT / "player_base.png", OUT / "player_kit.png"
+    base.save(pb)
+    kit.save(pk)
+    return pb, pk
 
 
 def ball_png(pal):
@@ -132,7 +133,8 @@ def main():
         raise SystemExit(f"extract DATSIM first: python3 {PKF} --extract /tmp/datsim_out DATSIM.PKF")
     OUT.mkdir(parents=True, exist_ok=True)
     pal = load_pal()
-    for f in (player_sheet("home", pal), player_sheet("away", pal), ball_png(pal), arrow_png(pal)):
+    pb, pk = player_layers(pal)
+    for f in (pb, pk, ball_png(pal), arrow_png(pal)):
         print("wrote", f.relative_to(ROOT), Image.open(f).size)
 
 

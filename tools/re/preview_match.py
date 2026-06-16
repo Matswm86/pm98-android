@@ -144,8 +144,23 @@ def render(minute, out):
         if dd < best:
             best, carrier = dd, i
 
-    ph = Image.open(ART / "player_home.png").convert("RGBA")
-    pa = Image.open(ART / "player_away.png").convert("RGBA")
+    base = Image.open(ART / "player_base.png").convert("RGBA")
+    kit = Image.open(ART / "player_kit.png").convert("RGBA")
+    col_home, col_away = (200, 40, 40), (40, 70, 200)
+
+    def player_cell(side, col_off, anim, dirn):
+        cell = base.crop((dirn * SPRITE_W, anim * SPRITE_H, (dirn + 1) * SPRITE_W, (anim + 1) * SPRITE_H)).copy()
+        kc = kit.crop((dirn * SPRITE_W, anim * SPRITE_H, (dirn + 1) * SPRITE_W, (anim + 1) * SPRITE_H)).copy()
+        r, g, b = col_home if side == 0 else col_away
+        kp = kc.load()
+        for yy in range(kc.height):
+            for xx in range(kc.width):
+                pr, pg, pb, pa2 = kp[xx, yy]
+                if pa2:
+                    kp[xx, yy] = (pr * r // 255, pg * g // 255, pb * b // 255, pa2)
+        cell.alpha_composite(kc)
+        return cell
+
     ball = Image.open(ART / "ball.png").convert("RGBA")
     draws = []
     for i, s in enumerate(slots):
@@ -170,8 +185,7 @@ def render(minute, out):
         draws.append((y, side, x, sc, col, anim, is_carrier))
     draws.sort(key=lambda t: t[0])
     for y, side, x, sc, col, anim, is_carrier in draws:
-        atlas = ph if side == 0 else pa
-        cell = atlas.crop((col * SPRITE_W, anim * SPRITE_H, (col + 1) * SPRITE_W, (anim + 1) * SPRITE_H))
+        cell = player_cell(side, 0, anim, col)
         dw, dh = int(SPRITE_W * sc), int(SPRITE_H * sc)
         cell = cell.resize((dw, dh), Image.NEAREST)
         d.ellipse([x - 7 * sc, y - 3 * sc, x + 7 * sc, y + 3 * sc], fill=(0, 0, 0, 70))

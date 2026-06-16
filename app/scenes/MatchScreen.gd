@@ -58,10 +58,14 @@ const MIN_PER_SEC := 3.6      # match minutes per real second (~25s for a 90' ma
 
 var _bar: Texture2D
 var _sky_tex: Texture2D
-var _ph: Texture2D
-var _pa: Texture2D
+var _pbase: Texture2D       # true-colour skin/boots/detail
+var _pkit: Texture2D        # kit-luma layer, tinted per club at draw time
 var _ball: Texture2D
 var _arrow: Texture2D
+var _col_home := Color(0.85, 0.18, 0.18)   # fallback kits (overridden from the club crest/kit art)
+var _col_away := Color(0.18, 0.30, 0.85)
+var _home_id := -1
+var _away_id := -1
 var _f14: Font
 var _f12: Font
 var _f10: Font
@@ -81,8 +85,8 @@ var _press_back := false
 
 func _ready() -> void:
 	_bar = load("res://art/screens/barra0.png")
-	_ph = load("res://art/match/player_home.png")
-	_pa = load("res://art/match/player_away.png")
+	_pbase = load("res://art/match/player_base.png")
+	_pkit = load("res://art/match/player_kit.png")
 	_ball = load("res://art/match/ball.png")
 	_arrow = load("res://art/match/arrow.png")
 	_f14 = load("res://art/fonts/proman14.fnt")
@@ -96,18 +100,80 @@ func _ready() -> void:
 	queue_redraw()
 
 
-## Feed a finished fixture. lines = MatchCommentary timeline lines.
-func setup(home_name: String, away_name: String, hg: int, ag: int, lines: Array) -> void:
+## Feed a finished fixture. lines = MatchCommentary timeline lines. home_id/away_id are
+## club ids used to pull each side's REAL kit colour from its kit art (res://art/kits/<id>.png);
+## pass -1 to keep the red/blue fallback.
+func setup(home_name: String, away_name: String, hg: int, ag: int, lines: Array,
+		home_id: int = -1, away_id: int = -1) -> void:
 	_home = home_name
 	_away = away_name
 	_hg = hg
 	_ag = ag
 	_lines = lines
+	_home_id = home_id
+	_away_id = away_id
+	_col_home = _kit_colour(home_id, true, _col_home)    # left half = home shirt
+	_col_away = _kit_colour(away_id, false, _col_away)   # right half = away shirt
+	# keep the two sides telling apart: if the kits are too close, contrast the away one
+	if _col_dist(_col_home, _col_away) < 0.32:
+		_col_away = Color(0.93, 0.93, 0.96) if _col_home.get_luminance() < 0.5 else Color(0.10, 0.12, 0.30)
 	_build_keyframes()
 	_build_formation()
 	_minute = 0.0
 	_playing = true
 	queue_redraw()
+
+
+func _col_dist(a: Color, b: Color) -> float:
+	return sqrt(pow(a.r - b.r, 2.0) + pow(a.g - b.g, 2.0) + pow(a.b - b.b, 2.0))
+
+
+## Dominant saturated colour of a club kit (one half of res://art/kits/<id>.png), brightened
+## for use as a modulate over the kit-luma layer. Returns `fallback` if no kit art / no
+## saturated colour (e.g. an all-white kit keeps the light fallback so it reads as white).
+func _kit_colour(club_id: int, home_half: bool, fallback: Color) -> Color:
+	if club_id < 0:
+		return fallback
+	var path := "res://art/kits/%d.png" % club_id
+	if not ResourceLoader.exists(path):
+		return fallback
+	var tex: Texture2D = load(path)
+	var img := tex.get_image() if tex != null else null
+	if img == null:
+		return fallback
+	var w := img.get_width()
+	var h := img.get_height()
+	var x0 := 0 if home_half else w / 2
+	var x1 := w / 2 if home_half else w
+	var buckets := {}        # quantized rgb -> [weight, r_sum, g_sum, b_sum]
+	for y in range(int(h * 0.15), int(h * 0.75)):     # torso band
+		for x in range(x0, x1):
+			var c := img.get_pixel(x, y)
+			if c.a < 0.5:
+				continue
+			var mx: float = max(c.r, max(c.g, c.b))
+			var mn: float = min(c.r, min(c.g, c.b))
+			if mx < 0.25 or (mx - mn) < 0.22:        # skip near-white/gray/black
+				continue
+			var key := Vector3i(int(c.r * 5), int(c.g * 5), int(c.b * 5))
+			var b: Array = buckets.get(key, [0.0, 0.0, 0.0, 0.0])
+			b[0] += 1.0
+			b[1] += c.r
+			b[2] += c.g
+			b[3] += c.b
+			buckets[key] = b
+	if buckets.is_empty():
+		return fallback
+	var best: Array = [0.0, 0.0, 0.0, 0.0]
+	for b in buckets.values():
+		if b[0] > best[0]:
+			best = b
+	var col := Color(best[1] / best[0], best[2] / best[0], best[3] / best[0])
+	# brighten so the modulate gives a vivid kit (the kit-luma layer supplies the shading)
+	var hsv_v: float = max(col.r, max(col.g, col.b))
+	if hsv_v > 0.0:
+		col = Color(col.r / hsv_v, col.g / hsv_v, col.b / hsv_v).lerp(col, 0.35)
+	return col
 
 
 ## Jump the clock (screenshot / test hook). Layout is a pure function of the minute.
@@ -423,8 +489,7 @@ func _draw_ellipse(c: Dictionary, rx: float, ry: float, col: Color) -> void:
 
 
 func _draw_player(p: Dictionary) -> void:
-	var tex: Texture2D = _ph if p["side"] == 0 else _pa
-	if tex == null:
+	if _pbase == null or _pkit == null:
 		return
 	var sc: float = p["scale"]
 	var dw := SPRITE_W * sc
@@ -434,7 +499,9 @@ func _draw_player(p: Dictionary) -> void:
 	# soft contact shadow
 	draw_colored_polygon(_ellipse_poly(Vector2(p["x"], p["y"]), 7 * sc, 3 * sc),
 		Color(0, 0, 0, 0.28))
-	draw_texture_rect_region(tex, dst, src)
+	# base (skin/boots/detail) then the kit-luma layer tinted to the club's real colour
+	draw_texture_rect_region(_pbase, dst, src)
+	draw_texture_rect_region(_pkit, dst, src, _col_home if p["side"] == 0 else _col_away)
 	if p.get("carrier") and _arrow != null:
 		var aw := 13.0 * sc
 		var fi := (int(_minute * 8.0)) % 8

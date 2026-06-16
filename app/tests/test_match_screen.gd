@@ -14,7 +14,7 @@ func _initialize() -> void:
 func _run() -> void:
 	var ok := true
 
-	for path in ["res://art/match/player_home.png", "res://art/match/player_away.png",
+	for path in ["res://art/match/player_base.png", "res://art/match/player_kit.png",
 			"res://art/match/ball.png", "res://art/match/arrow.png",
 			"res://art/screens/barra0.png", "res://art/fonts/proman14.fnt"]:
 		ok = _assert(ResourceLoader.exists(path), "asset present: %s" % path) and ok
@@ -25,7 +25,7 @@ func _run() -> void:
 	scr.set_process(false)          # freeze clock; seek() drives the minute
 	for _i in 3:
 		await process_frame
-	ok = _assert(scr._ph != null and scr._pa != null and scr._ball != null, "DATSIM atlases loaded") and ok
+	ok = _assert(scr._pbase != null and scr._pkit != null and scr._ball != null, "DATSIM atlases loaded") and ok
 
 	# A synthetic fixture: home goals @23 + @71, away goal @58.
 	var lines: Array = [
@@ -41,6 +41,14 @@ func _run() -> void:
 	await process_frame
 	ok = _assert(scr._slots.size() == 22, "formation has 22 players (%d)" % scr._slots.size()) and ok
 	ok = _assert(scr._keys.size() >= lines.size(), "keyframes built (%d)" % scr._keys.size()) and ok
+	ok = _assert(scr._col_home != scr._col_away, "the two kits are kept visually distinct") and ok
+
+	# Kit-colour deriver: a club with real kit art yields a saturated colour off the fallback.
+	if ResourceLoader.exists("res://art/kits/38.png"):
+		var fb := Color(0.5, 0.5, 0.5)
+		var c := scr._kit_colour(38, true, fb)
+		var sat: float = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b))
+		ok = _assert(c != fb and sat > 0.2, "kit colour derived from kit art (%s sat=%.2f)" % [str(c), sat]) and ok
 
 	# Layout is pure + on-pitch for a sweep of minutes.
 	var all_in := true
