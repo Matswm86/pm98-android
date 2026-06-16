@@ -105,13 +105,13 @@ static func roll_match(rng: RandomNumberGenerator, featured: Array, injury_mult 
 			var wk := _injury_weeks(rng)
 			p["injured_weeks"] = maxi(int(p.get("injured_weeks", 0)), wk)
 			news.append({"kind": "injury",
-				"text": "%s picked up an injury -- out for %d %s." % [_nm(p), wk, _matches(wk)]})
+				"text": "%s injured -- out for %d %s." % [_nm(p), wk, _matches(wk)]})
 			continue
 		if rng.randf() < RED_CHANCE:
 			var rwk := _red_weeks(rng)
 			p["suspended_weeks"] = maxi(int(p.get("suspended_weeks", 0)), rwk)
 			news.append({"kind": "suspension",
-				"text": "%s was sent off -- banned for %d %s." % [_nm(p), rwk, _matches(rwk)]})
+				"text": "%s sent off -- banned %d %s." % [_nm(p), rwk, _matches(rwk)]})
 			continue
 		if rng.randf() < YELLOW_CHANCE:
 			var y := int(p.get("yellows", 0)) + 1
@@ -119,7 +119,7 @@ static func roll_match(rng: RandomNumberGenerator, featured: Array, injury_mult 
 				p["yellows"] = 0
 				p["suspended_weeks"] = maxi(int(p.get("suspended_weeks", 0)), 1)
 				news.append({"kind": "suspension",
-					"text": "%s is suspended after %d bookings -- out next match." % [_nm(p), YELLOWS_FOR_BAN]})
+					"text": "%s suspended -- out next match." % _nm(p)})
 			else:
 				p["yellows"] = y
 	return news

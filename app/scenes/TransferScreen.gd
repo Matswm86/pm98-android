@@ -214,7 +214,31 @@ func _row(r: Dictionary, y: int) -> void:
 	_txt(_f8, COLS[3][1], ty, str(int(r.get("ca", 0))), C_TEXT, 11, true)
 	_txt(_f8, COLS[4][1], ty, fmt_money(int(r.get("fee", 0))), C_FEE, 11, true)
 	_txt(_f8, COLS[5][1], ty, fmt_money(int(r.get("wage", 0))), C_TEXT, 11, true)
-	_txt(_f8, COLS[6][1], ty, str(r.get("club_name", "")).substr(0, 12), C_DIM, 11)
+	# CLUB column runs to the panel's right edge (x 414..498 = 84px); fit the club
+	# name to it on whole-word boundaries so long names degrade cleanly
+	# ("MANCHESTER UTD." -> "MANCHESTER", never a mid-word "MANCHESTER U").
+	var club_w := float(int(PANEL.end.x) - COLS[6][1] - 1)
+	_txt(_f8, COLS[6][1], ty, _fit_club(str(r.get("club_name", "")), club_w), C_DIM, 11)
+
+
+## Fit a club name into `max_w` px of the CLUB column: keep whole words while they
+## fit (drop the trailing tag, e.g. " UTD."), and only char-truncate a single
+## over-long word as a last resort. No ellipsis - reads as a clean short name.
+func _fit_club(s: String, max_w: float) -> String:
+	if _f8 == null or s == "" or max_w <= 0.0:
+		return s
+	if _f8.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x <= max_w:
+		return s
+	var toks := s.split(" ", false)
+	while toks.size() > 1:
+		toks.remove_at(toks.size() - 1)
+		var cand := " ".join(toks)
+		if _f8.get_string_size(cand, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x <= max_w:
+			return cand
+	var out := s
+	while out.length() > 1 and _f8.get_string_size(out, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x > max_w:
+		out = out.substr(0, out.length() - 1)
+	return out
 
 
 ## Right column: bank box + the reversed CURRENT OFFERS / SCOUT / OFFERS / RETURN

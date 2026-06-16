@@ -230,7 +230,29 @@ func _draw_rows() -> void:
 		if ry >= top - 2 and ry + ROW_H <= bot + 2:
 			var accent: Variant = row.get("accent")
 			var col: Color = accent if accent is Color else (C_TEXT if enabled else C_DIM)
-			_txt(_f12, px + 12, ry + 6, str(row.get("text", "")).substr(0, 46), col, 13)
+			# Fit the row text to the pixel width left of the value (or the panel's
+			# right edge) so long lines (e.g. the club news feed) never bleed past
+			# the panel - they get a clean "..." instead of a mid-word clip.
 			var val := str(row.get("value", ""))
+			var val_w := _f12.get_string_size(val, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x if val != "" else 0.0
+			var text_w := float(pw - 24) - (val_w + 10.0 if val != "" else 0.0)
+			_txt(_f12, px + 12, ry + 6, _fit(_f12, 13, str(row.get("text", "")), text_w), col, 13)
 			if val != "":
 				_txt(_f12, px + pw - 12, ry + 6, val, C_VALUE, 13, true)
+
+
+## Truncate `s` to `max_w` px, appending "..." when it doesn't fit, so a long
+## row never overruns the list panel's right edge. Char-granular (robust for the
+## free-text news feed); the score/headline at the start survives, the trailing
+## flavour is what gets trimmed.
+func _fit(f: Font, sz: int, s: String, max_w: float) -> String:
+	if f == null or s == "" or max_w <= 0.0:
+		return s
+	if f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x <= max_w:
+		return s
+	var ell := "..."
+	var lim := max_w - f.get_string_size(ell, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
+	var out := s
+	while out.length() > 1 and f.get_string_size(out, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x > lim:
+		out = out.substr(0, out.length() - 1)
+	return out.strip_edges(false, true) + ell
