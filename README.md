@@ -62,6 +62,15 @@ captured from the actual Godot build:
   <img src="screenshots/hub.png" alt="Main Menu as the live career hub" width="320"/>
 </p>
 
+The database, the new-career club picker and the match read-out, all in PM98 chrome
+(the green data-browser is gone), captured from the running build:
+
+<p>
+  <img src="screenshots/home.png" alt="Database browse" width="240"/>
+  <img src="screenshots/pick_club.png" alt="Pick a club" width="240"/>
+  <img src="screenshots/match.png" alt="Match read-out" width="240"/>
+</p>
+
 The rest of the rebuilt screens, reconstructed at the exact pixel coordinates reversed
 out of the game's executable, from its own icons, fonts and backgrounds:
 
@@ -85,18 +94,18 @@ On a phone each screen runs in landscape with a marble bezel in the side margins
 
 ## Status
 
-This is an early build. It opens on the original title screen, and **the career hub is
-now the original PREMIER MANAGER 98 Main Menu**: take over a club and you land on the
-real menu, with its icons routing to each rebuilt screen and CONTINUE playing the week.
-Some deeper flows (picking a club, team tactics, the transfer desk and the match feed)
-still use a simpler functional UI; replacing those with original art is the next
-direction.
+This is an early build, but the whole front end is now PREMIER MANAGER 98, not a green
+placeholder UI: it opens on the original title screen, the career hub is the original
+Main Menu, and the database browse, the new-career club/league pickers and the
+match read-out all run in the game's own chrome (marble background, the BARRA bar, the
+PROMAN font), routing into the reversed Squad, League Tables and Finances screens. A
+couple of deep menus (team tactics, the transfer desk) are still a simpler functional UI.
 
 ## Coming next
 
-Original art for the remaining flows (club/league select, transfers, the match feed),
-then training, the cups and Europe, injuries and suspensions, and player contracts. Club crests, player photos and a 2D
-match view are decoded from the game files (the archive format is fully cracked, see
+The 2D match view (the iconic sprite match), then training, the cups and Europe,
+injuries and suspensions, and player contracts. Club crests, player photos and the
+match sprites are decoded from the game files (the archive format is fully cracked, see
 `docs/re/pkf_format.md`) and are being wired in. The season simulation uses the
 original game's verified random-number generator and a per-shot model tuned to
 realistic football results.
