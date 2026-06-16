@@ -111,8 +111,8 @@ the game's own trophy: the manager's run round-by-round, the latest draw, and th
 Captured from the running build:
 
 <p>
-  <img src="screenshots/cup.png" alt="F.A. Cup screen — the manager's run, the latest draw, and the trophy" width="420"/>
-  <img src="screenshots/league_cup.png" alt="Coca-Cola Cup screen — two-legged aggregate scorelines and the trophy" width="420"/>
+  <img src="screenshots/fa_cup.png" alt="F.A. Cup screen — the manager's run, the latest draw, and the trophy" width="420"/>
+  <img src="screenshots/coca_cola_cup.png" alt="Coca-Cola Cup screen — two-legged aggregate scorelines and the trophy" width="420"/>
 </p>
 
 The database and the new-career club picker, all in PM98 chrome (the green data-browser
@@ -138,11 +138,8 @@ out of the game's executable, from its own icons, fonts and backgrounds:
   <img src="screenshots/stadium.png" alt="Stadium" width="240"/>
 </p>
 
-<sub>The title, hub, match view, squad-with-injuries, club news, training, both cups, database, club picker and
-league table are real captures from the Godot build (Xvfb + GL in CI). The last six are reference renders from
-the reconstruction renderers (`tools/re/preview_*.py`), which mirror each rebuilt scene
-pixel-for-pixel from the same coordinates and assets the in-engine screens use; real
-captures of those are being added. On a phone each screen runs in landscape with a marble
+<sub>Every screenshot here is a real capture from the running Godot build (Xvfb + GL in CI) —
+not a mock-up or a preview render. On a phone each screen runs in landscape with a marble
 bezel in the side margins.</sub>
 
 ## Status
