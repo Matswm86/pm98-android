@@ -61,6 +61,15 @@ func _devshot() -> void:
 	if GameDB.loaded_path == "":
 		await GameDB.database_loaded
 	await _settle()
+	# The TITLE front door (the boot overlay): mount it explicitly, capture a REAL
+	# render of it, then free it so the rest of the walk sees the views beneath.
+	var title := load("res://scenes/TitleScreen.gd").new()
+	title.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(title)
+	await _settle()
+	_save_shot(dir, "title.png")
+	title.queue_free()
+	await _settle()
 	_save_shot(dir, "home.png")
 	if not GameDB.leagues.is_empty() or not GameDB.countries().is_empty():
 		_on_item(0)            # first competition (Premier League)
