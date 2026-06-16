@@ -54,11 +54,12 @@ captured from the running game (not a mock-up):
 
 <p><img src="screenshots/boot_phone.png" alt="PM98 running on a phone — the title screen" width="640"/></p>
 
-The Title and Main Menu, captured from the actual Godot build:
+The Title and the original Main Menu as the live career hub (here managing ARSENAL),
+captured from the actual Godot build:
 
 <p>
   <img src="screenshots/title.png" alt="Title / front-door menu" width="320"/>
-  <img src="screenshots/menu.png" alt="Main menu hub" width="320"/>
+  <img src="screenshots/hub.png" alt="Main Menu as the live career hub" width="320"/>
 </p>
 
 The rest of the rebuilt screens, reconstructed at the exact pixel coordinates reversed
