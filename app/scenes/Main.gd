@@ -288,10 +288,10 @@ func _train_shot() -> void:
 	get_tree().quit()
 
 
-## Faithful real-render of the F.A. CUP screen. Begins a career and plays into the
-## season so several cup rounds have been drawn and played, then captures the CUP
-## screen (the manager's run + the latest draw, around the trophy art). Run as the
-## NORMAL app under Xvfb+GL: PM98_CUP_SHOT=1.
+## Faithful real-render of the cup screens (F.A. Cup + Coca-Cola Cup). Begins a career
+## and plays into the season so several rounds of both cups have been drawn and played,
+## then captures each CUP screen (the manager's run + the latest draw, around the trophy
+## art). Run as the NORMAL app under Xvfb+GL: PM98_CUP_SHOT=1.
 func _cup_shot() -> void:
 	var dir := OS.get_environment("PM98_SHOT_DIR")
 	if GameDB.leagues.is_empty():
@@ -304,19 +304,27 @@ func _cup_shot() -> void:
 	_begin_career(lg, clubs[0])
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 717171            # fixed seed -> reproducible capture
-	for _i in 26:                # past several scheduled cup rounds
+	for _i in 22:                # past several scheduled rounds of both cups
 		if _career.season_over():
 			break
 		_career.advance_week(rng)
 	_show_career()               # raise the hub
 	await _settle()
-	_show_cup_screen()
+	_show_cup_screen(_career.fa_cup, "F.A. CUP", "res://art/screens/cup/trophy.png")
 	await _settle()
 	_save_shot(dir, "cup.png")
+	for c in get_children():
+		if c is CupScreen:
+			c.queue_free()
+	await _settle()
+	_show_cup_screen(_career.league_cup, "COCA-COLA CUP", "res://art/screens/cup/cocacola.png")
+	await _settle()
+	_save_shot(dir, "league_cup.png")
 	var b: Dictionary = _career.fa_cup
-	print("CUP-SHOT done rounds=%d champ=%d still_in=%s club=%s" % [
+	var lc: Dictionary = _career.league_cup
+	print("CUP-SHOT done facup_rounds=%d champ=%d | lcup_rounds=%d champ=%d club=%s" % [
 		(b.get("rounds", []) as Array).size(), int(b.get("champion_id", -1)),
-		str(Cup.still_in(b, _career.club_id)), _career.club_name])
+		(lc.get("rounds", []) as Array).size(), int(lc.get("champion_id", -1)), _career.club_name])
 	get_tree().quit()
 
 
@@ -899,18 +907,45 @@ func _show_stadium_screen() -> void:
 		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
 			scr.queue_free())
 
-## The F.A. CUP screen as a full-screen overlay over the hub: the manager's run through
-## the domestic knockout + the latest round's draw, around the authentic FA Cup trophy
-## art. Built from Career.fa_cup (the Cup.gd bracket). Display-only; tap to dismiss.
-## Wired onto the CALEN/fixtures hub icon (the season-calendar/competitions slot); the
-## next-match readout stays on the RIVAL/opponent icon. Full fixture calendar is future.
-func _show_cup_screen() -> void:
-	var v := _cup_view()
+## The COMPETITIONS chooser on the hub CALEN/fixtures icon (the season-calendar slot): a
+## PM98-chrome browse listing the two domestic cups, each routing to its CupScreen. The
+## next-match readout stays on the RIVAL/opponent icon; a full fixture calendar is future.
+func _show_competitions() -> void:
+	var rows := [
+		{"text": "F.A. CUP", "value": _cup_status_word(_career.fa_cup), "accent": CupScreen.C_GOLD},
+		{"text": "COCA-COLA CUP", "value": _cup_status_word(_career.league_cup), "accent": CupScreen.C_GOLD},
+	]
+	_mount_browse("%s  -  COMPETITIONS" % _career.club_name, "Domestic cups", rows,
+		func(i: int) -> void:
+			_dismiss_career_browse()
+			if i == 0:
+				_show_cup_screen(_career.fa_cup, "F.A. CUP", "res://art/screens/cup/trophy.png")
+			else:
+				_show_cup_screen(_career.league_cup, "COCA-COLA CUP", "res://art/screens/cup/cocacola.png"),
+		func() -> void: _dismiss_career_browse())
+
+## A one-word status of the manager's run in a cup, for the competitions list.
+func _cup_status_word(b: Dictionary) -> String:
+	if b.is_empty():
+		return "not started"
+	var champ := int(b.get("champion_id", -1))
+	if champ == _career.club_id:
+		return "WINNERS"
+	if champ != -1:
+		return "won by %s" % _cup_name(champ).substr(0, 14)
+	return "still in" if Cup.still_in(b, _career.club_id) else "out"
+
+## A cup screen as a full-screen overlay over the hub: the manager's run through the
+## knockout + the latest round's draw, around the competition's authentic trophy art.
+## Built from a Cup.gd bracket. Display-only; tap to dismiss.
+func _show_cup_screen(b: Dictionary, title: String, emblem_path: String) -> void:
+	var v := _cup_view(b)
 	var scr: CupScreen = load("res://scenes/CupScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
 	scr.setup(_career.club_name, "", _career.season, v["status"], v["status_col"],
-		v["sub"], v["run_rows"], v["draw_label"], v["draw_rows"], v["draw_more"])
+		v["sub"], v["run_rows"], v["draw_label"], v["draw_rows"], v["draw_more"],
+		title, emblem_path)
 	scr.gui_input.connect(func(e: InputEvent) -> void:
 		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
 			scr.queue_free())
@@ -921,13 +956,19 @@ func _cup_name(id: int) -> String:
 		return str(_career.club_names[id])
 	return str(GameDB.club(id).get("name", "?"))
 
-## "WINNER bt LOSER  2-1 (replay)" / "CLUB  (bye)" for a Cup.gd tie, winner first.
+## "WINNER bt LOSER  2-1 (replay)" / "WINNER bt LOSER  3-1 agg" / "CLUB  (bye)" for a
+## Cup.gd tie, winner first.
 func _cup_tie_line(tie: Dictionary) -> String:
 	if tie.get("bye", false):
 		return "%s  (bye)" % _cup_name(int(tie["home_id"]))
 	var w := int(tie["winner_id"])
 	var l := int(tie["loser_id"])
 	var decided: String = str(tie.get("decided", ""))
+	if tie.get("two_legged", false):
+		var hi := maxi(int(tie["h_agg"]), int(tie["a_agg"]))
+		var lo := mini(int(tie["h_agg"]), int(tie["a_agg"]))
+		var t := " agg pens" if decided == "pens" else " agg"
+		return "%s bt %s  %d-%d%s" % [_cup_name(w), _cup_name(l), hi, lo, t]
 	var a: int
 	var b: int
 	if decided == "replay" or decided == "pens":
@@ -941,13 +982,13 @@ func _cup_tie_line(tie: Dictionary) -> String:
 	var tag := " (replay)" if decided == "replay" else (" (pens)" if decided == "pens" else "")
 	return "%s bt %s  %d-%d%s" % [_cup_name(w), _cup_name(l), hi, lo, tag]
 
-## Build the CupScreen payload from Career.fa_cup: status, the manager's per-round run,
+## Build the CupScreen payload from a Cup.gd bracket: status, the manager's per-round run,
 ## and the latest round's draw (manager's tie first, the rest capped).
-func _cup_view() -> Dictionary:
-	var b: Dictionary = _career.fa_cup
+func _cup_view(b: Dictionary) -> Dictionary:
 	var cid: int = _career.club_id
+	var cup_nm: String = str(b.get("name", "Cup")) if not b.is_empty() else "Cup"
 	var out := {"status": "NOT DRAWN", "status_col": CupScreen.C_DIM,
-		"sub": "The F.A. Cup has not started.", "run_rows": [],
+		"sub": "The %s has not started." % cup_nm, "run_rows": [],
 		"draw_label": "", "draw_rows": [], "draw_more": 0}
 	if b.is_empty():
 		return out
@@ -977,7 +1018,7 @@ func _cup_view() -> Dictionary:
 	if champ == cid:
 		out["status"] = "WINNERS!"
 		out["status_col"] = CupScreen.C_GOLD
-		out["sub"] = "You have won the F.A. Cup."
+		out["sub"] = "You have won the %s." % cup_nm
 	elif champ != -1:
 		out["status"] = "KNOCKED OUT"
 		out["status_col"] = CupScreen.C_LOSS
@@ -1014,9 +1055,13 @@ func _cup_view() -> Dictionary:
 		out["draw_more"] = maxi(0, ties.size() - cap)
 	return out
 
-## The manager's scoreline string for a tie (decisive leg, his goals first).
+## The manager's scoreline string for a tie (decisive leg / aggregate, his goals first).
 func _cup_score_for(tie: Dictionary, cid: int) -> String:
 	var decided: String = str(tie.get("decided", ""))
+	if tie.get("two_legged", false):
+		var mine_a := int(tie["h_agg"]) if int(tie["home_id"]) == cid else int(tie["a_agg"])
+		var theirs_a := int(tie["a_agg"]) if int(tie["home_id"]) == cid else int(tie["h_agg"])
+		return "%d-%d agg%s" % [mine_a, theirs_a, " pens" if decided == "pens" else ""]
 	var hg: int
 	var ag: int
 	if decided == "replay" or decided == "pens":
@@ -1043,7 +1088,7 @@ func _menu_action(action: String, scr: MenuScreen) -> void:
 			scr.toast("Game saved")
 		"news": _show_club_news()
 		"staff": _show_training()
-		"fixtures": _show_cup_screen()
+		"fixtures": _show_competitions()
 		"opponent": scr.toast(_menu_next_match())
 		"continue":
 			if _career.season_over():

@@ -38,6 +38,16 @@ var offers_left: int = OFFERS_PER_WEEK  # signings the board still allows this w
 var news_log: Array = []                # newest-first club news {week,kind,text}
 var training_intensity: String = Training.DEFAULT_INTENSITY   # Light/Normal/Intensive
 var fa_cup: Dictionary = {}             # the F.A. Cup bracket (Cup.gd); {} = not running
+var league_cup: Dictionary = {}         # the Coca-Cola (League) Cup bracket; {} = not running
+
+# Coca-Cola Cup options: two-legged rounds, a single-leg final, sequential round labels
+# (Round 1 -> Round 2 -> Qtr Finals -> Semifinals -> Final), a smaller purse than the F.A.
+# Cup, and a schedule that finishes earlier in the season (so the two finals don't clash).
+const LEAGUE_CUP_OPTS := {
+	"name": "Coca-Cola Cup", "legs": 2, "two_legged_final": false,
+	"label_scheme": "sequential", "qtr_label": "Qtr Finals",
+	"prize_round": 120_000, "prize_winner": 900_000, "span_lo": 0.0, "span_hi": 0.7,
+}
 
 # "The Directors will only let you make %u offer%s to sign a player per week."
 const OFFERS_PER_WEEK := 3
@@ -63,6 +73,7 @@ static func create(club: Dictionary, league: Dictionary, league_clubs: Array, le
 		c.rosters[int(lc["id"])] = c._seed_squad(lc)
 	c.fixtures = SeasonSim.fixtures(ids)
 	c.fa_cup = Cup.create(ids, c.fixtures.size())
+	c.league_cup = Cup.create(ids, c.fixtures.size(), LEAGUE_CUP_OPTS)
 	c._init_table(league_clubs)
 	c._set_objective(league, league_clubs, leagues)
 	var fin := FinanceModel.summary(club, c.tier)
@@ -204,18 +215,20 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 	return manager_res
 
 
-## Play every F.A. Cup round whose scheduled week has been reached (usually one).
+## Play every due round of both cups (F.A. Cup + League Cup) whose scheduled week has
+## been reached. The bracket dicts mutate in place, so this writes straight to the save.
 func _play_due_cup_rounds(rng: RandomNumberGenerator, clubs_override: Dictionary) -> void:
-	if fa_cup.is_empty():
-		return
 	var ratings_fn := func(id: int) -> Dictionary: return _ratings_for(id, clubs_override)
 	var names_fn := func(id: int) -> String: return str(club_names.get(int(id), "?"))
-	while Cup.round_due(fa_cup, week):
-		var cr := Cup.play_round(fa_cup, rng, ratings_fn, club_id, names_fn)
-		for n in cr["news"]:
-			_news(n["kind"], n["text"])
-		if int(cr["prize"]) > 0:
-			cash += int(cr["prize"])
+	for cup in [fa_cup, league_cup]:
+		if cup.is_empty():
+			continue
+		while Cup.round_due(cup, week):
+			var cr := Cup.play_round(cup, rng, ratings_fn, club_id, names_fn)
+			for n in cr["news"]:
+				_news(n["kind"], n["text"])
+			if int(cr["prize"]) > 0:
+				cash += int(cr["prize"])
 
 
 ## Ratings for a club: the manager's own club uses the chosen XI + shape; every
@@ -503,6 +516,7 @@ func advance_season(leagues: Array) -> void:
 		views.append(club_view(id))
 	fixtures = SeasonSim.fixtures(ids)
 	fa_cup = Cup.create(ids, fixtures.size())   # a fresh F.A. Cup each season
+	league_cup = Cup.create(ids, fixtures.size(), LEAGUE_CUP_OPTS)
 	_init_table(views)
 	var league := {"id": league_id, "name": league_name, "tier": tier}
 	_set_objective(league, views, leagues)
@@ -545,6 +559,7 @@ func to_dict() -> Dictionary:
 		"transfer_listed": listed, "shortlist": shortlist, "transfer_log": transfer_log,
 		"offers_left": offers_left, "news_log": news_log,
 		"training_intensity": training_intensity, "fa_cup": fa_cup,
+		"league_cup": league_cup,
 	}
 
 static func from_dict(d: Dictionary) -> Career:
@@ -572,9 +587,10 @@ static func from_dict(d: Dictionary) -> Career:
 	c.offers_left = int(d.get("offers_left", OFFERS_PER_WEEK))
 	c.news_log = d.get("news_log", [])
 	c.training_intensity = d.get("training_intensity", Training.DEFAULT_INTENSITY)
-	# Saves from before the cup existed load with no bracket; it stays inert this
-	# season (round_due is false on an empty dict) and is rebuilt at the next rollover.
+	# Saves from before the cups existed load with no bracket; they stay inert this
+	# season (round_due is false on an empty dict) and are rebuilt at the next rollover.
 	c.fa_cup = d.get("fa_cup", {})
+	c.league_cup = d.get("league_cup", {})
 	c.table = {}
 	for k in d.get("table", {}):
 		c.table[int(k)] = d["table"][k]

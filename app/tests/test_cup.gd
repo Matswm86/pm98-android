@@ -20,6 +20,7 @@ func _run() -> bool:
 	ok = _engine_power_of_two() and ok
 	ok = _engine_with_byes() and ok
 	ok = _engine_all_level_resolves() and ok
+	ok = _engine_two_legged() and ok
 	ok = _unit_prize_and_news() and ok
 	ok = _career_integration() and ok
 	print("\n%s" % ("ALL PASS" if ok else "FAILURES ABOVE"))
@@ -178,6 +179,60 @@ func _engine_all_level_resolves() -> bool:
 	return ok
 
 
+# ---- engine: the League Cup (two-legged rounds, single-leg final) --------
+
+func _engine_two_legged() -> bool:
+	var ok := true
+	var rng := RandomNumberGenerator.new(); rng.seed = SEED + 5
+	var opts := {"name": "Coca-Cola Cup", "legs": 2, "two_legged_final": false,
+		"label_scheme": "sequential", "qtr_label": "Qtr Finals", "span_lo": 0.0, "span_hi": 0.7}
+	var b := Cup.create(_ids(20), 38, opts)
+	ok = _assert(b["name"] == "Coca-Cola Cup" and int(b["legs"]) == 2, "league cup: name + two legs") and ok
+	ok = _assert(int((b["round_weeks"] as Array)[-1]) < 38, "league cup final scheduled before season end (%s)" % str(b["round_weeks"])) and ok
+
+	var labels: Array = []
+	var two_leg_rounds := 0
+	var final_single := true
+	var guard := 0
+	while not Cup.is_finished(b) and guard < 20:
+		var r := Cup.play_round(b, rng, _ratings_fn(), -1, _names_fn())
+		labels.append(r["label"])
+		var rnd: Dictionary = (b["rounds"] as Array)[-1]
+		var is_two := false
+		for tie in rnd["ties"]:
+			if tie.get("two_legged", false):
+				is_two = true
+		if str(r["label"]) == "Final":
+			final_single = not is_two
+		elif is_two:
+			two_leg_rounds += 1
+		guard += 1
+	ok = _assert(labels == ["Round 1", "Round 2", "Qtr Finals", "Semifinals", "Final"],
+		"league cup labels: R1 -> R2 -> QF -> SF -> Final (%s)" % str(labels)) and ok
+	ok = _assert(two_leg_rounds >= 1, "league cup early rounds are two-legged (%d)" % two_leg_rounds) and ok
+	ok = _assert(final_single, "league cup final is single-leg") and ok
+	ok = _assert(Cup.champion_id(b) != -1, "league cup crowns a champion") and ok
+
+	# Every two-legged tie carries an aggregate and a winner that led it (or won on pens).
+	var agg_ok := true
+	for rnd in b["rounds"]:
+		for tie in rnd["ties"]:
+			if not tie.get("two_legged", false):
+				continue
+			var w := int(tie["winner_id"])
+			if w != int(tie["home_id"]) and w != int(tie["away_id"]):
+				agg_ok = false
+			if str(tie["decided"]) == "agg":
+				var ha := int(tie["h_agg"])
+				var aa := int(tie["a_agg"])
+				var win_agg := ha if w == int(tie["home_id"]) else aa
+				var lose_agg := aa if w == int(tie["home_id"]) else ha
+				if win_agg <= lose_agg:
+					agg_ok = false
+	ok = _assert(agg_ok, "two-legged winners lead on aggregate (or won on penalties)") and ok
+	return ok
+
+
 # ---- unit: prize money + news on the manager's own tie -------------------
 
 func _unit_prize_and_news() -> bool:
@@ -230,6 +285,8 @@ func _career_integration() -> bool:
 	var career := Career.create(prem[0], league, prem, leagues)
 	var ok := true
 	ok = _assert(not career.fa_cup.is_empty(), "career creates an F.A. Cup") and ok
+	ok = _assert(not career.league_cup.is_empty() and career.league_cup["name"] == "Coca-Cola Cup",
+		"career creates a League Cup too") and ok
 	ok = _assert((career.fa_cup["survivors"] as Array).size() == prem.size(), "cup field = the whole division (%d)" % prem.size()) and ok
 	ok = _assert((career.fa_cup["round_weeks"] as Array).size() == Cup._num_rounds(prem.size()), "cup scheduled across the season") and ok
 
@@ -237,7 +294,8 @@ func _career_integration() -> bool:
 	var rng := RandomNumberGenerator.new(); rng.seed = SEED
 	while not career.season_over():
 		career.advance_week(rng)
-	ok = _assert(Cup.champion_id(career.fa_cup) != -1, "the cup finishes within the league season") and ok
+	ok = _assert(Cup.champion_id(career.fa_cup) != -1, "the F.A. Cup finishes within the league season") and ok
+	ok = _assert(Cup.champion_id(career.league_cup) != -1, "the League Cup finishes within the season") and ok
 	var cup_news := 0
 	for n in career.news_log:
 		if n is Dictionary and n.get("kind") == "cup":
@@ -251,13 +309,15 @@ func _career_integration() -> bool:
 	var path := "user://career_cup_test.json"
 	career.save(path)
 	var loaded := Career.load_save(path)
-	ok = _assert(loaded != null and Cup.champion_id(loaded.fa_cup) == Cup.champion_id(career.fa_cup),
-		"the cup bracket survives a save/load round-trip") and ok
+	ok = _assert(loaded != null and Cup.champion_id(loaded.fa_cup) == Cup.champion_id(career.fa_cup)
+		and Cup.champion_id(loaded.league_cup) == Cup.champion_id(career.league_cup),
+		"both cup brackets survive a save/load round-trip") and ok
 
-	# Rollover mints a fresh cup.
+	# Rollover mints fresh cups.
 	career.advance_season(leagues)
-	ok = _assert(int(career.fa_cup["champion_id"]) == -1 and (career.fa_cup["rounds"] as Array).is_empty(),
-		"a new season draws a fresh cup") and ok
+	ok = _assert(int(career.fa_cup["champion_id"]) == -1 and (career.fa_cup["rounds"] as Array).is_empty()
+		and int(career.league_cup["champion_id"]) == -1,
+		"a new season draws fresh cups") and ok
 	ok = _assert((career.fa_cup["survivors"] as Array).size() == prem.size(), "fresh cup has the full field again") and ok
 
 	# Pre-cup save compatibility: a dict with no fa_cup loads inert (no crash, no rounds due).

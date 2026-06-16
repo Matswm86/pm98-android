@@ -1,14 +1,14 @@
 extends Control
 class_name CupScreen
-## PM98 F.A. CUP screen: the manager's run through the domestic knockout, with the
-## latest round's draw. PM98 chrome (BARRA bar + marble FONDO + ProMan font) around
-## the authentic F.A. Cup trophy art (img\premier\copas\facup.bmp, cracked from
-## IMG.PKF via the shared VGA palette -> app/art/screens/cup/trophy.png).
+## PM98 cup screen (F.A. Cup or Coca-Cola Cup): the manager's run through a domestic
+## knockout, with the latest round's draw. PM98 chrome (BARRA bar + marble FONDO + ProMan
+## font) around the competition's authentic trophy art (img\premier\copas\{facup,cocacola}.bmp,
+## cracked from IMG.PKF via the shared VGA palette -> app/art/screens/cup/{trophy,cocacola}.png).
 ##
-## Data-driven via setup() so it stays GameDB-free and headless-testable; Main builds
-## the rows from Career.fa_cup (the Cup.gd bracket). Native 640x480, self-scales and
-## marble-bezels into the landscape letterbox like the other graphical screens.
-## Display-only, tap-to-dismiss.
+## Data-driven via setup() so it stays GameDB-free and headless-testable; Main builds the
+## rows + picks the title/emblem from a Cup.gd bracket (Career.fa_cup / Career.league_cup).
+## Native 640x480, self-scales and marble-bezels into the landscape letterbox like the
+## other graphical screens. Display-only, tap-to-dismiss.
 
 const W := 640
 const H := 480
@@ -34,6 +34,7 @@ const LBL_RETURN := Rect2(36, 438, 110, 28)
 var _bg: Texture2D
 var _bar: Texture2D
 var _trophy: Texture2D
+var _title := "F.A. CUP"          # competition title in the BARRA
 var _f14: Font
 var _f12: Font
 var _f10: Font
@@ -65,10 +66,12 @@ func _ready() -> void:
 	queue_redraw()
 
 
-## Feed the prepared cup view, then repaint.
+## Feed the prepared cup view, then repaint. `title` is the BARRA heading and `emblem_path`
+## the competition's trophy art (defaults to the F.A. Cup trophy).
 func setup(club: String, manager: String, season: String, status: String,
 		status_col: Color, sub: String, run_rows: Array, draw_label: String,
-		draw_rows: Array, draw_more := 0) -> void:
+		draw_rows: Array, draw_more := 0, title := "F.A. CUP",
+		emblem_path := "res://art/screens/cup/trophy.png") -> void:
 	_club = club
 	_manager = manager
 	_season = season
@@ -79,6 +82,10 @@ func setup(club: String, manager: String, season: String, status: String,
 	_draw_label = draw_label
 	_draw_rows = draw_rows
 	_draw_more = maxi(0, draw_more)
+	_title = title
+	var em: Texture2D = load(emblem_path)
+	if em != null:
+		_trophy = em
 	queue_redraw()
 
 
@@ -116,7 +123,7 @@ func _draw() -> void:
 	if _bar != null:
 		draw_texture_rect(_bar, Rect2(0, 0, W, _bar.get_height()), false)
 
-	_txt(_f14, 285, 13, "F.A. CUP", C_TITLE, 15)
+	_txt(_f14, 285, 13, _title, C_TITLE, 15)
 	_txt(_f10, 12, 9, "Manager", C_TEXT, 11)
 	_txt(_f10, 12, 26, (_manager if _manager != "" else _club).substr(0, 18), C_DIM, 11)
 	_txt(_f10, 628, 9, _club.substr(0, 18), C_TEXT, 11, true)
