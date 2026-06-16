@@ -1,4 +1,5 @@
 // FUN_005beae0  entry=005beae0  size=42 bytes
+// callers/callees expanded one level from seeds
 
 void __thiscall FUN_005beae0(int param_1,LPCSTR param_2)
 

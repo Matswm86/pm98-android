@@ -507,6 +507,30 @@ func _board_panel() -> Dictionary:
 		"position": "%d%s" % [pos, _ord_suffix(pos)],
 	}
 
+## The original-art GROUND (ESTADIO) overview screen as a full-screen overlay: the
+## pre-rendered stadium scene for the club's capacity tier + the reversed info panel
+## and 2x2 IMPROVE/WORKS/MATCH DAY/RETURN grid, at the coordinates reversed from
+## MANAGER.EXE (docs/re/stadium_screen_re.md). The tier is the reversed capacity
+## formula (clamp(capacity*11/130000, 0, 11)) on the SAME capacity the finance screen
+## uses. GameDB stores only total capacity, so the seated/standing/parking split is
+## display-derived (flagged in the RE doc). Display-only; tap to dismiss.
+func _show_stadium_screen() -> void:
+	var club := _mgr_club()
+	var sm := FinanceModel.summary(club, FinanceModel.tier_of(club, GameDB.leagues))
+	var cap: int = int(sm["capacity"])
+	var ground_v: Variant = club.get("stadium")
+	var ground: String = ground_v if ground_v is String else ""
+	# Display split of the single stored total: ~62% seated, rest terraces, parking ~1/27.
+	var seated := int(round(cap * 0.62))
+	var scr: StadiumScreen = load("res://scenes/StadiumScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(_career.club_name, "", _career.season, ground,
+		cap, seated, cap - seated, int(round(cap / 27.0)))
+	scr.gui_input.connect(func(e: InputEvent) -> void:
+		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
+			scr.queue_free())
+
 ## The original-art MAIN MENU (MENUPRINCIPAL) screen as a full-screen overlay: the
 ## 12 management icons + the EXIT/SAVE/NEWS/CONTINUE control bar at the coordinates
 ## reversed from MANAGER.EXE (docs/re/menu_screen_re.md). Interactive: tapping an
@@ -530,7 +554,6 @@ func _menu_action(action: String, scr: MenuScreen) -> void:
 			_toast("Game saved")
 		"news": _toast("No news this week")
 		"staff": _toast("Staff management is not in this build yet")
-		"stadium": _toast("Stadium screen coming soon")
 		"opponent", "fixtures": _toast(_menu_next_match())
 		"continue":
 			scr.queue_free()
@@ -542,6 +565,7 @@ func _menu_action(action: String, scr: MenuScreen) -> void:
 				"lineup": _show_lineup_screen()
 				"finance": _show_finance_screen()
 				"board": _show_directiva_screen()
+				"stadium": _show_stadium_screen()
 				"buy": _show_transfer_screen()
 				"tactics": _push(_show_tactics)
 				"sell": _push(_show_transfers)

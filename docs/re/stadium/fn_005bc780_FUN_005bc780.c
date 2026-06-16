@@ -1,4 +1,5 @@
 // FUN_005bc780  entry=005bc780  size=1269 bytes
+// callers/callees expanded one level from seeds
 
 CWnd __thiscall
 FUN_005bc780(CWnd *param_1,int param_2,int *param_3,char *param_4,undefined4 param_5,
