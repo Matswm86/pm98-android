@@ -37,6 +37,7 @@ var transfer_log: Array = []            # newest-first transfer news lines
 var offers_left: int = OFFERS_PER_WEEK  # signings the board still allows this week
 var news_log: Array = []                # newest-first club news {week,kind,text}
 var training_intensity: String = Training.DEFAULT_INTENSITY   # Light/Normal/Intensive
+var fa_cup: Dictionary = {}             # the F.A. Cup bracket (Cup.gd); {} = not running
 
 # "The Directors will only let you make %u offer%s to sign a player per week."
 const OFFERS_PER_WEEK := 3
@@ -61,6 +62,7 @@ static func create(club: Dictionary, league: Dictionary, league_clubs: Array, le
 		c.club_names[int(lc["id"])] = lc.get("name", "?")
 		c.rosters[int(lc["id"])] = c._seed_squad(lc)
 	c.fixtures = SeasonSim.fixtures(ids)
+	c.fa_cup = Cup.create(ids, c.fixtures.size())
 	c._init_table(league_clubs)
 	c._set_objective(league, league_clubs, leagues)
 	var fin := FinanceModel.summary(club, c.tier)
@@ -192,9 +194,28 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 	# Player development for the training week just completed.
 	for n in Training.train_week(rng, my_squad(), training_intensity):
 		_news(n["kind"], n["text"])
+	# F.A. Cup: any midweek tie whose scheduled league week has arrived is played
+	# now (open random draw, replays then penalties). The manager's own tie writes a
+	# news line and a cup run pays prize money; the rest resolves in the background so
+	# a champion still emerges even after the manager is knocked out.
+	_play_due_cup_rounds(rng, clubs_override)
 	if season_over():
 		finished = true
 	return manager_res
+
+
+## Play every F.A. Cup round whose scheduled week has been reached (usually one).
+func _play_due_cup_rounds(rng: RandomNumberGenerator, clubs_override: Dictionary) -> void:
+	if fa_cup.is_empty():
+		return
+	var ratings_fn := func(id: int) -> Dictionary: return _ratings_for(id, clubs_override)
+	var names_fn := func(id: int) -> String: return str(club_names.get(int(id), "?"))
+	while Cup.round_due(fa_cup, week):
+		var cr := Cup.play_round(fa_cup, rng, ratings_fn, club_id, names_fn)
+		for n in cr["news"]:
+			_news(n["kind"], n["text"])
+		if int(cr["prize"]) > 0:
+			cash += int(cr["prize"])
 
 
 ## Ratings for a club: the manager's own club uses the chosen XI + shape; every
@@ -481,6 +502,7 @@ func advance_season(leagues: Array) -> void:
 	for id in ids:
 		views.append(club_view(id))
 	fixtures = SeasonSim.fixtures(ids)
+	fa_cup = Cup.create(ids, fixtures.size())   # a fresh F.A. Cup each season
 	_init_table(views)
 	var league := {"id": league_id, "name": league_name, "tier": tier}
 	_set_objective(league, views, leagues)
@@ -522,7 +544,7 @@ func to_dict() -> Dictionary:
 		"tactics": tactics, "tier": tier, "rosters": ros, "club_names": nms,
 		"transfer_listed": listed, "shortlist": shortlist, "transfer_log": transfer_log,
 		"offers_left": offers_left, "news_log": news_log,
-		"training_intensity": training_intensity,
+		"training_intensity": training_intensity, "fa_cup": fa_cup,
 	}
 
 static func from_dict(d: Dictionary) -> Career:
@@ -550,6 +572,9 @@ static func from_dict(d: Dictionary) -> Career:
 	c.offers_left = int(d.get("offers_left", OFFERS_PER_WEEK))
 	c.news_log = d.get("news_log", [])
 	c.training_intensity = d.get("training_intensity", Training.DEFAULT_INTENSITY)
+	# Saves from before the cup existed load with no bracket; it stays inert this
+	# season (round_due is false on an empty dict) and is rebuilt at the next rollover.
+	c.fa_cup = d.get("fa_cup", {})
 	c.table = {}
 	for k in d.get("table", {}):
 		c.table[int(k)] = d["table"][k]

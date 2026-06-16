@@ -48,7 +48,7 @@ func _ready() -> void:
 	if OS.has_environment("PM98_SHOT_DIR") and not OS.has_environment("PM98_BOOT_SHOT") \
 			and not OS.has_environment("PM98_HUB_SHOT") and not OS.has_environment("PM98_BROWSE_SHOT") \
 			and not OS.has_environment("PM98_MATCH_SHOT") and not OS.has_environment("PM98_NEWS_SHOT") \
-			and not OS.has_environment("PM98_TRAIN_SHOT"):
+			and not OS.has_environment("PM98_TRAIN_SHOT") and not OS.has_environment("PM98_CUP_SHOT"):
 		_devshot()
 
 
@@ -71,6 +71,9 @@ func _boot() -> void:
 		return
 	if OS.has_environment("PM98_TRAIN_SHOT"):
 		_train_shot()
+		return
+	if OS.has_environment("PM98_CUP_SHOT"):
+		_cup_shot()
 		return
 	var boot_shot := OS.has_environment("PM98_BOOT_SHOT")
 	if boot_shot or not OS.has_environment("PM98_SHOT_DIR"):
@@ -282,6 +285,38 @@ func _train_shot() -> void:
 	await _settle()
 	_save_shot(dir, "training.png")
 	print("TRAIN-SHOT done intensity=%s squad=%d" % [_career.training_intensity, _career.my_squad().size()])
+	get_tree().quit()
+
+
+## Faithful real-render of the F.A. CUP screen. Begins a career and plays into the
+## season so several cup rounds have been drawn and played, then captures the CUP
+## screen (the manager's run + the latest draw, around the trophy art). Run as the
+## NORMAL app under Xvfb+GL: PM98_CUP_SHOT=1.
+func _cup_shot() -> void:
+	var dir := OS.get_environment("PM98_SHOT_DIR")
+	if GameDB.leagues.is_empty():
+		print("CUP-SHOT no leagues loaded")
+		get_tree().quit()
+		return
+	var lg: Dictionary = GameDB.leagues[0]
+	var clubs := GameDB.clubs_in_league(lg["id"])
+	clubs.sort_custom(func(a, b): return a["name"] < b["name"])
+	_begin_career(lg, clubs[0])
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 717171            # fixed seed -> reproducible capture
+	for _i in 26:                # past several scheduled cup rounds
+		if _career.season_over():
+			break
+		_career.advance_week(rng)
+	_show_career()               # raise the hub
+	await _settle()
+	_show_cup_screen()
+	await _settle()
+	_save_shot(dir, "cup.png")
+	var b: Dictionary = _career.fa_cup
+	print("CUP-SHOT done rounds=%d champ=%d still_in=%s club=%s" % [
+		(b.get("rounds", []) as Array).size(), int(b.get("champion_id", -1)),
+		str(Cup.still_in(b, _career.club_id)), _career.club_name])
 	get_tree().quit()
 
 
@@ -864,6 +899,137 @@ func _show_stadium_screen() -> void:
 		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
 			scr.queue_free())
 
+## The F.A. CUP screen as a full-screen overlay over the hub: the manager's run through
+## the domestic knockout + the latest round's draw, around the authentic FA Cup trophy
+## art. Built from Career.fa_cup (the Cup.gd bracket). Display-only; tap to dismiss.
+## Wired onto the CALEN/fixtures hub icon (the season-calendar/competitions slot); the
+## next-match readout stays on the RIVAL/opponent icon. Full fixture calendar is future.
+func _show_cup_screen() -> void:
+	var v := _cup_view()
+	var scr: CupScreen = load("res://scenes/CupScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(_career.club_name, "", _career.season, v["status"], v["status_col"],
+		v["sub"], v["run_rows"], v["draw_label"], v["draw_rows"], v["draw_more"])
+	scr.gui_input.connect(func(e: InputEvent) -> void:
+		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
+			scr.queue_free())
+
+## A club name from the live division (falls back to GameDB / a placeholder).
+func _cup_name(id: int) -> String:
+	if _career.club_names.has(id):
+		return str(_career.club_names[id])
+	return str(GameDB.club(id).get("name", "?"))
+
+## "WINNER bt LOSER  2-1 (replay)" / "CLUB  (bye)" for a Cup.gd tie, winner first.
+func _cup_tie_line(tie: Dictionary) -> String:
+	if tie.get("bye", false):
+		return "%s  (bye)" % _cup_name(int(tie["home_id"]))
+	var w := int(tie["winner_id"])
+	var l := int(tie["loser_id"])
+	var decided: String = str(tie.get("decided", ""))
+	var a: int
+	var b: int
+	if decided == "replay" or decided == "pens":
+		a = int(tie.get("replay_hg", tie["hg"]))
+		b = int(tie.get("replay_ag", tie["ag"]))
+	else:
+		a = int(tie["hg"])
+		b = int(tie["ag"])
+	var hi := maxi(a, b)
+	var lo := mini(a, b)
+	var tag := " (replay)" if decided == "replay" else (" (pens)" if decided == "pens" else "")
+	return "%s bt %s  %d-%d%s" % [_cup_name(w), _cup_name(l), hi, lo, tag]
+
+## Build the CupScreen payload from Career.fa_cup: status, the manager's per-round run,
+## and the latest round's draw (manager's tie first, the rest capped).
+func _cup_view() -> Dictionary:
+	var b: Dictionary = _career.fa_cup
+	var cid: int = _career.club_id
+	var out := {"status": "NOT DRAWN", "status_col": CupScreen.C_DIM,
+		"sub": "The F.A. Cup has not started.", "run_rows": [],
+		"draw_label": "", "draw_rows": [], "draw_more": 0}
+	if b.is_empty():
+		return out
+	var rounds: Array = b.get("rounds", [])
+
+	# The manager's tie in each played round -> a run row.
+	var run_rows: Array = []
+	for rnd in rounds:
+		for tie in rnd.get("ties", []):
+			if int(tie["home_id"]) != cid and int(tie.get("away_id", -1)) != cid:
+				continue
+			var label := str(rnd.get("label", ""))
+			if tie.get("bye", false):
+				run_rows.append({"round": label, "line": "bye", "accent": CupScreen.C_DIM})
+				break
+			var won := int(tie["winner_id"]) == cid
+			var opp := int(tie["away_id"]) if int(tie["home_id"]) == cid else int(tie["home_id"])
+			var line := "%s %s  %s" % ["bt" if won else "lost to", _cup_name(opp).substr(0, 16),
+				_cup_score_for(tie, cid)]
+			run_rows.append({"round": label, "line": line,
+				"accent": CupScreen.C_WIN if won else CupScreen.C_LOSS})
+			break
+	out["run_rows"] = run_rows
+
+	# Status line.
+	var champ := int(b.get("champion_id", -1))
+	if champ == cid:
+		out["status"] = "WINNERS!"
+		out["status_col"] = CupScreen.C_GOLD
+		out["sub"] = "You have won the F.A. Cup."
+	elif champ != -1:
+		out["status"] = "KNOCKED OUT"
+		out["status_col"] = CupScreen.C_LOSS
+		out["sub"] = "%s won the cup." % _cup_name(champ)
+	else:
+		var remain: int = (b.get("survivors", []) as Array).size()
+		var k := Cup.weeks_until_next(b, _career.week)
+		var nxt := Cup.next_label(b)
+		var wk_txt := (", %s in %d wk%s" % [nxt, k, "" if k == 1 else "s"]) if k >= 0 and nxt != "" else ""
+		if Cup.still_in(b, cid):
+			out["status"] = "STILL IN"
+			out["status_col"] = CupScreen.C_WIN
+			out["sub"] = "%d clubs remain%s" % [remain, wk_txt]
+		else:
+			out["status"] = "KNOCKED OUT"
+			out["status_col"] = CupScreen.C_LOSS
+			out["sub"] = "%d clubs remain%s" % [remain, wk_txt]
+
+	# The latest round's draw: manager's tie first, the rest capped to fit.
+	if not rounds.is_empty():
+		var last: Dictionary = rounds[-1]
+		out["draw_label"] = str(last.get("label", ""))
+		var ties: Array = (last.get("ties", []) as Array).duplicate()
+		ties.sort_custom(func(x, y):
+			var xm: bool = int(x["home_id"]) == cid or int(x.get("away_id", -1)) == cid
+			var ym: bool = int(y["home_id"]) == cid or int(y.get("away_id", -1)) == cid
+			return xm and not ym)
+		var cap := 9
+		var draw_rows: Array = []
+		for tie in ties.slice(0, cap):
+			var mine: bool = int(tie["home_id"]) == cid or int(tie.get("away_id", -1)) == cid
+			draw_rows.append({"line": _cup_tie_line(tie), "mine": mine})
+		out["draw_rows"] = draw_rows
+		out["draw_more"] = maxi(0, ties.size() - cap)
+	return out
+
+## The manager's scoreline string for a tie (decisive leg, his goals first).
+func _cup_score_for(tie: Dictionary, cid: int) -> String:
+	var decided: String = str(tie.get("decided", ""))
+	var hg: int
+	var ag: int
+	if decided == "replay" or decided == "pens":
+		hg = int(tie.get("replay_hg", tie["hg"]))
+		ag = int(tie.get("replay_ag", tie["ag"]))
+	else:
+		hg = int(tie["hg"])
+		ag = int(tie["ag"])
+	var mine := hg if int(tie["home_id"]) == cid else ag
+	var theirs := ag if int(tie["home_id"]) == cid else hg
+	var tag := " (r)" if decided == "replay" else (" pens" if decided == "pens" else "")
+	return "%d-%d%s" % [mine, theirs, tag]
+
 ## Route a MENUPRINCIPAL icon/button tap from the persistent hub. The hub stays mounted:
 ## art overlays (table/line-up/finance/board/stadium/buy) mount ABOVE it and tap-dismiss
 ## back to it; still-green sub-flows (tactics/sell/results) are pushed and hide the hub
@@ -877,7 +1043,8 @@ func _menu_action(action: String, scr: MenuScreen) -> void:
 			scr.toast("Game saved")
 		"news": _show_club_news()
 		"staff": _show_training()
-		"opponent", "fixtures": scr.toast(_menu_next_match())
+		"fixtures": _show_cup_screen()
+		"opponent": scr.toast(_menu_next_match())
 		"continue":
 			if _career.season_over():
 				_push(_show_end_of_season)
@@ -999,6 +1166,7 @@ func _news_colour(kind: String) -> Color:
 		"return": return Availability.C_RETURN
 		"develop": return Color(0.45, 0.82, 0.98)   # blue -- a player improved
 		"decline": return Color(0.78, 0.62, 0.42)   # bronze -- a player slipped
+		"cup": return Color(0.98, 0.86, 0.45)       # gold -- an F.A. Cup result
 		_: return Color(0.86, 0.90, 0.96)
 
 ## Dismiss a browse overlay shown from the hub (results) and re-raise the hub beneath it.

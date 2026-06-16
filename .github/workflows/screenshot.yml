@@ -96,6 +96,13 @@ jobs:
             timeout 90 "$GITHUB_WORKSPACE/godot" --rendering-driver opengl3 \
             --resolution 2400x1080 . 2>&1 | tee train.log || true
           echo "--- TRAIN diagnostics ---"; grep -iE "TRAIN-SHOT|SHOT .*png|SCRIPT ERROR|error" train.log | head -20 || true
+          # F.A. Cup: begin a career, play into the season so several cup rounds are
+          # drawn/played, capture the CUP screen (run + latest draw + trophy art).
+          PM98_SHOT_DIR="$PWD/shots" PM98_CUP_SHOT=1 LIBGL_ALWAYS_SOFTWARE=1 \
+            xvfb-run -a -s "-screen 0 2400x1080x24" \
+            timeout 90 "$GITHUB_WORKSPACE/godot" --rendering-driver opengl3 \
+            --resolution 2400x1080 . 2>&1 | tee cup.log || true
+          echo "--- CUP diagnostics ---"; grep -iE "CUP-SHOT|SHOT .*png|SCRIPT ERROR|error" cup.log | head -20 || true
           # Direct art-screen render for comparison.
           PM98_SHOT_DIR="$PWD/shots" LIBGL_ALWAYS_SOFTWARE=1 \
             xvfb-run -a -s "-screen 0 1280x720x24" \
