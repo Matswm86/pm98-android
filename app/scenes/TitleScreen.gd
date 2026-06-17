@@ -29,11 +29,14 @@ const C_HILITE := Color(1.0, 1.0, 1.0, 0.20)  # press feedback
 # Hit areas in 640x480 design space. The three option buttons are the blue ellipses
 # baked into FONDO7 (rects measured off the pre-rendered title art); EXIT is the
 # reversed salir control rect from the FUN_00545180 layout table (pos 552,431 sz 73x35).
+# Tuned to the real box-art title (art/screens/title/fondo7.png, from the 894x671
+# Premier Manager 98 cover resized to 640x480): the three blue ovals sit on the left,
+# the small circular SALIR glyph is baked bottom-right.
 const HITS := {
-	"database": Rect2(350, 119, 285, 35),       # DATA BASE        (id 20002)
-	"career_league": Rect2(350, 177, 285, 35),  # MANAGER LEAGUE   (id 20021)
-	"career_pro": Rect2(350, 235, 285, 35),     # PRO-MANAGER LEAGUE (id 20022)
-	"exit": Rect2(552, 431, 73, 35),            # SALIR            (id 20026)
+	"database": Rect2(38, 92, 326, 30),         # DATA BASE        (id 20002)
+	"career_league": Rect2(38, 130, 326, 30),   # MANAGER LEAGUE   (id 20021)
+	"career_pro": Rect2(38, 167, 326, 30),      # PRO-MANAGER LEAGUE (id 20022)
+	"exit": Rect2(602, 452, 34, 24),            # SALIR glyph      (id 20026)
 }
 
 var _bg: Texture2D
@@ -126,13 +129,7 @@ func _draw() -> void:
 	if _bg != null:
 		draw_texture_rect(_bg, Rect2(0, 0, W, H), false)
 
-	# EXIT control: FONDO7 has no baked exit graphic, so paint a small navy pill +
-	# label at the reversed salir rect so the option is visible and tappable.
-	var er: Rect2 = HITS["exit"]
-	draw_rect(er, C_EXIT_BG, true)
-	draw_rect(er, C_EXIT, false, 1.0)
-	_txt(_f12, er, "EXIT", C_EXIT, 13)
-
-	# Press highlight over the held button.
+	# The three league/database ovals and the SALIR glyph are baked into the title art;
+	# this node only turns taps over them into actions. Show a press highlight on hold.
 	if _press != "":
 		draw_rect(HITS[_press], C_HILITE, true)
