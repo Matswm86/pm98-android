@@ -550,6 +550,7 @@ func _screens_shot() -> void:
 		["_show_stadium_screen", "stadium.png"],
 		["_show_tactics", "tactics.png"],          # reskinned _set_view flow (T1 #3)
 		["_show_market", "transfer_buy.png"],      # reskinned _set_view flow (T1 #3)
+		["_show_club_news", "club_news.png"],      # T2 #12: rival injuries surface here
 	]
 	for s in shots:
 		call(s[0])

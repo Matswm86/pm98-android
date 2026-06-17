@@ -136,6 +136,11 @@ const OFFERS_PER_WEEK := 3
 # Transfer window shuts this many rounds before the season ends (deadline day).
 const DEADLINE_TAIL := 6
 
+# Living league (#12): rival clubs' squads injure/develop week to week like the manager's.
+# Only a notable rival injury (this many matches or longer) is surfaced to the club news
+# feed -- minor knocks drift the ratings quietly, as in the original game.
+const AI_INJ_NEWS_WEEKS := 3
+
 
 # ---- construction --------------------------------------------------------
 
@@ -301,6 +306,8 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 	# The fit XI that actually featured this week (captured before the match so its
 	# injury/card rolls land on the players who played, not this week's recoveries).
 	var featured := _mgr_featured_xi()
+	# Each rival club's fit XI for this round, captured the same way (#12 living league).
+	var ai_featured := _ai_featured_by_club()
 	var ratings: Dictionary = {}
 	var manager_res: Dictionary = {}
 	for m in fixtures[week]:
@@ -352,6 +359,10 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 	# news line and a cup run pays prize money; the rest resolves in the background so
 	# a champion still emerges even after the manager is knocked out.
 	_play_due_cup_rounds(rng, clubs_override)
+	# Rival squads live through the same week (#12): recoveries tick, this round's knocks
+	# land on the XIs that featured, and development nudges their ratings. Kept quiet bar
+	# notable rival injuries, which surface in the club news feed.
+	_roll_ai_squads(rng, ai_featured)
 	if season_over():
 		finished = true
 	return manager_res
@@ -435,8 +446,13 @@ func _ratings_for(id: int, clubs_override: Dictionary = {}) -> Dictionary:
 		var r: Dictionary = (euro_ratings[id] as Dictionary).duplicate()
 		r["name"] = str(euro_names.get(id, "?"))
 		return r
-	var club: Dictionary = club_view(id) if rosters.has(id) else clubs_override.get(id, {})
-	return MatchEngine.team_ratings(club)
+	if rosters.has(id):
+		# A rival (AI) club: rate from its AVAILABLE players only, so a rival's injuries
+		# and suspensions actually weaken it (the living-league drift, #12). A thin XI
+		# pulls toward MatchEngine's rating floor, never below it.
+		return MatchEngine.team_ratings(_fit_view(id))
+	# Legacy save with no live roster for this club: the static override (full squad).
+	return MatchEngine.team_ratings(clubs_override.get(id, {}))
 
 
 # ---- availability --------------------------------------------------------
@@ -463,6 +479,75 @@ func _mgr_featured_xi() -> Array:
 		if by_id.has(int(pid)):
 			out.append(by_id[int(pid)])
 	return out
+
+
+# ---- living league (rival squads, #12) -----------------------------------
+
+## Each rival club featuring in this round mapped to the fit XI it fields, captured
+## before the match so this week's injury/card rolls land on the players who played.
+## The manager's own club is rolled separately (its chosen tactics), so it is excluded.
+func _ai_featured_by_club() -> Dictionary:
+	var out: Dictionary = {}
+	if season_over():
+		return out
+	for m in fixtures[week]:
+		for id in [int(m[0]), int(m[1])]:
+			if id != club_id and rosters.has(id) and not out.has(id):
+				out[id] = _ai_featured_xi(id)
+	return out
+
+
+## A rival club's best available XI (its keeper + ten outfielders, by current ability),
+## the players an AI side would field this week. Availability-filtered so an already-out
+## player is never picked, and never injured twice.
+func _ai_featured_xi(id: int) -> Array:
+	var gks: Array = []
+	var outfield: Array = []
+	for p in available_squad(id):
+		if p.get("isGK"):
+			gks.append(p)
+		else:
+			outfield.append(p)
+	gks.sort_custom(func(a, b): return _ai_ovr(a) > _ai_ovr(b))
+	outfield.sort_custom(func(a, b): return _ai_ovr(a) > _ai_ovr(b))
+	var xi: Array = []
+	if not gks.is_empty():
+		xi.append(gks[0])
+	for i in mini(10, outfield.size()):
+		xi.append(outfield[i])
+	return xi
+
+
+## Selection proxy for a rival player: keepers by PO, outfielders by overall ability (CA).
+func _ai_ovr(p: Dictionary) -> int:
+	var attrs: Dictionary = p.get("attrs", {})
+	if p.get("isGK"):
+		return int(attrs.get("PO", 0))
+	return int(attrs.get("CA", 0))
+
+
+## Live one rival week for every AI club: recoveries tick, the featured XI takes this
+## round's knocks/bookings, and the squad develops (Normal intensity). Rival news stays
+## quiet apart from notable new injuries (>= AI_INJ_NEWS_WEEKS matches), which feed the
+## club news so the living league is visible without flooding it.
+func _roll_ai_squads(rng: RandomNumberGenerator, ai_featured: Dictionary) -> void:
+	for cid in rosters:
+		if int(cid) == club_id:
+			continue
+		var squad: Array = rosters[cid]
+		Availability.tick_week(squad)   # recoveries (discarded -- rival feed stays quiet)
+		if ai_featured.has(int(cid)):
+			var feat: Array = ai_featured[int(cid)]
+			var before: Dictionary = {}
+			for p in feat:
+				before[int(p.get("id", -1))] = int(p.get("injured_weeks", 0))
+			Availability.roll_match(rng, feat)
+			for p in feat:
+				var now := int(p.get("injured_weeks", 0))
+				if now >= AI_INJ_NEWS_WEEKS and now > int(before.get(int(p.get("id", -1)), 0)):
+					_news("injury", "%s's %s is out injured for %d matches." % [
+						club_names.get(int(cid), "?"), p.get("name", "?"), now])
+		Training.train_week(rng, squad, Training.DEFAULT_INTENSITY)
 
 
 # ---- live squad access ---------------------------------------------------
@@ -967,12 +1052,18 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 		_log("%s has left your club as his contract has not been renewed." % p.get("name", "?"))
 	if free_agents.size() > FREE_POOL_CAP:
 		free_agents = free_agents.slice(free_agents.size() - FREE_POOL_CAP)
-	# AI contracts tick but auto-renew, so rival squads stay stable across years.
+	# AI contracts tick but auto-renew, so rival squads stay stable across years. Their
+	# players age a year and the season resets like the manager's (#12 living league): bans
+	# and injuries clear, the development carry-over zeroes, so the dev engine re-evaluates
+	# each rival from his new age (young rivals keep climbing, veterans keep sliding).
 	for cid in rosters:
 		if int(cid) == club_id:
 			continue
 		for p in rosters[cid]:
 			p["contract_years"] = maxi(1, int(p.get("contract_years", 2)) - 1) + 1
+			p["age"] = int(p.get("age", 26)) + 1
+		Availability.reset(rosters[cid])
+		Training.reset_progress(rosters[cid])
 	# Fresh season = clean slate: bans don't carry over, everyone reports fit, and the
 	# development carry-over is zeroed (ages just ticked, so trends re-evaluate).
 	Availability.reset(rosters.get(club_id, []))
