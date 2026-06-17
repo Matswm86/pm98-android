@@ -34,7 +34,7 @@ func _run() -> void:
 		node.position = Vector2.ZERO
 		node.size = Vector2(640, 480)
 		if node.has_method("setup") and s[1] == "menu.png":
-			node.setup("SAMPLE FC", "Premier League", "1997-98", 1_000_000, "1st")
+			node.setup("SAMPLE FC", "Premier League", "1997-98", 1_000_000, "1st", 38)
 		for _i in 14:
 			await process_frame
 		await RenderingServer.frame_post_draw

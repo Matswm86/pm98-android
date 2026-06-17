@@ -39,6 +39,7 @@ func _run() -> void:
 	ok = _assert(screen._bg != null and screen._bar != null, "FONDO + BARRA loaded") and ok
 	screen.setup(club, "", "£10,000,000")
 	await process_frame
+	ok = _assert(screen._kit_tex != null, "club kit (escudo) loaded for the squad screen") and ok
 
 	# Sections partition the squad: GK + outfield = the full roster, no dup/drop.
 	var secs: Array = screen._sections()

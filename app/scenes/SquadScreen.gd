@@ -62,11 +62,15 @@ var _f12: Font
 var _f10: Font
 var _f8: Font
 
+const KIT_SRC := Rect2(0, 0, 31, 64)          # shirt half of the 48x64 MINIESC kit
+const KIT_BOX := Rect2(539, 118, 80, 150)     # the club kit in the free right-strip gap
+
 var _club: Dictionary = {}
 var _manager: String = ""
 var _cash: String = ""
 var _youth_enabled := false      # the YOUTH TEAM button is live only for the managed club
 var _press := ""                 # "youth" / "return" held down (for the highlight)
+var _kit_tex: Texture2D          # the club's kit (escudo), or null if no art for the id
 
 
 func _ready() -> void:
@@ -88,6 +92,9 @@ func setup(club: Dictionary, manager: String = "", cash: String = "", youth_enab
 	_manager = manager
 	_cash = cash
 	_youth_enabled = youth_enabled
+	var cid := int(club.get("id", -1))
+	var path := "res://art/kits/%d.png" % cid
+	_kit_tex = load(path) if cid >= 0 and ResourceLoader.exists(path) else null
 	queue_redraw()
 
 
@@ -281,6 +288,15 @@ func _draw_side() -> void:
 	_cell(523, 60, 112, 40, C_CELL, C_CELL_HI, C_CELL_LO)
 	_txt(_f10, 529, 64, "SQUAD", C_HEAD, 11)
 	_txt(_f12, 631, 78, "%d players" % n, C_TEXT, 13, true)
+
+	# The club kit (escudo) in the free gap between the SQUAD cell and the YOUTH button.
+	if _kit_tex != null:
+		var sc: float = min(KIT_BOX.size.x / KIT_SRC.size.x, KIT_BOX.size.y / KIT_SRC.size.y)
+		var kw := KIT_SRC.size.x * sc
+		var kh := KIT_SRC.size.y * sc
+		draw_texture_rect_region(_kit_tex,
+			Rect2(KIT_BOX.position.x + (KIT_BOX.size.x - kw) * 0.5,
+				KIT_BOX.position.y + (KIT_BOX.size.y - kh) * 0.5, kw, kh), KIT_SRC)
 
 	# YOUTH TEAM: a live green button on the managed club (opens the academy), greyed on a
 	# browsed club where there's no youth team to open.

@@ -948,7 +948,7 @@ func _mount_hub() -> void:
 		move_child(_hub, get_child_count() - 1)
 	_hub.visible = true
 	_hub.setup(c.club_name, c.league_name, c.season, c.cash,
-		"%d%s" % [c.position(), _ord_suffix(c.position())])
+		"%d%s" % [c.position(), _ord_suffix(c.position())], c.club_id)
 	AudioManager.play_music()   # resume the menu theme on return from a match
 
 ## Leave the career back to the database/home browser (MENUPRINCIPAL EXIT). Saves first,

@@ -31,10 +31,11 @@ func _run() -> void:
 		await process_frame
 	ok = _assert(scr._bg != null, "menu_bg loaded into screen") and ok
 	ok = _assert(scr._f14 != null and scr._f12 != null, "PROMAN fonts loaded") and ok
-	scr.setup("MANCHESTER UTD.", "Premier League", "1997-98", 8_000_000, "1st")
+	scr.setup("MANCHESTER UTD.", "Premier League", "1997-98", 8_000_000, "1st", 38)
 	await process_frame
 	ok = _assert(scr._club == "MANCHESTER UTD." and scr._cash == 8_000_000,
 		"screen received career chrome") and ok
+	ok = _assert(scr._kit_tex != null, "managed club kit (escudo) loaded into the hub") and ok
 
 	# All 12 icon + 4 control actions are present.
 	ok = _assert(MenuScreen.ICON_HITS.size() == 12, "12 icon hit rects") and ok

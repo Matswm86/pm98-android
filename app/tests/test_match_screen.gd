@@ -37,9 +37,11 @@ func _run() -> void:
 		{"minute": 71, "side": 0, "text": "Goal by C", "goal": true},
 		{"minute": 90, "side": -1, "text": "FULL TIME"},
 	]
-	scr.setup("ARSENAL", "CHELSEA", 2, 1, lines)
+	scr.setup("ARSENAL", "CHELSEA", 2, 1, lines, 38, 39)
 	await process_frame
 	ok = _assert(scr._slots.size() == 22, "formation has 22 players (%d)" % scr._slots.size()) and ok
+	ok = _assert(scr._home_kit != null and scr._away_kit != null,
+		"both scoreboard kits (escudos) loaded") and ok
 	ok = _assert(scr._keys.size() >= lines.size(), "keyframes built (%d)" % scr._keys.size()) and ok
 	ok = _assert(scr._col_home != scr._col_away, "the two kits are kept visually distinct") and ok
 

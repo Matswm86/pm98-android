@@ -53,12 +53,19 @@ const CTRL_HITS := {
 const CX0 := 214
 const CX1 := 426
 
+# The managed club's kit (escudo), drawn in the centre panel above the club name. PM98
+# shows the club kit on MENUPRINCIPAL; the reversed menu_bg carries no kit, it's dynamic.
+const KIT_SRC := Rect2(0, 0, 31, 64)        # shirt half of the 48x64 MINIESC kit
+const KIT_BOX := Rect2(298, 150, 44, 60)    # centred on the CX0..CX1 column, above the name
+
 var _bg: Texture2D
 var _bezel: Texture2D            # marble fill for the landscape letterbox margins
 var _f14: Font
 var _f12: Font
+var _kit_tex: Texture2D          # the managed club's kit, or null if no art for the id
 
 var _club: String = ""
+var _club_id: int = -1
 var _manager: String = ""
 var _season: String = ""
 var _cash: int = 0
@@ -80,12 +87,16 @@ func _ready() -> void:
 
 
 ## Feed the live career chrome (club / manager / season / cash / position), repaint.
-func setup(club: String, manager := "", season := "", cash := 0, position := "") -> void:
+func setup(club: String, manager := "", season := "", cash := 0, position := "", club_id := -1) -> void:
 	_club = club
 	_manager = manager
 	_season = season
 	_cash = cash
 	_position = position
+	if club_id != _club_id:
+		_club_id = club_id
+		var path := "res://art/kits/%d.png" % club_id
+		_kit_tex = load(path) if club_id >= 0 and ResourceLoader.exists(path) else null
 	queue_redraw()
 
 
@@ -178,6 +189,15 @@ func _draw() -> void:
 
 	if _bg != null:
 		draw_texture_rect(_bg, Rect2(0, 0, W, H), false)
+
+	# The managed club's kit (escudo), centred above the club name.
+	if _kit_tex != null:
+		var sc: float = min(KIT_BOX.size.x / KIT_SRC.size.x, KIT_BOX.size.y / KIT_SRC.size.y)
+		var kw := KIT_SRC.size.x * sc
+		var kh := KIT_SRC.size.y * sc
+		draw_texture_rect_region(_kit_tex,
+			Rect2(KIT_BOX.position.x + (KIT_BOX.size.x - kw) * 0.5,
+				KIT_BOX.position.y + (KIT_BOX.size.y - kh) * 0.5, kw, kh), KIT_SRC)
 
 	# Live club panel in the centre gap between the two icon bands.
 	var cw := CX1 - CX0

@@ -41,6 +41,8 @@ const ANIM_ROWS := 3
 # group-of-8 layout (col widths 20,16,12,12,12,16,20,20 => sides wide, front/back narrow).
 const DIR_ANGLE := [0.0, 45.0, 90.0, 135.0, 180.0, 225.0, 270.0, 315.0]
 
+const KIT_SRC := Rect2(0, 0, 31, 64)   # shirt half of the 48x64 MINIESC kit (scoreboard escudos)
+
 const C_SKY_TOP := Color(0.30, 0.52, 0.86)
 const C_SKY_BOT := Color(0.46, 0.66, 0.92)
 const C_GRASS_A := Color(0.18, 0.52, 0.20)
@@ -66,6 +68,8 @@ var _col_home := Color(0.85, 0.18, 0.18)   # fallback kits (overridden from the 
 var _col_away := Color(0.18, 0.30, 0.85)
 var _home_id := -1
 var _away_id := -1
+var _home_kit: Texture2D       # each side's kit (escudo), flanking the scoreboard score
+var _away_kit: Texture2D
 var _f14: Font
 var _f12: Font
 var _f10: Font
@@ -120,6 +124,8 @@ func setup(home_name: String, away_name: String, hg: int, ag: int, lines: Array,
 	_away_id = away_id
 	_col_home = _kit_colour(home_id, true, _col_home)    # left half = home shirt
 	_col_away = _kit_colour(away_id, false, _col_away)   # right half = away shirt
+	_home_kit = _kit_tex(home_id)
+	_away_kit = _kit_tex(away_id)
 	# keep the two sides telling apart: if the kits are too close, contrast the away one
 	if _col_dist(_col_home, _col_away) < 0.32:
 		_col_away = Color(0.93, 0.93, 0.96) if _col_home.get_luminance() < 0.5 else Color(0.10, 0.12, 0.30)
@@ -158,6 +164,14 @@ func _exit_tree() -> void:
 
 func _col_dist(a: Color, b: Color) -> float:
 	return sqrt(pow(a.r - b.r, 2.0) + pow(a.g - b.g, 2.0) + pow(a.b - b.b, 2.0))
+
+
+## The club's kit art (res://art/kits/<id>.png), or null when no art exists for the id.
+func _kit_tex(club_id: int) -> Texture2D:
+	if club_id < 0:
+		return null
+	var path := "res://art/kits/%d.png" % club_id
+	return load(path) if ResourceLoader.exists(path) else null
 
 
 ## Dominant saturated colour of a club kit (one half of res://art/kits/<id>.png), brightened
@@ -579,6 +593,15 @@ func _draw_ball(ball: Dictionary) -> void:
 		_txt(_f14, int(p["x"]) - 26, int(p["y"]) - 60, "GOAL!", C_GOLD, 18)
 
 
+## A small kit (shirt crop) at the BARRA top, aspect-fitted into a 22x32 box at x.
+func _draw_kit(tex: Texture2D, x: float) -> void:
+	if tex == null:
+		return
+	var s: float = min(22.0 / KIT_SRC.size.x, 32.0 / KIT_SRC.size.y)
+	draw_texture_rect_region(tex,
+		Rect2(x + (22.0 - KIT_SRC.size.x * s) * 0.5, 4, KIT_SRC.size.x * s, KIT_SRC.size.y * s), KIT_SRC)
+
+
 func _draw_scoreboard(ball: Dictionary) -> void:
 	if _bar != null:
 		draw_texture_rect(_bar, Rect2(0, 0, W, _bar.get_height()), false)
@@ -590,6 +613,9 @@ func _draw_scoreboard(ball: Dictionary) -> void:
 	var pill := Rect2(CENTER_X - 44, 3, 88, 42)
 	draw_rect(pill, Color(0.04, 0.07, 0.12, 0.82), true)
 	draw_rect(Rect2(pill.position, Vector2(pill.size.x, 1)), Color(0.5, 0.6, 0.75, 0.6), true)
+	# each club's kit (escudo) flanking the score pill
+	_draw_kit(_home_kit, pill.position.x - 26)
+	_draw_kit(_away_kit, pill.end.x + 4)
 	var score := "%d : %d" % [sc.x, sc.y]
 	_txt(_f14, 0, 6, score, C_TITLE, 18, false, W)
 	_txt(_f10, 0, 30, clock, C_GOLD, 12, false, W)
