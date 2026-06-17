@@ -66,10 +66,15 @@ var _kit_tex: Texture2D          # the managed club's kit, or null if no art for
 
 var _club: String = ""
 var _club_id: int = -1
-var _manager: String = ""
+var _manager: String = ""       # the caller passes the league name here (no manager name modelled)
 var _season: String = ""
 var _cash: int = 0
 var _position: String = ""
+var _week: int = 0
+var _opp_name: String = ""      # next-fixture opponent (central stack, replaces the cash figure)
+var _opp_id: int = -1
+var _is_home: bool = true
+var _opp_tex: Texture2D
 var _press: String = ""        # action currently held down (for the highlight)
 var _toast_msg: String = ""    # transient feedback (save / news / next match)
 
@@ -86,17 +91,26 @@ func _ready() -> void:
 	queue_redraw()
 
 
-## Feed the live career chrome (club / manager / season / cash / position), repaint.
-func setup(club: String, manager := "", season := "", cash := 0, position := "", club_id := -1) -> void:
+## Feed the live career chrome (club / league / season / cash / position + the next-fixture
+## opponent for the central stack + week for the calendar plaque), repaint.
+func setup(club: String, manager := "", season := "", cash := 0, position := "", club_id := -1,
+		week := 0, opp_name := "", opp_id := -1, is_home := true) -> void:
 	_club = club
 	_manager = manager
 	_season = season
 	_cash = cash
 	_position = position
+	_week = week
+	_opp_name = opp_name
+	_is_home = is_home
 	if club_id != _club_id:
 		_club_id = club_id
 		var path := "res://art/kits/%d.png" % club_id
 		_kit_tex = load(path) if club_id >= 0 and ResourceLoader.exists(path) else null
+	if opp_id != _opp_id:
+		_opp_id = opp_id
+		var op := "res://art/kits/%d.png" % opp_id
+		_opp_tex = load(op) if opp_id >= 0 and ResourceLoader.exists(op) else null
 	queue_redraw()
 
 
@@ -190,7 +204,12 @@ func _draw() -> void:
 	if _bg != null:
 		draw_texture_rect(_bg, Rect2(0, 0, W, H), false)
 
-	# The managed club's kit (escudo), centred above the club name.
+	# Shared plaque header overlaid on the baked bg's empty navy top strip (manager+club /
+	# calendar date / league+week), with the MANAGER MENU title. (_manager carries the
+	# league name; manager-name is not modelled, so the left plaque centres the club.)
+	PMChrome.draw_header(self, "MANAGER MENU", "", _club, _manager, _season, _week, _club_id)
+
+	# The managed club's kit (escudo), centred above the central stack.
 	if _kit_tex != null:
 		var sc: float = min(KIT_BOX.size.x / KIT_SRC.size.x, KIT_BOX.size.y / KIT_SRC.size.y)
 		var kw := KIT_SRC.size.x * sc
@@ -199,18 +218,23 @@ func _draw() -> void:
 			Rect2(KIT_BOX.position.x + (KIT_BOX.size.x - kw) * 0.5,
 				KIT_BOX.position.y + (KIT_BOX.size.y - kh) * 0.5, kw, kh), KIT_SRC)
 
-	# Live club panel in the centre gap between the two icon bands.
+	# Central stack: managed club + league + position, then the next-fixture opponent
+	# (with its crest) — the real game's centre panel, NOT the cash figure the remake showed.
 	var cw := CX1 - CX0
 	if _club != "":
-		_txt(_f14, CX0, 220, _club.substr(0, 20), C_TITLE, 15, cw)
-	if _manager != "":
-		_txt(_f12, CX0, 239, _manager.substr(0, 22), C_DIM, 13, cw)
-	if _season != "":
-		_txt(_f12, CX0, 290, _season, C_DIM, 13, cw)
-	var foot := "£%s" % _fmt(_cash)
+		_txt(_f14, CX0, 214, _club.substr(0, 20), C_TITLE, 15, cw)
+	var sub := _manager
 	if _position != "":
-		foot += "   -   %s" % _position
-	_txt(_f12, CX0, 306, foot, C_CASH, 13, cw)
+		sub = "%s   -   %s" % [_manager, _position] if _manager != "" else _position
+	if sub != "":
+		_txt(_f12, CX0, 233, sub.substr(0, 28), C_DIM, 12, cw)
+	if _opp_name != "":
+		if _opp_tex != null:
+			var os: float = min(26.0 / KIT_SRC.size.x, 34.0 / KIT_SRC.size.y)
+			draw_texture_rect_region(_opp_tex,
+				Rect2(CX0 + 22, 262, KIT_SRC.size.x * os, KIT_SRC.size.y * os), KIT_SRC)
+		_txt(_f12, CX0 + 6, 264, "%s" % ("vs" if _is_home else "at"), C_DIM, 12, cw)
+		_txt(_f14, CX0, 282, _opp_name.substr(0, 20), C_TITLE, 14, cw)
 
 	# Press highlight over the held icon / button.
 	if _press != "":

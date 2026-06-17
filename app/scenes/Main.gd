@@ -1025,8 +1025,18 @@ func _mount_hub() -> void:
 	else:
 		move_child(_hub, get_child_count() - 1)
 	_hub.visible = true
+	# Next-fixture opponent for the hub's central stack.
+	var fx := c.manager_fixture()
+	var opp_name := ""
+	var opp_id := -1
+	var is_home := true
+	if not fx.is_empty():
+		is_home = int(fx[0]) == c.club_id
+		opp_id = int(fx[1]) if is_home else int(fx[0])
+		opp_name = str(GameDB.club(opp_id).get("name", ""))
 	_hub.setup(c.club_name, c.league_name, c.season, c.cash,
-		"%d%s" % [c.position(), _ord_suffix(c.position())], c.club_id)
+		"%d%s" % [c.position(), _ord_suffix(c.position())], c.club_id,
+		c.week + 1, opp_name, opp_id, is_home)
 	AudioManager.play_music()   # resume the menu theme on return from a match
 
 ## Leave the career back to the database/home browser (MENUPRINCIPAL EXIT). Saves first,
