@@ -198,6 +198,12 @@ the 300-season harness is calibrated and there is no ground-truth PM98 scoreline
 re-validate a curve change against.
 
 ## Open / next (active)
+- **EXACT engine + tactics port — see [`EXACT_PORT_PLAN.md`](EXACT_PORT_PLAN.md).** Mats wants
+  the calibrated `MatchEngine.gd` model and the ours `Tactics.gd` lever model REPLACED by
+  faithful ports of the real positional sim + its tactics coupling, validated bit-for-bit
+  (oracle = Ghidra PCode emulation / wine; kill-test = identical event stream + scoreline for a
+  fixed seed). Gaps to close: (A) port the per-tick movement physics (callees of `00598740`),
+  (B) decode the tactics struct + its sim read-sites, (C) map game_db attrs → sim player fields.
 - Live match commentary feed in the app — map generators `58f3c0` (shots 0x17-0x20),
   `5a7260`/`5ab5a0`/`5b41c0` (miss types 0xf/0x10/0x11) + formatter `FUN_00539140`. In progress.
 - Finance layer in the app — see `finance_constants.md` (weekly-ledger structure decoded).
