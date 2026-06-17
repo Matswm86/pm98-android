@@ -30,6 +30,15 @@ const DEFAULT_FORMATION := "4-4-2"
 
 const MARKINGS := ["Zonal", "Man-to-man"]
 
+# PM98's TEAM TACTICS modal levers (ma_9), verbatim option sets from the screen:
+# the ATTACK mentality, DEFENCE tackling, clearances and pressing line. The marking
+# pair above is the modal's MARKING row. The two PASSING<->LONG-BALL and COUNTER
+# ATTACK sliders are percentages (Yes/No share). All feed ratings() below.
+const MENTALITIES := ["Attacking", "Mixed", "Speculative"]
+const TACKLINGS := ["Soft", "Medium", "Aggressive"]
+const CLEARANCE_OPTS := ["Short", "Long"]
+const PRESSURISE_OPTS := ["Own", "Midfield", "Opponent"]
+
 const LINEUP_BAD := "The initial line-up is not correct."
 
 # Role emphasis. Used as a WEIGHTED MEAN over the XI (weights need not sum to 1),
@@ -52,6 +61,46 @@ const _FORM_FACTOR := {
 const _MARK_MAN_DEF := 1.04
 const _MARK_MAN_ATK := 0.98
 
+# The TEAM-TACTICS modal levers as [att, def] multipliers on the XI's ratings. Each
+# is a BOUNDED TRADE-OFF anchored at its neutral option = [1.0, 1.0], so the default
+# tactics (Mixed / Medium / Short / Midfield / 50-50 sliders / Zonal) leave ratings()
+# at parity with the formation-only feed -- the manager is never silently buffed over
+# the AI's auto-best-XI. Ours, calibrated; the option SETS are PM98's (see ma_9).
+# Mentality: forward commitment (att up, def down) vs patient/cautious (the reverse).
+const _MENTALITY_FACTOR := {
+	"Attacking": [1.08, 0.93],
+	"Mixed": [1.00, 1.00],          # anchor
+	"Speculative": [0.94, 1.07],
+}
+# Tackling: harder tackling wins more ball back (def up) at a small discipline/energy
+# cost up front (att down); softer concedes the ground but keeps shape forward.
+const _TACKLING_FACTOR := {
+	"Soft": [1.02, 0.96],
+	"Medium": [1.00, 1.00],         # anchor
+	"Aggressive": [0.98, 1.05],
+}
+# Clearances: SHORT plays out of the back (build attack, anchor); LONG hoofs clear --
+# safety first, less build-up.
+const _CLEARANCE_FACTOR := {
+	"Short": [1.00, 1.00],          # anchor
+	"Long": [0.97, 1.02],
+}
+# Pressurise from: a high line (Opponent) wins the ball high (att up) but leaves space
+# behind (def down); a deep block (Own) is compact (def up) with less attacking outlet.
+const _PRESSURISE_FACTOR := {
+	"Own": [0.96, 1.05],
+	"Midfield": [1.00, 1.00],       # anchor
+	"Opponent": [1.06, 0.95],
+}
+# Slider trade-off coefficients, applied to the deviation from the 50/50 neutral.
+# Passing<->long-ball: long ball is direct (att up, def down); passing keeps the ball
+# (def up, att down). Counter: more counter sharpens the break (att up) but pushes the
+# line out (def down). Small so the XI + formation stay the dominant terms.
+const _PASS_ATK := 0.03
+const _PASS_DEF := 0.03
+const _CNT_ATK := 0.04
+const _CNT_DEF := 0.02
+
 # Per-player fallback scores when a chosen player has no decoded attr row.
 const _NEUTRAL_SCORE := 50.0
 const _NEUTRAL_GK := 52.0
@@ -59,6 +108,13 @@ const _NEUTRAL_GK := 52.0
 var formation: String = DEFAULT_FORMATION
 var xi: Array = []              # 11 player ids, slot order: [GK, DEF.., MID.., FWD..]
 var marking: String = "Zonal"   # defending-line marking: "Zonal" | "Man-to-man"
+# TEAM-TACTICS modal levers (defaults are the neutral/parity anchors, see factors above).
+var mentality: String = "Mixed"      # "Attacking" | "Mixed" | "Speculative"
+var passing_pct: int = 50            # PASSING share (0..100); long-ball = 100 - passing_pct
+var counter_pct: int = 50            # COUNTER ATTACK "Yes" share (0..100)
+var tackling: String = "Medium"      # "Soft" | "Medium" | "Aggressive"
+var clearances: String = "Short"     # "Short" | "Long"
+var pressurise: String = "Midfield"  # "Own" | "Midfield" | "Opponent"
 var captain_id: int = -1
 var pk_taker_id: int = -1        # penalty
 var ck_taker_id: int = -1        # corner
@@ -223,6 +279,21 @@ func ratings(club: Dictionary) -> Dictionary:
 	if marking == "Man-to-man":
 		dfn_team *= _MARK_MAN_DEF
 		att *= _MARK_MAN_ATK
+	# TEAM-TACTICS modal levers: each a bounded att/def trade-off anchored at neutral.
+	var fm: Array = _MENTALITY_FACTOR.get(mentality, [1.0, 1.0])
+	att *= float(fm[0]); dfn_team *= float(fm[1])
+	var ft: Array = _TACKLING_FACTOR.get(tackling, [1.0, 1.0])
+	att *= float(ft[0]); dfn_team *= float(ft[1])
+	var fc: Array = _CLEARANCE_FACTOR.get(clearances, [1.0, 1.0])
+	att *= float(fc[0]); dfn_team *= float(fc[1])
+	var fp: Array = _PRESSURISE_FACTOR.get(pressurise, [1.0, 1.0])
+	att *= float(fp[0]); dfn_team *= float(fp[1])
+	var pass_dev: float = (clampf(float(passing_pct), 0.0, 100.0) - 50.0) / 50.0
+	att *= 1.0 - _PASS_ATK * pass_dev      # long ball (low passing) -> direct att
+	dfn_team *= 1.0 + _PASS_DEF * pass_dev  # passing keeps the ball -> better def
+	var cnt_dev: float = (clampf(float(counter_pct), 0.0, 100.0) - 50.0) / 50.0
+	att *= 1.0 + _CNT_ATK * cnt_dev          # counter Yes -> sharper breaks
+	dfn_team *= 1.0 - _CNT_DEF * cnt_dev      # counter Yes -> line pushes out
 	return {"att": att, "def": dfn_team, "gk": gk, "name": club.get("name", "?")}
 
 
@@ -274,6 +345,42 @@ func cycle_marking() -> void:
 	marking = MARKINGS[(MARKINGS.find(marking) + 1) % MARKINGS.size()]
 
 
+# ---- TEAM-TACTICS modal setters (the ma_9 controls) ----------------------
+# Radio rows set a value from its option set (ignoring unknown values); the two
+# sliders step in `delta` and clamp to [0, 100]. The passing/long-ball pair is one
+# slider (long-ball share is the complement), matching the modal's single bar.
+
+func set_mentality(m: String) -> void:
+	if m in MENTALITIES:
+		mentality = m
+
+func set_tackling(t: String) -> void:
+	if t in TACKLINGS:
+		tackling = t
+
+func set_clearances(c: String) -> void:
+	if c in CLEARANCE_OPTS:
+		clearances = c
+
+func set_pressurise(p: String) -> void:
+	if p in PRESSURISE_OPTS:
+		pressurise = p
+
+func set_marking(m: String) -> void:
+	if m in MARKINGS:
+		marking = m
+
+func step_passing(delta: int) -> void:
+	passing_pct = clampi(passing_pct + delta, 0, 100)
+
+func step_counter(delta: int) -> void:
+	counter_pct = clampi(counter_pct + delta, 0, 100)
+
+## Long-ball share, the complement of the passing share (the modal's right-hand %).
+func long_ball_pct() -> int:
+	return 100 - passing_pct
+
+
 # ---- helpers -------------------------------------------------------------
 
 func _players_by_id(club: Dictionary) -> Dictionary:
@@ -288,6 +395,8 @@ func _players_by_id(club: Dictionary) -> Dictionary:
 func to_dict() -> Dictionary:
 	return {
 		"formation": formation, "xi": xi.duplicate(), "marking": marking,
+		"mentality": mentality, "passing_pct": passing_pct, "counter_pct": counter_pct,
+		"tackling": tackling, "clearances": clearances, "pressurise": pressurise,
 		"captain_id": captain_id, "pk_taker_id": pk_taker_id,
 		"ck_taker_id": ck_taker_id, "fk_taker_id": fk_taker_id,
 	}
@@ -300,6 +409,12 @@ static func from_dict(d: Dictionary) -> Tactics:
 	for v in raw:
 		t.xi.append(int(v))
 	t.marking = d.get("marking", "Zonal")
+	t.mentality = d.get("mentality", "Mixed")
+	t.passing_pct = int(d.get("passing_pct", 50))
+	t.counter_pct = int(d.get("counter_pct", 50))
+	t.tackling = d.get("tackling", "Medium")
+	t.clearances = d.get("clearances", "Short")
+	t.pressurise = d.get("pressurise", "Midfield")
 	t.captain_id = int(d.get("captain_id", -1))
 	t.pk_taker_id = int(d.get("pk_taker_id", -1))
 	t.ck_taker_id = int(d.get("ck_taker_id", -1))
@@ -308,9 +423,10 @@ static func from_dict(d: Dictionary) -> Tactics:
 
 
 # ---- named presets (SAVE / LOAD / PREDEF. TACTICS) -----------------------
-# A preset stores only the reusable SHAPE (formation + marking), not the per-club
-# XI -- exactly what PM98's predefined/saved tactics carry. Loading one re-fills
-# the XI for the new club. Saved presets live as flat user://tactic_*.json files.
+# A preset stores the reusable TACTICAL SHAPE (formation + marking + the modal
+# levers), not the per-club XI -- exactly what PM98's SAVE TACTICS / PREDEF. TACTICS
+# carry. Loading one re-fills the XI for the new club. The four builtin formations
+# are neutral presets. Saved presets live as flat user://tactic_*.json files.
 
 const _PRESET_PREFIX := "tactic_"
 
@@ -339,11 +455,22 @@ func save_preset(name: String) -> void:
 	var slug := name.to_lower().replace(" ", "_").replace("/", "-")
 	var f := FileAccess.open("user://%s%s.json" % [_PRESET_PREFIX, slug], FileAccess.WRITE)
 	if f != null:
-		f.store_string(JSON.stringify({"name": name, "formation": formation, "marking": marking}))
+		f.store_string(JSON.stringify({
+			"name": name, "formation": formation, "marking": marking,
+			"mentality": mentality, "passing_pct": passing_pct, "counter_pct": counter_pct,
+			"tackling": tackling, "clearances": clearances, "pressurise": pressurise,
+		}))
 
-## Apply a preset's shape to `club`, refilling the XI for the new formation.
+## Apply a preset's shape + levers to `club`, refilling the XI for the new formation.
+## Missing lever keys (the builtin formation presets) default to the neutral anchors.
 func apply_preset(preset: Dictionary, club: Dictionary) -> void:
 	marking = preset.get("marking", "Zonal")
+	mentality = preset.get("mentality", "Mixed")
+	passing_pct = int(preset.get("passing_pct", 50))
+	counter_pct = int(preset.get("counter_pct", 50))
+	tackling = preset.get("tackling", "Medium")
+	clearances = preset.get("clearances", "Short")
+	pressurise = preset.get("pressurise", "Midfield")
 	set_formation(preset.get("formation", DEFAULT_FORMATION), club)
 
 

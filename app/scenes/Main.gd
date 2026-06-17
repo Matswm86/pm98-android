@@ -544,7 +544,7 @@ func _screens_shot() -> void:
 		["_show_transfer_screen", "transfer.png"],
 		["_show_directiva_screen", "directiva.png"],
 		["_show_stadium_screen", "stadium.png"],
-		["_show_tactics", "tactics.png"],          # reskinned _set_view flow (T1 #3)
+		["_show_tactics_screen", "tactics.png"],   # TEAM TACTICS modal over the line-up (ma_9)
 		["_show_market", "transfer_buy.png"],      # reskinned _set_view flow (T1 #3)
 		["_show_club_news", "club_news.png"],      # T2 #12: rival injuries surface here
 	]
@@ -608,7 +608,7 @@ func _free_overlays() -> void:
 		if c is LeagueTableScreen or c is LineupScreen or c is SquadScreen \
 				or c is FinanceScreen or c is TransferScreen or c is DirectivaScreen \
 				or c is StadiumScreen or c is CupScreen or c is YouthScreen \
-				or c is StaffScreen or c is BrowseScreen:
+				or c is StaffScreen or c is BrowseScreen or c is TacticsScreen:
 			c.queue_free()
 	_browse = null
 
@@ -1117,6 +1117,30 @@ func _show_lineup_screen() -> void:
 	scr.gui_input.connect(func(e: InputEvent) -> void:
 		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
 			scr.queue_free())
+
+## The original-art TEAM TACTICS modal (ma_9) over a real LINE-UP backdrop: the ATTACK |
+## DEFENCE control panel. Each control mutates the career Tactics live (its ratings() feed
+## the match engine), persisted on `changed`; SAVE writes a named preset; OK / RETURN close
+## both overlays. (scenes/TacticsScreen.gd; the lever att/def model lives in Tactics.gd.)
+func _show_tactics_screen() -> void:
+	var bg: LineupScreen = load("res://scenes/LineupScreen.gd").new()
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(bg)
+	bg.setup(_mgr_club(), _tactics(), "", _career.league_name, _career.season, _career.week + 1)
+	var scr: TacticsScreen = load("res://scenes/TacticsScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(_tactics())
+	scr.changed.connect(func(d: Dictionary) -> void:
+		_career.tactics = d
+		_career.save())
+	scr.save_requested.connect(func(d: Dictionary) -> void:
+		var t := Tactics.from_dict(d)
+		t.save_preset("%s %s" % [t.formation, t.marking])
+		_toast("Tactics saved"))
+	scr.done.connect(func() -> void:
+		scr.queue_free()
+		bg.queue_free())
 
 ## The original-art SQUAD MANAGEMENT (PLANTILLA) screen for the managed club. The YOUTH
 ## TEAM button opens the academy; a tap elsewhere dismisses to the hub.
@@ -2031,7 +2055,7 @@ func _show_tactics() -> void:
 	rows.append("VIEW LINE-UP   (the pitch)"); payload.append({"a": "lineup_view"})
 	rows.append("Formation:   %s" % t.formation); payload.append({"a": "formation"})
 	rows.append("LINE-UP   (choose your XI)"); payload.append({"a": "lineup"})
-	rows.append("Marking:   %s" % t.marking); payload.append({"a": "marking"})
+	rows.append("TEAM TACTICS   (attack / defence)"); payload.append({"a": "modal"})
 	rows.append("Set-piece takers"); payload.append({"a": "takers"})
 	rows.append("Auto-pick best XI"); payload.append({"a": "auto"})
 	rows.append("SAVE TACTICS"); payload.append({"a": "save"})
@@ -2048,13 +2072,9 @@ func _activate_tactics(item: Dictionary) -> void:
 		"lineup_view": _show_lineup_screen()
 		"formation": _push(_show_formation_pick)
 		"lineup": _push(_show_lineup)
+		"modal": _show_tactics_screen()
 		"takers": _push(_show_takers)
 		"load": _push(_show_load_tactics)
-		"marking":
-			var t := _tactics()
-			t.cycle_marking()
-			_save_tactics(t)
-			_show_tactics()
 		"auto":
 			var t := Tactics.auto_pick(_mgr_club(), _tactics().formation)
 			_save_tactics(t)

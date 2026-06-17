@@ -67,6 +67,68 @@ func _run() -> bool:
 	var rm := manm.ratings(club)
 	ok = _assert(rm["def"] > rz["def"] and rm["att"] < rz["att"], "man-to-man: more def, less att") and ok
 
+	# --- TEAM-TACTICS modal levers: default is neutral (parity anchor) and each lever is
+	# a bounded att/def trade-off. Base = the auto-picked 4-4-2 with all levers at default.
+	var base := Tactics.auto_pick(club, "4-4-2")
+	var rb := base.ratings(club)
+	ok = _assert(base.mentality == "Mixed" and base.passing_pct == 50 and base.counter_pct == 50
+		and base.tackling == "Medium" and base.clearances == "Short" and base.pressurise == "Midfield",
+		"default tactics are the neutral/parity anchors") and ok
+	# A clone with the neutral options set EXPLICITLY rates identically (anchor == [1,1]).
+	var neutral := Tactics.auto_pick(club, "4-4-2")
+	neutral.set_mentality("Mixed"); neutral.set_tackling("Medium")
+	neutral.set_clearances("Short"); neutral.set_pressurise("Midfield")
+	var rn := neutral.ratings(club)
+	ok = _assert(absf(rn["att"] - rb["att"]) < 0.001 and absf(rn["def"] - rb["def"]) < 0.001,
+		"neutral levers leave ratings at parity (%.2f/%.2f)" % [rb["att"], rb["def"]]) and ok
+
+	# A single helper: clone the base, mutate one lever, rate.
+	var lever := func(setup: Callable) -> Dictionary:
+		var t := Tactics.auto_pick(club, "4-4-2")
+		setup.call(t)
+		return t.ratings(club)
+
+	var atkr: Dictionary = lever.call(func(t): t.set_mentality("Attacking"))
+	var spec: Dictionary = lever.call(func(t): t.set_mentality("Speculative"))
+	ok = _assert(atkr["att"] > rb["att"] and atkr["def"] < rb["def"], "mentality Attacking: +att -def") and ok
+	ok = _assert(spec["def"] > rb["def"] and spec["att"] < rb["att"], "mentality Speculative: +def -att") and ok
+
+	var aggr: Dictionary = lever.call(func(t): t.set_tackling("Aggressive"))
+	ok = _assert(aggr["def"] > rb["def"] and aggr["att"] < rb["att"], "tackling Aggressive: +def -att") and ok
+
+	var lng: Dictionary = lever.call(func(t): t.set_clearances("Long"))
+	ok = _assert(lng["def"] > rb["def"] and lng["att"] < rb["att"], "clearances Long: +def -att") and ok
+
+	var press_hi: Dictionary = lever.call(func(t): t.set_pressurise("Opponent"))
+	var press_lo: Dictionary = lever.call(func(t): t.set_pressurise("Own"))
+	ok = _assert(press_hi["att"] > rb["att"] and press_hi["def"] < rb["def"], "press Opponent: +att -def") and ok
+	ok = _assert(press_lo["def"] > rb["def"] and press_lo["att"] < rb["att"], "press Own: +def -att") and ok
+
+	var longball: Dictionary = lever.call(func(t): t.step_passing(-50))   # 50 -> 0 (all long ball)
+	var possession: Dictionary = lever.call(func(t): t.step_passing(50))  # 50 -> 100 (all passing)
+	ok = _assert(longball["att"] > rb["att"] and longball["def"] < rb["def"], "long-ball: +att -def") and ok
+	ok = _assert(possession["def"] > rb["def"] and possession["att"] < rb["att"], "passing: +def -att") and ok
+
+	var cnt: Dictionary = lever.call(func(t): t.step_counter(50))         # 50 -> 100 (max counter)
+	ok = _assert(cnt["att"] > rb["att"] and cnt["def"] < rb["def"], "counter Yes: +att -def break") and ok
+
+	# Sliders clamp to [0,100] and long_ball is the complement.
+	var clamp_t := Tactics.auto_pick(club, "4-4-2")
+	clamp_t.step_passing(999); clamp_t.step_counter(-999)
+	ok = _assert(clamp_t.passing_pct == 100 and clamp_t.long_ball_pct() == 0
+		and clamp_t.counter_pct == 0, "sliders clamp to [0,100]; long-ball = complement") and ok
+
+	# Levers survive the dict round-trip and the named-preset path.
+	var full := Tactics.auto_pick(club, "3-5-2")
+	full.set_mentality("Attacking"); full.set_tackling("Aggressive")
+	full.set_clearances("Long"); full.set_pressurise("Opponent")
+	full.step_passing(-30); full.step_counter(20)
+	var full2 := Tactics.from_dict(full.to_dict())
+	ok = _assert(full2.mentality == "Attacking" and full2.tackling == "Aggressive"
+		and full2.clearances == "Long" and full2.pressurise == "Opponent"
+		and full2.passing_pct == 20 and full2.counter_pct == 70,
+		"levers survive to_dict/from_dict round-trip") and ok
+
 	# --- manual swap keeps a valid 11 and no duplicates.
 	var ts := Tactics.auto_pick(club, "4-4-2")
 	var bench_id := _a_bench_outfielder(club, ts)
