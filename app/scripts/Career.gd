@@ -39,6 +39,9 @@ var news_log: Array = []                # newest-first club news {week,kind,text
 var training_intensity: String = Training.DEFAULT_INTENSITY   # Light/Normal/Intensive
 var youth: Array = []                   # the youth team: scouted youngsters (Youth.gd)
 var youth_seq: int = YOUTH_ID_BASE      # monotonic id minter for youth (above senior ids)
+var staff: Array = []                   # hired backroom staff (Staff.gd)
+var staff_pool: Array = []              # staff available to hire (refreshed each season)
+var staff_seq: int = STAFF_ID_BASE      # monotonic id minter for staff candidates
 var fa_cup: Dictionary = {}             # the F.A. Cup bracket (Cup.gd); {} = not running
 var league_cup: Dictionary = {}         # the Coca-Cola (League) Cup bracket; {} = not running
 
@@ -110,6 +113,12 @@ const YOUTH_SEED_COUNT := 5             # the academy crop a new career starts w
 const YOUTH_INTAKE_LO := 1             # a season's fresh intake (scout's haul) ...
 const YOUTH_INTAKE_HI := 3             # ... is this many youngsters
 
+# Backroom staff: candidates are minted from their own id base; a new career starts with no
+# staff hired but a pool to hire from (refreshed each season), and a soft cap on headcount.
+const STAFF_ID_BASE := 800000
+const STAFF_POOL_SIZE := 6              # candidates available to hire at any time
+const STAFF_MAX := 8                    # the directors won't fund more staff than this
+
 # "The Directors will only let you make %u offer%s to sign a player per week."
 const OFFERS_PER_WEEK := 3
 # Transfer window shuts this many rounds before the season ends (deadline day).
@@ -146,6 +155,9 @@ static func create(club: Dictionary, league: Dictionary, league_clubs: Array, le
 	yrng.randomize()
 	c.youth = Youth.intake(yrng, YOUTH_SEED_COUNT, c.youth_seq)
 	c.youth_seq += YOUTH_SEED_COUNT
+	# No staff hired yet, but a pool of backroom staff to bring in.
+	c.staff_pool = Staff.generate_pool(yrng, c.staff_seq, STAFF_POOL_SIZE)
+	c.staff_seq += STAFF_POOL_SIZE
 	return c
 
 
@@ -251,6 +263,7 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 		if h == club_id or a == club_id:
 			manager_res = {"home_id": h, "away_id": a, "hg": hg, "ag": ag, "manager_home": h == club_id}
 	cash += weekly_net
+	cash -= Staff.weekly_wage(staff)   # the backroom staff wage bill (STAFF WAGES)
 	week += 1
 	offers_left = OFFERS_PER_WEEK   # the board's weekly signing allowance resets
 	if not manager_res.is_empty():
@@ -265,15 +278,17 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 	for n in Availability.tick_week(my_squad()):
 		_news(n["kind"], n["text"])
 	if not manager_res.is_empty():
-		var inj_mult := Training.injury_multiplier(training_intensity)
+		# A physiotherapist on the staff lowers the injury risk (physio_factor <= 1.0).
+		var inj_mult := Training.injury_multiplier(training_intensity) * Staff.physio_factor(staff)
 		for n in Availability.roll_match(rng, featured, inj_mult):
 			_news(n["kind"], n["text"])
-	# Player development for the training week just completed.
-	for n in Training.train_week(rng, my_squad(), training_intensity):
+	# Player development for the training week just completed -- a TRAINER on the staff
+	# speeds it up (training_factor >= 1.0).
+	for n in Training.train_week(rng, my_squad(), training_intensity, Staff.training_factor(staff)):
 		_news(n["kind"], n["text"])
-	# The youth team develops on its own track; a youngster crossing the readiness line
-	# is reported by the youth manager (so you know to look at the YOUTH TEAM screen).
-	for n in Youth.develop_week(rng, youth):
+	# The youth team develops on its own track (a YOUTH COACH speeds it); a youngster
+	# crossing the readiness line is reported so you know to look at the YOUTH TEAM screen.
+	for n in Youth.develop_week(rng, youth, Staff.youth_factor(staff)):
 		_news(n["kind"], n["text"])
 	# F.A. Cup: any midweek tie whose scheduled league week has arrived is played
 	# now (open random draw, replays then penalties). The manager's own tie writes a
@@ -488,7 +503,8 @@ func _roll_youth(rng: RandomNumberGenerator) -> void:
 	if room <= 0:
 		return
 	var want := mini(room, rng.randi_range(YOUTH_INTAKE_LO, YOUTH_INTAKE_HI))
-	for p in Youth.intake(rng, want, youth_seq):
+	# A youth coach raises the quality of the intake (Youth.intake's scout factor).
+	for p in Youth.intake(rng, want, youth_seq, Staff.youth_factor(staff)):
 		youth.append(p)
 		_news("youth", "%s has joined your Youth Team." % p.get("name", "?"))
 	youth_seq += want
@@ -525,6 +541,55 @@ func promote_youth(pid: int) -> Dictionary:
 	_news("youth", "%s has been promoted to the first team squad." % p.get("name", "?"))
 	_log("%s has been promoted from the youth team." % p.get("name", "?"))
 	return {"ok": true, "msg": "%s has been promoted to the first team." % p.get("name", "?")}
+
+
+# ---- backroom staff ------------------------------------------------------
+
+## The weekly STAFF WAGES bill (sum of the hired staff's wages).
+func staff_weekly_wage() -> int:
+	return Staff.weekly_wage(staff)
+
+## Hire a candidate from the pool into the backroom staff. Guards the headcount cap and the
+## directors' affordability (you must be able to cover the new wage bill). Moves the member
+## out of the pool. Returns {ok, msg}.
+func hire_staff(cand_id: int) -> Dictionary:
+	var idx := -1
+	for i in staff_pool.size():
+		if int(staff_pool[i].get("id", -2)) == cand_id:
+			idx = i
+			break
+	if idx == -1:
+		return {"ok": false, "msg": "That member of staff is no longer available."}
+	if staff.size() >= STAFF_MAX:
+		return {"ok": false, "msg": "The directors won't fund more than %d staff." % STAFF_MAX}
+	var m: Dictionary = staff_pool[idx]
+	# The board won't sanction a hire the club plainly can't pay for (a season's wage).
+	if int(m.get("wage", 0)) > cash:
+		return {"ok": false, "msg": "You can't afford %s's wages." % m.get("name", "?")}
+	staff_pool.remove_at(idx)
+	staff.append(m)
+	_news("staff", "%s has joined the club as %s." % [m.get("name", "?"), m.get("role", "staff")])
+	_log("Hired %s (%s)." % [m.get("name", "?"), m.get("role", "staff")])
+	return {"ok": true, "msg": "%s hired as %s." % [m.get("name", "?"), m.get("role", "staff")]}
+
+## Sack a hired staff member, paying the contract compensation (a few weeks' wage) from cash.
+## He returns to the available pool. Returns {ok, msg}.
+func sack_staff(member_id: int) -> Dictionary:
+	var idx := -1
+	for i in staff.size():
+		if int(staff[i].get("id", -2)) == member_id:
+			idx = i
+			break
+	if idx == -1:
+		return {"ok": false, "msg": "That member of staff is not on your books."}
+	var m: Dictionary = staff[idx]
+	var comp := Staff.sack_cost(m)
+	staff.remove_at(idx)
+	cash -= comp
+	staff_pool.append(m)
+	_news("staff", "%s has been sacked (£%s compensation)." % [m.get("name", "?"), _money(comp)])
+	_log("Sacked %s (%s); paid £%s compensation." % [m.get("name", "?"), m.get("role", "staff"), _money(comp)])
+	return {"ok": true, "msg": "%s sacked. £%s compensation paid." % [m.get("name", "?"), _money(comp)]}
 
 ## True while the transfer window is open (before deadline day).
 func transfers_open() -> bool:
@@ -681,6 +746,9 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	# The youth team ages a year too: anyone over the graduation age who was never
 	# promoted is released to make room, then the scout brings in a fresh crop.
 	_roll_youth(rng)
+	# A fresh batch of staff comes onto the market for the new season.
+	staff_pool = Staff.generate_pool(rng, staff_seq, STAFF_POOL_SIZE)
+	staff_seq += STAFF_POOL_SIZE
 
 	year += 1
 	season = _season_label(year)
@@ -930,7 +998,8 @@ func to_dict() -> Dictionary:
 		"transfer_listed": listed, "shortlist": shortlist, "transfer_log": transfer_log,
 		"offers_left": offers_left, "news_log": news_log,
 		"training_intensity": training_intensity, "youth": youth,
-		"youth_seq": youth_seq, "fa_cup": fa_cup,
+		"youth_seq": youth_seq, "staff": staff, "staff_pool": staff_pool,
+		"staff_seq": staff_seq, "fa_cup": fa_cup,
 		"league_cup": league_cup,
 		"last_champion_id": last_champion_id, "last_fa_winner_id": last_fa_winner_id,
 		"last_runners_up": last_runners_up, "charity_shield": charity_shield,
@@ -979,6 +1048,11 @@ static func from_dict(d: Dictionary) -> Career:
 	# rollover scouts a crop in. youth_seq defaults above the senior id space.
 	c.youth = d.get("youth", [])
 	c.youth_seq = int(d.get("youth_seq", YOUTH_ID_BASE))
+	# Pre-staff saves load with no staff + an empty pool (effects default to 1.0); the
+	# first rollover refreshes a pool to hire from.
+	c.staff = d.get("staff", [])
+	c.staff_pool = d.get("staff_pool", [])
+	c.staff_seq = int(d.get("staff_seq", STAFF_ID_BASE))
 	# Saves from before the cups existed load with no bracket; they stay inert this
 	# season (round_due is false on an empty dict) and are rebuilt at the next rollover.
 	c.fa_cup = d.get("fa_cup", {})

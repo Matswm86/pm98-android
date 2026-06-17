@@ -63,18 +63,23 @@ static func attr_name(code: String) -> String:
 
 # ---- weekly development --------------------------------------------------
 
-## Develop every player in `squad` for one training week at `intensity`. Mutates
-## attrs + dev_progress in place and returns news items
-## {kind:"develop"|"decline", text} for the players who crossed a point this week.
-static func train_week(rng: RandomNumberGenerator, squad: Array, intensity: String) -> Array:
+## Develop every player in `squad` for one training week at `intensity`. `dev_factor` is an
+## external multiplier on the IMPROVEMENT rate (the backroom TRAINER staff -- Staff.gd --
+## defaults to 1.0); it never speeds a veteran's decline. Mutates attrs + dev_progress in
+## place and returns {kind:"develop"|"decline", text} for the players who crossed this week.
+static func train_week(rng: RandomNumberGenerator, squad: Array, intensity: String, dev_factor := 1.0) -> Array:
 	var news: Array = []
 	var factor := intensity_factor(intensity)
+	var dev := maxf(0.1, dev_factor)
 	for p in squad:
 		var attrs: Variant = p.get("attrs", {})
 		if not (attrs is Dictionary) or (attrs as Dictionary).is_empty():
 			continue   # unrated fringe player: nothing to develop
 		var age := int(p.get("age", 26))
-		var rate := _base_rate(age) * factor
+		var base := _base_rate(age)
+		# Trainers speed development but don't hasten decline: dev_factor applies to a
+		# positive (improving) rate only.
+		var rate := base * factor * (dev if base > 0.0 else 1.0)
 		# A little noise so identically-aged players don't move in lockstep.
 		rate += (rng.randf() - 0.5) * 0.04 * factor
 		var prog := float(p.get("dev_progress", 0.0)) + rate

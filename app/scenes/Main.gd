@@ -49,7 +49,7 @@ func _ready() -> void:
 			and not OS.has_environment("PM98_HUB_SHOT") and not OS.has_environment("PM98_BROWSE_SHOT") \
 			and not OS.has_environment("PM98_MATCH_SHOT") and not OS.has_environment("PM98_NEWS_SHOT") \
 			and not OS.has_environment("PM98_TRAIN_SHOT") and not OS.has_environment("PM98_CUP_SHOT") \
-			and not OS.has_environment("PM98_YOUTH_SHOT") \
+			and not OS.has_environment("PM98_YOUTH_SHOT") and not OS.has_environment("PM98_STAFF_SHOT") \
 			and not OS.has_environment("PM98_SCREENS_SHOT"):
 		_devshot()
 
@@ -79,6 +79,9 @@ func _boot() -> void:
 		return
 	if OS.has_environment("PM98_YOUTH_SHOT"):
 		_youth_shot()
+		return
+	if OS.has_environment("PM98_STAFF_SHOT"):
+		_staff_shot()
 		return
 	if OS.has_environment("PM98_SCREENS_SHOT"):
 		_screens_shot()
@@ -330,6 +333,38 @@ func _youth_shot() -> void:
 	get_tree().quit()
 
 
+## Faithful real-render of the STAFF (EMPLE) screen. Begins a career (seeds the hire pool),
+## hires a few staff so the CURRENT STAFF section + the wage/effect readouts are populated,
+## then mounts the staff screen over the hub. Run as the NORMAL app under Xvfb+GL:
+## PM98_STAFF_SHOT=1.
+func _staff_shot() -> void:
+	var dir := OS.get_environment("PM98_SHOT_DIR")
+	if GameDB.leagues.is_empty():
+		print("STAFF-SHOT no leagues loaded")
+		get_tree().quit()
+		return
+	var lg: Dictionary = GameDB.leagues[0]
+	var clubs := GameDB.clubs_in_league(lg["id"])
+	clubs.sort_custom(func(a, b): return a["name"] < b["name"])
+	_begin_career(lg, clubs[0])
+	# Hire one of each role from the pool so the screen shows a real backroom team + effects.
+	var seen: Dictionary = {}
+	for cand in (_career.staff_pool as Array).duplicate():
+		var role: String = str(cand.get("role", ""))
+		if not seen.has(role):
+			seen[role] = true
+			_career.hire_staff(int(cand.get("id", -1)))
+	_show_career()               # raise the hub beneath the overlay
+	await _settle()
+	_show_staff_screen()
+	await _settle()
+	_save_shot(dir, "staff.png")
+	print("STAFF-SHOT done hired=%d pool=%d wage/wk=%d club=%s" % [
+		(_career.staff as Array).size(), (_career.staff_pool as Array).size(),
+		_career.staff_weekly_wage(), _career.club_name])
+	get_tree().quit()
+
+
 ## Faithful real-render of the cup screens (F.A. Cup + Coca-Cola Cup). Begins a career
 ## and plays into the season so several rounds of both cups have been drawn and played,
 ## then captures each CUP screen (the manager's run + the latest draw, around the trophy
@@ -479,7 +514,8 @@ func _free_overlays() -> void:
 			continue
 		if c is LeagueTableScreen or c is LineupScreen or c is SquadScreen \
 				or c is FinanceScreen or c is TransferScreen or c is DirectivaScreen \
-				or c is StadiumScreen or c is CupScreen or c is YouthScreen:
+				or c is StadiumScreen or c is CupScreen or c is YouthScreen \
+				or c is StaffScreen:
 			c.queue_free()
 
 
@@ -980,6 +1016,28 @@ func _refresh_squad_overlay() -> void:
 		if c is SquadScreen:
 			(c as SquadScreen).setup(_mgr_club(), "", "£%s" % _fmt_int(_career.cash), true)
 
+## The STAFF (EMPLE) screen on the hub's staff icon: hire/sack the backroom team (a TRAINER
+## speeds development, a PHYSIO cuts injuries, a YOUTH COACH improves the academy -- Staff.gd),
+## with the wage bill + live effect. The TRAINING button opens the training screen (the trainer
+## context); RETURN -> hub. Replaces the interim training-on-the-staff-icon (now nested under it).
+func _show_staff_screen() -> void:
+	var scr: StaffScreen = load("res://scenes/StaffScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	var refresh := func() -> void:
+		scr.setup(_career.staff, _career.staff_pool, "", _career.club_name, "£%s" % _fmt_int(_career.cash))
+	refresh.call()
+	scr.hire_requested.connect(func(cid: int) -> void:
+		_career.hire_staff(int(cid)); _career.save(); refresh.call())
+	scr.sack_requested.connect(func(mid: int) -> void:
+		_career.sack_staff(int(mid)); _career.save(); refresh.call())
+	# TRAINING opens the training browse, which dismisses back to the hub; free the staff
+	# overlay first so the hub doesn't re-raise over an orphaned staff screen.
+	scr.training_requested.connect(func() -> void:
+		scr.queue_free()
+		_show_training())
+	scr.back_pressed.connect(func() -> void: scr.queue_free())
+
 ## The original-art FINANCES ("INCOME + EXPENSES") screen for the managed club. Tap to
 ## dismiss. (docs/re/finance_screen_re.md, driven by FinanceModel.)
 func _show_finance_screen() -> void:
@@ -1437,7 +1495,7 @@ func _menu_action(action: String, scr: MenuScreen) -> void:
 			_career.save()
 			scr.toast("Game saved")
 		"news": _show_club_news()
-		"staff": _show_training()
+		"staff": _show_staff_screen()
 		"fixtures": _show_competitions()
 		"opponent": scr.toast(_menu_next_match())
 		"continue":
@@ -1562,6 +1620,8 @@ func _news_colour(kind: String) -> Color:
 		"develop": return Color(0.45, 0.82, 0.98)   # blue -- a player improved
 		"decline": return Color(0.78, 0.62, 0.42)   # bronze -- a player slipped
 		"cup": return Color(0.98, 0.86, 0.45)       # gold -- an F.A. Cup result
+		"youth": return Color(0.55, 0.85, 0.55)     # green -- youth academy news
+		"staff": return Color(0.70, 0.78, 0.95)     # steel -- backroom staff news
 		_: return Color(0.86, 0.90, 0.96)
 
 ## Dismiss a browse overlay shown from the hub (results) and re-raise the hub beneath it.

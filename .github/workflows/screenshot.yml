@@ -103,6 +103,13 @@ jobs:
             timeout 90 "$GITHUB_WORKSPACE/godot" --rendering-driver opengl3 \
             --resolution 2400x1080 . 2>&1 | tee youth.log || true
           echo "--- YOUTH diagnostics ---"; grep -iE "YOUTH-SHOT|SHOT .*png|SCRIPT ERROR|error" youth.log | head -20 || true
+          # Staff (EMPLE): begin a career, hire one of each role, capture the STAFF screen
+          # (current staff + available pool, wage bill and the live effect on the systems).
+          PM98_SHOT_DIR="$PWD/shots" PM98_STAFF_SHOT=1 LIBGL_ALWAYS_SOFTWARE=1 \
+            xvfb-run -a -s "-screen 0 2400x1080x24" \
+            timeout 90 "$GITHUB_WORKSPACE/godot" --rendering-driver opengl3 \
+            --resolution 2400x1080 . 2>&1 | tee staff.log || true
+          echo "--- STAFF diagnostics ---"; grep -iE "STAFF-SHOT|SHOT .*png|SCRIPT ERROR|error" staff.log | head -20 || true
           # F.A. Cup: begin a career, play into the season so several cup rounds are
           # drawn/played, capture the CUP screen (run + latest draw + trophy art).
           PM98_SHOT_DIR="$PWD/shots" PM98_CUP_SHOT=1 LIBGL_ALWAYS_SOFTWARE=1 \
