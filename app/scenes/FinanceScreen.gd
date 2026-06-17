@@ -11,8 +11,12 @@ class_name FinanceScreen
 ##
 ## Native 640x480; scales to fit its parent.
 
+signal prices_pressed   # the SET PRICES button -> Main opens the ticket/board control
+signal back_pressed     # RETURN / a tap elsewhere -> dismiss
+
 const W := 640
 const H := 480
+const BTN_PRICES := Rect2(250, 31, 150, 17)   # "SET PRICES" entry, in the empty top strip
 
 const C_TITLE := Color(0.91, 0.94, 1.0)
 const C_TEXT := Color(0.86, 0.90, 0.96)
@@ -56,7 +60,32 @@ func _ready() -> void:
 	_f10 = load("res://art/fonts/proman10.fnt")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2(W, H)
+	set_anchors_preset(Control.PRESET_FULL_RECT)
+	gui_input.connect(_on_input)
 	queue_redraw()
+
+
+var _press := false   # SET PRICES held down (for the highlight)
+
+func _to_design(p: Vector2) -> Vector2:
+	var s: float = min(size.x / W, size.y / H) if size.x > 0 and size.y > 0 else 1.0
+	return (p - Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5)) / s
+
+func _on_input(e: InputEvent) -> void:
+	if not (e is InputEventScreenTouch or e is InputEventMouseButton):
+		return
+	var on_prices := BTN_PRICES.has_point(_to_design(e.position))
+	if e.pressed:
+		_press = on_prices
+		queue_redraw()
+	else:
+		var was := _press
+		_press = false
+		queue_redraw()
+		if on_prices and was:
+			prices_pressed.emit()
+		elif not on_prices:
+			back_pressed.emit()
 
 
 ## Feed the screen a FinanceModel.summary() dict + chrome labels, then repaint.
@@ -134,6 +163,12 @@ func _draw() -> void:
 		C_TITLE, 11)
 	_txt(_f10, int(HDR_BAR.end.x) - 12, int(HDR_BAR.position.y) + 7, "AMOUNT (season)",
 		C_HEAD, 11, true)
+
+	# SET PRICES entry (the board ticket / advertising-board control), in the empty strip
+	# under the title. Tap it to open the control; tap anywhere else dismisses.
+	_cell(BTN_PRICES, C_CELL_HI if _press else C_CELL, C_CELL_HI, C_CELL_LO)
+	_txt(_f10, int(BTN_PRICES.position.x) + 10, int(BTN_PRICES.position.y) + 3, "SET PRICES",
+		Color(0.95, 0.86, 0.55), 11)
 
 	_draw_ledger()
 	_draw_totals()

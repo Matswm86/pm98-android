@@ -554,6 +554,11 @@ func _screens_shot() -> void:
 	await _settle()
 	_save_shot(dir, "stadium_inprogress.png")
 	_free_overlays()
+	# T2 #6: the board PRICES control.
+	_show_finance_control()
+	await _settle()
+	_save_shot(dir, "prices.png")
+	_free_overlays()
 	print("SCREENS-SHOT done club=%s week=%d" % [_career.club_name, _career.week])
 	get_tree().quit()
 
@@ -946,6 +951,13 @@ func _club_with_roster(id: int) -> Dictionary:
 	# overrides the static GameDB figure (feeds finance gate income + the stadium tier).
 	if id == _career.club_id and _career.stadium_capacity > 0:
 		base["capacity"] = _career.stadium_capacity
+	# Board-set prices (ticket / advertising board) likewise override the defaults so the
+	# finance ledger reflects the manager's pricing.
+	if id == _career.club_id:
+		if _career.ticket_price > 0:
+			base["ticket_price"] = _career.ticket_price
+		if _career.board_price > 0:
+			base["board_price"] = _career.board_price
 	return base
 
 ## The management hub IS the original-art MENUPRINCIPAL (B1): a persistent overlay raised
@@ -1112,8 +1124,71 @@ func _show_staff_screen() -> void:
 
 ## The original-art FINANCES ("INCOME + EXPENSES") screen for the managed club. Tap to
 ## dismiss. (docs/re/finance_screen_re.md, driven by FinanceModel.)
+## Selectable match ticket prices (£); the board advertising-board ladder is tier-scaled.
+const TICKET_LADDER := [8, 10, 12, 15, 18, 22, 28, 35]
+
 func _show_finance_screen() -> void:
-	_open_finance(_mgr_club(), _career.club_name, _career.season)
+	for c in get_children():
+		if c is FinanceScreen:
+			c.queue_free()
+	if _browse != null and is_instance_valid(_browse):
+		_browse.queue_free()
+		_browse = null
+	var club := _mgr_club()
+	var sm := FinanceModel.summary(club, FinanceModel.tier_of(club, GameDB.leagues))
+	var scr: FinanceScreen = load("res://scenes/FinanceScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(sm, _career.club_name, "", _career.season)
+	scr.prices_pressed.connect(_show_finance_control)
+	scr.back_pressed.connect(func() -> void: scr.queue_free())
+
+## The board PRICE controls (T2 #6): set the match TICKET PRICE and the advertising
+## BOARD PRICE; the live preview shows how demand (attendance / boards sold) responds, so
+## the manager can find the revenue-maximising price. PM98-chrome browse over the finances.
+func _show_finance_control() -> void:
+	var pv := _career.finance_preview()
+	var gold := Color(0.98, 0.86, 0.45)
+	var rows: Array = [
+		{"text": "Match ticket price", "value": "£%d" % int(pv["ticket"]), "accent": gold},
+		{"text": "Advertising board price", "value": "£%s" % Career._grp(int(pv["board"])), "accent": gold},
+		{"text": "Projected attendance", "enabled": false,
+			"value": "%s / %s" % [Career._grp(int(pv["attendance"])), Career._grp(int(pv["capacity"]))]},
+		{"text": "Season gate + board income", "enabled": false,
+			"value": "£%s" % Career._grp(int(pv["gate"]) + int(pv["boards"]))},
+	]
+	var payload: Array = [{"a": "ticket"}, {"a": "board"}, null, null]
+	_mount_browse("%s  -  PRICES" % _career.club_name,
+		"Tap a price to change it; demand responds", rows,
+		func(i: int) -> void:
+			var p: Variant = payload[i]
+			if p == null:
+				return
+			if p["a"] == "ticket":
+				_career.set_ticket_price(_cycle(TICKET_LADDER, int(pv["ticket"])))
+			else:
+				_career.set_board_price(_cycle(_board_ladder(), int(pv["board"])))
+			_career.save()
+			_show_finance_control(),
+		func() -> void: _show_finance_screen())
+
+## Tier-scaled advertising-board price ladder (rounded to £50), around the division default.
+func _board_ladder() -> Array:
+	var def := int(FinanceModel.summary({}, _career.tier).get("board_price", 600))
+	var out: Array = []
+	for fct in [0.5, 0.75, 1.0, 1.5, 2.0, 3.0]:
+		out.append(int(round(def * fct / 50.0)) * 50)
+	return out
+
+## Next rung up a price ladder (wraps); if `current` is off-ladder, the first rung above it.
+func _cycle(ladder: Array, current: int) -> int:
+	for i in ladder.size():
+		if int(ladder[i]) == current:
+			return int(ladder[(i + 1) % ladder.size()])
+	for v in ladder:
+		if int(v) > current:
+			return int(v)
+	return int(ladder[0])
 
 ## The original-art TRANSFER MARKET (FICHAR) screen as a full-screen overlay: the
 ## buyable players (dearest first) in the reversed list panel + the right-hand nav

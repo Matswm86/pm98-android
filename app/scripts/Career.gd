@@ -28,6 +28,8 @@ var finished: bool = false        # season complete + objective resolved
 var tactics: Dictionary = {}      # manager's Tactics.to_dict(): XI + shape + marking
 var stadium_capacity: int = 0     # managed club's current ground capacity (0 = GameDB default)
 var works: Dictionary = {}        # in-progress stadium expansion {added, weeks_left, cost}; {} = none
+var ticket_price: int = 0         # board-set match ticket price (0 = tier default)
+var board_price: int = 0          # board-set advertising-board price (0 = tier default)
 
 # Live transfer state: the division's squads mutate as players move, and persist
 # in the save -- the career, not GameDB, is the source of truth once you're managing.
@@ -157,6 +159,8 @@ static func create(club: Dictionary, league: Dictionary, league_clubs: Array, le
 	c.weekly_net = int(fin["weekly_balance"]) + int(fin["weekly_wages"])
 	c.cash = int(fin.get("total_income", 0)) / 4   # opening balance ~ a quarter's income
 	c.stadium_capacity = int(fin.get("capacity", 0))   # ground starts at the club's known size
+	c.ticket_price = int(fin.get("ticket_price", 0))   # prices start at the division defaults
+	c.board_price = int(fin.get("board_price", 0))
 	c.tactics = Tactics.auto_pick(club, Tactics.DEFAULT_FORMATION).to_dict()
 	# The academy starts with a small crop of youngsters to develop.
 	var yrng := RandomNumberGenerator.new()
@@ -1054,8 +1058,43 @@ func _tick_works() -> void:
 ## Re-derive weekly_net from the current capacity (gate income depends on it). weekly_net
 ## excludes player wages (drawn live), so it = weekly_balance + weekly_wages, as at create.
 func _recompute_weekly_net() -> void:
-	var fin := FinanceModel.summary({"capacity": stadium_capacity, "players": my_squad()}, tier)
-	weekly_net = int(fin["weekly_balance"]) + int(fin["weekly_wages"])
+	weekly_net = int(_fin_summary()["weekly_balance"]) + int(_fin_summary()["weekly_wages"])
+
+
+## The managed club's finance summary at the current capacity + board-set prices. Single
+## source of truth for the weekly_net recompute and the price-control preview.
+func _fin_summary() -> Dictionary:
+	return FinanceModel.summary({
+		"capacity": stadium_capacity, "players": my_squad(),
+		"ticket_price": ticket_price, "board_price": board_price}, tier)
+
+
+## Set the board-controlled match ticket price and refresh the weekly finance projection.
+func set_ticket_price(p: int) -> void:
+	ticket_price = maxi(1, p)
+	_recompute_weekly_net()
+
+
+## Set the board-controlled advertising-board price and refresh the weekly projection.
+func set_board_price(p: int) -> void:
+	board_price = maxi(1, p)
+	_recompute_weekly_net()
+
+
+## Live finance preview (attendance / season gate / board income) at the current prices,
+## for the price-control screen so the manager sees the trade-off before committing.
+func finance_preview() -> Dictionary:
+	var fin := _fin_summary()
+	var gate := 0
+	var boards := 0
+	for line in fin.get("income_lines", []):
+		if line[0] == "TICKETS":
+			gate = int(line[1])
+		elif line[0] == "SPONSOR BOARDS SOLD":
+			boards = int(line[1])
+	return {"attendance": int(fin["attendance"]), "capacity": int(fin["capacity"]),
+		"gate": gate, "boards": boards, "ticket": int(fin["ticket_price"]),
+		"board": int(fin["board_price"])}
 
 
 ## A short human status for the WORKS in progress (or "" when none), e.g. "+5,000 in 12 wk".
@@ -1106,6 +1145,7 @@ func to_dict() -> Dictionary:
 		"objective_text": objective_text, "finished": finished,
 		"tactics": tactics, "tier": tier, "rosters": ros, "club_names": nms,
 		"stadium_capacity": stadium_capacity, "works": works,
+		"ticket_price": ticket_price, "board_price": board_price,
 		"transfer_listed": listed, "shortlist": shortlist, "transfer_log": transfer_log,
 		"offers_left": offers_left, "news_log": news_log,
 		"training_intensity": training_intensity, "youth": youth,
@@ -1152,6 +1192,8 @@ static func from_dict(d: Dictionary) -> Career:
 	# Pre-stadium-works saves load with capacity 0 (-> GameDB default via Main) + no works.
 	c.stadium_capacity = int(d.get("stadium_capacity", 0))
 	c.works = d.get("works", {})
+	c.ticket_price = int(d.get("ticket_price", 0))
+	c.board_price = int(d.get("board_price", 0))
 	c.shortlist = []
 	for v in d.get("shortlist", []):
 		c.shortlist.append(int(v))

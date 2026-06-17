@@ -24,6 +24,15 @@ const _WAGE_BASE := {1: 4000, 2: 1500, 3: 700, 4: 400}     # £/wk for a CA-55 p
 
 const SEASON_WEEKS := 52   # PM98 finance loops 0x34 = 52 weeks
 
+# Demand response to the board-set prices (T2 #6). LINEAR in the price-vs-default ratio so
+# revenue (price x quantity) is a downward parabola with an interior maximum -- there's a
+# revenue-maximising price to find, not "always charge the max". At the default price the
+# multiplier is 1.0 (so the figures are unchanged for every club that never sets a price).
+#   attendance_mult = 1.6 - 0.6 * (ticket/default)   -> gate peaks at ~1.33x the default
+#   boards_mult     = 1.5 - 0.5 * (board/default)    -> board income peaks at ~1.5x the default
+const _TICKET_SLOPE := 0.6
+const _BOARD_SLOPE := 0.5
+
 
 ## Tier (1-4) for a club, resolved against a leagues array (e.g. GameDB.leagues).
 ## Leagueless / international clubs default to mid (tier 2). Kept free of the
@@ -57,14 +66,29 @@ static func weekly_wage(attrs: Dictionary, tier: int) -> int:
 static func summary(club: Dictionary, tier: int) -> Dictionary:
 	var cap_raw: Variant = club.get("capacity")
 	var cap: int = int(cap_raw) if (cap_raw != null and int(cap_raw) > 0) else int(_CAP[tier])
-	var attendance := int(round(cap * float(_FILL[tier])))
-	var ticket: int = int(_TICKET[tier])
-	var board_price: int = int(_BOARD[tier])
 	var home_games: int = int(_HOME_GAMES[tier])
+
+	# Board-set prices (T2 #6): a manager-chosen ticket / advertising-board price overrides
+	# the tier default, and demand responds. With no override (every non-managed club, and
+	# legacy callers) the defaults reproduce the previous figures exactly.
+	var def_ticket: int = int(_TICKET[tier])
+	var def_board: int = int(_BOARD[tier])
+	var ticket_raw: Variant = club.get("ticket_price")
+	var ticket: int = int(ticket_raw) if (ticket_raw != null and int(ticket_raw) > 0) else def_ticket
+	var board_raw: Variant = club.get("board_price")
+	var board_price: int = int(board_raw) if (board_raw != null and int(board_raw) > 0) else def_board
+
+	# Attendance thins as the ticket price rises above the default (and fills toward capacity
+	# as it drops), bounded so it never exceeds the ground or collapses to nothing.
+	var att_mult := clampf(1.6 - _TICKET_SLOPE * float(ticket) / float(def_ticket), 0.25, 1.6)
+	var attendance := mini(cap, int(round(cap * float(_FILL[tier]) * att_mult)))
+	# Fewer boards sell as their price rises above the default.
+	var boards_mult := clampf(1.5 - _BOARD_SLOPE * float(board_price) / float(def_board), 0.2, 1.5)
+	var boards_sold := int(round(_BOARDS[tier] * boards_mult))
 
 	# Income
 	var gate := attendance * ticket * home_games          # TICKETS
-	var boards := board_price * int(_BOARDS[tier])         # SPONSOR BOARDS SOLD
+	var boards := board_price * boards_sold                # SPONSOR BOARDS SOLD
 	var sponsor: int = int(_SPONSOR[tier])                 # SPONSORSHIP MONEY
 	var tv: int = int(_TV[tier])                           # TELEVISION
 	var income := gate + boards + sponsor + tv
