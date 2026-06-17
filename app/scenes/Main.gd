@@ -1179,7 +1179,7 @@ func _show_finance_screen() -> void:
 	var scr: FinanceScreen = load("res://scenes/FinanceScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
-	scr.setup(sm, _career.club_name, "", _career.season)
+	scr.setup(sm, _career.club_name, "", _career.season, _career.cash, _career.week + 1)
 	scr.prices_pressed.connect(_show_finance_control)
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
 

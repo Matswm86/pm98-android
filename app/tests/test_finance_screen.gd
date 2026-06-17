@@ -18,7 +18,7 @@ func _run() -> void:
 	ok = _assert(FinanceScreen.fmt_money(-1234567) == "-£1,234,567", "fmt_money negative") and ok
 	ok = _assert(FinanceScreen.fmt_money(999) == "£999", "fmt_money sub-thousand") and ok
 
-	for path in ["res://art/screens/fondo_marble.png", "res://art/screens/barra0.png",
+	for path in ["res://art/screens/management_bg.png",
 			"res://art/fonts/proman14.fnt", "res://art/fonts/proman12.fnt",
 			"res://art/fonts/proman10.fnt"]:
 		ok = _assert(ResourceLoader.exists(path), "asset present: %s" % path) and ok
@@ -57,7 +57,7 @@ func _run() -> void:
 		await process_frame
 	ok = _assert(screen._f14 != null and screen._f12 != null and screen._f10 != null,
 		"PROMAN fonts loaded") and ok
-	ok = _assert(screen._bg != null and screen._bar != null, "FONDO + BARRA loaded") and ok
+	ok = _assert(PMChrome.bg() != null, "PMChrome management background loads") and ok
 	screen.setup(sm, club["name"], "A. FERGUSON", "1997-98")
 	await process_frame
 	ok = _assert((screen._sum["income_lines"] as Array).size() == 4, "screen received the summary") and ok
