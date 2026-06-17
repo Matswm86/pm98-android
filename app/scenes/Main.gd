@@ -1257,7 +1257,7 @@ func _show_directiva_screen() -> void:
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
 	scr.setup(c.club_name, "", c.season, c.cash, bp["directors"], bp["supporters"],
-		bp["rating"], c.objective_text, bp["record"], bp["position"])
+		bp["rating"], c.objective_text, bp["record"], bp["position"], c.week + 1, c.league_name)
 	scr.gui_input.connect(func(e: InputEvent) -> void:
 		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
 			scr.queue_free())

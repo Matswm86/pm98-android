@@ -17,24 +17,20 @@ func _run() -> void:
 	ok = _assert(DirectivaScreen.fmt_money(4250000) == "£4,250,000", "fmt_money positive") and ok
 	ok = _assert(DirectivaScreen.fmt_money(0) == "£0", "fmt_money zero") and ok
 	ok = _assert(DirectivaScreen.fmt_money(-500) == "-£500", "fmt_money negative") and ok
-	ok = _assert(DirectivaScreen.meter_color(80) == DirectivaScreen.C_GOOD, "meter green high") and ok
-	ok = _assert(DirectivaScreen.meter_color(45) == DirectivaScreen.C_MID, "meter amber mid") and ok
-	ok = _assert(DirectivaScreen.meter_color(10) == DirectivaScreen.C_BAD, "meter red low") and ok
 
-	for path in ["res://art/screens/fondo_marble.png", "res://art/screens/barra0.png",
+	for path in ["res://art/screens/management_bg.png",
 			"res://art/screens/directiva/directiva.png", "res://art/screens/directiva/publico.png",
-			"res://art/screens/directiva/infomanager.png",
 			"res://art/fonts/proman14.fnt", "res://art/fonts/proman10.fnt",
 			"res://art/fonts/proman8.fnt"]:
 		ok = _assert(ResourceLoader.exists(path), "asset present: %s" % path) and ok
 		ok = _assert(load(path) != null, "asset loads: %s" % path) and ok
 
-	# Reversed rects must stay inside the native 640x480 canvas.
+	# Layout rects must stay inside the native 640x480 canvas.
 	var rects := {
-		"R_MANAGER": DirectivaScreen.R_MANAGER, "BAR_RATING": DirectivaScreen.BAR_RATING,
-		"BAR_SUPPORT": DirectivaScreen.BAR_SUPPORT, "BAR_DIRECT": DirectivaScreen.BAR_DIRECT,
-		"PANEL_MSG": DirectivaScreen.PANEL_MSG, "PANEL_INFO": DirectivaScreen.PANEL_INFO,
-		"LBL_INFO": DirectivaScreen.LBL_INFO, "LBL_RETURN": DirectivaScreen.LBL_RETURN,
+		"MGR_BOX": DirectivaScreen.MGR_BOX, "RAT_BOX": DirectivaScreen.RAT_BOX,
+		"DIR_BOX": DirectivaScreen.DIR_BOX, "SUP_BOX": DirectivaScreen.SUP_BOX,
+		"LOAN_PANEL": DirectivaScreen.LOAN_PANEL, "BONUS_PANEL": DirectivaScreen.BONUS_PANEL,
+		"BTN_RETURN": DirectivaScreen.BTN_RETURN,
 	}
 	for name in rects:
 		var r: Rect2 = rects[name]
@@ -48,8 +44,8 @@ func _run() -> void:
 		await process_frame
 	ok = _assert(screen._f14 != null and screen._f10 != null and screen._f8 != null,
 		"PROMAN fonts loaded") and ok
-	ok = _assert(screen._bg != null and screen._bar != null, "FONDO + BARRA loaded") and ok
-	ok = _assert(screen._ic_direct != null and screen._ic_public != null and screen._ic_info != null,
+	ok = _assert(PMChrome.bg() != null, "PMChrome management background loads") and ok
+	ok = _assert(screen._ic_direct != null and screen._ic_public != null,
 		"DIRECTIVA icons loaded") and ok
 
 	# Values clamp to 0..100, data wires through.
@@ -59,8 +55,7 @@ func _run() -> void:
 	ok = _assert(screen._directors == 100, "directors clamped high") and ok
 	ok = _assert(screen._supporters == 0, "supporters clamped low") and ok
 	ok = _assert(screen._rating == 64, "rating passed through") and ok
-	ok = _assert(screen._objective == "Finish in the top 5.", "objective wired") and ok
-	ok = _assert(screen._record == "8-3-2", "record wired") and ok
+	ok = _assert(screen._manager == "A. WENGER", "manager wired") and ok
 
 	screen.queue_redraw()
 	for _i in 3:
