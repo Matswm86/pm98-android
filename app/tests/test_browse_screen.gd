@@ -13,7 +13,7 @@ func _initialize() -> void:
 func _run() -> void:
 	var ok := true
 
-	for path in ["res://art/screens/fondo_marble.png", "res://art/screens/barra0.png",
+	for path in ["res://art/screens/management_bg.png",
 			"res://art/fonts/proman14.fnt", "res://art/fonts/proman12.fnt"]:
 		ok = _assert(ResourceLoader.exists(path), "asset present: %s" % path) and ok
 
@@ -22,7 +22,7 @@ func _run() -> void:
 	scr.size = Vector2(640, 480)   # scale 1, origin 0 -> design space == screen space
 	for _i in 3:
 		await process_frame
-	ok = _assert(scr._bg != null and scr._bar != null, "chrome bg + bar loaded") and ok
+	ok = _assert(PMChrome.bg() != null, "PMChrome management background loads") and ok
 	ok = _assert(scr._f14 != null and scr._f12 != null, "PROMAN fonts loaded") and ok
 
 	# 20 rows so the content overflows the panel and can scroll. Mix strings + dicts.

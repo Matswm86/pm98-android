@@ -38,8 +38,6 @@ const ROW_H := 26
 const BACK_BTN := Rect2(523, 448, 112, 26)
 const DRAG_SLOP := 6.0        # design px of travel before a tap becomes a scroll
 
-var _bg: Texture2D
-var _bar: Texture2D
 var _f14: Font
 var _f12: Font
 
@@ -48,6 +46,13 @@ var _subtitle: String = ""
 var _rows: Array = []         # normalized: [{text,value,enabled,accent}]
 var _show_back: bool = true
 var _back_label: String = "RETURN"
+# Optional career context (opts): when a club is given, the shared 3-plaque header is
+# drawn; otherwise a plain centred title bar (pickers / database browse have no club).
+var _club: String = ""
+var _league: String = ""
+var _season: String = ""
+var _week: int = 0
+var _club_id: int = -1
 
 var _scroll: float = 0.0
 var _down: bool = false
@@ -58,8 +63,6 @@ var _press_target: int = -2   # row index, -1 = back button, -2 = none
 
 
 func _ready() -> void:
-	_bg = load("res://art/screens/fondo_marble.png")
-	_bar = load("res://art/screens/barra0.png")
 	_f14 = load("res://art/fonts/proman14.fnt")
 	_f12 = load("res://art/fonts/proman12.fnt")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -87,6 +90,11 @@ func setup(title: String, subtitle: String, rows: Array, opts: Dictionary = {}) 
 			_rows.append({"text": str(r), "value": "", "enabled": true, "accent": null})
 	_show_back = bool(opts.get("show_back", true))
 	_back_label = str(opts.get("back_label", "RETURN"))
+	_club = str(opts.get("club", ""))
+	_league = str(opts.get("league", ""))
+	_season = str(opts.get("season", ""))
+	_week = int(opts.get("week", 0))
+	_club_id = int(opts.get("club_id", -1))
 	_scroll = 0.0
 	queue_redraw()
 
@@ -183,28 +191,29 @@ func _cell(r: Rect2, base: Color, hi: Color, lo: Color) -> void:
 
 
 func _draw() -> void:
-	if _bg != null:
-		draw_texture_rect(_bg, Rect2(Vector2.ZERO, size), false, Color(0.4, 0.4, 0.46))
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.05, 0.07, 0.14), true)
 	var s := _scale()
 	draw_set_transform(_origin(s), 0.0, Vector2(s, s))
 
-	if _bg != null:
-		draw_texture_rect(_bg, Rect2(0, 0, W, H), false)
-	if _bar != null:
-		draw_texture_rect(_bar, Rect2(0, 0, W, _bar.get_height()), false)
-
-	_txt(_f14, 150, 13, _title.substr(0, 30), C_TITLE, 15)
-	if _subtitle != "":
-		_txt(_f12, 628, 26, _subtitle.substr(0, 40), C_DIM, 13, true)
+	PMChrome.draw_bg(self)
+	# In a career context (club given) draw the full shared plaque header; otherwise a
+	# plain centred title bar for the pickers / database browse.
+	if _club != "":
+		PMChrome.draw_header(self, _title, "", _club, _league, _season, _week, _club_id)
+	else:
+		PMChrome.bevel(self, Rect2(4, 10, W - 8, 28), PMChrome.C_BAR, PMChrome.C_BAR_HI, PMChrome.C_BAR_LO)
+		PMChrome.text(self, _f14, 8, 14, _title.substr(0, 32), PMChrome.C_TITLE, 18, 1, W - 16)
+		if _subtitle != "":
+			PMChrome.text(self, _f12, W - 12, 42, _subtitle.substr(0, 40), C_DIM, 13, 2)
 
 	# List panel + rows (rows are vertically clamped to the panel; partial edge rows
-	# show their bar but suppress text so nothing bleeds over the BARRA / back button).
+	# show their bar but suppress text so nothing bleeds over the title / back button).
 	_cell(PANEL, C_CELL_LO, C_CELL_HI, Color(0.04, 0.08, 0.16))
 	_draw_rows()
 	if _show_back:
-		_cell(BACK_BTN, C_BTN, C_BTN_HI, C_CELL_LO)
+		PMChrome.bevel(self, BACK_BTN, Color(0.10, 0.16, 0.32), C_CELL_HI, C_CELL_LO)
 		_txt(_f12, int(BACK_BTN.position.x), int(BACK_BTN.position.y) + 6,
-			_back_label, Color(0.92, 1.0, 0.94), 13, false, int(BACK_BTN.size.x))
+			_back_label, Color(1.0, 0.86, 0.22), 13, false, int(BACK_BTN.size.x))
 
 
 func _draw_rows() -> void:
