@@ -260,7 +260,8 @@ func _news_shot() -> void:
 		_career._news("suspension", "%s suspended for the next match." % sq[1].get("name", "?"))
 	_show_career()               # raise the hub
 	await _settle()
-	_open_squad(_mgr_club(), "", "£%s" % _fmt_int(_career.cash))
+	_open_squad(_mgr_club(), "", "£%s" % _fmt_int(_career.cash), false,
+		_career.season, _career.week + 1)
 	await _settle()
 	_save_shot(dir, "squad_injuries.png")
 	for c in get_children():
@@ -771,11 +772,12 @@ func _mount_tap_overlay(scr: Control) -> void:
 ## Reversed SQUAD overlay for any club dict (career roster or a GameDB club). On the
 ## managed club (`youth_enabled`) the YOUTH TEAM button opens the academy; everywhere
 ## else the screen just tap-dismisses as before.
-func _open_squad(club: Dictionary, manager: String, cash: String, youth_enabled := false) -> void:
+func _open_squad(club: Dictionary, manager: String, cash: String, youth_enabled := false,
+		season := "1997-98", week := 0) -> void:
 	var scr: SquadScreen = load("res://scenes/SquadScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
-	scr.setup(club, manager, cash, youth_enabled)
+	scr.setup(club, manager, cash, youth_enabled, season, week)
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
 	scr.youth_pressed.connect(_show_youth_screen)
 
@@ -1110,7 +1112,8 @@ func _show_lineup_screen() -> void:
 ## TEAM button opens the academy; a tap elsewhere dismisses to the hub.
 ## (docs/re/squad_screen_re.md; the database browse reuses _open_squad with youth off.)
 func _show_squad_screen() -> void:
-	_open_squad(_mgr_club(), "", "£%s" % _fmt_int(_career.cash), true)
+	_open_squad(_mgr_club(), "", "£%s" % _fmt_int(_career.cash), true,
+		_career.season, _career.week + 1)
 
 ## The YOUTH TEAM screen (over the squad): the academy crop with their projected potential,
 ## the youth manager's READY flags, and PROMOTE (tap a ready youngster -> first team). The
@@ -1134,7 +1137,8 @@ func _show_youth_screen() -> void:
 func _refresh_squad_overlay() -> void:
 	for c in get_children():
 		if c is SquadScreen:
-			(c as SquadScreen).setup(_mgr_club(), "", "£%s" % _fmt_int(_career.cash), true)
+			(c as SquadScreen).setup(_mgr_club(), "", "£%s" % _fmt_int(_career.cash), true,
+				_career.season, _career.week + 1)
 
 ## The STAFF (EMPLE) screen on the hub's staff icon: hire/sack the backroom team (a TRAINER
 ## speeds development, a PHYSIO cuts injuries, a YOUTH COACH improves the academy -- Staff.gd),

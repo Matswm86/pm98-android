@@ -13,8 +13,8 @@ func _initialize() -> void:
 func _run() -> void:
 	var ok := true
 
-	for path in ["res://art/screens/fondo_marble.png", "res://art/screens/barra0.png",
-			"res://art/fonts/proman14.fnt", "res://art/fonts/proman12.fnt",
+	for path in ["res://art/screens/management_bg.png",
+			"res://art/fonts/proman12.fnt",
 			"res://art/fonts/proman10.fnt", "res://art/fonts/proman8.fnt"]:
 		ok = _assert(ResourceLoader.exists(path), "asset present: %s" % path) and ok
 		ok = _assert(load(path) != null, "asset loads: %s" % path) and ok
@@ -34,9 +34,9 @@ func _run() -> void:
 	get_root().add_child(screen)
 	for _i in 3:
 		await process_frame
-	ok = _assert(screen._f14 != null and screen._f12 != null and screen._f10 != null
-		and screen._f8 != null, "PROMAN fonts loaded into screen") and ok
-	ok = _assert(screen._bg != null and screen._bar != null, "FONDO + BARRA loaded") and ok
+	ok = _assert(screen._f12 != null and screen._f10 != null and screen._f8 != null,
+		"PROMAN fonts loaded into screen") and ok
+	ok = _assert(PMChrome.bg() != null, "PMChrome management background loads") and ok
 	screen.setup(club, "", "£10,000,000")
 	await process_frame
 	ok = _assert(screen._kit_tex != null, "club kit (escudo) loaded for the squad screen") and ok

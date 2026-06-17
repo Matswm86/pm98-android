@@ -1,23 +1,18 @@
 extends Control
 class_name SquadScreen
-## PM98 SQUAD MANAGEMENT (PLANTILLA) screen rebuilt from the ORIGINAL game art at the
-## coordinates reversed out of MANAGER.EXE (FUN_00552110). See docs/re/squad_screen_re.md.
-##
-## Reversed: title "SQUAD MANAGEMENT" at (150,16) in ProMan14; the squad list panel
-## spans (8,48)..(516,469); player rows are 16px tall; a "YOUTH TEAM" button sits
-## bottom-right at (523,360)..(635,385) loading recursos\iconos\plantilla\juveniles.bmp.
-## The grid's per-attribute columns reuse the same player-grid codes proven on the
-## LINE-UP screen (N. PLAYER ... EN SP ST AG QU FI MO AV); the original groups the
-## squad into sections, so we section it by the demarcación byte decoded out of
-## EQUIPOS.PKF, with the original's own band labels (KEEPERS / DEFENDERS /
-## MIDFIELDERS / FORWARDS from MANAGER.EXE), sorted by ability.
+## PM98 SQUAD MANAGEMENT (PLANTILLA) screen, rebuilt to match the real game's house style
+## (the white table proven on LINE-UP / TRAINING ma_7/ma_8): the shared PMChrome plaque
+## header + blue marble background over a white squad table — N. | PLAYER | AGE | EN SP ST
+## AG GU FI MO | AV (+bar) | POS — grouped into the original's own KEEPERS / DEFENDERS /
+## MIDFIELDERS / FORWARDS sections (the demarcación byte decoded out of EQUIPOS.PKF),
+## sorted by ability. Right: the SQUAD count, the club kit and the YOUTH TEAM / RETURN
+## buttons at their reversed positions.
 ##
 ## Driven live by the Career roster. Native 640x480; scales to fit its parent.
 ##
-## INTERACTIVE: the reversed YOUTH TEAM button opens the youth screen (emits
-## `youth_pressed`) when youth is enabled (the managed club); the RETURN button or a tap
-## on empty space emits `back_pressed` (the display-screen tap-to-dismiss). The GameDB
-## browse mounts it with youth disabled, so any tap there just dismisses as before.
+## INTERACTIVE: the YOUTH TEAM button opens the youth screen (emits `youth_pressed`) when
+## youth is enabled (the managed club); the RETURN button or a tap on empty space emits
+## `back_pressed` (the display-screen tap-to-dismiss).
 
 signal youth_pressed
 signal back_pressed
@@ -25,59 +20,60 @@ signal back_pressed
 const W := 640
 const H := 480
 
-const C_TITLE := Color(0.91, 0.94, 1.0)
-const C_TEXT := Color(0.86, 0.90, 0.96)
-const C_DIM := Color(0.59, 0.69, 0.82)
-const C_HEAD := Color(0.67, 0.78, 0.92)
-const C_CELL := Color(0.16, 0.27, 0.47)
-const C_CELL_HI := Color(0.27, 0.43, 0.65)
-const C_CELL_LO := Color(0.08, 0.16, 0.31)
-const C_ROW_A := Color(0.11, 0.17, 0.31)
-const C_ROW_B := Color(0.086, 0.14, 0.26)
-const C_SECTION := Color(1.0, 0.87, 0.0)   # FUN_00437020(0xff,0xdf,0) gold section text
-const C_NAME := Color(1.0, 1.0, 1.0)
-const C_BTN := Color(0.16, 0.43, 0.27)
-const C_BTN_HI := Color(0.27, 0.59, 0.39)
+const C_STATBAND := Color(0.80, 0.90, 0.78)      # pale-green stat-cell band
+const C_AVBAR := Color(0.46, 0.74, 0.32)
+const C_AVBAR_BG := Color(0.62, 0.64, 0.58)
+const C_GK_ROW := Color(0.98, 0.97, 0.80)
+const C_BTN := Color(0.18, 0.44, 0.26)           # green YOUTH button
+const C_BTN_HI := Color(0.34, 0.62, 0.40)
+const C_DKBTN := Color(0.10, 0.16, 0.32)
+const C_DKBTN_HI := Color(0.34, 0.46, 0.72)
+const C_DKBTN_LO := Color(0.04, 0.08, 0.18)
+const C_PANEL_TXT := Color(0.88, 0.93, 1.0)
+const C_GOLD := Color(1.0, 0.86, 0.22)
+const C_ROLE := {"GK": Color(0.20, 0.52, 0.30), "DF": Color(0.22, 0.36, 0.66),
+	"MF": Color(0.46, 0.30, 0.62), "FW": Color(0.66, 0.24, 0.22), "OUT": Color(0.40, 0.42, 0.48)}
 
-# Player-grid columns (the codes proven on the line-up screen), laid into the
-# reversed full-width squad panel (x 8..516). {code, x_left, attr_key}.
+# Player-grid columns laid into the white table. {code, x, attr_key}; x is the RIGHT edge
+# for numeric columns, LEFT edge for text columns. GU (not QU) per the real header.
 const COLS := [
-	["N.", 12, "_num"], ["PLAYER", 38, "_name"], ["AGE", 168, "_age"],
-	["EN", 198, "EN"], ["SP", 224, "VE"], ["ST", 250, "RE"], ["AG", 276, "AG"],
-	["QU", 302, "CA"], ["FI", 328, "TI"], ["MO", 354, "RM"], ["AV", 386, "_avg"],
-	["POS", 420, "_pos"],
+	["AGE", 176, "_age"],
+	["EN", 200, "EN"], ["SP", 224, "VE"], ["ST", 248, "RE"], ["AG", 272, "AG"],
+	["GU", 296, "CA"], ["FI", 320, "TI"], ["MO", 344, "RM"], ["AV", 372, "_avg"],
 ]
 const AVG_KEYS := ["VE", "RE", "AG", "CA", "RM", "RG", "PA", "TI"]
 
-const PANEL := Rect2(8, 48, 508, 421)   # reversed (8,72,516,469) list region
-const HDR_Y := 52
-const ROW0_Y := 70
+const TABLE := Rect2(6, 50, 510, 426)
+const HDR_Y := 66
+const ROW_X := 8
+const ROW_W := 506
+const ROW0_Y := 84
 const ROW_H := 16
-const YOUTH_BTN := Rect2(523, 360, 112, 25)   # reversed (0x20b,0x168)..(0x27b,0x181)
-const RETURN_BTN := Rect2(523, 440, 112, 25)
+const NAME_X := 48
+const STAT_X0 := 184
+const STAT_X1 := 356
+const AVBAR_X := 378
+const POS_X := 414
+const KIT_SRC := Rect2(0, 0, 31, 64)
+const KIT_BOX := Rect2(534, 150, 100, 130)
+const YOUTH_BTN := Rect2(522, 360, 112, 25)
+const RETURN_BTN := Rect2(522, 440, 112, 25)
 
-var _bg: Texture2D
-var _bar: Texture2D
-var _f14: Font
 var _f12: Font
 var _f10: Font
 var _f8: Font
 
-const KIT_SRC := Rect2(0, 0, 31, 64)          # shirt half of the 48x64 MINIESC kit
-const KIT_BOX := Rect2(539, 118, 80, 150)     # the club kit in the free right-strip gap
-
 var _club: Dictionary = {}
 var _manager: String = ""
 var _cash: String = ""
-var _youth_enabled := false      # the YOUTH TEAM button is live only for the managed club
-var _press := ""                 # "youth" / "return" held down (for the highlight)
-var _kit_tex: Texture2D          # the club's kit (escudo), or null if no art for the id
+var _season: String = "1997-98"
+var _week: int = 0
+var _youth_enabled := false
+var _press := ""
+var _kit_tex: Texture2D
 
 
 func _ready() -> void:
-	_bg = load("res://art/screens/fondo_marble.png")
-	_bar = load("res://art/screens/barra0.png")
-	_f14 = load("res://art/fonts/proman14.fnt")
 	_f12 = load("res://art/fonts/proman12.fnt")
 	_f10 = load("res://art/fonts/proman10.fnt")
 	_f8 = load("res://art/fonts/proman8.fnt")
@@ -88,11 +84,14 @@ func _ready() -> void:
 	queue_redraw()
 
 
-func setup(club: Dictionary, manager: String = "", cash: String = "", youth_enabled := false) -> void:
+func setup(club: Dictionary, manager: String = "", cash: String = "", youth_enabled := false,
+		season: String = "1997-98", week: int = 0) -> void:
 	_club = club
 	_manager = manager
 	_cash = cash
 	_youth_enabled = youth_enabled
+	_season = season
+	_week = week
 	var cid := int(club.get("id", -1))
 	var path := "res://art/kits/%d.png" % cid
 	_kit_tex = load(path) if cid >= 0 and ResourceLoader.exists(path) else null
@@ -108,7 +107,6 @@ func _to_design(p: Vector2) -> Vector2:
 	var s := _scale()
 	return (p - Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5)) / s
 
-## The control under a design-space point: "youth" (only when enabled), "return", or "".
 func _hit(d: Vector2) -> String:
 	if _youth_enabled and YOUTH_BTN.has_point(d):
 		return "youth"
@@ -138,8 +136,6 @@ func _on_input(e: InputEvent) -> void:
 		var was := _press
 		_press = ""
 		queue_redraw()
-		# A tap on a live control fires it; any other tap dismisses (only if it didn't
-		# start on a control), preserving the display-screen tap-to-dismiss feel.
 		if a != "" and a == was:
 			if a == "youth":
 				youth_pressed.emit()
@@ -151,10 +147,6 @@ func _on_input(e: InputEvent) -> void:
 
 # ---- ordering ------------------------------------------------------------
 
-## The squad split into the four decoded position sections (the demarcación byte
-## reversed out of EQUIPOS.PKF: GK/DF/MF/FW), each sorted by ability. Records with no
-## decoded position fall back to the GK flag (keepers) or an OUTFIELD catch-all.
-## Returns [{section:String, players:Array}], empty sections dropped.
 func _sections() -> Array:
 	var bucket := {"GK": [], "DF": [], "MF": [], "FW": [], "OUT": []}
 	for p in _club.get("players", []):
@@ -167,19 +159,15 @@ func _sections() -> Array:
 		if bucket[key].is_empty():
 			continue
 		bucket[key].sort_custom(by_avg)
-		out.append({"section": SECTION_LABELS[key], "players": bucket[key]})
+		out.append({"key": key, "section": SECTION_LABELS[key], "players": bucket[key]})
 	return out
 
 
-# The original's own section-header strings, lifted verbatim from MANAGER.EXE
-# (KEEPERS / DEFENDERS / MIDFIELDERS / FORWARDS — the 4-entry band table at 0x634e28).
 const SECTION_LABELS := {
 	"GK": "KEEPERS", "DF": "DEFENDERS", "MF": "MIDFIELDERS",
 	"FW": "FORWARDS", "OUT": "OUTFIELD",
 }
 
-## A player's section key: the decoded GK/DF/MF/FW, or a faithful fallback for records
-## without a position byte (keeper by the GK flag, else the OUTFIELD catch-all).
 func _pos_of(p: Dictionary) -> String:
 	var pos := str(p.get("pos", ""))
 	if pos in ["GK", "DF", "MF", "FW"]:
@@ -197,102 +185,97 @@ func _txt(f: Font, x: int, y_top: int, s: String, col: Color, sz: int, right := 
 	draw_string(f, Vector2(px, y_top + f.get_ascent(sz)), s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
 
 
-func _cell(x: int, y: int, w: int, h: int, base: Color, hi: Color, lo: Color) -> void:
-	draw_rect(Rect2(x, y, w, h), base, true)
-	draw_rect(Rect2(x, y, w, 1), hi, true)
-	draw_rect(Rect2(x, y, 1, h), hi, true)
-	draw_rect(Rect2(x, y + h - 1, w, 1), lo, true)
-	draw_rect(Rect2(x + w - 1, y, 1, h), lo, true)
-
-
 func _draw() -> void:
 	var s: float = min(size.x / W, size.y / H) if size.x > 0 and size.y > 0 else 1.0
-	if _bg != null:
-		draw_texture_rect(_bg, Rect2(Vector2.ZERO, size), false, Color(0.4, 0.4, 0.46))
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.05, 0.07, 0.14), true)
 	draw_set_transform(Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5), 0.0, Vector2(s, s))
 
-	if _bg != null:
-		draw_texture_rect(_bg, Rect2(0, 0, W, H), false)
-	if _bar != null:
-		draw_texture_rect(_bar, Rect2(0, 0, W, _bar.get_height()), false)
+	PMChrome.draw_bg(self)
+	PMChrome.draw_header(self, "SQUAD", _manager, str(_club.get("name", "")),
+		str(_club.get("leagueName", "")), _season, _week, int(_club.get("id", -1)))
 
-	_txt(_f14, 150, 13, "SQUAD MANAGEMENT", C_TITLE, 15)
-	_txt(_f12, 12, 9, "Manager", C_TEXT, 13)
-	_txt(_f12, 12, 26, _manager.substr(0, 18), C_DIM, 13)
-	_txt(_f12, 628, 9, str(_club.get("name", "")).substr(0, 18), C_TEXT, 13, true)
-	if _cash != "":
-		_txt(_f12, 628, 26, _cash, C_DIM, 13, true)
-
-	# Column header row.
-	for c in COLS:
-		var code: String = c[0]
-		var x: int = c[1]
-		if code == "PLAYER" or code == "N.":
-			_txt(_f8, x, HDR_Y, code, C_HEAD, 11)
-		else:
-			_txt(_f8, x + 18, HDR_Y, code, C_HEAD, 11, true)
-
+	PMChrome.draw_table_panel(self, TABLE)
+	_draw_col_header()
 	_draw_list()
 	_draw_side()
 
 
+func _draw_col_header() -> void:
+	PMChrome.draw_col_header(self, Rect2(TABLE.position.x + 2, HDR_Y, TABLE.size.x - 4, 16))
+	_txt(_f10, 14, HDR_Y + 2, "N.", PMChrome.C_TBL_HDR_TXT, 11)
+	_txt(_f10, NAME_X, HDR_Y + 2, "PLAYER", PMChrome.C_TBL_HDR_TXT, 11)
+	for c in COLS:
+		_txt(_f10, c[1], HDR_Y + 2, c[0], PMChrome.C_TBL_HDR_TXT, 11, true)
+	_txt(_f10, POS_X, HDR_Y + 2, "POS", PMChrome.C_TBL_HDR_TXT, 11)
+
+
 func _draw_list() -> void:
 	var secs := _sections()
-	# Keep the reversed 16px rows for ordinary squads; compress just enough to fit when
-	# the four position sections + a deep squad would otherwise clip a whole group (the
-	# old GK/outfield split only ever dropped the weakest fringe; four sections must not
-	# hide the forwards). Never below 11px so the PROMAN8 row text stays legible.
 	var n_players := 0
 	for sec in secs:
 		n_players += (sec["players"] as Array).size()
 	var n_rows := n_players + secs.size()
-	var avail := int(PANEL.position.y + PANEL.size.y) - ROW0_Y
+	var avail := int(TABLE.end.y - 4) - ROW0_Y
 	var row_h: int = ROW_H if n_rows == 0 else clampi(avail / n_rows, 11, ROW_H)
 
 	var y := ROW0_Y
 	var row := 0
 	var number := 1
 	for sec in secs:
-		# Section header (gold), like the original's section split.
-		_txt(_f8, COLS[1][1], y + 2, str(sec["section"]), C_SECTION, 11)
+		_section(y, str(sec["section"]), row_h)
 		y += row_h
 		for p in sec["players"]:
-			if y + row_h > int(PANEL.position.y + PANEL.size.y):
+			if y + row_h > int(TABLE.end.y - 4):
 				return
-			draw_rect(Rect2(int(PANEL.position.x), y, int(PANEL.size.x), row_h - 1),
-				C_ROW_A if row % 2 == 0 else C_ROW_B, true)
-			_row_player(p, number, y)
+			_row(y, row, p, number, str(sec["key"]), row_h)
 			y += row_h
 			row += 1
 			number += 1
 
 
-func _row_player(p: Dictionary, number: int, y: int) -> void:
+func _section(y: int, label: String, row_h: int) -> void:
+	draw_rect(Rect2(ROW_X, y, ROW_W, row_h - 1), PMChrome.C_ROW_DARK, true)
+	_txt(_f10, NAME_X, y + maxi(1, (row_h - 12) / 2), label, PMChrome.C_TBL_HDR, 11)
+
+
+func _row(y: int, idx: int, p: Dictionary, number: int, key: String, row_h: int) -> void:
+	var is_gk := key == "GK"
+	var bg: Color = C_GK_ROW if is_gk else (PMChrome.C_ROW_LIGHT if idx % 2 == 0 else PMChrome.C_ROW_DARK)
+	draw_rect(Rect2(ROW_X, y, ROW_W, row_h - 1), bg, true)
+	draw_rect(Rect2(ROW_X, y + row_h - 1, ROW_W, 1), PMChrome.C_ROW_SEP, true)
+	draw_rect(Rect2(STAT_X0, y, STAT_X1 - STAT_X0, row_h - 1), C_STATBAND, true)
+
+	var ty: int = y + maxi(1, (row_h - 12) / 2)
+	PMChrome.draw_crest(self, int(_club.get("id", -1)), Rect2(10, y, 13, row_h - 1))
+	_txt(_f10, 40, ty, str(number), PMChrome.C_ROW_TXT, 11, true)
+	_txt(_f10, NAME_X, ty, str(p.get("name", "?")).substr(0, 13), PMChrome.C_ROW_TXT, 11)
+
 	var attrs: Dictionary = p.get("attrs", {}) if p.get("attrs") is Dictionary else {}
-	var ty := y + 2
 	for c in COLS:
-		var key: String = c[2]
+		var key2: String = c[2]
 		var x: int = c[1]
-		match key:
-			"_num":
-				_txt(_f8, x + 16, ty, str(number), C_TEXT, 11, true)
-			"_name":
-				_txt(_f8, x, ty, str(p.get("name", "?")).substr(0, 16), C_NAME, 11)
-			"_age":
-				_txt(_f8, x + 18, ty, str(p.get("age", "")), C_TEXT, 11, true)
-			"_avg":
-				_txt(_f8, x + 18, ty, str(_avg_of(p)), C_TEXT, 11, true)
-			"_pos":
-				# Availability takes the POS cell when a player is out: INJ/SUS in its
-				# status colour, else the GK/OUT we can derive faithfully from the data.
-				var st := Availability.status(p)
-				if st["state"] == "FIT":
-					_txt(_f8, x, ty, _pos_of(p), C_DIM, 11)
-				else:
-					_txt(_f8, x, ty, "%s %dw" % [st["state"], int(st["weeks"])], st["colour"], 11)
-			_:
-				var v: Variant = attrs.get(key)
-				_txt(_f8, x + 18, ty, str(int(v)) if v != null else "-", C_TEXT, 11, true)
+		var sv := ""
+		if key2 == "_age":
+			sv = str(int(p.get("age", 0)))
+		elif key2 == "_avg":
+			sv = str(_avg_of(p))
+		else:
+			var v: Variant = attrs.get(key2)
+			sv = str(int(v)) if v != null else "-"
+		_txt(_f10, x, ty, sv, PMChrome.C_ROW_TXT, 11, true)
+
+	var avg := _avg_of(p)
+	draw_rect(Rect2(AVBAR_X, y + maxi(2, row_h / 2 - 3), 28, 6), C_AVBAR_BG, true)
+	draw_rect(Rect2(AVBAR_X, y + maxi(2, row_h / 2 - 3), 28.0 * clampf(avg / 99.0, 0.0, 1.0), 6), C_AVBAR, true)
+
+	# POS: a coloured role tag, or the injury/suspension status when out.
+	var st := Availability.status(p)
+	if st["state"] == "FIT":
+		var rcol: Color = C_ROLE.get(key, PMChrome.C_TBL_HDR)
+		draw_rect(Rect2(POS_X, y + 2, 22, row_h - 5), rcol, true)
+		_txt(_f8, POS_X + 26, ty, key, PMChrome.C_ROW_TXT, 10)
+	else:
+		_txt(_f8, POS_X, ty, "%s %dw" % [st["state"], int(st["weeks"])], st["colour"], 10)
 
 
 func _avg_of(p: Dictionary) -> int:
@@ -309,17 +292,18 @@ func _avg_of(p: Dictionary) -> int:
 	return int(round(sum / n)) if n > 0 else 0
 
 
-## Right column: squad count, the reversed YOUTH TEAM button + a small info box.
+## Right column: squad count, the club kit, the YOUTH TEAM + RETURN buttons.
 func _draw_side() -> void:
+	var px := 522.0
+	var pw := 112.0
 	var n := 0
 	for p in _club.get("players", []):
 		if int(p.get("id", -1)) >= 0:
 			n += 1
-	_cell(523, 60, 112, 40, C_CELL, C_CELL_HI, C_CELL_LO)
-	_txt(_f10, 529, 64, "SQUAD", C_HEAD, 11)
-	_txt(_f12, 631, 78, "%d players" % n, C_TEXT, 13, true)
+	PMChrome.bevel(self, Rect2(px, 52, pw, 44), Color(0.10, 0.16, 0.34), C_DKBTN_HI, C_DKBTN_LO)
+	_txt(_f10, int(px) + 6, 56, "SQUAD", C_PANEL_TXT, 11)
+	_txt(_f12, int(px + pw) - 8, 74, "%d players" % n, Color.WHITE, 13, true)
 
-	# The club kit (escudo) in the free gap between the SQUAD cell and the YOUTH button.
 	if _kit_tex != null:
 		var sc: float = min(KIT_BOX.size.x / KIT_SRC.size.x, KIT_BOX.size.y / KIT_SRC.size.y)
 		var kw := KIT_SRC.size.x * sc
@@ -328,16 +312,12 @@ func _draw_side() -> void:
 			Rect2(KIT_BOX.position.x + (KIT_BOX.size.x - kw) * 0.5,
 				KIT_BOX.position.y + (KIT_BOX.size.y - kh) * 0.5, kw, kh), KIT_SRC)
 
-	# YOUTH TEAM: a live green button on the managed club (opens the academy), greyed on a
-	# browsed club where there's no youth team to open.
 	var yb := YOUTH_BTN
-	var ybase := (C_BTN_HI if _press == "youth" else C_BTN) if _youth_enabled else C_CELL
-	_cell(int(yb.position.x), int(yb.position.y), int(yb.size.x), int(yb.size.y),
-		ybase, C_BTN_HI if _youth_enabled else C_CELL_HI, C_CELL_LO)
-	_txt(_f10, int(yb.position.x) + 10, int(yb.position.y) + 6, "YOUTH TEAM",
-		Color(0.92, 1.0, 0.94) if _youth_enabled else C_DIM, 11)
+	var ybase := (C_BTN_HI if _press == "youth" else C_BTN) if _youth_enabled else C_DKBTN
+	PMChrome.bevel(self, yb, ybase, C_BTN_HI if _youth_enabled else C_DKBTN_HI, C_DKBTN_LO)
+	_txt(_f10, int(yb.position.x) + 10, int(yb.position.y) + 7, "YOUTH TEAM",
+		Color(0.92, 1.0, 0.94) if _youth_enabled else PMChrome.C_STAR_OFF, 11)
 
 	var rb := RETURN_BTN
-	_cell(int(rb.position.x), int(rb.position.y), int(rb.size.x), int(rb.size.y),
-		C_CELL_HI if _press == "return" else C_CELL, C_CELL_HI, C_CELL_LO)
-	_txt(_f10, int(rb.position.x) + 6, int(rb.position.y) + 6, "RETURN", C_TEXT, 11)
+	PMChrome.bevel(self, rb, C_DKBTN_HI if _press == "return" else C_DKBTN, C_DKBTN_HI, C_DKBTN_LO)
+	_txt(_f10, int(rb.position.x) + 30, int(rb.position.y) + 7, "RETURN", C_GOLD, 12)
