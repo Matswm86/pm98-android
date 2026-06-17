@@ -13,6 +13,9 @@ class_name StadiumScreen
 ## are exact-reversed overlays painted on top. Display-only (works/improve/match-day
 ## stay in the text menu); native 640x480, self-scales + marble-bezels to fit landscape.
 
+signal works_pressed   # the WORKS button -> Main opens the expansion options
+signal back_pressed    # RETURN, or a tap on the stadium scene -> dismiss
+
 const W := 640
 const H := 480
 const MAX_CAPACITY := 130000                    # tier 11 threshold (130000/11 per tier)
@@ -54,6 +57,8 @@ var _seated: int = 0
 var _standing: int = 0
 var _parking: int = 0
 var _tier: int = 0
+var _works: String = ""     # in-progress expansion status (e.g. "+5,000 in 12 wk"), or ""
+var _press := ""            # button held down (for the highlight)
 
 
 func _ready() -> void:
@@ -67,6 +72,8 @@ func _ready() -> void:
 	_f8 = load("res://art/fonts/proman8.fnt")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2(W, H)
+	set_anchors_preset(Control.PRESET_FULL_RECT)
+	gui_input.connect(_on_input)
 	_load_scene()
 	queue_redraw()
 
@@ -83,7 +90,7 @@ func _load_scene() -> void:
 
 ## Feed the screen the live ground view, then repaint.
 func setup(club: String, manager: String, season: String, ground: String,
-		capacity: int, seated: int, standing: int, parking: int) -> void:
+		capacity: int, seated: int, standing: int, parking: int, works := "") -> void:
 	_club = club
 	_manager = manager
 	_season = season
@@ -92,8 +99,45 @@ func setup(club: String, manager: String, season: String, ground: String,
 	_seated = maxi(0, seated)
 	_standing = maxi(0, standing)
 	_parking = maxi(0, parking)
+	_works = works
 	_load_scene()
 	queue_redraw()
+
+
+# ---- input ---------------------------------------------------------------
+
+func _to_design(p: Vector2) -> Vector2:
+	var s: float = min(size.x / W, size.y / H) if size.x > 0 and size.y > 0 else 1.0
+	return (p - Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5)) / s
+
+## WORKS opens the expansion options; RETURN or a tap on the scene dismisses; IMPROVE /
+## MATCH DAY are inert (not yet built) so they neither act nor dismiss.
+func _hit(d: Vector2) -> String:
+	if LBL_WORKS.has_point(d):
+		return "works"
+	if LBL_RETURN.has_point(d):
+		return "return"
+	if LBL_IMPROVE.has_point(d) or LBL_MATCHDAY.has_point(d):
+		return "inert"
+	return "dismiss"
+
+func _on_input(e: InputEvent) -> void:
+	if not (e is InputEventScreenTouch or e is InputEventMouseButton):
+		return
+	var d := _to_design(e.position)
+	if e.pressed:
+		_press = _hit(d)
+		queue_redraw()
+	else:
+		var a := _hit(d)
+		var was := _press
+		_press = ""
+		queue_redraw()
+		if a != was:
+			return
+		match a:
+			"works": works_pressed.emit()
+			"return", "dismiss": back_pressed.emit()
 
 
 # ---- helpers -------------------------------------------------------------
@@ -174,8 +218,17 @@ func _draw() -> void:
 	_txt(_f8, ix, iy + 46, "STAND.  " + fmt_int(_standing), C_DIM, 10)
 	_txt(_f8, rx, iy + 46, "TIER %d/11" % _tier, C_DIM, 10, true)
 
+	# In-progress expansion banner above the button grid.
+	if _works != "":
+		_txt(_f8, 298, 392, "GROUND WORKS:  %s remaining" % _works, C_VAL, 10)
+
 	# 2x2 action grid (each button + its reversed icon).
 	_button(LBL_IMPROVE, "IMPROVE", _ic_improve)
 	_button(LBL_WORKS, "WORKS", _ic_works)
 	_button(LBL_MATCHDAY, "MATCH DAY", _ic_match)
 	_button(LBL_RETURN, "RETURN", null)
+
+	# Press highlight over the held button.
+	var hit := {"works": LBL_WORKS, "return": LBL_RETURN, "improve": LBL_IMPROVE}
+	if _press in ["works", "return"]:
+		draw_rect(hit[_press], Color(1, 1, 1, 0.18), true)

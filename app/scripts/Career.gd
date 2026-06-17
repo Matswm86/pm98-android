@@ -8,6 +8,7 @@ extends RefCounted
 ## unit-testable headless.
 
 const SAVE_PATH := "user://career.json"
+const MAX_STADIUM := 130000   # tier-11 capacity ceiling (matches StadiumScreen.MAX_CAPACITY)
 
 var club_id: int = -1
 var club_name: String = ""
@@ -25,6 +26,8 @@ var objective_pos: int = 17       # board wants: finish at least this high (1-ba
 var objective_text: String = ""
 var finished: bool = false        # season complete + objective resolved
 var tactics: Dictionary = {}      # manager's Tactics.to_dict(): XI + shape + marking
+var stadium_capacity: int = 0     # managed club's current ground capacity (0 = GameDB default)
+var works: Dictionary = {}        # in-progress stadium expansion {added, weeks_left, cost}; {} = none
 
 # Live transfer state: the division's squads mutate as players move, and persist
 # in the save -- the career, not GameDB, is the source of truth once you're managing.
@@ -153,6 +156,7 @@ static func create(club: Dictionary, league: Dictionary, league_clubs: Array, le
 	# squad the live deduction equals this added-back figure, i.e. identical to the old net.
 	c.weekly_net = int(fin["weekly_balance"]) + int(fin["weekly_wages"])
 	c.cash = int(fin.get("total_income", 0)) / 4   # opening balance ~ a quarter's income
+	c.stadium_capacity = int(fin.get("capacity", 0))   # ground starts at the club's known size
 	c.tactics = Tactics.auto_pick(club, Tactics.DEFAULT_FORMATION).to_dict()
 	# The academy starts with a small crop of youngsters to develop.
 	var yrng := RandomNumberGenerator.new()
@@ -273,6 +277,7 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 	cash -= Staff.weekly_wage(staff)   # the backroom staff wage bill (STAFF WAGES)
 	week += 1
 	offers_left = OFFERS_PER_WEEK   # the board's weekly signing allowance resets
+	_tick_works()                   # stadium expansion progresses a week
 	if not manager_res.is_empty():
 		results.append({
 			"week": week, "opp_id": manager_res["away_id"] if manager_res["manager_home"] else manager_res["home_id"],
@@ -1018,6 +1023,60 @@ func _record_supercup_news(tie: Dictionary, comp: String, prize: int) -> void:
 		_news("cup", "%s: %s beat %s%s." % [comp, wn, ln, pens])
 
 
+# ---- stadium expansion (WORKS) -------------------------------------------
+
+## Begin a ground expansion: pay `cost` now, capacity rises by `added` after `weeks`.
+## Refuses if works are already running, cash is short, or it would breach the ceiling.
+func start_works(added: int, cost: int, weeks: int) -> bool:
+	if not works.is_empty() or added <= 0 or cash < cost \
+			or stadium_capacity + added > MAX_STADIUM:
+		return false
+	cash -= cost
+	works = {"added": added, "weeks_left": maxi(1, weeks), "cost": cost}
+	_news("stadium", "Ground works begun: +%s capacity, ~%d weeks (-£%s)." % [
+		_grp(added), maxi(1, weeks), _grp(cost)])
+	return true
+
+
+## Tick an in-progress expansion one week; on completion raise the capacity and refresh
+## the weekly finance projection so the bigger gate actually feeds the books.
+func _tick_works() -> void:
+	if works.is_empty():
+		return
+	works["weeks_left"] = int(works["weeks_left"]) - 1
+	if int(works["weeks_left"]) <= 0:
+		stadium_capacity = mini(MAX_STADIUM, stadium_capacity + int(works["added"]))
+		_news("stadium", "Ground expansion complete: capacity now %s." % _grp(stadium_capacity))
+		works = {}
+		_recompute_weekly_net()
+
+
+## Re-derive weekly_net from the current capacity (gate income depends on it). weekly_net
+## excludes player wages (drawn live), so it = weekly_balance + weekly_wages, as at create.
+func _recompute_weekly_net() -> void:
+	var fin := FinanceModel.summary({"capacity": stadium_capacity, "players": my_squad()}, tier)
+	weekly_net = int(fin["weekly_balance"]) + int(fin["weekly_wages"])
+
+
+## A short human status for the WORKS in progress (or "" when none), e.g. "+5,000 in 12 wk".
+func works_status() -> String:
+	if works.is_empty():
+		return ""
+	return "+%s in %d wk" % [_grp(int(works["added"])), int(works["weeks_left"])]
+
+
+static func _grp(v: int) -> String:
+	var s := str(absi(v))
+	var out := ""
+	var c := 0
+	for i in range(s.length() - 1, -1, -1):
+		out = s[i] + out
+		c += 1
+		if c % 3 == 0 and i > 0:
+			out = "," + out
+	return ("-" if v < 0 else "") + out
+
+
 func _season_label(yr: int) -> String:
 	var start := 1996 + yr   # year 1 -> 1997-98
 	return "%d-%02d" % [start, (start + 1) % 100]
@@ -1046,6 +1105,7 @@ func to_dict() -> Dictionary:
 		"weekly_net": weekly_net, "objective_pos": objective_pos,
 		"objective_text": objective_text, "finished": finished,
 		"tactics": tactics, "tier": tier, "rosters": ros, "club_names": nms,
+		"stadium_capacity": stadium_capacity, "works": works,
 		"transfer_listed": listed, "shortlist": shortlist, "transfer_log": transfer_log,
 		"offers_left": offers_left, "news_log": news_log,
 		"training_intensity": training_intensity, "youth": youth,
@@ -1089,6 +1149,9 @@ static func from_dict(d: Dictionary) -> Career:
 	c.finished = bool(d.get("finished", false))
 	c.tactics = d.get("tactics", {})
 	c.tier = int(d.get("tier", 1))
+	# Pre-stadium-works saves load with capacity 0 (-> GameDB default via Main) + no works.
+	c.stadium_capacity = int(d.get("stadium_capacity", 0))
+	c.works = d.get("works", {})
 	c.shortlist = []
 	for v in d.get("shortlist", []):
 		c.shortlist.append(int(v))

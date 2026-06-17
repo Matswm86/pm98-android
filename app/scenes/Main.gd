@@ -542,6 +542,18 @@ func _screens_shot() -> void:
 		_save_shot(dir, s[1])
 		_free_overlays()
 		await _settle()
+	# T2 #5: the stadium WORKS sub-view, then the overview with an expansion in progress.
+	_career.cash = 20_000_000
+	_show_stadium_screen()
+	_show_stadium_works()
+	await _settle()
+	_save_shot(dir, "stadium_works.png")
+	_career.start_works(5000, 3_900_000, 13)
+	_free_overlays()
+	_show_stadium_screen()
+	await _settle()
+	_save_shot(dir, "stadium_inprogress.png")
+	_free_overlays()
 	print("SCREENS-SHOT done club=%s week=%d" % [_career.club_name, _career.week])
 	get_tree().quit()
 
@@ -930,6 +942,10 @@ func _mgr_club() -> Dictionary:
 func _club_with_roster(id: int) -> Dictionary:
 	var base: Dictionary = GameDB.club(id).duplicate()
 	base["players"] = _career.squad_of(id)
+	# The managed club's ground can be expanded via stadium WORKS, so its live capacity
+	# overrides the static GameDB figure (feeds finance gate income + the stadium tier).
+	if id == _career.club_id and _career.stadium_capacity > 0:
+		base["capacity"] = _career.stadium_capacity
 	return base
 
 ## The management hub IS the original-art MENUPRINCIPAL (B1): a persistent overlay raised
@@ -1189,7 +1205,21 @@ func _board_panel() -> Dictionary:
 ## formula (clamp(capacity*11/130000, 0, 11)) on the SAME capacity the finance screen
 ## uses. GameDB stores only total capacity, so the seated/standing/parking split is
 ## display-derived (flagged in the RE doc). Display-only; tap to dismiss.
+## Stadium expansion options (added capacity, £ cost, weeks to build). ~£780/seat.
+const STADIUM_WORKS := [
+	{"added": 2000, "cost": 1_600_000, "weeks": 6},
+	{"added": 5000, "cost": 3_900_000, "weeks": 13},
+	{"added": 10000, "cost": 7_500_000, "weeks": 24},
+]
+
 func _show_stadium_screen() -> void:
+	# Free any prior stadium overlay / browse so re-entry (e.g. after starting works) is clean.
+	for c in get_children():
+		if c is StadiumScreen:
+			c.queue_free()
+	if _browse != null and is_instance_valid(_browse):
+		_browse.queue_free()
+		_browse = null
 	var club := _mgr_club()
 	var sm := FinanceModel.summary(club, FinanceModel.tier_of(club, GameDB.leagues))
 	var cap: int = int(sm["capacity"])
@@ -1201,10 +1231,42 @@ func _show_stadium_screen() -> void:
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
 	scr.setup(_career.club_name, "", _career.season, ground,
-		cap, seated, cap - seated, int(round(cap / 27.0)))
-	scr.gui_input.connect(func(e: InputEvent) -> void:
-		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
-			scr.queue_free())
+		cap, seated, cap - seated, int(round(cap / 27.0)), _career.works_status())
+	scr.works_pressed.connect(_show_stadium_works)
+	scr.back_pressed.connect(func() -> void: scr.queue_free())
+
+## The WORKS sub-view: pick a ground expansion (spend cash now, capacity rises after the
+## build weeks). PM98-chrome browse over the stadium overview. Reverses FUN_0051bd80's
+## intent (a real spending lever) without its facility-counter sub-layout.
+func _show_stadium_works() -> void:
+	var rows: Array = []
+	var payload: Array = []
+	if not _career.works.is_empty():
+		rows.append({"text": "Works already in progress: %s remaining" % _career.works_status(),
+			"enabled": false, "accent": Color(0.98, 0.86, 0.45)})
+		payload.append(null)
+	else:
+		for opt in STADIUM_WORKS:
+			var affordable: bool = _career.cash >= int(opt["cost"])
+			var room: bool = _career.stadium_capacity + int(opt["added"]) <= Career.MAX_STADIUM
+			rows.append({
+				"text": "Expand +%s   (~%d weeks)" % [Career._grp(int(opt["added"])), int(opt["weeks"])],
+				"value": "£%s" % Career._grp(int(opt["cost"])),
+				"enabled": affordable and room,
+				"accent": null if (affordable and room) else Color(0.6, 0.55, 0.42),
+			})
+			payload.append(opt)
+		if _career.stadium_capacity >= Career.MAX_STADIUM:
+			rows = [{"text": "The ground is already at maximum capacity.", "enabled": false}]
+			payload = [null]
+	_mount_browse("%s  -  GROUND WORKS" % _career.club_name,
+		"Spend now, capacity rises when the build completes", rows,
+		func(i: int) -> void:
+			var opt: Variant = payload[i]
+			if opt != null and _career.start_works(int(opt["added"]), int(opt["cost"]), int(opt["weeks"])):
+				_career.save()
+				_show_stadium_screen(),
+		func() -> void: _show_stadium_screen())
 
 ## The COMPETITIONS chooser on the hub CALEN/fixtures icon (the season-calendar slot): a
 ## PM98-chrome browse listing the two domestic cups, each routing to its CupScreen. The

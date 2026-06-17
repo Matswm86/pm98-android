@@ -34,8 +34,15 @@ SAME capacity the finance screen uses (`FinanceModel.summary`), so tier and fina
   `%d` + `.bmp`), then draws the title, info panel and 2×2 button grid.
 - `FUN_0051bd80` = the **WORKS / construction sub-view** (facility counters SEATS / CAR PARK
   / FACILITIES / SERVICES at x6–140 + `gradas`/`parking`/`equipam`/`extras` + `Enobras`
-  under-construction overlays). A different screen state — not the overview. Not rebuilt
-  (the WORKS button is display-only for now).
+  under-construction overlays). **WORKS is now a live spending lever (T2 #5):** the button
+  emits `works_pressed`; `Main._show_stadium_works()` offers expansion options (+2k/+5k/+10k
+  capacity, £cost, build weeks), `Career.start_works()` pays up front, `Career._tick_works()`
+  advances it each played week, and on completion `stadium_capacity` rises and
+  `_recompute_weekly_net()` feeds the bigger gate into the books (the stadium TIER picture
+  also steps up, since it reads the same capacity). The original's exact facility-counter
+  sub-layout (4 separate gradas/parking/equipam/extras counters) is NOT reproduced — we
+  model one combined capacity lever; the in-progress state shows as a gold banner on the
+  overview. IMPROVE / MATCH DAY stay inert.
 Helper conventions (proven family): `FUN_00436fb0(x,y)` point (x = last push), first point
 made = SIZE, second = POS; `FUN_00436fd0(pos,size)` = Rect(pos, pos+size); `FUN_00437020`
 text colour; `FUN_005c06d0(...,0x32,...)` icon blit.
