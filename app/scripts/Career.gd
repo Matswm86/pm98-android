@@ -47,6 +47,8 @@ var youth_seq: int = YOUTH_ID_BASE      # monotonic id minter for youth (above s
 var staff: Array = []                   # hired backroom staff (Staff.gd)
 var staff_pool: Array = []              # staff available to hire (refreshed each season)
 var staff_seq: int = STAFF_ID_BASE      # monotonic id minter for staff candidates
+var free_agents: Array = []             # out-of-contract players you can sign for £0 + a wage
+var free_seq: int = FREE_ID_BASE        # monotonic id minter for generated free agents
 var fa_cup: Dictionary = {}             # the F.A. Cup bracket (Cup.gd); {} = not running
 var league_cup: Dictionary = {}         # the Coca-Cola (League) Cup bracket; {} = not running
 
@@ -122,6 +124,9 @@ const YOUTH_INTAKE_HI := 3             # ... is this many youngsters
 # staff hired but a pool to hire from (refreshed each season), and a soft cap on headcount.
 const STAFF_ID_BASE := 800000
 const STAFF_POOL_SIZE := 6              # candidates available to hire at any time
+const FREE_ID_BASE := 700000           # free-agent id space (below staff/youth, above seniors)
+const FREE_POOL_SIZE := 8              # generated free agents available at any time
+const FREE_POOL_CAP := 18              # pool ceiling once your released players are added in
 const STAFF_MAX := 8                    # the directors won't fund more staff than this
 
 # "The Directors will only let you make %u offer%s to sign a player per week."
@@ -170,6 +175,9 @@ static func create(club: Dictionary, league: Dictionary, league_clubs: Array, le
 	# No staff hired yet, but a pool of backroom staff to bring in.
 	c.staff_pool = Staff.generate_pool(yrng, c.staff_seq, STAFF_POOL_SIZE)
 	c.staff_seq += STAFF_POOL_SIZE
+	# A pool of out-of-contract free agents to sign for nothing but a wage.
+	c.free_agents = TransferMarket.generate_free_agents(yrng, FREE_POOL_SIZE, c.free_seq)
+	c.free_seq += FREE_POOL_SIZE
 	return c
 
 
@@ -668,6 +676,46 @@ func sign_player(pid: int, from_club_id: int, offer: int, rng: RandomNumberGener
 	_log("You have signed %s from %s for £%s." % [player.get("name", "?"), seller_name, _money(offer)])
 	return {"ok": true, "msg": "You have signed %s." % player.get("name", "?")}
 
+## Sign a free agent for NO fee on `offer_weekly` £/wk (default = his demand). It is a wage
+## NEGOTIATION (reuses Contract.evaluate_renewal): he accepts at/above his demand, may balk
+## just below, refuses a lowball. On success he joins your live squad + wage bill. {ok, msg,
+## demanded}. Same board guards as a transfer (window, weekly offers, squad max), minus cash
+## (there is no fee). A free signing still spends one of the week's offers.
+func sign_free_agent(pid: int, offer_weekly: int = -1, rng: RandomNumberGenerator = null) -> Dictionary:
+	if not transfers_open():
+		return {"ok": false, "msg": "The transfer deadline has passed."}
+	if offers_left <= 0:
+		return {"ok": false, "msg": "The Directors will only let you make %d offers per week." % OFFERS_PER_WEEK}
+	if my_squad().size() >= TransferMarket.SQUAD_MAX:
+		return {"ok": false, "msg": "Your squad is full (%d), the maximum allowed." % TransferMarket.SQUAD_MAX}
+	var player: Dictionary = {}
+	for p in free_agents:
+		if int(p.get("id", -1)) == pid:
+			player = p
+			break
+	if player.is_empty():
+		return {"ok": false, "msg": "That free agent is no longer available."}
+	if offer_weekly < 0:
+		offer_weekly = Contract.demanded_weekly(player, tier)
+	if rng == null:
+		rng = RandomNumberGenerator.new()
+		rng.randomize()
+	offers_left -= 1   # an offer counts whether or not it is accepted
+	var pname: String = player.get("name", "?")
+	var verdict := Contract.evaluate_renewal(player, offer_weekly, tier, rng)
+	if not verdict["accepted"]:
+		return {"ok": false, "msg": "%s has rejected your terms." % pname, "demanded": int(verdict["demanded"])}
+	free_agents.erase(player)
+	player.erase("free_agent")
+	player["clubId"] = club_id
+	player["contract_years"] = TransferMarket.NEW_CONTRACT_YEARS
+	player["wage"] = offer_weekly
+	player["auto_renew"] = false
+	rosters[club_id].append(player)
+	_log("You have signed free agent %s on £%s/wk." % [pname, _money(offer_weekly)])
+	return {"ok": true, "msg": "You have signed %s on a free." % pname, "demanded": int(verdict["demanded"])}
+
+
 func is_listed(pid: int) -> bool:
 	return transfer_listed.has(pid)
 
@@ -789,10 +837,20 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 			_log("%s has renewed his contract on £%s/wk (auto)." % [p.get("name", "?"), _money(w)])
 		else:
 			leavers.append(p)
+	# A fresh batch of free agents for the new season; the manager's own released players join
+	# the pool (you can re-sign one for nothing but a wage), capped so it never grows forever.
+	free_agents = TransferMarket.generate_free_agents(rng, FREE_POOL_SIZE, free_seq)
+	free_seq += FREE_POOL_SIZE
 	for p in leavers:
 		rosters[club_id].erase(p)
+		p["free_agent"] = true
+		p["contract_years"] = 0
+		p.erase("auto_renew")
+		free_agents.append(p)
 		_news("contract", "%s has left on a free (contract not renewed)." % p.get("name", "?"))
 		_log("%s has left your club as his contract has not been renewed." % p.get("name", "?"))
+	if free_agents.size() > FREE_POOL_CAP:
+		free_agents = free_agents.slice(free_agents.size() - FREE_POOL_CAP)
 	# AI contracts tick but auto-renew, so rival squads stay stable across years.
 	for cid in rosters:
 		if int(cid) == club_id:
@@ -1150,7 +1208,8 @@ func to_dict() -> Dictionary:
 		"offers_left": offers_left, "news_log": news_log,
 		"training_intensity": training_intensity, "youth": youth,
 		"youth_seq": youth_seq, "staff": staff, "staff_pool": staff_pool,
-		"staff_seq": staff_seq, "fa_cup": fa_cup,
+		"staff_seq": staff_seq, "free_agents": free_agents, "free_seq": free_seq,
+		"fa_cup": fa_cup,
 		"league_cup": league_cup,
 		"last_champion_id": last_champion_id, "last_fa_winner_id": last_fa_winner_id,
 		"last_runners_up": last_runners_up, "charity_shield": charity_shield,
@@ -1210,6 +1269,9 @@ static func from_dict(d: Dictionary) -> Career:
 	c.staff = d.get("staff", [])
 	c.staff_pool = d.get("staff_pool", [])
 	c.staff_seq = int(d.get("staff_seq", STAFF_ID_BASE))
+	# Pre-free-agent saves load with an empty pool; the first rollover seeds a fresh batch.
+	c.free_agents = d.get("free_agents", [])
+	c.free_seq = int(d.get("free_seq", FREE_ID_BASE))
 	# Saves from before the cups existed load with no bracket; they stay inert this
 	# season (round_due is false on an empty dict) and are rebuilt at the next rollover.
 	c.fa_cup = d.get("fa_cup", {})

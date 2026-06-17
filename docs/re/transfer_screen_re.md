@@ -53,3 +53,15 @@ Geometry helpers (same family proven on finance/squad/lineup):
   YOUTH TEAM / RETURN).
 - Driven live by `Career.market()` (`TransferMarket.market`), which already sorts
   dearest first; the screen takes the row list (GameDB-free, headless-testable).
+
+## Free agents (T2 #9)
+PM98 lets you sign out-of-contract players on a free. A **FREE AGENTS** entry on the
+transfer desk lists `Career.free_agents`; tapping one opens a wage negotiation
+(`Career.sign_free_agent` → `Contract.evaluate_renewal`: accepts at/above his demand, balks
+just below, refuses a lowball) and signs him for **no fee** onto the live squad + wage bill.
+Same board guards as a transfer (window, weekly offers, squad max), minus cash. The pool is
+seeded at career start and refreshed each season by `TransferMarket.generate_free_agents`
+(released journeymen, GameDB-free, reusing the Youth name pools + attribute builder), and the
+manager's own **non-renewed leavers drop into it** at the season rollover (capped at
+`FREE_POOL_CAP`). New career state (`free_agents` / `free_seq`) round-trips through save/load.
+Test: `app/tests/test_free_agents.gd`.

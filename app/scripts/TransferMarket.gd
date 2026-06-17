@@ -242,3 +242,33 @@ static func ai_round(rng: RandomNumberGenerator, rosters: Dictionary, names: Dic
 		buyer.append(player)
 		news.append("%s has been signed by %s." % [player.get("name", "?"), names.get(buyer_id, "?")])
 	return news
+
+
+# ---- free agents ---------------------------------------------------------
+
+# A free agent is an out-of-contract journeyman: older than a youth intake, modest ability.
+const FA_AGE_LO := 28
+const FA_AGE_HI := 35
+const FA_CA_LO := 42
+const FA_CA_HI := 64
+const FA_GK_CHANCE := 0.18
+
+## Generate `count` free agents (released journeymen) with ids from `first_id`. Reuses the
+## Youth name pools + attribute builder (GameDB-free) so a fresh pool reads like real players.
+## Returns player dicts shaped like a senior (id/name/age/isGK/attrs) + free_agent/contract_years.
+static func generate_free_agents(rng: RandomNumberGenerator, count: int, first_id: int) -> Array:
+	var out: Array = []
+	for i in maxi(0, count):
+		var is_gk := rng.randf() < FA_GK_CHANCE
+		var ca := rng.randi_range(FA_CA_LO, FA_CA_HI)
+		out.append({
+			"id": first_id + i,
+			"name": "%s %s" % [Youth._FORENAMES[rng.randi() % Youth._FORENAMES.size()],
+				Youth._SURNAMES[rng.randi() % Youth._SURNAMES.size()]],
+			"age": rng.randi_range(FA_AGE_LO, FA_AGE_HI),
+			"isGK": is_gk,
+			"attrs": Youth._make_attrs(rng, ca, is_gk),
+			"contract_years": 0,
+			"free_agent": true,
+		})
+	return out

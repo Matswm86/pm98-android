@@ -559,6 +559,11 @@ func _screens_shot() -> void:
 	await _settle()
 	_save_shot(dir, "prices.png")
 	_free_overlays()
+	# T2 #9: the FREE AGENTS list.
+	_show_free_agents()
+	await _settle()
+	_save_shot(dir, "free_agents.png")
+	_free_overlays()
 	print("SCREENS-SHOT done club=%s week=%d" % [_career.club_name, _career.week])
 	get_tree().quit()
 
@@ -2038,6 +2043,7 @@ func _show_transfers() -> void:
 	rows.append("VIEW TRANSFER MARKET   (the screen)"); payload.append({"t": "screen"})
 	rows.append("TRANSFER MARKET"); payload.append({"t": "market"})
 	rows.append("MY SQUAD   (sell / RENEW)"); payload.append({"t": "squad"})
+	rows.append("FREE AGENTS   (%d)   -  sign for £0 + wages" % c.free_agents.size()); payload.append({"t": "free"})
 	rows.append("Shortlist   (%d)" % c.shortlist.size()); payload.append({"t": "shortlist"})
 	rows.append("Transfer news   (%d)" % c.transfer_log.size()); payload.append({"t": "news"})
 	var win := ("OPEN, deadline in %d weeks" % c.deadline_weeks_left()) if c.transfers_open() else "CLOSED"
@@ -2050,6 +2056,7 @@ func _activate_transfers(which: String) -> void:
 		"screen": _show_transfer_screen()
 		"market": _push(_show_market)
 		"squad": _push(_show_transfer_squad)
+		"free": _push(_show_free_agents)
 		"shortlist": _push(_show_shortlist)
 		"news": _push(_show_transfer_news)
 
@@ -2105,6 +2112,55 @@ func _market_action(row: Dictionary, it: Dictionary) -> void:
 		_push(_show_deal_result.bind(res["msg"]))
 	else:
 		_toast(res["msg"])                   # stay; try a higher bid (offers permitting)
+
+## FREE AGENTS (T2 #9): out-of-contract players you can sign for no fee, just a wage. Tap
+## one to open the wage negotiation. Driven by Career.free_agents (released + generated).
+func _show_free_agents() -> void:
+	var rows: Array = []
+	var payload: Array = []
+	var pool: Array = _career.free_agents.duplicate()
+	pool.sort_custom(func(a, b): return int(a.get("attrs", {}).get("CA", 0)) > int(b.get("attrs", {}).get("CA", 0)))
+	for p in pool:
+		var gk := "GK" if p.get("isGK") else "  "
+		var ca := int(p.get("attrs", {}).get("CA", 0))
+		var demand := Contract.demanded_weekly(p, _career.tier)
+		rows.append("%-16s %s CA%2d  age %d  asks £%s/wk" % [
+			str(p.get("name", "?")).substr(0, 16), gk, ca, int(p.get("age", 0)), _fmt_int(demand)])
+		payload.append(p)
+	if rows.is_empty():
+		rows.append("No free agents available right now.")
+		payload.append(null)
+	_set_view("FREE AGENTS", "Sign for £0 fee + an agreed wage  -  %d offers left" % _career.offers_left,
+		rows, payload, func(p):
+			if p != null:
+				_push(_show_free_agent_deal.bind(p)))
+
+func _show_free_agent_deal(player: Dictionary) -> void:
+	var pid := int(player.get("id", -1))
+	var demand := Contract.demanded_weekly(player, _career.tier)
+	var rows: Array = []
+	var payload: Array = []
+	rows.append("Offer his demand        £%s/wk" % _fmt_int(demand)); payload.append({"wage": demand})
+	rows.append("Offer above demand      £%s/wk" % _fmt_int(_bid_round(int(demand * 1.15))))
+	payload.append({"wage": _bid_round(int(demand * 1.15))})
+	rows.append("Offer below (risky)     £%s/wk" % _fmt_int(_bid_round(int(demand * 0.85))))
+	payload.append({"wage": _bid_round(int(demand * 0.85))})
+	var ca := int(player.get("attrs", {}).get("CA", 0))
+	_set_view("Sign %s" % player.get("name", "?"),
+		"CA %d  -  age %d  -  free transfer, wage only  -  %d offers left" % [
+			ca, int(player.get("age", 0)), _career.offers_left],
+		rows, payload, func(it): _free_agent_action(pid, int(it["wage"])))
+
+func _free_agent_action(pid: int, wage: int) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var res := _career.sign_free_agent(pid, wage, rng)
+	_career.save()
+	if res["ok"]:
+		_nav.pop_back()                     # drop the offer screen
+		_push(_show_deal_result.bind(res["msg"]))
+	else:
+		_toast(res["msg"])                  # stay; renegotiate (offers permitting)
 
 func _show_transfer_squad() -> void:
 	var squad: Array = _career.my_squad().duplicate()
