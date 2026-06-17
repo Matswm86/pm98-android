@@ -84,8 +84,8 @@ func _run() -> bool:
 	for _i in 2:
 		await process_frame
 	scr.setup("ARSENAL", "", "1997-98", "Highbury", 38000, 23000, 15000, 1400, "+5,000 in 3 wk")
-	ok = _assert(scr._hit(StadiumScreen.LBL_WORKS.get_center()) == "works", "WORKS button hit-tests") and ok
-	ok = _assert(scr._hit(StadiumScreen.LBL_RETURN.get_center()) == "return", "RETURN button hit-tests") and ok
+	ok = _assert(scr._hit(StadiumScreen.BTN_WORKS.get_center()) == "works", "WORKS button hit-tests") and ok
+	ok = _assert(scr._hit(StadiumScreen.BTN_RETURN.get_center()) == "return", "RETURN button hit-tests") and ok
 	ok = _assert(scr._hit(Vector2(320, 250)) == "dismiss", "a tap on the scene dismisses") and ok
 	scr.queue_free()
 

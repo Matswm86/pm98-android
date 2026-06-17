@@ -1,50 +1,53 @@
 extends Control
 class_name StadiumScreen
-## PM98 GROUND (ESTADIO) overview screen rebuilt from the ORIGINAL game art at the
-## coordinates reversed out of MANAGER.EXE (OnDraw FUN_0051a6e0). See
-## docs/re/stadium_screen_re.md.
+## PM98 GROUND (ESTADIO) screen, rebuilt to match the real game (ma_15): the shared
+## PMChrome plaque header + blue marble background over a TWO-COLUMN layout — left a
+## white MATCH DAY card (ground / league / fixture + the TICKET PRICE stepper) and the
+## SPONSOR BOARDS price slider; right the CAPACITY / CAR PARK / PITCH table over the
+## pre-rendered ESTADIO<tier> stadium scene — with the IMPROVE / WORKS / MATCH DAY /
+## RETURN action grid along the bottom.
 ##
-## The stadium picture is one of 12 pre-rendered ESTADIO<tier>.BMP scenes (320x240,
-## half res). The game picks the tier by capacity:
-##   tier = clamp(capacity * 11 / 130000, 0, 11)        (FUN_0051a6e0 @0x51a728)
-## and blits it across the reversed client rect CRect(0,0,640,480) at 2x (half-res
-## backdrop). The title GROUND (150,16), the info panel (299,73,320,73) and the 2x2
-## action grid IMPROVE(298,407) / WORKS(484,407) / MATCH DAY(298,442) / RETURN(488,442)
-## are exact-reversed overlays painted on top. Display-only (works/improve/match-day
-## stay in the text menu); native 640x480, self-scales + marble-bezels to fit landscape.
+## The stadium picture is one of 12 pre-rendered ESTADIO<tier>.BMP scenes; the tier is
+## tier = clamp(capacity * 11 / 130000, 0, 11) (reversed FUN_0051a6e0). The invented
+## SEATS / STAND / TIER readouts the prior build showed are dropped. Native 640x480.
 
 signal works_pressed   # the WORKS button -> Main opens the expansion options
-signal back_pressed    # RETURN, or a tap on the stadium scene -> dismiss
+signal back_pressed    # RETURN, or a tap on empty space -> dismiss
 
 const W := 640
 const H := 480
-const MAX_CAPACITY := 130000                    # tier 11 threshold (130000/11 per tier)
+const MAX_CAPACITY := 130000
 
-const C_TITLE := Color(0.96, 0.97, 1.0)
-const C_TEXT := Color(0.86, 0.90, 0.96)
-const C_DIM := Color(0.59, 0.69, 0.82)
-const C_HEAD := Color(0.67, 0.78, 0.92)
-const C_LABEL := Color(0.63, 0.63, 0.78)         # FUN_00437020 -> (160,160,200)
-const C_PANEL := Color(0.13, 0.21, 0.38)
-const C_PANEL_HI := Color(0.27, 0.43, 0.65)
-const C_PANEL_LO := Color(0.07, 0.13, 0.26)
-const C_BTN := Color(0.18, 0.28, 0.47)
-const C_VAL := Color(0.96, 0.87, 0.47)
+const C_MATCHDAY := Color(0.16, 0.28, 0.66)
+const C_BLACKBAR := Color(0.07, 0.08, 0.10)
+const C_BARTXT := Color(0.94, 0.96, 1.0)
+const C_TICKET := Color(0.74, 0.80, 0.88)        # the ticket card body (pale blue-grey)
+const C_GREEN_HDR := Color(0.22, 0.50, 0.28)
+const C_ROWLBL := Color(0.40, 0.50, 0.66)        # blue-grey label cell
+const C_ROWVAL := Color(0.84, 0.88, 0.92)        # light value cell
+const C_VALTXT := Color(0.10, 0.16, 0.30)
+const C_SLIDER := Color(0.52, 0.74, 0.24)
+const C_SLIDER_BG := Color(0.30, 0.34, 0.30)
+const C_BOARDLBL := Color(0.70, 0.18, 0.12)      # red "PRICE OF BOARD" label
+const C_BTN := Color(0.08, 0.12, 0.24)
+const C_BTN_HI := Color(0.32, 0.44, 0.68)
+const C_BTN_LO := Color(0.03, 0.06, 0.14)
+const C_GOLD := Color(1.0, 0.86, 0.22)
+const C_PANEL_TXT := Color(0.88, 0.93, 1.0)
+const C_ROW_TXT := Color(0.10, 0.13, 0.22)
 
-# Reversed rects (left,top,w,h) from FUN_0051a6e0.
-const PANEL_INFO := Rect2(299, 73, 320, 73)
-const LBL_IMPROVE := Rect2(298, 407, 152, 25)
-const LBL_WORKS := Rect2(484, 407, 132, 25)
-const LBL_MATCHDAY := Rect2(298, 442, 152, 25)
-const LBL_RETURN := Rect2(488, 442, 124, 25)
+const L_PANEL := Rect2(6, 50, 282, 416)
+const R_HDR := Rect2(298, 50, 336, 18)
+const R_TABLE_Y := 72
+const SCENE_BOX := Rect2(298, 126, 336, 274)
+const BTN_IMPROVE := Rect2(298, 406, 164, 28)
+const BTN_WORKS := Rect2(470, 406, 164, 28)
+const BTN_MATCHDAY := Rect2(298, 438, 164, 28)
+const BTN_RETURN := Rect2(470, 438, 164, 28)
 
-var _bg: Texture2D
-var _bar: Texture2D
 var _scene: Texture2D
-var _ic_works: Texture2D
-var _ic_improve: Texture2D
-var _ic_match: Texture2D
 var _f14: Font
+var _f12: Font
 var _f10: Font
 var _f8: Font
 
@@ -52,22 +55,20 @@ var _club: String = ""
 var _manager: String = ""
 var _season: String = ""
 var _ground: String = ""
+var _league: String = ""
 var _capacity: int = 0
-var _seated: int = 0
-var _standing: int = 0
 var _parking: int = 0
 var _tier: int = 0
-var _works: String = ""     # in-progress expansion status (e.g. "+5,000 in 12 wk"), or ""
-var _press := ""            # button held down (for the highlight)
+var _ticket: int = 0
+var _board: int = 0
+var _week: int = 0
+var _works: String = ""
+var _press := ""
 
 
 func _ready() -> void:
-	_bg = load("res://art/screens/fondo_marble.png")
-	_bar = load("res://art/screens/barra0.png")
-	_ic_works = load("res://art/screens/stadium/obras.png")
-	_ic_improve = load("res://art/screens/stadium/remodela.png")
-	_ic_match = load("res://art/screens/stadium/diapartido.png")
 	_f14 = load("res://art/fonts/proman14.fnt")
+	_f12 = load("res://art/fonts/proman12.fnt")
 	_f10 = load("res://art/fonts/proman10.fnt")
 	_f8 = load("res://art/fonts/proman8.fnt")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -78,27 +79,29 @@ func _ready() -> void:
 	queue_redraw()
 
 
-## tier = clamp(capacity * 11 / 130000, 0, 11) — reversed FUN_0051a6e0 @0x51a728.
 static func tier_for(capacity: int) -> int:
 	return clampi(capacity * 11 / MAX_CAPACITY, 0, 11)
 
 
 func _load_scene() -> void:
 	_tier = tier_for(_capacity)
-	_scene = load("res://art/screens/stadium/estadio%d.png" % _tier)
+	var p := "res://art/screens/stadium/estadio%d.png" % _tier
+	_scene = load(p) if ResourceLoader.exists(p) else null
 
 
-## Feed the screen the live ground view, then repaint.
 func setup(club: String, manager: String, season: String, ground: String,
-		capacity: int, seated: int, standing: int, parking: int, works := "") -> void:
+		capacity: int, seated: int, standing: int, parking: int, works := "",
+		ticket := 0, board := 0, week := 0, league := "") -> void:
 	_club = club
 	_manager = manager
 	_season = season
 	_ground = ground
+	_league = league
 	_capacity = maxi(0, capacity)
-	_seated = maxi(0, seated)
-	_standing = maxi(0, standing)
 	_parking = maxi(0, parking)
+	_ticket = ticket
+	_board = board
+	_week = week
 	_works = works
 	_load_scene()
 	queue_redraw()
@@ -110,14 +113,12 @@ func _to_design(p: Vector2) -> Vector2:
 	var s: float = min(size.x / W, size.y / H) if size.x > 0 and size.y > 0 else 1.0
 	return (p - Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5)) / s
 
-## WORKS opens the expansion options; RETURN or a tap on the scene dismisses; IMPROVE /
-## MATCH DAY are inert (not yet built) so they neither act nor dismiss.
 func _hit(d: Vector2) -> String:
-	if LBL_WORKS.has_point(d):
+	if BTN_WORKS.has_point(d):
 		return "works"
-	if LBL_RETURN.has_point(d):
+	if BTN_RETURN.has_point(d):
 		return "return"
-	if LBL_IMPROVE.has_point(d) or LBL_MATCHDAY.has_point(d):
+	if BTN_IMPROVE.has_point(d) or BTN_MATCHDAY.has_point(d):
 		return "inert"
 	return "dismiss"
 
@@ -162,73 +163,109 @@ func _txt(f: Font, x: int, y_top: int, s: String, col: Color, sz: int, right := 
 	draw_string(f, Vector2(px, y_top + f.get_ascent(sz)), s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
 
 
-func _panel(r: Rect2, base := C_PANEL) -> void:
-	draw_rect(r, base, true)
-	draw_rect(Rect2(r.position.x, r.position.y, r.size.x, 1), C_PANEL_HI, true)
-	draw_rect(Rect2(r.position.x, r.position.y, 1, r.size.y), C_PANEL_HI, true)
-	draw_rect(Rect2(r.position.x, r.position.y + r.size.y - 1, r.size.x, 1), C_PANEL_LO, true)
-	draw_rect(Rect2(r.position.x + r.size.x - 1, r.position.y, 1, r.size.y), C_PANEL_LO, true)
+func _centre(f: Font, r: Rect2, s: String, col: Color, sz: int) -> void:
+	if f == null:
+		return
+	var w := f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
+	draw_string(f, Vector2(r.position.x + (r.size.x - w) * 0.5, r.position.y + (r.size.y - sz) * 0.5 + f.get_ascent(sz)),
+		s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
 
 
-func _button(r: Rect2, label: String, icon: Texture2D) -> void:
-	_panel(r, C_BTN)
-	var tx := int(r.position.x) + 8
-	if icon != null:
-		draw_texture(icon, Vector2(tx, r.position.y + (r.size.y - icon.get_height()) * 0.5))
-		tx += icon.get_width() + 6
-	_txt(_f10, tx, int(r.position.y) + 6, label, C_LABEL, 11)
-
+# ---- drawing -------------------------------------------------------------
 
 func _draw() -> void:
 	var s: float = min(size.x / W, size.y / H) if size.x > 0 and size.y > 0 else 1.0
-	# Darkened-marble bezel across the full node rect (landscape pillarbox).
-	if _bg != null:
-		draw_texture_rect(_bg, Rect2(Vector2.ZERO, size), false, Color(0.4, 0.4, 0.46))
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.05, 0.07, 0.14), true)
 	draw_set_transform(Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5), 0.0, Vector2(s, s))
 
-	# Half-res ESTADIO<tier> scene fills the reversed client rect at 2x, then BARRA chrome.
+	PMChrome.draw_bg(self)
+	PMChrome.draw_header(self, "GROUND", _manager, _club, _league, _season, _week,
+		_club_id_guess())
+
+	_draw_left()
+	_draw_right()
+	_draw_buttons()
+
+
+func _club_id_guess() -> int:
+	return -1   # the ground view carries no club id; header crest omitted
+
+
+func _draw_left() -> void:
+	PMChrome.draw_table_panel(self, L_PANEL)
+	_txt(_f14, int(L_PANEL.position.x) + 14, int(L_PANEL.position.y) + 8, "MATCH DAY", C_MATCHDAY, 15)
+
+	# TICKET PRICE black bar + ticket card.
+	var tb := Rect2(L_PANEL.position.x + 6, L_PANEL.position.y + 32, L_PANEL.size.x - 12, 16)
+	draw_rect(tb, C_BLACKBAR, true)
+	_centre(_f10, tb, "TICKET PRICE", C_BARTXT, 11)
+	var card := Rect2(L_PANEL.position.x + 6, tb.end.y + 4, L_PANEL.size.x - 12, 96)
+	PMChrome.bevel(self, card, C_TICKET, C_TICKET.lightened(0.2), C_TICKET.darkened(0.3))
+	_centre(_f10, Rect2(card.position.x, card.position.y + 4, card.size.x, 12),
+		(_ground if _ground != "" else _club), C_VALTXT, 11)
+	_centre(_f8, Rect2(card.position.x, card.position.y + 18, card.size.x, 10),
+		_league if _league != "" else "League", Color(0.32, 0.40, 0.56), 9)
+	_centre(_f12, Rect2(card.position.x, card.position.y + 36, card.size.x, 14),
+		_club, C_VALTXT, 13)
+	# PRICE stepper
+	var py := int(card.end.y) - 22
+	_txt(_f10, int(card.position.x) + 10, py + 2, "PRICE", C_GOLD.darkened(0.2), 11)
+	_stepper(Rect2(card.position.x + 56, py, 16, 16))
+	_txt(_f12, int(card.position.x) + 120, py, "£%d" % _ticket, C_VALTXT, 13)
+	_stepper(Rect2(card.end.x - 26, py, 16, 16))
+
+	# SPONSOR BOARDS black bar + price slider.
+	var sb := Rect2(L_PANEL.position.x + 6, card.end.y + 12, L_PANEL.size.x - 12, 16)
+	draw_rect(sb, C_BLACKBAR, true)
+	_centre(_f10, sb, "SPONSOR BOARDS", C_BARTXT, 11)
+	_txt(_f10, int(L_PANEL.position.x) + 14, int(sb.end.y) + 8, "PRICE OF BOARD", C_BOARDLBL, 11)
+	var sl := Rect2(L_PANEL.position.x + 14, sb.end.y + 24, L_PANEL.size.x - 28, 14)
+	PMChrome.bevel(self, sl, C_SLIDER_BG, C_SLIDER_BG.lightened(0.2), C_SLIDER_BG.darkened(0.3))
+	var frac := clampf(float(_board) / float(maxi(_board, 1) * 1.4), 0.2, 0.95) if _board > 0 else 0.5
+	draw_rect(Rect2(sl.position.x + 1, sl.position.y + 1, (sl.size.x - 2) * frac, sl.size.y - 2), C_SLIDER, true)
+	_txt(_f10, int(sl.end.x), int(sl.end.y) + 4, "£%s per board" % fmt_int(_board), C_ROW_TXT, 10, true)
+
+
+func _stepper(r: Rect2) -> void:
+	PMChrome.bevel(self, r, C_BTN, C_BTN_HI, C_BTN_LO)
+
+
+func _draw_right() -> void:
+	# Ground-name green header.
+	PMChrome.bevel(self, R_HDR, C_GREEN_HDR, C_GREEN_HDR.lightened(0.25), C_GREEN_HDR.darkened(0.4))
+	_centre(_f12, R_HDR, (_ground if _ground != "" else _club), Color(0.96, 1.0, 0.94), 13)
+
+	# CAPACITY / CAR PARK / PITCH table.
+	var rows := [["CAPACITY", "%s seats" % fmt_int(_capacity)],
+		["CAR PARK", "%s spaces" % fmt_int(_parking)],
+		["PITCH", "NORMAL"]]
+	var y := R_TABLE_Y
+	for r in rows:
+		var lbl := Rect2(R_HDR.position.x, y, 96, 16)
+		var val := Rect2(R_HDR.position.x + 98, y, R_HDR.size.x - 98, 16)
+		PMChrome.bevel(self, lbl, C_ROWLBL, C_ROWLBL.lightened(0.2), C_ROWLBL.darkened(0.3))
+		PMChrome.bevel(self, val, C_ROWVAL, C_ROWVAL.lightened(0.2), C_ROWVAL.darkened(0.3))
+		_txt(_f10, int(lbl.position.x) + 6, y + 2, str(r[0]), C_PANEL_TXT, 11)
+		_txt(_f10, int(val.position.x) + 8, y + 2, str(r[1]), C_VALTXT, 11)
+		y += 18
+
+	# Stadium scene render inside the right box.
 	if _scene != null:
-		draw_texture_rect(_scene, Rect2(0, 0, W, H), false)
-	elif _bg != null:
-		draw_texture_rect(_bg, Rect2(0, 0, W, H), false)
-	if _bar != null:
-		draw_texture_rect(_bar, Rect2(0, 0, W, _bar.get_height()), false)
-
-	# Title in the BARRA bar + live chrome corners.
-	_txt(_f14, 150, 13, "GROUND", C_TITLE, 15)
-	_txt(_f10, 12, 9, "Manager", C_TEXT, 11)
-	_txt(_f10, 12, 26, (_manager if _manager != "" else _club).substr(0, 18), C_DIM, 11)
-	_txt(_f10, 628, 9, _club.substr(0, 18), C_TEXT, 11, true)
-	if _season != "":
-		_txt(_f10, 628, 26, _season, C_DIM, 11, true)
-
-	# Right info panel: ground name + the capacity readout that drives the tier.
-	_panel(PANEL_INFO)
-	var ix := int(PANEL_INFO.position.x) + 10
-	var iy := int(PANEL_INFO.position.y) + 6
-	var rx := int(PANEL_INFO.end.x) - 10
-	var midx := int(PANEL_INFO.position.x + PANEL_INFO.size.x * 0.5)
-	_txt(_f10, ix, iy, (_ground if _ground != "" else _club).to_upper().substr(0, 22), C_HEAD, 11)
-	_txt(_f8, ix, iy + 18, "CAPACITY", C_DIM, 10)
-	_txt(_f8, rx, iy + 18, fmt_int(_capacity), C_VAL, 10, true)
-	_txt(_f8, ix, iy + 32, "SEATS", C_DIM, 10)
-	_txt(_f8, midx - 6, iy + 32, fmt_int(_seated), C_TEXT, 10, true)
-	_txt(_f8, midx + 6, iy + 32, "CAR PARK", C_DIM, 10)
-	_txt(_f8, rx, iy + 32, fmt_int(_parking), C_TEXT, 10, true)
-	_txt(_f8, ix, iy + 46, "STAND.  " + fmt_int(_standing), C_DIM, 10)
-	_txt(_f8, rx, iy + 46, "TIER %d/11" % _tier, C_DIM, 10, true)
-
-	# In-progress expansion banner above the button grid.
+		draw_texture_rect(_scene, SCENE_BOX, false)
+	else:
+		draw_rect(SCENE_BOX, Color(0.10, 0.20, 0.12), true)
 	if _works != "":
-		_txt(_f8, 298, 392, "GROUND WORKS:  %s remaining" % _works, C_VAL, 10)
+		_txt(_f8, int(SCENE_BOX.position.x) + 6, int(SCENE_BOX.position.y) + 4,
+			"GROUND WORKS: %s remaining" % _works, C_GOLD, 10)
 
-	# 2x2 action grid (each button + its reversed icon).
-	_button(LBL_IMPROVE, "IMPROVE", _ic_improve)
-	_button(LBL_WORKS, "WORKS", _ic_works)
-	_button(LBL_MATCHDAY, "MATCH DAY", _ic_match)
-	_button(LBL_RETURN, "RETURN", null)
 
-	# Press highlight over the held button.
-	var hit := {"works": LBL_WORKS, "return": LBL_RETURN, "improve": LBL_IMPROVE}
-	if _press in ["works", "return"]:
-		draw_rect(hit[_press], Color(1, 1, 1, 0.18), true)
+func _draw_buttons() -> void:
+	_button(BTN_IMPROVE, "IMPROVE", false)
+	_button(BTN_WORKS, "WORKS", _press == "works")
+	_button(BTN_MATCHDAY, "MATCH DAY", false)
+	_button(BTN_RETURN, "RETURN", _press == "return")
+
+
+func _button(r: Rect2, label: String, held: bool) -> void:
+	PMChrome.bevel(self, r, C_BTN_HI if held else C_BTN, C_BTN_HI, C_BTN_LO)
+	_centre(_f12, r, label, C_GOLD, 13)

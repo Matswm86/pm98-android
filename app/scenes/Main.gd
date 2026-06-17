@@ -1346,7 +1346,9 @@ func _show_stadium_screen() -> void:
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
 	scr.setup(_career.club_name, "", _career.season, ground,
-		cap, seated, cap - seated, int(round(cap / 27.0)), _career.works_status())
+		cap, seated, cap - seated, int(round(cap / 27.0)), _career.works_status(),
+		int(sm.get("ticket_price", 0)), int(sm.get("board_price", 0)), _career.week + 1,
+		_career.league_name)
 	scr.works_pressed.connect(_show_stadium_works)
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
 

@@ -31,9 +31,7 @@ func _run() -> void:
 	ok = _assert(StadiumScreen.fmt_int(900) == "900", "fmt_int small") and ok
 
 	# Every cracked asset must exist + load.
-	var assets := ["res://art/screens/fondo_marble.png", "res://art/screens/barra0.png",
-		"res://art/screens/stadium/obras.png", "res://art/screens/stadium/remodela.png",
-		"res://art/screens/stadium/diapartido.png",
+	var assets := ["res://art/screens/management_bg.png",
 		"res://art/fonts/proman14.fnt", "res://art/fonts/proman10.fnt", "res://art/fonts/proman8.fnt"]
 	for t in range(12):
 		assets.append("res://art/screens/stadium/estadio%d.png" % t)
@@ -41,11 +39,11 @@ func _run() -> void:
 		ok = _assert(ResourceLoader.exists(path), "asset present: %s" % path) and ok
 		ok = _assert(load(path) != null, "asset loads: %s" % path) and ok
 
-	# Reversed rects must stay inside the native 640x480 canvas.
+	# Action-grid rects must stay inside the native 640x480 canvas.
 	var rects := {
-		"PANEL_INFO": StadiumScreen.PANEL_INFO, "LBL_IMPROVE": StadiumScreen.LBL_IMPROVE,
-		"LBL_WORKS": StadiumScreen.LBL_WORKS, "LBL_MATCHDAY": StadiumScreen.LBL_MATCHDAY,
-		"LBL_RETURN": StadiumScreen.LBL_RETURN,
+		"BTN_IMPROVE": StadiumScreen.BTN_IMPROVE,
+		"BTN_WORKS": StadiumScreen.BTN_WORKS, "BTN_MATCHDAY": StadiumScreen.BTN_MATCHDAY,
+		"BTN_RETURN": StadiumScreen.BTN_RETURN,
 	}
 	for name in rects:
 		var r: Rect2 = rects[name]
@@ -59,16 +57,14 @@ func _run() -> void:
 		await process_frame
 	ok = _assert(screen._f14 != null and screen._f10 != null and screen._f8 != null,
 		"PROMAN fonts loaded") and ok
-	ok = _assert(screen._bg != null and screen._bar != null, "FONDO + BARRA loaded") and ok
-	ok = _assert(screen._ic_works != null and screen._ic_improve != null and screen._ic_match != null,
-		"button icons loaded") and ok
+	ok = _assert(PMChrome.bg() != null, "PMChrome management background loads") and ok
 
 	# setup() wires data, clamps negatives, and selects the matching tier scene.
 	screen.setup("Arsenal", "", "1997-98", "Highbury", 24500, 18000, -5, 900)
 	await process_frame
 	ok = _assert(screen._capacity == 24500, "capacity wired") and ok
 	ok = _assert(screen._ground == "Highbury", "ground wired") and ok
-	ok = _assert(screen._standing == 0, "negative standing clamped") and ok
+	ok = _assert(screen._parking == 900, "parking wired") and ok
 	ok = _assert(screen._tier == 2, "tier resolved from capacity") and ok
 	ok = _assert(screen._scene != null, "tier scene loaded") and ok
 
