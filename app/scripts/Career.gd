@@ -752,6 +752,16 @@ func loan_market() -> Array:
 	return TransferMarket.loan_market(rosters, club_names, tier, club_id)
 
 
+## A SCOUT's transfer report (T2 #10): the best affordable targets across the league, most
+## able first, as many as the scout's quality. [] when you have no scout hired.
+func scout_targets() -> Array:
+	if not Staff.has_scout(staff):
+		return []
+	var affordable: Array = market().filter(func(r): return int(r["fee"]) <= cash)
+	affordable.sort_custom(func(a, b): return int(a["ca"]) > int(b["ca"]))
+	return affordable.slice(0, Staff.scout_quality(staff))
+
+
 ## Take player `pid` on loan from `from_club_id` for the season: no fee, you pay his wage,
 ## and he RETURNS to his parent club at the next rollover. Same board guards as a signing
 ## (window, weekly offers, squad max). {ok, msg}.
@@ -913,12 +923,21 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 		# Contract up. An auto-renew player is re-signed at his demand if the club can fund the
 		# deal (a season's wage); otherwise -- and for everyone without auto-renew -- he leaves
 		# on a FREE TRANSFER. You tie a player down in advance via the RENEW screen.
-		if p.get("auto_renew") and Contract.yearly(Contract.demanded_weekly(p, tier)) <= cash:
-			var w := Contract.demanded_weekly(p, tier)
+		var demand_wk := Contract.demanded_weekly(p, tier)
+		var affordable := Contract.yearly(demand_wk) <= cash
+		# An ASSISTANT MANAGER (T2 #10) re-signs an expiring player good enough to keep, so your
+		# stars don't walk for free while you're not looking. His quality lowers the CA bar
+		# (q5 keeps CA>=60, q1 keeps CA>=72); needs no auto_renew flag, only affordability.
+		var aq := Staff.assistant_quality(staff)
+		var ca := int(p.get("attrs", {}).get("CA", 0))
+		var assistant_keeps := aq > 0 and ca >= 75 - aq * 3
+		if (p.get("auto_renew") or assistant_keeps) and affordable:
 			p["contract_years"] = Contract.NEW_TERM_YEARS
-			p["wage"] = w
-			_news("contract", "%s has renewed his contract (auto)." % p.get("name", "?"))
-			_log("%s has renewed his contract on £%s/wk (auto)." % [p.get("name", "?"), _money(w)])
+			p["wage"] = demand_wk
+			var how := "auto" if p.get("auto_renew") else "assistant"
+			_news("staff" if how == "assistant" else "contract",
+				"%s has renewed his contract (%s)." % [p.get("name", "?"), how])
+			_log("%s has renewed his contract on £%s/wk (%s)." % [p.get("name", "?"), _money(demand_wk), how])
 		else:
 			leavers.append(p)
 	# A fresh batch of free agents for the new season; the manager's own released players join

@@ -74,3 +74,19 @@ rng draws, persistence + legacy-save compat). Verified by a REAL render
 (`PM98_STAFF_SHOT=1` under opengl3, `screens/staff.png`): a hired trainer/physio/youth coach
 over an available pool, `£3,596/wk` reconciling with the three wages, and the live
 `+5% dev / −25% injuries / +12% youth` effect readout.
+
+## Automation roles — SCOUT + ASSISTANT MANAGER (T2 #10)
+Two roles previously deferred are now hireable from the same pool (they show in CURRENT
+STAFF / STAFF AVAILABLE with a role + quality + wage like the others; they carry no `_factor`
+multiplier — their effect is a hook):
+- **SCOUT** — `Career.scout_targets()` surfaces the best AFFORDABLE league targets, most able
+  first, as many as his quality (1-5). A **SCOUT REPORT** entry appears on the transfer desk
+  only when a scout is hired; tapping a target opens the bid screen.
+- **ASSISTANT MANAGER** — at the season rollover (`advance_season`) he auto-renews an expiring
+  player good enough to keep, so your stars don't walk for free unnoticed. His quality lowers
+  the CA bar (`keep_ca = 75 - quality*3`: q5 keeps CA≥60, q1 keeps CA≥72); gated on
+  affordability, same as the manual auto-renew flag.
+Helpers: `Staff.has_scout/scout_quality/has_assistant/assistant_quality`. Test:
+`app/tests/test_staff_roles.gd` (roles + wages, scout-report shape, assistant keeps an
+expiring star vs a no-assistant control where he leaves). Verified by the `PM98_STAFF_SHOT`
+render (Scout + Assistant Manager in the hired team) and a SCOUT REPORT GL capture.

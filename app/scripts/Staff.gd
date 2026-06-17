@@ -23,7 +23,12 @@ extends RefCounted
 const TRAINER := "Trainer"
 const PHYSIO := "Physiotherapist"
 const YOUTH_COACH := "Youth Coach"
-const ROLES := [TRAINER, PHYSIO, YOUTH_COACH]
+# Automation roles (T2 #10): a SCOUT produces transfer suggestions, an ASSISTANT MANAGER
+# protects your expiring stars by auto-renewing them at the rollover. They have no _factor
+# (their effect is a hook, not a multiplier) -- see has_scout / scout_quality / etc.
+const SCOUT := "Scout"
+const ASSISTANT := "Assistant Manager"
+const ROLES := [TRAINER, PHYSIO, YOUTH_COACH, SCOUT, ASSISTANT]
 
 # Per-role tuning. effect = the per-quality-point step on that role's factor; the factor is
 # clamped to [lo, hi]. wage = yearly_base + quality * wage_step (a seasonal wage).
@@ -34,6 +39,10 @@ const _DEF := {
 		"icon": "emple6", "blurb": "cuts injury risk"},
 	"Youth Coach": {"step": 0.06, "lo": 1.0, "hi": 1.6, "wage_base": 28000, "wage_step": 14000,
 		"icon": "emple7", "blurb": "improves the academy"},
+	"Scout": {"step": 0.0, "lo": 1.0, "hi": 1.0, "wage_base": 24000, "wage_step": 11000,
+		"icon": "emple1", "blurb": "finds transfer targets"},
+	"Assistant Manager": {"step": 0.0, "lo": 1.0, "hi": 1.0, "wage_base": 40000, "wage_step": 20000,
+		"icon": "emple2", "blurb": "auto-renews your stars"},
 }
 
 const QUALITY_LO := 1
@@ -117,6 +126,32 @@ static func physio_factor(staff: Array) -> float:
 ## Youth multiplier from the youth coach (>= 1.0; feeds Youth.intake + Youth.develop_week).
 static func youth_factor(staff: Array) -> float:
 	return _factor(staff, YOUTH_COACH)
+
+
+# ---- automation hooks (scout / assistant) --------------------------------
+
+## Highest quality among hired members of `role` (0 if none).
+static func _best_quality(staff: Array, role: String) -> int:
+	var q := 0
+	for m in staff:
+		if str(m.get("role", "")) == role:
+			q = maxi(q, int(m.get("quality", 0)))
+	return q
+
+static func has_scout(staff: Array) -> bool:
+	return _best_quality(staff, SCOUT) > 0
+
+## How many transfer targets the scout will surface (= his quality, 1-5).
+static func scout_quality(staff: Array) -> int:
+	return _best_quality(staff, SCOUT)
+
+static func has_assistant(staff: Array) -> bool:
+	return _best_quality(staff, ASSISTANT) > 0
+
+## The assistant's quality (1-5): the CA bar above which he auto-renews an expiring player
+## scales with it, so a better assistant protects more of your squad.
+static func assistant_quality(staff: Array) -> int:
+	return _best_quality(staff, ASSISTANT)
 
 
 # ---- wages ---------------------------------------------------------------

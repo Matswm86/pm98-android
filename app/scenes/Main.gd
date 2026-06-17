@@ -574,6 +574,16 @@ func _screens_shot() -> void:
 	await _settle()
 	_save_shot(dir, "loan_market.png")
 	_free_overlays()
+	# T2 #10: the SCOUT REPORT (hire a scout first so the report is available).
+	for cand in (_career.staff_pool as Array).duplicate():
+		if str(cand.get("role", "")) == Staff.SCOUT:
+			_career.hire_staff(int(cand.get("id", -1)))
+			break
+	_career.cash = 50_000_000
+	_show_scout_report()
+	await _settle()
+	_save_shot(dir, "scout_report.png")
+	_free_overlays()
 	print("SCREENS-SHOT done club=%s week=%d" % [_career.club_name, _career.week])
 	get_tree().quit()
 
@@ -2087,6 +2097,8 @@ func _show_transfers() -> void:
 	rows.append("MY SQUAD   (sell / RENEW)"); payload.append({"t": "squad"})
 	rows.append("FREE AGENTS   (%d)   -  sign for £0 + wages" % c.free_agents.size()); payload.append({"t": "free"})
 	rows.append("LOAN MARKET   -  take a player for the season"); payload.append({"t": "loan"})
+	if Staff.has_scout(c.staff):
+		rows.append("SCOUT REPORT   (%d targets)" % c.scout_targets().size()); payload.append({"t": "scout"})
 	rows.append("Shortlist   (%d)" % c.shortlist.size()); payload.append({"t": "shortlist"})
 	rows.append("Transfer news   (%d)" % c.transfer_log.size()); payload.append({"t": "news"})
 	var win := ("OPEN, deadline in %d weeks" % c.deadline_weeks_left()) if c.transfers_open() else "CLOSED"
@@ -2101,6 +2113,7 @@ func _activate_transfers(which: String) -> void:
 		"squad": _push(_show_transfer_squad)
 		"free": _push(_show_free_agents)
 		"loan": _push(_show_loan_market)
+		"scout": _push(_show_scout_report)
 		"shortlist": _push(_show_shortlist)
 		"news": _push(_show_transfer_news)
 
@@ -2205,6 +2218,25 @@ func _free_agent_action(pid: int, wage: int) -> void:
 		_push(_show_deal_result.bind(res["msg"]))
 	else:
 		_toast(res["msg"])                  # stay; renegotiate (offers permitting)
+
+## SCOUT REPORT (T2 #10): your scout's recommended transfer targets (best affordable, most
+## able first, as many as his quality). Tap one to open the bid screen. Needs a SCOUT hired.
+func _show_scout_report() -> void:
+	var rows: Array = []
+	var payload: Array = []
+	for row in _career.scout_targets():
+		var gk := "GK" if row["isGK"] else "  "
+		var star := "♥" if _career.shortlist.has(int(row["pid"])) else " "
+		rows.append("%s%-15s %s CA%2d £%-9s %s" % [
+			star, row["name"], gk, int(row["ca"]), _fmt_int(int(row["fee"])), row["club_name"]])
+		payload.append(row)
+	if rows.is_empty():
+		rows.append("Your scout has no affordable targets to recommend.")
+		payload.append(null)
+	_set_view("SCOUT REPORT", "Your scout's recommended targets  -  tap to bid",
+		rows, payload, func(r):
+			if r != null:
+				_push(_show_market_player.bind(r)))
 
 ## LOAN MARKET (T2 #8): other clubs' fringe players you can take on loan for the season
 ## (no fee, you pay the wage, he returns to his parent at the rollover). Tap to confirm.
