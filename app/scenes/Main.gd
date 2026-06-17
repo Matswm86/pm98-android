@@ -1240,7 +1240,7 @@ func _show_transfer_screen() -> void:
 	var scr: TransferScreen = load("res://scenes/TransferScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
-	scr.setup(c.market(), c.club_name, "", c.season, c.cash, win, c.offers_left)
+	scr.setup(c.market(), c.club_name, "", c.season, c.cash, win, c.offers_left, c.week + 1)
 	scr.gui_input.connect(func(e: InputEvent) -> void:
 		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
 			scr.queue_free())

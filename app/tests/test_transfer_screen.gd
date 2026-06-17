@@ -19,8 +19,8 @@ func _run() -> void:
 	ok = _assert(TransferScreen.fmt_money(25000) == "£25,000", "fmt_money thousands") and ok
 	ok = _assert(TransferScreen.fmt_money(999) == "£999", "fmt_money sub-thousand") and ok
 
-	for path in ["res://art/screens/fondo_marble.png", "res://art/screens/barra0.png",
-			"res://art/fonts/proman14.fnt", "res://art/fonts/proman12.fnt",
+	for path in ["res://art/screens/management_bg.png",
+			"res://art/fonts/proman12.fnt",
 			"res://art/fonts/proman10.fnt", "res://art/fonts/proman8.fnt"]:
 		ok = _assert(ResourceLoader.exists(path), "asset present: %s" % path) and ok
 		ok = _assert(load(path) != null, "asset loads: %s" % path) and ok
@@ -66,9 +66,9 @@ func _run() -> void:
 	get_root().add_child(screen)
 	for _i in 3:
 		await process_frame
-	ok = _assert(screen._f14 != null and screen._f12 != null and screen._f10 != null
-		and screen._f8 != null, "PROMAN fonts loaded into screen") and ok
-	ok = _assert(screen._bg != null and screen._bar != null, "FONDO + BARRA loaded") and ok
+	ok = _assert(screen._f12 != null and screen._f10 != null and screen._f8 != null,
+		"PROMAN fonts loaded into screen") and ok
+	ok = _assert(PMChrome.bg() != null, "PMChrome management background loads") and ok
 	screen.setup(market, names[my_id], "A. FERGUSON", "1997-98", 8_000_000, "OPEN", 3)
 	await process_frame
 	ok = _assert(screen._rows.size() == market.size(), "screen received the market") and ok

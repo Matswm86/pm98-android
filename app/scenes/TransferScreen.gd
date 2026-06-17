@@ -1,91 +1,73 @@
 extends Control
 class_name TransferScreen
-## PM98 TRANSFER MARKET (FICHAR) screen rebuilt from the ORIGINAL game art at the
-## coordinates reversed out of MANAGER.EXE (FUN_00532a50). See
-## docs/re/transfer_screen_re.md.
+## PM98 TRANSFER MARKET (FICHAR) screen, rebuilt to match the real game (ma_11): the
+## shared PMChrome plaque header + blue marble background over the white buyable-player
+## table — (crest) | NAME | ★ rating | AV | MO | AGE | CLUB FEE | WAGE | CLUB — grouped
+## into the RED position bands KEEPERS / DEFENDERS / MIDFIELDERS / FORWARDS (the [3,5,5,5]
+## camrol-role table). A selected-player detail strip runs along the bottom; the nav
+## column (CURRENT OFFERS / SCOUT / OFFERS / RETURN) + BANK sit on the right.
 ##
-## Reversed: title "TRANSFER MARKET" at (150,16); the buyable-player list panel
-## (8,72)..(498,435) with 16px rows; the original groups players into the 4 position
-## bands KEEPERS/DEFENDERS/MIDFIELDERS/FORWARDS (the [3,5,5,5] camrol-role table) -
-## now that the demarcación byte is decoded (docs/re/positions_re.md) we render all four,
-## the dearest target per band, exactly as the SQUAD screen does. The right-hand nav
-## column (CURRENT OFFERS / SCOUT / OFFERS / RETURN) sits at x~512.
-##
-## Driven live by Career.market() (already sorted dearest first). Native 640x480;
-## scales to fit its parent.
+## Driven live by Career.market() (dearest first). Native 640x480; scales to fit its parent.
 
 const W := 640
 const H := 480
 
-const C_TITLE := Color(0.91, 0.94, 1.0)
-const C_TEXT := Color(0.86, 0.90, 0.96)
-const C_DIM := Color(0.59, 0.69, 0.82)
-const C_HEAD := Color(0.67, 0.78, 0.92)
-const C_CELL := Color(0.16, 0.27, 0.47)
-const C_CELL_HI := Color(0.27, 0.43, 0.65)
-const C_CELL_LO := Color(0.08, 0.16, 0.31)
-const C_ROW_A := Color(0.11, 0.17, 0.31)
-const C_ROW_B := Color(0.086, 0.14, 0.26)
-const C_SECTION := Color(0.47, 0.55, 0.63)   # FUN_00437020(0x78,0x8c,0xa0) blue-grey band header
-const C_NAME := Color(1.0, 1.0, 1.0)
-const C_FEE := Color(0.98, 0.86, 0.45)       # gold fee figure
-const C_KEY := Color(1.0, 0.87, 0.0)         # ★ first-XI marker
-const C_SHORT := Color(0.95, 0.45, 0.55)     # ♥ shortlisted marker
-const C_BTN := Color(0.16, 0.27, 0.47)
-const C_BTN_HI := Color(0.27, 0.43, 0.65)
-const C_RETURN := Color(0.81, 0.64, 0.65)    # peachy RETURN label (FUN_..(0xce,0xa2,0xa5))
+const C_SECTION := Color(0.78, 0.16, 0.14)       # RED position-band header (ma_11)
+const C_STATBAND := Color(0.86, 0.88, 0.92)
+const C_FEE := Color(0.70, 0.18, 0.12)           # red club-fee figure
+const C_WAGE := Color(0.16, 0.34, 0.20)          # green wage figure
+const C_DKBTN := Color(0.10, 0.16, 0.32)
+const C_DKBTN_HI := Color(0.34, 0.46, 0.72)
+const C_DKBTN_LO := Color(0.04, 0.08, 0.18)
+const C_GOLD := Color(1.0, 0.86, 0.22)
+const C_PANEL_TXT := Color(0.88, 0.93, 1.0)
+const C_STRIP := Color(0.90, 0.91, 0.86)
 
-# Reversed list region (8,72)..(498,435); top raised to 48 to seat the header row.
-const PANEL := Rect2(8, 48, 490, 387)
-const HDR_Y := 52
-const ROW0_Y := 70
+const TABLE := Rect2(6, 50, 498, 384)
+const HDR_Y := 66
+const ROW_X := 8
+const ROW_W := 494
+const ROW0_Y := 84
 const ROW_H := 16
-# The original's 4 position bands and their slot caps, lifted verbatim from the reversed
-# [3,5,5,5] camrol-role table (DAT_0065c020): KEEPERS(3) / DEFENDERS(5) / MIDFIELDERS(5)
-# / FORWARDS(5). We show the dearest buyable target per band, the same 18-slot shape that
-# fits the reversed panel exactly. See docs/re/transfer_screen_re.md + positions_re.md.
+const NAME_X := 28
+const STARS_X := 148
+const AV_X := 226
+const MO_X := 256
+const AGE_X := 292
+const FEE_X := 376
+const WAGE_X := 452
+const CLUB_X := 458
+
 const BAND_CAPS := {"GK": 3, "DF": 5, "MF": 5, "FW": 5, "OUT": 5}
 const BAND_ORDER := ["GK", "DF", "MF", "FW", "OUT"]
 const BAND_LABELS := {
 	"GK": "KEEPERS", "DF": "DEFENDERS", "MF": "MIDFIELDERS", "FW": "FORWARDS", "OUT": "OUTFIELD",
 }
 
-# Grid columns laid into the reversed panel (x 8..498). {code, x, align_right}.
-const COLS := [
-	["", 12, false], ["NAME", 26, false], ["AGE", 168, true], ["AB", 200, true],
-	["CLUB FEE", 318, true], ["YR WAGE", 408, true], ["CLUB", 414, false],
-]
+# Right-hand nav column.
+const BANK_BOX := Rect2(510, 50, 124, 44)
+const BTN_CURRENT := Rect2(510, 286, 124, 25)
+const BTN_SCOUT := Rect2(510, 323, 124, 25)
+const BTN_OFFERS := Rect2(510, 360, 124, 25)
+const BTN_RETURN := Rect2(510, 440, 124, 25)
+# Bottom selected-player detail strip.
+const STRIP := Rect2(6, 440, 498, 26)
 
-# Right-hand nav column at the reversed x~512; button y's are the reversed values.
-const NAV_X := 512
-const NAV_W := 120
-const BTN_H := 25
-const BANK_BOX := Rect2(512, 48, 120, 44)
-const BTN_CURRENT := Rect2(512, 286, 120, 25)
-const BTN_SCOUT := Rect2(512, 323, 120, 25)
-const BTN_OFFERS := Rect2(512, 360, 120, 25)
-const BTN_RETURN := Rect2(512, 440, 120, 25)
-
-var _bg: Texture2D
-var _bar: Texture2D
-var _f14: Font
 var _f12: Font
 var _f10: Font
 var _f8: Font
 
-var _rows: Array = []          # Career.market() rows
+var _rows: Array = []
 var _club: String = ""
 var _manager: String = ""
 var _season: String = ""
+var _week: int = 0
 var _cash: int = 0
 var _window: String = ""
 var _offers: int = 0
 
 
 func _ready() -> void:
-	_bg = load("res://art/screens/fondo_marble.png")
-	_bar = load("res://art/screens/barra0.png")
-	_f14 = load("res://art/fonts/proman14.fnt")
 	_f12 = load("res://art/fonts/proman12.fnt")
 	_f10 = load("res://art/fonts/proman10.fnt")
 	_f8 = load("res://art/fonts/proman8.fnt")
@@ -94,9 +76,8 @@ func _ready() -> void:
 	queue_redraw()
 
 
-## Feed the buyable market (Career.market() rows) + chrome, then repaint.
 func setup(market: Array, club: String, manager := "", season := "", cash := 0,
-		window := "", offers := 0) -> void:
+		window := "", offers := 0, week := 0) -> void:
 	_rows = market
 	_club = club
 	_manager = manager
@@ -104,16 +85,12 @@ func setup(market: Array, club: String, manager := "", season := "", cash := 0,
 	_cash = cash
 	_window = window
 	_offers = offers
+	_week = week
 	queue_redraw()
 
 
 # ---- ordering ------------------------------------------------------------
 
-## The market split into the original's 4 position bands (KEEPERS / DEFENDERS /
-## MIDFIELDERS / FORWARDS) by the decoded demarcación, each capped to its [3,5,5,5]
-## slot count and kept dearest first (Career.market already sorts by fee). Players from
-## records without a decoded position fall into a faithful keeper/outfield fallback.
-## Empty bands are dropped. Returns [{section:String, players:Array}].
 func _sections() -> Array:
 	var bands := {"GK": [], "DF": [], "MF": [], "FW": [], "OUT": []}
 	for r in _rows:
@@ -127,8 +104,6 @@ func _sections() -> Array:
 	return out
 
 
-## A market row's band key: the decoded GK/DF/MF/FW, or a keeper/outfield fallback for
-## rows whose record carried no position byte.
 func _band_of(r: Dictionary) -> String:
 	var pos := str(r.get("pos", ""))
 	if pos in ["GK", "DF", "MF", "FW"]:
@@ -138,7 +113,6 @@ func _band_of(r: Dictionary) -> String:
 
 # ---- helpers -------------------------------------------------------------
 
-## £ with thousands separators, e.g. 21500000 -> "£21,500,000".
 static func fmt_money(v: int) -> String:
 	var neg := v < 0
 	var s := str(absi(v))
@@ -160,124 +134,119 @@ func _txt(f: Font, x: int, y_top: int, s: String, col: Color, sz: int, right := 
 	draw_string(f, Vector2(px, y_top + f.get_ascent(sz)), s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
 
 
-func _cell(r: Rect2, base: Color, hi: Color, lo: Color) -> void:
-	draw_rect(r, base, true)
-	draw_rect(Rect2(r.position.x, r.position.y, r.size.x, 1), hi, true)
-	draw_rect(Rect2(r.position.x, r.position.y, 1, r.size.y), hi, true)
-	draw_rect(Rect2(r.position.x, r.position.y + r.size.y - 1, r.size.x, 1), lo, true)
-	draw_rect(Rect2(r.position.x + r.size.x - 1, r.position.y, 1, r.size.y), lo, true)
-
-
 # ---- drawing -------------------------------------------------------------
 
 func _draw() -> void:
 	var s: float = min(size.x / W, size.y / H) if size.x > 0 and size.y > 0 else 1.0
-	if _bg != null:
-		draw_texture_rect(_bg, Rect2(Vector2.ZERO, size), false, Color(0.4, 0.4, 0.46))
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.05, 0.07, 0.14), true)
 	draw_set_transform(Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5), 0.0, Vector2(s, s))
 
-	if _bg != null:
-		draw_texture_rect(_bg, Rect2(0, 0, W, H), false)
-	if _bar != null:
-		draw_texture_rect(_bar, Rect2(0, 0, W, _bar.get_height()), false)
+	PMChrome.draw_bg(self)
+	PMChrome.draw_header(self, "TRANSFER MARKET", _manager, _club, "Premier", _season, _week)
 
-	_txt(_f14, 150, 13, "TRANSFER MARKET", C_TITLE, 15)
-	_txt(_f12, 12, 9, "Manager", C_TEXT, 13)
-	_txt(_f12, 12, 26, _manager.substr(0, 18), C_DIM, 13)
-	_txt(_f12, 500, 9, _club.substr(0, 18), C_TEXT, 13, true)
-	if _season != "":
-		_txt(_f12, 500, 26, _season, C_DIM, 13, true)
-
-	# Column header row across the list panel.
-	for c in COLS:
-		var code: String = c[0]
-		if code == "":
-			continue
-		var x: int = c[1]
-		_txt(_f8, x, HDR_Y, code, C_HEAD, 11, bool(c[2]))
-
+	PMChrome.draw_table_panel(self, TABLE)
+	_draw_col_header()
 	_draw_list()
+	_draw_strip()
 	_draw_nav()
+
+
+func _draw_col_header() -> void:
+	PMChrome.draw_col_header(self, Rect2(TABLE.position.x + 2, HDR_Y, TABLE.size.x - 4, 16))
+	_txt(_f10, NAME_X, HDR_Y + 2, "PLAYER", PMChrome.C_TBL_HDR_TXT, 11)
+	_txt(_f10, STARS_X, HDR_Y + 2, "RATING", PMChrome.C_TBL_HDR_TXT, 11)
+	_txt(_f10, AV_X, HDR_Y + 2, "AV", PMChrome.C_TBL_HDR_TXT, 11, true)
+	_txt(_f10, MO_X, HDR_Y + 2, "MO", PMChrome.C_TBL_HDR_TXT, 11, true)
+	_txt(_f10, AGE_X, HDR_Y + 2, "AGE", PMChrome.C_TBL_HDR_TXT, 11, true)
+	_txt(_f10, FEE_X, HDR_Y + 2, "CLUB FEE", PMChrome.C_TBL_HDR_TXT, 11, true)
+	_txt(_f10, WAGE_X, HDR_Y + 2, "WAGE", PMChrome.C_TBL_HDR_TXT, 11, true)
+	_txt(_f10, CLUB_X, HDR_Y + 2, "CLUB", PMChrome.C_TBL_HDR_TXT, 11)
 
 
 func _draw_list() -> void:
 	var y := ROW0_Y
 	var row := 0
 	for sec in _sections():
-		if (sec["players"] as Array).is_empty():
-			continue
-		if y + ROW_H > int(PANEL.end.y):
+		if y + ROW_H > int(TABLE.end.y):
 			break
-		_txt(_f8, COLS[1][1], y + 2, str(sec["section"]), C_SECTION, 11)
+		# RED position-band header on a light strip.
+		draw_rect(Rect2(ROW_X, y, ROW_W, ROW_H - 1), PMChrome.C_ROW_DARK, true)
+		_txt(_f10, NAME_X, y + 2, str(sec["section"]), C_SECTION, 11)
 		y += ROW_H
 		for r in sec["players"]:
-			if y + ROW_H > int(PANEL.end.y):
-				_txt(_f8, COLS[1][1], y + 2, "...more (bid via the menu)", C_DIM, 11)
+			if y + ROW_H > int(TABLE.end.y):
 				return
-			draw_rect(Rect2(int(PANEL.position.x), y, int(PANEL.size.x), ROW_H - 1),
-				C_ROW_A if row % 2 == 0 else C_ROW_B, true)
-			_row(r, y)
+			_row(r, y, row)
 			y += ROW_H
 			row += 1
 
 
-func _row(r: Dictionary, y: int) -> void:
+func _row(r: Dictionary, y: int, idx: int) -> void:
+	draw_rect(Rect2(ROW_X, y, ROW_W, ROW_H - 1),
+		PMChrome.C_ROW_LIGHT if idx % 2 == 0 else PMChrome.C_ROW_DARK, true)
+	draw_rect(Rect2(ROW_X, y + ROW_H - 1, ROW_W, 1), PMChrome.C_ROW_SEP, true)
 	var ty := y + 2
-	# ★ first-XI / ♥ shortlist flag.
-	if bool(r.get("key", false)):
-		_txt(_f8, 12, ty, "*", C_KEY, 11)
-	_txt(_f8, COLS[1][1], ty, str(r.get("name", "?")).substr(0, 16), C_NAME, 11)
-	_txt(_f8, COLS[2][1], ty, str(int(r.get("age", 0))), C_TEXT, 11, true)
-	_txt(_f8, COLS[3][1], ty, str(int(r.get("ca", 0))), C_TEXT, 11, true)
-	_txt(_f8, COLS[4][1], ty, fmt_money(int(r.get("fee", 0))), C_FEE, 11, true)
-	_txt(_f8, COLS[5][1], ty, fmt_money(int(r.get("wage", 0))), C_TEXT, 11, true)
-	# CLUB column runs to the panel's right edge (x 414..498 = 84px); fit the club
-	# name to it on whole-word boundaries so long names degrade cleanly
-	# ("MANCHESTER UTD." -> "MANCHESTER", never a mid-word "MANCHESTER U").
-	var club_w := float(int(PANEL.end.x) - COLS[6][1] - 1)
-	_txt(_f8, COLS[6][1], ty, _fit_club(str(r.get("club_name", "")), club_w), C_DIM, 11)
+	var ca := int(r.get("ca", 0))
+	PMChrome.draw_crest(self, int(r.get("club_id", -1)), Rect2(10, y, 13, ROW_H - 1))
+	_txt(_f10, NAME_X, ty, str(r.get("name", "?")).substr(0, 15), PMChrome.C_ROW_TXT, 11)
+	PMChrome.draw_stars(self, STARS_X, y + 3, ca / 20.0, 9, 5)
+	_txt(_f10, AV_X, ty, str(ca), PMChrome.C_ROW_TXT, 11, true)
+	_txt(_f10, MO_X, ty, str(int(r.get("mo", 0))), PMChrome.C_ROW_TXT, 11, true)
+	_txt(_f10, AGE_X, ty, str(int(r.get("age", 0))), PMChrome.C_ROW_TXT, 11, true)
+	_txt(_f10, FEE_X, ty, fmt_money(int(r.get("fee", 0))), C_FEE, 11, true)
+	_txt(_f10, WAGE_X, ty, fmt_money(int(r.get("wage", 0))), C_WAGE, 11, true)
+	_txt(_f8, CLUB_X, ty, _fit_club(str(r.get("club_name", "")), float(int(TABLE.end.x) - CLUB_X - 2)),
+		PMChrome.C_ROW_TXT, 10)
 
 
-## Fit a club name into `max_w` px of the CLUB column: keep whole words while they
-## fit (drop the trailing tag, e.g. " UTD."), and only char-truncate a single
-## over-long word as a last resort. No ellipsis - reads as a clean short name.
 func _fit_club(s: String, max_w: float) -> String:
 	if _f8 == null or s == "" or max_w <= 0.0:
 		return s
-	if _f8.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x <= max_w:
+	if _f8.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x <= max_w:
 		return s
 	var toks := s.split(" ", false)
 	while toks.size() > 1:
 		toks.remove_at(toks.size() - 1)
 		var cand := " ".join(toks)
-		if _f8.get_string_size(cand, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x <= max_w:
+		if _f8.get_string_size(cand, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x <= max_w:
 			return cand
 	var out := s
-	while out.length() > 1 and _f8.get_string_size(out, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x > max_w:
+	while out.length() > 1 and _f8.get_string_size(out, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x > max_w:
 		out = out.substr(0, out.length() - 1)
 	return out
 
 
-## Right column: bank box + the reversed CURRENT OFFERS / SCOUT / OFFERS / RETURN
-## nav buttons at their reversed y positions.
+## Bottom strip: the dearest target's name + selling club (the real screen shows the
+## selected row; this display overlay features the top target).
+func _draw_strip() -> void:
+	PMChrome.bevel(self, STRIP, C_STRIP, PMChrome.C_TBL_HI, PMChrome.C_TBL_LO, 2.0)
+	if _rows.is_empty():
+		return
+	var r: Dictionary = _rows[0]
+	_txt(_f12, int(STRIP.position.x) + 12, int(STRIP.position.y) + 6,
+		str(r.get("name", "?")), PMChrome.C_ROW_TXT, 13)
+	_txt(_f12, int(STRIP.end.x) - 12, int(STRIP.position.y) + 6,
+		str(r.get("club_name", "")), PMChrome.C_TBL_HDR, 13, true)
+
+
+## Right column: BANK box + CURRENT OFFERS / SCOUT / OFFERS / RETURN nav buttons.
 func _draw_nav() -> void:
-	_cell(BANK_BOX, C_CELL, C_CELL_HI, C_CELL_LO)
-	_txt(_f10, int(BANK_BOX.position.x) + 8, int(BANK_BOX.position.y) + 5, "BANK", C_HEAD, 11)
-	_txt(_f12, int(BANK_BOX.end.x) - 8, int(BANK_BOX.position.y) + 22, fmt_money(_cash),
-		C_FEE, 13, true)
+	PMChrome.bevel(self, BANK_BOX, Color(0.10, 0.16, 0.34), C_DKBTN_HI, C_DKBTN_LO)
+	_txt(_f10, int(BANK_BOX.position.x) + 8, int(BANK_BOX.position.y) + 5, "BANK", C_PANEL_TXT, 11)
+	_txt(_f12, int(BANK_BOX.end.x) - 8, int(BANK_BOX.position.y) + 24, fmt_money(_cash), C_GOLD, 13, true)
 
-	_nav_btn(BTN_CURRENT, "CURRENT OFFERS", C_HEAD, _f8)
-	_nav_btn(BTN_SCOUT, "SCOUT", C_TEXT, _f10)
-	_nav_btn(BTN_OFFERS, "OFFERS", C_TEXT, _f10)
-	_nav_btn(BTN_RETURN, "RETURN", C_RETURN, _f10)
+	_nav_btn(BTN_CURRENT, "CURRENT OFFERS", C_GOLD, _f10)
+	_nav_btn(BTN_SCOUT, "SCOUT", C_PANEL_TXT, _f12)
+	_nav_btn(BTN_OFFERS, "OFFERS", C_PANEL_TXT, _f12)
+	_nav_btn(BTN_RETURN, "RETURN", C_GOLD, _f12)
 
-	# Bottom help band (reversed (8,440) ProMan8 line) - window status + bank.
 	if _window != "":
-		_txt(_f8, int(PANEL.position.x) + 4, int(PANEL.end.y) + 6,
-			"Transfer window: %s   -   %d offers left this week" % [_window, _offers],
-			C_DIM, 11)
+		_txt(_f8, int(BANK_BOX.position.x) + 4, int(BANK_BOX.end.y) + 6,
+			"Window: %s" % _window, PMChrome.C_STAR_OFF, 10)
+		_txt(_f8, int(BANK_BOX.position.x) + 4, int(BANK_BOX.end.y) + 18,
+			"%d offers left" % _offers, PMChrome.C_STAR_OFF, 10)
 
 
 func _nav_btn(r: Rect2, label: String, col: Color, f: Font) -> void:
-	_cell(r, C_BTN, C_BTN_HI, C_CELL_LO)
-	_txt(f, int(r.position.x) + 10, int(r.position.y) + 7, label, col, 11)
+	PMChrome.bevel(self, r, C_DKBTN, C_DKBTN_HI, C_DKBTN_LO)
+	_txt(f, int(r.position.x) + 10, int(r.position.y) + 6, label, col, 12)

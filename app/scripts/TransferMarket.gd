@@ -140,7 +140,8 @@ static func market(rosters: Dictionary, names: Dictionary, tier: int, exclude_cl
 			out.append({
 				"pid": pid, "name": p.get("name", "?"), "isGK": bool(p.get("isGK", false)),
 				"pos": str(p.get("pos", "")),
-				"ca": int(attrs.get("CA", 0)), "age": int(p.get("age", 0)),
+				"ca": int(attrs.get("CA", 0)), "mo": int(attrs.get("RM", 0)),
+				"age": int(p.get("age", 0)),
 				"club_id": int(cid), "club_name": names.get(cid, "?"),
 				"fee": value_of(p, tier), "wage": wage_yearly(p, tier),
 				"key": key_ids.has(pid),
@@ -170,7 +171,8 @@ static func loan_market(rosters: Dictionary, names: Dictionary, tier: int, exclu
 			out.append({
 				"pid": pid, "name": p.get("name", "?"), "isGK": bool(p.get("isGK", false)),
 				"pos": str(p.get("pos", "")),
-				"ca": int(attrs.get("CA", 0)), "age": int(p.get("age", 0)),
+				"ca": int(attrs.get("CA", 0)), "mo": int(attrs.get("RM", 0)),
+				"age": int(p.get("age", 0)),
 				"club_id": int(cid), "club_name": names.get(cid, "?"),
 				"fee": 0, "wage": wage_yearly(p, tier), "key": false,
 			})
