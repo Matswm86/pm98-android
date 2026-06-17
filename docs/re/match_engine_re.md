@@ -197,6 +197,17 @@ permil) and records the exact kink for any future curve-shaping pass — NOT app
 the 300-season harness is calibrated and there is no ground-truth PM98 scoreline set to
 re-validate a curve change against.
 
+## Oracle stood up + finishing gate exact-verified (2026-06-18)
+A Ghidra PCode emulation oracle (`tools/re/ghidra_scripts/PcodeEmu.java`) now executes decoded
+functions on chosen register/memory inputs and reads the result + RNG-state straight from the
+CPU. Proven on `FUN_005ec250` (reproduces srand(1) 41,18467,6334,26500,19169) and used to drive
+the REAL resolver `FUN_005aeda0` to its finishing gate on a synthetic fixture. The gate's
+threshold is confirmed (disasm + emulator) to be `9*(ATTR<55 ? ATTR/3 : ATTR-25)` -- the sub-55
+branch is **stepped** `9*floor(ATTR/3)` (NOT linear 3*ATTR), kink 54->162 then 55->270. Ported
+EXACT in `app/scripts/Pm98Resolver.gd`, locked by `app/tests/test_resolver_gate.gd` (ALL PASS).
+This is the first bit-exact slice; the rest of the resolver tree is stage 2. See
+[`EXACT_PORT_PLAN.md`](EXACT_PORT_PLAN.md) STATUS for the full per-stage state.
+
 ## Open / next (active)
 - **EXACT engine + tactics port — see [`EXACT_PORT_PLAN.md`](EXACT_PORT_PLAN.md).** Mats wants
   the calibrated `MatchEngine.gd` model and the ours `Tactics.gd` lever model REPLACED by

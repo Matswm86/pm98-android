@@ -8,6 +8,30 @@ Read `match_engine_re.md` first (the decoded ground truth). This doc is the work
 Legit RE of the owner's own binary for the owner's own remake. Deliverable = original
 GDScript reproducing the decoded algorithm, not redistribution of the binary.
 
+## STATUS (2026-06-18)
+- **Stage 1 (oracle) DONE.** Ghidra PCode emulation harness `tools/re/ghidra_scripts/PcodeEmu.java`
+  (reusable: spec-driven register/memory/stack setup, cdecl/thiscall/fastcall call, EAX +
+  memory + step-level trace capture, callee stubs). Proven on the RNG `FUN_005ec250`: seeded
+  srand(1), reproduced 41,18467,6334,26500,19169 bit-for-bit (independent confirmation of the
+  MSVC LCG bytes). Spec `tools/re/specs/rng.spec`.
+- **Stage 1b (1-fn gate parity) DONE.** The harness drove the REAL resolver `FUN_005aeda0`
+  end-to-end (entry -> guards -> geometry sub-calls 005b1230/005a1700 -> finishing gate ->
+  RNG -> clean RET, 373 steps) on a constructed player/target/match fixture
+  (`tools/re/specs/resolver_gate.tmpl`, sweep `tools/re/run_gate_oracle.sh`). Read the gate's
+  own per-mil + threshold out of the CPU registers across an ATTR sweep
+  (`tools/re/specs/gate_oracle_table.txt`). The finishing gate is now disasm-verified AND
+  emulator-verified: threshold = `9*(ATTR<55 ? ATTR/3 : ATTR-25)` (sub-55 STEPPED, kink
+  54->162 then 55->270; `imul 0x55555556`=div3, lea x5x5x5/shl3=*1000, lea[edi+edi*8]=*9,
+  sar 0xf=>>15). Ported EXACT to `app/scripts/Pm98Resolver.gd`; locked by
+  `app/tests/test_resolver_gate.gd` (ALL PASS, oracle-backed). MatchEngine.gd unchanged (still
+  calibrated; the exact engine swaps in at stage S7).
+- **NEXT = Stage 2 (resolver exact).** Port the rest of `FUN_005aeda0` (all 23 RNG calls in
+  exact order: the goal/save/miss decision tree, lines 102-485 of the C dump) + dispatcher
+  `005966d0` + the predicates, using the SAME fixture-emulation method to get the per-draw
+  ground-truth stream. The trig LUT `DAT_006d31c8` (.bss, zero at emu start) gates the deep
+  paths -- decode `FUN_005ee080/005edfb0/005ee0f0` (atan2/rotate over the LUT) and pre-seed it
+  in the fixture, OR confirm those paths are off the seed-critical line.
+
 ## Already decoded — cite + port, don't redo (see match_engine_re.md for detail)
 - RNG `FUN_005ec250` (MSVC LCG, state @0x6d3184) — already exact as `Pm98Rng`. Per-mil idiom
   `(roll*1000)>>15 < permil`. Commentary rolls bracketed by `005ec240/005ec230` (replicate).

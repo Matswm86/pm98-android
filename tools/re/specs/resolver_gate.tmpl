@@ -1,0 +1,36 @@
+# Stage 1b oracle: drive the REAL resolver FUN_005aeda0 through its guards +
+# geometry sub-calls (005b1230 vec-scale, 005a1700 vec-add) to the finishing gate,
+# and read the binary's own computed permil + threshold straight out of registers.
+#
+# Fixture: player P@0x220000, target T@0x210000, match M@0x200000. P and T share
+# position/velocity (=0) so the three predicted-position deltas are <0x10000 and
+# the gate is reached. RNG seeded to 1 => gate roll = first draw = 41 => permil=1.
+# __ATTR__ is templated in; threshold = 9*(ATTR<55 ? ATTR/3 : ATTR-25).
+entry   0x5aeda0
+ret     0x00100000
+stack   0x00300000 0x00010000 0x00308000
+reg     ECX 0x00220000          # __fastcall: player pointer in ECX
+zero    0x00200000 0x00002000   # match M (covers +0x448, +0x180b, +0x43c, ...)
+zero    0x00210000 0x00000800   # target T
+zero    0x00220000 0x00001000   # player P
+# --- player P fields ---
+mem     0x0022002c 4 0x3             # P+0x2c = 3   (play-state guard)
+mem     0x00220030 4 0x0             # P+0x30 = 0
+mem     0x002200ac 4 0x00210000     # P+0xac = &T
+mem     0x0022018c 4 0x00200000     # P+0x18c = &M
+mem     0x00220190 4 0x00200000     # P+0x190 (400) = &M (valid ptr for later derefs)
+# --- target T fields ---
+mem     0x00210040 4 0x1             # T+0x40 = 1   (in [0,3])
+mem     0x00210068 4 0x2000          # T+0x68 = 0x2000 (>= 0x1333)
+mem     0x00210190 4 0x00210000     # T+0x190 (400) = &T (self; makes line-90 deref safe)
+mem     0x002102bc 4 0x1             # T+0x2bc (700) != 0
+mem     0x00210398 4 __ATTR__        # T+0x398 = finishing attribute under test
+# --- RNG seed ---
+mem     0x006d3184 4 0x1             # srand(1) -> first draw 41 -> permil (41*1000)>>15 = 1
+calls   1
+maxsteps 6000
+trace   0x005aeee2 rng_ret          # PC just after gate RNG call: EAX = draw
+trace   0x005aeeff gate_cmp         # PC at cmp eax,edx: EAX=permil, EDX=threshold
+trace_reg EAX
+trace_reg EDX
+read_reg EAX
