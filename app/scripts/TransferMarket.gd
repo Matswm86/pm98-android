@@ -148,6 +148,34 @@ static func market(rosters: Dictionary, names: Dictionary, tier: int, exclude_cl
 	return out
 
 
+## Loanable players: each other club's non-first-XI surplus (you loan their fringe, not
+## their stars), best CA first. Same row shape as market(). A club at the squad floor won't
+## loan anyone out. `fee` here is purely informational (loans are free + wages).
+static func loan_market(rosters: Dictionary, names: Dictionary, tier: int, exclude_club_id: int) -> Array:
+	var out: Array = []
+	for cid in rosters:
+		if int(cid) == exclude_club_id:
+			continue
+		var players: Array = rosters[cid]
+		if players.size() <= SQUAD_MIN:
+			continue
+		var view := {"id": cid, "name": names.get(cid, "?"), "players": players}
+		var key_ids := best_xi_ids(view)
+		for p in players:
+			var pid := int(p.get("id", -1))
+			if key_ids.has(pid):
+				continue   # never their first XI
+			var attrs := _attrs(p)
+			out.append({
+				"pid": pid, "name": p.get("name", "?"), "isGK": bool(p.get("isGK", false)),
+				"ca": int(attrs.get("CA", 0)), "age": int(p.get("age", 0)),
+				"club_id": int(cid), "club_name": names.get(cid, "?"),
+				"fee": 0, "wage": wage_yearly(p, tier), "key": false,
+			})
+	out.sort_custom(func(a, b): return a["ca"] > b["ca"])
+	return out
+
+
 ## The asking price a club wants for a player: book value, with a premium for a
 ## first-XI man.
 static func asking_price(player: Dictionary, is_key: bool, tier: int) -> int:

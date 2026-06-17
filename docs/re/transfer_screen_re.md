@@ -65,3 +65,16 @@ seeded at career start and refreshed each season by `TransferMarket.generate_fre
 manager's own **non-renewed leavers drop into it** at the season rollover (capped at
 `FREE_POOL_CAP`). New career state (`free_agents` / `free_seq`) round-trips through save/load.
 Test: `app/tests/test_free_agents.gd`.
+
+## Loans — loan IN (T2 #8)
+A **LOAN MARKET** entry on the transfer desk lists other clubs' fringe (their non-first-XI
+surplus, `TransferMarket.loan_market`); confirming `Career.sign_loan(pid, parent)` takes the
+player for the season for **no fee** (you pick up his wage), removing him from his parent's
+roster and stamping `on_loan` / `loan_from` on his dict. Same board guards as a signing
+(window / weekly offers / squad max). A loanee **cannot be sold** (`accept_sale` guard) and is
+tagged `[ON LOAN]` in MY SQUAD. At the season rollover `_return_loanees()` runs first (before
+contracts tick, so a loanee is never mistaken for an expiring player of yours) and sends him
+back to his parent club. State rides the existing `rosters` serialization (the `on_loan` flag
+is on the player dict), so it round-trips for free. Test: `app/tests/test_loans.gd`.
+NOT modeled (deferred, honest scope): loaning your own players OUT, loan-to-buy options, and
+"free if relegated" clauses — `TransferMarket.gd` notes those strings as faithful surface.

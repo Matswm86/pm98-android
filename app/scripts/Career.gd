@@ -747,6 +747,56 @@ func sign_free_agent(pid: int, offer_weekly: int = -1, rng: RandomNumberGenerato
 	return {"ok": true, "msg": "You have signed %s on a free." % pname, "demanded": int(verdict["demanded"])}
 
 
+## Players you can take on loan (other clubs' fringe), best first. {} -> none.
+func loan_market() -> Array:
+	return TransferMarket.loan_market(rosters, club_names, tier, club_id)
+
+
+## Take player `pid` on loan from `from_club_id` for the season: no fee, you pay his wage,
+## and he RETURNS to his parent club at the next rollover. Same board guards as a signing
+## (window, weekly offers, squad max). {ok, msg}.
+func sign_loan(pid: int, from_club_id: int) -> Dictionary:
+	if not transfers_open():
+		return {"ok": false, "msg": "The transfer deadline has passed."}
+	if offers_left <= 0:
+		return {"ok": false, "msg": "The Directors will only let you make %d offers per week." % OFFERS_PER_WEEK}
+	if my_squad().size() >= TransferMarket.SQUAD_MAX:
+		return {"ok": false, "msg": "Your squad is full (%d), the maximum allowed." % TransferMarket.SQUAD_MAX}
+	var player := _find_in(from_club_id, pid)
+	if player.is_empty():
+		return {"ok": false, "msg": "That player is no longer available to loan."}
+	offers_left -= 1
+	rosters[from_club_id].erase(player)
+	var parent_name: String = club_names.get(from_club_id, "?")
+	player["on_loan"] = true
+	player["loan_from"] = from_club_id
+	player["loan_from_name"] = parent_name
+	player["wage"] = Contract.market_weekly(player, tier)   # you pick up his wages
+	player["clubId"] = club_id
+	rosters[club_id].append(player)
+	_log("You have taken %s on loan from %s for the season." % [player.get("name", "?"), parent_name])
+	return {"ok": true, "msg": "You have signed %s on loan." % player.get("name", "?")}
+
+
+## Loanees in the manager's squad return to their parent clubs (called at the rollover,
+## before contracts tick, so a loanee is never mistaken for one of your expiring players).
+func _return_loanees() -> void:
+	var returning: Array = []
+	for p in rosters.get(club_id, []):
+		if p.get("on_loan"):
+			returning.append(p)
+	for p in returning:
+		rosters[club_id].erase(p)
+		var parent := int(p.get("loan_from", -1))
+		var pname: String = str(p.get("loan_from_name", "his club"))
+		p.erase("on_loan")
+		p.erase("loan_from")
+		p.erase("loan_from_name")
+		if rosters.has(parent):
+			rosters[parent].append(p)
+		_news("contract", "%s has returned to %s at the end of his loan." % [p.get("name", "?"), pname])
+
+
 func is_listed(pid: int) -> bool:
 	return transfer_listed.has(pid)
 
@@ -769,6 +819,8 @@ func accept_sale(pid: int, buyer_id: int, offer: int) -> Dictionary:
 	var player := _find_in(club_id, pid)
 	if player.is_empty():
 		return {"ok": false, "msg": "That player is no longer here."}
+	if player.get("on_loan"):
+		return {"ok": false, "msg": "%s is only on loan; you can't sell him." % player.get("name", "?")}
 	var squad := my_squad()
 	if squad.size() <= TransferMarket.SQUAD_MIN:
 		return {"ok": false, "msg": "Your squad is too small to sell (min %d)." % TransferMarket.SQUAD_MIN}
@@ -850,6 +902,7 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	if rng == null:
 		rng = RandomNumberGenerator.new()
 		rng.randomize()
+	_return_loanees()   # loanees go home before contracts tick (never counted as your leavers)
 	var leavers: Array = []
 	for p in rosters.get(club_id, []):
 		var yrs := int(p.get("contract_years", 1)) - 1

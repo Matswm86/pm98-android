@@ -569,6 +569,11 @@ func _screens_shot() -> void:
 	await _settle()
 	_save_shot(dir, "calendar.png")
 	_free_overlays()
+	# T2 #8: the LOAN MARKET.
+	_show_loan_market()
+	await _settle()
+	_save_shot(dir, "loan_market.png")
+	_free_overlays()
 	print("SCREENS-SHOT done club=%s week=%d" % [_career.club_name, _career.week])
 	get_tree().quit()
 
@@ -2081,6 +2086,7 @@ func _show_transfers() -> void:
 	rows.append("TRANSFER MARKET"); payload.append({"t": "market"})
 	rows.append("MY SQUAD   (sell / RENEW)"); payload.append({"t": "squad"})
 	rows.append("FREE AGENTS   (%d)   -  sign for £0 + wages" % c.free_agents.size()); payload.append({"t": "free"})
+	rows.append("LOAN MARKET   -  take a player for the season"); payload.append({"t": "loan"})
 	rows.append("Shortlist   (%d)" % c.shortlist.size()); payload.append({"t": "shortlist"})
 	rows.append("Transfer news   (%d)" % c.transfer_log.size()); payload.append({"t": "news"})
 	var win := ("OPEN, deadline in %d weeks" % c.deadline_weeks_left()) if c.transfers_open() else "CLOSED"
@@ -2094,6 +2100,7 @@ func _activate_transfers(which: String) -> void:
 		"market": _push(_show_market)
 		"squad": _push(_show_transfer_squad)
 		"free": _push(_show_free_agents)
+		"loan": _push(_show_loan_market)
 		"shortlist": _push(_show_shortlist)
 		"news": _push(_show_transfer_news)
 
@@ -2199,6 +2206,46 @@ func _free_agent_action(pid: int, wage: int) -> void:
 	else:
 		_toast(res["msg"])                  # stay; renegotiate (offers permitting)
 
+## LOAN MARKET (T2 #8): other clubs' fringe players you can take on loan for the season
+## (no fee, you pay the wage, he returns to his parent at the rollover). Tap to confirm.
+func _show_loan_market() -> void:
+	var rows: Array = []
+	var payload: Array = []
+	var mkt := _career.loan_market()
+	for row in mkt:
+		var gk := "GK" if row["isGK"] else "  "
+		rows.append("%-16s %s CA%2d  age %d  %s" % [
+			str(row["name"]).substr(0, 16), gk, int(row["ca"]), int(row["age"]), row["club_name"]])
+		payload.append(row)
+	if rows.is_empty():
+		rows.append("No clubs are willing to loan a player out right now.")
+		payload.append(null)
+	_set_view("LOAN MARKET", "Loan a player for the season  -  %d offers left" % _career.offers_left,
+		rows, payload, func(r):
+			if r != null:
+				_push(_show_loan_deal.bind(r)))
+
+func _show_loan_deal(row: Dictionary) -> void:
+	var weekly := int(round(float(row["wage"]) / FinanceModel.SEASON_WEEKS))
+	var rows: Array = ["Take him on loan for the season", "Cancel"]
+	var payload: Array = [{"do": true}, {"do": false}]
+	_set_view("Loan %s" % row["name"],
+		"%s  -  CA %d  -  no fee, you pay ~£%s/wk  -  returns next season" % [
+			row["club_name"], int(row["ca"]), _fmt_int(weekly)],
+		rows, payload, func(it): _loan_action(row, bool(it["do"])))
+
+func _loan_action(row: Dictionary, do_it: bool) -> void:
+	if not do_it:
+		_go_back()
+		return
+	var res := _career.sign_loan(int(row["pid"]), int(row["club_id"]))
+	_career.save()
+	if res["ok"]:
+		_nav.pop_back()                      # drop the confirm screen
+		_push(_show_deal_result.bind(res["msg"]))
+	else:
+		_toast(res["msg"])
+
 func _show_transfer_squad() -> void:
 	var squad: Array = _career.my_squad().duplicate()
 	squad.sort_custom(func(a, b):
@@ -2216,7 +2263,9 @@ func _show_transfer_squad() -> void:
 		var yrs := int(p.get("contract_years", 1))
 		var wage := Contract.current_weekly(p, _career.tier)
 		var tag := "  EXPIRING" if Contract.is_expiring(p) else ""
-		if _career.is_listed(pid):
+		if p.get("on_loan"):
+			tag = "  [ON LOAN]"
+		elif _career.is_listed(pid):
 			tag += "  [LISTED]"
 		rows.append("%-15s %s CA%2d £%s/wk %dy%s" % [
 			p.get("name", "?"), pos, ca, _fmt_int(wage), yrs, tag])
