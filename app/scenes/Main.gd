@@ -564,6 +564,11 @@ func _screens_shot() -> void:
 	await _settle()
 	_save_shot(dir, "free_agents.png")
 	_free_overlays()
+	# T2 #13: the SEASON FIXTURES calendar.
+	_show_calendar()
+	await _settle()
+	_save_shot(dir, "calendar.png")
+	_free_overlays()
 	print("SCREENS-SHOT done club=%s week=%d" % [_career.club_name, _career.week])
 	get_tree().quit()
 
@@ -1356,6 +1361,8 @@ func _show_competitions() -> void:
 	# qualified for (from the second season on), so route by an action tag, not an index.
 	var rows: Array = []
 	var acts: Array = []
+	rows.append({"text": "SEASON FIXTURES", "value": "league calendar", "accent": Color(0.27, 1.0, 0.53)})
+	acts.append("calendar")
 	if not _career.charity_shield.is_empty():
 		rows.append({"text": "CHARITY SHIELD", "value": _charity_status_word(), "accent": CupScreen.C_GOLD})
 		acts.append("charity")
@@ -1383,10 +1390,40 @@ func _show_competitions() -> void:
 			_open_competition(acts[i]),
 		func() -> void: _dismiss_career_browse())
 
+## The SEASON FIXTURES calendar (T2 #13): the manager's full league season, one row per
+## round, with the result filled in once played (W green / D neutral / L red) and the next
+## fixture flagged. PM98-chrome browse driven by Career.season_fixtures(). RETURN -> hub.
+func _show_calendar() -> void:
+	var rows: Array = []
+	for e in _career.season_fixtures():
+		var opp: String = str(GameDB.club(int(e["opp_id"])).get("name", "?")).substr(0, 18)
+		var vs := "v " if bool(e["home"]) else "@ "
+		var row: Dictionary = {"text": "Wk %2d   %s%s" % [int(e["week"]), vs, opp], "enabled": false}
+		if bool(e["played"]):
+			var wdl: String = str(e["wdl"])
+			row["value"] = "%d-%d  %s" % [int(e["mine"]), int(e["theirs"]), wdl]
+			row["accent"] = Color(0.27, 1.0, 0.53) if wdl == "W" else (
+				Color(0.86, 0.90, 0.96) if wdl == "D" else Color(0.85, 0.45, 0.42))
+		elif bool(e["is_next"]):
+			row["value"] = "NEXT"
+			row["accent"] = Color(0.98, 0.86, 0.45)
+			row["text"] = "> " + str(row["text"])
+		else:
+			row["value"] = "-"
+		rows.append(row)
+	if rows.is_empty():
+		rows.append({"text": "No league fixtures scheduled.", "enabled": false})
+	_mount_browse("%s  -  SEASON FIXTURES" % _career.club_name,
+		"%s  -  %d played" % [_career.season, _career.results.size()], rows,
+		func(_i: int) -> void: pass,
+		func() -> void: _dismiss_career_browse())
+
 ## Route a COMPETITIONS chooser pick to its screen (each is a Cup.gd bracket on CupScreen,
 ## bar the single-match Charity Shield), around the competition's own trophy art.
 func _open_competition(act: String) -> void:
-	if act == "charity":
+	if act == "calendar":
+		_show_calendar()
+	elif act == "charity":
 		_show_charity_shield()
 	elif act == "facup":
 		_show_cup_screen(_career.fa_cup, "F.A. CUP", "res://art/screens/cup/trophy.png")

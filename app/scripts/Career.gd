@@ -255,6 +255,37 @@ func manager_fixture() -> Array:
 			return [int(m[0]), int(m[1])]
 	return []
 
+
+## The manager's full league season for the CALENDAR view: one entry per round, in order,
+## with the result filled in once played. Each = {round, week, opp_id, home, played, mine,
+## theirs, wdl, is_next}. Result rounds are matched by the stored week (round index + 1).
+func season_fixtures() -> Array:
+	var by_week: Dictionary = {}
+	for r in results:
+		by_week[int(r["week"])] = r
+	var out: Array = []
+	for ri in fixtures.size():
+		var opp := -1
+		var home := false
+		for m in fixtures[ri]:
+			if int(m[0]) == club_id:
+				opp = int(m[1]); home = true; break
+			elif int(m[1]) == club_id:
+				opp = int(m[0]); home = false; break
+		if opp < 0:
+			continue   # bye (not expected in a round-robin, but skip cleanly)
+		var wk := ri + 1
+		var e := {"round": ri, "week": wk, "opp_id": opp, "home": home,
+			"played": false, "mine": 0, "theirs": 0, "wdl": "", "is_next": ri == week}
+		if by_week.has(wk):
+			var res: Dictionary = by_week[wk]
+			e["played"] = true
+			e["mine"] = int(res["hg"]) if bool(res["home"]) else int(res["ag"])
+			e["theirs"] = int(res["ag"]) if bool(res["home"]) else int(res["hg"])
+			e["wdl"] = "W" if e["mine"] > e["theirs"] else ("D" if e["mine"] == e["theirs"] else "L")
+		out.append(e)
+	return out
+
 ## Play the current round: simulate every fixture, update the table, accrue cash.
 ## `clubs_by_id` maps id -> full club dict (for ratings). Returns the manager's
 ## result {home_id, away_id, hg, ag, manager_home} or {} on a bye / season end.
