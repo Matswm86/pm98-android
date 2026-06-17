@@ -533,6 +533,8 @@ func _screens_shot() -> void:
 		["_show_transfer_screen", "transfer.png"],
 		["_show_directiva_screen", "directiva.png"],
 		["_show_stadium_screen", "stadium.png"],
+		["_show_tactics", "tactics.png"],          # reskinned _set_view flow (T1 #3)
+		["_show_market", "transfer_buy.png"],      # reskinned _set_view flow (T1 #3)
 	]
 	for s in shots:
 		call(s[0])
@@ -552,8 +554,9 @@ func _free_overlays() -> void:
 		if c is LeagueTableScreen or c is LineupScreen or c is SquadScreen \
 				or c is FinanceScreen or c is TransferScreen or c is DirectivaScreen \
 				or c is StadiumScreen or c is CupScreen or c is YouthScreen \
-				or c is StaffScreen:
+				or c is StaffScreen or c is BrowseScreen:
 			c.queue_free()
+	_browse = null
 
 
 # ---- dev screenshot harness (inert unless PM98_SHOT_DIR is set) -----------
@@ -643,22 +646,26 @@ func _go_back() -> void:
 		_nav.back().call()
 
 func _set_view(title: String, subtitle: String, rows: Array, payload: Array, on_activate: Callable) -> void:
-	# Any green data-browser view hides the persistent MENUPRINCIPAL hub (it sits on top
-	# of $Root); _show_career re-raises it. Lets the still-green sub-flows (tactics,
-	# transfer text menus, match feed, end-of-season) show beneath the hub overlay.
+	# T1 #3 reskin: the former green $Root ItemList is replaced by the PM98-chrome
+	# BrowseScreen (marble FONDO + BARRA + PROMAN font), the same chrome the database
+	# browse already uses. The _nav stack + payload/on_activate machinery is preserved, so
+	# every _set_view caller (TEAM TACTICS + its sub-flows, the transfer market/bid/sell/
+	# renew/shortlist flows, end-of-season) is reskinned with no change to its own logic.
+	# The hub sits on top of $Root; hide it so the opaque BrowseScreen reads clean.
 	if _hub != null and is_instance_valid(_hub):
 		_hub.visible = false
-	_title.text = title
-	_subtitle.text = subtitle
-	_list.clear()
-	for r in rows:
-		_list.add_item(str(r))
 	_payload = payload
 	_on_activate = on_activate
-	_back.visible = _nav.size() > 1
-	var src := "SAMPLE DATA" if GameDB.is_sample else GameDB.season() + " season"
-	_footer.text = "PM98  -  %s  -  %d clubs / %d players" % [
-		src, GameDB.clubs.size(), _total_players()]
+	var show_back := _nav.size() > 1
+	_mount_browse(title, subtitle, rows,
+		func(i: int) -> void:
+			if i >= 0 and i < _payload.size() and _on_activate.is_valid():
+				_on_activate.call(_payload[i]),
+		func() -> void:   # RETURN pops the nav stack (the old TopBar Back), no extra click SFX
+			if _nav.size() > 1:
+				_nav.pop_back()
+				_nav.back().call(),
+		{"show_back": show_back})
 
 func _on_item(idx: int) -> void:
 	if idx >= 0 and idx < _payload.size() and _on_activate.is_valid():
@@ -932,6 +939,11 @@ func _club_with_roster(id: int) -> Dictionary:
 func _show_career() -> void:
 	if _nav.is_empty():
 		_nav.append(_show_home)
+	# Free any browse overlay (a reskinned _set_view sub-flow / results / news) before the
+	# hub takes over, so it doesn't linger behind the hub when we pop back here.
+	if _browse != null and is_instance_valid(_browse):
+		_browse.queue_free()
+		_browse = null
 	_mount_hub()
 
 ## Create the persistent MENUPRINCIPAL hub on first entry (wiring its taps to _menu_action
