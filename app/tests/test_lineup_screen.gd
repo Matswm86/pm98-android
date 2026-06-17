@@ -44,10 +44,10 @@ func _run() -> void:
 	get_root().add_child(screen)
 	for _i in 3:
 		await process_frame
-	ok = _assert(screen._f24 != null and screen._f12 != null and screen._f10 != null
-		and screen._f8 != null, "PROMAN fonts loaded into screen") and ok
-	ok = _assert(screen._bg != null and screen._bar != null and screen._campo != null,
-		"FONDO + BARRA + CAMPO textures loaded") and ok
+	ok = _assert(screen._f12 != null and screen._f10 != null and screen._f8 != null,
+		"PROMAN fonts loaded into screen") and ok
+	ok = _assert(PMChrome.bg() != null and screen._campo != null,
+		"management background + CAMPO textures loaded") and ok
 	screen.setup(club, t, "", "Premier")
 	await process_frame
 	ok = _assert(screen._by_id.size() == (club["players"] as Array).size(),

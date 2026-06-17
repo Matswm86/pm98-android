@@ -1101,7 +1101,7 @@ func _show_lineup_screen() -> void:
 	var scr: LineupScreen = load("res://scenes/LineupScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
-	scr.setup(_mgr_club(), _tactics(), "", _career.league_name)
+	scr.setup(_mgr_club(), _tactics(), "", _career.league_name, _career.season, _career.week + 1)
 	scr.gui_input.connect(func(e: InputEvent) -> void:
 		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
 			scr.queue_free())

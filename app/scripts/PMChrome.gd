@@ -37,6 +37,21 @@ const C_GOLD := Color(1.0, 0.84, 0.22)
 const C_GOLD_LO := Color(0.72, 0.54, 0.06)
 const C_STAR_OFF := Color(0.42, 0.46, 0.54)
 
+# White data-table chrome (LINE-UP / SQUAD / TRANSFER: handoff root cause 3 — the real
+# game uses white/cream grids with a blue column header and dark-blue SUBSTITUTES /
+# RESERVES section bands, not flat dark text on a photo).
+const C_TBL := Color(0.93, 0.94, 0.90)           # white/cream table body
+const C_TBL_HI := Color(1.0, 1.0, 0.99)
+const C_TBL_LO := Color(0.50, 0.52, 0.54)
+const C_TBL_HDR := Color(0.16, 0.28, 0.54)       # blue column-header strip
+const C_TBL_HDR_TXT := Color(0.86, 0.92, 1.0)
+const C_ROW_LIGHT := Color(0.95, 0.96, 0.92)     # alternating cream rows
+const C_ROW_DARK := Color(0.86, 0.88, 0.82)
+const C_ROW_TXT := Color(0.10, 0.13, 0.22)
+const C_ROW_SEP := Color(0.64, 0.66, 0.62)       # thin row separator
+const C_BAND := Color(0.14, 0.24, 0.48)          # SUBSTITUTES / RESERVES section band
+const C_BAND_TXT := Color(0.88, 0.93, 1.0)
+
 # Date synthesis. PM98 is week-based; the real header shows a full calendar date.
 # Anchor: season week 1 == Saturday 9 Aug 1997 (verified: +16 weeks == Saturday
 # 29 November 1997, exactly the real "Week 17" screenshot).
@@ -125,6 +140,33 @@ static func draw_crest(ci: CanvasItem, club_id: int, r: Rect2) -> void:
 	ci.draw_texture_rect_region(tex,
 		Rect2(r.position.x + (r.size.x - w) * 0.5, r.position.y + (r.size.y - h) * 0.5, w, h),
 		KIT_SRC)
+
+
+# ---- white data-table chrome (LINE-UP / SQUAD / TRANSFER) ----------------
+
+## A white/cream table panel with a beveled white border.
+static func draw_table_panel(ci: CanvasItem, r: Rect2) -> void:
+	bevel(ci, r, C_TBL, C_TBL_HI, C_TBL_LO, 2.0)
+
+
+## A blue column-header strip; the caller draws the column labels in C_TBL_HDR_TXT.
+static func draw_col_header(ci: CanvasItem, r: Rect2) -> void:
+	bevel(ci, r, C_TBL_HDR, C_TBL_HDR.lightened(0.2), C_TBL_HDR.darkened(0.4))
+
+
+## An alternating cream table row with a thin bottom separator; highlight tints it.
+static func draw_row(ci: CanvasItem, r: Rect2, idx: int, highlight := false) -> void:
+	ci.draw_rect(r, C_ROW_LIGHT if idx % 2 == 0 else C_ROW_DARK, true)
+	if highlight:
+		ci.draw_rect(r, Color(0.20, 0.42, 0.86, 0.22), true)
+	ci.draw_rect(Rect2(r.position.x, r.end.y - 1, r.size.x, 1), C_ROW_SEP, true)
+
+
+## A dark-blue section band (SUBSTITUTES / RESERVES) with a centred label.
+static func draw_band(ci: CanvasItem, r: Rect2, label: String) -> void:
+	bevel(ci, r, C_BAND, C_BAND.lightened(0.25), C_BAND.darkened(0.4))
+	text(ci, font("12"), r.position.x, r.position.y + (r.size.y - 13) * 0.5, label,
+		C_BAND_TXT, 12, 1, r.size.x)
 
 
 # ---- star rating (replaces the leaked CA64/CA96 integers, handoff root cause 4) ----

@@ -1,73 +1,65 @@
 extends Control
 class_name LineupScreen
-## PM98 LINE-UP (ALINEACIÓN) screen rebuilt from the ORIGINAL game art at the
-## EXACT coordinates reversed out of MANAGER.EXE (FUN_004fc321 + FUN_004fe860).
-## See docs/re/lineup_screen_re.md for the full reverse-engineering write-up.
+## PM98 LINE-UP (ALINEACIÓN) screen, rebuilt to match the real game (ma_7): the shared
+## management chrome (PMChrome header + blue marble background) over the white squad
+## TABLE — N. | PLAYER | EN SP ST AG GU FI MO | AV (+bar) | ROL | POS — in the game's
+## own English column codes, with STARTERS / SUBSTITUTES / RESERVES sections and the
+## right control column (PARAMETERS / RATING, the TEAM RATING star strip, the attribute
+## buttons, the CAMPO mini-pitch with the live XI markers, TRAINING / INJURIES /
+## STATISTICS and TACTICS / RETURN).
 ##
-## Left: the squad list with the game's own English column codes
-##   N. PLAYER  EN SP ST AG QU FI MO AV  ROL POS
-## at their reversed pixel x's; the starting XI rows (x21,w411,h16 from y17), then
-## the SUBSTITUTES and RESERVES sections. Right: the real CAMPO mini-pitch with the
-## 11 kit markers placed by the engine's own mapping
-##   marker = pitch.origin + (tac_x*148/318, tac_y*88/198)
-## driven live by the career's Tactics XI + formation and the real roster.
-##
-## Native canvas 640x480 (the original screen); scales to fit its parent.
+## XI + formation come from the career's Tactics; markers are placed by the engine's own
+## mapping (marker = pitch.origin + tac*scale). Native 640x480; scales to fit its parent.
 
 const W := 640
 const H := 480
 
-# Palette-accurate chrome, matched to the league-table screen.
-const C_TITLE := Color(0.91, 0.94, 1.0)
-const C_TEXT := Color(0.86, 0.90, 0.96)
-const C_DIM := Color(0.59, 0.69, 0.82)
-const C_HEAD := Color(0.67, 0.78, 0.92)
-const C_CELL := Color(0.16, 0.27, 0.47)
-const C_CELL_HI := Color(0.27, 0.43, 0.65)
-const C_CELL_LO := Color(0.08, 0.16, 0.31)
-const C_ROW_A := Color(0.11, 0.17, 0.31)
-const C_ROW_B := Color(0.086, 0.14, 0.26)
-const C_SECTION := Color(0.50, 0.50, 0.50)
-const C_GK := Color(0.16, 0.43, 0.27)
-const C_NAME := Color(1.0, 1.0, 1.0)
+const C_GK_ROW := Color(0.98, 0.97, 0.80)        # pale-yellow goalkeeper row
+const C_STATBAND := Color(0.80, 0.90, 0.78)      # pale-green stat-cell band
+const C_AVBAR := Color(0.46, 0.74, 0.32)
+const C_AVBAR_BG := Color(0.62, 0.64, 0.58)
+const C_BTN := Color(0.20, 0.34, 0.62)           # attribute buttons (blue)
+const C_BTN_HI := Color(0.42, 0.56, 0.84)
+const C_BTN_LO := Color(0.08, 0.16, 0.34)
+const C_DKBTN := Color(0.08, 0.13, 0.26)         # dark navy buttons
+const C_DKBTN_HI := Color(0.28, 0.40, 0.66)
+const C_GOLD := Color(1.0, 0.86, 0.22)
+const C_PANEL_TXT := Color(0.88, 0.93, 1.0)
+# Role tag colours (ROL / POS).
+const C_ROLE := {"GK": Color(0.20, 0.52, 0.30), "DEF": Color(0.22, 0.36, 0.66),
+	"MID": Color(0.46, 0.30, 0.62), "FOR": Color(0.66, 0.24, 0.22)}
 
-# Reversed column left-x (MANAGER.EXE FUN_004fe860). Header row at y=5.
-# {code, x_left, attr_key}. The attr_key is the DISPLAY mapping decoded attrs ->
-# the game's English column codes: SP=VE(speed) ST=RE(stamina) AG=AG(agility)
-# QU=CA(quality) are exact; EN/FI/MO are best-effort (the English attr-label table
-# in the EXE is not reversed yet); AV is the computed mean; "" = derived/non-attr.
+# Table geometry (640x480). {code, x, attr_key}; x is the RIGHT edge for numeric cols,
+# LEFT edge for text cols. GU (not QU) per the real header.
 const COLS := [
-	["N.", 25, "_num"], ["PLAYER", 63, "_name"],
-	["EN", 166, "EN"], ["SP", 191, "VE"], ["ST", 216, "RE"], ["AG", 240, "AG"],
-	["QU", 266, "CA"], ["FI", 293, "TI"], ["MO", 317, "RM"], ["AV", 342, "_avg"],
-	["ROL", 364, "_rol"], ["POS", 394, "_pos"],
+	["EN", 174, "EN"], ["SP", 200, "VE"], ["ST", 226, "RE"], ["AG", 252, "AG"],
+	["GU", 278, "CA"], ["FI", 304, "TI"], ["MO", 330, "RM"], ["AV", 356, "_avg"],
 ]
 const AVG_KEYS := ["VE", "RE", "AG", "CA", "RM", "RG", "PA", "TI"]
-
-const ROW_X := 21
-const ROW_W := 411
+const TABLE := Rect2(6, 50, 470, 426)
+const HDR_Y := 66
+const ROW_X := 8
+const ROW_W := 466
 const ROW_H := 16
-const XI_Y0 := 17          # first XI row top (i=0x15 -> y17, step 16)
-const SUBS_HDR_Y := 204    # SUBSTITUTES header (FUN_004fe860)
-const SUBS_Y0 := 220       # first substitute row (i=0xdc)
-const MAX_SUBS := 5        # bench size shown before the RESERVES block
+const STAT_X0 := 158
+const STAT_X1 := 344
+const AVBAR_X := 360
+const ROL_X := 398
+const POS_X := 430
+const XI_Y0 := 84
 
-# Pitch panel (476,155,156,187); the CAMPO mini-pitch sits in its lower area.
-const PITCH_PANEL := Rect2(476, 155, 156, 187)
-const CAMPO_POS := Vector2(480, 250)   # 152x92 campo top-left
-const MARK_ORIGIN := Vector2(482, 252) # interior top-left (2px campo border)
-const MARK_W := 148.0                  # 0x94: tac_x * 148/318
-const MARK_H := 88.0                   # 0x58: tac_y * 88/198
-const TAC_W := 318.0                   # 0x13e design space
-const TAC_H := 198.0                   # 0xc6
-
-# Home-kit crop (left 31px of the 48x64 MINIESC kit), as the league table.
+# Pitch panel (right column).
+const PITCH_POS := Vector2(482, 250)
+const CAMPO_W := 150.0
+const CAMPO_H := 92.0
+const MARK_ORIGIN := Vector2(484, 252)
+const MARK_W := 146.0
+const MARK_H := 88.0
+const TAC_W := 318.0
+const TAC_H := 198.0
 const KIT_SRC := Rect2(0, 0, 31, 64)
 
-var _bg: Texture2D
-var _bar: Texture2D
 var _campo: Texture2D
-var _f24: Font
 var _f12: Font
 var _f10: Font
 var _f8: Font
@@ -75,16 +67,14 @@ var _kits: Dictionary = {}
 
 var _club: Dictionary = {}
 var _tactics: Tactics = null
-var _manager: String = ""
 var _division: String = ""
+var _season: String = "1997-98"
+var _week: int = 0
 var _by_id: Dictionary = {}
 
 
 func _ready() -> void:
-	_bg = load("res://art/screens/fondo_marble.png")
-	_bar = load("res://art/screens/barra0.png")
 	_campo = load("res://art/screens/campo.png")
-	_f24 = load("res://art/fonts/proman24.fnt")
 	_f12 = load("res://art/fonts/proman12.fnt")
 	_f10 = load("res://art/fonts/proman10.fnt")
 	_f8 = load("res://art/fonts/proman8.fnt")
@@ -93,12 +83,14 @@ func _ready() -> void:
 	queue_redraw()
 
 
-## Feed the screen the manager's club + chosen tactics, then repaint.
-func setup(club: Dictionary, tactics: Tactics, manager: String = "", division: String = "") -> void:
+## Feed the manager's club + chosen tactics (+ season/week for the calendar plaque), repaint.
+func setup(club: Dictionary, tactics: Tactics, manager: String = "", division: String = "",
+		season: String = "1997-98", week: int = 0) -> void:
 	_club = club
 	_tactics = tactics
-	_manager = manager
 	_division = division
+	_season = season
+	_week = week
 	_by_id.clear()
 	for p in club.get("players", []):
 		_by_id[int(p.get("id", -1))] = p
@@ -107,16 +99,13 @@ func setup(club: Dictionary, tactics: Tactics, manager: String = "", division: S
 
 # ---- formation geometry --------------------------------------------------
 
-## Tactical (x,y) in the 318x198 design space for each XI slot of a formation.
-## Attacking left->right (GK by the left penalty box, forwards on the right),
-## matching the CAMPO mini-pitch (box on the left). Lines spread evenly across y.
 func _slot_positions() -> Array:
 	if _tactics == null:
 		return []
 	var lines: Array = Tactics.FORMATIONS.get(_tactics.formation, Tactics.FORMATIONS["4-4-2"])
 	var cols := {"GK": 20.0, "DEF": 90.0, "MID": 175.0, "FWD": 262.0}
 	var out: Array = []
-	out.append(Vector2(cols["GK"], TAC_H * 0.5))   # GK centred
+	out.append(Vector2(cols["GK"], TAC_H * 0.5))
 	for role in ["DEF", "MID", "FWD"]:
 		var n := 0
 		match role:
@@ -124,9 +113,7 @@ func _slot_positions() -> Array:
 			"MID": n = int(lines[1])
 			"FWD": n = int(lines[2])
 		for k in n:
-			var y := TAC_H * (k + 0.5) / float(n)
-			# pull the spread in from the touchlines a touch
-			y = lerp(TAC_H * 0.16, TAC_H * 0.84, (k + 0.5) / float(n))
+			var y: float = lerpf(TAC_H * 0.16, TAC_H * 0.84, (k + 0.5) / float(n))
 			out.append(Vector2(cols[role], y))
 	return out
 
@@ -154,64 +141,43 @@ func _txt(f: Font, x: int, y_top: int, s: String, col: Color, sz: int, right := 
 	draw_string(f, Vector2(px, y_top + f.get_ascent(sz)), s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
 
 
-func _txt_c(f: Font, cx: int, y_top: int, s: String, col: Color, sz: int) -> void:
-	if f == null:
-		return
-	var w := f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
-	draw_string(f, Vector2(cx - w * 0.5, y_top + f.get_ascent(sz)), s,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
-
-
-func _cell(x: int, y: int, w: int, h: int, base: Color, hi: Color, lo: Color) -> void:
-	draw_rect(Rect2(x, y, w, h), base, true)
-	draw_rect(Rect2(x, y, w, 1), hi, true)
-	draw_rect(Rect2(x, y, 1, h), hi, true)
-	draw_rect(Rect2(x, y + h - 1, w, 1), lo, true)
-	draw_rect(Rect2(x + w - 1, y, 1, h), lo, true)
-
-
 func _draw() -> void:
 	var s: float = min(size.x / W, size.y / H) if size.x > 0 and size.y > 0 else 1.0
-	if _bg != null:
-		draw_texture_rect(_bg, Rect2(Vector2.ZERO, size), false, Color(0.4, 0.4, 0.46))
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.05, 0.07, 0.14), true)
 	draw_set_transform(Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5), 0.0, Vector2(s, s))
 
-	if _bg != null:
-		draw_texture_rect(_bg, Rect2(0, 0, W, H), false)
-	if _bar != null:
-		draw_texture_rect(_bar, Rect2(0, 0, W, _bar.get_height()), false)
+	PMChrome.draw_bg(self)
+	PMChrome.draw_header(self, "LINE-UP", "", str(_club.get("name", "")), _division,
+		_season, _week, int(_club.get("id", -1)))
 
-	_txt_c(_f24, 176, 14, "LINE-UP", C_TITLE, 26)
-	_txt(_f12, 12, 9, "Manager", C_TEXT, 13)
-	_txt(_f12, 12, 26, _manager.substr(0, 18), C_DIM, 13)
-	_txt(_f12, 628, 9, str(_club.get("name", "")).substr(0, 18), C_TEXT, 13, true)
-	_txt(_f12, 628, 26, _division, C_DIM, 13, true)
-
-	_draw_columns()
+	PMChrome.draw_table_panel(self, TABLE)
+	_draw_col_header()
 	_draw_squad()
-	_draw_pitch()
+	_draw_right_panel()
 
 
-func _draw_columns() -> void:
+func _draw_col_header() -> void:
+	PMChrome.draw_col_header(self, Rect2(TABLE.position.x + 2, HDR_Y, TABLE.size.x - 4, 16))
+	_txt(_f10, 14, HDR_Y + 2, "N.", PMChrome.C_TBL_HDR_TXT, 11)
+	_txt(_f10, 48, HDR_Y + 2, "PLAYER", PMChrome.C_TBL_HDR_TXT, 11)
 	for c in COLS:
-		var code: String = c[0]
-		var x: int = c[1]
-		if code == "PLAYER" or code == "N.":
-			_txt(_f8, x, 56, code, C_HEAD, 11)
-		else:
-			_txt(_f8, x, 56, code, C_HEAD, 11)
+		_txt(_f10, c[1], HDR_Y + 2, c[0], PMChrome.C_TBL_HDR_TXT, 11, true)
+	_txt(_f10, ROL_X, HDR_Y + 2, "ROL", PMChrome.C_TBL_HDR_TXT, 11)
+	_txt(_f10, POS_X, HDR_Y + 2, "POS", PMChrome.C_TBL_HDR_TXT, 11)
 
 
-## XI rows (from tactics.xi) + a SUBSTITUTES bench + RESERVES, at the reversed metrics.
+## XI rows + SUBSTITUTES + RESERVES at the real metrics, in the white table skin.
 func _draw_squad() -> void:
 	var roles: Array = _tactics.roles() if _tactics != null else []
 	var xi: Array = _tactics.xi if _tactics != null else []
+	var row := 0
+	var y := XI_Y0
 
-	# Starting XI.
 	for i in xi.size():
-		var y := XI_Y0 + 14 + i * ROW_H
-		_row(y, i % 2 == 0)
-		_row_player(int(xi[i]), i + 1, roles[i] if i < roles.size() else "", y)
+		var rl: String = roles[i] if i < roles.size() else ""
+		_row(y, row, int(xi[i]), i + 1, rl)
+		y += ROW_H
+		row += 1
 
 	# Bench + reserves: squad players not in the XI, by ability.
 	var rest: Array = []
@@ -221,54 +187,75 @@ func _draw_squad() -> void:
 			rest.append(p)
 	rest.sort_custom(func(a, b): return _avg_of(a) > _avg_of(b))
 
-	_txt(_f8, ROW_X, SUBS_HDR_Y, "SUBSTITUTES", C_SECTION, 11)
-	var bench := rest.slice(0, MAX_SUBS)
+	_section(y, "SUBSTITUTES"); y += 15
+	var bench := rest.slice(0, 5)
 	for j in bench.size():
-		var y := SUBS_Y0 + 14 + j * ROW_H
-		_row(y, j % 2 == 0)
-		_row_player(int(bench[j].get("id", -1)), 12 + j, _pos_of(bench[j]), y)
+		_row(y, row, int(bench[j].get("id", -1)), 12 + j, _pos_of(bench[j]))
+		y += ROW_H
+		row += 1
 
-	var res_hdr_y := SUBS_Y0 + 14 + bench.size() * ROW_H + 6
-	_txt(_f8, ROW_X, res_hdr_y, "RESERVES", C_SECTION, 11)
-	var res := rest.slice(MAX_SUBS, rest.size())
-	var ry0 := res_hdr_y + 16
-	var max_rows := int((H - 10 - ry0) / ROW_H)
+	_section(y, "RESERVES"); y += 15
+	var res := rest.slice(5, rest.size())
+	var max_rows := int((TABLE.end.y - 4 - y) / ROW_H)
 	for j in mini(res.size(), max_rows):
-		var y := ry0 + j * ROW_H
-		_row(y, j % 2 == 0)
-		_row_player(int(res[j].get("id", -1)), MAX_SUBS + 12 + j, _pos_of(res[j]), y)
+		_row(y, row, int(res[j].get("id", -1)), 17 + j, _pos_of(res[j]))
+		y += ROW_H
+		row += 1
 
 
-func _row(y: int, alt: bool) -> void:
-	draw_rect(Rect2(ROW_X, y, ROW_W, ROW_H - 1), C_ROW_A if alt else C_ROW_B, true)
+func _section(y: int, label: String) -> void:
+	draw_rect(Rect2(ROW_X, y, ROW_W, 14), PMChrome.C_ROW_DARK, true)
+	_centre(_f10, ROW_X, ROW_W, y + 1, label, PMChrome.C_TBL_HDR, 11)
 
 
-func _row_player(pid: int, number: int, role: String, y: int) -> void:
+func _row(y: int, idx: int, pid: int, number: int, role: String) -> void:
 	var p: Variant = _by_id.get(pid)
 	if p == null:
 		return
 	var pl: Dictionary = p
-	var attrs: Dictionary = pl.get("attrs", {}) if pl.get("attrs") is Dictionary else {}
+	var is_gk: bool = pl.get("isGK", false)
+	# row background
+	var bg: Color = C_GK_ROW if is_gk else (PMChrome.C_ROW_LIGHT if idx % 2 == 0 else PMChrome.C_ROW_DARK)
+	draw_rect(Rect2(ROW_X, y, ROW_W, ROW_H - 1), bg, true)
+	draw_rect(Rect2(ROW_X, y + ROW_H - 1, ROW_W, 1), PMChrome.C_ROW_SEP, true)
+	# pale-green stat band
+	draw_rect(Rect2(STAT_X0, y, STAT_X1 - STAT_X0, ROW_H - 1), C_STATBAND, true)
+
 	var ty := y + 2
+	PMChrome.draw_crest(self, int(_club.get("id", -1)), Rect2(10, y, 13, ROW_H - 1))
+	_txt(_f10, 44, ty, str(number), PMChrome.C_ROW_TXT, 11, true)
+	_txt(_f10, 48, ty, str(pl.get("name", "?")).substr(0, 13), PMChrome.C_ROW_TXT, 11)
+
+	var attrs: Dictionary = pl.get("attrs", {}) if pl.get("attrs") is Dictionary else {}
 	for c in COLS:
-		var code: String = c[0]
-		var x: int = c[1]
 		var key: String = c[2]
-		match key:
-			"_num":
-				_txt(_f8, x + 18, ty, str(number), C_TEXT, 11, true)
-			"_name":
-				_txt(_f8, x, ty, str(pl.get("name", "?")).substr(0, 14), C_NAME, 11)
-			"_avg":
-				_txt(_f8, x + 18, ty, str(_avg_of(pl)), C_TEXT, 11, true)
-			"_rol":
-				_txt(_f8, x, ty, role, C_DIM, 11)
-			"_pos":
-				_txt(_f8, x, ty, _pos_of(pl), C_DIM, 11)
-			_:
-				var v: Variant = attrs.get(key)
-				var sv := str(int(v)) if v != null else "-"
-				_txt(_f8, x + 18, ty, sv, C_TEXT, 11, true)
+		var x: int = c[1]
+		var sv := ""
+		if key == "_avg":
+			sv = str(_avg_of(pl))
+		else:
+			var v: Variant = attrs.get(key)
+			sv = str(int(v)) if v != null else "-"
+		_txt(_f10, x, ty, sv, PMChrome.C_ROW_TXT, 11, true)
+	# AV bar just right of the AV value
+	var avg := _avg_of(pl)
+	draw_rect(Rect2(AVBAR_X, y + 4, 30, 7), C_AVBAR_BG, true)
+	draw_rect(Rect2(AVBAR_X, y + 4, 30.0 * clampf(avg / 99.0, 0.0, 1.0), 7), C_AVBAR, true)
+	# ROL tag + POS text
+	var pos := _pos_of(pl)
+	var rcol: Color = C_ROLE.get(_role_group(pos), PMChrome.C_TBL_HDR)
+	draw_rect(Rect2(ROL_X, y + 2, 24, ROW_H - 5), rcol, true)
+	_txt(_f8, POS_X, ty, pos, PMChrome.C_ROW_TXT, 10)
+
+
+func _role_group(pos: String) -> String:
+	if pos == "GK":
+		return "GK"
+	if pos in ["DEF", "RB", "LB", "CB"]:
+		return "DEF"
+	if pos in ["FOR", "ST", "CF"]:
+		return "FOR"
+	return "MID"
 
 
 func _avg_of(p: Dictionary) -> int:
@@ -289,40 +276,94 @@ func _pos_of(p: Dictionary) -> String:
 	return "GK" if p.get("isGK") else "OUT"
 
 
-## CAMPO mini-pitch (right) with the 11 XI kit markers placed by the engine mapping.
+# ---- right control column ------------------------------------------------
+
+func _draw_right_panel() -> void:
+	var px := 480.0
+	var pw := 154.0
+	# PARAMETERS / RATING.
+	PMChrome.bevel(self, Rect2(px, 50, pw, 18), C_DKBTN, C_DKBTN_HI, C_BTN_LO)
+	_centre(_f12, px, pw, 52, "PARAMETERS", C_GOLD, 13)
+	PMChrome.bevel(self, Rect2(px, 70, pw, 18), C_DKBTN, C_DKBTN_HI, C_BTN_LO)
+	_centre(_f12, px, pw, 72, "RATING", C_PANEL_TXT, 13)
+
+	# TEAM RATING strip with stars.
+	var avg := _team_rating()
+	PMChrome.bevel(self, Rect2(px, 92, pw, 30), Color(0.10, 0.16, 0.34), C_DKBTN_HI, C_BTN_LO)
+	PMChrome.draw_crest(self, int(_club.get("id", -1)), Rect2(px + 4, 94, 18, 26))
+	_txt(_f8, int(px) + 26, 95, "TEAM RATING", C_PANEL_TXT, 10)
+	PMChrome.draw_stars(self, px + 26, 106, avg / 20.0, 11, 5)
+	_txt(_f12, int(px + pw) - 8, 100, str(avg), Color.WHITE, 14, true)
+
+	# Attribute buttons (2 cols x 3 rows).
+	var labels := [["HANDLING", "PASSING"], ["DRIBBLING", "HEADING"], ["TACKLING", "SHOOTING"]]
+	for r in 3:
+		for cc in 2:
+			var bx := px + cc * (pw / 2.0)
+			var by := 126 + r * 20
+			PMChrome.bevel(self, Rect2(bx + 1, by, pw / 2.0 - 2, 18), C_BTN, C_BTN_HI, C_BTN_LO)
+			_centre(_f8, bx, pw / 2.0, by + 3, labels[r][cc], C_PANEL_TXT, 10)
+
+	_draw_pitch()
+
+	# TRAINING / INJURIES / STATISTICS.
+	var rows := ["TRAINING", "INJURIES", "STATISTICS"]
+	for i in 3:
+		var by := 348 + i * 22
+		PMChrome.bevel(self, Rect2(px, by, pw, 20), C_DKBTN, C_DKBTN_HI, C_BTN_LO)
+		_txt(_f12, int(px + pw) - 8, by + 4, rows[i], C_PANEL_TXT, 12, true)
+
+	# TACTICS / RETURN.
+	for i in 2:
+		var bx := px + i * (pw / 2.0)
+		PMChrome.bevel(self, Rect2(bx + 1, 448, pw / 2.0 - 2, 24), C_DKBTN, C_DKBTN_HI, C_BTN_LO)
+		_centre(_f12, bx, pw / 2.0, 453, "TACTICS" if i == 0 else "RETURN",
+			C_GOLD if i == 1 else C_PANEL_TXT, 13)
+
+
+func _centre(f: Font, x: float, w: float, y_top: int, s: String, col: Color, sz: int) -> void:
+	if f == null:
+		return
+	var tw := f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
+	draw_string(f, Vector2(x + (w - tw) * 0.5, y_top + f.get_ascent(sz)), s,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
+
+
+func _team_rating() -> int:
+	var xi: Array = _tactics.xi if _tactics != null else []
+	if xi.is_empty():
+		return 0
+	var sum := 0
+	var n := 0
+	for pid in xi:
+		var p: Variant = _by_id.get(int(pid))
+		if p != null:
+			sum += _avg_of(p)
+			n += 1
+	return int(round(float(sum) / n)) if n > 0 else 0
+
+
+## CAMPO mini-pitch with the 11 XI kit markers placed by the engine mapping.
 func _draw_pitch() -> void:
-	# Panel header strip: club + formation, above the pitch.
-	_cell(int(PITCH_PANEL.position.x), 119, 156, 22, C_CELL, C_CELL_HI, C_CELL_LO)
-	_txt_c(_f10, int(PITCH_PANEL.position.x) + 78, 122,
-		_tactics.formation if _tactics != null else "", C_TITLE, 11)
-
 	if _campo != null:
-		draw_texture_rect(_campo, Rect2(CAMPO_POS, _campo.get_size()), false)
+		draw_texture_rect(_campo, Rect2(PITCH_POS, Vector2(CAMPO_W, CAMPO_H)), false)
 	else:
-		_cell(int(CAMPO_POS.x), int(CAMPO_POS.y), 152, 92, C_GK, C_CELL_HI, C_CELL_LO)
-
+		draw_rect(Rect2(PITCH_POS, Vector2(CAMPO_W, CAMPO_H)), Color(0.16, 0.43, 0.27), true)
 	if _tactics == null:
 		return
 	var pos := _slot_positions()
 	var xi: Array = _tactics.xi
 	var club_id := int(_club.get("id", -1))
 	for i in mini(xi.size(), pos.size()):
-		var c := _mark_center(pos[i])
-		_draw_marker(club_id, i + 1, c)
+		_draw_marker(club_id, i + 1, _mark_center(pos[i]))
 
 
-## A formation marker: the home-kit sprite (as the engine blits it) + the shirt
-## number. No surname here -- the original draws only the kit on the pitch; names
-## live in the squad list. Kept small (the engine's markers are 10x10 on a 148x88 pitch).
 func _draw_marker(club_id: int, number: int, center: Vector2) -> void:
-	var box_w := 11.0
-	var box_h := 14.0
 	var tex := _kit(club_id)
 	if tex != null:
-		var sc: float = min(box_w / KIT_SRC.size.x, box_h / KIT_SRC.size.y)
+		var sc: float = min(11.0 / KIT_SRC.size.x, 14.0 / KIT_SRC.size.y)
 		var w := KIT_SRC.size.x * sc
 		var h := KIT_SRC.size.y * sc
 		draw_texture_rect_region(tex, Rect2(center.x - w * 0.5, center.y - h * 0.5, w, h), KIT_SRC)
 	else:
-		draw_rect(Rect2(center.x - 5, center.y - 6, 10, 12), C_TITLE, true)
-	_txt_c(_f8, int(center.x), int(center.y + box_h * 0.5 - 1), str(number), C_NAME, 11)
+		draw_rect(Rect2(center.x - 5, center.y - 6, 10, 12), Color.WHITE, true)
