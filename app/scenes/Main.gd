@@ -50,7 +50,7 @@ func _ready() -> void:
 			and not OS.has_environment("PM98_MATCH_SHOT") and not OS.has_environment("PM98_NEWS_SHOT") \
 			and not OS.has_environment("PM98_TRAIN_SHOT") and not OS.has_environment("PM98_CUP_SHOT") \
 			and not OS.has_environment("PM98_YOUTH_SHOT") and not OS.has_environment("PM98_STAFF_SHOT") \
-			and not OS.has_environment("PM98_SCREENS_SHOT"):
+			and not OS.has_environment("PM98_CONTRACT_SHOT") and not OS.has_environment("PM98_SCREENS_SHOT"):
 		_devshot()
 
 
@@ -73,6 +73,9 @@ func _boot() -> void:
 		return
 	if OS.has_environment("PM98_TRAIN_SHOT"):
 		_train_shot()
+		return
+	if OS.has_environment("PM98_CONTRACT_SHOT"):
+		_contract_shot()
 		return
 	if OS.has_environment("PM98_CUP_SHOT"):
 		_cup_shot()
@@ -296,6 +299,40 @@ func _train_shot() -> void:
 	await _settle()
 	_save_shot(dir, "training.png")
 	print("TRAIN-SHOT done intensity=%s squad=%d" % [_career.training_intensity, _career.my_squad().size()])
+	get_tree().quit()
+
+
+## Faithful real-render of the RENEW negotiation. Begins a career, finds a player on a
+## final-year (EXPIRING) deal -- the seed squad's veterans start on one-year contracts -- and
+## mounts his renewal screen over the hub so the capture shows his current wage, his demand
+## and the hold/meet/better offers. Run as the NORMAL app under Xvfb+GL: PM98_CONTRACT_SHOT=1.
+func _contract_shot() -> void:
+	var dir := OS.get_environment("PM98_SHOT_DIR")
+	if GameDB.leagues.is_empty():
+		print("CONTRACT-SHOT no leagues loaded")
+		get_tree().quit()
+		return
+	var lg: Dictionary = GameDB.leagues[0]
+	var clubs := GameDB.clubs_in_league(lg["id"])
+	clubs.sort_custom(func(a, b): return a["name"] < b["name"])
+	_begin_career(lg, clubs[0])
+	# Pick an expiring player; guarantee one for the capture if the squad has none.
+	var target: Dictionary = {}
+	for p in _career.my_squad():
+		if Contract.is_expiring(p):
+			target = p
+			break
+	if target.is_empty() and not _career.my_squad().is_empty():
+		target = _career.my_squad()[0]
+		target["contract_years"] = Contract.EXPIRING_YEARS
+	_show_career()               # raise the hub
+	await _settle()
+	_show_renew(target)
+	await _settle()
+	_save_shot(dir, "contract.png")
+	print("CONTRACT-SHOT done squad=%d wagebill/wk=%d demand/wk=%d club=%s" % [
+		_career.my_squad().size(), _career.player_weekly_wage(),
+		Contract.demanded_weekly(target, _career.tier), _career.club_name])
 	get_tree().quit()
 
 
@@ -1622,6 +1659,7 @@ func _news_colour(kind: String) -> Color:
 		"cup": return Color(0.98, 0.86, 0.45)       # gold -- an F.A. Cup result
 		"youth": return Color(0.55, 0.85, 0.55)     # green -- youth academy news
 		"staff": return Color(0.70, 0.78, 0.95)     # steel -- backroom staff news
+		"contract": return Color(0.95, 0.80, 0.55)  # amber -- contract / wage news
 		_: return Color(0.86, 0.90, 0.96)
 
 ## Dismiss a browse overlay shown from the hub (results) and re-raise the hub beneath it.
@@ -1926,35 +1964,47 @@ func _show_transfer_squad() -> void:
 		var pos := "GK" if p.get("isGK") else "  "
 		var ca := int((p.get("attrs", {}) as Dictionary).get("CA", 0))
 		var yrs := int(p.get("contract_years", 1))
-		var listed := "  [LISTED]" if _career.is_listed(pid) else ""
-		rows.append("%-15s %s CA%2d  %dy%s" % [p.get("name", "?"), pos, ca, yrs, listed])
+		var wage := Contract.current_weekly(p, _career.tier)
+		var tag := "  EXPIRING" if Contract.is_expiring(p) else ""
+		if _career.is_listed(pid):
+			tag += "  [LISTED]"
+		rows.append("%-15s %s CA%2d £%s/wk %dy%s" % [
+			p.get("name", "?"), pos, ca, _fmt_int(wage), yrs, tag])
 		payload.append(p)
-	_set_view("MY SQUAD  (%d)" % squad.size(), "Tap a player to RENEW, list or sell",
+	_set_view("MY SQUAD  (%d)" % squad.size(),
+		"£%s/wk wage bill  -  tap a player to RENEW, list or sell" % _fmt_int(_career.player_weekly_wage()),
 		rows, payload, func(p): _push(_show_player_deal.bind(p)))
 
 func _show_player_deal(p: Dictionary) -> void:
 	var pid := int(p["id"])
+	var tier := _career.tier
+	var weekly := Contract.current_weekly(p, tier)
+	var auto: bool = bool(p.get("auto_renew", false))
 	var rows: Array = []
 	var payload: Array = []
-	rows.append("RENEW contract"); payload.append({"a": "renew"})
+	rows.append("RENEW contract  (negotiate wage)"); payload.append({"a": "renew"})
+	rows.append("Auto-renew at expiry:  %s" % ("ON" if auto else "OFF")); payload.append({"a": "auto"})
 	rows.append("Remove from transfer list" if _career.is_listed(pid) else "Place on transfer list")
 	payload.append({"a": "list"})
 	rows.append("Get an offer / sell now"); payload.append({"a": "sell"})
 	var attrs: Dictionary = p.get("attrs", {})
+	var expiring := "  -  EXPIRING" if Contract.is_expiring(p) else ""
 	_set_view(p.get("name", "?"),
-		"CA %d  -  CLUB FEE £%s  -  YEARLY WAGE £%s  -  contract %dy" % [
-			int(attrs.get("CA", 0)), _fmt_int(TransferMarket.value_of(p, _career.tier)),
-			_fmt_int(TransferMarket.wage_yearly(p, _career.tier)), int(p.get("contract_years", 1))],
+		"CA %d  -  CLUB FEE £%s  -  YEARLY WAGE £%s (£%s/mo)  -  contract %dy%s" % [
+			int(attrs.get("CA", 0)), _fmt_int(TransferMarket.value_of(p, tier)),
+			_fmt_int(Contract.yearly(weekly)), _fmt_int(Contract.monthly(weekly)),
+			int(p.get("contract_years", 1)), expiring],
 		rows, payload, func(it): _player_deal_action(p, it["a"]))
 
 func _player_deal_action(p: Dictionary, a: String) -> void:
 	var pid := int(p["id"])
 	match a:
 		"renew":
-			var res := _career.renew(pid)
+			_push(_show_renew.bind(p))
+		"auto":
+			_career.set_auto_renew(pid, not bool(p.get("auto_renew", false)))
 			_career.save()
-			_nav.pop_back()
-			_push(_show_deal_result.bind(res["msg"]))
+			_show_player_deal(p)            # refresh the ON/OFF label in place
 		"list":
 			_career.toggle_listed(pid)
 			_career.save()
@@ -1967,6 +2017,27 @@ func _player_deal_action(p: Dictionary, a: String) -> void:
 				_toast("No club has made an offer.")
 			else:
 				_push(_show_sale_offer.bind(pid, p.get("name", "?"), offer))
+
+## The RENEW negotiation: a player wants a wage to put pen to a new deal. You can hold his
+## current terms (a lowball he may refuse), meet his demand, or better it to lock him in.
+func _show_renew(p: Dictionary) -> void:
+	var tier := _career.tier
+	var weekly := Contract.current_weekly(p, tier)
+	var demand := Contract.demanded_weekly(p, tier)
+	var rows: Array = []
+	var payload: Array = []
+	for opt in Contract.renewal_options(p, tier):
+		rows.append("%-30s £%s/wk  %dy" % [opt["label"], _fmt_int(int(opt["weekly"])), int(opt["years"])])
+		payload.append(opt)
+	_set_view("Renew %s" % p.get("name", "?"),
+		"On £%s/wk now  -  he wants £%s/wk  -  pick an offer" % [_fmt_int(weekly), _fmt_int(demand)],
+		rows, payload, func(opt): _renew_action(p, int(opt["weekly"])))
+
+func _renew_action(p: Dictionary, offer_weekly: int) -> void:
+	var res := _career.renew(int(p["id"]), offer_weekly)
+	_career.save()
+	_nav.pop_back()                      # drop the renew screen
+	_push(_show_deal_result.bind(res["msg"]))
 
 func _show_sale_offer(pid: int, pname: String, offer: Dictionary) -> void:
 	var rows := ["ACCEPT  -  sell for £%s" % _fmt_int(int(offer["offer"])), "REFUSE"]

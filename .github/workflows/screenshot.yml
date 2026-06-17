@@ -110,6 +110,13 @@ jobs:
             timeout 90 "$GITHUB_WORKSPACE/godot" --rendering-driver opengl3 \
             --resolution 2400x1080 . 2>&1 | tee staff.log || true
           echo "--- STAFF diagnostics ---"; grep -iE "STAFF-SHOT|SHOT .*png|SCRIPT ERROR|error" staff.log | head -20 || true
+          # Contracts & wages: begin a career, find a player on an expiring deal, capture the
+          # RENEW negotiation screen (his current wage, his demand, and the hold/meet/better offers).
+          PM98_SHOT_DIR="$PWD/shots" PM98_CONTRACT_SHOT=1 LIBGL_ALWAYS_SOFTWARE=1 \
+            xvfb-run -a -s "-screen 0 2400x1080x24" \
+            timeout 90 "$GITHUB_WORKSPACE/godot" --rendering-driver opengl3 \
+            --resolution 2400x1080 . 2>&1 | tee contract.log || true
+          echo "--- CONTRACT diagnostics ---"; grep -iE "CONTRACT-SHOT|SHOT .*png|SCRIPT ERROR|error" contract.log | head -20 || true
           # F.A. Cup: begin a career, play into the season so several cup rounds are
           # drawn/played, capture the CUP screen (run + latest draw + trophy art).
           PM98_SHOT_DIR="$PWD/shots" PM98_CUP_SHOT=1 LIBGL_ALWAYS_SOFTWARE=1 \

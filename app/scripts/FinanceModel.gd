@@ -73,7 +73,11 @@ static func summary(club: Dictionary, tier: int) -> Dictionary:
 	var wbase: int = int(_WAGE_BASE[tier])
 	var weekly_wages := 0
 	for p in club.get("players", []):
-		weekly_wages += _player_wage(p.get("attrs", {}), wbase)
+		# A player's actual contracted wage (set on signing / renewal) takes precedence
+		# over the market estimate, so a renewal raise shows up in the books. Kept inline
+		# (not via Contract) so FinanceModel stays free of that dependency.
+		var stored: Variant = p.get("wage")
+		weekly_wages += int(stored) if stored != null else _player_wage(p.get("attrs", {}), wbase)
 	var wages := weekly_wages * SEASON_WEEKS               # STAFF WAGES
 	var bonus := int(round(gate * 0.02))                   # BONUS (win/appearance pool)
 	var expense := wages + bonus

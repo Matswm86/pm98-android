@@ -147,7 +147,11 @@ static func create(club: Dictionary, league: Dictionary, league_clubs: Array, le
 	c._init_table(league_clubs)
 	c._set_objective(league, league_clubs, leagues)
 	var fin := FinanceModel.summary(club, c.tier)
-	c.weekly_net = int(fin["weekly_balance"])
+	# weekly_net is the per-week finance delta WITHOUT the player wage bill -- player wages
+	# are drawn live from the squad each week (so signings + renewal raises move the bill),
+	# so we add the seed squad's wages back into the projected balance here. For an unchanged
+	# squad the live deduction equals this added-back figure, i.e. identical to the old net.
+	c.weekly_net = int(fin["weekly_balance"]) + int(fin["weekly_wages"])
 	c.cash = int(fin.get("total_income", 0)) / 4   # opening balance ~ a quarter's income
 	c.tactics = Tactics.auto_pick(club, Tactics.DEFAULT_FORMATION).to_dict()
 	# The academy starts with a small crop of youngsters to develop.
@@ -173,6 +177,8 @@ func _seed_squad(club_dict: Dictionary) -> Array:
 		dup["suspended_weeks"] = 0
 		dup["yellows"] = 0
 		dup["dev_progress"] = 0.0      # development carry-over (Training.gd)
+		Contract.stamp_wage(dup, tier)  # his contracted weekly wage (Contract.gd)
+		dup["auto_renew"] = false      # opt-in: auto-renew an expiring deal at rollover
 		out.append(dup)
 	return out
 
@@ -263,6 +269,7 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 		if h == club_id or a == club_id:
 			manager_res = {"home_id": h, "away_id": a, "hg": hg, "ag": ag, "manager_home": h == club_id}
 	cash += weekly_net
+	cash -= player_weekly_wage()        # the live squad wage bill (YEARLY WAGE / 52 per man)
 	cash -= Staff.weekly_wage(staff)   # the backroom staff wage bill (STAFF WAGES)
 	week += 1
 	offers_left = OFFERS_PER_WEEK   # the board's weekly signing allowance resets
@@ -537,6 +544,8 @@ func promote_youth(pid: int) -> Dictionary:
 	Youth.graduate(p)
 	p["clubId"] = club_id
 	p["contract_years"] = TransferMarket.NEW_CONTRACT_YEARS
+	Contract.stamp_wage(p, tier)   # a first-team wage now he's promoted
+	p["auto_renew"] = false
 	rosters[club_id].append(p)
 	_news("youth", "%s has been promoted to the first team squad." % p.get("name", "?"))
 	_log("%s has been promoted from the youth team." % p.get("name", "?"))
@@ -548,6 +557,11 @@ func promote_youth(pid: int) -> Dictionary:
 ## The weekly STAFF WAGES bill (sum of the hired staff's wages).
 func staff_weekly_wage() -> int:
 	return Staff.weekly_wage(staff)
+
+## The live weekly PLAYER wage bill (sum of your squad's contracted wages). Drawn from cash
+## each week, so a signing or a renewal raise lifts your outgoings (Contract.gd).
+func player_weekly_wage() -> int:
+	return Contract.squad_weekly_bill(my_squad(), tier)
 
 ## Hire a candidate from the pool into the backroom staff. Guards the headcount cap and the
 ## directors' affordability (you must be able to cover the new wage bill). Moves the member
@@ -636,6 +650,8 @@ func sign_player(pid: int, from_club_id: int, offer: int, rng: RandomNumberGener
 	rosters[from_club_id].erase(player)
 	player["clubId"] = club_id
 	player["contract_years"] = TransferMarket.NEW_CONTRACT_YEARS
+	Contract.stamp_wage(player, tier)   # his wage joins your live bill
+	player["auto_renew"] = false
 	rosters[club_id].append(player)
 	cash -= offer
 	transfer_listed.erase(pid)
@@ -681,14 +697,37 @@ func accept_sale(pid: int, buyer_id: int, offer: int) -> Dictionary:
 	_log("%s has been signed by %s for £%s." % [player.get("name", "?"), buyer_name, _money(offer)])
 	return {"ok": true, "msg": "Sold %s to %s for £%s." % [player.get("name", "?"), buyer_name, _money(offer)]}
 
-## Renew a squad player's contract (RENEW), resetting his term. {ok, msg}.
-func renew(pid: int) -> Dictionary:
+## Offer a squad player a renewal at `offer_weekly` £/wk (default = meet his demand). It is a
+## NEGOTIATION: he accepts at/above his wage demand, may balk just below it, and refuses a
+## lowball -- "%s has rejected your offer for renewal." On acceptance his term resets and his
+## stored wage updates (so a raise flows into the live wage bill). {ok, msg, demanded}.
+func renew(pid: int, offer_weekly: int = -1, rng: RandomNumberGenerator = null) -> Dictionary:
 	var player := _find_in(club_id, pid)
 	if player.is_empty():
 		return {"ok": false, "msg": "That player is not in your squad."}
-	player["contract_years"] = TransferMarket.NEW_CONTRACT_YEARS
-	_log("%s has renewed his contract." % player.get("name", "?"))
-	return {"ok": true, "msg": "%s has renewed his contract." % player.get("name", "?")}
+	if offer_weekly < 0:
+		offer_weekly = Contract.demanded_weekly(player, tier)
+	if rng == null:
+		rng = RandomNumberGenerator.new()
+		rng.randomize()
+	var verdict := Contract.evaluate_renewal(player, offer_weekly, tier, rng)
+	var pname: String = player.get("name", "?")
+	if not verdict["accepted"]:
+		_log("%s has rejected your offer for renewal." % pname)
+		return {"ok": false, "msg": "%s has rejected your offer for renewal." % pname,
+			"demanded": int(verdict["demanded"])}
+	player["contract_years"] = Contract.NEW_TERM_YEARS
+	player["wage"] = offer_weekly
+	_log("%s has renewed his contract." % pname)
+	return {"ok": true, "msg": "%s has renewed his contract on £%s/wk." % [pname, _money(offer_weekly)],
+		"demanded": int(verdict["demanded"])}
+
+## Toggle a player's auto-renew flag. An expiring deal with auto-renew on is renewed at his
+## demand at the next season rollover (if you can afford it), instead of him leaving on a free.
+func set_auto_renew(pid: int, on: bool) -> void:
+	var player := _find_in(club_id, pid)
+	if not player.is_empty():
+		player["auto_renew"] = on
 
 func toggle_shortlist(pid: int) -> void:
 	if shortlist.has(pid):
@@ -728,11 +767,23 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 		var yrs := int(p.get("contract_years", 1)) - 1
 		p["contract_years"] = yrs
 		p["age"] = int(p.get("age", 26)) + 1   # your squad ages a year (drives training)
-		if yrs <= 0:
+		if yrs > 0:
+			continue
+		# Contract up. An auto-renew player is re-signed at his demand if the club can fund the
+		# deal (a season's wage); otherwise -- and for everyone without auto-renew -- he leaves
+		# on a FREE TRANSFER. You tie a player down in advance via the RENEW screen.
+		if p.get("auto_renew") and Contract.yearly(Contract.demanded_weekly(p, tier)) <= cash:
+			var w := Contract.demanded_weekly(p, tier)
+			p["contract_years"] = Contract.NEW_TERM_YEARS
+			p["wage"] = w
+			_news("contract", "%s has renewed his contract (auto)." % p.get("name", "?"))
+			_log("%s has renewed his contract on £%s/wk (auto)." % [p.get("name", "?"), _money(w)])
+		else:
 			leavers.append(p)
 	for p in leavers:
 		rosters[club_id].erase(p)
-		_log("%s has left your club as his contract was not renewed." % p.get("name", "?"))
+		_news("contract", "%s has left on a free (contract not renewed)." % p.get("name", "?"))
+		_log("%s has left your club as his contract has not been renewed." % p.get("name", "?"))
 	# AI contracts tick but auto-renew, so rival squads stay stable across years.
 	for cid in rosters:
 		if int(cid) == club_id:
@@ -770,7 +821,7 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	var league := {"id": league_id, "name": league_name, "tier": tier}
 	_set_objective(league, views, leagues)
 	var fin := FinanceModel.summary(club_view(club_id), tier)
-	weekly_net = int(fin["weekly_balance"])
+	weekly_net = int(fin["weekly_balance"]) + int(fin["weekly_wages"])  # wage-free; wages drawn live
 	# Refit the XI to the (possibly changed) squad while keeping the shape.
 	if not tactics.is_empty():
 		var t := Tactics.from_dict(tactics)
@@ -1009,6 +1060,7 @@ func to_dict() -> Dictionary:
 		"euro_winner_ratings": _str_keyed(euro_winner_ratings),
 		"euro_winner_names": _str_keyed(euro_winner_names),
 		"supercup": supercup, "intercontinental": intercontinental,
+		"wages_live": true,   # marker: weekly_net excludes player wages (drawn live). See from_dict.
 	}
 
 
@@ -1092,6 +1144,11 @@ static func from_dict(d: Dictionary) -> Career:
 	c.transfer_listed = {}
 	for k in d.get("transfer_listed", {}):
 		c.transfer_listed[int(k)] = true
+	# Pre-contracts saves baked the player wage bill INTO weekly_net; the live loop now draws
+	# it separately, so add it back once on load to keep the old weekly burn unchanged. Legacy
+	# players have no stored `wage` -> current_weekly falls back to the (identical) market wage.
+	if not d.has("wages_live"):
+		c.weekly_net += c.player_weekly_wage()
 	return c
 
 static func has_save(path: String = SAVE_PATH) -> bool:

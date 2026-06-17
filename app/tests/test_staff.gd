@@ -133,15 +133,17 @@ func _career_integration() -> bool:
 	ok = _assert(Staff.training_factor(career.staff) > 1.0, "the hired trainer raises the live factor") and ok
 
 	# Wages are drawn from cash each week (week 0 has no cup prize, so the delta is exact).
+	# The week's draw is weekly_net minus BOTH the live player wage bill and the staff bill.
 	var cash_before := career.cash
 	var wage := career.staff_weekly_wage()
+	var players := career.player_weekly_wage()
 	var net := career.weekly_net
 	var rng := RandomNumberGenerator.new()
 	rng.seed = SEED
 	career.advance_week(rng)
 	ok = _assert(wage > 0, "the hired staff has a weekly wage (£%d/wk)" % wage) and ok
-	ok = _assert(career.cash == cash_before + net - wage,
-		"the staff wage bill is drawn from cash (%d + %d - %d)" % [cash_before, net, wage]) and ok
+	ok = _assert(career.cash == cash_before + net - players - wage,
+		"the staff wage bill is drawn from cash (%d + %d - %d - %d)" % [cash_before, net, players, wage]) and ok
 
 	# Sack the trainer: back to the pool, compensation paid, factor back to 1.0.
 	var mid := int(career.staff[0]["id"])

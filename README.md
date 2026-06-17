@@ -151,6 +151,15 @@ shows their live effect on development, injuries and the academy. On the EMPLE i
   <img src="screens/staff.png" alt="Staff screen — current staff, available pool, wages and live effects" width="420"/>
 </p>
 
+**Contracts & wages** — RENEW is a negotiation now: each player has a wage he wants, and he
+can reject your offer. Hold his current terms, meet his demand or better it; an unrenewed deal
+runs out and he leaves on a free, unless you set him to auto-renew. Signings and raises move a
+live weekly wage bill. Captured from the running build:
+
+<p>
+  <img src="screens/contract.png" alt="Renew negotiation — the player's current wage, his demand, and the hold/meet/better offers" width="420"/>
+</p>
+
 **The domestic cups** — the F.A. Cup (single-leg, replays then penalties) and the
 Coca-Cola Cup (two-legged, settled on aggregate), each on its own original cup screen with
 the game's own trophy: the manager's run round-by-round, the latest draw, and the status.
@@ -215,10 +224,10 @@ couple of deep menus (team tactics, the transfer desk) are still a simpler funct
 
 ## Coming next
 
-Deeper player contracts and wages, the stadium works/expansion sub-view, and the full
-position model (injuries, suspensions, the club news feed, training/player development,
-the youth team, the backroom staff, European competitions and BOTH domestic cups — the
-F.A. Cup and the Coca-Cola Cup — are now in). The 2D
+The stadium works/expansion sub-view and the full position model (injuries, suspensions,
+the club news feed, training/player development, the youth team, the backroom staff,
+player contracts and wages, European competitions and BOTH domestic cups — the F.A. Cup and
+the Coca-Cola Cup — are now in). The 2D
 match view now renders the original game's own sprites on a 3/4 broadcast pitch (the
 `.PGF` sprite format is fully cracked, see `docs/re/match_view_re.md`); next for it are
 the original scrolling tile-camera and per-team kit recolours. Club crests and player
