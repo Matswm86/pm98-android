@@ -14,7 +14,7 @@ func _run() -> void:
 	var ok := true
 
 	# Real assets must import + load.
-	for path in ["res://art/screens/fondo_marble.png", "res://art/screens/barra0.png",
+	for path in ["res://art/screens/management_bg.png",
 			"res://art/fonts/proman24.fnt", "res://art/fonts/proman18.fnt",
 			"res://art/fonts/proman12.fnt"]:
 		ok = _assert(ResourceLoader.exists(path), "asset present: %s" % path) and ok
@@ -44,7 +44,7 @@ func _run() -> void:
 		await process_frame
 	ok = _assert(screen._f24 != null and screen._f18 != null and screen._f12 != null,
 		"PROMAN fonts loaded into screen") and ok
-	ok = _assert(screen._bg != null and screen._bar != null, "background + bar textures loaded") and ok
+	ok = _assert(PMChrome.bg() != null, "PMChrome management background loads") and ok
 	screen.setup(rows, prem[0]["name"], db.get("meta", {}).get("season", "1997-98"),
 		"Week 38", 1, int(prem[0]["id"]))
 	await process_frame
