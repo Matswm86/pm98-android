@@ -49,6 +49,7 @@ func _ready() -> void:
 			and not OS.has_environment("PM98_HUB_SHOT") and not OS.has_environment("PM98_BROWSE_SHOT") \
 			and not OS.has_environment("PM98_MATCH_SHOT") and not OS.has_environment("PM98_NEWS_SHOT") \
 			and not OS.has_environment("PM98_TRAIN_SHOT") and not OS.has_environment("PM98_CUP_SHOT") \
+			and not OS.has_environment("PM98_YOUTH_SHOT") \
 			and not OS.has_environment("PM98_SCREENS_SHOT"):
 		_devshot()
 
@@ -75,6 +76,9 @@ func _boot() -> void:
 		return
 	if OS.has_environment("PM98_CUP_SHOT"):
 		_cup_shot()
+		return
+	if OS.has_environment("PM98_YOUTH_SHOT"):
+		_youth_shot()
 		return
 	if OS.has_environment("PM98_SCREENS_SHOT"):
 		_screens_shot()
@@ -292,6 +296,40 @@ func _train_shot() -> void:
 	get_tree().quit()
 
 
+## Faithful real-render of the YOUTH TEAM screen. Begins a career (seeds the academy),
+## develops the youth a season's worth so a youngster reaches first-team grade, guarantees
+## at least one READY prospect for the capture, then mounts the youth screen over the hub.
+## Run as the NORMAL app under Xvfb+GL: PM98_YOUTH_SHOT=1.
+func _youth_shot() -> void:
+	var dir := OS.get_environment("PM98_SHOT_DIR")
+	if GameDB.leagues.is_empty():
+		print("YOUTH-SHOT no leagues loaded")
+		get_tree().quit()
+		return
+	var lg: Dictionary = GameDB.leagues[0]
+	var clubs := GameDB.clubs_in_league(lg["id"])
+	clubs.sort_custom(func(a, b): return a["name"] < b["name"])
+	_begin_career(lg, clubs[0])
+	# Develop the academy a season's worth so the crop separates into ready / developing.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 717171
+	for _w in 46:
+		Youth.develop_week(rng, _career.youth)
+	# Guarantee a visible READY prospect for the capture (random ceilings may not hit it).
+	if _career.promotable_youth().is_empty() and not _career.youth.is_empty():
+		var top: Dictionary = _career.youth[0]
+		(top["attrs"] as Dictionary)["CA"] = Youth.READY_CA + 3
+		top["ready"] = true
+	_show_career()               # raise the hub beneath the overlay
+	await _settle()
+	_show_youth_screen()
+	await _settle()
+	_save_shot(dir, "youth.png")
+	print("YOUTH-SHOT done youth=%d ready=%d club=%s" % [
+		(_career.youth as Array).size(), _career.promotable_youth().size(), _career.club_name])
+	get_tree().quit()
+
+
 ## Faithful real-render of the cup screens (F.A. Cup + Coca-Cola Cup). Begins a career
 ## and plays into the season so several rounds of both cups have been drawn and played,
 ## then captures each CUP screen (the manager's run + the latest draw, around the trophy
@@ -441,7 +479,7 @@ func _free_overlays() -> void:
 			continue
 		if c is LeagueTableScreen or c is LineupScreen or c is SquadScreen \
 				or c is FinanceScreen or c is TransferScreen or c is DirectivaScreen \
-				or c is StadiumScreen or c is CupScreen:
+				or c is StadiumScreen or c is CupScreen or c is YouthScreen:
 			c.queue_free()
 
 
@@ -592,11 +630,16 @@ func _mount_tap_overlay(scr: Control) -> void:
 		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
 			scr.queue_free())
 
-## Reversed SQUAD overlay for any club dict (career roster or a GameDB club).
-func _open_squad(club: Dictionary, manager: String, cash: String) -> void:
+## Reversed SQUAD overlay for any club dict (career roster or a GameDB club). On the
+## managed club (`youth_enabled`) the YOUTH TEAM button opens the academy; everywhere
+## else the screen just tap-dismisses as before.
+func _open_squad(club: Dictionary, manager: String, cash: String, youth_enabled := false) -> void:
 	var scr: SquadScreen = load("res://scenes/SquadScreen.gd").new()
-	scr.setup(club, manager, cash)
-	_mount_tap_overlay(scr)
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(club, manager, cash, youth_enabled)
+	scr.back_pressed.connect(func() -> void: scr.queue_free())
+	scr.youth_pressed.connect(_show_youth_screen)
 
 ## Reversed LEAGUE TABLES overlay for any standings array (career or a SeasonSim table).
 func _open_table(rows: Array, title_left: String, season: String, week_label: String,
@@ -907,10 +950,35 @@ func _show_lineup_screen() -> void:
 		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
 			scr.queue_free())
 
-## The original-art SQUAD MANAGEMENT (PLANTILLA) screen for the managed club. Tap to
-## dismiss. (docs/re/squad_screen_re.md; the database browse reuses _open_squad too.)
+## The original-art SQUAD MANAGEMENT (PLANTILLA) screen for the managed club. The YOUTH
+## TEAM button opens the academy; a tap elsewhere dismisses to the hub.
+## (docs/re/squad_screen_re.md; the database browse reuses _open_squad with youth off.)
 func _show_squad_screen() -> void:
-	_open_squad(_mgr_club(), "", "£%s" % _fmt_int(_career.cash))
+	_open_squad(_mgr_club(), "", "£%s" % _fmt_int(_career.cash), true)
+
+## The YOUTH TEAM screen (over the squad): the academy crop with their projected potential,
+## the youth manager's READY flags, and PROMOTE (tap a ready youngster -> first team). The
+## development model is ours (Youth.gd); the surface is PM98's. RETURN reveals the squad.
+func _show_youth_screen() -> void:
+	var scr: YouthScreen = load("res://scenes/YouthScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(_career.youth, "", _career.club_name, "£%s" % _fmt_int(_career.cash))
+	scr.promote_requested.connect(func(pid: int) -> void:
+		_career.promote_youth(int(pid))
+		_career.save()
+		scr.setup(_career.youth, "", _career.club_name, "£%s" % _fmt_int(_career.cash))
+		_refresh_squad_overlay())
+	scr.back_pressed.connect(func() -> void:
+		scr.queue_free()
+		_refresh_squad_overlay())
+
+## Re-feed the SQUAD overlay (if it's still mounted under the youth screen) the live roster,
+## so a promotion shows up immediately when the youth screen closes.
+func _refresh_squad_overlay() -> void:
+	for c in get_children():
+		if c is SquadScreen:
+			(c as SquadScreen).setup(_mgr_club(), "", "£%s" % _fmt_int(_career.cash), true)
 
 ## The original-art FINANCES ("INCOME + EXPENSES") screen for the managed club. Tap to
 ## dismiss. (docs/re/finance_screen_re.md, driven by FinanceModel.)

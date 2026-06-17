@@ -37,6 +37,8 @@ var transfer_log: Array = []            # newest-first transfer news lines
 var offers_left: int = OFFERS_PER_WEEK  # signings the board still allows this week
 var news_log: Array = []                # newest-first club news {week,kind,text}
 var training_intensity: String = Training.DEFAULT_INTENSITY   # Light/Normal/Intensive
+var youth: Array = []                   # the youth team: scouted youngsters (Youth.gd)
+var youth_seq: int = YOUTH_ID_BASE      # monotonic id minter for youth (above senior ids)
 var fa_cup: Dictionary = {}             # the F.A. Cup bracket (Cup.gd); {} = not running
 var league_cup: Dictionary = {}         # the Coca-Cola (League) Cup bracket; {} = not running
 
@@ -100,6 +102,14 @@ const EURO_WINNER := 2_000_000
 const SUPERCUP_PRIZE := 500_000         # European Supercup (Euro Cup winner v Cup Winners' winner)
 const INTERCONTINENTAL_PRIZE := 750_000 # Intercontinental Cup (Euro Cup winner v S. American champion)
 
+# Youth team: ids are minted from a base well above the senior id space (~8k players)
+# so a promoted youngster never collides with a real player. Each career starts with a
+# small academy intake; a fresh crop is scouted in at every season rollover.
+const YOUTH_ID_BASE := 900000
+const YOUTH_SEED_COUNT := 5             # the academy crop a new career starts with
+const YOUTH_INTAKE_LO := 1             # a season's fresh intake (scout's haul) ...
+const YOUTH_INTAKE_HI := 3             # ... is this many youngsters
+
 # "The Directors will only let you make %u offer%s to sign a player per week."
 const OFFERS_PER_WEEK := 3
 # Transfer window shuts this many rounds before the season ends (deadline day).
@@ -131,6 +141,11 @@ static func create(club: Dictionary, league: Dictionary, league_clubs: Array, le
 	c.weekly_net = int(fin["weekly_balance"])
 	c.cash = int(fin.get("total_income", 0)) / 4   # opening balance ~ a quarter's income
 	c.tactics = Tactics.auto_pick(club, Tactics.DEFAULT_FORMATION).to_dict()
+	# The academy starts with a small crop of youngsters to develop.
+	var yrng := RandomNumberGenerator.new()
+	yrng.randomize()
+	c.youth = Youth.intake(yrng, YOUTH_SEED_COUNT, c.youth_seq)
+	c.youth_seq += YOUTH_SEED_COUNT
 	return c
 
 
@@ -255,6 +270,10 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 			_news(n["kind"], n["text"])
 	# Player development for the training week just completed.
 	for n in Training.train_week(rng, my_squad(), training_intensity):
+		_news(n["kind"], n["text"])
+	# The youth team develops on its own track; a youngster crossing the readiness line
+	# is reported by the youth manager (so you know to look at the YOUTH TEAM screen).
+	for n in Youth.develop_week(rng, youth):
 		_news(n["kind"], n["text"])
 	# F.A. Cup: any midweek tie whose scheduled league week has arrived is played
 	# now (open random draw, replays then penalties). The manager's own tie writes a
@@ -449,6 +468,64 @@ func cycle_training() -> void:
 	var i := Training.INTENSITIES.find(training_intensity)
 	training_intensity = Training.INTENSITIES[(i + 1) % Training.INTENSITIES.size()]
 
+
+# ---- youth team ----------------------------------------------------------
+
+## A season's youth turnover: every youngster ages a year; anyone over the graduation
+## age who was never promoted is released to free a place; then the scout brings in a
+## fresh crop (capped at the youth squad size). News lines either way.
+func _roll_youth(rng: RandomNumberGenerator) -> void:
+	var stayers: Array = []
+	for p in youth:
+		p["age"] = int(p.get("age", Youth.INTAKE_AGE_LO)) + 1
+		p["dev_progress"] = 0.0
+		if int(p.get("age", 0)) > Youth.GRADUATE_AGE:
+			_news("youth", "%s has left the youth team without making the grade." % p.get("name", "?"))
+		else:
+			stayers.append(p)
+	youth = stayers
+	var room := Youth.SQUAD_CAP - youth.size()
+	if room <= 0:
+		return
+	var want := mini(room, rng.randi_range(YOUTH_INTAKE_LO, YOUTH_INTAKE_HI))
+	for p in Youth.intake(rng, want, youth_seq):
+		youth.append(p)
+		_news("youth", "%s has joined your Youth Team." % p.get("name", "?"))
+	youth_seq += want
+
+
+## The youth players the manager can promote right now (the youth manager has flagged
+## them ready). The screen badges these and offers PROMOTE.
+func promotable_youth() -> Array:
+	return youth.filter(func(p): return Youth.is_ready(p))
+
+
+## Promote a youth player into the first-team squad. He must be flagged ready, there must
+## be room under the squad cap, and -- faithful to PM98's "rejected your offer" -- a very
+## raw prospect can balk. On success he moves out of `youth` into rosters[club_id] on a
+## fresh contract. Returns {ok, msg}.
+func promote_youth(pid: int) -> Dictionary:
+	var idx := -1
+	for i in youth.size():
+		if int(youth[i].get("id", -2)) == pid:
+			idx = i
+			break
+	if idx == -1:
+		return {"ok": false, "msg": "That youngster is not in your youth team."}
+	var p: Dictionary = youth[idx]
+	if not Youth.is_ready(p):
+		return {"ok": false, "msg": "%s is not ready for the first team yet." % p.get("name", "?")}
+	if my_squad().size() >= TransferMarket.SQUAD_MAX:
+		return {"ok": false, "msg": "Your squad is full (%d); make room before promoting." % TransferMarket.SQUAD_MAX}
+	youth.remove_at(idx)
+	Youth.graduate(p)
+	p["clubId"] = club_id
+	p["contract_years"] = TransferMarket.NEW_CONTRACT_YEARS
+	rosters[club_id].append(p)
+	_news("youth", "%s has been promoted to the first team squad." % p.get("name", "?"))
+	_log("%s has been promoted from the youth team." % p.get("name", "?"))
+	return {"ok": true, "msg": "%s has been promoted to the first team." % p.get("name", "?")}
+
 ## True while the transfer window is open (before deadline day).
 func transfers_open() -> bool:
 	return week < maxi(0, total_weeks() - DEADLINE_TAIL)
@@ -578,6 +655,9 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	# Supercup/Intercontinental (which need this season's European winners + ratings).
 	_capture_honours()
 	_capture_euro_honours()
+	if rng == null:
+		rng = RandomNumberGenerator.new()
+		rng.randomize()
 	var leavers: Array = []
 	for p in rosters.get(club_id, []):
 		var yrs := int(p.get("contract_years", 1)) - 1
@@ -598,6 +678,9 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	# development carry-over is zeroed (ages just ticked, so trends re-evaluate).
 	Availability.reset(rosters.get(club_id, []))
 	Training.reset_progress(rosters.get(club_id, []))
+	# The youth team ages a year too: anyone over the graduation age who was never
+	# promoted is released to make room, then the scout brings in a fresh crop.
+	_roll_youth(rng)
 
 	year += 1
 	season = _season_label(year)
@@ -626,9 +709,6 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 		t.set_formation(t.formation, club_view(club_id))
 		tactics = t.to_dict()
 	# The Charity Shield opens the new season: last season's champions v F.A. Cup winners.
-	if rng == null:
-		rng = RandomNumberGenerator.new()
-		rng.randomize()
 	_play_charity_shield(rng)
 	# European competitions for the new season, seeded from last season's honours.
 	mint_european_cups(euro_pool, rng)
@@ -849,7 +929,8 @@ func to_dict() -> Dictionary:
 		"tactics": tactics, "tier": tier, "rosters": ros, "club_names": nms,
 		"transfer_listed": listed, "shortlist": shortlist, "transfer_log": transfer_log,
 		"offers_left": offers_left, "news_log": news_log,
-		"training_intensity": training_intensity, "fa_cup": fa_cup,
+		"training_intensity": training_intensity, "youth": youth,
+		"youth_seq": youth_seq, "fa_cup": fa_cup,
 		"league_cup": league_cup,
 		"last_champion_id": last_champion_id, "last_fa_winner_id": last_fa_winner_id,
 		"last_runners_up": last_runners_up, "charity_shield": charity_shield,
@@ -894,6 +975,10 @@ static func from_dict(d: Dictionary) -> Career:
 	c.offers_left = int(d.get("offers_left", OFFERS_PER_WEEK))
 	c.news_log = d.get("news_log", [])
 	c.training_intensity = d.get("training_intensity", Training.DEFAULT_INTENSITY)
+	# Saves from before youth existed load with an empty academy (inert); the first
+	# rollover scouts a crop in. youth_seq defaults above the senior id space.
+	c.youth = d.get("youth", [])
+	c.youth_seq = int(d.get("youth_seq", YOUTH_ID_BASE))
 	# Saves from before the cups existed load with no bracket; they stay inert this
 	# season (round_due is false on an empty dict) and are rebuilt at the next rollover.
 	c.fa_cup = d.get("fa_cup", {})

@@ -47,6 +47,11 @@ prompted. Reinstalling over an older build? Uninstall the old one first.
   by age (youngsters climb, veterans fade), and training **intensity** is the lever:
   harder training develops them faster but risks more injuries. Squads age a year
   each season, so a career has a real arc.
+- **The youth team:** an academy of young prospects develops on its own track, each with
+  a projected **potential** (the ceiling he can reach). When the youth manager judges one
+  ready, he's flagged on the YOUTH TEAM screen and you **promote** him into the first-team
+  squad. A fresh crop is scouted in every season; youngsters who never make the grade move
+  on. Reached from the SQUAD screen's YOUTH TEAM button.
 - **The domestic cups:** the **F.A. Cup** and the **Coca-Cola (League) Cup** both run
   alongside the league, with a fresh open draw each round (as the real cups do) and
   prize money for every round you survive plus a bonus for lifting one. The F.A. Cup is
@@ -124,6 +129,15 @@ staff icon. Captured from the running build:
   <img src="screens/training.png" alt="Training screen — intensity lever and squad development trend" width="420"/>
 </p>
 
+**The youth team** — the academy crop with each prospect's current ability and a projected
+potential (star ceiling); the youth manager flags the ones READY for the first team, and a
+tap promotes them. Reached from the SQUAD screen's YOUTH TEAM button. Captured from the
+running build:
+
+<p>
+  <img src="screens/youth.png" alt="Youth team screen — prospects, potential stars, and READY/PROMOTE" width="420"/>
+</p>
+
 **The domestic cups** — the F.A. Cup (single-leg, replays then penalties) and the
 Coca-Cola Cup (two-legged, settled on aggregate), each on its own original cup screen with
 the game's own trophy: the manager's run round-by-round, the latest draw, and the status.
@@ -188,9 +202,10 @@ couple of deep menus (team tactics, the transfer desk) are still a simpler funct
 
 ## Coming next
 
-European competitions, youth development, a full staff team and deeper player contracts
-(injuries, suspensions, the club news feed, training/player development and BOTH domestic
-cups — the F.A. Cup and the Coca-Cola Cup — are now in). The 2D
+A full staff team and deeper player contracts
+(injuries, suspensions, the club news feed, training/player development, the youth team,
+European competitions and BOTH domestic cups — the F.A. Cup and the Coca-Cola Cup — are
+now in). The 2D
 match view now renders the original game's own sprites on a 3/4 broadcast pitch (the
 `.PGF` sprite format is fully cracked, see `docs/re/match_view_re.md`); next for it are
 the original scrolling tile-camera and per-team kit recolours. Club crests and player

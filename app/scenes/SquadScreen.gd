@@ -12,6 +12,14 @@ class_name SquadScreen
 ## the data (goalkeepers / outfield), sorted by ability.
 ##
 ## Driven live by the Career roster. Native 640x480; scales to fit its parent.
+##
+## INTERACTIVE: the reversed YOUTH TEAM button opens the youth screen (emits
+## `youth_pressed`) when youth is enabled (the managed club); the RETURN button or a tap
+## on empty space emits `back_pressed` (the display-screen tap-to-dismiss). The GameDB
+## browse mounts it with youth disabled, so any tap there just dismisses as before.
+
+signal youth_pressed
+signal back_pressed
 
 const W := 640
 const H := 480
@@ -45,6 +53,7 @@ const HDR_Y := 52
 const ROW0_Y := 70
 const ROW_H := 16
 const YOUTH_BTN := Rect2(523, 360, 112, 25)   # reversed (0x20b,0x168)..(0x27b,0x181)
+const RETURN_BTN := Rect2(523, 440, 112, 25)
 
 var _bg: Texture2D
 var _bar: Texture2D
@@ -56,6 +65,8 @@ var _f8: Font
 var _club: Dictionary = {}
 var _manager: String = ""
 var _cash: String = ""
+var _youth_enabled := false      # the YOUTH TEAM button is live only for the managed club
+var _press := ""                 # "youth" / "return" held down (for the highlight)
 
 
 func _ready() -> void:
@@ -67,14 +78,67 @@ func _ready() -> void:
 	_f8 = load("res://art/fonts/proman8.fnt")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2(W, H)
+	set_anchors_preset(Control.PRESET_FULL_RECT)
+	gui_input.connect(_on_input)
 	queue_redraw()
 
 
-func setup(club: Dictionary, manager: String = "", cash: String = "") -> void:
+func setup(club: Dictionary, manager: String = "", cash: String = "", youth_enabled := false) -> void:
 	_club = club
 	_manager = manager
 	_cash = cash
+	_youth_enabled = youth_enabled
 	queue_redraw()
+
+
+# ---- input ---------------------------------------------------------------
+
+func _scale() -> float:
+	return min(size.x / W, size.y / H) if size.x > 0 and size.y > 0 else 1.0
+
+func _to_design(p: Vector2) -> Vector2:
+	var s := _scale()
+	return (p - Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5)) / s
+
+## The control under a design-space point: "youth" (only when enabled), "return", or "".
+func _hit(d: Vector2) -> String:
+	if _youth_enabled and YOUTH_BTN.has_point(d):
+		return "youth"
+	if RETURN_BTN.has_point(d):
+		return "return"
+	return ""
+
+func _on_input(e: InputEvent) -> void:
+	var pos := Vector2.ZERO
+	var pressed := false
+	var tap := false
+	if e is InputEventMouseButton:
+		pos = (e as InputEventMouseButton).position
+		pressed = (e as InputEventMouseButton).pressed
+		tap = true
+	elif e is InputEventScreenTouch:
+		pos = (e as InputEventScreenTouch).position
+		pressed = (e as InputEventScreenTouch).pressed
+		tap = true
+	if not tap:
+		return
+	if pressed:
+		_press = _hit(_to_design(pos))
+		queue_redraw()
+	else:
+		var a := _hit(_to_design(pos))
+		var was := _press
+		_press = ""
+		queue_redraw()
+		# A tap on a live control fires it; any other tap dismisses (only if it didn't
+		# start on a control), preserving the display-screen tap-to-dismiss feel.
+		if a != "" and a == was:
+			if a == "youth":
+				youth_pressed.emit()
+			else:
+				back_pressed.emit()
+		elif was == "":
+			back_pressed.emit()
 
 
 # ---- ordering ------------------------------------------------------------
@@ -218,10 +282,16 @@ func _draw_side() -> void:
 	_txt(_f10, 529, 64, "SQUAD", C_HEAD, 11)
 	_txt(_f12, 631, 78, "%d players" % n, C_TEXT, 13, true)
 
-	_cell(int(YOUTH_BTN.position.x), int(YOUTH_BTN.position.y),
-		int(YOUTH_BTN.size.x), int(YOUTH_BTN.size.y), C_BTN, C_BTN_HI, C_CELL_LO)
-	_txt(_f10, int(YOUTH_BTN.position.x) + 10, int(YOUTH_BTN.position.y) + 6,
-		"YOUTH TEAM", Color(0.92, 1.0, 0.94), 11)
+	# YOUTH TEAM: a live green button on the managed club (opens the academy), greyed on a
+	# browsed club where there's no youth team to open.
+	var yb := YOUTH_BTN
+	var ybase := (C_BTN_HI if _press == "youth" else C_BTN) if _youth_enabled else C_CELL
+	_cell(int(yb.position.x), int(yb.position.y), int(yb.size.x), int(yb.size.y),
+		ybase, C_BTN_HI if _youth_enabled else C_CELL_HI, C_CELL_LO)
+	_txt(_f10, int(yb.position.x) + 10, int(yb.position.y) + 6, "YOUTH TEAM",
+		Color(0.92, 1.0, 0.94) if _youth_enabled else C_DIM, 11)
 
-	_cell(523, 440, 112, 25, C_CELL, C_CELL_HI, C_CELL_LO)
-	_txt(_f10, 529, 446, "RETURN", C_TEXT, 11)
+	var rb := RETURN_BTN
+	_cell(int(rb.position.x), int(rb.position.y), int(rb.size.x), int(rb.size.y),
+		C_CELL_HI if _press == "return" else C_CELL, C_CELL_HI, C_CELL_LO)
+	_txt(_f10, int(rb.position.x) + 6, int(rb.position.y) + 6, "RETURN", C_TEXT, 11)
