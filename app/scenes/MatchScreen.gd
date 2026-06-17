@@ -79,8 +79,13 @@ var _keys: Array = []          # ball keyframes [{m, l, w, goal, side}]
 var _slots: Array = []         # 22 formation slots [{side, l, w}]
 
 var _minute := 0.0
+var _prev_minute := 0.0     # for firing event SFX on the frame the clock crosses them
+var _final_done := false
 var _playing := true
 var _press_back := false
+# AudioManager autoload by node path (the bare global identifier doesn't resolve when this
+# screen is loaded under a --script test, so we look it up; null-guarded everywhere).
+var _am: Node
 
 
 func _ready() -> void:
@@ -96,6 +101,7 @@ func _ready() -> void:
 	custom_minimum_size = Vector2(W, H)
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	gui_input.connect(_on_input)
+	_am = get_node_or_null(^"/root/AudioManager")
 	set_process(true)
 	queue_redraw()
 
@@ -120,8 +126,34 @@ func setup(home_name: String, away_name: String, hg: int, ag: int, lines: Array,
 	_build_keyframes()
 	_build_formation()
 	_minute = 0.0
+	_prev_minute = 0.0
+	_final_done = false
 	_playing = true
+	# Match audio: the menu theme yields to the crowd bed, kick-off whistle blows.
+	if _am == null:
+		_am = get_node_or_null(^"/root/AudioManager")
+	if _am:
+		_am.stop_music()
+		_am.play_crowd()
+		_am.sfx("whistle")
 	queue_redraw()
+
+
+## SFX for a commentary line, or "" if it has none. Goals roar; cards draw the crowd.
+func _line_sfx(ln: Dictionary) -> String:
+	if ln.get("goal") == true:
+		return "goal"
+	var t := str(ln.get("text", ""))
+	if t.begins_with("Yellow card:"):
+		return "card_yellow"
+	if t.ends_with("sent off"):
+		return "card_red"
+	return ""
+
+
+func _exit_tree() -> void:
+	if _am:
+		_am.stop_crowd()
 
 
 func _col_dist(a: Color, b: Color) -> float:
@@ -335,6 +367,18 @@ func _wrap180(a: float) -> float:
 func _process(delta: float) -> void:
 	if _playing and _minute < 90.0:
 		_minute = minf(90.0, _minute + delta * MIN_PER_SEC)
+		# fire SFX for any event the clock just crossed (normal play only)
+		for ln in _lines:
+			var m := float(ln.get("minute", 0))
+			if m > _prev_minute and m <= _minute:
+				var key := _line_sfx(ln)
+				if key != "" and _am:
+					_am.sfx(key)
+		_prev_minute = _minute
+		if _minute >= 90.0 and not _final_done:
+			if _am:
+				_am.sfx("whistle_final")
+			_final_done = true
 		queue_redraw()
 
 
@@ -385,6 +429,11 @@ func _on_input(e: InputEvent) -> void:
 				# tap pitch: skip to full time, then pause on the result
 				if _minute < 90.0:
 					_minute = 90.0
+					_prev_minute = 90.0   # don't replay skipped goals/cards in one frame
+					if not _final_done:
+						if _am:
+							_am.sfx("whistle_final")
+						_final_done = true
 				_playing = not _playing
 				queue_redraw()
 			_press_back = false

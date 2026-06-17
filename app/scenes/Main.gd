@@ -638,6 +638,7 @@ func _push(view: Callable) -> void:
 
 func _go_back() -> void:
 	if _nav.size() > 1:
+		AudioManager.ui_select()
 		_nav.pop_back()
 		_nav.back().call()
 
@@ -661,6 +662,7 @@ func _set_view(title: String, subtitle: String, rows: Array, payload: Array, on_
 
 func _on_item(idx: int) -> void:
 	if idx >= 0 and idx < _payload.size() and _on_activate.is_valid():
+		AudioManager.ui_select()
 		_on_activate.call(_payload[idx])
 
 func _total_players() -> int:
@@ -685,8 +687,11 @@ func _mount_browse(title: String, subtitle: String, rows: Array,
 	_browse.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_browse)
 	_browse.setup(title, subtitle, rows, opts)
+	_browse.row_selected.connect(func(_i: int) -> void: AudioManager.ui_select())
 	_browse.row_selected.connect(on_select)
+	_browse.back_pressed.connect(func() -> void: AudioManager.ui_select())
 	_browse.back_pressed.connect(on_back)
+	AudioManager.play_music()   # the menu theme rides every front-end / management screen
 
 ## Free every front-of-house overlay (browse + title) before the career hub takes over.
 func _clear_front_overlays() -> void:
@@ -944,6 +949,7 @@ func _mount_hub() -> void:
 	_hub.visible = true
 	_hub.setup(c.club_name, c.league_name, c.season, c.cash,
 		"%d%s" % [c.position(), _ord_suffix(c.position())])
+	AudioManager.play_music()   # resume the menu theme on return from a match
 
 ## Leave the career back to the database/home browser (MENUPRINCIPAL EXIT). Saves first,
 ## frees the hub, clears the active career.
@@ -993,6 +999,7 @@ func _show_title_screen() -> void:
 ## beneath; either league mode starts a new career (the pro/league split isn't modelled
 ## in this build, so both enter the same new-career flow).
 func _title_action(action: String, scr: TitleScreen) -> void:
+	AudioManager.ui_select()
 	match action:
 		"exit":
 			get_tree().quit()
@@ -1526,6 +1533,7 @@ func _cup_score_for(tie: Dictionary, cid: int) -> String:
 ## via _set_view (re-shown on Back); info actions toast on the hub itself; CONTINUE plays
 ## the week (or opens end-of-season when the campaign is over); EXIT leaves the career.
 func _menu_action(action: String, scr: MenuScreen) -> void:
+	AudioManager.ui_select()
 	match action:
 		"exit": _leave_career()
 		"save":
