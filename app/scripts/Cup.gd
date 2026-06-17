@@ -67,11 +67,33 @@ static func create(club_ids: Array, total_weeks: int, opts: Dictionary = {}) -> 
 		ids.append(int(v))
 	var span_lo := float(opts.get("span_lo", 0.0))
 	var span_hi := float(opts.get("span_hi", 1.0))
+	# A group stage (the European Cup): the field is drawn into N groups that play a
+	# double round-robin; the top `advance` of each qualify into the knockout. The draw is
+	# deferred to the first matchday (it needs the rng), like the knockout draw. survivors
+	# stays empty until the groups resolve and seed it.
+	var gs: Dictionary = opts.get("group_stage", {})
+	var has_groups := not gs.is_empty() and ids.size() >= 4
+	var group_stage: Dictionary = {}
+	var survivors: Array = ids
+	var num_rounds := _num_rounds(ids.size())
+	if has_groups:
+		var n_groups := int(gs.get("groups", 4))
+		var advance := int(gs.get("advance", 2))
+		var group_size := ids.size() / n_groups
+		var n_md := 2 * (group_size - 1)               # double round-robin
+		var ko_field := n_groups * advance
+		num_rounds = n_md + _num_rounds(ko_field)       # group matchdays then the knockout
+		survivors = []
+		group_stage = {
+			"field": ids.duplicate(), "n_groups": n_groups, "advance": advance,
+			"group_size": group_size, "n_matchdays": n_md, "matchdays_played": 0,
+			"groups": [], "qualified": false,
+		}
 	return {
 		"name": str(opts.get("name", NAME)),
-		"survivors": ids,                  # clubs still in (full field at kickoff)
-		"rounds": [],                      # played rounds, oldest first: {label, ties}
-		"round_weeks": _schedule(total_weeks, _num_rounds(ids.size()), span_lo, span_hi),
+		"survivors": survivors,            # clubs still in the knockout (empty during groups)
+		"rounds": [],                      # played knockout rounds, oldest first: {label, ties}
+		"round_weeks": _schedule(total_weeks, num_rounds, span_lo, span_hi),
 		"champion_id": -1,
 		"n0": ids.size(),                  # starting field size (for labels)
 		"legs": int(opts.get("legs", 1)),
@@ -80,6 +102,7 @@ static func create(club_ids: Array, total_weeks: int, opts: Dictionary = {}) -> 
 		"qtr_label": str(opts.get("qtr_label", "Qtr. Finals")),
 		"prize_round": int(opts.get("prize_round", ROUND_PRIZE)),
 		"prize_winner": int(opts.get("prize_winner", WINNER_BONUS)),
+		"group_stage": group_stage,        # {} unless this comp has a group phase
 	}
 
 
@@ -137,8 +160,11 @@ static func _survivors(b: Dictionary) -> Array:
 static func champion_id(b: Dictionary) -> int:
 	return int(b.get("champion_id", -1))
 
-## The label of the round that will be played next (or "" if the cup is over).
+## The label of the step that will be played next (or "" if the cup is over).
 static func next_label(b: Dictionary) -> String:
+	if _in_group_phase(b):
+		var gs: Dictionary = b.get("group_stage", {})
+		return "Group Matchday %d" % (int(gs.get("matchdays_played", 0)) + 1)
 	var surv := _survivors(b).size()
 	if surv <= 1:
 		return ""
@@ -151,7 +177,7 @@ static func still_in(b: Dictionary, cid: int) -> bool:
 ## How many league weeks remain before the next cup round (so the hub can hint it).
 ## -1 if there is no further round.
 static func weeks_until_next(b: Dictionary, week: int) -> int:
-	var ridx: int = (b.get("rounds", []) as Array).size()
+	var ridx := _steps_done(b)
 	var rw: Array = b.get("round_weeks", [])
 	if ridx >= rw.size():
 		return -1
@@ -184,18 +210,32 @@ static func _label_for(b: Dictionary, count: int, round_no: int) -> String:
 
 # ---- the draw + play -----------------------------------------------------
 
-## Is a cup round due now? True when the cup is unfinished and the just-completed
-## league `week` has reached the next scheduled round-week.
+## Still in the group phase (a group-stage comp whose groups haven't resolved yet)?
+static func _in_group_phase(b: Dictionary) -> bool:
+	var gs: Dictionary = b.get("group_stage", {})
+	return not gs.is_empty() and not bool(gs.get("qualified", false))
+
+
+## Total competition steps already played: group matchdays + knockout rounds. The next
+## scheduled week to fire is round_weeks[_steps_done].
+static func _steps_done(b: Dictionary) -> int:
+	var gs: Dictionary = b.get("group_stage", {})
+	var md := int(gs.get("matchdays_played", 0)) if not gs.is_empty() else 0
+	return md + (b.get("rounds", []) as Array).size()
+
+
+## Is a cup step (group matchday or knockout round) due now? True when the competition is
+## unfinished and the just-completed league `week` has reached the next scheduled week.
 static func round_due(b: Dictionary, week: int) -> bool:
 	if int(b.get("champion_id", -1)) != -1:
 		return false
-	if _survivors(b).size() <= 1:
+	if not _in_group_phase(b) and _survivors(b).size() <= 1:
 		return false
-	var ridx: int = (b.get("rounds", []) as Array).size()
+	var sd := _steps_done(b)
 	var rw: Array = b.get("round_weeks", [])
-	if ridx >= rw.size():
+	if sd >= rw.size():
 		return false
-	return week >= int(rw[ridx])
+	return week >= int(rw[sd])
 
 
 ## Play the next round: draw the survivors at random, resolve every tie (replay then
@@ -280,6 +320,179 @@ static func play_round(b: Dictionary, rng: RandomNumberGenerator,
 	return out
 
 
+# ---- group stage (the European Cup) --------------------------------------
+
+## Play the next due step: a group matchday while the group phase is live, else a
+## knockout round. The single entry the season loop calls for any competition.
+static func play_next(b: Dictionary, rng: RandomNumberGenerator,
+		ratings_fn: Callable, club_id: int, names_fn: Callable) -> Dictionary:
+	if _in_group_phase(b):
+		return play_group_matchday(b, rng, ratings_fn, club_id, names_fn)
+	return play_round(b, rng, ratings_fn, club_id, names_fn)
+
+
+## Play one matchday across every group: simulate each fixture, update the standings, and
+## on the final matchday qualify the top `advance` of each group into the knockout (seeding
+## `survivors`). The group draw happens lazily on matchday one (it needs the rng), like the
+## knockout draw. Returns {phase:"group", label, news, manager_result, manager_group,
+## qualified, manager_qualified}.
+static func play_group_matchday(b: Dictionary, rng: RandomNumberGenerator,
+		ratings_fn: Callable, club_id: int, names_fn: Callable) -> Dictionary:
+	var gs: Dictionary = b["group_stage"]
+	if (gs.get("groups", []) as Array).is_empty():
+		_draw_groups(gs, rng)
+	var md := int(gs["matchdays_played"])
+	var out := {"phase": "group", "label": "Group Matchday %d" % (md + 1), "news": [],
+		"manager_result": "", "manager_group": -1, "qualified": false, "manager_qualified": false}
+	var sched: Array = gs["schedule"]
+	var pairs: Array = sched[md]
+	var groups: Array = gs["groups"]
+	for gi in groups.size():
+		var grp: Dictionary = groups[gi]
+		var clubs: Array = grp["clubs"]
+		var table: Array = grp["table"]
+		var results: Array = []
+		for pr in pairs:
+			var h := int(clubs[int(pr[0])])
+			var a := int(clubs[int(pr[1])])
+			var res := MatchEngine.simulate(rng, ratings_fn.call(h), ratings_fn.call(a))
+			var hg := int(res["home_goals"])
+			var ag := int(res["away_goals"])
+			_apply_result(table, h, a, hg, ag)
+			results.append({"h": h, "a": a, "hg": hg, "ag": ag})
+			if h == club_id or a == club_id:
+				out["manager_group"] = gi
+				var mine := hg if h == club_id else ag
+				var theirs := ag if h == club_id else hg
+				out["manager_result"] = ("win" if mine > theirs else ("loss" if mine < theirs else "draw"))
+				var opp := a if h == club_id else h
+				out["news"].append({"kind": "cup", "text": "%s %s: %s %s %s %d-%d." % [
+					str(b.get("name", NAME)), out["label"], str(names_fn.call(club_id)),
+					("beat" if mine > theirs else ("lost to" if mine < theirs else "drew with")),
+					str(names_fn.call(opp)), mine, theirs]})
+		grp["results"] = (grp.get("results", []) as Array) + [results]
+	gs["matchdays_played"] = md + 1
+	# Final matchday: rank each group, qualify the top `advance`, seed the knockout.
+	if int(gs["matchdays_played"]) >= int(gs["n_matchdays"]):
+		var qualifiers: Array = []
+		var advance := int(gs["advance"])
+		for grp in groups:
+			var ranked := _sorted_table(grp["table"])
+			grp["table"] = ranked                      # store ranked for the UI
+			for i in mini(advance, ranked.size()):
+				var qid := int(ranked[i]["id"])
+				qualifiers.append(qid)
+				if qid == club_id:
+					out["manager_qualified"] = true
+		b["survivors"] = qualifiers
+		gs["qualified"] = true
+		out["qualified"] = true
+		out["news"].append({"kind": "cup", "text": "%s: the group stage is over; %d clubs reach the knockout." % [
+			str(b.get("name", NAME)), qualifiers.size()]})
+	return out
+
+
+## Draw the field into N groups of `group_size` (shuffled), each with a zeroed table and a
+## shared double round-robin schedule (index pairs into the group's `clubs`).
+static func _draw_groups(gs: Dictionary, rng: RandomNumberGenerator) -> void:
+	var field: Array = (gs["field"] as Array).duplicate()
+	_shuffle(field, rng)
+	var n := int(gs["n_groups"])
+	var sz := int(gs["group_size"])
+	gs["schedule"] = _round_robin(sz)
+	var groups: Array = []
+	for gi in n:
+		var clubs: Array = field.slice(gi * sz, gi * sz + sz)
+		var table: Array = []
+		for cid in clubs:
+			table.append({"id": int(cid), "p": 0, "w": 0, "d": 0, "l": 0, "gf": 0, "ga": 0, "pts": 0})
+		groups.append({"clubs": clubs, "table": table, "results": []})
+	gs["groups"] = groups
+
+
+## A double round-robin schedule for `n` (even) teams via the circle method: `n-1`
+## matchdays of [home_idx, away_idx] pairs, then the same fixtures with venues reversed
+## (2(n-1) matchdays total). Indices are into a group's `clubs` array.
+static func _round_robin(n: int) -> Array:
+	var arr: Array = []
+	for i in n:
+		arr.append(i)
+	var half: Array = []
+	for r in (n - 1):
+		var pairs: Array = []
+		for i in (n / 2):
+			var x: int = arr[i]
+			var y: int = arr[n - 1 - i]
+			pairs.append([y, x] if r % 2 == 1 else [x, y])   # alternate venues for fairness
+		half.append(pairs)
+		var last: int = arr[n - 1]                            # rotate, fixing arr[0]
+		for i in range(n - 1, 1, -1):
+			arr[i] = arr[i - 1]
+		arr[1] = last
+	var full: Array = half.duplicate(true)
+	for md in half:
+		var rev: Array = []
+		for pr in md:
+			rev.append([int(pr[1]), int(pr[0])])
+		full.append(rev)
+	return full
+
+
+## Apply a group result to the standings table (3-1-0 points, GF/GA tracked).
+static func _apply_result(table: Array, h: int, a: int, hg: int, ag: int) -> void:
+	var rh: Dictionary = _table_row(table, h)
+	var ra: Dictionary = _table_row(table, a)
+	if rh.is_empty() or ra.is_empty():
+		return
+	rh["p"] += 1
+	ra["p"] += 1
+	rh["gf"] += hg
+	rh["ga"] += ag
+	ra["gf"] += ag
+	ra["ga"] += hg
+	if hg > ag:
+		rh["w"] += 1
+		rh["pts"] += 3
+		ra["l"] += 1
+	elif hg < ag:
+		ra["w"] += 1
+		ra["pts"] += 3
+		rh["l"] += 1
+	else:
+		rh["d"] += 1
+		ra["d"] += 1
+		rh["pts"] += 1
+		ra["pts"] += 1
+
+
+static func _table_row(table: Array, id: int) -> Dictionary:
+	for row in table:
+		if int(row["id"]) == id:
+			return row
+	return {}
+
+
+## A group table ranked by points, then goal difference, then goals for.
+static func _sorted_table(table: Array) -> Array:
+	var t: Array = table.duplicate()
+	t.sort_custom(func(a, b):
+		if int(a["pts"]) != int(b["pts"]):
+			return int(a["pts"]) > int(b["pts"])
+		var gda := int(a["gf"]) - int(a["ga"])
+		var gdb := int(b["gf"]) - int(b["ga"])
+		if gda != gdb:
+			return gda > gdb
+		return int(a["gf"]) > int(b["gf"]))
+	return t
+
+
+## The competition's group tables (each {clubs, table, results}), or [] for a knockout-only
+## comp. The table is ranked once the group stage has resolved.
+static func group_tables(b: Dictionary) -> Array:
+	var gs: Dictionary = b.get("group_stage", {})
+	return gs.get("groups", [])
+
+
 ## Resolve one tie over `legs` legs. Single-leg (FA Cup, League Cup final): a draw is
 ## replayed at the reversed venue, a level replay goes to penalties. Two-leg (League Cup
 ## rounds): home-and-away, advance on aggregate, a level aggregate goes to penalties.
@@ -312,8 +525,10 @@ static func _play_tie(rng: RandomNumberGenerator, h: int, a: int, ratings_fn: Ca
 		"winner_id": w3, "loser_id": (a if w3 == h else h), "decided": "pens", "bye": false}
 
 
-## A two-legged tie (h hosts leg 1, a hosts leg 2): aggregate decides, level aggregate
-## goes to penalties. Stores both leg scores (home-first-leg side's view) + the aggregate.
+## A two-legged tie (h hosts leg 1, a hosts leg 2), settled by the 1997-98 UEFA ladder:
+## aggregate, then away goals, then 30-min extra time in leg 2 (its goals add to the
+## aggregate and ET away goals still count), then penalties. Stores both leg scores
+## (home-first-leg side's view), the aggregate, and any ET goals.
 static func _play_two_leg_tie(rng: RandomNumberGenerator, h: int, a: int, rh: Dictionary, ra: Dictionary) -> Dictionary:
 	var l1 := MatchEngine.simulate(rng, rh, ra)        # leg 1: h at home
 	var l2 := MatchEngine.simulate(rng, ra, rh)        # leg 2: a at home
@@ -323,18 +538,50 @@ static func _play_two_leg_tie(rng: RandomNumberGenerator, h: int, a: int, rh: Di
 	var h_goals2 := int(l2["away_goals"])              # h is away in leg 2
 	var h_agg := h_goals1 + h_goals2
 	var a_agg := a_goals1 + a_goals2
-	var decided := "agg"
-	var w: int
-	if h_agg != a_agg:
-		w = h if h_agg > a_agg else a
-	else:
-		w = _penalties(rng, h, a, rh, ra)
-		decided = "pens"
-	return {"home_id": h, "away_id": a, "two_legged": true,
+	var tie := {"home_id": h, "away_id": a, "two_legged": true,
 		"leg1_hg": h_goals1, "leg1_ag": a_goals1,      # leg 1 (h home): h-a
 		"leg2_hg": h_goals2, "leg2_ag": a_goals2,      # leg 2 (a home), still h-then-a
-		"h_agg": h_agg, "a_agg": a_agg,
-		"winner_id": w, "loser_id": (a if w == h else h), "decided": decided, "bye": false}
+		"bye": false}
+	# 1) aggregate. h's away goals are those scored in leg 2 (at a); a's in leg 1 (at h).
+	var h_away := h_goals2
+	var a_away := a_goals1
+	var w := _two_leg_winner(h, a, h_agg, a_agg, h_away, a_away)
+	var decided := "agg"
+	if w == -1:
+		# 2) extra time in leg 2 (a at home); its goals join the aggregate, ET away goals
+		# (h's) still count. A 30-minute period off the same engine.
+		var et := MatchEngine.simulate(rng, ra, rh, 30)
+		var et_a := int(et["home_goals"])              # a home in ET
+		var et_h := int(et["away_goals"])              # h away in ET (an away goal)
+		h_agg += et_h
+		a_agg += et_a
+		h_away += et_h
+		tie["et_hg"] = et_h
+		tie["et_ag"] = et_a
+		w = _two_leg_winner(h, a, h_agg, a_agg, h_away, a_away)
+		decided = "aet"
+		if w == -1:
+			# 3) penalties.
+			w = _penalties(rng, h, a, rh, ra)
+			decided = "pens"
+	elif h_agg == a_agg:
+		decided = "away_goals"                          # level aggregate, settled on away goals
+	tie["h_agg"] = h_agg
+	tie["a_agg"] = a_agg
+	tie["winner_id"] = w
+	tie["loser_id"] = (a if w == h else h)
+	tie["decided"] = decided
+	return tie
+
+
+## Winner of a two-legged tie on aggregate, then away goals; -1 if still level (needs ET
+## or penalties). `h_away`/`a_away` are each side's goals scored at the opponent's ground.
+static func _two_leg_winner(h: int, a: int, h_agg: int, a_agg: int, h_away: int, a_away: int) -> int:
+	if h_agg != a_agg:
+		return h if h_agg > a_agg else a
+	if h_away != a_away:
+		return h if h_away > a_away else a
+	return -1
 
 
 ## A one-off neutral-venue match (the Charity Shield curtain-raiser; later the European
@@ -389,14 +636,21 @@ static func _manager_news(b: Dictionary, tie: Dictionary, label: String, club_id
 	var theirs: int
 	var suffix := ""
 	if tie.get("two_legged", false):
-		# Report the aggregate; penalties flagged when level on aggregate.
+		# Report the aggregate; flag how a level tie was settled (away goals / extra time
+		# / penalties), matching the 1997-98 UEFA ladder.
 		var h_agg := int(tie["h_agg"])
 		var a_agg := int(tie["a_agg"])
 		mine = h_agg if hid == club_id else a_agg
 		theirs = a_agg if hid == club_id else h_agg
-		suffix = " on aggregate"
-		if tie["decided"] == "pens":
-			suffix = " on aggregate, on penalties"
+		match str(tie.get("decided", "agg")):
+			"away_goals":
+				suffix = " on away goals"
+			"aet":
+				suffix = " after extra time"
+			"pens":
+				suffix = " on aggregate, on penalties"
+			_:
+				suffix = " on aggregate"
 	elif tie["decided"] == "replay" or tie["decided"] == "pens":
 		# The decisive replay scoreline (h's view in replay_hg/ag).
 		var rmine := int(tie.get("replay_hg", tie["hg"]))

@@ -167,16 +167,19 @@ static func _resolve(prng: Pm98Rng, chances: int, conv: int) -> int:
 	return goals
 
 
-## Simulate one match. `home`/`away` are team_ratings() dicts.
+## Simulate one match. `home`/`away` are team_ratings() dicts. `minutes` scales the
+## chance VOLUME (default 90 = a full match, unchanged); a two-legged tie level after
+## both legs plays a 30-minute extra time via simulate(..., 30) before penalties.
 ## Returns {home_goals, away_goals, shots_home, shots_away, conv_home, conv_away}.
-static func simulate(rng: RandomNumberGenerator, home: Dictionary, away: Dictionary) -> Dictionary:
+static func simulate(rng: RandomNumberGenerator, home: Dictionary, away: Dictionary, minutes := 90) -> Dictionary:
 	# Seed PM98's LCG from the season RNG so a fixed test seed stays reproducible
 	# while the per-shot rolls run on the authentic PM98 PRNG sequence.
 	var prng := Pm98Rng.new(rng.randi())
 	var gh := _gap(home, away)
 	var ga := _gap(away, home)
-	var sh := _chances(gh, BASE_SHOTS_HOME)
-	var sa := _chances(ga, BASE_SHOTS_AWAY)
+	var scale := clampf(float(minutes) / 90.0, 0.0, 1.0)
+	var sh := maxi(0, roundi(_chances(gh, BASE_SHOTS_HOME) * scale))
+	var sa := maxi(0, roundi(_chances(ga, BASE_SHOTS_AWAY) * scale))
 	var ch := _conv_permil(gh, BASE_CONV_HOME)
 	var ca := _conv_permil(ga, BASE_CONV_AWAY)
 	return {

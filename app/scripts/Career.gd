@@ -92,7 +92,8 @@ const CHARITY_PRIZE := 250_000
 
 # European competitions. Three two-legged knockouts seeded from last season's domestic
 # finish; the field is filled to EURO_FIELD clubs with strong foreign sides from game_db.
-const EURO_FIELD := 16                  # 16-club knockout = R16 -> QF -> SF -> Final
+const EURO_FIELD := 16                  # 16-club field. European Cup: 4 groups of 4 ->
+                                        # top 2 -> QF/SF/Final. UEFA/CWC: R16 -> QF -> SF -> Final.
 const UEFA_SPOTS := 2                   # league places below the champions that enter the UEFA Cup
 const EURO_OPTS := {
 	"european_cup": {"name": "European Cup", "emblem": "ligacamp"},
@@ -105,6 +106,7 @@ const EURO_OPTS := {
 # the round. EURO_WINNER (lifting it) is a documented bonus, not a reversed figure.
 const EURO_ENTRY := 1_000_000           # "1 million from UEFA for competing"
 const EURO_WIN := 510_000               # "510.000 for every match won"
+const EURO_DRAW := 255_000              # "255.000 for every draw match" (the group phase)
 const EURO_QF := 1_500_000              # "1.5 million ... qualification" (reach the last 8)
 const EURO_SF := 1_625_000              # "1.625 million ... qualification" (reach the last 4)
 const EURO_WINNER := 2_000_000
@@ -380,10 +382,21 @@ func _play_due_cup_rounds(rng: RandomNumberGenerator, clubs_override: Dictionary
 			continue
 		while Cup.round_due(eb, week):
 			var in_before := Cup.still_in(eb, club_id)
-			var er := Cup.play_round(eb, rng, ratings_fn, club_id, names_fn)
+			var er := Cup.play_next(eb, rng, ratings_fn, club_id, names_fn)
 			for n in er["news"]:
 				_news(n["kind"], n["text"])
-			if in_before:
+			if str(er.get("phase", "")) == "group":
+				# Group phase pays per match on the reversed UEFA per-match schedule (the
+				# figures the knockout collapses to per-tie), plus the last-8 bonus on
+				# qualifying through the group.
+				match str(er.get("manager_result", "")):
+					"win":
+						cash += EURO_WIN
+					"draw":
+						cash += EURO_DRAW
+				if bool(er.get("manager_qualified", false)):
+					cash += EURO_QF
+			elif in_before:
 				cash += _euro_prize(eb, er)
 
 
@@ -1098,6 +1111,11 @@ func mint_european_cups(euro_pool: Array, rng: RandomNumberGenerator) -> void:
 		var opts := {"name": str(EURO_OPTS[key]["name"]), "legs": 2,
 			"two_legged_final": false, "label_scheme": "sequential",
 			"qtr_label": "Quarter Finals", "prize_round": 0, "prize_winner": 0}
+		# Only the European Cup runs a group phase (the real 1997-98 format): the 16-club
+		# field is drawn into 4 groups of 4, double round-robin, top 2 into the knockout.
+		# The U.E.F.A. Cup and Cup Winners' Cup were straight knockouts that season.
+		if key == "european_cup":
+			opts["group_stage"] = {"groups": 4, "advance": 2}
 		euro[key] = Cup.create(field, fixtures.size(), opts)
 		if field.has(club_id):
 			cash += EURO_ENTRY

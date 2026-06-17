@@ -458,7 +458,22 @@ func _cup_shot() -> void:
 	for c in get_children():
 		if c is CupScreen:
 			c.queue_free()
-	for _j in 30:
+	# First, partway in: the European Cup group stage in flight (a few matchdays played).
+	for _g in 13:
+		if _career.season_over():
+			break
+		_career.advance_week(rng)
+	_show_career()
+	await _settle()
+	var ecg: Dictionary = _career.euro.get("european_cup", {})
+	_show_cup_screen(ecg, "EUROPEAN CUP", _euro_emblem("european_cup"))
+	await _settle()
+	_save_shot(dir, "european_cup_group.png")
+	for c in get_children():
+		if c is CupScreen:
+			c.queue_free()
+	# Then deeper, into the knockout rounds.
+	for _j in 18:
 		if _career.season_over():
 			break
 		_career.advance_week(rng)
@@ -1615,7 +1630,14 @@ func _cup_tie_line(tie: Dictionary) -> String:
 	if tie.get("two_legged", false):
 		var hi := maxi(int(tie["h_agg"]), int(tie["a_agg"]))
 		var lo := mini(int(tie["h_agg"]), int(tie["a_agg"]))
-		var t := " agg pens" if decided == "pens" else " agg"
+		var t := " agg"
+		match decided:
+			"pens":
+				t = " agg pens"
+			"away_goals":
+				t = " agg (a.g.)"
+			"aet":
+				t = " agg aet"
 		return "%s bt %s  %d-%d%s" % [_cup_name(w), _cup_name(l), hi, lo, t]
 	var a: int
 	var b: int
@@ -1641,6 +1663,12 @@ func _cup_view(b: Dictionary) -> Dictionary:
 	if b.is_empty():
 		return out
 	var rounds: Array = b.get("rounds", [])
+
+	# Group phase (the European Cup before its knockout): show the group standings + the
+	# manager's group results instead of a knockout draw.
+	var groups: Array = Cup.group_tables(b)
+	if not groups.is_empty() and rounds.is_empty():
+		return _cup_group_view(b, groups, out)
 
 	# The manager's tie in each played round -> a run row.
 	var run_rows: Array = []
@@ -1712,6 +1740,83 @@ func _cup_view(b: Dictionary) -> Dictionary:
 		out["draw_rows"] = draw_rows
 		out["draw_more"] = maxi(0, ties.size() - cap)
 	return out
+
+
+## The CupScreen payload during the European Cup group phase: the manager's group table in
+## THE DRAW panel, his matchday results in YOUR CUP RUN, and a group-position status.
+func _cup_group_view(b: Dictionary, groups: Array, out: Dictionary) -> Dictionary:
+	var cid: int = _career.club_id
+	var cup_nm: String = str(b.get("name", "Cup"))
+	var gs: Dictionary = b.get("group_stage", {})
+	var advance := int(gs.get("advance", 2))
+	# The manager's group (else group A, when browsing a comp he's not in).
+	var my_gi := -1
+	for gi in groups.size():
+		for row in groups[gi].get("table", []):
+			if int(row.get("id", -1)) == cid:
+				my_gi = gi
+	var gi: int = my_gi if my_gi >= 0 else 0
+	var grp: Dictionary = groups[gi]
+	var ranked: Array = Cup._sorted_table(grp.get("table", []))
+	out["draw_label"] = "GROUP %s" % char(65 + gi)
+
+	# Standings rows (top `advance` flagged by colour via the manager-gold "mine").
+	var draw_rows: Array = []
+	var pos_me := -1
+	for i in ranked.size():
+		var row: Dictionary = ranked[i]
+		if int(row.get("id", -1)) == cid:
+			pos_me = i + 1
+		draw_rows.append({"line": "%d %s  P%d  %d-%d  %dpts" % [i + 1,
+			_cup_name(int(row.get("id", -1))).substr(0, 13), int(row.get("p", 0)),
+			int(row.get("gf", 0)), int(row.get("ga", 0)), int(row.get("pts", 0))],
+			"mine": int(row.get("id", -1)) == cid})
+	out["draw_rows"] = draw_rows
+
+	# The manager's matchday results.
+	var run_rows: Array = []
+	if my_gi >= 0:
+		var md := 0
+		for md_results in grp.get("results", []):
+			md += 1
+			for m in md_results:
+				if int(m["h"]) != cid and int(m["a"]) != cid:
+					continue
+				var home := int(m["h"]) == cid
+				var mine_g := int(m["hg"]) if home else int(m["ag"])
+				var their_g := int(m["ag"]) if home else int(m["hg"])
+				var opp := int(m["a"]) if home else int(m["h"])
+				var verb := "drew" if mine_g == their_g else ("bt" if mine_g > their_g else "lost to")
+				var acc: Color = CupScreen.C_DIM if mine_g == their_g else \
+					(CupScreen.C_WIN if mine_g > their_g else CupScreen.C_LOSS)
+				run_rows.append({"round": "Matchday %d" % md,
+					"line": "%s %s  %d-%d" % [verb, _cup_name(opp).substr(0, 14), mine_g, their_g], "accent": acc})
+	out["run_rows"] = run_rows
+
+	# Status: in / through / out of the group.
+	var qualified := bool(gs.get("qualified", false))
+	if my_gi < 0:
+		out["status"] = "NOT QUALIFIED"
+		out["status_col"] = CupScreen.C_DIM
+		out["sub"] = "You are not in the %s." % cup_nm
+	elif qualified and pos_me > 0 and pos_me <= advance:
+		out["status"] = "QUALIFIED"
+		out["status_col"] = CupScreen.C_GOLD
+		out["sub"] = "Through to the knockout from Group %s." % char(65 + gi)
+	elif qualified:
+		out["status"] = "GROUP EXIT"
+		out["status_col"] = CupScreen.C_LOSS
+		out["sub"] = "Out at the group stage (Group %s)." % char(65 + gi)
+	else:
+		out["status"] = "GROUP STAGE"
+		out["status_col"] = CupScreen.C_WIN if (pos_me > 0 and pos_me <= advance) else CupScreen.C_TEXT
+		var k := Cup.weeks_until_next(b, _career.week)
+		var nxt := Cup.next_label(b)
+		var wk_txt := (", %s in %d wk%s" % [nxt, k, "" if k == 1 else "s"]) if k >= 0 and nxt != "" else ""
+		out["sub"] = "Group %s: %d%s of %d%s" % [char(65 + gi), pos_me,
+			_ord_suffix(pos_me), ranked.size(), wk_txt]
+	return out
+
 
 ## The manager's scoreline string for a tie (decisive leg / aggregate, his goals first).
 func _cup_score_for(tie: Dictionary, cid: int) -> String:

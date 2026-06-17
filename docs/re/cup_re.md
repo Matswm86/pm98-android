@@ -33,7 +33,8 @@ chassis (`Cup.create(ids, weeks, opts)` selects the competition). The European c
 
 * **Two-legged ties** (home-and-away, advance on aggregate) for every round EXCEPT the
   Final, which is a single match — exactly the binary's `Round 1 - 1st`/`- 2nd` …
-  `Semifinals - 1st`/`- 2nd` set plus a lone `Final`. A level aggregate goes to penalties
+  `Semifinals - 1st`/`- 2nd` set plus a lone `Final`. A level aggregate is settled by the
+  shared `Cup._play_two_leg_tie` ladder — away goals, then extra time, then penalties
   (`legs: 2, two_legged_final: false`).
 * **Sequential round labels**: `Round 1 → Round 2 → Qtr Finals → Semifinals → Final`
   (`label_scheme: "sequential"`, and note `Qtr Finals` with no period, vs the F.A. Cup's
