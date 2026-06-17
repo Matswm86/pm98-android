@@ -7,9 +7,9 @@ class_name TransferScreen
 ## Reversed: title "TRANSFER MARKET" at (150,16); the buyable-player list panel
 ## (8,72)..(498,435) with 16px rows; the original groups players into the 4 position
 ## bands KEEPERS/DEFENDERS/MIDFIELDERS/FORWARDS (the [3,5,5,5] camrol-role table) -
-## we render the two we can derive faithfully (KEEPERS / OUTFIELD, dearest first),
-## the role code not being decoded yet, exactly as the SQUAD screen does. The right-
-## hand nav column (CURRENT OFFERS / SCOUT / OFFERS / RETURN) sits at x~512.
+## now that the demarcación byte is decoded (docs/re/positions_re.md) we render all four,
+## the dearest target per band, exactly as the SQUAD screen does. The right-hand nav
+## column (CURRENT OFFERS / SCOUT / OFFERS / RETURN) sits at x~512.
 ##
 ## Driven live by Career.market() (already sorted dearest first). Native 640x480;
 ## scales to fit its parent.
@@ -40,9 +40,15 @@ const PANEL := Rect2(8, 48, 490, 387)
 const HDR_Y := 52
 const ROW0_Y := 70
 const ROW_H := 16
-# The original's keeper band has 3 slots; cap ours so the (much larger cross-club)
-# keeper pool can't starve the outfield band out of the visible panel.
-const KEEP_CAP := 5
+# The original's 4 position bands and their slot caps, lifted verbatim from the reversed
+# [3,5,5,5] camrol-role table (DAT_0065c020): KEEPERS(3) / DEFENDERS(5) / MIDFIELDERS(5)
+# / FORWARDS(5). We show the dearest buyable target per band, the same 18-slot shape that
+# fits the reversed panel exactly. See docs/re/transfer_screen_re.md + positions_re.md.
+const BAND_CAPS := {"GK": 3, "DF": 5, "MF": 5, "FW": 5, "OUT": 5}
+const BAND_ORDER := ["GK", "DF", "MF", "FW", "OUT"]
+const BAND_LABELS := {
+	"GK": "KEEPERS", "DF": "DEFENDERS", "MF": "MIDFIELDERS", "FW": "FORWARDS", "OUT": "OUTFIELD",
+}
 
 # Grid columns laid into the reversed panel (x 8..498). {code, x, align_right}.
 const COLS := [
@@ -103,20 +109,31 @@ func setup(market: Array, club: String, manager := "", season := "", cash := 0,
 
 # ---- ordering ------------------------------------------------------------
 
-## The market split into the bands we can derive faithfully (keepers / outfield),
-## each kept dearest first (Career.market already sorts by fee). Returns
-## [{section:String, players:Array}].
+## The market split into the original's 4 position bands (KEEPERS / DEFENDERS /
+## MIDFIELDERS / FORWARDS) by the decoded demarcación, each capped to its [3,5,5,5]
+## slot count and kept dearest first (Career.market already sorts by fee). Players from
+## records without a decoded position fall into a faithful keeper/outfield fallback.
+## Empty bands are dropped. Returns [{section:String, players:Array}].
 func _sections() -> Array:
-	var gks: Array = []
-	var outs: Array = []
+	var bands := {"GK": [], "DF": [], "MF": [], "FW": [], "OUT": []}
 	for r in _rows:
-		if bool(r.get("isGK", false)):
-			if gks.size() < KEEP_CAP:
-				gks.append(r)
-		else:
-			outs.append(r)
-	return [{"section": "KEEPERS", "players": gks},
-		{"section": "OUTFIELD", "players": outs}]
+		var key := _band_of(r)
+		if bands[key].size() < int(BAND_CAPS[key]):
+			bands[key].append(r)
+	var out: Array = []
+	for key in BAND_ORDER:
+		if not bands[key].is_empty():
+			out.append({"section": BAND_LABELS[key], "players": bands[key]})
+	return out
+
+
+## A market row's band key: the decoded GK/DF/MF/FW, or a keeper/outfield fallback for
+## rows whose record carried no position byte.
+func _band_of(r: Dictionary) -> String:
+	var pos := str(r.get("pos", ""))
+	if pos in ["GK", "DF", "MF", "FW"]:
+		return pos
+	return "GK" if bool(r.get("isGK", false)) else "OUT"
 
 
 # ---- helpers -------------------------------------------------------------

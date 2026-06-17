@@ -8,8 +8,9 @@ class_name SquadScreen
 ## bottom-right at (523,360)..(635,385) loading recursos\iconos\plantilla\juveniles.bmp.
 ## The grid's per-attribute columns reuse the same player-grid codes proven on the
 ## LINE-UP screen (N. PLAYER ... EN SP ST AG QU FI MO AV); the original groups the
-## squad into sections, so we section it by the split we can derive faithfully from
-## the data (goalkeepers / outfield), sorted by ability.
+## squad into sections, so we section it by the demarcación byte decoded out of
+## EQUIPOS.PKF, with the original's own band labels (KEEPERS / DEFENDERS /
+## MIDFIELDERS / FORWARDS from MANAGER.EXE), sorted by ability.
 ##
 ## Driven live by the Career roster. Native 640x480; scales to fit its parent.
 ##
@@ -150,23 +151,40 @@ func _on_input(e: InputEvent) -> void:
 
 # ---- ordering ------------------------------------------------------------
 
-## The squad split into the sections we can derive faithfully (goalkeepers /
-## outfield), each sorted by ability. Returns [{section:String, players:Array}].
+## The squad split into the four decoded position sections (the demarcación byte
+## reversed out of EQUIPOS.PKF: GK/DF/MF/FW), each sorted by ability. Records with no
+## decoded position fall back to the GK flag (keepers) or an OUTFIELD catch-all.
+## Returns [{section:String, players:Array}], empty sections dropped.
 func _sections() -> Array:
-	var gks: Array = []
-	var outs: Array = []
+	var bucket := {"GK": [], "DF": [], "MF": [], "FW": [], "OUT": []}
 	for p in _club.get("players", []):
 		if int(p.get("id", -1)) < 0:
 			continue
-		if p.get("isGK"):
-			gks.append(p)
-		else:
-			outs.append(p)
+		bucket[_pos_of(p)].append(p)
 	var by_avg := func(a, b): return _avg_of(a) > _avg_of(b)
-	gks.sort_custom(by_avg)
-	outs.sort_custom(by_avg)
-	return [{"section": "GOALKEEPERS", "players": gks},
-		{"section": "OUTFIELD", "players": outs}]
+	var out: Array = []
+	for key in ["GK", "DF", "MF", "FW", "OUT"]:
+		if bucket[key].is_empty():
+			continue
+		bucket[key].sort_custom(by_avg)
+		out.append({"section": SECTION_LABELS[key], "players": bucket[key]})
+	return out
+
+
+# The original's own section-header strings, lifted verbatim from MANAGER.EXE
+# (KEEPERS / DEFENDERS / MIDFIELDERS / FORWARDS — the 4-entry band table at 0x634e28).
+const SECTION_LABELS := {
+	"GK": "KEEPERS", "DF": "DEFENDERS", "MF": "MIDFIELDERS",
+	"FW": "FORWARDS", "OUT": "OUTFIELD",
+}
+
+## A player's section key: the decoded GK/DF/MF/FW, or a faithful fallback for records
+## without a position byte (keeper by the GK flag, else the OUTFIELD catch-all).
+func _pos_of(p: Dictionary) -> String:
+	var pos := str(p.get("pos", ""))
+	if pos in ["GK", "DF", "MF", "FW"]:
+		return pos
+	return "GK" if p.get("isGK") else "OUT"
 
 
 # ---- drawing -------------------------------------------------------------
@@ -219,20 +237,32 @@ func _draw() -> void:
 
 
 func _draw_list() -> void:
+	var secs := _sections()
+	# Keep the reversed 16px rows for ordinary squads; compress just enough to fit when
+	# the four position sections + a deep squad would otherwise clip a whole group (the
+	# old GK/outfield split only ever dropped the weakest fringe; four sections must not
+	# hide the forwards). Never below 11px so the PROMAN8 row text stays legible.
+	var n_players := 0
+	for sec in secs:
+		n_players += (sec["players"] as Array).size()
+	var n_rows := n_players + secs.size()
+	var avail := int(PANEL.position.y + PANEL.size.y) - ROW0_Y
+	var row_h: int = ROW_H if n_rows == 0 else clampi(avail / n_rows, 11, ROW_H)
+
 	var y := ROW0_Y
 	var row := 0
 	var number := 1
-	for sec in _sections():
+	for sec in secs:
 		# Section header (gold), like the original's section split.
 		_txt(_f8, COLS[1][1], y + 2, str(sec["section"]), C_SECTION, 11)
-		y += ROW_H
+		y += row_h
 		for p in sec["players"]:
-			if y + ROW_H > int(PANEL.position.y + PANEL.size.y):
+			if y + row_h > int(PANEL.position.y + PANEL.size.y):
 				return
-			draw_rect(Rect2(int(PANEL.position.x), y, int(PANEL.size.x), ROW_H - 1),
+			draw_rect(Rect2(int(PANEL.position.x), y, int(PANEL.size.x), row_h - 1),
 				C_ROW_A if row % 2 == 0 else C_ROW_B, true)
 			_row_player(p, number, y)
-			y += ROW_H
+			y += row_h
 			row += 1
 			number += 1
 
@@ -257,7 +287,7 @@ func _row_player(p: Dictionary, number: int, y: int) -> void:
 				# status colour, else the GK/OUT we can derive faithfully from the data.
 				var st := Availability.status(p)
 				if st["state"] == "FIT":
-					_txt(_f8, x, ty, "GK" if p.get("isGK") else "OUT", C_DIM, 11)
+					_txt(_f8, x, ty, _pos_of(p), C_DIM, 11)
 				else:
 					_txt(_f8, x, ty, "%s %dw" % [st["state"], int(st["weeks"])], st["colour"], 11)
 			_:

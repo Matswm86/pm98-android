@@ -23,9 +23,10 @@ draw). Geometry via `CRect::CRect(left,top,right,bottom)` and the `FUN_00436fb0/
 - Full-width list at the reversed panel bounds, 16px rows; per-attribute columns reuse
   the player-grid codes proven on the line-up screen (`N. PLAYER … EN SP ST AG QU FI
   MO AV POS`) since it is the same grid framework. The original's 4-section split is
-  position-based; our decoded DB carries `isGK` but not outfield positions, so we
-  section by the split we can derive faithfully — **goalkeepers / outfield** — each
-  sorted by ability (honest, not guessed). Refine to the 4 position groups once the
-  player-position field is decoded.
+  position-based; the demarcación byte is now decoded out of EQUIPOS.PKF
+  (`docs/re/positions_re.md`), so we section by the **4 real position groups** with the
+  original's own band labels — **KEEPERS / DEFENDERS / MIDFIELDERS / FORWARDS** (the
+  4-entry table at `0x634e28`) — each sorted by ability. Row height compresses just
+  enough to keep a deep squad's forwards on-panel (the original paged; we fit all).
 - Right column: squad count, the reversed YOUTH TEAM button (placeholder — youth not
   built), RETURN. Driven live by the Career roster.

@@ -139,6 +139,7 @@ static func market(rosters: Dictionary, names: Dictionary, tier: int, exclude_cl
 			var attrs := _attrs(p)
 			out.append({
 				"pid": pid, "name": p.get("name", "?"), "isGK": bool(p.get("isGK", false)),
+				"pos": str(p.get("pos", "")),
 				"ca": int(attrs.get("CA", 0)), "age": int(p.get("age", 0)),
 				"club_id": int(cid), "club_name": names.get(cid, "?"),
 				"fee": value_of(p, tier), "wage": wage_yearly(p, tier),
@@ -168,6 +169,7 @@ static func loan_market(rosters: Dictionary, names: Dictionary, tier: int, exclu
 			var attrs := _attrs(p)
 			out.append({
 				"pid": pid, "name": p.get("name", "?"), "isGK": bool(p.get("isGK", false)),
+				"pos": str(p.get("pos", "")),
 				"ca": int(attrs.get("CA", 0)), "age": int(p.get("age", 0)),
 				"club_id": int(cid), "club_name": names.get(cid, "?"),
 				"fee": 0, "wage": wage_yearly(p, tier), "key": false,
@@ -295,6 +297,7 @@ static func generate_free_agents(rng: RandomNumberGenerator, count: int, first_i
 				Youth._SURNAMES[rng.randi() % Youth._SURNAMES.size()]],
 			"age": rng.randi_range(FA_AGE_LO, FA_AGE_HI),
 			"isGK": is_gk,
+			"pos": Youth.random_pos(rng, is_gk),
 			"attrs": Youth._make_attrs(rng, ca, is_gk),
 			"contract_years": 0,
 			"free_agent": true,

@@ -144,6 +144,14 @@ def find_anchors(d: bytes, lo: int, hi: int):
 
 ATTR_NAMES = ["VE", "RE", "AG", "CA", "RM", "RG", "PA", "TI", "EN", "PO"]
 
+# Demarcación (position) byte, three bytes before the birth-year anchor in the small
+# field block: 0=GK 1=DF 2=MF 3=FW. Cross-validated vs the independent PO (goalkeeping)
+# attribute across all 92 English clubs: 177/194 pos==0 players are real keepers (PO>50),
+# and the real 97-98 Arsenal back four / midfield / strike force reproduce exactly
+# (Adams/Keown/Dixon/Winterburn=DF, Vieira/Petit/Parlour/Overmars=MF, Wright/Bergkamp/
+# Anelka=FW). See docs/re/positions_re.md.
+POS_NAMES = {0: "GK", 1: "DF", 2: "MF", 3: "FW"}
+
 
 def find_attr_blocks(d: bytes, lo: int, hi: int):
     """Per-player attribute rows. Each is a `6c 6b` (season) marker followed by the
@@ -228,13 +236,18 @@ def parse_club(d: bytes, off: int, end: int):
         # next one (it follows the player's bio, before the next player's record).
         nxt = anchors[k + 1] if k + 1 < len(anchors) else end
         row = next((w for j, w in attr_blocks if Y < j < nxt), None)
+        pos = POS_NAMES.get(d[Y - 3]) if Y - 3 >= 0 else None
+        # pos==0 (GK) is the authoritative keeper marker; it fixes outfielders with a
+        # high goalkeeping attribute (e.g. Grimandi PO=65) that PO>50 alone mislabels.
+        is_gk = pos == "GK" if pos else (bool(row) and row[9] > 50)
         players.append(
             {
                 "name": display,
                 "legalName": legal,
                 "birthYear": year,
                 "age": 1998 - year,
-                "isGK": bool(row) and row[9] > 50,
+                "pos": pos,
+                "isGK": is_gk,
                 "attrs": dict(zip(ATTR_NAMES, row)) if row else None,
             }
         )

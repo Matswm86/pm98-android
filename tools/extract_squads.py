@@ -34,6 +34,10 @@ SIG = bytes.fromhex("9a919abe5f68")
 MM = b"Dinamic Multimedia"
 COPY = b"Copyright (c)1996 Dinamic Multimedia"  # marks every detailed team record
 ATTR_NAMES = ["VE", "RE", "AG", "CA", "RM", "RG", "PA", "TI", "EN", "PO"]
+# Demarcación byte three bytes before the birth-year anchor: 0=GK 1=DF 2=MF 3=FW.
+# Same field as the English extended records (see docs/re/positions_re.md); clean 0-3
+# partition that reproduces a real squad's keepers/defence/midfield/attack (Barcelona).
+POS_NAMES = {0: "GK", 1: "DF", 2: "MF", 3: "FW"}
 
 _FWD = {L: (L if L % 2 == 0 else L + 2) for L in range(26)}
 C2 = {c: chr(65 + L) for L, c in _FWD.items()}
@@ -179,6 +183,7 @@ def parse_squad(d: bytes, off: int, end: int):
         else:
             legal, common = full_txt.strip(), short_txt
         display = common or short_txt or legal
+        pos = POS_NAMES.get(d[Y - 3]) if Y - 3 >= 0 else None
         players.append(
             {
                 "name": display,
@@ -186,8 +191,9 @@ def parse_squad(d: bytes, off: int, end: int):
                 "birthYear": year,
                 "age": 1998 - year,
                 "media": media,
+                "pos": pos,
                 "attrs": dict(zip(ATTR_NAMES, attrs)),
-                "isGK": attrs[9] > 50,
+                "isGK": pos == "GK" if pos else attrs[9] > 50,
             }
         )
         prev_end = Y + 15

@@ -2,7 +2,7 @@ extends SceneTree
 ## Headless wiring test for the TRANSFER MARKET (FICHAR) screen: confirms the cracked
 ## ORIGINAL assets (FONDO, BARRA, PROMAN8/10/12/14 BMFonts) load, that a real
 ## TransferMarket.market() feeds the screen, the money formatter is correct, and the
-## screen's bands (KEEPERS capped / OUTFIELD) split the buyable rows faithfully.
+## screen's 4 position bands (KEEPERS/DEFENDERS/MIDFIELDERS/FORWARDS) split the rows.
 ##   ~/godot462 --headless --path app --script res://tests/test_transfer_screen.gd
 
 
@@ -47,7 +47,7 @@ func _run() -> void:
 
 	# Row shape + dearest-first ordering.
 	var row0: Dictionary = market[0]
-	for key in ["pid", "name", "isGK", "ca", "fee", "wage", "club_name", "key"]:
+	for key in ["pid", "name", "isGK", "pos", "ca", "fee", "wage", "club_name", "key"]:
 		ok = _assert(row0.has(key), "market row has '%s'" % key) and ok
 	var sorted_ok := true
 	var prev := 1 << 60
@@ -73,20 +73,26 @@ func _run() -> void:
 	await process_frame
 	ok = _assert(screen._rows.size() == market.size(), "screen received the market") and ok
 
-	# Bands: KEEPERS (capped, all keepers) + OUTFIELD (no keepers).
+	# Bands: the original's 4 position bands KEEPERS/DEFENDERS/MIDFIELDERS/FORWARDS, each
+	# capped to its [3,5,5,5] slot count, each holding only rows of that decoded position.
 	var secs: Array = screen._sections()
-	ok = _assert(secs.size() == 2, "two bands (KEEPERS / OUTFIELD)") and ok
+	var band_labels := ["KEEPERS", "DEFENDERS", "MIDFIELDERS", "FORWARDS"]
+	ok = _assert(secs.size() == 4, "four position bands (got %d)" % secs.size()) and ok
 	ok = _assert(secs[0]["section"] == "KEEPERS", "first band is KEEPERS") and ok
-	ok = _assert((secs[0]["players"] as Array).size() <= TransferScreen.KEEP_CAP,
-		"KEEPERS band capped at %d (got %d)" % [TransferScreen.KEEP_CAP, (secs[0]["players"] as Array).size()]) and ok
-	var keepers_only := true
-	for r in secs[0]["players"]:
-		keepers_only = keepers_only and bool(r.get("isGK"))
-	ok = _assert(keepers_only, "KEEPERS band holds only keepers") and ok
-	var outfield_only := true
-	for r in secs[1]["players"]:
-		outfield_only = outfield_only and not bool(r.get("isGK"))
-	ok = _assert(outfield_only, "OUTFIELD band holds no keepers") and ok
+	var labels_ok := true
+	var caps_ok := true
+	var pos_ok := true
+	var pos_of := {"KEEPERS": "GK", "DEFENDERS": "DF", "MIDFIELDERS": "MF", "FORWARDS": "FW"}
+	for sec in secs:
+		var label := str(sec["section"])
+		labels_ok = labels_ok and band_labels.has(label)
+		var want: String = pos_of.get(label, "")
+		caps_ok = caps_ok and (sec["players"] as Array).size() <= int(TransferScreen.BAND_CAPS[want])
+		for r in sec["players"]:
+			pos_ok = pos_ok and str(r.get("pos")) == want
+	ok = _assert(labels_ok, "every band carries an original position label") and ok
+	ok = _assert(caps_ok, "each band within its [3,5,5,5] slot cap") and ok
+	ok = _assert(pos_ok, "each band holds only its own decoded position") and ok
 
 	screen.queue_redraw()
 	for _i in 3:

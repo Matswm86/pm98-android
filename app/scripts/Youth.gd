@@ -42,6 +42,10 @@ const POTENTIAL_LO := 8           # potential = intake CA + [POTENTIAL_LO..POTEN
 const POTENTIAL_HI := 42
 const POTENTIAL_CAP := 88         # no youth projects past this
 const GK_CHANCE := 0.16           # roughly one in six intakes is a goalkeeper
+# Outfield position split for generated players, weighted to the real squad balance
+# decoded from EQUIPOS.PKF (DF 677 / MF 598 / FW 481 across the English pyramid).
+const _DF_SHARE := 0.38
+const _MF_SHARE := 0.33           # remainder (0.29) is FW
 
 # Weekly development toward potential (youth climb fast -- roughly a point of ability every
 # ~3 weeks, so a promising prospect reaches first-team grade in one to two seasons). Scaled
@@ -94,12 +98,26 @@ static func _make_player(rng: RandomNumberGenerator, id: int, factor: float) -> 
 			_SURNAMES[rng.randi() % _SURNAMES.size()]],
 		"age": rng.randi_range(INTAKE_AGE_LO, INTAKE_AGE_HI),
 		"isGK": is_gk,
+		"pos": random_pos(rng, is_gk),
 		"attrs": _make_attrs(rng, ca, is_gk),
 		"potential": potential,
 		"dev_progress": 0.0,
 		"ready": false,
 		"is_youth": true,
 	}
+
+
+## A generated player's GK/DF/MF/FW demarcación, so regen youth and free agents bucket
+## into the same position sections (squad screen, tactics) as decoded senior players.
+static func random_pos(rng: RandomNumberGenerator, is_gk: bool) -> String:
+	if is_gk:
+		return "GK"
+	var r := rng.randf()
+	if r < _DF_SHARE:
+		return "DF"
+	if r < _DF_SHARE + _MF_SHARE:
+		return "MF"
+	return "FW"
 
 
 ## A raw attribute row around current ability `ca`, with the keeper/outfield split the

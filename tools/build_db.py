@@ -101,9 +101,13 @@ def main() -> None:
             "legalName": p.get("legalName", p["name"]),
             "birthYear": p.get("birthYear"),
             "age": p.get("age"),
+            "pos": p.get("pos"),  # GK/DF/MF/FW demarcación; null for un-decoded records
             "isGK": bool(p.get("isGK")),
             "media": p.get("media"),
-            "attrs": p.get("attrs", {}),
+            # Never null: a sparse record with no decoded attribute row gets {} so every
+            # consumer's `attrs.get(key, default)` chain stays safe (a pos-decoded keeper
+            # with no attr row is still isGK, and must not crash the commentary/sort paths).
+            "attrs": p.get("attrs") or {},
         }
 
     # --- English pyramid (the playable core) ---

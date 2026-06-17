@@ -112,7 +112,8 @@ func _fill_xi(club: Dictionary) -> void:
 		else:
 			var atk := MatchEngine.atk_score(attrs) if has_attrs else _NEUTRAL_SCORE
 			var dfn := MatchEngine.def_score(attrs) if has_attrs else _NEUTRAL_SCORE
-			outfield.append({"id": pid, "atk": atk, "def": dfn, "ovr": 0.5 * atk + 0.5 * dfn})
+			outfield.append({"id": pid, "atk": atk, "def": dfn, "ovr": 0.5 * atk + 0.5 * dfn,
+				"pos": str(p.get("pos", ""))})
 
 	keepers.sort_custom(func(a, b): return a["po"] > b["po"])
 	var lines: Array = FORMATIONS[formation]
@@ -120,11 +121,13 @@ func _fill_xi(club: Dictionary) -> void:
 	var n_mid := int(lines[1])
 	var n_fwd := int(lines[2])
 
-	# Defenders by defending, forwards by attacking, midfield by overall, no reuse.
+	# Each line prefers its decoded demarcación (DF back, FW up front, MF in the middle),
+	# ranked within the position by its trait, then spills into other outfielders if a
+	# bucket is short. Defenders first, forwards next, midfield takes the remainder.
 	var taken: Dictionary = {}
-	var def_ids := _take(outfield, "def", n_def, taken)
-	var fwd_ids := _take(outfield, "atk", n_fwd, taken)
-	var mid_ids := _take(outfield, "ovr", n_mid, taken)
+	var def_ids := _take(outfield, "def", n_def, taken, "DF")
+	var fwd_ids := _take(outfield, "atk", n_fwd, taken, "FW")
+	var mid_ids := _take(outfield, "ovr", n_mid, taken, "MF")
 
 	xi.clear()
 	xi.append(int(keepers[0]["id"]) if not keepers.is_empty() else -1)
@@ -132,14 +135,26 @@ func _fill_xi(club: Dictionary) -> void:
 	xi.append_array(mid_ids)
 	xi.append_array(fwd_ids)
 
-## Pick the top `n` ids of `pool` by `key`, skipping ids already in `taken`.
-func _take(pool: Array, key: String, n: int, taken: Dictionary) -> Array:
+## Pick the top `n` ids of `pool` by `key`, skipping ids already in `taken`. When
+## `want_pos` is given, players of that decoded position are preferred (sorted by `key`)
+## and only when the bucket runs short do other outfielders fill in (also by `key`) -
+## so a real defender is never benched for a forward with a fluke defending score.
+func _take(pool: Array, key: String, n: int, taken: Dictionary, want_pos: String = "") -> Array:
 	var avail: Array = pool.filter(func(r): return not taken.has(r["id"]))
-	avail.sort_custom(func(a, b): return a[key] > b[key])
+	var by_key := func(a, b): return a[key] > b[key]
+	var ordered: Array = avail
+	if want_pos != "":
+		var match_pos: Array = avail.filter(func(r): return str(r.get("pos", "")) == want_pos)
+		var rest: Array = avail.filter(func(r): return str(r.get("pos", "")) != want_pos)
+		match_pos.sort_custom(by_key)
+		rest.sort_custom(by_key)
+		ordered = match_pos + rest
+	else:
+		ordered.sort_custom(by_key)
 	var ids: Array = []
-	for i in mini(n, avail.size()):
-		ids.append(int(avail[i]["id"]))
-		taken[avail[i]["id"]] = true
+	for i in mini(n, ordered.size()):
+		ids.append(int(ordered[i]["id"]))
+		taken[ordered[i]["id"]] = true
 	return ids
 
 ## Captain + set-piece takers from the XI (captain = best ability, penalty/free

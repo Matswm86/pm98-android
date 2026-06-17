@@ -42,11 +42,12 @@ Geometry helpers (same family proven on finance/squad/lineup):
 - List panel (8,72)..(498,435), 16 px rows, ProMan8 grid. Columns are the buyable-
   market fields (the screen's authentic ROLE / NAME / CLUB FEE / YEARLY WAGE / CLUB):
   a ★ key / ♥ shortlist flag, NAME, AGE, AB (CA), CLUB FEE, YEARLY WAGE, CLUB.
-- **Sections KEEPERS / OUTFIELD only**, dearest first — same honest split as the
-  SQUAD screen. The original's 4-band KEEPERS/DEFENDERS/MIDFIELDERS/FORWARDS needs
-  the per-player 18-way `camrol` role code, which is NOT yet decoded out of the DB
-  (carry-over blocker: "player outfield positions not decoded"); guessing it would
-  invent data, so we render the two bands we can derive faithfully (`isGK`).
+- **The original's 4 bands KEEPERS / DEFENDERS / MIDFIELDERS / FORWARDS**, each capped
+  to its `[3,5,5,5]` slot count (`DAT_0065c020`), dearest target per band first — same
+  split as the SQUAD screen. Unblocked by the demarcación-byte decode
+  (`docs/re/positions_re.md`): the 4-way GK/DF/MF/FW position is the band key. (The
+  per-player 18-way `camrol` sub-role — DFC/LD/MC… — remains finer than we decode;
+  the 4 visible bands match the original's headers, which is what the screen shows.)
 - Right nav column at x≈512: a BANK box + CURRENT OFFERS / SCOUT / OFFERS / RETURN
   labelled cells (the secretario/ofertas bitmaps live in `recursos\iconos\fichar\`;
   represented as labelled buttons, the same convention the squad screen used for

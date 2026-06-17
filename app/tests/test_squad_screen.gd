@@ -1,8 +1,8 @@
 extends SceneTree
 ## Headless wiring test for the SQUAD MANAGEMENT (PLANTILLA) screen: confirms the
 ## cracked ORIGINAL assets (FONDO, BARRA, PROMAN8/10/12/14 BMFonts) load, that a real
-## club feeds the screen without error, and that the roster sections (goalkeepers /
-## outfield) cover the whole squad with no player dropped or duplicated.
+## club feeds the screen without error, and that the decoded position sections
+## (GK/DF/MF/FW) cover the whole squad with no player dropped or duplicated.
 ##   ~/godot462 --headless --path app --script res://tests/test_squad_screen.gd
 
 
@@ -41,34 +41,37 @@ func _run() -> void:
 	await process_frame
 	ok = _assert(screen._kit_tex != null, "club kit (escudo) loaded for the squad screen") and ok
 
-	# Sections partition the squad: GK + outfield = the full roster, no dup/drop.
+	# Sections partition the squad by the decoded demarcación (GK/DF/MF/FW): every
+	# label valid, the union = the full roster with no dup/drop, sorted within section.
 	var secs: Array = screen._sections()
-	ok = _assert(secs.size() == 2, "two sections (GK / outfield)") and ok
+	var valid_labels := ["KEEPERS", "DEFENDERS", "MIDFIELDERS", "FORWARDS", "OUTFIELD"]
+	ok = _assert(secs.size() >= 3, "at least three position sections (got %d)" % secs.size()) and ok
+	ok = _assert(secs[0]["section"] == "KEEPERS", "first section is KEEPERS") and ok
 	var total := 0
 	var seen := {}
 	var dup := false
+	var labels_ok := true
+	var sorted_ok := true
 	for sec in secs:
+		labels_ok = labels_ok and valid_labels.has(str(sec["section"]))
+		var prev := 999
 		for p in sec["players"]:
 			total += 1
 			var pid := int(p.get("id", -1))
 			dup = dup or seen.has(pid)
 			seen[pid] = true
+			var a := screen._avg_of(p)
+			sorted_ok = sorted_ok and a <= prev
+			prev = a
+	ok = _assert(labels_ok, "every section carries a valid position label") and ok
 	ok = _assert(total == (club["players"] as Array).size(),
 		"sections cover all %d players (got %d)" % [(club["players"] as Array).size(), total]) and ok
 	ok = _assert(not dup, "no player appears in two sections") and ok
+	ok = _assert(sorted_ok, "each section sorted by ability descending") and ok
 	var gk_all_keepers := true
 	for p in secs[0]["players"]:
-		gk_all_keepers = gk_all_keepers and bool(p.get("isGK"))
+		gk_all_keepers = gk_all_keepers and screen._pos_of(p) == "GK"
 	ok = _assert(gk_all_keepers, "GOALKEEPERS section holds only keepers") and ok
-
-	# Sorted by ability within the outfield section (descending average).
-	var sorted_ok := true
-	var prev := 999
-	for p in secs[1]["players"]:
-		var a := screen._avg_of(p)
-		sorted_ok = sorted_ok and a <= prev
-		prev = a
-	ok = _assert(sorted_ok, "outfield sorted by ability descending") and ok
 
 	screen.queue_redraw()
 	for _i in 3:
