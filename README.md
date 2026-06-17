@@ -108,13 +108,16 @@ captured from the actual Godot build:
   <img src="screens/hub.png" alt="Main Menu as the live career hub" width="320"/>
 </p>
 
-The **2D match view** — the iconic DATSIM sprite match — with the original game's own
-player sprites on a 3/4 broadcast pitch, driven by the reverse-engineered match engine
-(real scoreline, minute-by-minute events). Captured from the running Godot build:
+The **match screen** — the original's results / commentary view, reproduced from the real
+game: the digital clock + half indicator, both clubs' shirts and score, the POSSESSION
+PERCENTAGE bar, the minute-by-minute EVENTS table (MIN | COMMENT), and REPLAY / CONTINUE /
+EXIT, over the blue stadium background. It is driven by the reverse-engineered match engine
+(real scoreline + minute-by-minute events). The game's premium 3D highlights (Actua-engine
+models) are CD-only data not present in the archive, so this is the 2D + text mode.
 
 <p>
-  <img src="screens/match.png" alt="2D match view — kick-off" width="420"/>
-  <img src="screens/match_goals.png" alt="2D match view — late on, ARSENAL 2:4" width="420"/>
+  <img src="screens/match.png" alt="Match screen — clock, score, possession, events" width="420"/>
+  <img src="screens/match_goals.png" alt="Match screen — late on, with the events feed" width="420"/>
 </p>
 
 **Injuries, suspensions and the club news feed** — the squad screen flags who's out

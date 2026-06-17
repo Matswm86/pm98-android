@@ -204,18 +204,9 @@ func _match_shot() -> void:
 	var scr: MatchScreen = load("res://scenes/MatchScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
-	# showcase the per-club kits: pair the home club with the opponent whose REAL kit
-	# colour contrasts most (so the capture shows two distinct real kits, not a clash fallback).
+	# the results / commentary screen shows each club's shirt escudo; any two clubs work.
 	var home: Dictionary = cl[0]
-	var hcol := scr._kit_colour(int(home.get("id", -1)), true, Color(0.85, 0.18, 0.18))
 	var away: Dictionary = cl[1]
-	var best := -1.0
-	for i in range(1, mini(cl.size(), 12)):
-		var acol := scr._kit_colour(int(cl[i].get("id", -1)), false, Color(0.18, 0.30, 0.85))
-		var d := scr._col_dist(hcol, acol)
-		if d > best:
-			best = d
-			away = cl[i]
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 424242        # fixed seed -> reproducible capture
 	var m := MatchCommentary.timeline(rng, home, away)
