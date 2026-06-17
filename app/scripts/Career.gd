@@ -77,6 +77,18 @@ var euro_winner_names: Dictionary = {}    # winner/SA-champ id:int -> String
 var supercup: Dictionary = {}           # European Supercup result; {} = not played
 var intercontinental: Dictionary = {}   # Intercontinental Cup result; {} = not played
 
+# The manager's career ACROSS clubs (#14). Reputation tracks how you've done; the board can
+# sack you for missing its objective; stronger clubs headhunt you when you overachieve; and
+# every spell is recorded so a career spans several clubs (Manager.gd is the decision math).
+var reputation: float = Manager.REP_START   # 0..100 standing in the game
+var manager_history: Array = []         # past spells [{club, league, from_season, to_season, ...}]
+var pending_offers: Array = []          # job offers currently on the table (built by Main from GameDB)
+var sacked: bool = false                # set at season end when the board dismisses you
+var sack_reason: String = ""            # "relegated" / "missed" (for the end-of-season message)
+var headhunt_pending: bool = false      # a stronger club is courting you after a strong season
+var spell_start_year: int = 1           # the career `year` you joined the current club
+var _rep_year: int = 0                  # guard: the season `year` the board review was applied
+
 # Coca-Cola Cup options: two-legged rounds, a single-leg final, sequential round labels
 # (Round 1 -> Round 2 -> Qtr Finals -> Semifinals -> Final), a smaller purse than the F.A.
 # Cup, and a schedule that finishes earlier in the season (so the two finals don't clash).
@@ -148,44 +160,87 @@ const AI_INJ_NEWS_WEEKS := 3
 ## dict, `league_clubs` the full club dicts in that division, `leagues` all leagues.
 static func create(club: Dictionary, league: Dictionary, league_clubs: Array, leagues: Array) -> Career:
 	var c := Career.new()
-	c.club_id = int(club["id"])
-	c.club_name = club.get("name", "?")
-	c.league_id = str(league.get("id", ""))
-	c.league_name = league.get("name", "League")
-	c.tier = FinanceModel.tier_of(club, leagues)
+	c.reputation = Manager.REP_START
+	c._init_club(club, league, league_clubs, leagues)
+	return c
+
+
+## Set this career up to manage `club` in its division: live rosters, fixtures, table,
+## objective, finances, a fresh academy + staff pool + free-agent pool, and a clean slate
+## of competitions. Shared by `create` (a brand-new career) and `take_job` (switching clubs
+## mid-career) -- so the cross-career state (reputation, manager_history, the year counter)
+## is set by the CALLER, never here. The managed club's spell is stamped as starting in the
+## current `year`.
+func _init_club(club: Dictionary, league: Dictionary, league_clubs: Array, leagues: Array) -> void:
+	club_id = int(club["id"])
+	club_name = club.get("name", "?")
+	league_id = str(league.get("id", ""))
+	league_name = league.get("name", "League")
+	tier = FinanceModel.tier_of(club, leagues)
+	spell_start_year = year
+	season = _season_label(year)
+	# Fresh per-club slate (so switching clubs never carries the old club's data).
+	week = 0
+	finished = false
+	sacked = false
+	sack_reason = ""
+	headhunt_pending = false
+	pending_offers = []
+	_rep_year = 0
+	rosters = {}
+	club_names = {}
+	results = []
+	news_log = []
+	transfer_log = []
+	transfer_listed = {}
+	shortlist = []
+	works = {}
+	offers_left = OFFERS_PER_WEEK
+	# Competitions reset: you arrive with no European qualification or honours at the new club.
+	euro = {}
+	euro_ratings = {}
+	euro_names = {}
+	last_champion_id = -1
+	last_fa_winner_id = -1
+	last_runners_up = []
+	charity_shield = {}
+	euro_winner_cup = -1
+	euro_winner_cwc = -1
+	euro_winner_ratings = {}
+	euro_winner_names = {}
+	supercup = {}
+	intercontinental = {}
 	var ids: Array = []
 	for lc in league_clubs:
 		ids.append(int(lc["id"]))
-		c.club_names[int(lc["id"])] = lc.get("name", "?")
-		c.rosters[int(lc["id"])] = c._seed_squad(lc)
-	c.fixtures = SeasonSim.fixtures(ids)
-	c.fa_cup = Cup.create(ids, c.fixtures.size())
-	c.league_cup = Cup.create(ids, c.fixtures.size(), LEAGUE_CUP_OPTS)
-	c._init_table(league_clubs)
-	c._set_objective(league, league_clubs, leagues)
-	var fin := FinanceModel.summary(club, c.tier)
+		club_names[int(lc["id"])] = lc.get("name", "?")
+		rosters[int(lc["id"])] = _seed_squad(lc)
+	fixtures = SeasonSim.fixtures(ids)
+	fa_cup = Cup.create(ids, fixtures.size())
+	league_cup = Cup.create(ids, fixtures.size(), LEAGUE_CUP_OPTS)
+	_init_table(league_clubs)
+	_set_objective(league, league_clubs, leagues)
+	var fin := FinanceModel.summary(club, tier)
 	# weekly_net is the per-week finance delta WITHOUT the player wage bill -- player wages
 	# are drawn live from the squad each week (so signings + renewal raises move the bill),
 	# so we add the seed squad's wages back into the projected balance here. For an unchanged
 	# squad the live deduction equals this added-back figure, i.e. identical to the old net.
-	c.weekly_net = int(fin["weekly_balance"]) + int(fin["weekly_wages"])
-	c.cash = int(fin.get("total_income", 0)) / 4   # opening balance ~ a quarter's income
-	c.stadium_capacity = int(fin.get("capacity", 0))   # ground starts at the club's known size
-	c.ticket_price = int(fin.get("ticket_price", 0))   # prices start at the division defaults
-	c.board_price = int(fin.get("board_price", 0))
-	c.tactics = Tactics.auto_pick(club, Tactics.DEFAULT_FORMATION).to_dict()
-	# The academy starts with a small crop of youngsters to develop.
+	weekly_net = int(fin["weekly_balance"]) + int(fin["weekly_wages"])
+	cash = int(fin.get("total_income", 0)) / 4   # opening balance ~ a quarter's income
+	stadium_capacity = int(fin.get("capacity", 0))   # ground starts at the club's known size
+	ticket_price = int(fin.get("ticket_price", 0))   # prices start at the division defaults
+	board_price = int(fin.get("board_price", 0))
+	tactics = Tactics.auto_pick(club, Tactics.DEFAULT_FORMATION).to_dict()
+	# A fresh academy + staff pool + free-agent pool for the new club (none carry across).
 	var yrng := RandomNumberGenerator.new()
 	yrng.randomize()
-	c.youth = Youth.intake(yrng, YOUTH_SEED_COUNT, c.youth_seq)
-	c.youth_seq += YOUTH_SEED_COUNT
-	# No staff hired yet, but a pool of backroom staff to bring in.
-	c.staff_pool = Staff.generate_pool(yrng, c.staff_seq, STAFF_POOL_SIZE)
-	c.staff_seq += STAFF_POOL_SIZE
-	# A pool of out-of-contract free agents to sign for nothing but a wage.
-	c.free_agents = TransferMarket.generate_free_agents(yrng, FREE_POOL_SIZE, c.free_seq)
-	c.free_seq += FREE_POOL_SIZE
-	return c
+	youth = Youth.intake(yrng, YOUTH_SEED_COUNT, youth_seq)
+	youth_seq += YOUTH_SEED_COUNT
+	staff = []
+	staff_pool = Staff.generate_pool(yrng, staff_seq, STAFF_POOL_SIZE)
+	staff_seq += STAFF_POOL_SIZE
+	free_agents = TransferMarket.generate_free_agents(yrng, FREE_POOL_SIZE, free_seq)
+	free_seq += FREE_POOL_SIZE
 
 
 ## Deep-copy a club's squad into a live roster, stamping a contract length on each
@@ -600,6 +655,89 @@ func position() -> int:
 
 func objective_met() -> bool:
 	return position() <= objective_pos
+
+
+# ---- manager career across clubs (#14) -----------------------------------
+
+## Seasons you have managed the current club (1 = your first).
+func seasons_at_club() -> int:
+	return year - spell_start_year + 1
+
+## The relegation count for the current division (how many go down).
+func _releg_count() -> int:
+	return int(SeasonSim.ZONES.get(tier, {"releg": 3}).get("releg", 3))
+
+## Did the manager lift a domestic cup this season (F.A. Cup or League Cup)?
+func _won_domestic_cup() -> bool:
+	return Cup.champion_id(fa_cup) == club_id or Cup.champion_id(league_cup) == club_id
+
+## The board's end-of-season verdict, computed ONCE per season (idempotent on repeat calls
+## within the same `year`): applies the season's reputation change, decides whether you are
+## sacked, and whether a stronger club is headhunting you. Returns a display summary. The
+## actual job offers are built by Main (which has GameDB) from `offer_band()`.
+func board_review() -> Dictionary:
+	var finished_pos := position()
+	var total := standings().size()
+	if _rep_year != year:
+		var titles := {"league": finished_pos == 1, "cup": _won_domestic_cup()}
+		reputation = Manager.apply_delta(reputation,
+			Manager.reputation_delta(finished_pos, objective_pos, total, _releg_count(), titles))
+		var survival := objective_text == "Avoid relegation"
+		var sd := Manager.sack_decision(finished_pos, objective_pos, total,
+			_releg_count(), survival, seasons_at_club())
+		sacked = bool(sd["sacked"])
+		sack_reason = str(sd["reason"])
+		var rng := RandomNumberGenerator.new()
+		rng.randomize()
+		headhunt_pending = not sacked and Manager.headhunted(finished_pos, objective_pos, reputation, rng)
+		if sacked:
+			reputation = Manager.apply_delta(reputation, Manager.REP_SACK)
+		_rep_year = year
+	return {
+		"sacked": sacked, "reason": sack_reason, "headhunted": headhunt_pending,
+		"finished_pos": finished_pos, "objective_pos": objective_pos,
+		"objective_met": finished_pos <= objective_pos,
+		"reputation": int(round(reputation)), "rep_label": Manager.reputation_label(reputation),
+	}
+
+## The strength-percentile band + count of clubs that will offer you their job, given your
+## reputation and whether you were just sacked (Manager.offer_band). Main maps it to real
+## clubs ranked by strength.
+func offer_band() -> Dictionary:
+	return Manager.offer_band(reputation, sacked)
+
+## Record the current club as a finished spell in the manager's history. `reason` is how it
+## ended ("sacked" / "resigned" / "left for X"). Captures the span + the final standing.
+func record_spell(reason: String) -> void:
+	manager_history.append({
+		"club_id": club_id, "club_name": club_name, "league_name": league_name,
+		"from_season": _season_label(spell_start_year), "to_season": season,
+		"seasons": seasons_at_club(), "final_pos": position(),
+		"final_pos_str": "%d%s" % [position(), _ord_suffix(position())],
+		"reason": reason,
+	})
+
+## Switch clubs mid-career: record the current spell, advance the career into the next
+## season, and rebuild every per-club piece of state for the new club (`_init_club`). The
+## manager carries only reputation + history + the career year counter across the move.
+## `reason` is how the old spell ended. After this the new club's first season is ready.
+func take_job(club: Dictionary, league: Dictionary, league_clubs: Array, leagues: Array,
+		reason: String = "") -> void:
+	if reason == "":
+		reason = "sacked" if sacked else ("left for %s" % str(club.get("name", "?")))
+	record_spell(reason)
+	year += 1
+	_init_club(club, league, league_clubs, leagues)
+
+## A 1st/2nd/3rd/4th... suffix (local copy so Career stays Main-free).
+func _ord_suffix(n: int) -> String:
+	if n % 100 in [11, 12, 13]:
+		return "th"
+	match n % 10:
+		1: return "st"
+		2: return "nd"
+		3: return "rd"
+		_: return "th"
 
 
 # ---- transfer market -----------------------------------------------------
@@ -1431,6 +1569,10 @@ func to_dict() -> Dictionary:
 		"euro_winner_ratings": _str_keyed(euro_winner_ratings),
 		"euro_winner_names": _str_keyed(euro_winner_names),
 		"supercup": supercup, "intercontinental": intercontinental,
+		"reputation": reputation, "manager_history": manager_history,
+		"pending_offers": pending_offers, "sacked": sacked, "sack_reason": sack_reason,
+		"headhunt_pending": headhunt_pending, "spell_start_year": spell_start_year,
+		"rep_year": _rep_year,
 		"wages_live": true,   # marker: weekly_net excludes player wages (drawn live). See from_dict.
 	}
 
@@ -1511,6 +1653,16 @@ static func from_dict(d: Dictionary) -> Career:
 		c.euro_winner_names[int(k)] = d["euro_winner_names"][k]
 	c.supercup = d.get("supercup", {})
 	c.intercontinental = d.get("intercontinental", {})
+	# Manager career (#14). Pre-#14 saves load with a fresh reputation + empty history +
+	# spell starting in the save's own year, so an in-flight career carries on seamlessly.
+	c.reputation = float(d.get("reputation", Manager.REP_START))
+	c.manager_history = d.get("manager_history", [])
+	c.pending_offers = d.get("pending_offers", [])
+	c.sacked = bool(d.get("sacked", false))
+	c.sack_reason = str(d.get("sack_reason", ""))
+	c.headhunt_pending = bool(d.get("headhunt_pending", false))
+	c.spell_start_year = int(d.get("spell_start_year", c.year))
+	c._rep_year = int(d.get("rep_year", 0))
 	c.table = {}
 	for k in d.get("table", {}):
 		c.table[int(k)] = d["table"][k]

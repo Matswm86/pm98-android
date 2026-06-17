@@ -50,7 +50,8 @@ func _ready() -> void:
 			and not OS.has_environment("PM98_MATCH_SHOT") and not OS.has_environment("PM98_NEWS_SHOT") \
 			and not OS.has_environment("PM98_TRAIN_SHOT") and not OS.has_environment("PM98_CUP_SHOT") \
 			and not OS.has_environment("PM98_YOUTH_SHOT") and not OS.has_environment("PM98_STAFF_SHOT") \
-			and not OS.has_environment("PM98_CONTRACT_SHOT") and not OS.has_environment("PM98_SCREENS_SHOT"):
+			and not OS.has_environment("PM98_CONTRACT_SHOT") and not OS.has_environment("PM98_SCREENS_SHOT") \
+			and not OS.has_environment("PM98_MANAGER_SHOT"):
 		_devshot()
 
 
@@ -88,6 +89,9 @@ func _boot() -> void:
 		return
 	if OS.has_environment("PM98_SCREENS_SHOT"):
 		_screens_shot()
+		return
+	if OS.has_environment("PM98_MANAGER_SHOT"):
+		_manager_shot()
 		return
 	var boot_shot := OS.has_environment("PM98_BOOT_SHOT")
 	if boot_shot or not OS.has_environment("PM98_SHOT_DIR"):
@@ -2533,22 +2537,63 @@ func _show_deal_result(msg: String) -> void:
 	_set_view("Transfer", msg, ["Back to transfers"], [{}], func(_x): _go_back())
 
 
+## The end-of-season board review (#14): the board passes its verdict, your reputation is
+## updated, and the season either rolls on, ends in a sacking with job offers, or invites a
+## move to a bigger club. The career history is always one tap away.
 func _show_end_of_season() -> void:
-	var pos := _career.position()
-	var met := _career.objective_met()
+	var rv := _career.board_review()
 	var rows: Array = []
-	rows.append("Final position: %d%s of %d" % [pos, _ord_suffix(pos), _career.standings().size()])
+	var payload: Array = []
+	rows.append("Final position: %d%s of %d" % [
+		int(rv["finished_pos"]), _ord_suffix(int(rv["finished_pos"])), _career.standings().size()])
+	payload.append({})
 	rows.append("Board objective: %s" % _career.objective_text)
-	rows.append("Verdict: %s" % ("ACHIEVED - you keep your job" if met else "MISSED - the board is unhappy"))
+	payload.append({})
+	rows.append("Reputation: %d  -  %s" % [int(rv["reputation"]), rv["rep_label"]])
+	payload.append({})
 	rows.append("")
-	rows.append("▶  Start next season" if met else "▶  Start next season (last chance)")
-	var payload: Array = [{}, {}, {}, {}, {"act": "next"}]
+	payload.append({})
+	if bool(rv["sacked"]):
+		var why := "relegation" if str(rv["reason"]) == "relegated" else "falling short of the board's target"
+		rows.append("The board has SACKED you after %s." % why)
+		payload.append({})
+		_generate_offers(false)
+		rows.append("▶  See which clubs want you (%d)" % _career.pending_offers.size())
+		payload.append({"act": "offers"})
+	elif bool(rv["headhunted"]):
+		rows.append("Verdict: ACHIEVED  -  and bigger clubs have noticed.")
+		payload.append({})
+		_generate_offers(true)
+		rows.append("▶  Stay at %s next season" % _career.club_name)
+		payload.append({"act": "stay"})
+		rows.append("▶  Hear out %d job offer%s" % [
+			_career.pending_offers.size(), "" if _career.pending_offers.size() == 1 else "s"])
+		payload.append({"act": "offers"})
+	else:
+		var verdict := "ACHIEVED - you keep your job" if bool(rv["objective_met"]) \
+			else "MISSED - the board expects better"
+		rows.append("Verdict: %s" % verdict)
+		payload.append({})
+		rows.append("▶  Start next season")
+		payload.append({"act": "next"})
+	rows.append("▶  Your managerial record")
+	payload.append({"act": "record"})
 	_set_view("End of %s" % _career.season, "%s" % _career.club_name, rows, payload,
 		_activate_end_of_season)
 
 func _activate_end_of_season(item: Dictionary) -> void:
-	if item.get("act") == "next":
-		_next_season()
+	match str(item.get("act", "")):
+		"next":
+			_next_season()
+		"stay":
+			# Decline the suitors and sign up for another season at the current club.
+			_career.pending_offers = []
+			_career.headhunt_pending = false
+			_next_season()
+		"offers":
+			_show_job_offers()
+		"record":
+			_show_manager_career()
 
 func _next_season() -> void:
 	# Carry the live squads, cash and tactics into the new season; contracts tick
@@ -2558,6 +2603,188 @@ func _next_season() -> void:
 	_career.advance_season(GameDB.leagues, rng, _euro_pool(), _sa_champion())
 	_career.save()
 	_enter_career()
+
+
+# ---- manager career across clubs (#14) -----------------------------------
+
+## Build the job offers on the table from GameDB: real clubs in the reputation strength band
+## (every manageable club ranked weakest..strongest, sliced by the percentile window the
+## Career's reputation commands), excluding the club you manage. A headhunt restricts the
+## pool to clubs STRONGER than yours. Stored on the career so they persist + render. Stable
+## across redraws (no-op once offers exist).
+func _generate_offers(headhunt: bool) -> void:
+	if not _career.pending_offers.is_empty():
+		return
+	var band := _career.offer_band()
+	var ranked: Array = []
+	for c in GameDB.clubs:
+		if c.get("leagueId") == null:
+			continue   # only league clubs are manageable (skip the international-only set)
+		ranked.append({"club": c, "ovr": _club_strength(c)})
+	if ranked.is_empty():
+		return
+	ranked.sort_custom(func(a, b): return float(a["ovr"]) < float(b["ovr"]))
+	var n := ranked.size()
+	var lo_i := clampi(int(floor(float(band["lo"]) * (n - 1))), 0, n - 1)
+	var hi_i := clampi(int(ceil(float(band["hi"]) * (n - 1))), 0, n - 1)
+	var cur := _current_strength()
+	var pool: Array = []
+	for i in range(lo_i, hi_i + 1):
+		var club: Dictionary = ranked[i]["club"]
+		if int(club["id"]) == _career.club_id:
+			continue
+		if headhunt and float(ranked[i]["ovr"]) <= cur:
+			continue
+		pool.append(club)
+	if pool.is_empty():
+		# Always leave at least something on the table: nearest clubs, current excluded.
+		for entry in ranked:
+			var club: Dictionary = entry["club"]
+			if int(club["id"]) != _career.club_id:
+				pool.append(club)
+	pool.shuffle()
+	var offers: Array = []
+	for club in pool.slice(0, int(band["count"])):
+		offers.append(_offer_from_club(club))
+	_career.pending_offers = offers
+
+## Overall strength of a club dict (att + def + gk), the ranking key for offers.
+func _club_strength(club: Dictionary) -> float:
+	var r := MatchEngine.team_ratings(club)
+	return float(r["att"]) + float(r["def"]) + float(r["gk"])
+
+## Overall strength of the club you currently manage (from its live roster).
+func _current_strength() -> float:
+	return _club_strength(_mgr_club())
+
+## A serialisable offer {club_id, club_name, league_id, league_name} from a GameDB club.
+func _offer_from_club(club: Dictionary) -> Dictionary:
+	var lg := _league_by_id(str(club.get("leagueId", "")))
+	return {
+		"club_id": int(club["id"]), "club_name": str(club.get("name", "?")),
+		"league_id": str(club.get("leagueId", "")), "league_name": str(lg.get("name", "League")),
+	}
+
+func _league_by_id(id: String) -> Dictionary:
+	for lg in GameDB.leagues:
+		if str(lg.get("id", "")) == id:
+			return lg
+	return {}
+
+## The JOB OFFERS list (#14): the clubs that want you. Selecting one takes the job and
+## starts your first season there. PM98-chrome browse.
+func _show_job_offers() -> void:
+	var offers: Array = _career.pending_offers
+	var rows: Array = []
+	var payload: Array = []
+	if offers.is_empty():
+		rows.append({"text": "No clubs have come in for you.", "enabled": false})
+		payload.append(null)
+	for o in offers:
+		rows.append({"text": str(o["club_name"]), "value": str(o["league_name"])})
+		payload.append(o)
+	var subtitle := "Choose your next club" if _career.sacked else "A new challenge, if you want it"
+	_mount_browse("JOB OFFERS", subtitle, rows,
+		func(i: int) -> void:
+			if i < payload.size() and payload[i] != null:
+				_accept_job(payload[i]),
+		func() -> void: _dismiss_career_browse())
+
+## Take an offered job: rebuild the career around the new club (Career.take_job records the
+## old spell + carries reputation/history), save, and enter the new career.
+func _accept_job(offer: Dictionary) -> void:
+	var lid := str(offer["league_id"])
+	var league := _league_by_id(lid)
+	var club := GameDB.club(int(offer["club_id"]))
+	if club.is_empty() or league.is_empty():
+		_toast("That club is no longer available.")
+		return
+	var league_clubs := GameDB.clubs_in_league(lid)
+	var reason := "sacked" if _career.sacked else ("left %s" % _career.club_name)
+	_career.take_job(club, league, league_clubs, GameDB.leagues, reason)
+	_career.save()
+	_enter_career()
+
+## YOUR CAREER (#14): reputation + the current club + every past spell, most recent first.
+## The MANAGER INFO the board screen points at, here as a PM98-chrome browse.
+func _show_manager_career() -> void:
+	var rows: Array = []
+	rows.append({"text": "Reputation:  %d  -  %s" % [
+		int(round(_career.reputation)), Manager.reputation_label(_career.reputation)],
+		"accent": Color(1.0, 0.87, 0.0), "enabled": false})
+	rows.append({"text": "%s  (%s)" % [_career.club_name, _career.league_name],
+		"value": "now, season %d" % _career.seasons_at_club(),
+		"accent": Color(0.55, 0.85, 1.0), "enabled": false})
+	for i in range(_career.manager_history.size() - 1, -1, -1):
+		var h: Dictionary = _career.manager_history[i]
+		var span := str(h.get("from_season", "?"))
+		if str(h.get("to_season", "")) != span:
+			span = "%s to %s" % [span, str(h.get("to_season", ""))]
+		rows.append({
+			"text": "%s  (%s)" % [str(h.get("club_name", "?")), str(h.get("league_name", ""))],
+			"value": "%s, %s" % [span, _spell_reason(h)],
+			"accent": _spell_colour(h), "enabled": false})
+	if _career.manager_history.is_empty():
+		rows.append({"text": "Your first job  -  make your name here.", "enabled": false})
+	var clubs_managed := _career.manager_history.size() + 1
+	_mount_browse("YOUR CAREER", "%d club%s managed" % [
+		clubs_managed, "" if clubs_managed == 1 else "s"], rows,
+		func(_i: int) -> void: pass,
+		func() -> void: _dismiss_career_browse())
+
+## A short tag for how a spell ended ("sacked" / "resigned" / "left ...").
+func _spell_reason(h: Dictionary) -> String:
+	var r := str(h.get("reason", ""))
+	if r == "sacked" or r == "relegated":
+		return "%s, sacked" % str(h.get("final_pos_str", "?"))
+	return "%s, %s" % [str(h.get("final_pos_str", "?")), r]
+
+func _spell_colour(h: Dictionary) -> Color:
+	var r := str(h.get("reason", ""))
+	if r == "sacked" or r == "relegated":
+		return Color(0.92, 0.40, 0.36)   # a sacking reads red
+	return Color(0.80, 0.82, 0.88)
+
+## Real-render of the manager-career flow (#14): take a weak club, miss the board's target,
+## be sacked, render the JOB OFFERS list, take a job, render YOUR CAREER. PM98_MANAGER_SHOT.
+func _manager_shot() -> void:
+	var dir := OS.get_environment("PM98_SHOT_DIR")
+	if GameDB.leagues.is_empty():
+		print("MANAGER-SHOT no leagues loaded")
+		get_tree().quit()
+		return
+	var lg: Dictionary = GameDB.leagues[0]
+	var clubs := GameDB.clubs_in_league(lg["id"])
+	clubs.sort_custom(func(a, b): return _club_strength(a) < _club_strength(b))
+	_begin_career(lg, clubs[0])   # the weakest top-flight club -> likely to miss the target
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 999
+	while not _career.season_over():
+		_career.advance_week(rng)
+	var rv := _career.board_review()
+	if not bool(rv["sacked"]):
+		# Force the sacking branch for a deterministic capture if the minnows overachieved.
+		_career.sacked = true
+		_career.sack_reason = "missed"
+		_career.pending_offers = []
+	_show_career()
+	await _settle()
+	_generate_offers(false)
+	_show_job_offers()
+	await _settle()
+	_save_shot(dir, "job_offers.png")
+	var offer_count := _career.pending_offers.size()
+	_free_overlays()
+	if not _career.pending_offers.is_empty():
+		_accept_job(_career.pending_offers[0])
+		await _settle()
+	_show_manager_career()
+	await _settle()
+	_save_shot(dir, "manager_career.png")
+	print("MANAGER-SHOT done sacked=%s reason=%s offers=%d history=%d now=%s" % [
+		str(rv["sacked"]), str(rv["reason"]), offer_count,
+		_career.manager_history.size(), _career.club_name])
+	get_tree().quit()
 
 # ---- helpers -------------------------------------------------------------
 
