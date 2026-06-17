@@ -82,12 +82,28 @@ jumps it (for tests / screenshots). Verified by `app/tests/test_match_screen.gd`
 stays on-pitch every minute, scoreboard counts goals, ticker tracks lines) and by the
 `PM98_MATCH_SHOT` real-render path in `screenshot.yml` (Xvfb + software GL).
 
-### Honest scope (what is NOT a 1:1 port)
-- The original DATSIM is a **horizontally-scrolling 3/4 tile-scroll camera** that follows
-  the ball, composed from the `HIERBA` stadium tile atlas. The rebuild uses a clean fixed
-  broadcast pitch (drawn vectorially) instead of reversing that tile-projection/scroll
-  engine — the same pragmatic call made for the STADIUM pre-render. Reversing the scroll
-  camera + tile layout is the next refinement.
+### Scroll camera (T1 #4) — DONE
+The view is now a **horizontally-scrolling 3/4 camera that follows the ball**, like the
+original DATSIM (it was a fixed whole-pitch shot before). `_project(l,w)` windows the
+length axis around a camera focus `_cam_l`: `x = CENTER_X + (l - _cam_l)/VIEW_HALF * half`,
+so the visible window `_cam_l ± VIEW_HALF` (VIEW_HALF=0.34, ~1.5x zoom) fills the screen and
+both touchlines stay visible. `_cam_at(ball) = clamp(ball.l, VIEW_HALF, 1-VIEW_HALF)` pans
+the focus to track the ball, clamped so the view never scrolls past either goal (the goal
+line then sits at the screen edge). It is a **pure function of the minute** (it reads the
+already-eased `_ball_at` path), so `seek()` / the screenshot tests stay reproducible. The
+grass is now length-direction **mowing stripes drawn through the camera**, so they scroll
+with it (the visible cue that the camera is panning). Verified by `test_match_screen`
+(camera pans both ways 0.34 < 0.50 < 0.66; ball always on-screen; layout pure) and three
+`PM98_MATCH_SHOT` GL captures (left goal at kick-off, right goal at the goal minute).
+
+### Honest scope (what is still NOT a 1:1 port)
+- The pitch is still **drawn vectorially** (trapezoid + mowing stripes + line markings),
+  NOT composed from the real `HIERBA`/`CAMPINA` stadium **tile atlas** (decoded — grass
+  strips, crowd stands, `PC FUTBOL 5.0`/`LFP` ad-boards, plus a `HIERPREM.RAW` Premier
+  variant — see `tools/re/` and a render in the session notes). Skinning the pitch + a
+  crowd-stand / ad-board backdrop from that atlas (and the `CIELO1` sky) is the remaining
+  refinement; the exact tile-projection math in MANAGER.EXE is not yet reversed, so doing
+  it faithfully (not by guessing the layout) is the open piece.
 - Player **kit colour** is now REAL per-club: the sprite is split into a true-colour base
   layer (skin/boots/detail) + a kit-luma layer that MatchScreen tints to each club's actual
   kit colour, derived from the game's own kit art `app/art/kits/<club-id>.png` (the dominant

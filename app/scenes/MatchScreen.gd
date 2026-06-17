@@ -58,6 +58,13 @@ const BACK_BTN := Rect2(523, 448, 112, 26)
 
 const MIN_PER_SEC := 3.6      # match minutes per real second (~25s for a 90' match)
 
+# Scroll camera (T1 #4): the original DATSIM is a horizontally-scrolling 3/4 view that
+# follows the ball, not a fixed whole-pitch shot. The camera shows the length window
+# _cam_l ± VIEW_HALF (both touchlines always visible), zoomed to fill the screen width,
+# and pans _cam_l to track the ball - clamped so it never scrolls past either goal.
+const VIEW_HALF := 0.34
+var _cam_l := 0.5             # camera length-focus; a PURE function of the minute (see _cam_at)
+
 var _bar: Texture2D
 var _sky_tex: Texture2D
 var _pbase: Texture2D       # true-colour skin/boots/detail
@@ -299,6 +306,7 @@ func _build_formation() -> void:
 ## {side, x, y, scale, dir, anim, carrier} sorted far->near for painting.
 func _players_at(minute: float, ball: Dictionary) -> Array:
 	var out: Array = []
+	_cam_l = _cam_at(ball)   # camera tracks the ball before any _project below
 	# Whole block slides toward the ball's end of the pitch (both teams compact
 	# around the play); the attack DIRECTION (dir_sign) only sets facing, not the slide.
 	var ball_shift: float = (ball["l"] - 0.5) * TEAM_SHIFT
@@ -352,9 +360,18 @@ func _players_at(minute: float, ball: Dictionary) -> Array:
 func _project(l: float, w: float) -> Dictionary:
 	var y: float = lerpf(FAR_Y, NEAR_Y, w)
 	var half: float = lerpf(FAR_HALF, NEAR_HALF, w)
-	var x: float = CENTER_X + (l - 0.5) * half * 2.0
+	# Length is windowed around the camera focus: l == _cam_l ± VIEW_HALF maps to the
+	# trapezoid edges, so the visible window fills the screen and pans with _cam_l.
+	var x: float = CENTER_X + (l - _cam_l) / VIEW_HALF * half
 	var s: float = lerpf(FAR_SCALE, NEAR_SCALE, w)
 	return {"x": x, "y": y, "s": s}
+
+
+## Camera length-focus for a ball position: follows the ball, clamped so the view never
+## pans past either goal (the goal line then sits at the screen edge). Pure in the minute,
+## because _ball_at(minute) is — so seek()/tests stay reproducible.
+func _cam_at(ball: Dictionary) -> float:
+	return clampf(ball.get("l", 0.5), VIEW_HALF, 1.0 - VIEW_HALF)
 
 
 func _dir_col(angle_deg: float) -> int:
@@ -461,8 +478,9 @@ func _draw() -> void:
 	var s := _scale()
 	draw_set_transform(_origin(s), 0.0, Vector2(s, s))
 
-	_draw_pitch()
 	var ball := _ball_at(_minute)
+	_cam_l = _cam_at(ball)   # set the camera before the pitch markings project through it
+	_draw_pitch()
 	if not _slots.is_empty():
 		for p in _players_at(_minute, ball):
 			_draw_player(p)
@@ -473,20 +491,22 @@ func _draw() -> void:
 func _draw_pitch() -> void:
 	# sky band under the scoreboard
 	draw_rect(Rect2(0, 28, W, FAR_Y - 28), C_SKY_TOP, true)
-	# grass trapezoid as horizontal depth stripes (mowing bands)
-	var bands := 11
-	for i in bands:
-		var w0 := float(i) / bands
-		var w1 := float(i + 1) / bands
-		var yA: float = lerpf(FAR_Y, NEAR_Y, w0)
-		var yB: float = lerpf(FAR_Y, NEAR_Y, w1)
-		var hA: float = lerpf(FAR_HALF, NEAR_HALF, w0)
-		var hB: float = lerpf(FAR_HALF, NEAR_HALF, w1)
-		var col := C_GRASS_A if i % 2 == 0 else C_GRASS_B
-		var poly := PackedVector2Array([
-			Vector2(CENTER_X - hA, yA), Vector2(CENTER_X + hA, yA),
-			Vector2(CENTER_X + hB, yB), Vector2(CENTER_X - hB, yB)])
-		draw_colored_polygon(poly, col)
+	# Base grass: the full pitch-width trapezoid, always filling the screen (its width edges
+	# are camera-independent; only the length scrolls).
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(CENTER_X - FAR_HALF, FAR_Y), Vector2(CENTER_X + FAR_HALF, FAR_Y),
+		Vector2(CENTER_X + NEAR_HALF, NEAR_Y), Vector2(CENTER_X - NEAR_HALF, NEAR_Y)]), C_GRASS_B)
+	# Mowing stripes ALONG the length, projected through the camera so they scroll with it
+	# (the visible cue that the camera is panning to follow the ball).
+	var stripes := 16
+	for i in range(0, stripes, 2):
+		var a0 := _project(float(i) / stripes, 0.0)
+		var a1 := _project(float(i + 1) / stripes, 0.0)
+		var b1 := _project(float(i + 1) / stripes, 1.0)
+		var b0 := _project(float(i) / stripes, 1.0)
+		draw_colored_polygon(PackedVector2Array([
+			Vector2(a0["x"], a0["y"]), Vector2(a1["x"], a1["y"]),
+			Vector2(b1["x"], b1["y"]), Vector2(b0["x"], b0["y"])]), C_GRASS_A)
 	_draw_markings()
 
 
@@ -504,7 +524,8 @@ func _draw_markings() -> void:
 	var c0 := _project(0.5, 0.0)
 	var c1 := _project(0.5, 1.0)
 	draw_line(Vector2(c0["x"], c0["y"]), Vector2(c1["x"], c1["y"]), C_LINE, 2.0)
-	_draw_ellipse(_project(0.5, 0.5), 54.0, 26.0, C_LINE)
+	# centre-circle horizontal radius tracks the length zoom (vertical radius is width, unzoomed)
+	_draw_ellipse(_project(0.5, 0.5), 54.0 * (0.5 / VIEW_HALF), 26.0, C_LINE)
 	# penalty boxes + goals at each end
 	for end in [0.0, 1.0]:
 		var bl: float = 0.16 if end == 0.0 else 0.84

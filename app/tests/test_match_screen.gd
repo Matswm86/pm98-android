@@ -52,17 +52,35 @@ func _run() -> void:
 		var sat: float = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b))
 		ok = _assert(c != fb and sat > 0.2, "kit colour derived from kit art (%s sat=%.2f)" % [str(c), sat]) and ok
 
-	# Layout is pure + on-pitch for a sweep of minutes.
-	var all_in := true
+	# Layout is pure across a sweep of minutes; with the scroll camera (T1 #4) the ball
+	# stays on-screen (the camera follows it) and every player keeps its depth band, but
+	# players far from the ball legitimately scroll off the screen horizontally, so we no
+	# longer require all 22 to be on-screen at once.
+	var sane := true
+	var ball_onscreen := true
 	for mi in range(0, 91, 3):
 		var ball := scr._ball_at(float(mi))
-		all_in = all_in and ball["l"] >= -0.01 and ball["l"] <= 1.01 and ball["w"] >= -0.01 and ball["w"] <= 1.01
-		var ps := scr._players_at(float(mi), ball)
-		all_in = all_in and ps.size() == 22
+		sane = sane and ball["l"] >= -0.01 and ball["l"] <= 1.01 and ball["w"] >= -0.01 and ball["w"] <= 1.01
+		var ps := scr._players_at(float(mi), ball)   # also sets the camera focus for this minute
+		sane = sane and ps.size() == 22
+		var bp := scr._project(ball["l"], ball["w"])
+		if bp["x"] < 0.0 or bp["x"] > 640.0 or bp["y"] < 80.0 or bp["y"] > 480.0:
+			ball_onscreen = false
 		for p in ps:
-			if p["x"] < -40 or p["x"] > 680 or p["y"] < 80 or p["y"] > 480:
-				all_in = false
-	ok = _assert(all_in, "ball + 22 players stay on-pitch across all minutes") and ok
+			if p["y"] < 80.0 or p["y"] > 480.0 or not is_finite(float(p["x"])):
+				sane = false
+	ok = _assert(sane, "layout pure: 22 players each minute, all within the pitch depth band") and ok
+	ok = _assert(ball_onscreen, "the ball stays on-screen every minute (the camera follows it)") and ok
+
+	# The camera pans along the length to track the ball, both ways (clamped at the goals).
+	scr._players_at(0.0, scr._ball_at(0.0))           # kick-off: ball on the centre spot
+	var cam_kick: float = scr._cam_l
+	scr._players_at(58.0, scr._ball_at(58.0))         # the away goal drives the ball LEFT
+	var cam_left: float = scr._cam_l
+	scr._players_at(23.0, scr._ball_at(23.0))         # the home goal drives the ball RIGHT
+	var cam_right: float = scr._cam_l
+	ok = _assert(cam_left < cam_kick and cam_kick < cam_right,
+		"camera pans both ways to track the ball (%.2f < %.2f < %.2f)" % [cam_left, cam_kick, cam_right]) and ok
 
 	# Painter order is far->near (ascending y) so near players overdraw.
 	var ps0 := scr._players_at(40.0, scr._ball_at(40.0))
