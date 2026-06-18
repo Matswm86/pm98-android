@@ -378,6 +378,34 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   assignmarker 77 + relmatrix 128 + dispatch 366 + events 85 + predicates 147 + resolver tree/gate +
   trig 72 + engine ALL PASS; boots 0 SCRIPT ERROR). NEXT = slice B (field reset + facing + position,
   deps set_position_code DONE; needs the match+0x188+0x13c table model for +0xb0) then slice C.
+- **Stage 3 task 2 — FUN_005a3400 slice B (field reset + facing + position) PORTED + oracle-validated
+  DONE.** Ported into `Pm98Movement.gd` as `decide_slice_b(p, m)` (decomp lines 147-177 / disasm
+  0x5a374d..0x5a37f8, the `DAT_006d31c4 == 0` real-compute head): clear the per-tick movement scratch
+  (`+0x3b4/+0x48/+0x90/+0x54/+0x58/+0x68/+0x6c/+0x20/+0x24/+0x28/+4/+8/+0xc` = 0), set the s16 facing
+  `+0x34 & +0x64 = (((orient&1) ^ team) != 0) ? 0x8000 : 0` (180deg when defending the opposite side),
+  look up the formation-position value `+0xb0 = *(player+0x188 + 0x13c + player+0x2cc*4)` (0 when the
+  slot `+0x2cc` < 0) and set `+0x61 = 1` iff nonzero, then `set_position_code(player+0x2bc==0 ? 0x1e : 0)`
+  (DONE leaf). **TWO disasm-verified corrections to the 2026-06-18 slice-B note** (the decompile/handoff
+  were loose; the disasm is authoritative): (1) the zeroed velocity-scratch is `+0x20/+0x24/+0x28` ONLY,
+  NOT "+0x20..+0x30" -- `+0x2c/+0x30` are untouched here (and set_position_code's remap-clear never fires:
+  pos_code is 0 or 0x1e and POS_REMAP_LUT[0]==0 / POS_REMAP_LUT[0x1e]==0x1e both map to self); (2) `+0x61`
+  is only SET (to 1) when the table value is nonzero -- the binary `je`-skips otherwise, so it is NEVER
+  cleared here. STRUCT MODEL: player+0x188 -> `_ref(p, 0x188)` = the team/formation struct, its int32
+  table at +0x13c; player+0x18c -> the match (== `m`). Pure integer (NO RNG/LUT/ftol; set_position_code
+  reads only the static POS_REMAP_LUT). **Oracle trick (NOT the slice-A replay path -- slice B IS the
+  gated body):** `run_decideB_oracle.sh` drives the WHOLE real FUN_005a3400 with `DAT_006d31c4 = 0` (real
+  compute) and `match+0x448 = 8`, so the switch `cmp eax,0x7; ja 0x5a44ba` falls straight to the DEFAULT
+  exit (clean RET) immediately AFTER slice B -- slice C never runs, no LUT/RNG, and the default exit does
+  NOT rewrite facing. FUN_005bbf10 (queue-grow, called by slice B's head AND the leading FUN_005ed870
+  no-op) is STUBBED; FUN_005a5430 runs FOR REAL (reads the mapped .data LUT). Slice A executes as the
+  HALT-free prefix but writes only +0x1e0..+0x224/+0x3a4 (not read here). Banked `specs/decideB_oracle.txt`
+  (5 fixtures: home_on facing0/pos0/+0xb0 set, away_on facing0x8000/+0xb0=0/+0x61-seed-survives,
+  off_pitch facing0/pos0x1e/+0x2c+0x30-survive, neg_idx idx<0/+0x61-seed-survives, away_t1_big high-bit
+  +0xb0=0x7fff0000). Locked by `test_decideB.gd` (**100 checks, ALL PASS**, 20 fields/fixture parsed by
+  abs addr). No regression (decideB 100 + decideA 78 + decideset 84 + decidehelper 13 + movement 60 +
+  selectactive 24+125 + marktarget 8 + assignmarker 77 + relmatrix 128 + dispatch 366 + events 85 +
+  predicates 147 + resolver tree/gate + trig 72 + engine ALL PASS; boots 0 SCRIPT ERROR). NEXT = slice C
+  (the set-piece switch on match+0x448, dep set_engagement DONE).
 
 ### FUN_005a3400 DECODED STRUCTURE (the per-player DECIDE; decoded 2026-06-18 -- cite, don't re-derive)
 `__fastcall(ECX=player)`. The per-player movement-target / set-piece-positioning computer. **NO net
@@ -397,11 +425,13 @@ Real-compute structure (DAT_006d31c4==0):
    player+0x1e0..+500) + compose/planar from player+0x228/+0x230. Copy the 6-int target to
    player+0x210; seed bbox player+0x218=0xffff0000 / +0x224=0x12c0000; then 12 min/max clamps build
    the bbox `player+0x210..+0x224` from +0x1e0..+500 and +0x1ec..+500.
-2. **Field reset + facing + position (lines ~147-177):** zero player +0x3b4/+0x48/+0x90/+0x54/+0x58/
-   +0x68/+0x6c/+0x20..+0xc/+4/+8; facing `player+0x34 & +0x64` = `(side ? 0x8000 : 0)` (180deg if
-   away); `player+0xb0` from a table (match+0x188 +0x13c + player+0x2cc*4), `player+0x61=1` if
-   nonzero; `FUN_005a5430(player+0x2bc==0 ? 0x1e : 0)` (set position code -- PORTED as
-   `Pm98Movement.set_position_code`; LUT &DAT_00665208 extracted into POS_REMAP_LUT, DONE).
+2. **Field reset + facing + position (lines ~147-177): PORTED `decide_slice_b`, oracle-pinned.** zero
+   player +0x3b4/+0x48/+0x90/+0x54/+0x58/+0x68/+0x6c/+0x20/+0x24/+0x28/+4/+8/+0xc (disasm-verified:
+   +0x20/+0x24/+0x28 only, NOT +0x2c/+0x30); facing `player+0x34 & +0x64` = `(((orient&1)^team) ? 0x8000
+   : 0)` (180deg if defending the opposite side); `player+0xb0` from the team-struct table
+   `*(player+0x188 + 0x13c + player+0x2cc*4)` (0 when +0x2cc < 0), `player+0x61=1` if nonzero (SET only,
+   never cleared); `FUN_005a5430(player+0x2bc==0 ? 0x1e : 0)` (PORTED `set_position_code`; neither code
+   remaps so +0x2c/+0x30 stay). The +0x188 +0x13c table is modelled as a `_ref(p, 0x188)` struct field.
 3. **Set-piece switch on `match+0x448` (lines ~179-end):** cases 2 / 3 / 4+5 / default. Each branches
    on "am I the designated taker" (`player == match+0x438`). The taker path: stamina `player+0x48 =
    (taker-flag ? 0x2d0 : 0) + 0xb4` (taker-flag = teaminfo(+0x184)+0x2ee set AND phase0 via 5943b0
@@ -414,8 +444,9 @@ Real-compute structure (DAT_006d31c4==0):
 +0x34/+0x64 (facing s16), +0x40 (pos), +0x48, +0x54/+0x58, +0x61, +0x68/+0x6c, +0x80, +0x90, +0xb0,
 +0x1e0..+0x224 (target + bbox), +0x3a4, +0x3b4. **Slice plan:** (A) prologue+bbox = DONE
 (`decide_slice_a`, oracle-pinned via the replay path); (B) reset+facing+pos (deps FUN_005a5430 +
-POS_REMAP_LUT DONE; still needs the match+0x188 +0x13c table for +0xb0); (C) the switch case-by-case
-(dep FUN_0058eca0 DONE). Slice A wired; B/C remain.
+POS_REMAP_LUT DONE; the player+0x188 +0x13c table is modelled as a `_ref(p, 0x188)` struct -- DONE,
+`decide_slice_b`, oracle-pinned via the switch-default RET); (C) the switch case-by-case
+(dep FUN_0058eca0 DONE). Slices A+B wired; C remains.
 **Oracle:** slice A used the REPLAY path (DAT_006d31c4!=0) for a clean RET with no stubs/LUT. Slices
 B/C run real callees: set up a player struct + match struct + teaminfo; stub FUN_005bbf10 (queue-grow)
 as the 5b8f20 oracle did; inject ftol + cos/atan LUT; read back the mutated player fields.

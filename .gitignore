@@ -75,3 +75,4 @@ tools/re/specs/_dbg_vel.*
 tools/re/specs/_smoke.*
 tools/re/specs/_lut_membts.txt
 tools/re/specs/_decideA_run.*
+tools/re/specs/_decideB_run.*

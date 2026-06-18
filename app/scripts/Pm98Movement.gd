@@ -870,3 +870,55 @@ static func decide_slice_a(p: Dictionary, m: Dictionary) -> void:
 	_bbox_fold(p, 0x210, 0x21c, _g(p, 0x1ec))
 	_bbox_fold(p, 0x214, 0x220, _g(p, 0x1f0))
 	_bbox_fold(p, 0x218, 0x224, _g(p, 0x1f4))
+
+
+# ---- FUN_005a3400 the per-player DECIDE, slice B (field reset + facing + position) ----
+# The DAT_006d31c4==0 real-compute head (decomp lines 147-177 / disasm 0x5a374d..0x5a37f8):
+# clear the per-tick movement scratch, set the s16 facing (180deg=0x8000 when defending the
+# OPPOSITE side), look up the formation-position value +0xb0 from the team struct's +0x13c
+# table (indexed by the squad slot player+0x2cc), then stamp the position code via
+# set_position_code. The leading FUN_005bbf10(player+0x3b0,0) (queue-grow) is a no-op (Array
+# self-grows). NO RNG/LUT/ftol (set_position_code reads only the static POS_REMAP_LUT).
+#
+# DISASM-VERIFIED CORRECTIONS vs the 2026-06-18 slice-B note:
+#   * the zeroed velocity-scratch is +0x20/+0x24/+0x28 ONLY -- NOT "+0x20..+0x30". +0x2c/+0x30
+#     are untouched here (and set_position_code's remap-clear never fires: pos_code is 0 or
+#     0x1e, and POS_REMAP_LUT[0]==0 / POS_REMAP_LUT[0x1e]==0x1e both map to self -> no clear).
+#   * +0x61 is only SET to 1 when the table value is nonzero; the binary `je`-skips otherwise,
+#     so the port leaves +0x61 UNTOUCHED on a zero/absent entry (it is never cleared here).
+#
+# STRUCT MODEL: player+0x188 -> _ref(p, 0x188) = the player's team/formation struct; the
+# position table is its int32 array at +0x13c, indexed by player+0x2cc. A negative +0x2cc
+# yields 0 (no entry). player+0x18c -> the match (== the m arg). Facing (a WORD write at +0x34
+# / +0x64) is stored as the raw 16-bit pattern 0x8000/0; downstream readers apply _s16.
+# Oracle-pinned bit-for-bit by tools/re/run_decideB_oracle.sh -> specs/decideB_oracle.txt,
+# locked in test_decideB.gd.
+
+
+## FUN_005a3400 slice B. Mutates the player `p` in place (m = the player's +0x18c match).
+static func decide_slice_b(p: Dictionary, m: Dictionary) -> void:
+	p[0x3b4] = 0
+	p[0x48] = 0
+	p[0x90] = 0
+	p[0x54] = 0
+	p[0x58] = 0
+	# facing: 0x8000 (180deg) when (orient&1) != team, else 0; written to +0x34 and +0x64 (s16).
+	var facing := 0x8000 if ((_g(m, 0x19a0) & 1) ^ _g(p, 0x2b8)) != 0 else 0
+	p[0x34] = facing
+	p[0x64] = facing
+	# +0xb0 = team_struct(+0x188)[+0x13c + idx*4], or 0 when the slot idx (+0x2cc) < 0.
+	var idx := Pm98Trig._i32(_g(p, 0x2cc))
+	var val := _g(_ref(p, 0x188), 0x13c + idx * 4) if idx >= 0 else 0
+	p[0xb0] = val
+	if val != 0:                                            # binary: je-skip -> +0x61 NOT cleared
+		p[0x61] = 1
+	p[0x68] = 0
+	p[0x6c] = 0
+	p[0x20] = 0
+	p[0x24] = 0
+	p[0x28] = 0
+	p[0x4] = 0
+	p[0x8] = 0
+	p[0xc] = 0
+	# set_position_code(0x1e if off-pitch else 0). Neither code remaps -> +0x2c/+0x30 unchanged.
+	set_position_code(p, 0x1e if _g(p, 0x2bc) == 0 else 0)
