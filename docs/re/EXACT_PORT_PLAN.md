@@ -68,14 +68,32 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   isolated origin-coord tree, the draw alignment yields saves/misses, never a goal (provably:
   branch A needs thr<=350 AND thr>895 simultaneously). It validates end-to-end at Stage 3 when real
   matches score goals.
-- **NEXT = Stage 3 (driver + movement + scoring predicates).** Driver `00598740` + the movement
-  block (491-607) + the trig-LUT initializer (FPU-computed at boot; no decompiled fn writes
-  `0x6d31c8` yet -- find via the boot-path call graph / a data-xref on the LUT store sites). The
-  dispatcher `005966d0` (outcome 1-7 -> event enqueue) + the scoring predicates
-  `0058ede0/0058f100/0058fbe0/0058f140` were originally slated for 2c but are **folded into Stage
-  3**: they consume REAL ball coordinates (goal-box height bands, post/bar collision, keeper-reach
-  geometry), so they cannot be oracle-exercised in the isolated origin-coord tree -- they validate
-  with the driver + LUT via full-match event-stream parity (the big kill-test).
+- **Stage 3 task 1 (trig-LUT initializer DECODED + PORTED + oracle-validated) DONE.** The boot
+  initializer is `FUN_005edff0` (disasm 0x5edff0..0x5ee073), called once from the match-subsystem
+  init `0x5c36e0` (guard flag `0x674ea4`). It fills TWO tables: the cos LUT `@0x6d31c8` (4096 int32,
+  `COS[k]=ftol(cos(k*C1)*C2)`, k=0..4095, written DOWNWARD from k=4095) and the SEPARATE arctan LUT
+  `@0x6d71c8` (8193 int16, `ATAN[j]=ftol(atan(8j*C3)*C4)`, j=0..8192). Constants are the EXACT
+  8-byte .rdata doubles 0x63a040/48/50/58: C1=2pi/4096 (=0.0015339807878856446, NOT the naive
+  `TAU/4096` which is ~10 ULP off), C2=65536.0, C3=1/65536, C4=0x4000/(pi/2). `ftol` is the MSVC
+  float->long cast (`jmp *0x6233a4`) = TRUNCATION toward zero, NOT round-half (corrects the prior
+  session's round() guess; it only happened to agree). Angle unit = 0x10000 = full circle (cos table
+  indexed by angle>>4). **Bit-exactness proven** (`tools/re/lut_oracle.c`): the binary's real x87
+  `fcos`/`fpatan` under PC=64 AND PC=53 both equal 64-bit-double `cos`/`atan2` truncation for ALL
+  4096+8193 entries (0 differ) -- so GDScript's `int(cos()*65536)` reproduces it exactly. Ported to
+  `app/scripts/Pm98Trig.gd` (LUT build via `_static_init` + the reader cluster: `mul16`/`muladd16`/
+  `ratio16` fixed-point, `cos_a`/`sin_a`, `polar_vec` FUN_005ee0f0, `rotate_vec` FUN_005ee670,
+  `atan_angle` FUN_005ee080, `scale_vec3` FUN_005ee170). GDScript pitfalls handled: `>>` rejects
+  negative operands and `/` truncates-toward-zero, but x86 `sar`/`shrd` FLOOR -- so an `_asr`
+  floor-shift helper backs every fixed-point `>>`. Locked by `app/tests/test_trig_lut.gd` (30 checks:
+  every LUT entry vs banked `tools/re/specs/{cos,atan}_lut.txt` + checksums + structural invariants +
+  reader vectors). No regression (tree/gate/engine PASS; app boots clean, 0 SCRIPT ERROR).
+- **NEXT = Stage 3 tasks 2-3 (driver + movement + scoring predicates).** Driver `00598740` +
+  `005983f0`/`00598690` + the movement block (resolver 491-607) -- now unblocked, real ball
+  coordinates come from the `Pm98Trig` LUT. Then the dispatcher `005966d0` (outcome 1-7 -> event
+  enqueue) + the scoring predicates `0058ede0/0058f100/0058fbe0/0058f140` (goal-box height bands,
+  post/bar collision, keeper-reach geometry -- the keeper save uses `atan_angle`). These consume REAL
+  coordinates so they validate via full-match event-stream parity (fixed seed + fixed squads ->
+  identical event stream vs the original, N>=50 = the big kill-test), not the isolated origin tree.
 
 ## Already decoded — cite + port, don't redo (see match_engine_re.md for detail)
 - RNG `FUN_005ec250` (MSVC LCG, state @0x6d3184) — already exact as `Pm98Rng`. Per-mil idiom

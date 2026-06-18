@@ -221,6 +221,18 @@ decoded). Note: `FUN_005ee0f0`/`005ee670` read the sin/cos LUT `0x6d31c8`; `FUN_
 SEPARATE arctan LUT `0x6d71c8` and is off this path. Reproduce: `tools/re/check_lut_invariance.sh`
 (PASS). Branch-covering ground truth: `tools/re/run_tree_oracle.sh` -> `specs/tree_oracle_streams.txt`.
 
+### Stage 3 task 1 — trig-LUT initializer DECODED (2026-06-18): the boot table is `FUN_005edff0`
+The sin/cos + arctan LUTs are FPU-computed at the match-subsystem init (`FUN_005edff0` @0x5edff0,
+called once from 0x5c36e0 under guard `0x674ea4`). cos LUT `@0x6d31c8` = 4096 int32,
+`COS[k]=ftol(cos(k*C1)*C2)`; arctan LUT `@0x6d71c8` = 8193 int16, `ATAN[j]=ftol(atan(8j*C3)*C4)`.
+Constants are the EXACT .rdata doubles (C1=2pi/4096=0.0015339807878856446 NOT naive TAU/4096,
+C2=65536, C3=1/65536, C4=0x4000/(pi/2)); `ftol` truncates toward zero (the round() guess was wrong).
+Angle unit 0x10000=full circle. Proven bit-exact (real x87 fcos/fpatan == 64-bit double trunc for all
+12289 entries, `tools/re/lut_oracle.c`) and ported to `app/scripts/Pm98Trig.gd` with the reader
+cluster (FUN_005ee0f0/005ee670/005ee080/005ee170 + the 16.16 helpers). Locked by
+`app/tests/test_trig_lut.gd` (30 checks vs banked `specs/{cos,atan}_lut.txt`). This unblocks Stage-3
+movement (real ball coordinates). See [`EXACT_PORT_PLAN.md`](EXACT_PORT_PLAN.md) STATUS.
+
 ## Open / next (active)
 - **EXACT engine + tactics port — see [`EXACT_PORT_PLAN.md`](EXACT_PORT_PLAN.md).** Mats wants
   the calibrated `MatchEngine.gd` model and the ours `Tactics.gd` lever model REPLACED by
