@@ -522,9 +522,29 @@ static func _holds_ball(m: Dictionary, opp: Array, qi: int) -> bool:
 #   at the end sets the NEW active's +0x5c. Disasm-verified 0x5b8f20 (gate/6/4/else) + the
 #   final flag set 0x5b939f. POINTER->INDEX: ctx[0x168] / match+0x438 are player indices
 #   (-1 = none); the return is that index. NO RNG on these paths.
-#   DEFERRED to slice 5b (own oracle): phase 2 (a static LUT at 0x6392c8 indexed by
-#   player+0x2c8) and phase 5/7 (a persistent set-piece queue at ctx+0x208/+0x20c built on
-#   Win32 GlobalReAlloc = FUN_005bbf10 + memmove -- needs import stubs in the oracle).
+#
+# Slice 5b COMPLETES FUN_005b8f20 with its two remaining branches (no RNG; oracle-validated
+# by run_selectactive5b_oracle.sh -> test_selectactive5b.gd):
+#   * phase 2 -> the highest-priority on-pitch player by a STATIC priority table. The binary
+#     reads `LUT[player+0x2c8]` from `&DAT_006392c8` (an int32 .rdata table, extracted bit-
+#     for-bit into PHASE2_LUT; 20 entries -- doubles begin at 0x639318). The comparison is
+#     `LUT[active] <= LUT[cand]`, so a TIE keeps the LATER on-pitch player (strictly unlike
+#     phase 4's `<`, which keeps the first). Disasm 0x5b91xx: `mov ecx,[ecx*4+0x6392c8]`.
+#   * phase 5/7 -> a PERSISTENT set-piece queue (ctx+0x208 buffer / ctx+0x20c count). On an
+#     EMPTY queue it BUILDS (append every player in order), runs a verbatim selection pass,
+#     computes a flag, maybe truncates to 1, maybe zeroes a bookkeeping field; then EVERY
+#     call (build or not) POPS the front. CRITICAL: the build pass is NOT a clean descending
+#     sort -- the binary caches queue[i] once per outer iteration (edi @5b91db) and the
+#     comparator keeps comparing that CACHED value even after swaps move it, so the exact
+#     swap sequence (not "sort by key") is what reproduces it (_select_phase57). key =
+#     player+0x3a0 (+ player+0x388 when phase 7), signed; off-pitch (cached +0x2bc == 0)
+#     always swaps. flag (ctx+0x2ed) = (ctx+0x2ee != 0) AND sub-phase in {0,2,4}
+#     (FUN_005943f0/d0/b0 on match+0x468 -> +0xfa0). Truncate to 1 unless (flag == 0 AND
+#     match+0x19a0 == 4); zero every player's +0x8c when bVar2 (all +0x8c were != 0) OR
+#     match+0x19a0 != 4. QUEUE MODEL: ctx["queue"] = Array of player INDICES (the binary's
+#     int32 pointer buffer); its size IS the count; it persists across calls so pops cycle.
+#     The Win32 grower FUN_005bbf10 is a no-op (the Array self-grows); the pop's memmove
+#     down-shift == pop_front. The oracle stubs FUN_005bbf10 and injects a faithful memmove.
 static func select_active(ctx: Dictionary) -> int:
 	var players: Array = ctx.get("players", [])
 	var m: Dictionary = ctx.get(0x138, {})
@@ -545,11 +565,11 @@ static func select_active(ctx: Dictionary) -> int:
 
 	var phase := _g(m, 0x448)
 	if phase == 7 or phase == 5:
-		push_error("Pm98Movement.select_active: phase 5/7 set-piece queue not ported yet (slice 5b)")
+		_select_phase57(ctx, players, m, phase)
 	elif phase == 4:
 		_select_phase4(ctx, players)
 	elif phase == 2:
-		push_error("Pm98Movement.select_active: phase 2 LUT selection not ported yet (slice 5b)")
+		_select_phase2(ctx, players)
 	elif phase == 6:
 		ctx[0x168] = 0 if players.size() > 0 else -1
 	else:
@@ -585,3 +605,97 @@ static func _argmax_field(players: Array, off: int, ex1: int, ex2: int) -> int:
 static func _set_flag5c(players: Array, idx: int, val: int) -> void:
 	if idx >= 0 and idx < players.size():
 		players[idx][0x5c] = val
+
+
+# --- slice 5b: phase 2 (static priority LUT) + phase 5/7 (set-piece queue) ---
+
+## The static priority table `&DAT_006392c8` (int32 .rdata), extracted bit-for-bit from
+## MANAGER.EXE (file offset 0x2380c8; the next 8 bytes 0x639318 are doubles, so it is
+## exactly 20 entries). Indexed by player+0x2c8 (the position code copied from the squad
+## struct at *(player+0x3b8) + 0x44); the value is the phase-2 selection priority.
+const PHASE2_LUT := [0, 0, 0, 0, 0, 0, 0, 1, 2, 20, 3, 4, 18, 14, 16, 5, 12, 10, 6, 0]
+
+
+## phase 2: active = the on-pitch player with the highest LUT[+0x2c8]. The binary's test is
+## `LUT[active] <= LUT[cand]` (not `<`), so on a tie the LATER on-pitch player wins.
+static func _select_phase2(ctx: Dictionary, players: Array) -> void:
+	var best := -1
+	for i in players.size():
+		if _g(players[i], 0x2bc) == 0:
+			continue
+		if best < 0 or _lut2(players[best]) <= _lut2(players[i]):
+			best = i
+	ctx[0x168] = best
+
+
+## PHASE2_LUT[player+0x2c8]. Position codes are 0..18 in practice; an out-of-range code
+## would read into the trailing doubles in the binary, which never happens in a real match.
+static func _lut2(p: Dictionary) -> int:
+	var idx := _g(p, 0x2c8)
+	if idx < 0 or idx >= PHASE2_LUT.size():
+		return 0
+	return int(PHASE2_LUT[idx])
+
+
+## phase 5/7: the persistent set-piece queue. Builds on an empty queue (then truncates/zeroes
+## per the flag), and EVERY call pops the front into the active slot. See the slice-5b block
+## comment for the full decode. Mutates ctx (incl. ctx["queue"]) and the players in place.
+static func _select_phase57(ctx: Dictionary, players: Array, m: Dictionary, phase: int) -> void:
+	var queue: Array = ctx.get("queue", [])
+	if queue.size() == 0:
+		# BUILD: append every player in order; bVar2 = "every player had +0x8c != 0".
+		var all_8c_nonzero := true
+		for i in players.size():
+			if _g(players[i], 0x8c) == 0:
+				all_8c_nonzero = false
+			queue.append(i)
+		# Selection pass -- VERBATIM: queue[i] (`v`) is cached once per outer iteration and
+		# the comparator keeps using it even after swaps move it (binary edi @5b91db). This
+		# is NOT a clean descending sort; the exact swap sequence is the observable.
+		var count := queue.size()
+		for i in count:
+			var v: int = queue[i]
+			for j in range(i + 1, count):
+				var do_swap := false
+				if _g(players[v], 0x2bc) == 0:                       # cached v off-pitch -> swap
+					do_swap = true
+				elif _s32lt(_key57(players[v], phase), _key57(players[queue[j]], phase)):
+					do_swap = true
+				if do_swap:
+					var t: int = queue[i]
+					queue[i] = queue[j]
+					queue[j] = t
+		# +0x2ed flag = (ctx+0x2ee != 0) AND sub-phase (match+0x468 -> +0xfa0) in {0,2,4}.
+		var flag := 0
+		if _g(ctx, 0x2ee) != 0:
+			var sub := _g(_ref(m, 0x468), 0xfa0)
+			if sub == 0 or sub == 2 or sub == 4:
+				flag = 1
+		ctx[0x2ed] = flag
+		# Truncate the queue to 1 unless (flag == 0 AND match+0x19a0 == 4).
+		if (flag != 0 or _g(m, 0x19a0) != 4) and queue.size() > 1:
+			queue.resize(1)
+		# Zero every player's +0x8c when bVar2 OR match+0x19a0 != 4.
+		if all_8c_nonzero or _g(m, 0x19a0) != 4:
+			for p in players:
+				p[0x8c] = 0
+	# POP the front (every call): active = queue[0], shift down, count--.
+	if queue.size() > 0:
+		ctx[0x168] = queue[0]
+		queue.pop_front()
+	else:
+		ctx[0x168] = -1
+	ctx["queue"] = queue
+
+
+## phase 5/7 sort key: player+0x3a0 (+ player+0x388 when phase 7), int32-wrapped (x86 add).
+static func _key57(p: Dictionary, phase: int) -> int:
+	var k := Pm98Trig._i32(_g(p, 0x3a0))
+	if phase == 7:
+		k = Pm98Trig._i32(k + Pm98Trig._i32(_g(p, 0x388)))
+	return k
+
+
+## Signed 32-bit less-than (the binary's SBORROW4 / setl comparator).
+static func _s32lt(a: int, b: int) -> bool:
+	return Pm98Trig._i32(a) < Pm98Trig._i32(b)

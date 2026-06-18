@@ -265,6 +265,39 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   insertion-sort descending by +0x3a0(+0x388 if phase 7), the +0x2ed/+0x2ee flag via `FUN_005943f0/d0/b0`, pop
   the front per call; the oracle needs import stubs + a real injected `memmove` + a pre-seeded queue buffer).
   Both currently `push_error` + leave active = -1 in `select_active`.
+- **Stage 3 task 2 — movement slice 5b (phase 2 LUT + phase 5/7 set-piece queue) PORTED + oracle-validated DONE.**
+  COMPLETES `FUN_005b8f20`: the two branches slice 5a deferred (no RNG). **phase 2** ->
+  `Pm98Movement._select_phase2`: active = the on-pitch player with the highest `LUT[player+0x2c8]`,
+  where `LUT` is the STATIC int32 .rdata table `&DAT_006392c8` extracted bit-for-bit into
+  `PHASE2_LUT` (20 entries `[0,0,0,0,0,0,0,1,2,20,3,4,18,14,16,5,12,10,6,0]`; file offset
+  0x2380c8, doubles begin at 0x639318). The compare is `LUT[active] <= LUT[cand]` so a TIE keeps
+  the LATER on-pitch player (proven by the `p2_tie_last` + `p2_allzero` fixtures; strictly unlike
+  phase 4's `<`). +0x2c8 = `*(player+0x3b8)+0x44` (the squad position code, 0..18). **phase 5/7**
+  -> `Pm98Movement._select_phase57`: the persistent set-piece queue (ctx+0x208 buffer / ctx+0x20c
+  count, modelled as `ctx["queue"]` = Array of player INDICES whose size IS the count, persisting
+  across calls). Empty queue -> BUILD (append every player), a selection pass, the +0x2ed flag, a
+  maybe-truncate-to-1, a maybe-zero-+0x8c; then EVERY call POPS the front. **CRITICAL discovery
+  (disasm 0x5b91db): the build pass is NOT a clean descending sort** -- the binary caches
+  `queue[i]` once per outer iteration (`edi`) and the comparator keeps comparing that CACHED value
+  even after swaps move it, so the exact swap sequence is the observable (e.g. keys
+  [0x100,0x400,0x200,0x300] build to order [P3,P2,P1,P0], NOT sorted). `_select_phase57` reproduces
+  the verbatim double loop. key = `player+0x3a0` (+ `player+0x388` when phase 7), signed; off-pitch
+  (cached +0x2bc == 0) always swaps (sinks). flag (ctx+0x2ed) = (ctx+0x2ee != 0) AND sub-phase
+  (match+0x468 -> +0xfa0) in {0,2,4} (`FUN_005943f0/d0/b0`, ECX=match). Truncate to 1 unless
+  (flag == 0 AND match+0x19a0 == 4); zero every player's +0x8c when bVar2 (all +0x8c were != 0) OR
+  match+0x19a0 != 4. Oracle `tools/re/run_selectactive5b_oracle.sh` drives the REAL `FUN_005b8f20`:
+  the Win32 grower `FUN_005bbf10` (GlobalReAlloc) is STUBBED (cdecl no-op; ctx+0x208 pre-pointed at
+  0x270000 so appends land there) and the IAT memmove `call ds:0x6233d4` is repointed to a FAITHFUL
+  injected memmove @0x252100 (forward `rep movsb`, preserves esi/edi/ebx -- the caller re-reads
+  esi=&ctx+0x208 right after). NO trig LUT (no float path). Banked `specs/selectactive5b_oracle.txt`
+  (10 fixtures: 4 phase-2 + 6 phase-5/7 covering build/truncate, phase-7 +0x388 key, off-pitch sink,
+  the flag=1+predicate path, build-no-truncate full-order, and pure-pop+memmove). Locked by
+  `app/tests/test_selectactive5b.gd` (125 checks: active + queue count + surviving buffer[0..count-1]
+  + flag + all +0x5c + all +0x8c, bit-exact; the binary never erases the buffer past `count`, so the
+  queue is compared only over the valid prefix). No regression (selectactive5b 125 + selectactive 24 +
+  movement 60 + marktarget 8 + assignmarker 77 + relmatrix 128 + dispatch 366 + events 85 +
+  predicates 147 + resolver tree/gate + trig 30 + engine PASS; boots 0 SCRIPT ERROR). **`FUN_005b8f20`
+  is now COMPLETE (all 5 phase branches + the forced gate, every path oracle-pinned).**
 - **NEXT = Stage 3 task 2 (driver + the rest of movement physics).** Predicates + event-queue + dispatcher +
   the nearest-to-ball selector + the relationship matrix/roles + the marking-target leaf + the marker-assignment PASS are now ported. The 38 movement decompiles are extracted to
   `docs/re/move/` (largest: player-move/AI `0x5b73a0` 4834B, phase-selector `0x5b8f20` 1169B, relationship-
@@ -275,8 +308,9 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   the two player-move fns `0x5b70e0`/`0x5b73a0`, and `0x5b6ee0` from 005983f0 -- all in `docs/re/move/`) --
   real ball coordinates come from the `Pm98Trig` LUT. Suggested next bottom-up order: `0x5b8690` (matrix) DONE ->
   `0x5b36f0` (mark-target leaf) DONE -> `0x5b94f0` (marker-assignment PASS) DONE ->
-  `0x5b8f20` (phase selector) gate/6/4/else DONE (slice 5a); phase 2 + phase 5/7 queue = slice 5b. Then
-  the player-move fns (`0x5b70e0`/`0x5b73a0`, watch RNG order) then the driver `00598740`. The
+  `0x5b8f20` (phase selector) DONE -- gate/6/4/else (slice 5a) + phase 2 + phase 5/7 queue (slice 5b),
+  ALL 5 branches oracle-pinned. NEXT bottom-up: the two player-move/AI fns `0x5b70e0` (692B) +
+  `0x5b73a0` (4834B, WATCH RNG call order), then the driver `00598740`. The
   dispatcher (`005966d0`) it calls is DONE. Inject
   the LUT for the movement oracle via `tools/re/emit_lut_membts.py` (same trick `run_keeper_oracle.sh` /
   `run_dispatch_oracle.sh` use). **KILL-TEST** for task 2 = full-match event-stream parity (fixed seed +
