@@ -803,3 +803,70 @@ static func set_engagement(p: Dictionary, target_idx: int, players: Array) -> vo
 	if _g(m, 0x448) == 0 and _g(m, 0x460) != 0 and int(m.get(0x43c, -1)) != target_idx:
 		m[0x460] = 0
 		m[0x43c] = -1
+
+
+# ---- FUN_005a3400 the per-player DECIDE, slice A (prologue + bbox) --------------------
+# The first ~100 instructions of the per-player movement-target computer: set the goal-X
+# anchor, the two target endpoints, and the movement bounding box, all oriented by side.
+# Reads match +0x1820 (goal-X scale) / +0x19a0 (orient bit) and player +0x2b8 (team) /
+# +0x2bc (on-pitch flag) + the on-pitch formation slots +0x1f8/+0x204/+0x228/+0x230. Pure
+# integer (mirror / compose / per-axis min-max sort), NO RNG / LUT / ftol. The leading
+# FUN_005ed870 (the +0x38 replay-buffer housekeeping) and the trailing DAT_006d31c4 gate
+# (slices B/C, or the replay copy) are OUT OF SCOPE here. Oracle-pinned bit-for-bit by
+# tools/re/run_decideA_oracle.sh -> specs/decideA_oracle.txt, locked in test_decideA.gd.
+
+
+## Signed-int32 min into corner[lo] / max into corner[hi] (the binary's `if (b < a)` clamps).
+static func _bbox_fold(p: Dictionary, lo: int, hi: int, v: int) -> void:
+	if v < int(p[lo]):
+		p[lo] = v
+	if int(p[hi]) < v:
+		p[hi] = v
+
+
+## FUN_005a3400 slice A. Mutates the player `p` in place (m = the player's +0x18c match).
+static func decide_slice_a(p: Dictionary, m: Dictionary) -> void:
+	var orient := _g(m, 0x19a0)
+	var team := _g(p, 0x2b8)
+	var x1820 := _g(m, 0x1820)
+	var gx := goal_target_x(orient, x1820, team)
+	p[0x3a4] = gx
+
+	var src: Array                                          # the 6-int target-box source
+	if _g(p, 0x2bc) == 0:
+		# OFF-PITCH: both endpoints sit on the goal line; the box is an explicit default.
+		p[0x1e0] = gx; p[0x1e4] = 0; p[0x1e8] = 0
+		p[0x1ec] = gx; p[0x1f0] = 0; p[0x1f4] = 0
+		var u9 := (orient & 1) ^ team
+		var s3 := Pm98Trig._i32(0x108000 - x1820)
+		var s0 := Pm98Trig._i32(-x1820)
+		if u9 != 0:
+			s3 = Pm98Trig._i32(-s3)
+			s0 = x1820
+		if s3 < s0:                                         # ensure s0 = min, s3 = max
+			var t := s0; s0 = s3; s3 = t
+		src = [s0, Pm98Trig._i32(0xffebd70b), 0, s3, 0x1428f5, 0]
+	else:
+		# ON-PITCH: endpoints + box from the player's formation slots, mirrored to its side.
+		var v1: Array = mirror_to_side(orient, team, [_g(p, 0x1f8), _g(p, 0x1fc), _g(p, 0x200)])
+		p[0x1e0] = v1[0]; p[0x1e4] = v1[1]; p[0x1e8] = v1[2]
+		var v2: Array = mirror_to_side(orient, team, [_g(p, 0x204), _g(p, 0x208), _g(p, 0x20c)])
+		p[0x1ec] = v2[0]; p[0x1f0] = v2[1]; p[0x1f4] = v2[2]
+		var ma: Array = mirror_to_side(orient, team, vec_compose([_g(p, 0x228), _g(p, 0x22c)], 0))
+		var mb: Array = mirror_to_side(orient, team, [_g(p, 0x230), _g(p, 0x234), 0])
+		src = [ma[0], ma[1], ma[2], mb[0], mb[1], mb[2]]
+		for axis in 3:                                      # FUN_005b12c0: per-axis min->lo, max->hi
+			if src[axis + 3] < src[axis]:
+				var t: int = src[axis]; src[axis] = src[axis + 3]; src[axis + 3] = t
+
+	# Copy the 6-int source into the bbox, reseed z, then fold both endpoints in.
+	for i in 6:
+		p[0x210 + i * 4] = int(src[i])
+	p[0x218] = Pm98Trig._i32(0xffff0000)
+	p[0x224] = 0x12c0000
+	_bbox_fold(p, 0x210, 0x21c, _g(p, 0x1e0))
+	_bbox_fold(p, 0x214, 0x220, _g(p, 0x1e4))
+	_bbox_fold(p, 0x218, 0x224, _g(p, 0x1e8))
+	_bbox_fold(p, 0x210, 0x21c, _g(p, 0x1ec))
+	_bbox_fold(p, 0x214, 0x220, _g(p, 0x1f0))
+	_bbox_fold(p, 0x218, 0x224, _g(p, 0x1f4))

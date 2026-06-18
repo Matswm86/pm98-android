@@ -359,6 +359,25 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   assignmarker 77 + relmatrix 128 + dispatch 366 + events 85 + predicates 147 + resolver tree/gate +
   trig 72 + engine ALL PASS; boots 0 SCRIPT ERROR). NEXT = FUN_005a5430's only remaining dep for
   slice B (the position LUT) is done; port FUN_005a5430-driven slice B + FUN_005a3400 slice A.
+- **Stage 3 task 2 — FUN_005a3400 slice A (prologue + bbox) PORTED + oracle-validated DONE.** Ported
+  into `Pm98Movement.gd` as `decide_slice_a(p, m)` (decomp lines 45-146): the goal-X anchor
+  `+0x3a4 = goal_target_x(orient, match+0x1820, team)`; the two target endpoints (off-pitch -> both
+  sit on the goal line + an explicit default box from `0x108000 - x1820` oriented by side with an
+  x-component min/max swap; on-pitch -> `+0x1e0 = mirror_to_side(+0x1f8)`, `+0x1ec =
+  mirror_to_side(+0x204)`, and a sorted box = `FUN_005b12c0` of `mirror(compose(+0x228,z=0))` vs
+  `mirror(+0x230,z=0)`); then the 6-int source copied to the bbox `+0x210..+0x224`, z reseeded
+  (`+0x218 = 0xffff0000`, `+0x224 = 0x12c0000`), and 12 signed min/max clamps fold both endpoints
+  in. Pure integer (mirror/compose/per-axis min-max), NO RNG/LUT/ftol. **Oracle insight:** slice A
+  is a pure prefix, so `run_decideA_oracle.sh` drives the WHOLE real FUN_005a3400 down the REPLAY
+  path (`DAT_006d31c4 != 0` @0x6d31c4): slice A executes identically, then the simple replay-copy
+  tail RETURNs cleanly -- no callee stubs, no LUT, no RNG, and the 0x51-dword replay copy writes
+  only player+0x40..+0x184 so the slice-A outputs (+0x1e0..+0x224, +0x3a4) survive untouched. Banked
+  `specs/decideA_oracle.txt` (6 fixtures: off-pitch u9=0/1/team1 + on-pitch noflip/flip/flip-team1;
+  13 output fields each). Locked by `test_decideA.gd` (78 checks, all PASS). No regression (decideA
+  78 + decideset 84 + decidehelper 13 + movement 60 + selectactive 24+125 + marktarget 8 +
+  assignmarker 77 + relmatrix 128 + dispatch 366 + events 85 + predicates 147 + resolver tree/gate +
+  trig 72 + engine ALL PASS; boots 0 SCRIPT ERROR). NEXT = slice B (field reset + facing + position,
+  deps set_position_code DONE; needs the match+0x188+0x13c table model for +0xb0) then slice C.
 
 ### FUN_005a3400 DECODED STRUCTURE (the per-player DECIDE; decoded 2026-06-18 -- cite, don't re-derive)
 `__fastcall(ECX=player)`. The per-player movement-target / set-piece-positioning computer. **NO net
@@ -393,11 +412,13 @@ Real-compute structure (DAT_006d31c4==0):
    `Pm98Movement.set_engagement`, DONE.
 **Sim-mutations** (the port must write all): player +0x4/+8/+0xc (move target), +0x20..+0x30,
 +0x34/+0x64 (facing s16), +0x40 (pos), +0x48, +0x54/+0x58, +0x61, +0x68/+0x6c, +0x80, +0x90, +0xb0,
-+0x1e0..+0x224 (target + bbox), +0x3a4, +0x3b4. **Slice plan:** (A) prologue+bbox; (B) reset+facing+
-pos (deps FUN_005a5430 + POS_REMAP_LUT now DONE); (C) the switch case-by-case (dep FUN_0058eca0 now
-DONE). Both slice-B and slice-C state-setter dependencies are ported; A/B/C remain to wire into 5a3400.
-**Oracle:** set up a player struct + match struct + teaminfo; stub FUN_005bbf10 (queue-grow) as the
-5b8f20 oracle did; inject ftol + cos/atan LUT; read back the mutated player fields.
++0x1e0..+0x224 (target + bbox), +0x3a4, +0x3b4. **Slice plan:** (A) prologue+bbox = DONE
+(`decide_slice_a`, oracle-pinned via the replay path); (B) reset+facing+pos (deps FUN_005a5430 +
+POS_REMAP_LUT DONE; still needs the match+0x188 +0x13c table for +0xb0); (C) the switch case-by-case
+(dep FUN_0058eca0 DONE). Slice A wired; B/C remain.
+**Oracle:** slice A used the REPLAY path (DAT_006d31c4!=0) for a clean RET with no stubs/LUT. Slices
+B/C run real callees: set up a player struct + match struct + teaminfo; stub FUN_005bbf10 (queue-grow)
+as the 5b8f20 oracle did; inject ftol + cos/atan LUT; read back the mutated player fields.
 
 ### MOVEMENT-AI SUBSYSTEM MAP (decoded 2026-06-18 -- cite, don't re-derive)
 The driver calls, per team per tick (4 call-sites 0x593f38 / 0x598955 / 0x5a1433 / 0x5a1530, each
