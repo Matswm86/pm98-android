@@ -225,8 +225,28 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   `specs/marktarget_oracle.txt`. Locked by `app/tests/test_marktarget.gd` (8 checks: returned opp index, bit-exact).
   No regression (relmatrix 128 + movement 60 + dispatch 366 + events 85 + predicates 147 + resolver tree/gate +
   trig 30 + engine PASS; boots 0 SCRIPT ERROR).
+- **Stage 3 task 2 — movement slice 4 (marker-assignment PASS) PORTED + oracle-validated DONE.**
+  `FUN_005b94f0` (__fastcall this=sim-ctx) ported to `Pm98Movement.assign_markers(ctx)` -- the per-tick marking
+  pass that assembles slice 3's `select_mark_target`. **param_1 IS the ctx** (disasm 0x5b94f6 `mov ebx,ecx`, and
+  every helper call is `mov ecx,ebx`), so ctx +0/+4/+8 = our players base/count/team threaded into the
+  `0x5b70b0`/`0x5b70c0`/`0x5b8c90` accessors. Runs only while we are NOT in possession (`0x5b8c90`:
+  match+0x1664 == ctx+8). Three passes: (poss) if match+0x1668 != match+0x1664 zero each OUR player's
+  +0x13c..+0x178 block (`0x5b13c0`); (A) clear our +0x150/+0x154; (B) for each opponent HOLDING the ball (its
+  +0x190->+0x40 == itself, OR == ball+0x4c = match+0x165c) scan OUR team for the lowest-scoring eligible marker
+  (score = our->opp matrix dist + |z-diff|/3 via the 0x55555556 magic; eligible = on-pitch AND anchor-gap < the
+  opp's; best seed 0x3e80000) and wire +0x150/+0x154; (C) every still-unmarked OUR on-pitch player runs
+  `0x5b36f0` and wires the links. Integer-only -> oracle needs NO _ftol/LUT. **Composition fix pinned by the
+  oracle:** slice 3's "already marked" test was `+0x154 != 0`, but PASS B writes a real our-team INDEX 0 there,
+  which collides with the model's null; the faithful translation of the binary's null-pointer test in the
+  `-1 = none` model is `!= -1`. Fixed `select_mark_target` accordingly and updated `test_marktarget` (free -> -1,
+  taken -> a non-negative index); marktarget still 8/8. Oracle `tools/re/run_assignmarker_oracle.sh` drives the
+  REAL `FUN_005b94f0` and reads back the +0x150/+0x154 links + the possession-change scalars, 7 fixtures
+  (passB_route2 / in_possession / poss_change / passB_route1 / passB_reject / passC_taken_guard / off_pitch),
+  banked to `specs/assignmarker_oracle.txt`. Locked by `app/tests/test_assignmarker.gd` (77 checks: every link
+  mapped pointer->index via its base, bit-exact). No regression (marktarget 8 + relmatrix 128 + movement 60 +
+  dispatch 366 + events 85 + predicates 147 + resolver tree/gate + trig 30 + engine PASS; boots 0 SCRIPT ERROR).
 - **NEXT = Stage 3 task 2 (driver + the rest of movement physics).** Predicates + event-queue + dispatcher +
-  the nearest-to-ball selector + the relationship matrix/roles + the marking-target leaf are now ported. The 38 movement decompiles are extracted to
+  the nearest-to-ball selector + the relationship matrix/roles + the marking-target leaf + the marker-assignment PASS are now ported. The 38 movement decompiles are extracted to
   `docs/re/move/` (largest: player-move/AI `0x5b73a0` 4834B, phase-selector `0x5b8f20` 1169B, relationship-
   matrix `0x5b8690` 964B, marker-assign `0x5b94f0` 631B, `0x5b36f0` 788B, player-move `0x5b70e0` 692B). Driver
   `00598740` (904-line C dump) + `005983f0`/`00598690` + the movement physics 2 levels down (callees
@@ -234,10 +254,8 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   `0x5b8690` (relationship matrix), `0x5b8f20` (phase selector, calls the now-ported `0x5b8ce0` as fallback),
   the two player-move fns `0x5b70e0`/`0x5b73a0`, and `0x5b6ee0` from 005983f0 -- all in `docs/re/move/`) --
   real ball coordinates come from the `Pm98Trig` LUT. Suggested next bottom-up order: `0x5b8690` (matrix) DONE ->
-  `0x5b36f0` (mark-target leaf) DONE -> `0x5b94f0` (marker-assignment PASS that calls it: a 3-pass driver --
-  possession-change reset `0x5b13c0` per player, the +0x150/+0x154 clears, then the `0x5b36f0` assignment + the
-  +0x150==0 fallback pass; gated on `0x5b8c90` "we are NOT in possession" + the `0x5b70b0`/`0x5b70c0` accessors)
-  then `0x5b8f20` (phase selector, sits directly on the now-ported `0x5b8ce0` as its fallback) then
+  `0x5b36f0` (mark-target leaf) DONE -> `0x5b94f0` (marker-assignment PASS) DONE ->
+  `0x5b8f20` (phase selector, sits directly on the now-ported `0x5b8ce0` as its fallback) then
   the player-move fns (`0x5b70e0`/`0x5b73a0`, watch RNG order) then the driver `00598740`. The
   dispatcher (`005966d0`) it calls is DONE. Inject
   the LUT for the movement oracle via `tools/re/emit_lut_membts.py` (same trick `run_keeper_oracle.sh` /

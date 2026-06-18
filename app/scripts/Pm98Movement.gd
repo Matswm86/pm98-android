@@ -319,6 +319,10 @@ static func _select_roles(ctx: Dictionary) -> void:
 # +0x188) = ctx[0x138][0x78c]/size. The current mark target (player+0xb0) and the
 # return value are opponent INDICES (-1 = none). The 8690 relationship-matrix dists
 # at _dist_off(slot, team) are consumed for both the candidate score and reciprocity.
+# NULL CONVENTION: the binary's "already marked" test is `cand+0x154 != 0` (non-null
+# marker pointer). In the index model the marker links (+0x150/+0x154) use -1 = none
+# (index 0 is the real first player), so the faithful test is `!= -1` -- assign_markers
+# (slice 4, FUN_005b94f0) writes a real our-team index 0 there, which `!= 0` would miss.
 
 ## FUN_005b36f0. Returns the opp index to mark, or -1.
 static func select_mark_target(ctx: Dictionary, p_idx: int) -> int:
@@ -351,7 +355,7 @@ static func select_mark_target(ctx: Dictionary, p_idx: int) -> int:
 	var p_metric := absi(Pm98Trig._i32(_g(p, 0x4) - _g(p, 0x3a4)))   # FUN_005b1c40(p)
 	for k in opp.size():
 		var cand: Dictionary = opp[k]
-		if _g(cand, 0x154) != 0:                            # already a marker target -> skip
+		if int(cand.get(0x154, -1)) != -1:                  # already a marker target -> skip
 			continue
 		var score := _g(p, _dist_off(_g(cand, 0x2c4), _g(cand, 0x2b8)))   # matrix dist p->cand
 		if not _in_box_excl(p, cand):                       # out of box -> inflate score
@@ -399,3 +403,106 @@ static func _in_box_excl(p: Dictionary, q: Dictionary) -> bool:
 		and _g(p, 0x214) < _g(q, 0x8) and _g(q, 0x8) < _g(p, 0x220)
 		and _g(p, 0x218) < _g(q, 0xc) and _g(q, 0xc) < _g(p, 0x224)
 	)
+
+
+# =============================================================================
+# Slice 4: the per-tick marker-assignment PASS (assembles slice 3's selector).
+#   assign_markers = FUN_005b94f0 (__fastcall this=sim-ctx). param_1 IS the sim-ctx
+#   (disasm 0x5b94f6: `mov ebx,ecx`, and every helper call is `mov ecx,ebx` -- so the
+#   descriptor {base,count} the function iterates and the ctx threaded into the
+#   70b0/70c0/8c90 helpers are ONE object), so ctx +0/+4/+8 = our players base/count/team.
+#   Runs only while WE are NOT in possession (FUN_005b8c90: match+0x1664 == ctx+8).
+#   Three passes (disasm-verified 0x5b94f0..0x5b9766, NO RNG):
+#     (poss) possession changed (ball+0x58 != ball+0x54 == match+0x1668 != match+0x1664)
+#            -> zero each OUR player's +0x13c..+0x178 marking block (FUN_005b13c0).
+#     (A)    clear every OUR player's +0x150 (who-I-mark) / +0x154 (who-marks-me).
+#     (B)    for each opponent that HOLDS the ball (its +0x190->+0x40 points back to
+#            itself, OR it is ball+0x4c == match+0x165c) scan OUR team for the lowest-
+#            scoring eligible marker and wire the pair. score = matrix dist(our->opp)
+#            (the 8690 matrix at our+_dist_off(opp.slot,opp.team)) + |our.z-opp.z|/3;
+#            eligibility = our on-pitch (+0x2bc) AND our anchor-gap < the opp's anchor-gap
+#            (same-team abs(x-anchor) else abs(x+anchor)); best seed 1000.0 (0x3e80000).
+#     (C)    fallback: every OUR on-pitch player still unmarked (+0x150 == none) runs
+#            select_mark_target (FUN_005b36f0) and wires its +0x150 / the picked opp's
+#            +0x154 (the +0x154 only when that opp is not already someone's mark).
+#   Helpers (all take ctx as ECX): FUN_005b70b0 = match+0x1610 ball block; FUN_005b70c0
+#   = opponent team descriptor (match + 0x78c - 800*team; team0 -> +0x78c, modelled here
+#   as match[0x78c] like the other slices -- fixtures are team-0); FUN_005b8c90 = "we are
+#   in possession". POINTER->INDEX model: +0x150 holds an OPP index, +0x154 an OUR-team
+#   index, both -1 = none (the binary's null pointer; index 0 is the real first player).
+static func assign_markers(ctx: Dictionary) -> void:
+	var players: Array = ctx.get("players", [])
+	var team := _g(ctx, 0x8)
+	var m: Dictionary = ctx.get(0x138, {})
+	var opp: Array = m.get(0x78c, [])
+
+	# (poss) possession changed -> zero each OUR player's marking block.
+	if _g(m, 0x1668) != _g(m, 0x1664):
+		for p in players:
+			_clear_mark_block(p)
+
+	# gate: do nothing while WE hold the ball.
+	if _g(m, 0x1664) == team:
+		return
+
+	# (A) clear every OUR player's marker links.
+	for p in players:
+		p[0x150] = -1
+		p[0x154] = -1
+
+	# (B) assign the best eligible marker to each ball-holding opponent.
+	for qi in opp.size():
+		var q: Dictionary = opp[qi]
+		q[0x150] = -1
+		q[0x154] = -1
+		if not _holds_ball(m, opp, qi):
+			continue
+		var best := -1
+		var best_score := MATRIX_INIT                        # 0x3e80000 = 1000.0
+		for oi in players.size():
+			var our: Dictionary = players[oi]
+			var score := _g(our, _dist_off(_g(q, 0x2c4), _g(q, 0x2b8))) \
+				+ absi(Pm98Trig._i32(_g(our, 0x8) - _g(q, 0x8))) / 3
+			if _g(our, 0x2bc) == 0:                          # off pitch -> skip
+				continue
+			var q_metric: int
+			if _g(our, 0x2b8) == _g(q, 0x2b8):
+				q_metric = absi(Pm98Trig._i32(_g(q, 0x4) - _g(q, 0x3a4)))
+			else:
+				q_metric = absi(Pm98Trig._i32(_g(q, 0x3a4) + _g(q, 0x4)))
+			var our_metric := absi(Pm98Trig._i32(_g(our, 0x4) - _g(our, 0x3a4)))
+			if our_metric < q_metric and score < best_score:
+				best_score = score
+				best = oi
+		if best >= 0:
+			players[best][0x150] = qi                        # marker's target = opp
+			q[0x154] = best                                  # opp's marker = our player
+
+	# (C) fallback: each still-unmarked OUR on-pitch player picks its own target.
+	for oi in players.size():
+		var our: Dictionary = players[oi]
+		if _g(our, 0x2bc) == 0 or int(our.get(0x150, -1)) != -1:
+			continue
+		var t := select_mark_target(ctx, oi)
+		our[0x150] = t
+		if t >= 0 and int(opp[t].get(0x154, -1)) == -1:
+			opp[t][0x154] = oi
+
+
+## FUN_005b13c0: zero a player's +0x13c..+0x178 marking block. The two pointer links
+## (+0x150/+0x154) become -1 (the model's null); the rest are scalar state (-> 0).
+static func _clear_mark_block(p: Dictionary) -> void:
+	for off in [0x13c, 0x140, 0x144, 0x148, 0x158, 0x15c, 0x160, 0x164, 0x168, 0x16c, 0x170, 0x174, 0x178]:
+		p[off] = 0
+	p[0x150] = -1
+	p[0x154] = -1
+
+
+## The PASS-B "this opponent holds the ball" gate (disasm 0x5b958f..0x5b95b7). Either the
+## opponent's controller block (q+0x190 -> +0x40) names the opponent itself, or it is the
+## ball block's other-control slot (FUN_005b70b0 +0x4c == match+0x165c).
+static func _holds_ball(m: Dictionary, opp: Array, qi: int) -> bool:
+	var blk: Dictionary = _ref(opp[qi], 0x190)
+	if int(blk.get(0x40, -1)) == qi:
+		return true
+	return int(m.get(0x165c, -1)) == qi

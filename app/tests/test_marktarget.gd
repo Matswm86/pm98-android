@@ -21,8 +21,9 @@ const DEF := {
 	"tgt": -1, "m310": 0, "td300": 0, "td2fc": 0, "scale": 0,
 	"px": 0x40000, "panchor": 0x40000, "p1e0": 0,
 	"bxmin": 0, "bymin": 0, "bzmin": 0, "bxmax": 0x1000000, "bymax": 0x1000000, "bzmax": 0x1000000,
-	"q0x": 0x50000, "q0y": 0x50000, "q0z": 0, "q0anchor": 0, "q0taken": 0,
-	"q1x": 0x30000, "q1y": 0x30000, "q1z": 0, "q1anchor": 0, "q1taken": 0,
+	# +0x154 marker links use -1 = none (index 0 is a real player); "taken" = any index >=0.
+	"q0x": 0x50000, "q0y": 0x50000, "q0z": 0, "q0anchor": 0, "q0taken": -1,
+	"q1x": 0x30000, "q1y": 0x30000, "q1z": 0, "q1anchor": 0, "q1taken": -1,
 	"pq0": 0x50000, "pq1": 0x90000, "q0p": 0x40000, "q0p1": 0x80000, "q1p": 0x70000, "q1p1": 0x30000,
 }
 
@@ -33,7 +34,7 @@ const FIXTURES := {
 	"keep_alt": {"tgt": 0, "m310": 1, "td300": 0x100000, "td2fc": 0x80000},
 	"search_pick": {},
 	"recip_filter": {"q0p": 0x80000, "q0p1": 0x40000, "q1p": 0x30000, "q1p1": 0x70000},
-	"taken_skip": {"q0taken": 1, "q1p": 0x30000, "q1p1": 0x70000},
+	"taken_skip": {"q0taken": 0, "q1p": 0x30000, "q1p1": 0x70000},
 	"penalty_box": {"pq0": 0x80000, "pq1": 0x60000, "q1x": 0x2000000, "q1p": 0x30000, "q1p1": 0x70000},
 	"penalty_flip": {"pq0": 0x80000, "pq1": 0x60000, "q0z": 0x1000, "q1x": 0x2000000, "q1p": 0x30000, "q1p1": 0x70000},
 }

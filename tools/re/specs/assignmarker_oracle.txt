@@ -1,0 +1,11 @@
+# Stage 3 task 2 slice 4 marker-assignment (FUN_005b94f0) ground truth (PCode emu;
+# integer-only, no float-import). Each row: 'FIX <name>' then the verbatim CALL line.
+# bases: P0=0x230000 P1=0x2303bc Q0=0x240000 Q1=0x2403bc ; null=0. +0x150 holds an
+# OPP ptr, +0x154 an OUR ptr (map each via its base, 0 -> -1).
+FIX passB_route2 CALL 0 RET steps=572 EAX=2360252 mem[0x230150:4]=2359296 mem[0x230154:4]=0 mem[0x23050c:4]=2360252 mem[0x230510:4]=0 mem[0x240150:4]=0 mem[0x240154:4]=2293760 mem[0x24050c:4]=0 mem[0x240510:4]=2294716 mem[0x23013c:4]=0 mem[0x230158:4]=0 mem[0x230178:4]=0
+FIX in_possession CALL 0 RET steps=37 EAX=1 mem[0x230150:4]=0 mem[0x230154:4]=0 mem[0x23050c:4]=0 mem[0x230510:4]=0 mem[0x240150:4]=0 mem[0x240154:4]=0 mem[0x24050c:4]=0 mem[0x240510:4]=0 mem[0x23013c:4]=0 mem[0x230158:4]=0 mem[0x230178:4]=0
+FIX poss_change CALL 0 RET steps=625 EAX=2360252 mem[0x230150:4]=2359296 mem[0x230154:4]=0 mem[0x23050c:4]=2360252 mem[0x230510:4]=0 mem[0x240150:4]=0 mem[0x240154:4]=2293760 mem[0x24050c:4]=0 mem[0x240510:4]=2294716 mem[0x23013c:4]=0 mem[0x230158:4]=0 mem[0x230178:4]=0
+FIX passB_route1 CALL 0 RET steps=565 EAX=2360252 mem[0x230150:4]=2359296 mem[0x230154:4]=0 mem[0x23050c:4]=2360252 mem[0x230510:4]=0 mem[0x240150:4]=0 mem[0x240154:4]=2293760 mem[0x24050c:4]=0 mem[0x240510:4]=2294716 mem[0x23013c:4]=0 mem[0x230158:4]=0 mem[0x230178:4]=0
+FIX passB_reject CALL 0 RET steps=881 EAX=2360252 mem[0x230150:4]=2359296 mem[0x230154:4]=0 mem[0x23050c:4]=2360252 mem[0x230510:4]=0 mem[0x240150:4]=0 mem[0x240154:4]=2293760 mem[0x24050c:4]=0 mem[0x240510:4]=2294716 mem[0x23013c:4]=0 mem[0x230158:4]=0 mem[0x230178:4]=0
+FIX passC_taken_guard CALL 0 RET steps=308 EAX=2359296 mem[0x230150:4]=2359296 mem[0x230154:4]=0 mem[0x23050c:4]=2359296 mem[0x230510:4]=0 mem[0x240150:4]=0 mem[0x240154:4]=2293760 mem[0x24050c:4]=0 mem[0x240510:4]=0 mem[0x23013c:4]=0 mem[0x230158:4]=0 mem[0x230178:4]=0
+FIX off_pitch CALL 0 RET steps=326 EAX=1 mem[0x230150:4]=2359296 mem[0x230154:4]=0 mem[0x23050c:4]=0 mem[0x230510:4]=0 mem[0x240150:4]=0 mem[0x240154:4]=2293760 mem[0x24050c:4]=0 mem[0x240510:4]=0 mem[0x23013c:4]=0 mem[0x230158:4]=0 mem[0x230178:4]=0
