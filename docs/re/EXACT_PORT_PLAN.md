@@ -41,12 +41,21 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   Branch-covering ground truth banked: `tools/re/run_tree_oracle.sh` ->
   `tools/re/specs/tree_oracle_streams.txt` (6 fixtures, 6-11 draws, distinct outcomes:
   nrng + final state + match+0x461 bits + stats + target play-state, all clean RET).
-- **NEXT = Stage 2b (port the tree).** Translate `FUN_005aeda0` lines 120-611 to GDScript in
-  `Pm98Resolver.gd` (decision tree + flags bVar5/6/7/8 = on-target/header/off-target/saved;
-  movement-block draws consumed but coords deferred to S3) + dispatcher `005966d0` + predicates
-  `0058ede0/0058f100/0058fbe0/0058f140`. Validate by replaying each `tree_oracle_streams.txt`
-  fixture's struct inputs through the port and asserting nrng + final RNG state + outcome parity
-  (extend `test_resolver_gate.gd` or add `test_resolver_tree.gd`). RNG draw ORDER is load-bearing.
+- **Stage 2b (resolution tree ported) DONE.** `FUN_005aeda0` lines 120-485 (the goal/save/miss
+  decision tree, play-states 3-8) ported to `Pm98Resolver.resolve_tree` -- branch logic + flags
+  bVar5/6/7/8 (on-target/header/off-target/saved), the permil/`_prob_scale` idioms (incl. the
+  overflow-safe >>8->>7 split), the target-state set (6/7), the match+0x461 outcome bits, and the
+  engaged deflection/corner enqueue (0x13/0x14). Geometry firstgate (LUT) skipped: the LUT-free
+  position fallback governs (proven invariant). Locked by `app/tests/test_resolver_tree.gd`:
+  24/24 assertions PASS across the 6 branch-covering fixtures -- draw count + final RNG state +
+  match+0x461 bits + target play-state all bit-exact vs the oracle. No regression
+  (test_resolver_gate + test_engine still PASS; app boots clean).
+- **NEXT = Stage 2c.** (1) Add a **bVar5-true fixture** to `run_tree_oracle.sh` (needs
+  `M+0x19ac != 0` to avoid div0 in `FUN_0044ea40`) to validate the goal/save block + stat
+  counters + the `FUN_0058fb50` goal-box bit0 (currently structurally ported, NOT yet oracle-
+  exercised -- all 6 fixtures end bVar5=false). (2) Port dispatcher `005966d0` (outcome 1-7 ->
+  event enqueue) + predicates `0058ede0/0058f100/0058fbe0/0058f140`. (3) Then Stage 3 = driver
+  `00598740` + the movement block (491-607) + the trig-LUT initializer (FPU-computed at boot).
 
 ## Already decoded — cite + port, don't redo (see match_engine_re.md for detail)
 - RNG `FUN_005ec250` (MSVC LCG, state @0x6d3184) — already exact as `Pm98Rng`. Per-mil idiom

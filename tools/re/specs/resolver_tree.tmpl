@@ -40,6 +40,10 @@ mem 0x002103b8 4 0x00230000         # T+0x3b8 = &stats
 # --- match M incidentals ---
 mem 0x00200004 4 __HDR__            # M+4: header gate (8 < M+4 enables header block)
 mem 0x0020009c 4 0x00240000         # M+0x9c -> null struct
+mem 0x00200070 4 0x1                # M+0x70 != 0: gate OFF the tail movement block
+                                    #   (lines 491-607) -- that is positional/coordinate
+                                    #   work = Stage 3. Isolates the resolution tree so the
+                                    #   draw stream + outcome are exactly the Stage-2b port.
 # --- RNG seed ---
 mem 0x006d3184 4 0x1
 maxsteps 500000
