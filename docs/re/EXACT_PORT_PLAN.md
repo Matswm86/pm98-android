@@ -433,6 +433,33 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   decideA 78 + decideset 84 + decidehelper 13 + trig 72 + movement 60 + selectactive5b 125 + marktarget 8 +
   assignmarker 77 + relmatrix 128 + dispatch 366 + events 85 ALL PASS; boots 0 SCRIPT ERROR). NEXT = slice
   C2 (taker branches: ball-engage modelling + stamina + atan aim) then C3 (cases 2/4/5 + the .data tables).
+- **Stage 3 task 2 — FUN_005a3400 slice C2 (set-piece switch, TAKER paths) PORTED + oracle-validated DONE.**
+  Ported into `Pm98Movement.gd` as `_decide_slice_c_taker(p, m, phase)` + helper `_slice_c_taker_aim`,
+  wired from `decide_slice_c` when `is_same(p, _ref(m, 0x438))` (player IS the set-piece taker). Covers the
+  TAKER branches of cases 2/3/4/5/6/7. For the player's OWN reported fields every taker shares:
+  (1) `set_engagement(ball, 0, [p])` = ball.engage(player) (FUN_0058eca0 this=ball=player+0x190,
+  target=player) -- its only player-field effect is +0x54/+0x58=0 (already zeroed by slice B); the rest
+  mutate ball/match engagement state (validated in test_decideset). (2) stamina `+0x48 = (flag?0x2d0:0)+0xb4`,
+  `flag = teaminfo(+0x184)+0x2ee != 0 AND phase0(match) AND player+0x5c != 0` (FUN_005943b0 confirmed ==
+  `[match+0x468]+0xfa0 == 0` = `_phase0`). (3) `set_position_code` 0 (c2) / 0x13 (c3) / 0x1d (c4/5/6/7);
+  the 0x13 + 0x1d codes REMAP so they clear +0x2c/+0x30 (kill-tested). Per-case facing+move from the ball
+  position (ball+0x90 vec) and the goal-line aim `aim_x = -+match+0x1820 when (orient&1)==(1-team)`:
+  cases 2/4/5/7 -> `ang=atan(aim-ball_pos)`, `move=ball_pos - polar_vec(0x6666, ang)` (FUN_005ee0f0 confirmed
+  == polar_vec); case 2 keeps facing=ang + early-returns, cases 4/5/7 recompute facing=atan(aim-move) in the
+  common tail; case 3 -> facing(+0x34 ONLY, +0x64 keeps slice-B) = (ball+0x94<1)?0x4000:-0x4000,
+  move=ball_pos - polar_vec(0x6666, facing); case 6 -> facing(both)=((orient&1)^team)?0x8000:0, move=ball_pos.
+  **NOT modelled (verified player-field-inert global side-effects):** the case 4/5/6/7 `.data` set-piece
+  globals (0x665154/.../0x67455c), case 6's RNG save/restore bracket (5ec240/5ec230, net RNG-neutral) and its
+  gated SFX `FUN_004e9630` (skipped when match+0x180b==0; it is an SFX_COMENT sprintf path touching no P0
+  field). **Oracle:** `run_decideCtaker_oracle.sh` drives the real FUN_005a3400 with player==match+0x438,
+  ball+0x40=player (so the real ball.engage early-returns -> no wild writes), teaminfo/phase0 structs seeded,
+  match+0x180b=0, cos/atan LUT + _ftol injected. Banked `specs/decideCtaker_oracle.txt` (6 fixtures:
+  c2_flagT/flagF, c3/c4/c6/c7_taker). Locked by `test_decideCtaker.gd` (**54 checks, ALL PASS**, runs A->B->C
+  with match+0x438==p). No regression (decideCtaker 54 + decideC 70 + decideB 100 + decideA 78 + decideset 84
+  + decidehelper 13 + trig 72 + movement 60 + selectactive5b 125 + marktarget 8 + assignmarker 77 + relmatrix
+  128 + dispatch 366 + events 85 ALL PASS; boots 0 SCRIPT ERROR). NEXT = slice C3 (the NON-taker branches of
+  cases 2/4/5: case 2 bbox-blend via 5b12c0 + clamp_min_sep; cases 4/5 the DAT_006742ec one-time init + the
+  49-entry _DAT_00674330 set-piece position table indexed by player+0x2c8) then the else-replay branch.
 
 ### FUN_005a3400 DECODED STRUCTURE (the per-player DECIDE; decoded 2026-06-18 -- cite, don't re-derive)
 `__fastcall(ECX=player)`. The per-player movement-target / set-piece-positioning computer. **NO net

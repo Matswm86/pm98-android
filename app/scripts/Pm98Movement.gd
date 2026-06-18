@@ -966,6 +966,87 @@ static func _slice_c_tail(p: Dictionary) -> void:
 	p[0x64] = facing
 
 
+# ---- FUN_005a3400 slice C2 (set-piece switch, the TAKER paths) -----------------------
+# The branch each case takes when the player IS the set-piece taker (player == match+0x438).
+# Decoded from the disasm; for the player's OWN reported fields (move +0x4/+0x8/+0xc, facing
+# +0x34/+0x64, position +0x40, stamina +0x48, the +0x2c/+0x30 remap-clear) every taker shares:
+#   1. ball.engage(player) -- FUN_0058eca0(this=ball(player+0x190), target=player). Its only
+#      player-field effect is player+0x54/+0x58 = 0 (already zeroed by slice B); the rest mutate
+#      the ball / match engagement state (validated separately in test_decideset.gd).
+#   2. stamina +0x48 = (flag ? 0x2d0 : 0) + 0xb4, flag = teaminfo(+0x184)+0x2ee != 0 AND
+#      phase0(match) AND player+0x5c != 0.
+#   3. set_position_code(code): 0 (case 2) / 0x13 (case 3) / 0x1d (cases 4/5/6/7).
+# then a per-case facing + move from the ball position (ball+0x90 vec) and the goal-line aim x:
+#   * cases 2 / 4 / 5 / 7: aim = [aim_x, 0, 0] with aim_x = -+match+0x1820 when (orient&1)==(1-team);
+#     ang = atan(aim - ball_pos) ; move = ball_pos - polar_vec(0x6666, ang). Case 2 keeps facing
+#     = ang and early-returns; cases 4/5/7 recompute facing = atan(aim - move) in the common tail.
+#   * case 3: facing (+0x34 ONLY, +0x64 untouched) = (ball+0x94 < 1) ? 0x4000 : -0x4000 ;
+#     move = ball_pos - polar_vec(0x6666, facing).
+#   * case 6: facing (+0x34 & +0x64) = ((orient&1)^team != 0) ? 0x8000 : 0 ; move = ball_pos.
+# NOT modelled (non-player global side-effects, verified player-field-inert): the case 4/5/6/7
+# `.data` set-piece globals (0x665154/.../0x67455c), case 6's RNG save/restore bracket
+# (5ec240/5ec230, net RNG-neutral) and its gated SFX FUN_004e9630 (skipped when match+0x180b==0).
+# Oracle-pinned by tools/re/run_decideCtaker_oracle.sh -> specs/decideCtaker_oracle.txt
+# (test_decideCtaker.gd). Leaves polar_vec/atan_angle/vec3_sub/set_position_code/set_engagement
+# are all already oracle-pinned.
+
+
+## Taker aim: face the goal line and pull back 0x6666 toward it (cases 2 / 4 / 5 / 7). `double`
+## recomputes facing from the moved spot (the common-tail second atan); else facing = the first.
+static func _slice_c_taker_aim(p: Dictionary, ball: Dictionary, orient: int, team: int, x1820: int,
+		bpos: Array, double: bool) -> void:
+	var aim_x := Pm98Trig._i32(-x1820) if (orient & 1) == (1 - team) else Pm98Trig._i32(x1820)
+	var aim := [aim_x, 0, 0]
+	var ang1 := Pm98Trig.atan_angle(Pm98Trig._i32(aim_x - bpos[0]), Pm98Trig._i32(-bpos[1]))
+	var polar: Array = Pm98Trig.polar_vec(0x6666, ang1)
+	var move := [Pm98Trig._i32(bpos[0] - polar[0]), Pm98Trig._i32(bpos[1] - polar[1]),
+		Pm98Trig._i32(bpos[2] - polar[2])]
+	p[0x4] = move[0]
+	p[0x8] = move[1]
+	p[0xc] = move[2]
+	var face := ang1
+	if double:
+		var r2: Array = Pm98Trig.vec3_sub(aim, move)
+		face = Pm98Trig.atan_angle(r2[0], r2[1])
+	p[0x34] = face & 0xffff
+	p[0x64] = face & 0xffff
+
+
+## The set-piece taker (player == match+0x438) branch of cases 2/3/4/5/6/7.
+static func _decide_slice_c_taker(p: Dictionary, m: Dictionary, phase: int) -> void:
+	var ball: Dictionary = _ref(p, 0x190)
+	var orient := _g(m, 0x19a0)
+	var team := _g(p, 0x2b8)
+	var x1820 := _g(m, 0x1820)
+	var bpos := [_g(ball, 0x90), _g(ball, 0x94), _g(ball, 0x98)]
+	set_engagement(ball, 0, [p])                              # ball.engage(player); player+0x54/+0x58=0
+	var flag := _g(_ref(p, 0x184), 0x2ee) != 0 and _phase0(m) and _g(p, 0x5c) != 0
+	p[0x48] = (0x2d0 if flag else 0) + 0xb4
+	match phase:
+		2:
+			set_position_code(p, 0)
+			_slice_c_taker_aim(p, ball, orient, team, x1820, bpos, false)
+		3:
+			set_position_code(p, 0x13)
+			var fc := 0x4000 if _g(ball, 0x94) < 1 else -0x4000
+			p[0x34] = fc & 0xffff                             # +0x64 deliberately NOT written
+			var polar: Array = Pm98Trig.polar_vec(0x6666, fc)
+			p[0x4] = Pm98Trig._i32(bpos[0] - polar[0])
+			p[0x8] = Pm98Trig._i32(bpos[1] - polar[1])
+			p[0xc] = Pm98Trig._i32(bpos[2] - polar[2])
+		6:
+			set_position_code(p, 0x1d)
+			var fc6 := 0x8000 if ((orient & 1) ^ team) != 0 else 0
+			p[0x34] = fc6
+			p[0x64] = fc6
+			p[0x4] = bpos[0]
+			p[0x8] = bpos[1]
+			p[0xc] = bpos[2]
+		_:                                                   # cases 4 / 5 / 7 (identical taker body)
+			set_position_code(p, 0x1d)
+			_slice_c_taker_aim(p, ball, orient, team, x1820, bpos, true)
+
+
 ## FUN_005a3400 slice C1. Mutates the player `p` in place (m = the player's +0x18c match).
 static func decide_slice_c(p: Dictionary, m: Dictionary) -> void:
 	var phase := _g(m, 0x448)
@@ -973,7 +1054,7 @@ static func decide_slice_c(p: Dictionary, m: Dictionary) -> void:
 		return
 	var taker: Dictionary = _ref(m, 0x438)
 	if is_same(p, taker):
-		push_error("decide_slice_c: taker path (player == match+0x438) not yet ported")
+		_decide_slice_c_taker(p, m, phase)
 		return
 	if phase == 2 or phase == 4 or phase == 5:
 		push_error("decide_slice_c: case %d not yet ported" % phase)

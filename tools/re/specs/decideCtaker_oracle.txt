@@ -1,0 +1,10 @@
+# Stage 3 task 2 DECIDE slice C2 (FUN_005a3400 set-piece switch, TAKER paths) PCode-emu
+# ground truth. player==match+0x438 (taker); ball.engage early-returns (ball+0x40=player);
+# stamina flag via teaminfo+0x2ee / phase0(match+0x468+0xfa0==0) / player+0x5c; LUT+_ftol injected.
+# Each row: 'FIX <name>' + the verbatim CALL line (fields by abs addr, P0=0x230000).
+FIX c2_flagT CALL 0 RET steps=431 EAX=3178468 mem[0x230004:4]=2120603 mem[0x230008:4]=536038 mem[0x23000c:4]=0 mem[0x230034:4]=37604 mem[0x230064:4]=37604 mem[0x230040:4]=0 mem[0x230048:4]=900 mem[0x23002c:4]=0 mem[0x230030:4]=0
+FIX c2_flagF CALL 0 RET steps=430 EAX=3178468 mem[0x230004:4]=2120603 mem[0x230008:4]=536038 mem[0x23000c:4]=0 mem[0x230034:4]=37604 mem[0x230064:4]=37604 mem[0x230040:4]=0 mem[0x230048:4]=180 mem[0x23002c:4]=0 mem[0x230030:4]=0
+FIX c3_taker CALL 0 RET steps=338 EAX=3178456 mem[0x230004:4]=1572864 mem[0x230008:4]=550502 mem[0x23000c:4]=0 mem[0x230034:4]=49152 mem[0x230064:4]=0 mem[0x230040:4]=19 mem[0x230048:4]=900 mem[0x23002c:4]=0 mem[0x230030:4]=0
+FIX c4_taker CALL 0 RET steps=543 EAX=37604 mem[0x230004:4]=2120603 mem[0x230008:4]=536038 mem[0x23000c:4]=0 mem[0x230034:4]=37604 mem[0x230064:4]=37604 mem[0x230040:4]=29 mem[0x230048:4]=900 mem[0x23002c:4]=0 mem[0x230030:4]=0
+FIX c6_taker CALL 0 RET steps=315 EAX=2097152 mem[0x230004:4]=2097152 mem[0x230008:4]=524288 mem[0x23000c:4]=65536 mem[0x230034:4]=32768 mem[0x230064:4]=32768 mem[0x230040:4]=29 mem[0x230048:4]=900 mem[0x23002c:4]=0 mem[0x230030:4]=0
+FIX c7_taker CALL 0 RET steps=548 EAX=34490 mem[0x230004:4]=2123007 mem[0x230008:4]=528651 mem[0x23000c:4]=0 mem[0x230034:4]=34490 mem[0x230064:4]=34490 mem[0x230040:4]=29 mem[0x230048:4]=900 mem[0x23002c:4]=0 mem[0x230030:4]=0
