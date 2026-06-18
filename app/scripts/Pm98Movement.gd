@@ -699,3 +699,36 @@ static func _key57(p: Dictionary, phase: int) -> int:
 ## Signed 32-bit less-than (the binary's SBORROW4 / setl comparator).
 static func _s32lt(a: int, b: int) -> bool:
 	return Pm98Trig._i32(a) < Pm98Trig._i32(b)
+
+
+# ---- DECIDE coordinate helpers (FUN_005a44f0 / 5a4510 / 0059a0e0 / 5b11f0) -----------
+# The per-team-side orientation + vec-compose primitives the per-player DECIDE
+# (FUN_005a3400) and the positioning fn (FUN_005b73a0) call. Pure functions of the match
+# orientation bit (match+0x19a0 & 1), the team (player+0x2b8), and the input vec(s).
+# Oracle-pinned bit-for-bit by tools/re/run_decidehelper_oracle.sh ->
+# specs/decidehelper_oracle.txt, locked in test_decidehelper.gd.
+
+
+## FUN_005a44f0 (__thiscall match; team): the goal-target X for `team` -- match+0x1820,
+## negated when (match+0x19a0 & 1) == team. (Disasm 0x5a4505 `jne` skips the neg, so the
+## neg fires on EQUAL.)
+static func goal_target_x(orient_19a0: int, x_1820: int, team: int) -> int:
+	if (orient_19a0 & 1) == team:
+		return Pm98Trig._i32(-x_1820)
+	return Pm98Trig._i32(x_1820)
+
+
+## FUN_005a4510 / FUN_0059a0e0: mirror a vec3 to `team`'s attacking side -- negate x and y
+## when (match+0x19a0 & 1) ^ team != 0, copy z. 5a4510 takes match+team explicitly;
+## 0059a0e0 derives both from the player (player+0x18c->match, player+0x2b8 team) but
+## computes the identical formula, so both map here.
+static func mirror_to_side(orient_19a0: int, team: int, v: Array) -> Array:
+	if ((orient_19a0 & 1) ^ team) != 0:
+		return [Pm98Trig._i32(-v[0]), Pm98Trig._i32(-v[1]), Pm98Trig._i32(v[2])]
+	return [Pm98Trig._i32(v[0]), Pm98Trig._i32(v[1]), Pm98Trig._i32(v[2])]
+
+
+## FUN_005b11f0 (__thiscall out; in2d, z): compose a 3-vec from a 2-vec + an explicit z.
+## out = [in2d[0], in2d[1], z]. The binary ignores in2d[2].
+static func vec_compose(in2d: Array, z: int) -> Array:
+	return [Pm98Trig._i32(in2d[0]), Pm98Trig._i32(in2d[1]), Pm98Trig._i32(z)]

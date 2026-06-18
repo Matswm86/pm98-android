@@ -326,6 +326,56 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   +37). No regression (selectactive 24+125, movement 60, marktarget 8, assignmarker 77, relmatrix
   128, dispatch 366, events 85, predicates 147, resolver tree/gate, engine ALL PASS; boots 0
   SCRIPT ERROR). NEXT bottom-up: `FUN_005a5460` (vtable[+4]) then `FUN_005a3400` (the DECIDE bulk).
+- **Stage 3 task 2 — the 3 DECIDE coordinate helpers PORTED + oracle-validated DONE.** Ported into
+  `Pm98Movement.gd`: `goal_target_x` (FUN_005a44f0; the goal-target X for a team = match+0x1820,
+  negated when `(match+0x19a0 & 1) == team` -- the `jne` at 0x5a4505 means neg fires on EQUAL),
+  `mirror_to_side` (FUN_005a4510 AND FUN_0059a0e0 -- both negate x,y when `(match+0x19a0 & 1) ^ team
+  != 0` and copy z; 5a4510 takes match+team explicitly, 0059a0e0 derives them from the player but
+  computes the identical formula, so both map to one fn), and `vec_compose` (FUN_005b11f0; out =
+  `[in2d[0], in2d[1], z]`, in2d[2] ignored). All `__thiscall`, verified against disasm (the
+  Ghidra decompile dropped the implicit `this` at the 5a3400 call sites). Oracle
+  `tools/re/run_decidehelper_oracle.sh` drives the 3 REAL fns under PCodeEmu (match struct
+  @0x210000, vecs @0x200000; pure integer, NO LUT/ftol), banking `specs/decidehelper_oracle.txt`
+  (6 fixtures: goal-target eq/ne/eq0, mirror flip/noflip, compose). Locked by `test_decidehelper.gd`
+  (13 checks, all PASS). No regression (decidehelper 13 + movement 60 + selectactive 24+125 +
+  marktarget 8 + assignmarker 77 + relmatrix 128 + trig 72 + engine PASS; boots 0 SCRIPT ERROR).
+
+### FUN_005a3400 DECODED STRUCTURE (the per-player DECIDE; decoded 2026-06-18 -- cite, don't re-derive)
+`__fastcall(ECX=player)`. The per-player movement-target / set-piece-positioning computer. **NO net
+RNG**: the only RNG touch is `s=FUN_005ec240()` (GET state @0x6d3184) ... `FUN_004e9630` ...
+`FUN_005ec230(s)` (SET state back) -- a save/restore bracket that DISCARDS any draw, so the seed is
+unchanged (FUN_005ec230=`DAT_006d3184=x`, FUN_005ec240=`return DAT_006d3184`). Two top-level gates:
+- **`DAT_006d31c4`** (the replay global; the SAME family as FUN_005a4560/FUN_005ed870; **0 in
+  headless**): when `!= 0`, the function copies player pos/vel from the +0x38 replay buffer -- the
+  REPLAY path, **OUT OF SCOPE**. When `== 0` (our case) it runs the real compute below.
+- **`DAT_006d31c4` also gates FUN_005ed870** (called at the top): in headless it just does
+  `FUN_005bbf10(player+0x38,0)` (queue-grow) + `player+0x3c=0` -- replay-buffer housekeeping, no
+  movement effect. Treat as a no-op for parity (document the +0x38/+0x3c buffer as out-of-scope).
+Real-compute structure (DAT_006d31c4==0):
+1. **Prologue + bbox (decomp lines ~45-146):** set `player+0x3a4` = ±match+0x1820 (goal X by side).
+   Branch on the on-pitch flag `player+0x2bc`: off-pitch -> a default target box from match+0x1820 /
+   const 0x108000 oriented by side; on-pitch -> `mirror_to_side` x2 (player+0x1f8,+0x204 ->
+   player+0x1e0..+500) + compose/planar from player+0x228/+0x230. Copy the 6-int target to
+   player+0x210; seed bbox player+0x218=0xffff0000 / +0x224=0x12c0000; then 12 min/max clamps build
+   the bbox `player+0x210..+0x224` from +0x1e0..+500 and +0x1ec..+500.
+2. **Field reset + facing + position (lines ~147-177):** zero player +0x3b4/+0x48/+0x90/+0x54/+0x58/
+   +0x68/+0x6c/+0x20..+0xc/+4/+8; facing `player+0x34 & +0x64` = `(side ? 0x8000 : 0)` (180deg if
+   away); `player+0xb0` from a table (match+0x188 +0x13c + player+0x2cc*4), `player+0x61=1` if
+   nonzero; `FUN_005a5430(player+0x2bc==0 ? 0x1e : 0)` (set position code, reads static LUT
+   &DAT_00665208; clears +0x2c/+0x30 on remap -- TODO extract the LUT like PHASE2_LUT).
+3. **Set-piece switch on `match+0x448` (lines ~179-end):** cases 2 / 3 / 4+5 / default. Each branches
+   on "am I the designated taker" (`player == match+0x438`). The taker path: stamina `player+0x48 =
+   (taker-flag ? 0x2d0 : 0) + 0xb4` (taker-flag = teaminfo(+0x184)+0x2ee set AND phase0 via 5943b0
+   AND player+0x5c), `FUN_005a5430(case-specific pos: 0/0x13/0x1d)`, then aim at the ball/spot using
+   the ported leaves (590aa0/590ae0/5ee080/5ee0f0/5ee2d0/5b12c0) + goal_target_x. Non-taker paths set
+   the move target from the bbox / a defensive spot. `FUN_0058eca0(player)` sets engagement
+   (player+0x44/+0x48/+0x4c/+0x54/+0x80 + a match counter) -- sim-mutating, port it for the switch.
+**Sim-mutations** (the port must write all): player +0x4/+8/+0xc (move target), +0x20..+0x30,
++0x34/+0x64 (facing s16), +0x40 (pos), +0x48, +0x54/+0x58, +0x61, +0x68/+0x6c, +0x80, +0x90, +0xb0,
++0x1e0..+0x224 (target + bbox), +0x3a4, +0x3b4. **Slice plan:** (A) prologue+bbox; (B) reset+facing+
+pos (needs FUN_005a5430 + its DAT_00665208 LUT); (C) the switch case-by-case (needs FUN_0058eca0).
+**Oracle:** set up a player struct + match struct + teaminfo; stub FUN_005bbf10 (queue-grow) as the
+5b8f20 oracle did; inject ftol + cos/atan LUT; read back the mutated player fields.
 
 ### MOVEMENT-AI SUBSYSTEM MAP (decoded 2026-06-18 -- cite, don't re-derive)
 The driver calls, per team per tick (4 call-sites 0x593f38 / 0x598955 / 0x5a1433 / 0x5a1530, each

@@ -1,0 +1,8 @@
+# Stage 3 task 2 DECIDE helpers (FUN_005a44f0/5a4510/5b11f0) PCode-emu ground truth.
+# Row: FIX <name> fn=<addr> in=<input ints, csv> out=<scalar | 3-int vec>. signed LE.
+FIX gt_eq fn=5a44f0 in=1,1081344,1 out=4293885952
+FIX gt_ne fn=5a44f0 in=0,1081344,1 out=1081344
+FIX gt_eq0 fn=5a44f0 in=0,524288,0 out=4294443008
+FIX mir_flip fn=5a4510 in=1,0,196608,-262144,65536 out=4294770688,262144,65536
+FIX mir_noflip fn=5a4510 in=1,1,196608,-262144,65536 out=196608,4294705152,65536
+FIX compose fn=5b11f0 in=327680,-131072,458752 out=327680,4294836224,458752
