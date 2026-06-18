@@ -302,3 +302,100 @@ static func _select_roles(ctx: Dictionary) -> void:
 		if dist < best_ball:
 			ctx[0x204] = i
 			best_ball = dist
+
+
+# =============================================================================
+# Slice 3: per-player marking-target selection (the leaf of FUN_005b94f0).
+#   select_mark_target = FUN_005b36f0 (__fastcall this=player) -- a PURE selector
+#   that returns the opponent index our player p_idx should mark (or -1). The
+#   caller (FUN_005b94f0, the marker-assignment pass) writes the +0x150/+0x154
+#   marker links; this function only reads + returns. NO RNG. Disasm-verified
+#   0x5b36f0..0x5b3a03 (validity box/alt modes, the 0x18000/0x13333 out-of-box
+#   mul16 penalty, the /15 x-gap mul16 penalty, the reciprocity inner loop).
+#
+# STRUCT MODEL (extends the matrix model): the player's own team descriptor (binary
+# player+0x184) provides {base,count} = ctx["players"]/size + the tactical fields
+# 0x2fc/0x300/0x310, modelled as ctx["team_desc"]; the opponent descriptor (player
+# +0x188) = ctx[0x138][0x78c]/size. The current mark target (player+0xb0) and the
+# return value are opponent INDICES (-1 = none). The 8690 relationship-matrix dists
+# at _dist_off(slot, team) are consumed for both the candidate score and reciprocity.
+
+## FUN_005b36f0. Returns the opp index to mark, or -1.
+static func select_mark_target(ctx: Dictionary, p_idx: int) -> int:
+	var players: Array = ctx.get("players", [])
+	var m: Dictionary = ctx.get(0x138, {})
+	var opp: Array = m.get(0x78c, [])
+	var td: Dictionary = ctx.get("team_desc", {})
+	var p: Dictionary = players[p_idx]
+
+	# Keep the current target while it stays valid (no search).
+	var tgt_idx := int(p.get(0xb0, -1))
+	if tgt_idx >= 0:
+		var tgt: Dictionary = opp[tgt_idx]
+		var valid: bool
+		if _g(td, 0x310) == 0:                              # box mode: target inside box (inclusive)
+			valid = _in_box_incl(p, tgt)
+		else:                                               # alt mode: within a distance band
+			var scale := _g(m, 0x1820)
+			var thr1 := _g(td, 0x300) + scale
+			var thr2 := _g(td, 0x2fc) + scale
+			var band := absi(Pm98Trig._i32(_g(p, 0x1e0) - _g(p, 0x3a4)))
+			var tx := absi(Pm98Trig._i32(_g(tgt, 0x4) + _g(tgt, 0x3a4)))
+			valid = (tx < thr1) if band < thr1 else (tx < thr2)
+		if valid:
+			return tgt_idx
+
+	# Scan for a new target: lowest score AND reciprocal (p is its nearest defender).
+	var best := MATRIX_INIT
+	var result := tgt_idx                                   # fallback = current target
+	var p_metric := absi(Pm98Trig._i32(_g(p, 0x4) - _g(p, 0x3a4)))   # FUN_005b1c40(p)
+	for k in opp.size():
+		var cand: Dictionary = opp[k]
+		if _g(cand, 0x154) != 0:                            # already a marker target -> skip
+			continue
+		var score := _g(p, _dist_off(_g(cand, 0x2c4), _g(cand, 0x2b8)))   # matrix dist p->cand
+		if not _in_box_excl(p, cand):                       # out of box -> inflate score
+			score = Pm98Trig.mul16(score, 0x13333 if _g(td, 0x310) != 0 else 0x18000)
+		var cand_metric: int
+		if _g(p, 0x2b8) == _g(cand, 0x2b8):
+			cand_metric = absi(Pm98Trig._i32(_g(cand, 0x4) - _g(cand, 0x3a4)))   # FUN_005b1c40
+		else:
+			cand_metric = absi(Pm98Trig._i32(_g(cand, 0x4) + _g(cand, 0x3a4)))   # FUN_005b1c60
+		if cand_metric <= p_metric:                         # x-gap penalty
+			score = Pm98Trig.mul16(score, absi(Pm98Trig._i32(_g(cand, 0x4) - _g(p, 0x4))) / 0xf + 0x10000)
+		if _g(cand, 0x2bc) != 0 and score < best:
+			# reciprocity: find the nearest of OUR team to this candidate.
+			var rbest := MATRIX_INIT
+			var rnearest := -1
+			for r in players.size():
+				var rp: Dictionary = players[r]
+				if _g(rp, 0x2bc) == 0:
+					continue
+				var rd := _g(cand, _dist_off(_g(rp, 0x2c4), _g(rp, 0x2b8)))
+				if rd < rbest:
+					rbest = rd
+					rnearest = r
+			if rnearest == p_idx:
+				best = score
+				result = k
+	return result
+
+
+## Inclusive marking-box test (validity path): p+0x210..+0x224 contains q's xyz.
+static func _in_box_incl(p: Dictionary, q: Dictionary) -> bool:
+	if _g(p, 0x210) > _g(q, 0x4) or _g(q, 0x4) > _g(p, 0x21c):
+		return false
+	if _g(p, 0x214) > _g(q, 0x8) or _g(q, 0x8) > _g(p, 0x220):
+		return false
+	if _g(p, 0x218) > _g(q, 0xc) or _g(q, 0xc) > _g(p, 0x224):
+		return false
+	return true
+
+
+## Exclusive marking-box test (candidate path): strict bounds on all three axes.
+static func _in_box_excl(p: Dictionary, q: Dictionary) -> bool:
+	return (
+		_g(p, 0x210) < _g(q, 0x4) and _g(q, 0x4) < _g(p, 0x21c)
+		and _g(p, 0x214) < _g(q, 0x8) and _g(q, 0x8) < _g(p, 0x220)
+		and _g(p, 0x218) < _g(q, 0xc) and _g(q, 0xc) < _g(p, 0x224)
+	)

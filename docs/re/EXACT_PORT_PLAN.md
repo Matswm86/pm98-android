@@ -205,8 +205,28 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   harness. Locked by `app/tests/test_relmatrix.gd` (128 checks: 32 readbacks/fixture = all matrix slots both
   directions + +0x17c/+0x180 + the 3 role slots + tick, bit-exact). No regression (movement 60 + dispatch 366 +
   events 85 + predicates 147 + resolver tree/gate + trig 30 + engine PASS; boots 0 SCRIPT ERROR).
+- **Stage 3 task 2 — movement slice 3 (marking-target selector leaf) PORTED + oracle-validated DONE.**
+  `FUN_005b36f0` (__fastcall this=player) ported to `Pm98Movement.select_mark_target(ctx, p_idx)` -- a PURE
+  selector (disasm-verified: writes only stack locals) that returns the opp index our player should mark, the
+  leaf of the marker-assignment pass `FUN_005b94f0`. Keeps the current target (player+0xb0) while still valid
+  (inside the marking box +0x210..+0x224 INCLUSIVE in box mode team_desc+0x310==0, or `abs(tgt.x+tgt.anchor)`
+  within a `team_desc+0x300/+0x2fc + match+0x1820` band in alt mode); else scans unmarked (+0x154==0) opponents
+  (descriptor player+0x188 = {base,count}), scores each by the 8690 relationship-matrix dist
+  `player+0xe4+(slot+team*11)*4`, inflated by `mul16` when OUT of the box (EXCLUSIVE/strict test; penalty
+  0x18000 box-mode / 0x13333 alt) and by an x-gap term (`abs(cand.x-p.x)/15 + 0x10000`), and returns the lowest-
+  scoring one for which p is ALSO that opponent's nearest defender (reciprocity, scanning player+0x184 = our team
+  {base,count}). The trivial helpers `FUN_005b1c40` (abs(x-anchor), null->0xc80000) / `FUN_005b1c60`
+  (abs(x+anchor)) / `FUN_005edfa0` (==`Pm98Trig.mul16`) are inlined. NO RNG and NO float-import -> the oracle
+  needs NO _ftol/LUT injection (just poke state, read EAX). **Subtlety pinned by the oracle:** the strict
+  candidate box test EXCLUDES the boundary (a player at z==zmin is "out of box" and penalized) -- the port
+  matches bit-for-bit. Oracle `tools/re/run_marktarget_oracle.sh` drives the REAL `FUN_005b36f0` (EAX = returned
+  target pointer), 8 fixtures (keep_box / keep_alt / invalid_search / search_pick / recip_filter / taken_skip /
+  penalty_box / penalty_flip -- the last proves the out-of-box penalty CONSTANT by flipping the winner), banked to
+  `specs/marktarget_oracle.txt`. Locked by `app/tests/test_marktarget.gd` (8 checks: returned opp index, bit-exact).
+  No regression (relmatrix 128 + movement 60 + dispatch 366 + events 85 + predicates 147 + resolver tree/gate +
+  trig 30 + engine PASS; boots 0 SCRIPT ERROR).
 - **NEXT = Stage 3 task 2 (driver + the rest of movement physics).** Predicates + event-queue + dispatcher +
-  the nearest-to-ball selector + the relationship matrix/roles are now ported. The 38 movement decompiles are extracted to
+  the nearest-to-ball selector + the relationship matrix/roles + the marking-target leaf are now ported. The 38 movement decompiles are extracted to
   `docs/re/move/` (largest: player-move/AI `0x5b73a0` 4834B, phase-selector `0x5b8f20` 1169B, relationship-
   matrix `0x5b8690` 964B, marker-assign `0x5b94f0` 631B, `0x5b36f0` 788B, player-move `0x5b70e0` 692B). Driver
   `00598740` (904-line C dump) + `005983f0`/`00598690` + the movement physics 2 levels down (callees
@@ -214,8 +234,10 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   `0x5b8690` (relationship matrix), `0x5b8f20` (phase selector, calls the now-ported `0x5b8ce0` as fallback),
   the two player-move fns `0x5b70e0`/`0x5b73a0`, and `0x5b6ee0` from 005983f0 -- all in `docs/re/move/`) --
   real ball coordinates come from the `Pm98Trig` LUT. Suggested next bottom-up order: `0x5b8690` (matrix) DONE ->
-  `0x5b94f0` (marker assignment, +0x150/+0x154; uses `0x5b70b0/c0` accessors + `0x5b8c90` in-possession + `0x5b13c0`
-  + `0x5b36f0`) then `0x5b8f20` (phase selector, sits directly on the now-ported `0x5b8ce0` as its fallback) then
+  `0x5b36f0` (mark-target leaf) DONE -> `0x5b94f0` (marker-assignment PASS that calls it: a 3-pass driver --
+  possession-change reset `0x5b13c0` per player, the +0x150/+0x154 clears, then the `0x5b36f0` assignment + the
+  +0x150==0 fallback pass; gated on `0x5b8c90` "we are NOT in possession" + the `0x5b70b0`/`0x5b70c0` accessors)
+  then `0x5b8f20` (phase selector, sits directly on the now-ported `0x5b8ce0` as its fallback) then
   the player-move fns (`0x5b70e0`/`0x5b73a0`, watch RNG order) then the driver `00598740`. The
   dispatcher (`005966d0`) it calls is DONE. Inject
   the LUT for the movement oracle via `tools/re/emit_lut_membts.py` (same trick `run_keeper_oracle.sh` /

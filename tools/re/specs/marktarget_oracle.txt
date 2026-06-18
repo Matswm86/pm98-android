@@ -1,0 +1,11 @@
+# Stage 3 task 2 slice 3 marking-target (FUN_005b36f0) ground truth (PCode emu; pure
+# selector, no float-import, EAX = returned target pointer). Each row: FIX <name> CALL line.
+# bases: Q0=0x240000 Q1=0x2403bc ; null=0 (EAX -> opp index via (EAX-0x240000)/0x3bc)
+FIX keep_box CALL 0 RET steps=44 EAX=2359296
+FIX invalid_search CALL 0 RET steps=299 EAX=2359296
+FIX keep_alt CALL 0 RET steps=46 EAX=2359296
+FIX search_pick CALL 0 RET steps=294 EAX=2359296
+FIX recip_filter CALL 0 RET steps=353 EAX=2360252
+FIX taken_skip CALL 0 RET steps=201 EAX=2360252
+FIX penalty_box CALL 0 RET steps=344 EAX=2360252
+FIX penalty_flip CALL 0 RET steps=268 EAX=2359296
