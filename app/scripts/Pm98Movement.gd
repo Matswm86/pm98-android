@@ -161,3 +161,144 @@ static func _ref(d: Dictionary, off: int) -> Dictionary:
 ## FUN_005943b0: match phase (match+0x468 -> +0xfa0) == 0.
 static func _phase0(m: Dictionary) -> bool:
 	return _g(_ref(m, 0x468), 0xfa0) == 0
+
+
+# =============================================================================
+# Slice 2: the per-tick relationship matrix + role selection.
+#   build_relationship_matrix = FUN_005b8690 (__fastcall this=sim-ctx) -- throttled
+#     to every 8th call (ctx+0x2e0 counter & 7). Builds, per player, the pairwise
+#     angle + projected-planar-distance to every other player (own team in this
+#     context's slots, opponents in the other team's slots), plus +0x17c (nearest
+#     opponent) and +0x180 (nearest opponent IN FRONT, within a ~65deg facing cone).
+#     team-0's context additionally fills the cross-team half + every opponent's
+#     fields, then calls _select_roles. NO RNG.
+#   _select_roles = FUN_005b8a60 (called at 8690's tail) -- pick three OUR-team role
+#     players into ctx role slots. NO RNG (the only float op is ftol(sqrt) ball dist).
+#
+# Disasm-verified (0x5b8690..0x5b8a4f + 0x5b8a60..0x5b8be8): tick gate `inc;and 7`,
+# team-0 init gate `[ctx+8]==0`, opponent-seed const 0x3e80000 (1000.0), the cos/sin
+# LUT reads (== Pm98Trig.cos_a/sin_a), the muladd16 projection (FUN_005edfb0), the
+# atan (FUN_005ee080 == Pm98Trig.atan_angle), and 8a60's plain 3D ftol(sqrt(dx^2+
+# dy^2+dz^2)) (x87 seq @5b8b81..5b8bb5, no axis scaling -- same metric as _ball_dist).
+#
+# MATRIX LAYOUT (per player, byte-offset keys, matching the binary's struct):
+#   angle[slot + team*11] : short  at 0xb8 + (slot + team*0xb)*2   (s16, ang - facing)
+#   dist [slot + team*11] : int32  at 0xe4 + (slot + team*0xb)*4   (projected planar)
+#   +0x17c : nearest-opponent planar dist (int32, seed 1000.0)
+#   +0x180 : nearest-opponent-in-front dist (int32, seed 1000.0, ~65deg cone)
+# `slot` is the player's loop index == its +0x2c4; `team` its +0x2b8. The matrix keys
+# never collide with the select_nearest fields (0x4/0x8/0xc/0x34/0x2b8/0x2bc/0x2c4/
+# 0x3a4/0x54/0x58/0x5c/0x5d/0x184/0x18c) so both slices share one player Dict.
+
+const MATRIX_INIT := 0x3e80000   # 1000.0 (16.16): +0x17c / +0x180 seed
+const ROLE_INIT := 0x27100000    # 10000.0 (16.16): 8a60 min-ball / min-anchor seed
+const FRONT_CONE := 0x2e39       # ~65deg half-cone for the +0x180 nearest-in-front gate
+
+
+static func _angle_off(slot: int, team: int) -> int:
+	return 0xb8 + (slot + team * 0xb) * 2
+
+
+static func _dist_off(slot: int, team: int) -> int:
+	return 0xe4 + (slot + team * 0xb) * 4
+
+
+## Player facing angle, a `short` at +0x34.
+static func _facing(p: Dictionary) -> int:
+	return Pm98Trig._s16(_g(p, 0x34))
+
+
+## FUN_005b8690. Mutates ctx (+ its players + the opponents at match+0x78c) in place.
+static func build_relationship_matrix(ctx: Dictionary) -> void:
+	var tick := (int(ctx.get(0x2e0, 0)) + 1) & 7
+	ctx[0x2e0] = tick
+	if tick != 0:                                       # throttle: 1 in 8 calls works
+		return
+	var players: Array = ctx.get("players", [])
+	var team := _g(ctx, 0x8)
+	var m: Dictionary = ctx.get(0x138, {})
+	var opp: Array = m.get(0x78c, [])
+	var opp_n := int(m.get(0x790, 0))
+
+	# team-0 context seeds every opponent's nearest / nearest-in-front to 1000.0.
+	if team == 0:
+		for k in opp_n:
+			opp[k][0x17c] = MATRIX_INIT
+			opp[k][0x180] = MATRIX_INIT
+
+	var n := players.size()
+	for i in n:
+		var pi: Dictionary = players[i]
+		# within-team: each unordered pair (i, j), j > i, stored both directions.
+		for j in range(i + 1, n):
+			var pj: Dictionary = players[j]
+			var dx := Pm98Trig._i32(_g(pj, 0x4) - _g(pi, 0x4))
+			var dy := Pm98Trig._i32(_g(pj, 0x8) - _g(pi, 0x8))
+			var ang := Pm98Trig.atan_angle(dx, dy)
+			var proj := Pm98Trig.muladd16(dx, Pm98Trig.cos_a(ang), dy, Pm98Trig.sin_a(ang))
+			pi[_angle_off(j, team)] = Pm98Trig._s16(ang - _facing(pi))
+			pj[_angle_off(i, team)] = Pm98Trig._s16(ang - _facing(pj) - 0x8000)
+			pj[_dist_off(i, team)] = proj
+			pi[_dist_off(j, team)] = proj
+		# cross-team half (team-0 context only). Opponents live in team slot 1.
+		if team == 0:
+			pi[0x17c] = MATRIX_INIT
+			pi[0x180] = MATRIX_INIT
+			for k in opp_n:
+				var qk: Dictionary = opp[k]
+				var dx := Pm98Trig._i32(_g(qk, 0x4) - _g(pi, 0x4))
+				var dy := Pm98Trig._i32(_g(qk, 0x8) - _g(pi, 0x8))
+				var ang := Pm98Trig.atan_angle(dx, dy)
+				var proj := Pm98Trig.muladd16(dx, Pm98Trig.cos_a(ang), dy, Pm98Trig.sin_a(ang))
+				pi[_angle_off(k, 1)] = Pm98Trig._s16(ang - _facing(pi))
+				qk[_angle_off(i, 0)] = Pm98Trig._s16(ang - _facing(qk) - 0x8000)
+				qk[_dist_off(i, 0)] = proj
+				pi[_dist_off(k, 1)] = proj
+				pi[0x17c] = mini(_g(pi, 0x17c), proj)
+				qk[0x17c] = mini(_g(qk, 0x17c), proj)
+				# nearest-IN-FRONT gates: read the angle just written into the matrix.
+				var a_pi := Pm98Trig._s16(_g(pi, _angle_off(_g(qk, 0x2c4), _g(qk, 0x2b8))))
+				if absi(a_pi) < FRONT_CONE:
+					pi[0x180] = mini(_g(pi, 0x180), proj)
+				var a_qk := Pm98Trig._s16(_g(qk, _angle_off(_g(pi, 0x2c4), _g(pi, 0x2b8))))
+				if absi(a_qk) < FRONT_CONE:
+					qk[0x180] = mini(_g(qk, 0x180), proj)
+	_select_roles(ctx)
+
+
+## FUN_005b8a60. Pick three OUR-team role players into ctx role slots (indices into
+## ctx["players"], -1 = unset; match+0x1650 controller is likewise an index):
+##   +0x1fc = furthest-from-anchor   (max |x - +0x3a4|)
+##   +0x200 = nearest-to-anchor      (min |x - +0x3a4|)
+##   +0x204 = in-possession candidate = nearest on-pitch player to the ball (3D),
+##            forced to the controller (match+0x1650) when its team is ours.
+## Only on-pitch players (+0x2bc != 0) count. Strict comparisons -> ties keep first.
+static func _select_roles(ctx: Dictionary) -> void:
+	var players: Array = ctx.get("players", [])
+	var team := _g(ctx, 0x8)
+	var m: Dictionary = ctx.get(0x138, {})
+	var bx := _g(m, 0x1614)
+	var by := _g(m, 0x1618)
+	var bz := _g(m, 0x161c)
+	var best_ball := ROLE_INIT
+	var min_anchor := ROLE_INIT
+	var max_anchor := 0
+	var ctrl := int(m.get(0x1650, -1))
+	if ctrl >= 0 and _g(m, 0x1664) == team:
+		ctx[0x204] = ctrl
+		best_ball = 0
+	for i in players.size():
+		var p: Dictionary = players[i]
+		if _g(p, 0x2bc) == 0:                           # off-pitch -> skip
+			continue
+		var anchor := absi(Pm98Trig._i32(_g(p, 0x4) - _g(p, 0x3a4)))
+		if anchor > max_anchor:
+			ctx[0x1fc] = i
+			max_anchor = anchor
+		if anchor < min_anchor:
+			ctx[0x200] = i
+			min_anchor = anchor
+		var dist := _ball_dist(p, bx, by, bz)
+		if dist < best_ball:
+			ctx[0x204] = i
+			best_ball = dist

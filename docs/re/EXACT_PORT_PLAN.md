@@ -183,16 +183,40 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   independent. Banked `specs/movement_oracle.txt`; locked by `app/tests/test_movement.gd` (60 checks: active
   index + all three +0x5c flags + the velocity reset, all bit-exact). No regression (dispatch 366 + events 85 +
   predicates 147 + tree 56 + gate + trig 30 + engine PASS; boots 0 SCRIPT ERROR).
+- **Stage 3 task 2 — movement slice 2 (relationship matrix + role selection) PORTED + oracle-validated DONE.**
+  `FUN_005b8690` (__fastcall this=sim-ctx) ported to `Pm98Movement.build_relationship_matrix` and its tail-call
+  `FUN_005b8a60` to `Pm98Movement._select_roles`. 8690 is THROTTLED: increments ctx+0x2e0 (`inc;and 7`) and only
+  works on the wrap to 0 (every 8th call). When it runs it builds, per player, the pairwise angle (atan
+  `FUN_005ee080` == `Pm98Trig.atan_angle`, minus facing +0x34) at `0xb8+(slot+team*11)*2` (s16) and the projected
+  PLANAR distance (cos/sin LUT reads == `Pm98Trig.cos_a/sin_a` + muladd16 `FUN_005edfb0`) at `0xe4+(slot+team*11)*4`
+  (int32), plus +0x17c (nearest-opponent dist) and +0x180 (nearest-opponent-IN-FRONT, ~65deg cone 0x2e39, seed
+  1000.0=0x3e80000). team-0's context (gate `[ctx+8]==0`) additionally seeds every opponent (match+0x78c, count
+  +0x790), fills the cross-team half + the opponents' fields, and tail-calls 8a60. 8a60 picks 3 OUR-team role
+  players into ctx +0x1fc/+0x200/+0x204 = furthest-from-anchor (max |x - +0x3a4|) / nearest-to-anchor / nearest-
+  to-ball-3D (`ftol(sqrt(dx^2+dy^2+dz^2))`, x87 seq @5b8b81..5b8bb5 disasm-confirmed NO axis scaling = same metric
+  as select_nearest's _ball_dist; box-gate is just a sqrt-skip optimization == `dist<best`), the last forced to the
+  controller match+0x1650 when match+0x1664 == our team. NO RNG. The matrix never collides with the select_nearest
+  player fields, so both slices share one player Dict. **Matrix layout is a UNIFIED 22-entry array** (own team in
+  this context's slots 0..10, opponents in slots 11..21); +0xce/+0x110 are just slot-11 bases (0xb8+11*2 / 0xe4+11*4).
+  Oracle `tools/re/run_relmatrix_oracle.sh` drives the REAL `FUN_005b8690` (which executes 8a60 internally) under
+  PCode emu, 4 fixtures (t0_2v2 full path + the +0x180 cone split / t1_within team-1 within-only at the +11 slots
+  with nonzero facings / tick_skip the &7 throttle / ctrl_forced the controller role-force), banked verbatim to
+  `specs/relmatrix_oracle.txt` (one `CALL 0 RET ... mem[..]=..` line/fixture). REUSED the injected-_ftol + LUT-inject
+  harness. Locked by `app/tests/test_relmatrix.gd` (128 checks: 32 readbacks/fixture = all matrix slots both
+  directions + +0x17c/+0x180 + the 3 role slots + tick, bit-exact). No regression (movement 60 + dispatch 366 +
+  events 85 + predicates 147 + resolver tree/gate + trig 30 + engine PASS; boots 0 SCRIPT ERROR).
 - **NEXT = Stage 3 task 2 (driver + the rest of movement physics).** Predicates + event-queue + dispatcher +
-  the nearest-to-ball selector are now ported. The 38 movement decompiles are extracted to
+  the nearest-to-ball selector + the relationship matrix/roles are now ported. The 38 movement decompiles are extracted to
   `docs/re/move/` (largest: player-move/AI `0x5b73a0` 4834B, phase-selector `0x5b8f20` 1169B, relationship-
   matrix `0x5b8690` 964B, marker-assign `0x5b94f0` 631B, `0x5b36f0` 788B, player-move `0x5b70e0` 692B). Driver
   `00598740` (904-line C dump) + `005983f0`/`00598690` + the movement physics 2 levels down (callees
   `0x5a1820` (5x), `0x5b94f0` (marker-assign, DONE-adjacent), `0x5b8c20`/`0x5b8bf0` (vtable dispatch loops),
   `0x5b8690` (relationship matrix), `0x5b8f20` (phase selector, calls the now-ported `0x5b8ce0` as fallback),
   the two player-move fns `0x5b70e0`/`0x5b73a0`, and `0x5b6ee0` from 005983f0 -- all in `docs/re/move/`) --
-  real ball coordinates come from the `Pm98Trig` LUT. Suggested next bottom-up order: `0x5b8690` (matrix) then
-  `0x5b8f20` (phase selector, sits directly on `0x5b8ce0`) then the player-move fns then the driver. The
+  real ball coordinates come from the `Pm98Trig` LUT. Suggested next bottom-up order: `0x5b8690` (matrix) DONE ->
+  `0x5b94f0` (marker assignment, +0x150/+0x154; uses `0x5b70b0/c0` accessors + `0x5b8c90` in-possession + `0x5b13c0`
+  + `0x5b36f0`) then `0x5b8f20` (phase selector, sits directly on the now-ported `0x5b8ce0` as its fallback) then
+  the player-move fns (`0x5b70e0`/`0x5b73a0`, watch RNG order) then the driver `00598740`. The
   dispatcher (`005966d0`) it calls is DONE. Inject
   the LUT for the movement oracle via `tools/re/emit_lut_membts.py` (same trick `run_keeper_oracle.sh` /
   `run_dispatch_oracle.sh` use). **KILL-TEST** for task 2 = full-match event-stream parity (fixed seed +
