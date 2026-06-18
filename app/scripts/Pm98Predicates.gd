@@ -14,8 +14,10 @@ extends RefCounted
 ##                  + z/y clamp-and-reflect with velocity damping.
 ##   * traj_copy  = FUN_0058f100 -- copy the ball's target trajectory to +0x90..0x98.
 ##   * post_bar   = FUN_0058fbe0 -- post/bar collision: clamp + reflect velocity.
-## The keeper-reach save FUN_0058f140 is the next increment (deepest entanglement:
-## keeper struct, atan_angle geometry, the 0x15/0x16 enqueue path).
+##   * keeper_save = FUN_0058f140 -- keeper-reach save: box/reach test + ball+0x61
+##                  latch + atan_angle reach geometry + deflect-write. Returns
+##                  {ret, save}; the save-stat bump + 0x15/0x16 event enqueue
+##                  (FUN_005909f0 -> FUN_00594470) are deferred to driver task 2.
 ##
 ## Like Pm98Resolver, `b` (ball) and `m` (match) are offset->int Dictionaries that
 ## are MUTATED in place exactly as the binary mutates the structs. Sound/commentary
@@ -33,6 +35,13 @@ static func _g(d: Dictionary, off: int) -> int:
 ## sign bucket: +1 when v >= 0, -1 when v < 0 (the binary's `((-1<v)-1 & ~1)+1`).
 static func _sign(v: int) -> int:
 	return 1 if v >= 0 else -1
+
+
+## clamp v into [lo, hi] = min(hi, max(lo, v)); mirrors the keeper-box clamp asm
+## (max(lo,v) via cmp/cmov then min(hi,.)). Assumes lo <= hi as the goal box always is.
+static func _clamp(v: int, lo: int, hi: int) -> int:
+	var r := lo if lo > v else v
+	return hi if hi < r else r
 
 
 ## FUN_005ee1c0 on the ball velocity vector (+0x20/+0x24/+0x28): each *= s >> 16.
@@ -153,3 +162,65 @@ static func post_bar(b: Dictionary, m: Dictionary) -> int:
 			if reflected:
 				_damp_velocity(b)
 	return 1
+
+
+## FUN_0058f140: keeper-reach save. Classifies a live shot against the keeper's
+## expanded reach box + goal mouth, latches the reach state in ball+0x61, and on the
+## "was-reachable, now shooting past" edge runs the keeper-save geometry (an atan
+## reach gate through the arctan LUT) and writes the deflection target (+0x90/+0x94/
+## +0x98). `k` is the keeper struct (offset->int Dictionary); the keeper's own
+## match-context (keeper+0x18c) is the same match `m` in play, so the kmatch reads
+## (goal line +0x1820, possession +0x19a0) use `m`. DAT_006d31c4 is 0 in-sim.
+##
+## Returns {ret, save}: ret = the binary's bool return (1 = out-of-reach shot that
+## survives the 0x61 latch -> deflection written; 0 = in-reach or latch not armed).
+## save = whether the keeper-save fires -- the EXACT gate the binary uses to call
+## FUN_005909f0 (bump the keeper save-stat + maybe enqueue commentary event 0x15/0x16).
+## That stat increment + event enqueue (-> FUN_00594470, the match event queue) is
+## driver-integration (Stage 3 task 2); keeper_save exposes the validated boolean.
+## Oracle-validated bit-for-bit: tools/re/run_keeper_oracle.sh -> specs/keeper_oracle.txt.
+static func keeper_save(b: Dictionary, m: Dictionary, k: Dictionary) -> Dictionary:
+	var x := Pm98Trig._i32(_g(b, 4))
+	var y := Pm98Trig._i32(_g(b, 8))
+	var z := Pm98Trig._i32(_g(b, 0xc))
+	# Expanded keeper box: match+0x1828..+0x1830 (min) / +0x1834..+0x183c (max), +-0xccc.
+	var min_x := Pm98Trig._i32(_g(m, 0x1828)) - 0xccc
+	var min_y := Pm98Trig._i32(_g(m, 0x182c)) - 0xccc
+	var min_z := Pm98Trig._i32(_g(m, 0x1830)) - 0xccc
+	var max_x := Pm98Trig._i32(_g(m, 0x1834)) + 0xccc
+	var max_y := Pm98Trig._i32(_g(m, 0x1838)) + 0xccc
+	var max_z := Pm98Trig._i32(_g(m, 0x183c)) + 0xccc
+	var inside := not (x < min_x or max_x < x or y < min_y or max_y < y or z < min_z or max_z < z)
+
+	var line := Pm98Trig._i32(_g(m, 0x1820))
+	var bvar12 := 0 if (inside or (absi(y) < 0x3a8f5 and absi(x) <= line + 0x10000 and z < 0x270a3)) else 1
+
+	# ball+0x61 reach latch: bit0 is SET whenever in-reach (bvar12==0); the save path
+	# survives only on the out-of-reach edge while the latch is already odd.
+	var b9 := (_g(b, 0x61) | (1 if bvar12 == 0 else 0)) & 0xff
+	b[0x61] = b9
+	bvar12 = bvar12 & b9          # byte AND; bvar12 in {0,1}
+	if bvar12 == 0:
+		return {"ret": bvar12, "save": false}
+
+	var save_fired := false
+	if _g(b, 0x4c) == 0 and _g(b, 0x50) != 0:
+		# DAT_006d31c4 == 0 in-sim -> run the keeper-reach geometry, then clear the keeper.
+		var sgn_sel := (1 - _g(k, 0x2b8)) ^ (_g(m, 0x19a0) & 1)
+		var gline := line if sgn_sel != 0 else -line      # signed goal line (kmatch+0x1820)
+		var kx := Pm98Trig._i32(_g(k, 4))
+		var ky := Pm98Trig._i32(_g(k, 8))
+		# angle keeper->goal-line vs keeper->ball; keeper+0x34 cancels (k34 - k34).
+		var a1 := Pm98Trig.atan_angle(gline - kx, -ky)
+		var a2 := Pm98Trig.atan_angle(x - kx, y - ky)
+		if absi(Pm98Trig._s16(a2 - a1)) < 0x3555:
+			if absi(Pm98Trig._i32(_g(k, 0x3a4) + kx)) < 0x370000:
+				save_fired = true
+		b[0x50] = 0
+
+	# Deflection target: clamp the ball into the RAW goal box, zero z, nudge y outward.
+	b[0x90] = _clamp(x, Pm98Trig._i32(_g(m, 0x1828)), Pm98Trig._i32(_g(m, 0x1834)))
+	b[0x98] = 0
+	var oy := _clamp(y, Pm98Trig._i32(_g(m, 0x182c)), Pm98Trig._i32(_g(m, 0x1838)))
+	b[0x94] = Pm98Trig._i32(oy + _sign(oy) * 0x6666)
+	return {"ret": bvar12, "save": save_fired}

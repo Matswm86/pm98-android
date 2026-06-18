@@ -87,7 +87,22 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   floor-shift helper backs every fixed-point `>>`. Locked by `app/tests/test_trig_lut.gd` (30 checks:
   every LUT entry vs banked `tools/re/specs/{cos,atan}_lut.txt` + checksums + structural invariants +
   reader vectors). No regression (tree/gate/engine PASS; app boots clean, 0 SCRIPT ERROR).
-- **Stage 3 task 3 (3 of 4 scoring predicates PORTED + oracle-validated) DONE.** `FUN_0058ede0`
+- **Stage 3 task 3 (4 of 4 scoring predicates PORTED + oracle-validated) DONE.** `FUN_0058f140`
+  (keeper-reach save) is the 4th and last: expanded keeper-box test + goal-mouth reach logic ->
+  `bvar12`, the ball+0x61 reach LATCH (bit0 set in-reach; save survives only on the out-of-reach edge
+  while latched), the keeper-reach geometry (two `atan_angle` calls keeper->goal-line vs keeper->ball,
+  `abs(s16(a2-a1)) < 0x3555` AND `abs(keeper+0x3a4 + keeper.x) < 0x370000`), and the deflect-write
+  (clamp ball into the RAW goal box -> +0x90/+0x94, +0x98=0, then `+0x94 += sign*0x6666`). Ported as
+  `Pm98Predicates.keeper_save(b,m,k) -> {ret, save}`. The keeper's match-context (keeper+0x18c) is the
+  same match in play, so kmatch reads use `m`; `keeper+0x34` cancels (k34-k34). The save-stat bump +
+  0x15/0x16 commentary enqueue (`FUN_005909f0` -> `FUN_00594470`, the match event queue) is deferred to
+  driver task 2 -- `keeper_save` returns `save`, the EXACT gate, oracle-validated. Oracle
+  `tools/re/run_keeper_oracle.sh` (LUT injected via `emit_lut_membts.py`; match+0x462=0 isolates the
+  save counter at keeper+0x3b8+0x80 from the event queue) -> `specs/keeper_oracle.txt` (7 fixtures incl.
+  one that FIRES the save + a negative-clamp). Locked by `test_predicates.gd` (now 147 checks; +49 keeper
+  checks: ret + 0x61 latch + keeper-clear + deflect vec + save-fired, all bit-exact). No regression (trig
+  30 + tree 56 + gate + engine PASS; boots 0 SCRIPT ERROR).
+- **Stage 3 task 3 (first 3 of 4 scoring predicates) DONE earlier.** `FUN_0058ede0`
   (goal-area test + match+0x462 height-band bits + z/y clamp-and-reflect with 0x9eb8 velocity damping),
   `FUN_0058f100` (target-trajectory copy to +0x90/+0x94/+0x98), and `FUN_0058fbe0` (post/bar collision:
   clamp + reflect+damp) ported to `app/scripts/Pm98Predicates.gd`. Validated DIRECTLY as standalone
@@ -100,15 +115,16 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   bit-exact). GDScript pitfall confirmed: `0x37333`=226099 (not 225587). Fixed `PcodeEmu.hexVal` to
   accept negative hex (`-0x...`) + added a stale-`.out` guard to the runner. No regression (trig 30 +
   tree 56 + gate + engine PASS; boots 0 SCRIPT ERROR).
-- **NEXT = Stage 3 task 2 (driver + movement) + the last predicate `FUN_0058f140` (keeper-reach save).**
-  Driver `00598740` (904-line C dump) + `005983f0`/`00598690` + the movement physics 2 levels down
-  (callees `0x5a1820`, `0x59a120`, the `0x5b7xxx/0x5b8xxx/0x5b9xxx` player-AI cluster) -- real ball
+- **NEXT = Stage 3 task 2 (driver + movement).** All 4 predicates are now ported, so the driver can
+  call them. Driver `00598740` (904-line C dump) + `005983f0`/`00598690` + the movement physics 2 levels
+  down (callees `0x5a1820`, `0x59a120`, the `0x5b7xxx/0x5b8xxx/0x5b9xxx` player-AI cluster) -- real ball
   coordinates come from the `Pm98Trig` LUT. The dispatcher `005966d0` (outcome 1-7 -> event enqueue,
-  353-line, entangled with display flag 0x180b + language tables). `FUN_0058f140` (keeper save) was
-  deferred from this increment: deepest entanglement (keeper struct, `atan_angle` geometry, the 6-int
-  box helpers `00590ba0/be0`, the 0x15/0x16 enqueue via `005909f0`, the DAT_006d31c4 branch) -- port
-  next with the LUT injected (`tools/re/emit_lut_membts.py`). **KILL-TEST** for task 2 = full-match
-  event-stream parity (fixed seed + fixed squads -> identical event stream + scoreline, N>=50).
+  353-line, entangled with display flag 0x180b + language tables). Driver integration also OWNS the
+  deferred event enqueue from `keeper_save.save` + the goal-area bits: wire `FUN_005909f0` (save-stat
+  bump + 0x15/0x16) -> `FUN_00594470` (match event queue) once `match+0x462` is live. Inject the LUT
+  for the movement oracle via `tools/re/emit_lut_membts.py` (same trick `run_keeper_oracle.sh` uses).
+  **KILL-TEST** for task 2 = full-match event-stream parity (fixed seed + fixed squads -> identical
+  event stream + scoreline, N>=50).
 
 ## Already decoded — cite + port, don't redo (see match_engine_re.md for detail)
 - RNG `FUN_005ec250` (MSVC LCG, state @0x6d3184) — already exact as `Pm98Rng`. Per-mil idiom

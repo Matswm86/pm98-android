@@ -51,3 +51,5 @@ app/shots/
 
 # transient predicate-oracle scratch
 tools/re/specs/_pred_run.*
+tools/re/specs/_keeper_run.*
+tools/re/specs/_lut_membts.txt

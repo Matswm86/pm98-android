@@ -176,6 +176,11 @@ depth `0x4ccc`. Decoded roles:
 - `0058f100` — copies the ball's target trajectory vector (`+0x40` → `+0x90/+0x94/+0x98`).
 - `0058f140` — **keeper-reach save geometry**: ball trajectory vs keeper (`+0x50`), keeper
   rating via `FUN_005ee080`, save if a distance metric `< 0x3555`; default reach `0xc80000`.
+  PORTED + oracle-validated as `Pm98Predicates.keeper_save` (Stage 3 task 3, all 4 done):
+  the angle metric is `abs(s16(atan(keeper->ball) - atan(keeper->goal-line))) < 0x3555` AND
+  `abs(keeper+0x3a4 + keeper.x) < 0x370000`; the ball+0x61 latch makes the save fire only on the
+  "was-reachable, now shooting past" edge. The save-stat bump + 0x15/0x16 commentary enqueue is
+  driver-task-2 integration; `keeper_save` returns the validated `save` boolean.
 
 **Verdict (resolves last session's item 1):** chance *volume* is fully emergent from this
 continuous 22-player ball physics — there is **no discrete "shots per team" parameter** to

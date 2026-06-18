@@ -1,0 +1,9 @@
+# Stage 3 keeper-save ground truth (oracle = PCode emu, LUT injected). cols decimal (32-bit unsigned).
+# name | ret | f61 | k50 | ox | oy | oz | save | RET?
+inside     | 0   | 1   | 2293760    | 0          | 0          | 0   | 0    | RET
+reach      | 0   | 1   | 2293760    | 0          | 0          | 0   | 0    | RET
+save       | 1   | 1   | 0          | 1114112    | 4294875546 | 0   | 1    | RET
+nofire     | 1   | 1   | 0          | 1048576    | 222822     | 0   | 0    | RET
+noarm      | 0   | 0   | 2293760    | 0          | 0          | 0   | 0    | RET
+nokeep     | 1   | 1   | 0          | 1048576    | 222822     | 0   | 0    | RET
+clampn     | 1   | 1   | 0          | 1048576    | 4294744474 | 0   | 0    | RET
