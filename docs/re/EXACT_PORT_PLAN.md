@@ -87,13 +87,28 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   floor-shift helper backs every fixed-point `>>`. Locked by `app/tests/test_trig_lut.gd` (30 checks:
   every LUT entry vs banked `tools/re/specs/{cos,atan}_lut.txt` + checksums + structural invariants +
   reader vectors). No regression (tree/gate/engine PASS; app boots clean, 0 SCRIPT ERROR).
-- **NEXT = Stage 3 tasks 2-3 (driver + movement + scoring predicates).** Driver `00598740` +
-  `005983f0`/`00598690` + the movement block (resolver 491-607) -- now unblocked, real ball
-  coordinates come from the `Pm98Trig` LUT. Then the dispatcher `005966d0` (outcome 1-7 -> event
-  enqueue) + the scoring predicates `0058ede0/0058f100/0058fbe0/0058f140` (goal-box height bands,
-  post/bar collision, keeper-reach geometry -- the keeper save uses `atan_angle`). These consume REAL
-  coordinates so they validate via full-match event-stream parity (fixed seed + fixed squads ->
-  identical event stream vs the original, N>=50 = the big kill-test), not the isolated origin tree.
+- **Stage 3 task 3 (3 of 4 scoring predicates PORTED + oracle-validated) DONE.** `FUN_0058ede0`
+  (goal-area test + match+0x462 height-band bits + z/y clamp-and-reflect with 0x9eb8 velocity damping),
+  `FUN_0058f100` (target-trajectory copy to +0x90/+0x94/+0x98), and `FUN_0058fbe0` (post/bar collision:
+  clamp + reflect+damp) ported to `app/scripts/Pm98Predicates.gd`. Validated DIRECTLY as standalone
+  functions: the predicates are pure functions of (ball, match) state, so the PCode emu drives the REAL
+  binary on constructed ball+match fixtures (NOT origin coords -- arbitrary positions/velocities) and
+  captures the mutated state. Helpers folded: `FUN_005ee1c0` velocity-damp (= mul16 each component),
+  sound `FUN_00590f00` (skipped via match+0x180a=0), keeper stat `FUN_005909f0` (no-op via ball+0x50=0).
+  Oracle `tools/re/run_predicate_oracle.sh` -> `specs/predicate_oracle.txt` (10 fixtures); locked by
+  `app/tests/test_predicates.gd` (98 checks: ret + b462 + ball y/z + vx/vy/vz + deflection vec, all
+  bit-exact). GDScript pitfall confirmed: `0x37333`=226099 (not 225587). Fixed `PcodeEmu.hexVal` to
+  accept negative hex (`-0x...`) + added a stale-`.out` guard to the runner. No regression (trig 30 +
+  tree 56 + gate + engine PASS; boots 0 SCRIPT ERROR).
+- **NEXT = Stage 3 task 2 (driver + movement) + the last predicate `FUN_0058f140` (keeper-reach save).**
+  Driver `00598740` (904-line C dump) + `005983f0`/`00598690` + the movement physics 2 levels down
+  (callees `0x5a1820`, `0x59a120`, the `0x5b7xxx/0x5b8xxx/0x5b9xxx` player-AI cluster) -- real ball
+  coordinates come from the `Pm98Trig` LUT. The dispatcher `005966d0` (outcome 1-7 -> event enqueue,
+  353-line, entangled with display flag 0x180b + language tables). `FUN_0058f140` (keeper save) was
+  deferred from this increment: deepest entanglement (keeper struct, `atan_angle` geometry, the 6-int
+  box helpers `00590ba0/be0`, the 0x15/0x16 enqueue via `005909f0`, the DAT_006d31c4 branch) -- port
+  next with the LUT injected (`tools/re/emit_lut_membts.py`). **KILL-TEST** for task 2 = full-match
+  event-stream parity (fixed seed + fixed squads -> identical event stream + scoreline, N>=50).
 
 ## Already decoded — cite + port, don't redo (see match_engine_re.md for detail)
 - RNG `FUN_005ec250` (MSVC LCG, state @0x6d3184) — already exact as `Pm98Rng`. Per-mil idiom

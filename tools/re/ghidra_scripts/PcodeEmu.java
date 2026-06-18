@@ -46,8 +46,11 @@ public class PcodeEmu extends GhidraScript {
 
     private long hexVal(String s) {
         s = s.trim();
+        boolean neg = s.startsWith("-");
+        if (neg) s = s.substring(1).trim();
         if (s.startsWith("0x") || s.startsWith("0X")) s = s.substring(2);
-        return new BigInteger(s, 16).longValue();
+        long v = new BigInteger(s, 16).longValue();
+        return neg ? -v : v;
     }
 
     private long decVal(String s) { return Long.parseLong(s.trim()); }

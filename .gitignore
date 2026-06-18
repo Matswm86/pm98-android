@@ -48,3 +48,6 @@ app/shots/
 # audio under app/ ARE committed on purpose — this is a public full-game clone of
 # Mats's own PM98 (per owner decision 2026-06-14). Only the raw source game files
 # (extracted/, *.rar, *.iso, *.PKF) stay out of git.
+
+# transient predicate-oracle scratch
+tools/re/specs/_pred_run.*

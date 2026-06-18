@@ -1,0 +1,12 @@
+# Stage 3 predicate ground truth (oracle = PCode emu). cols decimal (32-bit unsigned).
+# name | ret | b462 | y | z | vx | vy | vz | ox | oy | oz | RET?
+ede0_out      | 0   | 0   | 0          | 0          | 0          | 0          | 0          | 0          | 0          | 0          | RET
+ede0_low      | 1   | 24  | 4096       | 4096       | 0          | 0          | 0          | 0          | 0          | 0          | RET
+ede0_zclamp   | 1   | 2   | 4096       | 136970     | 5079       | 0          | 4294954598 | 0          | 0          | 0          | RET
+ede0_yclamp   | 1   | 9   | 226099     | 4096       | 5079       | 4294957138 | 0          | 0          | 0          | 0          | RET
+ede0_win1     | 1   | 2   | 4096       | 136970     | 0          | 0          | 0          | 0          | 0          | 0          | RET
+f100_copy     | 1   | 0   | 0          | 0          | 0          | 0          | 0          | 273        | 546        | 819        | RET
+f100_noarm    | 0   | 0   | 0          | 0          | 0          | 0          | 0          | 0          | 0          | 0          | RET
+fbe0_out      | 0   | 0   | 0          | 0          | 0          | 0          | 0          | 0          | 0          | 0          | RET
+fbe0_zcol     | 1   | 0   | 65536      | 164494     | 2539       | 5079       | 7618       | 1028916    | 216269     | 0          | RET
+fbe0_ycol     | 1   | 0   | 253623     | 65536      | 2539       | 4294959677 | 2539       | 1028916    | 216269     | 0          | RET
