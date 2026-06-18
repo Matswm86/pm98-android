@@ -298,6 +298,42 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   movement 60 + marktarget 8 + assignmarker 77 + relmatrix 128 + dispatch 366 + events 85 +
   predicates 147 + resolver tree/gate + trig 30 + engine PASS; boots 0 SCRIPT ERROR). **`FUN_005b8f20`
   is now COMPLETE (all 5 phase branches + the forced gate, every path oracle-pinned).**
+- **Stage 3 task 2 — movement leaf FUN_005b1260 (planar magnitude) PORTED + oracle-validated DONE.**
+  The reusable "length of a 2D vector via the trig LUT" primitive -> `Pm98Trig.planar_mag(x, y)`
+  = `muladd16(x, cos_a(ang), y, sin_a(ang))`, `ang = atan_angle(x, y)` (disasm 0x5b1260: atan ->
+  cos LUT read at `(ang+8>>4)` + sin at `(0x3ff8-ang>>4)` -> FUN_005edfb0). Composes only already-
+  validated Pm98Trig primitives; pinned INDEPENDENTLY by `tools/re/run_planarmag_oracle.sh` ->
+  `specs/planarmag_oracle.txt` (5 fixtures: x-axis 1.0, 3-4-5, neg diagonal, zero, skew) and
+  `test_trig_lut.gd` (now 35 checks; +5 planar_mag, bit-exact vs the REAL fn). Integer-only (no
+  _ftol); only the cos+atan LUTs injected. It is what FUN_005b70e0's nearest-search + FUN_005a3400
+  read for vector lengths. No regression (all suites PASS; boots 0 SCRIPT ERROR).
+
+### MOVEMENT-AI SUBSYSTEM MAP (decoded 2026-06-18 -- cite, don't re-derive)
+The driver calls, per team per tick (4 call-sites 0x593f38 / 0x598955 / 0x5a1433 / 0x5a1530, each
+a `5b70e0; 5b73a0` pair; the 5b8bf0/5b8c20 vtable loops are driven from 0x598b35..0x598baa):
+- **`FUN_005b70e0`** (692B, NO direct RNG): per-team shell. Resets role slots ctx+0x1fc/+0x200/
+  +0x2dc; loops players calling vtable[+4]; a phase-2-only "nearest on-pitch player to the special
+  point match+0x16a0/+0x16a4/+0x16a8" assignment (uses FUN_00590aa0 vec-store + FUN_005b1260 mag +
+  atan); resets the relmatrix tick ctx+0x2e0 to -1 + calls `_select_roles` (FUN_005b8a60, DONE).
+- **`FUN_005b73a0`** (4834B, **7 RNG draws** + C++ exception frames): per-team shell. Calls
+  build_relationship_matrix (FUN_005b8690, DONE) then the big set-piece/positioning logic. The
+  ONLY seed-parity-critical RNG in movement lives here -- the oracle MUST trace 0x5ec250 to pin
+  the draw order. Slice it (set-piece queue build / per-player positioning / the RNG tail).
+- **player vtable A @0x639224** (set in the ctor near 0x5b6e19): [+0]=0x5ed810 (dtor),
+  **[+4]=`FUN_005a5460`** (small; the per-player method 5b70e0 dispatches),
+  **[+8]=`FUN_005a3400`** (~1309 insns -- the per-player DECIDE / the AI bulk; driven by the
+  FUN_005b8bf0 vtable[+8] loop; calls 590aa0/590ae0/5943b0(DONE)/5ee080(DONE)/5ee0f0(DONE)/5ee2d0/
+  5b11f0/5b12c0(=planar_mag,DONE)/5bbf10(queue grow)/5ec230+5ec240(RNG save/restore, net-zero like
+  the dispatcher)/5ed870/...; NO net RNG draw),
+  **[+0xc]=`FUN_005a4560`** (~70 insns -- replay/record SAVE-STATE; copies 0x51 dwords of player
+  state to/from a history buffer at player+0x3b0, gated by globals 0x6d31bc/0x6d31c4/0x665d8c that
+  are 0 in headless play -> **NO effect on event-stream/scoreline parity; treat as out-of-scope**).
+- **Leaf inventory still to port** (mostly pure): 00590aa0 (vec3 store, trivial), 00590ae0 (vec3
+  subtract, trivial), 005ee2d0 + 005ee3f0 (move-toward-target-if-within-L∞-box, use ftol+polar_vec),
+  005b11f0/005b12c0, 005b04e0/005b0b40, 005a5430, 005a44f0/005a4510. FUN_005b1260 DONE.
+- **Suggested slice order:** the small leaves (590aa0/590ae0/5ee2d0/5ee3f0) -> FUN_005a5460
+  (vtable[+4]) -> FUN_005a3400 (the decide bulk, biggest single piece) -> FUN_005b70e0 shell ->
+  FUN_005b73a0 (RNG-order critical) -> driver 0x598740. vtable[+0xc] FUN_005a4560 = parity-no-op.
 - **NEXT = Stage 3 task 2 (driver + the rest of movement physics).** Predicates + event-queue + dispatcher +
   the nearest-to-ball selector + the relationship matrix/roles + the marking-target leaf + the marker-assignment PASS are now ported. The 38 movement decompiles are extracted to
   `docs/re/move/` (largest: player-move/AI `0x5b73a0` 4834B, phase-selector `0x5b8f20` 1169B, relationship-

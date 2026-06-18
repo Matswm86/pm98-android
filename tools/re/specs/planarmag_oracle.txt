@@ -1,0 +1,7 @@
+# Stage 3 task 2 movement leaf FUN_005b1260 (planar magnitude) PCode-emu ground truth.
+# Each row: 'FIX <name>' then the verbatim CALL line; EAX = muladd16(x,cos,y,sin).
+FIX v_xaxis CALL 0 RET steps=81 EAX=65536 mem[0x200000:4]=65536 mem[0x200004:4]=0
+FIX v_345 CALL 0 RET steps=84 EAX=327915 mem[0x200000:4]=196608 mem[0x200004:4]=262144
+FIX v_diag CALL 0 RET steps=84 EAX=185218 mem[0x200000:4]=4294836224 mem[0x200004:4]=131072
+FIX v_zero CALL 0 RET steps=55 EAX=0 mem[0x200000:4]=0 mem[0x200004:4]=0
+FIX v_skew CALL 0 RET steps=82 EAX=469017 mem[0x200000:4]=458752 mem[0x200004:4]=4294868992

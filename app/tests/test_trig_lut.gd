@@ -21,6 +21,7 @@ func _init() -> void:
 	_test_tables()
 	_test_structural()
 	_test_readers()
+	_test_planarmag()
 	print("")
 	if _fail == 0:
 		print("ALL PASS (%d checks)" % _pass)
@@ -130,3 +131,37 @@ func _test_readers() -> void:
 	_ok(Pm98Trig.atan_angle(0x8000, -0x10000) == -11548, "atan quadrant fold (neg p2)")
 	_ok(Pm98Trig.atan_angle(0, 0) == 0, "atan (0,0) = 0")
 	_ok(Pm98Trig.atan_angle(0x4000, 0x10000) == 13829, "atan steep case (p1<p2)")
+
+
+## Pm98Trig.planar_mag (= the REAL FUN_005b1260) vs run_planarmag_oracle.sh ground truth:
+## each FIX row is `... EAX=<mag> mem[0x200000:4]=<x> mem[0x200004:4]=<y>` (x/y LE u32).
+func _test_planarmag() -> void:
+	print("== planar_mag (FUN_005b1260) vs PCode-emu oracle ==")
+	var f := FileAccess.open(_spec_path("planarmag_oracle.txt"), FileAccess.READ)
+	if f == null:
+		_ok(false, "cannot open oracle " + _spec_path("planarmag_oracle.txt"))
+		return
+	while not f.eof_reached():
+		var line := f.get_line().strip_edges()
+		if not line.begins_with("FIX "):
+			continue
+		var toks := line.split(" ", false)
+		var name := toks[1]
+		var eax := 0
+		var x := 0
+		var y := 0
+		for t in toks:
+			if t.begins_with("EAX="):
+				eax = _s32(t.substr(4).to_int())
+			elif t.begins_with("mem[0x200000:4]="):
+				x = _s32(t.split("=")[1].to_int())
+			elif t.begins_with("mem[0x200004:4]="):
+				y = _s32(t.split("=")[1].to_int())
+		var got := Pm98Trig.planar_mag(x, y)
+		_ok(got == eax, "%s planar_mag(%d,%d): got %d want %d" % [name, x, y, got, eax])
+
+
+## Reinterpret a 32-bit value as signed (the oracle prints mem as unsigned LE).
+func _s32(v: int) -> int:
+	v &= 0xffffffff
+	return v - 0x100000000 if v >= 0x80000000 else v

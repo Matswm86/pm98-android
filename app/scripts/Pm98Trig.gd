@@ -122,6 +122,17 @@ static func scale_vec3(vx: int, vy: int, vz: int, s: int) -> Array:
 	return [mul16(vx, s), mul16(vy, s), mul16(vz, s)]
 
 
+## FUN_005b1260: LUT-approximated length of the 2D vector (x, y) -- the projection of (x,y)
+## onto its own unit direction. ang = atan_angle(x, y); return muladd16(x, cos_a(ang), y,
+## sin_a(ang)). The reusable planar magnitude the player-move fns (FUN_005b70e0 nearest-search,
+## FUN_005a3400 decide) call; integer-only. Disasm 0x5b1260: atan -> two cos-LUT reads (the cos
+## at (ang+8>>4), the sin at (0x3ff8-ang>>4)) -> FUN_005edfb0(x, cos, y, sin). Oracle-pinned by
+## run_planarmag_oracle.sh (specs/planarmag_oracle.txt) -> test_trig_lut.gd.
+static func planar_mag(x: int, y: int) -> int:
+	var ang := atan_angle(x, y)
+	return muladd16(x, cos_a(ang), y, sin_a(ang))
+
+
 ## FUN_005ee080: atan2-like angle (0x10000 = full circle) of the vector (p1, p2),
 ## via the arctan LUT. Returns a signed 16-bit angle. p1 is the first arg (esi),
 ## p2 the second (edi); the quadrant fold + sign flips are the binary's exactly.
