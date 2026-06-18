@@ -922,3 +922,81 @@ static func decide_slice_b(p: Dictionary, m: Dictionary) -> void:
 	p[0xc] = 0
 	# set_position_code(0x1e if off-pitch else 0). Neither code remaps -> +0x2c/+0x30 unchanged.
 	set_position_code(p, 0x1e if _g(p, 0x2bc) == 0 else 0)
+
+
+# ---- FUN_005a3400 the per-player DECIDE, slice C1 (set-piece switch, NON-TAKER paths) ----
+# The DAT_006d31c4==0 tail: a switch on the set-piece phase match+0x448 (disasm 0x5a37f8..
+# 0x5a44c4). For EACH non-default case the player either IS the set-piece taker
+# (player == match+0x438) or is not; this C1 slice ports the NON-TAKER move-target writes of
+# cases 3 / 6 / 7 plus the shared atan-facing tail and the default (no-op) exit.
+#
+# Per the switch `cmp eax,7 ; ja 0x5a44ba`: match+0x448 outside 2..7 jumps straight to the
+# clean RET *after* the facing tail (0x5a44ba), so DEFAULT leaves the move target and the
+# slice-B facing UNTOUCHED. Cases 3/6/7 non-taker pick a move target from the two slice-A
+# endpoint vectors (endpoint1 = +0x1e0/+0x1e4/+0x1e8, endpoint2 = +0x1ec/+0x1f0/+0x1f4):
+#   * case 3 (5a3b0f): same team as taker -> endpoint2 ; different team -> endpoint1.
+#   * case 6 (5a41cc): same team -> the per-axis midpoint of the two endpoints, each
+#     (endpoint2 + endpoint1) halved truncating toward zero ; different team -> endpoint1.
+#   * case 7 (5a43ea): same team -> endpoint2 ; off-pitch (+0x2bc==0) -> set_position_code(0x20),
+#     endpoint1, then move[0] += (ball.x(+0x90) >= 0 ? -0x5999 : +0x5999) ; else endpoint1.
+# Every non-taker case then recomputes facing in the common tail (0x5a4494/0x5a449e):
+# facing = atan( (ball+0x4 vec) - (player move target) ), an s16 WORD write to +0x34 / +0x64
+# (stored as the raw 16-bit pattern, like slice B). The ball is player+0x190.
+#
+# NOT yet ported (explicit guards): the TAKER branches of every case (player == match+0x438:
+# set_engagement + stamina + aim, with RNG in case 6) and cases 2 / 4 / 5 (the bbox-blend and
+# the .data set-piece position tables). Oracle-pinned bit-for-bit by
+# tools/re/run_decideC_oracle.sh -> specs/decideC_oracle.txt, locked in test_decideC.gd.
+
+
+## Copy one of the slice-A endpoint vectors into the move target (+0x4/+0x8/+0xc).
+static func _slice_c_set_move(p: Dictionary, ep: int) -> void:
+	p[0x4] = _g(p, ep)
+	p[0x8] = _g(p, ep + 4)
+	p[0xc] = _g(p, ep + 8)
+
+
+## Common facing tail: facing = atan((ball+0x4 vec) - move target), raw-s16 to +0x34 / +0x64.
+static func _slice_c_tail(p: Dictionary) -> void:
+	var ball: Dictionary = _ref(p, 0x190)
+	var r: Array = Pm98Trig.vec3_sub(
+		[_g(ball, 0x4), _g(ball, 0x8), _g(ball, 0xc)], [_g(p, 0x4), _g(p, 0x8), _g(p, 0xc)])
+	var facing := Pm98Trig.atan_angle(r[0], r[1]) & 0xffff
+	p[0x34] = facing
+	p[0x64] = facing
+
+
+## FUN_005a3400 slice C1. Mutates the player `p` in place (m = the player's +0x18c match).
+static func decide_slice_c(p: Dictionary, m: Dictionary) -> void:
+	var phase := _g(m, 0x448)
+	if phase < 2 or phase > 7:                                # switch default: clean RET, no rewrite
+		return
+	var taker: Dictionary = _ref(m, 0x438)
+	if is_same(p, taker):
+		push_error("decide_slice_c: taker path (player == match+0x438) not yet ported")
+		return
+	if phase == 2 or phase == 4 or phase == 5:
+		push_error("decide_slice_c: case %d not yet ported" % phase)
+		return
+	var same_team := _g(p, 0x2b8) == _g(taker, 0x2b8)
+	match phase:
+		3:
+			_slice_c_set_move(p, 0x1ec if same_team else 0x1e0)
+		6:
+			if same_team:                                    # per-axis midpoint, trunc toward zero
+				p[0x4] = Pm98Trig._tdiv(Pm98Trig._i32(_g(p, 0x1ec) + _g(p, 0x1e0)), 2)
+				p[0x8] = Pm98Trig._tdiv(Pm98Trig._i32(_g(p, 0x1f0) + _g(p, 0x1e4)), 2)
+				p[0xc] = Pm98Trig._tdiv(Pm98Trig._i32(_g(p, 0x1f4) + _g(p, 0x1e8)), 2)
+			else:
+				_slice_c_set_move(p, 0x1e0)
+		7:
+			if same_team:
+				_slice_c_set_move(p, 0x1ec)
+			elif _g(p, 0x2bc) == 0:                          # off-pitch taker-side wing offset
+				set_position_code(p, 0x20)
+				_slice_c_set_move(p, 0x1e0)
+				var off := -0x5999 if _g(_ref(p, 0x190), 0x90) >= 0 else 0x5999
+				p[0x4] = Pm98Trig._i32(_g(p, 0x4) + off)
+			else:
+				_slice_c_set_move(p, 0x1e0)
+	_slice_c_tail(p)

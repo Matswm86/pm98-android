@@ -406,6 +406,33 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   selectactive 24+125 + marktarget 8 + assignmarker 77 + relmatrix 128 + dispatch 366 + events 85 +
   predicates 147 + resolver tree/gate + trig 72 + engine ALL PASS; boots 0 SCRIPT ERROR). NEXT = slice C
   (the set-piece switch on match+0x448, dep set_engagement DONE).
+- **Stage 3 task 2 — FUN_005a3400 slice C1 (set-piece switch, NON-TAKER paths) PORTED + oracle-validated
+  DONE.** Ported into `Pm98Movement.gd` as `decide_slice_c(p, m)` + helpers `_slice_c_set_move` /
+  `_slice_c_tail` (disasm 0x5a37f8..0x5a44c4, the `DAT_006d31c4==0` switch tail). C1 covers the DEFAULT
+  exit + the NON-TAKER (`player != match+0x438`) move-target writes of cases 3/6/7 + the shared atan
+  facing tail. Per `cmp eax,7; ja 0x5a44ba`: phase outside 2..7 -> clean RET *after* the tail, so DEFAULT
+  leaves move + slice-B facing UNTOUCHED. Non-taker move target picks from the two slice-A endpoints
+  (ep1 = +0x1e0/+0x1e4/+0x1e8, ep2 = +0x1ec/+0x1f0/+0x1f4): case 3 same-team->ep2 / diff->ep1; case 6
+  same->per-axis midpoint `_tdiv(ep2+ep1, 2)` (trunc toward zero, confirmed by c6_negmid `(-8+3)/2=-2`)
+  / diff->ep1; case 7 same->ep2 / off-pitch(+0x2bc==0)->`set_position_code(0x20)`,ep1,then
+  `move[0] += (ball.x(+0x90)>=0 ? -0x5999 : +0x5999)` / else->ep1. Every non-taker case then recomputes
+  facing in the common tail (0x5a4494/0x5a449e): `facing = atan((ball+0x4 vec) - move)`, raw-s16 WORD
+  write to +0x34/+0x64 (ball = player+0x190). Leaf sigs verified vs disasm: `FUN_00590ae0` vec3_sub
+  (this-param), `FUN_005b12c0(dst6, src3a, src3b)` (NOT one src), `FUN_0058eca0(engager, target_ptr)`
+  (engager = ball, target = player on takers -- hence ball.engage(player) = take possession).
+  **NOT YET PORTED (explicit push_error guards):** all TAKER branches (`player == match+0x438`:
+  set_engagement + stamina `(taker-flag?0x2d0:0)+0xb4` + atan aim, RNG save/restore in case 6) and cases
+  2/4/5 (the bbox-blend via 5b12c0 + the `_DAT_00674330` .data set-piece position tables + the
+  `DAT_006742ec` one-time init). **Oracle:** `run_decideC_oracle.sh` drives the WHOLE real FUN_005a3400
+  with `DAT_006d31c4=0`, `match+0x448 in {3,6,7,8}`, `match+0x438 -> a DISTINCT taker T2@0x260000` (so
+  non-taker), `player+0x2cc=-1` (slice-B lookup skipped), ball@0x250000, taker@0x260000; cos/atan LUTs +
+  faithful `_ftol` injected (moveleaf trick) so the real `FUN_005ee080` atan emulates without fcos;
+  FUN_005bbf10 stubbed, FUN_005a5430/590ae0/5ee080 real. Banked `specs/decideC_oracle.txt` (10 fixtures:
+  c3_same/diff, c6_same/negmid/diff, c7_same/off_pos/off_neg/on_diff, default). Locked by `test_decideC.gd`
+  (**70 checks, ALL PASS**, parsed by abs addr; runs A->B->C). No regression (decideC 70 + decideB 100 +
+  decideA 78 + decideset 84 + decidehelper 13 + trig 72 + movement 60 + selectactive5b 125 + marktarget 8 +
+  assignmarker 77 + relmatrix 128 + dispatch 366 + events 85 ALL PASS; boots 0 SCRIPT ERROR). NEXT = slice
+  C2 (taker branches: ball-engage modelling + stamina + atan aim) then C3 (cases 2/4/5 + the .data tables).
 
 ### FUN_005a3400 DECODED STRUCTURE (the per-player DECIDE; decoded 2026-06-18 -- cite, don't re-derive)
 `__fastcall(ECX=player)`. The per-player movement-target / set-piece-positioning computer. **NO net
