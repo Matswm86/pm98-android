@@ -339,7 +339,16 @@ a `5b70e0; 5b73a0` pair; the 5b8bf0/5b8c20 vtable loops are driven from 0x598b35
   ONLY seed-parity-critical RNG in movement lives here -- the oracle MUST trace 0x5ec250 to pin
   the draw order. Slice it (set-piece queue build / per-player positioning / the RNG tail).
 - **player vtable A @0x639224** (set in the ctor near 0x5b6e19): [+0]=0x5ed810 (dtor),
-  **[+4]=`FUN_005a5460`** (small; the per-player method 5b70e0 dispatches),
+  **[+4]=`FUN_005a5460`** (4404B -- NOT "small"; the plan's earlier note was WRONG) = the per-player
+  match-VIEW overlay updater (sprintf player name + sprite/text draws via 0x51fd00/5f33xx/5f34xx +
+  fills the match render buffer at match+0x29b0..+0x2a10). **PARITY NO-OP, verified 2026-06-18:**
+  (1) its ENTIRE body is gated by `match+0x5fac != 0`; (2) `+0x5fac` has exactly ONE writer in the
+  whole binary -- the match ctor at 0x591524, which stores ebx, and ebx is `xor ebx,ebx` (the zero
+  reg used to clear ~7 adjacent init fields) -> `+0x5fac` is ALWAYS 0, so the body NEVER runs; and
+  (3) even if it ran it writes NO sim state (no writes to the player param_1, the ball, or any
+  match-sim field -- only the +0x29b0 render region + local draw lists). So FUN_005b70e0's
+  per-player vtable[+4] loop is a no-op for the event-stream/scoreline kill-test. DON'T PORT (the
+  vtable[+4] analogue of the vtable[+0xc] FUN_005a4560 replay no-op). Decompile docs/re/move/.
   **[+8]=`FUN_005a3400`** (~1309 insns -- the per-player DECIDE / the AI bulk; driven by the
   FUN_005b8bf0 vtable[+8] loop; calls 590aa0/590ae0/5943b0(DONE)/5ee080(DONE)/5ee0f0(DONE)/5ee2d0/
   5b11f0/5b12c0(=planar_mag,DONE)/5bbf10(queue grow)/5ec230+5ec240(RNG save/restore, net-zero like
@@ -352,9 +361,10 @@ a `5b70e0; 5b73a0` pair; the 5b8bf0/5b8c20 vtable loops are driven from 0x598b35
   (vec3_sub) + 005ee290 (vec3_scale_ratio) + 005ee2d0 (clamp_min_sep) + 005ee3f0 (mid_offset),
   all in `Pm98Trig.gd`, oracle-pinned by run_moveleaf_oracle.sh. FUN_005ee080 (atan_angle) +
   FUN_005ee0f0 (polar_vec) also DONE.
-- **Suggested slice order:** the small leaves DONE -> FUN_005a5460 (vtable[+4]) -> FUN_005a3400
-  (the decide bulk, biggest single piece) -> FUN_005b70e0 shell -> FUN_005b73a0 (RNG-order
-  critical) -> driver 0x598740. vtable[+0xc] FUN_005a4560 = parity-no-op.
+- **Suggested slice order:** the small leaves DONE; FUN_005a5460 (vtable[+4]) = parity-no-op (DON'T
+  port, see above) -> FUN_005a3400 (the decide bulk, biggest single piece, ~1309 insns) ->
+  FUN_005b70e0 shell -> FUN_005b73a0 (RNG-order critical) -> driver 0x598740. Both vtable[+4]
+  FUN_005a5460 AND vtable[+0xc] FUN_005a4560 are parity-no-ops (view/replay overlays).
 - **NEXT = Stage 3 task 2 (driver + the rest of movement physics).** Predicates + event-queue + dispatcher +
   the nearest-to-ball selector + the relationship matrix/roles + the marking-target leaf + the marker-assignment PASS are now ported. The 38 movement decompiles are extracted to
   `docs/re/move/` (largest: player-move/AI `0x5b73a0` 4834B, phase-selector `0x5b8f20` 1169B, relationship-
