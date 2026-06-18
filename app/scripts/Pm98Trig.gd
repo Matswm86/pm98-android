@@ -151,3 +151,83 @@ static func atan_angle(p1: int, p2: int) -> int:
 	if p2 < 0:
 		ang = -ang
 	return _s16(ang)
+
+
+# ---- vector geometry leaves (FUN_00590aa0 / 590ae0 / 5ee290 / 5ee2d0 / 5ee3f0) -------
+# The small per-tick movement geometry primitives the player-move shells (FUN_005b70e0)
+# and the per-player DECIDE (FUN_005a3400) call. All pure: no RNG, no persistent state.
+# A vec3 is modelled as a 3-int Array [x, y, z] (the binary's three int32 dword slots).
+# Each is oracle-pinned bit-for-bit by tools/re/run_moveleaf_oracle.sh ->
+# specs/moveleaf_oracle.txt, locked in test_trig_lut.gd._test_moveleaves.
+
+
+## Truncate-toward-zero integer divide -- the x86 `idiv` quotient. GDScript int `/`
+## already truncates toward zero (unlike `_asr`, which floors); this names the intent
+## so the fixed-point ports read unambiguously against the disasm.
+static func _tdiv(a: int, b: int) -> int:
+	return a / b
+
+
+## ftol(sqrt(dx^2 + dy^2 + dz^2)) -- the binary's unbound msvcrt _ftol truncates toward
+## zero, reproduced by int(sqrt()). The squared terms are exact in 64-bit; the oracle
+## uses perfect-square distances so the float64 sqrt lands on the same integer the x87
+## 80-bit fsqrt + ftol does (the same convention select_nearest/run_movement_oracle use).
+static func _dist3(dx: int, dy: int, dz: int) -> int:
+	return int(sqrt(float(dx * dx + dy * dy + dz * dz)))
+
+
+## FUN_00590aa0: write a vec3 (three dword stores, `ret 0xc`). Returns [x, y, z].
+static func vec3_store(x: int, y: int, z: int) -> Array:
+	return [_i32(x), _i32(y), _i32(z)]
+
+
+## FUN_00590ae0: component-wise a - b, each stored as int32 (`ret 0x8`; a=this, b=param_3).
+static func vec3_sub(a: Array, b: Array) -> Array:
+	return [_i32(a[0] - b[0]), _i32(a[1] - b[1]), _i32(a[2] - b[2])]
+
+
+## FUN_005ee290: scale a vec3 by the ratio mult/div, in place. Each component is
+## (v[i] * mult) / div with a 64-bit signed product (imul) then a truncating idiv.
+static func vec3_scale_ratio(v: Array, mult: int, div: int) -> Array:
+	return [_i32(_tdiv(v[0] * mult, div)), _i32(_tdiv(v[1] * mult, div)), _i32(_tdiv(v[2] * mult, div))]
+
+
+## FUN_005ee2d0: minimum-separation clamp. If p1 lies inside the L-inf box of half-size
+## `box` around p2 (each |delta| strictly < box) AND its Euclidean distance to p2 is
+## < box, push p1 OUT to exactly `box` from p2 along the (p1 - p2) direction (delta
+## scaled by box/dist via FUN_005ee290); if p1 == p2 exactly (dist == 0), offset p1 by
+## polar_vec(box, 0). Otherwise p1 is unchanged. Returns the (possibly new) p1.
+static func clamp_min_sep(p1: Array, p2: Array, box: int) -> Array:
+	var dx := _i32(p1[0] - p2[0])
+	var dy := _i32(p1[1] - p2[1])
+	var dz := _i32(p1[2] - p2[2])
+	if not (absi(dx) < box and absi(dy) < box and absi(dz) < box):
+		return [p1[0], p1[1], p1[2]]
+	var dist := _dist3(dx, dy, dz)
+	if dist >= box:
+		return [p1[0], p1[1], p1[2]]
+	if dist != 0:
+		var sd := vec3_scale_ratio([dx, dy, dz], box, dist)
+		return [_i32(sd[0] + p2[0]), _i32(sd[1] + p2[1]), _i32(sd[2] + p2[2])]
+	var off := polar_vec(box, 0)
+	return [_i32(p1[0] + off[0]), _i32(p1[1] + off[1]), _i32(p1[2] + off[2])]
+
+
+## FUN_005ee3f0: midpoint-offset. If p1 lies inside the L-inf box of half-size `box`
+## around p2 AND dist(p1, p2) < box, move p1 to p4 + the midpoint of (p1, p2):
+## p1[i] = p4[i] + trunc((p1[i] - p2[i]) / 2) + p2[i]. The /2 is the cdq/sub/sar
+## truncate-toward-zero idiom (NOT a floor). Otherwise p1 is unchanged. Returns p1.
+static func mid_offset(p1: Array, p2: Array, box: int, p4: Array) -> Array:
+	var dx := _i32(p1[0] - p2[0])
+	var dy := _i32(p1[1] - p2[1])
+	var dz := _i32(p1[2] - p2[2])
+	if not (absi(dx) < box and absi(dy) < box and absi(dz) < box):
+		return [p1[0], p1[1], p1[2]]
+	var dist := _dist3(dx, dy, dz)
+	if dist >= box:
+		return [p1[0], p1[1], p1[2]]
+	return [
+		_i32(p4[0] + _tdiv(dx, 2) + p2[0]),
+		_i32(p4[1] + _tdiv(dy, 2) + p2[1]),
+		_i32(p4[2] + _tdiv(dz, 2) + p2[2]),
+	]

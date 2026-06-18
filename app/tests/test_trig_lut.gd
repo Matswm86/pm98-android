@@ -22,6 +22,7 @@ func _init() -> void:
 	_test_structural()
 	_test_readers()
 	_test_planarmag()
+	_test_moveleaves()
 	print("")
 	if _fail == 0:
 		print("ALL PASS (%d checks)" % _pass)
@@ -159,6 +160,58 @@ func _test_planarmag() -> void:
 				y = _s32(t.split("=")[1].to_int())
 		var got := Pm98Trig.planar_mag(x, y)
 		_ok(got == eax, "%s planar_mag(%d,%d): got %d want %d" % [name, x, y, got, eax])
+
+
+## The vector geometry leaves (FUN_00590aa0/590ae0/5ee290/5ee2d0/5ee3f0) vs the
+## PCode-emu ground truth (run_moveleaf_oracle.sh). Each row is `FIX <name> fn=<addr>
+## in=<input ints, signed csv> out=<3 output int32s, unsigned LE>`. Dispatch by fn,
+## call the GDScript port with `in`, assert the 3 output components bit-for-bit.
+func _test_moveleaves() -> void:
+	print("== vector geometry leaves vs PCode-emu oracle ==")
+	var f := FileAccess.open(_spec_path("moveleaf_oracle.txt"), FileAccess.READ)
+	if f == null:
+		_ok(false, "cannot open oracle " + _spec_path("moveleaf_oracle.txt"))
+		return
+	var rows := 0
+	while not f.eof_reached():
+		var line := f.get_line().strip_edges()
+		if not line.begins_with("FIX "):
+			continue
+		var toks := line.split(" ", false)
+		var name := toks[1]
+		var fn := ""
+		var arr := PackedInt64Array()
+		var want := PackedInt64Array()
+		for t in toks:
+			if t.begins_with("fn="):
+				fn = t.substr(3)
+			elif t.begins_with("in="):
+				for s in t.substr(3).split(","):
+					arr.append(s.to_int())
+			elif t.begins_with("out="):
+				for s in t.substr(4).split(","):
+					want.append(_s32(s.to_int()))
+		var got: Array
+		match fn:
+			"590aa0":
+				got = Pm98Trig.vec3_store(arr[0], arr[1], arr[2])
+			"590ae0":
+				got = Pm98Trig.vec3_sub([arr[0], arr[1], arr[2]], [arr[3], arr[4], arr[5]])
+			"5ee290":
+				got = Pm98Trig.vec3_scale_ratio([arr[0], arr[1], arr[2]], arr[3], arr[4])
+			"5ee2d0":
+				got = Pm98Trig.clamp_min_sep([arr[0], arr[1], arr[2]], [arr[3], arr[4], arr[5]], arr[6])
+			"5ee3f0":
+				got = Pm98Trig.mid_offset(
+					[arr[0], arr[1], arr[2]], [arr[3], arr[4], arr[5]], arr[6], [arr[7], arr[8], arr[9]]
+				)
+			_:
+				_ok(false, "%s unknown fn tag %s" % [name, fn])
+				continue
+		rows += 1
+		for i in 3:
+			_ok(got[i] == want[i], "%s[%d] (fn %s): got %d want %d" % [name, i, fn, got[i], want[i]])
+	_ok(rows == 12, "moveleaf oracle had 12 fixtures (got %d)" % rows)
 
 
 ## Reinterpret a 32-bit value as signed (the oracle prints mem as unsigned LE).

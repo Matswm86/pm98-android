@@ -307,6 +307,25 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   `test_trig_lut.gd` (now 35 checks; +5 planar_mag, bit-exact vs the REAL fn). Integer-only (no
   _ftol); only the cos+atan LUTs injected. It is what FUN_005b70e0's nearest-search + FUN_005a3400
   read for vector lengths. No regression (all suites PASS; boots 0 SCRIPT ERROR).
+- **Stage 3 task 2 — the 5 small movement geometry leaves PORTED + oracle-validated DONE.**
+  Ported into `Pm98Trig.gd` (geometry-leaf section): `vec3_store` (FUN_00590aa0, 3 dword stores),
+  `vec3_sub` (FUN_00590ae0, a - b), `vec3_scale_ratio` (FUN_005ee290, `v *= mult/div` with a
+  64-bit `imul` then a truncating `idiv`), `clamp_min_sep` (FUN_005ee2d0, minimum-separation push:
+  if p1 is inside the L-inf box of half-size `box` around p2 AND `ftol(sqrt(dx^2+dy^2+dz^2)) < box`,
+  scale the delta out to `box` via FUN_005ee290, or offset by `polar_vec(box,0)` when p1==p2 exactly),
+  and `mid_offset` (FUN_005ee3f0, `p1 = p4 + p2 + trunc((p1-p2)/2)`). **Two trap discoveries
+  oracle-confirmed:** (1) the `/div` in 5ee290 and the `/2` in 5ee3f0 (cdq/sub/sar idiom) are
+  TRUNCATE-toward-zero, NOT floor -- `scale_negodd` (-7/2 -> -3) and `mid_negodd` (-3/2 -> -1) pin
+  it; a naive `_asr` floor would be WRONG on negative odd deltas. (2) the box test is strict `<`.
+  Added helpers `_tdiv` (truncating divide) + `_dist3` (`int(sqrt())` = ftol). Oracle
+  `tools/re/run_moveleaf_oracle.sh` drives all 5 REAL functions under PCodeEmu (faithful trunc
+  `_ftol` @0x252000 + IAT 0x6233a4 repoint; cos/atan LUT injected for 5ee2d0's polar branch;
+  perfect-square distances so ftol truncation is exact), banking `specs/moveleaf_oracle.txt`
+  (12 fixtures: store/sub, scale even+neg-odd+5:3, clamp move/no-box/no-dist/coincident-polar,
+  mid basic/neg-odd-trunc/no-box). Locked by `test_trig_lut.gd::_test_moveleaves` (now 72 checks;
+  +37). No regression (selectactive 24+125, movement 60, marktarget 8, assignmarker 77, relmatrix
+  128, dispatch 366, events 85, predicates 147, resolver tree/gate, engine ALL PASS; boots 0
+  SCRIPT ERROR). NEXT bottom-up: `FUN_005a5460` (vtable[+4]) then `FUN_005a3400` (the DECIDE bulk).
 
 ### MOVEMENT-AI SUBSYSTEM MAP (decoded 2026-06-18 -- cite, don't re-derive)
 The driver calls, per team per tick (4 call-sites 0x593f38 / 0x598955 / 0x5a1433 / 0x5a1530, each
@@ -328,12 +347,14 @@ a `5b70e0; 5b73a0` pair; the 5b8bf0/5b8c20 vtable loops are driven from 0x598b35
   **[+0xc]=`FUN_005a4560`** (~70 insns -- replay/record SAVE-STATE; copies 0x51 dwords of player
   state to/from a history buffer at player+0x3b0, gated by globals 0x6d31bc/0x6d31c4/0x665d8c that
   are 0 in headless play -> **NO effect on event-stream/scoreline parity; treat as out-of-scope**).
-- **Leaf inventory still to port** (mostly pure): 00590aa0 (vec3 store, trivial), 00590ae0 (vec3
-  subtract, trivial), 005ee2d0 + 005ee3f0 (move-toward-target-if-within-L∞-box, use ftol+polar_vec),
-  005b11f0/005b12c0, 005b04e0/005b0b40, 005a5430, 005a44f0/005a4510. FUN_005b1260 DONE.
-- **Suggested slice order:** the small leaves (590aa0/590ae0/5ee2d0/5ee3f0) -> FUN_005a5460
-  (vtable[+4]) -> FUN_005a3400 (the decide bulk, biggest single piece) -> FUN_005b70e0 shell ->
-  FUN_005b73a0 (RNG-order critical) -> driver 0x598740. vtable[+0xc] FUN_005a4560 = parity-no-op.
+- **Leaf inventory still to port** (mostly pure): 005b11f0/005b12c0, 005b04e0/005b0b40, 005a5430,
+  005a44f0/005a4510. **DONE:** FUN_005b1260 (planar_mag); 00590aa0 (vec3_store) + 00590ae0
+  (vec3_sub) + 005ee290 (vec3_scale_ratio) + 005ee2d0 (clamp_min_sep) + 005ee3f0 (mid_offset),
+  all in `Pm98Trig.gd`, oracle-pinned by run_moveleaf_oracle.sh. FUN_005ee080 (atan_angle) +
+  FUN_005ee0f0 (polar_vec) also DONE.
+- **Suggested slice order:** the small leaves DONE -> FUN_005a5460 (vtable[+4]) -> FUN_005a3400
+  (the decide bulk, biggest single piece) -> FUN_005b70e0 shell -> FUN_005b73a0 (RNG-order
+  critical) -> driver 0x598740. vtable[+0xc] FUN_005a4560 = parity-no-op.
 - **NEXT = Stage 3 task 2 (driver + the rest of movement physics).** Predicates + event-queue + dispatcher +
   the nearest-to-ball selector + the relationship matrix/roles + the marking-target leaf + the marker-assignment PASS are now ported. The 38 movement decompiles are extracted to
   `docs/re/move/` (largest: player-move/AI `0x5b73a0` 4834B, phase-selector `0x5b8f20` 1169B, relationship-

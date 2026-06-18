@@ -1,0 +1,15 @@
+# Stage 3 task 2 movement leaves (FUN_00590aa0/590ae0/5ee290/5ee2d0/5ee3f0) PCode-emu
+# ground truth. Row: FIX <name> fn=<addr> in=<input ints, csv> out=<3 output int32s>.
+# faithful _ftol @0x252000 + cos/atan LUT injected; outputs read back as signed LE u32.
+FIX store_basic fn=590aa0 in=65536,131072,-196608 out=65536,131072,4294770688
+FIX sub_basic fn=590ae0 in=327680,196608,-65536,131072,262144,65536 out=196608,4294901760,4294836224
+FIX scale_half fn=5ee290 in=262144,-196608,131072,1,2 out=131072,4294868992,65536
+FIX scale_negodd fn=5ee290 in=7,-7,0,1,2 out=3,4294967293,0
+FIX scale_ratio53 fn=5ee290 in=196608,-262144,65536,5,3 out=327680,4294530390,109226
+FIX clamp_move fn=5ee2d0 in=196608,262144,0,0,0,0,393216 out=235929,314572,0
+FIX clamp_nobox fn=5ee2d0 in=196608,0,0,0,0,0,131072 out=196608,0,0
+FIX clamp_nodist fn=5ee2d0 in=196608,262144,0,0,0,0,282624 out=196608,262144,0
+FIX clamp_coincide fn=5ee2d0 in=65536,65536,0,65536,65536,0,65536 out=131072,65636,0
+FIX mid_basic fn=5ee3f0 in=196608,262144,0,0,0,0,393216,1048576,1048576,0 out=1146880,1179648,0
+FIX mid_negodd fn=5ee3f0 in=5,0,0,8,0,0,65536,0,0,0 out=7,0,0
+FIX mid_nobox fn=5ee3f0 in=524288,0,0,0,0,0,131072,0,0,0 out=524288,0,0
