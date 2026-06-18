@@ -18,7 +18,13 @@ extends SceneTree
 ## Proven LUT-invariant (tools/re/check_lut_invariance.sh), so geometry is not needed.
 
 # Each fixture mirrors a row of resolver_tree.tmpl + its oracle result.
-# {pang, tang, pos, engaged, skill, hdr  ->  draws, state, bits, tstate}
+# {pang, tang, pos, engaged, skill, hdr  ->  draws, state, bits, tstate; g/o/a = stats
+#  +0x98/+0x9c/+0xa0, default 0}. The last two are bVar5-TRUE goal/save outcomes
+# (Stage 2c): they exercise the resolved-outcome block -- match+0x461 bit0 via the
+# FUN_0058fb50 goal-box port, bit2 = save (bvar7), and the stat counters. hi_face is
+# a save (bvar7 -> bit2 + stats o/a); hi_angle is an on-target miss (bvar5 set but no
+# save/goal -> bit0 ONLY, the direct kill-test for the FUN_0058fb50 port: the old
+# bvar17=0 stub would give bits=8 here, not the oracle's 9).
 const FIXTURES := [
 	{"name": "baseline",      "pang": 0, "tang": 0,       "pos": 0, "eng": 0, "skill": 0,    "hdr": 0,
 	 "draws": 4,  "state": 3884216597, "bits": 0, "tstate": 5},
@@ -32,6 +38,10 @@ const FIXTURES := [
 	 "draws": 7,  "state": 752224798,  "bits": 8, "tstate": 6},
 	{"name": "engaged_angle", "pang": 0, "tang": 0x4000,  "pos": 9, "eng": 1, "skill": 0x50, "hdr": 0x14,
 	 "draws": 8,  "state": 1924036713, "bits": 8, "tstate": 6},
+	{"name": "hi_face",       "pang": 0, "tang": 0,       "pos": 9, "eng": 0, "skill": 0x64, "hdr": 0x14,
+	 "draws": 7,  "state": 752224798,  "bits": 13, "tstate": 7, "g": 0, "o": 1, "a": 1},
+	{"name": "hi_angle",      "pang": 0, "tang": 0x4000,  "pos": 9, "eng": 0, "skill": 0x64, "hdr": 0x14,
+	 "draws": 8,  "state": 1924036713, "bits": 9, "tstate": 6, "g": 0, "o": 0, "a": 0},
 ]
 
 
@@ -55,6 +65,11 @@ func _run() -> bool:
 		ok = _eq("%s: final RNG state" % fx.name, rng.state, fx.state) and ok
 		ok = _eq("%s: match+0x461 bits" % fx.name, r.bits, fx.bits) and ok
 		ok = _eq("%s: target play-state" % fx.name, r.target_state, fx.tstate) and ok
+		# Stat counters (goals +0x98, off-target +0x9c, shots +0xa0) -- only the
+		# bVar5-true fixtures touch these; the rest assert they stay 0.
+		ok = _eq("%s: stats +0x98 (goals)" % fx.name, int(stats.get(0x98, 0)), fx.get("g", 0)) and ok
+		ok = _eq("%s: stats +0x9c (off-tgt)" % fx.name, int(stats.get(0x9c, 0)), fx.get("o", 0)) and ok
+		ok = _eq("%s: stats +0xa0 (shots)" % fx.name, int(stats.get(0xa0, 0)), fx.get("a", 0)) and ok
 
 	print("\n%s" % ("ALL PASS" if ok else "FAIL"))
 	return ok

@@ -17,6 +17,7 @@ zero    0x00210000 0x00000800
 zero    0x00220000 0x00001000
 zero    0x00230000 0x00001000
 zero    0x00240000 0x00001000
+zero    0x00250000 0x00002000          # team arena (FUN_0044ea40/ec00 deflection counters)
 # --- player P ---
 mem 0x0022002c 4 0x3                # P+0x2c play-state = 3
 mem 0x00220030 4 0x0                # P+0x30 = 0
@@ -30,6 +31,7 @@ mem 0x0022018c 4 0x00200000         # P+0x18c = &M
 mem 0x00220190 4 0x00200000         # P+0x190 (400) = &M
 mem 0x00220384 4 __SKILL__          # P+0x384 (900) skill
 mem 0x002203b8 4 0x00230000         # P+0x3b8 = &stats
+mem 0x002202b8 4 0x00250000         # P+0x2b8 = &team arena (FUN_0044ea40/ec00 base ptr)
 # --- target T ---
 mem 0x00210034 4 __TANG__           # T+0x34 facing angle
 mem 0x00210040 4 0x5                # T+0x40 = 5 (skip first block, enter tree)
@@ -40,6 +42,8 @@ mem 0x002103b8 4 0x00230000         # T+0x3b8 = &stats
 # --- match M incidentals ---
 mem 0x00200004 4 __HDR__            # M+4: header gate (8 < M+4 enables header block)
 mem 0x0020009c 4 0x00240000         # M+0x9c -> null struct
+mem 0x002019ac 4 0x1                # M+0x19ac != 0: divisor in the bvar5-true goal/save
+                                    #   stat update (lines 437/445); 0 would div0 -> HALT.
 mem 0x00200070 4 0x1                # M+0x70 != 0: gate OFF the tail movement block
                                     #   (lines 491-607) -- that is positional/coordinate
                                     #   work = Stage 3. Isolates the resolution tree so the

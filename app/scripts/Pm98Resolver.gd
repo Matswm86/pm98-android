@@ -94,6 +94,32 @@ static func _s16(v: int) -> int:
 	return v - 0x10000 if v >= 0x8000 else v
 
 
+## FUN_0058fb50: ball at (x,y,z) inside the match goal box (bounds m+0x1828..0x183c),
+## past the goal line (m+0x1820 - 0x108000 < |x|) and within |y| < 0x1428f5. Reads
+## the match struct only; pure geometry, LUT-free (compares already-resolved coords).
+static func _goal_box(x: int, y: int, z: int, m: Dictionary) -> bool:
+	var in_box := not (x < int(m.get(0x1828, 0)) or int(m.get(0x1834, 0)) < x \
+			or y < int(m.get(0x182c, 0)) or int(m.get(0x1838, 0)) < y \
+			or z < int(m.get(0x1830, 0)) or int(m.get(0x183c, 0)) < z)
+	return in_box and (int(m.get(0x1820, 0)) - 0x108000 < absi(x)) and (absi(y) < 0x1428f5)
+
+
+## The binary's sign bucket from `((-1 < v) - 1 & 0xfffffffe) + 1`: +1 when v >= 0, -1 when v < 0.
+static func _sign_bucket(v: int) -> int:
+	return 1 if v >= 0 else -1
+
+
+## L397-424: decide outcome bit0 (bVar17). FUN_0058fb50 on the shooter's ball coords
+## (P+4) AND sign_bucket(P+4) == sign_bucket(P+0x3a4); on miss it retries the target's
+## coords (T+4) with the sign test INVERTED (!=). Either hit sets bit0.
+static func _goal_box_hit(p: Dictionary, t: Dictionary, m: Dictionary) -> bool:
+	if _goal_box(int(p.get(4, 0)), int(p.get(8, 0)), int(p.get(0xc, 0)), m) \
+			and _sign_bucket(int(p.get(4, 0))) == _sign_bucket(int(p.get(0x3a4, 0))):
+		return true
+	return _goal_box(int(t.get(4, 0)), int(t.get(8, 0)), int(t.get(0xc, 0)), m) \
+			and _sign_bucket(int(t.get(4, 0))) != _sign_bucket(int(t.get(0x3a4, 0)))
+
+
 ## Faithful port of FUN_005aeda0's resolution tree (lines 120-485). `p`,`t`,`m`,
 ## `stats` are offset->int dicts; `rng` is MatchEngine.Pm98Rng. Returns
 ## {draws, bits, target_state, goal, save, off_target, header, enqueue}.
@@ -226,13 +252,18 @@ static func _resolve_outcome(p: Dictionary, t: Dictionary, m: Dictionary, stats:
 		dc: Array, res: Dictionary, bvar5: bool, bvar6: bool, bvar7: bool, bvar8: bool,
 		draw: Callable) -> Dictionary:
 	if bvar5:
-		# L392: suppress the save flag in some low-rated, already-flagged states.
-		if int(m.get(4, 0)) < 9 and bvar8 and int(p.get(0x2da, 0)) != 0:
-			bvar8 = false
+		# L392: low-rated already-flagged states clear the save flag. The C's
+		# `(bVar7 = false, bVar8)` comma-expr also forces bvar7 false whenever M+4 < 9
+		# (redundant -- bvar7 implies bvar6 implies M+4 > 8 -- but ported faithfully).
+		if int(m.get(4, 0)) < 9:
+			bvar7 = false
+			if bvar8 and int(p.get(0x2da, 0)) != 0:
+				bvar8 = false
 		m[0x43c] = 1
-		# L397/413 FUN_0058fb50 = "ball ends in the goal box?" -> bit0. Pure geometry
-		# on P+4; deferred to S3 (bvar5-true outcomes are not yet in the oracle matrix).
-		var bvar17 := 0
+		# L397-424: bit0 = "ball ends in the goal box" (FUN_0058fb50 + sign-bucket gate).
+		# Oracle-validated by hi_face/hi_angle in test_resolver_tree.gd (origin coords ->
+		# bvar17=1). Real ball coordinates arrive with the Stage-3 movement block + LUT.
+		var bvar17 := 1 if _goal_box_hit(p, t, m) else 0
 		var bits := int(m.get(0x461, 0))
 		bits = (bits & ~1) | bvar17
 		bits = (bits & ~4) | (int(bvar7) << 2)

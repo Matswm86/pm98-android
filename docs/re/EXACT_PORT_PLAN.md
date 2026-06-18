@@ -50,12 +50,32 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   24/24 assertions PASS across the 6 branch-covering fixtures -- draw count + final RNG state +
   match+0x461 bits + target play-state all bit-exact vs the oracle. No regression
   (test_resolver_gate + test_engine still PASS; app boots clean).
-- **NEXT = Stage 2c.** (1) Add a **bVar5-true fixture** to `run_tree_oracle.sh` (needs
-  `M+0x19ac != 0` to avoid div0 in `FUN_0044ea40`) to validate the goal/save block + stat
-  counters + the `FUN_0058fb50` goal-box bit0 (currently structurally ported, NOT yet oracle-
-  exercised -- all 6 fixtures end bVar5=false). (2) Port dispatcher `005966d0` (outcome 1-7 ->
-  event enqueue) + predicates `0058ede0/0058f100/0058fbe0/0058f140`. (3) Then Stage 3 = driver
-  `00598740` + the movement block (491-607) + the trig-LUT initializer (FPU-computed at boot).
+- **Stage 2c (goal/save block oracle-validated) DONE.** The bVar5-true resolved-outcome block
+  (resolver lines 391-464) is now exercised by the oracle, closing the "structurally ported, not
+  oracle-exercised" gap. `FUN_0058fb50` (ball-in-goal-box) + its sign-bucket bit0 gate (lines
+  397-424) ported EXACT to `Pm98Resolver._goal_box`/`_sign_bucket`/`_goal_box_hit`, replacing the
+  `bvar17=0` stub. Two bVar5-true fixtures added to `run_tree_oracle.sh` (skill 0x64): `hi_face`
+  (a save -> bit2 + stats +0x9c/+0xa0, exercises the M+0x19ac-div-guarded `FUN_0044ec00` path) and
+  `hi_angle` (an on-target miss -> bit0 ONLY, the direct kill-test for the goal-box port: the old
+  stub gives bits=8, the oracle says 9). Template now pokes `M+0x19ac != 0` (else div0->HALT in the
+  goal/save stat update, lines 437/445) + `P+0x2b8 -> &team arena` (the `FUN_0044ea40/ec00` base
+  ptr). The suppress-save block is now faithful to the C `(bVar7=false, bVar8)` comma-expr.
+  `test_resolver_tree.gd`: 56/56 PASS across 8 fixtures (draws + final state + bits + target-state +
+  stats g/o/a). The 6 bvar5=false fixtures reproduce byte-identical -> template additions don't
+  perturb them. No regression (gate + engine PASS; app boots clean, 0 SCRIPT ERROR).
+  NOTE: the bVar8 (goal) stat path -- stats +0x98, bit1, `FUN_0044ea40` -- is the structural MIRROR
+  of the validated bVar7 save path but is NOT independently oracle-pinned: with srand(1) in the
+  isolated origin-coord tree, the draw alignment yields saves/misses, never a goal (provably:
+  branch A needs thr<=350 AND thr>895 simultaneously). It validates end-to-end at Stage 3 when real
+  matches score goals.
+- **NEXT = Stage 3 (driver + movement + scoring predicates).** Driver `00598740` + the movement
+  block (491-607) + the trig-LUT initializer (FPU-computed at boot; no decompiled fn writes
+  `0x6d31c8` yet -- find via the boot-path call graph / a data-xref on the LUT store sites). The
+  dispatcher `005966d0` (outcome 1-7 -> event enqueue) + the scoring predicates
+  `0058ede0/0058f100/0058fbe0/0058f140` were originally slated for 2c but are **folded into Stage
+  3**: they consume REAL ball coordinates (goal-box height bands, post/bar collision, keeper-reach
+  geometry), so they cannot be oracle-exercised in the isolated origin-coord tree -- they validate
+  with the driver + LUT via full-match event-stream parity (the big kill-test).
 
 ## Already decoded — cite + port, don't redo (see match_engine_re.md for detail)
 - RNG `FUN_005ec250` (MSVC LCG, state @0x6d3184) — already exact as `Pm98Rng`. Per-mil idiom
