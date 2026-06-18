@@ -732,3 +732,74 @@ static func mirror_to_side(orient_19a0: int, team: int, v: Array) -> Array:
 ## out = [in2d[0], in2d[1], z]. The binary ignores in2d[2].
 static func vec_compose(in2d: Array, z: int) -> Array:
 	return [Pm98Trig._i32(in2d[0]), Pm98Trig._i32(in2d[1]), Pm98Trig._i32(z)]
+
+
+# ---- DECIDE state setters (FUN_005a5430 set-position-code / FUN_0058eca0 engage) ------
+# The two state-mutating leaves the per-player DECIDE (FUN_005a3400) calls to record a
+# player's assigned formation position and its current engagement target. Oracle-pinned
+# bit-for-bit by tools/re/run_decideset_oracle.sh -> specs/decideset_oracle.txt, locked in
+# test_decideset.gd.
+
+## The static position-remap table `&DAT_00665208` (int32 .data), extracted bit-for-bit from
+## MANAGER.EXE (file offset 0x263808, VA 0x665208). It maps each position code to its
+## "canonical" code; codes that are their own canonical entry (value == index) are unchanged,
+## the rest are remaps. The coherent table runs indices 0..0x49 (74 entries); a 0x01010101
+## byte-object begins at 0x4a, but FUN_005a5430 only indexes by position code (<= ~0x1e in
+## practice), so the boundary is never crossed.
+const POS_REMAP_LUT := [
+	0, 1, 2, 3, 0, 0, 10, 10, 0, 0, 0, 0, 12, 0, 14, 15,
+	0, 0, 18, 0, 0, 0, 10, 0, 0, 0, 0, 0, 28, 5, 30, 31,
+	32, 33, 34, 35, 30, 30, 30, 30, 31, 31, 30, 30, 31, 31, 31, 31,
+	31, 30, 30, 31, 31, 30, 30, 30, 56, 57, 58, 59, 56, 56, 62, 56,
+	56, 65, 66, 67, 66, 66, 66, 66, 66, 0,
+]
+
+
+## POS_REMAP_LUT[code]. Out-of-range codes (which a real formation never produces) return the
+## code itself so the `code != remap` test below is false -- a safe "no remap" default.
+static func _pos_remap(code: int) -> int:
+	if code < 0 or code >= POS_REMAP_LUT.size():
+		return code
+	return int(POS_REMAP_LUT[code])
+
+
+## FUN_005a5430 (__thiscall player; pos_code): record the player's assigned position code at
+## +0x40. When the code is NOT its own canonical remap (POS_REMAP_LUT[code] != code), the
+## position has changed slot, so clear the cached +0x2c/+0x30 (remap bookkeeping).
+static func set_position_code(p: Dictionary, pos_code: int) -> void:
+	p[0x40] = pos_code
+	if pos_code != _pos_remap(pos_code):
+		p[0x2c] = 0
+		p[0x30] = 0
+
+
+## FUN_0058eca0 (__thiscall player; target): engage `target` (a player index into ctx
+## ["players"], -1 = null/none). The binary's null pointer (0) maps to index -1 here, so the
+## "non-null target" guard is `target_idx >= 0`. The match is the player's +0x1d4 ref.
+## When the target DIFFERS from the current engagement (player+0x40):
+##   * record it at +0x40 and clear +0x4c;
+##   * for a real (non-null) target: bump match+0x458 iff the cached team tag (player+0x54)
+##     changes, copy the target's team (+0x2b8) into +0x54, latch +0x44/+0x48 to the target,
+##     zero the target's +0x54/+0x58, bump the engagement counter +0x80, and -- only in open
+##     play (match+0x448 == 0) with a live set-piece taker (match+0x460 != 0) that is NOT this
+##     target -- clear that stale taker (match+0x460 = 0, match+0x43c = none).
+static func set_engagement(p: Dictionary, target_idx: int, players: Array) -> void:
+	if int(p.get(0x40, -1)) == target_idx:
+		return
+	p[0x40] = target_idx
+	p[0x4c] = 0
+	if target_idx < 0:                                      # binary: param_2 == 0 (null) -> done
+		return
+	var target: Dictionary = players[target_idx]
+	var m: Dictionary = _ref(p, 0x1d4)
+	var tteam := _g(target, 0x2b8)
+	m[0x458] = _g(m, 0x458) + (1 if _g(p, 0x54) != tteam else 0)
+	p[0x54] = tteam
+	p[0x48] = target_idx
+	p[0x44] = target_idx
+	target[0x58] = 0
+	target[0x54] = 0
+	p[0x80] = _g(p, 0x80) + 1
+	if _g(m, 0x448) == 0 and _g(m, 0x460) != 0 and int(m.get(0x43c, -1)) != target_idx:
+		m[0x460] = 0
+		m[0x43c] = -1

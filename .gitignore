@@ -69,6 +69,7 @@ tools/re/specs/_planarmag_lut.txt
 tools/re/specs/_moveleaf_run.*
 tools/re/specs/_moveleaf_lut.txt
 tools/re/specs/_decidehelper_run.*
+tools/re/specs/_decideset_run.*
 tools/re/specs/_probe_b8ce0.*
 tools/re/specs/_dbg_vel.*
 tools/re/specs/_smoke.*

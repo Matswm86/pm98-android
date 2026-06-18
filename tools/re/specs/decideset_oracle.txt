@@ -1,0 +1,17 @@
+# Stage 3 task 2 DECIDE state setters (FUN_005a5430 / FUN_0058eca0) PCode-emu ground
+# truth. Pointer fields (p40/p44/p48/m43c) are ABSOLUTE addresses; test maps -> index
+# (P0=2293760 P1=2294716 ; null=0). Other fields raw signed LE decimal.
+# 5a5430 row: FIX <name> fn=5a5430 p40=<code> p2c=<v> p30=<v>
+# 58eca0 row: FIX <name> fn=58eca0 p40=<a> p44=<a> p48=<a> p4c=<v> p54=<v> p80=<v> t54=<v> t58=<v> m458=<v> m460=<v> m43c=<a>
+FIX pos_keep0 fn=5a5430 p40=0 p2c=4369 p30=8738
+FIX pos_remap4 fn=5a5430 p40=4 p2c=0 p30=0
+FIX pos_remap19 fn=5a5430 p40=19 p2c=0 p30=0
+FIX pos_keep30 fn=5a5430 p40=30 p2c=4369 p30=8738
+FIX pos_remap29 fn=5a5430 p40=29 p2c=0 p30=0
+FIX pos_keep12 fn=5a5430 p40=12 p2c=4369 p30=8738
+FIX engage_new fn=58eca0 p40=2294716 p44=2294716 p48=2294716 p4c=0 p54=7 p80=6 t54=0 t58=0 m458=11 m460=0 m43c=0
+FIX engage_sameteam fn=58eca0 p40=2294716 p44=2294716 p48=2294716 p4c=0 p54=7 p80=6 t54=0 t58=0 m458=10 m460=0 m43c=0
+FIX engage_takereq fn=58eca0 p40=2294716 p44=2294716 p48=2294716 p4c=0 p54=7 p80=6 t54=0 t58=0 m458=11 m460=1 m43c=2294716
+FIX engage_phase fn=58eca0 p40=2294716 p44=2294716 p48=2294716 p4c=0 p54=7 p80=6 t54=0 t58=0 m458=11 m460=1 m43c=2293760
+FIX engage_same fn=58eca0 p40=2294716 p44=2294716 p48=2294716 p4c=13107 p54=99 p80=5 t54=43690 t58=48059 m458=10 m460=1 m43c=2293760
+FIX engage_null fn=58eca0 p40=0 p44=2294716 p48=2294716 p4c=0 p54=99 p80=5 t54=43690 t58=48059 m458=10 m460=1 m43c=2293760

@@ -339,6 +339,26 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   (6 fixtures: goal-target eq/ne/eq0, mirror flip/noflip, compose). Locked by `test_decidehelper.gd`
   (13 checks, all PASS). No regression (decidehelper 13 + movement 60 + selectactive 24+125 +
   marktarget 8 + assignmarker 77 + relmatrix 128 + trig 72 + engine PASS; boots 0 SCRIPT ERROR).
+- **Stage 3 task 2 — the 2 DECIDE state setters PORTED + oracle-validated DONE.** Ported into
+  `Pm98Movement.gd`: `set_position_code` (FUN_005a5430; `player+0x40 = pos_code`, and when
+  `pos_code != POS_REMAP_LUT[pos_code]` clear `+0x2c/+0x30`) and `set_engagement` (FUN_0058eca0;
+  engage a target player -- on a CHANGE from `player+0x40` it records the target at +0x40/+0x44/
+  +0x48, clears +0x4c, bumps `match+0x458` iff the cached team tag +0x54 changes, copies the
+  target team +0x2b8 into +0x54, zeroes the target's +0x54/+0x58, bumps the counter +0x80, and in
+  open play with a live stale taker clears `match+0x460`/`+0x43c`; `param_2==0` null maps to index
+  -1 so the non-null guard is `>= 0`). The static **position-remap LUT &DAT_00665208** is extracted
+  bit-for-bit into `POS_REMAP_LUT` (74 entries, indices 0..0x49; the coherent table ends where a
+  0x01010101 byte-object begins at 0x4a, and 5a5430 only indexes by position code so the boundary is
+  never crossed) -- the LUT EXTRACTION marked "TODO" in the 5a3400 decode is now CLOSED. Both fns are
+  straight-line (no sub-calls, no RNG/ftol/LUT injection); the 5a5430 oracle reads the REAL .data LUT
+  from the mapped program image, so it transitively validates the extraction. Oracle
+  `tools/re/run_decideset_oracle.sh` -> `specs/decideset_oracle.txt` (12 fixtures: 6 position codes
+  keep/remap + 6 engage new/sameteam/takereq/phase/same/null); pointer fields banked as absolute
+  addresses, mapped addr->index in the test. Locked by `test_decideset.gd` (84 checks, all PASS).
+  No regression (decideset 84 + decidehelper 13 + movement 60 + selectactive 24+125 + marktarget 8 +
+  assignmarker 77 + relmatrix 128 + dispatch 366 + events 85 + predicates 147 + resolver tree/gate +
+  trig 72 + engine ALL PASS; boots 0 SCRIPT ERROR). NEXT = FUN_005a5430's only remaining dep for
+  slice B (the position LUT) is done; port FUN_005a5430-driven slice B + FUN_005a3400 slice A.
 
 ### FUN_005a3400 DECODED STRUCTURE (the per-player DECIDE; decoded 2026-06-18 -- cite, don't re-derive)
 `__fastcall(ECX=player)`. The per-player movement-target / set-piece-positioning computer. **NO net
@@ -361,19 +381,21 @@ Real-compute structure (DAT_006d31c4==0):
 2. **Field reset + facing + position (lines ~147-177):** zero player +0x3b4/+0x48/+0x90/+0x54/+0x58/
    +0x68/+0x6c/+0x20..+0xc/+4/+8; facing `player+0x34 & +0x64` = `(side ? 0x8000 : 0)` (180deg if
    away); `player+0xb0` from a table (match+0x188 +0x13c + player+0x2cc*4), `player+0x61=1` if
-   nonzero; `FUN_005a5430(player+0x2bc==0 ? 0x1e : 0)` (set position code, reads static LUT
-   &DAT_00665208; clears +0x2c/+0x30 on remap -- TODO extract the LUT like PHASE2_LUT).
+   nonzero; `FUN_005a5430(player+0x2bc==0 ? 0x1e : 0)` (set position code -- PORTED as
+   `Pm98Movement.set_position_code`; LUT &DAT_00665208 extracted into POS_REMAP_LUT, DONE).
 3. **Set-piece switch on `match+0x448` (lines ~179-end):** cases 2 / 3 / 4+5 / default. Each branches
    on "am I the designated taker" (`player == match+0x438`). The taker path: stamina `player+0x48 =
    (taker-flag ? 0x2d0 : 0) + 0xb4` (taker-flag = teaminfo(+0x184)+0x2ee set AND phase0 via 5943b0
    AND player+0x5c), `FUN_005a5430(case-specific pos: 0/0x13/0x1d)`, then aim at the ball/spot using
    the ported leaves (590aa0/590ae0/5ee080/5ee0f0/5ee2d0/5b12c0) + goal_target_x. Non-taker paths set
    the move target from the bbox / a defensive spot. `FUN_0058eca0(player)` sets engagement
-   (player+0x44/+0x48/+0x4c/+0x54/+0x80 + a match counter) -- sim-mutating, port it for the switch.
+   (player+0x44/+0x48/+0x4c/+0x54/+0x80 + a match counter) -- PORTED as
+   `Pm98Movement.set_engagement`, DONE.
 **Sim-mutations** (the port must write all): player +0x4/+8/+0xc (move target), +0x20..+0x30,
 +0x34/+0x64 (facing s16), +0x40 (pos), +0x48, +0x54/+0x58, +0x61, +0x68/+0x6c, +0x80, +0x90, +0xb0,
 +0x1e0..+0x224 (target + bbox), +0x3a4, +0x3b4. **Slice plan:** (A) prologue+bbox; (B) reset+facing+
-pos (needs FUN_005a5430 + its DAT_00665208 LUT); (C) the switch case-by-case (needs FUN_0058eca0).
+pos (deps FUN_005a5430 + POS_REMAP_LUT now DONE); (C) the switch case-by-case (dep FUN_0058eca0 now
+DONE). Both slice-B and slice-C state-setter dependencies are ported; A/B/C remain to wire into 5a3400.
 **Oracle:** set up a player struct + match struct + teaminfo; stub FUN_005bbf10 (queue-grow) as the
 5b8f20 oracle did; inject ftol + cos/atan LUT; read back the mutated player fields.
 
