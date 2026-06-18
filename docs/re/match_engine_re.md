@@ -22,12 +22,18 @@ this is the 2D management sim that produces the scoreline.
 The big "Match" simulation object holds an **event queue**:
 - `match + 0x1a24` : pointer to event array
 - `match + 0x1a28` : event count (int)
-- `match + 0x1a2c`, `+ 0x1a30` : queue head/cursor + a delay counter
-- each event = **16 bytes**: `[u32 type, u32 p1, u32 p2, u32 delay/countdown]`
+- `match + 0x1a2c` : `max(., flag)` of the priority/flag arg (gated, see below); `+ 0x1a30` : a
+  countdown set to 300 (`0x12c`) when an event arrives with flag==1
+- each event = **16 bytes**: `[u32 type, u32 player+0x2b8, u32 player+0x2c0, u32 0x168]` — p1/p2 are
+  the firing player's display coords (0 when the enqueue is passed a null player), delay is a fixed 0x168
+- enqueue guard: no-op when `DAT_006d31c4!=0` (replay) or `match+0x1a38!=0` (queue frozen). The `0x1a2c`
+  update is skipped only when the phase (`match+0x468 -> +0xfa0` via `FUN_005943d0`/`b0`, ==0 or ==4) AND
+  code==1 AND flag==1.
 
 Only 5 functions touch `+0x1a28` (`tools/re/ghidra_scripts/FindFieldUsers.java 0x1a28`):
 `0x591180`, `0x591ba0`, `0x5923f0` (match setup — string/name heavy), `0x594470`
-(enqueue), `0x594570` (dequeue/display).
+(enqueue), `0x594570` (dequeue/display). **`0x594470` enqueue PORTED** as `Pm98Events.enqueue`
+(+ `0x5909f0` keeper_event), oracle-locked by `test_events.gd` — see EXACT_PORT_PLAN.md Stage 3 task 2.
 
 ## Event-type enum (VERIFIED from the commentary switch @ 0x539140)
 
@@ -179,8 +185,10 @@ depth `0x4ccc`. Decoded roles:
   PORTED + oracle-validated as `Pm98Predicates.keeper_save` (Stage 3 task 3, all 4 done):
   the angle metric is `abs(s16(atan(keeper->ball) - atan(keeper->goal-line))) < 0x3555` AND
   `abs(keeper+0x3a4 + keeper.x) < 0x370000`; the ball+0x61 latch makes the save fire only on the
-  "was-reachable, now shooting past" edge. The save-stat bump + 0x15/0x16 commentary enqueue is
-  driver-task-2 integration; `keeper_save` returns the validated `save` boolean.
+  "was-reachable, now shooting past" edge. The save-stat bump + 0x15/0x16 commentary enqueue
+  (`FUN_005909f0` -> `FUN_00594470`) is now PORTED as `Pm98Events.keeper_event` (Stage 3 task 2,
+  oracle-locked); `keeper_save` returns the validated `save` boolean that gates it, and the binary's
+  order (call `5909f0` at 58f30b, THEN zero ball+0x50 at 58f314) composes in `test_events.gd`.
 
 **Verdict (resolves last session's item 1):** chance *volume* is fully emergent from this
 continuous 22-player ball physics — there is **no discrete "shots per team" parameter** to

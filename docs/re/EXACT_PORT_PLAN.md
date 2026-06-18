@@ -115,16 +115,35 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   bit-exact). GDScript pitfall confirmed: `0x37333`=226099 (not 225587). Fixed `PcodeEmu.hexVal` to
   accept negative hex (`-0x...`) + added a stale-`.out` guard to the runner. No regression (trig 30 +
   tree 56 + gate + engine PASS; boots 0 SCRIPT ERROR).
-- **NEXT = Stage 3 task 2 (driver + movement).** All 4 predicates are now ported, so the driver can
-  call them. Driver `00598740` (904-line C dump) + `005983f0`/`00598690` + the movement physics 2 levels
-  down (callees `0x5a1820`, `0x59a120`, the `0x5b7xxx/0x5b8xxx/0x5b9xxx` player-AI cluster) -- real ball
-  coordinates come from the `Pm98Trig` LUT. The dispatcher `005966d0` (outcome 1-7 -> event enqueue,
-  353-line, entangled with display flag 0x180b + language tables). Driver integration also OWNS the
-  deferred event enqueue from `keeper_save.save` + the goal-area bits: wire `FUN_005909f0` (save-stat
-  bump + 0x15/0x16) -> `FUN_00594470` (match event queue) once `match+0x462` is live. Inject the LUT
-  for the movement oracle via `tools/re/emit_lut_membts.py` (same trick `run_keeper_oracle.sh` uses).
-  **KILL-TEST** for task 2 = full-match event-stream parity (fixed seed + fixed squads -> identical
-  event stream + scoreline, N>=50).
+- **Stage 3 task 2 — event-queue layer PORTED + oracle-validated DONE (first task-2 slice).**
+  `FUN_00594470` (enqueue, `__thiscall` this=match) + `FUN_005909f0` (keeper_event, `__thiscall`
+  this=ball) ported to `app/scripts/Pm98Events.gd`. enqueue appends a 16-byte record
+  `[code, player+0x2b8, player+0x2c0, 0x168]` at `match+0x1a24`, bumps the count `match+0x1a28`, sets
+  the `0x1a30` timer to 300 on flag==1, and updates `match+0x1a2c = max(., flag)` UNLESS the match phase
+  (`match+0x468 -> +0xfa0` read by `FUN_005943d0`/`b0`) is 0 or 4 AND code==1 AND flag==1; no-op when
+  `match+0x1a38!=0` (queue frozen). keeper_event bumps the keeper save stat (`*(keeper+0x3b8)+0x80` for a
+  save / `+0x7c` for conceded) then enqueues `0x16` (band `0x40`) or `0x15` (band `0xa0`) for the keeper.
+  **This CLOSES the deferred `keeper_save.save` -> enqueue wire**: the binary's `FUN_0058f140` calls
+  `FUN_005909f0(this=ball, save_flag=0)` at 58f30b BEFORE it zeroes ball+0x50 at 58f314; the now-ported
+  pieces compose in that order (test_events.gd integration check). Decoded from objdump (the C decompile
+  hides the thiscall ecx): enqueue's this=match is loaded in keeper_event at 590a24 from ball+0x1d4.
+  Oracle `tools/re/run_event_oracle.sh` drives both fns through the REAL binary; the queue grower
+  `FUN_005bbf10` (Win32 `GlobalReAlloc`) is STUBBED (`stub 0x5bbf10 0 0`) with the event buffer
+  pre-allocated at 0x260000 -> first event lands at buf exactly. No LUT needed (neither fn reads trig).
+  Banked `specs/event_oracle.txt` (11 fixtures: 6 enqueue + 5 keeper_event). Locked by
+  `app/tests/test_events.gd` (85 checks: count + event record + 0x1a2c/0x1a30 + stat counters + the
+  composition wire, all bit-exact). No regression (predicates 147 + tree 56 + trig 30 + gate + engine
+  PASS; boots 0 SCRIPT ERROR).
+- **NEXT = Stage 3 task 2 (driver + movement + dispatcher).** Predicates + event-queue layer are now
+  ported, so the driver can call them and emit events. Driver `00598740` (904-line C dump) +
+  `005983f0`/`00598690` + the movement physics 2 levels down (callees `0x5a1820`, `0x59a120`, the
+  `0x5b7xxx/0x5b8xxx/0x5b9xxx` player-AI cluster -- `0x5b8f20`/`0x5b70e0`/`0x5b73a0` are NOT yet
+  decompiled; extract via `DecompileAt.java` first) -- real ball coordinates come from the `Pm98Trig`
+  LUT. The dispatcher `005966d0` (outcome 1-7 -> `Pm98Events.enqueue`, 353-line, entangled with display
+  flag 0x180b + language tables; stub commentary behind 0x180b) sits on top of the event-queue layer.
+  Inject the LUT for the movement oracle via `tools/re/emit_lut_membts.py` (same trick
+  `run_keeper_oracle.sh` uses). **KILL-TEST** for task 2 = full-match event-stream parity (fixed seed +
+  fixed squads -> identical event stream + scoreline, N>=50).
 
 ## Already decoded — cite + port, don't redo (see match_engine_re.md for detail)
 - RNG `FUN_005ec250` (MSVC LCG, state @0x6d3184) — already exact as `Pm98Rng`. Per-mil idiom

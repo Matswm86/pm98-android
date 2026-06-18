@@ -1,0 +1,14 @@
+# Stage 3 task 2 event-queue ground truth (oracle = PCode emu, realloc stubbed).
+# == enqueue FUN_00594470 == name | count | code | x | y | delay | a2c | a30 | RET?
+E basic      | 1   | 16   | 273    | 546    | 360  | 0    | 0    | RET
+E noplayer   | 1   | 16   | 0      | 0      | 360  | 0    | 0    | RET
+E flag1      | 1   | 16   | 5      | 6      | 360  | 1    | 300  | RET
+E phase4skip | 1   | 1    | 0      | 0      | 360  | 0    | 300  | RET
+E phase4upd  | 1   | 2    | 0      | 0      | 360  | 3    | 0    | RET
+E frozen     | 0   | 0    | 0      | 0      | 0    | 0    | 0    | RET
+# == keeper_event FUN_005909f0 == name | s80 | s7c | count | code | x | y | delay | a2c | a30 | RET?
+K save_b40   | 1   | 0   | 1   | 22   | 1911   | 2184   | 360  | 0    | 0    | RET
+K save_b20   | 1   | 0   | 1   | 21   | 1911   | 2184   | 360  | 0    | 0    | RET
+K save_nobit | 1   | 0   | 0   | 0    | 0      | 0      | 0    | 0    | 0    | RET
+K conceded   | 0   | 1   | 1   | 22   | 1911   | 2184   | 360  | 0    | 0    | RET
+K save_b80   | 1   | 0   | 1   | 21   | 1911   | 2184   | 360  | 0    | 0    | RET
