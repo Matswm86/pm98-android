@@ -208,6 +208,19 @@ EXACT in `app/scripts/Pm98Resolver.gd`, locked by `app/tests/test_resolver_gate.
 This is the first bit-exact slice; the rest of the resolver tree is stage 2. See
 [`EXACT_PORT_PLAN.md`](EXACT_PORT_PLAN.md) STATUS for the full per-stage state.
 
+### Stage 2a — trig-LUT blocker RESOLVED (2026-06-18): draw stream is LUT-invariant
+The resolver's RNG draw stream + final RNG state are **invariant to the sin/cos LUT**
+`DAT_006d31c8` (`.bss`, zero at emu start). Driving `FUN_005aeda0` into the full goal/save/miss
+tree (target play-state 5) with a zero LUT vs a reconstructed cos table
+(`LUT[k]=round(65536*cos(2*pi*k/4096))`, the exact index form `FUN_005ee0f0` uses) gives a
+bit-identical draw stream (41,18467,...) and final state (1030492215). The LUT only moves ball
+COORDINATES + flips one projection branch (proj 2->3, line-514 fallback); the position-based
+fallback distance gates keep the RNG-consuming decisions geometry-independent. So the decision
+tree ports WITHOUT the LUT (real sin/cos coords are Stage 3 movement, where the LUT init must be
+decoded). Note: `FUN_005ee0f0`/`005ee670` read the sin/cos LUT `0x6d31c8`; `FUN_005ee080` reads a
+SEPARATE arctan LUT `0x6d71c8` and is off this path. Reproduce: `tools/re/check_lut_invariance.sh`
+(PASS). Branch-covering ground truth: `tools/re/run_tree_oracle.sh` -> `specs/tree_oracle_streams.txt`.
+
 ## Open / next (active)
 - **EXACT engine + tactics port — see [`EXACT_PORT_PLAN.md`](EXACT_PORT_PLAN.md).** Mats wants
   the calibrated `MatchEngine.gd` model and the ours `Tactics.gd` lever model REPLACED by

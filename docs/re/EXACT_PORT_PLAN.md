@@ -25,12 +25,28 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   sar 0xf=>>15). Ported EXACT to `app/scripts/Pm98Resolver.gd`; locked by
   `app/tests/test_resolver_gate.gd` (ALL PASS, oracle-backed). MatchEngine.gd unchanged (still
   calibrated; the exact engine swaps in at stage S7).
-- **NEXT = Stage 2 (resolver exact).** Port the rest of `FUN_005aeda0` (all 23 RNG calls in
-  exact order: the goal/save/miss decision tree, lines 102-485 of the C dump) + dispatcher
-  `005966d0` + the predicates, using the SAME fixture-emulation method to get the per-draw
-  ground-truth stream. The trig LUT `DAT_006d31c8` (.bss, zero at emu start) gates the deep
-  paths -- decode `FUN_005ee080/005edfb0/005ee0f0` (atan2/rotate over the LUT) and pre-seed it
-  in the fixture, OR confirm those paths are off the seed-critical line.
+- **Stage 2a (LUT blocker RESOLVED) DONE.** The trig-LUT blocker is settled empirically: the
+  resolver's RNG draw stream + final RNG state are **INVARIANT to the sin/cos LUT** `DAT_006d31c8`.
+  The PCode emu drove `FUN_005aeda0` into the MAIN goal/save/miss tree (target play-state 5 ->
+  skips the finishing block, enters the tree), once with a zero LUT and once with a reconstructed
+  cos table (`LUT[k]=round(65536*cos(2*pi*k/4096))`, the exact form `FUN_005ee0f0` indexes): the
+  draw stream (41,18467,...) and final state (1030492215) are bit-identical. The LUT only changes
+  ball COORDINATES + the projection count (proj 2->3, the line-514 fallback fires under a real
+  table); the position-based fallback distance gates keep the RNG-consuming decisions
+  geometry-independent. So the decision tree ports faithfully WITHOUT the LUT; real sin/cos
+  coordinates are deferred to **Stage 3 (movement)**, where the LUT initializer must be decoded.
+  Findings: `FUN_005ee0f0`/`005ee670` read the sin/cos LUT `0x6d31c8`; `FUN_005ee080` reads a
+  SEPARATE arctan LUT `0x6d71c8` (the handoff conflated them) and is OFF this path (0 hits).
+  Reproduce: `tools/re/check_lut_invariance.sh` (PASS, 32s, 2 emu runs).
+  Branch-covering ground truth banked: `tools/re/run_tree_oracle.sh` ->
+  `tools/re/specs/tree_oracle_streams.txt` (6 fixtures, 6-11 draws, distinct outcomes:
+  nrng + final state + match+0x461 bits + stats + target play-state, all clean RET).
+- **NEXT = Stage 2b (port the tree).** Translate `FUN_005aeda0` lines 120-611 to GDScript in
+  `Pm98Resolver.gd` (decision tree + flags bVar5/6/7/8 = on-target/header/off-target/saved;
+  movement-block draws consumed but coords deferred to S3) + dispatcher `005966d0` + predicates
+  `0058ede0/0058f100/0058fbe0/0058f140`. Validate by replaying each `tree_oracle_streams.txt`
+  fixture's struct inputs through the port and asserting nrng + final RNG state + outcome parity
+  (extend `test_resolver_gate.gd` or add `test_resolver_tree.gd`). RNG draw ORDER is load-bearing.
 
 ## Already decoded — cite + port, don't redo (see match_engine_re.md for detail)
 - RNG `FUN_005ec250` (MSVC LCG, state @0x6d3184) — already exact as `Pm98Rng`. Per-mil idiom

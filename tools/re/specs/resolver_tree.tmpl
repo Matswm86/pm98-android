@@ -1,0 +1,56 @@
+# Stage 2 oracle template: drive FUN_005aeda0 into the MAIN goal/save/miss
+# decision tree and capture the exact RNG draw stream + final RNG state.
+# Parametrised over the branch-selecting inputs; __NAME__ tokens are filled by
+# run_tree_oracle.sh. Proven LUT-invariant (zero vs reconstructed cos table give
+# identical draw streams + final state), so we run with a zero LUT.
+#
+# Layout: P@0x220000 (player, play-state 3), T@0x210000 (target, play-state 5 =>
+# skips the first finishing block AND passes the tree type guards), M@0x200000
+# (match, flags 0 => commentary skipped/RNG-neutral). Stats arena @0x230000,
+# generic null struct @0x240000.
+entry   0x5aeda0
+ret     0x00100000
+stack   0x00300000 0x00010000 0x00308000
+reg     ECX 0x00220000
+zero    0x00200000 0x00002000
+zero    0x00210000 0x00000800
+zero    0x00220000 0x00001000
+zero    0x00230000 0x00001000
+zero    0x00240000 0x00001000
+# --- player P ---
+mem 0x0022002c 4 0x3                # P+0x2c play-state = 3
+mem 0x00220030 4 0x0                # P+0x30 = 0
+mem 0x00220034 4 __PANG__           # P+0x34 facing angle
+mem 0x00220040 4 __POS__            # P+0x40 position (9 = forward, +20 skill bonus)
+mem 0x00220060 4 __ENGAGED__        # P+0x60 engaged-with-ball flag
+mem 0x002200ac 4 0x00210000         # P+0xac = &T
+mem 0x00220184 4 0x00200000         # P+0x184 = &M
+mem 0x00220188 4 0x00200000         # P+0x188 = &M
+mem 0x0022018c 4 0x00200000         # P+0x18c = &M
+mem 0x00220190 4 0x00200000         # P+0x190 (400) = &M
+mem 0x00220384 4 __SKILL__          # P+0x384 (900) skill
+mem 0x002203b8 4 0x00230000         # P+0x3b8 = &stats
+# --- target T ---
+mem 0x00210034 4 __TANG__           # T+0x34 facing angle
+mem 0x00210040 4 0x5                # T+0x40 = 5 (skip first block, enter tree)
+mem 0x00210184 4 0x00200000         # T+0x184 = &M
+mem 0x00210190 4 0x00210000         # T+0x190 (400) = &T
+mem 0x002102bc 4 0x1                # T+0x2bc (700) != 0
+mem 0x002103b8 4 0x00230000         # T+0x3b8 = &stats
+# --- match M incidentals ---
+mem 0x00200004 4 __HDR__            # M+4: header gate (8 < M+4 enables header block)
+mem 0x0020009c 4 0x00240000         # M+0x9c -> null struct
+# --- RNG seed ---
+mem 0x006d3184 4 0x1
+maxsteps 500000
+trace   0x005ec279 rng              # RNG ret: EAX = draw value, in order
+trace   0x005ee0f0 proj             # sin/cos projection (reads LUT 0x6d31c8)
+trace   0x00594470 enqueue          # event enqueue (count = events produced)
+trace   0x005a5430 setstate         # target play-state set (e.g. -> 0x17 shot)
+trace_reg EAX
+read_mem 0x006d3184 4               # final RNG state
+read_mem 0x00200461 1               # match+0x461 outcome bits (b0 on-target,b1 saved,b2 off-target)
+read_mem 0x00230098 4               # stats +0x98 (goals)
+read_mem 0x0023009c 4               # stats +0x9c (off-target/missed)
+read_mem 0x002300a0 4               # stats +0xa0 (shots/attempts)
+read_mem 0x00210040 4               # T+0x40 final play-state

@@ -1,0 +1,9 @@
+# Stage 2 resolver decision-tree ground truth (oracle = PCode emu, zero LUT)
+# Outcome cols: bits=match+0x461  g/o/a=stats +0x98/+0x9c/+0xa0  Tst=T+0x40 final
+# fixture | nrng | draws(in order) | state | enq set | bits g/o/a Tst | RET?
+baseline       | 6  | 41,18467,6334,26500,19169,15724                | 1030492215  | enq=0 set=0 | bits=0   0/0/0 Tst=5 | RET
+fwd_skill      | 6  | 41,18467,6334,26500,19169,15724                | 1030492215  | enq=0 set=0 | bits=0   0/0/0 Tst=5 | RET
+header         | 11 | 41,18467,6334,26500,19169,15724,11478,29358,26962,24464,5705 | 373929026   | enq=0 set=1 | bits=8   0/0/0 Tst=7 | RET
+engaged_hdr    | 10 | 41,18467,6334,26500,19169,15724,11478,29358,26962,24464 | 3750785579  | enq=0 set=1 | bits=8   0/0/0 Tst=7 | RET
+angle_else     | 9  | 41,18467,6334,26500,19169,15724,11478,29358,26962 | 1766988168  | enq=0 set=1 | bits=8   0/0/0 Tst=6 | RET
+engaged_angle  | 8  | 41,18467,6334,26500,19169,15724,11478,29358    | 1924036713  | enq=0 set=1 | bits=8   0/0/0 Tst=6 | RET
