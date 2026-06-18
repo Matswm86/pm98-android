@@ -506,3 +506,82 @@ static func _holds_ball(m: Dictionary, opp: Array, qi: int) -> bool:
 	if int(blk.get(0x40, -1)) == qi:
 		return true
 	return int(m.get(0x165c, -1)) == qi
+
+
+# =============================================================================
+# Slice 5a: the per-tick PHASE-BASED active-player selector (first half).
+#   select_active = FUN_005b8f20 (__fastcall this=sim-ctx) -- chooses ctx[0x168] (the
+#   active player) by the match phase (match+0x448) and sets its +0x5c flag. Branches:
+#     * FORCED override: a global byte (binary DAT_006d31c4, modelled as ctx["force_active"])
+#       -> active = match+0x438, set flag, return (no phase logic).
+#     * phase 6           -> active = player[0].
+#     * phase 4           -> drop the two players with the highest +0x39c, then pick the
+#                            highest +0x394 among the rest (signed; ties keep the first).
+#     * else (0/1/3/...)  -> select_nearest(ctx, find_in_front=0) (the now-ported fallback).
+#   In every case it first clears the OLD active's +0x5c and resets ctx[0x168] to none, and
+#   at the end sets the NEW active's +0x5c. Disasm-verified 0x5b8f20 (gate/6/4/else) + the
+#   final flag set 0x5b939f. POINTER->INDEX: ctx[0x168] / match+0x438 are player indices
+#   (-1 = none); the return is that index. NO RNG on these paths.
+#   DEFERRED to slice 5b (own oracle): phase 2 (a static LUT at 0x6392c8 indexed by
+#   player+0x2c8) and phase 5/7 (a persistent set-piece queue at ctx+0x208/+0x20c built on
+#   Win32 GlobalReAlloc = FUN_005bbf10 + memmove -- needs import stubs in the oracle).
+static func select_active(ctx: Dictionary) -> int:
+	var players: Array = ctx.get("players", [])
+	var m: Dictionary = ctx.get(0x138, {})
+	var active := int(ctx.get(0x168, -1))
+
+	# Forced-active override (global DAT_006d31c4 != 0 -> active = match+0x438).
+	if int(ctx.get("force_active", 0)) != 0:
+		_set_flag5c(players, active, 0)
+		var forced := int(m.get(0x438, -1))
+		ctx[0x168] = forced
+		if forced >= 0:
+			_set_flag5c(players, forced, 1)
+		return forced
+
+	# Normal path: clear the old active, reset to none.
+	_set_flag5c(players, active, 0)
+	ctx[0x168] = -1
+
+	var phase := _g(m, 0x448)
+	if phase == 7 or phase == 5:
+		push_error("Pm98Movement.select_active: phase 5/7 set-piece queue not ported yet (slice 5b)")
+	elif phase == 4:
+		_select_phase4(ctx, players)
+	elif phase == 2:
+		push_error("Pm98Movement.select_active: phase 2 LUT selection not ported yet (slice 5b)")
+	elif phase == 6:
+		ctx[0x168] = 0 if players.size() > 0 else -1
+	else:
+		select_nearest(ctx, 0)
+
+	var a := int(ctx.get(0x168, -1))
+	if a >= 0:
+		_set_flag5c(players, a, 1)
+	return a
+
+
+## phase 4: active = the highest-+0x394 player after removing the two highest-+0x39c
+## players. All comparisons signed; strict `<` so ties keep the earliest. On-pitch only.
+static func _select_phase4(ctx: Dictionary, players: Array) -> void:
+	var top1 := _argmax_field(players, 0x39c, -1, -1)
+	var top2 := _argmax_field(players, 0x39c, top1, -1)
+	ctx[0x168] = _argmax_field(players, 0x394, top1, top2)
+
+
+## Index of the on-pitch (+0x2bc) player with the max signed `off` field, excluding the
+## two given indices; -1 if none. Strict `<` keeps the first on a tie (matches the binary).
+static func _argmax_field(players: Array, off: int, ex1: int, ex2: int) -> int:
+	var best := -1
+	for i in players.size():
+		if _g(players[i], 0x2bc) == 0 or i == ex1 or i == ex2:
+			continue
+		if best < 0 or Pm98Trig._i32(_g(players[best], off)) < Pm98Trig._i32(_g(players[i], off)):
+			best = i
+	return best
+
+
+## Set player+0x5c (the active flag) when idx is a valid index; null (-1) is a no-op.
+static func _set_flag5c(players: Array, idx: int, val: int) -> void:
+	if idx >= 0 and idx < players.size():
+		players[idx][0x5c] = val

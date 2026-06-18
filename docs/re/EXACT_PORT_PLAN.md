@@ -245,6 +245,26 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   banked to `specs/assignmarker_oracle.txt`. Locked by `app/tests/test_assignmarker.gd` (77 checks: every link
   mapped pointer->index via its base, bit-exact). No regression (marktarget 8 + relmatrix 128 + movement 60 +
   dispatch 366 + events 85 + predicates 147 + resolver tree/gate + trig 30 + engine PASS; boots 0 SCRIPT ERROR).
+- **Stage 3 task 2 — movement slice 5a (phase active-selector, gate/6/4/else) PORTED + oracle-validated DONE.**
+  `FUN_005b8f20` (__fastcall this=sim-ctx) -> `Pm98Movement.select_active(ctx)`, the per-tick selector of the
+  active player ctx[0x168] by the match phase (match+0x448). This slice ports FOUR of its branches: the FORCED
+  override (global byte `DAT_006d31c4`, modelled `ctx["force_active"]`, -> active = match+0x438), **phase 6**
+  (active = player[0]), **phase 4** (drop the two highest-+0x39c players, then take the highest +0x394 of the
+  rest; signed, ties keep the first), and the **else** path (phase 0/1/3/... -> `FUN_005b8ce0(0)` =
+  `select_nearest(find_in_front=0)`, the now-ported fallback). Every path clears the old active's +0x5c, resets
+  ctx[0x168], and sets the new active's +0x5c. POINTER->INDEX: ctx[0x168] / match+0x438 are player indices
+  (-1 = none). Disasm-verified 0x5b8f20 (the phase-4 compares are signed `jge`; the forced gate reads
+  `ds:0x6d31c4` then match+0x438). Oracle `tools/re/run_selectactive_oracle.sh` drives the REAL `FUN_005b8f20`
+  (faithful _ftol injected, NO cos/atan LUT since find_in_front=0 skips the cone), 4 fixtures (forced / phase6 /
+  phase4 / else_nearest), banked `specs/selectactive_oracle.txt`. Locked by `app/tests/test_selectactive.gd`
+  (24 checks: active index + all four +0x5c flags, bit-exact). No regression (movement 60 + marktarget 8 +
+  assignmarker 77 + relmatrix 128 + dispatch 366 + events 85 + predicates 147 + resolver tree/gate + trig 30 +
+  engine PASS; boots 0 SCRIPT ERROR). **DEFERRED to slice 5b** (each needs extra oracle infra): **phase 2** (a
+  static LUT at `0x6392c8` indexed by player+0x2c8 -- extract the real table, no Win32) and **phase 5/7** (a
+  PERSISTENT set-piece queue at ctx+0x208/+0x20c built on Win32 `GlobalReAlloc` = `FUN_005bbf10` + `memmove` --
+  insertion-sort descending by +0x3a0(+0x388 if phase 7), the +0x2ed/+0x2ee flag via `FUN_005943f0/d0/b0`, pop
+  the front per call; the oracle needs import stubs + a real injected `memmove` + a pre-seeded queue buffer).
+  Both currently `push_error` + leave active = -1 in `select_active`.
 - **NEXT = Stage 3 task 2 (driver + the rest of movement physics).** Predicates + event-queue + dispatcher +
   the nearest-to-ball selector + the relationship matrix/roles + the marking-target leaf + the marker-assignment PASS are now ported. The 38 movement decompiles are extracted to
   `docs/re/move/` (largest: player-move/AI `0x5b73a0` 4834B, phase-selector `0x5b8f20` 1169B, relationship-
@@ -255,7 +275,7 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   the two player-move fns `0x5b70e0`/`0x5b73a0`, and `0x5b6ee0` from 005983f0 -- all in `docs/re/move/`) --
   real ball coordinates come from the `Pm98Trig` LUT. Suggested next bottom-up order: `0x5b8690` (matrix) DONE ->
   `0x5b36f0` (mark-target leaf) DONE -> `0x5b94f0` (marker-assignment PASS) DONE ->
-  `0x5b8f20` (phase selector, sits directly on the now-ported `0x5b8ce0` as its fallback) then
+  `0x5b8f20` (phase selector) gate/6/4/else DONE (slice 5a); phase 2 + phase 5/7 queue = slice 5b. Then
   the player-move fns (`0x5b70e0`/`0x5b73a0`, watch RNG order) then the driver `00598740`. The
   dispatcher (`005966d0`) it calls is DONE. Inject
   the LUT for the movement oracle via `tools/re/emit_lut_membts.py` (same trick `run_keeper_oracle.sh` /

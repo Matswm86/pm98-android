@@ -62,6 +62,7 @@ tools/re/specs/_relmatrix_run.*
 tools/re/specs/_relmatrix_lut.txt
 tools/re/specs/_marktarget_run.*
 tools/re/specs/_assignmarker_run.*
+tools/re/specs/_selectactive_run.*
 tools/re/specs/_probe_b8ce0.*
 tools/re/specs/_dbg_vel.*
 tools/re/specs/_smoke.*

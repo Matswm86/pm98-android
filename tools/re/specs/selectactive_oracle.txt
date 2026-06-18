@@ -1,0 +1,8 @@
+# Stage 3 task 2 slice 5a phase active-selector (FUN_005b8f20: gate/6/4/else) ground
+# truth (PCode emu; faithful _ftol injected, no LUT -- find_in_front=0). Each row:
+# 'FIX <name>' then the verbatim CALL line. bases: P0=0x230000 P1=0x2303bc P2=0x230778
+# P3=0x230b34 ; null=0 (active EAX -> index via (EAX-0x230000)/0x3bc, 0 -> -1).
+FIX forced CALL 0 RET steps=26 EAX=2294716 mem[0x200168:4]=2294716 mem[0x23005c:1]=0 mem[0x230418:1]=1 mem[0x2307d4:1]=0 mem[0x230b90:1]=0
+FIX phase6 CALL 0 RET steps=56 EAX=2293760 mem[0x200168:4]=2293760 mem[0x23005c:1]=1 mem[0x230418:1]=0 mem[0x2307d4:1]=0 mem[0x230b90:1]=0
+FIX phase4 CALL 0 RET steps=251 EAX=2295672 mem[0x200168:4]=2295672 mem[0x23005c:1]=0 mem[0x230418:1]=0 mem[0x2307d4:1]=1 mem[0x230b90:1]=0
+FIX else_nearest CALL 0 RET steps=387 EAX=2294716 mem[0x200168:4]=2294716 mem[0x23005c:1]=0 mem[0x230418:1]=1 mem[0x2307d4:1]=0 mem[0x230b90:1]=0
