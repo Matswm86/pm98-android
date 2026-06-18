@@ -1,0 +1,14 @@
+// FUN_005a5430  entry=005a5430  size=34 bytes
+
+void __thiscall FUN_005a5430(int param_1,int param_2)
+
+{
+  *(int *)(param_1 + 0x40) = param_2;
+  if (param_2 != *(int *)(&DAT_00665208 + param_2 * 4)) {
+    *(undefined4 *)(param_1 + 0x2c) = 0;
+    *(undefined4 *)(param_1 + 0x30) = 0;
+  }
+  return;
+}
+
+

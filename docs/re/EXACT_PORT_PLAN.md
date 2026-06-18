@@ -134,15 +134,41 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   `app/tests/test_events.gd` (85 checks: count + event record + 0x1a2c/0x1a30 + stat counters + the
   composition wire, all bit-exact). No regression (predicates 147 + tree 56 + trig 30 + gate + engine
   PASS; boots 0 SCRIPT ERROR).
-- **NEXT = Stage 3 task 2 (driver + movement + dispatcher).** Predicates + event-queue layer are now
-  ported, so the driver can call them and emit events. Driver `00598740` (904-line C dump) +
-  `005983f0`/`00598690` + the movement physics 2 levels down (callees `0x5a1820`, `0x59a120`, the
-  `0x5b7xxx/0x5b8xxx/0x5b9xxx` player-AI cluster -- `0x5b8f20`/`0x5b70e0`/`0x5b73a0` are NOT yet
-  decompiled; extract via `DecompileAt.java` first) -- real ball coordinates come from the `Pm98Trig`
-  LUT. The dispatcher `005966d0` (outcome 1-7 -> `Pm98Events.enqueue`, 353-line, entangled with display
-  flag 0x180b + language tables; stub commentary behind 0x180b) sits on top of the event-queue layer.
-  Inject the LUT for the movement oracle via `tools/re/emit_lut_membts.py` (same trick
-  `run_keeper_oracle.sh` uses). **KILL-TEST** for task 2 = full-match event-stream parity (fixed seed +
+- **Stage 3 task 2 — dispatcher PORTED + oracle-validated DONE (second task-2 slice).**
+  `FUN_005966d0` (__thiscall this=match, outcome 1-7) ported to `app/scripts/Pm98Dispatch.gd`
+  (`dispatch` + the case-1 aggregate `_agg_decision` = `FUN_00450e60`). It turns a resolver outcome
+  into the events it appends via the already-locked `Pm98Events.enqueue`: case 1 phase markers
+  (0x1c-0x20, may rewrite the outcome to 10 = replay/penalties), case 2 build-up + case 3 restart
+  (empty type-0 events), case 4 corner (0xc), case 5 foul/card/offside (1/3/4/5/0xb), case 6 GOAL/own
+  goal (7/8), case 7 penalty conceded (9) + card. The whole on-screen-commentary layer is stubbed:
+  every `FUN_004e*` is guarded by `match+0x180b` (=0 headless) so it never runs, and the
+  `FUN_005ec240/230` brackets around it are an RNG save/restore that then net-zeros the seed (dropped).
+  The ONLY load-bearing draws are the two conditional `FUN_005ec250` -- case 2 (geometry-gated: the ball-
+  speed projection via `Pm98Trig.muladd16`/`cos_a`/`sin_a`/`atan_angle` > 0 AND match+0x165c) and case 6
+  (genuine normal-time goal with match+0x462 bit2 clear AND match+0x461 bit5 set) -- both replicated,
+  consuming exactly one `MatchEngine.Pm98Rng` draw. `_agg_decision` (the 2-leg aggregate / away-goals /
+  ET decision read in case 1 sub-cases 1,3) is a faithful port of `FUN_00450e60` + its 4 goal-log
+  counters (`FUN_00450d60/db0/e00/e30`). Oracle `tools/re/run_dispatch_oracle.sh` drives the REAL
+  `FUN_005966d0` (FUN_005bbf10 realloc + the `call ebp` lstrcpyA @ *0x623054=0x251092 both STUBBED, event
+  buffer pre-set, cos/atan LUT injected for case 2, RNG seeded to 1) AND `FUN_00450e60` directly ->
+  `specs/dispatch_oracle.txt` (25 dispatcher fixtures across all 7 cases + the 0x440 prepend + the busy
+  guard, + 4 aggregate fixtures). Locked by `app/tests/test_dispatch.gd` (366 checks: count + every event
+  record + the rng-state draw parity + display/bookkeeping fields + freeze/phase-lock + 0x1a2c, all
+  bit-exact). No regression (events 85 + predicates 147 + tree 56 + trig 30 + gate + engine PASS; boots 0
+  SCRIPT ERROR). NOTE: case-1 `_team_reset` (`FUN_005946d0` -> `FUN_005b7080` x2 over the undecompiled
+  per-player reset `FUN_005a32c0`) is a VERIFIED no-op only when team+4==0 (the loop count), which is how
+  the case-1 fixtures pin it; the deeper `_agg_decision` branches (the +0x28 path + the iVar2==iVar4 tail)
+  are faithful ports not yet oracle-exercised (the 4 fixtures pin the leaf-cmp + 2-leg branches -> 0/1/2).
+- **NEXT = Stage 3 task 2 (driver + movement physics).** Predicates + event-queue layer + dispatcher are
+  now ported, so the driver can call them and emit events. The 38 movement decompiles are extracted to
+  `docs/re/move/` (largest: player-move `0x5b73a0` 4834B, ball-phys `0x5b8f20` 1169B, `0x5b8690` 964B,
+  `0x5b36f0` 788B, `0x5b70e0` 692B). Driver `00598740` (904-line C dump) +
+  `005983f0`/`00598690` + the movement physics 2 levels down (callees `0x5a1820` (5x), `0x5b94f0`,
+  `0x5b8c20`, `0x5b8bf0`, `0x5b8690`, `0x5b8ce0`, the ball-phys `0x5b8f20`, the two player-move fns
+  `0x5b70e0`/`0x5b73a0`, and `0x5b6ee0` from 005983f0 -- all now in `docs/re/move/`) -- real ball
+  coordinates come from the `Pm98Trig` LUT. The dispatcher (`005966d0`) it calls is DONE (above). Inject
+  the LUT for the movement oracle via `tools/re/emit_lut_membts.py` (same trick `run_keeper_oracle.sh` /
+  `run_dispatch_oracle.sh` use). **KILL-TEST** for task 2 = full-match event-stream parity (fixed seed +
   fixed squads -> identical event stream + scoreline, N>=50).
 
 ## Already decoded — cite + port, don't redo (see match_engine_re.md for detail)

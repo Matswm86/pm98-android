@@ -53,4 +53,7 @@ app/shots/
 tools/re/specs/_pred_run.*
 tools/re/specs/_keeper_run.*
 tools/re/specs/_event_run.*
+tools/re/specs/_dispatch_run.*
+tools/re/specs/_dispatch_lut.txt
+tools/re/specs/_smoke.*
 tools/re/specs/_lut_membts.txt

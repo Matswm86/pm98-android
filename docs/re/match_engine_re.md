@@ -136,6 +136,12 @@ goal-scored, corner, throw-in) and calls the **resolution dispatcher**
 | 1 | phase / kick-off | 0x1c-0x20 |
 | 2,3 | restart / buildup | 0 |
 
+**`FUN_005966d0` dispatcher PORTED** as `Pm98Dispatch.dispatch` (+ the case-1 aggregate
+`FUN_00450e60` -> `_agg_decision`), oracle-locked by `test_dispatch.gd` (366 checks) -- see
+EXACT_PORT_PLAN.md Stage 3 task 2. The on-screen commentary (every `FUN_004e*`, all behind
+`match+0x180b`) is stubbed; the only seed-affecting draws are the conditional `FUN_005ec250`
+in case 2 (ball-speed gate) + case 6 (genuine goal).
+
 The actual goal/no-goal decision is upstream of the dispatcher, in
 `FUN_005aeda0` (per-player **shot/tackle/save resolver**, 23 RNG calls — the
 heaviest user). Its outcome gates are **linear in player attributes** thresholded
