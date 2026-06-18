@@ -1,0 +1,14 @@
+# Stage 3 task 2 movement (FUN_005b8ce0 nearest-to-ball) ground truth (PCode emu;
+# faithful _ftol injected @0x252000, LUT injected, exact-integer distances). decimal.
+# base addrs: P0=2293760 P1=2294716 P2=2295672 ; null=0
+# M name | active | p0_5c | p1_5c | p2_5c | p1_v54 | p1_v58 | RET
+M near3         | 2294716  | 0   | 1   | 0   | 0      | 0      | RET
+M near3_3d      | 2294716  | 0   | 1   | 0   | 0      | 0      | RET
+M cone_skip     | 2295672  | 0   | 0   | 1   | 0      | 0      | RET
+M cone_keep     | 2294716  | 0   | 1   | 0   | 0      | 0      | RET
+M owned1650     | 2293760  | 1   | 0   | 0   | 0      | 0      | RET
+M owned165c     | 2294716  | 0   | 1   | 0   | 0      | 0      | RET
+M lock_keep     | 2293760  | 1   | 0   | 0   | 0      | 0      | RET
+M velreset      | 2294716  | 0   | 1   | 0   | 0      | 0      | RET
+M none_inrange  | 0        | 0   | 0   | 0   | 0      | 0      | RET
+M ineligible    | 0        | 0   | 0   | 0   | 0      | 0      | RET

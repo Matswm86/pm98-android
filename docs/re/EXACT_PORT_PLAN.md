@@ -159,14 +159,41 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   per-player reset `FUN_005a32c0`) is a VERIFIED no-op only when team+4==0 (the loop count), which is how
   the case-1 fixtures pin it; the deeper `_agg_decision` branches (the +0x28 path + the iVar2==iVar4 tail)
   are faithful ports not yet oracle-exercised (the 4 fixtures pin the leaf-cmp + 2-leg branches -> 0/1/2).
-- **NEXT = Stage 3 task 2 (driver + movement physics).** Predicates + event-queue layer + dispatcher are
-  now ported, so the driver can call them and emit events. The 38 movement decompiles are extracted to
-  `docs/re/move/` (largest: player-move `0x5b73a0` 4834B, ball-phys `0x5b8f20` 1169B, `0x5b8690` 964B,
-  `0x5b36f0` 788B, `0x5b70e0` 692B). Driver `00598740` (904-line C dump) +
-  `005983f0`/`00598690` + the movement physics 2 levels down (callees `0x5a1820` (5x), `0x5b94f0`,
-  `0x5b8c20`, `0x5b8bf0`, `0x5b8690`, `0x5b8ce0`, the ball-phys `0x5b8f20`, the two player-move fns
-  `0x5b70e0`/`0x5b73a0`, and `0x5b6ee0` from 005983f0 -- all now in `docs/re/move/`) -- real ball
-  coordinates come from the `Pm98Trig` LUT. The dispatcher (`005966d0`) it calls is DONE (above). Inject
+- **Stage 3 task 2 — movement first slice (nearest-to-ball selector) PORTED + oracle-validated DONE.**
+  `FUN_005b8ce0` (__thiscall this=sim-context, char find_in_front) ported to `app/scripts/Pm98Movement.gd`
+  (`select_nearest`): pick the eligible player (player+0x2bc != 0) nearest the ball by 3D Euclidean distance
+  `ftol(sqrt(dx^2+dy^2+dz^2))` (d = player.xyz +4/+8/+0xc minus ball.xyz match+0x1614/+0x1618/+0x161c) and make
+  it active (sim-ctx+0x168); optional +/-0x3555 facing cone gate via `atan_angle` (find_in_front); entry
+  ownership shortcut (match+0x1650 controller / +0x165c via team +0x2b8); lock-keep (active+0x5d); commit sets
+  the +0x5c active flags and, on a CHANGED active with team-flag teaminfo+0x2ee set AND phase 0 (FUN_005943b0),
+  zeroes the new active's velocity +0x54/+0x58. NO RNG. **NAMING CORRECTION:** the prior handoff called
+  `FUN_005b8f20` "ball physics" -- it is actually the PHASE-BASED active-player SELECTOR; the real physics is
+  spread across `FUN_005b8690` (pairwise player/ball relationship matrix, +0xb8 angles / +0xe4 distances),
+  `FUN_005b94f0` (marker assignment, +0x150/+0x154) and this `FUN_005b8ce0` -- all C++ vtable-dispatched
+  (player stride 0x3bc = 0xef ints; methods +8 "decide" / +0xc "advance" via FUN_005b8bf0/FUN_005b8c20).
+  Oracle `tools/re/run_movement_oracle.sh` drives the REAL `FUN_005b8ce0` under PCode emu (10 fixtures:
+  nearest / 3D / cone-skip / cone-keep / owned-1650 / owned-165c / lock-keep / velocity-reset / out-of-range /
+  ineligible). TWO emulation wrinkles solved + REUSABLE: (1) `ftol` = FUN_00605fb0 = `jmp [0x6233a4]`, an
+  UNBOUND msvcrt _ftol thunk (target 0x251000 below image base -> HALT); inject a faithful truncate-toward-zero
+  `_ftol` (`fnstcw; or ah,0x0c (RC=11); fist; restore`, NON-popping to match the caller's `fstp st(0)` cleanup)
+  at 0x252000 + repoint the IAT slot `mem 0x006233a4 4 0x00252000` -- `fsqrt` itself emulates natively.
+  (2) base-spec `mem` directives MUST be ONE PER LINE: PcodeEmu splits on whitespace and parses only the first
+  directive, so `;`-joined `mem ... ; mem ...` silently drops all but the first (this masked the velocity-reset
+  fixture until fixed). Distances kept to exact integers (pure-axis / 3-4-5) so ftol truncation is rounding-mode
+  independent. Banked `specs/movement_oracle.txt`; locked by `app/tests/test_movement.gd` (60 checks: active
+  index + all three +0x5c flags + the velocity reset, all bit-exact). No regression (dispatch 366 + events 85 +
+  predicates 147 + tree 56 + gate + trig 30 + engine PASS; boots 0 SCRIPT ERROR).
+- **NEXT = Stage 3 task 2 (driver + the rest of movement physics).** Predicates + event-queue + dispatcher +
+  the nearest-to-ball selector are now ported. The 38 movement decompiles are extracted to
+  `docs/re/move/` (largest: player-move/AI `0x5b73a0` 4834B, phase-selector `0x5b8f20` 1169B, relationship-
+  matrix `0x5b8690` 964B, marker-assign `0x5b94f0` 631B, `0x5b36f0` 788B, player-move `0x5b70e0` 692B). Driver
+  `00598740` (904-line C dump) + `005983f0`/`00598690` + the movement physics 2 levels down (callees
+  `0x5a1820` (5x), `0x5b94f0` (marker-assign, DONE-adjacent), `0x5b8c20`/`0x5b8bf0` (vtable dispatch loops),
+  `0x5b8690` (relationship matrix), `0x5b8f20` (phase selector, calls the now-ported `0x5b8ce0` as fallback),
+  the two player-move fns `0x5b70e0`/`0x5b73a0`, and `0x5b6ee0` from 005983f0 -- all in `docs/re/move/`) --
+  real ball coordinates come from the `Pm98Trig` LUT. Suggested next bottom-up order: `0x5b8690` (matrix) then
+  `0x5b8f20` (phase selector, sits directly on `0x5b8ce0`) then the player-move fns then the driver. The
+  dispatcher (`005966d0`) it calls is DONE. Inject
   the LUT for the movement oracle via `tools/re/emit_lut_membts.py` (same trick `run_keeper_oracle.sh` /
   `run_dispatch_oracle.sh` use). **KILL-TEST** for task 2 = full-match event-stream parity (fixed seed +
   fixed squads -> identical event stream + scoreline, N>=50).
