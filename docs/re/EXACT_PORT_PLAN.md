@@ -734,8 +734,30 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   truncates toward zero (the real x87 _ftol, per Pm98Trig); the PCode emulator's `fist` round-to-nearests at .5
   (ignoring the injected truncate control word), so an ODD-N radius like -44236.8 banks the emulator's -44237
   artifact instead of the real binary's -44236. Locked by `test_pathA.gd` (**40 checks, ALL PASS**). No
-  regression (all 70 parity suites + test_divisions pass; boots 0 SCRIPT ERROR). **NEXT** = the FUN_00598740
-  per-tick driver -> the full-match KILL-TEST (event-stream + scoreline parity, fixed seed, N>=50).
+  regression (all 70 parity suites + test_divisions pass; boots 0 SCRIPT ERROR). NEXT (superseded) = the
+  FUN_00598740 driver. **REVISED 2026-06-19 (see MATCH_TICK_DRIVER_MAP.md):** the driver's 4 sub-entity
+  vtable calls were mis-mapped as render; the corrected delta (0x401200) shows they are the BALL + 2 GKs +
+  referee, and the ball physics FUN_0058e2c0 + GK FUN_005a22d0 must be ported BEFORE the driver.
+
+- **Stage 3 task 2 — ball ADVANCE FUN_0058e2c0 SLICE A (timers + lerp-to-target) PORTED + oracle-validated
+  DONE 2026-06-19.** -> `Pm98Movement.ball_advance` + `_ball_step` (+ `_ball_freeflight` loud stub for the
+  unported branches). This is vtable+0xc on match+0x1610 (the ball; `get_ball` FUN_005b70b0 returns it),
+  the per-tick ball model the FUN_00598740 driver runs once per tick. disasm 0x58e2c0..0x58e357:
+  **timers** (every call) +0x58 = +0x54, then decrement +0x5c/+0x70/+0x68 each iff != 0; **lerp** iff
+  (post-decrement) +0x68 == 0 AND +0x6c != 0: N = ORIGINAL +0x6c; +0x6c -= 1; pos[axis] +=
+  (target[axis]-pos[axis]) / N with x86 idiv (truncate toward zero), target = +0x9c/+0xa0/+0xa4,
+  pos = +0x4/+0x8/+0xc. The set-piece ball-placement glide. **NOT ported (slice B+):** the free-flight
+  branch (pos+vel, gravity DAT_0066c1b0, ground bounce with FUN_005edfa0 damping, goal/post collision
+  FUN_005efac0, spin) and the shared FUN_0058fda0 trail tail + 0x58eb9a facing -- the tail writes only
+  +0x34/+0x74+/+0x84+, none of which slice A reads, so it is correctly omitted. Oracle
+  `run_balladvance_oracle.sh` drives the REAL FUN_0058e2c0 to a clean RET (the lerp path never derefs the
+  match; faithful _ftol injected for the tail's atan/polar; velocity +0x20 != 0 so the 0x58ebb1 epilogue
+  takes je->ret and leaves pos intact) -> `specs/balladvance_oracle.txt` (4 fixtures: lerp_pos, lerp_neg
+  [the truncate-toward-zero witness: -1398101, not floor -1398102], lerp_n1 [N=1 exact arrival], lerp_guard
+  [0-timers stay 0; negative target axis]; all CALL 0 RET). Locked by `test_balladvance.gd` (**32 checks,
+  ALL PASS**). No regression (71 parity suites + test_divisions pass; boots 0 SCRIPT ERROR). NEXT = ball
+  slice B (free-flight + gravity + ground bounce), then the collision loop, spin, and the FUN_0058fda0 tail;
+  then GK FUN_005a22d0; then the FUN_00598740 driver -> full-match KILL-TEST.
 
 ### FUN_005a3400 DECODED STRUCTURE (the per-player DECIDE; decoded 2026-06-18 -- cite, don't re-derive)
 `__fastcall(ECX=player)`. The per-player movement-target / set-piece-positioning computer. **NO net

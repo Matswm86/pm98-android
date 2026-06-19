@@ -1282,6 +1282,47 @@ static func advance(p: Dictionary, ring: int, playback: bool, record: bool, fram
 		p[0x3b4] = n + 1
 
 
+# ---- FUN_0058e2c0 ball ADVANCE (vtable+0xc on match+0x1610, i.e. the ball) ----------------
+# The per-tick ball model the FUN_00598740 driver runs once per tick (decide companion FUN_0058e220
+# = motion snapshot + replay, a no-op live). SLICE A (2026-06-19): the prologue timers + the
+# lerp-to-target branch (set-piece ball placement: glide the ball toward +0x9c/+0xa0/+0xa4 over
+# +0x6c steps). disasm 0x58e2c0..0x58e357.
+#   timers (every call): +0x58 = +0x54; then decrement +0x5c, +0x70, +0x68 each iff nonzero.
+#   lerp iff (post-decrement) +0x68 == 0 AND +0x6c != 0:
+#     N = ORIGINAL +0x6c; +0x6c -= 1; pos[axis] += (target[axis] - pos[axis]) / N  (idiv, trunc->0).
+#   else -> free flight / held-ball (NOT PORTED, slice B+).
+# The shared tail (FUN_0058fda0 trail + 0x58eb9a facing-from-velocity) writes only +0x34/+0x74+/+0x84+,
+# none of which slice A reads, so it is intentionally omitted here (port in a later slice).
+# Oracle: tools/re/run_balladvance_oracle.sh -> specs/balladvance_oracle.txt ; test_balladvance.gd.
+
+static func ball_advance(ball: Dictionary) -> void:
+	ball[0x58] = _g(ball, 0x54)                                  # +0x58 = +0x54 (prev-frame copy)
+	if _g(ball, 0x5c) != 0: ball[0x5c] = Pm98Trig._i32(_g(ball, 0x5c) - 1)
+	if _g(ball, 0x70) != 0: ball[0x70] = Pm98Trig._i32(_g(ball, 0x70) - 1)
+	if _g(ball, 0x68) != 0: ball[0x68] = Pm98Trig._i32(_g(ball, 0x68) - 1)
+	if _g(ball, 0x68) != 0 or _g(ball, 0x6c) == 0:              # not the lerp branch
+		_ball_freeflight(ball)
+		return
+	var n := _g(ball, 0x6c)                                      # divisor = ORIGINAL step count
+	ball[0x6c] = Pm98Trig._i32(n - 1)
+	ball[0x4] = Pm98Trig._i32(_g(ball, 0x4) + _ball_step(_g(ball, 0x9c) - _g(ball, 0x4), n))
+	ball[0x8] = Pm98Trig._i32(_g(ball, 0x8) + _ball_step(_g(ball, 0xa0) - _g(ball, 0x8), n))
+	ball[0xc] = Pm98Trig._i32(_g(ball, 0xc) + _ball_step(_g(ball, 0xa4) - _g(ball, 0xc), n))
+	# tail (FUN_0058fda0 + facing) intentionally omitted in slice A -- see header.
+
+
+## One lerp axis step: (target - cur) / N, x86 idiv (truncate toward zero). N != 0 by caller guard.
+static func _ball_step(delta: int, n: int) -> int:
+	@warning_ignore("integer_division")
+	return Pm98Trig._i32(Pm98Trig._i32(delta) / n)
+
+
+## NOT YET PORTED: free flight (pos+vel), gravity (DAT_0066c1b0), ground bounce, goal/post collision
+## (FUN_005efac0), spin. Reached when +0x68 (post-dec) != 0 or +0x6c == 0. See MATCH_TICK_DRIVER_MAP.md.
+static func _ball_freeflight(_ball: Dictionary) -> void:
+	push_error("Pm98Movement.ball_advance: free-flight branch not ported (FUN_0058e2c0 slice B+)")
+
+
 # ---- FUN_005b73a0 positioning leaves (forward-zone eligibility + goal-side count) -----
 # Two pure integer predicates the off-ball positioning pass FUN_005b73a0 calls (FUN_005b04e0 x2 +
 # FUN_005b0b40; the latter also serves the stamina pass FUN_005a4600). NO RNG/LUT/ftol. Oracle-

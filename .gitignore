@@ -101,3 +101,4 @@ tools/re/specs/_phase7wall_run.*
 tools/re/specs/_phase7wall_lut.txt
 tools/re/specs/_pathA_run.*
 tools/re/specs/_pathA_lut.txt
+tools/re/specs/_balladvance_run.*

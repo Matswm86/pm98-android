@@ -1,0 +1,8 @@
+# Stage 3 task 2 ball ADVANCE slice A (FUN_0058e2c0 timers + lerp-to-target) PCode-emu ground truth.
+# +0x58=+0x54; dec +0x5c/+0x70/+0x68 iff !=0; lerp iff +0x68(post-dec)==0 && +0x6c!=0:
+# N=orig +0x6c; +0x6c-=1; pos[a] += (target[a]-pos[a])/N (idiv). vel +0x20!=0 -> clean ret.
+# Each row: FIX <name> + verbatim CALL line. Reads: pos +0x4/+0x8/+0xc, step +0x6c, timers.
+FIX lerp_pos CALL 0 RET steps=3137 EAX=0 mem[0x230004:4]=2097152 mem[0x230008:4]=3145728 mem[0x23000c:4]=786432 mem[0x23006c:4]=3 mem[0x230058:4]=4660 mem[0x23005c:4]=2 mem[0x230068:4]=0 mem[0x230070:4]=4
+FIX lerp_neg CALL 0 RET steps=3133 EAX=0 mem[0x230004:4]=3844779 mem[0x230008:4]=3844779 mem[0x23000c:4]=699051 mem[0x23006c:4]=2 mem[0x230058:4]=2 mem[0x23005c:4]=0 mem[0x230068:4]=0 mem[0x230070:4]=0
+FIX lerp_n1 CALL 0 RET steps=3133 EAX=0 mem[0x230004:4]=7829367 mem[0x230008:4]=8947848 mem[0x23000c:4]=629145 mem[0x23006c:4]=0 mem[0x230058:4]=9 mem[0x23005c:4]=0 mem[0x230068:4]=0 mem[0x230070:4]=1
+FIX lerp_guard CALL 0 RET steps=2494 EAX=0 mem[0x230004:4]=262144 mem[0x230008:4]=4294705152 mem[0x23000c:4]=131072 mem[0x23006c:4]=1 mem[0x230058:4]=43981 mem[0x23005c:4]=0 mem[0x230068:4]=0 mem[0x230070:4]=0
