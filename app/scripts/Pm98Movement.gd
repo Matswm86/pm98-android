@@ -1218,3 +1218,65 @@ static func decide_slice_replay(p: Dictionary, m: Dictionary) -> void:
 		ts[0x168] = p                                         # this player becomes active
 		if is_same(p, _ref(m, 0x438)):                        # this player is the set-piece taker
 			m[0x45c] = _g(p, 0x2b8)                            # stamp the taker's team
+
+
+# ---- FUN_005a4560 (vtable+0xc, the per-player ADVANCE pass) + leaf FUN_005ed8e0 -------
+# The ADVANCE pass is PURE replay record/playback -- it does NO physics. The player's POSITION
+# (+0x4/+0x8/+0xc) is written directly by the DECIDE pass (FUN_005a3400) every tick; there is no
+# separate integration step (the match driver FUN_00598740 calls only decide(+8) + advance(+0xc)
+# per player -- see docs/re/MATCH_TICK_DRIVER_MAP.md). The pass acts only on the frame-ring wrap
+# (DAT_006d31bc == 0), and then only to PLAY BACK a recorded frame (DAT_006d31c4 set) or RECORD one
+# (DAT_00665d8c set). A live match-outcome run (the headless engine) sets neither -> NO-OP.
+#
+# Two snapshots, both indexed by the replay frame DAT_006d31c0:
+#   * MOTION (FUN_005ed8e0): 9 dwords at *(player+0x38), stride 0x24 -- [+0x4,+0x8,+0xc] position,
+#     [+0x20,+0x24,+0x28] velocity, +0x2c, +0x30, and +0x34 facing (a WORD in the 9th dword, so the
+#     high half of +0x34 is preserved). Record gathers via FUN_005ed820 (the exact inverse layout).
+#   * DECIDE STATE (FUN_005a4560 body): 0x51 dwords at *(player+0x3b0), stride 0x144 -> +0x40..+0x180.
+# Buffers modelled as offset-keyed Dicts (byte offsets into the whole multi-frame buffer, matching
+# memory + the decide_slice_replay convention); the {count} for record lives at +0x3c (motion) /
+# +0x3b4 (decide-state). Oracle-pinned (PLAYBACK + both NO-OP gates) by tools/re/run_advance_oracle.sh
+# -> specs/advance_oracle.txt, locked in test_advance.gd. The RECORD path is the structural inverse
+# (append the same snapshots) -- ported but exercised only structurally (the headless engine never
+# records); a future replay-recording feature would validate it.
+
+## FUN_005ed8e0: motion-state (+0x4../+0x34) record/playback. frame = DAT_006d31c0.
+static func _advance_motion(p: Dictionary, ring: int, playback: bool, record: bool, frame: int) -> void:
+	if ring != 0:                                             # acts only on the ring-wrap frame
+		return
+	if playback:
+		var buf: Dictionary = _ref(p, 0x38)
+		var s := frame * 0x24
+		p[0x4] = _g(buf, s); p[0x8] = _g(buf, s + 4); p[0xc] = _g(buf, s + 8)
+		p[0x20] = _g(buf, s + 0xc); p[0x24] = _g(buf, s + 0x10); p[0x28] = _g(buf, s + 0x14)
+		p[0x2c] = _g(buf, s + 0x18); p[0x30] = _g(buf, s + 0x1c)
+		p[0x34] = (_g(p, 0x34) & 0xffff0000) | (_g(buf, s + 0x20) & 0xffff)   # WORD write: high half kept
+	elif record:
+		var buf: Dictionary = _ref(p, 0x38)
+		var n := _g(p, 0x3c)                                  # +0x3c = motion-buffer frame count
+		var s := n * 0x24
+		buf[s] = _g(p, 0x4); buf[s + 4] = _g(p, 0x8); buf[s + 8] = _g(p, 0xc)
+		buf[s + 0xc] = _g(p, 0x20); buf[s + 0x10] = _g(p, 0x24); buf[s + 0x14] = _g(p, 0x28)
+		buf[s + 0x18] = _g(p, 0x2c); buf[s + 0x1c] = _g(p, 0x30)
+		buf[s + 0x20] = _g(p, 0x34) & 0xffff
+		p[0x3c] = n + 1
+
+
+## FUN_005a4560 (vtable+0xc): the per-player ADVANCE pass. ring = DAT_006d31bc (frame ring),
+## frame = DAT_006d31c0 (replay frame index). NO-OP in a live match (no playback, no record).
+static func advance(p: Dictionary, ring: int, playback: bool, record: bool, frame: int) -> void:
+	_advance_motion(p, ring, playback, record, frame)         # FUN_005ed8e0 (rechecks ring itself)
+	if ring != 0:
+		return
+	if playback:                                              # restore the 0x51-dword decide state
+		var buf: Dictionary = _ref(p, 0x3b0)
+		var s := frame * 0x144
+		for i in 0x51:
+			p[0x40 + i * 4] = _g(buf, s + i * 4)
+	elif record:
+		var buf: Dictionary = _ref(p, 0x3b0)
+		var n := _g(p, 0x3b4)                                 # +0x3b4 = decide-state buffer frame count
+		var s := n * 0x144
+		for i in 0x51:
+			buf[s + i * 4] = _g(p, 0x40 + i * 4)
+		p[0x3b4] = n + 1

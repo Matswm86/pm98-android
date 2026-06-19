@@ -532,6 +532,28 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   inventory) -> `docs/re/MATCH_TICK_DRIVER_MAP.md`. **CORRECTED NEXT (sim path) = FUN_005a4560 (advance,
   vtable+0xc; same replay record/playback brackets as 5a3400, leaf FUN_005ed8e0) -> FUN_005b73a0
   (positioning, slice it) -> the 4 sub-entity vtables -> FUN_00598740 driver -> full-match KILL-TEST.**
+- **Stage 3 task 2 — FUN_005a4560 (vtable+0xc ADVANCE pass) + FUN_005ed8e0 PORTED + oracle-validated
+  DONE.** Ported into `Pm98Movement.gd` as `advance(p, ring, playback, record, frame)` + `_advance_motion`.
+  **KEY FINDING: the ADVANCE pass is PURE replay record/playback -- it does NO physics.** The player's
+  POSITION (+0x4/+0x8/+0xc) is written directly by the DECIDE pass (FUN_005a3400) every tick; there is
+  no separate integration step (the driver FUN_00598740 calls only decide(+8) + advance(+0xc) per player).
+  FUN_005a4560 acts only on the frame-ring wrap (DAT_006d31bc == 0), and then: PLAYBACK (DAT_006d31c4) ->
+  FUN_005ed8e0 restores the 9-dword MOTION snapshot from *(player+0x38)[frame*0x24] (+0x4/+0x8/+0xc pos,
+  +0x20/+0x24/+0x28 vel, +0x2c, +0x30, +0x34 facing WORD) + the body restores the 0x51-dword DECIDE state
+  from *(player+0x3b0)[frame*0x144] -> +0x40..+0x180; RECORD (DAT_00665d8c) -> append the same snapshots
+  (FUN_005ed820 = the exact inverse motion layout); else NO-OP. **A live headless match-outcome run sets
+  neither replay nor record, so advance() is a NO-OP there** -- it contributes nothing to the scoreline,
+  confirming the player movement is FULLY captured by DECIDE (5a3400, DONE) + positioning (5b73a0).
+  **Oracle:** `run_advance_oracle.sh` drives the REAL FUN_005a4560 (which calls FUN_005ed8e0; pure copies,
+  NO stubs/LUT/RNG/ftol) -> `specs/advance_oracle.txt` (4 fixtures: pb_f0 / pb_f2 [frame-index] / noop_ring
+  / noop_live -- all CALL 0 RET). Locked by `test_advance.gd` (**48 checks, ALL PASS**: the 9 motion fields
+  + 3 decide-state samples for playback, all 12 unchanged for the two no-op gates). The RECORD path is the
+  structural inverse (append) -- ported, exercised only structurally (headless never records). No regression
+  (advance 48 + decideReplay 40 + decideC3 91 + decideCtaker 54 + decideC 70 + decideB 100 + decideA 78 +
+  decideset 84 + decidehelper 13 + trig 72 + movement 60 + selectactive 24+125 + marktarget 8 + assignmarker
+  77 + relmatrix 128 + dispatch 366 + events 85 + predicates 147 + resolver tree/gate + engine ALL PASS;
+  boots 0 SCRIPT ERROR). **vtable+0xc DONE. NEXT = FUN_005b73a0 (positioning, ~4.8KB, 7 RNG draws -- the
+  last big sim piece before the FUN_00598740 driver; SLICE it like 5a3400).**
 
 ### FUN_005a3400 DECODED STRUCTURE (the per-player DECIDE; decoded 2026-06-18 -- cite, don't re-derive)
 `__fastcall(ECX=player)`. The per-player movement-target / set-piece-positioning computer. **NO net

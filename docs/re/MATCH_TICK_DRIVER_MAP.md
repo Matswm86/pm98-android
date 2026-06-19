@@ -54,9 +54,10 @@ save-restore brackets that net-zero), the load-bearing simulation order is:
 
 ## Remaining ports to reach the full-match KILL-TEST (driver 0x598740)
 SIM, in dependency order:
-1. **FUN_005a4560** (ADVANCE, vtable+0xc) — per-player physics integrate. Has the SAME replay
-   record/playback brackets as FUN_005a3400 (DAT_006d31bc ring + DAT_006d31c4 replay + DAT_00665d8c
-   record); leaf `FUN_005ed8e0` at entry. **THE NEXT PORT.**
+1. ~~**FUN_005a4560** (ADVANCE, vtable+0xc)~~ **DONE 2026-06-19** -> Pm98Movement.advance + _advance_motion,
+   oracle test_advance.gd (48 ck). **FINDING: it is PURE replay record/playback, NOT physics** -- the
+   player position (+0x4/+0x8/+0xc) is set directly by DECIDE (FUN_005a3400) each tick. NO-OP in a live
+   headless run (ring != 0, or replay+record both off). leaf FUN_005ed8e0 = the 9-dword motion snapshot.
 2. **FUN_005b73a0** (positioning, ~4.8KB, 7 RNG draws -- trace 0x5ec250 for draw ORDER). Calls
    FUN_005b8690 (DONE) first; C++ unwinding + nested player loops. Will need SLICING like 5a3400.
 3. the 4 sub-entity vtables at match+0x1610/+0xaac/+0xe74/+0x123c (resolve identities + their
