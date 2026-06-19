@@ -595,6 +595,20 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   only fire on set-pieces (phases 3/4/5/7). So slicing FUN_005b73a0 = port the 3 set-piece branches; the
   open-play path is trivial.** NEXT = FUN_005b73a0 set-piece branches (phase-3 smallest, then 7, then 4/5
   wall + phase-5 tail) then the FUN_00598740 driver -> full-match KILL-TEST.
+- **Stage 3 task 2 — FUN_005b73a0 slice A (per-team positioning, prologue + OPEN-PLAY path) PORTED +
+  oracle-validated DONE.** -> `Pm98Movement.position_team(ctx)`: relationship matrix (FUN_005b8690,
+  throttled; DONE) + reset the throttle counter ctx+0x2e0 (= param_1[0xb8]) = -1, then dispatch on the
+  set-piece phase (match+0x448). For OPEN PLAY (phase 0, and the other non-set-piece phases 1/2/6) the
+  dispatch falls straight to the TAIL which returns (match+0x448 != 5) -- NO player is touched. ctx model
+  = the relationship-matrix ctx (ctx["players"]/ctx[0x8] team/ctx[0x138] match/ctx[0x2e0] throttle).
+  **The 4 set-piece branches are explicit push_error stubs (future slices): phase 4/(5&0x19cc) wall,
+  phase 7, phase 3, the phase-5 TAIL follow-up -- each a player loop with exact RNG ordering.** Oracle
+  `run_positionteam_oracle.sh` drives the REAL FUN_005b73a0 with phase in {0,1,6}, ctx+0x2e0 seeded 0 so
+  FUN_005b8690 increments to 1 and SKIPS (throttle -> no player iteration, no LUT/RNG, NO stubs); then
+  FUN_005b73a0 sets ctx+0x2e0 = -1 and the TAIL returns -> `specs/positionteam_oracle.txt` (3 fixtures,
+  all CALL 0 RET, ctx+0x2e0 -> -1 + player+0x4 untouched). Locked by `test_positionteam.gd` (**6 checks,
+  ALL PASS**). No regression (26 suites ALL PASS; boots 0 SCRIPT ERROR). NEXT = fill in the phase-3 / 7 /
+  4-5 / phase-5-tail set-piece branches, then the FUN_00598740 driver -> full-match KILL-TEST.
 
 ### FUN_005a3400 DECODED STRUCTURE (the per-player DECIDE; decoded 2026-06-18 -- cite, don't re-derive)
 `__fastcall(ECX=player)`. The per-player movement-target / set-piece-positioning computer. **NO net

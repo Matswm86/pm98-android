@@ -1370,3 +1370,36 @@ static func player_opposite_half(p: Dictionary, side: int) -> bool:
 	if ((_g(m, 0x19a0) & 1) ^ side) == 0:
 		goalx = Pm98Trig._i32(-goalx)
 	return _sign1(_si(p, 0x4)) != _sign1(goalx)
+
+
+# ---- FUN_005b73a0 the per-team off-ball POSITIONING pass (slice A: prologue + open play) ----
+# Called per team each tick by the driver FUN_00598740 (replay gate DAT_006d31c4 is the caller's;
+# this is the real-compute body). Runs the relationship matrix, resets the matrix throttle counter
+# (param_1[0xb8] = ctx+0x2e0 = -1), then dispatches on the set-piece phase (match+0x448). For OPEN
+# PLAY (phase 0) -- and any non-set-piece phase 1/2/6 -- it does NOTHING further: the off-ball
+# positioning fires ONLY on set-pieces (phases 3/4/5/7). So ~95% of match ticks reduce to
+# relationship-matrix + throttle reset. ctx model = the relationship-matrix ctx: ctx["players"]
+# (our team), ctx[0x8] team, ctx[0x138] match, ctx[0x2e0] throttle. Oracle-pinned (the open-play
+# path) by tools/re/run_positionteam_oracle.sh -> specs/positionteam_oracle.txt, in
+# test_positionteam.gd.
+#
+# NOT YET PORTED (push_error stubs -- future slices, each a player loop with exact RNG ordering):
+#   * phase 4 / (5 & match+0x19cc) when match+0x45c != our team: the defensive-WALL arrangement;
+#   * phase 7: the throw-in / free-kick positioning (RNG jitter);
+#   * phase 3: the kickoff/restart nearest-to-taker RNG jitter;
+#   * the TAIL phase-5 follow-up positioning (match+0x448 == 5).
+static func position_team(ctx: Dictionary) -> void:
+	build_relationship_matrix(ctx)                            # FUN_005b8690 (throttled; DONE)
+	ctx[0x2e0] = -1                                           # param_1[0xb8] = -1 (reset the throttle)
+	var m: Dictionary = ctx.get(0x138, {})
+	var phase := _g(m, 0x448)
+	var team := _g(ctx, 0x8)
+	if (phase == 4 or (phase == 5 and _g(m, 0x19cc) != 0)) and _g(m, 0x45c) != team:
+		push_error("position_team: phase 4/5 defensive-wall not yet ported")
+	elif phase == 7:
+		push_error("position_team: phase 7 not yet ported")
+	elif phase == 3:
+		push_error("position_team: phase 3 not yet ported")
+	# TAIL (0x5b81d6): only phase 5 continues to the follow-up positioning.
+	if _g(m, 0x448) == 5:
+		push_error("position_team: phase-5 tail not yet ported")

@@ -1,0 +1,6 @@
+# Stage 3 task 2 FUN_005b73a0 slice A (per-team positioning, OPEN-PLAY path) PCode-emu truth.
+# Non-set-piece phase -> relmatrix(skip via throttle) + ctx+0x2e0 = -1 + TAIL return; no player
+# touched. ctx+0x2e0 seeded 0; reads ctx+0x2e0 (-> -1=4294967295) + player+0x4 (-> 0x12340000).
+FIX phase0 CALL 0 RET steps=62 EAX=2162688 mem[0x2302e0:4]=4294967295 mem[0x240004:4]=305397760
+FIX phase1 CALL 0 RET steps=62 EAX=2162688 mem[0x2302e0:4]=4294967295 mem[0x240004:4]=305397760
+FIX phase6 CALL 0 RET steps=62 EAX=2162688 mem[0x2302e0:4]=4294967295 mem[0x240004:4]=305397760
