@@ -1358,3 +1358,15 @@ static func set_phase(m: Dictionary, phase: int) -> void:
 ## FUN_00590ac0 (__thiscall dst; src): copy a 3-vec src -> dst. Returns the copied vec.
 static func vec3_copy(src: Array) -> Array:
 	return [int(src[0]), int(src[1]), int(src[2])]
+
+
+## FUN_0058f0b0 (__thiscall player; side): 1 iff sign(player.x) != sign(goalx), where goalx =
+## -(match+0x1820) when (match+0x19a0 & 1) == side else +(match+0x1820) -- i.e. the player stands
+## on the opposite half from `side`'s goal. match = player+0x1d4; sign bucket = +1 if >=0 else -1.
+## (The driver FUN_00598740 calls it per team in the goal-area resolution branch.)
+static func player_opposite_half(p: Dictionary, side: int) -> bool:
+	var m: Dictionary = _ref(p, 0x1d4)
+	var goalx := _si(m, 0x1820)
+	if ((_g(m, 0x19a0) & 1) ^ side) == 0:
+		goalx = Pm98Trig._i32(-goalx)
+	return _sign1(_si(p, 0x4)) != _sign1(goalx)

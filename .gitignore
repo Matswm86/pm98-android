@@ -86,3 +86,4 @@ tools/re/specs/_decideReplay_run.*
 tools/re/specs/_advance_run.*
 tools/re/specs/_posleaf_run.*
 tools/re/specs/_driverleaf_run.*
+tools/re/specs/_halfpitch_run.*

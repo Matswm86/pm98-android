@@ -1,0 +1,7 @@
+# Stage 3 task 2 driver resolution leaf FUN_0058f0b0 (half-pitch test) PCode-emu ground truth.
+# EAX = 1 iff sign(player.x) != sign(goalx); goalx = -(m+0x1820) when orient==side else +. m+0x1820=0x140000.
+FIX opp_x CALL 0 RET steps=27 EAX=1
+FIX same_x CALL 0 RET steps=27 EAX=0
+FIX side1 CALL 0 RET steps=26 EAX=0
+FIX orient1 CALL 0 RET steps=26 EAX=1
+FIX zero_x CALL 0 RET steps=27 EAX=1

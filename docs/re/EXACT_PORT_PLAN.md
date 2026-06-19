@@ -583,6 +583,18 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   branches -- defensive-wall / phase-7 / phase-3 + phase-5 tail -- all leaves now ported) then the
   FUN_00598740 driver + its remaining helpers (FUN_00593a30/5946d0/94410/94570/5910c0/591120/0058f0b0/
   0058f3c0/59a120/59a1e0) -> full-match KILL-TEST.
+- **Stage 3 task 2 — driver resolution leaf FUN_0058f0b0 PORTED + oracle-validated DONE.** ->
+  `Pm98Movement.player_opposite_half(p, side)`: 1 iff sign(player.x) != sign(goalx), goalx =
+  -(match+0x1820) when (match+0x19a0 & 1) == side else +(match+0x1820) -- the player is on the opposite
+  half from `side`'s goal (match = player+0x1d4; sign bucket +1 if >=0 else -1). The driver FUN_00598740
+  calls it per team in the goal-area resolution branch (decompile line 377). Pure integer, no sub-calls.
+  Oracle `run_halfpitch_oracle.sh` -> `specs/halfpitch_oracle.txt` (5 fixtures: opp/same/side1/orient1/
+  zero-x [EAX], all CALL 0 RET); locked by `test_halfpitch.gd` (**5 checks, ALL PASS**). No regression
+  (25 suites ALL PASS; boots 0 SCRIPT ERROR). **OBSERVATION (verified): for phase 0 (open play, ~95% of
+  ticks) FUN_005b73a0 is just relmatrix(DONE) + ctx[0xb8]=-1 + return -- the off-ball positioning branches
+  only fire on set-pieces (phases 3/4/5/7). So slicing FUN_005b73a0 = port the 3 set-piece branches; the
+  open-play path is trivial.** NEXT = FUN_005b73a0 set-piece branches (phase-3 smallest, then 7, then 4/5
+  wall + phase-5 tail) then the FUN_00598740 driver -> full-match KILL-TEST.
 
 ### FUN_005a3400 DECODED STRUCTURE (the per-player DECIDE; decoded 2026-06-18 -- cite, don't re-derive)
 `__fastcall(ECX=player)`. The per-player movement-target / set-piece-positioning computer. **NO net
