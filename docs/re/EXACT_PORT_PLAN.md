@@ -676,6 +676,28 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   0 SCRIPT ERROR). NEXT = wall loops 2-4 + phase-5 tail Path A + the phase-7 wall-else (match+0x19a0!=4),
   then the FUN_00598740 driver -> full-match KILL-TEST.
 
+- **Stage 3 task 2 — FUN_005b73a0 slice F (phase-4 wall LOOPS 2-4) PORTED + oracle-validated DONE
+  2026-06-19.** -> `Pm98Movement._position_wall` (loops 2-4 replace the loud push_error stub) +
+  `_wall_nearest_opp` (disasm 0x5b763e..0x5b7ba0). The three marking loops over players LEFT unassigned by
+  loop 1, in order: **LOOP 2** (0x5b763e) assigns by the pre-set mark-target ptr `player+0xb0` (modelled
+  `_ref(p,0xb0)`) -> if on-pitch, unassigned, target unclaimed + pos_forward_ok(target): snap onto target,
+  x -= iVar21, claim both. **LOOP 3** (0x5b76ea) role NOT in {12,13,14,16,17}: nearest unclaimed
+  valid-forward opp within 1000.0 (0x3e80000), snap, x -= iVar21. **LOOP 4** (0x5b78b1) nearest within
+  100.0 (0x640000); HIT: snap + x += (flag?+0x10000:-0x10000); MISS: excluded role -> endpoint1
+  (player+0x1e0), else goal_target_x + 2-draw RNG jitter (x += +/-rng1*33, y = rng2*80 - 0x140000, z = 0).
+  KEY FINDINGS: [esp+0x18] == iVar21 (same compute as loop 1); [esp+0x14] == the opponents {base,count} (=
+  ctx["opponents"]); loop 4's FUN_0058fb50(box) + inline sign(opp.x)!=sign(opp+0x3a4) is bit-identical to
+  loops 2/3's FUN_005b04e0 (pos_forward_ok), so `_wall_nearest_opp` reuses it for both; flag =
+  (player.match+0x19a0 & 1) ^ player+0x2b8; the jitter `(rng*33*128)>>7` and `(rng*5*2048)>>7` reduce to
+  trunc-div = rng*33 / rng*80 (exact). Oracle `run_wall234_oracle.sh` drives the REAL phase-4 branch
+  (faithful _ftol @0x252000 for the fsqrt distance, loop-5 atan LUT, RNG seed @0x6d3184, relmatrix
+  throttle-skipped) -> `specs/wall234_oracle.txt` (8 fixtures: l2_marktarget, l3_nearest x2 orients,
+  l4_hit x2 orients, l4_endpoint, l4_goalrng x2 orients; all CALL 0 RET). The goalrng o0/o1 pair
+  cross-validates: x = ∓1309367 (goalx ∓ rng1*33=1353), same y=166640 (rng2*80-0x140000). Locked by
+  `test_wall234.gd` (**24 checks, ALL PASS**). No regression (all 68 parity suites + test_divisions pass;
+  boots 0 SCRIPT ERROR). NEXT = phase-5 tail Path A (insertion-sort) + phase-7 wall-else (match+0x19a0!=4),
+  then the FUN_00598740 driver -> full-match KILL-TEST.
+
 ### FUN_005a3400 DECODED STRUCTURE (the per-player DECIDE; decoded 2026-06-18 -- cite, don't re-derive)
 `__fastcall(ECX=player)`. The per-player movement-target / set-piece-positioning computer. **NO net
 RNG**: the only RNG touch is `s=FUN_005ec240()` (GET state @0x6d3184) ... `FUN_004e9630` ...

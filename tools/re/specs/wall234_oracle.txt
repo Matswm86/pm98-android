@@ -1,0 +1,10 @@
+# Stage 3 task 2 FUN_005b73a0 slice F (phase-4 wall LOOPS 2-4) PCode-emu ground truth.
+# l2=mark-target; l3=nearest<=1000; l4 hit<=100 / endpoint / goal+RNG. CALL RET rows.
+FIX l2_marktarget CALL 0 RET steps=599 EAX=2162688 mem[0x2403c0:4]=983040 mem[0x2403c4:4]=262144 mem[0x2403c8:4]=131072
+FIX l3_nearest_o0 CALL 0 RET steps=834 EAX=2162688 mem[0x2403c0:4]=458752 mem[0x2403c4:4]=0 mem[0x2403c8:4]=0
+FIX l3_nearest_o1 CALL 0 RET steps=834 EAX=2162688 mem[0x2403c0:4]=589824 mem[0x2403c4:4]=0 mem[0x2403c8:4]=0
+FIX l4_hit_o0 CALL 0 RET steps=702 EAX=2162688 mem[0x2403c0:4]=983040 mem[0x2403c4:4]=0 mem[0x2403c8:4]=0
+FIX l4_hit_o1 CALL 0 RET steps=702 EAX=2162688 mem[0x2403c0:4]=1114112 mem[0x2403c4:4]=0 mem[0x2403c8:4]=0
+FIX l4_endpoint CALL 0 RET steps=689 EAX=2162688 mem[0x2403c0:4]=1118481 mem[0x2403c4:4]=2236962 mem[0x2403c8:4]=3355443
+FIX l4_goalrng_o0 CALL 0 RET steps=670 EAX=2162688 mem[0x2403c0:4]=4293657929 mem[0x2403c4:4]=166640 mem[0x2403c8:4]=0
+FIX l4_goalrng_o1 CALL 0 RET steps=673 EAX=2162688 mem[0x2403c0:4]=1309367 mem[0x2403c4:4]=166640 mem[0x2403c8:4]=0

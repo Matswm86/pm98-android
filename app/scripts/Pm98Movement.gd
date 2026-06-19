@@ -1383,11 +1383,9 @@ static func player_opposite_half(p: Dictionary, side: int) -> bool:
 # path) by tools/re/run_positionteam_oracle.sh -> specs/positionteam_oracle.txt, in
 # test_positionteam.gd.
 #
-# NOT YET PORTED (push_error stubs -- future slices, each a player loop with exact RNG ordering):
-#   * phase 4 / (5 & match+0x19cc) when match+0x45c != our team: the defensive-WALL arrangement;
-#   * phase 7: the throw-in / free-kick positioning (RNG jitter);
-#   * phase 3: the kickoff/restart nearest-to-taker RNG jitter;
-#   * the TAIL phase-5 follow-up positioning (match+0x448 == 5).
+# PORTED: phase 4 / (5 & match+0x19cc) defensive-WALL (loops 1-5); phase 7 scatter (match+0x19a0==4);
+# phase 3 kickoff/restart; phase-5 tail Path C. STILL STUBBED (push_error): phase-7 wall-else
+# (match+0x19a0 != 4) and phase-5 tail Path A (0x19cc != 0 && 0x45c != team, the insertion-sort).
 static func position_team(ctx: Dictionary, rng = null) -> void:
 	build_relationship_matrix(ctx)                            # FUN_005b8690 (throttled; DONE)
 	ctx[0x2e0] = -1                                           # param_1[0xb8] = -1 (reset the throttle)
@@ -1498,12 +1496,14 @@ static func _position_phase7(ctx: Dictionary, m: Dictionary, team: int, rng) -> 
 ##         y = sign(match+0x16a4)*0x40000, z = 0.
 ##     iVar21 = (((match+0x19a0 & 1) ^ team) ? -0x10000 : +0x10000). No break: every matching opponent
 ##     re-claims (faithful -- realistically one per role). Each pull/anchor marks our-assigned[P id].
+##   * LOOPS 2-4 (0x5b763e..0x5b7ba0): assign players LEFT unassigned by loop 1 --
+##       - LOOP 2: by the pre-set mark-target pointer (player+0xb0), snap on, x -= iVar21;
+##       - LOOP 3: nearest unclaimed valid-forward opponent within 1000.0 (role-gated), snap, x -= iVar21;
+##       - LOOP 4: nearest within 100.0; on a hit snap + x += (flag ? +0x10000 : -0x10000); on a MISS,
+##         excluded roles -> endpoint1 (player+0x1e0), else goal_target_x + 2-draw RNG jitter.
+##     The [esp+0x18] x-offset is iVar21; [esp+0x14] is the opponents {base,count} (= ctx["opponents"]).
 ##   * LOOP 5 (0x5b7ba0..0x5b7c66): each player's facing (+0x34/+0x64) = atan(ball - player); then for
 ##     every on-pitch pair i<j, FUN_005ee3f0 (mid_offset) min-separation with offset [iVar21,0,0].
-##
-## NOT YET PORTED (loud guard): LOOPS 2-4 (0x5b763e..0x5b7ba0) -- the mark-target / nearest-opponent /
-## fallback-with-RNG assignment for players LEFT unassigned by loop 1. The guard fires push_error if any
-## on-pitch, still-unassigned player reaches them; the wall oracle keeps every player assigned by loop 1.
 static func _position_wall(ctx: Dictionary, m: Dictionary, team: int, rng = null) -> void:
 	var players: Array = ctx.get("players", [])
 	var opps: Array = ctx.get("opponents", [])
@@ -1538,12 +1538,77 @@ static func _position_wall(ctx: Dictionary, m: Dictionary, team: int, rng = null
 				our_assigned[pid] = true
 				wall_placed = true
 
-	# ---- LOOPS 2-4: mark-target / nearest-opponent / fallback (NOT YET PORTED) ----
+	# ---- LOOP 2 (0x5b763e): assign by the pre-set mark-target pointer (player+0xb0) ----
+	# Each player carries a mark-target opponent ref at +0xb0 (set by the marker pass FUN_005b94f0).
+	# If on-pitch, still-unassigned, the target unclaimed, and the target a valid forward position,
+	# snap onto the target (x shifted goal-side by -iVar21) and claim both.
 	for i in players.size():
 		var p: Dictionary = players[i]
-		if _g(p, 0x2bc) != 0 and not bool(our_assigned.get(_g(p, 0x2c4), false)):
-			push_error("position_team: wall loops 2-4 (marking/fallback) not yet ported")
-			break
+		if _g(p, 0x2bc) == 0 or bool(our_assigned.get(_g(p, 0x2c4), false)):
+			continue
+		var mt: Dictionary = _ref(p, 0xb0)                # mark-target opponent (player+0xb0)
+		if mt.is_empty() or bool(opp_claimed.get(_g(mt, 0x2c4), false)):
+			continue
+		if not pos_forward_ok(mt, [_si(mt, 0x4), _si(mt, 0x8), _si(mt, 0xc)]):
+			continue
+		our_assigned[_g(p, 0x2c4)] = true
+		opp_claimed[_g(mt, 0x2c4)] = true
+		p[0x4] = Pm98Trig._i32(_si(mt, 0x4) - ivar21)     # copy xyz then x -= iVar21
+		p[0x8] = _si(mt, 0x8)
+		p[0xc] = _si(mt, 0xc)
+
+	# ---- LOOP 3 (0x5b76ea): nearest unclaimed opponent within 1000.0, role-gated ----
+	# For each still-unassigned outfield player (role NOT in {12,13,14,16,17}), claim the closest
+	# valid-forward unclaimed opponent (3D ball-distance, bound 0x3e80000), snap on, x -= iVar21.
+	for i in players.size():
+		var p: Dictionary = players[i]
+		if _g(p, 0x2bc) == 0 or bool(our_assigned.get(_g(p, 0x2c4), false)):
+			continue
+		if _g(p, 0x2c8) in [0xc, 0xd, 0xe, 0x10, 0x11]:
+			continue
+		var j := _wall_nearest_opp(p, opps, opp_claimed, 0x3e80000)
+		if j < 0:
+			continue
+		var o: Dictionary = opps[j]
+		our_assigned[_g(p, 0x2c4)] = true
+		opp_claimed[_g(o, 0x2c4)] = true
+		p[0x4] = Pm98Trig._i32(_si(o, 0x4) - ivar21)
+		p[0x8] = _si(o, 0x8)
+		p[0xc] = _si(o, 0xc)
+
+	# ---- LOOP 4 (0x5b78b1): nearest unclaimed opponent within 100.0, else RNG fallback ----
+	# For each still-unassigned on-pitch player, claim the closest valid-forward unclaimed opponent
+	# within 0x640000; on a hit, snap on then x += (flag ? +0x10000 : -0x10000). On a MISS:
+	#   * role in {12,13,14,16,17} -> snap to endpoint1 (player+0x1e0);
+	#   * else -> goal_target_x + RNG jitter (x += +/-rng1*33, y = rng2*80 - 0x140000, z = 0).
+	# flag = (player.match+0x19a0 & 1) ^ player+0x2b8. our_assigned is marked on EVERY sub-path.
+	for i in players.size():
+		var p: Dictionary = players[i]
+		if _g(p, 0x2bc) == 0 or bool(our_assigned.get(_g(p, 0x2c4), false)):
+			continue
+		var pm: Dictionary = _ref(p, 0x18c)
+		var pteam := _g(p, 0x2b8)
+		var flag := (_g(pm, 0x19a0) & 1) ^ pteam
+		var j := _wall_nearest_opp(p, opps, opp_claimed, 0x640000)
+		our_assigned[_g(p, 0x2c4)] = true
+		if j >= 0:
+			var o: Dictionary = opps[j]
+			opp_claimed[_g(o, 0x2c4)] = true
+			p[0x4] = _si(o, 0x4)
+			p[0x8] = _si(o, 0x8)
+			p[0xc] = _si(o, 0xc)
+			p[0x4] = Pm98Trig._i32(_si(p, 0x4) + (0x10000 if flag != 0 else -0x10000))
+		elif _g(p, 0x2c8) in [0xc, 0xd, 0xe, 0x10, 0x11]:
+			p[0x4] = _si(p, 0x1e0)                         # endpoint1
+			p[0x8] = _si(p, 0x1e4)
+			p[0xc] = _si(p, 0x1e8)
+		else:
+			var goalx := goal_target_x(_g(pm, 0x19a0), _si(pm, 0x1820), pteam)
+			var mag1 := Pm98Trig._tdiv(Pm98Trig._i32(rng.next() * 0x1080), 0x80)   # rng*4224/128 = rng*33
+			p[0x4] = Pm98Trig._i32(goalx + (-mag1 if flag != 0 else mag1))
+			var mag2 := Pm98Trig._tdiv(Pm98Trig._i32(rng.next() * 0x2800), 0x80)   # rng*10240/128 = rng*80
+			p[0x8] = Pm98Trig._i32(mag2 - 0x140000)
+			p[0xc] = 0
 
 	# ---- LOOP 5: facing toward ball + pairwise min-separation (ALWAYS runs) ----
 	var n := players.size()
@@ -1579,6 +1644,30 @@ static func _wall_pull(p: Dictionary, pid: int, opps: Array, opp_claimed: Dictio
 			p[0x4] = Pm98Trig._i32(_si(o, 0x4) - ivar21)
 			p[0x8] = _si(o, 0x8)
 			p[0xc] = _si(o, 0xc)
+
+
+## FUN_005b73a0 loops 3+4 shared inner scan (disasm 0x5b7785../0x5b791c..): the nearest opponent (min
+## 3D ball-distance) that is on-pitch (+0x2bc), not yet claimed (opp+0x2c4 id), and a valid forward
+## target. Loop 3 gates with FUN_005b04e0; loop 4 with FUN_0058fb50 + an inline sign(opp.x) !=
+## sign(opp+0x3a4) test -- both are bit-identical to pos_forward_ok, so it is reused for both.
+## Returns the opponent index, or -1 if none is strictly within `bound`.
+static func _wall_nearest_opp(p: Dictionary, opps: Array, opp_claimed: Dictionary, bound: int) -> int:
+	var best := -1
+	var best_dist := bound
+	var px := _si(p, 0x4)
+	var py := _si(p, 0x8)
+	var pz := _si(p, 0xc)
+	for j in opps.size():
+		var o: Dictionary = opps[j]
+		if _g(o, 0x2bc) == 0 or bool(opp_claimed.get(_g(o, 0x2c4), false)):
+			continue
+		if not pos_forward_ok(o, [_si(o, 0x4), _si(o, 0x8), _si(o, 0xc)]):
+			continue
+		var dist := _ball_dist(o, px, py, pz)
+		if dist < best_dist:
+			best = j
+			best_dist = dist
+	return best
 
 
 ## FUN_005b73a0 phase-5 TAIL (LAB_005b81d6, disasm 0x5b81d6..0x5b8603). Reached after the wall (or
