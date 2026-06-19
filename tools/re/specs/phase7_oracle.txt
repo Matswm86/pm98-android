@@ -1,0 +1,5 @@
+# Stage 3 task 2 FUN_005b73a0 slice C (phase-7 scatter, match+0x19a0==4) PCode-emu ground truth.
+# each eligible player -> polar_vec((rand2*0xa00)>>7, (rand1*0x10000)>>15); 2 draws/player.
+# relmatrix throttle-skipped; cos LUT injected; RNG seed @0x6d3184. CALL RET rows.
+FIX scatter_seed1 CALL 0 RET steps=346 EAX=2162688 mem[0x2403c0:4]=369328 mem[0x2403c4:4]=3398 mem[0x2403c8:4]=0 mem[0x24059c:4]=369328 mem[0x24077c:4]=184654 mem[0x240780:4]=497069
+FIX offpitch_skip CALL 0 RET steps=234 EAX=2162688 mem[0x2403c0:4]=286326784 mem[0x2403c4:4]=0 mem[0x2403c8:4]=0 mem[0x24059c:4]=0 mem[0x24077c:4]=369328 mem[0x240780:4]=3398

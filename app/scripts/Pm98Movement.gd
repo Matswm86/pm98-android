@@ -1397,7 +1397,7 @@ static func position_team(ctx: Dictionary, rng = null) -> void:
 	if (phase == 4 or (phase == 5 and _g(m, 0x19cc) != 0)) and _g(m, 0x45c) != team:
 		push_error("position_team: phase 4/5 defensive-wall not yet ported")
 	elif phase == 7:
-		push_error("position_team: phase 7 not yet ported")
+		_position_phase7(ctx, m, team, rng)
 	elif phase == 3:
 		_position_phase3(ctx, m, team, rng)
 	# TAIL (0x5b81d6): only phase 5 continues to the follow-up positioning.
@@ -1451,3 +1451,31 @@ static func _position_phase3(ctx: Dictionary, m: Dictionary, team: int, rng) -> 
 		else:
 			role[0x4] = rx if rx > txx else txx               # max: keep role on the +x side
 		role[0x8] = 0
+
+
+## FUN_005b73a0 phase-7 branch (disasm 0x5b7c6d..0x5b7fe5). When match+0x19a0 == 4 (the
+## penalty/extra-time scatter mode): every eligible player -- not the taker, AND on-pitch OR
+## (off-pitch but on our set-piece side, team == match+0x45c) -- is scattered to a fresh random
+## polar position: angle = (rand1 * 0x10000) >> 15, radius = (rand2 * 0xa00) >> 7, then
+## pos (+0x4/+0x8/+0xc) = endpoint1 (+0x1e0) = endpoint2 (+0x1ec) = polar_vec(radius, angle).
+## Two FUN_005ec250 draws per processed player, angle-then-radius. The other (match+0x19a0 != 4)
+## wall path shares machinery with phase 4/5 and is NOT YET PORTED (push_error stub).
+static func _position_phase7(ctx: Dictionary, m: Dictionary, team: int, rng) -> void:
+	if _g(m, 0x19a0) != 4:
+		push_error("position_team: phase 7 wall (match+0x19a0 != 4) not yet ported")
+		return
+	var taker: Dictionary = _ref(m, 0x438)
+	var our_side := _g(m, 0x45c)
+	var players: Array = ctx.get("players", [])
+	for i in players.size():
+		var p: Dictionary = players[i]
+		if is_same(p, taker):
+			continue
+		if _g(p, 0x2bc) == 0 and our_side != team:            # off-pitch and not our set-piece side
+			continue
+		var a: int = (rng.next() * 0x10000) >> 15
+		var r: int = (rng.next() * 0xa00) >> 7
+		var polar: Array = Pm98Trig.polar_vec(r, a)
+		p[0x4] = polar[0]; p[0x8] = polar[1]; p[0xc] = polar[2]
+		p[0x1e0] = polar[0]; p[0x1e4] = polar[1]; p[0x1e8] = polar[2]
+		p[0x1ec] = polar[0]; p[0x1f0] = polar[1]; p[0x1f4] = polar[2]

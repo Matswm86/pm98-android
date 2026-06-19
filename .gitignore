@@ -90,3 +90,5 @@ tools/re/specs/_halfpitch_run.*
 tools/re/specs/_positionteam_run.*
 tools/re/specs/_phase3_run.*
 tools/re/specs/_phase3_lut.txt
+tools/re/specs/_phase7_run.*
+tools/re/specs/_phase7_lut.txt

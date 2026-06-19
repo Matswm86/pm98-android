@@ -625,6 +625,22 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   GDScript pitfall (warnings-as-errors): `var d := abs(...)` infers Variant (abs returns Variant) -> use
   explicit `var d: int =`. No regression (27 suites ALL PASS; boots 0 SCRIPT ERROR). NEXT = phase-7, then
   the phase-4/5 defensive-wall + phase-5 tail branches, then the FUN_00598740 driver -> full-match KILL-TEST.
+- **Stage 3 task 2 — FUN_005b73a0 slice C (phase-7 SCATTER sub) PORTED + oracle-validated DONE.** ->
+  `Pm98Movement._position_phase7` (disasm 0x5b7c6d..0x5b7fe5). When match+0x19a0 == 4 (penalty/ET scatter
+  mode): every eligible player -- not the taker, AND on-pitch OR (off-pitch on our set-piece side
+  team==match+0x45c) -- is scattered to a random polar position: angle = (rand1*0x10000)>>15, radius =
+  (rand2*0xa00)>>7, then pos (+0x4/+0x8/+0xc) = endpoint1 (+0x1e0) = endpoint2 (+0x1ec) =
+  polar_vec(radius, angle). Two FUN_005ec250 draws per processed player (angle then radius), in player
+  order. (The angle path's `(esi*r)>>15` is split as `(esi>>8)*r>>7` to avoid 32-bit overflow; esi is a
+  hardcoded 0x10000 here so the one-step branch is dead -- the result is just rand1*2 either way.)
+  **The match+0x19a0 != 4 wall path shares machinery with phase 4/5 and is a push_error stub (future).**
+  Oracle `run_phase7_oracle.sh` drives the REAL phase-7 (relmatrix throttle-skipped, cos LUT injected, RNG
+  seed @0x6d3184) -> `specs/phase7_oracle.txt` (2 fixtures: scatter_seed1 [P1 draws 1-2, P2 draws 3-4] +
+  offpitch_skip [match+0x45c=1 -> P1 off-pitch SKIPPED no-draws, P2 scattered draws 1-2], all CALL 0 RET).
+  Locked by `test_phase7.gd` (**12 checks, ALL PASS**; pos == endpoint1 == endpoint2 confirmed, skipped P1
+  retains its sentinel). No regression (28 suites ALL PASS; boots 0 SCRIPT ERROR). NEXT = the phase-4/5
+  defensive-wall (the biggest branch, shares the &DAT_00639270 table + FUN_005b04e0 + bitmap passes with
+  phase-7's wall) + the phase-5 TAIL follow-up, then the FUN_00598740 driver -> full-match KILL-TEST.
 
 ### FUN_005a3400 DECODED STRUCTURE (the per-player DECIDE; decoded 2026-06-18 -- cite, don't re-derive)
 `__fastcall(ECX=player)`. The per-player movement-target / set-piece-positioning computer. **NO net
