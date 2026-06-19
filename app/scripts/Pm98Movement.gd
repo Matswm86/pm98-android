@@ -1047,7 +1047,112 @@ static func _decide_slice_c_taker(p: Dictionary, m: Dictionary, phase: int) -> v
 			_slice_c_taker_aim(p, ball, orient, team, x1820, bpos, true)
 
 
-## FUN_005a3400 slice C1. Mutates the player `p` in place (m = the player's +0x18c match).
+# ---- FUN_005a3400 slice C3 (set-piece switch, NON-TAKER cases 2 / 4 / 5) -------------
+# The three remaining non-taker switch branches (cases 3/6/7 = slice C1, all takers = C2).
+# Decoded bit-for-bit from the disasm (the Ghidra decompile's comma-assignments are misleading
+# in the case-2 clamp ladder). Oracle-pinned by tools/re/run_decideC3_oracle.sh ->
+# specs/decideC3_oracle.txt, locked in test_decideC3.gd. All paths end in the shared atan
+# facing tail (_slice_c_tail), exactly like C1's non-taker cases.
+
+
+## Signed clamp of `v` into [lo, hi] -- the binary's `min(hi, max(lo, v))` jg/jge ladder at
+## 0x5a399c..0x5a39fe (case 2). lo <= hi always here (lo = per-axis min, hi = per-axis max).
+static func _clamp_i(v: int, lo: int, hi: int) -> int:
+	var r := lo if lo > v else v                              # max(lo, v)
+	return hi if hi < r else r                                # min(hi, .)
+
+
+## FUN_005a3400 case 2 NON-TAKER (disasm 0x5a3953..0x5a3a2a): clamp endpoint1 per-axis into the
+## box minmax(v, L), where v = [goal_target_x, -Yscale, -1.0], L = [0, +Yscale, +1000.0] in 16.16
+## (Yscale = match+0x1824), then push the result a minimum 0x90000 off the ball (clamp_min_sep).
+## The shared atan facing tail follows in the caller. Runs for ANY non-taker (no same-team split).
+static func _slice_c_case2_nontaker(p: Dictionary, m: Dictionary) -> void:
+	var orient := _g(m, 0x19a0)
+	var team := _g(p, 0x2b8)
+	var yscale := _g(m, 0x1824)
+	var v := [goal_target_x(orient, _g(m, 0x1820), team), Pm98Trig._i32(-yscale), Pm98Trig._i32(0xffff0000)]
+	var lvec := [0, yscale, 0x3e80000]                        # [0, Yscale, 1000.0]
+	var ep1 := [_g(p, 0x1e0), _g(p, 0x1e4), _g(p, 0x1e8)]
+	var mv := []
+	for axis in 3:
+		mv.append(_clamp_i(int(ep1[axis]), int(min(v[axis], lvec[axis])), int(max(v[axis], lvec[axis]))))
+	var ball: Dictionary = _ref(p, 0x190)
+	var res: Array = Pm98Trig.clamp_min_sep(mv, [_g(ball, 0x90), _g(ball, 0x94), _g(ball, 0x98)], 0x90000)
+	p[0x4] = res[0]
+	p[0x8] = res[1]
+	p[0xc] = res[2]
+
+
+## The set-piece position table &DAT_00674330 (19 entries x 3 int32, 16.16), written inline by
+## the cases-4/5 one-time init at 0x5a3d57..0x5a3ed6 (gated by DAT_006742ec & 1) and indexed by
+## the squad position code player+0x2c8 (0..18). Stored as raw u32; read via Pm98Trig._i32.
+## (FUN_00605ff0(&DAT_005a4550) in the init is a separate global side-effect that NEVER writes
+## this table -- it calls FUN_00605fc0 and returns a bool.)
+const SETPIECE_POS_TABLE := [
+	[0x0, 0x0, 0x0], [0x0, 0x0, 0x0], [0x0, 0x0, 0x0], [0x0, 0x0, 0x0], [0x0, 0x0, 0x0],
+	[0xb0000, 0x0, 0x0], [0xb0000, 0x0, 0x0],
+	[0x20000, 0xfff6d70b, 0x0], [0xc0000, 0xfff78000, 0x0], [0x70000, 0x30000, 0x0],
+	[0x128000, 0x0, 0x0], [0x90000, 0xfff50000, 0x0], [0xa0000, 0xb0000, 0x0],
+	[0x80000, 0x20000, 0x0], [0x68000, 0xb0000, 0x0], [0x0, 0x0, 0x0],
+	[0x80000, 0xfffb0000, 0x0], [0x80000, 0x60000, 0x0], [0xb0000, 0x58000, 0x0],
+]
+
+
+## FUN_005a3400 cases 4/5 NON-TAKER (disasm 0x5a3d12..0x5a40ad). Three sub-branches:
+##  * SAME team as taker: move = endpoint2, then a conditional override from
+##    SETPIECE_POS_TABLE[+0x2c8] -- move = [+/-(match+0x1820 - entry.x), +/-entry.y, entry.z]
+##    where the x sign mirrors by side and the y is negated when ball.y(+0x94) > 0. The override
+##    is SKIPPED when (phase==5 && match+0x19cc==0), or the table entry is all-zero, or the pos
+##    is 5/6 with player+0x2d6==0. On-pitch -> clamp_min_sep(ball, 0xa8000).
+##  * DIFFERENT team, off-pitch: set_position_code(0x20); move = endpoint1; move.x += the
+##    mirror-signed +/-0x4ccc wing offset; move.y += +/-0x20000 by ball.y(+0x94) sign (>=0 -> -).
+##  * DIFFERENT team, on-pitch: move = endpoint1, then clamp_min_sep(ball, 0xa8000).
+static func _slice_c_case45_nontaker(p: Dictionary, m: Dictionary, same_team: bool) -> void:
+	var orient := _g(m, 0x19a0)
+	var team := _g(p, 0x2b8)
+	var ball: Dictionary = _ref(p, 0x190)
+	if same_team:
+		var pos := _g(p, 0x2c8)
+		var entry: Array = SETPIECE_POS_TABLE[pos]
+		var ex := Pm98Trig._i32(int(entry[0]))
+		var ey := Pm98Trig._i32(int(entry[1]))
+		var ez := Pm98Trig._i32(int(entry[2]))
+		_slice_c_set_move(p, 0x1ec)                           # initial move = endpoint2
+		var gate1 := not (_g(m, 0x448) == 5 and _g(m, 0x19cc) == 0)
+		var nonzero := ex != 0 or ey != 0 or ez != 0
+		var gate3 := (pos != 5 and pos != 6) or _g(p, 0x2d6) != 0
+		if gate1 and nonzero and gate3:                       # override from the position table
+			var mx := Pm98Trig._i32(_g(m, 0x1820) - ex)
+			if ((orient & 1) ^ team) != 0:
+				mx = Pm98Trig._i32(-mx)
+			var my := Pm98Trig._i32(-ey) if _g(ball, 0x94) > 0 else ey
+			p[0x4] = mx
+			p[0x8] = my
+			p[0xc] = ez
+		if _g(p, 0x2bc) != 0:                                 # on-pitch -> minimum separation
+			_slice_c_min_sep(p, ball, 0xa8000)
+	elif _g(p, 0x2bc) == 0:                                   # different team, off-pitch
+		set_position_code(p, 0x20)
+		_slice_c_set_move(p, 0x1e0)                           # move = endpoint1
+		var off_x := -0x4ccc if ((orient & 1) ^ team) != 0 else 0x4ccc
+		p[0x4] = Pm98Trig._i32(_g(p, 0x4) + off_x)
+		var off_y := -0x20000 if _g(ball, 0x94) >= 0 else 0x20000
+		p[0x8] = Pm98Trig._i32(_g(p, 0x8) + off_y)
+	else:                                                     # different team, on-pitch
+		_slice_c_set_move(p, 0x1e0)                           # move = endpoint1
+		_slice_c_min_sep(p, ball, 0xa8000)
+
+
+## clamp_min_sep on the move target in place: push it `box` off the ball position (ball+0x90).
+static func _slice_c_min_sep(p: Dictionary, ball: Dictionary, box: int) -> void:
+	var res: Array = Pm98Trig.clamp_min_sep(
+		[_g(p, 0x4), _g(p, 0x8), _g(p, 0xc)], [_g(ball, 0x90), _g(ball, 0x94), _g(ball, 0x98)], box)
+	p[0x4] = res[0]
+	p[0x8] = res[1]
+	p[0xc] = res[2]
+
+
+## FUN_005a3400 slice C (C1 + C2 + C3). Mutates the player `p` in place (m = +0x18c match).
 static func decide_slice_c(p: Dictionary, m: Dictionary) -> void:
 	var phase := _g(m, 0x448)
 	if phase < 2 or phase > 7:                                # switch default: clean RET, no rewrite
@@ -1056,13 +1161,15 @@ static func decide_slice_c(p: Dictionary, m: Dictionary) -> void:
 	if is_same(p, taker):
 		_decide_slice_c_taker(p, m, phase)
 		return
-	if phase == 2 or phase == 4 or phase == 5:
-		push_error("decide_slice_c: case %d not yet ported" % phase)
-		return
+	# NON-TAKER cases 2..7: each computes a move target, then shares the atan facing tail.
 	var same_team := _g(p, 0x2b8) == _g(taker, 0x2b8)
 	match phase:
+		2:
+			_slice_c_case2_nontaker(p, m)
 		3:
 			_slice_c_set_move(p, 0x1ec if same_team else 0x1e0)
+		4, 5:
+			_slice_c_case45_nontaker(p, m, same_team)
 		6:
 			if same_team:                                    # per-axis midpoint, trunc toward zero
 				p[0x4] = Pm98Trig._tdiv(Pm98Trig._i32(_g(p, 0x1ec) + _g(p, 0x1e0)), 2)

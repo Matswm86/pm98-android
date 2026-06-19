@@ -460,6 +460,39 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   128 + dispatch 366 + events 85 ALL PASS; boots 0 SCRIPT ERROR). NEXT = slice C3 (the NON-taker branches of
   cases 2/4/5: case 2 bbox-blend via 5b12c0 + clamp_min_sep; cases 4/5 the DAT_006742ec one-time init + the
   49-entry _DAT_00674330 set-piece position table indexed by player+0x2c8) then the else-replay branch.
+- **Stage 3 task 2 — FUN_005a3400 slice C3 (set-piece switch, NON-TAKER cases 2/4/5) PORTED + oracle-validated
+  DONE.** Ported into `Pm98Movement.gd` as `_slice_c_case2_nontaker` + `_slice_c_case45_nontaker` (+ helpers
+  `_clamp_i` / `_slice_c_min_sep` + the const `SETPIECE_POS_TABLE`), wired into `decide_slice_c`. This COMPLETES
+  the whole `DAT_006d31c4==0` real-compute path of FUN_005a3400 (slices A+B + the switch: C1 non-taker 3/6/7 +
+  default, C2 all takers, C3 non-taker 2/4/5). Decoded BIT-FOR-BIT from the disasm (the Ghidra decompile's
+  comma-assignments mislead in the case-2 clamp ladder). **case 2** (0x5a3953..0x5a3a2a, any non-taker): clamp
+  endpoint1 per-axis into `minmax(v, L)` where `v = [goal_target_x(m+0x1820), -Yscale, -1.0]`, `L = [0, +Yscale,
+  +1000.0]` (Yscale = match+0x1824), via the `min(hi,max(lo,.))` jg/jge ladder at 0x5a399c..0x5a39fe, then
+  `clamp_min_sep(ball+0x90, 0x90000)`. **cases 4/5 same-team** (0x5a3d12..0x5a3fe9): move = endpoint2, then a
+  conditional OVERRIDE from `SETPIECE_POS_TABLE[player+0x2c8]` -> `move = [+/-(m+0x1820 - entry.x), +/-entry.y,
+  entry.z]` (x mirror-signed by `(orient&1)^team`; y negated when ball+0x94 > 0), SKIPPED when (phase==5 &&
+  match+0x19cc==0) OR the entry is all-zero OR (pos in {5,6} && player+0x2d6==0); on-pitch -> clamp_min_sep
+  0xa8000. **cases 4/5 diff-team off-pitch** (0x5a3fee..0x5a4073): set_position_code(0x20), move = endpoint1,
+  move.x += `((orient&1)^team ? -0x4ccc : +0x4ccc)`, move.y += `(ball+0x94 >= 0 ? -0x20000 : +0x20000)`.
+  **cases 4/5 diff-team on-pitch** (0x5a4078..0x5a40a9): move = endpoint1, clamp_min_sep 0xa8000. All non-taker
+  paths converge on the shared atan facing tail `_slice_c_tail` (verified: case 2 jmp 0x5a4494, cases 4/5 jmp
+  0x5a4495/0x5a449e -- same atan tail as C1's break-fallthrough). **SETPIECE_POS_TABLE** (19 entries x 3 int32,
+  &DAT_00674330) transcribed from the inline init writes 0x5a3d57..0x5a3ed6; `FUN_00605ff0(&DAT_005a4550)` in the
+  init is a separate global side-effect that NEVER touches the table (it calls FUN_00605fc0 + returns a bool).
+  **Oracle:** `run_decideC3_oracle.sh` drives the WHOLE real FUN_005a3400 with `DAT_006d31c4=0`, the table-init
+  flag `0x6742ec` cleared (so the inline table writes land + are read back -> validates the const transitively),
+  `FUN_00605ff0` + `FUN_005bbf10` STUBBED (faithful no-ops), cos/atan LUT + faithful `_ftol` injected
+  (clamp_min_sep + atan tail); 5a5430/590aa0/5b12c0/590ae0/5ee080/5ee2d0/5a44f0 run FOR REAL. ball.pos kept far so
+  clamp_min_sep is a no-op (the move computation is the novel logic; clamp_min_sep internals are pinned in
+  test_trig_lut moveleaves). Banked `specs/decideC3_oracle.txt` (13 fixtures: c2 plain/mirror, c4 same-team
+  override/mirror, c5 phase-5 guard on/off, c4 all-zero/pos5-guard/pos5-d6/off-pitch, c4 diff-team off/off-neg/on
+  -- all CALL 0 RET). Locked by `test_decideC3.gd` (**91 checks, ALL PASS**, runs A->B->C). No regression
+  (decideC3 91 + decideCtaker 54 + decideC 70 + decideB 100 + decideA 78 + decideset 84 + decidehelper 13 +
+  trig 72 + movement 60 + selectactive 24+125 + marktarget 8 + assignmarker 77 + relmatrix 128 + dispatch 366 +
+  events 85 + predicates 147 + resolver tree/gate + engine ALL PASS; boots 0 SCRIPT ERROR). **FUN_005a3400's
+  real-compute path is now COMPLETE.** NEXT = the else-replay branch (DAT_006d31c4 != 0, decompile 592-621: the
+  0x51-dword player+0x3b0 -> player+0x40 restore + the +0x5c active-marker bookkeeping + the +0x438-taker +0x45c
+  stamp), then FUN_005b70e0 shell + FUN_005b73a0 (RNG draws) + driver 0x598740 -> full-match KILL-TEST.
 
 ### FUN_005a3400 DECODED STRUCTURE (the per-player DECIDE; decoded 2026-06-18 -- cite, don't re-derive)
 `__fastcall(ECX=player)`. The per-player movement-target / set-piece-positioning computer. **NO net
