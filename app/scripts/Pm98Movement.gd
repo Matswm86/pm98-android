@@ -1402,7 +1402,7 @@ static func position_team(ctx: Dictionary, rng = null) -> void:
 		_position_phase3(ctx, m, team, rng)
 	# TAIL (0x5b81d6): only phase 5 continues to the follow-up positioning.
 	if _g(m, 0x448) == 5:
-		push_error("position_team: phase-5 tail not yet ported")
+		_position_phase5_tail(ctx, m, team)
 
 
 ## FUN_005b73a0 phase-3 (kickoff/restart) set-piece branch (disasm 0x5b7fec..0x5b81cf).
@@ -1579,3 +1579,43 @@ static func _wall_pull(p: Dictionary, pid: int, opps: Array, opp_claimed: Dictio
 			p[0x4] = Pm98Trig._i32(_si(o, 0x4) - ivar21)
 			p[0x8] = _si(o, 0x8)
 			p[0xc] = _si(o, 0xc)
+
+
+## FUN_005b73a0 phase-5 TAIL (LAB_005b81d6, disasm 0x5b81d6..0x5b8603). Reached after the wall (or
+## directly, when the wall branch was skipped) whenever match+0x448 == 5. Dispatch on match+0x19cc and
+## match+0x45c:
+##   * 0x19cc != 0 && 0x45c != team -> PATH A: the defensive-distribution insertion-sort (NOT YET PORTED);
+##   * 0x19cc != 0 && 0x45c == team -> no-op return;
+##   * 0x19cc == 0 && 0x45c == team -> PATH C (ported below).
+## (0x45c != team with 0x19cc == 0 never reaches here through phase 5: the wall needs 0x45c != team and
+## 0x19cc != 0, so a phase-5 wall implies Path A; Path C is the our-set-piece, no-19cc follow-up.)
+static func _position_phase5_tail(ctx: Dictionary, m: Dictionary, team: int) -> void:
+	if _g(m, 0x19cc) != 0:
+		if _g(m, 0x45c) != team:
+			push_error("position_team: phase-5 tail Path A (defensive distribution) not yet ported")
+		return
+	if _g(m, 0x45c) == team:
+		_phase5_tail_pathC(ctx, m, team)
+
+
+## FUN_005b73a0 phase-5 tail PATH C (disasm 0x5b8555..0x5b8603). For each OUR player whose x sits on the
+## WRONG side of its anchor (sign(P+0x4) != sign(P+0x3a4)) AND that has at most 1 goal-side opponent
+## (FUN_005b0b40(P, 0) <= 1), snap P.x to the team set-piece anchor x (*(match-team*800+0x98c)+0x4,
+## modelled as ctx["spc_anchor"].+0x4) then push P out of the taker's 0x93333 min-separation box
+## (FUN_005ee2d0 vs match+0x438). No RNG. count_goalside reads ctx["opponents"] (P+0x188 descriptor).
+static func _phase5_tail_pathC(ctx: Dictionary, m: Dictionary, _team: int) -> void:
+	var players: Array = ctx.get("players", [])
+	var opponents: Array = ctx.get("opponents", [])
+	var taker: Dictionary = _ref(m, 0x438)
+	var anchor: Dictionary = ctx.get("spc_anchor", {})
+	var anchor_x := _si(anchor, 0x4)
+	for i in players.size():
+		var p: Dictionary = players[i]
+		if _sign1(_si(p, 0x4)) != _sign1(_si(p, 0x3a4)) \
+				and count_goalside_opponents(p, opponents, 0) <= 1:
+			p[0x4] = anchor_x
+			var np: Array = Pm98Trig.clamp_min_sep(
+				[_si(p, 0x4), _si(p, 0x8), _si(p, 0xc)],
+				[_si(taker, 0x4), _si(taker, 0x8), _si(taker, 0xc)],
+				0x93333)
+			p[0x4] = np[0]; p[0x8] = np[1]; p[0xc] = np[2]

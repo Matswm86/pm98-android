@@ -660,6 +660,21 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   CALL 0 RET, P1/P2/P3 xyz hand-verified). Locked by `test_wall.gd` (**18 checks, ALL PASS**). No regression
   (all suites pass; boots 0 SCRIPT ERROR). NEXT = wall loops 2-4 + the phase-5 TAIL, then the phase-7 wall-
   else (match+0x19a0!=4), then the FUN_00598740 driver -> full-match KILL-TEST.
+- **Stage 3 task 2 — FUN_005b73a0 slice E (phase-5 TAIL Path C) PORTED + oracle-validated DONE.** ->
+  `Pm98Movement._position_phase5_tail` + `_phase5_tail_pathC` (LAB_005b81d6, disasm 0x5b81d6..0x5b8603).
+  The tail runs whenever match+0x448==5 (after the wall, or directly when the wall was skipped). Dispatch:
+  0x19cc!=0 && 0x45c!=team -> PATH A (defensive insertion-sort, still a loud push_error stub); 0x19cc!=0 &&
+  0x45c==team -> no-op; **0x19cc==0 && 0x45c==team -> PATH C (ported).** Path C: for each our player with
+  sign(P+0x4) != sign(P+0x3a4) AND FUN_005b0b40(P,0) (goal-side opponent count) <= 1, snap P.x to the team
+  set-piece anchor x (*(match-team*800+0x98c)+0x4, modelled ctx["spc_anchor"].+0x4) then FUN_005ee2d0
+  (clamp_min_sep) min-sep box 0x93333 vs the taker (match+0x438). No RNG. (Phase 5 reaches Path C only via
+  the wall-skipped route -- the wall needs 0x19cc!=0, so a phase-5 wall always implies the tail's Path A.)
+  Oracle `run_phase5tail_oracle.sh` drives the REAL tail (faithful _ftol injected @0x252000 so clamp fires;
+  relmatrix throttle-skipped) -> `specs/phase5tail_oracle.txt` (1 fixture, 3 players: P0 sign-diff+count0 ->
+  x=anchor=0x55000 then clamp -> 0x93333 ; P1 sign-same SKIP ; P2 count==2 SKIP, all CALL 0 RET, hand-
+  verified). Locked by `test_phase5tail.gd` (**5 checks, ALL PASS**). No regression (all suites pass; boots
+  0 SCRIPT ERROR). NEXT = wall loops 2-4 + phase-5 tail Path A + the phase-7 wall-else (match+0x19a0!=4),
+  then the FUN_00598740 driver -> full-match KILL-TEST.
 
 ### FUN_005a3400 DECODED STRUCTURE (the per-player DECIDE; decoded 2026-06-18 -- cite, don't re-derive)
 `__fastcall(ECX=player)`. The per-player movement-target / set-piece-positioning computer. **NO net

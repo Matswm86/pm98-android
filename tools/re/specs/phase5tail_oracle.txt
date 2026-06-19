@@ -1,0 +1,3 @@
+# Stage 3 task 2 FUN_005b73a0 slice E (phase-5 tail Path C, our-set-piece follow-up) PCode-emu truth.
+# P0 sign-diff+count0 -> x=anchor then clamp vs taker; P1 sign-same SKIP; P2 count>=2 SKIP. CALL RET.
+FIX pathC CALL 0 RET steps=430 EAX=2 mem[0x240004:4]=602931 mem[0x240008:4]=0 mem[0x24000c:4]=0 mem[0x2403c0:4]=1048576 mem[0x24077c:4]=1048576

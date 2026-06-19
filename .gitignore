@@ -94,3 +94,4 @@ tools/re/specs/_phase7_run.*
 tools/re/specs/_phase7_lut.txt
 tools/re/specs/_wall_run.*
 tools/re/specs/_wall_lut.txt
+tools/re/specs/_phase5tail_run.*
