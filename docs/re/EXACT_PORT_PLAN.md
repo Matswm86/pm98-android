@@ -518,6 +518,20 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   128 + dispatch 366 + events 85 + predicates 147 + resolver tree/gate + engine ALL PASS; boots 0 SCRIPT ERROR).
   NEXT (FUN_005a3400 fully done) = FUN_005b70e0 shell + FUN_005b73a0 (7 RNG draws, trace 0x5ec250 for ORDER) +
   driver 0x598740 -> the full-match KILL-TEST.
+- **Stage 3 task 2 — match-tick driver call-graph MAPPED (FUN_00598740) 2026-06-19.** Read the master
+  per-tick driver `FUN_00598740` (sim/fn_00598740) + resolved the player vtable from MANAGER.EXE .rdata
+  (VA 0x639224 = `[0x5ed810, 0x5a5460, 0x5a3400, 0x5a4560, ...]`). **Verified: vtable+8 = FUN_005a3400
+  (DECIDE, DONE), vtable+0xc = FUN_005a4560 (ADVANCE/physics, NOT ported), vtable+4 = FUN_005a5460
+  (SPRITE/ANIM draw -- DISPLAY).** The per-tick SIM order (each x2, once per team): FUN_005b8bf0 (decide
+  dispatch ->5a3400) -> 4 sub-entity decides -> FUN_005b8690 (relmatrix DONE) -> FUN_005b94f0 (markers
+  DONE) -> FUN_005b8c20 (advance dispatch ->5a4560) -> 4 sub-entity advances -> FUN_005b8ce0 (nearest
+  DONE) -> DAT_006d31bc ring++ -> open-play resolution (predicates DONE + dispatch DONE + RNG). **KEY
+  CORRECTION: FUN_005b70e0 + FUN_005a5460 are RENDER passes (sprite draw, gated by match+0x180b/0x5fac)
+  -- NOT needed for the headless match-outcome engine; the prior handoff's "FUN_005b70e0 shell" next-step
+  was mis-aimed at a render pass.** Full map (per-tick order, render/sim split, remaining-function
+  inventory) -> `docs/re/MATCH_TICK_DRIVER_MAP.md`. **CORRECTED NEXT (sim path) = FUN_005a4560 (advance,
+  vtable+0xc; same replay record/playback brackets as 5a3400, leaf FUN_005ed8e0) -> FUN_005b73a0
+  (positioning, slice it) -> the 4 sub-entity vtables -> FUN_00598740 driver -> full-match KILL-TEST.**
 
 ### FUN_005a3400 DECODED STRUCTURE (the per-player DECIDE; decoded 2026-06-18 -- cite, don't re-derive)
 `__fastcall(ECX=player)`. The per-player movement-target / set-piece-positioning computer. **NO net
