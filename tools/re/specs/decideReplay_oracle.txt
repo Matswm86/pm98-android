@@ -1,0 +1,9 @@
+# Stage 3 task 2 DECIDE else-replay (FUN_005a3400 DAT_006d31c4!=0 path) PCode-emu ground truth.
+# Replay copy *(player+0x3b0)->+0x40..+0x180 + active-marker bookkeeping; clean RET. No stubs/LUT.
+# buffer @0x254000 seeded [+0]=0x11110000 [+4]=0x22220000 [+0x70]=0x33330000 [+0x140]=0x44440000;
+# +0x1c (-> restored +0x5c) per-fixture. match+0x45c pre-seeded 0x7777 sentinel. Each row: FIX + CALL.
+FIX active_taker_old CALL 0 RET steps=292 EAX=0 mem[0x230040:4]=286326784 mem[0x230044:4]=572653568 mem[0x23005c:4]=1 mem[0x2300b0:4]=858980352 mem[0x230180:4]=1145307136 mem[0x240168:4]=2293760 mem[0x28005c:4]=0 mem[0x21045c:4]=1
+FIX active_nontaker_old CALL 0 RET steps=274 EAX=0 mem[0x230040:4]=286326784 mem[0x230044:4]=572653568 mem[0x23005c:4]=1 mem[0x2300b0:4]=858980352 mem[0x230180:4]=1145307136 mem[0x240168:4]=2293760 mem[0x28005c:4]=0 mem[0x21045c:4]=30583
+FIX inactive CALL 0 RET steps=275 EAX=0 mem[0x230040:4]=286326784 mem[0x230044:4]=572653568 mem[0x23005c:4]=0 mem[0x2300b0:4]=858980352 mem[0x230180:4]=1145307136 mem[0x240168:4]=2621440 mem[0x28005c:4]=1 mem[0x21045c:4]=30583
+FIX active_noold CALL 0 RET steps=289 EAX=0 mem[0x230040:4]=286326784 mem[0x230044:4]=572653568 mem[0x23005c:4]=1 mem[0x2300b0:4]=858980352 mem[0x230180:4]=1145307136 mem[0x240168:4]=2293760 mem[0x28005c:4]=0 mem[0x21045c:4]=1
+FIX active_self CALL 0 RET steps=273 EAX=0 mem[0x230040:4]=286326784 mem[0x230044:4]=572653568 mem[0x23005c:4]=1 mem[0x2300b0:4]=858980352 mem[0x230180:4]=1145307136 mem[0x240168:4]=2293760 mem[0x28005c:4]=0 mem[0x21045c:4]=30583

@@ -1188,3 +1188,33 @@ static func decide_slice_c(p: Dictionary, m: Dictionary) -> void:
 			else:
 				_slice_c_set_move(p, 0x1e0)
 	_slice_c_tail(p)
+
+
+# ---- FUN_005a3400 ELSE-REPLAY branch (DAT_006d31c4 != 0) ------------------------------
+# The non-real-compute path (disasm 0x5a368c..0x5a374c). When the global replay flag
+# DAT_006d31c4 is set, the per-player DECIDE does NOT recompute a move target: it RESTORES the
+# player's saved per-tick state and re-asserts the active-player marker.
+#  1. Copy 0x51 (81) dwords from the saved buffer at *(player+0x3b0) into player+0x40..+0x180.
+#  2. If the RESTORED +0x5c (active marker) is set: make this player the team's active player --
+#     team(+0x184)+0x168 = player, clearing the previously-active player's +0x5c (unless it is
+#     null or already this player) -- and, when this player is the set-piece taker (match+0x438),
+#     stamp match+0x45c = player team.
+#  3. (taker only) write the three set-piece globals 0x665154/0x66502c/0x67455c -- player-field-
+#     inert (validated in slice C2), so not modelled.
+# Slice A runs as the prefix (writes only +0x1e0..+0x224/+0x3a4, none of which the copy or the
+# bookkeeping read), so this branch is self-contained. Oracle-pinned bit-for-bit by
+# tools/re/run_decideReplay_oracle.sh -> specs/decideReplay_oracle.txt, locked in
+# test_decideReplay.gd. STRUCT MODEL: player+0x3b0 -> the saved-state buffer (a ref); player+0x184
+# -> the team struct, its +0x168 = the active player (a player ref, absent/null = none).
+static func decide_slice_replay(p: Dictionary, m: Dictionary) -> void:
+	var buf: Dictionary = _ref(p, 0x3b0)                      # *(player+0x3b0) = saved-state buffer
+	for i in 0x51:                                            # 81-dword restore -> +0x40..+0x180
+		p[0x40 + i * 4] = _g(buf, i * 4)
+	if _g(p, 0x5c) != 0:                                      # restored active marker set
+		var ts: Dictionary = _ref(p, 0x184)                   # team struct
+		var old: Variant = ts.get(0x168, null)                # previously-active player (or null)
+		if old != null and not is_same(old, p):
+			(old as Dictionary)[0x5c] = 0                     # clear the prior active player's marker
+		ts[0x168] = p                                         # this player becomes active
+		if is_same(p, _ref(m, 0x438)):                        # this player is the set-piece taker
+			m[0x45c] = _g(p, 0x2b8)                            # stamp the taker's team

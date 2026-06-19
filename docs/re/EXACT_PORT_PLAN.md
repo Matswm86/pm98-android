@@ -493,6 +493,31 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   real-compute path is now COMPLETE.** NEXT = the else-replay branch (DAT_006d31c4 != 0, decompile 592-621: the
   0x51-dword player+0x3b0 -> player+0x40 restore + the +0x5c active-marker bookkeeping + the +0x438-taker +0x45c
   stamp), then FUN_005b70e0 shell + FUN_005b73a0 (RNG draws) + driver 0x598740 -> full-match KILL-TEST.
+- **Stage 3 task 2 — FUN_005a3400 ELSE-REPLAY branch (DAT_006d31c4 != 0) PORTED + oracle-validated DONE.**
+  Ported into `Pm98Movement.gd` as `decide_slice_replay(p, m)` (disasm 0x5a368c..0x5a374c). The non-real-compute
+  path: when the global replay flag is set, the per-player DECIDE does NOT recompute -- it (1) copies 0x51 (81)
+  dwords from the saved buffer at *(player+0x3b0) into player+0x40..+0x180 (`rep movsd`; the source is a POINTER
+  stored at +0x3b0, NOT inline), then (2) if the RESTORED +0x5c (active marker, = buffer offset 0x1c) is set,
+  makes this player the team's active player -- team(+0x184)+0x168 = player, clearing the previously-active
+  player's +0x5c UNLESS it is null or already this player -- and, when this player is the set-piece taker
+  (match+0x438), stamps match+0x45c = player team. The taker-only set-piece globals 0x665154/0x66502c/0x67455c
+  are player-field-inert (validated in C2) and not modelled. **This COMPLETES FUN_005a3400 (all paths: slice A
+  prologue+bbox, the DAT_006d31c4==0 real-compute head slice B + the switch C1/C2/C3, AND this DAT_006d31c4!=0
+  replay branch).** STRUCT MODEL: player+0x3b0 -> saved-state buffer (a ref); player+0x184 -> team struct, its
+  +0x168 = the active player (a player ref; absent/null = none); the active-marker bookkeeping uses the GDScript
+  built-in `is_same` for pointer identity (player ref vs prior-active ref). **Oracle:** `run_decideReplay_oracle.sh`
+  drives the WHOLE real FUN_005a3400 down the replay path (DAT_006d31c4=1) -- the SAME harness as
+  run_decideA_oracle.sh (slice A runs as the prefix, writes only +0x1e0..+0x224/+0x3a4, none read here; NO callee
+  stubs, NO LUT/RNG). Buffer @0x254000 seeded with 4 distinct dwords (+0/+4/+0x70/+0x140) + the per-fixture +0x1c
+  gate; team @0x240000, prior-active OLD @0x280000, match+0x45c pre-seeded 0x7777 sentinel. Banked
+  `specs/decideReplay_oracle.txt` (5 fixtures: active_taker_old / active_nontaker_old / inactive / active_noold /
+  active_self -- all CALL 0 RET). Locked by `test_decideReplay.gd` (**40 checks, ALL PASS**: the 5 restored copy
+  fields + team+0x168 (pointer->dict identity mapped) + prior-active +0x5c cleared + match+0x45c stamp). No
+  regression (decideReplay 40 + decideC3 91 + decideCtaker 54 + decideC 70 + decideB 100 + decideA 78 + decideset
+  84 + decidehelper 13 + trig 72 + movement 60 + selectactive 24+125 + marktarget 8 + assignmarker 77 + relmatrix
+  128 + dispatch 366 + events 85 + predicates 147 + resolver tree/gate + engine ALL PASS; boots 0 SCRIPT ERROR).
+  NEXT (FUN_005a3400 fully done) = FUN_005b70e0 shell + FUN_005b73a0 (7 RNG draws, trace 0x5ec250 for ORDER) +
+  driver 0x598740 -> the full-match KILL-TEST.
 
 ### FUN_005a3400 DECODED STRUCTURE (the per-player DECIDE; decoded 2026-06-18 -- cite, don't re-derive)
 `__fastcall(ECX=player)`. The per-player movement-target / set-piece-positioning computer. **NO net
