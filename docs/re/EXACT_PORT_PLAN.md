@@ -570,6 +570,19 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   literal + abs() infers Variant -> use explicit `var x: int =`. No regression (posleaf 8 + advance 48 +
   decideReplay 40 + decideC3 91 + ... + engine ALL PASS; boots 0 SCRIPT ERROR). NEXT = slice FUN_005b73a0
   itself (the leaves are now in place: 5b04e0 + 5b0b40 ported, 5b8690/5a5430/predicates/trig all DONE).
+- **Stage 3 task 2 — 3 match-driver (FUN_00598740) leaves PORTED + oracle-validated DONE.** The small
+  leaves the per-tick driver calls -> `Pm98Movement.within_box` / `set_phase` / `vec3_copy`.
+  **FUN_005a1820** (__thiscall p1; p2, lx, ly, lz): 1 iff p1 within the per-axis L-inf box of half-extents
+  (lx, ly, lz) around p2 (STRICT <; per-axis diff wraps to int32 before abs) -- the driver uses it 5x for
+  goalkeeper-distribution region tests. **FUN_005942e0** (__thiscall match; phase): match+0x448 = phase
+  unless already 8 (locked), mirror to +0x44c unless phase == 1. **FUN_00590ac0**: 3-dword vec copy.
+  **Oracle:** `run_driverleaf_oracle.sh` -> `specs/driverleaf_oracle.txt` (9 fixtures: a1820 within/negok/
+  x/y/z-fail [EAX], phase set/one/locked [mem +0x448/+0x44c], copy_vec [mem] -- all CALL 0 RET). Locked by
+  `test_driverleaf.gd` (**14 checks, ALL PASS**). No regression (driverleaf 14 + posleaf 8 + advance 48 +
+  ... + engine = 24 suites ALL PASS; boots 0 SCRIPT ERROR). NEXT = slice FUN_005b73a0 (positioning; 3 phase
+  branches -- defensive-wall / phase-7 / phase-3 + phase-5 tail -- all leaves now ported) then the
+  FUN_00598740 driver + its remaining helpers (FUN_00593a30/5946d0/94410/94570/5910c0/591120/0058f0b0/
+  0058f3c0/59a120/59a1e0) -> full-match KILL-TEST.
 
 ### FUN_005a3400 DECODED STRUCTURE (the per-player DECIDE; decoded 2026-06-18 -- cite, don't re-derive)
 `__fastcall(ECX=player)`. The per-player movement-target / set-piece-positioning computer. **NO net

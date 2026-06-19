@@ -1329,3 +1329,32 @@ static func count_goalside_opponents(p: Dictionary, opponents: Array, thresh: in
 		if d < lim:
 			n += 1
 	return n
+
+
+# ---- Match-driver leaves (FUN_00598740): within-box test + phase setter + vec copy ----
+# Small leaves the per-tick match driver FUN_00598740 calls. Oracle-pinned (FUN_005a1820 EAX +
+# FUN_005942e0 state) by tools/re/run_driverleaf_oracle.sh -> specs/driverleaf_oracle.txt, locked
+# in test_driverleaf.gd.
+
+## FUN_005a1820 (__thiscall p1; p2, lx, ly, lz): 1 iff p1 is within the per-axis L-inf box of
+## half-extents (lx, ly, lz) around p2 (STRICT <). The driver uses it for goalkeeper-distribution
+## region tests. Each per-axis difference wraps to int32 before abs (faithful to the 32-bit sub).
+static func within_box(p1: Array, p2: Array, lx: int, ly: int, lz: int) -> bool:
+	return abs(Pm98Trig._i32(int(p1[0]) - int(p2[0]))) < lx \
+		and abs(Pm98Trig._i32(int(p1[1]) - int(p2[1]))) < ly \
+		and abs(Pm98Trig._i32(int(p1[2]) - int(p2[2]))) < lz
+
+
+## FUN_005942e0 (__thiscall match; phase): set the match phase match+0x448 = phase (UNLESS it is
+## already 8 = locked/match-over), and mirror it to the secondary phase +0x44c unless phase == 1.
+static func set_phase(m: Dictionary, phase: int) -> void:
+	if _g(m, 0x448) == 8:
+		return
+	m[0x448] = phase
+	if phase != 1:
+		m[0x44c] = phase
+
+
+## FUN_00590ac0 (__thiscall dst; src): copy a 3-vec src -> dst. Returns the copied vec.
+static func vec3_copy(src: Array) -> Array:
+	return [int(src[0]), int(src[1]), int(src[2])]

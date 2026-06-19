@@ -1,0 +1,12 @@
+# Stage 3 task 2 match-driver leaves (FUN_005a1820 within-box + FUN_005942e0 set-phase +
+# FUN_00590ac0 vec3-copy) PCode-emu ground truth. 5a1820: EAX=return. p1/dst@0x230000, p2/src
+# @0x230010, match@0x210000. Each row: FIX <name> + verbatim CALL (EAX and/or mem[...]).
+FIX a1820_within CALL 0 RET steps=31 EAX=1
+FIX a1820_negok CALL 0 RET steps=31 EAX=1
+FIX a1820_xfail CALL 0 RET steps=13 EAX=0
+FIX a1820_yfail CALL 0 RET steps=22 EAX=0
+FIX a1820_zfail CALL 0 RET steps=31 EAX=0
+FIX phase_set CALL 0 RET steps=8 EAX=6 mem[0x210448:4]=6 mem[0x21044c:4]=6
+FIX phase_one CALL 0 RET steps=7 EAX=1 mem[0x210448:4]=1 mem[0x21044c:4]=30583
+FIX phase_locked CALL 0 RET steps=3 EAX=0 mem[0x210448:4]=8 mem[0x21044c:4]=30583
+FIX copy_vec CALL 0 RET steps=9 EAX=2293760 mem[0x230000:4]=305397760 mem[0x230004:4]=1450704896 mem[0x230008:4]=2596012032
