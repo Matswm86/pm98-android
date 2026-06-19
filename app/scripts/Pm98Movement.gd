@@ -1383,9 +1383,9 @@ static func player_opposite_half(p: Dictionary, side: int) -> bool:
 # path) by tools/re/run_positionteam_oracle.sh -> specs/positionteam_oracle.txt, in
 # test_positionteam.gd.
 #
-# PORTED: phase 4 / (5 & match+0x19cc) defensive-WALL (loops 1-5); phase 7 scatter (match+0x19a0==4);
-# phase 3 kickoff/restart; phase-5 tail Path C. STILL STUBBED (push_error): phase-7 wall-else
-# (match+0x19a0 != 4) and phase-5 tail Path A (0x19cc != 0 && 0x45c != team, the insertion-sort).
+# FULLY PORTED (every branch): phase 4 / (5 & match+0x19cc) defensive-WALL (loops 1-5); phase 7 scatter
+# (match+0x19a0==4) + wall-else (match+0x19a0 != 4); phase 3 kickoff/restart; phase-5 tail Path A
+# (0x19cc != 0 && 0x45c != team, the insertion-sort fan) + Path C (our-set-piece follow-up).
 static func position_team(ctx: Dictionary, rng = null) -> void:
 	build_relationship_matrix(ctx)                            # FUN_005b8690 (throttled; DONE)
 	ctx[0x2e0] = -1                                           # param_1[0xb8] = -1 (reset the throttle)
@@ -1457,10 +1457,10 @@ static func _position_phase3(ctx: Dictionary, m: Dictionary, team: int, rng) -> 
 ## polar position: angle = (rand1 * 0x10000) >> 15, radius = (rand2 * 0xa00) >> 7, then
 ## pos (+0x4/+0x8/+0xc) = endpoint1 (+0x1e0) = endpoint2 (+0x1ec) = polar_vec(radius, angle).
 ## Two FUN_005ec250 draws per processed player, angle-then-radius. The other (match+0x19a0 != 4)
-## wall path shares machinery with phase 4/5 and is NOT YET PORTED (push_error stub).
+## branch is the role-table WALL, ported in _position_phase7_wall below.
 static func _position_phase7(ctx: Dictionary, m: Dictionary, team: int, rng) -> void:
 	if _g(m, 0x19a0) != 4:
-		push_error("position_team: phase 7 wall (match+0x19a0 != 4) not yet ported")
+		_position_phase7_wall(ctx, m, team)
 		return
 	var taker: Dictionary = _ref(m, 0x438)
 	var our_side := _g(m, 0x45c)
@@ -1477,6 +1477,71 @@ static func _position_phase7(ctx: Dictionary, m: Dictionary, team: int, rng) -> 
 		p[0x4] = polar[0]; p[0x8] = polar[1]; p[0xc] = polar[2]
 		p[0x1e0] = polar[0]; p[0x1e4] = polar[1]; p[0x1e8] = polar[2]
 		p[0x1ec] = polar[0]; p[0x1f0] = polar[1]; p[0x1f4] = polar[2]
+
+
+## FUN_005b73a0 phase-7 wall-else role-priority table &DAT_00639270 (2 rows x 11 int32, file offset
+## 0x238070). Row = `flag` (1 iff team != match+0x45c). Each on-pitch non-taker player whose role
+## (+0x2c8) matches an as-yet-unclaimed table entry is snapped to the wall slot keyed by that index;
+## the claimed-slot bitmap is SHARED across all players (a role appears at most once per row).
+const PHASE7_WALL_ROLES := [
+	[12, 7, 8, 16, 13, 9, 17, 10, 18, 11, 14],   # flag 0: team == set-piece side (match+0x45c)
+	[3, 11, 18, 5, 15, 4, 6, 8, 7, 2, 0],        # flag 1: team != set-piece side
+]
+
+
+## FUN_005b73a0 phase-7 wall-ELSE (disasm 0x5b7da9..0x5b7fe5, reached when match+0x19a0 != 4). For each
+## on-pitch non-taker player, scan the 11-entry role table for `flag` (= team != match+0x45c); the FIRST
+## unclaimed entry matching the player's role (+0x2c8) snaps it to a defensive-wall slot:
+##   x = +/-(0x109999 - goalXscale),  y = +/-(Yscale - trunc(Yscale*(flag+1+2*idx) / 11)),  z = 0,
+## both negated iff (orient ^ (1 - side)) != 0  (orient = match+0x19a0 & 1, side = match+0x45c). The
+## per-row claimed bitmap is shared, so two players of the same role only place the first. Then EVERY
+## eligible player (matched or not) runs the shared tail: clamp_min_sep off the taker (0xa0000); if its
+## x ends within 0x109999 of the near goal line snap x = +/-(goalXscale - 0x110000) (neg iff
+## (orient ^ side) != 0); face the ball (+0x34/+0x64 = atan(ball - player)). RNG-free.
+static func _position_phase7_wall(ctx: Dictionary, m: Dictionary, team: int) -> void:
+	var players: Array = ctx.get("players", [])
+	var taker: Dictionary = _ref(m, 0x438)
+	var side := _g(m, 0x45c)
+	var orient := _g(m, 0x19a0) & 1
+	var flag := 1 if team != side else 0
+	var table: Array = PHASE7_WALL_ROLES[flag]
+	var claimed := [false, false, false, false, false, false, false, false, false, false, false]
+	var goalx := _si(m, 0x1820)
+	var yscale := _si(m, 0x1824)
+	var ball := [_si(m, 0x1614), _si(m, 0x1618), _si(m, 0x161c)]
+	var neg := (orient ^ (1 - side)) != 0                         # (orient&1) ^ (1-side): the wall-xy + ivar18 sign
+	for i in players.size():
+		var p: Dictionary = players[i]
+		if is_same(p, taker) or _g(p, 0x2bc) == 0:
+			continue
+		var role := _g(p, 0x2c8)
+		for idx in 11:
+			if role == int(table[idx]) and not claimed[idx]:
+				claimed[idx] = true
+				var ebp := flag + 1 + 2 * idx
+				var ivar12 := Pm98Trig._i32(0x109999 - goalx)
+				var ivar21 := Pm98Trig._i32(yscale - Pm98Trig._tdiv(Pm98Trig._i32(yscale * ebp), 11))
+				if neg:
+					ivar21 = Pm98Trig._i32(-ivar21)
+					ivar12 = Pm98Trig._i32(-ivar12)
+				p[0x4] = ivar12
+				p[0x8] = ivar21
+				p[0xc] = 0
+		# ---- shared tail (runs for EVERY eligible player) ----
+		var np: Array = Pm98Trig.clamp_min_sep(
+			[_si(p, 0x4), _si(p, 0x8), _si(p, 0xc)],
+			[_si(taker, 0x4), _si(taker, 0x8), _si(taker, 0xc)], 0xa0000)
+		p[0x4] = np[0]; p[0x8] = np[1]; p[0xc] = np[2]
+		var ivar18 := Pm98Trig._i32(-goalx) if not neg else goalx
+		if abs(Pm98Trig._i32(_si(p, 0x4) - ivar18)) <= 0x109999:
+			var snap := Pm98Trig._i32(goalx - 0x110000)
+			if (orient ^ side) != 0:
+				snap = Pm98Trig._i32(-snap)
+			p[0x4] = snap
+		var facing := Pm98Trig.atan_angle(
+			Pm98Trig._i32(ball[0] - _si(p, 0x4)), Pm98Trig._i32(ball[1] - _si(p, 0x8))) & 0xffff
+		p[0x34] = facing
+		p[0x64] = facing
 
 
 ## FUN_005b73a0 phase-4 / phase-5(&match+0x19cc) DEFENSIVE-WALL arrangement (disasm 0x5b73a0..0x5b7c6c,
@@ -1673,7 +1738,7 @@ static func _wall_nearest_opp(p: Dictionary, opps: Array, opp_claimed: Dictionar
 ## FUN_005b73a0 phase-5 TAIL (LAB_005b81d6, disasm 0x5b81d6..0x5b8603). Reached after the wall (or
 ## directly, when the wall branch was skipped) whenever match+0x448 == 5. Dispatch on match+0x19cc and
 ## match+0x45c:
-##   * 0x19cc != 0 && 0x45c != team -> PATH A: the defensive-distribution insertion-sort (NOT YET PORTED);
+##   * 0x19cc != 0 && 0x45c != team -> PATH A: the defensive-distribution insertion-sort (_phase5_tail_pathA);
 ##   * 0x19cc != 0 && 0x45c == team -> no-op return;
 ##   * 0x19cc == 0 && 0x45c == team -> PATH C (ported below).
 ## (0x45c != team with 0x19cc == 0 never reaches here through phase 5: the wall needs 0x45c != team and
@@ -1681,7 +1746,7 @@ static func _wall_nearest_opp(p: Dictionary, opps: Array, opp_claimed: Dictionar
 static func _position_phase5_tail(ctx: Dictionary, m: Dictionary, team: int) -> void:
 	if _g(m, 0x19cc) != 0:
 		if _g(m, 0x45c) != team:
-			push_error("position_team: phase-5 tail Path A (defensive distribution) not yet ported")
+			_phase5_tail_pathA(ctx, m, team)
 		return
 	if _g(m, 0x45c) == team:
 		_phase5_tail_pathC(ctx, m, team)
@@ -1708,3 +1773,100 @@ static func _phase5_tail_pathC(ctx: Dictionary, m: Dictionary, _team: int) -> vo
 				[_si(taker, 0x4), _si(taker, 0x8), _si(taker, 0xc)],
 				0x93333)
 			p[0x4] = np[0]; p[0x8] = np[1]; p[0xc] = np[2]
+
+
+## Faithful overlapping copy of `count` dwords inside the flat slot array, src -> dst (the binary's
+## memmove import thunk ds:0x6233d4). Snapshots the source first so overlapping ranges behave exactly
+## like memmove (the insertion shifts the POINTER slots but NOT the parallel priority slots, so the
+## priority bytes at slot[6..] go intentionally stale -- reproduced bit-for-bit).
+static func _pathA_memmove(arr: Array, dst: int, src: int, count: int) -> void:
+	var tmp := []
+	for k in count:
+		tmp.append(arr[src + k])
+	for k in count:
+		arr[dst + k] = tmp[k]
+
+
+## FUN_005b73a0 phase-5 tail PATH A (disasm 0x5b8211..0x5b854c; reached when match+0x448==5 &&
+## match+0x19cc != 0 && match+0x45c != team -- i.e. the defensive follow-up that ALWAYS runs right
+## after the phase-5 wall). Distribute the N = match+0x19cc highest-priority on-pitch players into a fan
+## around the anchor = taker_pos + polar_vec(0x93333, taker_facing).
+##   FIRST pass (every on-pitch player): clamp_min_sep off the taker (0xa0000); if it lands OUTSIDE the
+##     pitch box [+0x1828..+0x183c] reflect it through the taker (p = 2*taker - p); face the ball; then
+##     insertion-sort it by role class (role<=6 -> 0; role in {7,8,10,11,15,18} -> 1; else 2) into N
+##     priority slots, highest class first.
+##   SECOND pass (each filled slot s): set_position_code(0x1c); place at anchor + polar_vec(radius_s,
+##     taker_facing + 0x4000), radius_s = ftol((s*0.45 - N*0.225) * 65536); face the ball. RNG-free.
+## Slot bookkeeping is a flat 13-int array: [0..5] = player slots (0 = empty, players stored as
+## _PATHA_PTR_BASE+index so a stale slot-pointer never compares < a 0..2 class, matching the binary's
+## large positive struct pointers), [6..12] = the parallel priority bytes the memmove leaves stale.
+const _PATHA_PTR_BASE := 0x10000000
+static func _phase5_tail_pathA(ctx: Dictionary, m: Dictionary, _team: int) -> void:
+	var players: Array = ctx.get("players", [])
+	var taker: Dictionary = _ref(m, 0x438)
+	var n := _g(m, 0x19cc)
+	var taker_facing := _g(taker, 0x34) & 0xffff
+	var polar0: Array = Pm98Trig.polar_vec(0x93333, taker_facing)
+	var anchor := [
+		Pm98Trig._i32(polar0[0] + _si(taker, 0x4)),
+		Pm98Trig._i32(polar0[1] + _si(taker, 0x8)),
+		Pm98Trig._i32(polar0[2] + _si(taker, 0xc)),
+	]
+	var base_angle := taker_facing + 0x4000
+	var ball := [_si(m, 0x1614), _si(m, 0x1618), _si(m, 0x161c)]
+
+	# local_3c: slot[0..5] = player pointers (0 = empty), slot[6..12] = priority bytes (-1 init).
+	var slot := []
+	slot.resize(13)
+	for k in 6:
+		slot[k] = 0
+	for k in range(6, 13):
+		slot[k] = -1
+
+	# ---- FIRST pass: clamp / box-reflect / face / insertion-sort by class ----
+	for i in players.size():
+		var p: Dictionary = players[i]
+		if _g(p, 0x2bc) == 0:
+			continue
+		var role := _g(p, 0x2c8)
+		var cls := 0
+		if role > 6:
+			cls = 1 if role in [7, 8, 0xa, 0xb, 0xf, 0x12] else 2
+		var np: Array = Pm98Trig.clamp_min_sep(
+			[_si(p, 0x4), _si(p, 0x8), _si(p, 0xc)],
+			[_si(taker, 0x4), _si(taker, 0x8), _si(taker, 0xc)], 0xa0000)
+		p[0x4] = np[0]; p[0x8] = np[1]; p[0xc] = np[2]
+		var px := _si(p, 0x4); var py := _si(p, 0x8); var pz := _si(p, 0xc)
+		var in_box := px >= _si(m, 0x1828) and px <= _si(m, 0x1834) \
+			and py >= _si(m, 0x182c) and py <= _si(m, 0x1838) \
+			and pz >= _si(m, 0x1830) and pz <= _si(m, 0x183c)
+		if not in_box:
+			p[0x4] = Pm98Trig._i32(px + (_si(taker, 0x4) - px) * 2)
+			p[0x8] = Pm98Trig._i32(py + (_si(taker, 0x8) - py) * 2)
+			p[0xc] = Pm98Trig._i32(pz + (_si(taker, 0xc) - pz) * 2)
+		var facing := Pm98Trig.atan_angle(
+			Pm98Trig._i32(ball[0] - _si(p, 0x4)), Pm98Trig._i32(ball[1] - _si(p, 0x8))) & 0xffff
+		p[0x34] = facing
+		p[0x64] = facing
+		for s in n:
+			if cls > int(slot[6 + s]):
+				_pathA_memmove(slot, s + 1, s, 6 - s)
+				slot[s] = _PATHA_PTR_BASE + i
+				slot[6 + s] = cls
+				break
+
+	# ---- SECOND pass: place each filled slot around the anchor ----
+	for s in n:
+		if int(slot[s]) == 0:
+			continue
+		var p: Dictionary = players[int(slot[s]) - _PATHA_PTR_BASE]
+		set_position_code(p, 0x1c)
+		var radius := int((float(s) * 0.45 - float(n) * 0.225) * 65536.0)
+		var polar: Array = Pm98Trig.polar_vec(radius, base_angle)
+		p[0x4] = Pm98Trig._i32(polar[0] + anchor[0])
+		p[0x8] = Pm98Trig._i32(polar[1] + anchor[1])
+		p[0xc] = Pm98Trig._i32(polar[2] + anchor[2])
+		var facing := Pm98Trig.atan_angle(
+			Pm98Trig._i32(ball[0] - _si(p, 0x4)), Pm98Trig._i32(ball[1] - _si(p, 0x8))) & 0xffff
+		p[0x34] = facing
+		p[0x64] = facing

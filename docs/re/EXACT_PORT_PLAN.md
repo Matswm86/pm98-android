@@ -698,6 +698,45 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   boots 0 SCRIPT ERROR). NEXT = phase-5 tail Path A (insertion-sort) + phase-7 wall-else (match+0x19a0!=4),
   then the FUN_00598740 driver -> full-match KILL-TEST.
 
+- **Stage 3 task 2 — FUN_005b73a0 slice G (phase-7 wall-ELSE) PORTED + oracle-validated DONE 2026-06-19.**
+  -> `Pm98Movement._position_phase7_wall` (replaces the loud push_error stub) + const `PHASE7_WALL_ROLES`
+  (disasm 0x5b7da9..0x5b7fe5, the match+0x19a0 != 4 branch of phase 7). For each on-pitch non-taker player,
+  scan the 11-entry role table `&DAT_00639270` (2 rows x 11 int32, file 0x238070; row = flag = team !=
+  match+0x45c) -> FIRST unclaimed entry matching the player role (+0x2c8) snaps it to a wall slot:
+  x = +/-(0x109999 - goalXscale), y = +/-(Yscale - trunc(Yscale*(flag+1+2*idx)/11)), z=0; both negated iff
+  (orient ^ (1-side)) != 0. The 11-bit claimed bitmap is SHARED across players (each row's roles are
+  distinct). Then EVERY eligible player runs the tail: clamp_min_sep off taker (0xa0000); if x ends within
+  0x109999 of the goal line, snap x = +/-(goalXscale - 0x110000) (neg iff (orient ^ side) != 0); face the
+  ball. KEY: the Yscale*(flag+1+2*idx) product is taken mod 2^32 BEFORE the signed /11 (the binary's 32-bit
+  `imul edx,ebp`); a matched player's |x - ivar18| is ALWAYS exactly 0x109999 so the goal-line snap always
+  fires. Table extracted: row0 [12,7,8,16,13,9,17,10,18,11,14], row1 [3,11,18,5,15,4,6,8,7,2,0]. Oracle
+  `run_phase7wall_oracle.sh` (atan LUT + faithful _ftol; taker a separate struct except taker_p where
+  match+0x438 aliases P1 -> skipped) -> `specs/phase7wall_oracle.txt` (4 fixtures: flag0, flag1, orient-bit,
+  taker_p; all CALL 0 RET). Locked by `test_phase7wall.gd` (**44 checks, ALL PASS**).
+
+- **Stage 3 task 2 — FUN_005b73a0 slice H (phase-5 tail PATH A) PORTED + oracle-validated DONE 2026-06-19
+  — FUN_005b73a0 NOW COMPLETE (every branch ported).** -> `Pm98Movement._phase5_tail_pathA` + `_pathA_memmove`
+  (replaces the loud push_error stub; disasm 0x5b8211..0x5b854c, match+0x448==5 && 0x19cc!=0 && 0x45c!=team,
+  the defensive follow-up that ALWAYS runs right after the phase-5 wall). Distributes the top-N (N=match+0x19cc)
+  on-pitch players into a fan around `anchor = taker_pos + polar_vec(0x93333, taker_facing)`. PASS 1 (every
+  on-pitch player): clamp off taker (0xa0000), reflect through taker (p = 2*taker - p) if outside the pitch box
+  [+0x1828..+0x183c], face the ball, insertion-sort by role CLASS (role<=6->0; {7,8,10,11,15,18}->1; else 2)
+  into N slots. PASS 2 (each filled slot s): set_position_code(0x1c) + anchor + polar_vec(radius_s,
+  taker_facing+0x4000), radius_s = ftol((s*0.45 - N*0.225) * 65536); face the ball. **KEY QUIRK reproduced:**
+  the insertion memmove (ds:0x6233d4) shifts only the POINTER slots, NOT the parallel priority slots, so the
+  priority bytes go stale and reorder later inserts -- modelled with a flat 13-int array + an exact backward-copy
+  memmove (players stored as 0x10000000+index so a stale slot-pointer never compares < a 0..2 class, matching
+  the binary's large positive struct pointers). Oracle `run_pathA_oracle.sh` runs the REAL wall+tail (the wall
+  fires first under the same entry condition; all players EXCLUDED roles so the wall is RNG-free -> endpoint1;
+  atan/cos LUT + faithful _ftol + an injected backward-copy memmove at 0x253000 overriding ds:0x6233d4) ->
+  `specs/pathA_oracle.txt` (2 fixtures, N=2 + N=4; all CALL 0 RET). **EMULATOR CAVEAT:** only EVEN N is banked
+  -- radius = ftol(14745.6*(2*slot - N)), so even N keeps every radius off the .5 truncation boundary. The port
+  truncates toward zero (the real x87 _ftol, per Pm98Trig); the PCode emulator's `fist` round-to-nearests at .5
+  (ignoring the injected truncate control word), so an ODD-N radius like -44236.8 banks the emulator's -44237
+  artifact instead of the real binary's -44236. Locked by `test_pathA.gd` (**40 checks, ALL PASS**). No
+  regression (all 70 parity suites + test_divisions pass; boots 0 SCRIPT ERROR). **NEXT** = the FUN_00598740
+  per-tick driver -> the full-match KILL-TEST (event-stream + scoreline parity, fixed seed, N>=50).
+
 ### FUN_005a3400 DECODED STRUCTURE (the per-player DECIDE; decoded 2026-06-18 -- cite, don't re-derive)
 `__fastcall(ECX=player)`. The per-player movement-target / set-piece-positioning computer. **NO net
 RNG**: the only RNG touch is `s=FUN_005ec240()` (GET state @0x6d3184) ... `FUN_004e9630` ...
