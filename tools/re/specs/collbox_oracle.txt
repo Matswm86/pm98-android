@@ -1,0 +1,13 @@
+# Stage 3 task 2 ball collision box leaves (FUN_00590b10 vec3+=s + FUN_00590b30 AABB overlap)
+# PCode-emu ground truth. v3/A@0x230000, B@0x230020. box = [minx,miny,minz,maxx,maxy,maxz].
+# 590b10: mem[v3] after += s. 590b30: EAX=1 iff strict overlap on all 3 axes.
+FIX b10_pos CALL 0 RET steps=12 EAX=2293760 mem[0x230000:4]=65636 mem[0x230004:4]=65736 mem[0x230008:4]=65836
+FIX b10_neg CALL 0 RET steps=12 EAX=2293760 mem[0x230000:4]=4294967291 mem[0x230004:4]=4294967291 mem[0x230008:4]=4294967291
+FIX b10_wrap CALL 0 RET steps=12 EAX=2293760 mem[0x230000:4]=2415919104 mem[0x230004:4]=1073741824 mem[0x230008:4]=0
+FIX ov_hit CALL 0 RET steps=43 EAX=1
+FIX ov_xedge CALL 0 RET steps=19 EAX=0
+FIX ov_xsep CALL 0 RET steps=19 EAX=0
+FIX ov_yedge CALL 0 RET steps=32 EAX=0
+FIX ov_zedge CALL 0 RET steps=45 EAX=0
+FIX ov_inside CALL 0 RET steps=44 EAX=1
+FIX ov_neg CALL 0 RET steps=41 EAX=1

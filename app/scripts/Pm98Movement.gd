@@ -1372,6 +1372,32 @@ static func _ball_freeflight(ball: Dictionary) -> void:
 			ball[0x28] = Pm98Trig._i32(vz - int(f[2]))
 
 
+# ---- FUN_0058e2c0 collision box leaves (the goal/post sweep broad-phase) ------------------
+# Two pure box primitives the ball physics' goal/post collision loop (0x58e497..0x58e963, the NEXT
+# unported slice of FUN_0058e2c0) calls while building + testing the ball's swept AABB against the
+# goal volumes (match+0x2884/+0x2adc) and posts (match+0x17f4). No RNG/LUT/ftol, no sub-calls.
+# Oracle-pinned by tools/re/run_collbox_oracle.sh -> specs/collbox_oracle.txt, in test_collbox.gd.
+# (The goal sweep FUN_005f3b80, the post narrow-phase FUN_005efac0, and the loop control flow that
+# wires these in -- calling the already-ported Pm98Events.keeper_event for the actual goal -- remain.)
+
+## FUN_00590b10 (__thiscall v3; s): add the scalar s to three consecutive int32 (a vec3 / a box
+## corner). Used to push a swept-box corner out by the 0x23d7 ball radius. Wraps to int32 each axis.
+static func box_add3(v3: Array, s: int) -> Array:
+	return [Pm98Trig._i32(int(v3[0]) + s), Pm98Trig._i32(int(v3[1]) + s), Pm98Trig._i32(int(v3[2]) + s)]
+
+
+## FUN_00590b30 (__thiscall A; B): STRICT AABB overlap of two boxes, each [minx,miny,minz,maxx,maxy,
+## maxz] (6 int32). Returns 1 iff on every axis max(A.min,B.min) < min(A.max,B.max); any axis with
+## lo >= hi -> 0. The broad-phase gate before the per-post narrow collision.
+static func boxes_overlap(a: Array, b: Array) -> bool:
+	for axis in 3:
+		var lo := maxi(int(a[axis]), int(b[axis]))         # max of the two mins
+		var hi := mini(int(a[axis + 3]), int(b[axis + 3])) # min of the two maxs
+		if lo >= hi:
+			return false
+	return true
+
+
 # ---- FUN_005b73a0 positioning leaves (forward-zone eligibility + goal-side count) -----
 # Two pure integer predicates the off-ball positioning pass FUN_005b73a0 calls (FUN_005b04e0 x2 +
 # FUN_005b0b40; the latter also serves the stamina pass FUN_005a4600). NO RNG/LUT/ftol. Oracle-

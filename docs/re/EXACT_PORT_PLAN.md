@@ -783,6 +783,26 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   test_divisions pass; boots 0 SCRIPT ERROR). NEXT in this fn = the goal/post collision loop
   (FUN_005f3b80 goal sweep + FUN_00590b30/FUN_005efac0 post resolve), then spin + the FUN_0058fda0 tail;
   then GK FUN_005a22d0; then the FUN_00598740 driver -> full-match KILL-TEST.
+- **Stage 3 task 2 — ball collision box leaves (FUN_00590b10 + FUN_00590b30) PORTED + oracle-validated
+  DONE 2026-06-19.** -> `Pm98Movement.box_add3` / `Pm98Movement.boxes_overlap`, the first two leaves of
+  the goal/post collision loop (the next FUN_0058e2c0 slice). Both pure integer, no RNG/LUT/ftol/sub-calls:
+  - **FUN_00590b10**(this=v3; s): adds s to three consecutive int32 (a swept-box corner pushed out by the
+    0x23d7 ball radius). Each axis wraps to int32.
+  - **FUN_00590b30**(this=A; B): STRICT AABB overlap of two `[minx,miny,minz,maxx,maxy,maxz]` boxes -- 1 iff
+    on every axis `max(A.min,B.min) < min(A.max,B.max)`; a touching edge (`lo == hi`) returns 0. The
+    broad-phase gate the post loop runs (0x58e65b) before the per-post narrow collision.
+  Oracle `run_collbox_oracle.sh` -> `specs/collbox_oracle.txt` (10 fixtures, all CALL 0 RET: 3 add incl.
+  neg + int32-wrap; 7 overlap incl. all three touching-edge cases + B-inside-A + negative-min signed cmp).
+  Locked by `test_collbox.gd` (**16 checks, ALL PASS**). No regression (full parity suite + test_divisions
+  pass; boots 0 SCRIPT ERROR).
+  **CORRECTION (verified vs the codebase, not re-discovered): the goal-scoring call inside this loop --
+  FUN_005909f0 at 0x58e832 + its enqueue FUN_00594470 -- is ALREADY ported** as `Pm98Events.keeper_event`
+  + `Pm98Events.enqueue` (the event-queue slice, oracle `run_event_oracle.sh`, test_events.gd). The loop
+  wiring will CALL those, not re-port them. So the genuinely-remaining collision work = FUN_005f3b80 (goal
+  swept-sphere vs goal-mouth box) + FUN_005efac0 (post narrow-phase swept collision + velocity reflect) +
+  the loop control flow (0x58e497..0x58e963); the net-ripple FUN_00590f00 / per-post sound FUN_005babe0 are
+  render/audio (skip headless). THEN spin + the FUN_0058fda0 trail tail; then GK FUN_005a22d0; then the
+  FUN_00598740 driver -> full-match KILL-TEST.
 
 ### FUN_005a3400 DECODED STRUCTURE (the per-player DECIDE; decoded 2026-06-18 -- cite, don't re-derive)
 `__fastcall(ECX=player)`. The per-player movement-target / set-piece-positioning computer. **NO net
