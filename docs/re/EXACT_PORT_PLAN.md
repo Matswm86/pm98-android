@@ -641,6 +641,25 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   retains its sentinel). No regression (28 suites ALL PASS; boots 0 SCRIPT ERROR). NEXT = the phase-4/5
   defensive-wall (the biggest branch, shares the &DAT_00639270 table + FUN_005b04e0 + bitmap passes with
   phase-7's wall) + the phase-5 TAIL follow-up, then the FUN_00598740 driver -> full-match KILL-TEST.
+- **Stage 3 task 2 — FUN_005b73a0 slice D (phase-4 DEFENSIVE-WALL, loop 1 + loop 5) PORTED + oracle-
+  validated DONE.** -> `Pm98Movement._position_wall` + `_wall_pull` (disasm 0x5b73a0..0x5b7c6c; entered when
+  match+0x448==4 || (==5 && match+0x19cc), AND match+0x45c != team). The two-team marking pass: OUR players
+  (ctx["players"]) get assigned to mark OPPONENTS (ctx["opponents"]); both sides carry a claimed/assigned
+  bitmap keyed by player+0x2c4. Seeds: opp-claimed[0]=1 + opp-claimed[keeper.+0x2c4]=1 (keeper =
+  *(match-team*800+0x8f4)); our-assigned[0]=1 (GK id 0 never repositioned). **LOOP 1** (0x5b74e1..0x5b763d
+  + role-9 trampoline 0x5b860c): role 5/6 -> first UNCLAIMED opp role 9 (copy xyz, x-=iVar21); role 10 ->
+  opp role 10; first role 2/3 with sign(P+0x1e4)==sign(match+0x16a4) -> WALL ANCHOR x=+/-(0x8000-
+  match+0x1820) [neg iff P.team+0x2b8 != (P.match+0x19a0&1)], y=sign(match+0x16a4)*0x40000, z=0. iVar21 =
+  (((match+0x19a0&1)^team)?-0x10000:+0x10000); NO break (every matching opp re-claims). **LOOP 5**
+  (0x5b7ba0..0x5b7c66): facing(+0x34/+0x64)=atan(ball-player) [FUN_005ee080] then pairwise (i<j, on-pitch)
+  FUN_005ee3f0 min-sep with offset [iVar21,0,0]. **Loops 2-4** (mark-target / nearest-opp ftol / fallback-
+  RNG, 0x5b763e..0x5b7ba0) = a loud push_error guard for any on-pitch still-unassigned player (NOT YET
+  PORTED). Oracle `run_wall_oracle.sh` drives the REAL phase-4 (two-team layout, relmatrix throttle-skipped,
+  atan LUT injected, loop-5 min-sep no-op via far-apart players) -> `specs/wall_oracle.txt` (2 fixtures:
+  wall_orient0 [iVar21=+0x10000, anchor not negated] + wall_orient1 [iVar21=-0x10000, anchor negated], both
+  CALL 0 RET, P1/P2/P3 xyz hand-verified). Locked by `test_wall.gd` (**18 checks, ALL PASS**). No regression
+  (all suites pass; boots 0 SCRIPT ERROR). NEXT = wall loops 2-4 + the phase-5 TAIL, then the phase-7 wall-
+  else (match+0x19a0!=4), then the FUN_00598740 driver -> full-match KILL-TEST.
 
 ### FUN_005a3400 DECODED STRUCTURE (the per-player DECIDE; decoded 2026-06-18 -- cite, don't re-derive)
 `__fastcall(ECX=player)`. The per-player movement-target / set-piece-positioning computer. **NO net

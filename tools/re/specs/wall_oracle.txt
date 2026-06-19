@@ -1,0 +1,5 @@
+# Stage 3 task 2 FUN_005b73a0 slice D (phase-4 defensive-wall, loop 1 + loop 5) PCode-emu truth.
+# our role 5->opp9, role 10->opp10, role 2->wall anchor; iVar21 sign per orient. CALL RET rows.
+# relmatrix throttle-skipped; atan LUT injected; loop-5 min-sep no-op (players far apart).
+FIX wall_orient0 CALL 0 RET steps=1199 EAX=2162688 mem[0x2403c0:4]=2031616 mem[0x2403c4:4]=1048576 mem[0x2403c8:4]=0 mem[0x24077c:4]=4128768 mem[0x240780:4]=1572864 mem[0x240784:4]=0 mem[0x240b38:4]=4293689344 mem[0x240b3c:4]=262144 mem[0x240b40:4]=0
+FIX wall_orient1 CALL 0 RET steps=1203 EAX=2162688 mem[0x2403c0:4]=2162688 mem[0x2403c4:4]=1048576 mem[0x2403c8:4]=0 mem[0x24077c:4]=4259840 mem[0x240780:4]=1572864 mem[0x240784:4]=0 mem[0x240b38:4]=1277952 mem[0x240b3c:4]=262144 mem[0x240b40:4]=0

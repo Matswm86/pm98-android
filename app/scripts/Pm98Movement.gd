@@ -1395,7 +1395,7 @@ static func position_team(ctx: Dictionary, rng = null) -> void:
 	var phase := _g(m, 0x448)
 	var team := _g(ctx, 0x8)
 	if (phase == 4 or (phase == 5 and _g(m, 0x19cc) != 0)) and _g(m, 0x45c) != team:
-		push_error("position_team: phase 4/5 defensive-wall not yet ported")
+		_position_wall(ctx, m, team, rng)
 	elif phase == 7:
 		_position_phase7(ctx, m, team, rng)
 	elif phase == 3:
@@ -1479,3 +1479,103 @@ static func _position_phase7(ctx: Dictionary, m: Dictionary, team: int, rng) -> 
 		p[0x4] = polar[0]; p[0x8] = polar[1]; p[0xc] = polar[2]
 		p[0x1e0] = polar[0]; p[0x1e4] = polar[1]; p[0x1e8] = polar[2]
 		p[0x1ec] = polar[0]; p[0x1f0] = polar[1]; p[0x1f4] = polar[2]
+
+
+## FUN_005b73a0 phase-4 / phase-5(&match+0x19cc) DEFENSIVE-WALL arrangement (disasm 0x5b73a0..0x5b7c6c,
+## entered when match+0x45c != team). The big two-team marking pass. Five sequential loops over OUR
+## players (ctx["players"], stride 0x3bc) assigning each to mark an OPPONENT (ctx["opponents"]); both
+## sides carry a per-player "claimed/assigned" bitmap keyed by player+0x2c4 (an id 0..N). Phase 4 RETs
+## after loop 5 (the phase-5 tail at LAB_005b81d6 is a SEPARATE, not-yet-ported slice).
+##
+## PORTED THIS SLICE (oracle-pinned by tools/re/run_wall_oracle.sh -> specs/wall_oracle.txt):
+##   * the bitmap seeds: opp-claimed[0]=1 + opp-claimed[keeper.+0x2c4]=1 (keeper = *(match-team*800+
+##     0x8f4)); our-assigned[0]=1 (the goalkeeper id 0 is never repositioned);
+##   * LOOP 1 (0x5b74e1..0x5b763d + trampoline 0x5b860c): role-based direct pulling --
+##       - our role 5/6 -> pull the first UNCLAIMED opponent of role 9 (forward): copy its xyz, x-=iVar21;
+##       - our role 10  -> same against opponent role 10;
+##       - our role 2/3 (first one only, gated on sign(P.+0x1e4)==sign(match+0x16a4)): the WALL ANCHOR --
+##         x = +/-(0x8000 - match+0x1820) (neg iff P.team+0x2b8 != (P.match.+0x19a0 & 1)),
+##         y = sign(match+0x16a4)*0x40000, z = 0.
+##     iVar21 = (((match+0x19a0 & 1) ^ team) ? -0x10000 : +0x10000). No break: every matching opponent
+##     re-claims (faithful -- realistically one per role). Each pull/anchor marks our-assigned[P id].
+##   * LOOP 5 (0x5b7ba0..0x5b7c66): each player's facing (+0x34/+0x64) = atan(ball - player); then for
+##     every on-pitch pair i<j, FUN_005ee3f0 (mid_offset) min-separation with offset [iVar21,0,0].
+##
+## NOT YET PORTED (loud guard): LOOPS 2-4 (0x5b763e..0x5b7ba0) -- the mark-target / nearest-opponent /
+## fallback-with-RNG assignment for players LEFT unassigned by loop 1. The guard fires push_error if any
+## on-pitch, still-unassigned player reaches them; the wall oracle keeps every player assigned by loop 1.
+static func _position_wall(ctx: Dictionary, m: Dictionary, team: int, rng = null) -> void:
+	var players: Array = ctx.get("players", [])
+	var opps: Array = ctx.get("opponents", [])
+	var ivar21 := -0x10000 if ((_g(m, 0x19a0) & 1) ^ team) != 0 else 0x10000
+
+	# bitmaps keyed by player+0x2c4 id. opp-claimed[0]=1 (literal) + keeper; our-assigned[0]=1 (GK).
+	var opp_claimed := {0: true}
+	var keeper_i := int(ctx.get("opp_keeper", 0))
+	if keeper_i >= 0 and keeper_i < opps.size():
+		opp_claimed[_g(opps[keeper_i], 0x2c4)] = true
+	var our_assigned := {0: true}
+	var wall_placed := false
+
+	# ---- LOOP 1: role-based direct pulling / wall anchor ----
+	for i in players.size():
+		var p: Dictionary = players[i]
+		var role := _g(p, 0x2c8)
+		var pid := _g(p, 0x2c4)
+		if role == 5 or role == 6:
+			_wall_pull(p, pid, opps, opp_claimed, our_assigned, 9, ivar21)
+		elif role == 10:
+			_wall_pull(p, pid, opps, opp_claimed, our_assigned, 10, ivar21)
+		elif not wall_placed and (role == 2 or role == 3):
+			if _sign1(_si(p, 0x1e4)) == _sign1(_si(m, 0x16a4)):
+				var pm: Dictionary = _ref(p, 0x18c)
+				var ivar12 := Pm98Trig._i32(0x8000 - _si(m, 0x1820))
+				if _g(p, 0x2b8) != (_g(pm, 0x19a0) & 1):
+					ivar12 = Pm98Trig._i32(-ivar12)
+				p[0x4] = ivar12
+				p[0x8] = _sign1(_si(m, 0x16a4)) * 0x40000
+				p[0xc] = 0
+				our_assigned[pid] = true
+				wall_placed = true
+
+	# ---- LOOPS 2-4: mark-target / nearest-opponent / fallback (NOT YET PORTED) ----
+	for i in players.size():
+		var p: Dictionary = players[i]
+		if _g(p, 0x2bc) != 0 and not bool(our_assigned.get(_g(p, 0x2c4), false)):
+			push_error("position_team: wall loops 2-4 (marking/fallback) not yet ported")
+			break
+
+	# ---- LOOP 5: facing toward ball + pairwise min-separation (ALWAYS runs) ----
+	var n := players.size()
+	var ball := [_si(m, 0x1614), _si(m, 0x1618), _si(m, 0x161c)]
+	for i in n:
+		var pi: Dictionary = players[i]
+		var d: Array = Pm98Trig.vec3_sub(ball, [_si(pi, 0x4), _si(pi, 0x8), _si(pi, 0xc)])
+		var facing := Pm98Trig.atan_angle(d[0], d[1]) & 0xffff
+		pi[0x34] = facing
+		pi[0x64] = facing
+		for j in range(i + 1, n):
+			var pj: Dictionary = players[j]
+			if _g(pj, 0x2bc) == 0:
+				continue
+			var np: Array = Pm98Trig.mid_offset(
+				[_si(pj, 0x4), _si(pj, 0x8), _si(pj, 0xc)],
+				[_si(pi, 0x4), _si(pi, 0x8), _si(pi, 0xc)],
+				0x10000, [ivar21, 0, 0])
+			pj[0x4] = np[0]; pj[0x8] = np[1]; pj[0xc] = np[2]
+
+
+## FUN_005b73a0 loop-1 inner pull (disasm 0x5b751f.. for role 10, 0x5b8626 for role 9). Scan every
+## opponent; for each of role `want` not yet claimed, claim it, mark P assigned, and copy its xyz onto
+## P with x shifted by -iVar21. No break (every matching opponent re-claims; one per role in practice).
+static func _wall_pull(p: Dictionary, pid: int, opps: Array, opp_claimed: Dictionary,
+		our_assigned: Dictionary, want: int, ivar21: int) -> void:
+	for j in opps.size():
+		var o: Dictionary = opps[j]
+		var oid := _g(o, 0x2c4)
+		if _g(o, 0x2c8) == want and not bool(opp_claimed.get(oid, false)):
+			opp_claimed[oid] = true
+			our_assigned[pid] = true
+			p[0x4] = Pm98Trig._i32(_si(o, 0x4) - ivar21)
+			p[0x8] = _si(o, 0x8)
+			p[0xc] = _si(o, 0xc)
