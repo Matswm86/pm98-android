@@ -554,6 +554,22 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   77 + relmatrix 128 + dispatch 366 + events 85 + predicates 147 + resolver tree/gate + engine ALL PASS;
   boots 0 SCRIPT ERROR). **vtable+0xc DONE. NEXT = FUN_005b73a0 (positioning, ~4.8KB, 7 RNG draws -- the
   last big sim piece before the FUN_00598740 driver; SLICE it like 5a3400).**
+- **Stage 3 task 2 — FUN_005b73a0 leaves FUN_005b04e0 + FUN_005b0b40 PORTED + oracle-validated DONE.**
+  The two genuinely-new pure-integer predicates the off-ball positioning pass FUN_005b73a0 calls
+  (FUN_005b04e0 x2 @ decompile 158/193; FUN_005b0b40 @ 651 + also the stamina pass FUN_005a4600) ->
+  `Pm98Movement.pos_forward_ok` + `count_goalside_opponents` (+ helpers `_si`/`_sign1`). **FUN_005b04e0**
+  (__thiscall player; pos3): 1 iff pos is inside the pitch box [m+0x1828..+0x1834]x[+0x182c..+0x1838]x
+  [+0x1830..+0x183c] AND abs(x) > m+0x1820-0x108000 AND abs(y) < 0x1428f5 AND sign(x) != sign(player+0x3a4)
+  (sign bucket = +1 if >=0 else -1). **FUN_005b0b40** (__thiscall player; thresh): count of opponents
+  (player+0x188 = {base,count}) with abs(opp.x - opp.anchor) < thresh + abs(player.x + player.anchor),
+  x=+0x4 anchor=+0x3a4, null term = 0xc80000, all sums wrap to int32 before the signed compare. Both are
+  pure integer, NO RNG/LUT/ftol/sub-calls. **Oracle:** `run_posleaf_oracle.sh` drives both REAL fns under
+  PCodeEmu (EAX = return; the stack arg via the `arg` directive) -> `specs/posleaf_oracle.txt` (8 fixtures:
+  b04e0 ok/outbox/online/ybig/samesign + b0b40 one/all/none -- all CALL 0 RET). Locked by `test_posleaf.gd`
+  (**8 checks, ALL PASS**). GDScript pitfall (warnings-as-errors): a `:=`-inferred ternary with an int
+  literal + abs() infers Variant -> use explicit `var x: int =`. No regression (posleaf 8 + advance 48 +
+  decideReplay 40 + decideC3 91 + ... + engine ALL PASS; boots 0 SCRIPT ERROR). NEXT = slice FUN_005b73a0
+  itself (the leaves are now in place: 5b04e0 + 5b0b40 ported, 5b8690/5a5430/predicates/trig all DONE).
 
 ### FUN_005a3400 DECODED STRUCTURE (the per-player DECIDE; decoded 2026-06-18 -- cite, don't re-derive)
 `__fastcall(ECX=player)`. The per-player movement-target / set-piece-positioning computer. **NO net

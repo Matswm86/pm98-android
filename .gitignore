@@ -84,3 +84,4 @@ tools/re/specs/_decideC3_run.*
 tools/re/specs/_decideC3_lut.txt
 tools/re/specs/_decideReplay_run.*
 tools/re/specs/_advance_run.*
+tools/re/specs/_posleaf_run.*

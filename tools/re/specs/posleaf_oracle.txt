@@ -1,0 +1,11 @@
+# Stage 3 task 2 positioning leaves (FUN_005b04e0 eligibility + FUN_005b0b40 goal-side count)
+# PCode-emu ground truth, EAX = return. box [-0x200000..0x200000]x[-0x180000..0x180000]x
+# [-0x10000..0x100000]; line thr = 0x140000-0x108000 = 0x38000; player+0x3a4 anchor = +0x140000.
+FIX b04e0_ok CALL 0 RET steps=64 EAX=1
+FIX b04e0_outbox CALL 0 RET steps=21 EAX=0
+FIX b04e0_online CALL 0 RET steps=42 EAX=0
+FIX b04e0_ybig CALL 0 RET steps=48 EAX=0
+FIX b04e0_samesign CALL 0 RET steps=64 EAX=0
+FIX b0b40_one CALL 0 RET steps=59 EAX=1
+FIX b0b40_all CALL 0 RET steps=60 EAX=2
+FIX b0b40_none CALL 0 RET steps=58 EAX=0

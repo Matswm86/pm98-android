@@ -1280,3 +1280,52 @@ static func advance(p: Dictionary, ring: int, playback: bool, record: bool, fram
 		for i in 0x51:
 			buf[s + i * 4] = _g(p, 0x40 + i * 4)
 		p[0x3b4] = n + 1
+
+
+# ---- FUN_005b73a0 positioning leaves (forward-zone eligibility + goal-side count) -----
+# Two pure integer predicates the off-ball positioning pass FUN_005b73a0 calls (FUN_005b04e0 x2 +
+# FUN_005b0b40; the latter also serves the stamina pass FUN_005a4600). NO RNG/LUT/ftol. Oracle-
+# pinned (EAX) by tools/re/run_posleaf_oracle.sh -> specs/posleaf_oracle.txt, in test_posleaf.gd.
+
+## Signed-int32 field read.
+static func _si(d: Dictionary, off: int) -> int:
+	return Pm98Trig._i32(_g(d, off))
+
+
+## The binary's sign bucket `((-1 < v) - 1 & 0xfffffffe) + 1`: +1 when v >= 0, -1 when v < 0.
+static func _sign1(v: int) -> int:
+	return 1 if v >= 0 else -1
+
+
+## FUN_005b04e0 (__thiscall player; pos3): is `pos` a valid forward-positioning target -- inside the
+## pitch box [match+0x1828..+0x1834] x [+0x182c..+0x1838] x [+0x1830..+0x183c], past the line
+## abs(x) > match+0x1820 - 0x108000, within abs(y) < 0x1428f5, AND on the opposite side (sign of x)
+## from the player's goal anchor +0x3a4.
+static func pos_forward_ok(p: Dictionary, pos: Array) -> bool:
+	var m: Dictionary = _ref(p, 0x18c)
+	var x := Pm98Trig._i32(int(pos[0]))
+	var y := Pm98Trig._i32(int(pos[1]))
+	var z := Pm98Trig._i32(int(pos[2]))
+	if x < _si(m, 0x1828) or x > _si(m, 0x1834) or y < _si(m, 0x182c) or y > _si(m, 0x1838) \
+			or z < _si(m, 0x1830) or z > _si(m, 0x183c):
+		return false
+	if not (_si(m, 0x1820) - 0x108000 < abs(x) and abs(y) < 0x1428f5):
+		return false
+	return _sign1(x) != _sign1(_si(p, 0x3a4))
+
+
+## FUN_005b0b40 (__thiscall player; thresh): count the opponents (the player+0x188 descriptor
+## {base, count} -> the `opponents` array) whose abs(opp.x - opp.anchor) < thresh + abs(player.x +
+## player.anchor); a null player/opponent contributes the sentinel 0xc80000. x = +0x4, anchor = +0x3a4.
+## The (x +/- anchor) sums and the (thresh + base) comparand wrap to int32 (faithful to the binary's
+## 32-bit add) before the signed compare.
+static func count_goalside_opponents(p: Dictionary, opponents: Array, thresh: int) -> int:
+	var base: int = 0xc80000 if p.is_empty() else abs(Pm98Trig._i32(_si(p, 0x4) + _si(p, 0x3a4)))
+	var lim := Pm98Trig._i32(thresh + base)
+	var n := 0
+	for q in opponents:
+		var qd: Dictionary = q
+		var d: int = 0xc80000 if qd.is_empty() else abs(Pm98Trig._i32(_si(qd, 0x4) - _si(qd, 0x3a4)))
+		if d < lim:
+			n += 1
+	return n
