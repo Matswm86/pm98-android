@@ -609,6 +609,22 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   all CALL 0 RET, ctx+0x2e0 -> -1 + player+0x4 untouched). Locked by `test_positionteam.gd` (**6 checks,
   ALL PASS**). No regression (26 suites ALL PASS; boots 0 SCRIPT ERROR). NEXT = fill in the phase-3 / 7 /
   4-5 / phase-5-tail set-piece branches, then the FUN_00598740 driver -> full-match KILL-TEST.
+- **Stage 3 task 2 — FUN_005b73a0 slice B (phase-3 kickoff/restart) PORTED + oracle-validated DONE.**
+  -> `Pm98Movement._position_phase3` (wired into position_team; `position_team` gained an optional `rng`
+  param). Decoded from the disasm 0x5b7fec..0x5b81cf. **OUR team** (match+0x45c == team): find the nearest
+  on-pitch teammate to the taker (min |x - taker.x|, != taker, best seed 0x640000), then RNG-jitter it
+  toward the taker -- `np.x = trunc((rand1*50>>15)*(np.x-taker.x)/100) + taker.x`, `np.y = trunc((rand2*50
+  >>15)*(np.y-taker.y)/100) + sign(np.y-taker.y)*0x70000 + taker.y` (z unchanged; 2 FUN_005ec250 draws in
+  x-then-y order; /100 = the 0x51eb851f truncate-toward-zero magic) -- and set the TAKER's facing
+  (+0x34/+0x64) = atan(np - taker). **ELSE** (opponent's set-piece): clamp the role player ctx+0x200's x to
+  the taker's goal side (min if attacking -x else max) and set its y(+0x8) = 0. **Oracle:**
+  `run_phase3_oracle.sh` drives the REAL FUN_005b73a0 phase-3 (relmatrix throttle-skipped via ctx+0x2e0=0,
+  atan LUT injected, RNG seed @0x6d3184) -> `specs/phase3_oracle.txt` (3 fixtures: our_jitter [seed 12345,
+  factor 11 -> P2.x=0x547a hand-verified] / our_seed1 [seed 1, factor 0 -> x collapses to taker] / else_min
+  [role.x clamped to 0x20000, y=0], all CALL 0 RET). Locked by `test_phase3.gd` (**8 checks, ALL PASS**).
+  GDScript pitfall (warnings-as-errors): `var d := abs(...)` infers Variant (abs returns Variant) -> use
+  explicit `var d: int =`. No regression (27 suites ALL PASS; boots 0 SCRIPT ERROR). NEXT = phase-7, then
+  the phase-4/5 defensive-wall + phase-5 tail branches, then the FUN_00598740 driver -> full-match KILL-TEST.
 
 ### FUN_005a3400 DECODED STRUCTURE (the per-player DECIDE; decoded 2026-06-18 -- cite, don't re-derive)
 `__fastcall(ECX=player)`. The per-player movement-target / set-piece-positioning computer. **NO net

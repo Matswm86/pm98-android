@@ -1,0 +1,6 @@
+# Stage 3 task 2 FUN_005b73a0 slice B (phase-3 kickoff/restart positioning) PCode-emu truth.
+# our-team: jitter nearest teammate toward taker (RNG) + taker facing; else: clamp role ctx+0x200.
+# relmatrix throttle-skipped (ctx+0x2e0=0); atan LUT injected; RNG seed @0x6d3184. CALL RET rows.
+FIX our_jitter CALL 0 RET steps=314 EAX=2162688 mem[0x24077c:4]=21626 mem[0x240780:4]=534773 mem[0x240034:4]=15963 mem[0x2403c0:4]=327680 mem[0x2403c4:4]=131072
+FIX our_seed1 CALL 0 RET steps=316 EAX=2162688 mem[0x24077c:4]=0 mem[0x240780:4]=532152 mem[0x240034:4]=16384 mem[0x2403c0:4]=327680 mem[0x2403c4:4]=131072
+FIX else_min CALL 0 RET steps=83 EAX=2162688 mem[0x24077c:4]=0 mem[0x240780:4]=0 mem[0x240034:4]=0 mem[0x2403c0:4]=131072 mem[0x2403c4:4]=0

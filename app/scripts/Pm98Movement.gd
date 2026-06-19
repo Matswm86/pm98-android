@@ -1388,7 +1388,7 @@ static func player_opposite_half(p: Dictionary, side: int) -> bool:
 #   * phase 7: the throw-in / free-kick positioning (RNG jitter);
 #   * phase 3: the kickoff/restart nearest-to-taker RNG jitter;
 #   * the TAIL phase-5 follow-up positioning (match+0x448 == 5).
-static func position_team(ctx: Dictionary) -> void:
+static func position_team(ctx: Dictionary, rng = null) -> void:
 	build_relationship_matrix(ctx)                            # FUN_005b8690 (throttled; DONE)
 	ctx[0x2e0] = -1                                           # param_1[0xb8] = -1 (reset the throttle)
 	var m: Dictionary = ctx.get(0x138, {})
@@ -1399,7 +1399,55 @@ static func position_team(ctx: Dictionary) -> void:
 	elif phase == 7:
 		push_error("position_team: phase 7 not yet ported")
 	elif phase == 3:
-		push_error("position_team: phase 3 not yet ported")
+		_position_phase3(ctx, m, team, rng)
 	# TAIL (0x5b81d6): only phase 5 continues to the follow-up positioning.
 	if _g(m, 0x448) == 5:
 		push_error("position_team: phase-5 tail not yet ported")
+
+
+## FUN_005b73a0 phase-3 (kickoff/restart) set-piece branch (disasm 0x5b7fec..0x5b81cf).
+## OUR team (match+0x45c == team): pull the nearest on-pitch teammate (min |x - taker.x|, != taker)
+## partway toward the taker -- x and y each jittered by a fresh RNG factor `(rand*50)>>15` taken as a
+## /100 fraction of the gap (y additionally + sign(y-gap)*0x70000), z unchanged -- then aim the
+## TAKER's facing (+0x34/+0x64) at the moved teammate. ELSE (opponent's set-piece): clamp the role
+## player ctx[0x200]'s x to the taker's side of goal (min if attacking -x else max), z = 0.
+## `rng` = the live MatchEngine.Pm98Rng. The /100 uses truncate-toward-zero (the 0x51eb851f magic).
+static func _position_phase3(ctx: Dictionary, m: Dictionary, team: int, rng) -> void:
+	var taker: Dictionary = _ref(m, 0x438)
+	var players: Array = ctx.get("players", [])
+	if _g(m, 0x45c) == team:
+		var tx := _si(taker, 0x4)
+		var nearest := -1
+		var best := 0x640000
+		for i in players.size():
+			var p: Dictionary = players[i]
+			if _g(p, 0x2bc) == 0 or is_same(p, taker):
+				continue
+			var d: int = abs(Pm98Trig._i32(_si(p, 0x4) - tx))
+			if d < best:
+				best = d
+				nearest = i
+		if nearest < 0:
+			return
+		var np: Dictionary = players[nearest]
+		var f1: int = (rng.next() * 0x32) >> 15
+		var ndx := Pm98Trig._i32(_si(np, 0x4) - _si(taker, 0x4))
+		np[0x4] = Pm98Trig._i32(Pm98Trig._tdiv(Pm98Trig._i32(f1 * ndx), 100) + _si(taker, 0x4))
+		var dy := Pm98Trig._i32(_si(np, 0x8) - _si(taker, 0x8))
+		var f2: int = (rng.next() * 0x32) >> 15
+		np[0x8] = Pm98Trig._i32(Pm98Trig._tdiv(Pm98Trig._i32(f2 * dy), 100) + _sign1(dy) * 0x70000 + _si(taker, 0x8))
+		var r: Array = Pm98Trig.vec3_sub(
+			[_si(np, 0x4), _si(np, 0x8), _si(np, 0xc)], [_si(taker, 0x4), _si(taker, 0x8), _si(taker, 0xc)])
+		var facing := Pm98Trig.atan_angle(r[0], r[1]) & 0xffff
+		taker[0x34] = facing
+		taker[0x64] = facing
+	else:
+		var goalx := goal_target_x(_g(m, 0x19a0), _g(m, 0x1820), team)
+		var role: Dictionary = players[_g(ctx, 0x200)]
+		var rx := _si(role, 0x4)
+		var txx := _si(taker, 0x4)
+		if goalx < 0:
+			role[0x4] = rx if rx < txx else txx               # min: keep role on the -x side of the taker
+		else:
+			role[0x4] = rx if rx > txx else txx               # max: keep role on the +x side
+		role[0x8] = 0

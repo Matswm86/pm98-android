@@ -88,3 +88,5 @@ tools/re/specs/_posleaf_run.*
 tools/re/specs/_driverleaf_run.*
 tools/re/specs/_halfpitch_run.*
 tools/re/specs/_positionteam_run.*
+tools/re/specs/_phase3_run.*
+tools/re/specs/_phase3_lut.txt
