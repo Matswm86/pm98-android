@@ -1290,9 +1290,10 @@ static func advance(p: Dictionary, ring: int, playback: bool, record: bool, fram
 #   timers (every call): +0x58 = +0x54; then decrement +0x5c, +0x70, +0x68 each iff nonzero.
 #   lerp iff (post-decrement) +0x68 == 0 AND +0x6c != 0:
 #     N = ORIGINAL +0x6c; +0x6c -= 1; pos[axis] += (target[axis] - pos[axis]) / N  (idiv, trunc->0).
-#   else -> free flight / held-ball (NOT PORTED, slice B+).
+#   else -> free flight / held-ball (SLICE B 2026-06-19: _ball_freeflight -- pos+=vel, gravity, bounce,
+#   roll; goal/post collision + spin + tail still deferred, see _ball_freeflight header).
 # The shared tail (FUN_0058fda0 trail + 0x58eb9a facing-from-velocity) writes only +0x34/+0x74+/+0x84+,
-# none of which slice A reads, so it is intentionally omitted here (port in a later slice).
+# none of which slice A/B reads, so it is intentionally omitted here (port in a later slice).
 # Oracle: tools/re/run_balladvance_oracle.sh -> specs/balladvance_oracle.txt ; test_balladvance.gd.
 
 static func ball_advance(ball: Dictionary) -> void:
@@ -1317,10 +1318,58 @@ static func _ball_step(delta: int, n: int) -> int:
 	return Pm98Trig._i32(Pm98Trig._i32(delta) / n)
 
 
-## NOT YET PORTED: free flight (pos+vel), gravity (DAT_0066c1b0), ground bounce, goal/post collision
-## (FUN_005efac0), spin. Reached when +0x68 (post-dec) != 0 or +0x6c == 0. See MATCH_TICK_DRIVER_MAP.md.
-static func _ball_freeflight(_ball: Dictionary) -> void:
-	push_error("Pm98Movement.ball_advance: free-flight branch not ported (FUN_0058e2c0 slice B+)")
+# ---- FUN_0058e2c0 free-flight: integration + gravity + ground bounce/roll (SLICE B) ---------
+# Constants from the disasm (gravity init FUN_0058e030 @0x58e030; bounce/roll @0x58e969..0x58eb09).
+const BALL_GRAVITY := [0, 0, -178]   # DAT_0066c1b0/b4/b8: x=0, y=0, z=0xffffff4e (-178)
+const BALL_BOUNCE_H := 0xc51e        # horiz restitution numerator (FUN_005edfa0 16.16, ~0.770)
+const BALL_BOUNCE_V := 0x9c28        # vert  restitution numerator (~0.610), result negated
+const BALL_VZ_SETTLE := 0x28f        # |vel.z| below this after a bounce -> vel.z = 0
+const BALL_ROLL_STOP := 0x22         # both |vel.x| and |vel.y| below -> ball halts; else roll friction
+
+## FUN_0058e2c0 free-flight branch -- SLICE B (the airborne/ground ball physics).
+## Reached from ball_advance when NOT the lerp branch. Disasm anchors:
+##   held gate 0x58e35c (byte ball+0x63 set -> tail only, no motion);
+##   integration pos += vel 0x58e974..0x58e993;
+##   bounce 0x58ea48, gravity 0x58ea1c, roll/stop 0x58e9b6, all then -> spin 0x58eb09.
+## DELIBERATELY OUT OF SLICE B (later slices, all gated off in the oracle so this runs straight):
+##   - goal/post collision sweep 0x58e497..0x58e963 (gated by match+0x5fac / post-count match+0x17f8);
+##   - spin 0x58eb09 (writes +0x2c/+0x30 only) + trail/facing tail 0x58eb93 (writes +0x34/+0x74/+0xa8);
+##   - the bounce's match+0x462 bit clears, bounce sound, and ball +0x61/+0x64 byte flags (match/anim
+##     side, no effect on pos/vel). None of the deferred work touches pos(+0x4/+0x8/+0xc) or
+##     vel(+0x20/+0x24/+0x28). The prologue's bbox build + temp `pos.z += 0x23d7` (0x58e437) is exactly
+##     undone at 0x58e96c when collision is skipped, so the net z effect is just the integration here.
+static func _ball_freeflight(ball: Dictionary) -> void:
+	if (_g(ball, 0x60) >> 24) & 0xff != 0:                 # byte ball+0x63 -> held; no motion (tail only)
+		return
+	var px := Pm98Trig._i32(_g(ball, 0x4) + _g(ball, 0x20))    # pos += vel (0x58e974..)
+	var py := Pm98Trig._i32(_g(ball, 0x8) + _g(ball, 0x24))
+	var pz := Pm98Trig._i32(_g(ball, 0xc) + _g(ball, 0x28))
+	ball[0x4] = px
+	ball[0x8] = py
+	ball[0xc] = pz
+	var vz := _g(ball, 0x28)
+	if pz < 0 or (pz == 0 and vz < 0):                    # GROUND BOUNCE (0x58ea48)
+		ball[0xc] = 0
+		ball[0x20] = Pm98Trig.mul16(_g(ball, 0x20), BALL_BOUNCE_H)
+		ball[0x24] = Pm98Trig.mul16(_g(ball, 0x24), BALL_BOUNCE_H)
+		var nvz := Pm98Trig._i32(-Pm98Trig.mul16(_g(ball, 0x28), BALL_BOUNCE_V))
+		ball[0x28] = 0 if absi(nvz) < BALL_VZ_SETTLE else nvz
+	elif pz != 0 or vz != 0:                              # GRAVITY while airborne (0x58ea1c)
+		ball[0x20] = Pm98Trig._i32(_g(ball, 0x20) + BALL_GRAVITY[0])
+		ball[0x24] = Pm98Trig._i32(_g(ball, 0x24) + BALL_GRAVITY[1])
+		ball[0x28] = Pm98Trig._i32(_g(ball, 0x28) + BALL_GRAVITY[2])
+	else:                                                 # GROUND ROLL: pos.z==0 && vel.z==0 (0x58e9b6)
+		var vx := _g(ball, 0x20)
+		var vy := _g(ball, 0x24)
+		if absi(vx) < BALL_ROLL_STOP and absi(vy) < BALL_ROLL_STOP:
+			ball[0x20] = 0
+			ball[0x24] = 0
+			ball[0x28] = 0
+		else:                                             # subtract a 0x22-magnitude step along heading
+			var f := Pm98Trig.polar_vec(BALL_ROLL_STOP, Pm98Trig.atan_angle(vx, vy))
+			ball[0x20] = Pm98Trig._i32(vx - int(f[0]))
+			ball[0x24] = Pm98Trig._i32(vy - int(f[1]))
+			ball[0x28] = Pm98Trig._i32(vz - int(f[2]))
 
 
 # ---- FUN_005b73a0 positioning leaves (forward-zone eligibility + goal-side count) -----

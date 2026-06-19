@@ -1,8 +1,15 @@
-# Stage 3 task 2 ball ADVANCE slice A (FUN_0058e2c0 timers + lerp-to-target) PCode-emu ground truth.
-# +0x58=+0x54; dec +0x5c/+0x70/+0x68 iff !=0; lerp iff +0x68(post-dec)==0 && +0x6c!=0:
-# N=orig +0x6c; +0x6c-=1; pos[a] += (target[a]-pos[a])/N (idiv). vel +0x20!=0 -> clean ret.
-# Each row: FIX <name> + verbatim CALL line. Reads: pos +0x4/+0x8/+0xc, step +0x6c, timers.
-FIX lerp_pos CALL 0 RET steps=3137 EAX=0 mem[0x230004:4]=2097152 mem[0x230008:4]=3145728 mem[0x23000c:4]=786432 mem[0x23006c:4]=3 mem[0x230058:4]=4660 mem[0x23005c:4]=2 mem[0x230068:4]=0 mem[0x230070:4]=4
-FIX lerp_neg CALL 0 RET steps=3133 EAX=0 mem[0x230004:4]=3844779 mem[0x230008:4]=3844779 mem[0x23000c:4]=699051 mem[0x23006c:4]=2 mem[0x230058:4]=2 mem[0x23005c:4]=0 mem[0x230068:4]=0 mem[0x230070:4]=0
-FIX lerp_n1 CALL 0 RET steps=3133 EAX=0 mem[0x230004:4]=7829367 mem[0x230008:4]=8947848 mem[0x23000c:4]=629145 mem[0x23006c:4]=0 mem[0x230058:4]=9 mem[0x23005c:4]=0 mem[0x230068:4]=0 mem[0x230070:4]=1
-FIX lerp_guard CALL 0 RET steps=2494 EAX=0 mem[0x230004:4]=262144 mem[0x230008:4]=4294705152 mem[0x23000c:4]=131072 mem[0x23006c:4]=1 mem[0x230058:4]=43981 mem[0x23005c:4]=0 mem[0x230068:4]=0 mem[0x230070:4]=0
+# Stage 3 task 2 ball ADVANCE (FUN_0058e2c0) PCode-emu ground truth. SLICE A (timers + lerp)
+# + SLICE B (free-flight: pos+=vel, gravity [0,0,-178], ground bounce/settle, roll-stop/friction).
+# Collision gates clear (match zeroed); spin/tail run but never write pos/vel. cos/atan LUT + _ftol.
+# Each row: FIX <name> + verbatim CALL line. Reads: pos +0x4/+0x8/+0xc, vel +0x20/+0x24/+0x28,
+# step +0x6c, timers +0x58/+0x5c/+0x68/+0x70.
+FIX lerp_pos CALL 0 RET steps=3120 EAX=0 mem[0x230004:4]=2097152 mem[0x230008:4]=3145728 mem[0x23000c:4]=786432 mem[0x230020:4]=65536 mem[0x230024:4]=0 mem[0x230028:4]=0 mem[0x23006c:4]=3 mem[0x230058:4]=4660 mem[0x23005c:4]=2 mem[0x230068:4]=0 mem[0x230070:4]=4
+FIX lerp_neg CALL 0 RET steps=3116 EAX=0 mem[0x230004:4]=3844779 mem[0x230008:4]=3844779 mem[0x23000c:4]=699051 mem[0x230020:4]=65536 mem[0x230024:4]=0 mem[0x230028:4]=0 mem[0x23006c:4]=2 mem[0x230058:4]=2 mem[0x23005c:4]=0 mem[0x230068:4]=0 mem[0x230070:4]=0
+FIX lerp_n1 CALL 0 RET steps=3116 EAX=0 mem[0x230004:4]=7829367 mem[0x230008:4]=8947848 mem[0x23000c:4]=629145 mem[0x230020:4]=65536 mem[0x230024:4]=0 mem[0x230028:4]=0 mem[0x23006c:4]=0 mem[0x230058:4]=9 mem[0x23005c:4]=0 mem[0x230068:4]=0 mem[0x230070:4]=1
+FIX lerp_guard CALL 0 RET steps=2483 EAX=0 mem[0x230004:4]=262144 mem[0x230008:4]=4294705152 mem[0x23000c:4]=131072 mem[0x230020:4]=65536 mem[0x230024:4]=0 mem[0x230028:4]=0 mem[0x23006c:4]=1 mem[0x230058:4]=43981 mem[0x23005c:4]=0 mem[0x230068:4]=0 mem[0x230070:4]=0
+FIX fb_gravity CALL 0 RET steps=1525 EAX=4294955748 mem[0x230004:4]=69632 mem[0x230008:4]=122880 mem[0x23000c:4]=274432 mem[0x230020:4]=4096 mem[0x230024:4]=4294959104 mem[0x230028:4]=12110 mem[0x23006c:4]=0 mem[0x230058:4]=0 mem[0x23005c:4]=0 mem[0x230068:4]=0 mem[0x230070:4]=0
+FIX fb_bounce CALL 0 RET steps=1575 EAX=4294962460 mem[0x230004:4]=53248 mem[0x230008:4]=8192 mem[0x23000c:4]=0 mem[0x230020:4]=25231 mem[0x230024:4]=4294954680 mem[0x230028:4]=22487 mem[0x23006c:4]=0 mem[0x230058:4]=0 mem[0x23005c:4]=0 mem[0x230068:4]=0 mem[0x230070:4]=0
+FIX fb_settle CALL 0 RET steps=1244 EAX=0 mem[0x230004:4]=16640 mem[0x230008:4]=16640 mem[0x23000c:4]=0 mem[0x230020:4]=197 mem[0x230024:4]=197 mem[0x230028:4]=0 mem[0x23006c:4]=0 mem[0x230058:4]=0 mem[0x23005c:4]=0 mem[0x230068:4]=0 mem[0x230070:4]=0
+FIX fb_rollstop CALL 0 RET steps=944 EAX=0 mem[0x230004:4]=12304 mem[0x230008:4]=12256 mem[0x23000c:4]=0 mem[0x230020:4]=0 mem[0x230024:4]=0 mem[0x230028:4]=0 mem[0x23006c:4]=0 mem[0x230058:4]=0 mem[0x23005c:4]=0 mem[0x230068:4]=0 mem[0x230070:4]=0
+FIX fb_rollfric CALL 0 RET steps=2060 EAX=0 mem[0x230004:4]=14336 mem[0x230008:4]=13312 mem[0x23000c:4]=0 mem[0x230020:4]=2018 mem[0x230024:4]=1009 mem[0x230028:4]=0 mem[0x23006c:4]=0 mem[0x230058:4]=0 mem[0x23005c:4]=0 mem[0x230068:4]=0 mem[0x230070:4]=0
+FIX fb_held CALL 0 RET steps=1226 EAX=11548 mem[0x230004:4]=4096 mem[0x230008:4]=8192 mem[0x23000c:4]=12288 mem[0x230020:4]=256 mem[0x230024:4]=512 mem[0x230028:4]=768 mem[0x23006c:4]=0 mem[0x230058:4]=0 mem[0x23005c:4]=0 mem[0x230068:4]=0 mem[0x230070:4]=0

@@ -758,6 +758,31 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   ALL PASS**). No regression (71 parity suites + test_divisions pass; boots 0 SCRIPT ERROR). NEXT = ball
   slice B (free-flight + gravity + ground bounce), then the collision loop, spin, and the FUN_0058fda0 tail;
   then GK FUN_005a22d0; then the FUN_00598740 driver -> full-match KILL-TEST.
+- **Stage 3 task 2 — ball ADVANCE FUN_0058e2c0 SLICE B (free-flight: integration + gravity + bounce/roll)
+  PORTED + oracle-validated DONE 2026-06-19.** -> `Pm98Movement._ball_freeflight` (replaces the loud stub).
+  The branch taken when NOT lerp ((post-dec) +0x68 != 0 OR +0x6c == 0). disasm:
+  - **held gate** 0x58e35c: byte ball+0x63 set -> jmp tail, no motion.
+  - **integration** 0x58e974..0x58e993: pos(+0x4/+0x8/+0xc) += vel(+0x20/+0x24/+0x28). (The prologue's
+    swept-bbox build temporarily does pos.z += 0x23d7 @0x58e437 and undoes it @0x58e96c when collision is
+    skipped, so the net z change is just the integration -- modelled directly.)
+  - **bounce** 0x58ea48 iff post-int pos.z<0 OR (pos.z==0 && vel.z<0): pos.z=0; vel.x,vel.y =
+    mul16(.,0xc51e) (FUN_005edfa0==Pm98Trig.mul16, ~0.770); vel.z = -mul16(vel.z,0x9c28) (~0.610); then
+    |vel.z| < 0x28f -> vel.z = 0 (settle).
+  - **gravity** 0x58ea1c iff post-int pos.z>0 OR (pos.z==0 && vel.z>0): vel += DAT_0066c1b0/b4/b8 = [0,0,-178]
+    (set once by FUN_0058e030 @0x58e030; poked in the oracle).
+  - **roll** 0x58e9b6 iff pos.z==0 && vel.z==0: |vel.x|<0x22 && |vel.y|<0x22 -> vel=[0,0,0]; else vel -=
+    polar_vec(0x22, atan_angle(vel.x,vel.y)) (FUN_005ee0f0/FUN_005ee080 == Pm98Trig leaves, real cos/atan LUT).
+  **DEFERRED to a later slice (all kept inert by the oracle):** the goal/post collision sweep
+  0x58e497..0x58e963 (gated off by match+0x5fac==0 and post-count match+0x17f8==0, both 0 in the zeroed
+  match); the spin 0x58eb09 (writes +0x2c/+0x30 only; FUN_005ee500 reads vel only) + trail/facing tail
+  0x58eb93 (writes +0x34/+0x74/+0xa8); and the bounce's match+0x462 bit-clears, bounce sound, and ball
+  +0x61/+0x64 anim-flag bytes -- none touch pos/vel, which read clean for every fixture. Oracle
+  `run_balladvance_oracle.sh` extended (+gravity pokes, +cos/atan LUT via emit_lut_membts.py, +vel reads):
+  6 new fixtures fb_gravity / fb_bounce / fb_settle / fb_rollstop / fb_rollfric / fb_held, all CALL 0 RET.
+  Locked by `test_balladvance.gd` (**110 checks, ALL PASS**, was 32). No regression (71 parity suites +
+  test_divisions pass; boots 0 SCRIPT ERROR). NEXT in this fn = the goal/post collision loop
+  (FUN_005f3b80 goal sweep + FUN_00590b30/FUN_005efac0 post resolve), then spin + the FUN_0058fda0 tail;
+  then GK FUN_005a22d0; then the FUN_00598740 driver -> full-match KILL-TEST.
 
 ### FUN_005a3400 DECODED STRUCTURE (the per-player DECIDE; decoded 2026-06-18 -- cite, don't re-derive)
 `__fastcall(ECX=player)`. The per-player movement-target / set-piece-positioning computer. **NO net

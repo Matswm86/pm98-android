@@ -1,22 +1,28 @@
 extends SceneTree
-## Oracle-backed parity test for FUN_0058e2c0 (vtable+0xc on match+0x1610, the BALL advance) SLICE A
-## -- the prologue timers + the lerp-to-target branch, ported in Pm98Movement.ball_advance.
+## Oracle-backed parity test for FUN_0058e2c0 (vtable+0xc on match+0x1610, the BALL advance), ported in
+## Pm98Movement.ball_advance. SLICE A = prologue timers + lerp-to-target. SLICE B = the free-flight
+## branch (integration + gravity + ground bounce/roll).
 ##
 ## Run headless from the project dir:
 ##   ~/godot462 --headless --path app --script res://tests/test_balladvance.gd
 ##
 ## ORACLE = the REAL FUN_0058e2c0 under the Ghidra PCode emulator, run to a clean RET
-## (tools/re/run_balladvance_oracle.sh -> specs/balladvance_oracle.txt). Each fixture forces the lerp
-## branch (post-dec +0x68==0 && +0x6c!=0) with velocity +0x20!=0 so the epilogue leaves pos intact.
-## Validates: +0x58=+0x54 copy, the three timer decrements (with 0-guards), and the per-axis lerp
-## pos[a] += (target[a]-pos[a])/N with x86 idiv truncation toward zero (lerp_neg is the truncation
-## witness: -1398101, not the floor -1398102).
+## (tools/re/run_balladvance_oracle.sh -> specs/balladvance_oracle.txt).
+## SLICE A (lerp_*): forces the lerp branch (post-dec +0x68==0 && +0x6c!=0), velocity +0x20!=0 so the
+## epilogue leaves pos intact. Validates +0x58=+0x54 copy, the 3 timer decrements (0-guards), and the
+## per-axis lerp pos[a] += (target[a]-pos[a])/N with x86 idiv trunc toward zero (lerp_neg witness:
+## -1398101, not the floor -1398102).
+## SLICE B (fb_*): forces the free-flight branch (+0x6c==0). Validates integration pos += vel, gravity
+## while airborne (vel.z += -178), ground bounce (pos.z->0; vel damped *0xc51e horiz / -*0x9c28 vert;
+## |vel.z|<0x28f settles to 0), roll-stop (|vx|,|vy|<0x22 -> halt) / roll-friction (subtract a
+## 0x22-magnitude step along atan2(vx,vy), real cos/atan LUT), and the held gate (byte ball+0x63).
 
 const B0 := 0x230000
 const U32 := 0xffffffff
 
-# Each fixture mirrors the oracle's fix(): the ball-field state poked before the call. Offsets:
-# 0x54/0x5c/0x68/0x6c/0x70 timers, 0x4/0x8/0xc pos, 0x9c/0xa0/0xa4 target, 0x20 velocity (nonzero).
+# Each fixture mirrors the oracle's fix()/fixb(): the ball-field state poked before the call. Offsets:
+# 0x54/0x5c/0x68/0x6c/0x70 timers, 0x4/0x8/0xc pos, 0x9c/0xa0/0xa4 target, 0x20/0x24/0x28 velocity.
+# Slice-B rows leave all timers 0 (so +0x6c==0 -> free-flight); 0x60 high byte = the ball+0x63 held flag.
 const FIX := {
 	"lerp_pos": {0x54: 0x1234, 0x5c: 3, 0x68: 1, 0x6c: 4, 0x70: 5,
 		0x4: 0x100000, 0x8: 0x200000, 0xc: 0x80000,
@@ -30,6 +36,18 @@ const FIX := {
 	"lerp_guard": {0x54: 0xabcd, 0x5c: 0, 0x68: 0, 0x6c: 2, 0x70: 0,
 		0x4: 0, 0x8: 0, 0xc: 0,
 		0x9c: 0x80000, 0xa0: -0x80000, 0xa4: 0x40000, 0x20: 0x10000},
+	"fb_gravity": {0x4: 0x10000, 0x8: 0x20000, 0xc: 0x40000,
+		0x20: 0x1000, 0x24: -0x2000, 0x28: 0x3000},
+	"fb_bounce": {0x4: 0x5000, 0x8: 0x6000, 0xc: 0x1000,
+		0x20: 0x8000, 0x24: -0x4000, 0x28: -0x9000},
+	"fb_settle": {0x4: 0x4000, 0x8: 0x4000, 0xc: 0x100,
+		0x20: 0x100, 0x24: 0x100, 0x28: -0x200},
+	"fb_rollstop": {0x4: 0x3000, 0x8: 0x3000, 0xc: 0,
+		0x20: 0x10, 0x24: -0x20, 0x28: 0},
+	"fb_rollfric": {0x4: 0x3000, 0x8: 0x3000, 0xc: 0,
+		0x20: 0x800, 0x24: 0x400, 0x28: 0},
+	"fb_held": {0x4: 0x1000, 0x8: 0x2000, 0xc: 0x3000,
+		0x20: 0x100, 0x24: 0x200, 0x28: 0x300, 0x60: 0x01000000},
 }
 
 var _fail := 0
