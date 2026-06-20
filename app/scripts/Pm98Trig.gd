@@ -255,3 +255,48 @@ static func mid_offset(p1: Array, p2: Array, box: int, p4: Array) -> Array:
 		_i32(p4[1] + _tdiv(dy, 2) + p2[1]),
 		_i32(p4[2] + _tdiv(dz, 2) + p2[2]),
 	]
+
+
+# ---- goal/pitch collision-geometry leaves (FUN_005a18a0 / 1a30 / 1870 / 1990) --------
+# The pure vec3/quad primitives the collision-geometry builder FUN_005946f0 calls while
+# it constructs the master geometry array (match+0x27c8) the post/collider list is copied
+# from. All allocator-free (they only chain FUN_005ee290 = vec3_scale_ratio), so each is
+# oracle-pinned bit-for-bit by tools/re/run_geomleaf_oracle.sh -> specs/geomleaf_oracle.txt
+# (app/tests/test_geomleaf.gd). The builder itself can't be emu-oracled end-to-end (its
+# grow path FUN_005bbf10 is a Win32 GlobalReAlloc import) -- see
+# docs/re/goal/collision_geometry_builder_re.md.
+
+
+## FUN_005a1870: component-wise truncating divide of a vec3 by a scalar (`idiv`, 3x
+## cdq/idiv, truncate toward zero). `ret 0x8` (this=in, out, divisor).
+static func vec3_div_scalar(v: Array, d: int) -> Array:
+	return [_i32(_tdiv(v[0], d)), _i32(_tdiv(v[1], d)), _i32(_tdiv(v[2], d))]
+
+
+## FUN_005a1990: copy a quad -- 4 vec3 = 12 int32 -- src -> out verbatim (an unrolled
+## 0xc-dword move, `ret 0x4`; this=out, src). Returns the 12-int copy.
+static func quad_copy(src: Array) -> Array:
+	var out := []
+	for i in range(12):
+		out.append(_i32(src[i]))
+	return out
+
+
+## FUN_005a18a0: vec3 linear interpolation. delta = b - a (this); scale by mult/div with
+## a 64-bit product then truncating idiv (FUN_005ee290 = vec3_scale_ratio); out = a +
+## scaled. `ret 0x10` (this=a, out, b, mult, div). out = a + (b - a) * mult / div.
+static func vec3_lerp(a: Array, b: Array, mult: int, div: int) -> Array:
+	var delta := [_i32(b[0] - a[0]), _i32(b[1] - a[1]), _i32(b[2] - a[2])]
+	var s := vec3_scale_ratio(delta, mult, div)
+	return [_i32(a[0] + s[0]), _i32(a[1] + s[1]), _i32(a[2] + s[2])]
+
+
+## FUN_005a1a30: bilinear interpolation across an oriented quad whose 4 vec3 corners are
+## this+0x00 (c0), +0x0c (c1), +0x18 (c2), +0x24 (c3). Two edges are lerped by the first
+## fraction (m1/d1), then the two edge points by the second (m2/d2):
+##   v_a = lerp(c3, c2, m1/d1);  v_b = lerp(c0, c1, m1/d1);  out = lerp(v_b, v_a, m2/d2).
+## (The binary subtracts c2-c3 and c1-c0, so the edges run c3->c2 and c0->c1.)
+static func quad_bilerp(c0: Array, c1: Array, c2: Array, c3: Array, m1: int, d1: int, m2: int, d2: int) -> Array:
+	var va := vec3_lerp(c3, c2, m1, d1)
+	var vb := vec3_lerp(c0, c1, m1, d1)
+	return vec3_lerp(vb, va, m2, d2)
