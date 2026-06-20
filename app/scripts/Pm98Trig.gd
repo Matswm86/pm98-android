@@ -300,3 +300,68 @@ static func quad_bilerp(c0: Array, c1: Array, c2: Array, c3: Array, m1: int, d1:
 	var va := vec3_lerp(c3, c2, m1, d1)
 	var vb := vec3_lerp(c0, c1, m1, d1)
 	return vec3_lerp(vb, va, m2, d2)
+
+
+# ---- goal/pitch collision-geometry leaves, batch 2 (FUN_005efa40 / 5a1730 / 5a1910 /
+#      5a19d0 / 590be0) ---------------------------------------------------------------
+# The remaining PURE primitives FUN_005946f0 calls inside the per-post fill: the quad
+# face-normal (+0x48 edge-orientation vec _post_narrow reads), the broadcast translate,
+# and the AABB (+0x30..+0x47) init / expand / copy. All allocator-free, so each is
+# oracle-pinned bit-for-bit by run_geomleaf_oracle.sh -> specs/geomleaf_oracle.txt.
+# NOTE: FUN_005efa40 does NOT normalize -- its only callee FUN_005ee540 is a pure
+# 16.16 fixed-point cross product (64-bit imul + sar 16), no fsqrt/ftol. The prior
+# handoff's "edge-normal needs the ftol stub" guess was wrong; verified against the
+# disasm (0x5ee540: imul/shrd only) and the emu (no stubs).
+
+
+## FUN_005ee540: 16.16 fixed-point cross product. out[i] = (a x b)[i] >> 16, each term a
+## 64-bit imul difference then arithmetic `sar 16` truncated to int32 (the binary's
+## `(uint)p>>0x10 | (int)(p>>0x20)<<0x10` reconstructs bits[16..47] = int32(p>>16)).
+static func cross16(a: Array, b: Array) -> Array:
+	return [
+		_i32(_asr(a[1] * b[2] - a[2] * b[1], 16)),
+		_i32(_asr(a[2] * b[0] - a[0] * b[2], 16)),
+		_i32(_asr(a[0] * b[1] - a[1] * b[0], 16)),
+	]
+
+
+## FUN_005efa40: face normal of a quad's first 3 corners. e1 = c1 - c0, e2 = c2 - c1
+## (this=quad +0x00 c0, +0x0c c1, +0x18 c2); out = cross16(e1, e2). `ret 0x4` (this, out).
+## The +0x48 edge-orientation vec the goal narrow-phase (_post_narrow) reads.
+static func quad_face_normal(q: Array) -> Array:
+	var e1 := [_i32(q[3] - q[0]), _i32(q[4] - q[1]), _i32(q[5] - q[2])]
+	var e2 := [_i32(q[6] - q[3]), _i32(q[7] - q[4]), _i32(q[8] - q[5])]
+	return cross16(e1, e2)
+
+
+## FUN_005a1730: broadcast-translate a vec3 -- add the scalar `s` to every component.
+## `ret 0x8` (this=in, out, s). out = [in.x + s, in.y + s, in.z + s].
+static func vec3_add_scalar(v: Array, s: int) -> Array:
+	return [_i32(v[0] + s), _i32(v[1] + s), _i32(v[2] + s)]
+
+
+## FUN_005a1910: initialize an AABB to the empty-set sentinels -- min = +BIG (0x70000000),
+## max = -BIG (0x90000000). `__fastcall`, this only. Returns [minx,miny,minz,maxx,maxy,maxz].
+static func aabb_init() -> Array:
+	return [0x70000000, 0x70000000, 0x70000000, _i32(0x90000000), _i32(0x90000000), _i32(0x90000000)]
+
+
+## FUN_005a19d0: expand AABB `aabb` (min +0x0/4/8, max +0xc/10/14) to include point `pt`.
+## Per-component signed min into the lo triple, signed max into the hi triple (the binary's
+## six cmp/jle). `ret 0x4` (this=aabb, pt). Mutates and returns `aabb`.
+static func aabb_expand_point(aabb: Array, pt: Array) -> Array:
+	for i in range(3):
+		if pt[i] < aabb[i]:
+			aabb[i] = _i32(pt[i])
+		if aabb[i + 3] < pt[i]:
+			aabb[i + 3] = _i32(pt[i])
+	return aabb
+
+
+## FUN_00590be0: copy 6 int32 (an AABB / 2-vec3 block) src -> out verbatim. `ret 0x4`
+## (this=out, src). Returns the 6-int copy.
+static func copy6(src: Array) -> Array:
+	var out := []
+	for i in range(6):
+		out.append(_i32(src[i]))
+	return out

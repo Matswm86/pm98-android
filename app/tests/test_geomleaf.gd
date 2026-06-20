@@ -27,6 +27,23 @@ const BILERP := {
 	"bilerp_mid": [[0x0, 0x0, 0x0], [0x40000, 0x0, 0x0], [0x40000, 0x40000, 0x0], [0x0, 0x40000, 0x0], 0x1, 0x2, 0x1, 0x2],
 	"bilerp_q": [[0x10000, 0x20000, 0x0], [0x50000, 0x20000, 0x4000], [0x50000, 0x60000, 0x8000], [0x10000, 0x60000, 0x2000], 0x1, 0x4, 0x2, 0x3],
 }
+# batch 2: face normal (flat 9-int quad c0|c1|c2), broadcast translate, AABB init/expand/copy6
+const FNORM := {
+	"fnorm_axis": [0x0, 0x0, 0x0, 0x10000, 0x0, 0x0, 0x10000, 0x10000, 0x0],
+	"fnorm_arb": [0x12345, -0x6789, 0x3333, 0x40000, 0x10000, -0x8000, -0x20000, 0x50000, 0x12000],
+}
+const ADDSC := {
+	# v, scalar
+	"addsc_pos": [[0x100, -0x200, 0x300], 0x50],
+	"addsc_neg": [[0x1000, 0x2000, -0x3000], -0x1234],
+	"addsc_wrap": [[0x7ffffff0, 0x0, 0x0], 0x20],
+}
+const AABBEXP := {
+	# aabb (6), point (3)  -- "fresh" uses the init sentinels (max = signed -0x70000000)
+	"aabbexp_fresh": [[0x70000000, 0x70000000, 0x70000000, -0x70000000, -0x70000000, -0x70000000], [0x100, -0x200, 0x300]],
+	"aabbexp_part": [[0x0, 0x0, 0x0, 0x1000, 0x1000, 0x1000], [-0x50, 0x800, 0x2000]],
+}
+const COPY6 := {"copy6_a": 0x1000, "copy6_b": -0x8000}
 
 var _fail := 0
 var _pass := 0
@@ -47,6 +64,16 @@ func _init() -> void:
 		for name in BILERP:
 			var b: Array = BILERP[name]
 			_check(name, orc, Pm98Trig.quad_bilerp(b[0], b[1], b[2], b[3], int(b[4]), int(b[5]), int(b[6]), int(b[7])))
+		for name in FNORM:
+			_check(name, orc, Pm98Trig.quad_face_normal(FNORM[name]))
+		for name in ADDSC:
+			_check(name, orc, Pm98Trig.vec3_add_scalar(ADDSC[name][0], int(ADDSC[name][1])))
+		_check6("aabbinit_x", orc, Pm98Trig.aabb_init())
+		for name in AABBEXP:
+			var a: Array = AABBEXP[name]
+			_check6(name, orc, Pm98Trig.aabb_expand_point(a[0].duplicate(), a[1]))
+		for name in COPY6:
+			_check6(name, orc, Pm98Trig.copy6(_ramp6(int(COPY6[name]))))
 	print("")
 	if _fail == 0:
 		print("ALL PASS (%d checks)" % _pass)
@@ -71,6 +98,23 @@ func _check(name: String, orc: Dictionary, v: Array) -> void:
 	var got := {0x0: int(v[0]) & U32, 0x4: int(v[1]) & U32, 0x8: int(v[2]) & U32}
 	for off in [0x0, 0x4, 0x8]:
 		_ok(got[off] == (int(exp[off]) & U32), "%s +0x%x: got 0x%x want 0x%x" % [name, off, got[off], int(exp[off]) & U32])
+
+
+func _ramp6(base: int) -> Array:
+	var out := []
+	for i in range(6):
+		out.append(base + i * 0x1111)
+	return out
+
+
+func _check6(name: String, orc: Dictionary, v: Array) -> void:
+	if not orc.has(name):
+		_ok(false, name + ": missing from oracle file")
+		return
+	var exp: Dictionary = orc[name]
+	for i in range(6):
+		var off := i * 4
+		_ok((int(v[i]) & U32) == (int(exp[off]) & U32), "%s +0x%x: got 0x%x want 0x%x" % [name, off, int(v[i]) & U32, int(exp[off]) & U32])
 
 
 func _check_quad(name: String, orc: Dictionary, v: Array) -> void:

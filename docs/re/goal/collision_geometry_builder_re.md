@@ -95,9 +95,14 @@ PURE (no allocator → individually PCode-oracle-able):
 - FUN_005a1a30 quad bilinear `lerp(lerp(c0,c1,f1),lerp(c3,c2,f1),f2)` — **PORTED 2026-06-20** (Pm98Trig.quad_bilerp).
 - FUN_005a1c00 RGB565→palette byte (DAT_00675398 LUT) — DEFERRED (needs 64KB palette
   export; only feeds the render `+0x64` color, not collision). 
-- FUN_005efa40 edge-normal (fsqrt/ftol) — DECOMPILED (`pm98dec`), port pending.
-- FUN_005a1730 / FUN_005a1910 / FUN_005a19d0 quad transforms — DECOMPILED, port pending.
-- FUN_00590ac0 / FUN_00590be0 AABB min/max accumulate — PORTED (Pm98Movement) / decompiled.
+- FUN_005efa40 quad face-normal — **PORTED 2026-06-20** (Pm98Trig.quad_face_normal). NOT
+  fsqrt/ftol: its only callee FUN_005ee540 is a pure 16.16 cross product (64-bit imul +
+  `sar 16`, Pm98Trig.cross16), no normalization. The prior "needs ftol stub" note was wrong
+  (verified disasm 0x5ee540 = imul/shrd only; emu RET clean with no stubs).
+- FUN_005a1730 broadcast-translate vec3 (+scalar to all 3) — **PORTED 2026-06-20** (vec3_add_scalar).
+- FUN_005a1910 AABB init (+BIG/-BIG sentinels) — **PORTED 2026-06-20** (aabb_init).
+- FUN_005a19d0 AABB expand-to-point (signed per-component min/max) — **PORTED 2026-06-20** (aabb_expand_point).
+- FUN_00590ac0 vec3 copy — PORTED (Pm98Trig.vec3_store). FUN_00590be0 6-int/AABB copy — **PORTED 2026-06-20** (copy6).
 ALLOCATOR / dtor (NOT emulatable, NOT needed once the loop structure is transcribed):
 - FUN_005bbf10 GlobalReAlloc grow, FUN_005963e0 / FUN_00596410 / FUN_005a1d40 element
   dtors, FUN_00404a80 / FUN_005c8f80 / FUN_0044cac0 the `+0x27c8` element ctor.
@@ -107,7 +112,9 @@ FUN_005bbf10 calls Win32 `GlobalAlloc`/`GlobalReAlloc`/`GlobalHandle`/`GlobalLoc
 (imports) — uncallable in the Ghidra PCode emu, exactly the class of blocker the prior
 handoff flagged for f3850. So FUN_005946f0 **cannot be run end-to-end in the emu** to
 bank a ground-truth `+0x17f4`. The port strategy is therefore:
-1. Port + oracle every PURE leaf individually (allocator-free) — IN PROGRESS (4 done).
+1. Port + oracle every PURE leaf individually (allocator-free) — DONE 2026-06-20 (9 done:
+   div_scalar/quad_copy/lerp/bilerp + face_normal/add_scalar/aabb_init/aabb_expand/copy6;
+   only the render-side RGB565 leaf FUN_005a1c00 deferred). test_geomleaf.gd = 93 checks.
 2. Transcribe the loop structure from the decompile/disasm (the allocator becomes a
    GDScript `Array.append`; the dtors become no-ops).
 3. Validate the ASSEMBLED `+0x17f4` against a ground-truth snapshot captured another way
@@ -116,7 +123,8 @@ bank a ground-truth `+0x17f4`. The port strategy is therefore:
    goal-line geometry is a pure function of `match+0x1820/+0x1970..0x197c`.
 
 ## Next-session plan (in order)
-1. Finish the pure leaves: FUN_005efa40, FUN_005a1730/1910/19d0, FUN_00590be0 (+oracles).
+1. ~~Finish the pure leaves: FUN_005efa40, FUN_005a1730/1910/19d0, FUN_00590be0 (+oracles).~~
+   DONE 2026-06-20 (all oracle-validated, test_geomleaf.gd 93 checks). NEXT real step ↓:
 2. Port FUN_005946f0 phases 1-3 (the `+0x27c8` master geometry) using the leaves; then
    phase 4 (the `+0x17f4` post copy) is mechanical.
 3. Capture/derive a ground-truth `+0x17f4` for one kickoff and pin it in a GDScript test.

@@ -94,6 +94,60 @@ bilerp_case() { # name  c0x c0y c0z c1x c1y c1z c2x c2y c2z c3x c3y c3z  M1 M2 D
   echo "[bilerp_$1] x=$(mval "$L" 0x210000) y=$(mval "$L" 0x210004) z=$(mval "$L" 0x210008)"
 }
 
+# ---- FUN_005efa40 face normal : this=quad@THIS (c0,c1,c2 @ +0..+0x20), arg out=OUTV ----
+# Pure: only callee FUN_005ee540 (16.16 cross) is native 64-bit imul/sar -- NO stub/LUT.
+fnorm_case() { # name  c0x c0y c0z  c1x c1y c1z  c2x c2y c2z
+  hdr 0x5efa40 "$THIS"
+  { for i in $(seq 0 8); do poke $((THIS+4*i)) "${@:$((i+2)):1}"; done
+    printf 'arg %s\n' "$OUTV"
+    printf 'read_mem %s 4\n' "$OUTV"; printf 'read_mem 0x%08x 4\n' $((OUTV+4)); printf 'read_mem 0x%08x 4\n' $((OUTV+8))
+  } >> "$SPEC"
+  L=$(run); echo "FIX fnorm_$1 $L" >> "$OUT"
+  echo "[fnorm_$1] x=$(mval "$L" 0x210000) y=$(mval "$L" 0x210004) z=$(mval "$L" 0x210008)"
+}
+
+# ---- FUN_005a1730 broadcast translate : this=in@THIS, args out=OUTV, scalar ----
+addsc_case() { # name  X Y Z  S
+  hdr 0x5a1730 "$THIS"
+  { poke $((THIS)) "$2"; poke $((THIS+4)) "$3"; poke $((THIS+8)) "$4"
+    printf 'arg %s\n' "$OUTV"; printf 'arg 0x%08x\n' $(( $5 & 0xffffffff ))
+    printf 'read_mem %s 4\n' "$OUTV"; printf 'read_mem 0x%08x 4\n' $((OUTV+4)); printf 'read_mem 0x%08x 4\n' $((OUTV+8))
+  } >> "$SPEC"
+  L=$(run); echo "FIX addsc_$1 $L" >> "$OUT"
+  echo "[addsc_$1] x=$(mval "$L" 0x210000) y=$(mval "$L" 0x210004) z=$(mval "$L" 0x210008)"
+}
+
+# ---- FUN_005a1910 aabb init (__fastcall this only) : this=OUTV ; read OUTV +0..+0x14 ----
+aabbinit_case() { # name
+  hdr 0x5a1910 "$OUTV"
+  { for i in $(seq 0 5); do printf 'read_mem 0x%08x 4\n' $((OUTV+4*i)); done; } >> "$SPEC"
+  L=$(run); echo "FIX aabbinit_$1 $L" >> "$OUT"
+  echo "[aabbinit_$1] $(for i in 0 1 2 3 4 5; do printf '%s=%s ' $i "$(mval "$L" $(printf 0x%x $((0x210000+4*i))))"; done)"
+}
+
+# ---- FUN_005a19d0 aabb expand : this=aabb@OUTV (preloaded), arg point=BV ; read OUTV +0..+0x14 ----
+aabbexp_case() { # name  minX minY minZ maxX maxY maxZ  pX pY pZ
+  hdr 0x5a19d0 "$OUTV"
+  { for i in $(seq 0 5); do poke $((OUTV+4*i)) "${@:$((i+2)):1}"; done
+    poke $((BV)) "$8"; poke $((BV+4)) "$9"; poke $((BV+8)) "${10}"
+    printf 'arg %s\n' "$BV"
+    for i in $(seq 0 5); do printf 'read_mem 0x%08x 4\n' $((OUTV+4*i)); done
+  } >> "$SPEC"
+  L=$(run); echo "FIX aabbexp_$1 $L" >> "$OUT"
+  echo "[aabbexp_$1] $(for i in 0 1 2 3 4 5; do printf '%s=%s ' $i "$(mval "$L" $(printf 0x%x $((0x210000+4*i))))"; done)"
+}
+
+# ---- FUN_00590be0 copy 6 i32 : this=out@OUTV, arg src=THIS ; read OUTV +0..+0x14 ----
+copy6_case() { # name base (THIS gets 6 ramp ints from base, step 0x1111)
+  hdr 0x590be0 "$OUTV"
+  { for i in $(seq 0 5); do poke $((THIS+4*i)) $(( $2 + i*0x1111 )); done
+    printf 'arg %s\n' "$THIS"
+    for i in $(seq 0 5); do printf 'read_mem 0x%08x 4\n' $((OUTV+4*i)); done
+  } >> "$SPEC"
+  L=$(run); echo "FIX copy6_$1 $L" >> "$OUT"
+  echo "[copy6_$1] $(for i in 0 1 2 3 4 5; do printf '%s=%s ' $i "$(mval "$L" $(printf 0x%x $((0x210000+4*i))))"; done)"
+}
+
 div_case   pos   0x64    0x2710  -0x4d2   0x7
 div_case   neg  -0x100000 0x30001 0x1     0x10000
 div_case   tz    0x7      -0x7    0x9     0x4      # truncate toward zero both signs
@@ -104,5 +158,15 @@ lerp_case  third 0x10000 -0x10000 0x4000  0x70000  0x20000 -0x8000   0x1      0x
 lerp_case  off   0x12345  0x6789  -0x4321 -0x55555 0x33333  0x10000  0x5      0x8
 bilerp_case mid  0x0 0x0 0x0   0x40000 0x0 0x0   0x40000 0x40000 0x0   0x0 0x40000 0x0   0x1 0x1 0x2 0x2
 bilerp_case q    0x10000 0x20000 0x0   0x50000 0x20000 0x4000   0x50000 0x60000 0x8000   0x10000 0x60000 0x2000   0x1 0x2 0x4 0x3
+fnorm_case axis  0x0 0x0 0x0   0x10000 0x0 0x0   0x10000 0x10000 0x0          # +Z unit (0,0,0x10000)
+fnorm_case arb   0x12345 -0x6789 0x3333   0x40000 0x10000 -0x8000   -0x20000 0x50000 0x12000
+addsc_case pos   0x100  -0x200  0x300    0x50
+addsc_case neg   0x1000  0x2000 -0x3000 -0x1234
+addsc_case wrap  0x7ffffff0 0x0 0x0      0x20      # +0x20 overflows int32 -> negative
+aabbinit_case x
+aabbexp_case fresh 0x70000000 0x70000000 0x70000000 0x90000000 0x90000000 0x90000000  0x100 -0x200 0x300
+aabbexp_case part  0x0 0x0 0x0 0x1000 0x1000 0x1000   -0x50 0x800 0x2000
+copy6_case a  0x1000
+copy6_case b -0x8000
 echo "=== geomleaf oracle -> $OUT ==="
 cat "$OUT"
