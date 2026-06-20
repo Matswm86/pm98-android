@@ -1,3 +1,0 @@
-# PcodeEmu result for spec _balltail_run.spec
-# entry=0x58e2c0 calls=1
-CALL 0 RET steps=2060 EAX=0 mem[0x230004:4]=38912 mem[0x230008:4]=37888 mem[0x23000c:4]=0 mem[0x230020:4]=2018 mem[0x230024:4]=1009 mem[0x230028:4]=0 mem[0x23002c:4]=3 mem[0x230030:4]=1 mem[0x230034:4]=4836 mem[0x230084:4]=38912 mem[0x230088:4]=37888 mem[0x23008c:4]=0

@@ -1,3 +1,0 @@
-# PcodeEmu result for spec _keeperadv_run.spec
-# entry=0x5a22d0 calls=1
-CALL 0 RET steps=204 EAX=66 mem[0x2303c0:4]=0 mem[0x230004:4]=1048576 mem[0x230034:4]=0 mem[0x230040:4]=66

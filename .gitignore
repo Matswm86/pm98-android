@@ -24,7 +24,10 @@ docs/shots/
 # The decompiled C dumps (docs/re/{decompiled,sim,flow}/*.c) + tooling (tools/re/)
 # + findings (docs/re/*.md) ARE committed as the saved analysis for next session.
 
-# ── Ghidra PCode-emulator transient run files (oracle TABLE + specs are kept)
+# ── Ghidra PCode-emulator transient run files (oracle TABLE *_oracle.txt are kept).
+# Catch-all: every transient is `_`-prefixed (_<name>_run.spec/.out, _<name>_lut.txt); kept
+# oracles never lead with `_`. Covers all current + future oracles in one rule.
+tools/re/specs/_*
 tools/re/specs/_gate_run.*
 tools/re/specs/_tree_run.*
 tools/re/specs/_lut_zero.*
