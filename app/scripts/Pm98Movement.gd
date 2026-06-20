@@ -1342,6 +1342,7 @@ static func _ball_freeflight(ball: Dictionary) -> void:
 	if (_g(ball, 0x60) >> 24) & 0xff != 0:                 # byte ball+0x63 -> held (0x58e361 jne 0x58eb93)
 		_ball_tail(ball)                                  # held jmps the trail entry (NO spin), still faces+snapshots
 		return
+	_ball_collision(ball)                                 # goal/post sweep 0x58e497.. (before integration)
 	var px := Pm98Trig._i32(_g(ball, 0x4) + _g(ball, 0x20))    # pos += vel (0x58e974..)
 	var py := Pm98Trig._i32(_g(ball, 0x8) + _g(ball, 0x24))
 	var pz := Pm98Trig._i32(_g(ball, 0xc) + _g(ball, 0x28))
@@ -1574,6 +1575,119 @@ static func boxes_overlap(a: Array, b: Array) -> bool:
 		if lo >= hi:
 			return false
 	return true
+
+
+# ---- FUN_0058e2c0 goal/post COLLISION loop (0x58e497..0x58e963) -------------------------------
+# Runs at the head of the free-flight branch, BEFORE integration: sweeps the ball's inflated swept AABB
+# against the two goal volumes (match+0x2884/+0x2adc) and the post array (match+0x17f4 base, +0x17f8
+# count, stride 0x58), clips pos/vel on a hit, and SCORES a goal when a goal-line post (id 0x9eb8) is
+# crossed inward in open play. The prologue's temp `pos.z += 0x23d7` (0x58e437) is always undone
+# (0x58e96c) before integration, so it has no net effect and is not modelled here.
+#
+# DEFERRED -- the two heavy geometry leaves, each a full bit-exact 3D swept-collision routine (~400 lines
+# of axis-rotation FUN_005ee670/6e0/750 + corner/clip math): FUN_005f3b80 (goal-mouth swept-sphere vs the
+# rotated goal-frame triangle mesh, mutates pos/vel on hit) and FUN_005efac0 (per-post swept-box narrow
+# phase + velocity reflect). Until they land they return NO HIT, so the loop is a faithful no-op on
+# pos/vel (the common per-tick case) and live goals are not yet detected. ALSO PENDING (next session,
+# with the driver): the match-init that POPULATES match+0x17f4 (the post array) + match+0x2884/+0x2adc
+# (goal volumes) -- without it the loop sees zero posts. The goal-scoring DETECTION below is fully ported
+# + unit-tested (test_collgoal.gd) and fires the already-validated Pm98Events.keeper_event + enqueue the
+# moment FUN_005efac0 reports a 0x9eb8 hit. The broad-phase box leaves were oracle-validated in 2bbdc13.
+
+const BALL_RADIUS := 0x23d7
+
+## The ball's swept AABB (0x58e367..0x58e404), inflated by the ball radius: per axis
+## [min(pos, pos+vel) - r,  max(pos, pos+vel) + r]. Returns a 6-int box [minx,miny,minz,maxx,maxy,maxz].
+static func _ball_swept_box(ball: Dictionary) -> Array:
+	var p := [_si(ball, 0x4), _si(ball, 0x8), _si(ball, 0xc)]
+	var e := [Pm98Trig._i32(p[0] + _si(ball, 0x20)), Pm98Trig._i32(p[1] + _si(ball, 0x24)),
+		Pm98Trig._i32(p[2] + _si(ball, 0x28))]
+	var mn := box_add3([mini(p[0], e[0]), mini(p[1], e[1]), mini(p[2], e[2])], -BALL_RADIUS)
+	var mx := box_add3([maxi(p[0], e[0]), maxi(p[1], e[1]), maxi(p[2], e[2])], BALL_RADIUS)
+	return [mn[0], mn[1], mn[2], mx[0], mx[1], mx[2]]
+
+
+## Ball pos inside the goal box [match+0x1828..+0x1834] x [+0x182c..+0x1838] x [+0x1830..+0x183c],
+## inclusive (the 0x58e448 prologue gate + the 0x58e7c6 goal-detect gate).
+static func _in_goal_box(ball: Dictionary, m: Dictionary) -> bool:
+	var x := _si(ball, 0x4)
+	var y := _si(ball, 0x8)
+	var z := _si(ball, 0xc)
+	return (_si(m, 0x1828) <= x and x <= _si(m, 0x1834)
+		and _si(m, 0x182c) <= y and y <= _si(m, 0x1838)
+		and _si(m, 0x1830) <= z and z <= _si(m, 0x183c))
+
+
+## FUN_005f3b80 goal-mouth swept-sphere vs the rotated goal-frame mesh. DEFERRED -- returns false (no
+## hit), leaving pos/vel untouched, until the rotation/triangle-mesh port lands. tag 0x8000/0x7ae1.
+static func _goal_sweep(_ball: Dictionary, _goal: Dictionary, _tag: int) -> bool:
+	return false
+
+
+## FUN_005efac0 per-post swept-box narrow phase + velocity reflect. DEFERRED -- returns false (no hit).
+## On a real hit it reflects vel off the post and (for a 0x9eb8 goal-line post) gates the goal scoring.
+static func _post_narrow(_ball: Dictionary, _post: Dictionary) -> bool:
+	return false
+
+
+## GOAL-SCORING DETECTION (0x58e756..0x58e8d2), reached once FUN_005efac0 reports a post hit. Branch on
+## the post id (post+0x54): 0x7ae1 = crossbar (render ripple only, no score); 0x9eb8 = goal line ->
+## score iff the ball is crossing the line inward (sign(vel.x) != sign(pos.x)), inside the goal box, and
+## in open play (match+0x448 == 0). On a goal: bump the keeper stat (keeper_event(ball, 1)), enqueue the
+## goal commentary event (0x1b when |pos.y| >= 0x36b85 else 0x1a), and clear the latched keeper +0x50.
+static func _collision_goal_check(ball: Dictionary, m: Dictionary, post: Dictionary) -> void:
+	var pid := _g(post, 0x54)
+	if pid == 0x7ae1:
+		return                                            # crossbar -- no scoring
+	if pid != 0x9eb8:
+		return                                            # not a goal-line post
+	if _sign1(_si(ball, 0x20)) == _sign1(_si(ball, 0x4)):  # 0x58e7a2 vel.x / pos.x sign must differ
+		return
+	if not _in_goal_box(ball, m):                         # 0x58e7c6
+		return
+	if _g(m, 0x448) != 0:                                 # 0x58e819 open play only
+		return
+	Pm98Events.keeper_event(ball, 1)                      # 0x58e832 FUN_005909f0 stat bump
+	var evcode := 0x1b if absi(_si(ball, 0x8)) >= 0x36b85 else 0x1a   # 0x58e83f wide-goal commentary code
+	Pm98Events.enqueue(m, evcode, {}, 1)                  # 0x58e8c7 FUN_00594470
+	ball[0x50] = 0                                        # 0x58e8d2
+
+
+## FUN_0058e2c0 collision loop control flow (0x58e497..0x58e963). Both goal sweeps + the per-post narrow
+## phase are DEFERRED leaves (no-hit) and the post array is unpopulated until match-init lands, so this
+## is currently a faithful no-op; the structure (gates, swept-box rebuild on hit, restart-on-hit, goal
+## scoring) is in place for when those land. Runs before integration in _ball_freeflight.
+static func _ball_collision(ball: Dictionary) -> void:
+	var m: Dictionary = _ref(ball, 0x1d4)
+	if m.is_empty():
+		return
+	var box := _ball_swept_box(ball)
+	# Two goal-frame sweeps, gated by match+0x5fac (goals enabled) AND the ball being OUTSIDE the goal
+	# box (0x58e43a/0x58e448 -- in-region skips straight to the post loop). Both leaves are deferred.
+	if _g(m, 0x5fac) & 0xff != 0 and not _in_goal_box(ball, m):
+		if _goal_sweep(ball, _ref(m, 0x2884), 0x8000):    # goal 1 (0x58e4a9)
+			box = _ball_swept_box(ball)
+		if _goal_sweep(ball, _ref(m, 0x2adc), 0x7ae1):    # goal 2 (0x58e56e)
+			box = _ball_swept_box(ball)
+	# Post loop: broad-phase boxes_overlap(swept, post+0x30) -> narrow FUN_005efac0 -> on hit, clip the
+	# swept box and re-scan from the top (the binary's restart-on-hit at 0x58e73e). Bounded by the post
+	# count to stay terminating even when a future narrow phase keeps reporting hits.
+	var posts: Array = m.get(0x17f4, [])
+	var count := _g(m, 0x17f8)
+	var guard := count * count + 1                        # restart-on-hit terminator
+	var i := 0
+	while i < count and i < posts.size() and guard > 0:
+		guard -= 1
+		var post: Dictionary = posts[i] if posts[i] is Dictionary else {}
+		var post_box := [_si(post, 0x30), _si(post, 0x34), _si(post, 0x38),
+			_si(post, 0x3c), _si(post, 0x40), _si(post, 0x44)]
+		if boxes_overlap(box, post_box) and _post_narrow(ball, post):
+			_collision_goal_check(ball, m, post)          # 0x9eb8 goal-line -> score
+			ball[0x80] = Pm98Trig._i32(_g(ball, 0x80) + 1)  # 0x58e954 collision counter
+			box = _ball_swept_box(ball)                   # rebuild after the reflect
+			i = 0                                         # restart the scan
+			continue
+		i += 1
 
 
 # ---- FUN_005b73a0 positioning leaves (forward-zone eligibility + goal-side count) -----
