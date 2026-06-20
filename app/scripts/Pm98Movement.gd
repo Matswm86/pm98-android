@@ -1309,7 +1309,7 @@ static func ball_advance(ball: Dictionary) -> void:
 	ball[0x4] = Pm98Trig._i32(_g(ball, 0x4) + _ball_step(_g(ball, 0x9c) - _g(ball, 0x4), n))
 	ball[0x8] = Pm98Trig._i32(_g(ball, 0x8) + _ball_step(_g(ball, 0xa0) - _g(ball, 0x8), n))
 	ball[0xc] = Pm98Trig._i32(_g(ball, 0xc) + _ball_step(_g(ball, 0xa4) - _g(ball, 0xc), n))
-	# tail (FUN_0058fda0 + facing) intentionally omitted in slice A -- see header.
+	_ball_tail(ball)                                             # lerp path jmps 0x58eb93 (trail entry, NO spin)
 
 
 ## One lerp axis step: (target - cur) / N, x86 idiv (truncate toward zero). N != 0 by caller guard.
@@ -1339,7 +1339,8 @@ const BALL_ROLL_STOP := 0x22         # both |vel.x| and |vel.y| below -> ball ha
 ##     vel(+0x20/+0x24/+0x28). The prologue's bbox build + temp `pos.z += 0x23d7` (0x58e437) is exactly
 ##     undone at 0x58e96c when collision is skipped, so the net z effect is just the integration here.
 static func _ball_freeflight(ball: Dictionary) -> void:
-	if (_g(ball, 0x60) >> 24) & 0xff != 0:                 # byte ball+0x63 -> held; no motion (tail only)
+	if (_g(ball, 0x60) >> 24) & 0xff != 0:                 # byte ball+0x63 -> held (0x58e361 jne 0x58eb93)
+		_ball_tail(ball)                                  # held jmps the trail entry (NO spin), still faces+snapshots
 		return
 	var px := Pm98Trig._i32(_g(ball, 0x4) + _g(ball, 0x20))    # pos += vel (0x58e974..)
 	var py := Pm98Trig._i32(_g(ball, 0x8) + _g(ball, 0x24))
@@ -1370,6 +1371,84 @@ static func _ball_freeflight(ball: Dictionary) -> void:
 			ball[0x20] = Pm98Trig._i32(vx - int(f[0]))
 			ball[0x24] = Pm98Trig._i32(vy - int(f[1]))
 			ball[0x28] = Pm98Trig._i32(vz - int(f[2]))
+	_ball_spin(ball)                                       # physics paths jmp 0x58eb09 (spin) -> tail
+	_ball_tail(ball)
+
+
+# ---- FUN_0058e2c0 post-physics tail (spin + facing + at-rest snapshot/drift) ------------------
+# Reached after the free-flight physics (0x58eb09 spin entry) and from the lerp/held paths (0x58eb93
+# trail entry, which skips spin). Pure ball-self state: spin index +0x2c/+0x30, facing +0x34, and the
+# at-rest position snapshot +0x84/+0x88/+0x8c. None of it feeds match outcome (it drives the sprite
+# spin frame + the ball's "predicted rest spot"); ported for fidelity. The render trail FUN_0058fda0
+# (0x58eb95, writes the +0x74/+0xa8 particle history) is DEFERRED -- ~446 lines of pure draw, no sim
+# read. Oracle-pinned by tools/re/run_balltail_oracle.sh -> specs/balltail_oracle.txt, test_balltail.gd.
+
+## FUN_005ee500 dot16(a, b): (a.x*b.x + a.y*b.y + a.z*b.z) >> 16, full signed 64-bit product-sum.
+static func _dot3_16(a: Array, b: Array) -> int:
+	return Pm98Trig._i32(Pm98Trig._asr(int(a[0]) * int(b[0]) + int(a[1]) * int(b[1]) + int(a[2]) * int(b[2]), 16))
+
+
+## SPIN (0x58eb09..0x58eb93). Advances the spin frame +0x2c (mod 32) by a step keyed on speed^2 =
+## dot16(vel, vel); the slowest tier toggles parity +0x30 so it only steps every other call. Reached
+## ONLY when vel != 0 (the 0x58eb09 all-zero gate falls straight through to the trail with no spin).
+static func _ball_spin(ball: Dictionary) -> void:
+	var vx := _g(ball, 0x20)
+	var vy := _g(ball, 0x24)
+	var vz := _g(ball, 0x28)
+	if vx == 0 and vy == 0 and vz == 0:                   # 0x58eb09: ball stopped -> no spin
+		return
+	var s := _dot3_16([vx, vy, vz], [vx, vy, vz])         # FUN_005ee500(vel, vel)
+	if s >= 0x4000:
+		ball[0x2c] = (_g(ball, 0x2c) + 4) & 0x1f
+	elif s > 0x226a:
+		ball[0x2c] = (_g(ball, 0x2c) + 3) & 0x1f
+	elif s > 0xc04:
+		ball[0x2c] = (_g(ball, 0x2c) + 2) & 0x1f
+	elif s > 0x222:
+		ball[0x2c] = (_g(ball, 0x2c) + 1) & 0x1f
+	else:                                                 # 0x58eb7d: slowest tier -- toggle +0x30, step every other
+		var t := (_g(ball, 0x30) - 1) & 1
+		ball[0x30] = t
+		if t == 0:
+			ball[0x2c] = (_g(ball, 0x2c) + 1) & 0x1f
+
+
+## TAIL (0x58eb93 trail entry): trail (deferred) -> facing +0x34 = atan(vel) -> at-rest snapshot/drift.
+static func _ball_tail(ball: Dictionary) -> void:
+	# FUN_0058fda0 trail (render, +0x74/+0xa8) deferred -- writes nothing the sim/spin/facing/snapshot read.
+	var vx := _g(ball, 0x20)
+	var vy := _g(ball, 0x24)
+	var vz := _g(ball, 0x28)
+	ball[0x34] = Pm98Trig.atan_angle(vx, vy) & 0xffff     # 0x58eba2: facing word
+	if vx == 0 and vy == 0 and vz == 0:                   # 0x58ebab vel==0 -> snapshot pos into +0x84
+		ball[0x84] = _g(ball, 0x4)
+		ball[0x88] = _g(ball, 0x8)
+		ball[0x8c] = _g(ball, 0xc)
+	else:                                                 # 0x58ebf2 drift branch
+		_ball_drift(ball)
+
+
+## DRIFT (0x58ebf2..0x58ec96): only while rolling on the deck (pos.z==0 && vel.z==0). Moves the at-rest
+## snapshot +0x84 to pos + heading*max(proj,0) where proj = dot16(heading_unit, snapshot - pos). I.e. it
+## keeps only the forward (along-heading) part of the snapshot's offset -- the ball's predicted stop spot.
+static func _ball_drift(ball: Dictionary) -> void:
+	if _g(ball, 0xc) != 0:                                # pos.z != 0 -> skip
+		return
+	if _g(ball, 0x28) != 0:                               # vel.z != 0 -> skip
+		return
+	var facing := Pm98Trig.atan_angle(_g(ball, 0x20), _g(ball, 0x24))   # eax from 0x58eba2 (vel heading)
+	var u := Pm98Trig.polar_vec(0x10000, facing)          # FUN_005ee0f0(1.0, facing) = [cos, sin, 0] unit
+	var d := [
+		Pm98Trig._i32(_g(ball, 0x84) - _g(ball, 0x4)),    # D = snapshot - pos
+		Pm98Trig._i32(_g(ball, 0x88) - _g(ball, 0x8)),
+		Pm98Trig._i32(_g(ball, 0x8c) - _g(ball, 0xc)),
+	]
+	var d1 := _dot3_16(u, d)                              # FUN_005ee500(unit, D)
+	var sc := d1 if d1 > 0 else 0                         # max(d1, 0) (0x58ec52 jle -> 0)
+	var p := Pm98Trig.scale_vec3(int(u[0]), int(u[1]), int(u[2]), sc)   # FUN_005ee170 unit*sc
+	ball[0x84] = Pm98Trig._i32(_g(ball, 0x4) + int(p[0])) # snapshot = pos + P
+	ball[0x88] = Pm98Trig._i32(_g(ball, 0x8) + int(p[1]))
+	ball[0x8c] = Pm98Trig._i32(_g(ball, 0xc) + int(p[2]))
 
 
 # ---- FUN_0058e2c0 collision box leaves (the goal/post sweep broad-phase) ------------------
