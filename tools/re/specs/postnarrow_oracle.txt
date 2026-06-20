@@ -1,0 +1,7 @@
+# Stage 3 task 2 post narrow-phase (FUN_005efac0) PCode-emu truth. axis-aligned quad (boxgeo +X).
+# MulDiv import stubbed ret 0 (exact: Δz==0 on every crossing edge). reads: pos +0/4/8, vel +0/4/8, out +0/4. EAX=hit.
+FIX hit_mid CALL 0 RET steps=2117 EAX=1 mem[0x240000:4]=67047 mem[0x240004:4]=4294836224 mem[0x240008:4]=131072 mem[0x240010:4]=4294804768 mem[0x240014:4]=0 mem[0x240018:4]=0 mem[0x240020:4]=16384 mem[0x240024:4]=32768
+FIX miss_hi CALL 0 RET steps=1936 EAX=0 mem[0x240000:4]=4294836224 mem[0x240004:4]=4294836224 mem[0x240008:4]=393216 mem[0x240010:4]=262144 mem[0x240014:4]=0 mem[0x240018:4]=0 mem[0x240020:4]=0 mem[0x240024:4]=0
+FIX miss_lowy CALL 0 RET steps=1784 EAX=0 mem[0x240000:4]=4294836224 mem[0x240004:4]=4294639616 mem[0x240008:4]=131072 mem[0x240010:4]=262144 mem[0x240014:4]=0 mem[0x240018:4]=0 mem[0x240020:4]=0 mem[0x240024:4]=0
+FIX hit_cross CALL 0 RET steps=2117 EAX=1 mem[0x240000:4]=50518 mem[0x240004:4]=65536 mem[0x240008:4]=196608 mem[0x240010:4]=4294841468 mem[0x240014:4]=0 mem[0x240018:4]=0 mem[0x240020:4]=40960 mem[0x240024:4]=49152
+FIX miss_away CALL 0 RET steps=552 EAX=262144 mem[0x240000:4]=4294836224 mem[0x240004:4]=4294836224 mem[0x240008:4]=131072 mem[0x240010:4]=4294705152 mem[0x240014:4]=0 mem[0x240018:4]=0 mem[0x240020:4]=0 mem[0x240024:4]=0

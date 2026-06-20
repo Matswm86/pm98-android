@@ -1624,10 +1624,167 @@ static func _goal_sweep(_ball: Dictionary, _goal: Dictionary, _tag: int) -> bool
 	return false
 
 
-## FUN_005efac0 per-post swept-box narrow phase + velocity reflect. DEFERRED -- returns false (no hit).
-## On a real hit it reflects vel off the post and (for a 0x9eb8 goal-line post) gates the goal scoring.
-static func _post_narrow(_ball: Dictionary, _post: Dictionary) -> bool:
-	return false
+## Win32 MulDiv(a, b, c) = round((a*b)/c), ties away from zero; -1 if c==0. Used by the post-quad
+## point-in-polygon edge interpolation (the binary calls the real MulDiv import).
+static func _muldiv(a: int, b: int, c: int) -> int:
+	if c == 0:
+		return -1
+	var prod := a * b
+	var neg := (prod < 0) != (c < 0)
+	var m := absi(prod)
+	var d := absi(c)
+	@warning_ignore("integer_division")
+	var r := (m + d / 2) / d
+	return Pm98Trig._i32(-r if neg else r)
+
+
+## FUN_005efac0 per-post swept narrow phase + velocity reflect. The post is an oriented quad: 4 corners
+## post+0..+0x2c, an orientation direction post+0x48 (boxgeo), and post+0x54 = id-AND-restitution. Rotate
+## the ball segment (pos -> pos+vel) into the post-local frame (2 angles from boxgeo), find where it
+## crosses the post plane (local x = the normal), test if that entry point is inside the quad (a 2x2-
+## sampled crossing-number point-in-polygon in the local y-z plane via MulDiv edge interpolation), and on
+## a hit advance pos to the crossing + reflect vel off the quad (scaled by post-id-as-restitution) +
+## write the 2-int deflect to `out`. Returns hit. (Disasm 0x5efac0..0x5f0058; decompile fn_005efac0.)
+static func _post_narrow(ball: Dictionary, post: Dictionary, out: Array = []) -> bool:
+	var c0 := [_si(post, 0x0), _si(post, 0x4), _si(post, 0x8)]
+	var boxgeo := [_si(post, 0x48), _si(post, 0x4c), _si(post, 0x50)]
+	var post_id := _g(post, 0x54)
+	var pos := [_si(ball, 0x4), _si(ball, 0x8), _si(ball, 0xc)]
+	var vel := [_si(ball, 0x20), _si(ball, 0x24), _si(ball, 0x28)]
+
+	# --- post orientation angles from boxgeo (local_40 = ang_z, local_58 = ang_y) ---
+	var ang_z := Pm98Trig.atan_angle(boxgeo[0], boxgeo[1])
+	var bg := boxgeo.duplicate()
+	Pm98Trig.rot_vec3(bg, -ang_z, 0)
+	var ang_y := Pm98Trig.atan_angle(bg[0], bg[2])
+	var sign := 1                                          # local_50
+
+	# velocity into the post-local frame
+	var lvel := vel.duplicate()
+	Pm98Trig.rot_vec3(lvel, -ang_z, 0)
+	Pm98Trig.rot_vec3(lvel, -ang_y, 1)
+	if lvel[0] < 0:                                        # 0x5efb7c
+		sign = -1
+		lvel[0] = Pm98Trig._i32(-lvel[0])
+		lvel[2] = Pm98Trig._i32(-lvel[2])
+		ang_y = Pm98Trig._i32(ang_y - 0x8000)
+
+	# rel-pos (pos - c0) into the post-local frame
+	var rp := [Pm98Trig._i32(pos[0] - c0[0]), Pm98Trig._i32(pos[1] - c0[1]), Pm98Trig._i32(pos[2] - c0[2])]
+	Pm98Trig.rot_vec3(rp, -ang_z, 0)
+	Pm98Trig.rot_vec3(rp, -ang_y, 1)
+
+	if lvel[0] == 0:                                       # 0x5efbe8 segment parallel to the post plane
+		return false
+
+	# swept entry along the local normal (local x): the gate at 0x5efbf0..0x5efc32
+	var absvx := absi(lvel[0])
+	var sgnvx := 1 if lvel[0] >= 0 else -1
+	var ent := Pm98Trig._i32(-((rp[0] + BALL_RADIUS) * sgnvx))
+	if not (((ent >= 0) and (ent < absvx)) or ((-BALL_RADIUS < rp[0]) and (rp[0] < 1))):
+		return false
+	var t := Pm98Trig.ratio16(ent, absvx)                 # FUN_005edf90: fraction along the segment (16.16)
+
+	# entry point in the local y-z plane = rp + lvel*t (only y,z used)
+	var ent_vec := Pm98Trig.scale_vec3(lvel[0], lvel[1], lvel[2], t)
+	var sy0 := Pm98Trig._i32(int(ent_vec[1]) + rp[1])     # local_8c
+	var sx0 := Pm98Trig._i32(int(ent_vec[2]) + rp[2])     # local_88
+
+	# the 4 quad corners -> relative to c0 -> rotated into the local frame (cv[3k+1]=y, cv[3k+2]=z)
+	var cv := []
+	for k in 4:
+		var cc := [_si(post, k * 0xc + 0x0), _si(post, k * 0xc + 0x4), _si(post, k * 0xc + 0x8)]
+		cc[0] = Pm98Trig._i32(cc[0] - c0[0])
+		cc[1] = Pm98Trig._i32(cc[1] - c0[1])
+		cc[2] = Pm98Trig._i32(cc[2] - c0[2])
+		Pm98Trig.rot_vec3(cc, -ang_z, 0)
+		Pm98Trig.rot_vec3(cc, -ang_y, 1)
+		cv.append_array(cc)
+
+	# 2x2-sampled crossing-number point-in-polygon (0x5efd47..0x5efe54). Polygon in (y,z); ray in +z.
+	var hit := false
+	var la := -1
+	while la <= 1:
+		var iv := -1
+		while not hit and iv < 2:
+			var parity := false
+			var sy := Pm98Trig._i32(la + sy0)
+			var sx := Pm98Trig._i32(iv + sx0)
+			for k in 4:
+				var cur_y := int(cv[k * 3 + 1])
+				var cur_z := int(cv[k * 3 + 2])
+				var ni := (k + 1) & 3
+				var nxt_y := int(cv[ni * 3 + 1])
+				var nxt_z := int(cv[ni * 3 + 2])
+				var crosses := false
+				if cur_y < sy:
+					if sy <= nxt_y:
+						crosses = true
+				elif nxt_y < sy:
+					crosses = true
+				if crosses:
+					var zc := _muldiv(nxt_z - cur_z, sy - cur_y, nxt_y - cur_y)
+					if Pm98Trig._i32(zc + cur_z) < sx:
+						parity = not parity
+			hit = parity
+			iv += 2
+		la += 2
+		if hit:
+			break
+	if not hit:
+		return false
+
+	# --- HIT: advance pos to the crossing, reflect vel, write deflect ---
+	var adv := Pm98Trig.scale_vec3(vel[0], vel[1], vel[2], t)   # pos += vel_world * t
+	pos[0] = Pm98Trig._i32(pos[0] + int(adv[0]))
+	pos[1] = Pm98Trig._i32(pos[1] + int(adv[1]))
+	pos[2] = Pm98Trig._i32(pos[2] + int(adv[2]))
+
+	if not out.is_empty():
+		_post_reflect_out(post, c0, pos, sign, out)        # the param_7 deflect (FPU edge-normal projection)
+
+	# reflect: rotate the LOCAL-frame vel (lvel, which already carries the forward-rotation LUT artifacts)
+	# back out (0x5effb3..0x5effd9), so the inverse rotation cancels them: ee750(-0x8000) [reflect across
+	# the yz plane] -> ee6e0(ang_y) -> ee670(ang_z), negate, scale by post-id restitution (ee1c0).
+	var rvel := lvel.duplicate()
+	Pm98Trig.rot_vec3(rvel, -0x8000, 2)                    # FUN_005ee750(0xffff8000)
+	Pm98Trig.rot_vec3(rvel, ang_y, 1)                      # FUN_005ee6e0(ang_y)
+	Pm98Trig.rot_vec3(rvel, ang_z, 0)                      # FUN_005ee670(ang_z)
+	rvel = [Pm98Trig._i32(-int(rvel[0])), Pm98Trig._i32(-int(rvel[1])), Pm98Trig._i32(-int(rvel[2]))]
+	rvel = Pm98Trig.scale_vec3(rvel[0], rvel[1], rvel[2], post_id)   # FUN_005ee1c0(post_id): *restitution
+	ball[0x20] = rvel[0]
+	ball[0x24] = rvel[1]
+	ball[0x28] = rvel[2]
+	var back := Pm98Trig.scale_vec3(rvel[0], rvel[1], rvel[2], t)
+	ball[0x4] = Pm98Trig._i32(pos[0] - int(back[0]))
+	ball[0x8] = Pm98Trig._i32(pos[1] - int(back[1]))
+	ball[0xc] = Pm98Trig._i32(pos[2] - int(back[2]))
+	return true
+
+
+## FUN_005efac0 reflect deflect-output (param_7 path, 0x5efe54..0x5effb0): project the hit point onto the
+## two quad edges (each normalized via fsqrt/ftol) and write the 2-int barycentric-ish deflect, x-sign by
+## `sign`. Best-effort FPU port -- pinned against the oracle's `out` reads.
+static func _post_reflect_out(post: Dictionary, c0: Array, pos: Array, sign: int, out: Array) -> void:
+	var e0 := [_si(post, 0xc) - c0[0], _si(post, 0x10) - c0[1], _si(post, 0x14) - c0[2]]   # c1-c0
+	var e1 := [_si(post, 0x18) - _si(post, 0xc), _si(post, 0x1c) - _si(post, 0x10), _si(post, 0x20) - _si(post, 0x14)]  # c2-c1
+	var hp := [Pm98Trig._i32(pos[0] - c0[0]), Pm98Trig._i32(pos[1] - c0[1]), Pm98Trig._i32(pos[2] - c0[2])]
+	var u0 := _normalize_edge(e0)
+	var u1 := _normalize_edge(e1)
+	out.resize(2)
+	out[0] = Pm98Trig._i32(_dot3_16(u0, hp) * sign)
+	out[1] = Pm98Trig._i32(_dot3_16(u1, hp) * sign)
+
+
+## Normalize an edge by its length: len = trunc(sqrt(dot)); d = (len*len)>>16; v[i] = (0x10000*v[i])/d.
+## Mirrors the binary's fsqrt -> ftol -> FUN_005edfa0(len,len) -> FUN_005ee200(d) chain.
+static func _normalize_edge(e: Array) -> Array:
+	var dot := int(e[0]) * int(e[0]) + int(e[1]) * int(e[1]) + int(e[2]) * int(e[2])
+	var ln := int(sqrt(float(dot)))                       # ftol(sqrt) truncates toward zero
+	var d := Pm98Trig.mul16(ln, ln)
+	if d == 0:
+		return [0, 0, 0]
+	return [Pm98Trig.ratio16(int(e[0]), d), Pm98Trig.ratio16(int(e[1]), d), Pm98Trig.ratio16(int(e[2]), d)]
 
 
 ## GOAL-SCORING DETECTION (0x58e756..0x58e8d2), reached once FUN_005efac0 reports a post hit. Branch on
