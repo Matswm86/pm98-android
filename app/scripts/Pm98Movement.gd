@@ -1451,6 +1451,105 @@ static func _ball_drift(ball: Dictionary) -> void:
 	ball[0x8c] = Pm98Trig._i32(_g(ball, 0xc) + int(p[2]))
 
 
+# ---- FUN_005a22d0 GOALKEEPER ball-tracking advance ----------------------------------------------
+# The keeper entity (match+0xaac / +0xe74, idx 1/2 in +0x3bc; vtable+0xc via FUN_005a2240 -> 5a24b0)
+# slides its x along the goal line to shadow the ball: accelerate +/-0x28f toward ball.x (gated by the
+# goal-mouth boundary flags), decay 0xa3/frame toward 0, clamp |vel| <= 0x1555, then face by velocity
+# sign (atan to the ball when stopped). Load-bearing for saves/scoreline. m = keeper+0x18c (the match);
+# ball pos = match+0x1614/+0x1618; goal line = match+0x1820. Reuses Pm98Trig.planar_mag (the FUN_005edfb0
+# cos/sin-LUT projection == the keeper's distance-to-ball) + atan_angle. The "close" branch (proj <
+# 0x30000) deliberately inverts the chase direction (shade between ball and goal). Oracle-pinned by
+# tools/re/run_keeperadv_oracle.sh -> specs/keeperadv_oracle.txt, in app/tests/test_keeperadv.gd.
+const KEEP_ACCEL := 0x28f       # per-frame accel toward ball.x (0x5a23b5/0x5a23d0)
+const KEEP_FRIC := 0xa3         # per-frame decay toward 0 (0x5a23e7/0x5a23f8)
+const KEEP_VMAX := 0x1555       # |velocity| clamp (0x5a2413/0x5a241f)
+const KEEP_REACH := 0x30000     # planar_mag(ball-keeper) below this = "close" -> inverted chase
+const KEEP_BAND := 0x40000      # goal-mouth half-width boundary + the far-branch x deadband
+
+## FUN_005a22d0. Mutates keeper +0x3c0 (velocity), +0x4 (x), +0x34 (facing), +0x40 (position code).
+static func keeper_advance(k: Dictionary) -> void:
+	var m: Dictionary = _ref(k, 0x18c)
+	var kx := _si(k, 0x4)
+	var line := _si(m, 0x1820)
+	var at_left: bool
+	var at_right: bool
+	if _g(k, 0x3bc) == 1:                                 # 0x5a22de team-1 (left) goal
+		at_left = kx < KEEP_BAND
+		at_right = kx > Pm98Trig._i32(line - KEEP_BAND)
+	else:                                                 # 0x5a2301 team-2 (right) goal
+		at_left = kx < Pm98Trig._i32(KEEP_BAND - line)
+		at_right = kx > -KEEP_BAND
+	var ky := _si(k, 0x8)
+	var bx := _si(m, 0x1614)
+	var by := _si(m, 0x1618)
+	var proj := Pm98Trig.planar_mag(Pm98Trig._i32(bx - kx), Pm98Trig._i32(by - ky))   # FUN_005edfb0
+	var vel := _si(k, 0x3c0)
+	if proj >= KEEP_REACH:                                # 0x5a239d far: chase ball.x past a deadband
+		var diff := Pm98Trig._i32(bx - kx)
+		if absi(diff) > KEEP_BAND:
+			if diff < 0:                              # ball left of keeper -> move left
+				if not at_left: vel = Pm98Trig._i32(vel - KEEP_ACCEL)
+			else:                                     # ball right -> move right
+				if not at_right: vel = Pm98Trig._i32(vel + KEEP_ACCEL)
+	else:                                                 # 0x5a238f close: INVERTED shade direction
+		if bx > kx:
+			if not at_left: vel = Pm98Trig._i32(vel - KEEP_ACCEL)
+		else:
+			if not at_right: vel = Pm98Trig._i32(vel + KEEP_ACCEL)
+	if vel > 0:                                           # 0x5a23db friction toward 0, no overshoot
+		vel = vel - KEEP_FRIC
+		if vel < 0: vel = 0
+	else:
+		vel = vel + KEEP_FRIC
+		if vel > 0: vel = 0
+	if vel >= KEEP_VMAX: vel = KEEP_VMAX                  # 0x5a240d clamp |vel|
+	if vel <= -KEEP_VMAX: vel = -KEEP_VMAX
+	k[0x3c0] = vel
+	var nkx := Pm98Trig._i32(kx + vel)                    # 0x5a243a keeper.x += vel
+	k[0x4] = nkx
+	if vel == 0:                                          # 0x5a243c facing by vel sign / atan to ball
+		k[0x34] = Pm98Trig.atan_angle(Pm98Trig._i32(bx - nkx), Pm98Trig._i32(by - ky)) & 0xffff
+	elif vel > 0:
+		k[0x34] = 0
+	else:
+		k[0x34] = 0x8000
+	set_position_code(k, 0x42 if vel == 0 else 0x43)      # 0x5a247e/0x5a2494
+	# FUN_005a50c0 sprite/anim (reads +0x40/+0x30 -> draw frame) -- render no-op, no sim write.
+
+
+## FUN_005a24b0 normal-play keeper wrapper (vtable state 1). Moving -> track ball; idle -> face by team +
+## a 3-step idle-anim that records a position code (0x44/0x45/0x46) and advances +0x3c4. The FUN_005a2240
+## entry dispatch over match+0x1a38 (set-piece/celebration keeper states 5a2560/5a25d0) is DEFERRED to
+## the driver wire-up; open play routes match+0x1a38==1 (or match+0x19a0==4) -> here.
+static func keeper_step(k: Dictionary) -> void:
+	if _si(k, 0x3c0) != 0:                                # 0x5a24bb moving -> track ball
+		keeper_advance(k)
+		return
+	k[0x34] = 0x4000 if _g(k, 0x3bc) == 1 else 0xc000     # 0x5a24c4 idle facing by team
+	var anim := _g(k, 0x3c4)                              # 0x5a24db idle-anim state
+	if anim == 0:                                         # 0x5a2544
+		set_position_code(k, 0x44)
+		k[0x3c4] = Pm98Trig._i32(anim + 1)
+	elif anim == 1:                                       # 0x5a24f5
+		# FUN_005a50c0 sprite -- render no-op.
+		if _g(k, 0x40) == 0x42:                           # 0x5a24fc only when last code was 0x42
+			var orient := _g(m_of(k), 0x19a0) & 1
+			var side := _g(m_of(k), 0x45c)
+			var gl := _si(m_of(k), 0x1820)
+			if (orient ^ side) == 0: gl = Pm98Trig._i32(-gl)   # 0x5a251f neg goal line
+			var is_t1 := 1 if _g(k, 0x3bc) == 1 else 0
+			var gl_neg := 1 if gl < 0 else 0
+			var code := 0x46 - (1 if (is_t1 ^ gl_neg) != 0 else 0)   # 0x5a253e 0x45/0x46
+			set_position_code(k, code)
+			k[0x3c4] = Pm98Trig._i32(anim + 1)
+	# anim == 2 -> sprite-only (render); anim >= 3 -> nothing. Both no-op for the sim.
+
+
+## Convenience: the keeper's match ref (keeper+0x18c).
+static func m_of(k: Dictionary) -> Dictionary:
+	return _ref(k, 0x18c)
+
+
 # ---- FUN_0058e2c0 collision box leaves (the goal/post sweep broad-phase) ------------------
 # Two pure box primitives the ball physics' goal/post collision loop (0x58e497..0x58e963, the NEXT
 # unported slice of FUN_0058e2c0) calls while building + testing the ball's swept AABB against the

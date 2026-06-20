@@ -1,0 +1,11 @@
+# Stage 3 task 2 GOALKEEPER advance (FUN_005a22d0) PCode-emu ground truth. cols decimal (uint32).
+# FUN_005a50c0 sprite stubbed to ret; LUTs injected. Each row: FIX <name> + verbatim CALL line.
+# reads: +0x3c0 vel, +0x4 x, +0x34 facing, +0x40 pos-code.
+FIX far_right_t1 CALL 0 RET steps=161 EAX=67 mem[0x2303c0:4]=492 mem[0x230004:4]=262636 mem[0x230034:4]=0 mem[0x230040:4]=67
+FIX far_left_t1 CALL 0 RET steps=164 EAX=67 mem[0x2303c0:4]=4294966804 mem[0x230004:4]=785940 mem[0x230034:4]=32768 mem[0x230040:4]=67
+FIX far_deadband CALL 0 RET steps=205 EAX=66 mem[0x2303c0:4]=0 mem[0x230004:4]=1048576 mem[0x230034:4]=15087 mem[0x230040:4]=66
+FIX close_invR CALL 0 RET steps=158 EAX=67 mem[0x2303c0:4]=492 mem[0x230004:4]=1114604 mem[0x230034:4]=0 mem[0x230040:4]=67
+FIX close_invL CALL 0 RET steps=154 EAX=67 mem[0x2303c0:4]=4294966804 mem[0x230004:4]=1113620 mem[0x230034:4]=32768 mem[0x230040:4]=67
+FIX team2_far CALL 0 RET steps=163 EAX=67 mem[0x2303c0:4]=4294966804 mem[0x230004:4]=4294704660 mem[0x230034:4]=32768 mem[0x230040:4]=67
+FIX clamp_max CALL 0 RET steps=162 EAX=67 mem[0x2303c0:4]=5461 mem[0x230004:4]=267605 mem[0x230034:4]=0 mem[0x230040:4]=67
+FIX at_right_blk CALL 0 RET steps=204 EAX=66 mem[0x2303c0:4]=0 mem[0x230004:4]=1048576 mem[0x230034:4]=0 mem[0x230040:4]=66
