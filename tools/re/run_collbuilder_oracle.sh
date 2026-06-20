@@ -28,7 +28,9 @@ ROUT=$SPECDIR/_collbuilder_run.out
 M=0x00500000                          # match base (ECX)
 SA=0x00600000; SB=0x00680000; SC=0x00700000; SD=0x00720000   # scratch: master/posts/entity/netpair
 MAXP=64                               # posts to dump (zero-padded beyond the real count)
+MAXM=64                               # master entries to dump (their +0x20 quad)
 PSTRIDE=0x58
+MSTRIDE=0x78
 
 pk() { printf 'mem 0x%08x 4 0x%08x\n' "$1" $(( $2 & 0xffffffff )); }
 
@@ -73,6 +75,11 @@ pk() { printf 'mem 0x%08x 4 0x%08x\n' "$1" $(( $2 & 0xffffffff )); }
     base=$(( SB + p*PSTRIDE ))
     for ((w=0; w<22; w++)); do printf 'read_mem 0x%08x 4\n' $(( base + w*4 )); done
   done
+  # master entries' +0x20 quad (12 words) -- lets phases 1 & 3 be validated before phase 4
+  for ((e=0; e<MAXM; e++)); do
+    qbase=$(( SA + e*MSTRIDE + 0x20 ))
+    for ((w=0; w<12; w++)); do printf 'read_mem 0x%08x 4\n' $(( qbase + w*4 )); done
+  done
   # stubs (no-op): allocator + ctors/dtors/color/net-pair
   echo "stub    0x5bbf10 0 0"
   echo "stub    0x404a80 0 16"
@@ -105,6 +112,16 @@ L=$(grep -E 'CALL 0 (RET|HALT)' "$ROUT" | head -1)
     row="POST $p"
     for ((w=0; w<22; w++)); do
       v=$(echo "$L" | grep -oE "mem\[$(printf 0x%x $((base+w*4))):4\]=[0-9-]+" | head -1 | cut -d= -f2)
+      row="$row ${v:-NA}"
+    done
+    echo "$row"
+  done
+  # one MASTER line per entry: "MASTER <idx> q0 q1 ... q11" (the +0x20 quad, 4 vec3 corners)
+  for ((e=0; e<MAXM; e++)); do
+    qbase=$(( SA + e*MSTRIDE + 0x20 ))
+    row="MASTER $e"
+    for ((w=0; w<12; w++)); do
+      v=$(echo "$L" | grep -oE "mem\[$(printf 0x%x $((qbase+w*4))):4\]=[0-9-]+" | head -1 | cut -d= -f2)
       row="$row ${v:-NA}"
     done
     echo "$row"
