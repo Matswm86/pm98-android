@@ -117,6 +117,30 @@ static func rotate_vec(x: int, y: int, angle: int) -> Array:
 	return [muladd16(x, c, -y, s), muladd16(y, c, x, s)]
 
 
+## FUN_005ee670 / 005ee6e0 / 005ee750: rotate a vec3 IN PLACE by a WORD `angle` about an axis, leaving
+## the axis component fixed and rotating the other two: a' = (a*cos - b*sin)>>16, b' = (a*sin + b*cos)>>16.
+##   plane 0 (FUN_005ee670) -> rotate (x, y), z fixed [about Z]
+##   plane 1 (FUN_005ee6e0) -> rotate (x, z), y fixed [about Y]
+##   plane 2 (FUN_005ee750) -> rotate (y, z), x fixed [about X]
+## The two LUT reads are exactly the binary's: cos = COS[((angle+8)>>4)&0xfff], sin = COS[((0x3ff8-angle)
+## >>4)&0xfff], dotted by FUN_005edfb0 (== muladd16). Mutates `v` and returns it.
+static func rot_vec3(v: Array, angle: int, plane: int) -> Array:
+	var c := cos_a(angle)
+	var s := sin_a(angle)
+	var ia := 0
+	var ib := 1
+	if plane == 1:
+		ib = 2
+	elif plane == 2:
+		ia = 1
+		ib = 2
+	var a := int(v[ia])
+	var b := int(v[ib])
+	v[ia] = muladd16(a, c, -b, s)          # (a*cos - b*sin) >> 16
+	v[ib] = muladd16(b, c, a, s)           # (a*sin + b*cos) >> 16
+	return v
+
+
 ## FUN_005ee170: scale a 3D vector by a 16.16 scalar -> out[i] = (v[i]*s) >> 16.
 static func scale_vec3(vx: int, vy: int, vz: int, s: int) -> Array:
 	return [mul16(vx, s), mul16(vy, s), mul16(vz, s)]
