@@ -32,6 +32,13 @@ func _init() -> void:
 		var F: Dictionary = Pm98CollBuilder.build_frame(m)
 		_check_frame(F, frame)
 		_check_completeness(F, frame)
+	# --- phases 1-4: MASTER geometry vs oracle (phase 1 = entries 0-29) ---
+	var oracle_master := _load_oracle("MASTER")
+	if oracle_master.is_empty():
+		_ok(false, "oracle MASTER empty/unreadable")
+	else:
+		var built: Dictionary = Pm98CollBuilder.build(m)
+		_check_master(built.get("master", []), oracle_master, 30)
 	print("")
 	if _fail == 0:
 		print("ALL PASS (%d checks)" % _pass)
@@ -76,6 +83,41 @@ func _check_completeness(F: Dictionary, frame: Dictionary) -> void:
 			_ok(false, "completeness: dump off 0x%x (X=0x%x val 0x%x) NOT set in F" % [o, x, int(frame[off]) & U32])
 	if miss == 0:
 		_ok(true, "completeness: all nonzero frame slots modeled")
+
+
+func _check_master(built: Array, oracle: Dictionary, n: int) -> void:
+	# built[idx] is a flat 12-int quad; compare to oracle MASTER idx for idx in [0, n).
+	for idx in range(n):
+		if idx >= built.size():
+			_ok(false, "MASTER %d missing from build (built %d)" % [idx, built.size()])
+			continue
+		var got: Array = built[idx]
+		var want: Array = oracle[idx]
+		var same := got.size() == want.size()
+		if same:
+			for k in range(want.size()):
+				if (int(got[k]) & U32) != (int(want[k]) & U32):
+					same = false
+					break
+		_ok(same, "MASTER %d: got %s want %s" % [idx, str(got), str(want)])
+
+
+func _load_oracle(tag: String) -> Dictionary:
+	# parse "MASTER <idx> <ints...>" / "POST <idx> <ints...>" from collbuilder_oracle.txt
+	var out := {}
+	var f := FileAccess.open(_spec_path("collbuilder_oracle.txt"), FileAccess.READ)
+	if f == null:
+		return {}
+	while not f.eof_reached():
+		var t := f.get_line().strip_edges().split(" ", false)
+		if t.size() < 2 or t[0] != tag:
+			continue
+		var idx := int(t[1])
+		var vals := []
+		for k in range(2, t.size()):
+			vals.append(int(t[k]))
+		out[idx] = vals
+	return out
 
 
 func _ok(cond: bool, msg: String) -> void:

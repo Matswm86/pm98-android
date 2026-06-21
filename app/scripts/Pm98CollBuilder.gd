@@ -159,3 +159,43 @@ static func build_frame(m: Dictionary) -> Dictionary:
 	F[0x5f0] = Pm98Trig._i32(_mi(m, 0x1820) - 0xccc)    # [esp+0x2c] goal-line x - 0xccc
 	F[0x5e4] = Pm98Trig._i32(-_mi(m, 0x195c))           # [esp+0x38]
 	return F
+
+
+## vec3 at frame local X: increasing address = decreasing X (see ADDRESS MODEL header).
+static func _vec3(F: Dictionary, x: int) -> Array:
+	return [Pm98Trig._i32(int(F.get(x, 0))), Pm98Trig._i32(int(F.get(x - 4, 0))), Pm98Trig._i32(int(F.get(x - 8, 0)))]
+
+
+# ---- phase 1: the +0x27c8 master-geometry fan (decompile loop, disasm 0x5952ff..0x5955c4).
+# 8 groups, counts [8,1,5,1,8,1,5,1] = 30 master entries (MASTER 0-29). Each group walks a
+# 4-corner SOURCE quad in the phase-0 frame: src pointer = &local_48c stepping -0x30 BYTES per
+# group, i.e. src_X = 0x48c - g*0x30; corners A=src B=src-0xc C=src-0x18 D=src-0x24 (byte ptr
+# DECR addr = X+0xc each). For entry i of N the master quad is the trapezoid slice:
+#   c0=lerp(D,C, i,N)  c1=lerp(D,C, i+1,N)  c2=lerp(A,B, i+1,N)  c3=lerp(A,B, i,N)
+# (the binary's 3 chained vec3_lerp + 3 quad_bilerp reduce to exactly these 4 edge lerps; the
+# stdcall arg-recycling was decoded structurally and confirmed bit-exact vs the MASTER oracle).
+const _PHASE1_COUNTS := [8, 1, 5, 1, 8, 1, 5, 1]
+
+
+static func _build_phase1(F: Dictionary, master: Array) -> void:
+	for g in range(8):
+		var src := 0x48c - g * 0x30
+		var a := _vec3(F, src)
+		var b := _vec3(F, src + 0xc)
+		var c := _vec3(F, src + 0x18)
+		var d := _vec3(F, src + 0x24)
+		var n: int = _PHASE1_COUNTS[g]
+		for i in range(n):
+			var c0 := Pm98Trig.vec3_lerp(d, c, i, n)
+			var c1 := Pm98Trig.vec3_lerp(d, c, i + 1, n)
+			var c2 := Pm98Trig.vec3_lerp(a, b, i + 1, n)
+			var c3 := Pm98Trig.vec3_lerp(a, b, i, n)
+			master.append(c0 + c1 + c2 + c3)
+
+
+# ---- top-level builder: returns {"master": [[12 ints]...], "posts": [...]}. Phases 2-4 TODO.
+static func build(m: Dictionary) -> Dictionary:
+	var F := build_frame(m)
+	var master := []
+	_build_phase1(F, master)
+	return {"master": master, "posts": []}
