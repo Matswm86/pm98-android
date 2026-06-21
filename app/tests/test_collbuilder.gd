@@ -38,7 +38,12 @@ func _init() -> void:
 		_ok(false, "oracle MASTER empty/unreadable")
 	else:
 		var built: Dictionary = Pm98CollBuilder.build(m)
-		_check_master(built.get("master", []), oracle_master, 38)
+		_check_master(built.get("master", []), oracle_master, 62)
+		var oracle_post := _load_oracle("POST")
+		if oracle_post.is_empty():
+			_ok(false, "oracle POST empty/unreadable")
+		else:
+			_check_post(built.get("posts", []), oracle_post, 62)
 	print("")
 	if _fail == 0:
 		print("ALL PASS (%d checks)" % _pass)
@@ -100,6 +105,23 @@ func _check_master(built: Array, oracle: Dictionary, n: int) -> void:
 					same = false
 					break
 		_ok(same, "MASTER %d: got %s want %s" % [idx, str(got), str(want)])
+
+
+func _check_post(built: Array, oracle: Dictionary, n: int) -> void:
+	# built[idx] = flat 22-int post (quad12 + AABB6 + normal3 + id1); compare to oracle POST idx.
+	for idx in range(n):
+		if idx >= built.size():
+			_ok(false, "POST %d missing from build (built %d)" % [idx, built.size()])
+			continue
+		var got: Array = built[idx]
+		var want: Array = oracle[idx]
+		var same := got.size() == want.size()
+		if same:
+			for k in range(want.size()):
+				if (int(got[k]) & U32) != (int(want[k]) & U32):
+					same = false
+					break
+		_ok(same, "POST %d: got %s want %s" % [idx, str(got), str(want)])
 
 
 func _load_oracle(tag: String) -> Dictionary:

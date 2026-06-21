@@ -204,10 +204,91 @@ static func _build_phase2(F: Dictionary, master: Array) -> void:
 		master.append(_vec3(F, x) + _vec3(F, x - 0xc) + _vec3(F, x - 0x18) + _vec3(F, x - 0x24))
 
 
-# ---- top-level builder: returns {"master": [[12 ints]...], "posts": [...]}. Phases 3-4 TODO.
+# ---- phase 3: the goal-frame boxes (MASTER 38-61 = the 0x9eb8 scoring posts), disasm
+# 0x5957da..0x595d5a (the +0x27d70/+0x751ea nested grid). Decode result: every corner is
+# (x, y, z) where ONLY x depends on m: x = sx*F[0x5f0] + tx, sx=+-1, tx=+-0x1000 (the post
+# half-thickness, a frame literal); F[0x5f0]=m[0x1820]-0xccc is the goal-line plane. y and z
+# are hardcoded immediates in the binary (0x3a8f5/0x27d70/0x751ea/0x28ccc +-0x1000), m-INDEP,
+# so they are baked verbatim from the oracle. Per-corner (sx, tx, y, z) template below; 8
+# groups x 3 sub-quads. Validated bit-exact vs oracle MASTER 38-61 (synthetic F[0x5f0]=0x8f334).
+const _PHASE3 := [
+	[-1, -4096, -239861, 159088, -1, -4096, -239861, 167280, -1, -4096, 239861, 167280, -1, -4096, 239861, 159088],
+	[-1, -4096, -243957, 167116, -1, -4096, -235765, 167116, -1, -4096, -235765, 0, -1, -4096, -243957, 0],
+	[-1, -4096, 235765, 167116, -1, -4096, 243957, 167116, -1, -4096, 243957, 0, -1, -4096, 235765, 0],
+	[1, -4096, -239861, 159088, 1, -4096, -239861, 167280, 1, -4096, 239861, 167280, 1, -4096, 239861, 159088],
+	[1, -4096, -243957, 167116, 1, -4096, -235765, 167116, 1, -4096, -235765, 0, 1, -4096, -243957, 0],
+	[1, -4096, 235765, 167116, 1, -4096, 243957, 167116, 1, -4096, 243957, 0, 1, -4096, 235765, 0],
+	[-1, -4096, -239861, 167280, -1, 4096, -239861, 167280, -1, 4096, 239861, 167280, -1, -4096, 239861, 167280],
+	[-1, -4096, -235765, 167116, -1, 4096, -235765, 167116, -1, 4096, -235765, 0, -1, -4096, -235765, 0],
+	[-1, -4096, 243957, 167116, -1, 4096, 243957, 167116, -1, 4096, 243957, 0, -1, -4096, 243957, 0],
+	[1, -4096, -239861, 167280, 1, 4096, -239861, 167280, 1, 4096, 239861, 167280, 1, -4096, 239861, 167280],
+	[1, -4096, -235765, 167116, 1, 4096, -235765, 167116, 1, 4096, -235765, 0, 1, -4096, -235765, 0],
+	[1, -4096, 243957, 167116, 1, 4096, 243957, 167116, 1, 4096, 243957, 0, 1, -4096, 243957, 0],
+	[-1, 4096, -239861, 167280, -1, 4096, -239861, 159088, -1, 4096, 239861, 159088, -1, 4096, 239861, 167280],
+	[-1, 4096, -235765, 167116, -1, 4096, -243957, 167116, -1, 4096, -243957, 0, -1, 4096, -235765, 0],
+	[-1, 4096, 243957, 167116, -1, 4096, 235765, 167116, -1, 4096, 235765, 0, -1, 4096, 243957, 0],
+	[1, 4096, -239861, 167280, 1, 4096, -239861, 159088, 1, 4096, 239861, 159088, 1, 4096, 239861, 167280],
+	[1, 4096, -235765, 167116, 1, 4096, -243957, 167116, 1, 4096, -243957, 0, 1, 4096, -235765, 0],
+	[1, 4096, 243957, 167116, 1, 4096, 235765, 167116, 1, 4096, 235765, 0, 1, 4096, 243957, 0],
+	[-1, 4096, -239861, 159088, -1, -4096, -239861, 159088, -1, -4096, 239861, 159088, -1, 4096, 239861, 159088],
+	[-1, 4096, -243957, 167116, -1, -4096, -243957, 167116, -1, -4096, -243957, 0, -1, 4096, -243957, 0],
+	[-1, 4096, 235765, 167116, -1, -4096, 235765, 167116, -1, -4096, 235765, 0, -1, 4096, 235765, 0],
+	[1, 4096, -239861, 159088, 1, -4096, -239861, 159088, 1, -4096, 239861, 159088, 1, 4096, 239861, 159088],
+	[1, 4096, -243957, 167116, 1, -4096, -243957, 167116, 1, -4096, -243957, 0, 1, 4096, -243957, 0],
+	[1, 4096, 235765, 167116, 1, -4096, 235765, 167116, 1, -4096, 235765, 0, 1, 4096, 235765, 0],
+]
+
+
+static func _build_phase3(F: Dictionary, master: Array) -> void:
+	var f5f0 := Pm98Trig._i32(int(F.get(0x5f0, 0)))
+	for row in _PHASE3:
+		var quad := []
+		for c in range(4):
+			var sx: int = row[c * 4]
+			var tx: int = row[c * 4 + 1]
+			quad.append(Pm98Trig._i32(sx * f5f0 + tx))   # x
+			quad.append(row[c * 4 + 2])                  # y
+			quad.append(row[c * 4 + 3])                  # z
+		master.append(quad)
+
+
+# ---- phase 4: fill the post/collider array +0x17f4 (disasm 0x595d94..0x59617f). Three copy
+# loops; each post (22 oracle words) = quad(12) + AABB(6) + normal(3) + id(1):
+#   1. crossbar  id 0x7ae1  (if m[0x1a1b]!=0): quad = master[0..29] +0x20 quad.
+#   2. net-post  id 0x8000  (always, 8): quad copied from the frame net table X=0x1b0-e*0x30.
+#   3. goal-line id 0x9eb8  (if master count > 0x26): quad = master[38..61].
+# Per post: AABB = aabb_init -> expand over the 4 corners -> expand once more by (min + 1)
+# (gives a degenerate axis thickness 1; verified vs POST 38 maxx=minx+1). normal = face_normal.
+static func _make_post(quad: Array, post_id: int) -> Array:
+	var aabb := Pm98Trig.aabb_init()
+	for c in range(4):
+		aabb = Pm98Trig.aabb_expand_point(aabb, [quad[c * 3], quad[c * 3 + 1], quad[c * 3 + 2]])
+	aabb = Pm98Trig.aabb_expand_point(
+		aabb, [Pm98Trig._i32(aabb[0] + 1), Pm98Trig._i32(aabb[1] + 1), Pm98Trig._i32(aabb[2] + 1)]
+	)
+	return quad + aabb + Pm98Trig.quad_face_normal(quad) + [post_id]
+
+
+static func _build_posts(F: Dictionary, m: Dictionary, master: Array, posts: Array) -> void:
+	if _mi(m, 0x1a1b) != 0:
+		for i in range(30):
+			posts.append(_make_post(master[i], 0x7ae1))
+	for e in range(8):
+		var x := 0x1b0 - e * 0x30
+		var quad := _vec3(F, x) + _vec3(F, x - 0xc) + _vec3(F, x - 0x18) + _vec3(F, x - 0x24)
+		posts.append(_make_post(quad, 0x8000))
+	if master.size() > 0x26:
+		for i in range(38, 62):
+			posts.append(_make_post(master[i], 0x9eb8))
+
+
+# ---- top-level builder: returns {"master": [[12 ints]...], "posts": [[22 ints]...]}.
 static func build(m: Dictionary) -> Dictionary:
 	var F := build_frame(m)
 	var master := []
 	_build_phase1(F, master)
 	_build_phase2(F, master)
-	return {"master": master, "posts": []}
+	_build_phase3(F, master)
+	var posts := []
+	_build_posts(F, m, master, posts)
+	return {"master": master, "posts": posts}
