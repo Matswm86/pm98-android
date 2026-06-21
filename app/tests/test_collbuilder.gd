@@ -31,6 +31,7 @@ func _init() -> void:
 	else:
 		var F: Dictionary = Pm98CollBuilder.build_frame(m)
 		_check_frame(F, frame)
+		_check_completeness(F, frame)
 	print("")
 	if _fail == 0:
 		print("ALL PASS (%d checks)" % _pass)
@@ -52,6 +53,29 @@ func _check_frame(F: Dictionary, frame: Dictionary) -> void:
 		var got := int(F[x]) & U32
 		var want := int(frame[off]) & U32
 		_ok(got == want, "F[0x%x] (off 0x%x): got 0x%x want 0x%x" % [x, off, got, want])
+
+
+func _check_completeness(F: Dictionary, frame: Dictionary) -> void:
+	# Reverse direction: every NONZERO in-range frame-dump slot must be modeled in F. Proves
+	# phase 0 is complete, not just that the slots we set happen to match. Exclusions are the two
+	# non-geometry slots: off 0x618 (X=0x0) = the phase-0/1 boundary sentinel (a return addr),
+	# and off 0x2c (X=0x5ec) = the `this`/match base pointer the builder stashes for the loop.
+	var excl := {0x0: true, 0x5ec: true}
+	var miss := 0
+	for off in frame:
+		var o := int(off)
+		if o < 0 or o > 0x618:
+			continue
+		if (int(frame[off]) & U32) == 0:
+			continue
+		var x := 0x618 - o
+		if excl.has(x):
+			continue
+		if not F.has(x):
+			miss += 1
+			_ok(false, "completeness: dump off 0x%x (X=0x%x val 0x%x) NOT set in F" % [o, x, int(frame[off]) & U32])
+	if miss == 0:
+		_ok(true, "completeness: all nonzero frame slots modeled")
 
 
 func _ok(cond: bool, msg: String) -> void:

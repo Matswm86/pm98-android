@@ -143,4 +143,19 @@ static func build_frame(m: Dictionary) -> Dictionary:
 	F[0x90] = F[0x120]; F[0x88] = F[0x1a8]; F[0x84] = F[0x1b0]; F[0x7c] = F[0x1a8]; F[0x78] = F[0x9c]
 	F[0x74] = l194; F[0x6c] = F[0x18c]; F[0x5c] = F[0x14c]; F[0x58] = F[0x1a8]; F[0x50] = F[0x17c]
 	F[0x4c] = F[0x1a8]; F[0x44] = F[0x164]; F[0x3c] = l198; F[0x38] = F[0xa4]
+	# ---- phase-0 scratch temporaries: disasm [esp+0x10..0x38] (D = 0x61c - X), the negated
+	# goal-dim seeds the phase-1 group setup/inner-loop reads. Re-derived from disasm with the
+	# +4 edi-push correction (dump EBASE is the 3-push body esp; the [esp+X] writes run after a
+	# 4th `push edi`, so disasm off D maps to dump off D-4, i.e. X = 0x61c - D). Each matches the
+	# emu frame dump bit-exact. F[0x5ec] = disasm [esp+0x30] = the `this`/match base POINTER, not
+	# geometry, so it is deliberately NOT modeled (excluded from the test completeness check).
+	F[0x60c] = Pm98Trig._i32(-_mi(m, 0x1960))           # [esp+0x10]
+	F[0x608] = Pm98Trig._i32(-_mi(m, 0x1950))           # [esp+0x14]
+	F[0x604] = Pm98Trig._i32(-_mi(m, 0x1958))           # [esp+0x18]
+	F[0x600] = Pm98Trig._i32(-_mi(m, 0x1978))           # [esp+0x1c]
+	F[0x5fc] = Pm98Trig._i32(-_mi(m, 0x1968))           # [esp+0x20]
+	F[0x5f8] = Pm98Trig._i32(-_mi(m, 0x1964))           # [esp+0x24]
+	F[0x5f4] = Pm98Trig._i32(-_mi(m, 0x196c))           # [esp+0x28]
+	F[0x5f0] = Pm98Trig._i32(_mi(m, 0x1820) - 0xccc)    # [esp+0x2c] goal-line x - 0xccc
+	F[0x5e4] = Pm98Trig._i32(-_mi(m, 0x195c))           # [esp+0x38]
 	return F
