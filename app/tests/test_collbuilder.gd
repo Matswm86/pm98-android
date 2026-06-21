@@ -38,7 +38,7 @@ func _init() -> void:
 		_ok(false, "oracle MASTER empty/unreadable")
 	else:
 		var built: Dictionary = Pm98CollBuilder.build(m)
-		_check_master(built.get("master", []), oracle_master, 30)
+		_check_master(built.get("master", []), oracle_master, 38)
 	print("")
 	if _fail == 0:
 		print("ALL PASS (%d checks)" % _pass)

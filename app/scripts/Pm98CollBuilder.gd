@@ -193,9 +193,21 @@ static func _build_phase1(F: Dictionary, master: Array) -> void:
 			master.append(c0 + c1 + c2 + c3)
 
 
-# ---- top-level builder: returns {"master": [[12 ints]...], "posts": [...]}. Phases 2-4 TODO.
+# ---- phase 2: the net box (MASTER 30-37), disasm 0x5955e9.. The loop does NO lerp -- it
+# `rep movs 0xc` a straight 12-int quad from the frame, 8 entries, source X = 0x330 - e*0x30
+# (src ptr = &local_314, copy reads ptr-0x1c = X 0x330 first). Each quad = 4 consecutive
+# vec3s. (The per-entry +0x64 color / +0x68 render-rect are display fields, not in the +0x20
+# quad oracle, so omitted.)
+static func _build_phase2(F: Dictionary, master: Array) -> void:
+	for e in range(8):
+		var x := 0x330 - e * 0x30
+		master.append(_vec3(F, x) + _vec3(F, x - 0xc) + _vec3(F, x - 0x18) + _vec3(F, x - 0x24))
+
+
+# ---- top-level builder: returns {"master": [[12 ints]...], "posts": [...]}. Phases 3-4 TODO.
 static func build(m: Dictionary) -> Dictionary:
 	var F := build_frame(m)
 	var master := []
 	_build_phase1(F, master)
+	_build_phase2(F, master)
 	return {"master": master, "posts": []}
