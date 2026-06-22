@@ -28,6 +28,11 @@ const FIXTURES := {
 	"fbe0_out":    {"kind": "fbe0", "x": 0,         "y": 0,       "z": 0,       "vx": 0,      "vy": 0,      "vz": 0,        "line": 0x100000, "post": 0x40000,  "poss": 0, "side": 1, "f63": 0, "b462": 0},
 	"fbe0_zcol":   {"kind": "fbe0", "x": 0x180000,  "y": 0x10000, "z": 0x28000, "vx": 0x1000, "vy": 0x2000, "vz": -0x3000,  "line": 0x100000, "post": 0x40000,  "poss": 0, "side": 1, "f63": 0, "b462": 0},
 	"fbe0_ycol":   {"kind": "fbe0", "x": 0x180000,  "y": 0x3a000, "z": 0x10000, "vx": 0x1000, "vy": 0x3000, "vz": 0x1000,   "line": 0x100000, "post": 0x40000,  "poss": 0, "side": 1, "f63": 0, "b462": 0},
+	"f3c0_out":    {"kind": "f3c0", "x": 0,         "y": 0,       "z": 0,       "vx": 0,      "vy": 0,      "vz": 0,        "line": 0x100000, "post": 0x40000,  "poss": 0, "side": 0, "f63": 0, "b462": 0},
+	"f3c0_in":     {"kind": "f3c0", "x": 0x180000,  "y": 0x10000, "z": 0x30000, "vx": 0x1000, "vy": 0x2000, "vz": 0x3000,   "line": 0x100000, "post": 0x40000,  "poss": 0, "side": 0, "f63": 0, "b462": 0},
+	"f3c0_zcol":   {"kind": "f3c0", "x": 0x180000,  "y": 0x10000, "z": 0x28000, "vx": 0x1000, "vy": 0x2000, "vz": -0x3000,  "line": 0x100000, "post": 0x40000,  "poss": 0, "side": 0, "f63": 0, "b462": 0},
+	"f3c0_ycol":   {"kind": "f3c0", "x": 0x180000,  "y": 0x3a000, "z": 0x10000, "vx": 0x1000, "vy": 0x3000, "vz": 0x1000,   "line": 0x100000, "post": 0x40000,  "poss": 0, "side": 0, "f63": 0, "b462": 0},
+	"f3c0_side1":  {"kind": "f3c0", "x": -0x180000, "y": 0x10000, "z": 0x30000, "vx": 0x1000, "vy": 0x2000, "vz": 0x3000,   "line": 0x100000, "post": 0x40000,  "poss": 0, "side": 1, "f63": 0, "b462": 0},
 }
 
 # FUN_0058f140 keeper-save fixtures (mirror tools/re/run_keeper_oracle.sh MATRIX).
@@ -127,7 +132,9 @@ func _run_fixture(name: String, exp: Dictionary) -> void:
 			Pm98Predicates.traj_copy(b, m, fx.get("src", [0, 0, 0]))
 		"fbe0":
 			ret = Pm98Predicates.post_bar(b, m)
-	# ret: meaningful for ede0/fbe0 (FUN_0058f100 is void -> skip).
+		"f3c0":
+			ret = Pm98Predicates.dead_ball(b, m)
+	# ret: meaningful for ede0/fbe0/f3c0 (FUN_0058f100 is void -> skip).
 	if fx.kind != "f100":
 		_eq(name, "ret", ret, exp.ret)
 	_eq(name, "b462", int(m.get(0x462, 0)) & 0xff, exp.b462)

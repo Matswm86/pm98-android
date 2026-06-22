@@ -14,6 +14,8 @@ extends RefCounted
 ##                  + z/y clamp-and-reflect with velocity damping.
 ##   * traj_copy  = FUN_0058f100 -- copy the ball's target trajectory to +0x90..0x98.
 ##   * post_bar   = FUN_0058fbe0 -- post/bar collision: clamp + reflect velocity.
+##   * dead_ball  = FUN_0058f3c0 -- mirror-side dead-ball/behind-line classifier
+##                  (-> dispatcher code 3). Unconditional aim write + post_bar reflect.
 ##   * keeper_save = FUN_0058f140 -- keeper-reach save: box/reach test + ball+0x61
 ##                  latch + atan_angle reach geometry + deflect-write. Returns
 ##                  {ret, save}; the save-stat bump + 0x15/0x16 event enqueue
@@ -161,6 +163,80 @@ static func post_bar(b: Dictionary, m: Dictionary) -> int:
 				b[0x24] = Pm98Trig._i32(-_g(b, 0x24))
 			if reflected:
 				_damp_velocity(b)
+	return 1
+
+
+## FUN_0058f3c0: dead-ball / behind-the-line classifier -> dispatcher code 3
+## (Pm98Dispatch _case_restart). It is the MIRROR-SIDE twin of `post_bar`: same
+## [signed_line, 2*signed_line] x-box and [-w, w] y-box and the same z/y reflect, but
+## the box sign is taken on the OPPOSITE parity (`(poss&1)==(1-side)` here vs
+## `(poss&1)==side` in post_bar), so it watches the ball going dead behind the far goal
+## line. Two SIM differences from post_bar that the port must keep:
+##   1. The aim/deflection target (+0x90/+0x94/+0x98) is written UNCONDITIONALLY at the
+##      top, BEFORE the box test -- so even a return-0 call rewrites the ball's aim.
+##      +0x90 = signed(0x58000 - line) (deep past the line), +0x94 = sign(y)*0x928f5
+##      (wide), +0x98 = 0.
+##   2. On the way out it clears the ball's player slot (+0x50 = 0).
+## Returns the box-test bool `local_35` (1 = ball in the dead-ball box). With ball+0x50
+## == 0 the binary's keeper-proximity probe (FUN_005909f0) and the 0x17/0x18/0x19 event
+## enqueues (FUN_00594470) are skipped; those are deferred to driver integration exactly
+## like keeper_save's stat/event tail. Sound (FUN_00590f00, match+0x180a/+0x180c) and the
+## 240/230 RNG save-restore brackets are display-only / seed-neutral and not modelled.
+## Oracle-validated bit-for-bit: tools/re/run_predicate_oracle.sh (f3c0_* rows).
+static func dead_ball(b: Dictionary, m: Dictionary) -> int:
+	var line := Pm98Trig._i32(_g(m, 0x1820))
+	var w := Pm98Trig._i32(_g(m, 0x1824))
+	var poss := _g(m, 0x19a0)
+	var side := _g(b, 0x54)
+	var u := 1 - side                                    # uVar12 = 1 - ball+0x54
+	var x := Pm98Trig._i32(_g(b, 4))
+	var y := Pm98Trig._i32(_g(b, 8))
+	var z := Pm98Trig._i32(_g(b, 0xc))
+
+	# x window: [signed_line, 2*signed_line], normalised to [xlo, xhi]. Sign flips when
+	# (poss&1)==u (the OPPOSITE parity to post_bar).
+	var sgx := -line if (poss & 1) == u else line
+	var xhi := sgx
+	var x2 := Pm98Trig._i32(sgx * 2)
+	var xlo := x2
+	if xhi < x2:
+		xlo = xhi
+		xhi = x2
+	# y window: [-w, w], normalised.
+	var ylo := -w
+	var yhi := w
+	if w < -w:
+		ylo = w
+		yhi = -w
+
+	# Aim/deflection target -- written UNCONDITIONALLY (before the box test).
+	var aim_x := Pm98Trig._i32(0x58000 - line)
+	if (poss & 1) != u:
+		aim_x = Pm98Trig._i32(-aim_x)
+	b[0x90] = aim_x
+	b[0x94] = Pm98Trig._i32(_sign(y) * 0x928f5)
+	b[0x98] = 0
+
+	if x <= xlo or xhi <= x or y <= ylo or yhi <= y or z < 0 or z > 0x3e7ffff:
+		return 0
+
+	# In-box: post/bar-style position clamp + velocity reflect (identical to post_bar).
+	if z < 0x2828e:
+		var ay := absi(y)
+		if ay < 0x3deb7:
+			var reflected := false
+			if absi(z - 0x2828e) < absi(ay - 0x3deb7):
+				b[0xc] = 0x2828e
+				if _g(b, 0x28) < 0:
+					reflected = true
+					b[0x28] = Pm98Trig._i32(-_g(b, 0x28))
+			else:
+				reflected = true
+				b[8] = _sign(y) * 0x3deb7
+				b[0x24] = Pm98Trig._i32(-_g(b, 0x24))
+			if reflected:
+				_damp_velocity(b)
+	b[0x50] = 0                                          # LAB_0058fb27: clear ball+0x50
 	return 1
 
 

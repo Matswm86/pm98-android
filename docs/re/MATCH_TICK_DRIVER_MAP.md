@@ -218,3 +218,58 @@ outputs feed display) purely to keep the seed in lockstep, plus the L465 per-pla
 shell FUN_00598740 into a new `Pm98Driver.gd` calling the DONE pieces + the timer draws above, with
 push_error stubs for any residue; (c) port match-init FUN_00591180 to build a valid `m`; (d) stand up
 the wine OR full-emu oracle; (e) run the N>=50 fixed-seed event-stream + scoreline parity kill-test.
+
+---
+
+## FUN_0058f3c0 PORTED + FUN_00593b70 CLASSIFIED (2026-06-22)
+
+### FUN_0058f3c0 -- DONE (Pm98Predicates.dead_ball, oracle-locked)
+The last open-play classification predicate. Read the 1922-byte decompile (/tmp/pm98dec/fn_0058f3c0).
+It is the **mirror-side twin of post_bar (FUN_0058fbe0)**: identical [signed_line, 2*signed_line]
+x-box, [-w, w] y-box (w = match+0x1824), and the identical z/y position-clamp + velocity-reflect, but
+the box sign is taken on the OPPOSITE parity (`(poss&1)==(1-side)` vs post_bar's `(poss&1)==side`),
+so it watches the ball dying behind the FAR goal line -> dispatcher code 3 (`_case_restart`, dead ball).
+Two SIM deltas vs post_bar, both ported:
+1. The aim/deflection target +0x90/+0x94/+0x98 is written **UNCONDITIONALLY** (before the box test):
+   +0x90 = signed(0x58000 - line), +0x94 = sign(ball.y)*0x928f5, +0x98 = 0. So even a return-0 call
+   rewrites the ball's aim (post_bar only writes it on collision).
+2. On exit it clears ball+0x50 = 0 (LAB_0058fb27).
+Return = the box-test bool. As with keeper_save, the ball+0x50!=0 tail (keeper-proximity probe
+FUN_005909f0 + the 0x17/0x18/0x19 event enqueues via FUN_00594470) is DEFERRED to driver integration;
+the SIM port is validated with ball+0x50==0. **NO unbracketed FUN_005ec250 in this function** -> it is
+SEED-NEUTRAL (the lone FUN_005ec240/230 pair in the else-branch is a save/restore around skipped
+commentary). Oracle: 5 new `f3c0_*` rows in run_predicate_oracle.sh -> predicate_oracle.txt; locked by
+test_predicates.gd.
+
+### FUN_00593b70 -- CLASSIFIED: the match-restart / phase-reset routine (NOT a pure leaf)
+Read the 1858-byte decompile (/tmp/pm98dec/fn_00593b70). It is the **one-shot restart handler** invoked
+from the driver's `+0x1a1e` skip-tick gate (driver skeleton step 2): when +0x1a1e was latched the prior
+tick, THIS tick runs the full kickoff/restart instead of the normal movement core, then the driver
+`goto`s its end. It is driver-shell-sized (it calls select_active + position_team + the phase setups),
+so it must be ported ALONGSIDE the FUN_00598740 shell (STEP-2 item 2), **not as an isolated oracle'd leaf.**
+
+What it does (sim-relevant skeleton):
+- If `+0x1a38 != 0` (a restart type is pending) and DAT_006d31c4==0: phase = `DAT_00664070[+0x1a38]`,
+  set +0x44c/+0x448 = phase, FUN_005946d0 (per-player reset, modeled no-op in Pm98Dispatch). Then
+  `switch(+0x1a38)`:
+  - `==1` kickoff: +0x19a8 += +0x450; clear +0x1a1f/+0x450/+0x19a4; `switch(+0x19a0)` runs the kickoff
+    placement FUN_0044d0d0/d190/d250/d310 (case1 may +2 to +0x19a0; case3 clears +0x45c); then +0x19a0 += 1.
+  - `1<x<9` (+ flag gate): a 2x11 player-position snapshot+compare loop (FUN_0044d3d0) latching bVar3.
+  - if `+0x19a0 != 4 || +0x19c0==0`: FUN_005b6ba0 x2. Then FUN_005946f0.
+- If `+0x19a0 == 4` (penalty/ET): +0x44c/+0x448 = 7; ball spot +0x16a0 = signed(+0x1820 - 0xb0000) by
+  +0x45c, +0x16a4/+0x16a8 = 0.
+- **State reset block** (always): zero +0x460, +0x461&=0x38, +0x1994, +0x1998, +0x454, +0x19dc, +0x434,
+  +0x43c, +0x440, +0x438, +0x444; FUN_005946f0; **+0x1a34 = timeGetTime()** (WALL-CLOCK, non-deterministic
+  -- must stub on the headless path; verify nothing on the scoreline path reads it); +0x1a38=0,
+  +0x461&=0xcf, +0x1a1f=0, **DAT_006d31c0=0, DAT_006d31bc=0 (resets the 1024-frame replay-ring counter)**,
+  +0x27ec=0; re-init the 2 replay rings +0x27dc/+0x27e4 (FUN_005bbf10 = Array clear), +0x27e0/+0x27e8=0.
+- Movement re-seed: ball vtable+4 (render, SKIP), FUN_005b8f20 (select_active, DONE) -> +0x438,
+  FUN_005b70e0 x2 (render, SKIP), FUN_005b73a0 x2 (position_team, DONE), 3 sub-entity vtable+4 (render,
+  SKIP); +0x458=0; FUN_005f5740/57a0/5800 (ball-trail display, SKIP).
+- Tail: `switch(+0x448)` commentary, all gated by +0x180b (display) inside 240/230 brackets.
+
+**RNG / kill-test impact:** exactly **ONE unbracketed FUN_005ec250 draw** (decompile L198), and only
+when `+0x448 ∈ {2,3,4,5,6}` -- for any other +0x448 the routine early-returns (L195-196) BEFORE that
+draw. Everything else is inside 240/230 save-restore brackets (seed-neutral). CAVEAT: the RNG behaviour
+of the callees FUN_005946d0/FUN_005946f0/FUN_005b6ba0/FUN_005b8f20/FUN_005b73a0/FUN_0044d0d0../FUN_0044d3d0
+is UNVERIFIED -- confirm each draws nothing (or model it) when porting the shell.
