@@ -163,6 +163,30 @@ static func _phase0(m: Dictionary) -> bool:
 	return play_state_eq(m, 0)
 
 
+## The OPPONENT team header for this movement context, faithful to the binary's opponent
+## descriptor `match + 0x78c - 800*team` (team0 -> match[0x78c] = team1 header; team1 ->
+## match[0x46c] = team0 header). Sourced from the nested m["sim"] = [team0, team1] that the
+## roster build (Pm98Match.build_match / _build_team) produces, so it now works for BOTH
+## team contexts -- not just the team-0 fixtures the earlier slices hardcoded.
+##
+## LEGACY FALLBACK: the oracle fixtures (test_relmatrix / test_marktarget / test_assignmarker)
+## hand-build `m[0x78c]` as a bare opponent-players Array (no "sim"). When "sim" is absent we
+## wrap that Array as a synthetic {"players": ...} header. The Array is shared by REFERENCE,
+## so the in-place opponent mutations the matrix/marker passes write (+0x17c/+0x180/+0x150/
+## +0x154/the matrix angle+dist keys) still flow back to what the fixture reads at m[0x78c].
+static func _opp_team(ctx: Dictionary) -> Dictionary:
+	var m: Dictionary = ctx.get(0x138, {})
+	var sim: Variant = m.get("sim", null)
+	if sim is Array and sim.size() == 2:
+		return sim[1 - _g(ctx, 0x8)]
+	return {"players": m.get(0x78c, [])}
+
+
+## The opponent player Array: the built team's roster (team["players"]) or the legacy flat array.
+static func _opp_players(ctx: Dictionary) -> Array:
+	return _opp_team(ctx).get("players", [])
+
+
 # =============================================================================
 # Slice 2: the per-tick relationship matrix + role selection.
 #   build_relationship_matrix = FUN_005b8690 (__fastcall this=sim-ctx) -- throttled
@@ -216,9 +240,8 @@ static func build_relationship_matrix(ctx: Dictionary) -> void:
 		return
 	var players: Array = ctx.get("players", [])
 	var team := _g(ctx, 0x8)
-	var m: Dictionary = ctx.get(0x138, {})
-	var opp: Array = m.get(0x78c, [])
-	var opp_n := int(m.get(0x790, 0))
+	var opp: Array = _opp_players(ctx)              # opponent roster (sim-sourced; team[0x4] count == size)
+	var opp_n := opp.size()
 
 	# team-0 context seeds every opponent's nearest / nearest-in-front to 1000.0.
 	if team == 0:
@@ -316,7 +339,9 @@ static func _select_roles(ctx: Dictionary) -> void:
 # STRUCT MODEL (extends the matrix model): the player's own team descriptor (binary
 # player+0x184) provides {base,count} = ctx["players"]/size + the tactical fields
 # 0x2fc/0x300/0x310, modelled as ctx["team_desc"]; the opponent descriptor (player
-# +0x188) = ctx[0x138][0x78c]/size. The current mark target (player+0xb0) and the
+# +0x188) = the opponent team header's players, fetched via _opp_players(ctx) (the
+# faithful m["sim"][1-team]["players"], legacy-falling-back to flat m[0x78c]). The
+# current mark target (player+0xb0) and the
 # return value are opponent INDICES (-1 = none). The 8690 relationship-matrix dists
 # at _dist_off(slot, team) are consumed for both the candidate score and reciprocity.
 # NULL CONVENTION: the binary's "already marked" test is `cand+0x154 != 0` (non-null
@@ -328,7 +353,7 @@ static func _select_roles(ctx: Dictionary) -> void:
 static func select_mark_target(ctx: Dictionary, p_idx: int) -> int:
 	var players: Array = ctx.get("players", [])
 	var m: Dictionary = ctx.get(0x138, {})
-	var opp: Array = m.get(0x78c, [])
+	var opp: Array = _opp_players(ctx)               # opponent roster (sim-sourced; was m[0x78c] flat)
 	var td: Dictionary = ctx.get("team_desc", {})
 	var p: Dictionary = players[p_idx]
 
@@ -426,15 +451,16 @@ static func _in_box_excl(p: Dictionary, q: Dictionary) -> bool:
 #            select_mark_target (FUN_005b36f0) and wires its +0x150 / the picked opp's
 #            +0x154 (the +0x154 only when that opp is not already someone's mark).
 #   Helpers (all take ctx as ECX): FUN_005b70b0 = match+0x1610 ball block; FUN_005b70c0
-#   = opponent team descriptor (match + 0x78c - 800*team; team0 -> +0x78c, modelled here
-#   as match[0x78c] like the other slices -- fixtures are team-0); FUN_005b8c90 = "we are
+#   = opponent team descriptor (match + 0x78c - 800*team; team0 -> +0x78c), resolved here
+#   via _opp_players(ctx) = m["sim"][1-team]["players"] (legacy fallback: flat match[0x78c]);
+#   FUN_005b8c90 = "we are
 #   in possession". POINTER->INDEX model: +0x150 holds an OPP index, +0x154 an OUR-team
 #   index, both -1 = none (the binary's null pointer; index 0 is the real first player).
 static func assign_markers(ctx: Dictionary) -> void:
 	var players: Array = ctx.get("players", [])
 	var team := _g(ctx, 0x8)
 	var m: Dictionary = ctx.get(0x138, {})
-	var opp: Array = m.get(0x78c, [])
+	var opp: Array = _opp_players(ctx)               # opponent roster (sim-sourced; was m[0x78c] flat)
 
 	# (poss) possession changed -> zero each OUR player's marking block.
 	if _g(m, 0x1668) != _g(m, 0x1664):
