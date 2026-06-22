@@ -19,7 +19,11 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   index, shirt, role +0x2c8 (GK->1 / demarcacion 1->2 adjust), start positions, and the full 0xde..0xe8
   derived stat block (GK branches, the e3 match-mode branch, the match-clock fatigue scale, 0xea/0xeb/
   0x1c/0x1e). Player Dict is BYTE-keyed (word index i -> byte key i*4). DEFERRED (none read downstream):
-  display strings/glyphs/sprite-masks + the 0xe1 ftol() field (FPU operand lost in this decompile).
+  display strings/glyphs/sprite-masks. **0xe1 ftol RECOVERED 2026-06-22 (disasm 0x5a2e36..0x5a2e6c):
+  `p[0xe1] = trunc(byte(rec+0x37) * C) & 0xff`, C the .rdata double selected by team_header+0x31c ==
+  team[0xc7] (0->0.6@0x639248 / 1->0.8@0x639250 / else 1.0@0x639258). The x87 80-bit fmul+truncate is
+  reproduced bit-exactly by `floor(byte * Cdouble)` over the double's integer mantissa (verified vs a
+  real gcc long-double x87 run for all 768 cases; naive `int(byte*0.6)` diverges at 51 boundaries).**
   **RNG VERIFIED (the load-bearing gate, now closed): the whole FUN_005b6ba0 -> FUN_005a2830 closure
   (462/455 fns) NEVER reaches the draw FUN_005ec250** -- static call-graph over the full objdump, 0 of
   552 indirect-call sites RNG-bound. So the build draws 0 and kickoff's 4-draw seed inventory is invariant

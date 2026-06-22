@@ -654,8 +654,8 @@ static func _build_team(m: Dictionary, ti: int, lineup: Dictionary, rng: MatchEn
 ## Pm98Movement / Pm98Resolver read -- header ptrs, team/slot idx, role 0x2c8, ability 0x39c,
 ## start positions, the 0xde..0xe8 derived stat block). Player Dict is BYTE-keyed, so word
 ## index param_1[i] -> byte key i*4; `(int)param_1 + 0xNN` byte casts -> byte key 0xNN.
-## Display work (name/photo/palette strings, kit-letter glyphs, sprite masks) and the 0xe1
-## ftol() field (FPU operand lost in this decompile) are deferred -- none are read downstream.
+## Display work (name/photo/palette strings, kit-letter glyphs, sprite masks) is deferred --
+## none are read downstream. The 0xe1 ftol() field is RECOVERED (disasm 0x5a2e36, see below).
 ## `slot` is the formation slot (0 == goalkeeper, drives the GK stat branches); `arr_idx` is
 ## the player's index in the own team array (binary: (this - base)/0x3bc).
 static func _build_player(m: Dictionary, ti: int, slot: int, arr_idx: int, rec: Dictionary) -> Dictionary:
@@ -694,7 +694,18 @@ static func _build_player(m: Dictionary, ti: int, slot: int, arr_idx: int, rec: 
 	p[0x378] = rb.call(0x34) & 0xff                      # 0xde
 	p[0x37c] = (rb.call(0x35) & 0xff) if not is_gk else ((rb.call(0x35) & 0xff) + 200) / 3  # 0xdf
 	p[0x380] = rb.call(0x36) & 0xff                      # 0xe0
-	p[0x384] = 0                                         # 0xe1 ftol() DEFERRED (operand lost)
+	# 0xe1 (L238-239) ftol RECOVERED from disasm 0x5a2e36..0x5a2e6c: trunc(byte(rec+0x37) * C)
+	# & 0xff, where C is the .rdata double selected by team_header+0x31c == team[0xc7] (the 9th
+	# squad-header dword, copied in _build_team before this runs): 0 -> 0.6 (@0x639248),
+	# 1 -> 0.8 (@0x639250), else 1.0 (@0x639258). x87 does fild->fmul(80-bit)->ftol(truncate);
+	# byte<=255 so the exact product fits the 64-bit extended mantissa, hence floor(byte*Cdouble)
+	# via the double's integer mantissa is BIT-EXACT (verified vs real x87 for all 768 cases; a
+	# naive int(byte*0.6) diverges at 51 integer boundaries, e.g. byte=10 -> 5 not 6).
+	var b37: int = rb.call(0x37) & 0xff
+	match int(team.get(0xc7, 0)):
+		0: p[0x384] = ((b37 * 5404319552844595) >> 53) & 0xff  # *0.6 mantissa / 2^53
+		1: p[0x384] = ((b37 * 7205759403792794) >> 53) & 0xff  # *0.8 mantissa / 2^53
+		_: p[0x384] = b37                                      # *1.0 (trunc is identity)
 	p[0x388] = rb.call(0x38) & 0xff                      # 0xe2
 	p[0x38c] = rb.call(0x3c) & 0xff                      # 0xe3
 	p[0x390] = rb.call(0x3d) & 0xff                      # 0xe4

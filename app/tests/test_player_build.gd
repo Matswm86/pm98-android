@@ -29,6 +29,7 @@ var _pass := 0
 
 func _init() -> void:
 	_test_build()
+	_test_e1_ftol()
 	_test_zero_draws()
 	_test_kickoff_integration()
 	print("")
@@ -46,8 +47,8 @@ func _gk_record() -> Dictionary:
 
 func _outfield_record(shirt: int, ability: int) -> Dictionary:
 	return {0x4: shirt, 0x8: 11, 0xc: 22, 0x10: 33, 0x14: 44, 0x18: 55, 0x1c: 66, 0x20: 77,
-		0x24: 88, 0x28: 111, 0x2c: 3, 0x30: 5, 0x34: 70, 0x35: 80, 0x36: 30, 0x38: 50, 0x3c: 40,
-		0x3d: 90, 0x3e: 55, 0x3f: 65, 0x40: ability, 0x41: 75, 0x42: 100, 0x44: 5, 0x98: 1}
+		0x24: 88, 0x28: 111, 0x2c: 3, 0x30: 5, 0x34: 70, 0x35: 80, 0x36: 30, 0x37: 77, 0x38: 50,
+		0x3c: 40, 0x3d: 90, 0x3e: 55, 0x3f: 65, 0x40: ability, 0x41: 75, 0x42: 100, 0x44: 5, 0x98: 1}
 
 func _lineup() -> Dictionary:
 	var slots := [_gk_record(), _outfield_record(7, 60), _outfield_record(9, 80)]
@@ -127,6 +128,7 @@ func _check_p1(m: Dictionary, p: Dictionary) -> void:
 	_eqx(int(p[0x378]), 70, "p1 0xde = rec+0x34")
 	_eqx(int(p[0x37c]), 92, "p1 0xdf fatigued (80 -> 92)")
 	_eqx(int(p[0x380]), 30, "p1 0xe0 = rec+0x36")
+	_eqx(int(p[0x384]), 77, "p1 0xe1 = trunc(rec+0x37 * 1.0) (header[8]=90 -> C=1.0)")
 	_eqx(int(p[0x388]), 81, "p1 0xe2 fatigued (50 -> 81)")
 	_eqx(int(p[0x38c]), 80, "p1 0xe3 branch ((40+200)/3)")
 	_eqx(int(p[0x390]), 90, "p1 0xe4 = rec+0x3d")
@@ -148,6 +150,28 @@ func _check_gk(p: Dictionary) -> void:
 	_eqx(int(p[0x37c]), 96, "GK 0xdf = ((70+200)/3=90) fatigued -> 96")
 	_eqx(int(p[0x39c]), 81, "GK 0xe7 ability fatigued (50 -> 81)")
 	_eqx(int(p[0x2dc]), 0x100, "GK +0xb7 = (1+0)*0x100")
+
+
+## 0xe1 ftol parity: trunc(byte(rec+0x37) * C) & 0xff, C by team[0xc7] (0->0.6/1->0.8/else 1.0).
+## Ground-truth values from a real x87 long-double run (gcc, /tmp/e1_oracle.c): the 0.6/0.8 cases
+## are the integer-boundary traps where naive double rounds UP (10->6, 100->60, 255->153) but x87
+## truncates the 80-bit product DOWN (10->5, 100->59, 255->152). Locks the integer-mantissa port.
+func _e1_build(m: Dictionary, c7: int, b37: int) -> int:
+	m["sim"][0][0xc7] = c7                                # team_header+0x31c selects the multiplier
+	var p: Dictionary = Pm98Match._build_player(m, 0, 1, 0, {0x44: 5, 0x37: b37})
+	return int(p[0x384])
+
+
+func _test_e1_ftol() -> void:
+	var m := _fresh_match()
+	# [byte(rec+0x37), team[0xc7] selector, x87 ground truth]
+	var cases := [
+		[5, 0, 2], [10, 0, 5], [100, 0, 59], [255, 0, 152],  # C=0.6 (boundary traps)
+		[5, 1, 4], [200, 1, 160],                            # C=0.8
+		[77, 2, 77], [255, 2, 255],                          # C=1.0 (identity)
+	]
+	for c in cases:
+		_eqx(_e1_build(m, c[1], c[0]), c[2], "0xe1 ftol byte=%d c7=%d" % [c[0], c[1]])
 
 
 func _test_zero_draws() -> void:
