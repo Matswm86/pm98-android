@@ -9,6 +9,24 @@ Legit RE of the owner's own binary for the owner's own remake. Deliverable = ori
 GDScript reproducing the decoded algorithm, not redistribution of the binary.
 
 ## STATUS (2026-06-18)
+- **Stage 3 task 2 item 3b-players — ROSTER BUILD FUN_005b6ba0 + FUN_005a2830 PORTED -> Pm98Match._build_team/_build_player (2026-06-22).**
+  `kickoff_init` now runs the 11-player build per team when a lineup is injected at team[0x9c]
+  (career/save data, injected like `session`; the e2e oracle can dump it straight from a live match).
+  **`_build_team` (FUN_005b6ba0):** squad-header copy team[0xbf..0xc7], the formation-slot active table
+  team[0x4f..], the keeper/marker role table team[0x5b..] (present iff record[0x44]!=0 == the binary's
+  slot+0x70 flag), and the role-5/6 captain pick (max fatigued ability +0x39c -> +0x2d6=1).
+  **`_build_player` (FUN_005a2830, sim subset):** header back-pointers (+0x61/+0x62/+0x63), team/slot/array
+  index, shirt, role +0x2c8 (GK->1 / demarcacion 1->2 adjust), start positions, and the full 0xde..0xe8
+  derived stat block (GK branches, the e3 match-mode branch, the match-clock fatigue scale, 0xea/0xeb/
+  0x1c/0x1e). Player Dict is BYTE-keyed (word index i -> byte key i*4). DEFERRED (none read downstream):
+  display strings/glyphs/sprite-masks + the 0xe1 ftol() field (FPU operand lost in this decompile).
+  **RNG VERIFIED (the load-bearing gate, now closed): the whole FUN_005b6ba0 -> FUN_005a2830 closure
+  (462/455 fns) NEVER reaches the draw FUN_005ec250** -- static call-graph over the full objdump, 0 of
+  552 indirect-call sites RNG-bound. So the build draws 0 and kickoff's 4-draw seed inventory is invariant
+  to whether the roster is empty or full (asserted: rng state unchanged + kickoff-with-roster draws exactly 4).
+  `app/tests/test_player_build.gd` (67 ck, hand-computed oracle independent of the port) PASS; full sweep
+  **86/86** + boot **0 SCRIPT ERROR**. NEXT: 3c reconcile Pm98Movement opponent-descriptor model; 4 e2e
+  oracle dump of a real lineup -> validate the derived stat block + scoreline; 5 N>=50 fixed-seed kill-test.
 - **Stage 3 task 2 — MATCH KICKOFF / PHASE-INIT FUN_00593600 PORTED -> Pm98Match.kickoff_init (2026-06-22).**
   `Pm98Match.kickoff_init(m, session, rng)` ports the kickoff/phase-init the asset loader FUN_005923f0
   runs last: goal geometry (+0x1820/+0x1824 from session+0x4c/+0x50), the pitch box (+0x1828..+0x183c),

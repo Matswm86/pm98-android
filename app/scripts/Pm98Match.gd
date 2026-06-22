@@ -536,10 +536,11 @@ static func kickoff_init(m: Dictionary, session: Dictionary, rng: MatchEngine.Pm
 	m[0x19c8] = side
 	m[0x45c] = side
 
-	# --- per-team kickoff reset x2 (FUN_005b6ba0). Empty skeleton: 0 players built,
-	# 0 seed draws. Re-zeros team active idx (+0x168) + team[0xc/0x10/0x14]. ---
+	# --- per-team kickoff reset x2 (FUN_005b6ba0). 0 seed draws either way (call-graph
+	# proven: FUN_005b6ba0 -> FUN_005a2830 never reaches the RNG FUN_005ec250). Empty
+	# skeleton -> 0 players; with a lineup at team[0x9c] -> the 11-player build runs. ---
 	for ti in range(2):
-		_team_kickoff_reset(m, ti)
+		_team_kickoff_reset(m, ti, rng)
 
 	m[0x1a1e] = 1                                         # arm skip-tick -> restart_handler next tick
 	m[0x1a3c] = 0
@@ -580,14 +581,157 @@ static func _pitch_box(xscale: int, yscale: int) -> Array:
 	return [_u(a0), _u(b1), 0xffff0000, _u(a3), _u(l8), 0x3e80000]
 
 
-## FUN_005b6ba0(this=team) on the EMPTY skeleton: the safe subset -- active idx -> 0 and
-## team[0xc/0x10/0x14] -> 0 (the puVar5 zeroes in FUN_00593600's per-team loop). The squad
-## header copy (team+0x9c) + the 11-player build (FUN_005a2830, stride 0x3bc) is the NEXT
-## sub-port; with no squad source present it builds 0 players and draws 0 -- faithful.
-static func _team_kickoff_reset(m: Dictionary, ti: int) -> void:
+## Per-team kickoff reset + roster build (FUN_005b6ba0, driven by FUN_00593600's per-team
+## loop). The puVar5 zeroes (team[0xc/0x10/0x14]) + active idx are the always-run subset; the
+## 11-player build (FUN_005a2830 per slot, stride 0x3bc) runs only when a lineup is injected
+## at team[0x9c]. RNG-INVARIANT: the whole FUN_005b6ba0 -> FUN_005a2830 closure (462/455 fns)
+## never calls the draw FUN_005ec250 -- so kickoff's 4-draw seed inventory holds either way.
+static func _team_kickoff_reset(m: Dictionary, ti: int, rng: MatchEngine.Pm98Rng) -> void:
 	var team: Dictionary = m["sim"][ti]
 	team[0x168] = 0                                       # param_1[0x5a] = active-player idx
 	team[0xc] = 0                                         # puVar5[-2]
 	team[0x10] = 0                                        # puVar5[-1]
 	team[0x14] = 0                                        # puVar5[0]
-	# squad source team+0x9c absent on the skeleton -> no FUN_005a2830 player build (0 draws).
+	var lineup: Dictionary = team[0x9c] if team.get(0x9c) is Dictionary else {}
+	if not lineup.is_empty():
+		_build_team(m, ti, lineup, rng)
+
+
+## team[0x9c] lineup model (career/save data, injected like `session` -- the e2e oracle can
+## dump it straight from a running match, sidestepping the career/save port). Shape:
+##   { "header": [9 ints], "slots": [ <record Dict or null> x11 ] }
+## "header" -> the 9 dwords copied to team[0xbf..0xc7] (binary: lineup+0x4..+0x28, skip +0,+0xc).
+## each present slot's "record" is the player attribute record (binary: slot+0x2c, byte-keyed),
+## present iff record[0x44] (the demarcacion / role byte) != 0 -- the binary's slot+0x70 flag,
+## which is exactly record+0x44. `rng` is threaded only to assert 0 draws; the build never draws.
+const STRIDE := 0x3bc                                    # player record stride
+static func _build_team(m: Dictionary, ti: int, lineup: Dictionary, rng: MatchEngine.Pm98Rng) -> void:
+	var team: Dictionary = m["sim"][ti]
+	# FUN_005b6ee0 (kit colours) -> display, 0 draws, skipped. Free + re-init the roster.
+	team[0x168] = 0                                       # param_1[0x5a] = 0 (L17)
+	var players: Array = []
+	# squad-header copy team[0xbf..0xc7] = lineup.header[0..8] (L35-46). ---
+	var hdr: Array = lineup.get("header", [])
+	for k in range(9):
+		team[0xbf + k] = int(hdr[k]) if k < hdr.size() else 0
+	# --- build loop: 11 formation slots, present iff record[0x44] != 0 (L47-60). ---
+	var slots: Array = lineup.get("slots", [])
+	for slot in range(11):
+		var rec = slots[slot] if slot < slots.size() else null
+		var present: bool = rec is Dictionary and int(rec.get(0x44, 0)) != 0
+		if present:
+			players.append(_build_player(m, ti, slot, players.size(), rec))
+			# active table team[0x4f+slot] (L61-74): formation slot -> built player.
+			team[0x4f + slot] = players[-1]
+		else:
+			team[0x4f + slot] = 0
+	team["players"] = players
+	team[0x0] = players                                  # *param_1 = base (the array)
+	team[0x4] = players.size()                           # param_1[1] = count
+	# --- role table team[0x5b..0x7e] = 0 then keeper/marker assign + captain (L75-100). ---
+	for k in range(0x24):
+		team[0x5b + k] = 0
+	var cap = 0
+	var cap_ability := 0
+	for p in players:                                    # base + n*stride, count times
+		var role := int(p[0x2c8])
+		if not (team[0x5b + role * 2] is Dictionary):    # slot empty (sentinel 0)
+			team[0x5b + role * 2] = p                    # first of role
+		elif not (team[0x5c + role * 2] is Dictionary):
+			team[0x5c + role * 2] = p                    # second of role
+		if (role == 5 or role == 6) and cap_ability < int(p[0x39c]):
+			cap_ability = int(p[0x39c])                  # midfield/forward captain pick
+			cap = p
+	if cap is Dictionary:
+		cap[0x2d6] = 1                                   # set captain flag (L98-100)
+	team[0x2e0] = -1                                      # param_1[0xb8] = -1 (L101)
+	team[0x2ed] = 0                                       # byte (L102)
+	team[0x208] = 0                                       # FUN_005bbf10(param_1+0x82,0) (L103)
+	team[0x20c] = 0                                       # param_1[0x83] = 0 (L104)
+
+
+## FUN_005a2830 -- per-player builder, sim-relevant subset (consumer-justified: the fields
+## Pm98Movement / Pm98Resolver read -- header ptrs, team/slot idx, role 0x2c8, ability 0x39c,
+## start positions, the 0xde..0xe8 derived stat block). Player Dict is BYTE-keyed, so word
+## index param_1[i] -> byte key i*4; `(int)param_1 + 0xNN` byte casts -> byte key 0xNN.
+## Display work (name/photo/palette strings, kit-letter glyphs, sprite masks) and the 0xe1
+## ftol() field (FPU operand lost in this decompile) are deferred -- none are read downstream.
+## `slot` is the formation slot (0 == goalkeeper, drives the GK stat branches); `arr_idx` is
+## the player's index in the own team array (binary: (this - base)/0x3bc).
+static func _build_player(m: Dictionary, ti: int, slot: int, arr_idx: int, rec: Dictionary) -> Dictionary:
+	var p: Dictionary = {}
+	var rb := func(o: int) -> int: return int(rec.get(o, 0))
+	var team: Dictionary = m["sim"][ti]
+	var is_gk := slot == 0                                # param_1[0xaf] == 0
+
+	# --- header back-pointers (L52-54): own header, opponent header, match. ---
+	p[0x184] = team                                      # param_1[0x61] = match+0x46c+ti*800
+	p[0x188] = m["sim"][1 - ti]                          # param_1[0x62] = match+0x78c-ti*800
+	p[0x18c] = m                                         # param_1[99] = match
+	p[0x2b8] = ti                                        # param_1[0xae] = team index
+	p[0x2bc] = slot                                      # param_1[0xaf] = formation slot
+	p[0x2c0] = rb.call(0x4) & 0xffff                     # param_1[0xb0] = shirt / id (u16)
+	p[0x2cc] = rb.call(0x28)                             # param_1[0xb3]
+	# start positions param_1[0x7e..0x83],[0x8a..0x8d] from record +8..+0x24 (L94-105).
+	p[0x1f8] = rb.call(0x8); p[0x1fc] = rb.call(0xc); p[0x200] = 0
+	p[0x204] = rb.call(0x10); p[0x208] = rb.call(0x14); p[0x20c] = 0
+	p[0x228] = rb.call(0x18); p[0x22c] = rb.call(0x1c)
+	p[0x230] = rb.call(0x20); p[0x234] = rb.call(0x24)
+	p[0x2da] = 1 if rb.call(0x98) != 0 else 0            # byte (L106)
+	p[0x2d9] = 0                                         # byte (L107)
+	p[0x2c4] = arr_idx                                   # param_1[0xb1] = (this-base)/stride (L128)
+	p[0x63] = 0                                          # byte (L129)
+	p[0x2d5] = 1                                         # byte (L130)
+	p[0x2dc] = ((1 if is_gk else 0) + ti * 2) * 0x100 + int(m.get(0x1a5c, 0))  # 0xb7 (L132-133)
+	p[0x36c] = rb.call(0x30) - 1                         # param_1[0xdb] (L134)
+	p[0x370] = rb.call(0x2c) - 1                         # param_1[0xdc] (L135)
+	# fitness clamp param_1[0xb4] in [1,0x3c] (L136-150).
+	var fit: int = rb.call(0x42)
+	p[0x2d0] = clampi(fit, 1, 0x3c) if fit != 0 else 1
+
+	# --- derived match-attribute block (L226-290), line-ordered. ---
+	p[0x2c8] = rb.call(0x44) & 0xff                      # param_1[0xb2] = role (adjusted L311 below)
+	p[0x378] = rb.call(0x34) & 0xff                      # 0xde
+	p[0x37c] = (rb.call(0x35) & 0xff) if not is_gk else ((rb.call(0x35) & 0xff) + 200) / 3  # 0xdf
+	p[0x380] = rb.call(0x36) & 0xff                      # 0xe0
+	p[0x384] = 0                                         # 0xe1 ftol() DEFERRED (operand lost)
+	p[0x388] = rb.call(0x38) & 0xff                      # 0xe2
+	p[0x38c] = rb.call(0x3c) & 0xff                      # 0xe3
+	p[0x390] = rb.call(0x3d) & 0xff                      # 0xe4
+	p[0x394] = (rb.call(0x3e) & 0xff) if not is_gk else 100  # 0xe5
+	p[0x398] = rb.call(0x3f) & 0xff                      # 0xe6
+	p[0x39c] = rb.call(0x40) & 0xff                      # 0xe7 (ability)
+	p[0x3a0] = rb.call(0x41) & 0xff                      # 0xe8
+	var df0 := int(p[0x37c])                             # iVar3 = pre-fatigue 0xdf (L263)
+	p[0x3a8] = ((df0 * 0x1333) / 100 + 0x1333) / 2       # 0xea (L265)
+	p[0x3ac] = ((df0 * 0xc5f) / 100 + 0xc5f) / 2         # 0xeb (L266)
+	p[0x74] = int(p[0x378]) * 0x8c                       # 0x1d (L267)
+	p[0x70] = int(p[0x378]) * 0x8c                       # 0x1c (L268)
+	p[0x78] = 0x78 - int(p[0x380]) / 3                   # 0x1e (L269)
+	# 0xe3 match-mode branch (match+0x19a0 == 4) (L270-276).
+	if int(m.get(0x19a0, 0)) == 4:
+		p[0x38c] = (int(p[0x38c]) + 100) / 2
+	else:
+		p[0x38c] = (int(p[0x38c]) + 200) / 3
+	# fatigue scale on 0xe8/0xe7/0xe2/0xdf via the match-clock match+0x19ac (L277-283).
+	var clk := 36000 - int(m.get(0x19ac, 0))
+	p[0x3a0] = (clk * (100 - int(p[0x3a0]))) / 0xe100 + int(p[0x3a0])
+	p[0x39c] = (clk * (100 - int(p[0x39c]))) / 0xe100 + int(p[0x39c])
+	p[0x388] = (clk * (100 - int(p[0x388]))) / 0xe100 + int(p[0x388])
+	p[0x37c] = (clk * (100 - df0)) / 0xe100 + df0
+	# part-strength reduction (own-header byte +0x2ec == 0 -> x0x5f/100) (L284-290). Default
+	# 1 (full strength, no reduction); the real flag is career-sourced on the team header.
+	if int(team.get(0x2ec, 1)) == 0:
+		p[0x38c] = (int(p[0x38c]) * 0x5f) / 100
+		p[0x3a0] = (int(p[0x3a0]) * 0x5f) / 100
+		p[0x39c] = (int(p[0x39c]) * 0x5f) / 100
+		p[0x394] = (int(p[0x394]) * 0x5f) / 100
+		p[0x388] = (int(p[0x388]) * 0x5f) / 100
+	p[0x2d6] = 0                                         # captain flag default (L294); set in _build_team
+
+	# --- home/away role adjust (L311-315): GK -> 1, else demarcacion 1 -> 2. ---
+	if is_gk:
+		p[0x2c8] = 1
+	elif int(p[0x2c8]) == 1:
+		p[0x2c8] = 2
+	return p
