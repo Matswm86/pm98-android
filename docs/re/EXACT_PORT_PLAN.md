@@ -28,9 +28,24 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   (462/455 fns) NEVER reaches the draw FUN_005ec250** -- static call-graph over the full objdump, 0 of
   552 indirect-call sites RNG-bound. So the build draws 0 and kickoff's 4-draw seed inventory is invariant
   to whether the roster is empty or full (asserted: rng state unchanged + kickoff-with-roster draws exactly 4).
-  `app/tests/test_player_build.gd` (67 ck, hand-computed oracle independent of the port) PASS; full sweep
-  **86/86** + boot **0 SCRIPT ERROR**. NEXT: 3c reconcile Pm98Movement opponent-descriptor model; 4 e2e
-  oracle dump of a real lineup -> validate the derived stat block + scoreline; 5 N>=50 fixed-seed kill-test.
+  `app/tests/test_player_build.gd` (76 ck, hand-computed oracle independent of the port) PASS.
+- **Stage 3 task 2 item 4 (BUILD ORACLE) — FUN_005a2830 PCode-emu-validated 2026-06-22.**
+  `tools/re/run_playerbuild_oracle.sh` drives the REAL FUN_005a2830 through the Ghidra PCode emulator
+  (display/sprite/Win32 calls stubbed: lstrcpyA stdcall/8 + lstrlenA stdcall/4 + sprintf cdecl/0 via
+  repointed IAT slots; FUN_005ec1d0->0 skips the sprite block; one-shot table-build guard preset; glyph
+  table -> zeroed region; injected truncate _ftol; the 0.6/0.8/1.0 selector doubles are static .rdata
+  already mapped). 10 fixtures (GK/outfield, all 3 selectors + boundary traps, mode-4, fatigue clock,
+  part-strength, team-1) ALL return RET cleanly. `app/tests/test_player_build_oracle.gd` (260 ck) asserts
+  `_build_player` against the banked output: **all 25 integer fields bit-exact vs the live function.**
+  0xe1 CAVEAT: Ghidra's PCode x87 stack is 64-bit double, so `byte*0.6` (55-bit-mantissa product) rounds
+  UP before ftol -> the emu mis-banks 0xe1 = 3/6/153 for byte 5/10/255; REAL 80-bit x87 truncates to
+  2/5/152 (== gcc long-double oracle == the exact-integer port). So 0xe1 is now triply-pinned (disasm +
+  gcc-x87 + the exact-int formula), and the build oracle confirms the rest of FUN_005a2830 against the
+  binary itself. (The FUN_005b6ba0 team-builder glue -- header copy, role table, captain -- stays
+  hand-verified in test_player_build.gd; only the math-bearing per-player half was emu-driven.)
+  Full sweep **88/88** + boot **0 SCRIPT ERROR**. NEXT: 3c reconcile Pm98Movement opponent-descriptor
+  model (done 06-22, 3d22b59); **5 = N>=50 fixed-seed KILL-TEST (port vs a running MANAGER.EXE under
+  wine: identical event stream + scoreline) -- the last open item.**
 - **Stage 3 task 2 — MATCH KICKOFF / PHASE-INIT FUN_00593600 PORTED -> Pm98Match.kickoff_init (2026-06-22).**
   `Pm98Match.kickoff_init(m, session, rng)` ports the kickoff/phase-init the asset loader FUN_005923f0
   runs last: goal geometry (+0x1820/+0x1824 from session+0x4c/+0x50), the pitch box (+0x1828..+0x183c),

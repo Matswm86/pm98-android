@@ -1,0 +1,18 @@
+# Stage 3 task 2 step-4 player-build (FUN_005a2830) ground truth (PCode emu;
+# real x87 ftol path for 0xe1; display/sprite stubbed; decimal LE; P=0x230000).
+# cols: name RET | b0 b1 b2 b4 b7 | de df e0 e1 e2 e3 e4 e5 e6 e7 e8 ea eb | 1c 1d 1e | db dc 2da | p7e p8a
+FIX outfield_s2   RET  | 9999 0 3 45 0 50 77 90 10 86 86 70 80 75 94 84 3440 2216 7000 7000 90 0 1 1 286335522 858997828 
+FIX gk_s2         RET  | 9999 0 1 45 256 50 92 90 10 86 86 70 100 75 94 84 4423 2850 7000 7000 90 0 1 1 286335522 858997828 
+FIX sel0_06       RET  | 9999 0 3 45 0 50 77 90 3 86 86 70 80 75 94 84 3440 2216 7000 7000 90 0 1 1 286335522 858997828 
+FIX sel1_08       RET  | 9999 0 3 45 0 50 77 90 4 86 86 70 80 75 94 84 3440 2216 7000 7000 90 0 1 1 286335522 858997828 
+FIX sel0_trap10   RET  | 9999 0 3 45 0 50 77 90 6 86 86 70 80 75 94 84 3440 2216 7000 7000 90 0 1 1 286335522 858997828 
+FIX sel0_255      RET  | 9999 0 3 45 0 50 77 90 153 86 86 70 80 75 94 84 3440 2216 7000 7000 90 0 1 1 286335522 858997828 
+FIX mode4         RET  | 9999 0 3 45 0 50 77 90 10 86 80 70 80 75 94 84 3440 2216 7000 7000 90 0 1 1 286335522 858997828 
+FIX clock18k      RET  | 9999 0 3 45 0 50 58 90 10 75 86 70 80 75 89 71 3440 2216 7000 7000 90 0 1 1 286335522 858997828 
+FIX partstr       RET  | 9999 0 3 45 0 50 77 90 10 81 81 70 76 75 89 79 3440 2216 7000 7000 90 0 1 1 286335522 858997828 
+FIX team1         RET  | 9999 2399 3 45 512 50 77 90 6 81 81 70 76 75 89 79 3440 2216 7000 7000 90 0 1 1 286335522 858997828 
+# NOTE: the 0xe1 column above is the RAW emulator output and is WRONG for byte 5/10/255
+# (banked 3/6/153). Ghidra's PCode x87 = 64-bit double, so byte*0.6 rounds UP before
+# ftol; real 80-bit x87 truncates to 2/5/152 (gcc long-double oracle == exact-integer
+# port (byte*mantissa)>>53). All 25 integer fields are emulator-exact. See
+# app/tests/test_player_build_oracle.gd CAVEAT.
