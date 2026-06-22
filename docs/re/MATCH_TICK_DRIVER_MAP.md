@@ -449,3 +449,91 @@ call site). Resolve that, port `FUN_005a4600` (+ the FUN_005ab5a0/FUN_005a50c0 s
 and only THEN can the e2e match score -> the N>=50 parity kill-test (5b/5c) becomes runnable.
 `mtest.exe` was checked and RULED OUT as the oracle (it is "Matties dTest", a file-integrity
 checksum verifier for mtest.dat, not a match simulator).
+
+---
+
+## STEP-5b CORRECTION (2026-06-22): the STEP-5a "port FUN_005a4600 into Pm98Driver.tick" PLAN IS WRONG
+
+Spent a full session on the call-graph + phase-field write map (objdump/decompile/PE-data verified, not
+inferred). The STEP-5a conclusion ("port FUN_005a4600 + wire into Pm98Driver.tick") rests on a false
+premise. The corrected facts:
+
+### 1. The per-tick driver NEVER runs the +0x10 (action-resolve) pass
+`FUN_00598740` calls exactly these player-loop dispatchers (verified by listing every `call 0x5b8xxx`
+inside it + each dispatcher's vtable offset): `FUN_005b8bf0` x2 = vtable **+8** (DECIDE), `FUN_005b8c20`
+x2 = vtable **+0xc** (ADVANCE). Plus the 4 sub-entity +8/+0xc slots. There is **no +0x10 player-loop
+dispatcher** anywhere in 0x5b8xxx, and the driver has no `call [reg+0x10]`. So wiring FUN_005a4600 into
+`Pm98Driver.tick` would be putting it where the binary never puts it.
+
+### 2. Phase 0 is UNREACHABLE through any live sim path
+Every write to the match phase field `+0x448` in the whole binary (grep `mov [reg+0x448]`):
+- sim range: `0x5938fd/0x593bee/0x593de5` (all inside `FUN_00593b70`, the restart handler) +
+  `0x5942f0` (`FUN_005942e0` = `set_phase`). The 0x46/0x49/0x4c writes are a different struct
+  (`FUN_00491960`'s `+0x448` is a `operator_delete`'d pointer-array, NOT the match).
+- `set_phase` arg per call site (verified the pushed immediate): `0x59711e` dispatcher -> **8**;
+  `0x599631` driver -> **6**; `0x5a4874`/`0x5a5259` -> **1**; `0x5ac0a5` (in `FUN_005ab5a0`) -> **0**.
+- `FUN_00593b70` sets `+0x448 = RESTART_PHASE_TABLE[+0x1a38]` ONLY when `+0x1a38 != 0`.
+  Table @0x664070 (correct .data delta: file = VA-0x401200 is .rdata; .data VA 0x652000 -> file
+  0x250600, so 0x664070 -> file 0x262670) = **[0,2,3,6,4,5,2,7]**. Index 0 -> phase 0, but the
+  `+0x1a38 != 0` guard excludes index 0. So the restart handler can produce phases {2,3,6,4,5,7}, never 0.
+- The driver dispatches `FUN_005966d0(code)` with code in {1..7} only; the dispatcher tail sets
+  `+0x1a38 = code` (0x597118) then `set_phase(8)` (0x59711e). Never 0.
+
+So in live code the phase is only ever **{1,2,3,4,5,6,7,8}**. The ONLY `set_phase(0)` is `0x5ac0a5`
+inside `FUN_005ab5a0`, and `FUN_005ab5a0`'s only callers (0x5acc0e/0x5ae41e/0x5ae8f8/0x5aed7e) are all
+inside the `FUN_005a4600` switch subtree. The resolver `FUN_005aeda0` (already ported as
+`Pm98Resolver`) is called ONLY from 0x5a47f9, also inside `FUN_005a4600`. **=> phase 0 (the open-play
+classification at `FUN_00598740` L209 `if +0x448 != 0 goto default`) is reachable ONLY if FUN_005a4600
+runs on players.**
+
+### 3. FUN_005a4600 has ZERO call/jmp xrefs in the entire binary
+`grep -c 0x5a4600` over the full objdump = **0**. It appears only as the player vtable+0x10 data slot
+(file ref @0x639234). Player vtable @0x639224 = `[+00 5ed810][+04 5a5460 SPRITE][+08 5a3400 DECIDE]
+[+0c 5a4560 ADVANCE][+10 5a4600 ACTION-RESOLVE][+14 5ed810][+18 5ed870][+1c 5ed8e0]`. Keeper/ball/ref
+vtables do NOT have 5a4600 at +0x10 (ball +0x10 is literally null). All 19 `call [reg+0x10]` sites in
+the binary were checked: the 3 that load `[reg+0x438]` (0x467ab9/0x4680d2/0x4688ec) dispatch on a
+SCREEN object (`FUN_00467a50`/`FUN_004680b0`/`FUN_00468860` are CString/`SetWindowTextA`/sprintf UI
+widget handlers; that object's +0x14 is a "%u %u %u" getter, whereas player+0x14 is the dtor -> NOT a
+player). The rest dispatch on app/library singletons. **No statically-provable call site dispatches
+FUN_005a4600 on a player.**
+
+### 4. The kickoff state, and why phase stays 2 (matches the port exactly)
+`kickoff_init` (FUN_00593600) sets phase=2 (+0x448/+0x44c), `+0x1a38=0`, `+0x19a0=0`, `+0x1a1e=1`.
+Tick 1: the `+0x1a1e` gate fires -> `FUN_00593b70`; with `+0x1a38==0` it SKIPS the phase-set block, does
+the state-reset, leaves phase=2, does NOT re-arm `+0x1a1e`. Tick 2+: normal driver, phase 2 -> L209
+skips classification -> movement core only -> phase stays 2 forever. The port reproduces the binary's
+literal control flow; the binary, driven this way, would ALSO stay at phase 2.
+
+### 5. What actually drives a watched match (the real architecture)
+`FUN_005983f0` (match step, tail-jmp'd via thunk 0x5910a0 from the career match loop `FUN_0044ee70`
+@0x44f394) branches on the play-state `PS = *(match+0x468)+0xfa0` (= career/session play-state, the
+career-layer field; `match+0x468` is a pointer to the session, NOT the team header which is +0x46c):
+- `FUN_005943b0/d0/f0` = `PS==0 / PS==4 / PS==2`. Set-piece branch iff `PS in {0,4}` (or penalty /
+  +0x1a20 latch); else the normal branch (one `FUN_00598740` tick).
+- `FUN_0044ee70` L128 `if (PS != 5)` = WATCHABLE positional match (the FUN_005910a0 loop); `PS == 5` =
+  the self-contained STATISTICAL match (the `rand()` attack/defense loops at L357-787, FUN_0044ece0 /
+  FUN_004510b0). The watched path does NOT pre-compute goals statistically.
+- The set-piece branch spins `FUN_00593ab0`, whose controller `FUN_005bce40` is the **Win32 message
+  pump** (PeekMessageA/GetCursorPos/AfxGetThread) -> returns -1 headless -> the set-piece branch is a
+  no-op headless.
+
+So a watched match must detect goals live (phase 0) yet phase 0 needs FUN_005a4600, which has no static
+caller. The only consistent resolution: **FUN_005a4600 is dispatched dynamically on the active player
+(`match+0x438` = select_active result) from the match-VIEW screen's per-frame handler / window-proc,
+reached through the message-pump indirection that static xref cannot follow** (OR it is vestigial and a
+mechanism still unfound injects phase 0). EITHER WAY the missing logic lives in the match-screen
+controller layer, not in `FUN_00598740`.
+
+### NEXT (decisive, supersedes "port FUN_005a4600 into the driver")
+1. **DYNAMIC trace under wine** (wine-9.0 present): breakpoint/trace `0x5a4600`, `0x5ac0a5` (set_phase 0),
+   `0x5942e0` (set_phase), `0x593b70` during a real WATCHED match. Settles: is FUN_005a4600 ever called?
+   what sets phase 0? what is `match+0x438` when +0x10 fires? Needs a save-game parked at a match (or
+   menu-drive headless). This is the gate; do NOT port FUN_005a4600 blind first.
+2. If confirmed live: port FUN_005a4600 (2632 B) + FUN_005a50c0 (872 B, the action-frame stepper that
+   sets phase 1) + the switch-case callees, and run it as a **separate per-active-player pass each frame
+   on `match+0x438`** (NOT inside Pm98Driver.tick). `Pm98Resolver` already ports the FUN_005aeda0 inner
+   tree (case 8/9).
+3. SCOPE QUESTION to raise with Mats: the STATISTICAL engine (FUN_0044ee70 PS==5 rand loops) is
+   self-contained and far cheaper to port + parity-test than the interactive positional engine. Decide
+   whether the playable port needs the positional match headless at all, or whether statistical sim +
+   a thinner positional animation is the better target.
