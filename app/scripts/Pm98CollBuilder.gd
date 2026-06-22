@@ -292,3 +292,28 @@ static func build(m: Dictionary) -> Dictionary:
 	var posts := []
 	_build_posts(F, m, master, posts)
 	return {"master": master, "posts": posts}
+
+
+# ---- runtime wiring (FUN_005946f0 stores +0x17f4 base / +0x17f8 count into the match) ---------
+# The ball collision loop (Pm98Movement._ball_collision / _post_narrow) reads each post as a Dict
+# keyed by BYTE offset, NOT the flat 22-int array build() returns. The flat layout is contiguous
+# (quad12 @0x0..0x2c, AABB6 @0x30..0x44, normal3 @0x48..0x50, id @0x54; post stride 0x58 = 22
+# ints), so byte offset == index * 4 -- a straight re-key, no reordering.
+static func post_to_dict(flat: Array) -> Dictionary:
+	var d := {}
+	for j in flat.size():
+		d[j * 4] = int(flat[j])
+	return d
+
+
+## Build the goal/pitch collision geometry for match `m` and store the post/collider array the
+## headless ball physics iterates: m[0x17f4] = [post Dicts], m[0x17f8] = count. Call once at
+## match-init (after the goal dims +0x1820/+0x1950..+0x197c/+0x1a1b are set). Returns the count.
+static func populate_posts(m: Dictionary) -> int:
+	var built := build(m)
+	var posts := []
+	for flat in built.get("posts", []):
+		posts.append(post_to_dict(flat))
+	m[0x17f4] = posts
+	m[0x17f8] = posts.size()
+	return posts.size()
