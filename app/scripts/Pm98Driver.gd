@@ -731,12 +731,14 @@ static func restart_handler(m: Dictionary, rng: MatchEngine.Pm98Rng) -> void:
 		# everything after (FUN_00606220 etc.) is 240/230-bracketed display -> seed-neutral.
 
 
-## DAT_00664070[rtype]: the restart-type -> phase table. Modeled from the decode (the table
-## maps the +0x1a38 restart code to the +0x448/+0x44c phase). Until the .rdata table is
-## banked, rtype is used as the phase directly for rtype in 0..7 (kickoff path keys on
-## +0x19a0, not this), which is the identity the decode implies for the common codes.
+## DAT_00664070[rtype]: the restart-type -> phase table, banked 2026-06-22 from MANAGER.EXE
+## .data 0x664070 (objdump -s): {0->0, 1->2, 2->3, 3->6, 4->4, 5->5, 6->2, 7->7}. Maps the
+## +0x1a38 restart code to the +0x448/+0x44c phase. (Was modeled as identity; codes 3 and 6
+## are the two that differ -- 3->6 and 6->2.)
+const RESTART_PHASE_TABLE := [0, 2, 3, 6, 4, 5, 2, 7]
+
 static func _restart_phase(rtype: int) -> int:
-	return rtype
+	return RESTART_PHASE_TABLE[rtype] if rtype >= 0 and rtype < RESTART_PHASE_TABLE.size() else rtype
 
 
 ## FUN_005946d0 team-reset: two passes of the per-player reset FUN_005a32c0 over team+4

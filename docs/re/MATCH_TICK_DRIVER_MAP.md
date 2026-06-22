@@ -373,14 +373,43 @@ throwaway rng to build_match.**
 
 ### STEP-2 REMAINING (item 3 = ctor now DONE; renumbered)
 3a. **DONE** -- match-init CTOR FUN_00591180 -> Pm98Match.build_match (skeleton, empty roster).
-3b. **NEXT: port the POPULATE FUN_005923f0** (15KB, ~40 callees incl. goal-dims FUN_00593600 [decoded]
-    + per-team FUN_00591ba0): loads the 22 players (heap array at team[0], count team[1], stride 0x3bc),
-    their coords/attributes, the session sub-object at match+0x468, the goal dims, kickoff placement.
-    This is what makes a match runnable end-to-end.
+3b-kickoff. **DONE 2026-06-22** -- match KICKOFF / phase-init FUN_00593600 -> Pm98Match.kickoff_init(m,
+    session, rng). Goal geometry (+0x1820/+0x1824 = half pitch len/width from session+0x4c/+0x50), the
+    pitch box (+0x1828..+0x183c, min/max-ordered), the free-kick spot tables (+0x194c..+0x197c), phase=2
+    (+0x448/+0x44c), the kickoff side (+0x19c8/+0x45c) + the 3 commentary timers (+0x19e4/8/c) the driver
+    decrements, arms +0x1a1e, +0x180e=1, +0x454=0. **Draws the match seed EXACTLY 4x on the empty
+    skeleton** (verified: FUN_005b6ba0/005b6ee0/00593a30/005f57xx all draw 0). DAT_00664060 pitch-type
+    table = [0x1c20,0x3840,0x5460,0x8ca0]; DAT_00664070 restart->phase = [0,2,3,6,4,5,2,7] (banked, wired
+    into Pm98Driver._restart_phase -- was identity; 3->6 and 6->2 differ). Locked by test_kickoff_init.gd
+    (61 ck) + sweep 86/86 + boot 0 errors.
+
+> **CORRECTION (2026-06-22), supersedes the prior item-3b premise.** The handoff said FUN_005923f0 "loads
+> the 22 players". **FALSE -- verified against the decompiles + objdump.** FUN_005923f0 is the match
+> **asset / layer / display loader**: palettes (DatSim\paletas\palarb/pallin), the grass texture
+> (hierba_raw), the per-league hierarchy textures (hier*_raw), the clock FLC (coreloj), the goalkeeper
+> save models (Modelos\/PARADOS) -- all DISPLAY, irrelevant to the headless scoreline engine. Its ONLY
+> sim-relevant tail callee is FUN_00593600 (the kickoff-init ported above). FUN_00591ba0 (the handoff's
+> "per-team populate") is the match **DESTRUCTOR** (frees the team-header array via
+> FUN_00605da0(match+0x46c, 800, 2, FUN_00591560)). **The real 22-player loader is the chain
+> FUN_00593600 -> FUN_005b6ba0 (per-team; builds 11 players, loop 0x764/0xac, stride 0x3bc, from the
+> squad source at team+0x9c) -> FUN_005a2830 (per-player builder).** team+0x9c (the squad source) is set
+> by the match-START caller at 0x44f1xx (the sole caller of the create-wrapper FUN_00590fc0; this=career
+> object `ebx`, ebx+0xfa0 = play-state), which loads it from the career / save subsystem -- OUTSIDE this
+> sim corpus. So a fully-standalone match-init needs that subsystem; the kill-test can instead seed the
+> player array from an oracle dump (see item 4).
+
+3b-players. **NEXT: port the player-build chain FUN_005b6ba0 (per-team) + FUN_005a2830 (per-player).**
+    FUN_005b6ba0 reads the squad header (team+0x9c: 9 dwords -> team[0xbf..199]) then builds up to 11
+    players (FUN_005a2830(match, slot_idx, team+0x138, squad_slot+0x2c), stride 0x3bc, growing team[0]
+    base / team[1] count), then assigns the keeper/marker slots (team+0x5b.. by player+0x2c8 role; +0x2d6
+    captain). **VERIFY FUN_005a2830's seed-draw count** (its callees not yet checked) -- if it draws, the
+    kickoff RNG inventory gains 2*11*k draws. Needs the squad-source data model (or an oracle dump).
 3c. **RECONCILE the movement data model**: Pm98Movement reads the opponent descriptor at match+0x46c/
     +0x78c as a players ARRAY (a fixture shortcut), but the binary-faithful ctor stores the 800-byte team
     HEADER there (players at header[0]). Reconcile (edit Pm98Movement opp-descriptor read + re-run
     run_assignmarker_oracle.sh / run_relmatrix_oracle.sh) so the driver's movement core runs on the
     real skeleton. Until then the per-team passes cannot run on build_match's output (the per-tick RNG
-    inventory + control flow ARE testable, the movement core is not).
-4. End-to-end oracle (wine MANAGER.EXE OR full-emu) + 5. the N>=50 fixed-seed kill-test (unchanged).
+    inventory + control flow + kickoff geometry ARE testable, the movement core is not).
+4. End-to-end oracle (wine MANAGER.EXE OR full-emu) + 5. the N>=50 fixed-seed kill-test. The oracle path
+   can DUMP the kickoff player array (coords+attributes) and seed Pm98Match directly -- this sidesteps
+   porting the entire career/save subsystem just to populate 22 players for the parity test.

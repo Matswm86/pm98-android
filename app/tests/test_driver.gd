@@ -107,7 +107,7 @@ func _test_flag_clear() -> void:
 func _test_skip_gate_restart() -> void:
 	# +0x1a1e latched -> restart_handler runs (resets state) then match-over. The handler's
 	# lone unbracketed draw fires iff the resulting +0x448 lands in {2,3,4,5,6}.
-	# Case A: restart type 3 -> +0x448 = 3 -> 1 draw.
+	# Case A: restart type 3 -> DAT_00664070[3] = phase 6 -> 1 draw (6 in {2..6}).
 	var m := _base_match()
 	m[0x1a1e] = 1; m[0x1a38] = 3; m[0x19a0] = 0; m[0x448] = 0
 	var rng := _rng()
@@ -115,8 +115,8 @@ func _test_skip_gate_restart() -> void:
 	Pm98Driver.tick(m, rng)
 	_ok(int(m[0x1a1e]) == 0, "skip_gate: +0x1a1e cleared")
 	_ok(int(m[0x460]) == 0 and int(m[0x454]) == 0, "skip_gate: restart_handler reset +0x460/+0x454")
-	_ok(int(m[0x448]) == 3, "skip_gate: restart type 3 -> +0x448 = %d (want 3)" % int(m[0x448]))
-	_ok(_draws(s0, rng.state) == 1, "skip_gate: phase-3 restart draws %d (want 1)" % _draws(s0, rng.state))
+	_ok(int(m[0x448]) == 6, "skip_gate: restart type 3 -> +0x448 = %d (want 6, DAT_00664070[3])" % int(m[0x448]))
+	_ok(_draws(s0, rng.state) == 1, "skip_gate: phase-6 restart draws %d (want 1)" % _draws(s0, rng.state))
 
 	# Case B: no restart type, +0x448 stays 0 -> 0 draws.
 	var m2 := _base_match()

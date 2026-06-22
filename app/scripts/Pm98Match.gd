@@ -425,3 +425,169 @@ static func _scale7(roll: int) -> int:
 ## Reinterpret a signed int as its unsigned 32-bit dword (the binary stores raw dwords).
 static func _u(v: int) -> int:
 	return v & 0xFFFFFFFF
+
+
+## Reinterpret a stored unsigned 32-bit dword as a signed int (inverse of _u).
+static func _i(v: int) -> int:
+	v &= 0xFFFFFFFF
+	return v - 0x100000000 if v >= 0x80000000 else v
+
+
+## C `int / 2` -- integer division truncating toward zero (matches MSVC `/2`).
+static func _idiv2(v: int) -> int:
+	var s := _i(v)
+	# GDScript int `/` truncates toward zero, same as C, but be explicit for clarity.
+	return int(s / 2) if s >= 0 else -int((-s) / 2)
+
+
+# =============================================================================
+# kickoff_init -- EXACT port of FUN_00593600, the match KICKOFF / phase-init that the
+# asset loader FUN_005923f0 runs LAST (its only sim-relevant tail callee). It is NOT a
+# "goal-dims" helper and FUN_005923f0 is NOT the player loader (it loads palettes /
+# pitch textures / FLC clock / models -- all display); the real 22-player loader is the
+# FUN_005b6ba0 -> FUN_005a2830 chain THIS routine drives per team (next sub-port).
+#
+# kickoff_init reads the session / play-state object (binary: match+0x468) for pitch
+# geometry + orientation, then writes: goal geometry (+0x1820/+0x1824 = half pitch
+# length/width, read all over Pm98Movement), the pitch box (+0x1828..+0x183c), the
+# free-kick spot tables (+0x194c..+0x197c), phase = 2 (+0x448/+0x44c), the kickoff side
+# (+0x19c8/+0x45c) and the three commentary timers (+0x19e4/+0x19e8/+0x19ec) the driver
+# decrements, arms the +0x1a1e skip-tick gate (-> restart_handler next tick), clears the
+# match-over counter (+0x454 = 0), and sets the in-match flag (+0x180e = 1). Mutates `m`.
+#
+# RNG (LOAD-BEARING): draws the match seed EXACTLY 4 times on the empty skeleton -- the
+# four FUN_005ec250 in FUN_00593600 (1 kickoff side + 3 timers). The per-team resets
+# (FUN_005b6ba0), the kit-color setup (FUN_005b6ee0), the display-flag pass (FUN_00593a30),
+# and the ball-trail calls (FUN_005f5800/5740/57a0) all draw 0 -- verified from disasm.
+# When a squad source (team+0x9c) is present the per-team build (FUN_005a2830) runs and
+# MAY add draws; that is the next sub-port, flagged here, not silently assumed.
+#
+# `session` is a Dict keyed by byte offset; required fields: 0x4c (pitch length), 0x50
+# (pitch width), 0xfd0/0xfd4 (orient bools), 0xfd8/0xfdc (orient ints), 0xff4 (pitch-type
+# index). A real session comes from the match-setup / career subsystem (the binary builds
+# it from the match-start caller at 0x44f1xx, this=career object); the e2e oracle dumps it.
+# =============================================================================
+
+const PITCH_TYPE_TABLE := [0x1c20, 0x3840, 0x5460, 0x8ca0]   # DAT_00664060[session+0xff4]
+
+static func kickoff_init(m: Dictionary, session: Dictionary, rng: MatchEngine.Pm98Rng) -> void:
+	m[0x468] = session                                   # FUN_005923f0 L184 sets the session link
+	var sg := func(o: int) -> int: return int(session.get(o, 0))
+
+	m[0x180d] = 0                                         # byte (display)
+	m[0x1a1b] = 1 if sg.call(0xfd0) != 0 else 0           # bool
+	m[0x1a1c] = 1 if sg.call(0xfd4) != 0 else 0           # bool
+	m[0x1984] = 3 - sg.call(0xfd8)
+	m[0x1988] = 2 - sg.call(0xfdc)
+	m[0x1a40] = 0xc66b14
+
+	# --- goal geometry: half pitch length / width (signed /2). ---
+	var xscale := _idiv2(sg.call(0x4c))                  # +0x1820
+	var yscale := _idiv2(sg.call(0x50))                  # +0x1824
+	m[0x1820] = _u(xscale)
+	m[0x1824] = _u(yscale)
+
+	# --- pitch box +0x1828..+0x183c: x in [-x,x], y in [-y,y], z in [-1.0, 1000.0] (16.16).
+	# The decompile's two min<=neg swaps only fire for non-positive scale; reproduced. ---
+	var box := _pitch_box(xscale, yscale)
+	m[0x1828] = box[0]; m[0x182c] = box[1]; m[0x1830] = box[2]
+	m[0x1834] = box[3]; m[0x1838] = box[4]; m[0x183c] = box[5]
+
+	# --- free-kick / wall spot tables (offsets relative to goal X / Y). ---
+	m[0x194c] = 0x190000
+	m[0x1950] = _u(xscale + 0x230000)
+	m[0x1954] = _u(xscale + 0xf0000)
+	m[0x1958] = _u(xscale + 0xf0000)
+	m[0x195c] = _u(xscale + 0x60000)
+	m[0x1960] = _u(yscale + 0x230000)
+	m[0x1964] = _u(yscale + 0xf0000)
+	m[0x1968] = _u(yscale + 0xf0000)
+	m[0x196c] = _u(yscale + 0x60000)
+	m[0x1970] = _u(xscale + 0xc0000)
+	m[0x1974] = _u(xscale + 0x40000)
+	m[0x1978] = _u(yscale + 0xc0000)
+	m[0x197c] = _u(yscale + 0x40000)
+	m[0x181e] = 0x2000                                    # short
+	m[0x1940] = 0xcccc
+
+	m[0x19ac] = PITCH_TYPE_TABLE[sg.call(0xff4) & 3]      # DAT_00664060[idx]
+	m[0x1810] = 0
+	m[0x19a0] = 0
+	m[0x19a4] = 0
+	m[0x450] = 0
+	m[0x19a8] = 0
+	m[0x1a18] = 0; m[0x1a19] = 0                          # bytes
+	m[0x1808] = 1                                         # byte
+	m[0x1804] = 0x1e0000
+	m[0x1814] = _u(-(yscale + 0x230000))                 # -(+0x1960)
+	m[0x1818] = 0xf0000
+	m[0x2882] = 0                                         # byte
+	# FUN_005f5800/5740/57a0 -- ball-trail display init; no sim/seed effect, skipped.
+
+	m[0x19d0] = 0; m[0x19c4] = 0; m[0x19c0] = 0
+	m[0x1a20] = 0                                         # byte
+	m[0x19b8] = 0
+	m[0x1809] = 1                                         # byte
+	m[0x44c] = 2
+	m[0x448] = 2                                          # PHASE = 2 (kickoff)
+
+	# --- DRAW 1: kickoff side (+0x19c8/+0x45c) in {0,1}. ---
+	var side := (rng.next() * 2) >> 15
+	m[0x19c8] = side
+	m[0x45c] = side
+
+	# --- per-team kickoff reset x2 (FUN_005b6ba0). Empty skeleton: 0 players built,
+	# 0 seed draws. Re-zeros team active idx (+0x168) + team[0xc/0x10/0x14]. ---
+	for ti in range(2):
+		_team_kickoff_reset(m, ti)
+
+	m[0x1a1e] = 1                                         # arm skip-tick -> restart_handler next tick
+	m[0x1a3c] = 0
+	m[0x1a38] = 0                                         # restart type = none
+	m[0x1990] = 0; m[0x198c] = 0
+	m[0x454] = 0                                          # match-over counter = 0 (NOT over)
+	m[0x1a2c] = 0; m[0x1a30] = 0
+	m[0x19b4] = 0; m[0x19b0] = 0
+	m[0x180e] = 1                                         # in-match flag
+	# FUN_00593a30 -- display flags +0x180a/b/c; headless (+0x180e set, display off) -> 0.
+	m[0x180a] = 0; m[0x180b] = 0; m[0x180c] = 0
+
+	m[0x19e0] = 0
+	# --- DRAW 2 / 3 / 4: the commentary timers the driver decrements each tick. ---
+	m[0x19e4] = (rng.next() * 900) >> 15                 # [0, 900)
+	m[0x19e8] = (rng.next() * 0xe10) >> 15               # [0, 3600)
+	var t := ((rng.next() * 0x960) >> 15) + 900          # [900, 3300)
+	m[0x19f0] = 0
+	m[0x19ec] = t
+	m[0x19f8] = 0; m[0x19f4] = 0; m[0x1a00] = 0; m[0x19fc] = 0
+
+
+## The pitch-box build from FUN_00593600 (L30-51): a min/max-ordered AABB. Returns the
+## 6 dwords copied to match+0x1828.. : [-x, -y, z_lo, x, y, z_hi] as raw unsigned dwords.
+static func _pitch_box(xscale: int, yscale: int) -> Array:
+	var a0 := -xscale                                    # local_18[0]
+	var a3 := xscale                                     # local_18[3]
+	var ix := -xscale                                    # iVar2
+	if -a3 != a3 and a3 <= ix:                            # only swaps when xscale <= 0
+		a0 = a3
+		a3 = ix
+	var b1 := -yscale                                    # local_18[1]
+	var l8 := yscale                                     # local_8
+	var iy := -yscale                                    # iVar3
+	if -l8 != l8 and l8 <= iy:                            # only swaps when yscale <= 0
+		b1 = l8
+		l8 = iy
+	return [_u(a0), _u(b1), 0xffff0000, _u(a3), _u(l8), 0x3e80000]
+
+
+## FUN_005b6ba0(this=team) on the EMPTY skeleton: the safe subset -- active idx -> 0 and
+## team[0xc/0x10/0x14] -> 0 (the puVar5 zeroes in FUN_00593600's per-team loop). The squad
+## header copy (team+0x9c) + the 11-player build (FUN_005a2830, stride 0x3bc) is the NEXT
+## sub-port; with no squad source present it builds 0 players and draws 0 -- faithful.
+static func _team_kickoff_reset(m: Dictionary, ti: int) -> void:
+	var team: Dictionary = m["sim"][ti]
+	team[0x168] = 0                                       # param_1[0x5a] = active-player idx
+	team[0xc] = 0                                         # puVar5[-2]
+	team[0x10] = 0                                        # puVar5[-1]
+	team[0x14] = 0                                        # puVar5[0]
+	# squad source team+0x9c absent on the skeleton -> no FUN_005a2830 player build (0 draws).

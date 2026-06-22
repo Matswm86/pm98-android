@@ -9,6 +9,21 @@ Legit RE of the owner's own binary for the owner's own remake. Deliverable = ori
 GDScript reproducing the decoded algorithm, not redistribution of the binary.
 
 ## STATUS (2026-06-18)
+- **Stage 3 task 2 — MATCH KICKOFF / PHASE-INIT FUN_00593600 PORTED -> Pm98Match.kickoff_init (2026-06-22).**
+  `Pm98Match.kickoff_init(m, session, rng)` ports the kickoff/phase-init the asset loader FUN_005923f0
+  runs last: goal geometry (+0x1820/+0x1824 from session+0x4c/+0x50), the pitch box (+0x1828..+0x183c),
+  the free-kick spot tables, phase=2, the kickoff side + 3 commentary timers, arms +0x1a1e, +0x180e=1,
+  +0x454=0. **Draws the match seed EXACTLY 4x on the empty skeleton** (FUN_005b6ba0/005b6ee0/00593a30/
+  005f57xx draw 0 -- verified from disasm). Banked tables: DAT_00664060 pitch-type [0x1c20,0x3840,0x5460,
+  0x8ca0], DAT_00664070 restart->phase [0,2,3,6,4,5,2,7] (wired into Pm98Driver._restart_phase -- was a
+  stub identity; 3->6 / 6->2 differ; test_driver case-A updated). `app/tests/test_kickoff_init.gd` (61 ck)
+  PASS; full sweep **85/85** + boot **0 SCRIPT ERROR**.
+  **CORRECTION:** FUN_005923f0 is the match ASSET/DISPLAY loader (palettes / hierba grass / hier* textures
+  / coreloj FLC / Modelos+PARADOS models), NOT the player loader; FUN_00591ba0 is the match DESTRUCTOR.
+  The real 22-player loader is FUN_00593600 -> FUN_005b6ba0 (per-team, 11 players, stride 0x3bc, squad
+  source team+0x9c) -> FUN_005a2830 (per-player) -- team+0x9c is set by the match-start caller 0x44f1xx
+  from the career/save subsystem (outside the sim corpus). NEXT: 3b-players (port FUN_005b6ba0 +
+  FUN_005a2830, verify FUN_005a2830 seed draws) OR oracle-dump the kickoff roster; 3c reconcile movement.
 - **Stage 3 task 2 — MATCH-INIT CTOR FUN_00591180 PORTED -> Pm98Match.gd (2026-06-22).**
   `Pm98Match.build_match(rng) -> m` ports the match-object constructor (operator new(0x5fb8) +
   FUN_00591180): the base subobject (FUN_005c52b0 @ match+0), two team headers (FUN_005b6360 @
