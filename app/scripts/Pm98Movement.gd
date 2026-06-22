@@ -158,9 +158,9 @@ static func _ref(d: Dictionary, off: int) -> Dictionary:
 	return v if v is Dictionary else {}
 
 
-## FUN_005943b0: match phase (match+0x468 -> +0xfa0) == 0.
+## FUN_005943b0: match play-state (match+0x468 -> +0xfa0) == 0. (Thin alias of play_state_eq.)
 static func _phase0(m: Dictionary) -> bool:
-	return _g(_ref(m, 0x468), 0xfa0) == 0
+	return play_state_eq(m, 0)
 
 
 # =============================================================================
@@ -1935,6 +1935,60 @@ static func player_opposite_half(p: Dictionary, side: int) -> bool:
 	if ((_g(m, 0x19a0) & 1) ^ side) == 0:
 		goalx = Pm98Trig._i32(-goalx)
 	return _sign1(_si(p, 0x4)) != _sign1(goalx)
+
+
+## FUN_00590aa0 (__thiscall out; x, y, z): store a 3-vec out=[x,y,z]. (FUN_00590ac0 copies a vec;
+## this one takes the three scalars directly.) The driver builds working positions with it in the
+## restart-placement ladder. Each component wraps to int32 (faithful to the 32-bit store).
+static func vec3_set(x: int, y: int, z: int) -> Array:
+	return [Pm98Trig._i32(x), Pm98Trig._i32(y), Pm98Trig._i32(z)]
+
+
+## FUN_005943b0 / FUN_005943f0 / FUN_005943d0 (__fastcall match): equality predicates on the
+## session play-state `match+0x468 -> +0xfa0` (a global mode int, distinct from the set-piece phase
+## +0x448). 5943b0 tests ==0, 5943f0 tests ==2, 5943d0 tests ==4. The event-queue layer uses them to
+## gate the priority counter (+0x1a2c) and the timed dequeue. match+0x468 is the session sub-object.
+static func _play_state(m: Dictionary) -> int:
+	return _g(_ref(m, 0x468), 0xfa0)
+
+static func play_state_eq(m: Dictionary, n: int) -> bool:
+	return _play_state(m) == n
+
+
+## FUN_0059a1e0 (__thiscall player; vec, factor): clamp vec.x toward `player`'s attacking goal by a
+## 0..50 (0x32) `factor`. boundary = i32((factor-50)*goalx)/50 when the player attacks -x
+## (player+0x3a4 < 0) -> clamp DOWN (take the min); else i32((50-factor)*goalx)/50 -> clamp UP (max).
+## goalx = match+0x1820 (match = player+0x18c). The product wraps to int32 (imul) before the truncating
+## /50 (idiv toward zero). Returns the clamped 3-vec (y, z untouched).
+static func clamp_x_goalside(p: Dictionary, vec: Array, factor: int) -> Array:
+	var goalx := _si(_ref(p, 0x18c), 0x1820)
+	var out := [Pm98Trig._i32(int(vec[0])), Pm98Trig._i32(int(vec[1])), Pm98Trig._i32(int(vec[2]))]
+	if _si(p, 0x3a4) < 0:
+		var b: int = Pm98Trig._i32((factor - 0x32) * goalx) / 0x32
+		if b < out[0]:
+			out[0] = b
+	else:
+		var b: int = Pm98Trig._i32((0x32 - factor) * goalx) / 0x32
+		if out[0] < b:
+			out[0] = b
+	return out
+
+
+## FUN_0059a120 (__thiscall player; vec) -> bool: the restart-placement "deep on own attacking flank"
+## test. It is the SAME-side (`==`) twin of pos_forward_ok (FUN_005b04e0, which is `!=`): vec must sit
+## in the positioning box (match dims +0x1828..+0x183c), past the line abs(x) > goalx-0x108000, within
+## abs(y) < 0x1428f5, AND on the SAME x-side as the player's attacking direction (+0x3a4). match = +0x18c.
+static func restart_box_ok(p: Dictionary, vec: Array) -> bool:
+	var m: Dictionary = _ref(p, 0x18c)
+	var x := Pm98Trig._i32(int(vec[0]))
+	var y := Pm98Trig._i32(int(vec[1]))
+	var z := Pm98Trig._i32(int(vec[2]))
+	if x < _si(m, 0x1828) or x > _si(m, 0x1834) or y < _si(m, 0x182c) or y > _si(m, 0x1838) \
+			or z < _si(m, 0x1830) or z > _si(m, 0x183c):
+		return false
+	if not (_si(m, 0x1820) - 0x108000 < abs(x) and abs(y) < 0x1428f5):
+		return false
+	return _sign1(x) == _sign1(_si(p, 0x3a4))
 
 
 # ---- FUN_005b73a0 the per-team off-ball POSITIONING pass (slice A: prologue + open play) ----

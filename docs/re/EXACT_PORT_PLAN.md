@@ -904,6 +904,25 @@ a `5b70e0; 5b73a0` pair; the 5b8bf0/5b8c20 vtable loops are driven from 0x598b35
   `run_dispatch_oracle.sh` use). **KILL-TEST** for task 2 = full-match event-stream parity (fixed seed +
   fixed squads -> identical event stream + scoreline, N>=50).
 
+- **Stage 3 task 2 — driver leaves batch 2 (4 PURE leaves of FUN_00598740) PORTED + oracle-validated
+  DONE 2026-06-22.** -> `Pm98Movement.vec3_set` (FUN_00590aa0, 3-scalar store), `play_state_eq`
+  (FUN_005943b0/f0/d0 = `match+0x468->+0xfa0 == {0,2,4}`; `_phase0` now delegates), `clamp_x_goalside`
+  (FUN_0059a1e0, clamp vec.x toward the goal by a 0..50 factor; product wraps i32 before truncating /50),
+  `restart_box_ok` (FUN_0059a120 = the SAME-side `==` twin of pos_forward_ok FUN_005b04e0). Oracle
+  `run_driverleaf2_oracle.sh` -> `specs/driverleaf2_oracle.txt` (12 fixtures: vec_set; ps_eq{0T,0F,2T,4T}
+  [EAX masked &0xff -- the binary leaves CONCAT31 junk = session_ptr>>8 in the upper bytes, caller reads AL];
+  clamp_{neg,pos,no} [hand-verified 648806 / -648806 / unchanged]; rb_{same_T,oppside_F,shallow_F,outbox_F]).
+  Locked by `test_driverleaf2.gd` (**14 checks, ALL PASS**). No regression (82 suites + test_divisions pass;
+  boots 0 SCRIPT ERROR). **With FUN_0058f0b0 (done earlier) this completes the driver's PURE leaf set.**
+  Read the full FUN_00598740 body + banked the sim skeleton + RNG-draw inventory in MATCH_TICK_DRIVER_MAP.md
+  ("Driver body decode 2026-06-22"). **KEY FINDING (corrects match_engine_re.md):** the driver's per-tick
+  commentary/event TIMERS (+0x19e4/+0x19e8/+0x19ec, decompile L747-L844) use UNBRACKETED FUN_005ec250 ->
+  they DO advance the match seed (not only dispatcher case 2/6); a bit-exact full-match port must reproduce
+  them. **STEP-2 remaining (multi-session): (a) port FUN_0058f3c0 (last open-play predicate) + classify
+  FUN_00593b70; (b) port the driver shell FUN_00598740 -> new Pm98Driver.gd; (c) port match-init
+  FUN_00591180 (the 22-player match object -- NOT yet ported, blocks the full-match loop); (d) stand up the
+  wine OR full-emu end-to-end oracle; (e) the N>=50 fixed-seed event-stream + scoreline KILL-TEST.**
+
 ## Already decoded — cite + port, don't redo (see match_engine_re.md for detail)
 - RNG `FUN_005ec250` (MSVC LCG, state @0x6d3184) — already exact as `Pm98Rng`. Per-mil idiom
   `(roll*1000)>>15 < permil`. Commentary rolls bracketed by `005ec240/005ec230` (replicate).

@@ -136,3 +136,85 @@ port is the ball physics FUN_0058e2c0, then the goalkeeper FUN_005a22d0, then th
 driver** (referee FUN_005b5dd0 is a skip candidate). The earlier "all 4 sub-entities are render,
 skip them" reading was wrong: it came from reading the vtables at file delta 0x401208 (off by 8),
 which put the sprite method at the +8/+0xc slots. Correct delta is 0x401200.
+
+---
+
+## Driver body decode + RNG-draw inventory (2026-06-22)
+Read the full FUN_00598740 decompile (6507 bytes, /tmp/pm98dec/fn_00598740). The ball physics
+(FUN_0058e2c0 -> Pm98Movement.ball_advance) and goalkeeper (FUN_005a22d0 -> keeper_advance) are
+DONE since 06-20/06-21, so all the *sub-entity ADVANCE* slots the driver invokes are ported. What is
+left is the driver shell itself + a few leaves. The 4 remaining PURE leaves are now PORTED + emu-
+oracle-validated (this slice): `vec3_set` (FUN_00590aa0), `play_state_eq` (FUN_005943b0/f0/d0 -> the
+`match+0x468->+0xfa0 == {0,2,4}` play-state predicates; `_phase0` now delegates), `clamp_x_goalside`
+(FUN_0059a1e0), `restart_box_ok` (FUN_0059a120 = the SAME-side twin of pos_forward_ok). Oracle
+`tools/re/run_driverleaf2_oracle.sh` -> `specs/driverleaf2_oracle.txt`; locked by `test_driverleaf2.gd`
+(14 checks). FUN_0058f0b0 (player_opposite_half) was done earlier.
+
+### Sim-relevant control-flow skeleton (what the body port must reproduce, in order)
+1. `FUN_00593a30` -- sets the display flags +0x180a/b/c from match+0x468->+0xfe8/fec/ff0. **DISPLAY-
+   only**; headless (+0x180e==0) leaves them 0. Port as a no-op (or faithful flag set; nothing else reads
+   them on the scoreline path).
+2. `cVar3 = match+0x1a1e; match+0x1a1e=0; if (cVar3) { FUN_00593b70(); goto end; }` -- a one-shot
+   "skip-tick" gate (FUN_00593b70 = NOT yet classified; rare).
+3. set-piece special (phase 7, or phase 5 w/ +0x19cc; taker-side; first-time via +0x1a20): rebuild the
+   queue (FUN_005bbf10 = Array.append), `FUN_005b8f20` (select_active, DONE) -> +0x438, render x2 (SKIP),
+   `FUN_005b73a0` x2 (position_team, DONE), then **early return**.
+4. replay record/playback (DAT_00665d8c / DAT_006d31c4): the +0x27dc/+0x27e4 snapshot rings + FUN_005910c0
+   /FUN_00591120. **SKIP in a live no-record run** (both flags 0).
+5. per-tick idle-counter bump (+0xcb per team, lines 164-179) -- trivial counters.
+6. movement core (all DONE): FUN_005b8bf0 x2 (decide dispatch), 4 sub-entity decide (+8 = replay, no-op),
+   FUN_005b8690 x2 (relmatrix), FUN_005b94f0 x2 (markers), FUN_005b8c20 x2 (advance dispatch), 4 sub-entity
+   advance (+0xc = ball_advance + keeper_advance x2 + referee[SKIP]), FUN_005b8ce0(0) x2 (nearest),
+   then `DAT_006d31bc = (DAT_006d31bc+1) & 0x3ff` (the 1024-frame ring counter).
+7. open-play / restart classification (lines 209-692), the per-tick "what happened" decision. ONE
+   `FUN_005966d0(code)` fires (dispatcher DONE = Pm98Dispatch). Code map by branch:
+   - +0x43c != 0 (a restart is pending), the `within_box`/`restart_box_ok` placement ladder (lines
+     213-359) -> sets +0x19cc {0,2,6} via the 4 region tests + `FUN_005966d0((+0x461&1)<<1|5)` = 5/7.
+   - `!FUN_0058f100 && FUN_0058ede0` (goal-area, lines 361-480): per-player loop; +0x19a0==4 (penalty/ET)
+     -> goal-diff test -> FUN_005966d0(1); else -> FUN_005966d0(6) = GOAL.
+   - +0x19a0==4 special (lines 481-544) -> FUN_005966d0(1) or (3).
+   - FUN_0058fbe0 (corner) -> FUN_005966d0(4); FUN_0058f140 (keeper save) -> FUN_005966d0(2);
+     **FUN_0058f3c0 (UNPORTED predicate) -> FUN_005966d0(3)**; the attacking-move build-up -> FUN_005966d0(1).
+8. stat/commentary tail (lines 693-888, only under phase==0): possession% (FUN_00590f60 sound = SKIP),
+   and the THREE commentary/event TIMER blocks (+0x19e4, +0x19e8, +0x19ec) -- see RNG note below.
+9. `FUN_00594570(0)` -- event-queue DEQUEUE (decrement each queued event's +0xc delay, fire
+   FUN_004511d0 = commentary thunk [no-op headless], shrink the array). SIM-relevant (queue timing).
+10. match-over: returns 0 iff `match+0x454 == 1` (else decrements +0x454 toward 1 when >1).
+
+### RNG-draw inventory (LOAD-BEARING for the kill-test -- a single missed draw desyncs the whole match)
+The MSVC LCG (FUN_005ec250 = Pm98Rng) is the match seed. `FUN_005ec240`/`FUN_005ec230` are a
+save/restore bracket: any draw BETWEEN a matched 240...230 pair is **seed-neutral** (used so cosmetic
+commentary text does not perturb the deterministic match). **CORRECTION to match_engine_re.md's "the
+only seed-affecting draws are dispatcher case 2/6":** the driver's per-tick commentary/event TIMERS use
+UNBRACKETED FUN_005ec250 and therefore DO advance the match seed. Full inventory:
+- **Seed-NEUTRAL (inside 240/230 brackets, all cosmetic FUN_004e* commentary):** lines 431-439, 530-537,
+  616-623, 637-666, 676-690, 715-724, 849-863, 868-874. No FUN_005ec250 sits inside any bracket.
+- **Seed-ADVANCING (unbracketed FUN_005ec250):**
+  - L465: 1 draw (discarded), open-play goal-area per-player loop, branch `(char)player[0xb8]!=0`.
+  - L747+L750 + exactly one of {L754|L758|L768|L772}: the +0x19e4 timer-expiry block = **3 draws** when
+    `--match+0x19e4 < 1`.
+  - +0x19e8 block: L792 (always on expiry) + L796 (short-circuit, only if `iVar19 >= -1`) + L799 (only if
+    not early-out) = **1-3 draws** when `--match+0x19e8 < 1`.
+  - +0x19ec block: L844 = **1 draw** when the gate at L831-838 passes (incl. `FUN_005e2750()==0`, non-RNG).
+  - Inside `FUN_005966d0` (DONE): case 2 (ball-speed gate) + case 6 (genuine goal) each draw -- already
+    modeled in Pm98Dispatch.
+So a bit-exact full-match port MUST port the +0x19e4/+0x19e8/+0x19ec commentary timers (even though their
+outputs feed display) purely to keep the seed in lockstep, plus the L465 per-player discard draw.
+
+### Blockers for the full-match KILL-TEST (why STEP 2 is multi-session, not done here)
+1. **No 22-player match-init.** The driver needs a fully-built match object `m` (22 players w/ vtables +
+   coords, ball, 2 GKs, referee, goal dims, the post array). That constructor is **FUN_00591180** (+ the
+   goal-dim arithmetic FUN_00593600, decoded in the builder handoff) and is **NOT yet ported**. STEP-1
+   wired `populate_posts(m)` (the collider array) only -- not the players. Without this, the full-match
+   loop cannot run end-to-end.
+2. **No end-to-end oracle.** Per-leaf parity uses PcodeEmu on synthetic fixtures; a full match needs the
+   REAL event stream + scoreline for a fixed seed. Two options: (a) **wine** (`/usr/bin/wine` is present) +
+   a debugger/save-game harness that drives MANAGER.EXE to a match and dumps the +0x1a24 event queue per
+   tick; (b) a full-match PCode-emu run (needs FUN_005bbf10/GlobalReAlloc stubbed as Array.append + the
+   whole match object in emu memory + thousands of ticks). Neither exists yet.
+3. **FUN_0058f3c0** (one open-play classification predicate -> FUN_005966d0(3)) is still UNPORTED.
+
+**Recommended next-session order:** (a) port FUN_0058f3c0 + classify FUN_00593b70; (b) port the driver
+shell FUN_00598740 into a new `Pm98Driver.gd` calling the DONE pieces + the timer draws above, with
+push_error stubs for any residue; (c) port match-init FUN_00591180 to build a valid `m`; (d) stand up
+the wine OR full-emu oracle; (e) run the N>=50 fixed-seed event-stream + scoreline parity kill-test.

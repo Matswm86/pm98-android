@@ -1,0 +1,15 @@
+# Stage 3 task 2 match-driver leaves batch 2 (vec3_set FUN_00590aa0 + play_state FUN_005943b0/f0/d0
+# + clamp_x_goalside FUN_0059a1e0 + restart_box_ok FUN_0059a120). PCode-emu ground truth. match
+# @0x210000 (session +0x468->0x216000), player @0x230000, vec @0x230100. play_state EAX masked &0xff.
+FIX vec_set CALL 0 RET steps=8 EAX=2293760 mem[0x230000:4]=286326784 mem[0x230004:4]=572653568 mem[0x230008:4]=858980352
+FIX ps_eq0_T CALL 0 RET steps=7 EAX=2187265
+FIX ps_eq0_F CALL 0 RET steps=7 EAX=2187264
+FIX ps_eq2_T CALL 0 RET steps=6 EAX=2187265
+FIX ps_eq4_T CALL 0 RET steps=6 EAX=2187265
+FIX clamp_neg CALL 0 RET steps=20 EAX=648806 mem[0x230100:4]=648806
+FIX clamp_pos CALL 0 RET steps=21 EAX=4294318490 mem[0x230100:4]=4294318490
+FIX clamp_no CALL 0 RET steps=20 EAX=0 mem[0x230100:4]=0
+FIX rb_same_T CALL 0 RET steps=64 EAX=1
+FIX rb_oppside_F CALL 0 RET steps=64 EAX=0
+FIX rb_shallow_F CALL 0 RET steps=42 EAX=0
+FIX rb_outbox_F CALL 0 RET steps=21 EAX=0
