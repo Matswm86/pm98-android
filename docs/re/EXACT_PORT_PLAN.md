@@ -9,6 +9,21 @@ Legit RE of the owner's own binary for the owner's own remake. Deliverable = ori
 GDScript reproducing the decoded algorithm, not redistribution of the binary.
 
 ## STATUS (2026-06-18)
+- **Stage 3 task 2 — MATCH-INIT CTOR FUN_00591180 PORTED -> Pm98Match.gd (2026-06-22).**
+  `Pm98Match.build_match(rng) -> m` ports the match-object constructor (operator new(0x5fb8) +
+  FUN_00591180): the base subobject (FUN_005c52b0 @ match+0), two team headers (FUN_005b6360 @
+  +0x46c/+0x78c), two keepers (idx 1/2 @ +0xaac/+0xe74) + referee (+0x123c) via FUN_005a2640, the
+  ball (FUN_0058e050 @ +0x1610), the auxiliary sub-objects, the sentinel bboxes (base +0x3fc.. and
+  positioning +0x1828..), and every scalar zero. TRANSCRIPTION-validated against the decompile +
+  the **objdump this-pointer offsets** (esi=match; every sub-ctor `lea ecx,[esi+off]` confirmed);
+  sub-ctors 0x5b6360/0x5917f0/0x591560/0x591830 freshly decompiled. **Builds an EMPTY-ROSTER
+  skeleton** (team[0]=0 player-base, team[1]=0 count -- the 22 players load in the populate
+  FUN_005923f0). **LOAD-BEARING: FUN_005baca0 @ +0x2bac draws the match seed exactly 1080x at
+  construction** (360x3 noise table, value=roll*32); build_match reproduces them; the test asserts
+  the rng advances by exactly 1080. `app/tests/test_match_init.gd` (130 checks) PASS. No regression
+  (full sweep **84/84** + boot **0 SCRIPT ERROR**). NEXT (renumbered in MATCH_TICK_DRIVER_MAP.md):
+  3b = populate FUN_005923f0 (players/goal-dims/session), 3c = reconcile Pm98Movement's opponent-
+  descriptor model (match+0x46c/+0x78c header-vs-players) so the movement core runs on the skeleton.
 - **Stage 3 task 2 — DRIVER SHELL FUN_00598740 + FUN_00593b70 PORTED -> Pm98Driver.gd (2026-06-22).**
   The per-tick match driver (`Pm98Driver.tick(m, rng) -> 1/0`) and its restart handler
   (`Pm98Driver.restart_handler`) -- the integration shell wiring every DONE piece (predicates, dispatcher,

@@ -322,3 +322,65 @@ AND phase==0). The driver port calls `Pm98Predicates.traj_copy` for the side eff
   phases and is wired with `rng` -- its exact draw count needs real player geometry (match-init).
 - DATA MODEL: `m` = match; `m["ball"]` = the ball at match+0x1610 (driver match+0x16XX reads -> ball
   offset 0x16XX-0x1610); `m["sim"]` = [ctx0,ctx1]; `m["keepers"]` = [k0,k1]; `m["ring"]` = DAT_006d31bc.
+
+---
+
+## MATCH-INIT CONSTRUCTOR FUN_00591180 PORTED -> Pm98Match.gd (2026-06-22)
+
+`FUN_00591180` (the match-object ctor that `operator new(0x5fb8)` + the create-wrapper FUN_00590fc0
+run) is PORTED to `app/scripts/Pm98Match.gd` -- `Pm98Match.build_match(rng) -> m`. TRANSCRIPTION of
+the decompile (docs/re/sim/fn_00591180...) cross-checked against the **objdump this-pointer offsets**
+(`esi` = match base; every sub-ctor `lea ecx,[esi+off]` confirmed). Locked by `app/tests/test_match_init.gd`
+(**130 checks PASS**). Same posture as the driver shell: not e2e-oracle-validated (the ctor calls
+operator_new + the CRT + globals, so it is not a pure PCode-emu leaf).
+
+### Sub-ctors decompiled this session (Ghidra DecompileAt 0x5b6360/0x5917f0/0x591560/0x591830)
+- `FUN_005c52b0(this=match+0)` -- the BASE subobject embedded at match+0 (C++ ctor chaining): base
+  bbox at match+0x3fc..+0x418 (LO/HI sentinels), match+0xb4 = 1, temp vtable 0x639888 (overwritten).
+- `FUN_005b6360(this=team header)` -- the team ctor. **Leaves team[0]=0 (player-array base = null) and
+  team[1]=0 (count) -> the ctor builds an EMPTY-ROSTER match.** The 22 players are heap-allocated +
+  loaded by the POPULATE FUN_005923f0 (next port). team[0x5a]=0 == movement ctx[0x168] (active idx).
+- `FUN_005917f0` -- the 9x8-byte array element ctor ({0,0} each). `FUN_00591560`/`FUN_00591830` are the
+  team / 0x4c-array DESTRUCTORS (free header[0] player array, stride 0x3bc -- confirms players are
+  heap, not in the header).
+
+### Object map inside FUN_00591180 (match byte offset -> what)
+| off    | object                          | ctor              |
+|--------|---------------------------------|-------------------|
+| +0x0   | base subobject (bbox +0x3fc..)  | FUN_005c52b0      |
+| +0x46c | team0 header (= m["sim"][0])     | FUN_005b6360      |
+| +0x78c | team1 header (= m["sim"][1])     | FUN_005b6360      |
+| +0xaac | keeper0 (idx 1, vt 0x639208)     | FUN_005a2640      |
+| +0xe74 | keeper1 (idx 2, vt 0x639208)     | FUN_005a2640      |
+| +0x123c| referee (vt 0x6391f8)            | FUN_005a2640      |
+| +0x1610| ball (vt 0x639080)               | FUN_0058e050      |
+| +0x2470| 9x 8-byte array                  | FUN_005917f0 elem |
+| +0x24b8/+0x2504/+0x2550 | 0x4c bbox holders | FUN_005c9210     |
+| +0x259c| 2x 0x4c array                    | FUN_005c9210 elem |
+| +0x2634| anim/state holder                | FUN_005d7240      |
+| +0x27f0| 3D-extent holder                 | FUN_005f56a0      |
+| +0x2884..+0x2b40 (stride 0x64) | 8x scale holders | FUN_005f2ad0  |
+| +0x2bac| **noise+param table**            | FUN_005baca0      |
+
+### LOAD-BEARING for the seed kill-test: 1080 ctor RNG draws
+`FUN_005baca0(this=match+0x2bac)` draws `FUN_005ec250` (the match seed) **exactly 3*360 = 1080 times**
+to fill a 360x3 noise table (each value = `(roll*0x1000)>>7` = roll*32 for the 15-bit rand), then a
+240x8 float-default record table (no RNG: 0.5f/1.0f/-2.0f/0/0.992f/0.992f). build_match(rng) reproduces
+all 1080 draws; test_match_init asserts the rng state advances by exactly 1080. **CAVEAT (unresolved
+until FUN_005923f0 is decoded): whether these 1080 ctor draws are part of the per-tick match seed
+stream depends on where the populate (re)seeds the match RNG. If it srand()s after construction, pass a
+throwaway rng to build_match.**
+
+### STEP-2 REMAINING (item 3 = ctor now DONE; renumbered)
+3a. **DONE** -- match-init CTOR FUN_00591180 -> Pm98Match.build_match (skeleton, empty roster).
+3b. **NEXT: port the POPULATE FUN_005923f0** (15KB, ~40 callees incl. goal-dims FUN_00593600 [decoded]
+    + per-team FUN_00591ba0): loads the 22 players (heap array at team[0], count team[1], stride 0x3bc),
+    their coords/attributes, the session sub-object at match+0x468, the goal dims, kickoff placement.
+    This is what makes a match runnable end-to-end.
+3c. **RECONCILE the movement data model**: Pm98Movement reads the opponent descriptor at match+0x46c/
+    +0x78c as a players ARRAY (a fixture shortcut), but the binary-faithful ctor stores the 800-byte team
+    HEADER there (players at header[0]). Reconcile (edit Pm98Movement opp-descriptor read + re-run
+    run_assignmarker_oracle.sh / run_relmatrix_oracle.sh) so the driver's movement core runs on the
+    real skeleton. Until then the per-team passes cannot run on build_match's output (the per-tick RNG
+    inventory + control flow ARE testable, the movement core is not).
+4. End-to-end oracle (wine MANAGER.EXE OR full-emu) + 5. the N>=50 fixed-seed kill-test (unchanged).
