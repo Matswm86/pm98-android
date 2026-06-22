@@ -9,6 +9,36 @@ Legit RE of the owner's own binary for the owner's own remake. Deliverable = ori
 GDScript reproducing the decoded algorithm, not redistribution of the binary.
 
 ## STATUS (2026-06-18)
+- **Stage 3 task 2 item 5a (e2e PORT-SIDE MATCH RUNNER) — PORT DRIVES A FULL HEADLESS MATCH, ZERO CRASHES; ROOT-CAUSE FOUND: no ported kickoff->open-play transition (2026-06-22).**
+  New harness `app/tests/run_full_match.gd` builds a match through the ports end-to-end
+  (`Pm98Match.build_match` -> `populate_posts` -> inject a synthetic but structurally-valid 11-player
+  lineup + session at team[0x9c] -> `kickoff_init` -> loop `Pm98Driver.tick` to a tick cap). **RESULT
+  (RUN, verified):** 22 players built (11+11), 3000+ ticks, **0 SCRIPT ERROR / 0 crashes**, construction
+  RNG draws == **1084** (1080 noise + 4 kickoff) EXACTLY per spec, fully deterministic (rng state frozen
+  after kickoff). This is the FIRST e2e run of the integration shell with a populated roster + live
+  movement core -- resolves the long-standing "no full-match loop can run end-to-end" blocker to "RUNS,
+  but does not progress past kickoff."
+  **ROOT CAUSE (decompile + objdump verified, NOT a guess):** the match stays in **PHASE 2 (kickoff)
+  forever** -- no dispatch ever fires, 0:0. `set_phase(0)` (open play) and `set_phase(1)` (phase boundary)
+  exist ONLY in the **resolver family**: `FUN_005ab5a0` (set_phase(0) @0x5ac0a5) and `FUN_005a50c0`
+  (set_phase(1) @0x5a5259), reached via `FUN_005a4600` (player **vtable+0x10**, calls the resolver
+  `FUN_005aeda0` @0x5a47f9). `FUN_005a4600` is invoked ONLY by `call *0x10(reg)` from the **career/UI
+  layer (0x44xxxx-0x54xxxx)** -- the per-tick driver tree (`FUN_00598740`) NEVER calls vtable+0x10 and
+  NEVER calls the resolver. The ALL-callers enumeration of `FUN_005942e0` (set_phase) is just 5 sites:
+  dispatcher(8) @0x59711e, driver keeper-throw(6) @0x599631, and the three resolver sites
+  (0x5a4874/0x5a5259/0x5ac0a5). **So the ported positional driver only ever sets phase 6/8, never 0/1 --
+  a match started at kickoff (phase 2) has NO ported path to open play.** Classification only runs in
+  phase 0 (driver decompile L210: `if (+0x448 != 0) goto default`), so phase 2 just runs the movement
+  core forever with no events.
+  **OPEN step-5 blocker (the real critical path, supersedes "stand up the oracle" as the next move):**
+  determine HOW/WHEN the live positional match invokes the vtable+0x10 resolver pass (`FUN_005a4600`),
+  i.e. the trigger + call site that fires the kickoff->open-play transition, then port `FUN_005a4600`
+  (+ the FUN_005ab5a0/FUN_005a50c0 set_phase tails) and wire it into `Pm98Driver.tick`. Until that lands
+  the e2e match cannot score, so the N>=50 parity kill-test (5b/5c, wine or PCode-emu oracle) is blocked
+  on it. (`mtest.exe` was checked and RULED OUT as an oracle: it is "Matties dTest", a file-integrity/
+  checksum verifier for mtest.dat, not a match simulator.)
+  Stale-comment fix banked: `Pm98Driver.gd` decide-loop comment claimed "set-piece taker branches still
+  push_error (the unported decide tail)" -- FALSE, slices C1/C2/C3 are all ported (no push_error).
 - **Stage 3 task 2 item 3b-players — ROSTER BUILD FUN_005b6ba0 + FUN_005a2830 PORTED -> Pm98Match._build_team/_build_player (2026-06-22).**
   `kickoff_init` now runs the 11-player build per team when a lineup is injected at team[0x9c]
   (career/save data, injected like `session`; the e2e oracle can dump it straight from a live match).

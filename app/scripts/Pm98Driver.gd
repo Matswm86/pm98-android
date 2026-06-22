@@ -257,8 +257,8 @@ static func _keepers(m: Dictionary) -> Array:
 
 
 ## FUN_005b8bf0: per-player DECIDE loop -> FUN_005a3400 (decide_slice_a/b/c). Open-play
-## (phase 0) hits decide_slice_c's clean DEFAULT; set-piece taker branches still push_error
-## (the unported decide tail) until that slice lands -- the known Stage-3 gap.
+## (phase 0) hits decide_slice_c's clean DEFAULT; the set-piece taker/non-taker branches
+## (slices C1/C2/C3) are all ported -- no push_error, the decide tail is complete.
 static func _decide_team(ctx: Dictionary, m: Dictionary) -> void:
 	for p in ctx.get("players", []):
 		Pm98Movement.decide_slice_a(p, m)

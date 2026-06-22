@@ -413,3 +413,39 @@ throwaway rng to build_match.**
 4. End-to-end oracle (wine MANAGER.EXE OR full-emu) + 5. the N>=50 fixed-seed kill-test. The oracle path
    can DUMP the kickoff player array (coords+attributes) and seed Pm98Match directly -- this sidesteps
    porting the entire career/save subsystem just to populate 22 players for the parity test.
+
+---
+
+## STEP-5a: e2e PORT RUNNER STOOD UP -> KICKOFF->OPEN-PLAY TRANSITION IS THE BLOCKER (2026-06-22)
+
+`app/tests/run_full_match.gd` drives the port end-to-end for the first time (build_match ->
+populate_posts -> inject synthetic 11-player lineup+session @team[0x9c] -> kickoff_init -> loop
+Pm98Driver.tick). **It RUNS: 22 players, thousands of ticks, 0 crashes, 1084 construction draws
+exactly, deterministic.** But it is STUCK in **phase 2 (kickoff)** -- 0 dispatches, 0:0 forever.
+
+### Why (decompile + objdump verified, not inferred)
+- Driver classification (the only event source per tick) runs ONLY in phase 0
+  (`FUN_00598740` decompile L210: `if (+0x448 != 0) goto switchD_default`).
+- The positional driver sets phase only to **6** (keeper-throw, L563 `FUN_005942e0(6)`) or **8**
+  (dispatcher lock, `FUN_005966d0` -> `FUN_005942e0(8)`). It NEVER sets phase 0 or 1.
+- `restart_handler` (FUN_00593b70) sets phase via `RESTART_PHASE_TABLE[rtype]` = [0,2,3,6,4,5,2,7],
+  but only when `rtype (+0x1a38) != 0`; kickoff sets +0x1a38=0, and no nonzero index maps to 0.
+- **ALL 5 callers of `FUN_005942e0` (set_phase):** 0x59711e (dispatcher, val 8), 0x599631 (driver,
+  val 6), 0x5a4874 (`FUN_005a4600`), 0x5a5259 (`FUN_005a50c0`, val 1), 0x5ac0a5 (`FUN_005ab5a0`,
+  val 0). The only **set_phase(0)** and **set_phase(1)** live in the **resolver family**
+  (FUN_005a4600 / FUN_005a50c0 / FUN_005ab5a0 / FUN_005aeda0 / FUN_005a7260 / FUN_005b41c0 -- the
+  `match_engine_re.md` resolution set).
+- The resolver `FUN_005aeda0` is called ONLY from 0x5a47f9, inside **`FUN_005a4600` = player
+  vtable+0x10**. `FUN_005a4600` is invoked ONLY by `call *0x10(reg)` from the **career/UI layer
+  (0x44xxxx-0x54xxxx)** -- NOT from the per-tick driver tree (the driver runs vtable +8 DECIDE /
+  +0xc ADVANCE / +4 SPRITE only; there is no +0x10 player-loop dispatcher in 0x5b8xxx).
+
+### Conclusion + next move (supersedes "stand up the oracle" as the critical path)
+The kickoff->open-play (phase 2->0) transition + the goal/save/miss resolution live in the
+**vtable+0x10 resolver pass (`FUN_005a4600`)**, which is NOT wired into `Pm98Driver.tick`. The
+unanswered RE question: **WHEN does a live positional match invoke vtable+0x10?** (the trigger +
+call site). Resolve that, port `FUN_005a4600` (+ the FUN_005ab5a0/FUN_005a50c0 set_phase tails;
+`Pm98Resolver.resolve_tree` already ports the FUN_005aeda0 inner tree), wire it into the driver,
+and only THEN can the e2e match score -> the N>=50 parity kill-test (5b/5c) becomes runnable.
+`mtest.exe` was checked and RULED OUT as the oracle (it is "Matties dTest", a file-integrity
+checksum verifier for mtest.dat, not a match simulator).
