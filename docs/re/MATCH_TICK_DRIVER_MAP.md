@@ -273,3 +273,52 @@ when `+0x448 ∈ {2,3,4,5,6}` -- for any other +0x448 the routine early-returns 
 draw. Everything else is inside 240/230 save-restore brackets (seed-neutral). CAVEAT: the RNG behaviour
 of the callees FUN_005946d0/FUN_005946f0/FUN_005b6ba0/FUN_005b8f20/FUN_005b73a0/FUN_0044d0d0../FUN_0044d3d0
 is UNVERIFIED -- confirm each draws nothing (or model it) when porting the shell.
+
+---
+
+## DRIVER SHELL PORTED -> Pm98Driver.gd (2026-06-22)
+
+`FUN_00598740` (the per-tick driver) + `FUN_00593b70` (the restart handler) are PORTED to
+`app/scripts/Pm98Driver.gd` -- `Pm98Driver.tick(m, rng) -> 1/0` and `Pm98Driver.restart_handler(m, rng)`.
+This is the integration shell wiring every DONE piece in the binary's exact per-tick order. **It is a
+TRANSCRIPTION of the decompile/disasm, NOT end-to-end-oracle-validated** (blocked by the two STEP-2 gaps:
+no 22-player match-init FUN_00591180, no full-match oracle). `app/tests/test_driver.gd` (34 checks) locks
+everything that is a pure function of the match Dict and needs no live players.
+
+### Disasm correction banked this session
+`FUN_0058f100` is Ghidra-typed `void` but the driver reads its return as a bool. Disasm (0x58f100) shows
+it returns **AL = ball+0x63** (the armed flag): `mov al,[ecx+0x63]` at entry, never overwritten on any
+exit path. So `cVar3 = FUN_0058f100()` == `ball+0x63` (the trajectory copy is a side effect when armed
+AND phase==0). The driver port calls `Pm98Predicates.traj_copy` for the side effect, then reads
+`_g(b, 0x63)` for the boolean -- faithful.
+
+### What test_driver.gd LOCKS (transcription, decompile-exact, no live players needed)
+- **Match-over return** (LAB_0059a06e): over iff +0x454==1; the +0x454>1 cooldown decrement.
+- **+0x1a1e skip-tick gate** -> restart_handler + ITS lone seed draw (fires iff final +0x448 ∈ {2..6}).
+- **Set-piece special** (phase 7 / phase 5+0x19cc, taker byte team*800+0x759) -> +0x1a20 latch + early return.
+- **FUN_00593a30** headless flag clear (+0x180a/b/c -> 0 when +0x180e==0).
+- **Open-play predicate-cascade DISPATCH CODES**, read back from match+0x1a38: dead_ball->3, post_bar->4
+  (corner), build-up->1, restart-placement->5/7 (by +0x461 bit0). Goal-area->6.
+- **Complete per-tick RNG-draw inventory**, measured by replaying a reference Pm98Rng from the pre-tick
+  state: +0x19e4 (exactly 3 on expiry), +0x19e8 (1 / 3 by score-diff), +0x19ec (1 when the minute/ball
+  gate passes), and the **L465 goal-area discard draw** (1, gated by the team*800+0x478+0x2e0 byte). The
+  dispatch case-2/6 internal draws are already pinned by test_dispatch.gd.
+- **FUN_00594570 dequeue**: play-state 0/4 flushes all; play-state 1 + phase 0 decrements per-event delay
+  and fires only delay<=0.
+
+### What is BEST-EFFORT in the port (exercised only once match-init lands)
+- The **movement core** wiring (decide/relmatrix/markers/advance/nearest per team + ball_advance/
+  keeper_advance) -- runs only when `m["sim"]`/`m["ball"]`/`m["keepers"]` are populated; the shell no-ops it.
+- The **player-pointer field writes** inside the goal-area / restart-placement / keeper-throw branches
+  (scorer+0x1e0 goal vector, the +0x19cc region geometry, the taker stamina) -- read/written via `_ref`
+  so they no-op cleanly when the sub-objects are absent.
+- `FUN_00593b70`'s **DAT_00664070[+0x1a38]** restart-type->phase table is modeled as identity
+  (`_restart_phase`) pending the .rdata extraction; **+0x1a34 = timeGetTime()** is STUBBED to 0 (wall-clock,
+  must be injected to match in an e2e oracle).
+
+### STILL-OPEN caveats carried into the kill-test
+- `FUN_005946d0` (`_team_reset`) and `FUN_005b6ba0`/`FUN_0044d3d0` RNG remain UNVERIFIED (modeled
+  non-drawing, same caveat Pm98Dispatch carries). `FUN_005b73a0` (position_team) DOES draw on set-piece
+  phases and is wired with `rng` -- its exact draw count needs real player geometry (match-init).
+- DATA MODEL: `m` = match; `m["ball"]` = the ball at match+0x1610 (driver match+0x16XX reads -> ball
+  offset 0x16XX-0x1610); `m["sim"]` = [ctx0,ctx1]; `m["keepers"]` = [k0,k1]; `m["ring"]` = DAT_006d31bc.

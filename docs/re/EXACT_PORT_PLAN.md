@@ -9,6 +9,21 @@ Legit RE of the owner's own binary for the owner's own remake. Deliverable = ori
 GDScript reproducing the decoded algorithm, not redistribution of the binary.
 
 ## STATUS (2026-06-18)
+- **Stage 3 task 2 — DRIVER SHELL FUN_00598740 + FUN_00593b70 PORTED -> Pm98Driver.gd (2026-06-22).**
+  The per-tick match driver (`Pm98Driver.tick(m, rng) -> 1/0`) and its restart handler
+  (`Pm98Driver.restart_handler`) -- the integration shell wiring every DONE piece (predicates, dispatcher,
+  events, the movement cluster) in the binary's exact per-tick order. **TRANSCRIPTION-validated against the
+  decompile/disasm, NOT end-to-end-oracle-validated** (blocked by the two open STEP-2 gaps: no 22-player
+  match-init FUN_00591180, no full-match oracle). Disasm correction banked: `FUN_0058f100` returns AL =
+  ball+0x63 (armed flag), not void -- the driver branches on it. `app/tests/test_driver.gd` (34 checks) locks
+  the match-over return, the +0x1a1e skip gate -> restart_handler + its lone seed draw, the set-piece
+  early-return + +0x1a20 latch, FUN_00593a30 flag clear, the open-play DISPATCH CODES (read from
+  match+0x1a38: dead_ball->3 / post_bar->4 / build-up->1 / restart-placement->5/7 / goal-area->6), the
+  COMPLETE per-tick RNG-draw inventory (+0x19e4=3, +0x19e8=1/3, +0x19ec=1 commentary timers + the L465
+  goal-area discard draw, measured by replaying a reference Pm98Rng), and the FUN_00594570 dequeue. The
+  movement core + player-pointer field writes are wired BEST-EFFORT (no-op without match-init, via `_ref`).
+  Full map + caveats in docs/re/MATCH_TICK_DRIVER_MAP.md ("DRIVER SHELL PORTED"). No regression (driver 34 +
+  full sweep 83/83 + boot 0 SCRIPT ERROR). NEXT = match-init FUN_00591180, then the e2e oracle + kill-test.
 - **Stage 1 (oracle) DONE.** Ghidra PCode emulation harness `tools/re/ghidra_scripts/PcodeEmu.java`
   (reusable: spec-driven register/memory/stack setup, cdecl/thiscall/fastcall call, EAX +
   memory + step-level trace capture, callee stubs). Proven on the RNG `FUN_005ec250`: seeded
