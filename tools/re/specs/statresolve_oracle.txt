@@ -1,0 +1,11 @@
+# Stage 3 task 2 STATISTICAL leaf: chance/goal resolver FUN_0044ece0 ground truth
+# (PCode emu; injected MSVC-LCG rand @0x257010; FUN_005bbf10 stubbed; M=0x210000).
+# cols: name | RET draws | count type minute p4 payload finalstate
+FIX goal_seg0_sh5  RET  draws=2  | 1 0 7 0 327687 2324625081 
+FIX goal_seg1_sh9  RET  draws=2  | 1 1 65 0 589831 3596396343 
+FIX goal_seg2_sh11 RET  draws=2  | 1 2 123 0 720903 2084798326 
+FIX goal_seg3_sh7  RET  draws=2  | 1 3 116 0 458759 3116742833 
+FIX save_keep40    RET  draws=1  | 0 0 0 0 0 2745024 
+FIX lowkeep_goal6  RET  draws=2  | 1 0 5 0 393223 813027064 
+FIX side1_goal_sh5 RET  draws=2  | 1 0 22 0 327699 2324625081 
+FIX gkout_goal_sh2 RET  draws=1  | 1 0 9 0 131079 3173050 
