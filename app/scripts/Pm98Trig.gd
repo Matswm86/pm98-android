@@ -86,6 +86,13 @@ static func muladd16(a: int, b: int, c: int, d: int) -> int:
 	return _i32(_asr(c * d + a * b, 16))
 
 
+## FUN_005edfd0 (cdecl a, b, c): ((a*b)>>16)*c >>16 -- chained 16.16 fixmul (imul/shrd 0x10 twice).
+## == mul16(mul16(a, b), c). Each >>16 takes the full 64-bit product's bits [16..47] (the binary's
+## shrd $0x10,%edx,%eax), matching mul16's _asr(product, 16) + int32 wrap.
+static func fixmul3(a: int, b: int, c: int) -> int:
+	return mul16(mul16(a, b), c)
+
+
 ## FUN_005edf90: (0x10000 * a) / b -- signed truncating divide (imul 0x10000; idiv).
 ## GDScript int `/` truncates toward zero, matching x86 idiv. b must be nonzero.
 static func ratio16(a: int, b: int) -> int:

@@ -1,0 +1,6 @@
+# Leaf oracle FUN_005edfd0 (fixmul3): cdecl ((a*b)>>16)*c >>16. Row: FIX <name> a b c -> EAX.
+FIX pos 0x30000 0x8000 0xb2 EAX=267
+FIX neg_a -0x30000 0x8000 0xb2 EAX=4294967029
+FIX neg_c 0x30000 0x8000 -0xb2 EAX=4294967029
+FIX big 0x1428f4 0x4000 0x200 EAX=2580
+FIX unit 0x10000 0x10000 0x10000 EAX=65536
