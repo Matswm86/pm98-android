@@ -229,12 +229,47 @@ The cup oracle fixtures (`cup_A..D`) share league seeds/squads but set the flags
 climb to 1314/1255/1229/1341 and the queues add type-2/3 ET goals + type-4 penalties,
 all bit-exact.
 
+## Full-time / tie-resolution gate (PORTED + oracle-validated)
+
+### `FUN_00450e60` full-time gate (`@0x450e60`, 586 B, NO rand) → `Pm98StatMatch.ft_gate`
+
+Returns a **byte verdict**: `0` = still level (replay / play on), `1` = side 0 through,
+`2` = side 1 through. It is **pure score arithmetic** — no `rand()` — so the statmatch
+oracle stubs it to 0 (forcing the longest ET+pen path); the port instead computes the
+real verdict and `simulate()`'s caller passes it in as `run_et` / `run_pen`.
+
+Inputs on the match struct (all i32; `0xff` = "no carry / single leg" sentinel):
+
+| field   | meaning |
+|---------|---------|
+| `+0x20` | two-legged flag (carry `+0x34/+0x38` into the aggregate when set with `+0x44`) |
+| `+0x24` | decide-by-penalties enabled |
+| `+0x28` | aggregate-only (away-goals OFF) branch enable |
+| `+0x2c` / `+0x30` | leg carry: side0 / side1 first-leg goals (`A` / `B`) |
+| `+0x34` / `+0x38` | alt leg carry (`C` / `D`), used only when `+0x20` **and** `+0x44` set |
+| `+0x44` / `+0x48` | extra-time / penalties enabled (`M+0x44` / `M+0x48`) |
+
+It calls four REAL leaf readers over the `+0xf98` event vector (pure, idempotent —
+the port computes each once and reuses): `FUN_00450d60`→side0 score, `FUN_00450db0`→side1
+score, `FUN_00450e00`→side0 pens, `FUN_00450e30`→side1 pens. A normal goal (`p4==0`)
+credits the team in the low short of payload; an own goal (`p4!=0`) credits the OTHER
+side, so each score reader passes its own id for normal goals and the other id for own
+goals. Decision order: single-match winner → (else) `+0x28` aggregate-only → (else)
+away-goals (aggregate, then away goals = side0 carry vs side1 this-match, then pens).
+
+Oracle: `tools/re/run_ftgate_oracle.sh` runs the real bytes on 15 synthetic structs
+(single match / no-pens / aggregate / away-goals branches), banking each EAX into
+`tools/re/specs/ftgate_oracle.txt`. `app/tests/test_ftgate_oracle.gd` rebuilds the same
+structs and asserts `ft_gate` returns the binary's byte (**15/15**).
+
 ## NEXT
 
 1. **Replace `app/scripts/MatchEngine.gd`** (the abstracted per-shot model) with
    `Pm98StatMatch` as the faithful instant-result engine wired into the career/league
-   loop. The wiring layer owns the `run_et`/`run_pen` decision: port `FUN_00450e60`
-   (no rand; reads leg-aggregate fields `+0x2c/0x30/0x34/0x38` + pen tallies
-   `FUN_00450e00/e30`) so a cup tie level at FT actually plays ET/penalties and a decided
-   one stops after H2.
+   loop. The gate is now ported (`ft_gate`, above): the wiring layer builds a `Mem` from
+   each club's squad, runs `simulate(mem, rng)` for H1+H2, then for a cup tie sets the
+   carry/flag fields and uses `run_et := ft_gate(mem) == 0` (replay/level) after H2 and
+   `run_pen := ft_gate(mem) == 0` after ET. The open RE question is the **Mem-from-clubs
+   bridge** — how the binary fills each participant record (`SEL/STR/GKSAVE/PASS/POS/
+   ROLE`) from club data before `FUN_0044ee70` (a different setup function, not yet mapped).
 2. The `PS != 5` positional engine stays parked (see `MATCH_TICK_DRIVER_MAP.md`).

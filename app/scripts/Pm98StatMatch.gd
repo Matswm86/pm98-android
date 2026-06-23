@@ -7,12 +7,14 @@ extends RefCounted
 ## every number here is lifted from the binary and validated against the real
 ## functions through the Ghidra PCode emulator. Full RE map: docs/re/stat_match_engine_re.md.
 ##
-## Three binary functions are ported here, each oracle-anchored:
+## Four binary functions are ported here, each oracle-anchored:
 ##   * FUN_0044ece0  chance/goal resolver    -> _resolve     (tools/re/run_statresolve_oracle.sh)
 ##   * FUN_00450510  per-segment stats accum  -> _stats       (tools/re/run_statacc_oracle.sh)
 ##   * FUN_0044ee70  PS==5 orchestration       -> simulate     (tools/re/run_statmatch_oracle.sh, end-to-end)
+##   * FUN_00450e60  full-time / tie gate      -> ft_gate      (tools/re/run_ftgate_oracle.sh; no rand)
 ## plus the leaf helpers FUN_004510b0 (_emit), FUN_0044ec00 (_shot_marker),
-## FUN_0044ea40 (_assist_marker), FUN_00450d20 (_count_events).
+## FUN_0044ea40 (_assist_marker), FUN_00450d20 (_count_events), and the gate's score
+## readers FUN_00450d60/db0/e00/e30 (_side_score / _side_pens).
 ##
 ## MEMORY MODEL. The match struct is a flat PackedByteArray (class Mem) mirroring
 ## MANAGER.EXE's in-memory layout byte-for-byte, so the port is a near-verbatim
@@ -84,8 +86,21 @@ const E0 := 0xe0                    # i32 slot A payload
 const E4 := 0xe4                    # i32 slot B payload
 const E8 := 0xe8                    # i32 shot payload
 const TEAMID := 0x7e8               # u16 team id (per team block)
+const TEAMID1 := 0xf88              # u16 side1 team id alias (= SIDE_STRIDE + TEAMID)
 const SHAPE := 0xbb                 # u8 team shape/aggression (per team block)
 const POSS := 0x64                  # i32 possession (team0); team1 at SIDE_STRIDE+0x64 = 0x804
+
+# --- full-time / tie-resolution gate fields (FUN_00450e60 reads these) -------
+# All i32 on the match struct. 0xff is the "no carry / single leg" sentinel.
+const G_F20 := 0x20                 # two-legged flag (carry C/D into the aggregate when set)
+const G_F24 := 0x24                 # decide-by-penalties enabled
+const G_F28 := 0x28                 # aggregate-only (away-goals off) branch enable
+const G_A := 0x2c                   # leg carry: side0 first-leg goals
+const G_B := 0x30                   # leg carry: side1 first-leg goals
+const G_C := 0x34                   # leg carry: alt side0 (used when G_F20 + G_F44 set)
+const G_D := 0x38                   # leg carry: alt side1
+const G_ET := 0x44                  # extra-time enabled (M+0x44)
+const G_PEN := 0x48                 # penalties enabled (M+0x48)
 
 ## Position -> attacking-threat weight, DAT_006532ec @ 0x6532ec. 19 entries; the
 ## central-striker slot (9) carries the heaviest weight (35); GK slots (0/1) weigh 0.
@@ -529,3 +544,115 @@ static func score(mem: Mem) -> Dictionary:
 			var tid: int = e["payload"] & 0xFFFF
 			s[tid] = int(s.get(tid, 0)) + 1
 	return s
+
+
+# --- FUN_00450d60 / db0: this-match score for one side --------------------------
+## Counts a side's goals over the event queue (penalties excluded). The binary keys
+## on two team ids per record: a normal goal (p4 == 0) credits the team in the low
+## short of payload; an own goal (p4 != 0) credits the OTHER side -- so each reader
+## passes its "own" id for normal goals and the "other" id for own goals.
+static func _side_score(mem: Mem, own_tid: int, other_tid: int) -> int:
+	var c := 0
+	for e in mem.events:
+		if e["type"] == 4:
+			continue
+		var tid: int = e["payload"] & 0xFFFF
+		if e["p4"] == 0:
+			if tid == (own_tid & 0xFFFF):
+				c += 1
+		elif tid == (other_tid & 0xFFFF):
+			c += 1
+	return c
+
+
+# --- FUN_00450e00 / e30: penalty-shootout tally for one side --------------------
+static func _side_pens(mem: Mem, tid: int) -> int:
+	var c := 0
+	for e in mem.events:
+		if e["type"] == 4 and (e["payload"] & 0xFFFF) == (tid & 0xFFFF):
+			c += 1
+	return c
+
+
+# --- FUN_00450e60: full-time / tie-resolution gate (NO rand) --------------------
+## Returns the binary's byte verdict: 0 = still level (replay / play on),
+## 1 = side 0 through, 2 = side 1 through. Reads the leg-carry fields and decision
+## flags off the match struct and the four real score readers above. A direct
+## transcription of FUN_00450e60 (docs/re/move/fn_00450e60_FUN_00450e60.c);
+## oracle-anchored by tools/re/run_ftgate_oracle.sh / test_ftgate_oracle.gd.
+## The caller of simulate() uses run_et := (ft_gate after H2 == 0) and
+## run_pen := (ft_gate after ET == 0) for a cup tie still level.
+static func ft_gate(mem: Mem) -> int:
+	var tid0 := mem.u16(TEAMID)
+	var tid1 := mem.u16(TEAMID1)
+	# The four leaf readers are pure (no rand, no writes); the binary re-reads them,
+	# so computing each once and reusing is behaviour-identical.
+	var s0 := _side_score(mem, tid0, tid1)   # FUN_00450d60
+	var s1 := _side_score(mem, tid1, tid0)   # FUN_00450db0
+	var p0 := _side_pens(mem, tid0)          # FUN_00450e00
+	var p1 := _side_pens(mem, tid1)          # FUN_00450e30
+
+	var c := mem.s32(G_C)
+	var carry0 := mem.s32(G_A)
+	var carry1 := mem.s32(G_B)
+	if c != 0xff and mem.s32(G_D) != 0xff and mem.s32(G_ET) != 0 and mem.s32(G_F20) != 0:
+		carry1 = mem.s32(G_D)
+		carry0 = c
+
+	if mem.s32(G_PEN) == 0:
+		return _gate_winner(s0, s1)
+
+	if carry0 == 0xff and carry1 == 0xff:
+		# single match (no carry): straight winner, else penalties if enabled.
+		if s0 != s1:
+			return 1 if s0 > s1 else 2
+		if mem.s32(G_F24) == 0:
+			return 0
+		if p1 < p0:
+			return 1
+		return 0 if p1 <= p0 else 2
+
+	if mem.s32(G_F28) != 0 and (mem.s32(G_ET) == 0 or mem.s32(G_F20) == 0 or c == 0xff):
+		# aggregate only (away goals disabled): compare two-leg totals.
+		var x := s0 + carry0
+		var y := s1 + carry1
+		if y < x:
+			return 1
+		return _gate_fd0(mem, x, y, p0, p1)
+
+	# away-goals path: aggregate first, then away goals, then penalties.
+	var decided := carry0 != carry1
+	if not decided:
+		decided = s0 != s1
+	if decided:
+		var x := s0 + carry0
+		var y := s1 + carry1
+		if x != y:
+			if y < x:
+				return 1
+			if x < y:
+				return 2
+			return _gate_winner(s0, s1)   # LAB_0045106a (unreached when x != y)
+	# aggregate level -> away goals: side0 carry vs side1 this-match score.
+	if s1 < carry0:
+		return 1
+	return _gate_fd0(mem, carry0, s1, p0, p1)
+
+
+## LAB_0045106a: straight this-match winner, mapped 1 / 2 / 0.
+static func _gate_winner(a: int, b: int) -> int:
+	if a > b:
+		return 1
+	return 2 if a < b else 0
+
+
+## LAB_00450fd0: x <= y already; x < y -> side1, else penalties (if G_F24) else level.
+static func _gate_fd0(mem: Mem, x: int, y: int, p0: int, p1: int) -> int:
+	if x < y:
+		return 2
+	if mem.s32(G_F24) != 0:
+		if p1 < p0:
+			return 1
+		if p0 < p1:
+			return 2
+	return 0
