@@ -1,0 +1,9 @@
+# Leaf oracle FUN_005b0bb0 (pass-target test). this=player; args (tgt@0x2a0000, angle, scale, dist).
+# Row: PT <name> EAX=<ret> 43c=<receiver> 460=<cooldown>. FUN_005b0b40 stubbed (count); rest real.
+PT owner RET steps=52 EAX=2097153 mem[0x26043c:4]=2293760 mem[0x260460:1]=90
+PT toomany RET steps=21 EAX=0 mem[0x26043c:4]=0 mem[0x260460:1]=0
+PT farself RET steps=32 EAX=2097152 mem[0x26043c:4]=0 mem[0x260460:1]=0
+PT facereject RET steps=140 EAX=24576 mem[0x26043c:4]=0 mem[0x260460:1]=0
+PT proxfail RET steps=161 EAX=0 mem[0x26043c:4]=0 mem[0x260460:1]=0
+PT proxtrue RET steps=349 EAX=1 mem[0x26043c:4]=2293760 mem[0x260460:1]=15
+PT proxfalse RET steps=333 EAX=393216 mem[0x26043c:4]=0 mem[0x260460:1]=0

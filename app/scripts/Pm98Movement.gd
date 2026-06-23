@@ -1922,6 +1922,87 @@ static func count_goalside_opponents(p: Dictionary, opponents: Array, thresh: in
 	return n
 
 
+## FUN_005b0bb0 (__thiscall player; tgt, angle, scale, dist -> bool): the AI "is this teammate a
+## valid pass / lay-off target" test. Returns true (and marks the receiver) when the player already
+## owns the ball, OR when the candidate position `tgt` lies inside the pass capsule: its projection
+## onto the unit pass direction is within [~round0(thr_base/3)/... , round0(thr_base/3)+scale] AND its
+## perpendicular offset |v1 x D| <= thr_base, where thr_base = 0x50000 if the ball is owned by someone
+## else 0x30000. On a hit it sets match+0x43c = player (chosen receiver) and match+0x460 = the
+## set-piece cooldown tier (0x5a/0x3c/0x1e/0xf) by |player.x - tgt.x|. `opponents` feeds the
+## FUN_005b0b40 gate (>= 2 goalside opponents closer than self -> no target). The `this` is the PLAYER
+## BASE (the FUN_005ab5a0 decompile mis-renders the call receiver as player+4; the body uses
+## [player+4]/[+0x3a4]/[+0x190]/[+0x18c], confirmed by objdump _passtest_5b0bb0.asm). Geometry leaves:
+## polar_vec (FUN_005ee0f0) / dot16 (FUN_005ee500) / cross16 (FUN_005ee540) + the FP perpendicular
+## magnitude (FILD/FSQRT + _ftol, round-to-zero). Oracle: run_passtest_oracle.sh -> passtest_oracle.txt.
+static func mark_pass_receiver(p: Dictionary, tgt: Array, angle: int, scale: int, dist: int, opponents: Array) -> bool:
+	if count_goalside_opponents(p, opponents, 0) >= 2:        # FUN_005b0b40(0) >= 2 -> no target
+		return _pass_tail(p, tgt, false)
+	var d_self: int = 0xc80000 if p.is_empty() else abs(Pm98Trig._i32(_si(p, 0x4) + _si(p, 0x3a4)))
+	if d_self >= Pm98Trig._i32(dist):
+		return _pass_tail(p, tgt, false)
+	var ball := _ref(p, 0x190)
+	var owner: Variant = ball.get(0x4c, null)
+	var hit: bool = (owner is Dictionary and owner == p)
+	if not hit:
+		var m := _ref(p, 0x18c)
+		if _si(p, 0x68) > 0x776:                              # facing must point near the player's goal
+			var goalx := _si(m, 0x1820)
+			if (1 - _g(p, 0x2b8)) == (_g(m, 0x19a0) & 1):
+				goalx = Pm98Trig._i32(-goalx)
+			var dgx := Pm98Trig._i32(goalx - _si(p, 0x4))     # FUN_00590ae0([goalx,0,0] - player.pos)
+			var dgy := Pm98Trig._i32(-_si(p, 0x8))
+			var ang := Pm98Trig.atan_angle(dgx, dgy)
+			if abs(Pm98Trig._s16(ang - _g(p, 0x34))) > 0x4e39:
+				return _pass_tail(p, tgt, false)
+		var thr_base := 0x50000 if (owner is Dictionary) else 0x30000   # ball+0x4c != 0
+		var half := _div2_rz(scale)
+		var v1 := Pm98Trig.polar_vec(0x10000, angle)          # unit pass direction
+		var v2 := Pm98Trig.polar_vec(half, angle)
+		var thr := Pm98Trig._i32(half + thr_base)
+		var inside: bool = abs(Pm98Trig._i32(_si(p, 0x4) - int(v2[0]) - int(tgt[0]))) < thr \
+			and abs(Pm98Trig._i32(_si(p, 0x8) - (int(v2[1]) + int(tgt[1])))) < thr \
+			and abs(Pm98Trig._i32(_si(p, 0xc) - (int(v2[2]) + int(tgt[2])))) < thr
+		if inside:
+			var dvec := [Pm98Trig._i32(_si(p, 0x4) - int(tgt[0])), \
+				Pm98Trig._i32(_si(p, 0x8) - int(tgt[1])), Pm98Trig._i32(_si(p, 0xc) - int(tgt[2]))]
+			var proj := _dot3_16(v1, dvec)                    # FUN_005ee500(v1, D)
+			var q3 := (thr_base * 0x55555555) >> 32           # high32 of signed product (thr_base > 0)
+			var lo := _div2_rz(q3 - thr_base)                 # (iVar8>>1) - (iVar8>>31) == round0(iVar8/2)
+			var hi := Pm98Trig._i32(((thr_base * 0x55555556) >> 32) + scale)
+			if lo <= proj and proj <= hi:
+				var cr: Array = Pm98Trig.cross16(v1, dvec)    # FUN_005ee540(v1, out, D)
+				var cx := float(int(cr[0]))
+				var cy := float(int(cr[1]))
+				var cz := float(int(cr[2]))
+				var perp := int(sqrt(cx * cx + cy * cy + cz * cz))   # FILD/FSQRT + _ftol (round to zero)
+				hit = perp <= thr_base
+	return _pass_tail(p, tgt, hit)
+
+
+## The FUN_005b0bb0 tail: on a hit, record the chosen receiver (match+0x43c = player) and the set-piece
+## cooldown tier (match+0x460) keyed on |player.x - tgt.x|. Returns `hit` unchanged.
+static func _pass_tail(p: Dictionary, tgt: Array, hit: bool) -> bool:
+	if hit:
+		var m := _ref(p, 0x18c)
+		m[0x43c] = p
+		var d: int = abs(Pm98Trig._i32(_si(p, 0x4) - int(tgt[0])))
+		if d > 0x1e0000:
+			m[0x460] = 0x5a
+		elif d > 0x140000:
+			m[0x460] = 0x3c
+		elif d > 0xa0000:
+			m[0x460] = 0x1e
+		else:
+			m[0x460] = 0xf
+	return hit
+
+
+## Round-toward-zero halving (the binary's `cdq; sub eax,edx; sar 1`), faithful for negative operands
+## where _asr would floor instead. Used for `scale / 2` and the `iVar8 / 2` capsule lower bound.
+static func _div2_rz(x: int) -> int:
+	return -((-x) >> 1) if x < 0 else x >> 1
+
+
 # ---- Match-driver leaves (FUN_00598740): within-box test + phase setter + vec copy ----
 # Small leaves the per-tick match driver FUN_00598740 calls. Oracle-pinned (FUN_005a1820 EAX +
 # FUN_005942e0 state) by tools/re/run_driverleaf_oracle.sh -> specs/driverleaf_oracle.txt, locked
