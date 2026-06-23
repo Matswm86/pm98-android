@@ -24,9 +24,12 @@
 //   read_mem <addr> <size>        capture LE memory value after each call (repeatable)
 //   trace   <va>                  record step#+regs each time PC hits va  (repeatable)
 //   trace_reg <NAME>              reg to snapshot at trace hits (default EAX) (repeatable)
-//   stub    <va> <retval> <argbytes>  on PC==va: set EAX=retval, pop ret + argbytes,
+//   stub    <va> <retval> <argbytes> [label]  on PC==va: set EAX=retval, pop ret + argbytes,
 //                                 i.e. emulate a cdecl/stdcall callee returning retval
-//                                 without executing it (for imports/uninteresting calls)
+//                                 without executing it (for imports/uninteresting calls).
+//                                 Each hit is logged "CALL c STUB label #n step=s ECX=.. arg0=.."
+//                                 (arg0 = [esp+4], the first pushed arg) so stubbed-callee
+//                                 SELECTION + ORDER + ARG stay observable; summary adds stubhits={}.
 import java.io.File;
 import java.io.PrintWriter;
 import java.math.BigInteger;
@@ -75,6 +78,7 @@ public class PcodeEmu extends GhidraScript {
         Map<Long, String> traceAddrs = new LinkedHashMap<>();
         List<String> traceRegs = new ArrayList<>();
         Map<Long, long[]> stubs = new HashMap<>();        // va -> {retval, argbytes}
+        Map<Long, String> stubLabels = new HashMap<>();   // va -> display label
 
         for (String raw : Files.readAllLines(specFile.toPath())) {
             String line = raw.trim();
@@ -103,7 +107,10 @@ public class PcodeEmu extends GhidraScript {
                 case "read_mem":  readMems.add(new long[]{hexVal(t[1]), decVal(t[2])}); break;
                 case "trace":     traceAddrs.put(hexVal(t[1]), t.length>2?t[2]:("t"+t[1])); break;
                 case "trace_reg": traceRegs.add(t[1]); break;
-                case "stub":      stubs.put(hexVal(t[1]), new long[]{hexVal(t[2]), decVal(t[3])}); break;
+                case "stub":
+                    stubs.put(hexVal(t[1]), new long[]{hexVal(t[2]), decVal(t[3])});
+                    stubLabels.put(hexVal(t[1]), t.length > 4 ? t[4] : ("0x" + Long.toHexString(hexVal(t[1]))));
+                    break;
                 default: println("PcodeEmu: WARN unknown directive: " + t[0]);
             }
         }
@@ -142,6 +149,7 @@ public class PcodeEmu extends GhidraScript {
 
                 long steps = 0; String err = null; boolean returned = false;
                 Map<String, Integer> traceCount = new LinkedHashMap<>();
+                Map<String, Integer> stubCount = new LinkedHashMap<>();
                 while (steps < maxsteps) {
                     Address cur = emu.getExecutionAddress();
                     long off = cur.getOffset();
@@ -151,6 +159,11 @@ public class PcodeEmu extends GhidraScript {
                         long[] sdef = stubs.get(off);
                         long curSp = emu.readRegister(sp).longValue();
                         long retAddr = readLE(emu, curSp, 4);
+                        long arg0 = readLE(emu, curSp + 4, 4);     // first pushed arg ([esp+4])
+                        String lab = stubLabels.get(off);
+                        int sn = stubCount.merge(lab, 1, Integer::sum);
+                        out.add("CALL " + call + " STUB " + lab + " #" + sn + " step=" + steps
+                                + " ECX=" + rd(emu, "ECX") + " arg0=" + arg0);
                         emu.writeRegister("EAX", BigInteger.valueOf(sdef[0]));
                         emu.writeRegister(sp, BigInteger.valueOf(curSp + 4 + sdef[1]));
                         emu.writeRegister(pc, BigInteger.valueOf(retAddr));
@@ -178,6 +191,7 @@ public class PcodeEmu extends GhidraScript {
                 for (long[] m : readMems) sb.append(" mem[").append(hex(m[0])).append(":").append(m[1])
                                             .append("]=").append(readLE(emu, m[0], (int) m[1]));
                 if (!traceCount.isEmpty()) sb.append(" tracehits=").append(traceCount);
+                if (!stubCount.isEmpty()) sb.append(" stubhits=").append(stubCount);
                 out.add(sb.toString());
             }
         } finally {

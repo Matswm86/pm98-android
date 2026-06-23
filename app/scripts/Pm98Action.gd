@@ -7,6 +7,12 @@ extends RefCounted
 ## FUN_005a4560 replay no-op the driver currently runs. Built one decompiled leaf at a time, each
 ## oracle-verified bit-for-bit against the REAL function under the Ghidra PCode emulator.
 ##
+## STATE: `tick_action`/`setup_kick` (the two prologue leaves) + the full `engine_tick` SKELETON are
+## ported and oracle-GREEN (test_tickaction.gd 179; test_engine_tick.gd 183). engine_tick's leaf calls
+## (7 action handlers, the resolver case 8/9, the case-0x13 shot-setup, the teammate-count, the 5
+## movement fns) are NO-OP stubs pending their own oracle-gated ports (handoff Tasks #2/#3). See the
+## engine_tick header for the exact scope + the transcription-only caveat (case 0x13 bVar17-true).
+##
 ## STEP 1 (this slice) -- the two leaves the engine prologue needs:
 ##   * tick_action = FUN_005a50c0 (872B, docs/re/move/fn_005a50c0_FUN_005a50c0.c). The per-player
 ##     ACTION / ANIMATION-PHASE advancer that FUN_005a4600 calls first. It bumps the 2-bit sub-tick
@@ -236,3 +242,353 @@ static func setup_kick(p: Dictionary, _m: Dictionary) -> void:
 	p[0x94] = ex
 	p[0x98] = ey
 	p[0x9c] = ez
+
+
+# --- FUN_005a4600 : engine_tick -- the per-player OPEN-PLAY ENGINE (player vtable +0xc) -------
+## EXACT port of FUN_005a4600 (2632B). Run x2/tick by the FUN_005b8c20 dispatcher (the +0xc pass)
+## as the headless per-tick player sim. Faithful transcription of the decompile + objdump-verified
+## thiscall receivers (ESI=player throughout; FUN_005b0b40/005943b0 take ECX=match-or-player as noted;
+## FUN_00590c10 point = player+4 box = match+0x1828).
+##
+## STEP-1 SCOPE (this slice = handoff Task #1): the SKELETON's own inline arithmetic + control flow is
+## the load-bearing surface oracle-verified here. The leaf calls are STUBS to be filled + oracle-gated
+## in handoff Tasks #2 (7 action handlers FUN_005acc40/ad010/ad970/adc60/adfc0/ae4c0/ae910) and #3
+## (5 movement fns FUN_005a8680/65a0/9490/7260/8f20), plus the resolver case 8/9 (FUN_005aeda0 ->
+## Pm98Resolver), the case-0x13 shot-setup FUN_005ac1a0, and the teammate-count FUN_005b0b40. Each
+## stub is a NO-OP here AND in the skeleton oracle (PcodeEmu `stub` directive) so the skeleton's field
+## writes match bit-for-bit; the leaves get wired + re-oracled in their own tasks.
+##
+## CAVEAT -- case 0x13 bVar17-true block (the kick-aim teammate search + ball launch, L137-193 of the
+## decompile) is transcription-only this slice: it is NOT exercised by the Step-1 oracle fixtures
+## (they keep +0x2c != 5 so bVar17 is false). It gets its own oracle when case 0x13 is gated.
+static func engine_tick(p: Dictionary, m: Dictionary) -> void:
+	trace_calls.clear()                    # Step-1 leaf-selection hook (see STUB section)
+	var gs := _ref(p, 0x184)               # player+0x184 -> game/highlights state object
+	var b := _ref(p, 0x190)                # player+0x190 (decompile "+400") -> the ball
+
+	# --- prologue flags (L30-39) ---
+	# FUN_00606220() is a verified no-op (size 1, `ret`).
+	p[0x2d7] = 0
+	var flag := 0
+	if _sign1(_si(p, 4)) != _sign1(_si(p, 0x3a4)):
+		if _count_teammates_closer(p, 0xfffe0000) <= 1:   # STUB FUN_005b0b40 (>1 -> flag 0)
+			flag = 1
+	p[0x2d8] = flag
+
+	# --- 16-tick stamina/recovery block (L40-71): only on the +0x88 low-nibble wrap ---
+	var ctr := (_g(p, 0x88) + 1) & 0xf
+	p[0x88] = ctr
+	if ctr == 0:
+		var s68 := _si(p, 0x68)
+		if s68 < 0x777:
+			var s74 := _si(p, 0x74)
+			if _si(p, 0x70) < s74:
+				var v := _idiv(_si(p, 0x78) * 5, 2) + _si(p, 0x70)
+				if v < s74:
+					s74 = v
+				p[0x70] = Pm98Trig._i32(s74)              # LAB_005a46d4
+		elif s68 < 0x1334:
+			if 0xd55 < s68 and _si(p, 0x78) < _si(p, 0x70):
+				p[0x70] = Pm98Trig._i32(_si(p, 0x70) - _idiv(_si(p, 0x78), 2))
+		elif _si(p, 0x78) < _si(p, 0x70):
+			p[0x70] = Pm98Trig._i32(_si(p, 0x70) - _si(p, 0x78))
+		if _si(p, 0x70) < _idiv(_si(p, 0x74) * 4, 5):
+			var div := _si(m, 0x19ac)
+			var nv := Pm98Trig._i32(_si(p, 0x74) - _idiv(72000, div))
+			p[0x74] = nv if nv >= 0 else 0               # ((nv<0)-1) & nv == clamp >=0
+
+	# --- the per-player action / animation-phase advance (L72) ---
+	tick_action(p, m)
+	p[0x6c] = 0
+
+	# --- possession / touch counters (L73-79): phase 0 only (playback flag DAT_006d31c4==0 live) ---
+	if _g(m, 0x448) == 0:
+		p[0x50] = Pm98Trig._i32(_si(p, 0x50) + 1)
+		var bk: Variant = b.get(0x44, null)
+		if bk is Dictionary and bk == p:                 # player == ball+0x44
+			p[0x4c] = Pm98Trig._i32(_si(p, 0x4c) + 1)
+			gs[0x2e8] = Pm98Trig._i32(_g(gs, 0x2e8) + 1)
+
+	# --- the action-code switch (L80-236): exactly one arm fires (post-tick_action +0x40) ---
+	_action_switch(p, m, gs, b)
+
+	# --- power-button accumulators (L237-266): user input via gs+0x214/+0x215; headless = both 0 ---
+	if _highlight_active(p, m, gs):
+		if (_g(gs, 0x214) & 0xff) != 0:
+			p[0x58] = mini(_si(p, 0x58) + 1, 0x10)
+		if (_g(gs, 0x215) & 0xff) != 0:
+			p[0x54] = mini(_si(p, 0x54) + 1, 0x10)
+
+	# --- motion-timer / interpolation vs movement-decision (L267-375) ---
+	if _g(p, 0x80) != 0:
+		p[0x80] = Pm98Trig._i32(_si(p, 0x80) - 1)
+	var steps := _si(p, 0x84)
+	if _g(p, 0x80) == 0 and steps != 0:
+		# interpolate facing (+0x34 WORD) + position (+4/+8/+0xc) toward (+0x66 / +0x94/+0x98/+0x9c).
+		p[0x84] = Pm98Trig._i32(steps - 1)
+		p[0x34] = Pm98Trig._s16(_idiv(Pm98Trig._s16(_g(p, 0x66) - _g(p, 0x34)), steps) + _g(p, 0x34))
+		p[8] = Pm98Trig._i32(_si(p, 8) + _idiv(_si(p, 0x98) - _si(p, 8), steps))
+		p[4] = Pm98Trig._i32(_si(p, 4) + _idiv(_si(p, 0x94) - _si(p, 4), steps))
+		p[0xc] = Pm98Trig._i32(_si(p, 0xc) + _idiv(_si(p, 0x9c) - _si(p, 0xc), steps))
+	else:
+		_movement_decision(p, m, gs, b)
+
+	# --- LAB_005a4e5b (L376-425): the +0x40-gated 9490 lean + the 7260 locomotion ---
+	var act := _g(p, 0x40)
+	if act != 0x1d and act != 5 and act != 0x24 and (_g(m, 0x461) & 0x40) == 0:
+		_move_9490(p)                                    # STUB
+	if _g(p, 0x2bc) == 0 and (_g(m, 0x461) & 0x40) == 0:
+		var run_7260 := true
+		if _g(m, 0x19a0) == 4:
+			run_7260 = _penalty_box_gate_b(p, m)
+		if run_7260:
+			if (_g(m, 0x44c) != 7 and _g(m, 0x44c) != 5) or not _is_taker(p, m):
+				_move_7260(p)                            # STUB
+
+	# --- LAB_005a4fa2 (L426-465): the body-orient pass + the open-play power reset ---
+	_move_8f20(p, _g(p, 0x34))                            # STUB (arg = facing)
+	if _highlight_active(p, m, gs):
+		if (_g(gs, 0x214) & 0xff) == 0 and _g(p, 0x40) >= 0 and _g(p, 0x40) <= 3:
+			p[0x58] = 0
+		if (_g(gs, 0x215) & 0xff) == 0 and _g(p, 0x40) >= 0 and _g(p, 0x40) <= 3:
+			p[0x54] = 0
+
+
+## L80-236: the action switch. Inline arms (6/7, 0x13, 0x1c, 0x1f/0x21) are ported here; the handler /
+## resolver / shot-setup arms are stubs (Tasks #2). `rng` for cases 6/7 + 0x1c is the match seed; the
+## Step-1 fixtures pick states where those arms draw 0 times, so engine_tick takes no rng here yet.
+static func _action_switch(p: Dictionary, m: Dictionary, gs: Dictionary, b: Dictionary) -> void:
+	var act := _g(p, 0x40)
+	match act:
+		4, 0x25:
+			_h_acc40(p)                                  # STUB
+		5, 0x24:
+			_h_ad010(p)                                  # STUB
+		6, 7:
+			if _g(p, 0x2c) == FRAME_COUNT[act] - 1 and _g(p, 0x30) == 0:
+				if _g(p, 0x48) == 0:
+					var prepend: Variant = m.get(0x440, null)
+					if prepend is Dictionary and prepend == p:   # match+0x440 == player
+						p[0x48] = 5000
+					else:
+						# NOTE: a live windup here would draw 1 rng (FUN_005ec250); Step-1 fixtures
+						# avoid this arm (bVar17 false), so the rng wire lands with Task #2.
+						push_error("engine_tick case 6/7 windup-draw arm not wired (Task #2)")
+				elif _si(p, 0x48) < 10:
+					m[0x461] = _g(m, 0x461) & 0xf7
+		8, 9:
+			_resolve_action(p, m)                        # STUB -> FUN_005aeda0 / Pm98Resolver
+		0x13:
+			_case_distribution(p, m, gs, b)
+		0x14, 0x16:
+			_h_ae4c0(p)                                  # STUB
+		0x15:
+			_h_ae910(p)                                  # STUB
+		0x19, 0x1a:
+			_h_adfc0(p)                                  # STUB
+		0x1c:
+			# only fires the rng + set_position_code(0) when the ball still carries velocity.
+			if _g(b, 0x20) != 0 or _g(b, 0x24) != 0 or _g(b, 0x28) != 0:
+				push_error("engine_tick case 0x1c moving-ball arm not wired (Task #2)")
+		0x1f, 0x21:
+			b[0x20] = 0
+			b[0x24] = 0
+			b[0x28] = 0
+			# the 3 anim-descriptor copies (DAT_00665158->_665154 etc.) are display-only; tracked as
+			# the same m["anim_*"] slots tick_action uses, sourced from the const .data display state.
+			m["anim_665154"] = m.get("anim_src_665158", 0)
+			m["anim_66502c"] = m.get("anim_src_665030", 0)
+			m["anim_67455c"] = m.get("anim_src_674560", 0)
+		0x36:
+			_h_ad970(p)                                  # STUB
+		0x37:
+			_h_adc60(p)                                  # STUB
+
+
+## L127-194: case 0x13 (keeper-distribution / kick windup). The set_phase nudge is skeleton; the
+## bVar17-true block (kick-aim teammate search + ball launch) is TRANSCRIPTION-ONLY this slice
+## (not oracle-covered -- see engine_tick header). FUN_005ac1a0 (shot physics) is a Task-#2 stub.
+static func _case_distribution(p: Dictionary, m: Dictionary, gs: Dictionary, b: Dictionary) -> void:
+	if _g(p, 0x48) == 0 and _g(m, 0x448) == 3:
+		Pm98Movement.set_phase(m, 1)
+	if not (_g(p, 0x2c) == 5 and _g(p, 0x30) == 0):
+		return                                           # bVar17 false -> only the set_phase nudge
+	# bVar17 TRUE (transcription-only): aim toward the nearest eligible teammate, then launch the ball.
+	var sc := _g(p, 0x58) * 0x280000
+	var pv := Pm98Trig.polar_vec(_asr4_bias(sc), _g(p, 0x34))
+	var ax: int = int(pv[0]) + _si(p, 4)
+	var ay: int = int(pv[1]) + _si(p, 8)
+	var best := {}
+	var best_d := 0x1f40000
+	var tz := 0
+	var base: Variant = gs.get(0, null)                  # **(p+0x184) -> [players_base, count]
+	if base is Array:
+		for q in (base as Array):
+			if q is Dictionary and q != p and _g(q, 700) != 0:
+				var dx := _si(q, 4) - ax
+				var dy := _si(q, 8) - ay
+				var d := Pm98Trig.planar_mag(dx, dy)
+				if d < best_d:
+					best_d = d
+					best = q
+	if not best.is_empty():
+		b[0x4c] = best
+		p[0xa0] = _g(best, 4)
+		tz = _g(best, 8)
+		p[0xa4] = tz
+		p[0xa8] = _g(best, 0xc)
+	p[0xb4] = 0
+	var pv2 := Pm98Trig.polar_vec(0x8000, _concat22(Pm98Trig._asr(tz, 16), _g(p, 0x34) & 0xffff))
+	b[4] = Pm98Trig._i32(int(pv2[0]) + _si(p, 4))
+	b[8] = Pm98Trig._i32(_si(p, 8) + int(pv2[1]))
+	b[0xc] = 0x15c28                                     # L190 (pv2.z + p.c) then L191 overwrites z = launch height
+	_shot_setup(p)                                       # STUB FUN_005ac1a0
+
+
+## L281-375: choose between FUN_005a8680 (settle) and FUN_005a65a0(iStack_38) (the general move), or
+## skip both (early goto LAB_005a4e5b). Both targets are Task-#3 stubs; the SELECTION is skeleton.
+static func _movement_decision(p: Dictionary, m: Dictionary, gs: Dictionary, b: Dictionary) -> void:
+	if _g(p, 0x2bc) == 0 and (_g(m, 0x461) & 0x40) == 0:
+		var pen_skip := false
+		if _g(m, 0x19a0) == 4:
+			pen_skip = not _penalty_box_gate_a(p, m)
+		if not pen_skip:
+			if (_g(m, 0x44c) != 7 and _g(m, 0x44c) != 5) or not _is_taker(p, m):
+				return                                   # goto LAB_005a4e5b (skip 8680/65a0)
+
+	# LAB_005a4ce6: settle gate -> bVar17 + iStack_38.
+	var bv := false
+	var istack := 0
+	if (_g(p, 0x63) & 0xff) == 0 and (_g(m, 0x461) & 0x40) == 0:
+		var armed := _highlight_active(p, m, gs)
+		if not armed \
+				or (_g(p, 0x2bc) != 0 and _g(m, 0x448) == 6) \
+				or (900 < _si(gs, 0x2dc)) \
+				or (_truthy(m, 0x440) and _g(m, 0x448) == 0):
+			bv = true                                    # LAB_005a4db0
+	else:
+		istack = 1
+		bv = true                                        # LAB_005a4db0
+
+	# LAB_005a4e3e: settle vs move (the controller / engaged / proximity resolution).
+	var ctrl: Variant = b.get(0x40, null)
+	if ctrl is Dictionary and ctrl == p:
+		pass                                             # is controller -> use bv as-is
+	else:
+		var eng: Variant = b.get(0x4c, null)
+		if eng is Dictionary and eng == p:
+			bv = true
+			istack = 1                                   # LAB_005a4e34
+		elif not bv:
+			if 0x78 < _si(gs, 0x2dc) \
+					and absi(Pm98Trig._i32(_si(p, 4) - _si(b, 0xcc))) < 0x60000 \
+					and absi(Pm98Trig._i32(_si(p, 8) - _si(b, 0xd0))) < 0x60000 \
+					and absi(Pm98Trig._i32(_si(p, 0xc) - _si(b, 0xd4))) < 0x60000:
+				bv = true
+				istack = 1                               # LAB_005a4e34
+	if not bv:
+		_move_8680(p)                                    # STUB
+		return
+	_move_65a0(p, istack)                                # STUB
+
+
+## L284-305: penalty/ET in-box + half + velocity gate (FUN_00590c10 box at match+0x1828). Returns the
+## bVar17 that decides whether the first movement cascade proceeds (true) or skips to LAB_005a4ce6.
+static func _penalty_box_gate_a(p: Dictionary, m: Dictionary) -> bool:
+	var inb := _in_box6([_si(p, 4), _si(p, 8), _si(p, 0xc)], m, 0x1828)
+	var bv: bool = inb \
+		and absi(Pm98Trig._i32(_si(p, 4))) > Pm98Trig._i32(_si(m, 0x1820) - 0x108000) \
+		and absi(Pm98Trig._i32(_si(p, 8))) <= 0x1428f4
+	return bv and _sign1(_si(p, 4)) == _sign1(_si(p, 0x3a4))
+
+
+## L389-419: the LAB_005a4e5b penalty/ET gate (explicit per-axis box, not FUN_00590c10). Returns
+## whether the 7260 locomotion section proceeds (true) or jumps to LAB_005a4fa2.
+static func _penalty_box_gate_b(p: Dictionary, m: Dictionary) -> bool:
+	var inb := _si(p, 4) >= _si(m, 0x1828) and _si(p, 4) <= _si(m, 0x1834) \
+		and _si(p, 8) >= _si(m, 0x182c) and _si(p, 8) <= _si(m, 0x1838) \
+		and _si(p, 0xc) >= _si(m, 0x1830) and _si(p, 0xc) <= _si(m, 0x183c)
+	var bv: bool = inb \
+		and Pm98Trig._i32(_si(m, 0x1820) - 0x108000) < absi(Pm98Trig._i32(_si(p, 4))) \
+		and absi(Pm98Trig._i32(_si(p, 8))) < 0x1428f5
+	return bv and _sign1(_si(p, 4)) == _sign1(_si(p, 0x3a4))
+
+
+# ---- skeleton helpers --------------------------------------------------------------------
+
+## The binary's sign idiom `((-1 < x) - 1 & 0xfffffffe) + 1`: +1 for x>=0, -1 for x<0.
+static func _sign1(x: int) -> int:
+	return 1 if x >= 0 else -1
+
+
+## L238-245 / L312-339 / L428-435: the highlight/replay-input gate -- gs+0x2ee set AND play-state 0
+## AND player+0x5c set. Models the "user is steering this player during a highlight" condition; on the
+## headless path gs+0x2ee is 0 so it is always false (no user input).
+static func _highlight_active(p: Dictionary, m: Dictionary, gs: Dictionary) -> bool:
+	return (_g(gs, 0x2ee) & 0xff) != 0 and Pm98Movement.play_state_eq(m, 0) and (_g(p, 0x5c) & 0xff) != 0
+
+
+## player == match+0x438 (the active set-piece taker), by Dict identity.
+static func _is_taker(p: Dictionary, m: Dictionary) -> bool:
+	var t: Variant = m.get(0x438, null)
+	return t is Dictionary and t == p
+
+
+## a non-null pointer field (a live Dict ref or a nonzero raw int address).
+static func _truthy(d: Dictionary, off: int) -> bool:
+	var v: Variant = d.get(off, null)
+	if v is Dictionary:
+		return true
+	return int(v) != 0 if (v is int or v is float) else false
+
+
+## FUN_00590c10: 3D AABB containment of `point` in the 6-int box at m[off..off+0x14]
+## (min = off/+4/+8, max = +0xc/+0x10/+0x14).
+static func _in_box6(point: Array, m: Dictionary, off: int) -> bool:
+	var px := Pm98Trig._i32(int(point[0]))
+	var py := Pm98Trig._i32(int(point[1]))
+	var pz := Pm98Trig._i32(int(point[2]))
+	return _si(m, off) <= px and px <= _si(m, off + 0xc) \
+		and _si(m, off + 4) <= py and py <= _si(m, off + 0x10) \
+		and _si(m, off + 8) <= pz and pz <= _si(m, off + 0x14)
+
+
+## `(x + (x >> 31 & 0xf)) >> 4` -- truncate-toward-zero divide-by-16 (the case-0x13 windup scale).
+static func _asr4_bias(x: int) -> int:
+	return (x + ((x >> 31) & 0xf)) >> 4
+
+
+## CONCAT22(hi, lo16): the binary's high:low 32-bit pack of a 16-bit angle with garbage high bits.
+static func _concat22(hi: int, lo16: int) -> int:
+	return Pm98Trig._i32(((hi & 0xffff) << 16) | (lo16 & 0xffff))
+
+
+# ---- STUB leaves (Task #2 action handlers / Task #3 movement fns) -------------------------
+# Each is a faithful NO-OP placeholder, mirrored by a PcodeEmu `stub` in run_engine_oracle.sh so the
+# skeleton's own field writes match bit-for-bit. They are replaced by oracle-gated ports in their tasks.
+#
+# STEP-1 VERIFICATION HOOK: because a stub writes no fields, its CALL is otherwise invisible; the leaves
+# append [label, arg] to `trace_calls` so test_engine_tick.gd can assert the movement-fn SELECTION +
+# ORDER + arg against the oracle's STUB lines. engine_tick clears it on entry. The hook drops out once
+# the real leaves (which DO write fields) replace these stubs in Tasks #2/#3.
+static var trace_calls: Array = []
+
+## FUN_005b0b40 (thiscall player; 0xfffe0000): count teammates closer to goal than self. STUB -> 0.
+static func _count_teammates_closer(_p: Dictionary, arg: int) -> int:
+	trace_calls.append(["B0B40", arg])
+	return 0
+
+static func _h_acc40(_p: Dictionary) -> void: trace_calls.append(["ACC40", 0])     # FUN_005acc40 (case 4/0x25)
+static func _h_ad010(_p: Dictionary) -> void: trace_calls.append(["AD010", 0])     # FUN_005ad010 (case 5/0x24)
+static func _h_ae4c0(_p: Dictionary) -> void: trace_calls.append(["AE4C0", 0])     # FUN_005ae4c0 (case 0x14/0x16)
+static func _h_ae910(_p: Dictionary) -> void: trace_calls.append(["AE910", 0])     # FUN_005ae910 (case 0x15)
+static func _h_adfc0(_p: Dictionary) -> void: trace_calls.append(["ADFC0", 0])     # FUN_005adfc0 (case 0x19/0x1a)
+static func _h_ad970(_p: Dictionary) -> void: trace_calls.append(["AD970", 0])     # FUN_005ad970 (case 0x36)
+static func _h_adc60(_p: Dictionary) -> void: trace_calls.append(["ADC60", 0])     # FUN_005adc60 (case 0x37)
+static func _resolve_action(_p: Dictionary, _m: Dictionary) -> void: trace_calls.append(["AEDA0", 0])  # FUN_005aeda0 (case 8/9)
+static func _shot_setup(_p: Dictionary) -> void: trace_calls.append(["AC1A0", 0])  # FUN_005ac1a0 (case 0x13 bVar17-true)
+static func _move_8680(_p: Dictionary) -> void: trace_calls.append(["M8680", 0])   # FUN_005a8680 (settle)
+static func _move_65a0(_p: Dictionary, arg: int) -> void: trace_calls.append(["M65a0", arg])  # FUN_005a65a0 (general move)
+static func _move_9490(_p: Dictionary) -> void: trace_calls.append(["M9490", 0])   # FUN_005a9490 (lean)
+static func _move_7260(_p: Dictionary) -> void: trace_calls.append(["M7260", 0])   # FUN_005a7260 (locomotion)
+static func _move_8f20(_p: Dictionary, facing: int) -> void: trace_calls.append(["M8f20", facing])  # FUN_005a8f20 (body orient)

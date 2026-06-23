@@ -1,0 +1,29 @@
+# Stage 3 POSITIONAL Task #1: FUN_005a4600 (engine_tick) SKELETON PCode-emu truth.
+# 14 leaves STUBBED (action handlers + resolver + movement fns + teammate-count); in-image helpers real.
+# Each row: FIX <name> + verbatim CALL/STUB lines. STUB lines show selection+arg; mem[]= the field writes.
+## FIX flag2d8
+CALL 0 STUB B0B40 #1 step=33 ECX=2293760 arg0=4294836224
+CALL 0 STUB M9490 #1 step=147 ECX=2293760 arg0=0
+CALL 0 STUB M7260 #1 step=170 ECX=2293760 arg0=0
+CALL 0 STUB M8f20 #1 step=175 ECX=2293760 arg0=2293760
+CALL 0 RET steps=192 EAX=0 mem[0x230004:4]=5 mem[0x230008:4]=0 mem[0x23000c:4]=0 mem[0x230020:4]=0 mem[0x230024:4]=0 mem[0x230028:4]=0 mem[0x23002c:4]=0 mem[0x230030:4]=1 mem[0x230040:4]=2 mem[0x230048:4]=4 mem[0x23004c:4]=0 mem[0x230050:4]=1 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x230034:2]=0 mem[0x230066:2]=0 mem[0x23006c:4]=0 mem[0x230070:4]=0 mem[0x230074:4]=0 mem[0x230080:4]=0 mem[0x230084:4]=0 mem[0x230088:4]=1 mem[0x2300b4:4]=0 mem[0x2302d7:1]=0 mem[0x2302d8:1]=1 mem[0x270020:4]=0 mem[0x270024:4]=0 mem[0x270028:4]=0 mem[0x260448:4]=0 mem[0x26044c:4]=0 mem[0x260461:4]=0 mem[0x2802e8:4]=0 stubhits={B0B40=1, M9490=1, M7260=1, M8f20=1}
+## FIX stamina16
+CALL 0 STUB M9490 #1 step=179 ECX=2293760 arg0=0
+CALL 0 STUB M7260 #1 step=202 ECX=2293760 arg0=0
+CALL 0 STUB M8f20 #1 step=207 ECX=2293760 arg0=2293760
+CALL 0 RET steps=224 EAX=0 mem[0x230004:4]=0 mem[0x230008:4]=0 mem[0x23000c:4]=0 mem[0x230020:4]=0 mem[0x230024:4]=0 mem[0x230028:4]=0 mem[0x23002c:4]=0 mem[0x230030:4]=1 mem[0x230040:4]=0 mem[0x230048:4]=4 mem[0x23004c:4]=0 mem[0x230050:4]=1 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x230034:2]=0 mem[0x230066:2]=0 mem[0x23006c:4]=0 mem[0x230070:4]=60 mem[0x230074:4]=74 mem[0x230080:4]=0 mem[0x230084:4]=0 mem[0x230088:4]=0 mem[0x2300b4:4]=0 mem[0x2302d7:1]=0 mem[0x2302d8:1]=0 mem[0x270020:4]=0 mem[0x270024:4]=0 mem[0x270028:4]=0 mem[0x260448:4]=0 mem[0x26044c:4]=0 mem[0x260461:4]=0 mem[0x2802e8:4]=0 stubhits={M9490=1, M7260=1, M8f20=1}
+## FIX case1f
+CALL 0 STUB M9490 #1 step=154 ECX=2293760 arg0=0
+CALL 0 STUB M7260 #1 step=177 ECX=2293760 arg0=0
+CALL 0 STUB M8f20 #1 step=182 ECX=2293760 arg0=2293760
+CALL 0 RET steps=199 EAX=0 mem[0x230004:4]=0 mem[0x230008:4]=0 mem[0x23000c:4]=0 mem[0x230020:4]=0 mem[0x230024:4]=0 mem[0x230028:4]=0 mem[0x23002c:4]=0 mem[0x230030:4]=1 mem[0x230040:4]=31 mem[0x230048:4]=2 mem[0x23004c:4]=0 mem[0x230050:4]=1 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x230034:2]=0 mem[0x230066:2]=0 mem[0x23006c:4]=0 mem[0x230070:4]=0 mem[0x230074:4]=0 mem[0x230080:4]=0 mem[0x230084:4]=0 mem[0x230088:4]=1 mem[0x2300b4:4]=0 mem[0x2302d7:1]=0 mem[0x2302d8:1]=0 mem[0x270020:4]=0 mem[0x270024:4]=0 mem[0x270028:4]=0 mem[0x260448:4]=0 mem[0x26044c:4]=0 mem[0x260461:4]=0 mem[0x2802e8:4]=0 stubhits={M9490=1, M7260=1, M8f20=1}
+## FIX settle8680
+CALL 0 STUB M8680 #1 step=210 ECX=2293760 arg0=0
+CALL 0 STUB M9490 #1 step=227 ECX=2293760 arg0=0
+CALL 0 STUB M8f20 #1 step=256 ECX=2293760 arg0=2490368
+CALL 0 RET steps=316 EAX=1 mem[0x230004:4]=0 mem[0x230008:4]=0 mem[0x23000c:4]=0 mem[0x230020:4]=0 mem[0x230024:4]=0 mem[0x230028:4]=0 mem[0x23002c:4]=0 mem[0x230030:4]=1 mem[0x230040:4]=2 mem[0x230048:4]=4 mem[0x23004c:4]=0 mem[0x230050:4]=1 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x230034:2]=0 mem[0x230066:2]=0 mem[0x23006c:4]=0 mem[0x230070:4]=0 mem[0x230074:4]=0 mem[0x230080:4]=0 mem[0x230084:4]=0 mem[0x230088:4]=1 mem[0x2300b4:4]=0 mem[0x2302d7:1]=0 mem[0x2302d8:1]=0 mem[0x270020:4]=0 mem[0x270024:4]=0 mem[0x270028:4]=0 mem[0x260448:4]=0 mem[0x26044c:4]=7 mem[0x260461:4]=0 mem[0x2802e8:4]=0 stubhits={M8680=1, M9490=1, M8f20=1}
+## FIX move65a0
+CALL 0 STUB M65a0 #1 step=162 ECX=2293760 arg0=0
+CALL 0 STUB M9490 #1 step=180 ECX=2293760 arg0=0
+CALL 0 STUB M8f20 #1 step=209 ECX=2293760 arg0=2490368
+CALL 0 RET steps=226 EAX=0 mem[0x230004:4]=0 mem[0x230008:4]=0 mem[0x23000c:4]=0 mem[0x230020:4]=0 mem[0x230024:4]=0 mem[0x230028:4]=0 mem[0x23002c:4]=0 mem[0x230030:4]=1 mem[0x230040:4]=2 mem[0x230048:4]=4 mem[0x23004c:4]=0 mem[0x230050:4]=1 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x230034:2]=0 mem[0x230066:2]=0 mem[0x23006c:4]=0 mem[0x230070:4]=0 mem[0x230074:4]=0 mem[0x230080:4]=0 mem[0x230084:4]=0 mem[0x230088:4]=1 mem[0x2300b4:4]=0 mem[0x2302d7:1]=0 mem[0x2302d8:1]=0 mem[0x270020:4]=0 mem[0x270024:4]=0 mem[0x270028:4]=0 mem[0x260448:4]=0 mem[0x26044c:4]=7 mem[0x260461:4]=0 mem[0x2802e8:4]=0 stubhits={M65a0=1, M9490=1, M8f20=1}
