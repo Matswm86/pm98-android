@@ -536,6 +536,100 @@ static func simulate(mem: Mem, rng: Rng, run_et := false, run_pen := false) -> v
 		_penalties(mem, rng)
 
 
+# --- FUN_0044d5f0: the Mem-from-clubs bridge --------------------------------
+## Build a match Mem from two selected XIs, mirroring FUN_0044d5f0 (the bridge that
+## fills the participant records the stat engine reads). RE map + verified attr
+## alignment: docs/re/stat_match_engine_re.md ("game_db-attr -> in-memory-offset map",
+## loader FUN_00583bd0). The three attrs the stat engine actually consumes:
+##   STR    = (VE + RE + AG + CA) >> 2     (FUN_005841e0 averages player+0x9c..0x9f;
+##            runtime fatigue-scaling needs club-perf bands absent from game_db -> mean)
+##   GKSAVE = PO                           (+10 if the GK / slot 0, clamp 99)
+##   PASS   = PA
+##   ROLE   = pos -> 0/1/2/3 (GK/DEF/MID/ATT); POS = a representative fine code per
+##            role (steers the scorer roulette WEIGHT only, never the goal count).
+##
+## `xi0`/`xi1` are ordered Arrays of up to 11 entries, slot 0 = the GK. An entry is a
+## game_db player Dictionary ({"attrs": {...}, "pos": "GK"/"DF"/"MF"/"FW"}); a null /
+## non-Dictionary / attr-less / empty entry leaves that slot zeroed (SEL = 0, not in XI).
+const ROLE_OF := {"GK": 0, "DF": 1, "MF": 2, "FW": 3}
+# Representative participant POS (= player+0x18 + 1) per broad role -> POS_WEIGHT index.
+# The exact per-player fine position is not in game_db (see RE note); FW carries the
+# heaviest scoring weight, GK zero, mirroring the central-striker bias of POS_WEIGHT.
+const POS_OF := {"GK": 1, "DF": 3, "MF": 12, "FW": 9}
+
+
+static func _fill_participant(mem: Mem, side: int, idx: int, p: Variant) -> bool:
+	var pb := _player(side, idx)
+	if p == null or not (p is Dictionary):
+		return false
+	var attrs: Variant = (p as Dictionary).get("attrs", {})
+	if not (attrs is Dictionary) or (attrs as Dictionary).is_empty():
+		return false
+	var a: Dictionary = attrs
+	mem.set_u16(pb + SEL, idx + 1)   # shirt: slot+1 (game_db has no shirt; matches build_xi)
+	var strg: int = (int(a.get("VE", 0)) + int(a.get("RE", 0)) \
+			+ int(a.get("AG", 0)) + int(a.get("CA", 0))) >> 2
+	mem.set_u8(pb + STR, strg)
+	var gk: int = int(a.get("PO", 0))
+	if idx == 0:
+		gk = mini(gk + 10, 99)
+	mem.set_u8(pb + GKSAVE, gk)
+	mem.set_u8(pb + PASS, int(a.get("PA", 0)))
+	var pos: String = str((p as Dictionary).get("pos", ""))
+	# slot 0 is always the keeper; default an undecoded outfielder to MID.
+	mem.set_s32(pb + ROLE, 0 if idx == 0 else int(ROLE_OF.get(pos, 2)))
+	mem.set_s32(pb + POS, 1 if idx == 0 else int(POS_OF.get(pos, 12)))
+	return true
+
+
+## Fill one team block (11 participant records + team id + shape byte). Returns the
+## count actually selected. SHAPE (+0xbb) aliases participant-0's AG byte in the binary
+## (the buildup loops read it as the keeper's aggression gate), so it is the GK's AG.
+static func _fill_side(mem: Mem, side: int, xi: Array, team_id: int) -> int:
+	var n := 0
+	for idx in range(11):
+		var p: Variant = xi[idx] if idx < xi.size() else null
+		if _fill_participant(mem, side, idx, p):
+			n += 1
+	mem.set_u16(side * SIDE_STRIDE + TEAMID, team_id)
+	var gk: Variant = xi[0] if xi.size() > 0 else null
+	var shape := 0x32
+	if gk is Dictionary and (gk as Dictionary).get("attrs", {}) is Dictionary:
+		shape = int(((gk as Dictionary).get("attrs", {}) as Dictionary).get("AG", 0x32))
+	mem.set_u8(side * SIDE_STRIDE + SHAPE, shape)
+	return n
+
+
+## Build a league-fixture Mem (no two-leg carry, ET/penalties off). For a cup tie set
+## the carry / ET / pen fields on the returned Mem and pass run_et/run_pen to simulate().
+static func build_mem(xi0: Array, xi1: Array, team_id0: int, team_id1: int) -> Mem:
+	var mem := Mem.new()
+	_fill_side(mem, 0, xi0, team_id0)
+	_fill_side(mem, 1, xi1, team_id1)
+	# League sentinels: single leg, no carry, ET/pen disabled (ft_gate -> straight winner).
+	mem.set_s32(G_A, 0xff)
+	mem.set_s32(G_B, 0xff)
+	mem.set_s32(G_C, 0xff)
+	mem.set_s32(G_D, 0xff)
+	return mem
+
+
+## High-level convenience: simulate a fixture from two XIs and return goals per side.
+## Returns { home_goals, away_goals, mem } (mem retained for event/commentary use).
+## `seed` seeds the msvcrt LCG (callers pass rng.randi() for reproducibility).
+static func simulate_fixture(seed: int, xi0: Array, xi1: Array, team_id0: int, \
+		team_id1: int, run_et := false, run_pen := false) -> Dictionary:
+	var mem := build_mem(xi0, xi1, team_id0, team_id1)
+	var rng := Rng.new(seed)
+	simulate(mem, rng, run_et, run_pen)
+	var sc := score(mem)
+	return {
+		"home_goals": int(sc.get(team_id0 & 0xFFFF, 0)),
+		"away_goals": int(sc.get(team_id1 & 0xFFFF, 0)),
+		"mem": mem,
+	}
+
+
 ## Final score as { teamId: goals } from the event queue (goals = non-penalty events).
 static func score(mem: Mem) -> Dictionary:
 	var s := {}

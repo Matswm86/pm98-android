@@ -307,28 +307,64 @@ base `match+0x84+i*0xac`; side 1 lines 385-665 at `match+0x7f8 + i*0x2b dwords`)
 from the scorer roulette; `1`(DEF) takes the role-1 convergence path; `2/3`(MID/ATT) are the
 watched pair (key-pass / assist draws). `POS = player+0x18 + 1` indexes `POS_WEIGHT[1..18]`.
 
-### Residual before the bridge is runnable
+### game_db-attr → in-memory-offset map (CLOSED — loader `FUN_00583bd0`)
 
-The **only** unresolved link is the in-memory player offsets → the decoded `game_db.json`
-attrs (`VE RE AG CA RM RG PA TI EN PO`, order from `tools/extract_squads.py`). The in-memory
-record is the **fully-loaded player object** (has form `+0x19`, club id `+0x14`, position-fit
-bands via `DAT_00638e34..40`, next-ptr `+0x100`), NOT the raw `EQUIPOS.PKF` blob, so the 10
-attrs are NOT a verbatim copy at `+0x9c`. Two ways to close it, either of which avoids a guess:
-1. **Oracle `FUN_0044d5f0` + `FUN_005841e0`** against synthetic player records (known bytes at
-   `+0x9c..0xa2/+0x18/+0x1c`) — validates the transform end-to-end; the GDScript bridge then
-   maps `game_db` attrs → those offsets, the single remaining unknown.
-2. **RE the PKF→player-object loader** (the function that writes `player+0x9c..0xa6` from
-   EQUIPOS.PKF) to get the offset→attr names directly, **or** one-time dump a known player's
-   live record under wine and read the bytes.
+The EQUIPOS→in-memory player loader is `FUN_00583bd0` (`@0x583bd0`), the per-player
+deserializer called by the club deserializer `FUN_0057bfb0` (which `operator_new(0x104)`s
+each node, ctors it via `FUN_00581c80`, fills it via `FUN_00583bd0`, links `+0x100`, chains
+the squad list at `club+0x24`). The 10 named attrs are **contiguous on disk in EQUIPOS order
+`VE RE AG CA RM RG PA TI EN PO`** (`extract_squads.py`, bytes `Y+4..Y+13`); the deserializer
+reads them as **10 consecutive single-byte stream reads** and **scatters** them — verbatim
+copies, NO scaling (`uVar3 = *cursor; *(node+off) = uVar3`). So the in-memory attr block is a
+pure **REORDER** of the on-disk run, NOT a transform. Store sequence verified at the
+instruction level in `FUN_00583bd0` (decompile lines 244-282; asm `0x584031..0x5840b3`):
 
-`player+0x18` (POS) / `player+0x1c` (ROLE) are already decodable: they are the demarcación /
-broad-role bytes mapped in `docs/re/positions_re.md` (`game_db` `pos` / `isGK`).
+| node off | disk attr | game_db name | stat-engine field |
+|----------|-----------|--------------|-------------------|
+| `+0x9c`  | attr[0]   | **VE** | STR component (avg) |
+| `+0x9d`  | attr[1]   | **RE** | STR component (avg) |
+| `+0x9e`  | attr[2]   | **AG** | STR component (avg) |
+| `+0x9f`  | attr[3]   | **CA** | STR component (avg) |
+| `+0xa0`  | attr[9]   | **PO** | **GKSAVE** (+10 if GK slot, clamp 99) |
+| `+0xa1`  | attr[8]   | EN     | (participant+0x3d, unread by stat engine) |
+| `+0xa2`  | attr[6]   | **PA** | **PASS** |
+| `+0xa3`  | attr[4]   | RM     | (participant+0x3f, unread) |
+| `+0xa4`  | attr[5]   | RG     | (participant+0x40, unread) |
+| `+0xa5`  | attr[7]   | TI     | (participant+0x41, unread) |
+| `+0xa6`  | byte after PO | **NOT a named skill** | overall-rating base in `FUN_00582db0` (`+0xa6 + neg pos-fit penalty`); ≈0x01 for most |
+
+**The bridge therefore needs only three game_db attrs:**
+* **`STR = (VE + RE + AG + CA) >> 2`** (FUN_005841e0 averages `+0x9c..+0x9f`).
+* **`GKSAVE = PO`** (`+10` if the player is the GK / lineup slot 0, clamp 99).
+* **`PASS = PA`** (`+0xa2`).
+
+`+0x18` (POS, → `POS_WEIGHT[+0x18+1]`) and `+0x1c` (ROLE, the `0/1/2/3 = GK/DEF/MID/ATT`
+switch) and `+0x19` (the `<0xc` gate byte) are **HEADER bytes** read before the attr run, NOT
+from the attr block (`FUN_00583bd0` stores at `0x583c72`/`0x583c9d`/`0x583ccf`). `+0x1c` is the
+broad role = the `positions_re.md` demarcación = `game_db` `pos` (`GK/DF/MF/FW` → `0/1/2/3`).
+`+0x14` (club id u16) comes from the ctor (team id) and is overwritten by the stream u16
+(`0x584019`); read by `FUN_005841e0`/`FUN_00582db0` to resolve the club for STR scaling.
+
+**Two caveats carried into the port (documented, not guessed):**
+* **STR fatigue-scaling is a runtime club-state dependency, out of game_db scope.** For a
+  starter (`+0x19 < 0xc`) of a "real" club (`club+0x10 != 0` and `club+0x5c != 0xffff`),
+  `FUN_005841e0` reduces STR to `mean/2` (GK / slot-1 outfield) or `mean*3/4`, gated on a
+  per-slot **club-performance band table** `(+0x19+2)*0x20 + club+0x10` (fixture/fatigue
+  history). `game_db` carries no form or club-perf bands, so the faithful **baseline is the
+  plain `mean`** (the unfatigued / `goto LAB_005842f6` path); fatigue-scaling is left as a
+  runtime-only refinement.
+* **`+0x18` is a FINER position code (0..17 → the 19-entry `POS_WEIGHT`), not the 0-3
+  demarcación,** and is NOT currently in `game_db` (the loader reads it from a header byte the
+  extractor does not decode). It only steers the scorer-roulette WEIGHT (who scores), never the
+  goal COUNT, so the bridge assigns a representative fine code per formation slot (as
+  `run_statmatch_oracle.sh` `build_xi` did, `POS=(1 2 3 5 7 9 11 13 16 9 12)`); exact
+  per-player fine position is a follow-up extraction, not a scoreline blocker.
 
 ## NEXT
 
-1. Close the **residual** above (oracle `FUN_0044d5f0`, route 1 preferred — same PCodeEmu
-   pattern as `run_statmatch_oracle.sh`), producing the `game_db`-attr → in-memory-offset map.
-2. **Then** replace `app/scripts/MatchEngine.gd`: build a `Mem` per club from the lineup
+1. ~~Close the residual~~ **DONE** — loader `FUN_00583bd0` traced + instruction-verified; map
+   above. STR = avg(VE,RE,AG,CA), GKSAVE = PO, PASS = PA.
+2. **Now** replace `app/scripts/MatchEngine.gd`: build a `Mem` per club from the lineup
    (SEL=shirt for the 11 selected available; STR/GKSAVE/PASS/POS/ROLE per the table above),
    `simulate(mem, rng)` for H1+H2; for a cup tie set carry/flags and use
    `run_et := ft_gate(mem)==0` after H2, `run_pen := ft_gate(mem)==0` after ET.
