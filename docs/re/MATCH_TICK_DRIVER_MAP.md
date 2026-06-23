@@ -1,5 +1,21 @@
 # PM98 -- match-tick driver call-graph map (FUN_00598740)
 
+> **⛔ CORRECTION 2026-06-23 (LIVE WINE TRACE) — the player vtable base below is OFF BY 4.**
+> The live match's player objects carry vtable pointer **`0x639228`**, NOT `0x639224` (verified by
+> `winedbg` on a real watched match: `EAX=[player]=0x639228`; and by the object ctors at
+> `0x5a271e/0x5a295c/0x5b6ec6` storing `0x639228`). `0x639224` is a DIFFERENT class's vtable.
+> Consequence: every "FUN_005b8xxx → +off → FUN_005aXXXX" mapping in this file is shifted one slot.
+> **LIVE-CONFIRMED:** the per-tick dispatcher `FUN_005b8c20` (`call [eax+0xc]`, eax=0x639228 →
+> `[0x639234]`) calls **`FUN_005a4600`** (the action-resolve → resolver `FUN_005aeda0` → scoring),
+> NOT `FUN_005a4560`. This is why the headless port stays at phase 2 / 0-0: it ported `FUN_005b8c20`'s
+> target as the no-op replay `FUN_005a4560`. Full evidence + the corrected vtable + the port fix:
+> `[[handoff-pm98-vtable-offset-rootcause-2026-06-23]]`. **The vtable + dispatcher + per-tick sections
+> below are now CORRECTED to base 0x639228 (2026-06-23) and verified three ways (live trace, binary
+> bytes, sub-entity-pattern cross-check); a FUN_005a4600 structural map + port scope is appended at the
+> end.** The 2026-06-19 "VA<->file delta" note just below predates the correction -- the LAYOUT it
+> defends is right, but its `+8=DECIDE / +0xc=replay` role labels were the off-by-4 and are superseded.
+
+
 Verified 2026-06-19 by reading the decompiles + disasm + the player vtable. This replaces the
 loose "FUN_005b70e0 shell + FUN_005b73a0 -> driver" sketch in the prior handoffs with the actual
 per-tick call order, and splits SIMULATION (needed for a headless match-outcome engine) from
@@ -13,21 +29,50 @@ draws. Verified the right delta by locating player DECIDE 0x5a3400 in the binary
 at file 0x23802c == VA 0x63922c == player-vtable+8. The player-vtable LAYOUT below was already
 correct; only the file-offset note was off.)
 
-## Player vtable (VA 0x639224, the object whose `this` is a player, stride 0x3bc)
-Dumped from MANAGER.EXE .rdata at file offset 0x238024 (`file = 0x639224 - 0x401200`):
+## Player vtable (base VA **0x639228**, the object whose `this` is a player, stride 0x3bc)
+**CORRECTED 2026-06-23** (live wine trace + binary bytes + sub-entity-pattern cross-check; supersedes
+the old 0x639224 reading above). The contiguous vtable bytes at file 0x238024 (VA 0x639224) are:
 ```
-+0x00  0x5ed810   (dtor/RTTI-ish)
-+0x04  0x5a5460   FUN_005a5460   = per-player SPRITE/ANIMATION draw  (DISPLAY, skip headless)
-+0x08  0x5a3400   FUN_005a3400   = per-player DECIDE (move target)   (SIM, DONE)
-+0x0c  0x5a4560   FUN_005a4560   = per-player ADVANCE (replay rec/play, no-op live)   (SIM, DONE)
-+0x10  0x5a4600   ...
+VA 0x639224  0x5ed810   (dtor/RTTI)                      <- this slot belongs to the OTHER class
+VA 0x639228  0x5a5460   FUN_005a5460   <- PLAYER vtable +0x00
+VA 0x63922c  0x5a3400   FUN_005a3400   <- PLAYER vtable +0x04
+VA 0x639230  0x5a4560   FUN_005a4560   <- PLAYER vtable +0x08
+VA 0x639234  0x5a4600   FUN_005a4600   <- PLAYER vtable +0x0c
+VA 0x639238  0x5ed810   (dtor/RTTI)    <- PLAYER vtable +0x10
+```
+The live match's player objects store **0x639228** as their vtable pointer (winedbg: `EAX=[player]=
+0x639228` at the FUN_005a4600 breakpoint; object ctors at 0x5a271e/0x5a295c/0x5b6ec6). So the PLAYER
+vtable, read from its true base, is:
+```
++0x00  0x5a5460   FUN_005a5460   = per-player SPRITE/ANIMATION draw  (DISPLAY, skip headless)
++0x04  0x5a3400   FUN_005a3400   = per-player DECIDE / set-piece positioning  (SIM)  -- ported as decide_slice_a/b/c
++0x08  0x5a4560   FUN_005a4560   = per-player ADVANCE replay rec/play  (no-op live)  -- ported as Pm98Movement.advance
++0x0c  0x5a4600   FUN_005a4600   = per-player OPEN-PLAY ENGINE (stamina + set_phase + action switch + move + resolve)  -- *** NOT PORTED ***
++0x10  0x5ed810   (dtor/RTTI)
 ```
 The per-player passes are driven by trivial player-loop dispatchers (each loops `param_1[1]` players
-from base `*param_1`, stride 0x3bc, `this`=player):
-- `FUN_005b8bf0` -> calls vtable **+8** (DECIDE = FUN_005a3400). DONE downstream.
-- `FUN_005b8c20` -> calls vtable **+0xc** (ADVANCE = FUN_005a4560). DONE (replay rec/play, no-op live).
-- `FUN_005b70e0` -> calls vtable **+4** (FUN_005a5460 SPRITE/ANIM) + a free-kick visual block +
-  FUN_005b8a60. **RENDER pass -- NOT needed for the headless outcome engine.**
+from base `*param_1`, stride 0x3bc, `this`=player; the `call [eax+N]` offset is intrinsic to each
+dispatcher, base=0x639228):
+- `FUN_005b70e0` -> calls vtable **+4** = **FUN_005a3400 (DECIDE / positioning)**, then a select-active
+  walk. Called **ONLY in the set-piece branch** (driver L96, x2), NOT in open play. (Old map called
+  this "RENDER pass via +4=FUN_005a5460" -- WRONG, that was the off-by-4.)
+- `FUN_005b8bf0` -> calls vtable **+8** = **FUN_005a4560 (replay rec/play, no-op live)**. Per-tick x2.
+  (Old map called this "+8 = DECIDE FUN_005a3400" -- WRONG.)
+- `FUN_005b8c20` -> calls vtable **+0xc** = **FUN_005a4600 (the OPEN-PLAY per-player ENGINE)**. Per-tick
+  x2. *** This is the real sim and it is NOT yet ported. *** LIVE-CONFIRMED. (Old map called this
+  "+0xc = ADVANCE replay FUN_005a4560" -- WRONG; that shifted the whole movement core one slot.)
+
+This `+8 = FUN_005a4560 replay / +0xc = real advance` layout is **identical to the already-verified
+sub-entity vtables** (GK 0x639208, ref 0x6391f8; see the sub-entity table below) -- the player class
+follows the same shape, which is the third independent confirmation of base 0x639228.
+
+> **PORT CONSEQUENCE (the "stuck at phase 2 / 0-0" root cause):** the port currently runs
+> `decide_slice_a/b/c` (FUN_005a3400) in the open-play movement core and `Pm98Movement.advance`
+> (FUN_005a4560 replay) as the +0xc pass. Both are one slot off. In open play DECIDE must NOT run
+> (it is the set-piece-only +4 pass), the +8 pass is the live no-op replay, and **the +0xc pass must
+> run a port of FUN_005a4600** -- the only path that calls `FUN_005a50c0` (set_phase, advances phase
+> 2->0) and the resolver `FUN_005aeda0` (case 8/9, scoring). See the FUN_005a4600 structural map at the
+> end of this file.
 
 ## FUN_00598740 per-tick SIM sequence (this = match, returns 1=continue / 0=match over)
 Stripping the display/sound/commentary (FUN_00590f00/f40/f60, FUN_004e*, FUN_005ec240/230 RNG
@@ -38,16 +83,21 @@ save-restore brackets that net-zero), the load-bearing simulation order is:
    `FUN_005b8f20` (select_active, DONE) -> match+0x438, then `FUN_005b70e0`x2 (RENDER) +
    `FUN_005b73a0`x2 (positioning). Then return early. NOTE: the x2 FUN_005b70e0 here is render;
    the sim-relevant part of this branch is select_active + FUN_005b73a0.
-3. main sequence (the per-tick movement core), each called **x2 (once per team)**:
-   - `FUN_005b8bf0` x2  -- DECIDE dispatch -> FUN_005a3400 (DONE).
-   - 4 sub-entity DECIDE: `(*[match+0x1610]+8)()`, `+0xaac`, `+0xe74`, `+0x123c` -- vtable+8.
+3. main sequence (the per-tick movement core), each called **x2 (once per team)**. CORRECTED
+   2026-06-23 for the 0x639228 base -- the player +8 / +0xc roles were swapped in the old map:
+   - `FUN_005b8bf0` x2  -- player **+8 dispatch -> FUN_005a4560 (replay rec/play, NO-OP live)**. The
+     player decide/positioning (FUN_005a3400) is NOT here; it is the +4 pass run only by FUN_005b70e0
+     in the set-piece branch.
+   - 4 sub-entity +8: `(*[match+0x1610]+8)()`, `+0xaac`, `+0xe74`, `+0x123c` -- vtable+8.
      **IDENTITIES RESOLVED 2026-06-19 (see "Sub-entity resolution" below): ball + 2 GKs + referee.**
-     All four +8 (decide) methods are replay record/playback (FUN_0058e220 ball-snapshot, FUN_005a4560
+     All four +8 methods are replay record/playback (FUN_0058e220 ball-snapshot, FUN_005a4560
      for the other three) -> NO-OP in a live headless run (DAT_006d31c4==0). The SIM work is in +0xc.
    - `FUN_005b8690` x2  -- relationship matrix (DONE).
    - `FUN_005b94f0` x2  -- marker assignment (DONE).
-   - `FUN_005b8c20` x2  -- player ADVANCE dispatch -> FUN_005a4560 (DONE; replay rec/play, no-op live).
-   - 4 sub-entity ADVANCE: `(*[match+0x1610]+0xc)()`, `+0xaac`, `+0xe74`, `+0x123c` -- vtable+0xc.
+   - `FUN_005b8c20` x2  -- player **+0xc dispatch -> FUN_005a4600 (the OPEN-PLAY ENGINE)**. *** NOT
+     PORTED *** -- this is the real per-tick player sim (stamina, set_phase via FUN_005a50c0, the
+     action-code switch incl. resolver FUN_005aeda0, and the movement FUN_005a65a0/7260/8f20).
+   - 4 sub-entity +0xc: `(*[match+0x1610]+0xc)()`, `+0xaac`, `+0xe74`, `+0x123c` -- vtable+0xc.
      **This is the real per-tick sub-entity sim. ball physics + GK tracking live HERE, all UNPORTED.**
    - `FUN_005b8ce0(0)` x2 -- nearest-to-ball selector (DONE).
    - DAT_006d31bc = (DAT_006d31bc + 1) & 0x3ff  -- the 1024-frame replay ring counter.
@@ -537,3 +587,41 @@ controller layer, not in `FUN_00598740`.
    self-contained and far cheaper to port + parity-test than the interactive positional engine. Decide
    whether the playable port needs the positional match headless at all, or whether statistical sim +
    a thinner positional animation is the better target.
+
+## FUN_005a4600 -- the per-player OPEN-PLAY ENGINE (vtable +0xc, run x2/tick by FUN_005b8c20)
+Decompile: `docs/re/move/fn_005a4600_FUN_005a4600.c` (generated 2026-06-23, 2632 B). `this`=player
+(+0x18c = match, +0x190 = ball, +0x184 = a roster/team struct, +400/0x190 = ball ptr). This is the
+function the headless port must run as its +0xc pass. Structure:
+
+1. **Prologue** `FUN_00606220()` (stack-cookie), set player+0x2d7=0, compute player+0x2d8 side-flag
+   (player+4 x vs +0x3a4, via FUN_005b0b40), then a **16-tick stamina/fitness decay** on
+   player+0x68/0x70/0x74/0x78 (regen = 72000 / match+0x19ac). Then `FUN_005a50c0()` (872 B) =
+   **set_phase / state-update subtree -- this is what advances phase 2 -> 0**. PORT THIS.
+2. **Action-code switch on `player+0x40`** (the player's current action). One handler per code:
+   | code(s)      | handler          | size  | note |
+   |--------------|------------------|-------|------|
+   | 4, 0x25      | FUN_005acc40     | 975B  | action handler (unported) |
+   | 5, 0x24      | FUN_005ad010     | 2391B | action handler (unported) |
+   | 6, 7         | *inline*         | --    | held-action timer +0x48 (FUN_005ec250 RNG) |
+   | **8, 9**     | **FUN_005aeda0** | 4737B | **the shot/save/goal RESOLVER -- ALREADY ported in Pm98Resolver** |
+   | 0x13         | *inline*         | --    | pick nearest teammate (angle-weighted), set pass target +0xa0..0xa8, FUN_005ac1a0 |
+   | 0x14, 0x16   | FUN_005ae4c0     | 1103B | action handler (unported) |
+   | 0x15         | FUN_005ae910     | 1157B | action handler (unported) |
+   | 0x19, 0x1a   | FUN_005adfc0     | 1131B | action handler (unported) |
+   | 0x1c         | *inline*+FUN_005a5430 | 34B | (trivial) |
+   | 0x1f, 0x21   | *inline*         | --    | reset match+globals |
+   | 0x36         | FUN_005ad970     | 737B  | action handler (unported) |
+   | 0x37         | FUN_005adc60     | 854B  | action handler (unported) |
+3. **Movement tail** (gated by human-control checks FUN_005943b0 / player+0x5c):
+   - FUN_005a8680 (820B)  -- idle/hold-position branch
+   - FUN_005a65a0(flag) (3193B) -- move-to-target
+   - FUN_005a9490 (4062B) -- run state / leg animation
+   - FUN_005a7260 (5114B) -- **main locomotion / pathing** (the big one)
+   - FUN_005a8f20(facing) (1378B) -- turn / facing update
+
+**PORT SCOPE (counted 2026-06-23):** FUN_005a4600 + FUN_005a50c0 + 7 action handlers (~8.3 KB) +
+5 movement fns (~14.6 KB) ~= **26 KB of new decompiled C, plus their own one-more-level callees**
+(FUN_005a7260/FUN_005a9490 each fan out further). FUN_005aeda0 (resolver) is the only large piece
+already ported. The resolver only fires when a player reaches action-code 8/9, which requires the
+movement subtree to drive players to shooting positions -- so there is **no "score-only" shortcut**:
+the engine scores only once decide+move+action are all faithful. This is a multi-session port.
