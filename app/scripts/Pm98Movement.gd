@@ -2003,6 +2003,196 @@ static func _div2_rz(x: int) -> int:
 	return -((-x) >> 1) if x < 0 else x >> 1
 
 
+# ---- FUN_005ab5a0 : the POST-SHOT / loose-ball RESOLUTION (oracle: run_postshot_oracle.sh) --------
+# The open-play engine runs this after a player's action settles. Three small predicates the body uses
+# (the corner/byline + goal-box tests, oriented by the player's goal anchor +0x3a4). goalx = match+0x1820.
+
+## FUN_005ac0e0 (__thiscall player; vec): |vec.x| is past the goal line minus 0x160000 AND |vec.y| is
+## beyond the box half-width 0x1428f5.
+static func _ps_corner(p: Dictionary, vx: int, vy: int) -> bool:
+	var goalx := _si(_ref(p, 0x18c), 0x1820)
+	return abs(Pm98Trig._i32(vx)) > goalx - 0x160000 and abs(Pm98Trig._i32(vy)) > 0x1428f5
+
+
+## FUN_005ac120 (__thiscall player; vec): _ps_corner AND vec.x on the OPPOSITE side from the anchor.
+static func _ps_corner_oppside(p: Dictionary, vx: int, vy: int) -> bool:
+	return _ps_corner(p, vx, vy) and _sign1(Pm98Trig._i32(vx)) != _sign1(_si(p, 0x3a4))
+
+
+## FUN_0058fb50 (__thiscall player; vec): vec inside the goal AABB (match+0x1828..+0x183c) AND |vec.x|
+## past goalx - 0x108000 AND |vec.y| < 0x1428f5.
+static func _ps_goalbox(p: Dictionary, v: Array) -> bool:
+	var m := _ref(p, 0x18c)
+	var x := Pm98Trig._i32(int(v[0]))
+	var y := Pm98Trig._i32(int(v[1]))
+	var z := Pm98Trig._i32(int(v[2]))
+	if x < _si(m, 0x1828) or _si(m, 0x1834) < x or y < _si(m, 0x182c) or _si(m, 0x1838) < y \
+			or z < _si(m, 0x1830) or _si(m, 0x183c) < z:
+		return false
+	return _si(m, 0x1820) - 0x108000 < abs(x) and abs(y) < 0x1428f5
+
+
+## FUN_005ab5a0 (__fastcall this=player): the post-shot / loose-ball resolution. Headless (match+0x180b
+## == 0) every commentary/animation call is gated out, so this reproduces only the SIM residue + the
+## match event-queue pushes:
+##   * ball+0x50 = player and ball+0x64 = (|anchor+px| > 0x1e0000) (always);
+##   * contested-touch stat (player[0x3b8]+0x88)++ when the ball was owned (DAT_006d31c4 is 0 in-sim);
+##   * action != 0x13 + the corner/oppside gates + |bvec - pos| > 0xa0000 + match+0x44c != 4 -> enqueue
+##     0x10 (bvec = ball+0xcc, the ball's predicted-rest spot);
+##   * the pass-target scan: FUN_005b0bb0 from the ball owner, then each teammate, testing THIS player
+##     (player+4) as the receiver -- a hit jumps straight to the tail (its receiver mark is then cleared
+##     again by the tail engage, so net match+0x43c/0x460 = 0);
+##   * ball+0x48 an opponent of a DIFFERENT team + the corner/sameside gate (and |player.a0| not past
+##     the box) -> enqueue 0xe;
+##   * else LAB_bbe8: unowned ball -> keeper counter (player[0x184]+0x2e4)++ when facing aligns with the
+##     goal (<= 0x3554); owned ball -> the classification ladder draws ONE rng when it reaches the
+##     004ea9f0 arm (mag <= 0x7ffff AND sign(px) != sign(anchor));
+##   * the tail engages the ball to the player (FUN_0058eca0), clears ball+0x40 (FUN_0058ed70), clears
+##     match+0x438 if it held this player, and resets the match phase to 0.
+## `teammates` is the player[0x184] team list (the +0x3bc-stride array, self/owner skipped); `rng` is the
+## match seed (Pm98Rng or null) for the lone classification draw.
+static func resolve_post_shot(p: Dictionary, teammates: Array, rng = null) -> void:
+	var ball := _ref(p, 0x190)
+	var m := _ref(p, 0x18c)
+	var px := _si(p, 0x4)
+	var py := _si(p, 0x8)
+	var pz := _si(p, 0xc)
+	var anchor := _si(p, 0x3a4)
+	var bvx := _si(ball, 0xcc)
+	var bvy := _si(ball, 0xd0)
+	ball[0x50] = p                                        # ball+0x50 = player (always)
+	var owner: Variant = ball.get(0x4c, null)
+	var owned: bool = owner is Dictionary
+	if owned:                                             # DAT_006d31c4 is 0 in-sim -> gate = "ball owned"
+		var stat := _ref(p, 0x3b8)
+		stat[0x88] = _g(stat, 0x88) + 1                   # contested-touch counter
+
+	var to_tail := false
+	if _g(p, 0x40) != 0x13:                               # not the case-0x13 (set-piece) action
+		if _ps_corner_oppside(p, px, py):
+			var okg := _ps_goalbox(p, [bvx, bvy, _si(ball, 0xd4)]) and _sign1(bvx) != _sign1(anchor)
+			if not okg:
+				okg = _ps_corner(p, bvx, bvy) and _sign1(bvx) != _sign1(anchor)
+			if okg:
+				var lcx := Pm98Trig._i32(bvx - px)        # local_c = bvec - player_pos
+				var lcy := Pm98Trig._i32(bvy - py)
+				if Pm98Trig.planar_mag(lcx, lcy) > 0xa0000 and _g(m, 0x44c) != 4:
+					Pm98Events.enqueue(m, 0x10, p, 0)
+
+	if m.get(0x438, null) == p:                           # player == match+0x438 (controlled) -> tail
+		to_tail = true
+
+	if not to_tail:
+		var dx := Pm98Trig._i32(_si(p, 0xa0) - px)
+		var dy := Pm98Trig._i32(_si(p, 0xa4) - py)
+		var angle := Pm98Trig.atan_angle(dx, dy)
+		var pm := Pm98Trig.planar_mag(dx, dy)
+		var scale: int = pm if pm < 0x370000 else 0x370000    # local_20 = min(planar_mag, 0x370000)
+		var dist: int = abs(Pm98Trig._i32(anchor + px))       # local_24
+		var ppos := [px, py, pz]
+		var hit := false
+		if _g(m, 0x448) == 0 and _sign1(anchor) != _sign1(_si(ball, 0x20)):
+			if owned:                                     # FUN_005b0bb0 from the owner's perspective
+				if mark_pass_receiver(owner, ppos, angle, scale, dist, owner.get(0x188, [])):
+					hit = true
+			if not hit:
+				for tc in teammates:                      # ... then each teammate
+					var tcd: Dictionary = tc
+					if tcd != p and not (owned and tcd == owner):
+						if mark_pass_receiver(tcd, ppos, angle, scale, dist, tcd.get(0x188, [])):
+							hit = true
+							break
+		if hit:
+			to_tail = true
+
+	if not to_tail:
+		var do_bbe8 := false
+		var bp48: Variant = ball.get(0x48, null)
+		if not (bp48 is Dictionary) or _g(p, 0x2b8) == _g(bp48, 0x2b8):
+			do_bbe8 = true
+		else:                                             # ball+0x48 = a different-team opponent
+			var ok2 := _ps_goalbox(p, [px, py, pz]) and _sign1(px) == _sign1(anchor)
+			if not ok2:
+				ok2 = _ps_corner(p, px, py) and _sign1(px) == _sign1(anchor)
+			if not ok2:
+				do_bbe8 = true
+			elif _sign1(_si(p, 0xa0)) == _sign1(anchor) and abs(_si(p, 0xa0)) > 0xeffff:
+				do_bbe8 = true
+			else:
+				Pm98Events.enqueue(m, 0xe, p, 0)
+		if do_bbe8:
+			if not owned:                                 # unowned -> keeper counter
+				_postshot_keeper(p, m, px, py)
+			else:                                         # owned -> classification ladder (lone draw)
+				_postshot_classify_draw(p, px, py, anchor, rng)
+
+	# tail (LAB_005ac069) -- always runs
+	_ball_engage_player(ball, p)
+	ball[0x40] = 0                                        # FUN_0058ed70 (this=ball)
+	if m.get(0x438, null) == p:
+		m[0x438] = 0
+	set_phase(m, 0)                                       # FUN_005942e0(0)
+	ball[0x64] = 1 if abs(Pm98Trig._i32(anchor + px)) > 0x1e0000 else 0
+
+
+## The unowned-ball keeper arm: when the player is FACING the goal (the goal-direction angle is within
+## 0x3554 of the player's facing +0x34), bump the keeper-attention counter player[0x184]+0x2e4. The rest
+## of the arm is commentary-only (display gated headless), so nothing else is reproduced.
+static func _postshot_keeper(p: Dictionary, m: Dictionary, px: int, py: int) -> void:
+	var goalx := _si(m, 0x1820)
+	if (_g(m, 0x19a0) & 1) == (1 - _g(p, 0x2b8)):
+		goalx = Pm98Trig._i32(-goalx)
+	var ang := Pm98Trig.atan_angle(Pm98Trig._i32(goalx - px), Pm98Trig._i32(-py))
+	if abs(Pm98Trig._s16(ang - _g(p, 0x34))) <= 0x3554:
+		var p184 := _ref(p, 0x184)
+		p184[0x2e4] = _g(p184, 0x2e4) + 1
+
+
+## The owned-ball classification ladder. Headless, every arm is commentary-only EXCEPT the innermost
+## 004ea9f0 arm, which first draws one rng (the seed advances whether or not the roll picks commentary).
+## Reached only when the velocity/distance gates pass AND mag <= 0x7ffff AND sign(px) != sign(anchor).
+static func _postshot_classify_draw(p: Dictionary, px: int, py: int, anchor: int, rng) -> void:
+	var vy := _si(p, 0x8)
+	var ty := _si(p, 0xa4)
+	if not (_sign1(vy) == _sign1(ty) or abs(vy) < 0xf0001 or abs(ty) < 0xf0001):
+		return
+	var a0 := _si(p, 0xa0)
+	var s := _sign1(anchor)
+	if Pm98Trig._i32((a0 - px) * s) >= 0x190001:
+		return
+	if not (Pm98Trig._i32((px - a0) * s) < 0x140001 or abs(Pm98Trig._i32(a0 + anchor)) > 0x1dffff):
+		return
+	var mag := Pm98Trig.planar_mag(Pm98Trig._i32(a0 - px), Pm98Trig._i32(ty - vy))
+	if mag <= 0x7ffff and _sign1(px) != _sign1(anchor):
+		if rng != null:
+			rng.next()
+
+
+## FUN_0058eca0 with this=ball, target=player (the post-shot tail's "engage the ball to the toucher").
+## ball+0x1d4 is the match. When the engagement target changes: record it at ball+0x40, clear ball+0x4c,
+## bump match+0x458 iff the cached team tag (ball+0x54) changed, copy the team into ball+0x54, latch
+## ball+0x44/+0x48 to the player, zero the player's +0x54/+0x58, bump ball+0x80, and -- in open play
+## (match+0x448 == 0) with a live set-piece taker (match+0x460 != 0) that is NOT this player -- clear
+## that stale taker (match+0x460 = 0, match+0x43c = 0). This is the ref-model twin of set_engagement.
+static func _ball_engage_player(ball: Dictionary, target: Dictionary) -> void:
+	if ball.get(0x40, null) == target:
+		return
+	ball[0x40] = target
+	ball[0x4c] = 0
+	var m := _ref(ball, 0x1d4)
+	var tteam := _g(target, 0x2b8)
+	m[0x458] = _g(m, 0x458) + (1 if _g(ball, 0x54) != tteam else 0)
+	ball[0x54] = tteam
+	ball[0x48] = target
+	ball[0x44] = target
+	target[0x58] = 0
+	target[0x54] = 0
+	ball[0x80] = _g(ball, 0x80) + 1
+	if _g(m, 0x448) == 0 and _g(m, 0x460) != 0 and m.get(0x43c, null) != target:
+		m[0x460] = 0
+		m[0x43c] = 0
+
+
 # ---- Match-driver leaves (FUN_00598740): within-box test + phase setter + vec copy ----
 # Small leaves the per-tick match driver FUN_00598740 calls. Oracle-pinned (FUN_005a1820 EAX +
 # FUN_005942e0 state) by tools/re/run_driverleaf_oracle.sh -> specs/driverleaf_oracle.txt, locked
