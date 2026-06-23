@@ -369,3 +369,23 @@ broad role = the `positions_re.md` demarcación = `game_db` `pos` (`GK/DF/MF/FW`
    `simulate(mem, rng)` for H1+H2; for a cup tie set carry/flags and use
    `run_et := ft_gate(mem)==0` after H2, `run_pen := ft_gate(mem)==0` after ET.
 3. The `PS != 5` positional engine stays parked (see `MATCH_TICK_DRIVER_MAP.md`).
+
+## Consumers — naming the engine's scorers in the match feed (2026-06-23)
+
+The match VIEW (`scenes/MatchScreen.gd`) and commentary feed now show the players THIS
+engine actually picked, not a re-rolled set:
+
+- `Pm98StatMatch.goal_events(mem, tid0, tid1)` walks `mem.events`, drops penalties
+  (`type==4`), and returns the scoreline goals sorted by minute as
+  `{minute, shirt, shot_side, credited_side, own_goal}`. `shirt = SEL = XI slot + 1`, so the
+  scorer is `xi[shot_side][shirt-1]`; `credited_side` flips for an own goal (none emitted by
+  this port — `_resolve` only writes `p4==0` — but the path is kept faithful).
+- `MatchSim.simulate(...)` resolves those to named scorers and returns them under `goals`
+  (`{minute, side, scorer, scorer_side, own_goal}`); empty `[]` on the legacy fallback.
+- `MatchCommentary.narrate(..., engine_goals)` / `.timeline(...)` use `goals` for the GOAL
+  lines when present, re-rolling by finishing weight only when it is empty (no usable XI).
+  Career threads the manager match's `goals` through `advance_week` → `_show_match_result`
+  (in-memory only, not persisted to the save).
+- Test: `app/tests/test_engine_scorers.gd` (645 asserts) — feed length == scoreline, every
+  scorer is a fielded outfielder of the crediting side, minutes 1..90, deterministic per seed,
+  and `narrate` reproduces the engine's scorers + minutes.

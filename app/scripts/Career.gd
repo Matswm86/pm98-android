@@ -383,7 +383,8 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 		_apply(table[h], hg, ag)
 		_apply(table[a], ag, hg)
 		if h == club_id or a == club_id:
-			manager_res = {"home_id": h, "away_id": a, "hg": hg, "ag": ag, "manager_home": h == club_id}
+			manager_res = {"home_id": h, "away_id": a, "hg": hg, "ag": ag, "manager_home": h == club_id,
+				"goals": res.get("goals", [])}   # stat engine's resolved scorers for the feed (not persisted)
 	cash += weekly_net
 	cash -= player_weekly_wage()        # the live squad wage bill (YEARLY WAGE / 52 per man)
 	cash -= Staff.weekly_wage(staff)   # the backroom staff wage bill (STAFF WAGES)

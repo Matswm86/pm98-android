@@ -71,11 +71,22 @@ and `docs/re/goal/collision_geometry_builder_re.md`. Summary of what's left:
   not read by the current engine; re-check when the driver lands).
 - Estimate: builder + driver + kill-test = a few focused sessions (it's decode effort, not unknowns).
 
-### 2. Animated 2D match VIEW  [NOT BUILT — the biggest "looks like 98" gap]
-The engine computes player/ball positions but nothing DRAWS them. The original's iconic top-down
-green pitch with moving player dots/sprites, score bug, clock, and event captions does not exist yet.
-Needed: a `MatchView` scene that reads the engine's per-tick positions and renders pitch + players +
-ball + UI overlay, touch-friendly. (Works with either engine — plausible or bit-exact.)
+### 2. 2D match VIEW  [BUILT — the FAITHFUL PM98 screen; not a dot-pitch]
+CORRECTED 2026-06-23: the real PM98 non-CD match view IS a results/commentary screen, and it is
+DONE — `scenes/MatchScreen.gd` (clock + half, both shirts + score, possession bar, minute-by-minute
+EVENTS table, REPLAY/CONTINUE/EXIT, blue FONDO9 backdrop), wired into both the exhibition
+(`_play_watch_match`) and career (`_open_match`) flows, driven by the live stat engine via
+`MatchCommentary.timeline()`→`MatchSim.simulate()`, tested green (`tests/test_match_screen.gd`,
+`test_browse_nav.gd`, `test_audio.gd`). The iconic top-down green pitch with moving player dots was
+the Actua-engine 3D **highlights**, shipped only on the CD and absent from the game archive — so a
+dot-pitch would be a BEYOND-ORIGINAL enhancement, not "as it was in '98". Genuine remaining gaps:
+- **Scorer/event fidelity** — **DONE 2026-06-23**: the EVENTS table now names the players the stat
+  engine actually picked (`Pm98StatMatch.goal_events` → `MatchSim.simulate`'s `goals` →
+  `MatchCommentary`), at the engine's minutes, across exhibition + career; legacy fallback still
+  re-rolls when no usable XI. Test `tests/test_engine_scorers.gd` (645 asserts). The only residual is
+  the scorer-ROULETTE WEIGHT (fine position `+0x18`, item 1 / stat-engine follow-up) which the bridge
+  approximates per-role — it shifts the *odds* of who scores, not whether the named scorer is real.
+- **(Optional, beyond-original)** an animated top-down dot/sprite pitch, IF wanted as an addition.
 
 ### 3. Graphics / asset extraction  [PARTIAL — badges only]
 Roadmap Phase 0 still open:

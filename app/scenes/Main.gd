@@ -795,10 +795,11 @@ func _open_finance(club: Dictionary, club_name: String, season: String) -> void:
 	scr.setup(sm, club_name, "", season)
 	_mount_tap_overlay(scr)
 
-## A1 — the 2D MATCH VIEW (iconic DATSIM): real DATSIM sprites on a 3/4 broadcast
-## pitch, animated to the engine's minute-by-minute event timeline. The verbatim
-## commentary still rides the live ticker; RETURN runs `on_back`. (`sub` unused now
-## that the scoreline + clock live in the BARRA scoreboard.)
+## A1 — the 2D MATCH VIEW: the faithful PM98 results/commentary screen (clock + half,
+## both shirts + score, possession bar, minute-by-minute EVENTS table, REPLAY/CONTINUE/
+## EXIT) animated to the engine's event timeline. NOT a sprite pitch — the original's
+## top-down 3D highlights were Actua-engine CD-only data, out of scope (see MatchScreen.gd).
+## RETURN runs `on_back`. (`sub` unused now that the scoreline + clock live in MatchScreen.)
 func _open_match(home: Dictionary, away: Dictionary, hg: int, ag: int,
 		lines: Array, _sub: String, on_back: Callable) -> void:
 	var scr: MatchScreen = load("res://scenes/MatchScreen.gd").new()
@@ -1067,8 +1068,9 @@ func _show_match_result(res: Dictionary) -> void:
 	var away := GameDB.club(int(res["away_id"]))
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
-	# Narrate the EXACT stored scoreline so feed and table agree.
-	var m := MatchCommentary.narrate(rng, home, away, int(res["hg"]), int(res["ag"]))
+	# Narrate the EXACT stored scoreline so feed and table agree; the stat engine's own
+	# scorers ride along in res["goals"] (empty -> narrate re-rolls by finishing weight).
+	var m := MatchCommentary.narrate(rng, home, away, int(res["hg"]), int(res["ag"]), res.get("goals", []))
 	var verdict := _result_word(int(res["hg"]), int(res["ag"]), bool(res["manager_home"]))
 	_open_match(home, away, int(res["hg"]), int(res["ag"]), m["lines"],
 		"%s  -  back to the dugout" % verdict, func() -> void: _show_career())

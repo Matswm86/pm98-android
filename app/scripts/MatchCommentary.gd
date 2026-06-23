@@ -101,12 +101,17 @@ static func timeline(rng: RandomNumberGenerator, home: Dictionary, away: Diction
 	var ar := MatchEngine.team_ratings(away)
 	var res := MatchSim.simulate(rng, hr, ar, MatchSim.xi_of(home), MatchSim.xi_of(away), \
 			int(home.get("id", 0)), int(away.get("id", 0)))
-	return narrate(rng, home, away, int(res["home_goals"]), int(res["away_goals"]))
+	return narrate(rng, home, away, int(res["home_goals"]), int(res["away_goals"]), res.get("goals", []))
 
 
 ## Narrate a PREDETERMINED scoreline (used by career mode so the league table and
 ## the highlights feed always agree). Same output shape as timeline().
-static func narrate(rng: RandomNumberGenerator, home: Dictionary, away: Dictionary, home_goals: int, away_goals: int) -> Dictionary:
+##
+## `engine_goals` (from MatchSim.simulate's `goals`) names the players the stat engine
+## actually picked + the minutes it scored at; when present the GOAL lines come straight
+## from it instead of re-rolling here, so the feed and the scoreline agree on WHO scored.
+## Empty (legacy fallback / no XI) -> the goals are re-rolled by finishing weight as before.
+static func narrate(rng: RandomNumberGenerator, home: Dictionary, away: Dictionary, home_goals: int, away_goals: int, engine_goals: Array = []) -> Dictionary:
 	var prng := MatchEngine.Pm98Rng.new(rng.randi())
 	var hp := _outfield(home)
 	var ap := _outfield(away)
@@ -114,13 +119,22 @@ static func narrate(rng: RandomNumberGenerator, home: Dictionary, away: Dictiona
 	var an: String = away.get("name", "Away")
 	var events: Array = []   # {minute, side, text}
 
-	# Goals -> scorer weighted by finishing (RM heading/finishing + TI shooting + CA).
-	for _g in home_goals:
-		var s := _pick(prng, hp, ["RM", "TI", "CA"])
-		events.append({"minute": _minute(prng), "side": 0, "text": T_GOAL % [s.get("name", "?"), hn], "goal": true})
-	for _g in away_goals:
-		var s := _pick(prng, ap, ["RM", "TI", "CA"])
-		events.append({"minute": _minute(prng), "side": 1, "text": T_GOAL % [s.get("name", "?"), an], "goal": true})
+	if not engine_goals.is_empty():
+		# The stat engine already chose the scorers + minutes -- narrate THOSE.
+		for g in engine_goals:
+			var nm := str((g as Dictionary).get("scorer", "?"))
+			var club := hn if int((g as Dictionary).get("scorer_side", 0)) == 0 else an
+			var tmpl := T_OWN_GOAL if bool((g as Dictionary).get("own_goal", false)) else T_GOAL
+			events.append({"minute": int((g as Dictionary).get("minute", 1)),
+				"side": int((g as Dictionary).get("side", 0)), "text": tmpl % [nm, club], "goal": true})
+	else:
+		# Legacy / no-XI fallback: scorer weighted by finishing (RM heading + TI shooting + CA).
+		for _g in home_goals:
+			var s := _pick(prng, hp, ["RM", "TI", "CA"])
+			events.append({"minute": _minute(prng), "side": 0, "text": T_GOAL % [s.get("name", "?"), hn], "goal": true})
+		for _g in away_goals:
+			var s := _pick(prng, ap, ["RM", "TI", "CA"])
+			events.append({"minute": _minute(prng), "side": 1, "text": T_GOAL % [s.get("name", "?"), an], "goal": true})
 
 	# Ancillary events: alternate-ish between sides via the roll.
 	var both := [[0, hp, hn], [1, ap, an]]

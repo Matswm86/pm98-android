@@ -648,6 +648,28 @@ static func score(mem: Mem) -> Dictionary:
 	return s
 
 
+## The scoreline goals (penalties excluded) as resolved records, sorted by minute, so the
+## commentary feed can name the engine's OWN scorers instead of re-rolling its own. Each:
+##   { minute:int, shirt:int, shot_side:int(0/1), credited_side:int(0/1), own_goal:bool }
+## `shot_side` is the side whose player took the shot (SEL=slot+1 -> XI slot = shirt-1 on
+## that side); `credited_side` is the side the goal counts FOR (the other side for an own
+## goal). This port only emits normal goals (p4==0), but the own-goal path is kept faithful.
+static func goal_events(mem: Mem, tid0: int, tid1: int) -> Array:
+	var out: Array = []
+	for e in mem.events:
+		if e["type"] == 4:
+			continue
+		var shot_tid: int = e["payload"] & 0xFFFF
+		var shirt: int = (e["payload"] >> 16) & 0xFFFF
+		var og: bool = int(e["p4"]) != 0
+		var shot_side := 0 if shot_tid == (tid0 & 0xFFFF) else 1
+		var credited := shot_side if not og else 1 - shot_side
+		out.append({"minute": int(e["minute"]), "shirt": shirt,
+			"shot_side": shot_side, "credited_side": credited, "own_goal": og})
+	out.sort_custom(func(a, b): return a["minute"] < b["minute"])
+	return out
+
+
 # --- FUN_00450d60 / db0: this-match score for one side --------------------------
 ## Counts a side's goals over the event queue (penalties excluded). The binary keys
 ## on two team ids per record: a normal goal (p4 == 0) credits the team in the low

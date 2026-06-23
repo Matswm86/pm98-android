@@ -64,7 +64,9 @@ static func _usable(xi) -> bool:
 ## Simulate one fixture. `rh`/`ra` are legacy aggregate ratings dicts (fallback, always
 ## present). `xi_h`/`xi_a` are ordered XIs (slot 0 GK); `tid_h`/`tid_a` are the clubs'
 ## ids (the stat engine's event team ids). `minutes` 90 = a full match, 30 = standalone
-## extra time (two-leg cup tie). Returns the legacy result shape.
+## extra time (two-leg cup tie). Returns the legacy result shape PLUS a `goals` array of
+## the stat engine's own resolved scorers (empty on the legacy fallback) so the commentary
+## feed can name the players who actually scored instead of re-rolling its own.
 static func simulate(rng: RandomNumberGenerator, rh: Dictionary, ra: Dictionary, \
 		xi_h: Array, xi_a: Array, tid_h: int, tid_a: int, minutes := 90) -> Dictionary:
 	if _stat_on() and _usable(xi_h) and _usable(xi_a):
@@ -79,5 +81,26 @@ static func simulate(rng: RandomNumberGenerator, rh: Dictionary, ra: Dictionary,
 			"home_goals": int(sc.get(tid_h & 0xFFFF, 0)),
 			"away_goals": int(sc.get(tid_a & 0xFFFF, 0)),
 			"shots_home": 0, "shots_away": 0, "conv_home": 0, "conv_away": 0,
+			"goals": _resolve_goals(mem, xi_h, xi_a, tid_h, tid_a),
 		}
-	return MatchEngine.simulate(rng, rh, ra, minutes)
+	var res := MatchEngine.simulate(rng, rh, ra, minutes)
+	res["goals"] = []
+	return res
+
+
+## Map the stat engine's raw goal events to named scorers for the commentary feed:
+##   [{ minute:int, side:int(credited 0/1), scorer:String, scorer_side:int(0/1), own_goal:bool }]
+## `side` is the team CREDITED (drives the on-screen score); `scorer`/`scorer_side` name the
+## player who took the shot (the conceding side for an own goal). XI slot = shirt-1 (SEL=slot+1).
+static func _resolve_goals(mem: Pm98StatMatch.Mem, xi_h: Array, xi_a: Array, tid_h: int, tid_a: int) -> Array:
+	var out: Array = []
+	for g in Pm98StatMatch.goal_events(mem, tid_h, tid_a):
+		var shot_side := int(g["shot_side"])
+		var xi: Array = xi_h if shot_side == 0 else xi_a
+		var slot := int(g["shirt"]) - 1
+		var name := "?"
+		if slot >= 0 and slot < xi.size() and xi[slot] is Dictionary:
+			name = str((xi[slot] as Dictionary).get("name", "?"))
+		out.append({"minute": int(g["minute"]), "side": int(g["credited_side"]),
+			"scorer": name, "scorer_side": shot_side, "own_goal": bool(g["own_goal"])})
+	return out
