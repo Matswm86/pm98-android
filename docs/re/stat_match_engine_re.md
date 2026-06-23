@@ -131,24 +131,81 @@ indexing past the 19-entry LUT into garbage), and only **one directive per line*
 read. `FUN_005bbf10` is **cdecl** (`ret`), so its stub must pop 0 arg bytes — popping
 8 corrupts the return chain (PC lands on a stack arg).
 
-## Orchestration (NOT yet ported — NEXT)
+## Stats accumulator (PORTED + oracle-validated)
 
-`FUN_0044ee70` lines 357-792 drive the resolver. Structure per period (kickoff, two
-half-segments each, halftime, two more, extra time):
+### `FUN_00450510` — per-segment player-stats accumulator (`@0x450510`, 2052 B)
 
-* **Chance-count rand loops.** For each side, average the selected XI's strength byte
-  (`+0xbf`), then `chances = (rand()%8 - opp_strength) - 1 + own_strength`, clamped by
-  `3 - rand()%3`; each chance calls `FUN_0044ece0(side, seg, rand()%45 + base_minute)`.
-  Build-up events come from `FUN_0044ec00` (shot marker `+0xdc`) and `FUN_0044ea40`
-  (assist slots `+0xd4/+0xd8`); both also fire a UI vtable call that is a no-op headless.
-* **Segment stats accumulator** `FUN_00450510` (`@0x450510`, 2052 B) — per-participant
-  possession, passes (`+0x108`), tackles (`+0x10c`), rating (`+0x114`); consumes many
-  `rand()` draws (so it MUST be ported in-order to keep the stream aligned with the
-  resolver) but does NOT change the scoreline.
-* **Half/period transitions** `FUN_0044d0d0` / `d190` / `d250` / `d310` / `d520`;
-  abandonment/extra-time gate `FUN_00450e60`.
+`__thiscall(this=match, dur, p3, p4)`. Call sites are `(0x2d,0,0)` (a 45-min half)
+and `(0xf,0,0)` (a 15-min ET segment). Does NOT change the scoreline, but it consumes
+a **heavily data-dependent** number of `rand()` draws between the two halves, so it
+MUST be ported in-order or H2's scorer stream desyncs. Ported to `Pm98StatMatch._stats`.
+Draw budget per call:
 
-NEXT session: port the `FUN_0044ee70` PS==5 skeleton (chance-count loops + segment
-ordering) on top of the validated resolver, oracle the whole-match event queue +
-final score end-to-end, then port `FUN_00450510` for player match ratings. The
-`PS != 5` positional engine remains parked (see `MATCH_TICK_DRIVER_MAP.md`).
+1. **Possession** (2 draws): `M+0x64`/`M+0x804` += `(rand()*(dur/8))>>15 + dur/40`.
+2. **Accumulation loop** (N draws): alternate side, advance player; each *selected*
+   visit rolls `rand()%200` vs the strength byte (`+0xbf`, **halved when role `+0xcc`==0**)
+   and bumps that player's counter on a hit. Stops once the running counter total
+   reaches `dur`. **Strength bytes must be nonzero or this never terminates.**
+3. **Per-player stat draws** (4 per selected player, +2 for a non-GK role-2/3 player):
+   key-pass `+0x104` (2 draws, role 2/3 non-GK only), passes `+0x108` + tackles `+0x10c`
+   (2), dribble `+0x110` (1), rating `+0x114` (1). The GK (player 0) uses `*2` scalings
+   and its own pass seed; outfielders use `*5`.
+4. **Event re-roll** (block C): for each player, while a local counter `< +0xfc`
+   (= `FUN_00450d20` count of that shirt's goal events) roll `+= rand()%3`. So this
+   couples to the H1 goals already in the queue — a scorer drives extra draws here.
+5. **Convergence loop** (block D, ≤1000 iters): role-2/3 players draw **1** (`+= rand()%2`),
+   role-1 players draw 1 coin **+1 if even**; converges immediately for an all-role-0 XI.
+
+`FUN_00450d20` (`@0x450d20`, 55 B) counts events with `type != 4`, matching shirt
+(record `+0xe`), and `p4 == 0`. No `rand()`. Ported to `_count_events`.
+
+**Validation.** `tools/re/run_statacc_oracle.sh` drives the real `FUN_00450510` through
+the emulator (injected rand thunk, `FUN_00450d20` runs for real against a pre-filled
+event vector) and banks the draw count + final LCG state + sampled stat fields for 4
+fixtures (clean / +events / +roles+markers / ET-duration). `app/tests/test_statacc_oracle.gd`
+asserts `_stats` reproduces all of them (44 checks green).
+
+## Orchestration (PORTED + oracle-validated, LEAGUE)
+
+### `FUN_0044ee70` PS==5 (lines 357-792) — instant-result driver → `Pm98StatMatch.simulate`
+
+For a **LEAGUE** fixture (extra-time flag `M+0x44`==0 AND penalties flag `M+0x48`==0)
+the engine runs **H1 then H2**, each:
+
+* **Buildup markers.** One shot pass (`FUN_0044ec00`, 1/16 four-coin gate, sets shot
+  marker `+0xdc`) then two assist passes (`FUN_0044ea40`, 1/2 one-coin gate, sets
+  `+0xd4/+0xd8`). Each picks `side = rand()&1`, `idx = rand()%11`; for `idx==0` it skips
+  unless the team shape byte (`+0xbb`) beats `rand()%100`; else places a marker at minute
+  `rand()%span + base`. Markers feed the resolver's availability check. (Both also fire
+  a UI vtable call — a no-op headless; in the emulator a fake `DAT_0066b1e0` vtable +
+  `DAT_0066c150=0` keep it from faulting.)
+* **Chance-count loops.** Average each XI's strength (`+0xbf`); per side
+  `chances = rand()%8 - opp_avg - 1 + own_avg` (if `<0`, `+= rand()%own_avg`), clamped to
+  `3 - rand()%3`; each chance calls the resolver `FUN_0044ece0(side, seg, rand()%45 + 1)`.
+* **Stats accumulator** `FUN_00450510(0x2d,0,0)`, then the H1→H2 transition `FUN_0044d0d0`
+  (no `rand()`, no event). After H2: `FUN_00450510(0x2d,0,0)` then the full-time gate
+  `FUN_00450e60` (no `rand()`; its result is unused when ET/pen are off).
+
+Buildup minute base/span: H1 `(0x2d,1)`, H2 `(0x2d,0x2e)`. The resolver's per-period
+minute offset (`FUN_004510b0`: +0/+0x2d/+0x5a/+0x69 by segment) means a seg-1 goal at
+within-period minute 25 is recorded at minute 70.
+
+**Validation (end-to-end).** `tools/re/run_statmatch_oracle.sh` enters the real
+`FUN_0044ee70` at its entry, skips the positional/UI block by zeroing `DAT_00652a10`,
+stubs the UI helpers (`FUN_0044d5f0`, the `d0d0/d190/d250/d310/d520` transitions, the
+gate, `FUN_005bbf10`), and runs the full statistical engine for 4 league fixtures,
+banking the complete event queue + final score + draw count + final LCG state.
+`app/tests/test_statmatch_oracle.gd` asserts `simulate` reproduces every one bit-exact
+(36 checks: scores 3-2, 4-2, 0-1, 1-3; draw counts 856/836/789/891).
+
+## NEXT
+
+1. **Extra time + penalties** (cup only — `M+0x44`/`M+0x48` set). The ET segments
+   (seg 2/3) use a **different** chance-count formula `(own_avg-opp_avg)/6 - 1 + rand()%3`
+   with a probabilistic tail loop (`while count < chances/2 || rand()%4==0`), the real
+   `FUN_00450e60` gate, transitions `FUN_0044d190/d250/d310`, and the penalty-shootout
+   event emitter (lines 742-787). Add a cup fixture (flags set) to the oracle, port,
+   validate. `Pm98StatMatch.simulate` currently stops after H2.
+2. **Replace `app/scripts/MatchEngine.gd`** (the abstracted per-shot model) with
+   `Pm98StatMatch` as the faithful instant-result engine wired into the career/league loop.
+3. The `PS != 5` positional engine stays parked (see `MATCH_TICK_DRIVER_MAP.md`).

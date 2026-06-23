@@ -1,0 +1,7 @@
+# Stage 3 task 2 STATISTICAL leaf: per-segment stats accumulator FUN_00450510 ground truth
+# (PCode emu; injected MSVC-LCG rand @0x257010; FUN_00450d20 runs real; M=0x210000).
+# cols: name | RET | draws | poss0 poss1 p0.kp p0.pass p0.tkl p0.drb p0.rate p1.pass p1.rate finalstate
+FIX A_clean    RET  draws=395  | 3 4 0 3 0 0 0 1 0 3148439573 
+FIX B_events   RET  draws=400  | 3 4 0 3 0 0 0 1 0 2054110344 
+FIX C_roles    RET  draws=298  | 5 3 0 1 0 3 4 5 2 3363291277 
+FIX D_et       RET  draws=163  | 0 0 0 0 4 0 0 0 2 837697878 

@@ -1,0 +1,27 @@
+# Stage 3 task 2 STATISTICAL end-to-end: FUN_0044ee70 PS==5 league fixture ground truth
+# (PCode emu; preamble skipped via DAT_00652a10=0; UI helpers stubbed; M=0x210000).
+# Each fixture: RET | draws | count | finalstate | then one 'EV i type minute payload' per event.
+FIX league_A seed=0x12345678 RET draws=856 count=5 finalstate=3281934352
+  EV 0 type=0 minute=27 payload=0x60007
+  EV 1 type=0 minute=37 payload=0x90007
+  EV 2 type=0 minute=4 payload=0x90013
+  EV 3 type=0 minute=45 payload=0x60013
+  EV 4 type=1 minute=70 payload=0xb0007
+  SCORE 7=3 19=2
+FIX league_B seed=0x0abcdef1 RET draws=836 count=6 finalstate=3290174789
+  EV 0 type=0 minute=43 payload=0x60007
+  EV 1 type=0 minute=5 payload=0x50007
+  EV 2 type=0 minute=9 payload=0x70013
+  EV 3 type=1 minute=63 payload=0x80007
+  EV 4 type=1 minute=48 payload=0x70007
+  EV 5 type=1 minute=47 payload=0x60013
+  SCORE 7=4 19=2
+FIX league_C seed=0x00112233 RET draws=789 count=1 finalstate=1500429598
+  EV 0 type=0 minute=14 payload=0x90013
+  SCORE 7=0 19=1
+FIX league_D seed=0x7eeeeee1 RET draws=891 count=4 finalstate=3983246610
+  EV 0 type=0 minute=35 payload=0xa0007
+  EV 1 type=0 minute=9 payload=0x80013
+  EV 2 type=1 minute=77 payload=0x60013
+  EV 3 type=1 minute=86 payload=0xa0013
+  SCORE 7=1 19=3
