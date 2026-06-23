@@ -262,14 +262,74 @@ Oracle: `tools/re/run_ftgate_oracle.sh` runs the real bytes on 15 synthetic stru
 `tools/re/specs/ftgate_oracle.txt`. `app/tests/test_ftgate_oracle.gd` rebuilds the same
 structs and asserts `ft_gate` returns the binary's byte (**15/15**).
 
+## Mem-from-clubs bridge (MAPPED — `FUN_0044d5f0`)
+
+The participant records the stat engine reads are filled by `FUN_0044d5f0` (`@0x44d5f0`,
+3602 B), which `FUN_0044ee70` calls as its **first action** (line 48, `this=match`).
+Caller chain confirmed by xref: `FUN_00448b60` (the career-match runner) constructs the
+two `0x7a0` team blocks (`local_fbc`, ctor `FUN_00449400`) then calls `FUN_0044ee70`;
+`FUN_0044ee70` calls `FUN_0044d5f0` to populate them from the **fixture global
+`DAT_0066afd0`** + each club's loaded squad. Decompile: `docs/re/move/fn_0044d5f0_*.c`.
+
+`FUN_0044d5f0` runs two identical 11-iteration loops (side 0 lines 117-348 at participant
+base `match+0x84+i*0xac`; side 1 lines 385-665 at `match+0x7f8 + i*0x2b dwords`). Per slot
+`i` (1-indexed via `FUN_0057a2e0(i)` which walks the squad linked list `club+0x24` / next
+`+0x100`, matching the lineup-slot byte `player+0x19`):
+
+* slot empty (`FUN_0057a2e0`==0) **or** unavailable (`FUN_005836a0()!=0`, injured/suspended)
+  ⇒ all fields zeroed, **`SEL=0`** (not in XI). Otherwise the fields below are filled.
+
+**Stat-engine INPUT fields** (only these are read by `Pm98StatMatch`; port offset = absolute
+`side*0x7a0 + i*0xac + off`; binary writes at `iVar11 = match+0x84 + i*0xac`, side 0):
+
+| port field | port off | `FUN_0044d5f0` line | source (in-memory player record) |
+|------------|----------|---------------------|----------------------------------|
+| `SEL`    | `+0x88` | 175 (`iVar11+0x04`) | u16 shirt @ `player+0x00` |
+| `STR`    | `+0xbf` | 226 (`iVar11+0x3b`) | `FUN_005841e0(player)` = `mean(player+0x9c..0x9f)`, then `×3/4` in-form / `÷2` out-of-form (gated on `player+0x19<0xc`, `player+0x1c`, opponent-is-human) |
+| `GKSAVE` | `+0xc0` | 231 (`iVar11+0x3c`) | byte `player+0xa0`; **`+10` if slot 0 (GK)**, clamp 99 |
+| `PASS`   | `+0xc2` | 242 (`iVar11+0x3e`) | byte `player+0xa2` |
+| `POS`    | `+0xc8` | 251 (`iVar11+0x44`) | byte `player+0x18` **`+1`** → `POS_WEIGHT` index |
+| `ROLE`   | `+0xcc` | 253 (`iVar11+0x48`) | byte `player+0x1c` → switch 0/1/2/3 (`GK/DEF/MID/ATT`; string LUT `PTR_s_GOALKEEPER_00662d10`) |
+
+**Team-level fields:**
+
+* `TEAMID` side0 `+0x7e8` = `DAT_0066afd0+0x38` (home club id, line 82); side1 `+0xf88` =
+  `DAT_0066afd0+0x3a` (away, line 349).
+* `SHAPE` side0 `+0xbb` aliases participant-0's `iVar11+0x37` = `player[slot1]+0x9e` (a GK
+  attribute byte); side1 `+0x85b` likewise. The buildup loops read it as-is — no separate
+  handling; the bridge just fills participant 0.
+* `ft_gate` carry/flags `match+0x20..0x48` ← `DAT_0066afd0+0x58/0x5c/0x40/0x48/0x50/0x30/
+  0x34..0x37` (lines 64-73). League = sentinels/0; a cup tie sets them from the tie state.
+* Pre-loaded events (lines 634-661): if `DAT_0066afd0+0x64` (u16) > 0, prior-leg goals/cards
+  are replayed into the queue via `FUN_004510b0`. A league instant-result has 0.
+
+`ROLE` semantics line up with the port: `0`(GK) halves strength in `_stats` and is excluded
+from the scorer roulette; `1`(DEF) takes the role-1 convergence path; `2/3`(MID/ATT) are the
+watched pair (key-pass / assist draws). `POS = player+0x18 + 1` indexes `POS_WEIGHT[1..18]`.
+
+### Residual before the bridge is runnable
+
+The **only** unresolved link is the in-memory player offsets → the decoded `game_db.json`
+attrs (`VE RE AG CA RM RG PA TI EN PO`, order from `tools/extract_squads.py`). The in-memory
+record is the **fully-loaded player object** (has form `+0x19`, club id `+0x14`, position-fit
+bands via `DAT_00638e34..40`, next-ptr `+0x100`), NOT the raw `EQUIPOS.PKF` blob, so the 10
+attrs are NOT a verbatim copy at `+0x9c`. Two ways to close it, either of which avoids a guess:
+1. **Oracle `FUN_0044d5f0` + `FUN_005841e0`** against synthetic player records (known bytes at
+   `+0x9c..0xa2/+0x18/+0x1c`) — validates the transform end-to-end; the GDScript bridge then
+   maps `game_db` attrs → those offsets, the single remaining unknown.
+2. **RE the PKF→player-object loader** (the function that writes `player+0x9c..0xa6` from
+   EQUIPOS.PKF) to get the offset→attr names directly, **or** one-time dump a known player's
+   live record under wine and read the bytes.
+
+`player+0x18` (POS) / `player+0x1c` (ROLE) are already decodable: they are the demarcación /
+broad-role bytes mapped in `docs/re/positions_re.md` (`game_db` `pos` / `isGK`).
+
 ## NEXT
 
-1. **Replace `app/scripts/MatchEngine.gd`** (the abstracted per-shot model) with
-   `Pm98StatMatch` as the faithful instant-result engine wired into the career/league
-   loop. The gate is now ported (`ft_gate`, above): the wiring layer builds a `Mem` from
-   each club's squad, runs `simulate(mem, rng)` for H1+H2, then for a cup tie sets the
-   carry/flag fields and uses `run_et := ft_gate(mem) == 0` (replay/level) after H2 and
-   `run_pen := ft_gate(mem) == 0` after ET. The open RE question is the **Mem-from-clubs
-   bridge** — how the binary fills each participant record (`SEL/STR/GKSAVE/PASS/POS/
-   ROLE`) from club data before `FUN_0044ee70` (a different setup function, not yet mapped).
-2. The `PS != 5` positional engine stays parked (see `MATCH_TICK_DRIVER_MAP.md`).
+1. Close the **residual** above (oracle `FUN_0044d5f0`, route 1 preferred — same PCodeEmu
+   pattern as `run_statmatch_oracle.sh`), producing the `game_db`-attr → in-memory-offset map.
+2. **Then** replace `app/scripts/MatchEngine.gd`: build a `Mem` per club from the lineup
+   (SEL=shirt for the 11 selected available; STR/GKSAVE/PASS/POS/ROLE per the table above),
+   `simulate(mem, rng)` for H1+H2; for a cup tie set carry/flags and use
+   `run_et := ft_gate(mem)==0` after H2, `run_pen := ft_gate(mem)==0` after ET.
+3. The `PS != 5` positional engine stays parked (see `MATCH_TICK_DRIVER_MAP.md`).
