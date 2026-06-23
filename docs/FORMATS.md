@@ -172,7 +172,8 @@ per-player record layout (forward-parsed, verified vs the real 97-98 squads):
 [u16 len][shortname cipher]         common/display name, e.g. "FIGO" "JAVI NAVARRO"
 [u16 len][fullname  cipher]         legal name; may pack "LEGAL<0x4d>COMMON",
                                     e.g. "LUIS FILIPE MADEIRA CAEIRO<sep>FIGO"
-[variable padding + 6 field bytes]  (nationality/position/number/value? — TODO)
+[variable padding + 6 field bytes]  (nationality/position/number/value? — partly TODO;
+                                    Y-3 = broad position 0-3, Y-12 = fine position 0-18)
 birth year : u16                    (verified: Hesp 1965, Baía 1969, Busquets 1967)
 [flag/squad byte, high bit set 0x80+]
 media : u8                          (overall rating)

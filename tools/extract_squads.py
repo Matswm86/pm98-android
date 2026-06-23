@@ -184,6 +184,10 @@ def parse_squad(d: bytes, off: int, end: int):
             legal, common = full_txt.strip(), short_txt
         display = common or short_txt or legal
         pos = POS_NAMES.get(d[Y - 3]) if Y - 3 >= 0 else None
+        # Fine position byte at Y-12 (the in-memory player+0x18 the stat engine reads as
+        # the scorer-roulette POS_WEIGHT index, loader FUN_00583bd0). Cross-validated to
+        # a clean role partition (GK->1/w0, central striker->9/w35) in docs/re/positions_re.md.
+        fine = d[Y - 12] if Y - 12 >= 0 and d[Y - 12] < 19 else None
         players.append(
             {
                 "name": display,
@@ -192,6 +196,7 @@ def parse_squad(d: bytes, off: int, end: int):
                 "age": 1998 - year,
                 "media": media,
                 "pos": pos,
+                "posFine": fine,
                 "attrs": dict(zip(ATTR_NAMES, attrs)),
                 "isGK": pos == "GK" if pos else attrs[9] > 50,
             }

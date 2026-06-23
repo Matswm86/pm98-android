@@ -353,12 +353,14 @@ broad role = the `positions_re.md` demarcación = `game_db` `pos` (`GK/DF/MF/FW`
   history). `game_db` carries no form or club-perf bands, so the faithful **baseline is the
   plain `mean`** (the unfatigued / `goto LAB_005842f6` path); fatigue-scaling is left as a
   runtime-only refinement.
-* **`+0x18` is a FINER position code (0..17 → the 19-entry `POS_WEIGHT`), not the 0-3
-  demarcación,** and is NOT currently in `game_db` (the loader reads it from a header byte the
-  extractor does not decode). It only steers the scorer-roulette WEIGHT (who scores), never the
-  goal COUNT, so the bridge assigns a representative fine code per formation slot (as
-  `run_statmatch_oracle.sh` `build_xi` did, `POS=(1 2 3 5 7 9 11 13 16 9 12)`); exact
-  per-player fine position is a follow-up extraction, not a scoreline blocker.
+* **`+0x18` is a FINER position code (0..18 → the 19-entry `POS_WEIGHT`), not the 0-3
+  demarcación.** **DECODED 2026-06-23** — it is the EQUIPOS byte at `d[Y-12]` (Y = birth-year
+  anchor), in both the compact and English records; cross-validation + the role partition are in
+  `docs/re/positions_re.md`. Now extracted to `game_db` as `posFine` and used DIRECTLY as the
+  participant POS by `Pm98StatMatch._fill_participant` (the per-role `POS_OF` constant is only the
+  fallback for sparse records). It steers the scorer-roulette WEIGHT (who scores), never the goal
+  COUNT, so this changes nothing in the oracle tests (they build participant POS directly).
+  Test: `app/tests/test_posfine.gd`.
 
 ## NEXT
 

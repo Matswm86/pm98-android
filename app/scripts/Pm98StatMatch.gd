@@ -545,17 +545,22 @@ static func simulate(mem: Mem, rng: Rng, run_et := false, run_pen := false) -> v
 ##            runtime fatigue-scaling needs club-perf bands absent from game_db -> mean)
 ##   GKSAVE = PO                           (+10 if the GK / slot 0, clamp 99)
 ##   PASS   = PA
-##   ROLE   = pos -> 0/1/2/3 (GK/DEF/MID/ATT); POS = a representative fine code per
-##            role (steers the scorer roulette WEIGHT only, never the goal count).
+##   ROLE   = pos -> 0/1/2/3 (GK/DEF/MID/ATT)
+##   POS    = posFine, the per-player fine position (game_db `posFine`, the EQUIPOS
+##            Y-12 byte), used DIRECTLY as the POS_WEIGHT index = the scorer-roulette
+##            weight (FUN_0044ece0); falls back to a representative per-role code when a
+##            sparse record has no decoded fine position. Steers WHO scores, never the
+##            goal count. Decode + cross-validation: docs/re/positions_re.md.
 ##
 ## `xi0`/`xi1` are ordered Arrays of up to 11 entries, slot 0 = the GK. An entry is a
-## game_db player Dictionary ({"attrs": {...}, "pos": "GK"/"DF"/"MF"/"FW"}); a null /
-## non-Dictionary / attr-less / empty entry leaves that slot zeroed (SEL = 0, not in XI).
+## game_db player Dictionary ({"attrs": {...}, "pos": "GK"/"DF"/"MF"/"FW", "posFine": int});
+## a null / non-Dictionary / attr-less / empty entry leaves that slot zeroed (SEL = 0).
 const ROLE_OF := {"GK": 0, "DF": 1, "MF": 2, "FW": 3}
-# Representative participant POS (= player+0x18 + 1) per broad role -> POS_WEIGHT index.
-# The exact per-player fine position is not in game_db (see RE note); FW carries the
-# heaviest scoring weight, GK zero, mirroring the central-striker bias of POS_WEIGHT.
+# Representative participant POS (-> POS_WEIGHT index) per broad role, used ONLY when a
+# player has no decoded `posFine`. FW carries the heaviest scoring weight, GK zero,
+# mirroring the central-striker bias of POS_WEIGHT.
 const POS_OF := {"GK": 1, "DF": 3, "MF": 12, "FW": 9}
+const POS_WEIGHT_N := 19  # POS_WEIGHT has 19 entries; a valid fine code indexes 0..18
 
 
 static func _fill_participant(mem: Mem, side: int, idx: int, p: Variant) -> bool:
@@ -578,7 +583,13 @@ static func _fill_participant(mem: Mem, side: int, idx: int, p: Variant) -> bool
 	var pos: String = str((p as Dictionary).get("pos", ""))
 	# slot 0 is always the keeper; default an undecoded outfielder to MID.
 	mem.set_s32(pb + ROLE, 0 if idx == 0 else int(ROLE_OF.get(pos, 2)))
-	mem.set_s32(pb + POS, 1 if idx == 0 else int(POS_OF.get(pos, 12)))
+	# POS = the per-player fine position (POS_WEIGHT index). Use the decoded `posFine`
+	# when present + in range; else the representative per-role code (slot 0 = GK = 1).
+	var fine: Variant = (p as Dictionary).get("posFine")
+	var pos_idx: int = 1 if idx == 0 else int(POS_OF.get(pos, 12))
+	if fine != null and int(fine) >= 0 and int(fine) < POS_WEIGHT_N:
+		pos_idx = int(fine)
+	mem.set_s32(pb + POS, pos_idx)
 	return true
 
 

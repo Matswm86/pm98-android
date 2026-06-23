@@ -83,9 +83,12 @@ dot-pitch would be a BEYOND-ORIGINAL enhancement, not "as it was in '98". Genuin
 - **Scorer/event fidelity** — **DONE 2026-06-23**: the EVENTS table now names the players the stat
   engine actually picked (`Pm98StatMatch.goal_events` → `MatchSim.simulate`'s `goals` →
   `MatchCommentary`), at the engine's minutes, across exhibition + career; legacy fallback still
-  re-rolls when no usable XI. Test `tests/test_engine_scorers.gd` (645 asserts). The only residual is
-  the scorer-ROULETTE WEIGHT (fine position `+0x18`, item 1 / stat-engine follow-up) which the bridge
-  approximates per-role — it shifts the *odds* of who scores, not whether the named scorer is real.
+  re-rolls when no usable XI. Test `tests/test_engine_scorers.gd` (645 asserts).
+- **Scorer-roulette WEIGHT (fine position `+0x18`)** — **DONE 2026-06-23**: decoded to the
+  EQUIPOS byte `d[Y-12]`, extracted to `game_db` as `posFine`, and used directly as the
+  participant POS_WEIGHT index by the bridge (per-role fallback only for sparse records). Now each
+  player's *odds* of being the scorer match the original (central strikers heaviest, keepers zero),
+  not just per-broad-role. Decode in `docs/re/positions_re.md`; test `tests/test_posfine.gd`.
 - **(Optional, beyond-original)** an animated top-down dot/sprite pitch, IF wanted as an addition.
 
 ### 3. Graphics / asset extraction  [PARTIAL — badges only]

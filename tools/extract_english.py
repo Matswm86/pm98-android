@@ -240,6 +240,10 @@ def parse_club(d: bytes, off: int, end: int):
         # pos==0 (GK) is the authoritative keeper marker; it fixes outfielders with a
         # high goalkeeping attribute (e.g. Grimandi PO=65) that PO>50 alone mislabels.
         is_gk = pos == "GK" if pos else (bool(row) and row[9] > 50)
+        # Fine position byte at Y-12 (same offset as the compact records): the in-memory
+        # player+0x18 the stat engine reads as the scorer-roulette POS_WEIGHT index.
+        # Cross-validated to a clean role partition; see docs/re/positions_re.md.
+        fine = d[Y - 12] if Y - 12 >= 0 and d[Y - 12] < 19 else None
         players.append(
             {
                 "name": display,
@@ -247,6 +251,7 @@ def parse_club(d: bytes, off: int, end: int):
                 "birthYear": year,
                 "age": 1998 - year,
                 "pos": pos,
+                "posFine": fine,
                 "isGK": is_gk,
                 "attrs": dict(zip(ATTR_NAMES, row)) if row else None,
             }

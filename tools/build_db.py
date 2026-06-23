@@ -102,6 +102,7 @@ def main() -> None:
             "birthYear": p.get("birthYear"),
             "age": p.get("age"),
             "pos": p.get("pos"),  # GK/DF/MF/FW demarcación; null for un-decoded records
+            "posFine": p.get("posFine"),  # fine position (POS_WEIGHT scorer-roulette index)
             "isGK": bool(p.get("isGK")),
             "media": p.get("media"),
             # Never null: a sparse record with no decoded attribute row gets {} so every
