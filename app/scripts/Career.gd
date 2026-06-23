@@ -365,6 +365,10 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 	var ai_featured := _ai_featured_by_club()
 	var ratings: Dictionary = {}
 	var manager_res: Dictionary = {}
+	# The fit XI each side actually fields (reused from the featured/living-league capture
+	# above, so the stat engine rates the same players the injury/card rolls land on).
+	var xi_of_id := func(id: int) -> Array:
+		return featured if id == club_id else (ai_featured.get(id, []) as Array)
 	for m in fixtures[week]:
 		var h := int(m[0])
 		var a := int(m[1])
@@ -372,7 +376,8 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 			ratings[h] = _ratings_for(h, clubs_override)
 		if not ratings.has(a):
 			ratings[a] = _ratings_for(a, clubs_override)
-		var res := MatchEngine.simulate(rng, ratings[h], ratings[a])
+		var res := MatchSim.simulate(rng, ratings[h], ratings[a], \
+				xi_of_id.call(h), xi_of_id.call(a), h, a)
 		var hg := int(res["home_goals"])
 		var ag := int(res["away_goals"])
 		_apply(table[h], hg, ag)
@@ -427,6 +432,7 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 ## been reached. The bracket dicts mutate in place, so this writes straight to the save.
 func _play_due_cup_rounds(rng: RandomNumberGenerator, clubs_override: Dictionary) -> void:
 	var ratings_fn := func(id: int) -> Dictionary: return _ratings_for(id, clubs_override)
+	var xi_fn := func(id: int) -> Array: return _xi_for(id, clubs_override)
 	var names_fn := func(id: int) -> String:
 		if club_names.has(int(id)):
 			return str(club_names[int(id)])
@@ -435,7 +441,7 @@ func _play_due_cup_rounds(rng: RandomNumberGenerator, clubs_override: Dictionary
 		if cup.is_empty():
 			continue
 		while Cup.round_due(cup, week):
-			var cr := Cup.play_round(cup, rng, ratings_fn, club_id, names_fn)
+			var cr := Cup.play_round(cup, rng, ratings_fn, club_id, names_fn, xi_fn)
 			for n in cr["news"]:
 				_news(n["kind"], n["text"])
 			if int(cr["prize"]) > 0:
@@ -448,7 +454,7 @@ func _play_due_cup_rounds(rng: RandomNumberGenerator, clubs_override: Dictionary
 			continue
 		while Cup.round_due(eb, week):
 			var in_before := Cup.still_in(eb, club_id)
-			var er := Cup.play_next(eb, rng, ratings_fn, club_id, names_fn)
+			var er := Cup.play_next(eb, rng, ratings_fn, club_id, names_fn, xi_fn)
 			for n in er["news"]:
 				_news(n["kind"], n["text"])
 			if str(er.get("phase", "")) == "group":
@@ -508,6 +514,20 @@ func _ratings_for(id: int, clubs_override: Dictionary = {}) -> Dictionary:
 		return MatchEngine.team_ratings(_fit_view(id))
 	# Legacy save with no live roster for this club: the static override (full squad).
 	return MatchEngine.team_ratings(clubs_override.get(id, {}))
+
+
+## The ordered fit XI (slot 0 = GK) for a club id, the parallel of `_ratings_for` that
+## feeds the faithful statistical engine via MatchSim. Mirrors the same fit/repair logic
+## so injuries weaken the side the same way. A foreign euro opponent (frozen ratings, no
+## live players) returns [] -> MatchSim falls back to its ratings path.
+func _xi_for(id: int, clubs_override: Dictionary = {}) -> Array:
+	if id == club_id and not tactics.is_empty():
+		return _mgr_featured_xi()
+	if not rosters.has(id) and euro_ratings.has(id):
+		return []
+	if rosters.has(id):
+		return _ai_featured_xi(id)
+	return MatchSim.xi_of(clubs_override.get(id, {}))
 
 
 # ---- availability --------------------------------------------------------
@@ -1276,7 +1296,8 @@ func _play_charity_shield(rng: RandomNumberGenerator) -> void:
 	if fa == -1 or fa == champ:
 		return
 	var ratings_fn := func(id: int) -> Dictionary: return _ratings_for(id)
-	var tie := Cup.single_neutral_match(rng, champ, fa, ratings_fn)
+	var xi_fn := func(id: int) -> Array: return _xi_for(id)
+	var tie := Cup.single_neutral_match(rng, champ, fa, ratings_fn, xi_fn)
 	tie["champ_id"] = champ
 	tie["fa_id"] = fa
 	tie["season"] = season

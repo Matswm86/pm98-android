@@ -99,7 +99,8 @@ static func _minute(prng: MatchEngine.Pm98Rng) -> int:
 static func timeline(rng: RandomNumberGenerator, home: Dictionary, away: Dictionary) -> Dictionary:
 	var hr := MatchEngine.team_ratings(home)
 	var ar := MatchEngine.team_ratings(away)
-	var res := MatchEngine.simulate(rng, hr, ar)
+	var res := MatchSim.simulate(rng, hr, ar, MatchSim.xi_of(home), MatchSim.xi_of(away), \
+			int(home.get("id", 0)), int(away.get("id", 0)))
 	return narrate(rng, home, away, int(res["home_goals"]), int(res["away_goals"]))
 
 

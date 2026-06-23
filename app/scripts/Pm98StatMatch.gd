@@ -630,6 +630,14 @@ static func simulate_fixture(seed: int, xi0: Array, xi1: Array, team_id0: int, \
 	}
 
 
+## Standalone extra time (two 15-min segments) on a fresh Mem -- for a two-legged cup
+## tie whose 90-min legs were simulated separately and whose aggregate is level. Mirrors
+## FUN_0044ee70's ET tail without the preceding H1/H2. Read the ET goals via score(mem).
+static func simulate_extra_time(mem: Mem, rng: Rng) -> void:
+	_et_half(mem, rng, 2, 0x5b)
+	_et_half(mem, rng, 3, 0x6a)
+
+
 ## Final score as { teamId: goals } from the event queue (goals = non-penalty events).
 static func score(mem: Mem) -> Dictionary:
 	var s := {}

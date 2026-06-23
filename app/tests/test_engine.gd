@@ -25,6 +25,10 @@ func _initialize() -> void:
 
 
 func _run() -> bool:
+	# This validates MatchEngine's OWN real-football calibration (its BASE/SCALE
+	# tunables), so it must exercise the legacy model -- not the flag-routed stat
+	# engine (which has its own faithful, separately-validated output windows).
+	MatchSim.use_stat_engine = false
 	var clubs := _premier_clubs()
 	if clubs.size() != 20:
 		push_error("expected 20 Premier clubs, got %d" % clubs.size())

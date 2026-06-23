@@ -85,12 +85,14 @@ static func _cmp(a: Dictionary, b: Dictionary) -> bool:
 ## {id,name,P,W,D,L,GF,GA,GD,Pts} sorted into final standings.
 static func simulate_season(rng: RandomNumberGenerator, clubs: Array) -> Dictionary:
 	var ratings: Dictionary = {}
+	var xis: Dictionary = {}
 	var table: Dictionary = {}
 	var ids: Array = []
 	for c in clubs:
 		var id := int(c["id"])
 		ids.append(id)
 		ratings[id] = MatchEngine.team_ratings(c)
+		xis[id] = MatchSim.xi_of(c)
 		table[id] = {
 			"id": id, "name": ratings[id]["name"],
 			"P": 0, "W": 0, "D": 0, "L": 0, "GF": 0, "GA": 0, "GD": 0, "Pts": 0,
@@ -104,7 +106,7 @@ static func simulate_season(rng: RandomNumberGenerator, clubs: Array) -> Diction
 		for m in round:
 			var h: int = m[0]
 			var a: int = m[1]
-			var res := MatchEngine.simulate(rng, ratings[h], ratings[a])
+			var res := MatchSim.simulate(rng, ratings[h], ratings[a], xis[h], xis[a], h, a)
 			var hg: int = res["home_goals"]
 			var ag: int = res["away_goals"]
 			_apply(table[h], hg, ag)
