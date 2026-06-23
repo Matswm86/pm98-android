@@ -3,8 +3,9 @@ extends SceneTree
 ## match runner FUN_0044ee70 (PS==5 league branch) driven through the Ghidra PCode
 ## emulator (tools/re/run_statmatch_oracle.sh -> tools/re/specs/statmatch_oracle.txt).
 ##
-## This is the whole-match check: a full LEAGUE fixture (H1 + H2, no extra time / no
-## penalties) run draw-for-draw. Every EXPECTED row is BANKED FROM THE EMULATOR:
+## This is the whole-match check: full LEAGUE fixtures (H1 + H2) AND full CUP fixtures
+## (H1 + H2 + extra time + penalty shootout) run draw-for-draw. Every EXPECTED row is
+## BANKED FROM THE EMULATOR:
 ##   * draws  -- total rand() draws the emulator traced (stream alignment)
 ##   * state  -- final msvcrt-LCG state (a second stream-alignment anchor)
 ##   * events -- the complete goal queue {type(=seg), minute(seg-offset applied), payload}
@@ -33,7 +34,8 @@ func _build(str0: int, str1: int, keeper: int, passv: int) -> Pm98StatMatch.Mem:
 		var sb := s * Pm98StatMatch.SIDE_STRIDE
 		mem.set_u16(sb + Pm98StatMatch.TEAMID, tid)
 		mem.set_u8(sb + Pm98StatMatch.SHAPE, 0x32)
-	# extra-time flag (M+0x44) and penalties flag (M+0x48) left 0 -> league match.
+	# The ET / penalty branch (M+0x44 / M+0x48 + the full-time gate) is driven through
+	# simulate()'s run_et / run_pen args rather than these flags (see _init / cup_*).
 	return mem
 
 
@@ -67,6 +69,42 @@ var FIX := {
 		"draws": 891, "state": 3983246610, "score7": 1, "score19": 3,
 		"events": [[0, 35, 0xa0007], [0, 9, 0x80013], [1, 77, 0x60013], [1, 86, 0xa0013]],
 	},
+	# cup_* : same seeds/squads as league_*, but extra time + penalties forced on
+	# (run_et = run_pen = true, i.e. the still-level full-time gate). type 2/3 = ET
+	# goals, type 4 = penalty-shootout events (no minute, outside the scoreline).
+	"cup_A": {
+		"cup": true,
+		"seed": 0x12345678, "str0": 0x46, "str1": 0x32, "keeper": 0x28, "pass": 0x40,
+		"draws": 1314, "state": 4204157906, "score7": 5, "score19": 2,
+		"events": [[0, 27, 0x60007], [0, 37, 0x90007], [0, 4, 0x90013], [0, 45, 0x60013],
+			[1, 70, 0xb0007], [2, 91, 0x90007], [3, 110, 0x60007], [4, 0, 0xb0007]],
+	},
+	"cup_B": {
+		"cup": true,
+		"seed": 0x0abcdef1, "str0": 0x3c, "str1": 0x3c, "keeper": 0x28, "pass": 0x40,
+		"draws": 1255, "state": 3935604398, "score7": 4, "score19": 2,
+		"events": [[0, 43, 0x60007], [0, 5, 0x50007], [0, 9, 0x70013], [1, 63, 0x80007],
+			[1, 48, 0x70007], [1, 47, 0x60013], [4, 0, 0x10007], [4, 0, 0x50007],
+			[4, 0, 0x60007], [4, 0, 0xb0013], [4, 0, 0xa0013]],
+	},
+	"cup_C": {
+		"cup": true,
+		"seed": 0x00112233, "str0": 0x50, "str1": 0x28, "keeper": 0x20, "pass": 0x44,
+		"draws": 1229, "state": 2734095446, "score7": 5, "score19": 1,
+		"events": [[0, 14, 0x90013], [2, 98, 0xb0007], [2, 102, 0x90007], [2, 101, 0x60007],
+			[2, 100, 0xa0007], [3, 117, 0x40007], [4, 0, 0x20007], [4, 0, 0x50013],
+			[4, 0, 0x10013], [4, 0, 0x80013], [4, 0, 0x30013], [4, 0, 0x40013]],
+	},
+	"cup_D": {
+		"cup": true,
+		"seed": 0x7eeeeee1, "str0": 0x32, "str1": 0x46, "keeper": 0x30, "pass": 0x38,
+		"draws": 1341, "state": 2638942172, "score7": 1, "score19": 6,
+		"events": [[0, 35, 0xa0007], [0, 9, 0x80013], [1, 77, 0x60013], [1, 86, 0xa0013],
+			[2, 91, 0xa0013], [3, 109, 0x80013], [3, 114, 0x90013], [4, 0, 0xb0007],
+			[4, 0, 0x20007], [4, 0, 0x90007], [4, 0, 0xa0007], [4, 0, 0x20007],
+			[4, 0, 0x80013], [4, 0, 0xb0013], [4, 0, 0x50013], [4, 0, 0x30013],
+			[4, 0, 0x70013], [4, 0, 0x30013]],
+	},
 }
 
 
@@ -75,7 +113,8 @@ func _init() -> void:
 		var f: Dictionary = FIX[name]
 		var rng := Pm98StatMatch.Rng.new(f["seed"])
 		var mem := _build(f["str0"], f["str1"], f["keeper"], f["pass"])
-		Pm98StatMatch.simulate(mem, rng)
+		var cup: bool = f.get("cup", false)
+		Pm98StatMatch.simulate(mem, rng, cup, cup)
 		_ck(name + ".draws", rng.draws, f["draws"])
 		_ck(name + ".state", rng.state, f["state"])
 		_ck(name + ".count", mem.events.size(), (f["events"] as Array).size())

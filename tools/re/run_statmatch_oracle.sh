@@ -50,7 +50,7 @@ RAND_THUNK=A10070250069C0FD43030005C39E2600A300702500C1E81025FF7F0000C3
 
 s0=$(( 0x210000 ))
 s1=$(( 0x210000 + 0x7a0 ))
-NREC=16               # event records to read back (a league match never reaches this)
+NREC=48               # event records to read back (a cup tie: H1/H2 + ET goals + shootout)
 
 # Build one XI at side base $1, team id $2, strength $3 (hex), keeper save $4, pass $5.
 build_xi() {
@@ -77,7 +77,8 @@ done
 READS+=( "0x257000 4" )                                 # final LCG state
 
 emit_spec() {
-  # $1 seed  $2 str0  $3 str1  $4 keeper  $5 pass
+  # $1 seed  $2 str0  $3 str1  $4 keeper  $5 pass  $6 cup (0 league / 1 ET+penalties)
+  local cupflag=0; [ "${6:-0}" = "1" ] && cupflag=1
   cat > "$SPEC" <<EOF
 entry   0x44ee70
 ret     0x00100000
@@ -86,7 +87,7 @@ reg     ECX $M
 zero    0x00210000 0x00004000
 zero    0x00256000 0x00004000
 zero    0x00257000 0x00001000
-zero    0x00258000 0x00000400
+zero    0x00258000 0x00000800
 membts  $THUNK $RAND_THUNK
 mem     $SEEDADDR 4 $1
 mem     0x006233b0 4 $THUNK
@@ -102,8 +103,8 @@ mem     $(printf 0x%x $((FVT+0x118))) 4 $VSTUB
 mem     $(printf 0x%x $((FVT+0x11c))) 4 $VSTUB
 $(build_xi $s0 0x0007 $2 $4 $5)
 $(build_xi $s1 0x0013 $3 $4 $5)
-mem     0x00210044 4 0x0
-mem     0x00210048 4 0x0
+mem     0x00210044 4 0x$cupflag
+mem     0x00210048 4 0x$cupflag
 stub    0x0044d5f0 0 0
 stub    0x0044d0d0 0 0
 stub    0x0044d190 0 0
@@ -111,6 +112,7 @@ stub    0x0044d250 0 0
 stub    0x0044d310 0 0
 stub    0x0044d520 0 0
 stub    0x00450e60 0 0
+stub    0x00606220 0 0
 stub    0x005bbf10 0 0
 stub    $VSTUB 0 4
 EOF
@@ -126,12 +128,16 @@ run_emu() {
 }
 mval() { echo "$1" | grep -oE "mem\\[$2:[0-9]+\\]=[0-9-]+" | cut -d= -f2 || true; }
 
-# Fixtures: name | seed | str0 | str1 | keeper | pass
+# Fixtures: name | seed | str0 | str1 | keeper | pass | cup (0 league / 1 ET+penalties)
 FIX=(
-  "league_A|0x12345678|0x46|0x32|0x28|0x40"
-  "league_B|0x0abcdef1|0x3c|0x3c|0x28|0x40"
-  "league_C|0x00112233|0x50|0x28|0x20|0x44"
-  "league_D|0x7eeeeee1|0x32|0x46|0x30|0x38"
+  "league_A|0x12345678|0x46|0x32|0x28|0x40|0"
+  "league_B|0x0abcdef1|0x3c|0x3c|0x28|0x40|0"
+  "league_C|0x00112233|0x50|0x28|0x20|0x44|0"
+  "league_D|0x7eeeeee1|0x32|0x46|0x30|0x38|0"
+  "cup_A|0x12345678|0x46|0x32|0x28|0x40|1"
+  "cup_B|0x0abcdef1|0x3c|0x3c|0x28|0x40|1"
+  "cup_C|0x00112233|0x50|0x28|0x20|0x44|1"
+  "cup_D|0x7eeeeee1|0x32|0x46|0x30|0x38|1"
 )
 
 : > "$OUT"
@@ -139,8 +145,8 @@ echo "# Stage 3 task 2 STATISTICAL end-to-end: FUN_0044ee70 PS==5 league fixture
 echo "# (PCode emu; preamble skipped via DAT_00652a10=0; UI helpers stubbed; M=$M)." >> "$OUT"
 echo "# Each fixture: RET | draws | count | finalstate | then one 'EV i type minute payload' per event." >> "$OUT"
 for row in "${FIX[@]}"; do
-  IFS='|' read -r NAME SEED S0 S1 KEEP PASS <<<"$row"
-  emit_spec "$SEED" "$S0" "$S1" "$KEEP" "$PASS"
+  IFS='|' read -r NAME SEED S0 S1 KEEP PASS CUP <<<"$row"
+  emit_spec "$SEED" "$S0" "$S1" "$KEEP" "$PASS" "$CUP"
   run_emu
   S=$(grep -E 'CALL 0 (RET|HALT)' "$ROUT" | head -1)
   RET=$(echo "$S" | grep -oE 'CALL 0 (RET|HALT)' | awk '{print $3}' || true)
@@ -154,6 +160,8 @@ for row in "${FIX[@]}"; do
     b=$(( 0x258000 + i*0x10 ))
     T=$(mval "$S" $(printf 0x%x $b)); MIN=$(mval "$S" $(printf 0x%x $((b+4)))); PAY=$(mval "$S" $(printf 0x%x $((b+12))))
     printf '  EV %d type=%s minute=%s payload=0x%x\n' "$i" "$T" "$MIN" "$PAY" >> "$OUT"
+    # type 4 = penalty-shootout event: outside the scoreline (matches Pm98StatMatch.score).
+    [ "$T" = "4" ] && continue
     tid=$(( PAY & 0xffff )); score[$tid]=$(( ${score[$tid]:-0} + 1 ))
   done
   echo "  SCORE 7=${score[7]:-0} 19=${score[19]:-0}" >> "$OUT"

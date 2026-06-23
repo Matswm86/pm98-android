@@ -396,6 +396,69 @@ static func _half_chances(mem: Mem, rng: Rng, seg: int, span: int) -> void:
 		_resolve(mem, rng, 1, seg, ((rng.next() * span) >> 15) + 1)
 
 
+## Extra-time chance count (cup only) -- a DIFFERENT formula from the league halves:
+## chances = (avg_own - avg_opp)/6 - 1 + rand%3; if <0 add ((avg_own/20) * rand)>>15.
+## There is NO `3 - rand%3` upper clamp here (unlike _chance_count).
+static func _et_chance_count(rng: Rng, avg_own: int, avg_opp: int) -> int:
+	var c := (avg_own - avg_opp) / 6 - 1 + ((rng.next() * 3) >> 15)
+	if c < 0:
+		c += ((avg_own / 0x14) * rng.next()) >> 15
+	return c
+
+
+## One extra-time segment (seg 2 = ET1, seg 3 = ET2). Buildup markers, then each
+## side's probabilistic tail loop -- `while count < chances/2 OR rand%4 == 0` -- so a
+## segment can run on past its nominal chance budget. The `rand%4` is only drawn once
+## `count` reaches `chances/2` (|| short-circuit), exactly like the binary.
+static func _et_half(mem: Mem, rng: Rng, seg: int, base: int) -> void:
+	_buildup(mem, rng, 0xf, base)
+	var avg0 := _avg_strength(mem, 0)
+	var avg1 := _avg_strength(mem, 1)
+	var ch0 := _et_chance_count(rng, avg0, avg1)
+	var count := 0
+	while count < ch0 / 2 or ((rng.next() * 4) >> 15) == 0:
+		_resolve(mem, rng, 0, seg, ((rng.next() * 0xf) >> 15) + 1)
+		count += 1
+	var ch1 := _et_chance_count(rng, avg1, avg0)
+	count = 0
+	while count < ch1 / 2 or ((rng.next() * 4) >> 15) == 0:
+		_resolve(mem, rng, 1, seg, ((rng.next() * 0xf) >> 15) + 1)
+		count += 1
+	_stats(mem, rng, 0xf, 0, 0)
+
+
+## FUN_0044ee70 penalty shootout (lines 743-787, cup only). First fix a non-level
+## shootout score: s0/s1 = rand%6 each, then while level draw a coin for each side
+## until they differ. Then emit one type-4 event per converted penalty for each side,
+## drawing a taker idx = rand%11 until `sN` selected players have scored (an empty
+## slot redraws without counting). Penalty events carry no minute offset and are
+## excluded from the scoreline; they only record the shootout outcome.
+static func _penalties(mem: Mem, rng: Rng) -> void:
+	var s0 := (rng.next() * 6) >> 15
+	var s1 := (rng.next() * 6) >> 15
+	while s0 == s1:
+		var r3 := rng.next()
+		var r4 := rng.next()
+		s1 += r4 & 1
+		s0 += r3 & 1
+	var tid0 := mem.u16(TEAMID)
+	var tid1 := mem.u16(SIDE_STRIDE + TEAMID)
+	var made := 0
+	while made < s0:
+		var pb := _player(0, (rng.next() * 0xb) >> 15)
+		var sel := mem.u16(pb + SEL)
+		if sel != 0:
+			_emit(mem, 4, 0, 0, ((sel & 0xFFFF) << 16) | (tid0 & 0xFFFF))
+			made += 1
+	made = 0
+	while made < s1:
+		var pb := _player(1, (rng.next() * 0xb) >> 15)
+		var sel := mem.u16(pb + SEL)
+		if sel != 0:
+			_emit(mem, 4, 0, 0, ((sel & 0xFFFF) << 16) | (tid1 & 0xFFFF))
+			made += 1
+
+
 # --- buildup markers (1 shot pass + 2 assist passes per half) ---------------
 static func _buildup_shot(mem: Mem, rng: Rng, span: int, base: int) -> void:
 	# 4-coin gate (prob 1/16), short-circuit on first even draw.
@@ -429,10 +492,13 @@ static func _buildup(mem: Mem, rng: Rng, span: int, base: int) -> void:
 
 # --- FUN_0044ee70 (PS==5): simulate a full instant-result fixture -----------
 ## Drives the validated resolver + stats accumulator through the binary's segment
-## ordering. LEAGUE matches (extra-time flag M+0x44 == 0, penalties flag M+0x48 == 0)
-## are H1 + H2; ET / penalties are cup-only and not yet ported (see NEXT in the doc).
-## On return mem.events holds the full goal queue (final score = goals per team id).
-static func simulate(mem: Mem, rng: Rng) -> void:
+## ordering. H1 + H2 always run. For a cup tie still level at full time the binary
+## additionally plays extra time (segments 2/3) and a penalty shootout, each gated on
+## a static flag (M+0x44 / M+0x48) AND the no-rand full-time gate FUN_00450e60 (which
+## returns 0 only while the tie is level). That gate consumes no rand, so the caller
+## passes its decision in as `run_et` / `run_pen`; league fixtures leave both false.
+## On return mem.events holds the full event queue (goals = non-penalty events).
+static func simulate(mem: Mem, rng: Rng, run_et := false, run_pen := false) -> void:
 	# first half (segment 0): buildup minutes rand%45 + 1
 	_buildup(mem, rng, 0x2d, 1)
 	_half_chances(mem, rng, 0, 0x2d)
@@ -442,8 +508,17 @@ static func simulate(mem: Mem, rng: Rng) -> void:
 	_buildup(mem, rng, 0x2d, 0x2e)
 	_half_chances(mem, rng, 1, 0x2d)
 	_stats(mem, rng, 0x2d, 0, 0)
-	# (FUN_00450e60 full-time gate -- consumes no rand; result unused when ET/pen off.)
-	# ET (segments 2/3) + penalties: cup-only, gated on M+0x44 / M+0x48. NOT YET PORTED.
+	# (FUN_00450e60 full-time gate -- no rand; its result is `run_et` / `run_pen`.)
+	if run_et:
+		# ET1 (segment 2): buildup minutes rand%15 + 91
+		_et_half(mem, rng, 2, 0x5b)
+		# (FUN_0044d250 ET1->ET2 transition -- no rand)
+		# ET2 (segment 3): buildup minutes rand%15 + 106
+		_et_half(mem, rng, 3, 0x6a)
+		# (FUN_00450e60 ET gate + FUN_0044d310 transition -- no rand)
+	if run_pen:
+		# penalty shootout (FUN_00606220 finalize -- no rand)
+		_penalties(mem, rng)
 
 
 ## Final score as { teamId: goals } from the event queue (goals = non-penalty events).

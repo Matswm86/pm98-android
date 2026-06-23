@@ -193,19 +193,48 @@ within-period minute 25 is recorded at minute 70.
 **Validation (end-to-end).** `tools/re/run_statmatch_oracle.sh` enters the real
 `FUN_0044ee70` at its entry, skips the positional/UI block by zeroing `DAT_00652a10`,
 stubs the UI helpers (`FUN_0044d5f0`, the `d0d0/d190/d250/d310/d520` transitions, the
-gate, `FUN_005bbf10`), and runs the full statistical engine for 4 league fixtures,
-banking the complete event queue + final score + draw count + final LCG state.
-`app/tests/test_statmatch_oracle.gd` asserts `simulate` reproduces every one bit-exact
-(36 checks: scores 3-2, 4-2, 0-1, 1-3; draw counts 856/836/789/891).
+gate `FUN_00450e60`, the penalty finalize `FUN_00606220`, `FUN_005bbf10`), and runs the
+full statistical engine, banking the complete event queue + final score + draw count +
+final LCG state. `app/tests/test_statmatch_oracle.gd` asserts `simulate` reproduces every
+one bit-exact (**105 checks** over **4 league + 4 cup** fixtures; league scores 3-2/4-2/
+0-1/1-3, draws 856/836/789/891).
+
+## Extra time + penalties (PORTED + oracle-validated, CUP)
+
+### `FUN_0044ee70` ET/penalty tail (lines 549-787)
+
+A **cup** tie still level at full time plays two 15-min extra-time segments then a
+penalty shootout. Each ET/penalty stage is gated on a static flag (ET = `M+0x44`, pen =
+`M+0x48`) AND the no-rand full-time gate `FUN_00450e60`, which returns 0 only while the
+aggregate is level (1 = side 0 ahead, 2 = side 1). Because that gate consumes **no
+rand**, the oracle stubs it to 0 (forcing the longest path) and the port takes the
+decision as `simulate(mem, rng, run_et, run_pen)`. League = both false.
+
+* **Each ET segment** (seg 2 = ET1 base `0x5b`, seg 3 = ET2 base `0x6a`; span `0xf`) runs
+  the same 1-shot + 2-assist buildup, then a **probabilistic tail loop per side**:
+  `chances = (own_avg - opp_avg)/6 - 1 + rand()%3` (if `< 0`, `+= ((own_avg/20)*rand())>>15`;
+  **no `3-rand()%3` clamp**), then `count=0; while count < chances/2 OR rand()%4==0 {
+  resolve(side, seg, rand()%15+1); count++ }`. The `rand()%4` is drawn only once `count`
+  reaches `chances/2` (`||` short-circuit). Then `FUN_00450510(0xf,0,0)` ET stats. →
+  `_et_half`.
+* **Penalty shootout** (lines 743-787 → `_penalties`): `s0=rand()%6`, `s1=rand()%6`, then
+  `while s0==s1 { s1+=rand()&1; s0+=rand()&1 }` (each iter draws two coins, s1 then s0).
+  Emit one **type-4** event per converted penalty: for each side draw `idx=rand()%11`
+  until `sN` **selected** takers have scored (an empty slot redraws, no count). Payload
+  `(shirt<<16)|teamId`; type-4 events carry no minute offset and are **excluded from the
+  scoreline** (`score()` / `_count_events` skip type 4). The shootout records only the
+  outcome.
+
+The cup oracle fixtures (`cup_A..D`) share league seeds/squads but set the flags; draws
+climb to 1314/1255/1229/1341 and the queues add type-2/3 ET goals + type-4 penalties,
+all bit-exact.
 
 ## NEXT
 
-1. **Extra time + penalties** (cup only — `M+0x44`/`M+0x48` set). The ET segments
-   (seg 2/3) use a **different** chance-count formula `(own_avg-opp_avg)/6 - 1 + rand()%3`
-   with a probabilistic tail loop (`while count < chances/2 || rand()%4==0`), the real
-   `FUN_00450e60` gate, transitions `FUN_0044d190/d250/d310`, and the penalty-shootout
-   event emitter (lines 742-787). Add a cup fixture (flags set) to the oracle, port,
-   validate. `Pm98StatMatch.simulate` currently stops after H2.
-2. **Replace `app/scripts/MatchEngine.gd`** (the abstracted per-shot model) with
-   `Pm98StatMatch` as the faithful instant-result engine wired into the career/league loop.
-3. The `PS != 5` positional engine stays parked (see `MATCH_TICK_DRIVER_MAP.md`).
+1. **Replace `app/scripts/MatchEngine.gd`** (the abstracted per-shot model) with
+   `Pm98StatMatch` as the faithful instant-result engine wired into the career/league
+   loop. The wiring layer owns the `run_et`/`run_pen` decision: port `FUN_00450e60`
+   (no rand; reads leg-aggregate fields `+0x2c/0x30/0x34/0x38` + pen tallies
+   `FUN_00450e00/e30`) so a cup tie level at FT actually plays ET/penalties and a decided
+   one stops after H2.
+2. The `PS != 5` positional engine stays parked (see `MATCH_TICK_DRIVER_MAP.md`).

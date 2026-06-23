@@ -25,3 +25,60 @@ FIX league_D seed=0x7eeeeee1 RET draws=891 count=4 finalstate=3983246610
   EV 2 type=1 minute=77 payload=0x60013
   EV 3 type=1 minute=86 payload=0xa0013
   SCORE 7=1 19=3
+FIX cup_A seed=0x12345678 RET draws=1314 count=8 finalstate=4204157906
+  EV 0 type=0 minute=27 payload=0x60007
+  EV 1 type=0 minute=37 payload=0x90007
+  EV 2 type=0 minute=4 payload=0x90013
+  EV 3 type=0 minute=45 payload=0x60013
+  EV 4 type=1 minute=70 payload=0xb0007
+  EV 5 type=2 minute=91 payload=0x90007
+  EV 6 type=3 minute=110 payload=0x60007
+  EV 7 type=4 minute=0 payload=0xb0007
+  SCORE 7=5 19=2
+FIX cup_B seed=0x0abcdef1 RET draws=1255 count=11 finalstate=3935604398
+  EV 0 type=0 minute=43 payload=0x60007
+  EV 1 type=0 minute=5 payload=0x50007
+  EV 2 type=0 minute=9 payload=0x70013
+  EV 3 type=1 minute=63 payload=0x80007
+  EV 4 type=1 minute=48 payload=0x70007
+  EV 5 type=1 minute=47 payload=0x60013
+  EV 6 type=4 minute=0 payload=0x10007
+  EV 7 type=4 minute=0 payload=0x50007
+  EV 8 type=4 minute=0 payload=0x60007
+  EV 9 type=4 minute=0 payload=0xb0013
+  EV 10 type=4 minute=0 payload=0xa0013
+  SCORE 7=4 19=2
+FIX cup_C seed=0x00112233 RET draws=1229 count=12 finalstate=2734095446
+  EV 0 type=0 minute=14 payload=0x90013
+  EV 1 type=2 minute=98 payload=0xb0007
+  EV 2 type=2 minute=102 payload=0x90007
+  EV 3 type=2 minute=101 payload=0x60007
+  EV 4 type=2 minute=100 payload=0xa0007
+  EV 5 type=3 minute=117 payload=0x40007
+  EV 6 type=4 minute=0 payload=0x20007
+  EV 7 type=4 minute=0 payload=0x50013
+  EV 8 type=4 minute=0 payload=0x10013
+  EV 9 type=4 minute=0 payload=0x80013
+  EV 10 type=4 minute=0 payload=0x30013
+  EV 11 type=4 minute=0 payload=0x40013
+  SCORE 7=5 19=1
+FIX cup_D seed=0x7eeeeee1 RET draws=1341 count=18 finalstate=2638942172
+  EV 0 type=0 minute=35 payload=0xa0007
+  EV 1 type=0 minute=9 payload=0x80013
+  EV 2 type=1 minute=77 payload=0x60013
+  EV 3 type=1 minute=86 payload=0xa0013
+  EV 4 type=2 minute=91 payload=0xa0013
+  EV 5 type=3 minute=109 payload=0x80013
+  EV 6 type=3 minute=114 payload=0x90013
+  EV 7 type=4 minute=0 payload=0xb0007
+  EV 8 type=4 minute=0 payload=0x20007
+  EV 9 type=4 minute=0 payload=0x90007
+  EV 10 type=4 minute=0 payload=0xa0007
+  EV 11 type=4 minute=0 payload=0x20007
+  EV 12 type=4 minute=0 payload=0x80013
+  EV 13 type=4 minute=0 payload=0xb0013
+  EV 14 type=4 minute=0 payload=0x50013
+  EV 15 type=4 minute=0 payload=0x30013
+  EV 16 type=4 minute=0 payload=0x70013
+  EV 17 type=4 minute=0 payload=0x30013
+  SCORE 7=1 19=6
