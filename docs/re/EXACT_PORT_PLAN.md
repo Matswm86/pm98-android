@@ -18,6 +18,12 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   after kickoff). This is the FIRST e2e run of the integration shell with a populated roster + live
   movement core -- resolves the long-standing "no full-match loop can run end-to-end" blocker to "RUNS,
   but does not progress past kickoff."
+  **[ROOT-CAUSE NOTE BELOW SUPERSEDED 2026-06-23 -- the "vtable+0x10 / no driver path" framing came from
+  an off-by-4 vtable base (0x639224); the live wine trace proved base 0x639228 -> FUN_005a4600 is at
+  vtable+0xc and IS dispatched every tick by FUN_005b8c20. engine_tick is now wired into
+  Pm98Driver._advance_team; phase 2->1 proven by test_driver_advance_engine.gd. The remaining gap is the
+  set_phase(0) handler cascade (Task #4b item 4) + real kickoff placement, NOT the dispatch. See
+  [[handoff-pm98-vtable-offset-rootcause-2026-06-23]] + the driver-wiring handoff. Original text retained:]**
   **ROOT CAUSE (decompile + objdump verified, NOT a guess):** the match stays in **PHASE 2 (kickoff)
   forever** -- no dispatch ever fires, 0:0. `set_phase(0)` (open play) and `set_phase(1)` (phase boundary)
   exist ONLY in the **resolver family**: `FUN_005ab5a0` (set_phase(0) @0x5ac0a5) and `FUN_005a50c0`

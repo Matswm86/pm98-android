@@ -504,6 +504,17 @@ checksum verifier for mtest.dat, not a match simulator).
 
 ## STEP-5b CORRECTION (2026-06-22): the STEP-5a "port FUN_005a4600 into Pm98Driver.tick" PLAN IS WRONG
 
+> **!!! ITSELF SUPERSEDED 2026-06-23 (live wine trace) !!!** This whole section's "phase 0 is
+> unreachable / FUN_005a4600 has no caller / don't wire it into the driver" conclusion rested on the
+> player vtable base `0x639224`, which is OFF BY 4. The live trace
+> ([[handoff-pm98-vtable-offset-rootcause-2026-06-23]]) proved the base is `0x639228`, so the +0xc
+> ADVANCE dispatcher `FUN_005b8c20` (run every tick, x2) dispatches `[vtable+0xc] = FUN_005a4600` (the
+> open-play engine), NOT the no-op `FUN_005a4560`. The "zero static xrefs" in point 3 below is exactly
+> what an indirect `call [eax+0xc]` looks like to a `grep 0x5a4600`. So the STEP-5a plan was RIGHT:
+> `Pm98Action.engine_tick` IS now wired into `Pm98Driver._advance_team` (the +0xc pass), and
+> `test_driver_advance_engine.gd` proves a 0x1d kicker advances phase 2->1 through it. The points below
+> are retained only as the record of the off-by-4 dead end; read them through the corrected base.
+
 Spent a full session on the call-graph + phase-field write map (objdump/decompile/PE-data verified, not
 inferred). The STEP-5a conclusion ("port FUN_005a4600 + wire into Pm98Driver.tick") rests on a false
 premise. The corrected facts:

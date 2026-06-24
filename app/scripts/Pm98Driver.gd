@@ -160,7 +160,7 @@ static func tick(m: Dictionary, rng: MatchEngine.Pm98Rng) -> int:
 
 	# --- movement core (L180-208): all NO-RNG. Decide/relmatrix/markers/advance/nearest per
 	# team + the ball/keeper physics, then bump the 1024-frame ring counter. ---
-	_movement_core(m, int(m.get("ring", 0)))
+	_movement_core(m, int(m.get("ring", 0)), rng)
 	m["ring"] = (int(m.get("ring", 0)) + 1) & 0x3ff   # DAT_006d31bc = (DAT_006d31bc+1)&0x3ff
 
 	# --- open-play / restart classification (L209-692): exactly one dispatch code fires. ---
@@ -227,7 +227,7 @@ static func _build_taker_queue(m: Dictionary) -> void:
 # All NO-RNG. Runs only when match-init has populated m["sim"]/m["ball"]/m["keepers"]; the
 # shell (no match-init) skips it so the deterministic skeleton + RNG inventory stay testable.
 
-static func _movement_core(m: Dictionary, ring: int) -> void:
+static func _movement_core(m: Dictionary, ring: int, rng = null) -> void:
 	var sim: Variant = m.get("sim", null)
 	if not (sim is Array) or (sim as Array).is_empty():
 		return                                        # no match-init -> nothing to advance
@@ -240,7 +240,7 @@ static func _movement_core(m: Dictionary, ring: int) -> void:
 	for ctx in ctxs:
 		Pm98Movement.assign_markers(ctx)              # FUN_005b94f0
 	for ctx in ctxs:
-		_advance_team(ctx, ring)                       # FUN_005b8c20 (advance dispatch, no-op live)
+		_advance_team(ctx, m, rng)                     # FUN_005b8c20 -> [vtable+0xc]=FUN_005a4600 (engine_tick)
 	# sub-entity ADVANCE (+0xc): ball physics + the 2 keepers (referee skipped, outcome-irrelevant).
 	var ball := _ball(m)
 	if not ball.is_empty():
@@ -266,11 +266,15 @@ static func _decide_team(ctx: Dictionary, m: Dictionary) -> void:
 		Pm98Movement.decide_slice_c(p, m)
 
 
-## FUN_005b8c20: per-player ADVANCE loop -> FUN_005a4560 (replay record/playback). NO-OP in a
-## live run (playback/record both off).
-static func _advance_team(ctx: Dictionary, ring: int) -> void:
+## FUN_005b8c20: per-player ADVANCE loop. The player vtable+0xc slot (base 0x639228, live-confirmed
+## via wine trace -- [[handoff-pm98-vtable-offset-rootcause-2026-06-23]]) is FUN_005a4600 = the
+## per-player OPEN-PLAY ENGINE (Pm98Action.engine_tick), NOT the replay no-op FUN_005a4560 that the old
+## off-by-4 vtable map (base 0x639224) attributed here. engine_tick reaches the resolver FUN_005aeda0
+## and sets phase 0/1, advancing kickoff (phase 2) -> open play. Threads the shared match `rng` (the
+## handler arms draw from the match LCG).
+static func _advance_team(ctx: Dictionary, m: Dictionary, rng = null) -> void:
 	for p in ctx.get("players", []):
-		Pm98Movement.advance(p, ring, false, false, 0)
+		Pm98Action.engine_tick(p, m, rng)
 
 
 ## FUN_005b73a0 x2 (position_team for both teams). Set-piece branches draw RNG.

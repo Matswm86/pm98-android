@@ -6,13 +6,21 @@ extends SceneTree
 ## movement core; the prior test_driver.gd only locked pure-scalar tick behaviour.
 ##
 ## RESULT (2026-06-22): runs 22 players, N ticks, ZERO crashes, construction draws == 1084
-## (1080 noise + 4 kickoff), EXACTLY per spec. BUT the match stays in PHASE 2 (kickoff)
-## forever -- no dispatch fires, 0:0. ROOT CAUSE (decompile-verified): set_phase(0)/(1), the
-## kickoff->open-play transition, lives ONLY in the RESOLVER family (FUN_005a4600 vtable+0x10
-## -> FUN_005aeda0 -> FUN_005ab5a0/FUN_005a50c0), invoked via player vtable+0x10 from OUTSIDE
-## the per-tick driver. The ported positional driver only ever sets phase 6 (keeper-throw) or
-## 8 (dispatch lock), NEVER 0/1 -- so a match started at kickoff has no ported path to open
-## play. Wiring the resolver pass into the driver is the open step-5 blocker (see the handoff).
+## (1080 noise + 4 kickoff), EXACTLY per spec. BUT the match stays in PHASE 2 (kickoff) forever
+## -- 0:0. The 2026-06-23 wine trace (([[handoff-pm98-vtable-offset-rootcause-2026-06-23]])) found
+## the off-by-4 vtable error behind the old "vtable+0x10 / no caller" story: the per-tick driver's
+## +0xc ADVANCE pass (FUN_005b8c20) really dispatches FUN_005a4600 = the OPEN-PLAY ENGINE
+## (Pm98Action.engine_tick), which reaches the resolver + the set_phase tails. engine_tick is now
+## wired into Pm98Driver._advance_team (test_driver_advance_engine.gd proves a 0x1d kicker advances
+## phase 2->1 through it).
+##
+## WHY THIS HARNESS STILL SHOWS {2: N}: the SYNTHETIC input never puts a player into the 0x1d
+## kickoff-kick state -- real kickoff placement (FUN_0044d3d0) + the outer match loop (FUN_005983f0)
+## are NOT ported here, so no taker kicks off, the ball never moves, no player reaches a shooting /
+## resolve state, and the phase-advancing paths are never organically triggered. Reaching open-play
+## phase 0 also needs resolve_post_shot's set_phase(0) (the handler cascade, Task #4b item 4, where
+## the setup_shot/resolve_post_shot leaves are still call_resolve=false stubs). Those two are the
+## remaining gaps -- NOT the +0xc dispatch, which is now correct.
 ##
 ## Honest scope: INPUT is SYNTHETIC (attributes + no real kickoff placement), so this proves
 ## the port RUNS deterministically end-to-end, NOT bit-for-bit parity vs MANAGER.EXE. The
