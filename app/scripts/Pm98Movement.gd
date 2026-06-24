@@ -831,6 +831,248 @@ static func set_engagement(p: Dictionary, target_idx: int, players: Array) -> vo
 		m[0x43c] = -1
 
 
+# =============================================================================
+# Stage 3 KICKOFF UNSTICK: the movement dispatcher FUN_005a65a0 (kickoff-taker slice) plus
+# its kick-setup FUN_005aa4d0 and pass-target selector FUN_005aa680. The driver parks at phase 2
+# because the kickoff taker (match+0x438, DECIDE action 0) never reassigns to a resolve-capable
+# action while _move_65a0 is a NO-OP stub. The REAL FUN_005a65a0, for the taker at
+# (phase==2 && p==match+0x438 && action==0 && p+0x48<600), calls FUN_005aa4d0 -> FUN_005a5430
+# (set_position_code) with action 4 (on-pitch) / 0x25 (off-pitch). Action 4 is resolve-capable
+# (engine_tick case 4 -> setup_shot -> resolve_post_shot -> set_phase(0)), so phase leaves 2.
+#
+# BINARY-VERIFIED GROUND TRUTH: tools/re/run_kicksetup_oracle.sh drives the REAL FUN_005a65a0
+# under the Ghidra PCode emulator on a kickoff-taker fixture -> specs/kicksetup_oracle.txt
+# (on-pitch -> action 4 / v54 10 / c+0x4c=target / p+0x80=1; off-pitch -> action 0x25). Locked by
+# test_kicksetup.gd. The RNG is the shared match LCG (FUN_005ec250 == MatchEngine.Pm98Rng).
+#
+# SCOPE (per handoff-pm98-kickoff-unstick-oracle-binary-verified): the kickoff-taker path is ported
+# faithfully (top guard + ACTIVE-taker velocity block + the LAB_005a6759 gates + the taker dispatch
+# L237-291 for phases 2/3/5). The LARGER open-play movement -- the NON-ACTIVE velocity sub-path
+# (L74-108), the highlight/chase-return block (L110-236), the phase-4 set-piece taker (needs the
+# FUN_005a89c0/8bc0 ball-steering leaves) and the IF-B/IF-A else arms (L293-405) -- stays DEFERRED
+# behind clear markers. move_dispatch returns false ONLY on the immediate non-active bail (no field
+# writes, no draws), so the caller records the M65a0 stub trace and test_engine_tick stays green.
+
+const KICK_PASS_INIT := 0x1f40000     # FUN_005aa680 local_28[0..4] distance seed (500.0)
+const KICK_REF_RADIUS := 0xa0000      # FUN_005aa680 polar reach ahead of the passer (10.0)
+
+
+## (r*k) >> 15 truncating, the binary's `(r*k + (r*k>>31 & 0x7fff)) >> 15`. r is a 15-bit LCG draw
+## (>=0) and k >= 0, so r*k >= 0 and the round-toward-zero bias term is 0 -- i.e. plain (r*k) >> 15.
+static func _rscale15(r: int, k: int) -> int:
+	var prod := r * k
+	return (prod + ((prod >> 31) & 0x7fff)) >> 15
+
+
+## FUN_005aa680 (__fastcall this=passer): pick the teammate the kicking player passes to. Returns the
+## chosen teammate Dict, or {} (the binary's null = no target -> the caller bails without kicking).
+## NO RNG. The 5 best teammates (least planar-projected distance to a point KICK_REF_RADIUS ahead of
+## the passer along its facing) are binned into 5 angle-gated distance slots; the pick walks a growing
+## distance threshold and keeps the last qualifying slot, falling back to the first non-empty slot.
+## team_players = gs[0] (the binary's **(p+0x184) = our team players base; count == array size).
+## The matrix angle p[_angle_off(q.slot, q.team)] is the FUN_005b8690 relationship matrix (built each
+## tick before the engine pass), s16; `match+0x44c == 2` bypasses both angle gates.
+static func pass_target_select(p: Dictionary, m: Dictionary) -> Dictionary:
+	var gs: Dictionary = _ref(p, 0x184)
+	var team_players: Array = gs.get(0, [])
+	var pv: Array = Pm98Trig.polar_vec(KICK_REF_RADIUS, _g(p, 0x34))   # FUN_005ee0f0(0xa0000, facing)
+	var refx := Pm98Trig._i32(_g(p, 4) + int(pv[0]))
+	var refy := Pm98Trig._i32(_g(p, 8) + int(pv[1]))
+	var sub2 := _g(m, 0x44c) == 2
+	var best_dist := [KICK_PASS_INIT, KICK_PASS_INIT, KICK_PASS_INIT, KICK_PASS_INIT, KICK_PASS_INIT]
+	var best_player: Array = [null, null, null, null, null]
+	for q in team_players:
+		if not (q is Dictionary) or is_same(q, p):         # is_same: Dict == deep-recurses the graph
+			continue
+		# the matrix angle is keyed off p (the passer): p holds the q-relative entry (8690 matrix).
+		var ang := Pm98Trig._s16(_g(p, _angle_off(_g(q, 0x2c4), _g(q, 0x2b8))))
+		var aabs := absi(ang)
+		if not (aabs < 0x18e4 or sub2):
+			continue
+		var dx := Pm98Trig._i32(_g(q, 4) - refx)
+		var dy := Pm98Trig._i32(_g(q, 8) - refy)
+		var proj := Pm98Trig.planar_mag(dx, dy)                       # FUN_005edfb0(dx,cos,dy,sin)
+		var thr := 0x4fa
+		for slot in 5:
+			if (aabs < thr or sub2) and proj < int(best_dist[slot]):
+				best_dist[slot] = proj
+				best_player[slot] = q
+			thr += 0x4fa
+	# Pick: grow thr6 by 0x370000; inner loop keeps the LAST slot under thr6/5; exit when chosen set
+	# (do-while tests at the bottom) or thr6 passes 0x112ffff (cnt then only ever reaches slot 4).
+	var chosen: Variant = null
+	var cnt := 0
+	var thr6 := 0
+	while true:
+		if thr6 > 0x112ffff:
+			break
+		var s := 0
+		while s <= cnt and s < 5:
+			if int(best_dist[s]) < thr6 / 5:
+				chosen = best_player[s]
+			s += 1
+		cnt += 1
+		thr6 += 0x370000
+		if chosen != null:
+			break
+	if chosen == null:
+		for s in 5:
+			if best_player[s] != null:
+				chosen = best_player[s]
+				break
+	return chosen if chosen is Dictionary else {}
+
+
+## FUN_005aa4d0 (__thiscall this=kicker): set the ball-launch trajectory at a kickoff / free-kick.
+## Reached from move_dispatch's phase-2 taker branch. No-op unless the kicker is the ball's active
+## controller (p+0x190 -> +0x40 == p). Picks the receiver (p+0xb4, else pass_target_select); on no
+## receiver it bails (no kick). Writes the launch fields onto both the player and the ball/controller,
+## the aim facing (+0x66), and set_position_code(on-pitch ? 4 : 0x25). NO RNG. controller+0x4c holds
+## the chosen target (Dict); p+0xb4 is cleared (0 = no pending target).
+static func kick_setup(p: Dictionary, m: Dictionary) -> void:
+	var controller: Dictionary = _ref(p, 0x190)
+	if not is_same(controller.get(0x40, null), p):         # not the active controller -> no-op (L20)
+		return
+	# L21-24: FUN_00590f00() commentary leaf only when phase==2 && match+0x180a!=0 (DEFERRED, inert
+	# on the kickoff path where match+0x180a==0).
+	p[0x48] = 0
+	if _g(p, 0x40) == 0x13 or _g(m, 0x448) == 4:           # L26: kick-windup / penalty -> no setup
+		return
+	# p+0xb4 is a POINTER: a present Dict (even one with no fields, like the zeroed oracle target) is
+	# a non-null target; only 0/absent is null. is_empty() can't tell those apart, so test the raw type.
+	var preset: Variant = p.get(0xb4, null)
+	var had_preset := preset is Dictionary                 # L49 uses the ORIGINAL p+0xb4 != 0
+	var tgt: Dictionary = preset if had_preset else {}
+	if not had_preset:
+		tgt = pass_target_select(p, m)                     # L28: FUN_005aa680 when p+0xb4 == 0
+		if tgt.is_empty():
+			return                                         # no receiver -> bail (no kick)
+	var vx6 := Pm98Trig._i32(_g(p, 0x20) * 6)              # 6x velocity offsets (0 at kickoff)
+	var vy6 := Pm98Trig._i32(_g(p, 0x24) * 6)
+	var vz6 := Pm98Trig._i32(_g(p, 0x28) * 6)
+	var aim_off := Pm98Trig._s16(_g(p, _angle_off(_g(tgt, 0x2c4), _g(tgt, 0x2b8))))   # sVar1 (L33)
+	var px := _g(p, 4)
+	var py := _g(p, 8)
+	var pz := _g(p, 0xc)
+	var cx := _g(controller, 4)
+	var cy := _g(controller, 8)
+	var cz := _g(controller, 0xc)
+	controller[0x4c] = tgt                                  # L43: *(controller+0x4c) = target
+	p[0xa0] = _g(tgt, 4)
+	p[0xa4] = _g(tgt, 8)
+	p[0xa8] = _g(tgt, 0xc)
+	set_position_code(p, 4 if _g(p, 0x2bc) != 0 else 0x25)  # L47: FUN_005a5430((-(p+0x2bc==0)&0x21)+4)
+	var face := Pm98Trig._s16(_g(p, 0x34))                  # sVar9 (L48)
+	if had_preset:                                          # L49: if (p+0xb4 != 0) sVar9 += sVar1
+		face = Pm98Trig._s16(face + aim_off)
+	p[0x66] = face
+	p[0x94] = Pm98Trig._i32(vx6 + px)
+	p[0x80] = 1
+	p[0x84] = 8
+	p[0x98] = Pm98Trig._i32(vy6 + py)
+	p[0x9c] = Pm98Trig._i32(vz6 + pz)
+	controller[0x68] = 1
+	controller[0x6c] = 8
+	controller[0x9c] = Pm98Trig._i32(vx6 + cx)
+	controller[0xa0] = Pm98Trig._i32(vy6 + cy)
+	controller[0xa4] = Pm98Trig._i32(vz6 + cz)
+	p[0xb4] = 0                                             # L64: clear the pending target
+
+
+## FUN_005a65a0 (__thiscall this=player; param_2 char): the per-player movement dispatcher.
+## SCOPE: only the SET-PIECE TAKER dispatch (phases 2/3/5, p == match+0x438) is ported -- the kickoff
+## unstick. Returns true when it handles the player; false for the DEFERRED open-play movement (every
+## non-taker, and the taker at the highlight/chase phases 0/1/6/7 and the phase-4 leaf), so the caller
+## records the M65a0 stub trace. The handle gate is checked FIRST (before any draw/write) so a deferred
+## player is byte-for-byte the old stub. `rng` is the shared match LCG; param_2 (highlight bias) is
+## only read by the DEFERRED highlight block, so it is unused here.
+static func move_dispatch(p: Dictionary, m: Dictionary, rng) -> bool:
+	var phase := _g(m, 0x448)
+	# is_same (NOT ==): Dictionary == is a DEEP recursive compare that blows the stack on the cyclic
+	# player<->match<->sim graph. We need pointer identity (the binary compares pointers).
+	var is_taker := is_same(m.get(0x438, null), p)
+	if not (is_taker and (phase == 2 or phase == 3 or phase == 5)):
+		return false                                       # DEFERRED -> caller stub-traces (no writes)
+
+	var uVar2 := _g(p, 0x5c)                                # saved + restored highlight flag
+	var gs: Dictionary = _ref(p, 0x184)                    # = the sim-ctx (gs+0x138 match, gs+8 team)
+	var bv_top := _g(gs, 0x2ee) != 0 and play_state_eq(m, 0)   # L36-42: FUN_005943b0 short-circuit
+	var action := _g(p, 0x40)
+
+	# --- velocity block (L43-109): only when !bv_top and action not 4/0x25 ---
+	if not bv_top and action != 4 and action != 0x25:
+		var controller: Dictionary = _ref(p, 0x190)
+		if is_same(controller.get(0x40, null), p):         # ACTIVE side (L44): p is the ball's active
+			var anchor := absi(Pm98Trig._i32(_g(p, 0x3a4) + _g(p, 4)))
+			if anchor < 0x280001:
+				if anchor < 0x1a0001:                      # L63-64
+					p[0x54] = _rscale15(rng.next(), 6) + 10
+				else:                                      # L67-68
+					p[0x54] = _rscale15(rng.next(), 4) + 0xc
+			else:                                          # L107-108 fall-through
+				p[0x54] = _rscale15(rng.next(), 2) + 0xe
+		elif not _velocity_nonactive(p, m, controller, gs, rng):   # NON-ACTIVE (L74-106); else L107
+			p[0x54] = _rscale15(rng.next(), 2) + 0xe       # L107-108 wander
+
+	# --- LAB_005a6759 gates (L110-236) -> reach the taker dispatch ---
+	p[0x5c] = 0
+	var bVar11 := _g(m, 0x461) & 0x40
+	if bVar11 != 0 and (action == 0x10 or action == 0x11 or action == 0x35):
+		# IF-A else (L394): the set-piece-frame wall player. DEFERRED (never set at a plain kickoff).
+		p[0x5c] = uVar2
+		return true
+	var special: Dictionary = _ref(m, 0x444)
+	if bVar11 != 0 and _g(p, 0x2b8) == _g(special, 0x2b8):
+		# IF-B else (L293-392): the same-team wall player. DEFERRED.
+		p[0x5c] = uVar2
+		return true
+	if _g(m, 0x19a0) != 4 and action >= 0 and action <= 3:   # IF-C (L117) + bVar14 (L118-124)
+		if (phase == 0 or phase == 6) and _g(p, 0x48) == 0:  # L127: highlight / chase-return body
+			# (L128-233) -- DEFERRED open-play movement. phase 2/3/5 (our gate) skip it -> fall through.
+			p[0x5c] = uVar2
+			return true
+
+	# --- taker dispatch (L237-291): phases 2 / 3 / (4 deferred) / 5 for p == match+0x438 ---
+	if phase == 2 and _g(p, 0x40) == 0 and _g(p, 0x48) < 600:
+		var holder: Dictionary = _ref(_ref(p, 0x190), 0x4c)
+		if not holder.is_empty():
+			# FUN_005a8bc0(holder+4) ball-holder steering -- DEFERRED (controller+0x4c == 0 at kickoff).
+			pass
+		var r2: int = rng.next()                             # L244: unconditional draw
+		if _rscale15(r2, 1000) < 0x32 or _g(p, 0x48) == 0:   # L245
+			kick_setup(p, m)                                 # FUN_005aa4d0
+	elif phase == 3:
+		var r3: int = rng.next()
+		if _rscale15(r3, 1000) < 0x28:                       # L253-254
+			p[0x48] = 0
+	elif phase == 5:
+		p[0x58] = _rscale15(rng.next(), 0x10)                # L288
+		p[0x54] = _rscale15(rng.next(), 3) + 0xd             # L290
+
+	p[0x5c] = uVar2                                          # LAB_005a7208: restore + return
+	return true
+
+
+## Non-active velocity sub-path of FUN_005a65a0 (L74-106). Returns true if it STOPPED the player (v58
+## = v54 = 0, skipping the L107 wander); false to fall through to the wander draw. Draws RNG following
+## the binary's short-circuit structure exactly. FUN_005b8c90 (we-in-possession) is match+0x1664 ==
+## gs+8 (the player's team) -- the disasm loads ECX = *(player+0x184) (= gs) before the call.
+static func _velocity_nonactive(p: Dictionary, m: Dictionary, controller: Dictionary, gs: Dictionary, rng) -> bool:
+	var iv := absi(Pm98Trig._i32(_g(p, 0x3a4) + _g(p, 4)))        # L74-82
+	var enter := iv > 0x13ffff or absi(Pm98Trig._i32(_g(p, 8))) > 0xbffff   # L83-85 cond1
+	if not enter and not is_same(controller.get(0x4c, null), p):   # L86: && short-circuit
+		if _rscale15(rng.next(), 1000) > 299:                    # L87-88: DRAW, 299 < scale1000
+			enter = true
+	if enter:                                                    # L89-104 inner block
+		var iv2 := absi(Pm98Trig._i32(_g(p, 4) - _g(p, 0x3a4)))
+		var cond2 := iv2 > 0x13ffff or absi(Pm98Trig._i32(_g(p, 8))) > 0xbffff
+		if cond2 or _g(m, 0x1664) == _g(gs, 8):                  # L97-100: cond2 || possession -> STOP
+			p[0x58] = 0
+			p[0x54] = 0
+			return true
+	return false
+
+
 # ---- FUN_005a3400 the per-player DECIDE, slice A (prologue + bbox) --------------------
 # The first ~100 instructions of the per-player movement-target computer: set the goal-X
 # anchor, the two target endpoints, and the movement bounding box, all oriented by side.

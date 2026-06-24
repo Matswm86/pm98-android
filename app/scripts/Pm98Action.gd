@@ -334,7 +334,7 @@ static func engine_tick(p: Dictionary, m: Dictionary, rng = null) -> void:
 		p[4] = Pm98Trig._i32(_si(p, 4) + _idiv(_si(p, 0x94) - _si(p, 4), steps))
 		p[0xc] = Pm98Trig._i32(_si(p, 0xc) + _idiv(_si(p, 0x9c) - _si(p, 0xc), steps))
 	else:
-		_movement_decision(p, m, gs, b)
+		_movement_decision(p, m, gs, b, rng)
 
 	# --- LAB_005a4e5b (L376-425): the +0x40-gated 9490 lean + the 7260 locomotion ---
 	var act := _g(p, 0x40)
@@ -458,7 +458,7 @@ static func _case_distribution(p: Dictionary, m: Dictionary, gs: Dictionary, b: 
 
 ## L281-375: choose between FUN_005a8680 (settle) and FUN_005a65a0(iStack_38) (the general move), or
 ## skip both (early goto LAB_005a4e5b). Both targets are Task-#3 stubs; the SELECTION is skeleton.
-static func _movement_decision(p: Dictionary, m: Dictionary, gs: Dictionary, b: Dictionary) -> void:
+static func _movement_decision(p: Dictionary, m: Dictionary, gs: Dictionary, b: Dictionary, rng) -> void:
 	if _g(p, 0x2bc) == 0 and (_g(m, 0x461) & 0x40) == 0:
 		var pen_skip := false
 		if _g(m, 0x19a0) == 4:
@@ -500,7 +500,7 @@ static func _movement_decision(p: Dictionary, m: Dictionary, gs: Dictionary, b: 
 	if not bv:
 		_move_8680(p)                                    # STUB
 		return
-	_move_65a0(p, istack)                                # STUB
+	_move_65a0(p, m, istack, rng)                        # FUN_005a65a0 (kickoff-taker slice ported)
 
 
 ## L284-305: penalty/ET in-box + half + velocity gate (FUN_00590c10 box at match+0x1828). Returns the
@@ -605,7 +605,13 @@ static func _resolve_action(p: Dictionary, m: Dictionary, rng) -> void:
 static func _shot_setup(_p: Dictionary) -> void: trace_calls.append(["AC1A0", 0])
 
 static func _move_8680(_p: Dictionary) -> void: trace_calls.append(["M8680", 0])   # FUN_005a8680 (settle)
-static func _move_65a0(_p: Dictionary, arg: int) -> void: trace_calls.append(["M65a0", arg])  # FUN_005a65a0 (general move)
+
+## FUN_005a65a0 (general move). The kickoff-taker slice is ported (Pm98Movement.move_dispatch); the
+## NON-active open-play movement is still DEFERRED -- move_dispatch returns false there, and we record
+## the M65a0 stub trace (with iStack_38 arg) so the test_engine_tick selection oracle stays exact.
+static func _move_65a0(p: Dictionary, m: Dictionary, arg: int, rng) -> void:
+	if not Pm98Movement.move_dispatch(p, m, rng):
+		trace_calls.append(["M65a0", arg])
 static func _move_9490(_p: Dictionary) -> void: trace_calls.append(["M9490", 0])   # FUN_005a9490 (lean)
 static func _move_7260(_p: Dictionary) -> void: trace_calls.append(["M7260", 0])   # FUN_005a7260 (locomotion)
 static func _move_8f20(_p: Dictionary, facing: int) -> void: trace_calls.append(["M8f20", facing])  # FUN_005a8f20 (body orient)

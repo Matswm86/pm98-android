@@ -668,6 +668,10 @@ static func _build_player(m: Dictionary, ti: int, slot: int, arr_idx: int, rec: 
 	p[0x184] = team                                      # param_1[0x61] = match+0x46c+ti*800
 	p[0x188] = m["sim"][1 - ti]                          # param_1[0x62] = match+0x78c-ti*800
 	p[0x18c] = m                                         # param_1[99] = match
+	p[0x190] = m.get(0x1610, {})                          # param_1[100] = match+0x1610 = the ball
+	# ^ disasm 0x5a28c7-0x5a28cd: `add ecx,0x1610; mov [ebp+0x190],ecx`. The build previously
+	# omitted this, so every outfield player ran the engine with an empty ball (the controller /
+	# possession / kick-setup checks could never match), freezing the kickoff at phase 2.
 	p[0x2b8] = ti                                        # param_1[0xae] = team index
 	p[0x2bc] = slot                                      # param_1[0xaf] = formation slot
 	p[0x2c0] = rb.call(0x4) & 0xffff                     # param_1[0xb0] = shirt / id (u16)
