@@ -125,7 +125,7 @@ static func tick(m: Dictionary, rng: MatchEngine.Pm98Rng) -> int:
 			_build_taker_queue(m)                     # FUN_005bbf10 queue append (best-effort)
 			var ctx_taker := _sim_ctx(m, _g(m, 0x45c))
 			if not ctx_taker.is_empty():
-				m[0x438] = Pm98Movement.select_active(ctx_taker)   # FUN_005b8f20 -> +0x438
+				m[0x438] = _active_ref(ctx_taker, Pm98Movement.select_active(ctx_taker))   # FUN_005b8f20 -> +0x438 (player ptr)
 			# FUN_005b70e0 x2 RENDER (skip). FUN_005b73a0 x2 positioning (set-piece -> draws RNG).
 			_position_both(m, rng)
 			return _match_over(m)
@@ -210,6 +210,19 @@ static func _sim_ctx(m: Dictionary, team: int) -> Dictionary:
 	return {}
 
 
+## Resolve select_active's INDEX (-1 = none) into the player POINTER (Dict ref) that match+0x438
+## holds in the binary. The decide/engine taker-identity checks (Pm98Action.is_taker,
+## decide_slice_c, the resolver) compare match+0x438 by Dict identity, NOT by index -- so the
+## driver must store the ref, not the raw index. 0 = none (the no-active sentinel used elsewhere).
+static func _active_ref(ctx: Dictionary, idx: int) -> Variant:
+	if idx < 0:
+		return 0
+	var players: Array = ctx.get("players", [])
+	if idx < players.size():
+		return players[idx]
+	return 0
+
+
 ## FUN_005bbf10 set-piece-queue append for the +0x45c team's taker (best-effort; the real
 ## walk finds the first taker with +0x8c==0 in the +0x46c team and pushes it onto the
 ## +0x674 queue). No RNG. Modeled as a Dict-level append where the data is present.
@@ -232,8 +245,12 @@ static func _movement_core(m: Dictionary, ring: int, rng = null) -> void:
 	if not (sim is Array) or (sim as Array).is_empty():
 		return                                        # no match-init -> nothing to advance
 	var ctxs: Array = sim
-	for ctx in ctxs:
-		_decide_team(ctx, m)                          # FUN_005b8bf0 (decide dispatch)
+	# The NORMAL per-tick "decide" pass FUN_005b8bf0 dispatches player vtable+8. With the
+	# wine-corrected vtable base 0x639228, vtable+8 = FUN_005a4560 (the replay record/playback
+	# pass) -- a NO-OP on the live headless path -- NOT FUN_005a3400 (the real DECIDE, which is
+	# vtable+4, dispatched only by FUN_005b70e0 at restart/set-piece; see restart_handler). The
+	# old off-by-4 map (base 0x639224) put DECIDE at +8, so this loop wrongly ran decide_slice
+	# every tick and reset the kickoff taker's windup +0x48 each tick -> phase 2 frozen.
 	# ball/GK/ref DECIDE (+8) are replay snapshot -> NO-OP live.
 	for ctx in ctxs:
 		Pm98Movement.build_relationship_matrix(ctx)   # FUN_005b8690
@@ -723,7 +740,15 @@ static func restart_handler(m: Dictionary, rng: MatchEngine.Pm98Rng) -> void:
 	# L159-184: movement re-seed (all NO-RNG; render/trail calls skipped).
 	var ctx0 := _sim_ctx(m, 0)
 	if not ctx0.is_empty():
-		m[0x438] = Pm98Movement.select_active(ctx0)   # FUN_005b8f20 -> +0x438
+		m[0x438] = _active_ref(ctx0, Pm98Movement.select_active(ctx0))   # FUN_005b8f20 -> +0x438 (player ptr)
+	# FUN_00593b70 calls FUN_005b70e0 x2 -- the DECIDE dispatcher (player vtable+4 = FUN_005a3400
+	# per player) + the phase-2 kickoff-partner placement tail. The old framing wrongly dismissed
+	# FUN_005b70e0 as a "render, SKIP" pass (it is vtable+4 = render only under the off-by-4 base).
+	# This decide pass is what assigns the kickoff taker its action + windup (decide_slice case 2).
+	# TODO(next): port FUN_005b70e0's kickoff-partner placement tail (nearest-teammate +0x63=1).
+	for ctx in [ctx0, _sim_ctx(m, 1)]:
+		if not ctx.is_empty():
+			_decide_team(ctx, m)
 	_position_both(m, rng)                            # FUN_005b73a0 x2 (set-piece -> draws)
 	m[0x458] = 0
 

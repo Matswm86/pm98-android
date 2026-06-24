@@ -9,6 +9,36 @@ Legit RE of the owner's own binary for the owner's own remake. Deliverable = ori
 GDScript reproducing the decoded algorithm, not redistribution of the binary.
 
 ## STATUS (2026-06-18)
+- **Stage 3 task 2 — "port FUN_005a7260" NEXT is FALSIFIED; real blocker = no phase-2 kickoff EXIT (2026-06-24, RUN-verified).**
+  Disproved the prior NEXT by static RE + a 300-tick live diag. **(a)** engine_tick (FUN_005a4600 L387)
+  gates the 7260 call on `player+0x2bc==0`; the live taker has `+0x2bc=8` -> 7260 is **never reached** for
+  it, and 7260 never WRITES 0x1d anyway (it only acts on already-0x1d/chase/tackle states). **(b)** The
+  taker standing in phase 2 with action 0 + windup 180 is **correct/faithful** (DECIDE FUN_005a3400
+  `switch(match+0x448)` case 2 -> `FUN_005a5430(0)`); action 0x1d is DECIDE case 4/5 only. **(c)** REAL
+  blocker: nothing promotes the phase-2 taker from action 0 (terminal idle, `NEXT_ACTION[0]=0`) to the kick
+  0x1d. Per-tick DECIDE is genuinely off (vtable+8 FUN_005a4560 = replay no-op, verified; DECIDE vtable+4
+  runs only via FUN_005b70e0 at restart). Phase machine fully mapped: set_phase(FUN_005942e0) has EXACTLY
+  5 sites (->8/6/1/0); phase 2/3/4/5/7 are direct writes; the ONLY in-engine phase-2 exit is
+  action-0x1d -> FUN_005a50c0 windup-through-0 -> set_phase(1) -> resolve_post_shot -> set_phase(0). The
+  restart supervisor **FUN_00593b70** (un-ported; driver L68 when `match+0x1a1e!=0`) runs select_active +
+  DECIDE x2 but KEEPS phase 2. **NEXT = find how a real kickoff taker gets 0x1d (WINE TRACE first; then
+  FUN_005946f0 36KB / dispatcher FUN_005966d0).** Full detail + the phase map -> [[handoff-pm98-kickoff-exit-rootcause-2026-06-24]].
+- **Stage 3 task 2 — KICKOFF FREEZE ROOT-CAUSE CORRECTED + decide-wiring & active-ptr FIXES (2026-06-24).**
+  The `{2:3000}` freeze was NOT a missing FUN_0044d3d0 (that + FUN_0044d0d0/d190/d250/d310 are
+  DISPLAY render, decompile-confirmed; FUN_005983f0 is the outer match-loop wrapper, not the kickoff
+  mechanism). TWO real bugs, both fixed in `app/scripts/Pm98Driver.gd` (working tree, NOT committed):
+  (1) the DECIDE pass was mis-wired against the wine-corrected vtable base `0x639228` -- the per-tick
+  "decide" loop FUN_005b8bf0 dispatches vtable+8 = **FUN_005a4560 (replay no-op headless)**, while the
+  real DECIDE FUN_005a3400 is **vtable+4 = FUN_005b70e0**, run only at restart/set-piece. The port ran
+  decide_slice EVERY tick, resetting the kickoff taker's windup +0x48 every tick -> frozen. Fixed:
+  decide now runs in `restart_handler` (FUN_005b70e0 x2), removed from `_movement_core`. (2) match+0x438
+  was stored as an INDEX but consumed by Dict-identity (`is_same(p,_ref(m,0x438))`) -> taker never
+  identified. Fixed via `_active_ref()` (index -> player Dict ptr) at both select_active sites. RESULT:
+  the taker is now correctly selected + gets action 0 + windup 180 that COUNTS DOWN (live-verified) --
+  real progress from frozen. **Full suite 112 files / 0 FAIL / 0 SCRIPT ERROR; boot clean.** STILL in
+  phase 2 because the next blocker is the **5 NO-OP-stubbed movement leaves** (FUN_005a8680/65a0/9490/
+  **7260**/8f20); FUN_005a7260 carries the 0x1d kick-trigger. **NEXT = port FUN_005a7260** (then 8680/
+  9490) so the taker reaches 0x1d -> set_phase(1). Full detail + map -> [[handoff-pm98-decide-wiring-active-ptr-2026-06-24]].
 - **Stage 3 task 2 item 5a (e2e PORT-SIDE MATCH RUNNER) — PORT DRIVES A FULL HEADLESS MATCH, ZERO CRASHES; ROOT-CAUSE FOUND: no ported kickoff->open-play transition (2026-06-22).**
   New harness `app/tests/run_full_match.gd` builds a match through the ports end-to-end
   (`Pm98Match.build_match` -> `populate_posts` -> inject a synthetic but structurally-valid 11-player
