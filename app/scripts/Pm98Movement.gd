@@ -2834,6 +2834,90 @@ static func feed_layoff_037(p: Dictionary, rng, call_setup: bool = true) -> void
 		setup_shot(p, [], rng)
 
 
+## FUN_005acc40 (case 4/0x25, this=player, frame guard p+0x2c==4 && p+0x30==3): the AI "aim the set-piece
+## feed AT the goal" handler -- the third Family-A member, but geometry-heavy, NOT a corridor/loose-ball
+## scan. Aims at the ball+0x4c teammate's position (player+0xa0/a4/a8 = target.pos), then, on a special
+## set-piece touch (gs+0x2ee && play_state==0 && p+0x5c) with the full power window (p+0x58==0x10, p+0x54),
+## may FLAG a goal-mouth redirect (p+0x5f=1, p+0x58=4) UNLESS the player itself already sits in a
+## byline-corner / goal-box region on the side OPPOSITE its goal anchor (FUN_0058fb50 goalbox /
+## FUN_005ac0e0 corner) or match+0x44c==2. When p+0x5f is set (here or on entry) it bends the aim: it
+## displaces the aim by polar(dist_to_aim/4, blended_angle) where dist_to_aim = planar_mag(aim - pos) and
+## blended_angle = atan(goal - target.pos) rotated halfway toward the goal-facing axis (the +0x8000 side
+## term); a long feed (dist > 0x1e0000) also sets ball+0x62=1. Finally it clamps the aim into the goal
+## AABB shrunk 0x4ccc per face (match+0x1828..+0x183c) and, on the special touch, sets p+0x5e=(p+0x54!=0).
+## Draws NO rng. Ends with FUN_005ac1a0 (= setup_shot). Oracle-pinned bit-for-bit by
+## tools/re/run_acc40_oracle.sh -> specs/acc40_oracle.txt (FUN_005ac1a0 + FUN_005943b0 stubbed; the
+## commentary FUN_00590f00 is gated out headless by match+0x180a==0). All vec leaves (FUN_00590aa0 set /
+## 00590ae0 sub / 00590ac0 copy / 00590b10 add-scalar / 005b1210 sub-scalar / 00590be0 6-int copy) run
+## REAL under the emu and are inlined here; the angle-blend's `target.facing - target.facing == 0` and the
+## pointer-high CONCAT22 garbage (masked by MOVSX AX / polar's &0xfff) were recovered from the disasm.
+static func goal_aim_025(p: Dictionary, rng, call_setup: bool = true) -> void:
+	if _g(p, 0x2c) != 4 or _g(p, 0x30) != 3:
+		return
+	var ball := _ref(p, 0x190)
+	var target_v: Variant = ball.get(0x4c, 0)
+	if not (target_v is Dictionary):
+		return
+	var target: Dictionary = target_v
+	var m := _ref(p, 0x18c)
+	var gs := _ref(p, 0x184)
+	ball[0x62] = 0
+	# aim = target.pos (player+0xa0/a4/a8 = ball+0x4c teammate's +4/+8/+c)
+	p[0xa0] = _g(target, 0x4)
+	p[0xa4] = _g(target, 0x8)
+	p[0xa8] = _g(target, 0xc)
+
+	var special: bool = _g(gs, 0x2ee) != 0 and _phase0(m) and _g(p, 0x5c) != 0
+
+	# special touch with full power window -> maybe flag the goal-mouth redirect.
+	if special and _g(p, 0x58) == 0x10 and _g(p, 0x54) != 0:
+		var anchor_sign := _sign1(_si(p, 0x3a4))
+		var oppside := _sign1(_si(p, 0x4)) != anchor_sign
+		var in_goalbox := _ps_goalbox(p, [_si(p, 0x4), _si(p, 0x8), _si(p, 0xc)]) and oppside
+		if not in_goalbox:
+			var in_corner := _ps_corner(p, _si(p, 0x4), _si(p, 0x8)) and oppside
+			if not in_corner and _g(m, 0x44c) != 2:
+				p[0x5f] = 1
+				p[0x58] = 4
+
+	# redirect bend (fires when p+0x5f set here OR on entry).
+	if _g(p, 0x5f) != 0:
+		var dx := Pm98Trig._i32(_si(p, 0xa0) - _si(p, 0x4))
+		var dy := Pm98Trig._i32(_si(p, 0xa4) - _si(p, 0x8))
+		var mag := Pm98Trig.planar_mag(dx, dy)                     # FUN_00436fb0 + FUN_005edfb0
+		var team := _g(p, 0x2b8)
+		var orient := _g(m, 0x19a0) & 1
+		var goalx := _si(m, 0x1820)                               # FUN_00590aa0([goalx,0,0])
+		if orient == (1 - team):
+			goalx = Pm98Trig._i32(-goalx)
+		# local_18 = goalpos - target.pos (FUN_00590ae0); angle target -> goal.
+		var gdx := Pm98Trig._i32(goalx - _si(target, 0x4))
+		var gdy := Pm98Trig._i32(-_si(target, 0x8))
+		var ang_base := Pm98Trig.atan_angle(gdx, gdy)
+		# the facing term word[target+0x34] - word[target+0x34] == 0 (both deref ball+0x4c).
+		var sign_term := 0x8000 if orient != team else 0
+		var t := Pm98Trig._s16(sign_term - ang_base)
+		var blended := ang_base + _div2_rz(t)                     # half-rotate toward the goal axis
+		var disp := Pm98Trig.polar_vec(Pm98Trig._tdiv(mag, 4), blended)
+		p[0xa0] = Pm98Trig._i32(_si(p, 0xa0) + int(disp[0]))
+		p[0xa4] = Pm98Trig._i32(_si(p, 0xa4) + int(disp[1]))
+		p[0xa8] = Pm98Trig._i32(_si(p, 0xa8) + int(disp[2]))
+		if mag > 0x1e0000:
+			ball[0x62] = 1
+
+	# clamp the aim into the goal AABB, shrunk 0x4ccc per face (FUN_00590ac0/b10/5b1210/590be0 + min/max).
+	p[0xa0] = _clamp_i(_si(p, 0xa0), Pm98Trig._i32(_si(m, 0x1828) + 0x4ccc), Pm98Trig._i32(_si(m, 0x1834) - 0x4ccc))
+	p[0xa4] = _clamp_i(_si(p, 0xa4), Pm98Trig._i32(_si(m, 0x182c) + 0x4ccc), Pm98Trig._i32(_si(m, 0x1838) - 0x4ccc))
+	p[0xa8] = _clamp_i(_si(p, 0xa8), Pm98Trig._i32(_si(m, 0x1830) + 0x4ccc), Pm98Trig._i32(_si(m, 0x183c) - 0x4ccc))
+
+	# special touch: latch p+0x5e = (power != 0) (predicate re-evaluated; inputs unchanged here).
+	if special:
+		p[0x5e] = 1 if _g(p, 0x54) != 0 else 0
+
+	if call_setup:
+		setup_shot(p, [], rng)
+
+
 # ---- Match-driver leaves (FUN_00598740): within-box test + phase setter + vec copy ----
 # Small leaves the per-tick match driver FUN_00598740 calls. Oracle-pinned (FUN_005a1820 EAX +
 # FUN_005942e0 state) by tools/re/run_driverleaf_oracle.sh -> specs/driverleaf_oracle.txt, locked

@@ -578,7 +578,7 @@ static func _count_teammates_closer(_p: Dictionary, arg: int) -> int:
 	trace_calls.append(["B0B40", arg])
 	return 0
 
-static func _h_acc40(_p: Dictionary) -> void: trace_calls.append(["ACC40", 0])     # FUN_005acc40 (case 4/0x25)
+static func _h_acc40(_p: Dictionary) -> void: trace_calls.append(["ACC40", 0])     # FUN_005acc40 (case 4/0x25) -- port = Pm98Movement.goal_aim_025 (oracle GREEN); wire here in Task #4
 static func _h_ad010(_p: Dictionary) -> void: trace_calls.append(["AD010", 0])     # FUN_005ad010 (case 5/0x24)
 static func _h_ae4c0(_p: Dictionary) -> void: trace_calls.append(["AE4C0", 0])     # FUN_005ae4c0 (case 0x14/0x16) -- port = Pm98Movement.kick_resolve(.,.,KICK_AE4C0) (oracle GREEN); wire here in Task #4
 static func _h_ae910(_p: Dictionary) -> void: trace_calls.append(["AE910", 0])     # FUN_005ae910 (case 0x15) -- port = Pm98Movement.kick_resolve(.,.,KICK_AE910) (oracle GREEN); wire here in Task #4

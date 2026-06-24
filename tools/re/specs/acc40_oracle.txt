@@ -1,0 +1,16 @@
+# Oracle FUN_005acc40 (case 4/0x25 AI goal-aim feed). this=player. setup_shot/005943b0 stubbed; commentary headless.
+# reads: ball+0x62, player+0x5e/5f/58, aim a0/a4/a8, seed (0 draws). All vec + atan + polar leaves run REAL.
+## FIX redirect_special
+CALL 0 RET steps=527 EAX=0 mem[0x270062:1]=1 mem[0x23005e:1]=1 mem[0x23005f:1]=1 mem[0x230058:4]=4 mem[0x2300a0:4]=20973243 mem[0x2300a4:4]=466401 mem[0x2300a8:4]=0 mem[0x6d3184:4]=305419896 stubhits={PHASE0=2, SETUP=1}
+## FIX special_in_corner
+CALL 0 RET steps=306 EAX=0 mem[0x270062:1]=0 mem[0x23005e:1]=1 mem[0x23005f:1]=0 mem[0x230058:4]=16 mem[0x2300a0:4]=16796876 mem[0x2300a4:4]=524288 mem[0x2300a8:4]=0 mem[0x6d3184:4]=305419896 stubhits={PHASE0=2, SETUP=1}
+## FIX not_special
+CALL 0 RET steps=179 EAX=0 mem[0x270062:1]=0 mem[0x23005e:1]=0 mem[0x23005f:1]=0 mem[0x230058:4]=16 mem[0x2300a0:4]=16796876 mem[0x2300a4:4]=524288 mem[0x2300a8:4]=0 mem[0x6d3184:4]=305419896 stubhits={SETUP=1}
+## FIX preset_5f_nonspecial
+CALL 0 RET steps=446 EAX=0 mem[0x270062:1]=1 mem[0x23005e:1]=0 mem[0x23005f:1]=1 mem[0x230058:4]=16 mem[0x2300a0:4]=20973243 mem[0x2300a4:4]=466401 mem[0x2300a8:4]=0 mem[0x6d3184:4]=305419896 stubhits={SETUP=1}
+## FIX blocked_44c2
+CALL 0 RET steps=258 EAX=0 mem[0x270062:1]=0 mem[0x23005e:1]=1 mem[0x23005f:1]=0 mem[0x230058:4]=16 mem[0x2300a0:4]=16796876 mem[0x2300a4:4]=524288 mem[0x2300a8:4]=0 mem[0x6d3184:4]=305419896 stubhits={PHASE0=2, SETUP=1}
+## FIX long_feed
+CALL 0 RET steps=448 EAX=0 mem[0x270062:1]=1 mem[0x23005e:1]=0 mem[0x23005f:1]=1 mem[0x230058:4]=16 mem[0x2300a0:4]=50311988 mem[0x2300a4:4]=8368948 mem[0x2300a8:4]=0 mem[0x6d3184:4]=305419896 stubhits={SETUP=1}
+## FIX neg_orient
+CALL 0 RET steps=531 EAX=0 mem[0x270062:1]=1 mem[0x23005e:1]=1 mem[0x23005f:1]=1 mem[0x230058:4]=4 mem[0x2300a0:4]=16796876 mem[0x2300a4:4]=498546 mem[0x2300a8:4]=0 mem[0x6d3184:4]=305419896 stubhits={PHASE0=2, SETUP=1}
