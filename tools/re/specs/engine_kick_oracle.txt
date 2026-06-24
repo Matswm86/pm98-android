@@ -1,0 +1,12 @@
+# Stage 3 INTEGRATION: FUN_005a4600 (engine_tick) -> kick_resolve (FUN_005ae4c0, case 0x14) ->
+#   resolve_post_shot (FUN_005ab5a0), both REAL. set_phase(0) reached. PASS = FUN_005b0bb0 fired.
+#   reads: engine skeleton + kick velocity + full resolve residue + rng seed (2 draws).
+## FIX kick_tail
+CALL 0 STUB TRAIL #1 step=744 ECX=2555904 arg0=819
+CALL 0 STUB M65a0 #1 step=953 ECX=2293760 arg0=0
+CALL 0 STUB M9490 #1 step=971 ECX=2293760 arg0=0
+CALL 0 STUB M8f20 #1 step=982 ECX=2293760 arg0=2293760
+CALL 0 RET steps=999 EAX=0 mem[0x2302d7:1]=0 mem[0x2302d8:1]=0 mem[0x23002c:4]=8 mem[0x230030:4]=0 mem[0x230040:4]=20 mem[0x230048:4]=4 mem[0x230050:4]=1 mem[0x23006c:4]=0 mem[0x230088:4]=1 mem[0x270020:4]=28731 mem[0x270024:4]=4294964466 mem[0x270028:4]=132 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x27004c:4]=0 mem[0x270070:4]=100 mem[0x260462:4]=64 mem[0x270064:4]=1 mem[0x270050:4]=2293760 mem[0x270040:4]=0 mem[0x270044:4]=2293760 mem[0x270048:4]=2293760 mem[0x270054:4]=0 mem[0x270080:4]=2 mem[0x260438:4]=0 mem[0x26043c:4]=0 mem[0x260458:4]=0 mem[0x260460:1]=0 mem[0x260448:4]=0 mem[0x26044c:4]=0 mem[0x2b0088:4]=0 mem[0x2802e4:4]=0 mem[0x6d3184:4]=1530878130 tracehits={RNG=2} stubhits={TRAIL=1, M65a0=1, M9490=1, M8f20=1}
+## FIX kick_passblock
+CALL 0 TRACE PASS #1 step=1013 EAX=0
+CALL 0 RET steps=1579 EAX=0 mem[0x2302d7:1]=0 mem[0x2302d8:1]=0 mem[0x23002c:4]=8 mem[0x230030:4]=0 mem[0x230040:4]=20 mem[0x230048:4]=4 mem[0x230050:4]=1 mem[0x23006c:4]=0 mem[0x230088:4]=1 mem[0x270020:4]=4294938421 mem[0x270024:4]=4294967251 mem[0x270028:4]=132 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x27004c:4]=0 mem[0x270070:4]=100 mem[0x260462:4]=64 mem[0x270064:4]=1 mem[0x270050:4]=2293760 mem[0x270040:4]=0 mem[0x270044:4]=2293760 mem[0x270048:4]=2293760 mem[0x270054:4]=1 mem[0x270080:4]=2 mem[0x260438:4]=0 mem[0x26043c:4]=0 mem[0x260458:4]=1 mem[0x260460:1]=0 mem[0x260448:4]=0 mem[0x26044c:4]=0 mem[0x2b0088:4]=0 mem[0x2802e4:4]=0 mem[0x6d3184:4]=1530878130 tracehits={RNG=2, PASS=1} stubhits={TRAIL=1, B0B40=1, M65a0=1, M9490=1, M8f20=1}

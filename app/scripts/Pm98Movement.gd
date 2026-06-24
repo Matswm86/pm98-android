@@ -2472,6 +2472,7 @@ static func kick_resolve(p: Dictionary, rng, cfg: Dictionary, call_resolve: bool
 	var s_center := Pm98Trig._s16(Pm98Trig.atan_angle(Pm98Trig._i32(goalx - px), Pm98Trig._i32(-py)) - facing)
 	var s_post1 := Pm98Trig._s16(Pm98Trig.atan_angle(Pm98Trig._i32(goalx - px), Pm98Trig._i32(_KICK_POST - py)) - facing)
 	var s_post2 := Pm98Trig._s16(Pm98Trig.atan_angle(Pm98Trig._i32(goalx - px), Pm98Trig._i32(-_KICK_POST - py)) - facing)
+	ball[0x80] = Pm98Trig._i32(_g(ball, 0x80) + 1)           # decompile L57: claim the touch (ball+0x80++)
 	var tmarr: Variant = p.get(0x188, null)
 	var tm0: Dictionary = (tmarr[0] if tmarr is Array and not (tmarr as Array).is_empty() else {})
 	var skill := _kick_skill16(p, tm0)
