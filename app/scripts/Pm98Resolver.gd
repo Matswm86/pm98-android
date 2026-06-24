@@ -63,6 +63,36 @@ static func shot_proceeds(rng: MatchEngine.Pm98Rng, attr: int) -> bool:
 # binary does, and returns a small result dict for assertions.
 # ============================================================================
 
+## Faithful top-level entry of FUN_005aeda0 -- the case-8/9 post-shot RESOLVER that engine_tick's
+## action switch dispatches to (Pm98Action._resolve_action). The decompile has THREE sections:
+##
+##   * L41-118  the finishing PRE-BLOCK (fires only when player play-state +0x2c == 3 AND +0x30 == 0):
+##              a tackle/intercept windup laid on the TARGET. STAGE-3 DEFERRED -- its body uses the
+##              still-unported positional helpers FUN_005b1230 / FUN_005a1700 (vector reads) +
+##              FUN_005a7220 / FUN_0058ed50 (trajectory set). It is provably INERT (draws 0 RNG, writes
+##              nothing) UNLESS the target is in play-state [0,3] with target+0x68 > 0x1332; the resolver
+##              is only reached with the target live in the tree (play-state 5), so the pre-block falls
+##              straight through. The GREEN tree oracle (run_tree_oracle.sh, target T+0x40 = 5) confirms
+##              this bit-for-bit -- its first RNG draw is the tree's, not the pre-block's.
+##   * L120-485 the play-state dispatch (chase for +0x2c < 3 / > 8; tree for [3,8]) + the main
+##              goal/save/miss DECISION TREE -> resolve_tree() below (oracle-GREEN, test_resolver_tree).
+##   * L491-607 the post-resolution MOVEMENT tail (re-aim + relocate the ball). STAGE-3 DEFERRED
+##              (LUT/positional: FUN_005ee0f0 projection, FUN_00590aa0, FUN_0058eca0, FUN_005ee170/670,
+##              the FUN_0044ea40/ec00 deflection counters). The tree oracle gates it OFF via match+0x70
+##              != 0; resolve_tree omits it, matching that gating exactly.
+##
+## So for every state the engine actually reaches today (case 8/9 with the target live in the tree),
+## resolve_action == resolve_tree == the binary. The two deferred blocks get their own leaf ports + a
+## dedicated integration oracle in the follow-up (handoff Task #4b-tail). `p`/`t`/`m`/`stats` are
+## offset->int dicts; `rng` is MatchEngine.Pm98Rng. Returns resolve_tree's result dict.
+static func resolve_action(p: Dictionary, t: Dictionary, m: Dictionary, stats: Dictionary,
+		rng: MatchEngine.Pm98Rng) -> Dictionary:
+	# L38 entry guard (match+0x448 != 0 -> no resolution this tick) is inside resolve_tree.
+	# The finishing pre-block (L41-118) and the movement tail (L491-607) are Stage-3 deferred and
+	# provably not taken for the resolver-reachable fixtures (see the function-level note above).
+	return resolve_tree(p, t, m, stats, rng)
+
+
 ## Signed (a*b) >> 15 with the binary's round-toward-zero term (`>>31 & 0x7fff`).
 ## For non-negative products this is just (a*b)>>15.
 static func _fixmul15(a: int, b: int) -> int:

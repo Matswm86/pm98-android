@@ -8,10 +8,11 @@ extends RefCounted
 ## oracle-verified bit-for-bit against the REAL function under the Ghidra PCode emulator.
 ##
 ## STATE: `tick_action`/`setup_kick` (the two prologue leaves) + the full `engine_tick` SKELETON are
-## ported and oracle-GREEN (test_tickaction.gd 179; test_engine_tick.gd 183). engine_tick's leaf calls
-## (7 action handlers, the resolver case 8/9, the case-0x13 shot-setup, the teammate-count, the 5
-## movement fns) are NO-OP stubs pending their own oracle-gated ports (handoff Tasks #2/#3). See the
-## engine_tick header for the exact scope + the transcription-only caveat (case 0x13 bVar17-true).
+## ported and oracle-GREEN (test_tickaction.gd 179; test_engine_tick.gd 183). The 7 Family-A action
+## handlers (Task #4) AND the case-8/9 resolver (Task #4b) are now WIRED to their oracle-GREEN ports;
+## the remaining leaf calls (the case-0x13 shot-setup, the teammate-count, the 5 movement fns) are still
+## NO-OP stubs pending their own oracle-gated ports. See the engine_tick header for the exact scope +
+## the transcription-only caveat (case 0x13 bVar17-true).
 ##
 ## STEP 1 (this slice) -- the two leaves the engine prologue needs:
 ##   * tick_action = FUN_005a50c0 (872B, docs/re/move/fn_005a50c0_FUN_005a50c0.c). The per-player
@@ -361,8 +362,9 @@ static func engine_tick(p: Dictionary, m: Dictionary, rng = null) -> void:
 ## DECOMPOSITION GATE: each handler is wired with call_setup=false / call_resolve=false so its NESTED
 ## cascade leaf (setup_shot = FUN_005ac1a0, resolve_post_shot = FUN_005ab5a0) stays a no-op -- those are
 ## their own separately-oracled leaves, STUBBED in run_engine_oracle.sh too, so the integration matches
-## bit-for-bit. The full call_setup=true cascade lands once setup_shot + the case-8/9 resolver (FUN_005aeda0,
-## not yet ported) are integrated. The resolver (case 8/9) + the case-0x13 shot-setup stay stubs for now.
+## bit-for-bit. The full call_setup=true cascade lands once setup_shot is integrated. case 8/9 is now
+## WIRED to Pm98Resolver.resolve_action (Task #4b, transitive-parity GREEN); only the case-0x13 shot-setup
+## stays a stub for now.
 static func _action_switch(p: Dictionary, m: Dictionary, gs: Dictionary, b: Dictionary, rng) -> void:
 	var act := _g(p, 0x40)
 	match act:
@@ -383,7 +385,7 @@ static func _action_switch(p: Dictionary, m: Dictionary, gs: Dictionary, b: Dict
 				elif _si(p, 0x48) < 10:
 					m[0x461] = _g(m, 0x461) & 0xf7
 		8, 9:
-			_resolve_action(p, m)                        # STUB -> FUN_005aeda0 / Pm98Resolver
+			_resolve_action(p, m, rng)                   # FUN_005aeda0 -> Pm98Resolver.resolve_action
 		0x13:
 			_case_distribution(p, m, gs, b)
 		0x14, 0x16:
@@ -585,9 +587,16 @@ static func _count_teammates_closer(_p: Dictionary, arg: int) -> int:
 	return 0
 
 # The 7 Family-A action handlers are now WIRED inline in _action_switch (Task #4) to their oracle-GREEN
-# Pm98Movement ports. These two switch leaves stay STUBS (mirrored in run_engine_oracle.sh):
-## FUN_005aeda0 (case 8/9): the post-shot RESOLVER -- NOT yet ported. No-op until its own port lands.
-static func _resolve_action(_p: Dictionary, _m: Dictionary) -> void: trace_calls.append(["AEDA0", 0])
+# Pm98Movement ports. case 8/9 is now WIRED to the resolver port (Task #4b); only the case-0x13 shot-setup
+# stays a STUB (mirrored in run_engine_oracle.sh).
+## FUN_005aeda0 (case 8/9): the post-shot RESOLVER. WIRED to Pm98Resolver.resolve_action, threading the
+## shared match `rng` and the target/stats refs (player+0xac / +0x3b8). The finishing pre-block (L41-118)
+## and the movement tail (L491-607) inside FUN_005aeda0 are Stage-3 deferred there -- provably inert for
+## the resolver-reachable states (target live in the tree). Verified by transitive parity in
+## test_engine_resolver.gd (engine residue == bare resolve_action residue; resolve_action itself is
+## oracle-GREEN via test_resolver_tree.gd against the REAL FUN under the PCode emulator).
+static func _resolve_action(p: Dictionary, m: Dictionary, rng) -> void:
+	Pm98Resolver.resolve_action(p, _ref(p, 0xac), m, _ref(p, 0x3b8), rng)
 ## FUN_005ac1a0 (case 0x13 bVar17-true): shot-setup, reached only from the transcription-only
 ## _case_distribution block (not oracle-covered). port = Pm98Movement.setup_shot; stub until case 0x13 is gated.
 static func _shot_setup(_p: Dictionary) -> void: trace_calls.append(["AC1A0", 0])
