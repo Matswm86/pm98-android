@@ -2404,6 +2404,118 @@ static func setup_shot(p: Dictionary, teammates: Array = [], rng = null, call_re
 	p[0x58] = 0
 
 
+# ---- Kick-resolution action handlers (FUN_005adfc0 / 005ae4c0 / 005ae910) -----------------------
+# The three "launch the ball toward goal" open-play action handlers (engine_tick cases 0x19/0x1a,
+# 0x14/0x16, 0x15). Each computes a launch SPEED (ball-velocity magnitude / div + a touch term), an aim
+# YAW chosen between the two goalposts and jittered by the player's accuracy (+0x39c), and a launch
+# PITCH jittered by power (+0x388); rotates the {speed,0,0} vector by pitch (about Y) then yaw (about Z)
+# and writes it as the ball velocity (ball+0x20/24/28); then resets +0x54/58, ball+0x4c, bumps
+# ball+0x70>=4, sets match+0x462|=flag and (FUN_005ab5a0) resolves the post-shot. The three differ ONLY
+# in constants (the KICK_* cfgs). Oracle-pinned bit-for-bit by tools/re/run_adfc0_oracle.sh (etc.) ->
+# specs/adfc0_oracle.txt, locked in test_adfc0.gd. The decompile DROPPED the lost-FPU ftol (= the ball
+# SPEED sqrt) and mislabelled the rotate -> velocity write as a direct store; recovered from the disasm.
+#
+# cfg keys: g2c/g30 self-guard (player+0x2c/+0x30); sdiv ball-speed divisor (iVar10/sdiv); tmul touch
+# term mul ((touch+0x10)*tmul, /0x20); pconst power-spread const; pbias launch-pitch bias; flag the
+# match+0x462 OR-bit; ypre facing pre-rotate (ae910 rotates geometry by +0xb4); addv add player velocity
+# to ball position (ae910 follow-through); set64 set ball+0x64=1 after resolve (ae4c0/ae910).
+const KICK_ADFC0 := {"g2c": 4, "g30": 3, "sdiv": 0x18, "tmul": 0x6147, "pconst": 0x71c,
+	"pbias": 0x71c, "flag": 0x20, "ypre": 0, "addv": false, "set64": false}
+const KICK_AE4C0 := {"g2c": 8, "g30": 0, "sdiv": 0x20, "tmul": 0x5999, "pconst": 0x666,
+	"pbias": -0x222, "flag": 0x40, "ypre": 0, "addv": false, "set64": true}
+const KICK_AE910 := {"g2c": 5, "g30": 0, "sdiv": 0x18, "tmul": 0x5999, "pconst": 0x38e,
+	"pbias": 0x16c, "flag": 0x20, "ypre": 0xb4, "addv": true, "set64": true}
+
+const _KICK_POST := 0x39999     # half goal-mouth width: the +/- post offset on the goal-line y
+
+
+## The signed-16 skill at player+0xb8 + idx*2 (idx = tm0+0x2b8 * 0xb + tm0+0x2c4). The oracle pins
+## idx == 0 (the packed-short skill table needs a sub-word model when wired live); reads +0xb8's low 16.
+static func _kick_skill16(p: Dictionary, tm0: Dictionary) -> int:
+	var idx := _g(tm0, 0x2b8) * 0xb + _g(tm0, 0x2c4)
+	return Pm98Trig._s16(_g(p, 0xb8 + (idx * 2 if idx != 0 else 0)))
+
+
+## FUN_005adfc0 / FUN_005ae4c0 / FUN_005ae910. Mutates ball + player + match. `cfg` selects the variant.
+## Pass call_resolve=false to skip the FUN_005ab5a0 tail (the oracle stubs it; the velocity is verified
+## here, the post-shot residue separately).
+static func kick_resolve(p: Dictionary, rng, cfg: Dictionary, call_resolve: bool = true) -> void:
+	if _g(p, 0x2c) != int(cfg["g2c"]) or _g(p, 0x30) != int(cfg["g30"]):
+		return
+	var ball := _ref(p, 0x190)
+	var m := _ref(p, 0x18c)
+	if _g(p, 0x7c) != _g(ball, 0x80):
+		return
+	if _shot_engage_guard(ball, m) != 0:                     # FUN_0058f100: ball+0x63 set -> bail
+		return
+
+	# ae910 rotates the whole goal geometry by +0xb4 (un-done at the end; +0x34 is not a tracked output).
+	var facing := Pm98Trig._s16(_g(p, 0x34) + int(cfg["ypre"]))
+
+	# --- launch speed (pre-rotation magnitude): ball-velocity 3D mag / sdiv + a touch term / 0x20 ---
+	var spd := Pm98Trig._dist3(_si(ball, 0x20), _si(ball, 0x24), _si(ball, 0x28))
+	var touch := _si(p, 0x54)
+	if touch < 5:
+		touch = 4
+	var ivar3 := (touch + 0x10) * int(cfg["tmul"])
+	var mag := Pm98Trig._tdiv(spd, int(cfg["sdiv"])) + Pm98Trig._tdiv(ivar3, 0x20)
+
+	# --- aim yaw: angle to a goalpost (jittered by accuracy +0x39c) ---
+	var goalx := _si(m, 0x1820)
+	if (1 - _g(p, 0x2b8)) == (_g(m, 0x19a0) & 1):            # own-vs-attacking goal side -> negate x
+		goalx = -goalx
+	var px := _si(p, 0x4)
+	var py := _si(p, 0x8)
+	# center + the two posts on the goal line; the angle FROM the player, minus facing (signed-16).
+	var s_center := Pm98Trig._s16(Pm98Trig.atan_angle(Pm98Trig._i32(goalx - px), Pm98Trig._i32(-py)) - facing)
+	var s_post1 := Pm98Trig._s16(Pm98Trig.atan_angle(Pm98Trig._i32(goalx - px), Pm98Trig._i32(_KICK_POST - py)) - facing)
+	var s_post2 := Pm98Trig._s16(Pm98Trig.atan_angle(Pm98Trig._i32(goalx - px), Pm98Trig._i32(-_KICK_POST - py)) - facing)
+	var tmarr: Variant = p.get(0x188, null)
+	var tm0: Dictionary = (tmarr[0] if tmarr is Array and not (tmarr as Array).is_empty() else {})
+	var skill := _kick_skill16(p, tm0)
+	var mn := s_post1
+	var mx := s_post2
+	if s_post2 < s_post1:
+		mn = s_post2
+		mx = s_post1
+	var base_ang := Pm98Trig._s16((mx if skill < s_center else mn) - s_center)
+	var spread_geo := Pm98Trig._tdiv(base_ang * 2, 3)
+
+	var acc := _si(p, 0x39c)
+	var iv15 := Pm98Trig._tdiv((100 - acc) * 0x1555, 100)
+	var rng_a := _shot_rng_scale(rng.next(), 2 * iv15 + 1)   # rng draw #1 (accuracy spread)
+	var yaw := Pm98Trig._s16(s_center + spread_geo + (rng_a - iv15) + facing)
+
+	# --- launch pitch: power spread (rng draw #2) ---
+	var pwr := _si(p, 0x388)
+	var iv16b := Pm98Trig._tdiv((100 - pwr) * int(cfg["pconst"]), 100)
+	var pitch := _shot_rng_scale(rng.next(), iv16b) + int(cfg["pbias"])
+
+	# --- rotate {mag,0,0} by pitch (about Y) then yaw (about Z) -> ball velocity ---
+	var vel := [mag, 0, 0]
+	vel = Pm98Trig.rot_vec3(vel, pitch, 1)
+	vel = Pm98Trig.rot_vec3(vel, yaw, 0)
+	ball[0x20] = Pm98Trig._i32(int(vel[0]))
+	ball[0x24] = Pm98Trig._i32(int(vel[1]))
+	ball[0x28] = Pm98Trig._i32(int(vel[2]))
+
+	if cfg["addv"]:                                          # ae910: nudge ball pos by the player's velocity
+		ball[0x4] = Pm98Trig._i32(_si(ball, 0x4) + _si(p, 0x20))
+		ball[0x8] = Pm98Trig._i32(_si(ball, 0x8) + _si(p, 0x24))
+		ball[0xc] = Pm98Trig._i32(_si(ball, 0xc) + _si(p, 0x28))
+
+	var kb70 := _si(ball, 0x70)
+	ball[0x70] = kb70 if kb70 > 4 else 4
+	m[0x462] = _g(m, 0x462) | int(cfg["flag"])
+	p[0x54] = 0
+	p[0x58] = 0
+	ball[0x4c] = 0
+	if call_resolve:
+		resolve_post_shot(p, [], rng)
+	if cfg["set64"]:
+		ball[0x64] = 1
+
+
 # ---- Match-driver leaves (FUN_00598740): within-box test + phase setter + vec copy ----
 # Small leaves the per-tick match driver FUN_00598740 calls. Oracle-pinned (FUN_005a1820 EAX +
 # FUN_005942e0 state) by tools/re/run_driverleaf_oracle.sh -> specs/driverleaf_oracle.txt, locked

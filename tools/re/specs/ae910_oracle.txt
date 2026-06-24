@@ -1,0 +1,13 @@
+# Oracle FUN_005ae910 (kick resolution, case 0x15). this=player. FUN_005ab5a0/590f00/4e9940 stubbed.
+# reads: ball vel +0x20/24/28, player+0x54/58, ball+0x4c/70, match+0x462, seed (2 rng draws).
+## FIX base
+CALL 0 RET steps=670 EAX=2555904 mem[0x270020:4]=32057 mem[0x270024:4]=4294964138 mem[0x270028:4]=2177 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x27004c:4]=0 mem[0x270070:4]=100 mem[0x260462:4]=32 mem[0x270004:4]=74001 mem[0x270008:4]=148002 mem[0x27000c:4]=222003 mem[0x270064:4]=1 mem[0x6d3184:4]=1530878130 tracehits={RNG=2} stubhits={RESOLVE=1}
+## FIX maxpath
+## FIX nonsq_speed
+## FIX touch_lt5
+## FIX lowacc
+## FIX side_neg
+## FIX clamp70
+CALL 0 RET steps=671 EAX=2555904 mem[0x270020:4]=32057 mem[0x270024:4]=4294964138 mem[0x270028:4]=2177 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x27004c:4]=0 mem[0x270070:4]=4 mem[0x260462:4]=32 mem[0x270004:4]=74001 mem[0x270008:4]=148002 mem[0x27000c:4]=222003 mem[0x270064:4]=1 mem[0x6d3184:4]=1530878130 tracehits={RNG=2} stubhits={RESOLVE=1}
+## FIX facing
+CALL 0 RET steps=670 EAX=2555904 mem[0x270020:4]=32057 mem[0x270024:4]=4294964138 mem[0x270028:4]=2177 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x27004c:4]=0 mem[0x270070:4]=100 mem[0x260462:4]=32 mem[0x270004:4]=74001 mem[0x270008:4]=148002 mem[0x27000c:4]=222003 mem[0x270064:4]=1 mem[0x6d3184:4]=1530878130 tracehits={RNG=2} stubhits={RESOLVE=1}

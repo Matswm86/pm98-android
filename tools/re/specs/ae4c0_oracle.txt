@@ -1,0 +1,18 @@
+# Oracle FUN_005ae4c0 (kick resolution, case 0x14/0x16). this=player. FUN_005ab5a0/590f00/4e9940 stubbed.
+# reads: ball vel +0x20/24/28, player+0x54/58, ball+0x4c/70, match+0x462, seed (2 rng draws).
+## FIX base
+CALL 0 RET steps=655 EAX=0 mem[0x270020:4]=28731 mem[0x270024:4]=4294964466 mem[0x270028:4]=132 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x27004c:4]=0 mem[0x270070:4]=100 mem[0x260462:4]=64 mem[0x270064:4]=1 mem[0x6d3184:4]=1530878130 tracehits={RNG=2} stubhits={RESOLVE=1}
+## FIX maxpath
+CALL 0 RET steps=656 EAX=0 mem[0x270020:4]=28875 mem[0x270024:4]=44 mem[0x270028:4]=132 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x27004c:4]=0 mem[0x270070:4]=100 mem[0x260462:4]=64 mem[0x270064:4]=1 mem[0x6d3184:4]=1530878130 tracehits={RNG=2} stubhits={RESOLVE=1}
+## FIX nonsq_speed
+CALL 0 RET steps=655 EAX=0 mem[0x270020:4]=21423 mem[0x270024:4]=4294965185 mem[0x270028:4]=98 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x27004c:4]=0 mem[0x270070:4]=100 mem[0x260462:4]=64 mem[0x270064:4]=1 mem[0x6d3184:4]=1530878130 tracehits={RNG=2} stubhits={RESOLVE=1}
+## FIX touch_lt5
+CALL 0 RET steps=656 EAX=0 mem[0x270020:4]=24451 mem[0x270024:4]=4294964887 mem[0x270028:4]=112 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x27004c:4]=0 mem[0x270070:4]=100 mem[0x260462:4]=64 mem[0x270064:4]=1 mem[0x6d3184:4]=1530878130 tracehits={RNG=2} stubhits={RESOLVE=1}
+## FIX lowacc
+CALL 0 RET steps=655 EAX=0 mem[0x270020:4]=28505 mem[0x270024:4]=4294963066 mem[0x270028:4]=1770 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x27004c:4]=0 mem[0x270070:4]=100 mem[0x260462:4]=64 mem[0x270064:4]=1 mem[0x6d3184:4]=1530878130 tracehits={RNG=2} stubhits={RESOLVE=1}
+## FIX side_neg
+CALL 0 RET steps=665 EAX=0 mem[0x270020:4]=4294938421 mem[0x270024:4]=4294967251 mem[0x270028:4]=132 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x27004c:4]=0 mem[0x270070:4]=100 mem[0x260462:4]=64 mem[0x270064:4]=1 mem[0x6d3184:4]=1530878130 tracehits={RNG=2} stubhits={RESOLVE=1}
+## FIX clamp70
+CALL 0 RET steps=656 EAX=0 mem[0x270020:4]=28731 mem[0x270024:4]=4294964466 mem[0x270028:4]=132 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x27004c:4]=0 mem[0x270070:4]=4 mem[0x260462:4]=64 mem[0x270064:4]=1 mem[0x6d3184:4]=1530878130 tracehits={RNG=2} stubhits={RESOLVE=1}
+## FIX facing
+CALL 0 RET steps=655 EAX=0 mem[0x270020:4]=28731 mem[0x270024:4]=4294964466 mem[0x270028:4]=132 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x27004c:4]=0 mem[0x270070:4]=100 mem[0x260462:4]=64 mem[0x270064:4]=1 mem[0x6d3184:4]=1530878130 tracehits={RNG=2} stubhits={RESOLVE=1}
