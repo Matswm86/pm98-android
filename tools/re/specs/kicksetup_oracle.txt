@@ -1,0 +1,5 @@
+# Stage 3 movement-subtree kickoff unstick: FUN_005a65a0 taker branch ground truth
+# (PCode emu, LUT-free path, p+0xb4 preset). Row: M <name> | action | v54 | c+4c | p+80 | RET
+# action 4 = on-pitch resolve-capable kick; 0x25(37) = off-pitch. addrs: P=0x230000 TGT=0x270000
+M onpitch   | 4    | 10  | 2555904  | 1    | RET
+M offpitch  | 37   | 10  | 2555904  | 1    | RET
