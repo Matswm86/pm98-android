@@ -20,8 +20,9 @@ extends SceneTree
 ##     so it stays skipped after the handler too) -> the handler's pos/facing/aim survive.
 ##   * gs+0x2ee = 0 so the highlight power-accumulate AND the open-play power reset are both inactive
 ##     (they would otherwise clobber the handler's +0x54/+0x58).
-##   * the 5 movement leaves + the teammate-count + the case-8/9 resolver + the case-0x13 shot-setup are
-##     still NO-OP stubs (Tasks #3 / #4b), so they add no field writes.
+##   * the 5 movement leaves + the teammate-count + the case-8/9 resolver are still NO-OP stubs (Task #3),
+##     so they add no field writes. The Family-A cascade leaf (setup_shot/resolve_post_shot) now runs REAL
+##     on BOTH sides (call_setup/call_resolve=true), so it adds the SAME writes to each -> they still agree.
 ## The remaining prologue writes are a FIXED, handler-independent set (INERT_P) we exclude from the diff;
 ## any OTHER divergence -- a missed dispatch, a clobbered output, an extra/short rng draw -- fails loudly.
 
@@ -37,30 +38,31 @@ var _pass := 0
 
 
 func _init() -> void:
-	# label, action code, builder name, the bare-handler Callable (call_setup/call_resolve = false).
+	# label, action code, builder name, the bare-handler Callable (call_setup/call_resolve = true, matching
+	# the engine_tick wiring -- both sides run the full handler -> setup_shot/resolve_post_shot cascade).
 	var cases := [
 		["acc40 (case 4)",      0x04, "acc40",
-			func(p, r): Pm98Movement.goal_aim_025(p, r, false)],
+			func(p, r): Pm98Movement.goal_aim_025(p, r, true)],
 		["acc40 alias (0x25)",  0x25, "acc40",
-			func(p, r): Pm98Movement.goal_aim_025(p, r, false)],
+			func(p, r): Pm98Movement.goal_aim_025(p, r, true)],
 		["ad010 (case 5)",      0x05, "ad010",
-			func(p, r): Pm98Movement.ai_feed_024(p, r, false)],
+			func(p, r): Pm98Movement.ai_feed_024(p, r, true)],
 		["ad010 alias (0x24)",  0x24, "ad010",
-			func(p, r): Pm98Movement.ai_feed_024(p, r, false)],
+			func(p, r): Pm98Movement.ai_feed_024(p, r, true)],
 		["ad970 (case 0x36)",   0x36, "ad970",
-			func(p, r): Pm98Movement.feed_layoff_036(p, r, false)],
+			func(p, r): Pm98Movement.feed_layoff_036(p, r, true)],
 		["adc60 (case 0x37)",   0x37, "adc60",
-			func(p, r): Pm98Movement.feed_layoff_037(p, r, false)],
+			func(p, r): Pm98Movement.feed_layoff_037(p, r, true)],
 		["adfc0 (case 0x19)",   0x19, "adfc0",
-			func(p, r): Pm98Movement.kick_resolve(p, r, Pm98Movement.KICK_ADFC0, false)],
+			func(p, r): Pm98Movement.kick_resolve(p, r, Pm98Movement.KICK_ADFC0, true)],
 		["adfc0 alias (0x1a)",  0x1a, "adfc0",
-			func(p, r): Pm98Movement.kick_resolve(p, r, Pm98Movement.KICK_ADFC0, false)],
+			func(p, r): Pm98Movement.kick_resolve(p, r, Pm98Movement.KICK_ADFC0, true)],
 		["ae4c0 (case 0x14)",   0x14, "ae4c0",
-			func(p, r): Pm98Movement.kick_resolve(p, r, Pm98Movement.KICK_AE4C0, false)],
+			func(p, r): Pm98Movement.kick_resolve(p, r, Pm98Movement.KICK_AE4C0, true)],
 		["ae4c0 alias (0x16)",  0x16, "ae4c0",
-			func(p, r): Pm98Movement.kick_resolve(p, r, Pm98Movement.KICK_AE4C0, false)],
+			func(p, r): Pm98Movement.kick_resolve(p, r, Pm98Movement.KICK_AE4C0, true)],
 		["ae910 (case 0x15)",   0x15, "ae910",
-			func(p, r): Pm98Movement.kick_resolve(p, r, Pm98Movement.KICK_AE910, false)],
+			func(p, r): Pm98Movement.kick_resolve(p, r, Pm98Movement.KICK_AE910, true)],
 	]
 	for c in cases:
 		_run(c[0], c[1], c[2], c[3])

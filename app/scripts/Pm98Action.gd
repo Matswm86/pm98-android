@@ -359,19 +359,22 @@ static func engine_tick(p: Dictionary, m: Dictionary, rng = null) -> void:
 
 ## L80-236: the action switch. Inline arms (6/7, 0x13, 0x1c, 0x1f/0x21) are ported here. The 7 Family-A
 ## action handlers are WIRED (Task #4) to their oracle-GREEN ports, threading the shared match `rng`.
-## DECOMPOSITION GATE: each handler is wired with call_setup=false / call_resolve=false so its NESTED
-## cascade leaf (setup_shot = FUN_005ac1a0, resolve_post_shot = FUN_005ab5a0) stays a no-op -- those are
-## their own separately-oracled leaves, STUBBED in run_engine_oracle.sh too, so the integration matches
-## bit-for-bit. The full call_setup=true cascade lands once setup_shot is integrated. case 8/9 is now
-## WIRED to Pm98Resolver.resolve_action (Task #4b, transitive-parity GREEN); only the case-0x13 shot-setup
-## stays a stub for now.
+## CASCADE (Task #4b item 4): each handler now runs call_setup=true / call_resolve=true so its NESTED
+## cascade leaf fires for real -- the 4 feed/aim handlers chain to setup_shot (FUN_005ac1a0) and on to
+## resolve_post_shot (FUN_005ab5a0); the 3 kick handlers chain straight to resolve_post_shot. That tail
+## is the only path that reaches set_phase(0) (FUN_005942e0(0) inside resolve_post_shot). The composition
+## is integration-oracle-GREEN for the setup_shot tail via the acc40 path (run_engine_cascade_oracle.sh ->
+## test_engine_cascade.gd: engine_tick -> goal_aim_025 -> setup_shot -> resolve_post_shot, all REAL under
+## the emu). The resolve_post_shot pass/keeper/classify blocks are not yet engine-exercised (the cascade
+## fixture drives the to_tail path) -- see the handoff for the deferred pass-block fixture. case 8/9 is
+## WIRED to Pm98Resolver.resolve_action (transitive-parity GREEN).
 static func _action_switch(p: Dictionary, m: Dictionary, gs: Dictionary, b: Dictionary, rng) -> void:
 	var act := _g(p, 0x40)
 	match act:
 		4, 0x25:
-			Pm98Movement.goal_aim_025(p, rng, false)     # FUN_005acc40 (setup_shot leaf stubbed)
+			Pm98Movement.goal_aim_025(p, rng, true)      # FUN_005acc40 -> setup_shot -> resolve_post_shot
 		5, 0x24:
-			Pm98Movement.ai_feed_024(p, rng, false)      # FUN_005ad010 (setup_shot leaf stubbed)
+			Pm98Movement.ai_feed_024(p, rng, true)       # FUN_005ad010 -> setup_shot -> resolve_post_shot
 		6, 7:
 			if _g(p, 0x2c) == FRAME_COUNT[act] - 1 and _g(p, 0x30) == 0:
 				if _g(p, 0x48) == 0:
@@ -389,11 +392,11 @@ static func _action_switch(p: Dictionary, m: Dictionary, gs: Dictionary, b: Dict
 		0x13:
 			_case_distribution(p, m, gs, b)
 		0x14, 0x16:
-			Pm98Movement.kick_resolve(p, rng, Pm98Movement.KICK_AE4C0, false)  # FUN_005ae4c0 (resolve_post_shot stubbed)
+			Pm98Movement.kick_resolve(p, rng, Pm98Movement.KICK_AE4C0, true)  # FUN_005ae4c0 -> resolve_post_shot
 		0x15:
-			Pm98Movement.kick_resolve(p, rng, Pm98Movement.KICK_AE910, false)  # FUN_005ae910 (resolve_post_shot stubbed)
+			Pm98Movement.kick_resolve(p, rng, Pm98Movement.KICK_AE910, true)  # FUN_005ae910 -> resolve_post_shot
 		0x19, 0x1a:
-			Pm98Movement.kick_resolve(p, rng, Pm98Movement.KICK_ADFC0, false)  # FUN_005adfc0 (resolve_post_shot stubbed)
+			Pm98Movement.kick_resolve(p, rng, Pm98Movement.KICK_ADFC0, true)  # FUN_005adfc0 -> resolve_post_shot
 		0x1c:
 			# only fires the rng + set_position_code(0) when the ball still carries velocity.
 			if _g(b, 0x20) != 0 or _g(b, 0x24) != 0 or _g(b, 0x28) != 0:
@@ -408,9 +411,9 @@ static func _action_switch(p: Dictionary, m: Dictionary, gs: Dictionary, b: Dict
 			m["anim_66502c"] = m.get("anim_src_665030", 0)
 			m["anim_67455c"] = m.get("anim_src_674560", 0)
 		0x36:
-			Pm98Movement.feed_layoff_036(p, rng, false)  # FUN_005ad970 (setup_shot leaf stubbed)
+			Pm98Movement.feed_layoff_036(p, rng, true)   # FUN_005ad970 -> setup_shot -> resolve_post_shot
 		0x37:
-			Pm98Movement.feed_layoff_037(p, rng, false)  # FUN_005adc60 (setup_shot leaf stubbed)
+			Pm98Movement.feed_layoff_037(p, rng, true)   # FUN_005adc60 -> setup_shot -> resolve_post_shot
 
 
 ## L127-194: case 0x13 (keeper-distribution / kick windup). The set_phase nudge is skeleton; the

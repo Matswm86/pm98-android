@@ -2175,8 +2175,8 @@ static func _postshot_classify_draw(p: Dictionary, px: int, py: int, anchor: int
 ## (match+0x448 == 0) with a live set-piece taker (match+0x460 != 0) that is NOT this player -- clear
 ## that stale taker (match+0x460 = 0, match+0x43c = 0). This is the ref-model twin of set_engagement.
 static func _ball_engage_player(ball: Dictionary, target: Dictionary) -> void:
-	if ball.get(0x40, null) == target:
-		return
+	if is_same(ball.get(0x40, null), target):   # ball+0x40 may be int 0 (FUN_0058ed70 clears it); the
+		return                                   # binary's pointer compare -> reference identity
 	ball[0x40] = target
 	ball[0x4c] = 0
 	var m := _ref(ball, 0x1d4)
@@ -2236,8 +2236,10 @@ static func setup_shot(p: Dictionary, teammates: Array = [], rng = null, call_re
 	var ball := _ref(p, 0x190)
 	var m := _ref(p, 0x18c)
 
-	# Entry guard: a non-engaged shooter with ball+0x63 set hands off (copy) and bails.
-	if ball.get(0x40, null) != p and _shot_engage_guard(ball, m) != 0:
+	# Entry guard: a non-engaged shooter with ball+0x63 set hands off (copy) and bails. ball+0x40 is a
+	# pointer field (a player Dict ref, or int 0 when unengaged); `int != Dictionary` throws in GDScript,
+	# so compare by reference identity (is_same) -- the binary's pointer compare.
+	if not is_same(ball.get(0x40, null), p) and _shot_engage_guard(ball, m) != 0:
 		p[0x54] = 0
 		p[0x58] = 0
 		return
@@ -2511,7 +2513,7 @@ static func kick_resolve(p: Dictionary, rng, cfg: Dictionary, call_resolve: bool
 	p[0x58] = 0
 	ball[0x4c] = 0
 	if call_resolve:
-		resolve_post_shot(p, [], rng)
+		resolve_post_shot(p, _ref(p, 0x184).get(0, []), rng)  # gs[0] roster (binary reads it from player+0x184)
 	if cfg["set64"]:
 		ball[0x64] = 1
 
@@ -2640,7 +2642,7 @@ static func feed_layoff_036(p: Dictionary, rng, call_setup: bool = true) -> void
 		p[0xa8] = _g(hd, 0xc)
 		ball[0x4c] = hd
 		if call_setup:
-			setup_shot(p, [], rng)
+			setup_shot(p, gs.get(0, []), rng)
 		return
 
 	# no corridor teammate: a blind polar throw (one extra rng draw).
@@ -2650,7 +2652,7 @@ static func feed_layoff_036(p: Dictionary, rng, call_setup: bool = true) -> void
 	p[0xa4] = Pm98Trig._i32(_si(p, 0x8) + int(disp2[1]))
 	p[0xa8] = Pm98Trig._i32(_si(p, 0xc) + int(disp2[2]))
 	if call_setup:
-		setup_shot(p, [], rng)
+		setup_shot(p, gs.get(0, []), rng)
 
 
 ## FUN_005b3580 (__thiscall this=cand; &cand.x): 1 iff sign(cand.x) == sign(cand+0x3a4) -- the
@@ -2821,7 +2823,7 @@ static func feed_layoff_037(p: Dictionary, rng, call_setup: bool = true) -> void
 		p[0xa8] = _g(hd, 0xc)
 		ball[0x4c] = hd
 		if call_setup:
-			setup_shot(p, [], rng)
+			setup_shot(p, gs.get(0, []), rng)
 		return
 
 	# no corridor teammate: a blind polar throw (one extra rng draw).
@@ -2831,7 +2833,7 @@ static func feed_layoff_037(p: Dictionary, rng, call_setup: bool = true) -> void
 	p[0xa4] = Pm98Trig._i32(_si(p, 0x8) + int(disp2[1]))
 	p[0xa8] = Pm98Trig._i32(_si(p, 0xc) + int(disp2[2]))
 	if call_setup:
-		setup_shot(p, [], rng)
+		setup_shot(p, gs.get(0, []), rng)
 
 
 ## FUN_005acc40 (case 4/0x25, this=player, frame guard p+0x2c==4 && p+0x30==3): the AI "aim the set-piece
@@ -2915,7 +2917,7 @@ static func goal_aim_025(p: Dictionary, rng, call_setup: bool = true) -> void:
 		p[0x5e] = 1 if _g(p, 0x54) != 0 else 0
 
 	if call_setup:
-		setup_shot(p, [], rng)
+		setup_shot(p, gs.get(0, []), rng)
 
 
 ## FUN_005a44f0 (__thiscall match; side): the opponent goal-line x. goalx = match+0x1820, NEGATED when
@@ -3118,7 +3120,7 @@ static func ai_feed_024(p: Dictionary, rng, call_setup: bool = true) -> void:
 
 	# ---- (5) setup_shot + match+0x462 |= 0x80 (unconditional once the frame guard passes) ----
 	if call_setup:
-		setup_shot(p, [], rng)
+		setup_shot(p, gs.get(0, []), rng)
 	m[0x462] = _g(m, 0x462) | 0x80
 
 

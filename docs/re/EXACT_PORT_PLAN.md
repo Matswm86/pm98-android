@@ -24,6 +24,14 @@ GDScript reproducing the decoded algorithm, not redistribution of the binary.
   Pm98Driver._advance_team; phase 2->1 proven by test_driver_advance_engine.gd. The remaining gap is the
   set_phase(0) handler cascade (Task #4b item 4) + real kickoff placement, NOT the dispatch. See
   [[handoff-pm98-vtable-offset-rootcause-2026-06-23]] + the driver-wiring handoff. Original text retained:]**
+  **[Task #4b item 4 LANDED 2026-06-24: the 7 Family-A handler arms in Pm98Action._action_switch now run
+  call_setup=true/call_resolve=true, so engine_tick reaches set_phase(0) via handler -> setup_shot
+  (FUN_005ac1a0) -> resolve_post_shot (FUN_005ab5a0). Integration-oracle-GREEN for the setup_shot tail via
+  the acc40 path: run_engine_cascade_oracle.sh runs the WHOLE chain REAL under the PCode emu (only the 6
+  off-path handlers / resolver / movement fns stubbed) -> test_engine_cascade.gd 40/40. The fixture drives
+  resolve_post_shot's to_tail path; the pass/keeper/classify blocks + a kick-handler (resolve_post_shot-
+  direct) engine fixture remain as the next integration increment. Fixed two latent int-vs-Dict pointer
+  compares surfaced by the cascade (setup_shot entry guard + _ball_engage_player, now is_same).]**
   **ROOT CAUSE (decompile + objdump verified, NOT a guess):** the match stays in **PHASE 2 (kickoff)
   forever** -- no dispatch ever fires, 0:0. `set_phase(0)` (open play) and `set_phase(1)` (phase boundary)
   exist ONLY in the **resolver family**: `FUN_005ab5a0` (set_phase(0) @0x5ac0a5) and `FUN_005a50c0`
