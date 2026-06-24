@@ -2918,6 +2918,210 @@ static func goal_aim_025(p: Dictionary, rng, call_setup: bool = true) -> void:
 		setup_shot(p, [], rng)
 
 
+## FUN_005a44f0 (__thiscall match; side): the opponent goal-line x. goalx = match+0x1820, NEGATED when
+## (match+0x19a0 & 1) == side. ai_feed_024 calls it with side = 1 - team (the goal the player attacks),
+## both in the preamble heading test and the tail re-aim. (Same orientation rule as goal_aim_025's goalx.)
+static func _opp_goalx(m: Dictionary, side: int) -> int:
+	var goalx := _si(m, 0x1820)
+	if (_g(m, 0x19a0) & 1) == side:
+		goalx = Pm98Trig._i32(-goalx)
+	return goalx
+
+
+## FUN_005ad010 (case 5/0x24, __fastcall this=player), frame guard p+0x2c==3 && p+0x30==3: THE MONSTER (2391 B)
+## -- the AI "feed / blind-aim" handler, last of Family A. Clears ball+0x4c up front. The branches (oracle
+## tools/re/run_ad010_oracle.sh -> specs/ad010_oracle.txt; setup_shot + 005943b0 stubbed, commentary headless):
+## (1) POWER-BUMP preamble -- only when p+0x54 >= 0xe AND p+0x5e==0: if the player faces within ~90deg of the
+##     opp goal (heading_diff to [opp_goalx,0,0] s16-abs < 0x4000) AND |anchor+x| > 0x1e0000, boost p+0x54 by
+##     min((|anchor+x|-0x1e0000)/0x80000, 5). Draws NO rng.
+## (2) special = gs+0x2ee && phase0 && p+0x5c. If special: p+0x5e = (p+0x58 != 0). ELSE a power roll: DRAW A,
+##     p+0x5e = ((A*1000)/0x8000 < (|anchor+x|*500)/0x3c0000); if set, DRAW B, p+0x58 = shot_rng_scale(B,
+##     (|anchor+x|*10)/0x3c0000) + 4. (1-2 draws.)
+## (3) BIG branch on p+700 (0x2bc):
+##   * p700==0 AND restart_box_ok(player pos): p+0x5e=1; special -> p+0x58 = tdiv(p58,2)+8 (0 draws); else
+##     reroll p58 = scale(rng,4)+0xc, p54 = scale(rng,2)+0xe (2 draws) + worst-teammate facing bias (+1 draw
+##     if a worst teammate exists; SIGN IS OPPOSITE feed_layoff_036: word>=0 -> +0x222, word<0 -> -0x222).
+##     Then displace by polar(p54*0x120000/16+0x120000, facing), corridor_nearest(0x1e0000,0xa0000); HIT ->
+##     aim=teammate + ball+0x4c; MISS -> blind polar(p54*0xe0000/16+0x120000 + rng*0x800/0x80) (+1 draw).
+##   * else (p700!=0 OR box-fail) match+0x44c==4: reroll unless special -- p58=scale(rng,6)+0xc, p54=scale(rng,
+##     3)+0xd (2 draws); if p58!=0 displace by polar(p54*0x190000/16+0xf0000, facing) + corridor(0x460000,
+##     0x80000); HIT->aim; MISS-> 2nd corridor(0x460000,0xf0000) on the RESTORED position; HIT->aim.
+##   * else 44c!=4: unless special, if 44c==5: 19cc==0 -> corridor(0x190000,0xf0000) (HIT->aim); 19cc!=0 ->
+##     p+0x5e=1 + p+0x58 = scale(rng,8)+4 (1 draw).
+## (4) TAIL (p+0x5e set && ball+0x4c==0): for p700==0, a goalbox-on-anchor-side early-out skips the re-aim.
+##     Else: aim -= pos; scale by (0x10000 - p58*0x8000/16) (== 1 - p58/32) via FUN_005ee1c0; if the heading
+##     to the scaled aim is within 0x2000 of the heading to the opp goal (atan(opp_goalx-x, -y)), blend in
+##     polar(|anchor+x|, atan(scaled.x, scaled.y)) and halve each lane; aim += pos.
+## (5) setup_shot + match+0x462 |= 0x80. ALL corridor casts are FUN_005b1100 (deterministic, no rng); ad010
+##     NEVER uses loose_ball_search. The decompiler aliased local_18/14/10 as opp_goalx, but at the
+##     displacement sites those slots hold the FRESH FUN_005ee0f0 polar output -- verified in the disasm.
+static func ai_feed_024(p: Dictionary, rng, call_setup: bool = true) -> void:
+	if _g(p, 0x2c) != 3 or _g(p, 0x30) != 3:
+		return
+	var ball := _ref(p, 0x190)
+	var m := _ref(p, 0x18c)
+	var gs := _ref(p, 0x184)
+	ball[0x4c] = 0
+
+	# ---- (1) power-bump preamble (no rng) ----
+	if _si(p, 0x54) >= 0xe and _g(p, 0x5e) == 0:
+		var ogoalx := _opp_goalx(m, 1 - _g(p, 0x2b8))
+		var hd := Pm98Trig._s16(Pm98Trig.atan_angle(Pm98Trig._i32(ogoalx - _si(p, 0x4)), Pm98Trig._i32(-_si(p, 0x8))) - _g(p, 0x34))
+		if abs(hd) < 0x4000:
+			var ax0: int = abs(Pm98Trig._i32(_si(p, 0x3a4) + _si(p, 0x4)))
+			if ax0 > 0x1e0000:
+				var boost: int = Pm98Trig._tdiv(Pm98Trig._i32(ax0 - 0x1e0000), 0x80000)
+				if boost > 5:
+					boost = 5
+				p[0x54] = Pm98Trig._i32(_si(p, 0x54) + boost)
+
+	# ---- (2) special predicate + power roll ----
+	var special: bool = _g(gs, 0x2ee) != 0 and _phase0(m) and _g(p, 0x5c) != 0
+	if special:
+		p[0x5e] = 1 if _g(p, 0x58) != 0 else 0
+	else:
+		var ax: int = abs(Pm98Trig._i32(_si(p, 0x3a4) + _si(p, 0x4)))
+		var draw_a: int = rng.next()                                          # DRAW A
+		# ax*500 and ax*10 WRAP to int32 (the imul) BEFORE the signed /0x3c0000 -- a 34M*500 product
+		# overflows, so the roll is on the wrapped value, not the 64-bit one.
+		var lhs := Pm98Trig._tdiv(Pm98Trig._i32(draw_a * 1000), 0x8000)
+		var rhs := Pm98Trig._tdiv(Pm98Trig._i32(ax * 500), 0x3c0000)
+		p[0x5e] = 1 if lhs < rhs else 0
+		if lhs < rhs:
+			p[0x58] = _shot_rng_scale(rng.next(), Pm98Trig._tdiv(Pm98Trig._i32(ax * 10), 0x3c0000)) + 4   # DRAW B
+		# (p+0x58 left as-is when the roll fails)
+
+	# ---- (3) big p+700 branch ----
+	if _g(p, 0x2bc) == 0 and restart_box_ok(p, [_si(p, 0x4), _si(p, 0x8), _si(p, 0xc)]):
+		# --- p700==0 path ---
+		p[0x5e] = 1
+		if special:
+			p[0x58] = Pm98Trig._tdiv(_si(p, 0x58), 2) + 8
+		else:
+			p[0x58] = _shot_rng_scale(rng.next(), 4) + 0xc                    # DRAW
+			p[0x54] = _shot_rng_scale(rng.next(), 2) + 0xe                    # DRAW
+			# worst-rated teammate facing bias (SIGN OPPOSITE feed_layoff_036).
+			var roster1: Array = p.get(0x188, [])
+			var worst: Variant = null
+			var worst_skill := 0x3e80000
+			for cand in roster1:
+				var skill: int
+				if cand is Dictionary:
+					var cd: Dictionary = cand
+					var ci := _g(cd, 0x2b8) * 0xb + _g(cd, 0x2c4)
+					skill = _si(p, 0xe4 + ci * 4)
+				else:
+					skill = 0xc80000
+				if skill < worst_skill:
+					worst_skill = skill
+					worst = cand
+			if worst is Dictionary:
+				var wd: Dictionary = worst
+				var wi := _g(wd, 0x2b8) * 0xb + _g(wd, 0x2c4)
+				var sk16 := Pm98Trig._s16(_g(p, 0xb8 + wi * 2))
+				if sk16 >= 0:                                                 # word >= 0 (JGE) -> +0x222
+					p[0x34] = Pm98Trig._s16(_g(p, 0x34) + (_shot_rng_scale(rng.next(), 0x222) + 0x222))
+				else:                                                        # word < 0 -> -0x222
+					p[0x34] = Pm98Trig._s16(_g(p, 0x34) + (-0x222 - _shot_rng_scale(rng.next(), 0x222)))
+
+		var facing := _g(p, 0x34)
+		var mag := Pm98Trig._tdiv(Pm98Trig._i32(_si(p, 0x54) * 0x120000), 0x10) + 0x120000
+		var disp := Pm98Trig.polar_vec(mag, facing)
+		p[0x4] = Pm98Trig._i32(_si(p, 0x4) + int(disp[0]))
+		p[0x8] = Pm98Trig._i32(_si(p, 0x8) + int(disp[1]))
+		p[0xc] = Pm98Trig._i32(_si(p, 0xc) + int(disp[2]))
+		var hit: Variant = _corridor_nearest(p, gs.get(0, []), facing, 0x1e0000, 0xa0000)
+		p[0x4] = Pm98Trig._i32(_si(p, 0x4) - int(disp[0]))
+		p[0x8] = Pm98Trig._i32(_si(p, 0x8) - int(disp[1]))
+		p[0xc] = Pm98Trig._i32(_si(p, 0xc) - int(disp[2]))
+		if hit is Dictionary:
+			var hd2: Dictionary = hit
+			p[0xa0] = _g(hd2, 0x4); p[0xa4] = _g(hd2, 0x8); p[0xa8] = _g(hd2, 0xc)
+			ball[0x4c] = hd2
+		else:
+			var mag2 := Pm98Trig._tdiv(rng.next() * 0x800, 0x80) + Pm98Trig._tdiv(Pm98Trig._i32(_si(p, 0x54) * 0xe0000), 0x10) + 0x120000   # DRAW
+			var disp2 := Pm98Trig.polar_vec(mag2, facing)
+			p[0xa0] = Pm98Trig._i32(_si(p, 0x4) + int(disp2[0]))
+			p[0xa4] = Pm98Trig._i32(_si(p, 0x8) + int(disp2[1]))
+			p[0xa8] = Pm98Trig._i32(_si(p, 0xc) + int(disp2[2]))
+	elif _g(m, 0x44c) == 4:
+		# --- p700!=0, match+0x44c==4 ---
+		if not special:
+			p[0x5e] = 1
+			p[0x58] = _shot_rng_scale(rng.next(), 6) + 0xc                    # DRAW
+			p[0x54] = _shot_rng_scale(rng.next(), 3) + 0xd                    # DRAW
+		if _g(p, 0x58) != 0:
+			var facing := _g(p, 0x34)
+			var mag := Pm98Trig._tdiv(Pm98Trig._i32(_si(p, 0x54) * 0x190000), 0x10) + 0xf0000
+			var disp := Pm98Trig.polar_vec(mag, facing)
+			p[0x4] = Pm98Trig._i32(_si(p, 0x4) + int(disp[0]))
+			p[0x8] = Pm98Trig._i32(_si(p, 0x8) + int(disp[1]))
+			p[0xc] = Pm98Trig._i32(_si(p, 0xc) + int(disp[2]))
+			var hit1: Variant = _corridor_nearest(p, gs.get(0, []), facing, 0x460000, 0x80000)
+			p[0x4] = Pm98Trig._i32(_si(p, 0x4) - int(disp[0]))
+			p[0x8] = Pm98Trig._i32(_si(p, 0x8) - int(disp[1]))
+			p[0xc] = Pm98Trig._i32(_si(p, 0xc) - int(disp[2]))
+			if hit1 is Dictionary:
+				var h1: Dictionary = hit1
+				p[0xa0] = _g(h1, 0x4); p[0xa4] = _g(h1, 0x8); p[0xa8] = _g(h1, 0xc)
+				ball[0x4c] = h1
+			else:
+				var hit2: Variant = _corridor_nearest(p, gs.get(0, []), facing, 0x460000, 0xf0000)
+				if hit2 is Dictionary:
+					var h2: Dictionary = hit2
+					p[0xa0] = _g(h2, 0x4); p[0xa4] = _g(h2, 0x8); p[0xa8] = _g(h2, 0xc)
+					ball[0x4c] = h2
+	else:
+		# --- p700!=0, 44c != 4 ---
+		if not special and _g(m, 0x44c) == 5:
+			if _g(m, 0x19cc) == 0:
+				var facing := _g(p, 0x34)
+				var hit3: Variant = _corridor_nearest(p, gs.get(0, []), facing, 0x190000, 0xf0000)
+				if hit3 is Dictionary:
+					var h3: Dictionary = hit3
+					p[0xa0] = _g(h3, 0x4); p[0xa4] = _g(h3, 0x8); p[0xa8] = _g(h3, 0xc)
+					ball[0x4c] = h3
+			else:
+				p[0x5e] = 1
+				p[0x58] = _shot_rng_scale(rng.next(), 8) + 4                  # DRAW
+
+	# ---- (4) tail re-aim (blind aim refinement) ----
+	# ball+0x4c is a teammate POINTER in the binary: a corridor HIT stores a Dict here, so "== 0" (no
+	# target) means it is NOT a Dict.
+	if _g(p, 0x5e) != 0 and not (ball.get(0x4c, 0) is Dictionary):
+		var skip := false
+		if _g(p, 0x2bc) == 0:
+			if _ps_goalbox(p, [_si(p, 0x4), _si(p, 0x8), _si(p, 0xc)]) and _sign1(_si(p, 0x4)) == _sign1(_si(p, 0x3a4)):
+				skip = true
+		if not skip:
+			var amag: int = abs(Pm98Trig._i32(_si(p, 0x3a4) + _si(p, 0x4)))
+			# aim relative to pos, then scaled by (1 - p58/32) (FUN_005ee1c0).
+			var arx := Pm98Trig._i32(_si(p, 0xa0) - _si(p, 0x4))
+			var ary := Pm98Trig._i32(_si(p, 0xa4) - _si(p, 0x8))
+			var arz := Pm98Trig._i32(_si(p, 0xa8) - _si(p, 0xc))
+			var sf := Pm98Trig._i32(0x10000 - Pm98Trig._tdiv(Pm98Trig._i32(_si(p, 0x58) * 0x8000), 0x10))
+			var scaled := Pm98Trig.scale_vec3(arx, ary, arz, sf)
+			var sx: int = int(scaled[0])
+			var sy: int = int(scaled[1])
+			var sz: int = int(scaled[2])
+			var goalx := _opp_goalx(m, 1 - _g(p, 0x2b8))
+			var s5 := Pm98Trig.atan_angle(Pm98Trig._i32(goalx - _si(p, 0x4)), Pm98Trig._i32(-_si(p, 0x8)))
+			var s6 := Pm98Trig.atan_angle(Pm98Trig._i32(sx - _si(p, 0x4)), Pm98Trig._i32(sy - _si(p, 0x8)))
+			if abs(Pm98Trig._s16(s6 - s5)) < 0x2000:
+				var pol := Pm98Trig.polar_vec(amag, Pm98Trig.atan_angle(sx, sy))
+				sx = Pm98Trig._tdiv(Pm98Trig._i32(sx + int(pol[0])), 2)
+				sy = Pm98Trig._tdiv(Pm98Trig._i32(sy + int(pol[1])), 2)
+				sz = Pm98Trig._tdiv(Pm98Trig._i32(sz + int(pol[2])), 2)
+			p[0xa0] = Pm98Trig._i32(sx + _si(p, 0x4))
+			p[0xa4] = Pm98Trig._i32(sy + _si(p, 0x8))
+			p[0xa8] = Pm98Trig._i32(sz + _si(p, 0xc))
+
+	# ---- (5) setup_shot + match+0x462 |= 0x80 (unconditional once the frame guard passes) ----
+	if call_setup:
+		setup_shot(p, [], rng)
+	m[0x462] = _g(m, 0x462) | 0x80
+
+
 # ---- Match-driver leaves (FUN_00598740): within-box test + phase setter + vec copy ----
 # Small leaves the per-tick match driver FUN_00598740 calls. Oracle-pinned (FUN_005a1820 EAX +
 # FUN_005942e0 state) by tools/re/run_driverleaf_oracle.sh -> specs/driverleaf_oracle.txt, locked
