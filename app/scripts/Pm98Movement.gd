@@ -2516,6 +2516,143 @@ static func kick_resolve(p: Dictionary, rng, cfg: Dictionary, call_resolve: bool
 		ball[0x64] = 1
 
 
+# ---- AI lay-off / feed action handlers (Family A: FUN_005ad970 / 005adc60 / 005acc40) -----------
+# The three "AI passes / lays the ball off to a teammate" open-play handlers; each ENDS by calling
+# FUN_005ac1a0 (= setup_shot) once it has chosen an aim point (player+0xa0/a4/a8). FUN_005ad970 (case
+# 0x36) is ported here. It clears ball+0x63 and sets player+0x5e=1; then UNLESS the set-piece predicate
+# holds (gs+0x2ee && play_state==0 && player+0x5c) it re-rolls the touch/power (player+0x58 =
+# rng*4/0x8000+0xc, player+0x54 = rng*3/0x8000+0xd) and biases the facing player+0x34 toward/away from
+# the WORST-rated teammate at its pitch position (the per-position skill table player+0xe4[idx]). Then it
+# casts a corridor from the (temporarily forward-displaced) player along the facing and asks FUN_005b1100
+# for the nearest teammate in that corridor: a hit -> aim = that teammate's pos + ball+0x4c repointed to
+# it; a miss -> a blind polar throw (one extra rng draw). Oracle-pinned bit-for-bit by
+# tools/re/run_ad970_oracle.sh -> specs/ad970_oracle.txt (FUN_005ac1a0 + FUN_005943b0 stubbed, like the
+# kick handlers stub FUN_005ab5a0); the corridor leaf FUN_005b1100/005b0e90 runs REAL under the emu.
+
+## FUN_005b0e90 (__thiscall this=candidate; self_pos, angle, scale, dist): the perpendicular distance of
+## `cand_pos` from the ray cast from `self_pos` along `angle`, but ONLY inside a corridor. Returns
+## 0xc80000 ("infinitely far", the no-hit sentinel) when the candidate is outside the abs(.)<scale/2+dist
+## L-inf box about the corridor midpoint, OR its along-ray projection is <0 or >scale. Otherwise the true
+## perpendicular |unit_dir x D| (D = candidate-self) via the FP sqrt + ftol (truncate-toward-zero). The
+## mid offset and unit dir are polar(scale/2, angle) and polar(1.0, angle) = FUN_005ee0f0; the projection
+## is dot16 (FUN_005ee500) and the perpendicular is |cross16| (FUN_005ee540) magnitude.
+static func _seg_corridor_dist(cand_pos: Array, self_pos: Array, angle: int, scale: int, dist: int) -> int:
+	var unit := Pm98Trig.polar_vec(0x10000, angle)             # FUN_005ee0f0(1.0, angle)
+	var half_s := Pm98Trig._tdiv(scale, 2)                     # scale/2, truncate toward zero
+	var mid := Pm98Trig.polar_vec(half_s, angle)              # FUN_005ee0f0(scale/2, angle)
+	var ext := half_s + dist                                  # corridor L-inf half-extent
+	# box test about (self_pos + mid); each subtraction wraps to int32 like the binary's two SUBs.
+	var bx: int = abs(Pm98Trig._i32(Pm98Trig._i32(int(cand_pos[0]) - int(mid[0])) - int(self_pos[0])))
+	var by: int = abs(Pm98Trig._i32(Pm98Trig._i32(int(cand_pos[1]) - int(mid[1])) - int(self_pos[1])))
+	var bz: int = abs(Pm98Trig._i32(Pm98Trig._i32(int(cand_pos[2]) - int(mid[2])) - int(self_pos[2])))
+	if bx < ext and by < ext and bz < ext:
+		var d := [Pm98Trig._i32(int(cand_pos[0]) - int(self_pos[0])),
+			Pm98Trig._i32(int(cand_pos[1]) - int(self_pos[1])),
+			Pm98Trig._i32(int(cand_pos[2]) - int(self_pos[2]))]
+		var proj := _dot3_16(unit, d)                         # FUN_005ee500(unit, D) -- along-ray
+		if proj >= 0 and proj <= scale:
+			var cr: Array = Pm98Trig.cross16(unit, d)         # FUN_005ee540(unit, out, D)
+			return int(sqrt(float(cr[0] * cr[0] + cr[1] * cr[1] + cr[2] * cr[2])))  # |perp|, ftol-truncated
+	return 0xc80000
+
+
+## FUN_005b1100 (__thiscall this=player; roster, angle, scale, dist): scan `roster` (the gs player list)
+## for the teammate (NOT self, with +0x2bc != 0) of MINIMUM _seg_corridor_dist along the facing ray.
+## Returns that teammate Dict, or null if none qualifies. null roster entries are skipped (the +0x2bc gate).
+static func _corridor_nearest(self_p: Dictionary, roster: Array, angle: int, scale: int, dist: int) -> Variant:
+	var self_pos := [_si(self_p, 0x4), _si(self_p, 0x8), _si(self_p, 0xc)]
+	var best: Variant = null
+	var best_d := 0xc80000
+	for cand in roster:
+		if not (cand is Dictionary):
+			continue
+		if _g(cand, 0x2bc) == 0 or cand == self_p:
+			continue
+		var d := _seg_corridor_dist([_si(cand, 0x4), _si(cand, 0x8), _si(cand, 0xc)], self_pos, angle, scale, dist)
+		if d < best_d:
+			best_d = d
+			best = cand
+	return best
+
+
+## FUN_005ad970 (__fastcall this=player), case 0x36: the AI lay-off / short-feed handler. Mutates ball
+## (+0x63=0, +0x4c) and player (+0x5e=1, +0x54/58, +0x34, +0xa0/a4/a8 aim) and ends with setup_shot. The
+## player position +4/8/c is displaced forward by a polar step for the corridor scan then RESTORED (net
+## zero). Pass call_setup=false to skip the FUN_005ac1a0 tail (the oracle stubs it; the residue verified
+## here is ball+0x63/4c, player+0x5e/54/58/34/aim and the rng seed).
+static func feed_layoff_036(p: Dictionary, rng, call_setup: bool = true) -> void:
+	if _g(p, 0x2c) != 0x13 or _g(p, 0x30) != 0:
+		return
+	var ball := _ref(p, 0x190)
+	var m := _ref(p, 0x18c)
+	var gs := _ref(p, 0x184)
+	ball[0x63] = 0
+	p[0x5e] = 1
+
+	# set-piece predicate: gs+0x2ee set AND play-state 0 (FUN_005943b0) AND player+0x5c.
+	var special: bool = _g(gs, 0x2ee) != 0 and _phase0(m) and _g(p, 0x5c) != 0
+	if special:
+		p[0x58] = Pm98Trig._tdiv(_si(p, 0x58), 2) + 8
+	else:
+		p[0x58] = _shot_rng_scale(rng.next(), 4) + 0xc        # rng draw #1
+		p[0x54] = _shot_rng_scale(rng.next(), 3) + 0xd        # rng draw #2
+		# Worst-rated teammate at its pitch position (MIN of self's per-position table player+0xe4[idx]).
+		var roster1: Array = p.get(0x188, [])
+		var worst: Variant = null
+		var worst_skill := 0x3e80000
+		for cand in roster1:
+			var skill: int
+			if cand is Dictionary:
+				var cd: Dictionary = cand
+				var ci := _g(cd, 0x2b8) * 0xb + _g(cd, 0x2c4)
+				skill = _si(p, 0xe4 + ci * 4)
+			else:
+				skill = 0xc80000
+			if skill < worst_skill:
+				worst_skill = skill
+				worst = cand
+		if worst is Dictionary:
+			var wd: Dictionary = worst
+			var wi := _g(wd, 0x2b8) * 0xb + _g(wd, 0x2c4)
+			var sk16 := Pm98Trig._s16(_g(p, 0xb8 + wi * 2))
+			if sk16 < 1:                                       # CMP word, JLE 0 -> the +0x222 bias
+				p[0x34] = Pm98Trig._s16(_g(p, 0x34) + (_shot_rng_scale(rng.next(), 0x222) + 0x222))
+			else:                                              # the -0x222 bias
+				p[0x34] = Pm98Trig._s16(_g(p, 0x34) + (-0x222 - _shot_rng_scale(rng.next(), 0x222)))
+
+	# ---- corridor scan from the forward-displaced player position ----
+	var facing := _g(p, 0x34)
+	var mag := Pm98Trig._tdiv(Pm98Trig._i32(_si(p, 0x54) * 0x120000), 0x10) + 0x120000
+	var disp := Pm98Trig.polar_vec(mag, facing)
+	p[0x4] = Pm98Trig._i32(_si(p, 0x4) + int(disp[0]))
+	p[0x8] = Pm98Trig._i32(_si(p, 0x8) + int(disp[1]))
+	p[0xc] = Pm98Trig._i32(_si(p, 0xc) + int(disp[2]))
+	var groster: Array = gs.get(0, [])
+	var hit: Variant = _corridor_nearest(p, groster, facing, 0x1e0000, 0xa0000)
+	p[0x4] = Pm98Trig._i32(_si(p, 0x4) - int(disp[0]))
+	p[0x8] = Pm98Trig._i32(_si(p, 0x8) - int(disp[1]))
+	p[0xc] = Pm98Trig._i32(_si(p, 0xc) - int(disp[2]))
+
+	if hit is Dictionary:
+		var hd: Dictionary = hit
+		p[0xa0] = _g(hd, 0x4)
+		p[0xa4] = _g(hd, 0x8)
+		p[0xa8] = _g(hd, 0xc)
+		ball[0x4c] = hd
+		if call_setup:
+			setup_shot(p, [], rng)
+		return
+
+	# no corridor teammate: a blind polar throw (one extra rng draw).
+	var mag2 := Pm98Trig._tdiv(rng.next() * 0xa00, 0x80) + Pm98Trig._tdiv(Pm98Trig._i32(_si(p, 0x54) * 0xe0000), 0x10) + 0x120000
+	var disp2 := Pm98Trig.polar_vec(mag2, facing)
+	p[0xa0] = Pm98Trig._i32(_si(p, 0x4) + int(disp2[0]))
+	p[0xa4] = Pm98Trig._i32(_si(p, 0x8) + int(disp2[1]))
+	p[0xa8] = Pm98Trig._i32(_si(p, 0xc) + int(disp2[2]))
+	if call_setup:
+		setup_shot(p, [], rng)
+
+
 # ---- Match-driver leaves (FUN_00598740): within-box test + phase setter + vec copy ----
 # Small leaves the per-tick match driver FUN_00598740 calls. Oracle-pinned (FUN_005a1820 EAX +
 # FUN_005942e0 state) by tools/re/run_driverleaf_oracle.sh -> specs/driverleaf_oracle.txt, locked
