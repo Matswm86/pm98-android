@@ -2193,6 +2193,217 @@ static func _ball_engage_player(ball: Dictionary, target: Dictionary) -> void:
 		m[0x43c] = 0
 
 
+# ---- FUN_005ac1a0 : the SHOT / TRAJECTORY SETUP (oracle: run_shotsetup_oracle.sh) --------------------
+# The open-play engine runs this to launch the ball (case-0x13 shot etc.). It builds, from the player's
+# skill (+0x394 owned / +0x3a0 unowned, all as 100-rating = iVar21), the aim target (player+0xa0/a4/a8)
+# and the ball position (ball+4/8/c): a horizontal REACH (the 3D ball->aim distance jittered by a
+# skill-scaled random factor near 1.0), a launch PITCH (local_28) and a horizontal DIRECTION (local_20,
+# = atan(aim-ball) +/- a skill spread). It then writes the predicted landing spot (ball+0x84/88/8c =
+# ball.pos + polar(mag_land, dir)) and the launch velocity (ball+0x20/24/28), runs the post-shot
+# resolution (FUN_005ab5a0 = resolve_post_shot), bumps ball+0x70 to >= 4 and clears player+0x54/0x58.
+# Headless: there is no display state here, so the port is the full SIM residue. Every fixed-point op,
+# RNG draw (FUN_005ec250) and MulDiv is the binary's. Oracle-pinned bit-for-bit (the landing, the
+# velocity, ball+0x70 and the RNG draw count) by run_shotsetup_oracle.sh -> specs/shotsetup_oracle.txt.
+
+## FUN_005ec250 random scaled by n: the binary's `(rng * n) >> 15` with the >= 0x8000 overflow-avoiding
+## split (round0(n/256) * rng round0(/128)) for large n. round0 == truncate-toward-zero (rng, n >= 0).
+static func _shot_rng_scale(r: int, n: int) -> int:
+	if n < 0x8000:
+		return Pm98Trig._tdiv(r * n, 0x8000)
+	return Pm98Trig._tdiv(Pm98Trig._tdiv(n, 0x100) * r, 0x80)
+
+
+## FUN_0058f100 (__thiscall ball): the early ball-engage copy guard. Returns ball+0x63 (the AL the
+## caller tests). Side effect: when ball+0x63 != 0 AND match+0x448 == 0, copy the engaged player's
+## position (ball+0x40 -> +4/8/c) into ball+0x90/94/98. Only invoked when the shooter is NOT the
+## ball's engaged player (the && short-circuit), so the copy reflects a hand-off.
+static func _shot_engage_guard(ball: Dictionary, m: Dictionary) -> int:
+	var flag := _g(ball, 0x63)
+	if flag != 0 and _g(m, 0x448) == 0:
+		var eng: Variant = ball.get(0x40, null)
+		if eng is Dictionary:
+			ball[0x90] = _g(eng, 0x4)
+			ball[0x94] = _g(eng, 0x8)
+			ball[0x98] = _g(eng, 0xc)
+	return flag
+
+
+## FUN_005ac1a0 (__fastcall this=player). Mutates ball (landing ball+0x84/88/8c, velocity ball+0x20/24/28,
+## ball+0x70) and clears player+0x54/0x58. `teammates`/`rng` are forwarded to resolve_post_shot (the tail
+## FUN_005ab5a0). Pass call_resolve=false to run ONLY this function's residue (the oracle stubs
+## FUN_005ab5a0; resolve_post_shot is verified separately and never overwrites our ball writes).
+static func setup_shot(p: Dictionary, teammates: Array = [], rng = null, call_resolve: bool = true) -> void:
+	var ball := _ref(p, 0x190)
+	var m := _ref(p, 0x18c)
+
+	# Entry guard: a non-engaged shooter with ball+0x63 set hands off (copy) and bails.
+	if ball.get(0x40, null) != p and _shot_engage_guard(ball, m) != 0:
+		p[0x54] = 0
+		p[0x58] = 0
+		return
+
+	var anchor := _si(p, 0x3a4)
+	var action := _g(p, 0x40)
+	var goalx := _si(m, 0x1820)
+	var aim := [_si(p, 0xa0), _si(p, 0xa4), _si(p, 0xa8)]
+	var dx := Pm98Trig._i32(int(aim[0]) - _si(ball, 0x4))     # aim - ball.pos (the shot vector)
+	var dy := Pm98Trig._i32(int(aim[1]) - _si(ball, 0x8))
+	var dz := Pm98Trig._i32(int(aim[2]) - _si(ball, 0xc))
+
+	# aim_goal: the aim point is inside the goal box on the side opposite the player's anchor.
+	var aim_goal: bool = _ps_goalbox(p, aim) and _sign1(int(aim[0])) != _sign1(anchor)
+
+	# local_20 cap (drives the C-condition below). m+0x44c==4 forces 0x500000.
+	var cap: int
+	if _g(m, 0x44c) == 4:
+		cap = 0x500000
+	elif aim_goal:
+		cap = 0x500000
+	elif action == 0x13 or action == 0x37:
+		cap = 0x140000
+	else:
+		cap = 0x260000
+
+	var owner: Variant = ball.get(0x4c, null)
+	var unowned: bool = not (owner is Dictionary)
+
+	# iVar21 = 100 - skill (owned uses +0x394, unowned +0x3a0); m+0x44c==6 thirds it.
+	var iv21 := 100 - (_si(p, 0x3a0) if unowned else _si(p, 0x394))
+	if _g(m, 0x44c) == 6:
+		iv21 = Pm98Trig._tdiv(iv21, 3)
+
+	# touch = max(4, unowned ? player+0x54 : player+0x58)  (the early local_24 / local_18).
+	var touch := _si(p, 0x54) if unowned else _si(p, 0x58)
+	if touch < 4:
+		touch = 4
+
+	# reach = 3D ball->aim distance * a skill-jittered factor near 1.0 (16.16).
+	var hr := Pm98Trig._tdiv((0x9999 if unowned else 0x6666) * iv21, 100)
+	var rnd0 := _shot_rng_scale(rng.next(), 2 * hr + 1)
+	var pw := (rnd0 - hr) + 0x10000
+	var dist := int(sqrt(float(dx * dx + dy * dy + dz * dz)))   # ftol(fsqrt), truncate
+	var reach := Pm98Trig.mul16(dist, pw)
+
+	# bVar2: a "weak/short" shot flag -- only for non-special shots (cVar4 == 0) whose reach is short.
+	var cvar4 := _g(p, 0x5e) & 0xff
+	var bvar2 := false
+	if cvar4 == 0:
+		bvar2 = reach < (rng.next() * 10 + 0xf0000)
+
+	# power (local_24). C = cVar4==0 OR (owned AND reach >= cap).
+	var power: int
+	if cvar4 == 0 or (not unowned and reach >= cap):
+		if bvar2:
+			power = reach
+		else:
+			var xden := Pm98Trig._tdiv((0x10 - touch) * 0x3851, 0x10) + 0x175c2
+			power = Pm98Trig.ratio16(reach, xden)
+	else:
+		var half := 0x20000 if aim_goal else 0
+		power = Pm98Trig._i32(reach + _shot_rng_scale(rng.next(), half))
+
+	# local_20 = atan(aim-ball horizontal) +/- a skill spread.
+	var base_ang := Pm98Trig.atan_angle(dx, dy)
+	var iv14 := Pm98Trig._tdiv(Pm98Trig._s16((0x160c if unowned else 0) + 0x2d8) * iv21, 100)
+	var local_20 := Pm98Trig._i32((base_ang - iv14) + _shot_rng_scale(rng.next(), 2 * iv14 + 1))
+
+	# local_28 = launch pitch.
+	var local_28: int
+	if cvar4 != 0:
+		var sv23: int
+		if unowned:
+			var t58 := _si(p, 0x58)
+			if t58 < 2:
+				t58 = 2
+			sv23 = (t58 + 1) * 0x16c
+		else:
+			sv23 = 0x1e94
+		var iv14b := Pm98Trig._tdiv(Pm98Trig._s16((0x889 if unowned else 0) + 0x5b0) * iv21, 100)
+		var sv22 := _shot_rng_scale(rng.next(), 2 * iv14b + 1)
+		var fac3 := Pm98Trig._s16((0xf555 if unowned else 0) + 0xe39)
+		var md3 := _muldiv(reach, fac3, 0x500000)
+		local_28 = ((sv23 - iv14b) + sv22) - md3
+	else:
+		if bvar2:
+			local_28 = 0x271c
+		else:
+			var sv23b := 0 if unowned else _muldiv(reach - 0xb0000, 0x5b0, 0x500000)
+			var iv14c := Pm98Trig._tdiv(iv21 * 0x4fa, 100)
+			var sv22b := _shot_rng_scale(rng.next(), 2 * iv14c + 1)
+			var pitch_atan := Pm98Trig.atan_angle(reach, dz)   # atan(reach, aim.z - ball.z)
+			local_28 = ((pitch_atan + 0x71c) + sv22b) + (sv23b - iv14c)
+
+	# Unowned-only adjustments (two rng-gated bumps) + the local_28 clamps.
+	if unowned:
+		if ((rng.next() * 1000) >> 15) < iv21 * 6:
+			var v := Pm98Trig._tdiv(iv21 * 0x11c7, 100) + 0x71c
+			local_28 += _shot_rng_scale(rng.next(), v)
+		if ((rng.next() * 1000) >> 15) < iv21 * 6:
+			var v2 := Pm98Trig._tdiv(iv21 * 0x11c7, 100) + 0xaab
+			local_20 += _shot_rng_scale(rng.next(), 2 * v2 + 1) - v2
+		if Pm98Trig._s16(local_28) <= 0x16c:
+			local_28 = 0x16c
+		if power < 0xf0000:
+			if Pm98Trig._s16(local_28) > 0x1dde:
+				local_28 = 0x1dde
+		elif power < 0x140000:
+			if Pm98Trig._s16(local_28) > 0x216c:
+				local_28 = 0x216c
+		elif Pm98Trig._s16(local_28) > 0x238e:
+			local_28 = 0x238e
+
+	# Late goalbox bump: a special shot taken from inside the own-side goal box (not a 0x37 action).
+	if _g(p, 0x2bc) == 0:
+		var ppos := [_si(p, 0x4), _si(p, 0x8), _si(p, 0xc)]
+		if _ps_goalbox(p, ppos) and _sign1(int(ppos[0])) == _sign1(anchor) \
+				and cvar4 != 0 and action != 0x37:
+			local_28 += 0x222 + Pm98Trig._tdiv(rng.next() * 0x38e, 0x8000)
+
+	# ---- emit landing + velocity ----
+	var sin_p := Pm98Trig.sin_a(local_28)
+	var cos_p := Pm98Trig.cos_a(local_28)
+	var r1 := Pm98Trig.muladd16(Pm98Trig._i32(_si(ball, 0xc) - int(aim[2])), cos_p, power, sin_p)
+	var l14 := Pm98Trig.mul16(2 * cos_p, r1)
+	if l14 < 0x28f:
+		l14 = 0x28f
+	var vterm := Pm98Trig.fixmul3(power, power, 0xb2)
+	# FILD vterm / FIDIV l14 / FSQRT / FMUL 65536 / ftol(TRUNCATE). MSVC runs the x87 at PC=53, so the
+	# 64-bit double sequence reproduces it; int() truncates toward zero like _ftol (NOT round-nearest).
+	var tof := int(sqrt(float(vterm) / float(l14)) * 65536.0)
+
+	# landing ball+0x84/88/8c = ball.pos + polar(mag_land, local_20).
+	var mag_land := Pm98Trig._tdiv(rng.next() * 0xb3, 0x80) + reach - 0x5999
+	var out_land := Pm98Trig.polar_vec(mag_land, local_20)
+	ball[0x84] = Pm98Trig._i32(int(out_land[0]) + _si(ball, 0x4))
+	ball[0x88] = Pm98Trig._i32(int(out_land[1]) + _si(ball, 0x8))
+	ball[0x8c] = Pm98Trig._i32(int(out_land[2]) + _si(ball, 0xc))
+
+	# tof clamp: tof = min(tof, round0((MulDiv(0x9999, power-rating, 15000) + 0x13332 + MulDiv(...))/4)).
+	var thr := Pm98Trig._tdiv(_muldiv(0x9999, _si(p, 0x70), 15000) + 0x13332 + _muldiv(0x9999, 100 - iv21, 100), 4)
+	if thr <= tof:
+		tof = thr
+
+	# velocity ball+0x20/24/28 (horizontal uses cos, vertical uses sin).
+	if bvar2:
+		var ov := Pm98Trig.polar_vec(Pm98Trig.mul16(cos_p, 2 * tof), local_20)
+		ball[0x20] = int(ov[0])
+		ball[0x24] = int(ov[1])
+		ball[0x28] = int(ov[2])
+	else:
+		var ov2 := Pm98Trig.polar_vec(Pm98Trig.mul16(cos_p, tof), local_20)
+		ball[0x20] = int(ov2[0])
+		ball[0x24] = int(ov2[1])
+		ball[0x28] = Pm98Trig.mul16(sin_p, tof)
+
+	if call_resolve:
+		resolve_post_shot(p, teammates, rng)              # FUN_005ab5a0 tail
+
+	var b70 := _g(ball, 0x70)
+	ball[0x70] = b70 if b70 > 4 else 4
+	p[0x54] = 0
+	p[0x58] = 0
+
+
 # ---- Match-driver leaves (FUN_00598740): within-box test + phase setter + vec copy ----
 # Small leaves the per-tick match driver FUN_00598740 calls. Oracle-pinned (FUN_005a1820 EAX +
 # FUN_005942e0 state) by tools/re/run_driverleaf_oracle.sh -> specs/driverleaf_oracle.txt, locked

@@ -1,0 +1,31 @@
+# Oracle FUN_005ac1a0 (shot/trajectory setup). this=player. FUN_005ab5a0 STUBbed (ported sep).
+# reads: landing ball+0x84/88/8c, vel ball+0x20/24/28, ball+0x70, player+0x54/58, ball+0x90/94/98, seed.
+# rng draws = (seed advanced); each draw multiplies seed by 0x343fd. tracehits RNG = draw count.
+## FIX cvar0_owned
+CALL 0 RET steps=761 EAX=0 mem[0x270084:4]=2074449 mem[0x270088:4]=268732 mem[0x27008c:4]=0 mem[0x270020:4]=22379 mem[0x270024:4]=2899 mem[0x270028:4]=5139 mem[0x270070:4]=100 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x270090:4]=0 mem[0x270094:4]=0 mem[0x270098:4]=0 mem[0x6d3184:4]=1536596111 tracehits={RNG=5} stubhits={RESOLVE=1}
+## FIX bVar2_true
+CALL 0 RET steps=614 EAX=0 mem[0x270084:4]=398925 mem[0x270088:4]=1832 mem[0x27008c:4]=0 mem[0x270020:4]=9814 mem[0x270024:4]=45 mem[0x270028:4]=0 mem[0x270070:4]=100 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x270090:4]=0 mem[0x270094:4]=0 mem[0x270098:4]=0 mem[0x6d3184:4]=3768712380 tracehits={RNG=4} stubhits={RESOLVE=1}
+## FIX cvar1_owned
+CALL 0 RET steps=697 EAX=0 mem[0x270084:4]=2074449 mem[0x270088:4]=268732 mem[0x27008c:4]=0 mem[0x270020:4]=15861 mem[0x270024:4]=2054 mem[0x270028:4]=11583 mem[0x270070:4]=100 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x270090:4]=0 mem[0x270094:4]=0 mem[0x270098:4]=0 mem[0x6d3184:4]=1536596111 tracehits={RNG=5} stubhits={RESOLVE=1}
+## FIX unowned
+CALL 0 RET steps=767 EAX=0 mem[0x270084:4]=2001575 mem[0x270088:4]=325124 mem[0x27008c:4]=0 mem[0x270020:4]=25532 mem[0x270024:4]=4147 mem[0x270028:4]=7025 mem[0x270070:4]=100 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x270090:4]=0 mem[0x270094:4]=0 mem[0x270098:4]=0 mem[0x6d3184:4]=405865345 tracehits={RNG=7} stubhits={RESOLVE=1}
+## FIX cvar0_unowned
+CALL 0 RET steps=802 EAX=0 mem[0x270084:4]=2001575 mem[0x270088:4]=325124 mem[0x27008c:4]=0 mem[0x270020:4]=23606 mem[0x270024:4]=3834 mem[0x270028:4]=4716 mem[0x270070:4]=100 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x270090:4]=0 mem[0x270094:4]=0 mem[0x270098:4]=0 mem[0x6d3184:4]=405865345 tracehits={RNG=7} stubhits={RESOLVE=1}
+## FIX action13
+CALL 0 RET steps=696 EAX=0 mem[0x270084:4]=2075410 mem[0x270088:4]=275320 mem[0x27008c:4]=0 mem[0x270020:4]=12667 mem[0x270024:4]=1680 mem[0x270028:4]=9076 mem[0x270070:4]=100 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x270090:4]=0 mem[0x270094:4]=0 mem[0x270098:4]=0 mem[0x6d3184:4]=3768712380 tracehits={RNG=4} stubhits={RESOLVE=1}
+## FIX action37
+CALL 0 RET steps=698 EAX=0 mem[0x270084:4]=2075410 mem[0x270088:4]=275320 mem[0x27008c:4]=0 mem[0x270020:4]=12667 mem[0x270024:4]=1680 mem[0x270028:4]=9076 mem[0x270070:4]=100 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x270090:4]=0 mem[0x270094:4]=0 mem[0x270098:4]=0 mem[0x6d3184:4]=3768712380 tracehits={RNG=4} stubhits={RESOLVE=1}
+## FIX phase44c6
+CALL 0 RET steps=767 EAX=0 mem[0x270084:4]=2097036 mem[0x270088:4]=268378 mem[0x27008c:4]=0 mem[0x270020:4]=22917 mem[0x270024:4]=2932 mem[0x270028:4]=5073 mem[0x270070:4]=100 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x270090:4]=0 mem[0x270094:4]=0 mem[0x270098:4]=0 mem[0x6d3184:4]=1536596111 tracehits={RNG=5} stubhits={RESOLVE=1}
+## FIX phase44c4
+CALL 0 RET steps=669 EAX=0 mem[0x270084:4]=2074449 mem[0x270088:4]=268732 mem[0x27008c:4]=0 mem[0x270020:4]=15861 mem[0x270024:4]=2054 mem[0x270028:4]=11583 mem[0x270070:4]=100 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x270090:4]=0 mem[0x270094:4]=0 mem[0x270098:4]=0 mem[0x6d3184:4]=1536596111 tracehits={RNG=5} stubhits={RESOLVE=1}
+## FIX aim_goal
+CALL 0 RET steps=786 EAX=0 mem[0x270084:4]=2074449 mem[0x270088:4]=268732 mem[0x27008c:4]=0 mem[0x270020:4]=16213 mem[0x270024:4]=2100 mem[0x270028:4]=11840 mem[0x270070:4]=100 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x270090:4]=0 mem[0x270094:4]=0 mem[0x270098:4]=0 mem[0x6d3184:4]=1536596111 tracehits={RNG=5} stubhits={RESOLVE=1}
+## FIX late2bc
+CALL 0 RET steps=794 EAX=0 mem[0x270084:4]=2061665 mem[0x270088:4]=267076 mem[0x27008c:4]=0 mem[0x270020:4]=14102 mem[0x270024:4]=1826 mem[0x270028:4]=13028 mem[0x270070:4]=100 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x270090:4]=0 mem[0x270094:4]=0 mem[0x270098:4]=0 mem[0x6d3184:4]=3080048918 tracehits={RNG=6} stubhits={RESOLVE=1}
+## FIX clamp70
+CALL 0 RET steps=698 EAX=0 mem[0x270084:4]=2074449 mem[0x270088:4]=268732 mem[0x27008c:4]=0 mem[0x270020:4]=15861 mem[0x270024:4]=2054 mem[0x270028:4]=11583 mem[0x270070:4]=4 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x270090:4]=0 mem[0x270094:4]=0 mem[0x270098:4]=0 mem[0x6d3184:4]=1536596111 tracehits={RNG=5} stubhits={RESOLVE=1}
+## FIX touch_lt4
+CALL 0 RET steps=758 EAX=0 mem[0x270084:4]=2074449 mem[0x270088:4]=268732 mem[0x27008c:4]=0 mem[0x270020:4]=22189 mem[0x270024:4]=2874 mem[0x270028:4]=5095 mem[0x270070:4]=100 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x270090:4]=0 mem[0x270094:4]=0 mem[0x270098:4]=0 mem[0x6d3184:4]=1536596111 tracehits={RNG=5} stubhits={RESOLVE=1}
+## FIX skip
+CALL 0 RET steps=48 EAX=0 mem[0x270084:4]=0 mem[0x270088:4]=0 mem[0x27008c:4]=0 mem[0x270020:4]=0 mem[0x270024:4]=0 mem[0x270028:4]=0 mem[0x270070:4]=100 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x270090:4]=273 mem[0x270094:4]=546 mem[0x270098:4]=819 mem[0x6d3184:4]=305419896

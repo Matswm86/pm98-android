@@ -586,7 +586,8 @@ static func _h_adfc0(_p: Dictionary) -> void: trace_calls.append(["ADFC0", 0])  
 static func _h_ad970(_p: Dictionary) -> void: trace_calls.append(["AD970", 0])     # FUN_005ad970 (case 0x36)
 static func _h_adc60(_p: Dictionary) -> void: trace_calls.append(["ADC60", 0])     # FUN_005adc60 (case 0x37)
 static func _resolve_action(_p: Dictionary, _m: Dictionary) -> void: trace_calls.append(["AEDA0", 0])  # FUN_005aeda0 (case 8/9)
-static func _shot_setup(_p: Dictionary) -> void: trace_calls.append(["AC1A0", 0])  # FUN_005ac1a0 (case 0x13 bVar17-true)
+static func _shot_setup(_p: Dictionary) -> void: trace_calls.append(["AC1A0", 0])  # FUN_005ac1a0 (case 0x13 bVar17-true) -- port = Pm98Movement.setup_shot (oracle GREEN); wire here in Task #4
+
 static func _move_8680(_p: Dictionary) -> void: trace_calls.append(["M8680", 0])   # FUN_005a8680 (settle)
 static func _move_65a0(_p: Dictionary, arg: int) -> void: trace_calls.append(["M65a0", arg])  # FUN_005a65a0 (general move)
 static func _move_9490(_p: Dictionary) -> void: trace_calls.append(["M9490", 0])   # FUN_005a9490 (lean)
