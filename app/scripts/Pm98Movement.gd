@@ -2653,6 +2653,187 @@ static func feed_layoff_036(p: Dictionary, rng, call_setup: bool = true) -> void
 		setup_shot(p, [], rng)
 
 
+## FUN_005b3580 (__thiscall this=cand; &cand.x): 1 iff sign(cand.x) == sign(cand+0x3a4) -- the
+## candidate already stands on the same side as the goal it attacks. +0x3a4 is the player's
+## attacking-goal x anchor (signed). The loose-ball search uses it as the mode-1 reject gate.
+static func _loose_dir_match(cand: Dictionary) -> bool:
+	return _sign1(_si(cand, 0x3a4)) == _sign1(_si(cand, 0x4))
+
+
+## FUN_005b3c10 (__thiscall this=player; lo, mid, hi): a zone-dependent percentage roll. The threshold
+## (per-mille) is `lo` when gs+0x30c==0, `mid` when ==2, else `hi` (gs = player+0x184, +0x30c a
+## phase/zone field). Returns true w.p. threshold/1000 via the rand()*1000>>15 idiom -- ONE rng draw.
+static func _loose_chance(p: Dictionary, lo: int, mid: int, hi: int, rng) -> bool:
+	var zone := _g(_ref(p, 0x184), 0x30c)
+	var thr: int = lo if zone == 0 else (mid if zone == 2 else hi)
+	return rng.chance_permil(thr)
+
+
+## FUN_005b31a0 (__thiscall this=player; mode), RET 0x8: the loose-ball / open-man search. Scans the gs
+## roster (gs[0], gs = player+0x184) for the best teammate to receive, scoring each by a heading-spread
+## metric, and returns that teammate Dict (or null if the best score < 0x71c). Per active non-self
+## candidate it applies: a distance gate `ag(player) < ag(cand)+0x60000` (else a zone chance roll
+## _loose_chance, ONE rng draw); the mode gate (1 = reject candidates already in their attacking half
+## via _loose_dir_match; 2 = require ag(cand) >= ag(player)-0x40000; 3 = require ag(cand) >=
+## ag(player)+0x30000; 0 = none); a skill gate cand_skill > 0x40000 (cand_skill = self table
+## player+0xe4[idx], idx = cand+0x2b8*0xb + cand+0x2c4). Then an inner scan over player+0x188 finds the
+## minimum heading difference `ivar9` (init 0x7c72) to teammates with skill < cand_skill+0x18000, and
+## score = ivar9*100 / ((abs(cand_skill-0x80000)*100/30 >> 16) + 100), halved when cand's heading short16
+## >= 0x71c7 or *2/3 when >= 0x471c. ag(pl) = abs(pl.x - pl+0x3a4). Reused by adc60 (mode 0) and ad010.
+static func loose_ball_search(p: Dictionary, mode: int, rng) -> Variant:
+	var roster: Array = _ref(p, 0x184).get(0, [])     # gs[0]
+	var inner: Array = p.get(0x188, [])               # player+0x188 inner roster
+	var p_ag: int = abs(Pm98Trig._i32(_si(p, 0x4) - _si(p, 0x3a4)))
+	var best_score := 0
+	var best_cand: Variant = null
+	for cand in roster:
+		if not (cand is Dictionary):
+			continue
+		var cd: Dictionary = cand
+		if _g(cd, 0x2bc) == 0 or cd == p:             # inactive slot / self
+			continue
+		var c_ag: int = abs(Pm98Trig._i32(_si(cd, 0x4) - _si(cd, 0x3a4)))
+		# distance gate: pass if ag(player) < ag(cand)+0x60000, else the zone chance roll (1 rng draw).
+		if not (p_ag < c_ag + 0x60000):
+			if not _loose_chance(p, 0x64, 0x12c, 0x384, rng):
+				continue
+		if mode == 1 and _loose_dir_match(cd):
+			continue
+		if mode == 2 and c_ag < Pm98Trig._i32(p_ag - 0x40000):
+			continue
+		if mode == 3 and c_ag < Pm98Trig._i32(p_ag + 0x30000):
+			continue
+		var idx_c := _g(cd, 0x2b8) * 0xb + _g(cd, 0x2c4)
+		var cand_skill := _si(p, 0xe4 + idx_c * 4)
+		if cand_skill <= 0x40000:
+			continue
+		# inner heading-spread scan: minimise ivar9 over teammates with skill < cand_skill+0x18000.
+		var thresh := Pm98Trig._i32(cand_skill + 0x18000)
+		var thresh2 := Pm98Trig._i32(cand_skill - 0x80000)   # = thresh - 0x98000
+		var ivar9 := 0x7c72
+		var bp := Pm98Trig._s16(_g(p, 0xb8 + idx_c * 2))
+		for c2 in inner:
+			var idx2 := -1
+			var skill2 := 0xc80000
+			if c2 is Dictionary:
+				idx2 = _g(c2, 0x2b8) * 0xb + _g(c2, 0x2c4)
+				skill2 = _si(p, 0xe4 + idx2 * 4)
+			if skill2 >= thresh:
+				continue
+			var h: int = 0
+			if idx2 >= 0:
+				h = abs(Pm98Trig._s16(Pm98Trig._s16(_g(p, 0xb8 + idx2 * 2)) - bp))
+			if skill2 < 0x80000 and (h >> 1) < ivar9:
+				ivar9 = h
+				continue
+			if skill2 <= thresh2:
+				continue
+			if h < ivar9:
+				ivar9 = h
+		# score the candidate (signed integer math, all operands non-negative here).
+		var abs_s: int = abs(Pm98Trig._i32(cand_skill - 0x80000))
+		var t30 := Pm98Trig._tdiv(abs_s * 100, 30)
+		var divisor := Pm98Trig._asr(t30, 0x10) + 100
+		var score := Pm98Trig._tdiv(ivar9 * 100, divisor)
+		if bp >= 0x71c7:
+			score = Pm98Trig._tdiv(score, 2)
+		elif bp >= 0x471c:
+			score = Pm98Trig._tdiv(score * 2, 3)
+		if score > best_score:
+			best_score = score
+			best_cand = cd
+	if best_score < 0x71c:
+		return null
+	return best_cand
+
+
+## FUN_005adc60 (__fastcall this=player), case 0x37: the near-twin of feed_layoff_036. Clears ball+0x63,
+## sets player+0x5e=0 (NOT 1). Unlike 0x36, the set-piece SPECIAL case does NOTHING in the top block --
+## ONLY the non-special branch re-rolls touch/power, and it does so with FOUR rng draws: p58/p54 are
+## rolled, then immediately RE-rolled (the first pair is overwritten but the rng IS consumed), then the
+## worst-rated-teammate facing bias (same as 0x36, +1 draw if a worst teammate exists). The tail
+## displaces the player forward by polar(p54*0xe0000>>4 + 0xe0000, facing) and asks for a corridor
+## teammate, but the scan function depends on the set-piece predicate AGAIN: SPECIAL -> the corridor
+## scan _corridor_nearest (FUN_005b1100); non-special -> the loose-ball search loose_ball_search
+## (FUN_005b31a0, mode 0). Hit -> aim = teammate pos + ball+0x4c repointed; miss -> a blind polar throw
+## (fallback mag p54*0x70000>>4 + 0xa0000 + rng*0xa00/0x80, +1 draw). Ends with setup_shot.
+static func feed_layoff_037(p: Dictionary, rng, call_setup: bool = true) -> void:
+	if _g(p, 0x2c) != 6 or _g(p, 0x30) != 0:
+		return
+	var ball := _ref(p, 0x190)
+	var m := _ref(p, 0x18c)
+	var gs := _ref(p, 0x184)
+	ball[0x63] = 0
+	p[0x5e] = 0
+
+	var special: bool = _g(gs, 0x2ee) != 0 and _phase0(m) and _g(p, 0x5c) != 0
+	if not special:
+		# FOUR rng draws: the first p58/p54 are immediately overwritten but DO advance the rng.
+		p[0x58] = _shot_rng_scale(rng.next(), 2) + 6          # draw #1 (overwritten)
+		p[0x54] = _shot_rng_scale(rng.next(), 3) + 0xd        # draw #2 (overwritten)
+		p[0x58] = _shot_rng_scale(rng.next(), 4) + 0xc        # draw #3
+		p[0x54] = _shot_rng_scale(rng.next(), 3) + 0xd        # draw #4
+		# Worst-rated teammate facing bias (identical to feed_layoff_036).
+		var roster1: Array = p.get(0x188, [])
+		var worst: Variant = null
+		var worst_skill := 0x3e80000
+		for cand in roster1:
+			var skill: int
+			if cand is Dictionary:
+				var cd: Dictionary = cand
+				var ci := _g(cd, 0x2b8) * 0xb + _g(cd, 0x2c4)
+				skill = _si(p, 0xe4 + ci * 4)
+			else:
+				skill = 0xc80000
+			if skill < worst_skill:
+				worst_skill = skill
+				worst = cand
+		if worst is Dictionary:
+			var wd: Dictionary = worst
+			var wi := _g(wd, 0x2b8) * 0xb + _g(wd, 0x2c4)
+			var sk16 := Pm98Trig._s16(_g(p, 0xb8 + wi * 2))
+			if sk16 < 1:
+				p[0x34] = Pm98Trig._s16(_g(p, 0x34) + (_shot_rng_scale(rng.next(), 0x222) + 0x222))
+			else:
+				p[0x34] = Pm98Trig._s16(_g(p, 0x34) + (-0x222 - _shot_rng_scale(rng.next(), 0x222)))
+
+	# ---- corridor scan from the forward-displaced player position ----
+	var facing := _g(p, 0x34)
+	var mag := Pm98Trig._tdiv(Pm98Trig._i32(_si(p, 0x54) * 0xe0000), 0x10) + 0xe0000
+	var disp := Pm98Trig.polar_vec(mag, facing)
+	p[0x4] = Pm98Trig._i32(_si(p, 0x4) + int(disp[0]))
+	p[0x8] = Pm98Trig._i32(_si(p, 0x8) + int(disp[1]))
+	p[0xc] = Pm98Trig._i32(_si(p, 0xc) + int(disp[2]))
+	# the scan function is re-selected by the SAME set-piece predicate (special == top branch).
+	var hit: Variant
+	if special:
+		hit = _corridor_nearest(p, gs.get(0, []), facing, 0x1e0000, 0xa0000)
+	else:
+		hit = loose_ball_search(p, 0, rng)
+	p[0x4] = Pm98Trig._i32(_si(p, 0x4) - int(disp[0]))
+	p[0x8] = Pm98Trig._i32(_si(p, 0x8) - int(disp[1]))
+	p[0xc] = Pm98Trig._i32(_si(p, 0xc) - int(disp[2]))
+
+	if hit is Dictionary:
+		var hd: Dictionary = hit
+		p[0xa0] = _g(hd, 0x4)
+		p[0xa4] = _g(hd, 0x8)
+		p[0xa8] = _g(hd, 0xc)
+		ball[0x4c] = hd
+		if call_setup:
+			setup_shot(p, [], rng)
+		return
+
+	# no corridor teammate: a blind polar throw (one extra rng draw).
+	var mag2 := Pm98Trig._tdiv(rng.next() * 0xa00, 0x80) + Pm98Trig._tdiv(Pm98Trig._i32(_si(p, 0x54) * 0x70000), 0x10) + 0xa0000
+	var disp2 := Pm98Trig.polar_vec(mag2, facing)
+	p[0xa0] = Pm98Trig._i32(_si(p, 0x4) + int(disp2[0]))
+	p[0xa4] = Pm98Trig._i32(_si(p, 0x8) + int(disp2[1]))
+	p[0xa8] = Pm98Trig._i32(_si(p, 0xc) + int(disp2[2]))
+	if call_setup:
+		setup_shot(p, [], rng)
+
+
 # ---- Match-driver leaves (FUN_00598740): within-box test + phase setter + vec copy ----
 # Small leaves the per-tick match driver FUN_00598740 calls. Oracle-pinned (FUN_005a1820 EAX +
 # FUN_005942e0 state) by tools/re/run_driverleaf_oracle.sh -> specs/driverleaf_oracle.txt, locked
