@@ -261,7 +261,9 @@ static func setup_kick(p: Dictionary, _m: Dictionary) -> void:
 ## CAVEAT -- case 0x13 bVar17-true block (the kick-aim teammate search + ball launch, L137-193 of the
 ## decompile) is transcription-only this slice: it is NOT exercised by the Step-1 oracle fixtures
 ## (they keep +0x2c != 5 so bVar17 is false). It gets its own oracle when case 0x13 is gated.
-static func engine_tick(p: Dictionary, m: Dictionary) -> void:
+static func engine_tick(p: Dictionary, m: Dictionary, rng = null) -> void:
+	if rng == null:                        # handler arms (Task #4) draw from the shared match LCG; the
+		rng = MatchEngine.Pm98Rng.new(0)   # Step-1 skeleton fixtures hit no handler arm so any seed is inert.
 	trace_calls.clear()                    # Step-1 leaf-selection hook (see STUB section)
 	var gs := _ref(p, 0x184)               # player+0x184 -> game/highlights state object
 	var b := _ref(p, 0x190)                # player+0x190 (decompile "+400") -> the ball
@@ -310,7 +312,7 @@ static func engine_tick(p: Dictionary, m: Dictionary) -> void:
 			gs[0x2e8] = Pm98Trig._i32(_g(gs, 0x2e8) + 1)
 
 	# --- the action-code switch (L80-236): exactly one arm fires (post-tick_action +0x40) ---
-	_action_switch(p, m, gs, b)
+	_action_switch(p, m, gs, b, rng)
 
 	# --- power-button accumulators (L237-266): user input via gs+0x214/+0x215; headless = both 0 ---
 	if _highlight_active(p, m, gs):
@@ -354,16 +356,20 @@ static func engine_tick(p: Dictionary, m: Dictionary) -> void:
 			p[0x54] = 0
 
 
-## L80-236: the action switch. Inline arms (6/7, 0x13, 0x1c, 0x1f/0x21) are ported here; the handler /
-## resolver / shot-setup arms are stubs (Tasks #2). `rng` for cases 6/7 + 0x1c is the match seed; the
-## Step-1 fixtures pick states where those arms draw 0 times, so engine_tick takes no rng here yet.
-static func _action_switch(p: Dictionary, m: Dictionary, gs: Dictionary, b: Dictionary) -> void:
+## L80-236: the action switch. Inline arms (6/7, 0x13, 0x1c, 0x1f/0x21) are ported here. The 7 Family-A
+## action handlers are WIRED (Task #4) to their oracle-GREEN ports, threading the shared match `rng`.
+## DECOMPOSITION GATE: each handler is wired with call_setup=false / call_resolve=false so its NESTED
+## cascade leaf (setup_shot = FUN_005ac1a0, resolve_post_shot = FUN_005ab5a0) stays a no-op -- those are
+## their own separately-oracled leaves, STUBBED in run_engine_oracle.sh too, so the integration matches
+## bit-for-bit. The full call_setup=true cascade lands once setup_shot + the case-8/9 resolver (FUN_005aeda0,
+## not yet ported) are integrated. The resolver (case 8/9) + the case-0x13 shot-setup stay stubs for now.
+static func _action_switch(p: Dictionary, m: Dictionary, gs: Dictionary, b: Dictionary, rng) -> void:
 	var act := _g(p, 0x40)
 	match act:
 		4, 0x25:
-			_h_acc40(p)                                  # STUB
+			Pm98Movement.goal_aim_025(p, rng, false)     # FUN_005acc40 (setup_shot leaf stubbed)
 		5, 0x24:
-			_h_ad010(p)                                  # STUB
+			Pm98Movement.ai_feed_024(p, rng, false)      # FUN_005ad010 (setup_shot leaf stubbed)
 		6, 7:
 			if _g(p, 0x2c) == FRAME_COUNT[act] - 1 and _g(p, 0x30) == 0:
 				if _g(p, 0x48) == 0:
@@ -381,11 +387,11 @@ static func _action_switch(p: Dictionary, m: Dictionary, gs: Dictionary, b: Dict
 		0x13:
 			_case_distribution(p, m, gs, b)
 		0x14, 0x16:
-			_h_ae4c0(p)                                  # STUB
+			Pm98Movement.kick_resolve(p, rng, Pm98Movement.KICK_AE4C0, false)  # FUN_005ae4c0 (resolve_post_shot stubbed)
 		0x15:
-			_h_ae910(p)                                  # STUB
+			Pm98Movement.kick_resolve(p, rng, Pm98Movement.KICK_AE910, false)  # FUN_005ae910 (resolve_post_shot stubbed)
 		0x19, 0x1a:
-			_h_adfc0(p)                                  # STUB
+			Pm98Movement.kick_resolve(p, rng, Pm98Movement.KICK_ADFC0, false)  # FUN_005adfc0 (resolve_post_shot stubbed)
 		0x1c:
 			# only fires the rng + set_position_code(0) when the ball still carries velocity.
 			if _g(b, 0x20) != 0 or _g(b, 0x24) != 0 or _g(b, 0x28) != 0:
@@ -400,9 +406,9 @@ static func _action_switch(p: Dictionary, m: Dictionary, gs: Dictionary, b: Dict
 			m["anim_66502c"] = m.get("anim_src_665030", 0)
 			m["anim_67455c"] = m.get("anim_src_674560", 0)
 		0x36:
-			_h_ad970(p)                                  # STUB
+			Pm98Movement.feed_layoff_036(p, rng, false)  # FUN_005ad970 (setup_shot leaf stubbed)
 		0x37:
-			_h_adc60(p)                                  # STUB
+			Pm98Movement.feed_layoff_037(p, rng, false)  # FUN_005adc60 (setup_shot leaf stubbed)
 
 
 ## L127-194: case 0x13 (keeper-distribution / kick windup). The set_phase nudge is skeleton; the
@@ -578,15 +584,13 @@ static func _count_teammates_closer(_p: Dictionary, arg: int) -> int:
 	trace_calls.append(["B0B40", arg])
 	return 0
 
-static func _h_acc40(_p: Dictionary) -> void: trace_calls.append(["ACC40", 0])     # FUN_005acc40 (case 4/0x25) -- port = Pm98Movement.goal_aim_025 (oracle GREEN); wire here in Task #4
-static func _h_ad010(_p: Dictionary) -> void: trace_calls.append(["AD010", 0])     # FUN_005ad010 (case 5/0x24) -- port = Pm98Movement.ai_feed_024 (oracle GREEN); wire here in Task #4
-static func _h_ae4c0(_p: Dictionary) -> void: trace_calls.append(["AE4C0", 0])     # FUN_005ae4c0 (case 0x14/0x16) -- port = Pm98Movement.kick_resolve(.,.,KICK_AE4C0) (oracle GREEN); wire here in Task #4
-static func _h_ae910(_p: Dictionary) -> void: trace_calls.append(["AE910", 0])     # FUN_005ae910 (case 0x15) -- port = Pm98Movement.kick_resolve(.,.,KICK_AE910) (oracle GREEN); wire here in Task #4
-static func _h_adfc0(_p: Dictionary) -> void: trace_calls.append(["ADFC0", 0])     # FUN_005adfc0 (case 0x19/0x1a) -- port = Pm98Movement.kick_resolve(.,.,KICK_ADFC0) (oracle GREEN); wire here in Task #4
-static func _h_ad970(_p: Dictionary) -> void: trace_calls.append(["AD970", 0])     # FUN_005ad970 (case 0x36) -- port = Pm98Movement.feed_layoff_036 (oracle GREEN); wire here in Task #4
-static func _h_adc60(_p: Dictionary) -> void: trace_calls.append(["ADC60", 0])     # FUN_005adc60 (case 0x37) -- port = Pm98Movement.feed_layoff_037 (oracle GREEN); wire here in Task #4
-static func _resolve_action(_p: Dictionary, _m: Dictionary) -> void: trace_calls.append(["AEDA0", 0])  # FUN_005aeda0 (case 8/9)
-static func _shot_setup(_p: Dictionary) -> void: trace_calls.append(["AC1A0", 0])  # FUN_005ac1a0 (case 0x13 bVar17-true) -- port = Pm98Movement.setup_shot (oracle GREEN); wire here in Task #4
+# The 7 Family-A action handlers are now WIRED inline in _action_switch (Task #4) to their oracle-GREEN
+# Pm98Movement ports. These two switch leaves stay STUBS (mirrored in run_engine_oracle.sh):
+## FUN_005aeda0 (case 8/9): the post-shot RESOLVER -- NOT yet ported. No-op until its own port lands.
+static func _resolve_action(_p: Dictionary, _m: Dictionary) -> void: trace_calls.append(["AEDA0", 0])
+## FUN_005ac1a0 (case 0x13 bVar17-true): shot-setup, reached only from the transcription-only
+## _case_distribution block (not oracle-covered). port = Pm98Movement.setup_shot; stub until case 0x13 is gated.
+static func _shot_setup(_p: Dictionary) -> void: trace_calls.append(["AC1A0", 0])
 
 static func _move_8680(_p: Dictionary) -> void: trace_calls.append(["M8680", 0])   # FUN_005a8680 (settle)
 static func _move_65a0(_p: Dictionary, arg: int) -> void: trace_calls.append(["M65a0", arg])  # FUN_005a65a0 (general move)
