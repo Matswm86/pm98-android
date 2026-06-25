@@ -66,7 +66,8 @@ var _kit_tex: Texture2D          # the managed club's kit, or null if no art for
 
 var _club: String = ""
 var _club_id: int = -1
-var _manager: String = ""       # the caller passes the league name here (no manager name modelled)
+var _manager: String = ""       # the caller passes the LEAGUE name here (central-stack subline)
+var _manager_name: String = ""  # the real manager name entered on the SELECCION screen (left plaque, line 1)
 var _season: String = ""
 var _cash: int = 0
 var _position: String = ""
@@ -94,9 +95,10 @@ func _ready() -> void:
 ## Feed the live career chrome (club / league / season / cash / position + the next-fixture
 ## opponent for the central stack + week for the calendar plaque), repaint.
 func setup(club: String, manager := "", season := "", cash := 0, position := "", club_id := -1,
-		week := 0, opp_name := "", opp_id := -1, is_home := true) -> void:
+		week := 0, opp_name := "", opp_id := -1, is_home := true, manager_name := "") -> void:
 	_club = club
 	_manager = manager
+	_manager_name = manager_name
 	_season = season
 	_cash = cash
 	_position = position
@@ -205,9 +207,10 @@ func _draw() -> void:
 		draw_texture_rect(_bg, Rect2(0, 0, W, H), false)
 
 	# Shared plaque header overlaid on the baked bg's empty navy top strip (manager+club /
-	# calendar date / league+week), with the MANAGER MENU title. (_manager carries the
-	# league name; manager-name is not modelled, so the left plaque centres the club.)
-	PMChrome.draw_header(self, "MANAGER MENU", "", _club, _manager, _season, _week, _club_id)
+	# calendar date / league+week), with the MANAGER MENU title. The left plaque shows the
+	# real manager name (entered on the SELECCION screen) over the club; falls back to the
+	# club centred for legacy saves with no name. _manager carries the league (right plaque).
+	PMChrome.draw_header(self, "MANAGER MENU", _manager_name, _club, _manager, _season, _week, _club_id)
 
 	# The managed club's kit (escudo), centred above the central stack.
 	if _kit_tex != null:

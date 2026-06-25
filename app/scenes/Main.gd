@@ -1057,7 +1057,7 @@ func _mount_hub() -> void:
 		opp_name = str(GameDB.club(opp_id).get("name", ""))
 	_hub.setup(c.club_name, c.league_name, c.season, c.cash,
 		"%d%s" % [c.position(), _ord_suffix(c.position())], c.club_id,
-		c.week + 1, opp_name, opp_id, is_home)
+		c.week + 1, opp_name, opp_id, is_home, c.manager_name)
 	AudioManager.play_music()   # resume the menu theme on return from a match
 
 ## Leave the career back to the database/home browser (MENUPRINCIPAL EXIT). Saves first,
