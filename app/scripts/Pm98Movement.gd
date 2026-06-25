@@ -1940,6 +1940,52 @@ static func _marker_gate_proceed(p: Dictionary) -> bool:
 	return true
 
 
+## FUN_005a7260 marker-grid block, slice 2b-iii-b: the GRID BUILD (0x5a7e23..0x5a800e). Per outer-loop
+## PASS, builds a 16-entry vec3 work grid (the binary's descending stack grid at esp+0xb0) from the ball's
+## predicted-trajectory array: work[j] = ball_traj(0x17 + j) for j in 0..0xf, where ball_traj(s) = the
+## vec3 at ball + 0xc*s (the copy at 0x5a7e67 walks slots 0x17..0x26 straight in). On PASS 1 ONLY it then
+## applies the goal-extrapolation transform 0x5a7ec5..0x5a800e: with N = ball+0x5c (the per-pass bound is
+## 1 + (N != 0), so pass 1 only runs when N != 0), pick idxbase = trunc((N-1)/4), the anchor slot
+## idx = idxbase + 0x17, a per-step vector step = polar_vec(0x15478, atan(goalx - anchor.x, -anchor.y))
+## with goalx = goal_target_x(m+0x19a0, m+0x1820, p+0x2b8) (the binary's `(orient&1)^team` mirror is
+## exactly goal_target_x), then linearly extrapolate the TAIL slots j = idxbase+1 .. 0xf as
+## work[j] = anchor + step*(j - idxbase) (the binary accumulates step*j and subtracts step*idxbase;
+## every term is int32-wrapped). When idxbase+1 >= 0x10 the tail is empty, so pass 1 == the raw copy.
+## anchor = work[idxbase] (the copy and the direct ball read are the same slot). step.z = 0 (polar), so
+## the extrapolated z is just anchor.z. DECIDE-only, NOT wired (scan/apply/tail are 2b-iii-c.. / 2b-iv).
+## Locked vs the REAL FUN_005a7260 grid build (the stack grid read back at esp+0xb0) by
+## tools/re/run_7260gridbuild_oracle.sh -> app/tests/test_7260gridbuild.gd.
+static func _marker_grid_build(p: Dictionary, pass_idx: int) -> Array:
+	var ball: Dictionary = _ref(p, 0x190)
+	# Raw copy: work[j] = ball trajectory slot (0x17 + j), j = 0..0xf.
+	var work: Array = []
+	for j in range(0x10):
+		var base := 0xc * (0x17 + j)
+		work.append([_si(ball, base), _si(ball, base + 4), _si(ball, base + 8)])
+	# Pass 1 only: goal-extrapolation of the tail slots.
+	if pass_idx == 1:
+		var n := _si(ball, 0x5c)
+		var idxbase := Pm98Trig._tdiv(n - 1, 4)              # cdq/and 3/sar 2 = trunc-toward-zero / 4
+		var k := idxbase + 1
+		if k < 0x10:
+			var ab := 0xc * (idxbase + 0x17)
+			var ax := _si(ball, ab)
+			var ay := _si(ball, ab + 4)
+			var az := _si(ball, ab + 8)
+			var m: Dictionary = _ref(p, 0x18c)
+			var goalx := goal_target_x(_g(m, 0x19a0), _g(m, 0x1820), _g(p, 0x2b8))
+			var angle := Pm98Trig.atan_angle(Pm98Trig._i32(goalx - ax), Pm98Trig._i32(-ay))
+			var step: Array = Pm98Trig.polar_vec(0x15478, angle)
+			for j in range(k, 0x10):
+				var t := j - idxbase
+				work[j] = [
+					Pm98Trig._i32(ax + Pm98Trig._i32(int(step[0]) * t)),
+					Pm98Trig._i32(ay + Pm98Trig._i32(int(step[1]) * t)),
+					Pm98Trig._i32(az + Pm98Trig._i32(int(step[2]) * t)),
+				]
+	return work
+
+
 # ---- FUN_005a3400 the per-player DECIDE, slice A (prologue + bbox) --------------------
 # The first ~100 instructions of the per-player movement-target computer: set the goal-X
 # anchor, the two target endpoints, and the movement bounding box, all oriented by side.
