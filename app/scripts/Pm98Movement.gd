@@ -1053,6 +1053,268 @@ static func move_dispatch(p: Dictionary, m: Dictionary, rng) -> bool:
 	return true
 
 
+# =============================================================================
+# Stage 3 OPEN-PLAY STEERING TRIO: FUN_005a89c0 -> FUN_005a8bc0 -> FUN_005a8f20.
+# The ball-holder / open-play movement core that actually moves a player toward a target,
+# advances the carried ball, and (via set_position_code) hands a resolve-capable action to
+# engine_tick. NOT YET WIRED -- this slice ports + locks the trio; the wiring into
+# move_dispatch's still-DEFERRED non-taker arms (L1014 / L1029-1033 / L1037-1040) is the
+# next slice. Field map decompile-verified, banked bit-for-bit by tools/re/run_steering_oracle.sh
+# (FUN_005a89c0 driven through the Ghidra PCode emulator across 6 fixtures: park / steer /
+# carrier-advance / arrived / curve-flip / re-target) -> specs/steering_oracle.txt, locked by
+# app/tests/test_steering.gd.
+#
+# STRUCT MODEL (same offset->Variant Dicts as the rest of this file): p=player Dict;
+# ctrl=_ref(p,0x190) the ball/controller (ctrl+4/8/c ball pos, +0x20/24/28 ball vel, +0x40
+# active-player REF, +0x68/0x6c ball speed/curve); m=_ref(p,0x18c) match; gs=_ref(p,0x184).
+# target_pos is the int* the binary steers toward, modelled as a 3-int Array [x,y,z].
+# is_carrier := the active controller IS this player (is_same(ctrl[0x40], p)).
+#
+# The +/-0xccc and +/-0x20000 L-inf box DAT globals are compile-time constants (the binary
+# lazy-inits them to those literals on first call), so they are inlined. The ONLY ftol in the
+# trio is 8f20's carrier marker->ball distance gate+scale; int(sqrt()) reproduces the faithful
+# truncating _ftol (the `carrier` fixture is built so that distance is a perfect square).
+
+
+## FUN_005a89c0(p, target_pos, speed_scale): the dispatcher that sets the curve param P+0x6c then
+## tail-calls steer_8bc0. If this player carries the ball, speed_scale is cut to 75% (*0x4b/100).
+## In phases {2,3,4,5,7} with the wall flag clear (or this player not the special-team carrier) the
+## curve is PARKED to 0; otherwise it is the (P+0x70*P+0x3ac)/15000 * speed_scale/100 + P+0x3a8 formula.
+static func steer_89c0(p: Dictionary, target_pos: Array, speed_scale: int) -> void:
+	var ctrl: Dictionary = _ref(p, 0x190)
+	var m: Dictionary = _ref(p, 0x18c)
+	var scale := speed_scale
+	if is_same(ctrl.get(0x40, null), p):                    # P == ball.active -> 75%
+		scale = Pm98Trig._tdiv(Pm98Trig._i32(scale * 0x4b), 100)
+	var phase := _g(m, 0x448)
+	var park := false
+	if phase == 2 or phase == 3 or phase == 4 or phase == 5 or phase == 7:
+		if (_g(m, 0x461) & 0x40) == 0:
+			park = true
+		elif _g(p, 0x2b8) != _g(_ref(m, 0x444), 0x2b8):
+			park = true
+	if park:
+		p[0x6c] = 0
+	else:
+		var r1 := Pm98Trig._tdiv(Pm98Trig._i32(_g(p, 0x70) * _g(p, 0x3ac)), 15000)
+		var r2 := Pm98Trig._tdiv(Pm98Trig._i32(r1 * scale), 100)
+		p[0x6c] = Pm98Trig._i32(r2 + _g(p, 0x3a8))
+	steer_8bc0(p, target_pos)
+
+
+## FUN_005a8bc0(p, target_pos): compute the steer heading toward target_pos and tail-call steer_8f20.
+## delta = target - P.pos. Three L-inf gates: (1) the +/-(P+0x68*6) box zeroes the curve; (2) the
+## +/-0xccc box re-targets onto the match set-piece point (m+0x1240 when m+0x43c==P) else the ball,
+## and zeroes speed+curve; (3) the +/-0xccc box on the re-targeted delta returns early (arrived). Then
+## heading = atan_angle(delta); when the curve is active and delta is inside +/-0x20000 with heading
+## ~opposite facing and the ball is roughly ahead, FLIP: heading-=0x8000, curve=-curve, bump P+0x90.
+static func steer_8bc0(p: Dictionary, target_pos: Array) -> void:
+	var ctrl: Dictionary = _ref(p, 0x190)
+	var m: Dictionary = _ref(p, 0x18c)
+	var px := _g(p, 4)
+	var py := _g(p, 8)
+	var pz := _g(p, 0xc)
+	var dx := Pm98Trig._i32(int(target_pos[0]) - px)
+	var dy := Pm98Trig._i32(int(target_pos[1]) - py)
+	var dz := Pm98Trig._i32(int(target_pos[2]) - pz)
+
+	var v6 := Pm98Trig._i32(_g(p, 0x68) * 6)               # box 1: +/-(speed*6), sign-gated
+	if -v6 < dx and dx < v6 and -v6 < dy and dy < v6 and -v6 < 0 and 0 < v6:
+		p[0x6c] = 0
+
+	if -0xccc < dx and dx < 0xccc and -0xccc < dy and dy < 0xccc:   # box 2: +/-0xccc -> re-target
+		p[0x6c] = 0
+		p[0x68] = 0
+		if is_same(m.get(0x43c, null), p):
+			dx = Pm98Trig._i32(_g(m, 0x1240) - px)
+			dy = Pm98Trig._i32(_g(m, 0x1244) - py)
+			dz = Pm98Trig._i32(_g(m, 0x1248) - pz)
+		else:
+			dx = Pm98Trig._i32(_g(ctrl, 4) - px)
+			dy = Pm98Trig._i32(_g(ctrl, 8) - py)
+			dz = Pm98Trig._i32(_g(ctrl, 0xc) - pz)
+
+	if -0xccc < dx and dx < 0xccc and -0xccc < dy and dy < 0xccc:   # box 3: arrived -> no steer
+		return
+
+	var heading := Pm98Trig.atan_angle(dx, dy)
+	var curve := _g(p, 0x6c)
+	if curve != 0:
+		var face16 := _g(p, 0x34) & 0xffff
+		var a1 := Pm98Trig._s16(heading - face16 - 0x8000)
+		if -0x20000 < dx and dx < 0x20000 and -0x20000 < dy and dy < 0x20000 and absi(a1) < 0x2000:
+			# sub-angle = atan_angle(ball.pos - P.pos) (the binary's 590ae0 this=ball+4, b=P+4)
+			var sub := Pm98Trig.atan_angle(Pm98Trig._i32(_g(ctrl, 4) - px),
+				Pm98Trig._i32(_g(ctrl, 8) - py))
+			var a2 := Pm98Trig._s16(sub - face16)
+			if absi(a2) < 0x238e and not is_same(ctrl.get(0x40, null), p) and _g(p, 0x90) < 0x78:
+				heading = Pm98Trig._i32(heading - 0x8000)
+				p[0x6c] = Pm98Trig._i32(-curve)
+				p[0x90] = _g(p, 0x90) + 1
+			elif _g(p, 0x90) != 0:
+				p[0x90] = _g(p, 0x90) - 1
+	steer_8f20(p, heading)
+
+
+## FUN_005a8f20(p, heading): the FPU steering APPLY. Once-per-tick guard P+0x2d7; optional steer-to-ball
+## override; TURN facing P+0x34 toward heading in +/-0x400 steps; ball-carrier ADVANCE (write ball pos
+## from a marker+ftol-scaled polar reach); RAMP speed P+0x68 toward curve P+0x6c clamped +/-0x106 (or
+## decay 0x1ca when the turn is sharp); INTEGRATE velocity into P.pos with the carrier ball-drag; then
+## set_position_code by speed bucket so engine_tick can resolve.
+static func steer_8f20(p: Dictionary, heading: int) -> void:
+	var ctrl: Dictionary = _ref(p, 0x190)
+	var m: Dictionary = _ref(p, 0x18c)
+	var gs: Dictionary = _ref(p, 0x184)
+	var is_carrier := is_same(ctrl.get(0x40, null), p)
+
+	var guard := _g(p, 0x2d7) & 0xff                       # once-per-tick char guard
+	p[0x2d7] = 1
+	if guard != 0:
+		return
+
+	var atb := Pm98Trig.atan_angle(Pm98Trig._i32(_g(ctrl, 4) - _g(p, 4)),
+		Pm98Trig._i32(_g(ctrl, 8) - _g(p, 8)))            # angle_to_ball
+	var hmab := Pm98Trig._i32(heading - atb)
+
+	var bcond := (_g(gs, 0x2ee) & 0xff) != 0 and play_state_eq(m, 0)   # FUN_005943b0(match)
+	bcond = bcond and (_g(p, 0x5c) & 0xff) != 0
+	if bcond and not is_carrier:
+		var thr := Pm98Trig._tdiv(Pm98Trig._i32(_g(p, 0x388) * 0x1555), 100)
+		if absi(Pm98Trig._s16(hmab)) < thr:
+			heading = atb                                  # steer to ball
+
+	# TURN: d = heading - facing; steps = (|s16 d| - 0x100)/0x400 + 1 (trunc toward zero)
+	var face16 := _g(p, 0x34) & 0xffff
+	var d := heading - face16
+	var sv := Pm98Trig._s16(d)
+	var ad := absi(sv)
+	var xq := ad - 0x100
+	if xq < 0:
+		xq += 0x3ff
+	var iv13 := xq >> 10
+	var steps := iv13 + 1
+
+	# marker = P.pos + polar_vec(0x4ccc, facing) (used only by the carrier ftol gate/scale)
+	var pv: Array = Pm98Trig.polar_vec(0x4ccc, face16)
+	var marker := [
+		Pm98Trig._i32(_g(p, 4) + int(pv[0])),
+		Pm98Trig._i32(_g(p, 8) + int(pv[1])),
+		Pm98Trig._i32(_g(p, 0xc) + int(pv[2])),
+	]
+
+	if steps < 2:
+		p[0x34] = heading & 0xffff
+	else:
+		var step := 0x400 if sv > 0 else -0x400
+		p[0x34] = (face16 + step) & 0xffff
+
+	# CARRIER ball-advance (FPU ftol gate): only the ball's active controller, turn nonzero,
+	# within reach, wall flag clear. ball pos := P.pos + polar_vec((ftol*iv13/steps)+0x4ccc, facing).
+	if sv != 0 and is_carrier:
+		var mdx := Pm98Trig._i32(_g(ctrl, 4) - marker[0])
+		var mdy := Pm98Trig._i32(_g(ctrl, 8) - marker[1])
+		var mdz := Pm98Trig._i32(_g(ctrl, 0xc) - marker[2])
+		var ftol := int(sqrt(float(mdx * mdx + mdy * mdy + mdz * mdz)))
+		var gate := Pm98Trig._tdiv(Pm98Trig._i32(_g(p, 0x388) << 0x10), 100)
+		if ftol < gate and (_g(m, 0x461) & 0x40) == 0:
+			var facing_now := _g(p, 0x34) & 0xffff
+			var ivar10 := Pm98Trig._tdiv(Pm98Trig._i32(_g(ctrl, 0xc) * iv13), steps)
+			var r := Pm98Trig._i32(Pm98Trig._tdiv(Pm98Trig._i32(ftol * iv13), steps) + 0x4ccc)
+			var pv2: Array = Pm98Trig.polar_vec(r, facing_now)
+			ctrl[4] = Pm98Trig._i32(_g(p, 4) + int(pv2[0]))
+			ctrl[8] = Pm98Trig._i32(_g(p, 8) + int(pv2[1]))
+			ctrl[0xc] = Pm98Trig._i32(_g(p, 0xc) + int(pv2[2]))
+			var bvel := [_g(ctrl, 0x20), _g(ctrl, 0x24), _g(ctrl, 0x28)]
+			Pm98Trig.rot_vec3(bvel, Pm98Trig._s16(d), 0)
+			bvel = Pm98Trig.vec3_scale_ratio(bvel, iv13, steps)
+			ctrl[0x20] = int(bvel[0])
+			ctrl[0x24] = int(bvel[1])
+			ctrl[0x28] = int(bvel[2])
+			ctrl[0xc] = ivar10
+
+	# SPEED ramp toward curve (clamped +/-0x106); decay 0x1ca when the turn is sharp.
+	if ad < 0x1555:
+		p[0x64] = heading & 0xffff                         # yaw = heading
+		var curve := _g(p, 0x6c)
+		var speed := _g(p, 0x68)
+		if speed < curve:
+			var up := Pm98Trig._i32(speed + 0x106)
+			p[0x68] = curve if up >= curve else up
+		elif speed > curve:
+			var dn := Pm98Trig._i32(speed - 0x106)
+			p[0x68] = curve if dn <= curve else dn
+	else:
+		var sp := Pm98Trig._i32(_g(p, 0x68) - 0x1ca)
+		p[0x68] = 0 if sp <= 0 else sp
+
+	# INTEGRATE velocity into P.pos, bounded by the pitch extents (m+0x1970/+0x1978 - 0x4ccc).
+	var spd := _g(p, 0x68)
+	if spd != 0:
+		var yaw := _g(p, 0x64) & 0xffff
+		var vel: Array = Pm98Trig.polar_vec(spd, yaw)
+		p[0x20] = int(vel[0])
+		p[0x24] = int(vel[1])
+		p[0x28] = int(vel[2])
+		var nx := Pm98Trig._i32(_g(p, 4) + int(vel[0]))
+		var ny := Pm98Trig._i32(_g(p, 8) + int(vel[1]))
+		var lim_x := Pm98Trig._i32(_g(m, 0x1970) - 0x4ccc)
+		var lim_y := Pm98Trig._i32(_g(m, 0x1978) - 0x4ccc)
+		if absi(nx) < lim_x and absi(ny) < lim_y:
+			if is_carrier:
+				_steer_carrier_drag(p, ctrl, vel)
+			p[4] = nx
+			p[8] = ny
+			p[0xc] = Pm98Trig._i32(_g(p, 0xc) + int(vel[2]))
+		else:
+			p[0x68] = 0
+
+	# set_position_code by speed bucket (action 0..3) / off-pitch class (0x1e/0x20/0x22/0x23).
+	var action := _g(p, 0x40)
+	if action >= 0 and action <= 3:
+		var s2 := _g(p, 0x68)
+		if s2 > 0x1333:
+			set_position_code(p, 3)
+		elif s2 < 0x778:
+			set_position_code(p, 1 if s2 != 0 else 0)
+		else:
+			set_position_code(p, 2)
+	elif action == 0x1e or action == 0x22 or action == 0x23 or (action == 0x20 and _g(p, 0x68) != 0):
+		var s3 := _g(p, 0x68)
+		if s3 > 0x777:
+			set_position_code(p, 0x23)
+		else:
+			set_position_code(p, (4 if s3 != 0 else 0) + 0x1e)
+
+
+## The carrier ball-drag sub-block of 8f20's velocity integrate (only when P carries the ball). With
+## the curve inactive the ball velocity copies P's; with it active and the ball roughly ahead+slow,
+## the ball velocity becomes tilt_to_heading(scale(P.vel, 0x14ccc), 0x38e) and the ball stops curving.
+## Touches ONLY ctrl velocity / ctrl+0x6c/0x68 -- never P's velocity or position.
+static func _steer_carrier_drag(p: Dictionary, ctrl: Dictionary, pvel: Array) -> void:
+	var negf := Pm98Trig._s16(-(_g(p, 0x34) & 0xffff))
+	var rel := [
+		Pm98Trig._i32(_g(ctrl, 4) - _g(p, 4)),
+		Pm98Trig._i32(_g(ctrl, 8) - _g(p, 8)),
+		Pm98Trig._i32(_g(ctrl, 0xc) - _g(p, 0xc)),
+	]
+	Pm98Trig.rot_vec3(rel, negf, 0)                        # rotate (ball - P) by -facing
+	var relx := int(rel[0])
+	var rely := int(rel[1])
+	var ballvelx := _g(ctrl, 0x20)
+	if _g(p, 0x6c) == 0:
+		ctrl[0x20] = int(pvel[0])
+		ctrl[0x24] = int(pvel[1])
+		ctrl[0x28] = int(pvel[2])
+	elif absi(rely) < 0x8001 and relx < 0x4ccc and ballvelx <= Pm98Trig.mul16(_g(p, 0x68), 0x11999):
+		var sc: Array = Pm98Trig.scale_vec3(int(pvel[0]), int(pvel[1]), int(pvel[2]), 0x14ccc)
+		Pm98Trig.tilt_to_heading(sc, 0x38e)
+		ctrl[0x20] = int(sc[0])
+		ctrl[0x24] = int(sc[1])
+		ctrl[0x28] = int(sc[2])
+		ctrl[0x6c] = 0
+		ctrl[0x68] = 0
+
+
 ## Non-active velocity sub-path of FUN_005a65a0 (L74-106). Returns true if it STOPPED the player (v58
 ## = v54 = 0, skipping the L107 wander); false to fall through to the wander draw. Draws RNG following
 ## the binary's short-circuit structure exactly. FUN_005b8c90 (we-in-possession) is match+0x1664 ==
