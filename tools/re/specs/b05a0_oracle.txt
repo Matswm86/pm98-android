@@ -1,0 +1,10 @@
+# Gate oracle FUN_005b05a0 (near-ball pull-in). b0040=1 iff the interception move was CALLED.
+# Row: B05A0 <name> <RET/HALT> steps=<n> b0040=<0|1>.
+B05A0 bboxfail HALT steps=380 b0040=0
+B05A0 nearfail HALT steps=500 b0040=0
+B05A0 near2 RET steps=322 b0040=1
+B05A0 near3 RET steps=358 b0040=1
+B05A0 carriersame HALT steps=505 b0040=0
+B05A0 carrierdiff RET steps=293 b0040=1
+B05A0 clearmove RET steps=286 b0040=1
+B05A0 blockednomove HALT steps=1266 b0040=0

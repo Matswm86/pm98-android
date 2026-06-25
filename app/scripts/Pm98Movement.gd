@@ -1785,6 +1785,59 @@ static func _lane_clearance(p: Dictionary, roster: Array, target_pos: Array, rad
 	return _lane_min_dist(p, roster, angle, halfmag, radius)
 
 
+## FUN_005b05a0 PHASE 1 (the near-ball pull-in), 0x5b05a0..0x5b07c3. Returns true iff the binary takes
+## the pull-in branch -- `mov ecx,esi; call FUN_005b0040 (_move_b0040); ret`. When ANY gate below fails
+## the binary does NOT return: it falls through to PHASE 2 (0x5b07c4..0x5b0a13, the sector-grid
+## approach-ball steer -> FUN_005a89c0), which is a SEPARATE unported slice. So this is a DECIDE-only
+## building block -- it is NOT yet wired into ball_touch_7260 (wiring waits on the phase-2 port, exactly
+## as the slice-2b-i lane-clearance chain was committed unwired). The 2026-06-25 handoff's "548 bytes /
+## fully decoded / bare return on gate-fail" was WRONG: the real function is 1140 bytes with two phases.
+## Gates, in binary order (no RNG/ftol in phase 1; the ftol lives in the FUN_005b1070 clearance leaf):
+##   (1) BBOX -- ball.pos inside the pitch box [m+0x1828,0x1834] x [m+0x182c,0x1838] x [m+0x1830,0x183c].
+##   (2) NEAR -- any of THREE ball ref-points (ball.pos / ball+0x168 / ball+0x1bc) within per-axis
+##       (0xf8000, 0xd8000, 0x320000) of the team goal anchor vec [goal_target_x(m,team), 0, 0]. The
+##       anchor recomputes identically per ref-point (FUN_005a44f0 + FUN_00590aa0 [goalx,0,0]).
+##   (3) CARRIER -- bail when the ball is owned by a TEAMMATE (carrier != 0 AND carrier.team == p.team).
+##   (4) CLEARANCE -- _lane_clearance(p, gs[0], ball.pos, 0x20000) (FUN_005b1070). Pull-in branch is
+##       taken ONLY when this is >= 0x20000 (lane CLEAR). The binary is `setl cl / test / jne phase2`:
+##       clearance < radius SKIPS the pull-in (-> phase 2), so >= radius (incl. equality, setl is strict
+##       <) takes it. (The 2026-06-25 handoff prose had this comparison inverted; verified vs the binary.)
+## roster = gs[0] (gs = p+0x184, our team; +0x3bc stride, self/inactive skipped inside _lane_min_dist).
+## Locked by tools/re/run_b05a0_oracle.sh (real b05a0 under PcodeEmu, b0040 stubbed -> observed;
+## HALT on the no-pull-in rows == control fell into the unported phase-2 steer) / test_b05a0.gd.
+static func _near_ball_pullin_decide(p: Dictionary) -> bool:
+	var m: Dictionary = _ref(p, 0x18c)
+	var ball: Dictionary = _ref(p, 0x190)
+	# (1) bbox gate.
+	var bx := _si(ball, 4)
+	var by := _si(ball, 8)
+	var bz := _si(ball, 0xc)
+	if _si(m, 0x1828) > bx or bx > _si(m, 0x1834):
+		return false
+	if _si(m, 0x182c) > by or by > _si(m, 0x1838):
+		return false
+	if _si(m, 0x1830) > bz or bz > _si(m, 0x183c):
+		return false
+	# (2) near gate: OR over the 3 ball ref-points vs [goalx, 0, 0].
+	var goalx := goal_target_x(_g(m, 0x19a0), _g(m, 0x1820), _g(p, 0x2b8))
+	var near := false
+	for off in [4, 0x168, 0x1bc]:
+		if absi(Pm98Trig._i32(_si(ball, off) - goalx)) < 0xf8000 \
+				and absi(_si(ball, off + 4)) < 0xd8000 \
+				and absi(_si(ball, off + 8)) < 0x320000:
+			near = true
+			break
+	if not near:
+		return false
+	# (3) teammate-owned bail.
+	var carrier = ball.get(0x40, null)
+	if carrier is Dictionary and _g(carrier, 0x2b8) == _g(p, 0x2b8):
+		return false
+	# (4) lane clearance -- take the pull-in ONLY when the dribble lane to the ball is CLEAR (>= radius).
+	var roster: Array = _ref(p, 0x184).get(0, [])
+	return _lane_clearance(p, roster, [bx, by, bz], 0x20000) >= 0x20000
+
+
 # ---- FUN_005a3400 the per-player DECIDE, slice A (prologue + bbox) --------------------
 # The first ~100 instructions of the per-player movement-target computer: set the goal-X
 # anchor, the two target endpoints, and the movement bounding box, all oriented by side.
