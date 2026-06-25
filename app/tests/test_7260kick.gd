@@ -19,15 +19,18 @@ const B_BASE := 0x240000
 const M_BASE := 0x210000
 const STAT_BASE := 0x270000
 
-const WIDTH := {0x63: 1}            # offsets within their region (ball+0x63 is a byte)
+const WIDTH := {0x63: 1, 0x461: 1}   # offsets within their region (ball+0x63, m+0x461 are bytes)
 
 var _fail := 0
 var _pass := 0
 
-# name -> [action, px, py, p3a4, idx, power, anim_x, anim_y, anim_z]
+# name -> [action, px, py, p3a4, idx, power, anim_x, anim_y, anim_z, (facing=0x2000)]
 var _fixtures := {
-	"kick26": [0x26, 0x1000, 0x2000, 0x500, 2, 100, 0x4333, 0x2000, 0x1cccc],
-	"kick31": [0x31, 0x1000, 0x2000, 0x500, 2, 100, 0x4333, 0x2000, 0x1cccc],
+	"kick26": [0x26, 0x1000, 0x2000, 0x500, 2, 100, 0x4333, 0x2000, 0x1cccc],          # sub-arm 1 strike
+	"kick31": [0x31, 0x1000, 0x2000, 0x500, 2, 100, 0x4333, 0x2000, 0x1cccc],          # sub-arm 1 strike
+	"pass26": [0x26, 0x1000, 0x2000, 0x500, 2, 100, 0x4333, 0x2000, 142964],           # sub-arm 2 pass
+	"pass2b": [0x26, 0x1000, 0x2000, 0x500, 2, 150, 0x5000, 0x2000, 157964, 0x1000],   # sub-arm 2 (indep)
+	"near26": [0x26, 0x1000, 0x2000, 0x500, 2, 50,  0x4333, 0x2000, 137964],           # sub-arm 3 near-miss
 }
 
 
@@ -102,7 +105,8 @@ func _build(spec: Array) -> Dictionary:
 	P[0xc] = 0
 	P[0x3a4] = spec[3]                                 # same-side anchor
 	P[0x2b8] = 1                                       # team
-	P[0x34] = 0x2000                                   # facing
+	P[0x34] = (spec[9] if spec.size() > 9 else 0x2000)   # facing (sub-arm 2 aim base)
+	P[0x20] = 0x100; P[0x24] = 0x200; P[0x28] = 0x300  # p.vel (sub-arm 2 drags ball.pos by this)
 	P[0x54] = 7; P[0x58] = 7                           # -> 0 (engage zeroes target+0x54/0x58)
 	P[0x3b8] = STAT                                    # stat struct
 	M[0x448] = 0
@@ -126,6 +130,7 @@ func _build(spec: Array) -> Dictionary:
 	BALL[0x63] = 0
 	BALL[0x68] = 0; BALL[0x6c] = 0; BALL[0x70] = 0
 	BALL[0x20] = 0; BALL[0x24] = 0; BALL[0x28] = 0
+	BALL[0x4] = 0x1111; BALL[0x8] = 0x2222; BALL[0xc] = 0x3333   # ball.pos (sub-arm 2: += p.vel)
 	BALL[0x114] = spec[6]; BALL[0x118] = spec[7]; BALL[0x11c] = spec[8]   # ball-anim @ (frame+0x12)*0xc
 	BALL[0x1d4] = M                                    # ball+0x1d4 -> m (engage turnover counter)
 	return P
@@ -136,6 +141,7 @@ func _run_fixture(name: String, exp: Dictionary) -> void:
 	var BALL: Dictionary = P[0x190]
 	var M: Dictionary = P[0x18c]
 	var STAT: Dictionary = P[0x3b8]
+	var OTHER0: Variant = BALL.get(0x40, null)        # initial carrier (banked as emulated 0x260000)
 	Pm98Movement.ball_touch_7260(P, MatchEngine.Pm98Rng.new(0))
 
 	for addr in exp:
@@ -155,14 +161,20 @@ func _run_fixture(name: String, exp: Dictionary) -> void:
 			continue                                  # grid/static cross-check read -- not a Dict field
 
 		# ball+0x40/0x44/0x48 are carrier IDENTITY refs in the Dict model (an emulated address in the
-		# oracle). Don't int-compare -- a nonzero banked value means "engaged to a player" (Dict ref).
+		# oracle). Don't int-compare -- map the banked emulated address to the expected Dict: 0 = released,
+		# 0x230000 = P (engaged/owner), 0x260000 = the unchanged initial carrier (OTHER, sub-arm 3 miss).
 		if src == BALL and (off == 0x40 or off == 0x44 or off == 0x48):
 			var fld: Variant = BALL.get(off, 0)
 			var is_ref := fld is Dictionary
-			if int(exp[addr]) == 0:
-				_ok(not is_ref and int(fld) == 0, "%s %s: expected released (int 0), got ref=%s" % [name, tag, is_ref])
-			else:
-				_ok(is_ref and is_same(fld, P), "%s %s: expected engaged-to-player ref, got ref=%s" % [name, tag, is_ref])
+			match int(exp[addr]):
+				0:
+					_ok(not is_ref and int(fld) == 0, "%s %s: expected released (int 0), got ref=%s" % [name, tag, is_ref])
+				0x230000:
+					_ok(is_ref and is_same(fld, P), "%s %s: expected ref to P, got ref=%s" % [name, tag, is_ref])
+				0x260000:
+					_ok(is_ref and is_same(fld, OTHER0), "%s %s: expected unchanged carrier (OTHER), got ref=%s" % [name, tag, is_ref])
+				_:
+					_ok(false, "%s %s: unexpected banked carrier addr 0x%x" % [name, tag, int(exp[addr])])
 			continue
 
 		var mask: int = 0xffffffff

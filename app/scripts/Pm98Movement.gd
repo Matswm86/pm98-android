@@ -1535,9 +1535,9 @@ static func ball_touch_7260(p: Dictionary, rng = null) -> void:
 
 	# L165-176: the open-play GATE -- live play (m+0x448==0), this player is NOT the carrier, and
 	# (recomputed) same-side. The lazy-init DAT grids (L177-238) are modelled as the KICK_GRID1/GRID2
-	# consts (pure DAT bookkeeping, field-inert). The dribble-grid block (L242-514) and the execute-kick
-	# sub-arms 2/3 (L606-666) stay DEFERRED to slice 2b/2c; only the action-gated execute-kick sub-arm 1
-	# (the primary shot/pass STRIKE, L544-605) is ported here.
+	# consts (pure DAT bookkeeping, field-inert). The full execute-kick block (L544-666, all THREE
+	# sub-arms) is ported in _kick_execute; only the dribble-grid block (L242-514) -- the marker search
+	# that SETS the kick action codes -- stays DEFERRED to slice 2b.
 	if _g(m, 0x448) == 0 and not is_same(ball.get(0x40, null), p):
 		var same2 := _ps_goalbox(p, [_si(p, 4), _si(p, 8), _si(p, 0xc)]) \
 			and _sign1(_si(p, 4)) == _sign1(_si(p, 0x3a4))
@@ -1548,7 +1548,7 @@ static func ball_touch_7260(p: Dictionary, rng = null) -> void:
 			if (_g(m, 0x461) & 0x20) == 0 and _g(p, 0x2c) == 5 and action in KICK_ACTIONS:
 				if rng == null:
 					rng = MatchEngine.Pm98Rng.new(0)
-				_kick_execute(p, ball, m, action, rng)  # execute-kick sub-arm 1 (L544-605)
+				_kick_execute(p, ball, m, action, rng)  # execute-kick L544-666 (all 3 sub-arms)
 
 
 # Static + lazy-init tables the execute-kick block indexes by the marker row p+0x44 (0..8). KICK_FRAME =
@@ -1571,13 +1571,17 @@ const KICK_GRID2 := [
 ]
 
 
-## FUN_005a7260 execute-kick sub-arm 1 (L544-605): the primary shot/pass STRIKE. The marker row p+0x44
-## selects the static frame (DAT_00665538) + gate scale (DAT_00665510) and the lazy-init grids. iVar9 is
-## the ball's planar speed; the gate is the z-error within power*0x570a/100 (or a 0x31/0x32 short shot)
-## AND the planar error within DAT_00665510[idx]*power/0x140, then an RNG roll under a MulDiv threshold.
-## Sub-arms 2/3 (L606-666, weaker-pass + near-miss) are DEFERRED: when the gate fails this returns rather
-## than falling through to them (a future slice 2c). `rng` is the match LCG (FUN_005ec250). Oracle-pinned
-## bit-for-bit by tools/re/run_7260kick_oracle.sh -> specs/7260kick_oracle.txt (test_7260kick.gd).
+## FUN_005a7260 execute-kick (L544-666): the THREE sequential sub-arms, each a wider-but-weaker fallback.
+## The marker row p+0x44 selects the static frame (DAT_00665538) + gate scale (DAT_00665510) and the
+## lazy-init grids; iVar9 is the ball's planar speed. The geometry is the z-error (anim_z vs grid-z) and
+## the planar error (|iv10 - grid-x|). Each sub-arm gate = (z-error < power*K/100 OR a 0x31/0x32 short
+## shot) AND (planar < KICK_THRESH[idx]*power/D), then an RNG roll under a MulDiv threshold; a FAILED gate
+## or roll FALLS THROUGH to the next sub-arm (no early return), consuming RNG only on a passed gate:
+##   1 (L544-605): K=0x570a D=0x140 -> the primary STRIKE (_kick_strike).
+##   2 (L606-655): K=0x7333 D=0xfa  -> the weaker RNG-aimed pass + ownership transfer (_kick_pass).
+##   3 (L657-666): z<0x7333, planar<KICK_THRESH/3, roll<300 -> near-miss: just set the m+0x461 bit.
+## `rng` is the match LCG (FUN_005ec250). Oracle-pinned bit-for-bit by tools/re/run_7260kick_oracle.sh ->
+## specs/7260kick_oracle.txt (test_7260kick.gd: kick26/kick31 strike, pass26/pass2b pass, near26 miss).
 static func _kick_execute(p: Dictionary, ball: Dictionary, m: Dictionary, action: int, rng) -> void:
 	var idx := _g(p, 0x44)
 	var frame: int = KICK_FRAME[idx]
@@ -1591,16 +1595,31 @@ static func _kick_execute(p: Dictionary, ball: Dictionary, m: Dictionary, action
 	var ivar22 := Pm98Trig._i32(int(g1[2]) - int(g2[2]))
 	var iv10 := Pm98Trig.planar_mag(Pm98Trig._i32(anim_x - _si(p, 4)), Pm98Trig._i32(anim_y - _si(p, 8)))
 	var power := _si(p, 0x38c)
-	var uvar23 := Pm98Trig._i32(iv10 - Pm98Trig._i32(int(g1[0]) - int(g2[0])))
+	var uvar23 := absi(Pm98Trig._i32(iv10 - Pm98Trig._i32(int(g1[0]) - int(g2[0]))))
 	var ivar24 := absi(Pm98Trig._i32(anim_z - ivar22))
-	var cond_a := ivar24 < Pm98Trig._tdiv(power * 0x570a, 100) \
-		or ((action == 0x31 or action == 0x32) and anim_z < ivar22)
-	var cond_b := absi(uvar23) < Pm98Trig._tdiv(int(KICK_THRESH[idx]) * power, 0x140)
-	if cond_a and cond_b:
+	var short_shot := (action == 0x31 or action == 0x32) and anim_z < ivar22
+	var thresh := int(KICK_THRESH[idx])
+
+	# Sub-arm 1 (L544-605): primary strike.
+	if (ivar24 < Pm98Trig._tdiv(power * 0x570a, 100) or short_shot) \
+			and uvar23 < Pm98Trig._tdiv(thresh * power, 0x140):
 		var thr := _muldiv(power * 4 + 400, Pm98Trig._i32(0x9999 - ispeed), 0x4c96)
 		if _shot_rng_scale(rng.next(), 1000) < thr:
 			_kick_strike(p, ball, m, action, frame, anim_x, anim_y, anim_z)
-	# else: DEFERRED slice 2c -- the binary falls through to execute-kick sub-arms 2/3 (L606-666).
+			return
+
+	# Sub-arm 2 (L606-655): weaker RNG-aimed pass.
+	if (ivar24 < Pm98Trig._tdiv(power * 0x7333, 100) or short_shot) \
+			and uvar23 < Pm98Trig._tdiv(thresh * power, 0xfa):
+		var thr2 := _muldiv(power * 2 + 400, Pm98Trig._i32(0x9999 - ispeed), 0x4c96) + power * 2 + 100
+		if _shot_rng_scale(rng.next(), 1000) < thr2:
+			_kick_pass(p, ball, m, power, rng)
+			return
+
+	# Sub-arm 3 (L657-666): near-miss -> mark the kick consumed (m+0x461 |= 0x20) and bail.
+	if ivar24 < 0x7333 and uvar23 < Pm98Trig._tdiv(thresh, 3):
+		if _shot_rng_scale(rng.next(), 1000) < 300:
+			m[0x461] = _g(m, 0x461) | 0x20
 
 
 ## The strike body (L552-602): fire the kick event, advance the action code, zero the ball velocity,
@@ -1624,6 +1643,55 @@ static func _kick_strike(p: Dictionary, ball: Dictionary, m: Dictionary, action:
 	_ball_engage_player(ball, p)                                           # FUN_0058eca0(ball, p) (L599)
 	ball[0x63] = 1                                                         # (L600)
 	m[0x458] = 0                                                           # (L602)
+
+
+## FUN_005a7260 execute-kick sub-arm 2 body (L606-655): the weaker RNG-aimed pass. Builds a polar launch
+## vector polar(radius=(power*0x4d03)/200, aim=facing+rng-0x4000), rotates it about Y by
+## rotang=_rscale15(rng,0xe39)+0x38f, and writes it as ball.vel; drags ball.pos by p.vel; transfers ball
+## ownership to p (FUN_0058ed80, a LIGHTER engage than sub-arm 1's), sets the m+0x461 "kick consumed" bit,
+## and enqueues the 0xe pass event. CRITICAL: the binary's prologue local-vec (anim - p.pos) is FULLY
+## OVERWRITTEN -- a live `push aim` shifts FUN_005ee0f0's out-ptr exactly onto that slot, and a symmetric
+## `push p` shifts the ball.vel reads back, so ball.vel == the rotated polar vector and Dx never reaches
+## it. Settled against the REAL FUN_005a7260 by the oracle (pass26 + the independent pass2b: different
+## power/aim/Dx), NOT the decompile (which renders the dead "ball.vel = anim - p.pos"). The two RNG
+## save/restore brackets (5ec240/5ec230) around the gated-off commentary leaf are net-neutral; skipped.
+static func _kick_pass(p: Dictionary, ball: Dictionary, m: Dictionary, power: int, rng) -> void:
+	# Aim polar -- RNG draw 2. The binary's (rng<<7)>>7 round-to-zero is identity for the 15-bit draw.
+	var aim := Pm98Trig._i32(Pm98Trig._s16(_g(p, 0x34)) + rng.next() - 0x4000)
+	var radius := Pm98Trig._tdiv(power * 0x4d03, 200)
+	var vel: Array = Pm98Trig.polar_vec(radius, aim)             # FUN_005ee0f0 -> [polx, poly, 0]
+	Pm98Events.keeper_event(ball, 1)                             # FUN_005909f0(1) (no-op, keeper null)
+	if _si(ball, 0x4c) == 0 and _si(ball, 0x50) != 0:            # keeper-target clear (L620-623)
+		ball[0x50] = 0
+	m[0x461] = _g(m, 0x461) | 0x20                              # kick-consumed bit (L626)
+	# Rotate the launch vector about Y -- RNG draw 3 (FUN_005ee6e0 in place; v[1] fixed, v[0]/v[2] mix).
+	var rotang := _rscale15(rng.next(), 0xe39) + 0x38f
+	Pm98Trig.rot_vec3(vel, rotang, 1)                           # -> [(polx*c)>>16, poly, (polx*s)>>16]
+	ball[4] = Pm98Trig._i32(_si(ball, 4) + _si(p, 0x20))        # ball.pos += p.vel (L640-646)
+	ball[8] = Pm98Trig._i32(_si(ball, 8) + _si(p, 0x24))
+	ball[0xc] = Pm98Trig._i32(_si(ball, 0xc) + _si(p, 0x28))
+	ball[0x20] = int(vel[0]); ball[0x24] = int(vel[1]); ball[0x28] = int(vel[2])   # ball.vel (L647-651)
+	_ball_transfer(ball, p)                                      # FUN_0058ed80 ownership transfer (L652)
+	Pm98Events.enqueue(m, 0xe, p, 1)                            # FUN_00594470(0xe, p, 1) (L653)
+
+
+## FUN_0058ed80 (__thiscall this=ball): the LIGHT ownership transfer the weaker-pass sub-arm uses. Unlike
+## the full engage FUN_0058eca0 (_ball_engage_player) it RELEASES the ball (ball+0x40 = 0) then records
+## the new owner in ball+0x44 only -- no ball+0x48, no ball+0x4c clear, no p+0x54/0x58 zero, no dribble
+## guard. Bumps the turnover counter m+0x458 on a team change and the touch counter ball+0x80. `target`
+## is never null in the kick path (the binary's p != 0 guard is kept for fidelity).
+static func _ball_transfer(ball: Dictionary, target: Dictionary) -> void:
+	if is_same(ball.get(0x40, null), target):       # already the carrier -> no-op (pointer compare)
+		return
+	ball[0x40] = 0                                   # release (ball+0x40 = 0, before the p != 0 guard)
+	if target == null:
+		return
+	var mm := _ref(ball, 0x1d4)
+	var tteam := _g(target, 0x2b8)
+	mm[0x458] = _g(mm, 0x458) + (1 if _g(ball, 0x54) != tteam else 0)
+	ball[0x44] = target
+	ball[0x80] = _g(ball, 0x80) + 1
+	ball[0x54] = tteam
 
 
 ## Non-active velocity sub-path of FUN_005a65a0 (L74-106). Returns true if it STOPPED the player (v58

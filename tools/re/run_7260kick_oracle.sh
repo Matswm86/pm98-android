@@ -44,6 +44,10 @@ read_mem 0x00230040 4
 read_mem 0x00230054 4
 read_mem 0x00230058 4
 read_mem 0x00270094 4
+read_mem 0x00210461 1
+read_mem 0x00240004 4
+read_mem 0x00240008 4
+read_mem 0x0024000c 4
 read_mem 0x00240040 4
 read_mem 0x00240044 4
 read_mem 0x00240048 4
@@ -72,9 +76,9 @@ read_mem 0x00665518 4
 read_mem 0x006d3184 4
 "
 
-# emit_spec ACTION PX PY P3A4 IDX POWER ANIMX ANIMY ANIMZ
+# emit_spec ACTION PX PY P3A4 IDX POWER ANIMX ANIMY ANIMZ [FACING]
 emit_spec() {
-  local action=$1 px=$2 py=$3 p3a4=$4 idx=$5 power=$6 ax=$7 ay=$8 az=$9
+  local action=$1 px=$2 py=$3 p3a4=$4 idx=$5 power=$6 ax=$7 ay=$8 az=$9 facing=${10:-0x2000}
   {
     echo "entry   0x5a7260"
     echo "ret     0x00100000"
@@ -111,7 +115,7 @@ emit_spec() {
     poke 0x0023000c 0
     poke 0x002303a4 "$p3a4"                      # sign(p.x)==sign(p+0x3a4) -> same-side
     poke 0x002302b8 1                            # team
-    poke 0x00230034 0x2000                       # facing
+    poke 0x00230034 "$facing"                    # facing
     poke 0x00230054 7                            # -> 0 (engage zeroes target+0x54)
     poke 0x00230058 7                            # -> 0
     poke 0x00240040 $OTHER                       # ball+0x40 carrier = OTHER (not-carrier)
@@ -123,6 +127,8 @@ emit_spec() {
     poke 0x0024006c 0
     poke 0x00240070 0
     poke 0x00240020 0; poke 0x00240024 0; poke 0x00240028 0
+    poke 0x00240004 0x1111; poke 0x00240008 0x2222; poke 0x0024000c 0x3333   # ball.pos (sub-arm2: += p.vel)
+    poke 0x00230020 0x100;  poke 0x00230024 0x200;  poke 0x00230028 0x300     # p.vel (sub-arm2 ball.pos drag)
     poke 0x00240114 "$ax"                        # ball anim x at (DAT_00665538[idx]+0x12)*0xc (idx=2 -> 0x114)
     poke 0x00240118 "$ay"
     poke 0x0024011c "$az"
@@ -162,8 +168,19 @@ echo "# Stage 3 ball-touch slice-2a (FUN_005a7260 execute-kick sub-arm 1, L544-6
 echo "# Row: FIX <name> | <abs-addr>=<u LE> ... . P=0x230000 ball=0x240000 m=0x210000 stat=0x270000." >> "$OUT"
 
 #         ACTION PX      PY      P3A4  IDX POWER ANIMX   ANIMY   ANIMZ
+# Sub-arm 1 (primary strike): gate-1 z-error 0 (anim_z == GRID1[2].2) -> fires.
 emit_spec 0x26   0x1000  0x2000  0x500 2   100   0x4333  0x2000  0x1cccc;  run_emu; bank kick26
 emit_spec 0x31   0x1000  0x2000  0x500 2   100   0x4333  0x2000  0x1cccc;  run_emu; bank kick31
+# Sub-arm 2 (weaker pass): anim_z = 0x1cccc+25000 -> z-error 25000 fails gate-1 (<22282) but passes
+# gate-2 (<29491); planar 0 (anim_x-p.x == GRID1[2].0-GRID2[2].0). Settles the polar/rotate ball.vel
+# slot-overlap (the in-place FUN_005ee6e0 about Y) + FUN_0058ed80 ownership transfer + ball.pos += p.vel.
+emit_spec 0x26   0x1000  0x2000  0x500 2   100   0x4333  0x2000  142964;   run_emu; bank pass26
+# Sub-arm 2 independent point: power 150 (radius), facing 0x1000 (aim), anim_x 0x5000 (Dx 16384, must
+# NOT affect ball.vel) -- confirms the polar/rotate formula generalizes (not curve-fit to pass26).
+emit_spec 0x26   0x1000  0x2000  0x500 2   150   0x5000  0x2000  157964  0x1000;  run_emu; bank pass2b
+# Sub-arm 3 (near-miss): power 50 so z-error 20000 fails gate-1 (<11141) AND gate-2 (<14745) but passes
+# gate-3 (<29491); only sets m+0x461 |= 0x20.
+emit_spec 0x26   0x1000  0x2000  0x500 2   50    0x4333  0x2000  137964;   run_emu; bank near26
 
 echo "=== 7260kick oracle -> $OUT ==="
 cat "$OUT"
