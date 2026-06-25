@@ -127,10 +127,15 @@ def chrome() -> Image.Image:
     """The static 640x480 menu chrome: trozo bands + icons + captions + controls."""
     cv = Image.new("RGB", (W, H), (16, 20, 36))
     trozo = render("RECURSOS.PKF", "TROZO_FONDO.BMP", force_vga=True, transparent=True)
-    mirror = trozo.transpose(Image.FLIP_LEFT_RIGHT)
+    # The mirror supplies ONLY the right-column grey label slots. It must be clipped
+    # to the right half (x>=320): the full mirror is opaque across most of its width,
+    # so pasting it whole would overwrite trozo's own left-column slots (the menu is
+    # symmetric, so mirror's left half == trozo's right half — marble, no left slots),
+    # leaving the left captions floating on marble. Clip so both columns keep slots.
+    mirror = trozo.transpose(Image.FLIP_LEFT_RIGHT).crop((W // 2, 0, W, 158))
     for y in TROZO_Y:
         cv.paste(trozo, (0, y), trozo)
-        cv.paste(mirror, (0, y), mirror)
+        cv.paste(mirror, (W // 2, y), mirror)
     # side panels around the centre
     for p in PANELS:
         cell(cv, (p[0], p[1], p[2] - p[0], p[3] - p[1]), C_PANEL, C_PANEL_HI, C_PANEL_LO)

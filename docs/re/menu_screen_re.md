@@ -66,6 +66,11 @@ LINE-UP, TACTICS, SIGN PLAYER, STADIUM) + RESULTS for the marcador/scoreboard ic
   is left-right symmetric, so a horizontally-mirrored copy supplies the right-column
   grey slots (trozo's left slot at x63-207 mirrors to x433-577 = the reversed right
   caption x-range). Friendly-match mode swaps in `fondo_amistoso.bmp` (not used here).
+  **Bake gotcha (fixed 2026-06-25):** the mirror is opaque across most of its width, so
+  it must be CLIPPED to the right half (x≥320) before compositing — pasting the whole
+  mirror over trozo overwrites trozo's own left-column slots (mirror's left half ==
+  trozo's right half = marble), leaving the six left captions floating on bare marble.
+  Verify: every caption centre must sample grey (80,80,80), not marble blue.
 
 ## Build mapping (→ `app/scenes/MenuScreen.gd`)
 - The whole static chrome (trozo bands + mirror + 12 icons + captions + control bar +
