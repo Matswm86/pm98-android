@@ -153,6 +153,19 @@ static func scale_vec3(vx: int, vy: int, vz: int, s: int) -> Array:
 	return [mul16(vx, s), mul16(vy, s), mul16(vz, s)]
 
 
+## FUN_005ee7c0: tilt a vec3 out of the ground plane by `angle` (about Y) while preserving its
+## compass heading. a = atan_angle(v.x, v.y) (the vec's heading); rotate v by -a about Z so its
+## heading aligns to +x; rotate by `angle` about Y (lifts x into z); rotate by +a about Z to
+## restore the heading. All three rotations mutate the SAME register (the binary's param_1 vec),
+## modelled as in-place rot_vec3 calls threaded through `v`. Returns `v`.
+static func tilt_to_heading(v: Array, angle: int) -> Array:
+	var a := atan_angle(int(v[0]), int(v[1]))
+	rot_vec3(v, -a, 0)
+	rot_vec3(v, angle, 1)
+	rot_vec3(v, a, 0)
+	return v
+
+
 ## FUN_005b1260: LUT-approximated length of the 2D vector (x, y) -- the projection of (x,y)
 ## onto its own unit direction. ang = atan_angle(x, y); return muladd16(x, cos_a(ang), y,
 ## sin_a(ang)). The reusable planar magnitude the player-move fns (FUN_005b70e0 nearest-search,

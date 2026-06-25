@@ -205,13 +205,15 @@ func _test_moveleaves() -> void:
 				got = Pm98Trig.mid_offset(
 					[arr[0], arr[1], arr[2]], [arr[3], arr[4], arr[5]], arr[6], [arr[7], arr[8], arr[9]]
 				)
+			"5ee7c0":
+				got = Pm98Trig.tilt_to_heading([arr[0], arr[1], arr[2]], arr[3])
 			_:
 				_ok(false, "%s unknown fn tag %s" % [name, fn])
 				continue
 		rows += 1
 		for i in 3:
 			_ok(got[i] == want[i], "%s[%d] (fn %s): got %d want %d" % [name, i, fn, got[i], want[i]])
-	_ok(rows == 12, "moveleaf oracle had 12 fixtures (got %d)" % rows)
+	_ok(rows == 14, "moveleaf oracle had 14 fixtures (got %d)" % rows)
 
 
 ## Reinterpret a 32-bit value as signed (the oracle prints mem as unsigned LE).

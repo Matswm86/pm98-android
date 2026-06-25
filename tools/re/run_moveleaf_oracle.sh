@@ -189,5 +189,20 @@ $(poke 0x200038 0)"
 emit_spec 0x005ee3f0 "$VA" "$VB 131072 $V4" "$POK" "0x00200000 0x00200004 0x00200008"
 run_emu; bank mid_nobox 5ee3f0 "524288,0,0,0,0,0,131072,0,0,0" 0x200000 0x200004 0x200008
 
+# ---- FUN_005ee7c0  tilt_to_heading(v=VA, angle) -> v tilted by `angle` about Y, heading kept --
+# atan(x,y) -> rotate -a (Z) -> rotate angle (Y) -> rotate +a (Z); exercises cos+atan LUT, no ftol.
+# vec heading ~45deg with a nonzero z; tilt up by 0x2000 (45deg of the 0x10000 circle).
+POK="$(poke 0x200000 196608)
+$(poke 0x200004 196608)
+$(poke 0x200008 65536)"
+emit_spec 0x005ee7c0 "$VA" "8192" "$POK" "0x00200000 0x00200004 0x00200008"
+run_emu; bank tilt_diag45 5ee7c0 "196608,196608,65536,8192" 0x200000 0x200004 0x200008
+# heading along -x, tilt down by -0x1000, z starts negative
+POK="$(poke 0x200000 -262144)
+$(poke 0x200004 0)
+$(poke 0x200008 -131072)"
+emit_spec 0x005ee7c0 "$VA" "-4096" "$POK" "0x00200000 0x00200004 0x00200008"
+run_emu; bank tilt_negx 5ee7c0 "-262144,0,-131072,-4096" 0x200000 0x200004 0x200008
+
 echo "=== moveleaf oracle -> $OUT ==="
 cat "$OUT"
