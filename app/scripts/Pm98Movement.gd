@@ -1838,6 +1838,72 @@ static func _near_ball_pullin_decide(p: Dictionary) -> bool:
 	return _lane_clearance(p, roster, [bx, by, bz], 0x20000) >= 0x20000
 
 
+## FUN_005b05a0 PHASE 2 (the sector-grid approach-ball steer), 0x5b07c4..0x5b0a13. Reached on EVERY
+## phase-1 gate-fail (the `je 0x5b07c4` after each bbox/near/carrier/clearance check). Builds a steer
+## TARGET from a lookahead index into the ball's predicted-trajectory grid, then tail-calls the locked
+## steer_89c0(target, 0x5a). DETERMINISTIC -- no RNG; the LUT/atan/ftol/MulDiv leaves are all already
+## locked. Steps, in binary order (esp-traced; the function is stack-vec-heavy -- the disasm, not the
+## absent decompile, is ground truth):
+##   anchor = [goal_target_x(m, team), 0, 0]                    (FUN_005a44f0 + vec_store FUN_00590aa0)
+##   D1     = ball.pos - anchor                                 -> dot1 = planar_mag(D1.x, D1.y)
+##   vel    = ball.vel.xy (ball+0x20/0x24)                      -> dot2 = planar_mag(vel.x, vel.y)
+##   sector = min( (dot1 / (dot2 + 1)) / 3 , 0xc )              (both divides = x86 idiv, truncate to 0)
+##   grid   = the ball trajectory vec3 at ball + 0xc*(sector + 0x17)
+##   D2     = grid - anchor                                     -> D2mag = planar_mag(D2.x, D2.y)  (5b1260)
+##   r      = min( 2*D2mag/3 ,  MulDiv(0x30000, max(0, 0x190000 - D2mag), 0x190000) + 0x20000 )
+##   P3     = polar_vec(r, atan(D2.x, D2.y))                    (5ee0f0)
+##   target = (anchor + P3) with x AND y masked & 0xffffc000 (low 14 bits cleared); z stays 0
+##   steer_89c0(p, target, 0x5a)                                (FUN_005a89c0)
+## The handoff (2026-06-25) had the 5a16c0 LUT order reversed -- the binary writes out[0]=cos_a, out[1]=
+## sin_a (verified vs 0x5a16c0 disasm), i.e. exactly polar_vec's x,y, so dot1/dot2 reduce to planar_mag.
+## Locked by tools/re/run_b05a0_phase2_oracle.sh (the REAL b05a0 forced into phase 2 via an empty bbox,
+## FUN_005a89c0 STUBBED, the composed target read back off the stack) -> app/tests/test_b05a0_phase2.gd.
+static func _approach_steer_target(p: Dictionary) -> Array:
+	var m: Dictionary = _ref(p, 0x18c)
+	var ball: Dictionary = _ref(p, 0x190)
+	var goalx := goal_target_x(_g(m, 0x19a0), _g(m, 0x1820), _g(p, 0x2b8))
+	# D1 = ball.pos - [goalx, 0, 0]; dot1 = its planar (x-y) magnitude.
+	var dot1 := Pm98Trig.planar_mag(Pm98Trig._i32(_si(ball, 4) - goalx), _si(ball, 8))
+	# dot2 = planar magnitude of the ball velocity (ball+0x20/0x24).
+	var dot2 := Pm98Trig.planar_mag(_si(ball, 0x20), _si(ball, 0x24))
+	# sector lookahead index = (dot1 / (dot2 + 1)) / 3, clamped to <= 0xc (no lower bound -- both >= 0).
+	var sector := Pm98Trig._tdiv(Pm98Trig._tdiv(dot1, dot2 + 1), 3)
+	if sector > 0xc:
+		sector = 0xc
+	# grid vec = ball trajectory slot (sector + 0x17); D2 = grid - anchor.
+	var base := 0xc * (sector + 0x17)
+	var d2x := Pm98Trig._i32(_si(ball, base) - goalx)
+	var d2y := _si(ball, base + 4)
+	var d2mag := Pm98Trig.planar_mag(d2x, d2y)
+	# radius = min(2*D2mag/3, MulDiv(0x30000, max(0, 0x190000 - D2mag), 0x190000) + 0x20000).
+	var num := 0x190000 - d2mag
+	if num < 0:
+		num = 0
+	var upper := _muldiv(0x30000, num, 0x190000) + 0x20000
+	var r := Pm98Trig._tdiv(2 * d2mag, 3)
+	if r >= upper:
+		r = upper
+	# P3 = polar(r, atan(D2)); target = anchor + P3 with x,y masked & 0xffffc000 (z stays 0).
+	var p3: Array = Pm98Trig.polar_vec(r, Pm98Trig.atan_angle(d2x, d2y))
+	var tx := Pm98Trig._i32(Pm98Trig._i32(goalx + int(p3[0])) & ~0x3fff)
+	var ty := Pm98Trig._i32(Pm98Trig._i32(int(p3[1])) & ~0x3fff)
+	return [tx, ty, 0]
+
+
+static func _near_ball_approach_steer(p: Dictionary) -> void:
+	steer_89c0(p, _approach_steer_target(p), 0x5a)
+
+
+## FUN_005b05a0 (full): the near-ball pull-in. Phase 1 gates decide; on PASS the binary tail-calls
+## FUN_005b0040 (the interception/mark move), on ANY fail it runs phase 2 (the approach-ball steer).
+## This is the call FUN_005a7260's dribble-grid block (L242) makes. Effect-faithful; not yet wired live.
+static func _near_ball_pullin(p: Dictionary) -> void:
+	if _near_ball_pullin_decide(p):
+		_move_b0040(p)
+	else:
+		_near_ball_approach_steer(p)
+
+
 # ---- FUN_005a3400 the per-player DECIDE, slice A (prologue + bbox) --------------------
 # The first ~100 instructions of the per-player movement-target computer: set the goal-X
 # anchor, the two target endpoints, and the movement bounding box, all oriented by side.

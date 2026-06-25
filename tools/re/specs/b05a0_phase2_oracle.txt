@@ -1,0 +1,6 @@
+# Oracle FUN_005b05a0 PHASE 2 (sector-grid approach steer). 5a89c0 stubbed; target read off stack.
+# Row: B05A0P2 <name> steer=<0|1> | <abs-addr>=<u32 LE> ... . target.xyz @ 0x307fc0/c4/c8.
+B05A0P2 sectorlo steer=1 | 0x307fb8=65536 0x307fbc=100 0x307fc0=1179648 0x307fc4=16384 0x307fc8=0 0x307fcc=65536 
+B05A0P2 sectorclamp steer=1 | 0x307fb8=65536 0x307fbc=100 0x307fc0=1163264 0x307fc4=0 0x307fc8=0 0x307fcc=1572864 
+B05A0P2 sectormid steer=1 | 0x307fb8=65536 0x307fbc=100 0x307fc0=1277952 0x307fc4=0 0x307fc8=0 0x307fcc=786432 
+B05A0P2 angled steer=1 | 0x307fb8=58628 0x307fbc=29375 0x307fc0=1310720 0x307fc4=16384 0x307fc8=0 0x307fcc=524288 
