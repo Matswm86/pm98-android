@@ -336,7 +336,7 @@ static func engine_tick(p: Dictionary, m: Dictionary, rng = null) -> void:
 	else:
 		_movement_decision(p, m, gs, b, rng)
 
-	# --- LAB_005a4e5b (L376-425): the +0x40-gated 9490 lean + the 7260 locomotion ---
+	# --- LAB_005a4e5b (L376-425): the +0x40-gated 9490 lean + the 7260 ball-touch decision ---
 	var act := _g(p, 0x40)
 	if act != 0x1d and act != 5 and act != 0x24 and (_g(m, 0x461) & 0x40) == 0:
 		_move_9490(p)                                    # STUB
@@ -346,7 +346,7 @@ static func engine_tick(p: Dictionary, m: Dictionary, rng = null) -> void:
 			run_7260 = _penalty_box_gate_b(p, m)
 		if run_7260:
 			if (_g(m, 0x44c) != 7 and _g(m, 0x44c) != 5) or not _is_taker(p, m):
-				_move_7260(p)                            # STUB
+				_move_7260(p)                            # ball_touch_7260 (slice 1: L63-176)
 
 	# --- LAB_005a4fa2 (L426-465): the body-orient pass + the open-play power reset ---
 	_move_8f20(p, _g(p, 0x34))                            # STUB (arg = facing)
@@ -514,7 +514,7 @@ static func _penalty_box_gate_a(p: Dictionary, m: Dictionary) -> bool:
 
 
 ## L389-419: the LAB_005a4e5b penalty/ET gate (explicit per-axis box, not FUN_00590c10). Returns
-## whether the 7260 locomotion section proceeds (true) or jumps to LAB_005a4fa2.
+## whether the 7260 ball-touch section proceeds (true) or jumps to LAB_005a4fa2.
 static func _penalty_box_gate_b(p: Dictionary, m: Dictionary) -> bool:
 	var inb := _si(p, 4) >= _si(m, 0x1828) and _si(p, 4) <= _si(m, 0x1834) \
 		and _si(p, 8) >= _si(m, 0x182c) and _si(p, 8) <= _si(m, 0x1838) \
@@ -613,5 +613,9 @@ static func _move_65a0(p: Dictionary, m: Dictionary, arg: int, rng) -> void:
 	if not Pm98Movement.move_dispatch(p, m, arg, rng):
 		trace_calls.append(["M65a0", arg])
 static func _move_9490(_p: Dictionary) -> void: trace_calls.append(["M9490", 0])   # FUN_005a9490 (lean)
-static func _move_7260(_p: Dictionary) -> void: trace_calls.append(["M7260", 0])   # FUN_005a7260 (locomotion)
+## FUN_005a7260 (ball-touch/dribble/pass/shot decision). Slice 1 (L63-176) is WIRED to the real port
+## Pm98Movement.ball_touch_7260 -- the M7260 stub is retired (run_engine_oracle.sh now runs the REAL
+## FUN_005a7260, un-stubbed). The lazy-init + dribble-grid + execute-kick (L177-668) are DEFERRED there.
+static func _move_7260(p: Dictionary) -> void:
+	Pm98Movement.ball_touch_7260(p)
 static func _move_8f20(_p: Dictionary, facing: int) -> void: trace_calls.append(["M8f20", facing])  # FUN_005a8f20 (body orient)

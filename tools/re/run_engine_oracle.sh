@@ -4,11 +4,13 @@
 # and bank the SKELETON's field writes + the movement-fn SELECTION that Pm98Action.engine_tick must
 # reproduce bit-for-bit (app/tests/test_engine_tick.gd).
 #
-# The 14 leaf calls are STUBBED (PcodeEmu `stub`): the 7 action handlers (FUN_005acc40/ad010/ad970/
+# 13 leaf calls are STUBBED (PcodeEmu `stub`): the 7 action handlers (FUN_005acc40/ad010/ad970/
 # adc60/adfc0/ae4c0/ae910), the resolver case 8/9 (FUN_005aeda0), the case-0x13 shot-setup (FUN_005ac1a0),
-# the teammate-count (FUN_005b0b40), and the 5 movement fns (FUN_005a8680/65a0/9490/7260/8f20). Each
-# stub returns 0, pops its args, and LOGS a "STUB <label> ... arg0=.." line so the movement-fn selection
-# + arg stay observable. The in-image pure helpers run REAL: tick_action=FUN_005a50c0, set_phase=005942e0,
+# the teammate-count (FUN_005b0b40), and 4 movement fns (FUN_005a8680/65a0/9490/8f20). The 5th movement fn
+# FUN_005a7260 is PORTED (Pm98Movement.ball_touch_7260) and runs REAL here (un-stubbed), so test_engine_tick
+# verifies it transitively. FUN_00605ff0 (atexit) is stubbed as a fault-guard for the steer box-init it
+# now reaches. Each stub returns 0, pops its args, and LOGS a "STUB <label> ... arg0=.." line so the
+# movement-fn selection + arg stay observable. The in-image pure helpers run REAL: tick_action=FUN_005a50c0, set_phase=005942e0,
 # set_position_code=005a5430, play_state=005943b0, within_box=00590c10, FUN_00606220 (no-op).
 #
 # These Step-1 fixtures pick states that DRAW NO rng (no case 6/7 windup, no moving-ball 0x1c, no 0x1d,
@@ -42,9 +44,14 @@ STUBS=(
   "0x5a8680 0 0 M8680"     # settle move
   "0x5a65a0 0 4 M65a0"     # general move (arg = iStack_38)
   "0x5a9490 0 0 M9490"     # lean
-  "0x5a7260 0 0 M7260"     # locomotion
   "0x5a8f20 0 4 M8f20"     # body orient (arg = facing)
+  "0x605ff0 0 0 atexit"    # FUN_00605ff0 atexit (7260 lazy-init marker grids + steer box-init) -- fault guard
 )
+# NOTE: FUN_005a7260 (M7260, the ball-touch/dribble decision) is NO LONGER STUBBED -- it is ported
+# (Pm98Movement.ball_touch_7260) and runs REAL here so test_engine_tick verifies it transitively. Its
+# slice-1 reachable surface for these fixtures: flag2d8 (not-same-side) takes the goal-anchor steer
+# (89c0/8bc0, INERT on the zeroed box -> arrives early, no 8f20); stamina16/case1f (same-side) defer at
+# the open-play gate after the lazy-init (which writes only the 0x674xxx marker grids, mapped below).
 
 READS=(
   "0x00230004 4" "0x00230008 4" "0x0023000c 4"
@@ -72,6 +79,7 @@ zero    0x00260000 0x00002000
 zero    0x00270000 0x00001000
 zero    0x00280000 0x00001000
 zero    0x00290000 0x00001000
+zero    0x00674000 0x00001000
 maxsteps 400000
 EOF
     cat "$LUT"

@@ -1481,6 +1481,68 @@ static func _b0040_target(p: Dictionary) -> Array:
 	]
 
 
+## FUN_005a7260 (__fastcall this=player): the per-tick BALL-TOUCH / dribble / pass / shot DECISION the
+## engine runs at LAB_005a4e5b (Pm98Action.engine_tick), AFTER the lean (9490) and BEFORE the body-orient
+## (8f20). It is NOT a locomotion integrator (steer_8f20 is): it decides whether a player near the ball
+## acts on it -- fires FUN_00594470 kick events, sets ball velocity, advances the action code. The binary
+## returns `uVar5` (the caller discards it; engine_tick uses _move_7260 in a void context), so this is void.
+##
+## SLICE 1 (this port): L63-176 -- the action-0x1d ball-power park (L63-65), the highlight-REPLAY prologue
+## GATE (L66-134, DEFERRED: m+0x448==6 only, never in headless sim; it calls the unported FUN_005aad30 /
+## FUN_005aae40 / FUN_005b05a0), the same-side / facing test (L135-145, FUN_0058fb50 + sign gate), the
+## NOT-same-side GOAL-ANCHOR steer (L146-154, steer_89c0([+/-goalx,0,0], 0x5a)) + the CARRIER ball-drag
+## (L155-163: release the ball and pull it back to the dribbler by polar(0x6666, facing)), and the
+## not-carrier GATE into the big block (L165-176). The lazy-init DAT marker grids + the dribble-grid
+## search (L177-514) + the execute-kick block (L515-666) are DEFERRED to slice 2/3 -- reached only when
+## same-side & not-carrier in open play; the binary returns there. Oracle: tools/re/run_7260_oracle.sh ->
+## specs/7260_oracle.txt, locked in app/tests/test_7260.gd; PLUS the transitive engine_tick parity --
+## run_engine_oracle.sh now runs the REAL FUN_005a7260 (the M7260 stub is retired).
+static func ball_touch_7260(p: Dictionary) -> void:
+	var m: Dictionary = _ref(p, 0x18c)
+	var ball: Dictionary = _ref(p, 0x190)
+
+	# L63-65: action 0x1d with +0x48 == 0 parks the ball-power scalar m+0x19dc to 10000.
+	if _g(p, 0x40) == 0x1d and _g(p, 0x48) == 0:
+		m[0x19dc] = 10000
+
+	# L66-134: the highlight-REPLAY prologue. Entered ONLY when m+0x448 == 6 (a replay mode the headless
+	# sim never reaches) AND action in {0x1f, 0x21, 0x1d-with-+0x48>=1}; the binary otherwise takes
+	# `goto LAB_005a73dd`. DEFERRED (its body calls the unported FUN_005aad30 / FUN_005aae40 / FUN_005b05a0).
+	var act := _g(p, 0x40)
+	if _g(m, 0x448) == 6 and (act == 0x1f or act == 0x21 or (act == 0x1d and _si(p, 0x48) >= 1)):
+		return                                          # DEFERRED slice-N replay prologue
+
+	# LAB_005a73dd (L135-145): same-side test -- P.pos inside the goal box (FUN_0058fb50) AND
+	# sign(P.x) == sign(P+0x3a4).
+	var same_side := _ps_goalbox(p, [_si(p, 4), _si(p, 8), _si(p, 0xc)]) \
+		and _sign1(_si(p, 4)) == _sign1(_si(p, 0x3a4))
+
+	# L146-164: NOT same-side -> steer toward the (team-mirrored) goal anchor, then the carrier ball-drag.
+	if not same_side:
+		var goalx := _si(m, 0x1820)
+		if (_g(m, 0x19a0) & 1) == _g(p, 0x2b8):
+			goalx = Pm98Trig._i32(-goalx)
+		steer_89c0(p, [goalx, 0, 0], 0x5a)              # FUN_00590aa0([goalx,0,0]); FUN_005a89c0(.,0x5a)
+		# L155-163: if THIS player carries the ball (param_1 == ball+0x40) and the engage-copy guard is
+		# clear (FUN_0058f100 == 0), release the ball (ball+0x40 = 0) and pull it back to the dribbler by
+		# polar(0x6666, facing).
+		if is_same(ball.get(0x40, null), p) and _shot_engage_guard(ball, m) == 0:
+			ball[0x40] = 0                              # FUN_0058ed70 (this=ball)
+			var pv := Pm98Trig.polar_vec(0x6666, _g(p, 0x34))   # FUN_005ee0f0(0x6666, facing)
+			ball[4] = Pm98Trig._i32(_si(ball, 4) - int(pv[0]))
+			ball[8] = Pm98Trig._i32(_si(ball, 8) - int(pv[1]))
+			ball[0xc] = Pm98Trig._i32(_si(ball, 0xc) - int(pv[2]))
+
+	# L165-176: the open-play GATE -- live play (m+0x448==0), this player is NOT the carrier, and
+	# (recomputed) same-side. The lazy-init DAT grids + dribble-grid + execute-kick (L177-668) are
+	# DEFERRED to slice 2/3; the binary's tail there is `return uVar5` (discarded).
+	if _g(m, 0x448) == 0 and not is_same(ball.get(0x40, null), p):
+		var same2 := _ps_goalbox(p, [_si(p, 4), _si(p, 8), _si(p, 0xc)]) \
+			and _sign1(_si(p, 4)) == _sign1(_si(p, 0x3a4))
+		if same2:
+			return                                      # DEFERRED slice 2/3 (L177-668)
+
+
 ## Non-active velocity sub-path of FUN_005a65a0 (L74-106). Returns true if it STOPPED the player (v58
 ## = v54 = 0, skipping the L107 wander); false to fall through to the wander draw. Draws RNG following
 ## the binary's short-circuit structure exactly. FUN_005b8c90 (we-in-possession) is match+0x1664 ==

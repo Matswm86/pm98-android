@@ -7,10 +7,14 @@ extends SceneTree
 ## Run headless from the project dir:
 ##   ~/godot462 --headless --path app --script res://tests/test_engine_tick.gd
 ##
-## ORACLE = the REAL FUN_005a4600 under the Ghidra PCode emulator with the 14 leaf calls STUBBED (the 7
-## action handlers + resolver + shot-setup + teammate-count + 5 movement fns), run to a clean RET
-## (tools/re/run_engine_oracle.sh -> specs/engine_oracle.txt). The stubbed leaves are NO-OPS here too, so
-## the skeleton's field writes match bit-for-bit; the leaves get their own oracle in Tasks #2/#3.
+## ORACLE = the REAL FUN_005a4600 under the Ghidra PCode emulator with 13 leaf calls STUBBED (the 7
+## action handlers + resolver + shot-setup + teammate-count + 4 movement fns FUN_005a8680/65a0/9490/8f20),
+## run to a clean RET (tools/re/run_engine_oracle.sh -> specs/engine_oracle.txt). The 5th movement fn
+## FUN_005a7260 is now PORTED (Pm98Movement.ball_touch_7260) and runs REAL -- it is verified transitively
+## here (its slice-1 surface is field-inert for these fixtures). The other stubbed leaves are NO-OPS here
+## too, so the skeleton's field writes still match bit-for-bit. `atexit` (FUN_00605ff0, the steer
+## box-init's static-local registration, now reachable via 7260's goal-anchor) is dropped from the
+## expected stub list (host artifact, not a game leaf).
 ##
 ## Each STUB line in the oracle records the leaf SELECTION + ORDER + arg0. We assert the ordered label
 ## list plus the two clean args -- B0B40's 0xfffe0000 and M65a0's iStack_38. (M8f20's arg is
@@ -95,7 +99,11 @@ func _load_oracle() -> Dictionary:
 			continue
 		elif line.find(" STUB ") >= 0:
 			var sm := rx_stub.search(line)
-			if sm:
+			# `atexit` (FUN_00605ff0) is the MSVC static-local registration the steer box-init fires the
+			# first time it runs (now reachable because FUN_005a7260 is un-stubbed and its goal-anchor
+			# steers). It is a host-runtime artifact, NOT a game leaf -- the GDScript port computes the box
+			# inline and never records it -- so it is dropped from the expected selection list.
+			if sm and sm.get_string(1) != "atexit":
 				out[cur]["stubs"].append([sm.get_string(1), sm.get_string(2).to_int()])
 		elif line.find(" RET ") >= 0 or line.find(" HALT ") >= 0:
 			for mtch in rx_mem.search_all(line):

@@ -68,8 +68,9 @@ STUBS=(
   "0x5a8680 0 0 M8680"     # settle move
   "0x5a65a0 0 4 M65a0"     # general move
   "0x5a9490 0 0 M9490"     # lean (post-switch)
-  "0x5a7260 0 0 M7260"     # locomotion (post-switch)
   "0x5a8f20 0 4 M8f20"     # body orient (post-switch)
+  "0x605ff0 0 0 atexit"    # FUN_005a7260 (ball-touch) now runs REAL (un-stubbed); atexit guards its steer
+                           # box-init. These fixtures never reach 7260's body, so the output is unchanged.
   "0x58fda0 0 0 TRAIL"     # resolve_post_shot render trail (no sim residue)
   "0x594470 0 12 ENQ"      # resolve_post_shot enqueue (arg0 = event code)
   "0x590f00 0 0 EFFECT"    # kick crowd/commentary effect (no tracked field, no rng)
@@ -107,6 +108,7 @@ zero    0x00280000 0x00001000
 zero    0x00290000 0x00001000
 zero    0x002a0000 0x00001000
 zero    0x002b0000 0x00001000
+zero    0x00674000 0x00001000
 maxsteps 8000000
 EOF
     cat "$LUT"

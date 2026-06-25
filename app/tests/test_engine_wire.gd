@@ -20,8 +20,10 @@ extends SceneTree
 ##     so it stays skipped after the handler too) -> the handler's pos/facing/aim survive.
 ##   * gs+0x2ee = 0 so the highlight power-accumulate AND the open-play power reset are both inactive
 ##     (they would otherwise clobber the handler's +0x54/+0x58).
-##   * the 5 movement leaves + the teammate-count + the case-8/9 resolver are still NO-OP stubs (Task #3),
-##     so they add no field writes. The Family-A cascade leaf (setup_shot/resolve_post_shot) now runs REAL
+##   * 4 of the 5 movement leaves (8680/65a0/9490/8f20) + the teammate-count + the case-8/9 resolver are
+##     still NO-OP stubs, so they add no field writes. FUN_005a7260 (ball-touch) is now WIRED+REAL: for a
+##     not-same-side player it runs the goal-anchor steer, whose handler-INDEPENDENT outputs are excluded
+##     via STEER_7260 (see below). The Family-A cascade leaf (setup_shot/resolve_post_shot) now runs REAL
 ##     on BOTH sides (call_setup/call_resolve=true), so it adds the SAME writes to each -> they still agree.
 ## The remaining prologue writes are a FIXED, handler-independent set (INERT_P) we exclude from the diff;
 ## any OTHER divergence -- a missed dispatch, a clobbered output, an extra/short rng draw -- fails loudly.
@@ -32,6 +34,15 @@ const SEED := 0x12345678
 #   0x48 tick_action decrement · 0x88 the &0xf counter · 0x6c cleared · 0x2d7/0x2d8 prologue flags ·
 #   0x50 the phase-0 possession touch counter · 0x4c the (here-unreached) possession owner-touch counter.
 const INERT_P := {0x48: true, 0x88: true, 0x6c: true, 0x2d7: true, 0x2d8: true, 0x50: true, 0x4c: true}
+
+# FUN_005a7260 (the ball-touch decision) is now WIRED+REAL in engine_tick (no longer a no-op stub). For a
+# not-same-side, non-carrier player it runs the goal-anchor steer (steer_89c0->8bc0->8f20), whose outputs
+# are HANDLER-INDEPENDENT (they depend only on the player's side/goal geometry, not which handler fired) --
+# the same class as INERT_P. The bare standalone handler does NOT run 7260, so we exclude the steer's
+# rotational outputs from the player diff: 0x34 facing, 0x64 yaw, 0x68 speed, 0x90 flip-hysteresis (its
+# curve 0x6c is already in INERT_P). Position 0x4/8/c is NOT excluded -- these fixtures keep speed 0 so the
+# steer never integrates position; a handler's pos output stays fully checked.
+const STEER_7260 := {0x34: true, 0x64: true, 0x68: true, 0x90: true}
 
 var _fail := 0
 var _pass := 0
@@ -99,8 +110,9 @@ func _run(label: String, action: int, fixture: String, bare: Callable) -> void:
 	_ok(rng_et.state == rng_sa.state,
 		"%s rng end-state: engine_tick 0x%x vs standalone 0x%x" % [label, rng_et.state, rng_sa.state])
 
-	# every int field of player / ball / match must agree, except the inert-prologue set on player.
-	_diff(label, "p", sa["p"], et["p"], INERT_P)
+	# every int field of player / ball / match must agree, except the inert-prologue set + the now-wired
+	# 7260 goal-anchor steer outputs on player (both handler-independent).
+	_diff(label, "p", sa["p"], et["p"], _merge(INERT_P, STEER_7260))
 	_diff(label, "ball", sa["p"][0x190], et["p"][0x190], {})
 	_diff(label, "m", sa["p"][0x18c], et["p"][0x18c], {})
 
@@ -127,6 +139,13 @@ func _diff(label: String, region: String, a: Dictionary, b: Dictionary, skip: Di
 			_ok(false, "%s %s+0x%x: type mismatch (standalone %s vs engine_tick %s)"
 				% [label, region, int(k), typeof(va), typeof(vb)])
 		# both Dict/Array -> topology pointer, skip.
+
+
+func _merge(a: Dictionary, b: Dictionary) -> Dictionary:
+	var out := a.duplicate()
+	for k in b:
+		out[k] = b[k]
+	return out
 
 
 func _ok(cond: bool, msg: String) -> void:
