@@ -1,0 +1,11 @@
+# Oracle FUN_005a7260 marker-grid ENTRY GATES (0x5a7d9e..0x5a7e23). Entered mid-fn at 0x5a7d9e
+# (ESI=p, EBP=p+4). trace GRID@0x5a7e23 (run search) vs TAIL@0x5a8457 (skip). proceed = GRID fired.
+# Row: MGATE <name> proceed=<0|1> | <CALL summary with tracehits=...>.
+MGATE near_loose proceed=1 | tracehits={GRID=1}
+MGATE far_x proceed=0 | tracehits={TAIL=1}
+MGATE far_y_neg proceed=0 | tracehits={TAIL=1}
+MGATE far_z proceed=0 | tracehits={TAIL=1}
+MGATE near_boundary proceed=1 | tracehits={GRID=1}
+MGATE poss_carrier proceed=0 | tracehits={TAIL=1}
+MGATE poss_loose_match44 proceed=1 | tracehits={GRID=1}
+MGATE poss_loose_nomatch44 proceed=0 | tracehits={TAIL=1}

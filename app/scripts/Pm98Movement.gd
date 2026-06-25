@@ -1904,6 +1904,42 @@ static func _near_ball_pullin(p: Dictionary) -> void:
 		_near_ball_approach_steer(p)
 
 
+## FUN_005a7260 marker-grid block, slice 2b-iii-a: the ENTRY GATES (0x5a7d9e..0x5a7e23). Immediately
+## after the FUN_005b05a0 pull-in (slice 2b-ii), the binary decides whether to run the ~470-insn
+## marker-grid dribble search (fall through to 0x5a7e23) or skip straight to the tail re-engage block
+## (jump to 0x5a8457). Two gates, in binary order:
+##   (1) PROXIMITY -- ball.pos must be within per-axis |Δ| < 0x230000 of p.pos on ALL THREE axes. Any
+##       axis with |Δ| >= 0x230000 (each is a cdq/xor/sub abs then `cmp eax,0x230000; jge`) -> NOT
+##       near -> tail. ball.pos = ball+4 (ECX=p+0x190 then `add ecx,4`); p.pos = EBP (= p+4).
+##   (2) POSSESSION early-out -- evaluated ONLY when WE are in possession (FUN_005b8c90: gs[0x138]+
+##       0x1664 == gs+8, gs = p+0x184). Then proceed ONLY if the ball is loose (carrier ball+0x40 == 0)
+##       AND ball+0x44 == p (the `setne`/`cmp [eax+0x44],esi` pair, either failure -> tail). When we are
+##       NOT in possession this whole gate is skipped (control drops straight into the search).
+## Returns true = run the marker search (0x5a7e23); false = jump to the tail (0x5a8457). DECIDE-only,
+## NOT yet wired (the search body + tail + FUN_005aa870 are slices 2b-iii-b.. / 2b-iv). Locked vs the
+## REAL FUN_005a7260 entered at 0x5a7d9e (ESI=p, EBP=p+4) by tools/re/run_7260markergate_oracle.sh
+## (tracehits GRID@0x5a7e23 vs TAIL@0x5a8457) -> app/tests/test_7260markergate.gd.
+static func _marker_gate_proceed(p: Dictionary) -> bool:
+	var ball: Dictionary = _ref(p, 0x190)
+	# (1) proximity: every axis within 0x230000 of p.pos.
+	if absi(Pm98Trig._i32(_si(ball, 4) - _si(p, 4))) >= 0x230000:
+		return false
+	if absi(Pm98Trig._i32(_si(ball, 8) - _si(p, 8))) >= 0x230000:
+		return false
+	if absi(Pm98Trig._i32(_si(ball, 0xc) - _si(p, 0xc))) >= 0x230000:
+		return false
+	# (2) we-in-possession early-out (FUN_005b8c90).
+	var gs: Dictionary = _ref(p, 0x184)
+	var m: Dictionary = _ref(gs, 0x138)
+	if _g(m, 0x1664) == _g(gs, 8):                          # we hold the ball
+		var carrier: Variant = ball.get(0x40, null)
+		if carrier != null and carrier != 0:               # ball+0x40 carrier != 0 -> tail
+			return false
+		if not is_same(ball.get(0x44, null), p):           # ball+0x44 != p -> tail
+			return false
+	return true
+
+
 # ---- FUN_005a3400 the per-player DECIDE, slice A (prologue + bbox) --------------------
 # The first ~100 instructions of the per-player movement-target computer: set the goal-X
 # anchor, the two target endpoints, and the movement bounding box, all oriented by side.
