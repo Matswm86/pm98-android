@@ -25,6 +25,7 @@ var _on_activate: Callable
 var _career: Career = null              # active managed career, null on the menu
 var _hub: MenuScreen = null             # persistent MENUPRINCIPAL hub while in a career
 var _browse: BrowseScreen = null        # active PM98-chrome browse/select overlay (Track B)
+var _seleccion: SeleccionScreen = null  # active new-career SELECCION overlay (faithful art)
 
 @onready var _title: Label = $Root/TopBar/Title
 @onready var _subtitle: Label = $Root/TopBar/Subtitle
@@ -136,7 +137,7 @@ func _hub_shot() -> void:
 	var lg: Dictionary = GameDB.leagues[0]
 	var clubs := GameDB.clubs_in_league(lg["id"])
 	clubs.sort_custom(func(a, b): return a["name"] < b["name"])
-	_begin_career(lg, clubs[0])
+	_begin_career("Manager", lg, clubs[0])
 	for _i in 20:
 		await get_tree().process_frame
 	await RenderingServer.frame_post_draw
@@ -163,13 +164,10 @@ func _browse_shot() -> void:
 		return
 	await _settle()
 	_save_shot(dir, "home.png")            # _boot already mounted the home/database browse
-	_show_career_pick_league()
+	_show_career_select()
 	await _settle()
-	_save_shot(dir, "pick_league.png")
+	_save_shot(dir, "seleccion.png")
 	var lg: Dictionary = GameDB.leagues[0]
-	_show_career_pick_club(lg)
-	await _settle()
-	_save_shot(dir, "pick_club.png")
 	_show_db_league(lg)
 	await _settle()
 	_save_shot(dir, "db_league.png")
@@ -243,7 +241,7 @@ func _news_shot() -> void:
 	var lg: Dictionary = GameDB.leagues[0]
 	var clubs := GameDB.clubs_in_league(lg["id"])
 	clubs.sort_custom(func(a, b): return a["name"] < b["name"])
-	_begin_career(lg, clubs[0])
+	_begin_career("Manager", lg, clubs[0])
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 909090            # fixed seed -> reproducible capture
 	for _i in 6:
@@ -287,7 +285,7 @@ func _train_shot() -> void:
 	var lg: Dictionary = GameDB.leagues[0]
 	var clubs := GameDB.clubs_in_league(lg["id"])
 	clubs.sort_custom(func(a, b): return a["name"] < b["name"])
-	_begin_career(lg, clubs[0])
+	_begin_career("Manager", lg, clubs[0])
 	_career.training_intensity = "Intensive"
 	_show_career()               # raise the hub
 	await _settle()
@@ -311,7 +309,7 @@ func _contract_shot() -> void:
 	var lg: Dictionary = GameDB.leagues[0]
 	var clubs := GameDB.clubs_in_league(lg["id"])
 	clubs.sort_custom(func(a, b): return a["name"] < b["name"])
-	_begin_career(lg, clubs[0])
+	_begin_career("Manager", lg, clubs[0])
 	# Pick an expiring player; guarantee one for the capture if the squad has none.
 	var target: Dictionary = {}
 	for p in _career.my_squad():
@@ -345,7 +343,7 @@ func _youth_shot() -> void:
 	var lg: Dictionary = GameDB.leagues[0]
 	var clubs := GameDB.clubs_in_league(lg["id"])
 	clubs.sort_custom(func(a, b): return a["name"] < b["name"])
-	_begin_career(lg, clubs[0])
+	_begin_career("Manager", lg, clubs[0])
 	# Develop the academy a season's worth so the crop separates into ready / developing.
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 717171
@@ -379,7 +377,7 @@ func _staff_shot() -> void:
 	var lg: Dictionary = GameDB.leagues[0]
 	var clubs := GameDB.clubs_in_league(lg["id"])
 	clubs.sort_custom(func(a, b): return a["name"] < b["name"])
-	_begin_career(lg, clubs[0])
+	_begin_career("Manager", lg, clubs[0])
 	# Hire one of each role from the pool so the screen shows a real backroom team + effects.
 	var seen: Dictionary = {}
 	for cand in (_career.staff_pool as Array).duplicate():
@@ -416,7 +414,7 @@ func _cup_shot() -> void:
 		var ra := MatchEngine.team_ratings(a)
 		var rb := MatchEngine.team_ratings(b)
 		return (ra["att"] + ra["def"] + ra["gk"]) > (rb["att"] + rb["def"] + rb["gk"]))
-	_begin_career(lg, clubs[0])
+	_begin_career("Manager", lg, clubs[0])
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 717171            # fixed seed -> reproducible capture
 	for _i in 22:                # past several scheduled rounds of both cups
@@ -527,7 +525,7 @@ func _screens_shot() -> void:
 	var lg: Dictionary = GameDB.leagues[0]
 	var clubs := GameDB.clubs_in_league(lg["id"])
 	clubs.sort_custom(func(a, b): return a["name"] < b["name"])
-	_begin_career(lg, clubs[0])
+	_begin_career("Manager", lg, clubs[0])
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 313131            # fixed seed -> reproducible captures
 	for _i in 8:                 # a few weeks so the table + finances have data
@@ -754,12 +752,13 @@ func _mount_browse(title: String, subtitle: String, rows: Array,
 	_browse.back_pressed.connect(on_back)
 	AudioManager.play_music()   # the menu theme rides every front-end / management screen
 
-## Free every front-of-house overlay (browse + title) before the career hub takes over.
+## Free every front-of-house overlay (browse + title + seleccion) before the career hub.
 func _clear_front_overlays() -> void:
 	for c in get_children():
-		if c is BrowseScreen or c is TitleScreen:
+		if c is BrowseScreen or c is TitleScreen or c is SeleccionScreen:
 			c.queue_free()
 	_browse = null
+	_seleccion = null
 
 ## Add a full-rect art overlay that frees on any tap (the display-only screen pattern).
 func _mount_tap_overlay(scr: Control) -> void:
@@ -842,7 +841,7 @@ func _show_home() -> void:
 func _home_select(item: Dictionary) -> void:
 	match item["type"]:
 		"continue": _continue_career()
-		"new": _show_career_pick_league()
+		"new": _show_career_select()
 		"league": _show_db_league(item["league"])
 		_: _show_db_intl()
 
@@ -941,32 +940,48 @@ func _play_watch_match(home: Dictionary, away: Dictionary, league: Dictionary) -
 
 # ---- career mode ---------------------------------------------------------
 
-## New-career division picker (B2): original-art select list. Back -> the database root.
-func _show_career_pick_league() -> void:
-	var rows: Array = []
-	var leagues: Array = []
-	for lg in GameDB.leagues:
-		rows.append({"text": lg["name"], "value": "%d clubs" % (lg["clubIds"] as Array).size()})
-		leagues.append(lg)
-	_mount_browse("NEW CAREER", "Choose a division to manage in", rows,
-		func(i: int) -> void: _show_career_pick_club(leagues[i]),
-		func() -> void: _show_home())
+## New-career SELECCION screen (the faithful original-art "ENTER YOUR NAME AND SELECT A
+## TEAM"): one screen for manager-name entry + club selection across the divisions,
+## replacing the old two-step Track-B division/club pickers. See SeleccionScreen.gd.
+func _show_career_select() -> void:
+	if _seleccion != null and is_instance_valid(_seleccion):
+		_seleccion.queue_free()
+	if _hub != null and is_instance_valid(_hub):
+		_hub.visible = false
+	for c in get_children():
+		if c is BrowseScreen or c is TitleScreen:
+			c.queue_free()
+	_browse = null
+	_seleccion = load("res://scenes/SeleccionScreen.gd").new()
+	_seleccion.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_seleccion)
+	_seleccion.setup(GameDB.leagues, Career.has_save())
+	_seleccion.career_begun.connect(_begin_career)
+	_seleccion.back_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		_dismiss_seleccion()
+		_show_home())
+	_seleccion.load_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		_dismiss_seleccion()
+		_continue_career())
+	_seleccion.delete_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		Career.delete_save())
+	AudioManager.play_music()
 
-## New-career club picker (B2): original-art select list. Back -> the division picker.
-func _show_career_pick_club(league: Dictionary) -> void:
-	var cl := GameDB.clubs_in_league(league["id"])
-	cl.sort_custom(func(a, b): return a["name"] < b["name"])
-	var rows: Array = []
-	for c in cl:
-		rows.append({"text": c["name"], "value": "%d" % (c.get("players", []) as Array).size()})
-	_mount_browse(str(league["name"]).to_upper(), "Choose the club to take over", rows,
-		func(i: int) -> void: _begin_career(league, cl[i]),
-		func() -> void: _show_career_pick_league())
+func _dismiss_seleccion() -> void:
+	if _seleccion != null and is_instance_valid(_seleccion):
+		_seleccion.queue_free()
+	_seleccion = null
 
-func _begin_career(league: Dictionary, club: Dictionary) -> void:
+func _begin_career(manager_name: String, league: Dictionary, club: Dictionary) -> void:
+	AudioManager.ui_select()
 	var league_clubs := GameDB.clubs_in_league(league["id"])
 	_career = Career.create(club, league, league_clubs, GameDB.leagues)
+	_career.manager_name = manager_name
 	_career.save()
+	_dismiss_seleccion()
 	_enter_career()
 
 ## Enter the career: drop the front-of-house browse/title overlays, reset nav so the hub
@@ -1104,7 +1119,7 @@ func _title_action(action: String, scr: TitleScreen) -> void:
 				_show_home()
 		_:
 			scr.queue_free()
-			_show_career_pick_league()
+			_show_career_select()
 
 ## The original-art LEAGUE TABLES screen over the hub, driven by the live career
 ## standings. Tap to dismiss. (See scenes/LeagueTableScreen.gd for asset provenance.)
@@ -2796,7 +2811,7 @@ func _manager_shot() -> void:
 	var lg: Dictionary = GameDB.leagues[0]
 	var clubs := GameDB.clubs_in_league(lg["id"])
 	clubs.sort_custom(func(a, b): return _club_strength(a) < _club_strength(b))
-	_begin_career(lg, clubs[0])   # the weakest top-flight club -> likely to miss the target
+	_begin_career("Manager", lg, clubs[0])   # the weakest top-flight club -> likely to miss the target
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 999
 	while not _career.season_over():

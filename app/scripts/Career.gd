@@ -12,6 +12,7 @@ const MAX_STADIUM := 130000   # tier-11 capacity ceiling (matches StadiumScreen.
 
 var club_id: int = -1
 var club_name: String = ""
+var manager_name: String = ""     # entered on the SELECCION new-career screen
 var league_id: String = ""
 var league_name: String = ""
 var season: String = "1997-98"
@@ -1592,7 +1593,8 @@ func to_dict() -> Dictionary:
 	for pid in transfer_listed:
 		listed[str(pid)] = true
 	return {
-		"club_id": club_id, "club_name": club_name, "league_id": league_id,
+		"club_id": club_id, "club_name": club_name, "manager_name": manager_name,
+		"league_id": league_id,
 		"league_name": league_name, "season": season, "year": year, "week": week,
 		"fixtures": fixtures, "table": tbl, "results": results, "cash": cash,
 		"weekly_net": weekly_net, "objective_pos": objective_pos,
@@ -1634,6 +1636,7 @@ static func from_dict(d: Dictionary) -> Career:
 	var c := Career.new()
 	c.club_id = int(d.get("club_id", -1))
 	c.club_name = d.get("club_name", "?")
+	c.manager_name = str(d.get("manager_name", ""))
 	c.league_id = d.get("league_id", "")
 	c.league_name = d.get("league_name", "League")
 	c.season = d.get("season", "1997-98")
@@ -1730,6 +1733,11 @@ static func from_dict(d: Dictionary) -> Career:
 
 static func has_save(path: String = SAVE_PATH) -> bool:
 	return FileAccess.file_exists(path)
+
+## Remove the save file (the SELECCION screen's DELETE button). No-op if none exists.
+static func delete_save(path: String = SAVE_PATH) -> void:
+	if FileAccess.file_exists(path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 func save(path: String = SAVE_PATH) -> void:
 	var f := FileAccess.open(path, FileAccess.WRITE)

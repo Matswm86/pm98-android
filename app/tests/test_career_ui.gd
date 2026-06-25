@@ -31,7 +31,7 @@ func _run() -> void:
 			league = lg
 	var club: Dictionary = gamedb.clubs_in_league("eng_prem")[0]
 
-	main._begin_career(league, club)            # build career + enter hub
+	main._begin_career("Test Mgr", league, club)   # build career + enter hub
 	await process_frame
 	ok = _assert(main._career != null and main._career.club_id == int(club["id"]),
 		"career created for %s" % club.get("name", "?")) and ok

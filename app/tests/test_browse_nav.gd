@@ -36,19 +36,16 @@ func _run() -> void:
 	ok = _assert(main._browse._rows.size() >= gamedb.leagues.size() + 1,
 		"home lists new-career + leagues (%d rows)" % main._browse._rows.size()) and ok
 
-	# New-career division picker (B2).
-	main._show_career_pick_league()
+	# New-career SELECCION screen (faithful one-screen name + team select).
+	main._show_career_select()
 	await process_frame
-	ok = _assert(main._browse._rows.size() == gamedb.leagues.size(),
-		"pick-league lists every division (%d)" % main._browse._rows.size()) and ok
-
-	# New-career club picker (B2).
-	main._show_career_pick_club(lg)
-	await process_frame
-	ok = _assert(main._browse._rows.size() == cl.size(),
-		"pick-club lists the division's clubs (%d)" % main._browse._rows.size()) and ok
+	ok = _assert(main._seleccion != null and main._seleccion is SeleccionScreen,
+		"new-career mounts the faithful SELECCION overlay") and ok
+	ok = _assert((main._seleccion._clubs as Array).size() == cl.size(),
+		"SELECCION lists the first division's clubs (%d)" % (main._seleccion._clubs as Array).size()) and ok
 
 	# Database league browse (B3): simulate / watch + clubs.
+	main._dismiss_seleccion()
 	main._show_db_league(lg)
 	await process_frame
 	ok = _assert(main._browse._rows.size() == cl.size() + 2,
@@ -88,7 +85,7 @@ func _run() -> void:
 	ok = _assert(matched, "watch -> 2D MATCH VIEW overlay with a timeline") and ok
 
 	# Enter a career -> the front-of-house browse is dropped and the hub is raised.
-	main._begin_career(lg, cl[0])
+	main._begin_career("Test Mgr", lg, cl[0])
 	await process_frame
 	ok = _assert(main._browse == null, "entering a career clears the browse overlay") and ok
 	ok = _assert(main._hub != null and is_instance_valid(main._hub),
