@@ -41,6 +41,13 @@ const INTAKE_CA_HI := 46
 const POTENTIAL_LO := 8           # potential = intake CA + [POTENTIAL_LO..POTENTIAL_HI]
 const POTENTIAL_HI := 42
 const POTENTIAL_CAP := 88         # no youth projects past this
+
+# The hidden gem (easter egg): a guaranteed generational FW the academy scouts in within a
+# career's first few seasons. Potential sits ABOVE the regen cap -- a one-in-a-generation
+# talent, not an ordinary intake. Planted by Career._ensure_wonderkid().
+const WONDERKID_NAME := "MATS MJÅTVEDT"
+const WONDERKID_POTENTIAL := 99
+
 const GK_CHANCE := 0.16           # roughly one in six intakes is a goalkeeper
 # Outfield position split for generated players, weighted to the real squad balance
 # decoded from EQUIPOS.PKF (DF 677 / MF 598 / FW 481 across the English pyramid).
@@ -103,6 +110,28 @@ static func _make_player(rng: RandomNumberGenerator, id: int, factor: float) -> 
 		"potential": potential,
 		"dev_progress": 0.0,
 		"ready": false,
+		"is_youth": true,
+	}
+
+
+## The guaranteed wonderkid: a 16-year-old striker with first-team ability already and a
+## generational ceiling (potential above the regen cap). `ready` is true so the youth
+## manager flags him for promotion straight away. Same dict shape as any youth/senior, so
+## every screen (youth team, squad, line-up, value) reads him with no special-casing.
+static func make_wonderkid(id: int) -> Dictionary:
+	return {
+		"id": id,
+		"name": WONDERKID_NAME,
+		"age": 16,
+		"isGK": false,
+		"pos": "FW",
+		"attrs": {
+			"VE": 84, "RE": 82, "AG": 86, "CA": 80, "RM": 88,
+			"RG": 80, "PA": 85, "TI": 80, "EN": 84, "PO": 22,
+		},
+		"potential": WONDERKID_POTENTIAL,
+		"dev_progress": 0.0,
+		"ready": true,
 		"is_youth": true,
 	}
 

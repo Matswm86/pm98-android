@@ -849,6 +849,11 @@ func _home_select(item: Dictionary) -> void:
 func _continue_career() -> void:
 	_career = Career.load_save()
 	if _career != null:
+		# An in-progress career in its first seasons still gets the guaranteed gem on resume.
+		var before: int = (_career.youth as Array).size()
+		_career._ensure_wonderkid()
+		if (_career.youth as Array).size() != before:
+			_career.save()
 		_enter_career()
 
 ## Database browse of one league (B3): simulate / watch options, then the clubs. Tap a
@@ -1218,6 +1223,12 @@ func _show_finance_screen() -> void:
 	scr.setup(sm, _career.club_name, "", _career.season, _career.cash, _career.week + 1)
 	scr.prices_pressed.connect(_show_finance_control)
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
+	# Secret cash cheat: 5 taps on the live-cash box deposit £100M, then re-render with it.
+	scr.cheat_cash.connect(func() -> void:
+		_career.cash += 100_000_000
+		_career._news("finance", "An anonymous benefactor deposits £100,000,000 into the club account.")
+		_career.save()
+		_show_finance_screen())
 
 ## The board PRICE controls (T2 #6): set the match TICKET PRICE and the advertising
 ## BOARD PRICE; the live preview shows how demand (attendance / boards sold) responds, so

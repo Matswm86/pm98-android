@@ -13,6 +13,9 @@ class_name FinanceScreen
 
 signal prices_pressed   # the SET PRICES button -> Main opens the ticket/board control
 signal back_pressed     # RETURN / a tap elsewhere -> dismiss
+signal cheat_cash       # secret: 5 taps on the CURRENT WEEK cash box -> Main grants +100M
+
+const CHEAT_TAPS := 5   # taps on the live-cash box that trigger the cash cheat
 
 const W := 640
 const H := 480
@@ -58,6 +61,7 @@ var _season: String = ""
 var _cash: int = 0
 var _week: int = 0
 var _press := ""
+var _cash_taps := 0      # consecutive taps on the live-cash box (the hidden cheat counter)
 
 
 func _ready() -> void:
@@ -94,6 +98,8 @@ func _on_input(e: InputEvent) -> void:
 		return
 	var d := _to_design(e.position)
 	var on_prices := BTN_PRICES.has_point(d)
+	# The CURRENT WEEK box carries the live CASH figure; tapping it is the cheat target.
+	var on_cash := BOX_CUR.has_point(d) and not on_prices
 	if e.pressed:
 		_press = "prices" if on_prices else ""
 		queue_redraw()
@@ -103,7 +109,15 @@ func _on_input(e: InputEvent) -> void:
 		queue_redraw()
 		if on_prices and was == "prices":
 			prices_pressed.emit()
-		elif not on_prices:
+		elif on_cash:
+			# Count consecutive taps on the cash box; the Nth fires the cheat (and is swallowed,
+			# so the screen does not dismiss). Any tap elsewhere resets the run.
+			_cash_taps += 1
+			if _cash_taps >= CHEAT_TAPS:
+				_cash_taps = 0
+				cheat_cash.emit()
+		else:
+			_cash_taps = 0
 			back_pressed.emit()
 
 

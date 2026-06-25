@@ -133,6 +133,7 @@ const YOUTH_ID_BASE := 900000
 const YOUTH_SEED_COUNT := 5             # the academy crop a new career starts with
 const YOUTH_INTAKE_LO := 1             # a season's fresh intake (scout's haul) ...
 const YOUTH_INTAKE_HI := 3             # ... is this many youngsters
+const WONDERKID_MAX_YEAR := 3          # the guaranteed gem is scouted within a career's first 3 seasons
 
 # Backroom staff: candidates are minted from their own id base; a new career starts with no
 # staff hired but a pool to hire from (refreshed each season), and a soft cap on headcount.
@@ -811,6 +812,7 @@ func _roll_youth(rng: RandomNumberGenerator) -> void:
 		else:
 			stayers.append(p)
 	youth = stayers
+	_ensure_wonderkid()           # season-rollover delivery of the gem (first 3 seasons; no-op after)
 	var room := Youth.SQUAD_CAP - youth.size()
 	if room <= 0:
 		return
@@ -820,6 +822,28 @@ func _roll_youth(rng: RandomNumberGenerator) -> void:
 		youth.append(p)
 		_news("youth", "%s has joined your Youth Team." % p.get("name", "?"))
 	youth_seq += want
+
+
+## Plant the guaranteed generational FW (easter egg) if a career is still in its first
+## seasons and he isn't already in the academy or the first team. Idempotent: the name scan
+## means re-running it on load / at every rollover never duplicates him. Bypasses the youth
+## squad cap on purpose -- he is a one-off, not part of the regular scouted crop.
+func _ensure_wonderkid() -> void:
+	if year > WONDERKID_MAX_YEAR or _has_wonderkid():
+		return
+	youth.append(Youth.make_wonderkid(youth_seq))
+	youth_seq += 1
+	_news("youth", "%s, a sensational young striker, has joined your Youth Team." % Youth.WONDERKID_NAME)
+
+
+func _has_wonderkid() -> bool:
+	for p in youth:
+		if String(p.get("name", "")) == Youth.WONDERKID_NAME:
+			return true
+	for p in rosters.get(club_id, []):
+		if String(p.get("name", "")) == Youth.WONDERKID_NAME:
+			return true
+	return false
 
 
 ## The youth players the manager can promote right now (the youth manager has flagged
