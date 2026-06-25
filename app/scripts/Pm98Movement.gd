@@ -1714,6 +1714,77 @@ static func _velocity_nonactive(p: Dictionary, m: Dictionary, controller: Dictio
 	return false
 
 
+# ---- FUN_005a7260 dribble-grid block, slice 2b-i: the FUN_005b05a0 lane-clearance chain -----------
+# The dribble/pass/shoot decision (FUN_005a7260 L242-513) opens by calling FUN_005b05a0 (the near-ball
+# pull-in). That gate's load-bearing query is FUN_005b1070 -> FUN_005b0fd0 -> FUN_005b0e90: "how close
+# does the CLOSEST other player come, perpendicularly, to my p->ball dribble lane?" -- the lane-clearance
+# distance. These three leaves are ported + oracle-locked here; FUN_005b05a0's own bbox/anchor/team gates
+# and the wiring into ball_touch_7260, plus the 636-insn marker-grid search (L267-470), are slice 2b-ii/iii.
+# Banked bit-for-bit by run_b0e90_oracle.sh + run_b1070_oracle.sh -> test_b1070.gd.
+
+
+## FUN_005b0e90(pl, p_pos, angle, halfmag, radius): the perpendicular distance from player `pl` to the
+## dribble-LANE SEGMENT that starts at p_pos and runs `halfmag` along `angle`. Returns 0xc80000 (far)
+## when pl is outside the segment's L-inf bbox (half-extent = halfmag/2 + radius, centred on the lane
+## MIDPOINT p_pos+polar(halfmag/2,angle)) OR its projection onto the lane falls outside [0, halfmag];
+## otherwise the FP perpendicular magnitude ftol(sqrt(|unit x D|^2)), round-to-zero. Same dot16 (5ee500)
+## / cross16 (5ee540) / FILD-FSQRT-_ftol primitive as mark_pass_receiver (5b0bb0). unit = polar(0x10000,
+## angle); D = pl.pos - p_pos. esp-tracked: 5ee500/5ee540 are ret-4, so the proj bound slot == halfmag.
+static func _lane_perp_dist(pl: Dictionary, p_pos: Array, angle: int, halfmag: int, radius: int) -> int:
+	var unit: Array = Pm98Trig.polar_vec(0x10000, angle)             # FUN_005ee0f0(0x10000, angle)
+	var half := _div2_rz(halfmag)                                    # cdq; sub; sar 1 == round0(a3/2)
+	var mid: Array = Pm98Trig.polar_vec(half, angle)                 # FUN_005ee0f0(a3/2, angle)
+	var ex := Pm98Trig._i32(int(mid[0]) + int(p_pos[0]))            # lane midpoint = p_pos + mid
+	var ey := Pm98Trig._i32(int(mid[1]) + int(p_pos[1]))
+	var ez := Pm98Trig._i32(int(mid[2]) + int(p_pos[2]))
+	var box := Pm98Trig._i32(half + radius)                         # esi = a3/2 + radius
+	if absi(Pm98Trig._i32(_g(pl, 4) - ex)) >= box \
+			or absi(Pm98Trig._i32(_g(pl, 8) - ey)) >= box \
+			or absi(Pm98Trig._i32(_g(pl, 0xc) - ez)) >= box:
+		return 0xc80000                                             # outside bbox -> far (init value)
+	var d := [Pm98Trig._i32(_g(pl, 4) - int(p_pos[0])), \
+		Pm98Trig._i32(_g(pl, 8) - int(p_pos[1])), \
+		Pm98Trig._i32(_g(pl, 0xc) - int(p_pos[2]))]
+	var proj := _dot3_16(unit, d)                                   # FUN_005ee500(unit, D)
+	if proj < 0 or proj > halfmag:                                  # outside [0, lane-len] -> far
+		return 0xc80000
+	var cr: Array = Pm98Trig.cross16(unit, d)                       # FUN_005ee540(unit, out, D)
+	var cx := float(int(cr[0]))
+	var cy := float(int(cr[1]))
+	var cz := float(int(cr[2]))
+	return int(sqrt(cx * cx + cy * cy + cz * cz))                   # FILD/FSQRT + _ftol (round to zero)
+
+
+## FUN_005b0fd0(p, roster, angle, halfmag, radius): the MIN over every OTHER active player of the lane
+## perpendicular distance (FUN_005b0e90). "Active" = pl+0x2bc != 0; `p` itself is skipped. Init 0xc80000.
+## The binary calls b0e90 twice per kept candidate (min < new -> skip; else recompute + set); since
+## b0e90 is pure the second call is redundant, so one call per player with `min = min(min, dist)` matches.
+static func _lane_min_dist(p: Dictionary, roster: Array, angle: int, halfmag: int, radius: int) -> int:
+	var p_pos := [_g(p, 4), _g(p, 8), _g(p, 0xc)]
+	var best := 0xc80000
+	for pl in roster:
+		if not (pl is Dictionary) or _g(pl, 0x2bc) == 0:
+			continue
+		if is_same(pl, p):
+			continue
+		var dist := _lane_perp_dist(pl, p_pos, angle, halfmag, radius)
+		if dist < best:
+			best = dist
+	return best
+
+
+## FUN_005b1070(p, roster, target_pos, radius): the lane-clearance query FUN_005b05a0 gates on. The lane
+## runs from p.pos toward `target_pos` (the ball): angle = atan(target - p.pos), halfmag = planar_mag(
+## target - p.pos); returns FUN_005b0fd0 -- the closest OTHER player's perpendicular distance to that
+## lane. b05a0 calls FUN_005b0040 (the interception move) only when this comes back < radius (0x20000).
+static func _lane_clearance(p: Dictionary, roster: Array, target_pos: Array, radius: int) -> int:
+	var dx := Pm98Trig._i32(int(target_pos[0]) - _g(p, 4))
+	var dy := Pm98Trig._i32(int(target_pos[1]) - _g(p, 8))
+	var angle := Pm98Trig.atan_angle(dx, dy)                        # FUN_005ee080(dx, dy)
+	var halfmag := Pm98Trig.planar_mag(dx, dy)                      # FUN_005b1260(dx, dy)
+	return _lane_min_dist(p, roster, angle, halfmag, radius)
+
+
 # ---- FUN_005a3400 the per-player DECIDE, slice A (prologue + bbox) --------------------
 # The first ~100 instructions of the per-player movement-target computer: set the goal-X
 # anchor, the two target endpoints, and the movement bounding box, all oriented by side.

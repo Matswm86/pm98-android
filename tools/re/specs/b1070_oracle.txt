@@ -1,0 +1,7 @@
+# Leaf oracle FUN_005b1070 + FUN_005b0fd0 (lane clearance = min OTHER-player perp dist).
+# Row: B1070 <name> <steps> EAX=<mindist>  (13107200 == off-lane / none-active sentinel).
+B1070 none RET steps=192 EAX=13107200
+B1070 one RET steps=770 EAX=130672
+B1070 min2 RET steps=1348 EAX=65136
+B1070 offlane RET steps=468 EAX=13107200
+B1070 skipself RET steps=772 EAX=130672

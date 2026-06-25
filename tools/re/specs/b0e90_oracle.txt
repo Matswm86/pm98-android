@@ -1,0 +1,8 @@
+# Leaf oracle FUN_005b0e90 (lane perpendicular distance). this=pl; args (p_pos@0x240000, angle, halfmag, radius).
+# Row: B0E90 <name> <steps> EAX=<dist>  (13107200 == 0xc80000 == off-lane sentinel).
+B0E90 boxmiss RET steps=134 EAX=13107200
+B0E90 online RET steps=278 EAX=400
+B0E90 perp RET steps=278 EAX=130672
+B0E90 behind RET steps=188 EAX=13107200
+B0E90 beyond RET steps=190 EAX=13107200
+B0E90 diag RET steps=278 EAX=23454
