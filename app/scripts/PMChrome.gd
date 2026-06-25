@@ -102,6 +102,12 @@ static func text(ci: CanvasItem, f: Font, x: float, y_top: float, s: String,
 	if f == null:
 		return
 	var w := f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
+	# Auto-fit: when a box width is given and the string overflows it, shrink the font
+	# so the WHOLE label stays inside its box. Replaces the old fixed-width clipping that
+	# chopped long titles / league names ("Premier League" -> "Premier L") on every screen.
+	if box_w > 0.0 and w > box_w:
+		sz = maxi(6, int(floor(sz * box_w / w)))
+		w = f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
 	var px := x
 	if align == 1:
 		px = x + (box_w - w) * 0.5
@@ -225,10 +231,10 @@ static func draw_header(ci: CanvasItem, title: String, manager: String, club: St
 	bevel(ci, mp, C_PLAQUE, C_PLAQUE_HI, C_PLAQUE_LO)
 	var tw := mp.size.x - 26   # leave room for the crest at the right edge
 	if manager != "":
-		text(ci, f12, mp.position.x, 7, manager.substr(0, 16), C_PLAQUE_TXT, 12, 1, tw)
-		text(ci, f12, mp.position.x, 22, club.substr(0, 16), C_PLAQUE_TXT, 12, 1, tw)
+		text(ci, f12, mp.position.x, 7, manager, C_PLAQUE_TXT, 12, 1, tw)
+		text(ci, f12, mp.position.x, 22, club, C_PLAQUE_TXT, 12, 1, tw)
 	else:
-		text(ci, f12, mp.position.x, 14, club.substr(0, 16), C_PLAQUE_TXT, 13, 1, tw)
+		text(ci, f12, mp.position.x, 14, club, C_PLAQUE_TXT, 13, 1, tw)
 	if club_id >= 0:
 		draw_crest(ci, club_id, Rect2(mp.end.x - 24, 5, 20, 36))
 
@@ -245,9 +251,10 @@ static func draw_header(ci: CanvasItem, title: String, manager: String, club: St
 	# Green league / week plaque (right) with a small gold trophy.
 	var lp := Rect2(538, 2, 96, 42)
 	bevel(ci, lp, C_LEAGUE, C_LEAGUE_HI, C_LEAGUE_LO)
-	text(ci, f10, lp.position.x + 4, 8, league.substr(0, 9), C_LEAGUE_TXT, 11)
+	# League name auto-fits the plaque (room left for the trophy at the right edge); never clipped.
+	text(ci, f10, lp.position.x + 4, 8, league, C_LEAGUE_TXT, 11, 0, lp.size.x - 22)
 	if week_disp > 0:
-		text(ci, f10, lp.position.x + 4, 26, "Week %d" % week_disp, C_LEAGUE_TXT, 11)
+		text(ci, f10, lp.position.x + 4, 26, "Week %d" % week_disp, C_LEAGUE_TXT, 11, 0, lp.size.x - 8)
 	_trophy(ci, lp.end.x - 18, 10, 13)
 
 

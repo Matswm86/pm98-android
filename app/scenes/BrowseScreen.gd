@@ -202,9 +202,9 @@ func _draw() -> void:
 		PMChrome.draw_header(self, _title, "", _club, _league, _season, _week, _club_id)
 	else:
 		PMChrome.bevel(self, Rect2(4, 10, W - 8, 28), PMChrome.C_BAR, PMChrome.C_BAR_HI, PMChrome.C_BAR_LO)
-		PMChrome.text(self, _f14, 8, 14, _title.substr(0, 32), PMChrome.C_TITLE, 18, 1, W - 16)
+		PMChrome.text(self, _f14, 8, 14, _title, PMChrome.C_TITLE, 18, 1, W - 16)
 		if _subtitle != "":
-			PMChrome.text(self, _f12, W - 12, 42, _subtitle.substr(0, 40), C_DIM, 13, 2)
+			PMChrome.text(self, _f12, W - 12, 42, _subtitle, C_DIM, 13, 2, W - 24)
 
 	# List panel + rows (rows are vertically clamped to the panel; partial edge rows
 	# show their bar but suppress text so nothing bleeds over the title / back button).

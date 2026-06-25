@@ -154,6 +154,13 @@ jobs:
           echo "--- export.log error/warning lines ---"
           grep -iE "error|warning|template|keystore|sdk|missing|invalid|config|not found|valid" export.log | head -60 || true
           ls -la "${EXPORT_NAME}.apk"
+          # Cache-bust (gotcha #12): the rolling latest/<name>.apk URL is heavily cached by
+          # Android/browsers, so a fixed filename keeps serving the OLD build. Give every build a
+          # unique, uncacheable filename (commit SHA suffix). Keep pm98.apk too for the artifact.
+          APK_FILE="${EXPORT_NAME}-${GITHUB_SHA:0:7}.apk"
+          cp "${EXPORT_NAME}.apk" "$APK_FILE"
+          echo "APK_FILE=$APK_FILE" >> "$GITHUB_ENV"
+          ls -la "$APK_FILE"
           exit $rc
 
       - name: Upload APK as workflow artifact
@@ -174,14 +181,15 @@ jobs:
             Auto-built APK from latest `main` commit (${{ github.sha }}).
             Sideload only — debug-signed, not for distribution.
 
-            **Install on phone:** download `${{ env.EXPORT_NAME }}.apk`, open it,
-            allow "Install from this source" if Android prompts. If reinstalling
-            over a previous build with a different signature, uninstall first.
+            **Install on phone:** download `${{ env.APK_FILE }}` (filename changes every
+            build so your browser/Android can't serve a cached old APK), open it, allow
+            "Install from this source" if Android prompts. If reinstalling over a previous
+            build with a different signature, uninstall first.
 
             Ships with sample data only. Side-load your own `game_db.json`
             (built from owned game files) into the app's user data dir for the
             full database.
-          files: app/${{ env.EXPORT_NAME }}.apk
+          files: app/${{ env.APK_FILE }}
           fail_on_unmatched_files: true
 
       - name: Create tagged release (vX.Y.Z tags)
