@@ -529,7 +529,7 @@ static func _clear_mark_block(p: Dictionary) -> void:
 ## ball block's other-control slot (FUN_005b70b0 +0x4c == match+0x165c).
 static func _holds_ball(m: Dictionary, opp: Array, qi: int) -> bool:
 	var blk: Dictionary = _ref(opp[qi], 0x190)
-	if int(blk.get(0x40, -1)) == qi:
+	if is_same(blk.get(0x40, null), opp[qi]):             # ref model: ball+0x40 == this opponent
 		return true
 	return int(m.get(0x165c, -1)) == qi
 
@@ -1287,7 +1287,12 @@ static func _decide_slice_c_taker(p: Dictionary, m: Dictionary, phase: int) -> v
 	var team := _g(p, 0x2b8)
 	var x1820 := _g(m, 0x1820)
 	var bpos := [_g(ball, 0x90), _g(ball, 0x94), _g(ball, 0x98)]
-	set_engagement(ball, 0, [p])                              # ball.engage(player); player+0x54/+0x58=0
+	_ball_engage_player(ball, p)                              # FUN_0058eca0: ball+0x40/+0x44/+0x48 = taker
+	# match-side mirror (binary aliases ball+0x40 == match+0x1650): so select_nearest / assign_markers
+	# / _holds_ball see the kickoff controller + controlling team. ref engage already set the ball Dict.
+	m[0x1650] = _team_index_of(m, team, p)
+	m[0x1664] = team
+	m[0x165c] = -1
 	var flag := _g(_ref(p, 0x184), 0x2ee) != 0 and _phase0(m) and _g(p, 0x5c) != 0
 	p[0x48] = (0x2d0 if flag else 0) + 0xb4
 	match phase:
@@ -2184,7 +2189,7 @@ static func mark_pass_receiver(p: Dictionary, tgt: Array, angle: int, scale: int
 		return _pass_tail(p, tgt, false)
 	var ball := _ref(p, 0x190)
 	var owner: Variant = ball.get(0x4c, null)
-	var hit: bool = (owner is Dictionary and owner == p)
+	var hit: bool = (owner is Dictionary and is_same(owner, p))
 	if not hit:
 		var m := _ref(p, 0x18c)
 		if _si(p, 0x68) > 0x776:                              # facing must point near the player's goal
@@ -2321,7 +2326,7 @@ static func resolve_post_shot(p: Dictionary, teammates: Array, rng = null) -> vo
 				if Pm98Trig.planar_mag(lcx, lcy) > 0xa0000 and _g(m, 0x44c) != 4:
 					Pm98Events.enqueue(m, 0x10, p, 0)
 
-	if m.get(0x438, null) == p:                           # player == match+0x438 (controlled) -> tail
+	if is_same(m.get(0x438, null), p):                    # player == match+0x438 (controlled) -> tail
 		to_tail = true
 
 	if not to_tail:
@@ -2340,7 +2345,7 @@ static func resolve_post_shot(p: Dictionary, teammates: Array, rng = null) -> vo
 			if not hit:
 				for tc in teammates:                      # ... then each teammate
 					var tcd: Dictionary = tc
-					if tcd != p and not (owned and tcd == owner):
+					if not is_same(tcd, p) and not (owned and is_same(tcd, owner)):
 						if mark_pass_receiver(tcd, ppos, angle, scale, dist, tcd.get(0x188, [])):
 							hit = true
 							break
@@ -2371,7 +2376,7 @@ static func resolve_post_shot(p: Dictionary, teammates: Array, rng = null) -> vo
 	# tail (LAB_005ac069) -- always runs
 	_ball_engage_player(ball, p)
 	ball[0x40] = 0                                        # FUN_0058ed70 (this=ball)
-	if m.get(0x438, null) == p:
+	if is_same(m.get(0x438, null), p):
 		m[0x438] = 0
 	set_phase(m, 0)                                       # FUN_005942e0(0)
 	ball[0x64] = 1 if abs(Pm98Trig._i32(anchor + px)) > 0x1e0000 else 0
@@ -2433,6 +2438,20 @@ static func _ball_engage_player(ball: Dictionary, target: Dictionary) -> void:
 	if _g(m, 0x448) == 0 and _g(m, 0x460) != 0 and m.get(0x43c, null) != target:
 		m[0x460] = 0
 		m[0x43c] = 0
+
+
+## Team-relative index of player `p` in m["sim"][team]["players"], -1 if absent. is_same scan
+## (NOT Array.find, whose Dictionary == is a deep recursive compare that blows the cyclic graph).
+## Feeds the match-side controller mirror (match+0x1650 holds a team-relative INDEX, see select_nearest).
+static func _team_index_of(m: Dictionary, team: int, p: Dictionary) -> int:
+	var sim: Array = m.get("sim", [])
+	if team < 0 or team >= sim.size():
+		return -1
+	var roster: Array = (sim[team] as Dictionary).get("players", [])
+	for i in roster.size():
+		if is_same(roster[i], p):
+			return i
+	return -1
 
 
 # ---- FUN_005ac1a0 : the SHOT / TRAJECTORY SETUP (oracle: run_shotsetup_oracle.sh) --------------------

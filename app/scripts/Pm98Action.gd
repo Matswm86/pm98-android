@@ -222,7 +222,7 @@ static func setup_kick(p: Dictionary, _m: Dictionary) -> void:
 	# controller test: player IS the ball's controlling player (ball+0x40). Pointers are modelled by
 	# identity; the port stores the controller as the same Dict ref, so compare references.
 	var ctrl: Variant = ball.get(0x40, null)
-	if not (ctrl is Dictionary and ctrl == p):
+	if not (ctrl is Dictionary and is_same(ctrl, p)):
 		return
 	# aim = 0x36-unit vector along facing, added to position -> +0xa0 and +0x94 endpoint (L5aac68+).
 	var av := Pm98Trig.polar_vec(0x360000, _g(p, 0x34))
@@ -308,7 +308,7 @@ static func engine_tick(p: Dictionary, m: Dictionary, rng = null) -> void:
 	if _g(m, 0x448) == 0:
 		p[0x50] = Pm98Trig._i32(_si(p, 0x50) + 1)
 		var bk: Variant = b.get(0x44, null)
-		if bk is Dictionary and bk == p:                 # player == ball+0x44
+		if bk is Dictionary and is_same(bk, p):          # player == ball+0x44
 			p[0x4c] = Pm98Trig._i32(_si(p, 0x4c) + 1)
 			gs[0x2e8] = Pm98Trig._i32(_g(gs, 0x2e8) + 1)
 
@@ -379,7 +379,7 @@ static func _action_switch(p: Dictionary, m: Dictionary, gs: Dictionary, b: Dict
 			if _g(p, 0x2c) == FRAME_COUNT[act] - 1 and _g(p, 0x30) == 0:
 				if _g(p, 0x48) == 0:
 					var prepend: Variant = m.get(0x440, null)
-					if prepend is Dictionary and prepend == p:   # match+0x440 == player
+					if prepend is Dictionary and is_same(prepend, p):   # match+0x440 == player
 						p[0x48] = 5000
 					else:
 						# NOTE: a live windup here would draw 1 rng (FUN_005ec250); Step-1 fixtures
@@ -483,11 +483,11 @@ static func _movement_decision(p: Dictionary, m: Dictionary, gs: Dictionary, b: 
 
 	# LAB_005a4e3e: settle vs move (the controller / engaged / proximity resolution).
 	var ctrl: Variant = b.get(0x40, null)
-	if ctrl is Dictionary and ctrl == p:
-		pass                                             # is controller -> use bv as-is
+	if ctrl is Dictionary and is_same(ctrl, p):          # is_same: == is a deep compare that blows the
+		pass                                             # cyclic ball<->player graph now b[0x40] is a ref
 	else:
 		var eng: Variant = b.get(0x4c, null)
-		if eng is Dictionary and eng == p:
+		if eng is Dictionary and is_same(eng, p):
 			bv = true
 			istack = 1                                   # LAB_005a4e34
 		elif not bv:
@@ -542,7 +542,7 @@ static func _highlight_active(p: Dictionary, m: Dictionary, gs: Dictionary) -> b
 ## player == match+0x438 (the active set-piece taker), by Dict identity.
 static func _is_taker(p: Dictionary, m: Dictionary) -> bool:
 	var t: Variant = m.get(0x438, null)
-	return t is Dictionary and t == p
+	return t is Dictionary and is_same(t, p)
 
 
 ## a non-null pointer field (a live Dict ref or a nonzero raw int address).

@@ -438,8 +438,8 @@ static func _penalty_branch(m: Dictionary, rng: MatchEngine.Pm98Rng, b: Dictiona
 		var sv := 1 if _g(b, 0x20) >= 0 else -1
 		var sl := 1 if line >= 0 else -1
 		if sv != sl:
-			if _g(b, 0x20) == 0 and _g(b, 0x24) == 0 and _g(b, 0x28) == 0 and _g(b, 0x40) == 0:
-				return                                # ball dead in front -> no dispatch
+			if _g(b, 0x20) == 0 and _g(b, 0x24) == 0 and _g(b, 0x28) == 0 and _ref(b, 0x40).is_empty():
+				return                                # ball dead in front + no controller -> no dispatch
 	m[0x45c] = _i(1 - _g(m, 0x45c))
 	# penalty kick counter (L501-507).
 	m[0x19c0] = _i(_g(m, 0x19c0) + 1)
