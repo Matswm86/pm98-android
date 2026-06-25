@@ -1315,6 +1315,114 @@ static func _steer_carrier_drag(p: Dictionary, ctrl: Dictionary, pvel: Array) ->
 		ctrl[0x68] = 0
 
 
+## FUN_005b0040(p): the off-ball / non-active positioning core that FUN_005a65a0 routes every
+## non-controlling player through (move_dispatch L138 / L208). PURE INTEGER: it predicts a ball
+## INTERCEPTION / marking point and tail-calls the locked steer_89c0(target, 0x5a). Banked
+## bit-for-bit (p end-state + the steer target) by tools/re/run_b0040_oracle.sh ->
+## specs/b0040_oracle.txt, locked in app/tests/test_b0040.gd.
+##
+## `point` (the steer-target source) starts at ball.pos. CARRIER (p+0x2bc!=0 && ctrl+0x4c==p): ball
+## too high (z>0x16666) OR ball not within the |ball-p|<box L-inf box -> point = ctrl+0x84 carrier
+## target, steer. Otherwise (ball moving) the <=0x12-iter BISECTION interception loop refines the
+## lead distance `lead` along the ball-facing unit; an optional marker-adjust (p+0x2bc) rebases
+## `point` onto a formation marker; then point += facedir*lead. Finally point is clamped per-axis
+## into the pitch box m+0x1828 and handed to steer_89c0.
+##
+## NOTE re decompile: Ghidra mis-folds the carrier branch's `goto LAB_005b04a6` -- the asm writes
+## point=ctrl+0x84 at 0x5b017c FIRST (oracle-confirmed: carriernear target == ctrl+0x84), so the
+## carrier arm ports the ASM, not the decompile's bare goto. The post-loop point is base+facedir*lead
+## (asm ADD [ESP+0x28]), not an overwrite -- the marker-adjust rebases that base.
+static func _move_b0040(p: Dictionary) -> void:
+	steer_89c0(p, _b0040_target(p), 0x5a)
+
+
+## The targeting half of FUN_005b0040 (everything before the steer_89c0 tail-call): returns the
+## clamped interception / marking point. Split out so app/tests/test_b0040.gd can assert the banked
+## steer target (local_c @ 0x307ff0) directly, decoupled from the already-locked steering trio.
+static func _b0040_target(p: Dictionary) -> Array:
+	var ctrl: Dictionary = _ref(p, 0x190)
+	var px := _g(p, 4)
+	var py := _g(p, 8)
+	var pz := _g(p, 0xc)
+	var bx := _g(ctrl, 4)
+	var by := _g(ctrl, 8)
+	var bz := _g(ctrl, 0xc)
+	var facedir: Array = Pm98Trig.polar_vec(0x10000, _g(ctrl, 0x34) & 0xffff)   # ball-facing unit
+	var bvx := _g(ctrl, 0x20)                                   # local_24
+	var bvy := _g(ctrl, 0x24)                                   # local_20
+	# lead = dot16(p.pos - ball.pos, facedir): the initial lead estimate (uVar7).
+	var rel := [Pm98Trig._i32(px - bx), Pm98Trig._i32(py - by), Pm98Trig._i32(pz - bz)]
+	var lead := _dot3_16(rel, facedir)
+	var curve_rate := Pm98Trig._tdiv(Pm98Trig._i32(_g(p, 0x70) * _g(p, 0x3ac)), 15000) + _g(p, 0x3a8)
+	var point := [bx, by, bz]                                   # accumulator starts at ball.pos
+
+	# --- CARRIER block (p+0x2bc!=0 && ctrl+0x4c==p): high/far ball -> steer ctrl+0x84 (asm 0x5b017c) ---
+	var to_common := true
+	if _g(p, 0x2bc) != 0 and is_same(ctrl.get(0x4c, null), p):
+		var to_carrier := bz > 0x16666
+		if not to_carrier:
+			var box := 0x10000 if pos_forward_ok(p, [px, py, pz]) else 0x60000
+			var within := absi(Pm98Trig._i32(bx - px)) < box and absi(Pm98Trig._i32(by - py)) < box \
+					and absi(Pm98Trig._i32(bz - pz)) < box
+			to_carrier = not within
+		if to_carrier:
+			point = [_g(ctrl, 0x84), _g(ctrl, 0x88), _g(ctrl, 0x8c)]
+			to_common = false                                   # -> straight to clamp + steer
+
+	# --- common path: ball-moving interception loop (skipped if ball stationary) ---
+	if to_common and not (bvx == 0 and bvy == 0 and _g(ctrl, 0x28) == 0):
+		var k := 0
+		var conv := absi(lead)
+		while conv > 0xccc and k < 0x12:
+			var lp: Array = Pm98Trig.scale_vec3(int(facedir[0]), int(facedir[1]), int(facedir[2]), lead)
+			var dx := Pm98Trig._i32(Pm98Trig._i32(px - int(lp[0])) - bx)
+			var dy := Pm98Trig._i32(Pm98Trig._i32(py - by) - int(lp[1]))
+			var ticks := Pm98Trig._tdiv(Pm98Trig.planar_mag(dx, dy), curve_rate)
+			var uv9 := Pm98Trig._i32(ticks - 0x3c)
+			if uv9 < 0:
+				uv9 = 0
+			var idx := Pm98Trig._tdiv(ticks, 4)
+			if idx > 0xf:
+				idx = 0xf
+			var mk := (idx + 0x17) * 0xc                         # formation marker slot ctrl+(idx+0x17)*0xc
+			var tp := [
+				Pm98Trig._i32(Pm98Trig._i32(uv9 * bvx) + _g(ctrl, mk) - bx),
+				Pm98Trig._i32(Pm98Trig._i32(uv9 * bvy) + _g(ctrl, mk + 4) - by),
+				Pm98Trig._i32(-bz),
+			]
+			var nd := _dot3_16(tp, facedir)
+			lead = Pm98Trig._tdiv(Pm98Trig._i32(nd + lead), 2)  # bisection
+			conv = absi(Pm98Trig._i32(lead - nd))
+			k += 1
+
+		# marker-adjust (p+0x2bc): bump the lead distance toward a formation marker's projection
+		# (ball-relative) when it is farther along the facing. The point BASE stays ball.pos -- the
+		# binary writes md only to the loop temp slot, recomputing uVar7, never the final accumulator.
+		if _g(p, 0x2bc) != 0:
+			if _g(ctrl, 0xb0) > 0x2cccc:
+				var dotA := _dot3_16([Pm98Trig._i32(_g(ctrl, 0xcc) - bx), Pm98Trig._i32(_g(ctrl, 0xd0) - by),
+						Pm98Trig._i32(_g(ctrl, 0xd4) - bz)], facedir)
+				if lead <= dotA:
+					lead = dotA
+			if _g(ctrl, 0xbc) > 0x2cccc:
+				var dotB := _dot3_16([Pm98Trig._i32(_g(ctrl, 0xd8) - bx), Pm98Trig._i32(_g(ctrl, 0xdc) - by),
+						Pm98Trig._i32(_g(ctrl, 0xe0) - bz)], facedir)
+				if lead <= dotB:
+					lead = dotB
+
+		var fp: Array = Pm98Trig.scale_vec3(int(facedir[0]), int(facedir[1]), int(facedir[2]), lead)
+		point = [Pm98Trig._i32(int(point[0]) + int(fp[0])), Pm98Trig._i32(int(point[1]) + int(fp[1])),
+				Pm98Trig._i32(int(point[2]) + int(fp[2]))]
+
+	# --- clamp per-axis into the pitch box m+0x1828 (lo +0x1828..30, hi +0x1834..3c) ---
+	var m: Dictionary = _ref(p, 0x18c)
+	return [
+		_clamp_i(int(point[0]), _g(m, 0x1828), _g(m, 0x1834)),
+		_clamp_i(int(point[1]), _g(m, 0x182c), _g(m, 0x1838)),
+		_clamp_i(int(point[2]), _g(m, 0x1830), _g(m, 0x183c)),
+	]
+
+
 ## Non-active velocity sub-path of FUN_005a65a0 (L74-106). Returns true if it STOPPED the player (v58
 ## = v54 = 0, skipping the L107 wander); false to fall through to the wander draw. Draws RNG following
 ## the binary's short-circuit structure exactly. FUN_005b8c90 (we-in-possession) is match+0x1664 ==
