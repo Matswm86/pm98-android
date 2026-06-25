@@ -346,7 +346,7 @@ static func engine_tick(p: Dictionary, m: Dictionary, rng = null) -> void:
 			run_7260 = _penalty_box_gate_b(p, m)
 		if run_7260:
 			if (_g(m, 0x44c) != 7 and _g(m, 0x44c) != 5) or not _is_taker(p, m):
-				_move_7260(p)                            # ball_touch_7260 (slice 1: L63-176)
+				_move_7260(p, rng)                       # ball_touch_7260 (slice 1 + kick sub-arm 1)
 
 	# --- LAB_005a4fa2 (L426-465): the body-orient pass + the open-play power reset ---
 	_move_8f20(p, _g(p, 0x34))                            # STUB (arg = facing)
@@ -616,6 +616,6 @@ static func _move_9490(_p: Dictionary) -> void: trace_calls.append(["M9490", 0])
 ## FUN_005a7260 (ball-touch/dribble/pass/shot decision). Slice 1 (L63-176) is WIRED to the real port
 ## Pm98Movement.ball_touch_7260 -- the M7260 stub is retired (run_engine_oracle.sh now runs the REAL
 ## FUN_005a7260, un-stubbed). The lazy-init + dribble-grid + execute-kick (L177-668) are DEFERRED there.
-static func _move_7260(p: Dictionary) -> void:
-	Pm98Movement.ball_touch_7260(p)
+static func _move_7260(p: Dictionary, rng = null) -> void:
+	Pm98Movement.ball_touch_7260(p, rng)
 static func _move_8f20(_p: Dictionary, facing: int) -> void: trace_calls.append(["M8f20", facing])  # FUN_005a8f20 (body orient)

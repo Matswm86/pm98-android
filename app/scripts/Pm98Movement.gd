@@ -1497,7 +1497,7 @@ static func _b0040_target(p: Dictionary) -> Array:
 ## same-side & not-carrier in open play; the binary returns there. Oracle: tools/re/run_7260_oracle.sh ->
 ## specs/7260_oracle.txt, locked in app/tests/test_7260.gd; PLUS the transitive engine_tick parity --
 ## run_engine_oracle.sh now runs the REAL FUN_005a7260 (the M7260 stub is retired).
-static func ball_touch_7260(p: Dictionary) -> void:
+static func ball_touch_7260(p: Dictionary, rng = null) -> void:
 	var m: Dictionary = _ref(p, 0x18c)
 	var ball: Dictionary = _ref(p, 0x190)
 
@@ -1534,13 +1534,96 @@ static func ball_touch_7260(p: Dictionary) -> void:
 			ball[0xc] = Pm98Trig._i32(_si(ball, 0xc) - int(pv[2]))
 
 	# L165-176: the open-play GATE -- live play (m+0x448==0), this player is NOT the carrier, and
-	# (recomputed) same-side. The lazy-init DAT grids + dribble-grid + execute-kick (L177-668) are
-	# DEFERRED to slice 2/3; the binary's tail there is `return uVar5` (discarded).
+	# (recomputed) same-side. The lazy-init DAT grids (L177-238) are modelled as the KICK_GRID1/GRID2
+	# consts (pure DAT bookkeeping, field-inert). The dribble-grid block (L242-514) and the execute-kick
+	# sub-arms 2/3 (L606-666) stay DEFERRED to slice 2b/2c; only the action-gated execute-kick sub-arm 1
+	# (the primary shot/pass STRIKE, L544-605) is ported here.
 	if _g(m, 0x448) == 0 and not is_same(ball.get(0x40, null), p):
 		var same2 := _ps_goalbox(p, [_si(p, 4), _si(p, 8), _si(p, 0xc)]) \
 			and _sign1(_si(p, 4)) == _sign1(_si(p, 0x3a4))
 		if same2:
-			return                                      # DEFERRED slice 2/3 (L177-668)
+			var action := _g(p, 0x40)
+			if action == 0x1e or action == 0x22 or action == 0x23 or action == 0x20:
+				return                                  # DEFERRED dribble-grid block (slice 2b, L242-514)
+			if (_g(m, 0x461) & 0x20) == 0 and _g(p, 0x2c) == 5 and action in KICK_ACTIONS:
+				if rng == null:
+					rng = MatchEngine.Pm98Rng.new(0)
+				_kick_execute(p, ball, m, action, rng)  # execute-kick sub-arm 1 (L544-605)
+
+
+# Static + lazy-init tables the execute-kick block indexes by the marker row p+0x44 (0..8). KICK_FRAME =
+# DAT_00665538 (ball-anim frame base); KICK_THRESH = DAT_00665510 (planar gate scale) -- both extracted
+# bit-for-bit from MANAGER.EXE. KICK_GRID1 = DAT_00674280, KICK_GRID2 = DAT_00674438 are the lazy-init
+# marker grids (FUN_005a7260 L177-238 constants); only .0/.2 feed the kick block (.1 feeds the deferred
+# dribble block). Grid .0/.2 + both static tables are oracle-cross-checked in run_7260kick_oracle.sh.
+const KICK_ACTIONS := [0x35, 0x31, 0x26, 0x2a, 0x32, 0x27, 0x2b]
+const KICK_FRAME := [3, 3, 5, 5, 5, 5, 5, 5, 5]
+const KICK_THRESH := [0x19999, 0x5999, 0x8000, 0x10000, 0x11999, 0x18000, 0x10000, 0x11999, 0x18000]
+const KICK_GRID1 := [
+	[0x1b333, 0, 0x4000], [0x9999, 0, 0x10000], [0x9999, 0, 0x1cccc],
+	[0x21999, 0x3555, 0x3333], [0x21999, 0x3555, 0xf333], [0x21999, 0x3555, 0x1b333],
+	[0x21999, -0x3555, 0x3333], [0x21999, -0x3555, 0xf333], [0x21999, -0x3555, 0x1b333],
+]
+const KICK_GRID2 := [
+	[0x14ccc, 0, 0], [0x6666, 0, 0], [0x6666, 0, 0],
+	[0x18ccc, 0x3555, 0], [0x18ccc, 0x3555, 0], [0x18ccc, 0x3555, 0],
+	[0x18ccc, -0x3555, 0], [0x18ccc, -0x3555, 0], [0x18ccc, -0x3555, 0],
+]
+
+
+## FUN_005a7260 execute-kick sub-arm 1 (L544-605): the primary shot/pass STRIKE. The marker row p+0x44
+## selects the static frame (DAT_00665538) + gate scale (DAT_00665510) and the lazy-init grids. iVar9 is
+## the ball's planar speed; the gate is the z-error within power*0x570a/100 (or a 0x31/0x32 short shot)
+## AND the planar error within DAT_00665510[idx]*power/0x140, then an RNG roll under a MulDiv threshold.
+## Sub-arms 2/3 (L606-666, weaker-pass + near-miss) are DEFERRED: when the gate fails this returns rather
+## than falling through to them (a future slice 2c). `rng` is the match LCG (FUN_005ec250). Oracle-pinned
+## bit-for-bit by tools/re/run_7260kick_oracle.sh -> specs/7260kick_oracle.txt (test_7260kick.gd).
+static func _kick_execute(p: Dictionary, ball: Dictionary, m: Dictionary, action: int, rng) -> void:
+	var idx := _g(p, 0x44)
+	var frame: int = KICK_FRAME[idx]
+	var ispeed := Pm98Trig.planar_mag(_si(ball, 0x20), _si(ball, 0x24))     # iVar9 ball planar speed
+	var ab := (frame + 0x12) * 0xc                                          # ball-anim frame offset
+	var anim_x := _si(ball, ab)
+	var anim_y := _si(ball, ab + 4)
+	var anim_z := _si(ball, ab + 8)
+	var g1: Array = KICK_GRID1[idx]
+	var g2: Array = KICK_GRID2[idx]
+	var ivar22 := Pm98Trig._i32(int(g1[2]) - int(g2[2]))
+	var iv10 := Pm98Trig.planar_mag(Pm98Trig._i32(anim_x - _si(p, 4)), Pm98Trig._i32(anim_y - _si(p, 8)))
+	var power := _si(p, 0x38c)
+	var uvar23 := Pm98Trig._i32(iv10 - Pm98Trig._i32(int(g1[0]) - int(g2[0])))
+	var ivar24 := absi(Pm98Trig._i32(anim_z - ivar22))
+	var cond_a := ivar24 < Pm98Trig._tdiv(power * 0x570a, 100) \
+		or ((action == 0x31 or action == 0x32) and anim_z < ivar22)
+	var cond_b := absi(uvar23) < Pm98Trig._tdiv(int(KICK_THRESH[idx]) * power, 0x140)
+	if cond_a and cond_b:
+		var thr := _muldiv(power * 4 + 400, Pm98Trig._i32(0x9999 - ispeed), 0x4c96)
+		if _shot_rng_scale(rng.next(), 1000) < thr:
+			_kick_strike(p, ball, m, action, frame, anim_x, anim_y, anim_z)
+	# else: DEFERRED slice 2c -- the binary falls through to execute-kick sub-arms 2/3 (L606-666).
+
+
+## The strike body (L552-602): fire the kick event, advance the action code, zero the ball velocity,
+## record the ball-anim target (ball+0x9c/a0/a4) and engage the ball to the player. The event queue is
+## verified separately (test_events.gd); the audio/commentary leaves are flag-gated off in headless sim.
+static func _kick_strike(p: Dictionary, ball: Dictionary, m: Dictionary, action: int, frame: int,
+		anim_x: int, anim_y: int, anim_z: int) -> void:
+	Pm98Events.keeper_event(ball, 1)                                       # FUN_005909f0(1) (no-op, keeper null)
+	Pm98Events.enqueue(m, 0xf, p, 0 if (action == 0x31 or action == 0x32) else 1)   # FUN_00594470(0xf,p,flag)
+	if action == 0x35:                                                     # action advance (L574-579)
+		p[0x40] = 0x30
+	else:
+		p[0x40] = Pm98Trig._i32(action + 2)
+	var stat := _ref(p, 0x3b8)                                             # DAT_006d31c4==0 live -> bump (L580)
+	stat[0x94] = _g(stat, 0x94) + 1
+	ball[0x70] = 0x78 if _si(ball, 0x70) < 0x79 else _si(ball, 0x70)       # (L584-588)
+	ball[0x20] = 0; ball[0x24] = 0; ball[0x28] = 0                         # (L590-592)
+	ball[0x68] = 1                                                         # (L594)
+	ball[0x6c] = (frame - 5) * 4                                           # (L595) local_148 = (iVar14-5)*4
+	ball[0x9c] = anim_x; ball[0xa0] = anim_y; ball[0xa4] = anim_z          # (L596-598)
+	_ball_engage_player(ball, p)                                           # FUN_0058eca0(ball, p) (L599)
+	ball[0x63] = 1                                                         # (L600)
+	m[0x458] = 0                                                           # (L602)
 
 
 ## Non-active velocity sub-path of FUN_005a65a0 (L74-106). Returns true if it STOPPED the player (v58
