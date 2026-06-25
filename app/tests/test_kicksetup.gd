@@ -94,7 +94,7 @@ func _run_dispatch(name: String, onpitch: int, exp: Dictionary) -> void:
 	C[0x40] = P
 
 	var rng := MatchEngine.Pm98Rng.new(1)
-	var handled: bool = Pm98Movement.move_dispatch(P, M, rng)
+	var handled: bool = Pm98Movement.move_dispatch(P, M, 0, rng)   # param_2 unused on the taker path
 
 	_ok(handled, "%s: move_dispatch returned true (taker path handled)" % name)
 	_ok((int(P.get(0x40, 0)) & U32) == (exp["action"] & U32),

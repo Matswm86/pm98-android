@@ -610,7 +610,7 @@ static func _move_8680(_p: Dictionary) -> void: trace_calls.append(["M8680", 0])
 ## NON-active open-play movement is still DEFERRED -- move_dispatch returns false there, and we record
 ## the M65a0 stub trace (with iStack_38 arg) so the test_engine_tick selection oracle stays exact.
 static func _move_65a0(p: Dictionary, m: Dictionary, arg: int, rng) -> void:
-	if not Pm98Movement.move_dispatch(p, m, rng):
+	if not Pm98Movement.move_dispatch(p, m, arg, rng):
 		trace_calls.append(["M65a0", arg])
 static func _move_9490(_p: Dictionary) -> void: trace_calls.append(["M9490", 0])   # FUN_005a9490 (lean)
 static func _move_7260(_p: Dictionary) -> void: trace_calls.append(["M7260", 0])   # FUN_005a7260 (locomotion)

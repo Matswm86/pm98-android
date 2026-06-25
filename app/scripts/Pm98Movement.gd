@@ -980,29 +980,39 @@ static func kick_setup(p: Dictionary, m: Dictionary) -> void:
 
 
 ## FUN_005a65a0 (__thiscall this=player; param_2 char): the per-player movement dispatcher.
-## SCOPE: only the SET-PIECE TAKER dispatch (phases 2/3/5, p == match+0x438) is ported -- the kickoff
-## unstick. Returns true when it handles the player; false for the DEFERRED open-play movement (every
-## non-taker, and the taker at the highlight/chase phases 0/1/6/7 and the phase-4 leaf), so the caller
-## records the M65a0 stub trace. The handle gate is checked FIRST (before any draw/write) so a deferred
-## player is byte-for-byte the old stub. `rng` is the shared match LCG; param_2 (highlight bias) is
-## only read by the DEFERRED highlight block, so it is unused here.
-static func move_dispatch(p: Dictionary, m: Dictionary, rng) -> bool:
+## SCOPE: the SET-PIECE TAKER dispatch (phases 2/3/5, p == match+0x438, the kickoff unstick) PLUS the
+## open-play movement region's PORTED leaves -- the non-active interception move (FUN_005b0040), the
+## body-orient steer (FUN_005a8f20) and the active-highlight goal-anchor steer (FUN_005a89c0). Still
+## DEFERRED inside the open-play region: the param_2==0 formation gate (FUN_005b1420 + 5b1500/5b1c80),
+## the active teammate-mark (FUN_005aa490), the arm-2 active tail (FUN_005aa870), the phase-4 leaf and
+## the set-piece wall arms. Returns true when it handles the player; false for a DEFERRED player, whose
+## caller records the M65a0 stub trace.
+##
+## The HANDLE GATE (_openplay_leaf + taker_ok) is computed FIRST, read-only (no field write, no RNG), so
+## a deferred player is byte-for-byte the old stub -- crucially the velocity block's RNG draw is skipped
+## for it, which is what keeps the engine_tick/kick/cascade oracles (FUN_005a65a0 fully stubbed) green.
+## `rng` is the shared match LCG; param_2 is the highlight-bias byte (istack: 1 = near-ball/engine-ctrl).
+static func move_dispatch(p: Dictionary, m: Dictionary, param_2: int, rng) -> bool:
 	var phase := _g(m, 0x448)
+	var action := _g(p, 0x40)
+	var ctrl: Dictionary = _ref(p, 0x190)
 	# is_same (NOT ==): Dictionary == is a DEEP recursive compare that blows the stack on the cyclic
 	# player<->match<->sim graph. We need pointer identity (the binary compares pointers).
+	var is_active := is_same(ctrl.get(0x40, null), p)      # p == ball.active (L44 / L138 / L208)
 	var is_taker := is_same(m.get(0x438, null), p)
-	if not (is_taker and (phase == 2 or phase == 3 or phase == 5)):
+	var taker_ok := is_taker and (phase == 2 or phase == 3 or phase == 5)
+	var op := _openplay_leaf(p, m, phase, action, ctrl, is_active, param_2)   # "" = no ported leaf
+
+	if op == "" and not taker_ok:
 		return false                                       # DEFERRED -> caller stub-traces (no writes)
 
 	var uVar2 := _g(p, 0x5c)                                # saved + restored highlight flag
 	var gs: Dictionary = _ref(p, 0x184)                    # = the sim-ctx (gs+0x138 match, gs+8 team)
 	var bv_top := _g(gs, 0x2ee) != 0 and play_state_eq(m, 0)   # L36-42: FUN_005943b0 short-circuit
-	var action := _g(p, 0x40)
 
 	# --- velocity block (L43-109): only when !bv_top and action not 4/0x25 ---
 	if not bv_top and action != 4 and action != 0x25:
-		var controller: Dictionary = _ref(p, 0x190)
-		if is_same(controller.get(0x40, null), p):         # ACTIVE side (L44): p is the ball's active
+		if is_active:                                      # ACTIVE side (L44): p is the ball's active
 			var anchor := absi(Pm98Trig._i32(_g(p, 0x3a4) + _g(p, 4)))
 			if anchor < 0x280001:
 				if anchor < 0x1a0001:                      # L63-64
@@ -1011,11 +1021,15 @@ static func move_dispatch(p: Dictionary, m: Dictionary, rng) -> bool:
 					p[0x54] = _rscale15(rng.next(), 4) + 0xc
 			else:                                          # L107-108 fall-through
 				p[0x54] = _rscale15(rng.next(), 2) + 0xe
-		elif not _velocity_nonactive(p, m, controller, gs, rng):   # NON-ACTIVE (L74-106); else L107
+		elif not _velocity_nonactive(p, m, ctrl, gs, rng):   # NON-ACTIVE (L74-106); else L107
 			p[0x54] = _rscale15(rng.next(), 2) + 0xe       # L107-108 wander
 
 	# --- LAB_005a6759 gates (L110-236) -> reach the taker dispatch ---
 	p[0x5c] = 0
+	if op != "":                                           # open-play movement region (L128-232)
+		_run_openplay_leaf(op, p, m)
+		p[0x5c] = uVar2                                     # restore highlight flag + return
+		return true
 	var bVar11 := _g(m, 0x461) & 0x40
 	if bVar11 != 0 and (action == 0x10 or action == 0x11 or action == 0x35):
 		# IF-A else (L394): the set-piece-frame wall player. DEFERRED (never set at a plain kickoff).
@@ -1051,6 +1065,50 @@ static func move_dispatch(p: Dictionary, m: Dictionary, rng) -> bool:
 
 	p[0x5c] = uVar2                                          # LAB_005a7208: restore + return
 	return true
+
+
+## Read-only classifier for the open-play movement region of FUN_005a65a0 (decompile L113-233): which
+## PORTED leaf this player reaches. "" => the taker dispatch, an UNPORTED leaf, or nothing (deferred).
+## Pure -- no field write, no RNG -- so move_dispatch can check it BEFORE the velocity draw and keep a
+## deferred player a byte-exact M65a0 stub. UNPORTED (=> ""): set-piece walls (m+0x461 & 0x40), the
+## param_2==0 formation gate FUN_005b1420 (+5b1500/5b1c80), the active teammate-mark FUN_005aa490 and
+## the arm-2 active FUN_005aa870 tail. param_2 (istack) is 1 for near-ball / engine-controller players.
+static func _openplay_leaf(p: Dictionary, m: Dictionary, phase: int, action: int,
+		ctrl: Dictionary, is_active: bool, param_2: int) -> String:
+	if (_g(m, 0x461) & 0x40) != 0:
+		return ""                                          # set-piece frame -> wall arms (deferred)
+	if _g(m, 0x19a0) == 4 or action < 0 or action > 3:
+		return ""                                          # IF-C (m+0x19a0!=4) / bVar14 (0<=action<=3)
+	if not ((phase == 0 or phase == 6) and _g(p, 0x48) == 0):
+		return ""                                          # not the open-play region (L127) -> taker
+	if _g(m, 0x440) == 0 or phase != 0:
+		# ARM 1 (L128-205)
+		if param_2 == 0:
+			return ""                                      # L129 guard -> FUN_005b1420 (UNPORTED)
+		if not is_active:
+			return "b0040"                                 # L138 non-active interception move
+		if _g(p, 0x63) == 0:
+			return "active_simple"                         # L144-150 goal-anchor steer
+		return ""                                          # active p+0x63!=0: teammate-mark aa490 (UNPORTED)
+	# ARM 2 (m+0x440!=0 && phase==0, L206-232)
+	if not is_active:
+		return "steer8f20" if _g(ctrl, 0x40) != 0 else "b0040"   # L210 / L214
+	return ""                                              # arm-2 active: steer_89c0 + aa870 (deferred)
+
+
+## Run the classified open-play leaf. Caller has already run the velocity block and set p[0x5c]=0, and
+## restores p[0x5c] + returns true after this. All three leaves are oracle-locked (b0040 / the trio).
+static func _run_openplay_leaf(op: String, p: Dictionary, m: Dictionary) -> void:
+	match op:
+		"b0040":
+			_move_b0040(p)                                 # FUN_005b0040 interception/mark + steer_89c0
+		"steer8f20":
+			steer_8f20(p, _g(p, 0x34) & 0xffff)            # body-orient toward own facing
+		"active_simple":
+			var gx := _g(m, 0x1820)                        # +/- goal-X anchor by team/orient (L145-148)
+			if (1 - _g(p, 0x2b8)) == (_g(m, 0x19a0) & 1):
+				gx = -gx
+			steer_89c0(p, [gx, 0, 0], 0x5a)
 
 
 # =============================================================================
