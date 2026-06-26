@@ -241,10 +241,12 @@ func _row(y: int, idx: int, pid: int, number: int, role: String) -> void:
 	var avg := _avg_of(pl)
 	draw_rect(Rect2(AVBAR_X, y + 4, 30, 7), C_AVBAR_BG, true)
 	draw_rect(Rect2(AVBAR_X, y + 4, 30.0 * clampf(avg / 99.0, 0.0, 1.0), 7), C_AVBAR, true)
-	# ROL tag + POS text
+	# ROL: the original CAMROL pitch-position icon (faithful), with the colour tag as
+	# a fallback when the icon / fine code is unavailable. POS: the broad role text.
 	var pos := _pos_of(pl)
-	var rcol: Color = C_ROLE.get(_role_group(pos), PMChrome.C_TBL_HDR)
-	draw_rect(Rect2(ROL_X, y + 2, 24, ROW_H - 5), rcol, true)
+	var rol_cell := Rect2(ROL_X, y + 1, 24, ROW_H - 3)
+	if not PMChrome.draw_role_icon(self, rol_cell, int(pl.get("posFine", 0)), str(pl.get("pos", ""))):
+		draw_rect(Rect2(ROL_X, y + 2, 24, ROW_H - 5), C_ROLE.get(_role_group(pos), PMChrome.C_TBL_HDR), true)
 	_txt(_f8, POS_X, ty, pos, PMChrome.C_ROW_TXT, 10)
 
 

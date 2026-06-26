@@ -268,12 +268,14 @@ func _row(y: int, idx: int, p: Dictionary, number: int, key: String, row_h: int)
 	draw_rect(Rect2(AVBAR_X, y + maxi(2, row_h / 2 - 3), 28, 6), C_AVBAR_BG, true)
 	draw_rect(Rect2(AVBAR_X, y + maxi(2, row_h / 2 - 3), 28.0 * clampf(avg / 99.0, 0.0, 1.0), 6), C_AVBAR, true)
 
-	# POS: a coloured role tag, or the injury/suspension status when out.
+	# POS: the original CAMROL pitch-position icon (colour tag fallback), or the
+	# injury/suspension status when out.
 	var st := Availability.status(p)
 	if st["state"] == "FIT":
-		var rcol: Color = C_ROLE.get(key, PMChrome.C_TBL_HDR)
-		draw_rect(Rect2(POS_X, y + 2, 22, row_h - 5), rcol, true)
-		_txt(_f8, POS_X + 26, ty, key, PMChrome.C_ROW_TXT, 10)
+		var pos_cell := Rect2(POS_X, y + 1, 24, row_h - 2)
+		if not PMChrome.draw_role_icon(self, pos_cell, int(p.get("posFine", 0)), str(p.get("pos", key))):
+			draw_rect(Rect2(POS_X, y + 2, 22, row_h - 5), C_ROLE.get(key, PMChrome.C_TBL_HDR), true)
+		_txt(_f8, POS_X + 28, ty, key, PMChrome.C_ROW_TXT, 10)
 	else:
 		_txt(_f8, POS_X, ty, "%s %dw" % [st["state"], int(st["weeks"])], st["colour"], 10)
 

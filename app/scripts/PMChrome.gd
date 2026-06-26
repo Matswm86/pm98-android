@@ -65,6 +65,13 @@ const KIT_SRC := Rect2(0, 0, 31, 64)
 static var _fonts: Dictionary = {}
 static var _kits: Dictionary = {}
 static var _bg: Texture2D = null
+static var _camrol: Dictionary = {}
+
+# Fallback fine-position code per broad role, for records whose posFine is absent / out
+# of range. Picks a representative central CAMROL slot: GK=1, central DF=4, central
+# MF=10, central striker=9 (see docs/re/positions_re.md fine-code -> dot-x mapping).
+const _CAMROL_FALLBACK := {"GK": 1, "DF": 4, "DEF": 4, "MF": 10, "MID": 10,
+	"FW": 9, "FOR": 9}
 
 
 # ---- shared assets -------------------------------------------------------
@@ -92,6 +99,38 @@ static func kit(club_id: int) -> Texture2D:
 		var p := "res://art/kits/%d.png" % club_id
 		_kits[club_id] = load(p) if ResourceLoader.exists(p) else null
 	return _kits[club_id]
+
+
+## The original CAMROL position icon (25x14 top-down pitch + role dot) for a fine
+## position code 1..18 (the EQUIPOS demarcación, docs/re/positions_re.md). Cached.
+static func camrol(pos_fine: int) -> Texture2D:
+	var n: int = clampi(pos_fine, 1, 18)
+	if not _camrol.has(n):
+		var p := "res://art/icons/camrol/camrol%02d.png" % n
+		_camrol[n] = load(p) if ResourceLoader.exists(p) else null
+	return _camrol[n]
+
+
+## Draw a player's CAMROL role icon centred in a cell. Uses posFine when present,
+## else falls back to a representative slot for the broad position. Returns true if
+## an icon was drawn (caller can paint a colour-tag fallback otherwise).
+static func draw_role_icon(ci: CanvasItem, r: Rect2, pos_fine: int, broad_pos := "") -> bool:
+	var fine := pos_fine
+	if fine < 1 or fine > 18:
+		fine = int(_CAMROL_FALLBACK.get(broad_pos.to_upper(), 0))
+	if fine < 1:
+		return false
+	var tex := camrol(fine)
+	if tex == null:
+		return false
+	var tw := float(tex.get_width())
+	var th := float(tex.get_height())
+	var s: float = minf(r.size.x / tw, r.size.y / th)
+	var w := tw * s
+	var h := th * s
+	ci.draw_texture_rect(tex, Rect2(r.position.x + (r.size.x - w) * 0.5,
+		r.position.y + (r.size.y - h) * 0.5, w, h), false)
+	return true
 
 
 # ---- low-level drawing helpers -------------------------------------------
