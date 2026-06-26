@@ -500,7 +500,7 @@ static func _movement_decision(p: Dictionary, m: Dictionary, gs: Dictionary, b: 
 				bv = true
 				istack = 1                               # LAB_005a4e34
 	if not bv:
-		_move_8680(p)                                    # STUB
+		_move_8680(p, rng)                               # FUN_005a8680 settle (AA870 tail now wired)
 		return
 	_move_65a0(p, m, istack, rng)                        # FUN_005a65a0 (kickoff-taker slice ported)
 
@@ -618,14 +618,15 @@ static func _resolve_action(p: Dictionary, m: Dictionary, rng) -> void:
 ## FUN_005ac1a0 (case 0x13 bVar17-true) is now WIRED inline in _case_distribution to Pm98Movement.setup_shot
 ## (-> resolve_post_shot), oracle-gated via run_engine_dist_oracle.sh -> test_engine_dist.gd. No stub here.
 
-## FUN_005a8680 (settle) is now WIRED to the real port Pm98Movement.settle_8680(p, wire=true) -- the
+## FUN_005a8680 (settle) is now WIRED to the real port Pm98Movement.settle_8680(p, wire=true, rng) -- the
 ## M8680 stub is retired (run_engine_oracle.sh now runs the REAL FUN_005a8680, un-stubbed). settle_8680's
 ## own SELECTION + two direct writes (p+0x5d windup-edge flag, p+0x54 possession clear) run, and the
 ## already-ported leaves are CALLED for real: steer_8f20 (M8F20, GREEN), windup_8ac0 (M8AC0, 619989d),
-## kick_setup (AA4D0) and select_nearest (B8CE0). The three remaining leaves (B1420/AA870/AAFD0) stay
-## DEFERRED -- stubbed in the engine oracle, trace-only in the port -- to be ported then wired next.
-static func _move_8680(p: Dictionary) -> void:
-	Pm98Movement.settle_8680(p, true)
+## kick_setup (AA4D0), select_nearest (B8CE0) and _arm2_active_tail (AA870, the FUN_005aa870(0) tail).
+## The shared match `rng` is threaded for AA870's FUN_005ec250 draws. The two remaining leaves (B1420/
+## AAFD0) stay DEFERRED -- stubbed in the engine oracle, trace-only in the port -- to be ported then wired.
+static func _move_8680(p: Dictionary, rng) -> void:
+	Pm98Movement.settle_8680(p, true, rng)
 
 ## FUN_005a65a0 (general move). The kickoff-taker slice is ported (Pm98Movement.move_dispatch); the
 ## NON-active open-play movement is still DEFERRED -- move_dispatch returns false there, and we record

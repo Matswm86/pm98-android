@@ -5271,12 +5271,14 @@ static func _settle_b(d: Dictionary, off: int) -> bool:
 
 
 # `wire`: when true (the engine_tick integration call), the body-orient steer leaf FUN_005a8f20
-# (steer_8f20) AND the branch-2 windup leaf FUN_005a8ac0 (windup_8ac0, which itself sets p+0x6c then
-# tail-calls steer_8f20) are CALLED for real instead of only trace-recorded; the other five leaves
-# (B1420/AA4D0/AA870/AAFD0/B8CE0) stay deferred (traced). When false (the bare test_settle.gd gate)
-# every leaf is trace-only. Either way the M8F20/M8AC0 trace entries are still appended, so the bare
-# selection oracle is unaffected.
-static func settle_8680(p: Dictionary, wire: bool = false) -> void:
+# (steer_8f20), the branch-2 windup leaf FUN_005a8ac0 (windup_8ac0, which itself sets p+0x6c then
+# tail-calls steer_8f20), and the action-gated tail leaves AA4D0/B8CE0/AA870 are CALLED for real
+# instead of only trace-recorded; the other two tail leaves (B1420/AAFD0) stay deferred (traced).
+# When false (the bare test_settle.gd gate) every leaf is trace-only. Either way the M8F20/M8AC0
+# trace entries are still appended, so the bare selection oracle is unaffected. `rng` is the live
+# MatchEngine.Pm98Rng -- needed only by the AA870 tail leaf (FUN_005ec250 draws); null is fine on
+# the bare (wire=false) path, which never reaches it.
+static func settle_8680(p: Dictionary, wire: bool = false, rng = null) -> void:
 	settle_trace = []
 	var m: Dictionary = _ref(p, 0x18c)
 	var gs: Dictionary = _ref(p, 0x184)
@@ -5349,17 +5351,19 @@ static func settle_8680(p: Dictionary, wire: bool = false) -> void:
 		# else: bVar9 false or phase != 0 -> goto LAB_005a8854 (no steer)
 
 	# LAB_005a8854: the action-gated possession / marking tail (L84-130).
-	_settle_tail(p, m, gs, ball, wire)
+	_settle_tail(p, m, gs, ball, wire, rng)
 
 
 ## L84-130: at most one leaf, gated on the action code, the ball-controller identity, and the gs
 ## input flags +0x214/+0x215. The only direct write here is p+0x54 = 0 (clear the possession claim).
-## `wire`: when true, the two ALREADY-PORTED tail leaves are CALLED for real -- AA4D0 = kick_setup(p, m)
-## (the ball-launch trajectory; here this=p the controller, matching ball=_ref(p,0x190)) and B8CE0 =
-## select_nearest(gs, 1) (re-pick the active player; here this=gs, find_in_front=1). AA870/AAFD0 stay
-## DEFERRED (trace-only) pending their own ports. The trace is appended either way, so the bare
-## test_settle selection oracle is unaffected.
-static func _settle_tail(p: Dictionary, m: Dictionary, gs: Dictionary, ball: Dictionary, wire: bool) -> void:
+## `wire`: when true, the THREE ALREADY-PORTED tail leaves are CALLED for real -- AA4D0 = kick_setup(p, m)
+## (the ball-launch trajectory; here this=p the controller, matching ball=_ref(p,0x190)); B8CE0 =
+## select_nearest(gs, 1) (re-pick the active player; here this=gs, find_in_front=1); and AA870 =
+## FUN_005aa870(0) = _arm2_active_tail(p, 0, rng) (the controller-possession tail; here param_2=0, so the
+## istack==0 arm, whose own carrier guard ball+0x40==p the AA870-branch gate already guarantees). AAFD0/
+## B1420 stay DEFERRED (trace-only) pending their own ports. The trace is appended either way, so the
+## bare test_settle selection oracle is unaffected.
+static func _settle_tail(p: Dictionary, m: Dictionary, gs: Dictionary, ball: Dictionary, wire: bool, rng = null) -> void:
 	var action := _g(p, 0x40)
 	if action == 4 or action == 5 or action == 8 or action == 9:
 		return
@@ -5380,6 +5384,8 @@ static func _settle_tail(p: Dictionary, m: Dictionary, gs: Dictionary, ball: Dic
 			return
 		if _settle_b(gs, 0x215):
 			settle_trace.append(["AA870", 0])                # FUN_005aa870(0)
+			if wire:
+				_arm2_active_tail(p, 0, rng)
 			return
 	else:                                                    # p is NOT the controller
 		if _settle_b(gs, 0x214):
