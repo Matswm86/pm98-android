@@ -9,7 +9,7 @@
 #
 # UN-STUBBED vs run_engine_oracle.sh: 0x5acc40 (acc40 = goal_aim_025) and 0x5ac1a0 (setup_shot) run REAL.
 # resolve_post_shot (0x5ab5a0) is reached transitively from setup_shot and runs REAL (never stubbed). The
-# OTHER 6 handlers + the resolver + teammate-count + the 5 movement fns stay STUBBED (not on the acc40 path).
+# OTHER 6 handlers + the resolver + teammate-count + 3 movement fns stay STUBBED; 7260+8f20 run REAL (not on the acc40 path).
 # resolve_post_shot's own two display/queue leaves are stubbed (TRAIL FUN_0058fda0, ENQ FUN_00594470) --
 # exactly as in run_postshot_oracle.sh -- since the GD port models them as no-ops.
 #
@@ -59,7 +59,6 @@ STUBS=(
   "0x5a8680 0 0 M8680"     # settle move
   "0x5a65a0 0 4 M65a0"     # general move
   "0x5a9490 0 0 M9490"     # lean (post-switch)
-  "0x5a8f20 0 4 M8f20"     # body orient (post-switch)
   "0x605ff0 0 0 atexit"    # FUN_005a7260 (ball-touch) now runs REAL (un-stubbed); atexit guards its steer
                            # box-init. These fixtures never reach 7260's body, so the output is unchanged.
   "0x58fda0 0 0 TRAIL"     # resolve_post_shot render trail (no sim residue)
@@ -146,7 +145,7 @@ RESOLVE="$(poke 0x260438 0x230000);$(poke 0x260460 0);$(poke 0x260448 0)"
 : > "$OUT"
 echo "# Stage 3 INTEGRATION: FUN_005a4600 (engine_tick) -> acc40 (FUN_005acc40) -> setup_shot (FUN_005ac1a0)" >> "$OUT"
 echo "#   -> resolve_post_shot (FUN_005ab5a0), all REAL. set_phase(0) reached. STUBS: 6 handlers + resolver +" >> "$OUT"
-echo "#   teammate-count + 5 movement fns + TRAIL/ENQ. reads: full cascade residue + rng seed (0x6d3184)." >> "$OUT"
+echo "#   teammate-count + 3 movement fns (7260+8f20 REAL) + TRAIL/ENQ. reads: full cascade residue + rng seed (0x6d3184)." >> "$OUT"
 POKES="$FRAME;$ACC40;$SETUP;$RESOLVE;$PTRS;$GLOB"
 emit_spec "${POKES//;/$'\n'}"
 run_emu

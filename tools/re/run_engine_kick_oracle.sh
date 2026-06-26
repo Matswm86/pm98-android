@@ -17,7 +17,7 @@
 # UN-STUBBED vs run_engine_cascade_oracle.sh: 0x5ae4c0 (kick_resolve) runs REAL; resolve_post_shot
 # (0x5ab5a0) is reached transitively and runs REAL (+ its real leaves: FUN_005b0bb0 pass-target test,
 # the engage FUN_0058eca0/0058ed70, set_phase FUN_005942e0, the predicates/geometry). STUBBED: the OTHER
-# 6 handlers + setup_shot + resolver + teammate-count FUN_005b0b40 + the 5 movement fns + resolve's TRAIL
+# 6 handlers + setup_shot + resolver + teammate-count FUN_005b0b40 + 3 movement fns (7260+8f20 run REAL) + resolve's TRAIL
 # (FUN_0058fda0) / ENQ (FUN_00594470) + the kick's EFFECT (FUN_00590f00) / AUDIO (FUN_004e9940).
 #
 # FTOL: the FISTTP truncating thunk (run_ae4c0/shotsetup). The kick ball-SPEED sqrt is a perfect square
@@ -68,7 +68,6 @@ STUBS=(
   "0x5a8680 0 0 M8680"     # settle move
   "0x5a65a0 0 4 M65a0"     # general move
   "0x5a9490 0 0 M9490"     # lean (post-switch)
-  "0x5a8f20 0 4 M8f20"     # body orient (post-switch)
   "0x605ff0 0 0 atexit"    # FUN_005a7260 (ball-touch) now runs REAL (un-stubbed); atexit guards its steer
                            # box-init. These fixtures never reach 7260's body, so the output is unchanged.
   "0x58fda0 0 0 TRAIL"     # resolve_post_shot render trail (no sim residue)

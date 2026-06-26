@@ -349,7 +349,7 @@ static func engine_tick(p: Dictionary, m: Dictionary, rng = null) -> void:
 				_move_7260(p, rng)                       # ball_touch_7260 (slice 1 + kick sub-arm 1)
 
 	# --- LAB_005a4fa2 (L426-465): the body-orient pass + the open-play power reset ---
-	_move_8f20(p, _g(p, 0x34))                            # STUB (arg = facing)
+	_move_8f20(p, _g(p, 0x34))                            # FUN_005a8f20 body-orient steer (WORD facing)
 	if _highlight_active(p, m, gs):
 		if (_g(gs, 0x214) & 0xff) == 0 and _g(p, 0x40) >= 0 and _g(p, 0x40) <= 3:
 			p[0x58] = 0
@@ -631,4 +631,8 @@ static func _move_9490(_p: Dictionary) -> void: trace_calls.append(["M9490", 0])
 ## FUN_005a7260, un-stubbed). The lazy-init + dribble-grid + execute-kick (L177-668) are DEFERRED there.
 static func _move_7260(p: Dictionary, rng = null) -> void:
 	Pm98Movement.ball_touch_7260(p, rng)
-static func _move_8f20(_p: Dictionary, facing: int) -> void: trace_calls.append(["M8f20", facing])  # FUN_005a8f20 (body orient)
+## FUN_005a8f20 (body-orient steer / FPU APPLY) is WIRED to the real port Pm98Movement.steer_8f20 --
+## the M8f20 stub is retired (run_engine_oracle.sh now runs the REAL FUN_005a8f20, un-stubbed). The
+## binary's LAB_005a4fa2 call passes `*(undefined2 *)(param_1 + 0x34)` (a WORD read), so mask to 0xffff.
+static func _move_8f20(p: Dictionary, facing: int) -> void:
+	Pm98Movement.steer_8f20(p, facing & 0xffff)
