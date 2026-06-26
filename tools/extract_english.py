@@ -33,7 +33,11 @@ from __future__ import annotations
 
 import json
 import struct
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "re"))
+from pkf_unpack import files_of as _pkf_files  # noqa: E402
 
 GAME = Path(__file__).resolve().parent.parent / "extracted" / "Premier Manager 98"
 OUT = Path(__file__).resolve().parent.parent / "assets" / "squads_english.json"
@@ -212,13 +216,14 @@ def split_name(short_txt: str, full_txt: str):
     return display, legal
 
 
-def parse_club(d: bytes, off: int, end: int):
+def parse_club(d: bytes, off: int, end: int, archive: set[int] | None = None):
     strings, num_off = header(d, off)
     anchors = find_anchors(d, num_off, end)
     attr_blocks = find_attr_blocks(d, num_off, end)
     players = []
     prev_end = num_off
     seen = set()
+    archive = archive or set()
     for k, Y in enumerate(anchors):
         nb = name_before(d, prev_end, Y)
         prev_end = Y + 3
@@ -232,16 +237,26 @@ def parse_club(d: bytes, off: int, end: int):
         if key in seen:
             continue
         seen.add(key)
-        # Player-photo id: the u16 immediately preceding this player's name (name_start
-        # - 3; a single pad byte sits between the id and the [u16 len] name prefix). It
-        # is the J96NNNNN bank key (NNNNN == this id) for DBDAT/BIGFOTO + MINIFOTO.
-        # Decode + validation (Schmeichel=3371, Flowers=1851; 97% of the 610 big photos
-        # claimed, every star verified by sight) in docs/re/faces_re.md. 0 / implausible
-        # -> no photo (the original draws a blank frame).
+        # Player-photo id: the u16 just before this player's name (the J96NNNNN bank key
+        # for DBDAT/BIGFOTO + MINIFOTO; NNNNN == this id). It sits at name_start - 3 for
+        # most players, but some carry a 4-6 byte field block between the id and the name
+        # (e.g. Babb: real id 8443 at -9, with `06 04 00 23 00 03` then the name, so a
+        # naive -3 read the tail `00 03` = a phantom 768). So we scan back from -3 in 2-byte
+        # steps and take the first candidate that is a real photo in THIS club's BIGFOTO
+        # archive; that pins it to the actual face (Schmeichel=3371, Flowers=1851, Babb=8443,
+        # all verified by sight). No archive hit -> the -3 value if plausible, else None
+        # (photo-less -> the original drew a blank frame). See docs/re/faces_re.md.
         name_start = nb[0]
-        photo_id = struct.unpack_from("<H", d, name_start - 3)[0] if name_start >= 3 else 0
-        if not (0 < photo_id <= 60000):
-            photo_id = None
+        photo_id = None
+        for back in range(3, 16, 2):
+            if name_start - back < 0:
+                break
+            cand = struct.unpack_from("<H", d, name_start - back)[0]
+            if cand in archive:
+                photo_id = cand
+                break
+            if back == 3 and 0 < cand <= 60000:
+                photo_id = cand  # provisional -3 fallback; an archive hit further back wins
         # the player's attribute row is the attr block between this anchor and the
         # next one (it follows the player's bio, before the next player's record).
         nxt = anchors[k + 1] if k + 1 < len(anchors) else end
@@ -270,14 +285,32 @@ def parse_club(d: bytes, off: int, end: int):
     return strings, players
 
 
+def bigfoto_by_idx() -> dict[int, set[int]]:
+    """record idx -> its BIGFOTO photoId set. EQUIPOS.PKF stores one EQ96<code>.DBC entry
+    per record in record order, so entry N's code (== the club crest code) names record
+    N's photo archive DBDAT/BIGFOTO/EQ96<code>.PKF. Used to pin each decoded photoId to a
+    real face in the player's own club (see the parse_club scan)."""
+    eq = (GAME / "DBDAT/EQUIPOS.PKF").read_bytes()
+    out: dict[int, set[int]] = {}
+    for idx, (name, _o, _s) in enumerate(_pkf_files(eq)):
+        code = name.split(".")[0][4:]  # EQ960305.DBC -> 0305
+        bf = GAME / f"DBDAT/BIGFOTO/EQ96{code}.PKF"
+        if bf.exists():
+            out[idx] = {
+                int(n[1:].split(".")[0]) % 100000 for n, _oo, _ss in _pkf_files(bf.read_bytes())
+            }
+    return out
+
+
 def main():
     d = (GAME / "DBDAT/EQUIPOS.PKF").read_bytes()
     offs = record_offsets(d)
+    archives = bigfoto_by_idx()
     clubs = []
     for n in range(ENG_FIRST, ENG_LAST + 1):
         off = offs[n]
         end = offs[n + 1] if n + 1 < len(offs) else len(d)
-        strings, players = parse_club(d, off, end)
+        strings, players = parse_club(d, off, end, archives.get(n))
         clubs.append(
             {
                 "idx": n,
