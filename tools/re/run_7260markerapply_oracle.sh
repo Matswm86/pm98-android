@@ -107,6 +107,16 @@ FIX=(
   "p1hit2|0x005a7e67|$SEED_P1;$(poke 0x28005c 0x15);$(traj 0x1c 0x9999 0 0x1cccc)"
   "comp|0x005a7e23|$SEED_WORK;$(bpos 0x100000 0 0);$(traj 0x1a 0x1b333 0x8000 0x4000);$(traj 0x1c 0x9999 0x400 0x1cccc)"
   "bbox|0x005a7e23|$SEED_WORK;$(bpos 0x100000 0 0);$(traj 0x1a 0x1b333 0 0x4000);$(traj 0x1c 0x9999 0x2000 0x1cccc);$(box 0x9000 -0x10000 0x1c000 0xa000 0x10000 0x1d000)"
+  # Two-pass DISCRIMINATORS (slice 2b residual): N=8 => idxbase=trunc(7/4)=1 => pass-1 goal-extrapolation
+  # rewrites the SCANNED work[5] (slot 0x1c), unlike the N=0/0x15 fixtures (idxbase 0/5 never touch work[5]).
+  # Both enter at the FULL loop start 0x5a7e23 (not the pass-1 copy 0x5a7e67), so the REAL 2-pass loop runs.
+  #   twopass => pass-0 MISS (slot 0x1a/0x1c parked at z=0x40000 -> every z-band fails) -> pass-1 HIT marker 6
+  #              (extrapolated work[5]). Locks: n_passes=2, the L280 break does NOT fire after a miss,
+  #              pass_idx=1 extrapolation feeds the scan, apply applies the pass-1 marker.
+  #   brkkeep  => pass-0 HIT marker 6; the L280 break FIRES so pass 1 is suppressed and marker 6 is applied.
+  #              Counterfactual (port _nobreak_loop) would extrapolate to marker 3 -> locks the break is load-bearing.
+  "twopass|0x005a7e23|$SEED_WORK;$(poke 0x28005c 8);$(traj 0x18 -0x30000 -0x20000 0x3333);$(traj 0x1a 0x40000 0 0x40000);$(traj 0x1c 0x40000 0 0x40000)"
+  "brkkeep|0x005a7e23|$SEED_WORK;$(poke 0x28005c 8);$(traj 0x18 -0x30000 0x18000 0x3333);$(traj 0x1a 0x40000 0 0x40000);$(traj 0x1c 0x12000 -0x8000 0x3333)"
 )
 
 emit_spec() {  # $1=entry  $2=extra-pokes

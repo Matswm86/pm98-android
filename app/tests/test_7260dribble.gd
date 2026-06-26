@@ -22,6 +22,17 @@ var _apply_fix := {
 	"hit1":   {"n": 0,    "traj": {0x1a: [0x9999, 0, 0x10000]}},
 	"nohit":  {"n": 0,    "traj": {}},
 	"p1hit2": {"n": 0x15, "traj": {0x1c: [0x9999, 0, 0x1cccc]}},
+	# Two-pass DISCRIMINATORS (slice 2b residual): N=8 => idxbase=trunc(7/4)=1 => pass-1 goal-extrapolation
+	# rewrites the SCANNED work[5] (slot 0x1c) -- unlike every N=0/0x15 fixture (idxbase 0/5 leave work[5]
+	# untouched, so break-vs-no-break and 1-vs-2 passes were indistinguishable). slot 0x18 = the anchor work[1].
+	#   twopass => slot 0x1a/0x1c parked at z=0x40000 so pass 0 MISSES all 9 markers; pass-1 extrapolated
+	#              work[5] HITS marker 6. Locks: n_passes=2, the break does NOT fire after a miss, pass_idx=1
+	#              extrapolation feeds the scan. (binary ran 5645 steps = both passes.)
+	#   brkkeep  => pass 0 HITS marker 6; the break FIRES so pass 1 is skipped and marker 6 applied. The
+	#              port _nobreak path would extrapolate to marker 3 -> the break is load-bearing. (binary 2854
+	#              steps = one pass + apply.) _init asserts the no-break counterfactual diverges.
+	"twopass": {"n": 8, "traj": {0x18: [-0x30000, -0x20000, 0x3333], 0x1a: [0x40000, 0, 0x40000], 0x1c: [0x40000, 0, 0x40000]}},
+	"brkkeep": {"n": 8, "traj": {0x18: [-0x30000, 0x18000, 0x3333], 0x1a: [0x40000, 0, 0x40000], 0x1c: [0x12000, -0x8000, 0x3333]}},
 	"comp":   {"n": 0, "ballpos": [0x100000, 0, 0],
 		"traj": {0x1a: [0x1b333, 0x8000, 0x4000], 0x1c: [0x9999, 0x400, 0x1cccc]}},
 	"bbox":   {"n": 0, "ballpos": [0x100000, 0, 0],
@@ -71,6 +82,7 @@ func _init() -> void:
 			_run_tail(name, ot[name])
 		else:
 			_ok(false, name + ": missing from marker-tail oracle")
+	_assert_discriminators()
 	print("")
 	if _fail == 0:
 		print("ALL PASS (%d checks)" % _pass)
@@ -127,10 +139,55 @@ func _scan_loop(p: Dictionary, ball: Dictionary) -> Array:
 	return best
 
 
+# Counterfactual loop with the L280 break REMOVED: both passes always run into the same `best`. Used only to
+# prove the break is load-bearing on `brkkeep` (with break -> pass-0 marker 6; without -> pass-1 marker 3).
+func _nobreak_loop(p: Dictionary, ball: Dictionary) -> Array:
+	var best := [-1, 0, 0, 0x7c72, 0x7c72, 0, 0, 0]
+	var n_passes := 1 + (1 if int(ball.get(0x5c, 0)) != 0 else 0)
+	for pass_idx in range(n_passes):
+		var work: Array = Pm98Movement._marker_grid_build(p, pass_idx)
+		Pm98Movement._marker_scan(p, work, pass_idx, best)
+	return best
+
+
+# Rebuild the same p/ball/m the apply path uses for fixture `name` (goal anchors + N + traj only -- enough to
+# drive the loop; the apply field reads are exercised by _run_apply).
+func _build_pball(name: String) -> Array:
+	var cfg: Dictionary = _apply_fix[name]
+	var m := {0x1a38: 1, 0x19a0: 1, 0x1820: 0x100000}
+	var ball := {0x5c: int(cfg["n"]), 4: 0, 8: 0, 0xc: 0, 0x40: 0, 0x1d4: m}
+	for s in cfg["traj"]:
+		var v: Array = cfg["traj"][s]
+		ball[0xc * s] = int(v[0]); ball[0xc * s + 4] = int(v[1]); ball[0xc * s + 8] = int(v[2])
+	var p := {0x4: 0, 0x8: 0, 0xc: 0, 0x34: 0, 0x2b8: 0, 0x18c: m, 0x190: ball, 0x3b8: {0x94: 0}}
+	return [p, ball]
+
+
+# Lock the TWO-PASS discriminators structurally (independent of the oracle field reads): twopass genuinely
+# needs pass 1 (pass-0 alone misses), and brkkeep's break is load-bearing (no-break picks a different marker).
+func _assert_discriminators() -> void:
+	var pb: Array = _build_pball("twopass")
+	var b0 := [-1, 0, 0, 0x7c72, 0x7c72, 0, 0, 0]
+	Pm98Movement._marker_scan(pb[0], Pm98Movement._marker_grid_build(pb[0], 0), 0, b0)
+	_ok(b0[0] == -1, "twopass: pass-0 must MISS (got idx %d) so the 2nd pass is required" % int(b0[0]))
+	_ok(_scan_loop(pb[0], pb[1])[0] == 6, "twopass: full loop must keep pass-1 marker 6")
+
+	pb = _build_pball("brkkeep")
+	var brk: int = _scan_loop(pb[0], pb[1])[0]
+	var nob: int = _nobreak_loop(pb[0], pb[1])[0]
+	_ok(brk == 6, "brkkeep: with break must keep pass-0 marker 6 (got %d)" % int(brk))
+	_ok(nob == 3, "brkkeep: NO-break counterfactual must pick marker 3 (got %d)" % int(nob))
+	_ok(brk != nob, "brkkeep: break must be load-bearing (with=%d no-break=%d)" % [int(brk), int(nob)])
+
+
 func _run_apply(name: String, want: Dictionary) -> void:
 	var cfg: Dictionary = _apply_fix[name]
 	var m: Dictionary = cfg.get("box", {}).duplicate()
 	m[0x1a38] = 1
+	# Goal anchors for the pass-1 goal-extrapolation (grid_build reads m+0x19a0/0x1820 via goal_target_x);
+	# == the oracle CONST poke 0x2a19a0/0x2a1820. Irrelevant for the N=0/0x15 fixtures (no scanned extrapolation).
+	m[0x19a0] = 1
+	m[0x1820] = 0x100000
 	var stat := {0x94: 0}
 	var bp: Array = cfg.get("ballpos", [0, 0, 0])
 	var ball := {0x5c: int(cfg["n"]), 4: int(bp[0]), 8: int(bp[1]), 0xc: int(bp[2]), 0x40: 0, 0x1d4: m}
