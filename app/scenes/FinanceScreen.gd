@@ -158,9 +158,9 @@ func _draw() -> void:
 	_txt(_f12, W - 12, TITLE_Y, "SEASON %s" % _season, C_PANEL_TXT, 13, true)
 
 	_draw_ledger(INC_PANEL, "INCOME", _sum.get("income_lines", []), C_INCOME_HDR, C_INCOME_ROW,
-		"TOTAL INCOME", int(_sum.get("total_income", 0)), C_TOTAL_INC)
+		"TOTAL INCOME", int(_sum.get("total_income", 0)), C_TOTAL_INC, "fin_up")
 	_draw_ledger(EXP_PANEL, "EXPENSES", _sum.get("expense_lines", []), C_EXPENSE_HDR, C_EXPENSE_ROW,
-		"TOTAL EXPENSES", int(_sum.get("total_expense", 0)), C_TOTAL_EXP)
+		"TOTAL EXPENSES", int(_sum.get("total_expense", 0)), C_TOTAL_EXP, "fin_down")
 	_draw_chart()
 	_draw_week_boxes()
 
@@ -179,20 +179,21 @@ func _draw_tabs() -> void:
 
 
 func _draw_ledger(panel: Rect2, title: String, lines: Array, hdr: Color, row_col: Color,
-		total_label: String, total: int, total_col: Color) -> void:
+		total_label: String, total: int, total_col: Color, marker := "") -> void:
 	PMChrome.draw_table_panel(self, panel)
 	# coloured header bar
 	var hb := Rect2(panel.position.x + 2, panel.position.y + 2, panel.size.x - 4, 18)
 	PMChrome.bevel(self, hb, hdr, hdr.lightened(0.25), hdr.darkened(0.4))
 	_centre(_f12, hb, title, Color(0.98, 1.0, 0.96), 13)
-	# rows
+	# rows: original FLECHAGREEN ▲ / FLECHARED ▼ marker, then label, then right £amount.
 	var y := int(panel.position.y) + 24
 	var rh := 22
 	for i in lines.size():
 		var line: Array = lines[i]
 		var rr := Rect2(panel.position.x + 4, y, panel.size.x - 8, rh - 2)
 		draw_rect(rr, row_col if i % 2 == 0 else row_col.darkened(0.06), true)
-		_txt(_f10, int(panel.position.x) + 12, y + 5, str(line[0]).substr(0, 22), C_ROW_TXT, 11)
+		_draw_marker(marker, Rect2(panel.position.x + 8, y + 3, 12, 12), title == "INCOME")
+		_txt(_f10, int(panel.position.x) + 26, y + 5, str(line[0]).substr(0, 21), C_ROW_TXT, 11)
 		_txt(_f10, int(panel.end.x) - 12, y + 5, fmt_money(int(line[1])), C_ROW_TXT, 11, true)
 		y += rh
 	# total bar at the panel foot
@@ -201,6 +202,22 @@ func _draw_ledger(panel: Rect2, title: String, lines: Array, hdr: Color, row_col
 	var tcol: Color = Color(0.06, 0.10, 0.20) if total_col == C_TOTAL_EXP else Color.WHITE
 	_txt(_f10, int(tb.position.x) + 8, int(tb.position.y) + 4, total_label, tcol, 11)
 	_txt(_f14, int(tb.end.x) - 10, int(tb.position.y) + 3, fmt_money(total), tcol, 14, true)
+
+
+## The income/expense row marker: the original FLECHAGREEN/FLECHARED sprite when baked,
+## else a drawn triangle (green ▲ up for income, red ▼ down for expense) so the row still
+## reads correctly in CI before the art is present.
+func _draw_marker(name: String, r: Rect2, up: bool) -> void:
+	if name == "" or PMChrome.draw_icon(self, name, r):
+		return
+	var col := C_INCOME_HDR.lightened(0.15) if up else Color(0.78, 0.16, 0.14)
+	var cx := r.position.x + r.size.x * 0.5
+	if up:
+		draw_colored_polygon(PackedVector2Array([Vector2(cx, r.position.y),
+			Vector2(r.end.x, r.end.y), Vector2(r.position.x, r.end.y)]), col)
+	else:
+		draw_colored_polygon(PackedVector2Array([Vector2(r.position.x, r.position.y),
+			Vector2(r.end.x, r.position.y), Vector2(cx, r.end.y)]), col)
 
 
 func _draw_chart() -> void:

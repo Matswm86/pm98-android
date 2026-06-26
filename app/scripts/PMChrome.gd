@@ -66,6 +66,7 @@ static var _fonts: Dictionary = {}
 static var _kits: Dictionary = {}
 static var _bg: Texture2D = null
 static var _camrol: Dictionary = {}
+static var _icons: Dictionary = {}
 
 # Fallback fine-position code per broad role, for records whose posFine is absent / out
 # of range. Picks a representative central CAMROL slot: GK=1, central DF=4, central
@@ -109,6 +110,32 @@ static func camrol(pos_fine: int) -> Texture2D:
 		var p := "res://art/icons/camrol/camrol%02d.png" % n
 		_camrol[n] = load(p) if ResourceLoader.exists(p) else null
 	return _camrol[n]
+
+
+## A flat management-UI glyph baked by tools/re/export_icons.py (the FLECHA / ARROW /
+## SECRETARIO / OFERTAS sprites), e.g. "fin_up", "scroll_down_on", "scout". Cached;
+## returns null if the PNG is missing so callers keep their text fallback.
+static func icon(name: String) -> Texture2D:
+	if not _icons.has(name):
+		var p := "res://art/icons/%s.png" % name
+		_icons[name] = load(p) if ResourceLoader.exists(p) else null
+	return _icons[name]
+
+
+## Draw a flat icon fitted (aspect-preserved) and centred in a cell. Returns true if a
+## texture was drawn, so the caller can fall back to a drawn glyph when art is absent.
+static func draw_icon(ci: CanvasItem, name: String, r: Rect2) -> bool:
+	var tex := icon(name)
+	if tex == null:
+		return false
+	var tw := float(tex.get_width())
+	var th := float(tex.get_height())
+	var s: float = minf(r.size.x / tw, r.size.y / th)
+	var w := tw * s
+	var h := th * s
+	ci.draw_texture_rect(tex, Rect2(r.position.x + (r.size.x - w) * 0.5,
+		r.position.y + (r.size.y - h) * 0.5, w, h), false)
+	return true
 
 
 ## Draw a player's CAMROL role icon centred in a cell. Uses posFine when present,

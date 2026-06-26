@@ -21,6 +21,8 @@ func _run() -> void:
 		["res://scenes/MenuScreen.gd", "menu.png"],
 		["res://scenes/SquadScreen.gd", "squad_demo.png"],
 		["res://scenes/LineupScreen.gd", "lineup_demo.png"],
+		["res://scenes/FinanceScreen.gd", "finance_demo.png"],
+		["res://scenes/TransferScreen.gd", "transfer_demo.png"],
 	]
 	var club := _demo_club()
 	var tactics := Tactics.auto_pick(club)
@@ -43,6 +45,14 @@ func _run() -> void:
 			node.setup(club, "M. MJATVEDT", "1,000,000", false, "1997-98", 1)
 		elif s[1] == "lineup_demo.png":
 			node.setup(club, tactics, "M. MJATVEDT", "Premier League", "1997-98", 1)
+		elif s[1] == "finance_demo.png":
+			# Real ledger summary off the demo roster so the income ▲ / expense ▼ markers
+			# render on populated rows (FinanceModel is GameDB-free).
+			var fin := FinanceModel.summary(club, 0)
+			node.setup(fin, "ARSENAL", "M. MJATVEDT", "1997-98", 1_000_000, 17)
+		elif s[1] == "transfer_demo.png":
+			node.setup(_demo_market(), "ARSENAL", "M. MJATVEDT", "1997-98", 8_500_000,
+				"OPEN", 5, 1)
 		for _i in 14:
 			await process_frame
 		await RenderingServer.frame_post_draw
@@ -80,3 +90,21 @@ func _demo_club() -> Dictionary:
 				"PA": base - 2, "PO": (78 if r[2] else 12)},
 		})
 	return {"id": 1, "name": "ARSENAL", "players": players}
+
+
+## A small synthetic transfer market (dearest first) so the SCOUT / OFFERS nav glyphs and
+## the row table render without a career boot.
+func _demo_market() -> Array:
+	const M := [["RONALDO", "FW", 92, 21, 18_000_000, 60_000, "Inter"],
+		["ZIDANE", "MF", 90, 25, 15_000_000, 55_000, "Juventus"],
+		["SHEARER", "FW", 88, 27, 12_000_000, 48_000, "Newcastle"],
+		["KLUIVERT", "FW", 84, 21, 9_000_000, 40_000, "Milan"],
+		["DAVIDS", "MF", 83, 24, 7_500_000, 38_000, "Juventus"],
+		["STAM", "DF", 85, 25, 8_000_000, 42_000, "PSV"]]
+	var out: Array = []
+	for i in M.size():
+		var m: Array = M[i]
+		out.append({"id": i + 1, "name": m[0], "pos": m[1], "isGK": false, "ca": m[2],
+			"mo": m[2] - 4, "age": m[3], "fee": m[4], "wage": m[5], "club_id": -1,
+			"club_name": m[6]})
+	return out

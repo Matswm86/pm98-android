@@ -236,8 +236,8 @@ func _draw_nav() -> void:
 	_txt(_f12, int(BANK_BOX.end.x) - 8, int(BANK_BOX.position.y) + 24, fmt_money(_cash), C_GOLD, 13, true)
 
 	_nav_btn(BTN_CURRENT, "CURRENT OFFERS", C_GOLD, _f10)
-	_nav_btn(BTN_SCOUT, "SCOUT", C_PANEL_TXT, _f12)
-	_nav_btn(BTN_OFFERS, "OFFERS", C_PANEL_TXT, _f12)
+	_nav_btn(BTN_SCOUT, "SCOUT", C_PANEL_TXT, _f12, "scout")
+	_nav_btn(BTN_OFFERS, "OFFERS", C_PANEL_TXT, _f12, "offers")
 	_nav_btn(BTN_RETURN, "RETURN", C_GOLD, _f12)
 
 	if _window != "":
@@ -247,6 +247,13 @@ func _draw_nav() -> void:
 			"%d offers left" % _offers, PMChrome.C_STAR_OFF, 10)
 
 
-func _nav_btn(r: Rect2, label: String, col: Color, f: Font) -> void:
+func _nav_btn(r: Rect2, label: String, col: Color, f: Font, glyph := "") -> void:
 	PMChrome.bevel(self, r, C_DKBTN, C_DKBTN_HI, C_DKBTN_LO)
-	_txt(f, int(r.position.x) + 10, int(r.position.y) + 6, label, col, 12)
+	# The original SECRETARIO magnifier / OFERTAS money-bag glyph sits to the left of the
+	# label when baked; without it the label just keeps its original inset.
+	var tx := int(r.position.x) + 10
+	if glyph != "":
+		var gr := Rect2(r.position.x + 5, r.position.y + 4, 17, 17)
+		if PMChrome.draw_icon(self, glyph, gr):
+			tx = int(gr.end.x) + 5
+	_txt(f, tx, int(r.position.y) + 6, label, col, 12)
