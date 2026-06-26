@@ -90,6 +90,13 @@ func _run() -> void:
 	ok = _assert(screen._money(14_000_000) == "14,000,000", "money formats thousands") and ok
 	ok = _assert(screen._fitness() >= 0 and screen._moral() >= 0, "FITNESS / MORAL derive") and ok
 
+	# The ROLE band shows the FINE position name (the SHORT fine-name table 0x662df8,
+	# indexed by posFine-1), not the broad word. Verified vs the Bakayoko reference.
+	ok = _assert(PlayerInfoScreen.FINE_ROLE.size() == 18, "FINE_ROLE carries the 18 fine positions") and ok
+	ok = _assert(PlayerInfoScreen.FINE_ROLE[0] == "KEEPER", "posFine 1 -> KEEPER") and ok
+	ok = _assert(PlayerInfoScreen.FINE_ROLE[8] == "CENTRE FORWARD",
+		"posFine 9 -> CENTRE FORWARD (the Bakayoko reference role)") and ok
+
 	# A photo-less player draws a blank frame (face() returns null) without crashing.
 	var blank := PlayerInfoScreen.new()
 	get_root().add_child(blank)

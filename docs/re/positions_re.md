@@ -85,3 +85,41 @@ offset was instead pinned by cross-validation, the same method used for the broa
 carried through `build_db.py`, and consumed by `Pm98StatMatch._fill_participant`, which
 sets participant POS = `posFine` directly (per-role `POS_OF` fallback only when absent /
 out of range). Test: `app/tests/test_posfine.gd`.
+
+## Fine-position NAME tables (the FICHA ROLE band) — located 2026-06-26
+
+MANAGER.EXE carries two parallel 18-entry string-pointer tables for the fine demarcación:
+
+| idx | LONG `0x662db0`       | SHORT `0x662df8`   | maps to posFine |
+|-----|----------------------|--------------------|-----------------|
+| 0   | GOALKEEPER           | KEEPER             | 1 (GK)          |
+| 1   | RIGHT BACK           | RIGHT BACK         | 2               |
+| 2   | LEFT BACK            | LEFT BACK          | 3               |
+| 3   | SWEEPER              | SWEEPER            | 4               |
+| 4   | INSIDE CENTRE LEFT   | INS. CENT. LEFT    | 5               |
+| 5   | INSIDE CENTRE RIGHT  | INS. CENT. RIGHT   | 6               |
+| 6   | RIGHT MIDFIELDER     | RIGHT MID.         | 7               |
+| 7   | INSIDE RIGHT         | INSIDE RIGHT       | 8               |
+| 8   | CENTRE FORWARD       | CENTRE FORWARD     | 9 (striker)     |
+| 9   | CENTRAL MIDFIELDER   | CENTRAL MID.       | 10              |
+| 10  | LEFT MIDFIELDER      | LEFT MID.          | 11              |
+| 11  | RIGHT WINGER         | RIGHT WINGER       | 12              |
+| 12  | CENTRAL STRIKER      | CENTRAL STRIKER    | 13              |
+| 13  | LEFT WINGER          | LEFT WINGER        | 14              |
+| 14  | DEFENSIVE MIDFIELDER | DEF. MIDFIELDER    | 15              |
+| 15  | RIGHT FORWARD        | RIGHT FORWARD      | 16              |
+| 16  | LEFT FORWARD         | LEFT FORWARD       | 17              |
+| 17  | INSIDE LEFT          | INSIDE LEFT        | 18              |
+
+**Indexing.** The tables are 0-based by the in-memory fine byte `player+0x18`. Our extracted
+`posFine` is that byte **+1** (the POS_WEIGHT index space), so `name = TABLE[posFine - 1]`.
+This reconciles every anchor: GK posFine 1 -> idx 0 (GOALKEEPER); central striker posFine 9
+-> idx 8 (CENTRE FORWARD, `POS_WEIGHT[9]=35`); def-mid posFine 15 -> idx 14 (DEFENSIVE
+MIDFIELDER, `POS_WEIGHT[15]=3`); wide forwards posFine 12/14/16/17 -> RIGHT WINGER / LEFT
+WINGER / RIGHT FORWARD / LEFT FORWARD. Verified empirically against the DB (Schmeichel/Seaman
+GK=1, Bakayoko/Cole/Solskjaer FW=9) and the `player_info_ref.jpg` reference.
+
+**The FICHA uses the SHORT table** (renderer `FUN_0052e0d0` at `0x52ea9e`:
+`mov dl,[ebp+0x18]` / `mov edx,[edx*4 + 0x662df8]`). Ported as `FINE_ROLE` in
+`app/scenes/PlayerInfoScreen.gd`; falls back to the broad `POS_WORD` when posFine is
+absent / out of range. Test: `app/tests/test_player_info.gd`.

@@ -55,12 +55,23 @@ derives from nationality: English/British -> NATIONAL, else NON-NATIONAL.
 `SPEED=VE STAMINA=RE AGGRESSION=AG QUALITY=CA` · `HANDLING=PO PASSING=PA DRIBBLING=RM
 HEADING=RG TACKLING=EN SHOOTING=TI` · `RATING` = the squad-AV (mean of the 8 outfield
 attrs) · `FITNESS / MORAL` = dynamic form (not static attrs; defaulted match-fit/settled
-for a freshly loaded squad). The ROLE label uses the broad 4-entry role LUT
-(`PTR_s_GOALKEEPER_00662d10` -> GOALKEEPER/DEFENDER/MIDFIELDER/FORWARD); the fine position
-is shown by the CAMROL icon.
+for a freshly loaded squad).
+
+The **header subtitle** (under the name) uses the broad 4-entry role LUT
+(`PTR_s_GOALKEEPER_00662d10` -> GOALKEEPER/DEFENDER/MIDFIELDER/FORWARD). The **ROLE band**,
+however, shows the FINE position name: the renderer at `0x52ea9e` reads the in-memory fine
+byte `player+0x18` and indexes the **SHORT fine-name table at `0x662df8`** (`mov dl,[ebp+0x18]`
+/ `mov edx,[edx*4 + 0x662df8]`). The reference confirms it -- Bakayoko's subtitle is "FORWARD"
+(broad) while his ROLE band reads "CENTRE FORWARD" (fine). See positions_re.md for the full
+18-entry table and the posFine mapping. (An earlier pass mislabelled the ROLE band as using
+the broad LUT -- corrected 2026-06-26.)
 
 ## Open
-- The fine role-NAME text ("CENTRE FORWARD") source LUT is not yet located (the camrol icon
-  carries the fine detail today).
-- Nationality FLAG art (`DBDAT/BANDERAS.PKF`) not yet extracted — the name is shown as text.
 - International (compact-record) clubs carry neither photoId nor these physicals yet.
+
+## Done
+- The fine role-NAME LUT IS located (2026-06-26): SHORT table `0x662df8` / LONG `0x662db0`,
+  18 entries indexed by `posFine-1`. The FICHA ROLE band now renders the fine name
+  (`FINE_ROLE` in `PlayerInfoScreen.gd`); verified vs the Bakayoko reference. See positions_re.md.
+- Nationality FLAG art (`DBDAT/BANDERAS.PKF`) extracted (2026-06-26): the real waving flag
+  now blits left of the country name on the FICHA. See `tools/re/export_flags.py`.

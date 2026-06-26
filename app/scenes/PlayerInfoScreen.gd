@@ -47,6 +47,14 @@ const OK_BTN := Rect2(548, 446, 86, 26)
 
 # attr code -> readable; the confirmed FICHA mapping (Babb reference).
 const POS_WORD := {"GK": "GOALKEEPER", "DF": "DEFENDER", "MF": "MIDFIELDER", "FW": "FORWARD"}
+# The FICHA ROLE band shows the FINE position name, not the broad word: the original
+# renderer FUN_0052e0d0 indexes the SHORT fine-name table (MANAGER.EXE 0x662df8) by the
+# in-memory fine byte player+0x18, which equals our 1-based posFine minus one. This 0-based
+# array IS that table (KEEPER..INSIDE LEFT). See docs/re/positions_re.md.
+const FINE_ROLE := ["KEEPER", "RIGHT BACK", "LEFT BACK", "SWEEPER", "INS. CENT. LEFT",
+	"INS. CENT. RIGHT", "RIGHT MID.", "INSIDE RIGHT", "CENTRE FORWARD", "CENTRAL MID.",
+	"LEFT MID.", "RIGHT WINGER", "CENTRAL STRIKER", "LEFT WINGER", "DEF. MIDFIELDER",
+	"RIGHT FORWARD", "LEFT FORWARD", "INSIDE LEFT"]
 const AVG_KEYS := ["VE", "RE", "AG", "CA", "RM", "RG", "PA", "TI"]
 
 var _f8: Font
@@ -225,7 +233,13 @@ func _draw_left_column() -> void:
 	_txt(_f10, x + 6, 156, "ROLE", C_LABEL, 11)
 	var icon_cell := Rect2(x + 52, 152, 30, 22)
 	PMChrome.draw_role_icon(self, icon_cell, int(_p.get("posFine", 0)), str(_p.get("pos", "")))
-	var word := str(POS_WORD.get(str(_p.get("pos", "")), "OUTFIELD"))
+	var pf_v: Variant = _p.get("posFine")
+	var pf := int(pf_v) if pf_v != null else 0
+	var word: String
+	if pf >= 1 and pf <= FINE_ROLE.size():
+		word = FINE_ROLE[pf - 1]
+	else:
+		word = str(POS_WORD.get(str(_p.get("pos", "")), "OUTFIELD"))
 	_txt(_f12, x + 90, 155, word, Color(0.90, 0.96, 1.0), 13)
 
 	# Row 4: STATUS | INSURANCE.
