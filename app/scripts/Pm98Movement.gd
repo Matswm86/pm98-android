@@ -5263,6 +5263,7 @@ const SETTLE_A_HI: Array[int] = [31858, 31858, -910, -910, 32586, 16202, -16566,
 const SETTLE_B: Array[int] = [-1, 0, 16384, 8192, -32768, -1, 24576, 16384, -16384, -8192, -1, 0, -24576, -16384, -32768, -1]
 
 static var settle_trace: Array = []
+static var b1420_trace: Array = []
 
 
 ## A struct byte field (`*(char*)(base+off) != '\0'` in the binary) as a nonzero test.
@@ -5287,7 +5288,9 @@ static func settle_8680(p: Dictionary, wire: bool = false, rng = null) -> void:
 
 	# L16-18: off-ball reposition gate -- carrier flag set AND open play (phase 0).
 	if _g(p, 0x2bc) != 0 and phase == 0:
-		settle_trace.append(["B1420", 0])                    # FUN_005b1420 (deferred; bool, discarded)
+		settle_trace.append(["B1420", 0])                    # FUN_005b1420 (return discarded by settle)
+		if wire:
+			formation_gate_b1420(p, true)                    # counter + b0040 (b1500/b1c80 deferred)
 
 	var is_taker: bool = is_same(m.get(0x438, null), p)
 	if (phase == 3 or phase == 4 or phase == 5 or phase == 7) and is_taker:
@@ -5398,3 +5401,49 @@ static func _settle_tail(p: Dictionary, m: Dictionary, gs: Dictionary, ball: Dic
 				if wire:
 					select_nearest(gs, 1)
 				p[0x54] = 0                                   # WRITE p+0x54 (clear claim)
+
+
+## FUN_005b1420(p): the off-ball formation gate settle_8680 runs at its very top (L16-18) when the carrier
+## flag p+0x2bc is set in open play (phase 0). It maintains the per-player formation counter p+0x14c --
+## INC while p is the ball carrier (ball+0x40 == p), else RESET to 0 -- then, unless the "set-piece freeze"
+## bVar2 holds (gs+0x2ee flag AND the sub-phase predicate FUN_005943b0(m) = (*(m+0x468)+0xfa0)==0 AND the
+## player's own p+0x5c lock), dispatches EXACTLY ONE positioning leaf:
+##   * p == gs+0x204 (the formation-anchor slot) AND no ball carrier (ball+0x40 == 0) -> FUN_005b0040
+##     (B0040, the interception/mark core, PORTED as _move_b0040), and returns 1.
+##   * else ball+0x54 (loose-ball owning team) != p+0x2b8 (player team) -> FUN_005b1500 (B1500, UNPORTED).
+##   * else -> FUN_005b1c80 (B1C80, UNPORTED).
+## The return byte (1, or the b1500/b1c80 return) is DISCARDED by settle. Disasm-decoded 0x5b1420..0x5b14f0:
+## the four thiscall leaves take ECX=this only (FUN_005943b0 ECX=m; b0040/b1500/b1c80 ECX=p; no stack args).
+## `wire`: when true the b0040 arm CALLS the real _move_b0040(p); b1500/b1c80 stay trace-only (deferred,
+## UNPORTED). Oracle-locked (the p+0x14c counter write + leaf SELECTION + return) vs the REAL FUN_005b1420
+## under the PCode emulator (FUN_005943b0 executed for real; b0040/b1500/b1c80 stubbed):
+## tools/re/run_b1420_oracle.sh -> specs/b1420_oracle.txt, locked in app/tests/test_b1420.gd.
+static func formation_gate_b1420(p: Dictionary, wire: bool = false) -> int:
+	b1420_trace = []
+	var ball: Dictionary = _ref(p, 0x190)
+	var gs: Dictionary = _ref(p, 0x184)
+	var m: Dictionary = _ref(p, 0x18c)
+	var carrier = ball.get(0x40, null)                       # ball+0x40: null/0 = no carrier, else a Dict
+	if is_same(carrier, p):                                  # p holds the ball -> increment the counter
+		p[0x14c] = Pm98Trig._i32(_g(p, 0x14c) + 1)
+	else:
+		p[0x14c] = 0
+	# bVar2 = gs+0x2ee flag AND sub-phase==0 (FUN_005943b0(m)) AND p+0x5c lock -> freeze, no leaf.
+	var freeze := false
+	if _settle_b(gs, 0x2ee):
+		var sub: Dictionary = _ref(m, 0x468)
+		if _g(sub, 0xfa0) == 0:                              # FUN_005943b0(m): *(m+0x468)+0xfa0 == 0
+			freeze = _settle_b(p, 0x5c)
+	if freeze:
+		return 1
+	# Exactly one positioning leaf (the disasm's mutually-exclusive arms).
+	if is_same(gs.get(0x204, null), p) and (carrier == null or carrier == 0):
+		b1420_trace.append(["B0040", 0])                     # FUN_005b0040 (interception/mark; PORTED)
+		if wire:
+			_move_b0040(p)
+		return 1
+	if _g(ball, 0x54) != _g(p, 0x2b8):
+		b1420_trace.append(["B1500", 0])                     # FUN_005b1500 (UNPORTED -- deferred)
+		return 1                                             # placeholder (real return discarded by settle)
+	b1420_trace.append(["B1C80", 0])                         # FUN_005b1c80 (UNPORTED -- deferred)
+	return 1

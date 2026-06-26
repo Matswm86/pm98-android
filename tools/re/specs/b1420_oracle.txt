@@ -1,0 +1,24 @@
+# Stage 3 settle leaf FUN_005b1420 (off-ball formation gate) PCode-emu truth. 3 dispatch leaves
+# STUBBED (B0040 ret0/B1500 0x55/B1C80 0xaa); FUN_005943b0 executed for real. Each row: FIX <name>
+# + STUB/RET lines. mem[0x23014c]=p+0x14c counter; EAX=return byte. P=0x230000 M=0x260000
+# BALL=0x270000 GS=0x280000 SUB=0x290000.
+## FIX b0040
+CALL 0 STUB B0040 #1 step=36 ECX=2293760 arg0=0
+CALL 0 RET steps=41 EAX=1 mem[0x23014c:4]=0 stubhits={B0040=1}
+## FIX b1500_carrier
+CALL 0 STUB B1500 #1 step=38 ECX=2293760 arg0=0
+CALL 0 RET steps=43 EAX=85 mem[0x23014c:4]=6 stubhits={B1500=1}
+## FIX b1c80
+CALL 0 STUB B1C80 #1 step=37 ECX=2293760 arg0=0
+CALL 0 RET steps=43 EAX=170 mem[0x23014c:4]=0 stubhits={B1C80=1}
+## FIX b1c80_carrier
+CALL 0 STUB B1C80 #1 step=38 ECX=2293760 arg0=0
+CALL 0 RET steps=44 EAX=170 mem[0x23014c:4]=10 stubhits={B1C80=1}
+## FIX freeze
+CALL 0 RET steps=41 EAX=1 mem[0x23014c:4]=0
+## FIX freeze_phase
+CALL 0 STUB B1C80 #1 step=48 ECX=2293760 arg0=0
+CALL 0 RET steps=54 EAX=170 mem[0x23014c:4]=0 stubhits={B1C80=1}
+## FIX freeze_nolock
+CALL 0 STUB B1C80 #1 step=52 ECX=2293760 arg0=0
+CALL 0 RET steps=58 EAX=170 mem[0x23014c:4]=0 stubhits={B1C80=1}
