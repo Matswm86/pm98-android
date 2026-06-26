@@ -94,6 +94,47 @@ func _run() -> void:
 	ok = _assert(caps_ok, "each band within its [3,5,5,5] slot cap") and ok
 	ok = _assert(pos_ok, "each band holds only its own decoded position") and ok
 
+	# ---- scroll wiring (the original ARROW up/down list paging) -------------
+	# Native design space so hit-tests map 1:1; a forced oversized market (all 5 bands at
+	# their slot cap = 23 rows + 5 headers = 28 items) overflows the 21-row panel.
+	screen.size = Vector2(640, 480)
+	var big: Array = []
+	var pid := 1
+	for pair in [["GK", 3], ["DF", 5], ["MF", 5], ["FW", 5], ["", 5]]:
+		for _k in int(pair[1]):
+			big.append({"id": pid, "name": "P%d" % pid, "pos": String(pair[0]),
+				"isGK": pair[0] == "GK", "ca": 70, "mo": 66, "age": 25, "fee": 1_000_000,
+				"wage": 20_000, "club_id": -1, "club_name": "FC"})
+			pid += 1
+	screen.setup(big, "ME", "MGR", "1997-98", 5_000_000, "OPEN", 3)
+	ok = _assert(screen._visible_rows() == 21, "panel fits 21 rows") and ok
+	ok = _assert(screen._flat_items().size() == 28, "flat list = 23 rows + 5 headers") and ok
+	ok = _assert(screen._max_scroll() == 7, "max scroll = 28 - 21") and ok
+	ok = _assert(screen._scroll == 0, "setup resets scroll to top") and ok
+	# Clamp at both ends.
+	screen._scroll = 999; screen._clamp_scroll()
+	ok = _assert(screen._scroll == 7, "scroll clamps to max") and ok
+	screen._scroll = -5; screen._clamp_scroll()
+	ok = _assert(screen._scroll == 0, "scroll clamps to top") and ok
+	# Hit-test: both arrows live while overflowing.
+	ok = _assert(screen._hit(SCROLL_DOWN_C) == "down", "down arrow hit-tests") and ok
+	ok = _assert(screen._hit(SCROLL_UP_C) == "up", "up arrow hit-tests") and ok
+	# A down tap pages by SCROLL_STEP and is consumed (no dismiss); an up tap pages back.
+	var dismissed := [false]
+	screen.back_pressed.connect(func() -> void: dismissed[0] = true)
+	_tap(screen, SCROLL_DOWN_C)
+	ok = _assert(screen._scroll == 3 and not dismissed[0], "down tap pages by step, consumed") and ok
+	_tap(screen, SCROLL_UP_C)
+	ok = _assert(screen._scroll == 0 and not dismissed[0], "up tap pages back, consumed") and ok
+	# A non-arrow tap dismisses.
+	_tap(screen, Vector2(60, 200))
+	ok = _assert(dismissed[0], "non-arrow tap emits back_pressed") and ok
+	# A market that fits shows no arrows, so every tap dismisses.
+	screen.setup([big[0], big[3]], "ME", "MGR", "1997-98", 5_000_000, "OPEN", 3)
+	ok = _assert(screen._max_scroll() == 0, "small market does not overflow") and ok
+	ok = _assert(screen._hit(SCROLL_DOWN_C) == "", "no arrow hit when list fits") and ok
+
+	screen.setup(market, names[my_id], "A. FERGUSON", "1997-98", 8_000_000, "OPEN", 3)
 	screen.queue_redraw()
 	for _i in 3:
 		await process_frame
@@ -101,6 +142,22 @@ func _run() -> void:
 	screen.queue_free()
 	print("\n%s" % ("ALL PASS" if ok else "FAILURES ABOVE"))
 	quit(0 if ok else 1)
+
+
+const SCROLL_UP_C := Vector2(606 + 12, 150 + 11)    # centre of TransferScreen.SCROLL_UP
+const SCROLL_DOWN_C := Vector2(606 + 12, 206 + 11)  # centre of TransferScreen.SCROLL_DOWN
+
+
+## Synthesize a press+release tap at a design-space point through the screen's own handler.
+func _tap(screen: TransferScreen, p: Vector2) -> void:
+	var down := InputEventScreenTouch.new()
+	down.position = p
+	down.pressed = true
+	screen._on_input(down)
+	var up := InputEventScreenTouch.new()
+	up.position = p
+	up.pressed = false
+	screen._on_input(up)
 
 
 func _assert(cond: bool, label: String) -> bool:

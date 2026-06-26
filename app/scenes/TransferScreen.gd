@@ -8,6 +8,12 @@ class_name TransferScreen
 ## column (CURRENT OFFERS / SCOUT / OFFERS / RETURN) + BANK sit on the right.
 ##
 ## Driven live by Career.market() (dearest first). Native 640x480; scales to fit its parent.
+##
+## INTERACTIVE: the original ARROW scroll buttons page the buyable list when it overflows
+## the panel (KEEPERS off the top, the last FORWARDS into view); any other tap emits
+## `back_pressed` (the display-screen tap-to-dismiss).
+
+signal back_pressed
 
 const W := 640
 const H := 480
@@ -52,6 +58,12 @@ const BTN_OFFERS := Rect2(510, 360, 124, 25)
 const BTN_RETURN := Rect2(510, 440, 124, 25)
 # Bottom selected-player detail strip.
 const STRIP := Rect2(6, 440, 498, 26)
+# Original ARROW scroll buttons (16x16 art), in the nav gutter centred on the list height;
+# the hit rect is padded for touch and the 16px glyph is drawn centred inside it. Shown only
+# while the list overflows the panel (the original registers them on the list widget).
+const SCROLL_UP := Rect2(606, 150, 24, 22)
+const SCROLL_DOWN := Rect2(606, 206, 24, 22)
+const SCROLL_STEP := 3
 
 var _f12: Font
 var _f10: Font
@@ -65,6 +77,8 @@ var _week: int = 0
 var _cash: int = 0
 var _window: String = ""
 var _offers: int = 0
+var _scroll: int = 0
+var _press: String = ""
 
 
 func _ready() -> void:
@@ -73,6 +87,8 @@ func _ready() -> void:
 	_f8 = load("res://art/fonts/proman8.fnt")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2(W, H)
+	set_anchors_preset(Control.PRESET_FULL_RECT)
+	gui_input.connect(_on_input)
 	queue_redraw()
 
 
@@ -86,7 +102,86 @@ func setup(market: Array, club: String, manager := "", season := "", cash := 0,
 	_window = window
 	_offers = offers
 	_week = week
+	_scroll = 0
 	queue_redraw()
+
+
+# ---- scroll model + input -----------------------------------------------
+
+## The list flattened to draw-items in render order — a {t:"hdr"} per band then its
+## {t:"row"} players, each row carrying a continuous `idx` for the alternating stripe.
+func _flat_items() -> Array:
+	var items: Array = []
+	var idx := 0
+	for sec in _sections():
+		items.append({"t": "hdr", "label": str(sec["section"])})
+		for r in sec["players"]:
+			items.append({"t": "row", "r": r, "idx": idx})
+			idx += 1
+	return items
+
+
+## How many 16px rows fit between the first row and the panel's bottom.
+func _visible_rows() -> int:
+	return int((TABLE.end.y - ROW0_Y) / ROW_H)
+
+
+func _max_scroll() -> int:
+	return maxi(0, _flat_items().size() - _visible_rows())
+
+
+func _clamp_scroll() -> void:
+	_scroll = clampi(_scroll, 0, _max_scroll())
+
+
+func _scale() -> float:
+	return min(size.x / W, size.y / H) if size.x > 0 and size.y > 0 else 1.0
+
+
+func _to_design(p: Vector2) -> Vector2:
+	var s := _scale()
+	return (p - Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5)) / s
+
+
+## Which scroll button (if any) a design-space point hits. Returns "" when the list does
+## not overflow, so a tap there falls through to dismiss.
+func _hit(d: Vector2) -> String:
+	if _max_scroll() <= 0:
+		return ""
+	if SCROLL_UP.has_point(d):
+		return "up"
+	if SCROLL_DOWN.has_point(d):
+		return "down"
+	return ""
+
+
+func _on_input(e: InputEvent) -> void:
+	var pos := Vector2.ZERO
+	var pressed := false
+	var tap := false
+	if e is InputEventMouseButton:
+		pos = (e as InputEventMouseButton).position
+		pressed = (e as InputEventMouseButton).pressed
+		tap = true
+	elif e is InputEventScreenTouch:
+		pos = (e as InputEventScreenTouch).position
+		pressed = (e as InputEventScreenTouch).pressed
+		tap = true
+	if not tap:
+		return
+	if pressed:
+		_press = _hit(_to_design(pos))
+	else:
+		var a := _hit(_to_design(pos))
+		var was := _press
+		_press = ""
+		if a != "" and a == was:
+			# A scroll-button tap pages the list and is consumed (never dismisses).
+			_scroll += SCROLL_STEP if a == "down" else -SCROLL_STEP
+			_clamp_scroll()
+			queue_redraw()
+		elif was == "":
+			back_pressed.emit()
 
 
 # ---- ordering ------------------------------------------------------------
@@ -147,6 +242,7 @@ func _draw() -> void:
 	PMChrome.draw_table_panel(self, TABLE)
 	_draw_col_header()
 	_draw_list()
+	_draw_scroll()
 	_draw_strip()
 	_draw_nav()
 
@@ -164,21 +260,41 @@ func _draw_col_header() -> void:
 
 
 func _draw_list() -> void:
+	var items := _flat_items()
+	_clamp_scroll()
+	var vis := _visible_rows()
 	var y := ROW0_Y
-	var row := 0
-	for sec in _sections():
-		if y + ROW_H > int(TABLE.end.y):
-			break
-		# RED position-band header on a light strip.
-		draw_rect(Rect2(ROW_X, y, ROW_W, ROW_H - 1), PMChrome.C_ROW_DARK, true)
-		_txt(_f10, NAME_X, y + 2, str(sec["section"]), C_SECTION, 11)
+	for i in range(_scroll, mini(items.size(), _scroll + vis)):
+		var it: Dictionary = items[i]
+		if it["t"] == "hdr":
+			# RED position-band header on a light strip.
+			draw_rect(Rect2(ROW_X, y, ROW_W, ROW_H - 1), PMChrome.C_ROW_DARK, true)
+			_txt(_f10, NAME_X, y + 2, str(it["label"]), C_SECTION, 11)
+		else:
+			_row(it["r"], y, int(it["idx"]))
 		y += ROW_H
-		for r in sec["players"]:
-			if y + ROW_H > int(TABLE.end.y):
-				return
-			_row(r, y, row)
-			y += ROW_H
-			row += 1
+
+
+## The original ARROW scroll buttons: up/down with on/off art for whether more list exists
+## in that direction. Drawn only while the list overflows the panel.
+func _draw_scroll() -> void:
+	if _max_scroll() <= 0:
+		return
+	_draw_arrow(SCROLL_UP, "scroll_up_on" if _scroll > 0 else "scroll_up_off")
+	_draw_arrow(SCROLL_DOWN, "scroll_down_on" if _scroll < _max_scroll() else "scroll_down_off")
+
+
+func _draw_arrow(hit: Rect2, name: String) -> void:
+	var g := Rect2(hit.position + (hit.size - Vector2(16, 16)) * 0.5, Vector2(16, 16))
+	if not PMChrome.draw_icon(self, name, g):
+		# Fallback so the control still reads when the PNG is absent: a drawn triangle.
+		var up := name.begins_with("scroll_up")
+		var col := PMChrome.C_GOLD if name.ends_with("_on") else PMChrome.C_STAR_OFF
+		var c := g.get_center()
+		var pts := PackedVector2Array([Vector2(c.x, c.y - 6), Vector2(c.x - 6, c.y + 5),
+			Vector2(c.x + 6, c.y + 5)] if up else [Vector2(c.x, c.y + 6),
+			Vector2(c.x - 6, c.y - 5), Vector2(c.x + 6, c.y - 5)])
+		draw_colored_polygon(pts, col)
 
 
 func _row(r: Dictionary, y: int, idx: int) -> void:

@@ -60,6 +60,17 @@ func _run() -> void:
 		var img := get_root().get_texture().get_image()
 		var err := img.save_png(dir.path_join(s[1]))
 		print("SHOT %s err=%d %dx%d" % [s[1], err, img.get_width(), img.get_height()])
+		# Second transfer capture paged to the bottom: proves the ARROW buttons swap to the
+		# up-on / down-off art and the KEEPERS band scrolls off the top.
+		if s[1] == "transfer_demo.png":
+			node._scroll = node._max_scroll()
+			node.queue_redraw()
+			for _i in 8:
+				await process_frame
+			await RenderingServer.frame_post_draw
+			var img2 := get_root().get_texture().get_image()
+			var err2 := img2.save_png(dir.path_join("transfer_scrolled.png"))
+			print("SHOT transfer_scrolled.png err=%d %dx%d" % [err2, img2.get_width(), img2.get_height()])
 		node.queue_free()
 		for _i in 3:
 			await process_frame
@@ -93,19 +104,36 @@ func _demo_club() -> Dictionary:
 	return {"id": 1, "name": "ARSENAL", "players": players}
 
 
-## A small synthetic transfer market (dearest first) so the SCOUT / OFFERS nav glyphs and
-## the row table render without a career boot.
+## A synthetic transfer market (dearest first) that fills all four [3,5,5,5] position bands
+## so the SCOUT / OFFERS nav glyphs, the row table AND the ARROW scroll buttons render (18
+## shown + 4 headers = 22 rows overflow the 21-row panel) without a career boot.
 func _demo_market() -> Array:
-	const M := [["RONALDO", "FW", 92, 21, 18_000_000, 60_000, "Inter"],
-		["ZIDANE", "MF", 90, 25, 15_000_000, 55_000, "Juventus"],
-		["SHEARER", "FW", 88, 27, 12_000_000, 48_000, "Newcastle"],
-		["KLUIVERT", "FW", 84, 21, 9_000_000, 40_000, "Milan"],
-		["DAVIDS", "MF", 83, 24, 7_500_000, 38_000, "Juventus"],
-		["STAM", "DF", 85, 25, 8_000_000, 42_000, "PSV"]]
+	const M := [
+		["RONALDO", "FW", 92, 21, 18_000_000, "Inter"],
+		["ZIDANE", "MF", 90, 25, 15_000_000, "Juventus"],
+		["MALDINI", "DF", 90, 29, 13_000_000, "Milan"],
+		["SHEARER", "FW", 88, 27, 12_000_000, "Newcastle"],
+		["BATISTUTA", "FW", 88, 28, 11_500_000, "Fiorentina"],
+		["NESTA", "DF", 86, 21, 10_000_000, "Lazio"],
+		["FIGO", "MF", 87, 24, 9_500_000, "Barcelona"],
+		["STAM", "DF", 85, 25, 9_000_000, "PSV"],
+		["KLUIVERT", "FW", 84, 21, 8_500_000, "Milan"],
+		["DAVIDS", "MF", 83, 24, 7_500_000, "Juventus"],
+		["THURAM", "DF", 84, 25, 7_000_000, "Parma"],
+		["VERON", "MF", 83, 22, 6_500_000, "Sampdoria"],
+		["KAHN", "GK", 86, 28, 6_000_000, "Bayern"],
+		["CAFU", "DF", 83, 27, 5_500_000, "Roma"],
+		["REDONDO", "MF", 82, 28, 5_000_000, "Real Madrid"],
+		["TONI", "FW", 80, 20, 4_500_000, "Brescia"],
+		["BUFFON", "GK", 84, 19, 4_000_000, "Parma"],
+		["DEL PIERO", "FW", 85, 23, 3_500_000, "Juventus"],
+		["MATAUS", "MF", 79, 30, 3_000_000, "Inter"],
+		["BARTHEZ", "GK", 82, 26, 2_500_000, "Monaco"],
+		["TALDEA", "DF", 76, 24, 2_000_000, "Espanyol"]]
 	var out: Array = []
 	for i in M.size():
 		var m: Array = M[i]
-		out.append({"id": i + 1, "name": m[0], "pos": m[1], "isGK": false, "ca": m[2],
-			"mo": m[2] - 4, "age": m[3], "fee": m[4], "wage": m[5], "club_id": -1,
-			"club_name": m[6]})
+		out.append({"id": i + 1, "name": m[0], "pos": m[1], "isGK": m[1] == "GK", "ca": m[2],
+			"mo": m[2] - 4, "age": m[3], "fee": m[4], "wage": int(m[4] / 200), "club_id": -1,
+			"club_name": m[5]})
 	return out
