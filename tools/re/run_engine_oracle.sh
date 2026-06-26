@@ -52,6 +52,10 @@ STUBS=(
 # stubbed-to-0 HERE because these Step-1 fixtures build no opponent descriptor (P+0x188 zeroed); the
 # port likewise returns 0 on the empty roster, so the two sides match. A future engine fixture that
 # populates P+0x188 must drop this stub to exercise the non-trivial count.
+# NOTE: FUN_005ac1a0 (AC1A0, the case-0x13 shot-setup) is now PORTED + WIRED into engine_tick
+# (Pm98Movement.setup_shot, called from Pm98Action._case_distribution). It STAYS stubbed-to-noop HERE only
+# because these Step-1 fixtures keep +0x2c != 5 (bVar17 false) so case 0x13 never reaches the call -- inert on
+# both sides, like B0B40. The wired path is oracle-gated in run_engine_dist_oracle.sh -> test_engine_dist.gd.
 # NOTE: FUN_005a7260 (M7260, the ball-touch/dribble decision) is NO LONGER STUBBED -- it is ported
 # (Pm98Movement.ball_touch_7260) and runs REAL here so test_engine_tick verifies it transitively. Its
 # slice-1 reachable surface for these fixtures: flag2d8 (not-same-side) takes the goal-anchor steer

@@ -390,7 +390,7 @@ static func _action_switch(p: Dictionary, m: Dictionary, gs: Dictionary, b: Dict
 		8, 9:
 			_resolve_action(p, m, rng)                   # FUN_005aeda0 -> Pm98Resolver.resolve_action
 		0x13:
-			_case_distribution(p, m, gs, b)
+			_case_distribution(p, m, gs, b, rng)
 		0x14, 0x16:
 			Pm98Movement.kick_resolve(p, rng, Pm98Movement.KICK_AE4C0, true)  # FUN_005ae4c0 -> resolve_post_shot
 		0x15:
@@ -417,9 +417,11 @@ static func _action_switch(p: Dictionary, m: Dictionary, gs: Dictionary, b: Dict
 
 
 ## L127-194: case 0x13 (keeper-distribution / kick windup). The set_phase nudge is skeleton; the
-## bVar17-true block (kick-aim teammate search + ball launch) is TRANSCRIPTION-ONLY this slice
-## (not oracle-covered -- see engine_tick header). FUN_005ac1a0 (shot physics) is a Task-#2 stub.
-static func _case_distribution(p: Dictionary, m: Dictionary, gs: Dictionary, b: Dictionary) -> void:
+## bVar17-true block (kick-aim teammate search + ball launch) is now WIRED to setup_shot (FUN_005ac1a0)
+## and oracle-GATED for the teammate-present happy path (run_engine_dist_oracle.sh -> test_engine_dist.gd).
+## CAVEAT: the no-eligible-teammate edge (iVar16==0) leaves the binary's pv2 yaw seeded from the loop-
+## counter leftover (iStack_20 = -1), not 0 as here -- not yet oracle-covered (the fixture always finds one).
+static func _case_distribution(p: Dictionary, m: Dictionary, gs: Dictionary, b: Dictionary, rng) -> void:
 	if _g(p, 0x48) == 0 and _g(m, 0x448) == 3:
 		Pm98Movement.set_phase(m, 1)
 	if not (_g(p, 0x2c) == 5 and _g(p, 0x30) == 0):
@@ -453,7 +455,7 @@ static func _case_distribution(p: Dictionary, m: Dictionary, gs: Dictionary, b: 
 	b[4] = Pm98Trig._i32(int(pv2[0]) + _si(p, 4))
 	b[8] = Pm98Trig._i32(_si(p, 8) + int(pv2[1]))
 	b[0xc] = 0x15c28                                     # L190 (pv2.z + p.c) then L191 overwrites z = launch height
-	_shot_setup(p)                                       # STUB FUN_005ac1a0
+	Pm98Movement.setup_shot(p, gs.get(0, []), rng)       # FUN_005ac1a0 -> resolve_post_shot
 
 
 ## L281-375: choose between FUN_005a8680 (settle) and FUN_005a65a0(iStack_38) (the general move), or
@@ -613,9 +615,8 @@ static func _count_teammates_closer(p: Dictionary, arg: int) -> int:
 ## oracle-GREEN via test_resolver_tree.gd against the REAL FUN under the PCode emulator).
 static func _resolve_action(p: Dictionary, m: Dictionary, rng) -> void:
 	Pm98Resolver.resolve_action(p, _ref(p, 0xac), m, _ref(p, 0x3b8), rng)
-## FUN_005ac1a0 (case 0x13 bVar17-true): shot-setup, reached only from the transcription-only
-## _case_distribution block (not oracle-covered). port = Pm98Movement.setup_shot; stub until case 0x13 is gated.
-static func _shot_setup(_p: Dictionary) -> void: trace_calls.append(["AC1A0", 0])
+## FUN_005ac1a0 (case 0x13 bVar17-true) is now WIRED inline in _case_distribution to Pm98Movement.setup_shot
+## (-> resolve_post_shot), oracle-gated via run_engine_dist_oracle.sh -> test_engine_dist.gd. No stub here.
 
 static func _move_8680(_p: Dictionary) -> void: trace_calls.append(["M8680", 0])   # FUN_005a8680 (settle)
 

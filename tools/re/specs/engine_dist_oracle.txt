@@ -1,0 +1,8 @@
+# Stage 3 INTEGRATION (case-0x13 GATE): FUN_005a4600 (engine_tick) case 0x13 bVar17-true ->
+#   teammate search + ball launch -> setup_shot (FUN_005ac1a0) -> resolve_post_shot (FUN_005ab5a0), all REAL.
+#   STUBS: 8 handlers + resolver + teammate-count + 3 movement fns + TRAIL/ENQ (8f20 REAL/inert, 7260 skipped).
+## FIX dist_case13
+CALL 0 STUB TRAIL #1 step=1152 ECX=2555904 arg0=2293760
+CALL 0 STUB M65a0 #1 step=1343 ECX=2293760 arg0=15802624
+CALL 0 STUB M9490 #1 step=1361 ECX=2293760 arg0=0
+CALL 0 RET steps=1584 EAX=0 mem[0x2302d7:1]=1 mem[0x2302d8:1]=0 mem[0x23002c:4]=5 mem[0x230030:4]=0 mem[0x230040:4]=19 mem[0x230048:4]=4 mem[0x230050:4]=1 mem[0x23006c:4]=0 mem[0x230088:4]=1 mem[0x2300a0:4]=16777216 mem[0x2300a4:4]=524288 mem[0x2300a8:4]=0 mem[0x2300b4:4]=0 mem[0x270004:4]=32768 mem[0x270008:4]=50 mem[0x27000c:4]=89128 mem[0x27004c:4]=0 mem[0x270084:4]=16532861 mem[0x270088:4]=582231 mem[0x27008c:4]=89128 mem[0x270020:4]=27003 mem[0x270024:4]=952 mem[0x270028:4]=18578 mem[0x270070:4]=100 mem[0x230054:4]=0 mem[0x230058:4]=0 mem[0x270050:4]=2293760 mem[0x270064:1]=0 mem[0x270040:4]=0 mem[0x270044:4]=2293760 mem[0x270048:4]=2293760 mem[0x270054:4]=0 mem[0x270080:4]=1 mem[0x260438:4]=0 mem[0x26043c:4]=0 mem[0x260458:4]=0 mem[0x260460:1]=0 mem[0x260448:4]=0 mem[0x2b0088:4]=1 mem[0x2802e4:4]=0 mem[0x6d3184:4]=1536596111 tracehits={RNG=5} stubhits={TRAIL=1, M65a0=1, M9490=1}
