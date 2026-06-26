@@ -68,6 +68,19 @@ the broad LUT -- corrected 2026-06-26.)
 
 ## Open
 - International (compact-record) clubs carry neither photoId nor these physicals yet.
+  **Verified 2026-06-26 why (not a TODO, a data-availability finding):** the compact
+  Spanish/continental EQUIPOS record is `[u16 year][flag][media][10 attrs u8][01]` — it has
+  **no physical bytes at all** (height/weight live only in the EXTENDED English layout at
+  `Y+2/Y+3`), and **no per-player nationality byte**. Empirically (Barcelona dump): the `flag`
+  byte at `Y+2` ranges `0xa9..0xc2` and tracks the player's rating, not a country (it gates
+  the `media` byte's presence, `>=0xa0`); `media` (`Y+3`, 56-99, Spanish for "average") is a
+  rating field, **not** a face key (J96 photoIds run in the thousands, so a 56-99 byte cannot
+  index the 1302-face bank). So `flagCode` for every compact player is just the
+  `flag_for(None)`=`ENGLAND_CODE` fallback in `build_db.py` (cosmetically wrong: shows the
+  English flag for foreign clubs). The original game DOES display foreign nationalities, so
+  they must be stored in a **separate** DBDAT structure (candidate join: `PAISES.30` country
+  list + a parallel per-player nationality index, or `NOMBRES.30`/`APELLIDO.30` name
+  dictionaries) — a NEW RE track, not recoverable from the per-player EQUIPOS bytes.
 
 ## Done
 - The fine role-NAME LUT IS located (2026-06-26): SHORT table `0x662df8` / LONG `0x662db0`,
