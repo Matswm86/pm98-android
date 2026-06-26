@@ -620,9 +620,10 @@ static func _resolve_action(p: Dictionary, m: Dictionary, rng) -> void:
 
 ## FUN_005a8680 (settle) is now WIRED to the real port Pm98Movement.settle_8680(p, wire=true) -- the
 ## M8680 stub is retired (run_engine_oracle.sh now runs the REAL FUN_005a8680, un-stubbed). settle_8680's
-## own SELECTION + two direct writes (p+0x5d windup-edge flag, p+0x54 possession clear) run, the steer
-## leaf FUN_005a8f20 is called for real (it is GREEN), and its other six leaves (B1420/M8AC0/AA4D0/AA870/
-## AAFD0/B8CE0) stay DEFERRED -- stubbed in the engine oracle, trace-only in the port -- to be wired next.
+## own SELECTION + two direct writes (p+0x5d windup-edge flag, p+0x54 possession clear) run, and the
+## already-ported leaves are CALLED for real: steer_8f20 (M8F20, GREEN), windup_8ac0 (M8AC0, 619989d),
+## kick_setup (AA4D0) and select_nearest (B8CE0). The three remaining leaves (B1420/AA870/AAFD0) stay
+## DEFERRED -- stubbed in the engine oracle, trace-only in the port -- to be ported then wired next.
 static func _move_8680(p: Dictionary) -> void:
 	Pm98Movement.settle_8680(p, true)
 

@@ -5349,12 +5349,17 @@ static func settle_8680(p: Dictionary, wire: bool = false) -> void:
 		# else: bVar9 false or phase != 0 -> goto LAB_005a8854 (no steer)
 
 	# LAB_005a8854: the action-gated possession / marking tail (L84-130).
-	_settle_tail(p, m, gs, ball)
+	_settle_tail(p, m, gs, ball, wire)
 
 
 ## L84-130: at most one leaf, gated on the action code, the ball-controller identity, and the gs
 ## input flags +0x214/+0x215. The only direct write here is p+0x54 = 0 (clear the possession claim).
-static func _settle_tail(p: Dictionary, m: Dictionary, gs: Dictionary, ball: Dictionary) -> void:
+## `wire`: when true, the two ALREADY-PORTED tail leaves are CALLED for real -- AA4D0 = kick_setup(p, m)
+## (the ball-launch trajectory; here this=p the controller, matching ball=_ref(p,0x190)) and B8CE0 =
+## select_nearest(gs, 1) (re-pick the active player; here this=gs, find_in_front=1). AA870/AAFD0 stay
+## DEFERRED (trace-only) pending their own ports. The trace is appended either way, so the bare
+## test_settle selection oracle is unaffected.
+static func _settle_tail(p: Dictionary, m: Dictionary, gs: Dictionary, ball: Dictionary, wire: bool) -> void:
 	var action := _g(p, 0x40)
 	if action == 4 or action == 5 or action == 8 or action == 9:
 		return
@@ -5370,6 +5375,8 @@ static func _settle_tail(p: Dictionary, m: Dictionary, gs: Dictionary, ball: Dic
 	if is_same(ball.get(0x40, null), p):                     # p IS the ball controller
 		if phase != 7 and (_settle_b(gs, 0x214) or (phase == 2 and _settle_b(gs, 0x215))):
 			settle_trace.append(["AA4D0", 0])                # FUN_005aa4d0 (kick_setup)
+			if wire:
+				kick_setup(p, m)
 			return
 		if _settle_b(gs, 0x215):
 			settle_trace.append(["AA870", 0])                # FUN_005aa870(0)
@@ -5382,4 +5389,6 @@ static func _settle_tail(p: Dictionary, m: Dictionary, gs: Dictionary, ball: Dic
 			var other: Dictionary = _ref(ball, 0x4c)         # ball+0x4c (the other claimant)
 			if other.is_empty() or _g(p, 0x2b8) != _g(other, 0x2b8):
 				settle_trace.append(["B8CE0", 1])            # FUN_005b8ce0(gs, 1) select_nearest
+				if wire:
+					select_nearest(gs, 1)
 				p[0x54] = 0                                   # WRITE p+0x54 (clear claim)
