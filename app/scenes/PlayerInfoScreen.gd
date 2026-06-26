@@ -266,7 +266,9 @@ func _draw_stat_panel() -> void:
 		["QUALITY", _attr("CA")], ["FITNESS", _fitness()], ["MORAL", _moral()]]
 	var y := 68.0
 	for row in rows:
-		_txt(_f12, 326, y, str(row[0]), Color(0.04, 0.10, 0.22), 13, 2, 196)   # right-aligned label
+		# Label right-aligned so it ENDS just left of the value cell (align 2 = x is the
+		# right edge); must sit inside the panel, not draw leftward into the left column.
+		_txt(_f12, 520, y, str(row[0]), Color(0.04, 0.10, 0.22), 13, 2)
 		var cell := Rect2(528, y - 1, 36, 16)
 		PMChrome.bevel(self, cell, C_STATCELL, C_STATCELL.lightened(0.2), C_STATCELL.darkened(0.3))
 		_txt(_f12, cell.position.x, cell.position.y + 2, str(row[1]), C_VAL, 13, 1, cell.size.x)
@@ -288,7 +290,8 @@ func _draw_skill_strip() -> void:
 	var y := 194.0
 	for row in rows:
 		var val := _attr(str(row[1]))
-		_txt(_f12, 326, y, str(row[0]), Color(0.92, 0.94, 1.0), 13, 2, 150)   # right-aligned label
+		# Right-aligned label ending just left of the stars/bar (inside the strip).
+		_txt(_f12, 476, y, str(row[0]), Color(0.92, 0.94, 1.0), 13, 2)
 		if row[2]:
 			# HANDLING as a filled bar (keepers full, outfielders near-empty), like the original.
 			var bar := Rect2(484, y + 1, 110, 12)
