@@ -621,10 +621,11 @@ static func _resolve_action(p: Dictionary, m: Dictionary, rng) -> void:
 ## FUN_005a8680 (settle) is now WIRED to the real port Pm98Movement.settle_8680(p, wire=true, rng) -- the
 ## M8680 stub is retired (run_engine_oracle.sh now runs the REAL FUN_005a8680, un-stubbed). settle_8680's
 ## own SELECTION + two direct writes (p+0x5d windup-edge flag, p+0x54 possession clear) run, and the
-## already-ported leaves are CALLED for real: steer_8f20 (M8F20, GREEN), windup_8ac0 (M8AC0, 619989d),
-## kick_setup (AA4D0), select_nearest (B8CE0) and _arm2_active_tail (AA870, the FUN_005aa870(0) tail).
-## The shared match `rng` is threaded for AA870's FUN_005ec250 draws. The two remaining leaves (B1420/
-## AAFD0) stay DEFERRED -- stubbed in the engine oracle, trace-only in the port -- to be ported then wired.
+## already-ported leaves are CALLED for real: B1420 (formation gate), steer_8f20 (M8F20), windup_8ac0
+## (M8AC0), kick_setup (AA4D0), select_nearest (B8CE0), _arm2_active_tail (AA870 = FUN_005aa870(0)) and
+## possession_tail_aafd0 (AAFD0 = FUN_005aafd0(1)). The shared match `rng` is threaded for the AA870/AAFD0
+## FUN_005ec250 draws. All seven settle leaves are now wired; only sub-leaves one level down remain
+## deferred (B1420's b1500/b1c80, AAFD0's 590f00 audio).
 static func _move_8680(p: Dictionary, rng) -> void:
 	Pm98Movement.settle_8680(p, true, rng)
 

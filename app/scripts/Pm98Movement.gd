@@ -5271,14 +5271,14 @@ static func _settle_b(d: Dictionary, off: int) -> bool:
 	return (_g(d, off) & 0xff) != 0
 
 
-# `wire`: when true (the engine_tick integration call), the body-orient steer leaf FUN_005a8f20
-# (steer_8f20), the branch-2 windup leaf FUN_005a8ac0 (windup_8ac0, which itself sets p+0x6c then
-# tail-calls steer_8f20), and the action-gated tail leaves AA4D0/B8CE0/AA870 are CALLED for real
-# instead of only trace-recorded; the other two tail leaves (B1420/AAFD0) stay deferred (traced).
-# When false (the bare test_settle.gd gate) every leaf is trace-only. Either way the M8F20/M8AC0
-# trace entries are still appended, so the bare selection oracle is unaffected. `rng` is the live
-# MatchEngine.Pm98Rng -- needed only by the AA870 tail leaf (FUN_005ec250 draws); null is fine on
-# the bare (wire=false) path, which never reaches it.
+# `wire`: when true (the engine_tick integration call), EVERY settle leaf is now CALLED for real instead
+# of only trace-recorded -- the top B1420 formation gate, the body-orient steer FUN_005a8f20 (steer_8f20),
+# the branch-2 windup FUN_005a8ac0 (windup_8ac0), and the four action-gated tail leaves AA4D0 (kick_setup),
+# B8CE0 (select_nearest), AA870 (_arm2_active_tail) and AAFD0 (possession_tail_aafd0). The only sub-leaves
+# still deferred live one level DOWN, inside B1420 (b1500/b1c80) and AAFD0's audio (590f00). When false (the
+# bare test_settle.gd gate) every leaf is trace-only; either way the trace entries are appended, so the bare
+# selection oracle is unaffected. `rng` is the live MatchEngine.Pm98Rng -- needed by the AA870/AAFD0 tail
+# leaves (FUN_005ec250 draws); null is fine on the bare (wire=false) path, which never reaches them.
 static func settle_8680(p: Dictionary, wire: bool = false, rng = null) -> void:
 	settle_trace = []
 	var m: Dictionary = _ref(p, 0x18c)
@@ -5361,11 +5361,11 @@ static func settle_8680(p: Dictionary, wire: bool = false, rng = null) -> void:
 ## input flags +0x214/+0x215. The only direct write here is p+0x54 = 0 (clear the possession claim).
 ## `wire`: when true, the THREE ALREADY-PORTED tail leaves are CALLED for real -- AA4D0 = kick_setup(p, m)
 ## (the ball-launch trajectory; here this=p the controller, matching ball=_ref(p,0x190)); B8CE0 =
-## select_nearest(gs, 1) (re-pick the active player; here this=gs, find_in_front=1); and AA870 =
+## select_nearest(gs, 1) (re-pick the active player; here this=gs, find_in_front=1); AA870 =
 ## FUN_005aa870(0) = _arm2_active_tail(p, 0, rng) (the controller-possession tail; here param_2=0, so the
-## istack==0 arm, whose own carrier guard ball+0x40==p the AA870-branch gate already guarantees). AAFD0/
-## B1420 stay DEFERRED (trace-only) pending their own ports. The trace is appended either way, so the
-## bare test_settle selection oracle is unaffected.
+## istack==0 arm, whose own carrier guard ball+0x40==p the AA870-branch gate already guarantees); and AAFD0
+## = FUN_005aafd0(1) = possession_tail_aafd0(p, 1, rng) (the NON-controller possession tail). The trace is
+## appended either way, so the bare test_settle selection oracle is unaffected.
 static func _settle_tail(p: Dictionary, m: Dictionary, gs: Dictionary, ball: Dictionary, wire: bool, rng = null) -> void:
 	var action := _g(p, 0x40)
 	if action == 4 or action == 5 or action == 8 or action == 9:
@@ -5393,6 +5393,8 @@ static func _settle_tail(p: Dictionary, m: Dictionary, gs: Dictionary, ball: Dic
 	else:                                                    # p is NOT the controller
 		if _settle_b(gs, 0x214):
 			settle_trace.append(["AAFD0", 1])                # FUN_005aafd0(1)
+			if wire:
+				possession_tail_aafd0(p, 1, rng)
 			return
 		if not _settle_b(gs, 0x215) and _si(p, 0x54) != 0:
 			var other: Dictionary = _ref(ball, 0x4c)         # ball+0x4c (the other claimant)
@@ -5446,4 +5448,140 @@ static func formation_gate_b1420(p: Dictionary, wire: bool = false) -> int:
 		b1420_trace.append(["B1500", 0])                     # FUN_005b1500 (UNPORTED -- deferred)
 		return 1                                             # placeholder (real return discarded by settle)
 	b1420_trace.append(["B1C80", 0])                         # FUN_005b1c80 (UNPORTED -- deferred)
+	return 1
+
+
+static var aafd0_trace: Array = []
+
+
+## The two rng-scaling forms FUN_005aafd0 uses (each draws EXACTLY ONE FUN_005ec250).
+## val < 0x8000 (form A, 0x5ab21a): tdiv(rand * val, 0x8000).
+## val >= 0x8000 (form B, 0x5ab1f7): tdiv(tdiv(val, 0x100) * rand, 0x80). Both truncate toward zero;
+## rand in [0, 0x7fff] so the 32-bit imul never overflows for the engine's stat ranges.
+static func _aafd0_scale(val: int, rng) -> int:
+	if val < 0x8000:
+		return Pm98Trig._tdiv(Pm98Trig._i32(rng.next() * val), 0x8000)
+	return Pm98Trig._tdiv(Pm98Trig._i32(Pm98Trig._tdiv(val, 0x100) * rng.next()), 0x80)
+
+
+## FUN_005aafd0(p, param2): the NON-controller possession tail settle_8680 dispatches (L116-119) when p is
+## NOT the ball controller and gs+0x214 is set; settle calls it as FUN_005aafd0(1). Decoded bit-for-bit from
+## the disasm 0x5aafd0..0x5ab59a. It aims the player at an interception point -- the FOREIGN carrier's lead
+## point (carrier.pos + 0x18*carrier.vel) when bVar2 holds, else the ball's stored target ball+0x174 -- and
+## drives a move there with an rng-jittered distance + heading. bVar2 = ball+0x54 != p.team AND the carrier
+## (ball+0x40) is on-pitch AND its action is NOT in {6,7,8,9,0x14,0x15}. Five early-out gates RETURN 0 with
+## no writes / no rng: ball.z >= 0x3333; carrier present-but-off-pitch; ball+0x4c == p; |s16(atan-facing)|
+## >= 0x1555; 3D distance >= threshold (0x38000 for param2!=0, else 0x18000). On the success path it draws:
+## DRAW1 (always, the A0 baseline); DRAW2..5 (the nested distance-clamp, conditional on the binary's branch
+## structure); DRAW6 (always, the heading jitter); DRAW7 (only when the move distance local24 > 0x28000,
+## picking pos-code 9 vs 8). Writes p+0x20/24/28 (velocity = polar(local24/0x20, heading)), p+0x80=1 /
+## p+0x84=0x2c, p+0x66=heading, p+0x94/98/9c (pos + vel*0x2c), p+0xac (carrier ref or 0), p+0x60=0 /
+## p+0x62=0; set_position_code(8|9); and the telemetry counter (p+0x3b8)+0x90 (gated on DAT_006d31c4==0,
+## live default). FUN_005ee080 (atan) / FUN_005ee0f0 (polar) / FUN_005a5430 (set_position_code) / the vec
+## ops FUN_005b1230+FUN_005a1700 are the already-ported helpers; FUN_00590f00 (audio, gated on m+0x180a) is
+## skipped (traced). Oracle-locked vs the REAL FUN under the PCode emulator (rng draws + every field write +
+## final rng state): tools/re/run_aafd0_oracle.sh -> specs/aafd0_oracle.txt, locked in app/tests/test_aafd0.gd.
+static func possession_tail_aafd0(p: Dictionary, param2: int, rng, dat_replay: bool = false) -> int:
+	aafd0_trace = []
+	var ball: Dictionary = _ref(p, 0x190)
+	var team := _g(p, 0x2b8)
+	# bVar2: a FOREIGN carrier doing an "open" action -> aim at its lead point.
+	var bVar2 := false
+	var carrier: Dictionary = {}
+	if _g(ball, 0x54) != team:
+		carrier = _ref(ball, 0x40)
+		if not carrier.is_empty() and _g(carrier, 0x2bc) != 0:
+			var ca := _g(carrier, 0x40)
+			if ca != 8 and ca != 9 and ca != 6 and ca != 7 and ca != 0x14 and ca != 0x15:
+				bVar2 = true
+	var refx: int
+	var refy: int
+	var refz: int
+	if bVar2:
+		refx = Pm98Trig._i32(_si(carrier, 0x4) + Pm98Trig._i32(_si(carrier, 0x20) * 0x18))
+		refy = Pm98Trig._i32(_si(carrier, 0x8) + Pm98Trig._i32(_si(carrier, 0x24) * 0x18))
+		refz = Pm98Trig._i32(_si(carrier, 0xc) + Pm98Trig._i32(_si(carrier, 0x28) * 0x18))
+	else:
+		refx = _si(ball, 0x174)
+		refy = _si(ball, 0x178)
+		refz = _si(ball, 0x17c)
+	var dx := Pm98Trig._i32(refx - _si(p, 4))
+	var dy := Pm98Trig._i32(refy - _si(p, 8))
+	var dz := Pm98Trig._i32(refz - _si(p, 0xc))
+	var atan := Pm98Trig.atan_angle(dx, dy)                    # FUN_005ee080 (full eax saved as heading base)
+	var dist := Pm98Trig._dist3(dx, dy, dz)                    # ftol(sqrt(dx^2+dy^2+dz^2))
+	# iVar7 aggression magnitude, by the gs+0x31c tier.
+	var gs: Dictionary = _ref(p, 0x184)
+	var tier := _g(gs, 0x31c)
+	var stat384 := _si(p, 0x384)
+	var ivar7: int
+	if tier == 0:
+		ivar7 = Pm98Trig._tdiv(Pm98Trig._i32(stat384 * 2), 3)
+	elif tier == 1:
+		ivar7 = stat384
+	else:
+		ivar7 = Pm98Trig._tdiv(stat384 + 100, 2)
+	# Early-out gates (return 0, no writes, no rng).
+	if not (_si(ball, 0xc) < 0x3333):
+		return 0
+	var gcar: Dictionary = _ref(ball, 0x40)
+	if not gcar.is_empty() and _g(gcar, 0x2bc) == 0:
+		return 0
+	if is_same(ball.get(0x4c, null), p):
+		return 0
+	if absi(Pm98Trig._s16(atan - _g(p, 0x34))) >= 0x1555:
+		return 0
+	var threshold := 0x18000 + (0x20000 if param2 != 0 else 0)
+	if dist >= threshold:
+		return 0
+	# DRAW1: the A0 baseline.
+	var a0 := Pm98Trig._i32(_aafd0_scale(Pm98Trig._tdiv(Pm98Trig._i32(ivar7 * 0xd999), 100), rng) + 0x18000)
+	var local24 := dist
+	if a0 < dist:
+		var p68 := _si(p, 0x68)
+		var t1 := Pm98Trig._i32((p68 + _aafd0_scale(Pm98Trig._tdiv(Pm98Trig._i32(ivar7 * p68), 200), rng)) * 0x20)  # DRAW2
+		var ivar10: int
+		if t1 >= dist:
+			ivar10 = dist
+		else:
+			ivar10 = Pm98Trig._i32((p68 + _aafd0_scale(Pm98Trig._tdiv(Pm98Trig._i32(ivar7 * p68), 200), rng)) * 0x20)  # DRAW3
+		if a0 > ivar10:
+			local24 = a0
+		else:
+			var t3 := Pm98Trig._i32((p68 + _aafd0_scale(Pm98Trig._tdiv(Pm98Trig._i32(ivar7 * p68), 200), rng)) * 0x20)  # DRAW4
+			if t3 >= dist:
+				local24 = dist
+			else:
+				local24 = Pm98Trig._i32((p68 + _aafd0_scale(Pm98Trig._tdiv(Pm98Trig._i32(ivar7 * p68), 200), rng)) * 0x20)  # DRAW5
+	# DRAW6: the heading jitter.
+	var prod := Pm98Trig._i32((100 - _si(p, 0x390)) * (100 - ivar7))
+	var jbase := Pm98Trig._tdiv(Pm98Trig._i32(prod * 0xaab), 10000)
+	var jit := _aafd0_scale(jbase * 2 + 1, rng)
+	var heading := Pm98Trig._i32(atan + (jit - jbase))
+	# Telemetry counter (p+0x3b8)+0x90, incremented when the DAT_006d31c4 replay flag is clear (live default).
+	if not dat_replay:
+		var stats: Dictionary = _ref(p, 0x3b8)
+		stats[0x90] = Pm98Trig._i32(_g(stats, 0x90) + 1)
+	# pos code 8/9 (DRAW7 only when the move distance exceeds 0x28000).
+	var pos_code := 8
+	if local24 > 0x28000:
+		if Pm98Trig._tdiv(Pm98Trig._i32(rng.next() * 1000), 0x8000) < Pm98Trig._i32(ivar7 * 7):    # DRAW7
+			pos_code = 9
+	set_position_code(p, pos_code)                            # FUN_005a5430
+	if _g(_ref(p, 0x18c), 0x180a) != 0:
+		aafd0_trace.append(["A590F00", 0])                   # FUN_00590f00 audio -- skipped (out of scope)
+	# Final reach velocity + the 0x2c-tick move target.
+	var reach: Array = Pm98Trig.polar_vec(Pm98Trig._tdiv(local24, 0x20), heading)   # FUN_005ee0f0
+	p[0x20] = int(reach[0])
+	p[0x24] = int(reach[1])
+	p[0x28] = int(reach[2])
+	p[0x80] = 1
+	p[0x84] = 0x2c
+	p[0x66] = Pm98Trig._s16(heading) & 0xffff
+	p[0x94] = Pm98Trig._i32(_si(p, 4) + Pm98Trig._i32(int(reach[0]) * 0x2c))
+	p[0x98] = Pm98Trig._i32(_si(p, 8) + Pm98Trig._i32(int(reach[1]) * 0x2c))
+	p[0x9c] = Pm98Trig._i32(_si(p, 0xc) + Pm98Trig._i32(int(reach[2]) * 0x2c))
+	p[0xac] = carrier if bVar2 else 0                         # ball+0x40 carrier ref, or 0
+	p[0x60] = 0
+	p[0x62] = 0
 	return 1
