@@ -2142,6 +2142,136 @@ static func _marker_apply(p: Dictionary, best: Array) -> bool:
 	return true
 
 
+# ---- FUN_005aa870 the "arm-2 active tail" (slice 2b-iv) -------------------------------
+# The movement / pass target the marker tail (and other open-play callers) reaches for a player who is to
+# drive toward a velocity blend of itself + the ball, oriented by an RNG-jittered heading toward the
+# OPPONENT goal. `istack` (param_2) is 1 for near-ball / engine-controller players; istack == 0 ALSO writes
+# the ball's chase target. Resolved straight from the linear disasm 0x5aa870..0x5aabf9 -- the five
+# FUN_00590aa0 calls are __thiscall vec3 STORES whose dest ptr the decompiler aliased onto overlapping
+# locals (the esp-alias trap); traced via esp, NOT the decompile. Leaf deps: FUN_00590aa0 (vec3 store),
+# FUN_005a44f0 (== goal_target_x), FUN_005aac00 (atan(vec - p.pos) - facing -> _aac00), FUN_005a5430
+# (set_position_code), FUN_005ee0f0 (polar_vec), FUN_005ec250 (rng). Two RNG draws, in order: the heading
+# jitter then the z override. `rng` is the live MatchEngine.Pm98Rng (== FUN_005ec250). Oracle-pinned
+# bit-for-bit by tools/re/run_arm2tail_oracle.sh -> specs/arm2tail_oracle.txt, locked in test_arm2tail.gd.
+
+
+## FUN_005aac00 (__thiscall player; vec3): the heading of `vec` relative to the player's facing --
+## _s16(atan_angle(vec.x - p.x, vec.y - p.y) - p.facing). The trailing facing subtract is the binary's
+## 16-bit `sub ax, word[p+0x34]`, so only the low 16 bits matter (sign-extended back to a short).
+static func _aac00(p: Dictionary, v: Array) -> int:
+	var dx := Pm98Trig._i32(int(v[0]) - _si(p, 4))
+	var dy := Pm98Trig._i32(int(v[1]) - _si(p, 8))
+	return Pm98Trig._s16(Pm98Trig.atan_angle(dx, dy) - _g(p, 0x34))
+
+
+static func _arm2_active_tail(p: Dictionary, istack: int, rng) -> void:
+	p[0x48] = 0
+	var action := _g(p, 0x40)
+	if action == 0x13 or action == 0x1d:
+		return
+	var ball: Dictionary = _ref(p, 0x190)
+	# Guard: istack != 0, OR p is the ball carrier (ball+0x40 == p, reference identity).
+	if istack == 0 and not is_same(ball.get(0x40, null), p):
+		return
+	# Velocity-blend vectors: pv8 = 8*p.vel, bv6 = 6*ball.vel; half = (bv6 + pv8)/2 = 3*ball.vel + 4*p.vel
+	# (round-to-zero /2, the binary's `cdq; sub; sar 1`).
+	var pv8 := [Pm98Trig._i32(_si(p, 0x20) * 8), Pm98Trig._i32(_si(p, 0x24) * 8), Pm98Trig._i32(_si(p, 0x28) * 8)]
+	var bv6 := [Pm98Trig._i32(_si(ball, 0x20) * 6), Pm98Trig._i32(_si(ball, 0x24) * 6), Pm98Trig._i32(_si(ball, 0x28) * 6)]
+	var half := [
+		Pm98Trig._tdiv(Pm98Trig._i32(bv6[0] + pv8[0]), 2),
+		Pm98Trig._tdiv(Pm98Trig._i32(bv6[1] + pv8[1]), 2),
+		Pm98Trig._tdiv(Pm98Trig._i32(bv6[2] + pv8[2]), 2)]
+	# Heading evaluation: three reference points on the line to the OPPONENT goal (team = 1 - p.team).
+	var m: Dictionary = _ref(p, 0x18c)
+	var goalx := goal_target_x(_g(m, 0x19a0), _g(m, 0x1820), 1 - _g(p, 0x2b8))
+	var sv4 := _aac00(p, [goalx, 0, 0])
+	# sVar11: p's relationship-matrix heading toward the player ctx = *(*(p+0x188)) (slot +0x2c4, team +0x2b8).
+	var ctx: Dictionary = _ref(_ref(p, 0x188), 0)
+	var sv11 := Pm98Trig._s16(_g(p, _angle_off(_g(ctx, 0x2c4), _g(ctx, 0x2b8))))
+	var sv5 := _aac00(p, [goalx, 0x39999, 0])
+	var sv6 := _aac00(p, [goalx, -0x39999, 0])
+	var svmax := sv6
+	var svmin := sv5
+	if sv6 < sv5:                                           # sVar14 = max(sv5, sv6); the other = min
+		svmax = sv5
+		svmin = sv6
+	var delta: int
+	if sv11 < sv4:
+		delta = Pm98Trig._tdiv(Pm98Trig._s16(svmax - sv4) * 2, 3)
+	else:
+		delta = Pm98Trig._tdiv(Pm98Trig._s16(svmin - sv4) * 2, 3)
+	sv4 = Pm98Trig._s16(sv4 + delta)
+	if absi(sv4) > 0x3c72:
+		sv4 = 0
+	if _g(m, 0x448) == 4:
+		sv4 = 0
+	# RNG-jittered heading delta: angle16 = ((p+0x3a0 + jitter) * sv4) / 100, truncate-toward-zero.
+	var base100 := _si(p, 0x3a0)
+	var iv13 := 100 - base100
+	if iv13 < 0x8000:
+		iv13 = Pm98Trig._tdiv(rng.next() * iv13, 0x8000)
+	else:
+		iv13 = Pm98Trig._tdiv(Pm98Trig._tdiv(iv13, 0x100) * rng.next(), 0x80)
+	var d16 := Pm98Trig._tdiv(Pm98Trig._i32((base100 + iv13) * sv4), 100)
+	var angle := (d16 + _g(p, 0x34)) & 0xffff
+	# Reach point p+0xa0/a4/a8 = polar(0x410000, angle) + p.pos; z is then OVERWRITTEN with a fresh rng*4.
+	var reach: Array = Pm98Trig.polar_vec(0x410000, angle)
+	p[0xa0] = Pm98Trig._i32(reach[0] + _si(p, 4))
+	p[0xa4] = Pm98Trig._i32(reach[1] + _si(p, 8))
+	p[0xa8] = Pm98Trig._tdiv(rng.next() * 0x200, 0x80)      # = rng * 4 (round-to-zero), overwrites reach.z
+	p[0x5e] = 0
+	# Locomotion target = 8*p.vel + p.pos; ball-chase target = (3*ball.vel + 4*p.vel) + ball.pos.
+	set_position_code(p, 0x24 if _g(p, 0x2bc) == 0 else 5)
+	p[0x80] = 1
+	p[0x84] = 8
+	p[0x94] = Pm98Trig._i32(pv8[0] + _si(p, 4))
+	p[0x98] = Pm98Trig._i32(pv8[1] + _si(p, 8))
+	p[0x9c] = Pm98Trig._i32(pv8[2] + _si(p, 0xc))
+	p[0x66] = angle
+	if istack == 0:
+		ball[0x68] = 1
+		ball[0x6c] = 8
+		ball[0x9c] = Pm98Trig._i32(half[0] + _si(ball, 4))
+		ball[0xa0] = Pm98Trig._i32(half[1] + _si(ball, 8))
+		ball[0xa4] = Pm98Trig._i32(half[2] + _si(ball, 0xc))
+
+
+# ---- FUN_005a7260 marker TAIL 0x5a8457..0x5a85ac (slice 2b-iii-e) ---------------------
+# Reached unconditionally after the marker apply. When the scan kept NO marker (apply was a no-op, so the
+# applied byte local_159 == 0) AND the ball has no carrier OR a FOREIGN-team carrier, two L-inf proximity
+# gates decide whether to hand off to the arm-2 active tail FUN_005aa870(1): gate1 vs the offset point
+# polar(0x4ccc, facing) + p.pos; on gate1 fail, gate2 additionally subtracts p.vel. Either gate passing ->
+# _arm2_active_tail(p, 1); both failing -> return (no handoff). An applied marker, or a same-team carrier,
+# returns straight to the caller (the binary jumps to the shared epilogue 0x5a85a2). Decode + esp trace of
+# 0x5a8457..0x5a85ac. Oracle-pinned bit-for-bit by tools/re/run_7260markertail_oracle.sh ->
+# specs/7260markertail_oracle.txt, locked in test_7260markertail.gd.
+
+
+## One L-inf (per-axis abs < 0x8000) proximity gate of the ball's +0x138 ref point against
+## polar(0x4ccc, facing) + p.pos, optionally also subtracting p.vel (gate2). True when all three axes
+## are within reach.
+static func _marker_reach_gate(ball: Dictionary, p: Dictionary, polar: Array, sub_vel: bool) -> bool:
+	for ax in 3:
+		var ref := _si(ball, 0x138 + ax * 4)
+		var vel := _si(p, 0x20 + ax * 4) if sub_vel else 0
+		var d := Pm98Trig._i32(ref - vel - int(polar[ax]) - _si(p, 4 + ax * 4))
+		if absi(d) >= 0x8000:
+			return false
+	return true
+
+
+static func _marker_tail(p: Dictionary, applied: bool, rng) -> void:
+	if applied:
+		return
+	var ball: Dictionary = _ref(p, 0x190)
+	var carrier = ball.get(0x40, null)                       # ball+0x40: 0/null = none, else carrier Dict
+	if carrier is Dictionary and _g(p, 0x2b8) == _g(carrier, 0x2b8):
+		return                                               # same-team carrier -> no handoff
+	var polar: Array = Pm98Trig.polar_vec(0x4ccc, _g(p, 0x34))
+	if _marker_reach_gate(ball, p, polar, false) or _marker_reach_gate(ball, p, polar, true):
+		_arm2_active_tail(p, 1, rng)
+
+
 # ---- FUN_005a3400 the per-player DECIDE, slice A (prologue + bbox) --------------------
 # The first ~100 instructions of the per-player movement-target computer: set the goal-X
 # anchor, the two target endpoints, and the movement bounding box, all oriented by side.
