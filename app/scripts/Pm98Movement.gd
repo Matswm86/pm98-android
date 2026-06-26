@@ -1160,6 +1160,35 @@ static func steer_89c0(p: Dictionary, target_pos: Array, speed_scale: int) -> vo
 	steer_8bc0(p, target_pos)
 
 
+## FUN_005a8ac0(p, heading, strength): the EXPLICIT-heading twin of steer_89c0. Same curve-setup -- the
+## ball-carrier 75% strength cut and the phase {2,3,4,5,7} PARK (wall flag clear or team mismatch) vs
+## the (P+0x70*P+0x3ac)/15000 * strength/100 + P+0x3a8 formula -- but it steers to a heading the caller
+## already computed (no steer_8bc0 target_pos delta), so it tail-calls steer_8f20(heading) directly.
+## settle_8680's phase-0 formation branch is the call site (heading = the windup-table angle, strength
+## = 100). Oracle-locked vs the REAL FUN_005a8ac0 (tools/re/run_8ac0_oracle.sh, 8f20 stubbed) in
+## app/tests/test_8ac0.gd; the inner steer_8f20 is itself GREEN via run_steering_oracle.sh.
+static func windup_8ac0(p: Dictionary, heading: int, strength: int) -> void:
+	var ctrl: Dictionary = _ref(p, 0x190)
+	var m: Dictionary = _ref(p, 0x18c)
+	var scale := strength
+	if is_same(ctrl.get(0x40, null), p):                    # P == ball.active -> 75%
+		scale = Pm98Trig._tdiv(Pm98Trig._i32(scale * 0x4b), 100)
+	var phase := _g(m, 0x448)
+	var park := false
+	if phase == 2 or phase == 3 or phase == 4 or phase == 5 or phase == 7:
+		if (_g(m, 0x461) & 0x40) == 0:
+			park = true
+		elif _g(p, 0x2b8) != _g(_ref(m, 0x444), 0x2b8):
+			park = true
+	if park:
+		p[0x6c] = 0
+	else:
+		var r1 := Pm98Trig._tdiv(Pm98Trig._i32(_g(p, 0x70) * _g(p, 0x3ac)), 15000)
+		var r2 := Pm98Trig._tdiv(Pm98Trig._i32(r1 * scale), 100)
+		p[0x6c] = Pm98Trig._i32(r2 + _g(p, 0x3a8))
+	steer_8f20(p, heading)
+
+
 ## FUN_005a8bc0(p, target_pos): compute the steer heading toward target_pos and tail-call steer_8f20.
 ## delta = target - P.pos. Three L-inf gates: (1) the +/-(P+0x68*6) box zeroes the curve; (2) the
 ## +/-0xccc box re-targets onto the match set-piece point (m+0x1240 when m+0x43c==P) else the ball,
@@ -5220,8 +5249,9 @@ static func _phase5_tail_pathA(ctx: Dictionary, m: Dictionary, _team: int) -> vo
 # to their real ports (steer_8f20 is already GREEN; the rest are their own tasks) is the next gate,
 # exactly as the engine_tick skeleton wired its handlers one at a time.
 #   B1420 = FUN_005b1420 (off-ball reposition / +0x14c formation counter; itself calls b0040/b1500/b1c80)
-#   M8F20 = FUN_005a8f20 (steer_8f20, oracle-GREEN -- wired next)
-#   M8AC0 = FUN_005a8ac0 (curve-speed windup that tail-calls 8f20; arg0 = the computed heading)
+#   M8F20 = FUN_005a8f20 (steer_8f20, oracle-GREEN -- WIRED under `wire`)
+#   M8AC0 = FUN_005a8ac0 (curve-speed windup that tail-calls 8f20; arg0 = the computed heading;
+#           windup_8ac0, oracle-GREEN via run_8ac0_oracle.sh -- WIRED under `wire`)
 #   AA4D0 = FUN_005aa4d0 (kick_setup, already ported; distinct call site here)
 #   AA870/AAFD0 = FUN_005aa870(0) / FUN_005aafd0(1) (controller / non-controller possession tails)
 #   B8CE0 = FUN_005b8ce0 (select_nearest, already ported; here this=gs, find_in_front=1)
@@ -5240,10 +5270,12 @@ static func _settle_b(d: Dictionary, off: int) -> bool:
 	return (_g(d, off) & 0xff) != 0
 
 
-# `wire`: when true (the engine_tick integration call), the body-orient steer leaf FUN_005a8f20 is
-# CALLED for real (Pm98Movement.steer_8f20) instead of only trace-recorded; the other six leaves stay
-# deferred (traced). When false (the bare test_settle.gd gate) every leaf is trace-only. Either way the
-# M8F20 trace entry is still appended, so the bare selection oracle is unaffected.
+# `wire`: when true (the engine_tick integration call), the body-orient steer leaf FUN_005a8f20
+# (steer_8f20) AND the branch-2 windup leaf FUN_005a8ac0 (windup_8ac0, which itself sets p+0x6c then
+# tail-calls steer_8f20) are CALLED for real instead of only trace-recorded; the other five leaves
+# (B1420/AA4D0/AA870/AAFD0/B8CE0) stay deferred (traced). When false (the bare test_settle.gd gate)
+# every leaf is trace-only. Either way the M8F20/M8AC0 trace entries are still appended, so the bare
+# selection oracle is unaffected.
 static func settle_8680(p: Dictionary, wire: bool = false) -> void:
 	settle_trace = []
 	var m: Dictionary = _ref(p, 0x18c)
@@ -5305,6 +5337,8 @@ static func settle_8680(p: Dictionary, wire: bool = false) -> void:
 				ivar7cur = Pm98Trig._i32((tb & 0xffff) - 0x4000 + adj)
 				if Pm98Trig._s16(ivar7cur) != -1:
 					settle_trace.append(["M8AC0", ivar7cur & 0xffffffff])   # FUN_005a8ac0(ivar7cur, 100)
+					if wire:
+						windup_8ac0(p, Pm98Trig._i32(ivar7cur), 100)         # curve-windup + steer_8f20
 					taken = true
 			if not taken:
 				var hiword := (ivar7cur & 0xffffffff) >> 16

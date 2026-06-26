@@ -1,0 +1,10 @@
+# Stage 3 settle leaf FUN_005a8ac0 (windup) PCode-emu truth. PURE INTEGER; tail-call 8f20 STUBBED.
+# Row: FIX <name> | 6c=<p+0x6c LE int32> | m8f20_arg0=<heading forwarded>. P=0x230000 M=0x260000
+# BALL=0x270000 OTHER=0x2a0000. Formula inputs p+0x70=15000 p+0x3ac=0x10000 p+0x3a8=0x111.
+FIX formula | mem[0x23006c:4]=65809 | m8f20_arg0=8738
+FIX formula_str80 | mem[0x23006c:4]=52701 | m8f20_arg0=4660
+FIX formula_scale | mem[0x23006c:4]=49425 | m8f20_arg0=8738
+FIX park_flagclear | mem[0x23006c:4]=0 | m8f20_arg0=12288
+FIX park_mismatch | mem[0x23006c:4]=0 | m8f20_arg0=16384
+FIX noscale_match | mem[0x23006c:4]=65809 | m8f20_arg0=20480
+FIX phase1_formula | mem[0x23006c:4]=65809 | m8f20_arg0=24576
