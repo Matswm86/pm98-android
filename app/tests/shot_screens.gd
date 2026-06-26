@@ -47,8 +47,9 @@ func _run() -> void:
 			node.setup(club, tactics, "M. MJATVEDT", "Premier League", "1997-98", 1)
 		elif s[1] == "finance_demo.png":
 			# Real ledger summary off the demo roster so the income ▲ / expense ▼ markers
-			# render on populated rows (FinanceModel is GameDB-free).
-			var fin := FinanceModel.summary(club, 0)
+			# render on populated rows (FinanceModel is GameDB-free). Tier is 1..4 (Premier..
+			# Div3); its constant tables have no tier-0 key, so 1 is the valid demo tier.
+			var fin := FinanceModel.summary(club, 1)
 			node.setup(fin, "ARSENAL", "M. MJATVEDT", "1997-98", 1_000_000, 17)
 		elif s[1] == "transfer_demo.png":
 			node.setup(_demo_market(), "ARSENAL", "M. MJATVEDT", "1997-98", 8_500_000,
