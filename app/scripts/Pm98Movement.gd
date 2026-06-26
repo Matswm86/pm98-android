@@ -1986,6 +1986,89 @@ static func _marker_grid_build(p: Dictionary, pass_idx: int) -> Array:
 	return work
 
 
+## DAT_006654e8: per-marker selector. -1 markers (i=0,1) are SKIPPED on pass>=1 in the scan and, in the
+## (unported) apply, the >=0 entries are the kick/transfer action ids. Carried from the gridbuild handoff.
+const MARK_SENTINEL := [-1, -1, 53, 49, 38, 42, 50, 39, 43]
+
+
+## True when (x,y,z) is inside the match marker bbox m+0x1828..0x183c (signed, inclusive). The binary's
+## OUTSIDE test is `x<1828 || 1834<x || y<182c || 1838<y || z<1830 || 183c<z`; inside = none of those.
+static func _marker_in_bbox(m: Dictionary, x: int, y: int, z: int) -> bool:
+	if x < _si(m, 0x1828) or _si(m, 0x1834) < x:
+		return false
+	if y < _si(m, 0x182c) or _si(m, 0x1838) < y:
+		return false
+	if z < _si(m, 0x1830) or _si(m, 0x183c) < z:
+		return false
+	return true
+
+
+## FUN_005a7260 marker-grid block, slice 2b-iii-c: the per-pass MARKER SCAN (0x5a8010..0x5a826e). For each
+## of the 9 markers i=0..8 it forms D = work[KICK_FRAME[i]] - p.pos, scores it by planar distance against
+## the marker's grid cell (KICK_GRID1[i]), applies a z-band gate + a planar-threshold gate + a heading gate,
+## and tracks the single best marker into `best`. On pass >=1 the two no-sentinel markers (i=0,1) are skipped.
+## `best` is an 8-int row [idx, frame4, score, heading_abs, hd1, wx, wy, wz] seeded by the per-pass-loop to
+## [-1, 0, 0, 0x7c72, 0x7c72, 0, 0, 0] (the binary seeds [esp+0x2c]=-1, [esp+0x28]=0, [esp+0x38]=0,
+## [esp+0x4c]=[esp+0x50]=0x7c72; wx/wy/wz [esp+0x54..0x5c] are real-game uninit-until-first-keep, pinned to
+## 0 here and in the oracle). DECIDE-only, NOT wired (the 2-pass outer loop + apply/tail are 2b-iii-d..2b-iv).
+##   score   = planar_mag(D.x, D.y) - KICK_GRID1[i].x
+##   angle1  = atan_angle(D.x, D.y);  angle2 = atan_angle(ball.pos - p.pos)   [angle2 is per-pass constant]
+##   hd1     = CONCAT22(hi(angle1), s16(angle1 - p.facing)) - KICK_GRID1[i].y                       (int32)
+##   heading = abs( s16( (p.facing - angle2) + s16(hd1) ) )
+##   gate    = abs(work[frame].z - KICK_GRID1[i].z) < 0x6666  AND  abs(score) < KICK_THRESH[i]
+##             (the binary's `(double)g1z == 1.8` OR-branch is DEAD -- g1z is an int, never 1.8)
+##   keep if heading < s16(best.heading); else keep only when work[frame] is inside the marker bbox AND the
+##          incumbent best is NOT (prefer in-box markers even at a worse heading).
+## Locked vs the REAL FUN_005a7260 scan (best-state read back after one scan pass at the 0x5a8274 pass
+## increment) by tools/re/run_7260markerscan_oracle.sh -> app/tests/test_7260markerscan.gd.
+static func _marker_scan(p: Dictionary, work: Array, pass_idx: int, best: Array) -> void:
+	var ball: Dictionary = _ref(p, 0x190)
+	var m: Dictionary = _ref(p, 0x18c)
+	var px := _si(p, 4)
+	var py := _si(p, 8)
+	var facing := _g(p, 0x34) & 0xffff
+	# angle2 = atan to the ball (ball.pos - p.pos), constant across markers within the pass.
+	var bdx := Pm98Trig._i32(_si(ball, 4) - px)
+	var bdy := Pm98Trig._i32(_si(ball, 8) - py)
+	var angle2 := Pm98Trig.atan_angle(bdx, bdy) & 0xffff
+	for i in range(9):
+		if pass_idx != 0 and int(MARK_SENTINEL[i]) == -1:
+			continue
+		var frame: int = int(KICK_FRAME[i])
+		var g1: Array = KICK_GRID1[i]
+		var w: Array = work[frame]
+		var wx := int(w[0])
+		var wy := int(w[1])
+		var wz := int(w[2])
+		var dx := Pm98Trig._i32(wx - px)
+		var dy := Pm98Trig._i32(wy - py)
+		var mag := Pm98Trig.planar_mag(dx, dy)
+		var score := Pm98Trig._i32(mag - int(g1[0]))
+		var atan1 := Pm98Trig._i32(Pm98Trig.atan_angle(dx, dy))
+		# hd1 = CONCAT22(hi(atan1), (atan1 - facing)&0xffff) - g1y, int32 (only s16(hd1) feeds heading).
+		var hd1 := Pm98Trig._i32(((atan1 & ~0xffff) | ((atan1 - facing) & 0xffff)) - int(g1[1]))
+		var heading := absi(Pm98Trig._s16((facing - angle2) + Pm98Trig._s16(hd1)))
+		# z-band + planar-threshold gates (the FP OR-branch on g1z==1.8 is dead).
+		if absi(Pm98Trig._i32(wz - int(g1[2]))) >= 0x6666:
+			continue
+		if absi(score) >= int(KICK_THRESH[i]):
+			continue
+		var keep := heading < Pm98Trig._s16(int(best[3]))
+		if not keep:
+			# worse heading: replace only if this marker is in the bbox and the incumbent is not.
+			if _marker_in_bbox(m, wx, wy, wz) and not _marker_in_bbox(m, int(best[5]), int(best[6]), int(best[7])):
+				keep = true
+		if keep:
+			best[0] = i
+			best[1] = frame * 4
+			best[2] = score
+			best[3] = heading
+			best[4] = hd1
+			best[5] = wx
+			best[6] = wy
+			best[7] = wz
+
+
 # ---- FUN_005a3400 the per-player DECIDE, slice A (prologue + bbox) --------------------
 # The first ~100 instructions of the per-player movement-target computer: set the goal-X
 # anchor, the two target endpoints, and the movement bounding box, all oriented by side.
