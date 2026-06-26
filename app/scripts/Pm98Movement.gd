@@ -2069,6 +2069,79 @@ static func _marker_scan(p: Dictionary, work: Array, pass_idx: int, best: Array)
 			best[7] = wz
 
 
+## DAT_006654c0: per-marker APPLY action -- the set-position-code arg on the kick-fire path (markers whose
+## MARK_SENTINEL is -1). STATIC, extracted bit-for-bit from MANAGER.EXE @0x6654c0; indexed by the winning
+## marker row (best-idx 0..8). On the NON-fire path the apply uses MARK_SENTINEL[idx] itself instead.
+const MARK_ACTION := [0x2e, 0x2f, 0x30, 0x33, 0x28, 0x2c, 0x34, 0x29, 0x2d]
+
+
+## FUN_005a7260 marker-grid block, slice 2b-iii-d: the APPLY (0x5a829a..0x5a8453), run when the scan kept a
+## marker (best-idx >= 0). Returns true when a marker was applied (the binary's local_159 / [esp+0x17] flag),
+## false when best-idx < 0 (the `test edi,edi; jl 0x5a8457` no-op). It builds a polar locomotion STEER-POINT,
+## sets the marker bit + the chosen position code, optionally FIRES the kick (markers 0/1, MARK_SENTINEL ==
+## -1), then writes the locomotion target. The Ghidra decompiler renders the locomotion target as
+## `local_158 + p.pos` -- an esp-slot ALIAS. The disassembly (0x5a82c2..0x5a843d) proves it is actually the
+## FUN_005ee0f0 steer-point offset by p.pos (slots [esp+0x18/1c/20] hold polar.xyz + p.pos, NOT the last
+## marker's work pos). ball+0x6c / the ball-anim target come from the BEST row, NOT (frame-5)*4 / ball anim.
+##   steer = polar_vec(KICK_GRID2[idx].x + best_score, p.facing + KICK_GRID2[idx].y + best_hd1)   [z = 0]
+##   m+0x461 |= 0x10 ; p+0x44 = best_idx
+##   if MARK_SENTINEL[idx] == -1:  fire kick -- keeper_event(ball,1); enqueue(m,0xf,p,0);
+##       set_position_code(MARK_ACTION[idx]); stat+0x94++; ball+0x70 = max(.,0x78); ball.vel = 0;
+##       ball+0x68 = 1; ball+0x6c = best_frame4; ball anim target +0x9c/a0/a4 = best wx/wy/wz;
+##       engage(ball->p); ball+0x63 = 1; m+0x458 = 0
+##   else:                          set_position_code(MARK_SENTINEL[idx])
+##   p+0x84 = best_frame4 ; p+0x80 = 1 ; p+0x94/98/9c = steer + p.pos ; p+0x66 = (p.facing + best_hd1) word
+## The RNG save/restore (5ec240/5ec230) + gated commentary (4ebf80, match+0x180b==0) leaves are net-neutral
+## and skipped (as in _kick_strike). Locked vs the REAL FUN_005a7260 apply (driven mid-fn through build +
+## scan + apply, fields read back at the 0x5a8457 tail) by tools/re/run_7260markerapply_oracle.sh ->
+## app/tests/test_7260markerapply.gd.
+static func _marker_apply(p: Dictionary, best: Array) -> bool:
+	var idx := int(best[0])
+	if idx < 0:
+		return false
+	var ball: Dictionary = _ref(p, 0x190)
+	var m: Dictionary = _ref(p, 0x18c)
+	var g2: Array = KICK_GRID2[idx]
+	var score := int(best[2])
+	var hd1 := int(best[4])
+	var frame4 := int(best[1])
+	# Steer-point: polar(grid2.x + score, facing + grid2.y + hd1) -- cos_a/sin_a _s16 the angle, so the
+	# binary's 16-bit `add dx,cx` then 32-bit `add edx,ebp` reduce to this sum mod 0x10000. z = 0.
+	var aim := (_g(p, 0x34) & 0xffff) + int(g2[1]) + hd1
+	var steer: Array = Pm98Trig.polar_vec(Pm98Trig._i32(int(g2[0]) + score), aim)
+	var sx := Pm98Trig._i32(int(steer[0]) + _si(p, 4))
+	var sy := Pm98Trig._i32(int(steer[1]) + _si(p, 8))
+	var sz := Pm98Trig._i32(int(steer[2]) + _si(p, 0xc))
+	m[0x461] = _g(m, 0x461) | 0x10
+	p[0x44] = idx
+	if int(MARK_SENTINEL[idx]) == -1:
+		# Fire the kick (the kick-grid markers 0/1). Mirrors _kick_strike's tail, but driven off the scan
+		# best row: ball+0x6c = best_frame4 (KICK_FRAME[idx]*4) and the anim target = best wx/wy/wz.
+		Pm98Events.keeper_event(ball, 1)                       # FUN_005909f0(1) (no-op, keeper null)
+		Pm98Events.enqueue(m, 0xf, p, 0)                       # FUN_00594470(0xf, p, 0)
+		set_position_code(p, int(MARK_ACTION[idx]))            # FUN_005a5430(DAT_006654c0[idx])
+		var stat := _ref(p, 0x3b8)                             # DAT_006d31c4 == 0 (live) -> bump
+		stat[0x94] = _g(stat, 0x94) + 1
+		ball[0x70] = 0x78 if _si(ball, 0x70) < 0x79 else _si(ball, 0x70)
+		ball[0x20] = 0; ball[0x24] = 0; ball[0x28] = 0
+		ball[0x68] = 1
+		ball[0x6c] = frame4
+		ball[0x9c] = int(best[5]); ball[0xa0] = int(best[6]); ball[0xa4] = int(best[7])
+		_ball_engage_player(ball, p)                           # FUN_0058eca0(ball, p)
+		ball[0x63] = 1
+		m[0x458] = 0
+	else:
+		set_position_code(p, int(MARK_SENTINEL[idx]))          # FUN_005a5430(DAT_006654e8[idx])
+	# Locomotion target (BOTH branches).
+	p[0x84] = frame4
+	p[0x80] = 1
+	p[0x94] = sx
+	p[0x98] = sy
+	p[0x9c] = sz
+	p[0x66] = (_g(p, 0x34) + hd1) & 0xffff
+	return true
+
+
 # ---- FUN_005a3400 the per-player DECIDE, slice A (prologue + bbox) --------------------
 # The first ~100 instructions of the per-player movement-target computer: set the goal-X
 # anchor, the two target endpoints, and the movement bounding box, all oriented by side.
