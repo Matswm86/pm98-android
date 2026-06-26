@@ -584,10 +584,23 @@ static func _concat22(hi: int, lo16: int) -> int:
 # the real leaves (which DO write fields) replace these stubs in Tasks #2/#3.
 static var trace_calls: Array = []
 
-## FUN_005b0b40 (thiscall player; 0xfffe0000): count teammates closer to goal than self. STUB -> 0.
-static func _count_teammates_closer(_p: Dictionary, arg: int) -> int:
+## FUN_005b0b40 (__thiscall player P, int param_2): count the OPPONENT-team players (the descriptor
+## P+0x188 = {base, count}) whose `abs(q[4]-q[0x3a4])` is strictly below `param_2 + abs(P[4]+
+## P[0x3a4])` (signed). Note the binary's asymmetry: SELF uses '+', each roster player uses '-'.
+## The binary's {base,count} descriptor maps to the team's roster Array (count == roster size, base
+## always valid in a populated match), per the select_mark_target convention; a null/absent
+## descriptor (the engine Step-1 fixtures, no opponent built) yields 0 -- matching the engine-oracle
+## stub. Oracle-locked vs the REAL FUN_005b0b40 (tools/re/run_b0b40_oracle.sh -> test_b0b40.gd).
+static func _count_teammates_closer(p: Dictionary, arg: int) -> int:
 	trace_calls.append(["B0B40", arg])
-	return 0
+	var self_m := absi(Pm98Trig._i32(_si(p, 4) + _si(p, 0x3a4)))
+	var thr := Pm98Trig._i32(Pm98Trig._i32(arg) + self_m)
+	var players: Array = _ref(p, 0x188).get("players", [])
+	var n := 0
+	for q in players:
+		if q is Dictionary and absi(Pm98Trig._i32(_si(q, 4) - _si(q, 0x3a4))) < thr:
+			n += 1
+	return n
 
 # The 7 Family-A action handlers are now WIRED inline in _action_switch (Task #4) to their oracle-GREEN
 # Pm98Movement ports. case 8/9 is now WIRED to the resolver port (Task #4b); only the case-0x13 shot-setup

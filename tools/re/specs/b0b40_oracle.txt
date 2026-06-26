@@ -1,0 +1,9 @@
+# Stage 3 movement leaf: FUN_005b0b40 (opponent-count) ground truth (PCode emu; pure
+# counter, no float-import, no LUT; EAX = returned count). Each row: FIX <name> CALL line.
+# self=abs(P[4]+P[0x3a4]); per-q abs(q[4]-q[0x3a4]); count where q<param_2+self (param_2=-0x20000).
+FIX count0 CALL 0 RET steps=26 EAX=0
+FIX count2 CALL 0 RET steps=60 EAX=2
+FIX mixed3 CALL 0 RET steps=76 EAX=2
+FIX boundary CALL 0 RET steps=59 EAX=1
+FIX null_base CALL 0 RET steps=36 EAX=0
+FIX negself CALL 0 RET steps=74 EAX=0

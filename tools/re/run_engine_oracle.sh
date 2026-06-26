@@ -47,6 +47,11 @@ STUBS=(
   "0x5a8f20 0 4 M8f20"     # body orient (arg = facing)
   "0x605ff0 0 0 atexit"    # FUN_00605ff0 atexit (7260 lazy-init marker grids + steer box-init) -- fault guard
 )
+# NOTE: FUN_005b0b40 (B0B40, the opponent-count for the +0x2d8 flag) is now PORTED
+# (Pm98Action._count_teammates_closer, oracle-locked via run_b0b40_oracle.sh -> test_b0b40.gd). It STAYS
+# stubbed-to-0 HERE because these Step-1 fixtures build no opponent descriptor (P+0x188 zeroed); the
+# port likewise returns 0 on the empty roster, so the two sides match. A future engine fixture that
+# populates P+0x188 must drop this stub to exercise the non-trivial count.
 # NOTE: FUN_005a7260 (M7260, the ball-touch/dribble decision) is NO LONGER STUBBED -- it is ported
 # (Pm98Movement.ball_touch_7260) and runs REAL here so test_engine_tick verifies it transitively. Its
 # slice-1 reachable surface for these fixtures: flag2d8 (not-same-side) takes the goal-anchor steer
