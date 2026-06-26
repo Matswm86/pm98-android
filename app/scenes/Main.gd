@@ -52,7 +52,7 @@ func _ready() -> void:
 			and not OS.has_environment("PM98_TRAIN_SHOT") and not OS.has_environment("PM98_CUP_SHOT") \
 			and not OS.has_environment("PM98_YOUTH_SHOT") and not OS.has_environment("PM98_STAFF_SHOT") \
 			and not OS.has_environment("PM98_CONTRACT_SHOT") and not OS.has_environment("PM98_SCREENS_SHOT") \
-			and not OS.has_environment("PM98_MANAGER_SHOT"):
+			and not OS.has_environment("PM98_MANAGER_SHOT") and not OS.has_environment("PM98_FICHA_SHOT"):
 		_devshot()
 
 
@@ -93,6 +93,9 @@ func _boot() -> void:
 		return
 	if OS.has_environment("PM98_MANAGER_SHOT"):
 		_manager_shot()
+		return
+	if OS.has_environment("PM98_FICHA_SHOT"):
+		_ficha_shot()
 		return
 	var boot_shot := OS.has_environment("PM98_BOOT_SHOT")
 	if boot_shot or not OS.has_environment("PM98_SHOT_DIR"):
@@ -597,6 +600,43 @@ func _screens_shot() -> void:
 	print("SCREENS-SHOT done club=%s week=%d" % [_career.club_name, _career.week])
 	get_tree().quit()
 
+## Faithful real-render of the PLAYER INFORMATION (FICHA) popup. Picks a real Premier
+## player WITH a BIGFOTO mugshot (Schmeichel, photoId 3371) so the capture proves the
+## extracted face renders on a real screen, mounts his FICHA over the squad, and captures
+## it. Run as the NORMAL app under Xvfb+GL: PM98_FICHA_SHOT=1.
+func _ficha_shot() -> void:
+	var dir := OS.get_environment("PM98_SHOT_DIR")
+	# Find the club + player carrying the canonical verified face (Schmeichel 3371),
+	# else any Premier player with a photo + decoded physicals.
+	var club: Dictionary = {}
+	var player: Dictionary = {}
+	for c in GameDB.clubs:
+		if c.get("leagueId") != "eng_prem":
+			continue
+		for p in c.get("players", []):
+			if int(p.get("photoId", 0)) == 3371:
+				club = c
+				player = p
+			if player.is_empty() and p.get("photoId") != null and p.get("heightCm") != null:
+				club = c
+				player = p
+		if int(player.get("photoId", 0)) == 3371:
+			break
+	if player.is_empty():
+		print("FICHA-SHOT no photo player found")
+		get_tree().quit()
+		return
+	_open_squad(club, "", "")
+	await _settle()
+	_open_player_info(player, club)
+	await _settle()
+	_save_shot(dir, "player_info.png")
+	print("FICHA-SHOT done %s %s photoId=%s %scm %skg %s" % [str(player.get("name")),
+		str(club.get("name")), str(player.get("photoId")), str(player.get("heightCm")),
+		str(player.get("weightKg")), str(player.get("nationality"))])
+	get_tree().quit()
+
+
 ## Free any mounted art-overlay child (everything except the persistent hub), so the next
 ## capture starts clean. Used by _screens_shot between shots.
 func _free_overlays() -> void:
@@ -606,7 +646,8 @@ func _free_overlays() -> void:
 		if c is LeagueTableScreen or c is LineupScreen or c is SquadScreen \
 				or c is FinanceScreen or c is TransferScreen or c is DirectivaScreen \
 				or c is StadiumScreen or c is CupScreen or c is YouthScreen \
-				or c is StaffScreen or c is BrowseScreen or c is TacticsScreen:
+				or c is StaffScreen or c is BrowseScreen or c is TacticsScreen \
+				or c is PlayerInfoScreen:
 			c.queue_free()
 	_browse = null
 
@@ -779,6 +820,16 @@ func _open_squad(club: Dictionary, manager: String, cash: String, youth_enabled 
 	scr.setup(club, manager, cash, youth_enabled, season, week)
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
 	scr.youth_pressed.connect(_show_youth_screen)
+	scr.player_pressed.connect(_open_player_info.bind(club))
+
+## PLAYER INFORMATION (FICHA) overlay for one squad player, raised over the SQUAD screen.
+## tier (for value/wage) comes from the club's division; OK / a tap dismisses it.
+func _open_player_info(player: Dictionary, club: Dictionary) -> void:
+	var scr: PlayerInfoScreen = load("res://scenes/PlayerInfoScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(player, club, FinanceModel.tier_of(club, GameDB.leagues))
+	scr.back_pressed.connect(func() -> void: scr.queue_free())
 
 ## Reversed LEAGUE TABLES overlay for any standings array (career or a SeasonSim table).
 func _open_table(rows: Array, title_left: String, season: String, week_label: String,

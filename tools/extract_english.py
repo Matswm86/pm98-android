@@ -132,9 +132,10 @@ def header(d: bytes, off: int):
 
 def find_anchors(d: bytes, lo: int, hi: int):
     """Candidate birth-year anchors for the EXTENDED English record: a u16 year in
-    1940-1985 followed by a flag byte >=0x80. The real filter is name_before()
-    succeeding (a length-prefixed short+full name ending just before the anchor) -
-    coincidental u16s in bio/career text don't have a clean name in front of them."""
+    1940-1985 followed at Y+2 by the HEIGHT-in-cm byte (always >=0x80 == 150cm for an
+    adult; this is the byte an earlier pass mislabelled a "flag >=0x80"). The real filter
+    is name_before() succeeding (a length-prefixed short+full name ending just before the
+    anchor) - coincidental u16s in bio/career text don't have a clean name in front."""
     out = []
     for Y in range(lo, hi - 6):
         year = struct.unpack_from("<H", d, Y)[0]
@@ -155,6 +156,107 @@ ATTR_NAMES = ["VE", "RE", "AG", "CA", "RM", "RG", "PA", "TI", "EN", "PO"]
 # (Adams/Keown/Dixon/Winterburn=DF, Vieira/Petit/Parlour/Overmars=MF, Wright/Bergkamp/
 # Anelka=FW). See docs/re/positions_re.md.
 POS_NAMES = {0: "GK", 1: "DF", 2: "MF", 3: "FW"}
+
+# Nationality whitelist. The EXTENDED record stores an explicit nationality cipher string
+# ONLY for non-English players (it is the 3rd length-prefixed string after the physical
+# bytes: birthplace, previous club, NATIONALITY); English players omit it and default to
+# ENGLAND. So we read the 3rd string and accept it only when it is a real country - every
+# other 3rd-string is bio prose ("NO", "CK", "YS AS A CENTR"...) and means the field was
+# absent, i.e. ENGLAND. Whitelist derived by scanning the nationality position across all
+# 92 English clubs (the home nations WALES/SCOTLAND/EIRE/NORTHERN IRELAND are tagged, only
+# England is the omitted default). See docs/re/faces_re.md / the FICHA decode notes.
+COUNTRIES = {
+    "WALES",
+    "SCOTLAND",
+    "EIRE",
+    "NORTHERN IRELAND",
+    "NORWAY",
+    "SWEDEN",
+    "DENMARK",
+    "ICELAND",
+    "FINLAND",
+    "HOLLAND",
+    "FRANCE",
+    "ITALIA",
+    "ITALY",
+    "GERMANY",
+    "SPAIN",
+    "PORTUGAL",
+    "BELGIUM",
+    "SWITZERLAND",
+    "AUSTRIA",
+    "GREECE",
+    "YUGOSLAVIA",
+    "CROATIA",
+    "SLOVENIA",
+    "CZECH REPUBLIC",
+    "SLOVAKIA",
+    "POLAND",
+    "ROMANIA",
+    "BULGARIA",
+    "HUNGARY",
+    "RUSSIA",
+    "GEORGIA",
+    "UKRAINE",
+    "ISRAEL",
+    "AUSTRALIA",
+    "SOUTH AFRICA",
+    "NIGERIA",
+    "GHANA",
+    "CAMEROON",
+    "MOROCCO",
+    "UNITED STATES",
+    "USA",
+    "CANADA",
+    "JAMAICA",
+    "TRINIDAD",
+    "BARBADOS",
+    "BERMUDA",
+    "COSTA RICA",
+    "BRAZIL",
+    "ARGENTINA",
+    "URUGUAY",
+    "COLOMBIA",
+    "NEW ZEALAND",
+    "ZIMBABWE",
+    "ZAMBIA",
+    "LIBERIA",
+    "DR CONGO",
+}
+
+
+def physicals(d: bytes, Y: int):
+    """(height_cm, weight_kg) from the two bytes right after the birth-year anchor:
+    Y+2 = height in cm, Y+3 = weight in kg (single bytes; the FICHA reads them at
+    player+0xf9 / +0xfa and converts to stone/feet via 6.35 kg/stone + 30.48 cm/foot,
+    confirmed in MANAGER.EXE FUN_0058dd70/FUN_0058de00). Validated vs real values:
+    Giggs 180cm, Owen 173cm, Schmeichel/Seaman 193cm, Beckham 183cm. None for absent
+    (out-of-range) records."""
+    cm = d[Y + 2] if len(d) > Y + 2 else 0
+    kg = d[Y + 3] if len(d) > Y + 3 else 0
+    h = cm if 140 <= cm <= 215 else None
+    w = kg if 45 <= kg <= 130 else None
+    return h, w
+
+
+def nationality(d: bytes, Y: int, hi: int):
+    """The player's nationality: the 3rd length-prefixed cipher string after the physical
+    bytes (birthplace, prev-club, NATIONALITY), accepted only when it is a known country;
+    otherwise the field was omitted (English player) -> 'ENGLAND'. Bounded to this player's
+    record region (`hi` = next anchor) so it never grabs the next player's data."""
+    p = Y + 4
+    got = []
+    scan = p
+    while scan < hi and len(got) < 3:
+        r = rdstr(d, scan, 40)
+        if r:
+            got.append(r[0].strip())
+            scan = r[1]
+        else:
+            scan += 1
+    if len(got) >= 3 and got[2].upper() in COUNTRIES:
+        return got[2].upper()
+    return "ENGLAND"
 
 
 def find_attr_blocks(d: bytes, lo: int, hi: int):
@@ -269,6 +371,8 @@ def parse_club(d: bytes, off: int, end: int, archive: set[int] | None = None):
         # player+0x18 the stat engine reads as the scorer-roulette POS_WEIGHT index.
         # Cross-validated to a clean role partition; see docs/re/positions_re.md.
         fine = d[Y - 12] if Y - 12 >= 0 and d[Y - 12] < 19 else None
+        height_cm, weight_kg = physicals(d, Y)
+        nat = nationality(d, Y, nxt)
         players.append(
             {
                 "name": display,
@@ -279,6 +383,14 @@ def parse_club(d: bytes, off: int, end: int, archive: set[int] | None = None):
                 "posFine": fine,
                 "isGK": is_gk,
                 "photoId": photo_id,
+                "nationality": nat,
+                # KIND: the FICHA's NATIONAL / NON-NATIONAL flag - English/British players
+                # are "national" to the English game, foreigners are not.
+                "kind": "NATIONAL"
+                if nat in ("ENGLAND", "WALES", "SCOTLAND", "NORTHERN IRELAND", "EIRE")
+                else "NON-NATIONAL",
+                "heightCm": height_cm,
+                "weightKg": weight_kg,
                 "attrs": dict(zip(ATTR_NAMES, row)) if row else None,
             }
         )

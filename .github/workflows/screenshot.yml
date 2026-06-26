@@ -131,6 +131,13 @@ jobs:
             timeout 120 "$GITHUB_WORKSPACE/godot" --rendering-driver opengl3 \
             --resolution 2400x1080 . 2>&1 | tee screens.log || true
           echo "--- SCREENS diagnostics ---"; grep -iE "SCREENS-SHOT|SHOT .*png|SCRIPT ERROR|error" screens.log | head -20 || true
+          # PLAYER INFORMATION (FICHA) popup: proves the extracted BIGFOTO mugshot +
+          # decoded metric height/weight + nationality render on a real screen.
+          PM98_SHOT_DIR="$PWD/shots" PM98_FICHA_SHOT=1 LIBGL_ALWAYS_SOFTWARE=1 \
+            xvfb-run -a -s "-screen 0 2400x1080x24" \
+            timeout 90 "$GITHUB_WORKSPACE/godot" --rendering-driver opengl3 \
+            --resolution 2400x1080 . 2>&1 | tee ficha.log || true
+          echo "--- FICHA diagnostics ---"; grep -iE "FICHA-SHOT|SHOT .*png|SCRIPT ERROR|error" ficha.log | head -20 || true
           # Direct art-screen render for comparison.
           PM98_SHOT_DIR="$PWD/shots" LIBGL_ALWAYS_SOFTWARE=1 \
             xvfb-run -a -s "-screen 0 1280x720x24" \

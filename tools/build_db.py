@@ -15,6 +15,7 @@ Season is 1996-97 (verified: idx 38-57 == the real 96-97 Premier League).
 English clubs are idx-ordered into the four divisions; everything else is tagged
 country-only (best-effort) under leagueId=null. Run from the project root.
 """
+
 from __future__ import annotations
 
 import json
@@ -45,8 +46,23 @@ def norm(s: str) -> str:
     """Uppercase, strip accents + punctuation + club-form noise for fuzzy match."""
     s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode()
     s = s.upper()
-    for junk in ("F.C.", "FC", "C.F.", "CF", "R.C.", "RC", "A.C.", "AC", "U.D.",
-                 "S.C.", "UTD", "UNITED", "REAL", "CLUB", "DEPORTIVO"):
+    for junk in (
+        "F.C.",
+        "FC",
+        "C.F.",
+        "CF",
+        "R.C.",
+        "RC",
+        "A.C.",
+        "AC",
+        "U.D.",
+        "S.C.",
+        "UTD",
+        "UNITED",
+        "REAL",
+        "CLUB",
+        "DEPORTIVO",
+    ):
         s = s.replace(junk, " ")
     s = re.sub(r"[^A-Z0-9 ]", " ", s)
     return re.sub(r"\s+", " ", s).strip()
@@ -106,6 +122,10 @@ def main() -> None:
             "isGK": bool(p.get("isGK")),
             "media": p.get("media"),
             "photoId": p.get("photoId"),  # J96NNNNN face-bank key (English squads); faces_re.md
+            "nationality": p.get("nationality"),  # EQUIPOS cipher string; ENGLAND default
+            "kind": p.get("kind"),  # FICHA NATIONAL / NON-NATIONAL flag (derived from nat)
+            "heightCm": p.get("heightCm"),  # EQUIPOS Y+2 byte (cm); FICHA player+0xf9
+            "weightKg": p.get("weightKg"),  # EQUIPOS Y+3 byte (kg); FICHA player+0xfa
             # Never null: a sparse record with no decoded attribute row gets {} so every
             # consumer's `attrs.get(key, default)` chain stays safe (a pos-decoded keeper
             # with no attr row is still isGK, and must not crash the commentary/sort paths).
@@ -121,21 +141,24 @@ def main() -> None:
                 continue
             cid = idx  # English idx is a stable, unique club id
             cap = laliga_caps.get(c["name"], {})  # (English clubs won't match; null cap)
-            clubs.append({
-                "id": cid,
-                "name": c["name"],
-                "fullName": c.get("fullName", c["name"]),
-                "stadium": c.get("stadium"),
-                "manager": c.get("manager"),
-                "country": "England",
-                "leagueId": lid,
-                "capacity": cap.get("capacity"),
-                "foundingYear": cap.get("founded"),
-                "players": [emit_player(p, cid) for p in c.get("players", [])],
-            })
+            clubs.append(
+                {
+                    "id": cid,
+                    "name": c["name"],
+                    "fullName": c.get("fullName", c["name"]),
+                    "stadium": c.get("stadium"),
+                    "manager": c.get("manager"),
+                    "country": "England",
+                    "leagueId": lid,
+                    "capacity": cap.get("capacity"),
+                    "foundingYear": cap.get("founded"),
+                    "players": [emit_player(p, cid) for p in c.get("players", [])],
+                }
+            )
             club_ids.append(cid)
-        leagues.append({"id": lid, "name": lname, "country": "England",
-                        "tier": tier, "clubIds": club_ids})
+        leagues.append(
+            {"id": lid, "name": lname, "country": "England", "tier": tier, "clubIds": club_ids}
+        )
 
     # --- International clubs (browseable; leagueId null, country best-effort) ---
     matched = 0
@@ -149,18 +172,20 @@ def main() -> None:
         if ctry:
             matched += 1
         cap = laliga_caps.get(t["name"], {})
-        clubs.append({
-            "id": cid,
-            "name": t["name"],
-            "fullName": t.get("fullName", t["name"]),
-            "stadium": t.get("stadium"),
-            "manager": t.get("manager"),
-            "country": ctry,
-            "leagueId": None,
-            "capacity": cap.get("capacity"),
-            "foundingYear": cap.get("founded"),
-            "players": [emit_player(p, cid) for p in t.get("players", [])],
-        })
+        clubs.append(
+            {
+                "id": cid,
+                "name": t["name"],
+                "fullName": t.get("fullName", t["name"]),
+                "stadium": t.get("stadium"),
+                "manager": t.get("manager"),
+                "country": ctry,
+                "leagueId": None,
+                "capacity": cap.get("capacity"),
+                "foundingYear": cap.get("founded"),
+                "players": [emit_player(p, cid) for p in t.get("players", [])],
+            }
+        )
 
     intl = [c for c in clubs if c["leagueId"] is None]
     db = {
@@ -169,8 +194,8 @@ def main() -> None:
             "season": "1997-98",
             "source": "reverse-engineered from EQUIPOS.PKF (owned game files); personal use",
             "note": "English divisions decoded from MANAGER.EXE's own league table "
-                    "(Premier == real 97-98 top flight; game keeps Hereford in Div3); "
-                    "international clubs country-tagged best-effort.",
+            "(Premier == real 97-98 top flight; game keeps Hereford in Div3); "
+            "international clubs country-tagged best-effort.",
             "counts": {
                 "leagues": len(leagues),
                 "clubs": len(clubs),
@@ -188,9 +213,11 @@ def main() -> None:
     out.write_text(json.dumps(db, ensure_ascii=False, indent=1), encoding="utf-8")
     c = db["meta"]["counts"]
     print(f"wrote {out.relative_to(ROOT)}")
-    print(f"  leagues={c['leagues']} clubs={c['clubs']} "
-          f"(english={c['englishClubs']} intl={c['internationalClubs']}) "
-          f"players={c['players']}")
+    print(
+        f"  leagues={c['leagues']} clubs={c['clubs']} "
+        f"(english={c['englishClubs']} intl={c['internationalClubs']}) "
+        f"players={c['players']}"
+    )
     print(f"  intl country-match rate: {c['intlCountryMatchRate']:.0%}")
 
 

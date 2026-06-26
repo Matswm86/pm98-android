@@ -16,6 +16,7 @@ class_name SquadScreen
 
 signal youth_pressed
 signal back_pressed
+signal player_pressed(player)
 
 const W := 640
 const H := 480
@@ -71,6 +72,7 @@ var _week: int = 0
 var _youth_enabled := false
 var _press := ""
 var _kit_tex: Texture2D
+var _rows: Array = []   # [{r: Rect2 (design space), p: Dictionary}] for player-row taps
 
 
 func _ready() -> void:
@@ -132,7 +134,8 @@ func _on_input(e: InputEvent) -> void:
 		_press = _hit(_to_design(pos))
 		queue_redraw()
 	else:
-		var a := _hit(_to_design(pos))
+		var d := _to_design(pos)
+		var a := _hit(d)
 		var was := _press
 		_press = ""
 		queue_redraw()
@@ -141,7 +144,13 @@ func _on_input(e: InputEvent) -> void:
 				youth_pressed.emit()
 			else:
 				back_pressed.emit()
-		elif was == "":
+			return
+		# A tap on a player row opens his PLAYER INFORMATION (FICHA), not a dismiss.
+		for row in _rows:
+			if (row["r"] as Rect2).has_point(d):
+				player_pressed.emit(row["p"])
+				return
+		if was == "":
 			back_pressed.emit()
 
 
@@ -210,6 +219,7 @@ func _draw_col_header() -> void:
 
 
 func _draw_list() -> void:
+	_rows.clear()
 	var secs := _sections()
 	var n_players := 0
 	for sec in secs:
@@ -239,6 +249,7 @@ func _section(y: int, label: String, row_h: int) -> void:
 
 
 func _row(y: int, idx: int, p: Dictionary, number: int, key: String, row_h: int) -> void:
+	_rows.append({"r": Rect2(ROW_X, y, ROW_W, row_h - 1), "p": p})
 	var is_gk := key == "GK"
 	var bg: Color = C_GK_ROW if is_gk else (PMChrome.C_ROW_LIGHT if idx % 2 == 0 else PMChrome.C_ROW_DARK)
 	draw_rect(Rect2(ROW_X, y, ROW_W, row_h - 1), bg, true)
