@@ -4,12 +4,13 @@
 # and bank the SKELETON's field writes + the movement-fn SELECTION that Pm98Action.engine_tick must
 # reproduce bit-for-bit (app/tests/test_engine_tick.gd).
 #
-# 12 leaf calls are STUBBED (PcodeEmu `stub`): the 7 action handlers (FUN_005acc40/ad010/ad970/
+# Leaf calls are STUBBED (PcodeEmu `stub`): the 7 action handlers (FUN_005acc40/ad010/ad970/
 # adc60/adfc0/ae4c0/ae910), the resolver case 8/9 (FUN_005aeda0), the case-0x13 shot-setup (FUN_005ac1a0),
-# the teammate-count (FUN_005b0b40), and 3 movement fns (FUN_005a8680/65a0/9490). Two movement fns now run
-# REAL here (un-stubbed): FUN_005a7260 (Pm98Movement.ball_touch_7260) and FUN_005a8f20
-# (Pm98Movement.steer_8f20, the body-orient steer wired at LAB_005a4fa2), so test_engine_tick verifies
-# both transitively. FUN_00605ff0 (atexit) is stubbed as a fault-guard for the steer box-init it
+# the teammate-count (FUN_005b0b40), 2 movement fns (FUN_005a65a0/9490), and the 6 DEFERRED settle sub-leaves
+# (FUN_005b1420/5a8ac0/5aa4d0/5aa870/5aafd0/5b8ce0). Three movement fns now run REAL here (un-stubbed):
+# FUN_005a7260 (Pm98Movement.ball_touch_7260), FUN_005a8f20 (Pm98Movement.steer_8f20, body-orient steer at
+# LAB_005a4fa2 AND inside settle), and FUN_005a8680 (Pm98Movement.settle_8680, wired via _move_8680), so
+# test_engine_tick verifies all three transitively. FUN_00605ff0 (atexit) is stubbed as a fault-guard for the steer box-init it
 # now reaches. Each stub returns 0, pops its args, and LOGS a "STUB <label> ... arg0=.." line so the
 # movement-fn selection + arg stay observable. The in-image pure helpers run REAL: tick_action=FUN_005a50c0, set_phase=005942e0,
 # set_position_code=005a5430, play_state=005943b0, within_box=00590c10, FUN_00606220 (no-op).
@@ -42,9 +43,19 @@ STUBS=(
   "0x5ae4c0 0 0 AE4C0"     # case 0x14/0x16
   "0x5ae910 0 0 AE910"     # case 0x15
   "0x5ac1a0 0 0 AC1A0"     # case 0x13 shot setup
-  "0x5a8680 0 0 M8680"     # settle move
   "0x5a65a0 0 4 M65a0"     # general move (arg = iStack_38)
   "0x5a9490 0 0 M9490"     # lean
+  # FUN_005a8680 (settle) is NO LONGER STUBBED -- it is ported + WIRED (Pm98Movement.settle_8680(p, true),
+  # called from Pm98Action._move_8680) and runs REAL here so test_engine_tick verifies it transitively. Its
+  # body-orient steer leaf FUN_005a8f20 stays un-stubbed (runs REAL, GREEN). The OTHER six settle leaves are
+  # DEFERRED -- stubbed below (returning 0, except B1420's discarded bool 1) so the settle SELECTION + the two
+  # direct writes (p+0x5d / p+0x54) are the surface; they get wired in a later gate. Argbytes per run_settle_oracle.sh.
+  "0x5b1420 1 0 B1420"     # settle: off-ball reposition gate (returns bool, discarded)
+  "0x5a8ac0 0 8 M8AC0"     # settle: curve-speed windup (heading, 100)
+  "0x5aa4d0 0 0 AA4D0"     # settle: kick_setup (distinct call site)
+  "0x5aa870 0 4 AA870"     # settle: controller possession tail (arg 0)
+  "0x5aafd0 0 4 AAFD0"     # settle: non-controller possession tail (arg 1)
+  "0x5b8ce0 0 4 B8CE0"     # settle: select_nearest(gs, 1)
   "0x605ff0 0 0 atexit"    # FUN_00605ff0 atexit (7260 lazy-init marker grids + steer box-init) -- fault guard
 )
 # NOTE: FUN_005b0b40 (B0B40, the opponent-count for the +0x2d8 flag) is now PORTED
@@ -72,6 +83,7 @@ READS=(
   "0x00230020 4" "0x00230024 4" "0x00230028 4"
   "0x0023002c 4" "0x00230030 4" "0x00230040 4" "0x00230048 4"
   "0x0023004c 4" "0x00230050 4" "0x00230054 4" "0x00230058 4"
+  "0x0023005d 1"
   "0x00230034 2" "0x00230066 2"
   "0x00230064 4" "0x00230068 4"
   "0x0023006c 4" "0x00230070 4" "0x00230074 4"
@@ -131,7 +143,7 @@ FIX=(
 
 : > "$OUT"
 echo "# Stage 3 POSITIONAL Task #1: FUN_005a4600 (engine_tick) SKELETON PCode-emu truth." >> "$OUT"
-echo "# 12 leaves STUBBED (action handlers + resolver + 3 movement fns + teammate-count); 7260+8f20 + in-image helpers real." >> "$OUT"
+echo "# Leaves STUBBED (action handlers + resolver + 2 movement fns + teammate-count + 6 settle sub-leaves); 7260+8f20+8680 + in-image helpers real." >> "$OUT"
 echo "# Each row: FIX <name> + verbatim CALL/STUB lines. STUB lines show selection+arg; mem[]= the field writes." >> "$OUT"
 for row in "${FIX[@]}"; do
   IFS='|' read -r NAME POKES <<<"$row"

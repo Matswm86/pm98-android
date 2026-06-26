@@ -618,7 +618,13 @@ static func _resolve_action(p: Dictionary, m: Dictionary, rng) -> void:
 ## FUN_005ac1a0 (case 0x13 bVar17-true) is now WIRED inline in _case_distribution to Pm98Movement.setup_shot
 ## (-> resolve_post_shot), oracle-gated via run_engine_dist_oracle.sh -> test_engine_dist.gd. No stub here.
 
-static func _move_8680(_p: Dictionary) -> void: trace_calls.append(["M8680", 0])   # FUN_005a8680 (settle)
+## FUN_005a8680 (settle) is now WIRED to the real port Pm98Movement.settle_8680(p, wire=true) -- the
+## M8680 stub is retired (run_engine_oracle.sh now runs the REAL FUN_005a8680, un-stubbed). settle_8680's
+## own SELECTION + two direct writes (p+0x5d windup-edge flag, p+0x54 possession clear) run, the steer
+## leaf FUN_005a8f20 is called for real (it is GREEN), and its other six leaves (B1420/M8AC0/AA4D0/AA870/
+## AAFD0/B8CE0) stay DEFERRED -- stubbed in the engine oracle, trace-only in the port -- to be wired next.
+static func _move_8680(p: Dictionary) -> void:
+	Pm98Movement.settle_8680(p, true)
 
 ## FUN_005a65a0 (general move). The kickoff-taker slice is ported (Pm98Movement.move_dispatch); the
 ## NON-active open-play movement is still DEFERRED -- move_dispatch returns false there, and we record

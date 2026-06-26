@@ -5240,7 +5240,11 @@ static func _settle_b(d: Dictionary, off: int) -> bool:
 	return (_g(d, off) & 0xff) != 0
 
 
-static func settle_8680(p: Dictionary) -> void:
+# `wire`: when true (the engine_tick integration call), the body-orient steer leaf FUN_005a8f20 is
+# CALLED for real (Pm98Movement.steer_8f20) instead of only trace-recorded; the other six leaves stay
+# deferred (traced). When false (the bare test_settle.gd gate) every leaf is trace-only. Either way the
+# M8F20 trace entry is still appended, so the bare selection oracle is unaffected.
+static func settle_8680(p: Dictionary, wire: bool = false) -> void:
 	settle_trace = []
 	var m: Dictionary = _ref(p, 0x18c)
 	var gs: Dictionary = _ref(p, 0x184)
@@ -5279,6 +5283,8 @@ static func settle_8680(p: Dictionary) -> void:
 		if bv9:
 			uVar5 -= 0x4000
 		settle_trace.append(["M8F20", Pm98Trig._i32(uVar5) & 0xffffffff])   # FUN_005a8f20(uVar5)
+		if wire:
+			steer_8f20(p, Pm98Trig._i32(uVar5))
 	else:
 		# --- BRANCH 2: open-play action 0..3 in open play -- windup heading or held facing (L54-82). ---
 		var action := _g(p, 0x40)
@@ -5304,6 +5310,8 @@ static func settle_8680(p: Dictionary) -> void:
 				var hiword := (ivar7cur & 0xffffffff) >> 16
 				var uVar5b := ((hiword & 0xffff) << 16) | (_g(p, 0x34) & 0xffff)
 				settle_trace.append(["M8F20", uVar5b & 0xffffffff])         # FUN_005a8f20(uVar5)
+				if wire:
+					steer_8f20(p, Pm98Trig._i32(uVar5b))
 		# else: bVar9 false or phase != 0 -> goto LAB_005a8854 (no steer)
 
 	# LAB_005a8854: the action-gated possession / marking tail (L84-130).
