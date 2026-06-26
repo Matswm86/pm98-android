@@ -105,6 +105,7 @@ def main() -> None:
             "posFine": p.get("posFine"),  # fine position (POS_WEIGHT scorer-roulette index)
             "isGK": bool(p.get("isGK")),
             "media": p.get("media"),
+            "photoId": p.get("photoId"),  # J96NNNNN face-bank key (English squads); faces_re.md
             # Never null: a sparse record with no decoded attribute row gets {} so every
             # consumer's `attrs.get(key, default)` chain stays safe (a pos-decoded keeper
             # with no attr row is still isGK, and must not crash the commentary/sort paths).

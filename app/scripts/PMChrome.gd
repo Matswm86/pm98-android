@@ -64,6 +64,8 @@ const KIT_SRC := Rect2(0, 0, 31, 64)
 
 static var _fonts: Dictionary = {}
 static var _kits: Dictionary = {}
+static var _faces: Dictionary = {}
+static var _mini_faces: Dictionary = {}
 static var _bg: Texture2D = null
 static var _camrol: Dictionary = {}
 static var _icons: Dictionary = {}
@@ -100,6 +102,31 @@ static func kit(club_id: int) -> Texture2D:
 		var p := "res://art/kits/%d.png" % club_id
 		_kits[club_id] = load(p) if ResourceLoader.exists(p) else null
 	return _kits[club_id]
+
+
+## The player's 124x182 profile photo (the original BIGFOTO mugshot), keyed by the
+## EQUIPOS photoId on the player record (English squads). null when the player has no
+## photoId or no bank entry -- the original drew a blank frame, so callers should too.
+## Decode + the photoId->player join is documented in docs/re/faces_re.md.
+static func face(photo_id) -> Texture2D:
+	if photo_id == null or int(photo_id) <= 0:
+		return null
+	var id := int(photo_id)
+	if not _faces.has(id):
+		var p := "res://art/faces/%d.png" % id
+		_faces[id] = load(p) if ResourceLoader.exists(p) else null
+	return _faces[id]
+
+
+## The player's 32x32 squad-list thumbnail (the original MINIFOTO), same photoId key.
+static func mini_face(photo_id) -> Texture2D:
+	if photo_id == null or int(photo_id) <= 0:
+		return null
+	var id := int(photo_id)
+	if not _mini_faces.has(id):
+		var p := "res://art/faces/mini/%d.png" % id
+		_mini_faces[id] = load(p) if ResourceLoader.exists(p) else null
+	return _mini_faces[id]
 
 
 ## The original CAMROL position icon (25x14 top-down pitch + role dot) for a fine

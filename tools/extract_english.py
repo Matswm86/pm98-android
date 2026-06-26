@@ -232,6 +232,16 @@ def parse_club(d: bytes, off: int, end: int):
         if key in seen:
             continue
         seen.add(key)
+        # Player-photo id: the u16 immediately preceding this player's name (name_start
+        # - 3; a single pad byte sits between the id and the [u16 len] name prefix). It
+        # is the J96NNNNN bank key (NNNNN == this id) for DBDAT/BIGFOTO + MINIFOTO.
+        # Decode + validation (Schmeichel=3371, Flowers=1851; 97% of the 610 big photos
+        # claimed, every star verified by sight) in docs/re/faces_re.md. 0 / implausible
+        # -> no photo (the original draws a blank frame).
+        name_start = nb[0]
+        photo_id = struct.unpack_from("<H", d, name_start - 3)[0] if name_start >= 3 else 0
+        if not (0 < photo_id <= 60000):
+            photo_id = None
         # the player's attribute row is the attr block between this anchor and the
         # next one (it follows the player's bio, before the next player's record).
         nxt = anchors[k + 1] if k + 1 < len(anchors) else end
@@ -253,6 +263,7 @@ def parse_club(d: bytes, off: int, end: int):
                 "pos": pos,
                 "posFine": fine,
                 "isGK": is_gk,
+                "photoId": photo_id,
                 "attrs": dict(zip(ATTR_NAMES, row)) if row else None,
             }
         )
