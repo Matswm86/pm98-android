@@ -1,0 +1,58 @@
+# Stage 3 movement leaf FUN_005a8680 (settle) PCode-emu truth. PURE INTEGER -> 7 leaves STUBBED;
+# each row: FIX <name> + verbatim STUB/RET lines. STUB shows leaf selection + arg0; mem[0x23005d]=p+0x5d,
+# mem[0x230054]=p+0x54. P=0x230000 M=0x260000 BALL=0x270000 GS=0x280000 OTHER=0x2a0000.
+## FIX b1_p3_i0
+CALL 0 STUB M8F20 #1 step=74 ECX=2293760 arg0=910
+CALL 0 RET steps=86 EAX=4 mem[0x23005d:1]=0 mem[0x230054:4]=0 stubhits={M8F20=1}
+## FIX b1_p3_i3
+CALL 0 STUB M8F20 #1 step=76 ECX=2293760 arg0=64626
+CALL 0 RET steps=88 EAX=4 mem[0x23005d:1]=0 mem[0x230054:4]=0 stubhits={M8F20=1}
+## FIX b1_p4_i4
+CALL 0 STUB M8F20 #1 step=79 ECX=2293760 arg0=20480
+CALL 0 RET steps=91 EAX=4 mem[0x23005d:1]=0 mem[0x230054:4]=0 stubhits={M8F20=1}
+## FIX b1_p4_i7
+CALL 0 STUB M8F20 #1 step=79 ECX=2293760 arg0=49334
+CALL 0 RET steps=91 EAX=4 mem[0x23005d:1]=0 mem[0x230054:4]=0 stubhits={M8F20=1}
+## FIX b1_p7_i8
+CALL 0 STUB M8F20 #1 step=93 ECX=2293760 arg0=6372
+CALL 0 RET steps=105 EAX=4 mem[0x23005d:1]=0 mem[0x230054:4]=0 stubhits={M8F20=1}
+## FIX b1_p7_i11
+CALL 0 STUB M8F20 #1 step=93 ECX=2293760 arg0=39140
+CALL 0 RET steps=105 EAX=4 mem[0x23005d:1]=0 mem[0x230054:4]=0 stubhits={M8F20=1}
+## FIX b1_p5
+CALL 0 STUB M8F20 #1 step=75 ECX=2293760 arg0=13398
+CALL 0 RET steps=87 EAX=4 mem[0x23005d:1]=0 mem[0x230054:4]=0 stubhits={M8F20=1}
+## FIX b1_gsadj
+CALL 0 STUB M8F20 #1 step=75 ECX=2293760 arg0=910
+CALL 0 RET steps=87 EAX=4 mem[0x23005d:1]=0 mem[0x230054:4]=0 stubhits={M8F20=1}
+## FIX b2_fall
+CALL 0 STUB M8F20 #1 step=94 ECX=2293760 arg0=8738
+CALL 0 RET steps=152 EAX=2555904 mem[0x23005d:1]=0 mem[0x230054:4]=0 stubhits={M8F20=1}
+## FIX b2_call8ac0
+CALL 0 STUB M8AC0 #1 step=101 ECX=2293760 arg0=40960
+CALL 0 RET steps=160 EAX=2555904 mem[0x23005d:1]=1 mem[0x230054:4]=0 stubhits={M8AC0=1}
+## FIX b2_skip_action
+CALL 0 RET steps=54 EAX=5 mem[0x23005d:1]=0 mem[0x230054:4]=0
+## FIX b2_skip_phase
+CALL 0 RET steps=104 EAX=2555904 mem[0x23005d:1]=0 mem[0x230054:4]=0
+## FIX reset_b1420
+CALL 0 STUB B1420 #1 step=20 ECX=2293760 arg0=0
+CALL 0 STUB M8F20 #1 step=104 ECX=2293760 arg0=17185
+CALL 0 RET steps=162 EAX=2555904 mem[0x23005d:1]=0 mem[0x230054:4]=0 stubhits={B1420=1, M8F20=1}
+## FIX tail_aa4d0
+CALL 0 STUB AA4D0 #1 step=96 ECX=2293760 arg0=0
+CALL 0 RET steps=102 EAX=0 mem[0x23005d:1]=0 mem[0x230054:4]=0 stubhits={AA4D0=1}
+## FIX tail_aa870
+CALL 0 STUB AA870 #1 step=106 ECX=2293760 arg0=0
+CALL 0 RET steps=112 EAX=0 mem[0x23005d:1]=0 mem[0x230054:4]=0 stubhits={AA870=1}
+## FIX tail_aafd0
+CALL 0 STUB AAFD0 #1 step=90 ECX=2293760 arg0=1
+CALL 0 RET steps=96 EAX=0 mem[0x23005d:1]=0 mem[0x230054:4]=0 stubhits={AAFD0=1}
+## FIX tail_b8ce0
+CALL 0 STUB B8CE0 #1 step=98 ECX=2621440 arg0=1
+CALL 0 RET steps=105 EAX=0 mem[0x23005d:1]=0 mem[0x230054:4]=0 stubhits={B8CE0=1}
+## FIX tail_b8ce0_team
+CALL 0 STUB B8CE0 #1 step=105 ECX=2621440 arg0=1
+CALL 0 RET steps=112 EAX=0 mem[0x23005d:1]=0 mem[0x230054:4]=0 stubhits={B8CE0=1}
+## FIX tail_b8ce0_same
+CALL 0 RET steps=108 EAX=2752512 mem[0x23005d:1]=0 mem[0x230054:4]=5

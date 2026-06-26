@@ -5202,3 +5202,142 @@ static func _phase5_tail_pathA(ctx: Dictionary, m: Dictionary, _team: int) -> vo
 			Pm98Trig._i32(ball[0] - _si(p, 0x4)), Pm98Trig._i32(ball[1] - _si(p, 0x8))) & 0xffff
 		p[0x34] = facing
 		p[0x64] = facing
+
+
+# ---- FUN_005a8680 the per-tick "settle" mover (set-piece / off-ball body orientation) ------
+# The movement leaf FUN_005a4600 (engine_tick) routes a player through when bv stays false in
+# _movement_decision: it ORIENTS the player (steer APPLY FUN_005a8f20) toward a set-piece aim
+# (branch 1, the active taker on a phase 3/4/5/7 dead-ball) or the held facing / windup heading
+# (branch 2, an open-play action 0..3), then a small action-gated TAIL dispatches at most one
+# possession / marking leaf. Built one branch at a time; oracle-locked vs the REAL FUN_005a8680
+# (tools/re/run_settle_oracle.sh -> specs/settle_oracle.txt) in app/tests/test_settle.gd.
+#
+# FIRST GATE = SELECTION + the two DIRECT writes. FUN_005a8680 is PURE INTEGER (the FPU lives in the
+# leaves), so this skeleton STUB-TRACES all seven leaf calls -- recording [label, arg0] into
+# `settle_trace` exactly as the oracle's STUB lines report them -- and asserts the branch/tail
+# SELECTION + the heading passed to the steer (M8F20 / M8AC0 arg0) + the only fields 8680 writes
+# itself: p+0x5d (the windup-edge flag) and p+0x54 (the possession-claim clear). WIRING the leaves
+# to their real ports (steer_8f20 is already GREEN; the rest are their own tasks) is the next gate,
+# exactly as the engine_tick skeleton wired its handlers one at a time.
+#   B1420 = FUN_005b1420 (off-ball reposition / +0x14c formation counter; itself calls b0040/b1500/b1c80)
+#   M8F20 = FUN_005a8f20 (steer_8f20, oracle-GREEN -- wired next)
+#   M8AC0 = FUN_005a8ac0 (curve-speed windup that tail-calls 8f20; arg0 = the computed heading)
+#   AA4D0 = FUN_005aa4d0 (kick_setup, already ported; distinct call site here)
+#   AA870/AAFD0 = FUN_005aa870(0) / FUN_005aafd0(1) (controller / non-controller possession tails)
+#   B8CE0 = FUN_005b8ce0 (select_nearest, already ported; here this=gs, find_in_front=1)
+# DAT tables dumped from MANAGER.EXE .rdata (tools/re/pe.py): SETTLE_A @0x665560 = 12 x {lo,hi} short
+# (the set-piece aim snap, indexed by the sign/phase bucket), SETTLE_B @0x665590 = 16 short (the
+# windup heading, indexed by the 4-bit gs input-edge mask; -1 = "no snap").
+const SETTLE_A_LO: Array[int] = [910, 910, -31858, -31858, 16566, 182, -32586, -16202, 10012, -22756, 10012, -22756]
+const SETTLE_A_HI: Array[int] = [31858, 31858, -910, -910, 32586, 16202, -16566, -182, 22756, -10012, 22756, -10012]
+const SETTLE_B: Array[int] = [-1, 0, 16384, 8192, -32768, -1, 24576, 16384, -16384, -8192, -1, 0, -24576, -16384, -32768, -1]
+
+static var settle_trace: Array = []
+
+
+## A struct byte field (`*(char*)(base+off) != '\0'` in the binary) as a nonzero test.
+static func _settle_b(d: Dictionary, off: int) -> bool:
+	return (_g(d, off) & 0xff) != 0
+
+
+static func settle_8680(p: Dictionary) -> void:
+	settle_trace = []
+	var m: Dictionary = _ref(p, 0x18c)
+	var gs: Dictionary = _ref(p, 0x184)
+	var ball: Dictionary = _ref(p, 0x190)
+	var phase := _g(m, 0x448)                                # iVar7
+
+	# L16-18: off-ball reposition gate -- carrier flag set AND open play (phase 0).
+	if _g(p, 0x2bc) != 0 and phase == 0:
+		settle_trace.append(["B1420", 0])                    # FUN_005b1420 (deferred; bool, discarded)
+
+	var is_taker: bool = is_same(m.get(0x438, null), p)
+	if (phase == 3 or phase == 4 or phase == 5 or phase == 7) and is_taker:
+		# --- BRANCH 1: the active set-piece taker snaps body angle to the aim table (L21-53). ---
+		var bv9 := (phase == 7)
+		var idx := int(_si(p, 4) < 0) + (int(_si(p, 8) > 0) + (int(phase == 4) + int(bv9) * 2) * 2) * 2
+		var u4 := _g(p, 0x34) & 0xffff                       # facing word (zero-extended)
+		if _settle_b(gs, 0x210):
+			u4 -= 0x80
+		if _settle_b(gs, 0x212):
+			u4 += 0x80
+		if bv9:
+			u4 += 0x4000
+		var uVar5 := u4
+		if phase != 5:
+			var hi := SETTLE_A_HI[idx]                        # signed short
+			var lo := SETTLE_A_LO[idx]                        # signed short
+			var uVar3 := hi & 0xffff                          # CONCAT22(0, hi)
+			var u8 := u4
+			if hi <= Pm98Trig._s16(u4):
+				u8 = uVar3
+			uVar5 = lo & 0xffff
+			if lo <= Pm98Trig._s16(u8):
+				uVar5 = u4                                    # (uVar5 = uVar4) comma side effect
+				if hi <= Pm98Trig._s16(u4):
+					uVar5 = uVar3
+		if bv9:
+			uVar5 -= 0x4000
+		settle_trace.append(["M8F20", Pm98Trig._i32(uVar5) & 0xffffffff])   # FUN_005a8f20(uVar5)
+	else:
+		# --- BRANCH 2: open-play action 0..3 in open play -- windup heading or held facing (L54-82). ---
+		var action := _g(p, 0x40)
+		var in_range := action >= 0 and action <= 3
+		if in_range and phase == 0:
+			# bit-pack the 4 gs input-edge bytes gs+0x213..0x210 MSB-first.
+			var packed := 0
+			for off in [0x213, 0x212, 0x211, 0x210]:
+				packed = packed * 2
+				if _settle_b(gs, off):
+					packed = packed | 1
+			p[0x5d] = 1 if packed != 0 else 0                # WRITE p+0x5d (the windup-edge flag)
+			var tb := SETTLE_B[packed]                        # signed short
+			var ivar7cur := tb & 0xffff                       # CONCAT22(0, tb)
+			var taken := false
+			if tb != -1:
+				var adj := ((Pm98Trig._s16(_g(m, 0x181c)) + 0x1000) & 0xffff) & 0xffffe000
+				ivar7cur = Pm98Trig._i32((tb & 0xffff) - 0x4000 + adj)
+				if Pm98Trig._s16(ivar7cur) != -1:
+					settle_trace.append(["M8AC0", ivar7cur & 0xffffffff])   # FUN_005a8ac0(ivar7cur, 100)
+					taken = true
+			if not taken:
+				var hiword := (ivar7cur & 0xffffffff) >> 16
+				var uVar5b := ((hiword & 0xffff) << 16) | (_g(p, 0x34) & 0xffff)
+				settle_trace.append(["M8F20", uVar5b & 0xffffffff])         # FUN_005a8f20(uVar5)
+		# else: bVar9 false or phase != 0 -> goto LAB_005a8854 (no steer)
+
+	# LAB_005a8854: the action-gated possession / marking tail (L84-130).
+	_settle_tail(p, m, gs, ball)
+
+
+## L84-130: at most one leaf, gated on the action code, the ball-controller identity, and the gs
+## input flags +0x214/+0x215. The only direct write here is p+0x54 = 0 (clear the possession claim).
+static func _settle_tail(p: Dictionary, m: Dictionary, gs: Dictionary, ball: Dictionary) -> void:
+	var action := _g(p, 0x40)
+	if action == 4 or action == 5 or action == 8 or action == 9:
+		return
+	if action == 0x24 or action == 0x25:
+		return
+	if action == 0xb and not (4 < _g(p, 0x2c)):
+		return
+	if action == 0xd and not (8 < _g(p, 0x2c)):
+		return
+	if action == 0x1d and not (0 < _si(p, 0x48)):
+		return
+	var phase := _g(m, 0x448)
+	if is_same(ball.get(0x40, null), p):                     # p IS the ball controller
+		if phase != 7 and (_settle_b(gs, 0x214) or (phase == 2 and _settle_b(gs, 0x215))):
+			settle_trace.append(["AA4D0", 0])                # FUN_005aa4d0 (kick_setup)
+			return
+		if _settle_b(gs, 0x215):
+			settle_trace.append(["AA870", 0])                # FUN_005aa870(0)
+			return
+	else:                                                    # p is NOT the controller
+		if _settle_b(gs, 0x214):
+			settle_trace.append(["AAFD0", 1])                # FUN_005aafd0(1)
+			return
+		if not _settle_b(gs, 0x215) and _si(p, 0x54) != 0:
+			var other: Dictionary = _ref(ball, 0x4c)         # ball+0x4c (the other claimant)
+			if other.is_empty() or _g(p, 0x2b8) != _g(other, 0x2b8):
+				settle_trace.append(["B8CE0", 1])            # FUN_005b8ce0(gs, 1) select_nearest
+				p[0x54] = 0                                   # WRITE p+0x54 (clear claim)
