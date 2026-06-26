@@ -1520,7 +1520,7 @@ func _open_competition(act: String) -> void:
 	elif act == "charity":
 		_show_charity_shield()
 	elif act == "facup":
-		_show_cup_screen(_career.fa_cup, "F.A. CUP", "res://art/screens/cup/trophy.png")
+		_show_cup_screen(_career.fa_cup, "F.A. CUP", "res://art/screens/cup/facup.png")
 	elif act == "lcup":
 		_show_cup_screen(_career.league_cup, "COCA-COLA CUP", "res://art/screens/cup/cocacola.png")
 	elif act.begins_with("euro:"):
