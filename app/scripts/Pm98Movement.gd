@@ -5585,3 +5585,58 @@ static func possession_tail_aafd0(p: Dictionary, param2: int, rng, dat_replay: b
 	p[0x60] = 0
 	p[0x62] = 0
 	return 1
+
+
+## FUN_005a9490 ("the lean") SLICE A -- the ACTIVE-CARRIER branch (decompile L55-120 / asm 0x5a9490-
+## 0x5a96e0). Fires ONLY when p IS the ball's active carrier (p == ball+0x40); it steers the carried
+## ball at the dribble target = p.pos + polar_vec(0x4ccc, p.facing) (a point 0x4ccc ahead of the
+## player's facing). With rot.x = rot_vec3([ball-p], -facing, 0)[0] (FUN_005ee670, sign-extended WORD
+## angle) and dist = |rot.x - 0x4ccc|:
+##   * FAR  (dist > 0x10000, action not 8/9, p+0x2bc != 0): FUN_0058ed50 RELEASES the ball (ball+0x40
+##     -> 0) and returns -- the dribble ran too far ahead.
+##   * p+0x68 != 0 (ball-anim running) -> return ;  dist < 0x6667 (too close) -> return.
+##   * SLOW (ball planar speed FUN_005edfb0(vx,vy) < 0x8001): damp ball.vel *= 0xe666/0x10000
+##     (FUN_005ee1c0) and lerp ball.pos 1/16 toward the target (ball.pos += (target - ball.pos)/16).
+##   * FAST: zero ball.vel, start the ball-anim (ball+0x68 = 1, ball+0x6c = DAT_00664fe4<<2 = 36, the
+##     move target ball+0x9c/a0/a4 = target), and if p+0x2bc != 0 set_position_code(p, 0xb).
+## NON-carrier returns false (the off-ball grid/marker/tail of 9490, Slices B/C, are DEFERRED). NO RNG.
+## Oracle: tools/re/run_9490sliceA_oracle.sh -> specs/9490sliceA_oracle.txt, locked by tests/test_9490.gd.
+static func lean_9490(p: Dictionary) -> bool:
+	var ball: Dictionary = _ref(p, 0x190)
+	if not is_same(ball.get(0x40, null), p):
+		return false                                       # not the carrier -> Slice B/C (deferred)
+	var dx := Pm98Trig._i32(_g(ball, 4) - _g(p, 4))
+	var dy := Pm98Trig._i32(_g(ball, 8) - _g(p, 8))
+	var dz := Pm98Trig._i32(_g(ball, 0xc) - _g(p, 0xc))
+	var facing := Pm98Trig._s16(_g(p, 0x34))
+	var rotx: int = int(Pm98Trig.rot_vec3([dx, dy, dz], -facing, 0)[0])   # FUN_005ee670 (plane 0)
+	var dist := absi(rotx - 0x4ccc)
+	if dist > 0x10000:
+		var action := _g(p, 0x40)
+		if action != 8 and action != 9 and _g(p, 0x2bc) != 0:
+			ball[0x40] = 0                                  # FUN_0058ed50: release the carried ball
+			return true
+	if _g(p, 0x68) != 0:
+		return true                                        # ball-anim already running
+	if dist < 0x6667:
+		return true                                        # too close, no push
+	# dribble target = p.pos + polar(0x4ccc, facing) -- a point 0x4ccc ahead of the player's facing
+	var polar: Array = Pm98Trig.polar_vec(0x4ccc, facing)   # FUN_005ee0f0
+	var tx := Pm98Trig._i32(_g(p, 4) + int(polar[0]))
+	var ty := Pm98Trig._i32(_g(p, 8) + int(polar[1]))
+	var tz := Pm98Trig._i32(_g(p, 0xc) + int(polar[2]))
+	if Pm98Trig.planar_mag(_g(ball, 0x20), _g(ball, 0x24)) < 0x8001:   # SLOW: damp vel + lerp ball 1/16
+		var sv := Pm98Trig.scale_vec3(_g(ball, 0x20), _g(ball, 0x24), _g(ball, 0x28), 0xe666)  # FUN_005ee1c0
+		ball[0x20] = sv[0]; ball[0x24] = sv[1]; ball[0x28] = sv[2]
+		ball[4] = Pm98Trig._i32(_g(ball, 4) + Pm98Trig._tdiv(tx - _g(ball, 4), 16))
+		ball[8] = Pm98Trig._i32(_g(ball, 8) + Pm98Trig._tdiv(ty - _g(ball, 8), 16))
+		ball[0xc] = Pm98Trig._i32(_g(ball, 0xc) + Pm98Trig._tdiv(tz - _g(ball, 0xc), 16))
+		return true
+	# FAST: stop the ball and start the ball-anim toward the target
+	ball[0x20] = 0; ball[0x24] = 0; ball[0x28] = 0
+	ball[0x68] = 1
+	ball[0x6c] = 9 << 2                                     # DAT_00664fe4 (=9) << 2 = 36
+	ball[0x9c] = tx; ball[0xa0] = ty; ball[0xa4] = tz
+	if _g(p, 0x2bc) != 0:
+		set_position_code(p, 0xb)                           # FUN_005a5430(0xb)
+	return true
