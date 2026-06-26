@@ -211,10 +211,12 @@ func _draw_left_column() -> void:
 	_stat_box(Rect2(x + bw + 4, 66, bw, 38), C_WEIGHT, "WEIGHT", w_s)
 	_stat_box(Rect2(x + 2 * (bw + 4), 66, bw, 38), C_HEIGHT, "HEIGHT", h_s)
 
-	# Row 2: NATIONALITY | KIND.
+	# Row 2: NATIONALITY (with the real BANDERAS flag) | KIND.
 	var hw := (w - 6) / 2.0
-	var nat := str(_p.get("nationality", "")).capitalize() if _p.get("nationality") else "England"
-	_band_box(Rect2(x, 110, hw, 34), "NATIONALITY", nat)
+	var nat := str(_p.get("nationality", "ENGLAND")).to_upper()
+	if nat == "":
+		nat = "ENGLAND"
+	_band_box_flag(Rect2(x, 110, hw, 34), "NATIONALITY", nat, PMChrome.flag(_p.get("flagCode")))
 	_band_box(Rect2(x + hw + 6, 110, hw, 34), "KIND", str(_p.get("kind", "NATIONAL")))
 
 	# Row 3: ROLE (camrol pitch icon + the role word).
@@ -256,6 +258,25 @@ func _band_box(r: Rect2, label: String, value: String) -> void:
 	var vr := Rect2(r.position.x, r.position.y + 16, r.size.x, r.size.y - 16)
 	PMChrome.bevel(self, vr, Color(0.80, 0.86, 0.94), C_CARD_HI, C_CARD_LO)
 	_txt(_f10, vr.position.x + 2, vr.position.y + 2, value, C_VAL, 11, 1, vr.size.x)
+
+
+## Like _band_box, but blits the nationality FLAG at the left of the value strip with the
+## country name beside it (the original FICHA layout). Falls back to a centred name when
+## the flag art is missing.
+func _band_box_flag(r: Rect2, label: String, value: String, flag: Texture2D) -> void:
+	PMChrome.bevel(self, Rect2(r.position.x, r.position.y, r.size.x, 15), C_IDENT, C_IDENT.lightened(0.25), C_IDENT_LO)
+	_txt(_f10, r.position.x, r.position.y + 1, label, C_LABEL, 11, 1, r.size.x)
+	var vr := Rect2(r.position.x, r.position.y + 16, r.size.x, r.size.y - 16)
+	PMChrome.bevel(self, vr, Color(0.80, 0.86, 0.94), C_CARD_HI, C_CARD_LO)
+	if flag == null:
+		_txt(_f10, vr.position.x + 2, vr.position.y + 2, value, C_VAL, 11, 1, vr.size.x)
+		return
+	var fh := vr.size.y - 4
+	var fw := fh * float(flag.get_width()) / float(flag.get_height())
+	var fr := Rect2(vr.position.x + 3, vr.position.y + 2, fw, fh)
+	draw_texture_rect(flag, fr, false)
+	draw_rect(fr, C_VAL, false, 1.0)  # thin border, as the original frames the flag
+	_txt(_f10, fr.position.x + fw + 5, vr.position.y + 2, value, C_VAL, 11, 0, vr.size.x - fw - 8)
 
 
 ## Right stat panel: SPEED STAMINA AGGRESSION QUALITY FITNESS MORAL + the RATING box.

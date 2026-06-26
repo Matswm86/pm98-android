@@ -37,6 +37,21 @@ ENGLISH_LEAGUES = [
     ("eng_div3", "Division Three", "DIVISION THREE", 4),
 ]
 
+# The English nationality whitelist (extract_english.COUNTRIES) uses a few names that
+# differ from the game's own country table (DBDAT/PAISES.30, see tools/re/export_flags.py).
+# Map each variant onto the PAISES spelling so the FICHA flag code resolves. Real, not
+# fabricated: EIRE == Republic of Ireland; ZAIRE was renamed DR Congo in 1997.
+FLAG_ALIASES = {
+    "EIRE": "REP. OF IRELAND",
+    "NORTHERN IRELAND": "NORTH. IRELAND",
+    "USA": "U.S.A.",
+    "UNITED STATES": "U.S.A.",
+    "ITALIA": "ITALY",
+    "TRINIDAD": "TRINIDAD T.",
+    "DR CONGO": "ZAIRE",
+}
+ENGLAND_CODE = 30  # the FICHA default flag for the omitted-nationality (English) players
+
 
 def load(name: str):
     return json.loads((ASSETS / name).read_text(encoding="utf-8"))
@@ -92,11 +107,28 @@ def country_for(name: str, lut: dict[str, str]) -> str | None:
     return None
 
 
+def build_flag_lookup() -> dict[str, int]:
+    """nationality string -> BANDERAS flag code, from the game's PAISES.30 table
+    (assets/country_codes.json, baked by tools/re/export_flags.py) plus the English
+    whitelist aliases. Unknown / absent -> ENGLAND default."""
+    by_name = load("country_codes.json")["byName"]  # PAISES spelling -> code
+    lut = {k.upper(): int(v) for k, v in by_name.items()}
+    for alias, canon in FLAG_ALIASES.items():
+        if canon.upper() in lut:
+            lut[alias] = lut[canon.upper()]
+    return lut
+
+
+def flag_for(nationality, lut: dict[str, int]) -> int:
+    return lut.get(str(nationality or "").upper(), ENGLAND_CODE)
+
+
 def main() -> None:
     english = load("squads_english.json")["clubs"]
     teams_all = load("teams_all.json")["teams"]
     laliga_caps = {t["name"]: t for t in load("teams_laliga.json")["teams"]}
     country_lut = build_country_lookup()
+    flag_lut = build_flag_lookup()
     # idx -> division label, decoded from MANAGER.EXE's own league table
     div_by_idx = {int(k): v for k, v in load("divisions_english.json")["divisionByIdx"].items()}
 
@@ -123,6 +155,7 @@ def main() -> None:
             "media": p.get("media"),
             "photoId": p.get("photoId"),  # J96NNNNN face-bank key (English squads); faces_re.md
             "nationality": p.get("nationality"),  # EQUIPOS cipher string; ENGLAND default
+            "flagCode": flag_for(p.get("nationality"), flag_lut),  # BANDERAS index; FICHA flag
             "kind": p.get("kind"),  # FICHA NATIONAL / NON-NATIONAL flag (derived from nat)
             "heightCm": p.get("heightCm"),  # EQUIPOS Y+2 byte (cm); FICHA player+0xf9
             "weightKg": p.get("weightKg"),  # EQUIPOS Y+3 byte (kg); FICHA player+0xfa

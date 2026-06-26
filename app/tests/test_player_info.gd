@@ -56,6 +56,20 @@ func _run() -> void:
 	ok = _assert(str(star.get("kind", "")) in ["NATIONAL", "NON-NATIONAL"],
 		"player carries a KIND flag (got %s)" % str(star.get("kind"))) and ok
 
+	# The nationality FLAG code landed and resolves to a real BANDERAS texture. Schmeichel
+	# (DENMARK) must be code 18 (the Dannebrog); whatever player we found must have a flag.
+	ok = _assert(star.get("flagCode") != null, "player carries a flagCode") and ok
+	if str(star.get("nationality", "")) == "DENMARK":
+		ok = _assert(int(star.get("flagCode", -1)) == 18,
+			"DENMARK resolves to BANDERAS code 18 (got %s)" % str(star.get("flagCode"))) and ok
+	var flag := PMChrome.flag(star.get("flagCode"))
+	ok = _assert(flag != null, "nationality flag resolves for code %s" % str(star.get("flagCode"))) and ok
+	if flag != null:
+		ok = _assert(flag.get_width() == 30 and flag.get_height() == 20,
+			"flag is the 30x20 BANDERAS bitmap (got %dx%d)" % [flag.get_width(), flag.get_height()]) and ok
+	# The ENGLAND default (code 30) must also be a real flag (most players hit this path).
+	ok = _assert(PMChrome.flag(30) != null, "ENGLAND default flag (code 30) resolves") and ok
+
 	# The mugshot resolves to a real texture for a player with a photo.
 	var face := PMChrome.face(star.get("photoId"))
 	ok = _assert(face != null, "BIGFOTO mugshot resolves for photoId %s" % str(star.get("photoId"))) and ok

@@ -69,6 +69,7 @@ static var _mini_faces: Dictionary = {}
 static var _bg: Texture2D = null
 static var _camrol: Dictionary = {}
 static var _icons: Dictionary = {}
+static var _flags: Dictionary = {}
 
 # Fallback fine-position code per broad role, for records whose posFine is absent / out
 # of range. Picks a representative central CAMROL slot: GK=1, central DF=4, central
@@ -137,6 +138,19 @@ static func camrol(pos_fine: int) -> Texture2D:
 		var p := "res://art/icons/camrol/camrol%02d.png" % n
 		_camrol[n] = load(p) if ResourceLoader.exists(p) else null
 	return _camrol[n]
+
+
+## The player's nationality FLAG (the 30x20 BANDERAS waving flag) for a country code
+## (the EQUIPOS/PAISES index on the player's `flagCode`, baked by tools/re/export_flags.py).
+## Cached; null when the code has no flag so callers keep their text-only fallback.
+static func flag(code) -> Texture2D:
+	if code == null or int(code) < 0:
+		return null
+	var n := int(code)
+	if not _flags.has(n):
+		var p := "res://art/flags/flag_%03d.png" % n
+		_flags[n] = load(p) if ResourceLoader.exists(p) else null
+	return _flags[n]
 
 
 ## A flat management-UI glyph baked by tools/re/export_icons.py (the FLECHA / ARROW /
