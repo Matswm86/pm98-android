@@ -1536,15 +1536,39 @@ static func ball_touch_7260(p: Dictionary, rng = null) -> void:
 	# L165-176: the open-play GATE -- live play (m+0x448==0), this player is NOT the carrier, and
 	# (recomputed) same-side. The lazy-init DAT grids (L177-238) are modelled as the KICK_GRID1/GRID2
 	# consts (pure DAT bookkeeping, field-inert). The full execute-kick block (L544-666, all THREE
-	# sub-arms) is ported in _kick_execute; only the dribble-grid block (L242-514) -- the marker search
-	# that SETS the kick action codes -- stays DEFERRED to slice 2b.
+	# sub-arms) is ported in _kick_execute; the dribble-grid block (L242-514) -- the marker search that
+	# SETS the kick action codes -- is now WIRED (slice 2b: gate -> build/scan -> apply -> tail).
 	if _g(m, 0x448) == 0 and not is_same(ball.get(0x40, null), p):
 		var same2 := _ps_goalbox(p, [_si(p, 4), _si(p, 8), _si(p, 0xc)]) \
 			and _sign1(_si(p, 4)) == _sign1(_si(p, 0x3a4))
 		if same2:
 			var action := _g(p, 0x40)
+			# L242-513: the dribble-grid marker block (actions 0x1e/0x22/0x23/0x20). Every dep is ported +
+			# oracle-locked: same-side bit-clear -> _near_ball_pullin -> _marker_gate_proceed -> the 2-pass
+			# build/scan loop -> _marker_apply -> _marker_tail (which may hand off to the arm-2 active tail
+			# FUN_005aa870). The binary's else-if means this RETURNS (the kick block below is the `else` arm;
+			# the action sets are disjoint anyway).
 			if action == 0x1e or action == 0x22 or action == 0x23 or action == 0x20:
-				return                                  # DEFERRED dribble-grid block (slice 2b, L242-514)
+				# L242-248: ball & p on the same side -> clear the m+0x461 marker bits 0x20 | 0x10.
+				if _sign1(_si(ball, 4)) == _sign1(_si(p, 4)):
+					m[0x461] = _g(m, 0x461) & 0xcf
+				_near_ball_pullin(p)                    # L249: FUN_005b05a0 pull-in
+				# L250-470: proximity + possession gate, then the 2-pass build/scan loop + apply.
+				var applied := false
+				if _marker_gate_proceed(p):
+					var best := [-1, 0, 0, 0x7c72, 0x7c72, 0, 0, 0]
+					var n_passes := 1 + (1 if _si(ball, 0x5c) != 0 else 0)
+					for pass_idx in range(n_passes):
+						if best[0] != -1:               # L280: a marker already kept -> stop
+							break
+						var work := _marker_grid_build(p, pass_idx)
+						_marker_scan(p, work, pass_idx, best)
+					applied = _marker_apply(p, best)
+				# L472-513: the tail -- re-engage / arm-2 active-tail handoff.
+				if rng == null:
+					rng = MatchEngine.Pm98Rng.new(0)
+				_marker_tail(p, applied, rng)
+				return
 			if (_g(m, 0x461) & 0x20) == 0 and _g(p, 0x2c) == 5 and action in KICK_ACTIONS:
 				if rng == null:
 					rng = MatchEngine.Pm98Rng.new(0)
