@@ -1136,9 +1136,9 @@ func _show_lineup_screen() -> void:
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
 	scr.setup(_mgr_club(), _tactics(), "", _career.league_name, _career.season, _career.week + 1)
-	scr.gui_input.connect(func(e: InputEvent) -> void:
-		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
-			scr.queue_free())
+	# The screen owns its input now (the ARROW scroll buttons page the squad list); a
+	# non-scroll tap emits back_pressed to dismiss the overlay.
+	scr.back_pressed.connect(func() -> void: scr.queue_free())
 
 ## The original-art TEAM TACTICS modal (ma_9) over a real LINE-UP backdrop: the ATTACK |
 ## DEFENCE control panel. Each control mutates the career Tactics live (its ratings() feed

@@ -60,17 +60,22 @@ func _run() -> void:
 		var img := get_root().get_texture().get_image()
 		var err := img.save_png(dir.path_join(s[1]))
 		print("SHOT %s err=%d %dx%d" % [s[1], err, img.get_width(), img.get_height()])
-		# Second transfer capture paged to the bottom: proves the ARROW buttons swap to the
-		# up-on / down-off art and the KEEPERS band scrolls off the top.
+		# Second capture paged to the bottom: proves the ARROW buttons swap to the up-on /
+		# down-off art and the top of the list (KEEPERS band / starting XI) scrolls off.
+		var scrolled_name := ""
 		if s[1] == "transfer_demo.png":
+			scrolled_name = "transfer_scrolled.png"
+		elif s[1] == "lineup_demo.png":
+			scrolled_name = "lineup_scrolled.png"
+		if scrolled_name != "":
 			node._scroll = node._max_scroll()
 			node.queue_redraw()
 			for _i in 8:
 				await process_frame
 			await RenderingServer.frame_post_draw
 			var img2 := get_root().get_texture().get_image()
-			var err2 := img2.save_png(dir.path_join("transfer_scrolled.png"))
-			print("SHOT transfer_scrolled.png err=%d %dx%d" % [err2, img2.get_width(), img2.get_height()])
+			var err2 := img2.save_png(dir.path_join(scrolled_name))
+			print("SHOT %s err=%d %dx%d" % [scrolled_name, err2, img2.get_width(), img2.get_height()])
 		node.queue_free()
 		for _i in 3:
 			await process_frame
@@ -78,18 +83,23 @@ func _run() -> void:
 	quit(0)
 
 
-## A synthetic 16-man roster whose posFine codes span the GK/DF/MF/FW role bands, so
-## the SQUAD POS column and LINE-UP ROL column render the full CAMROL icon set (verify
-## the role-icon wiring without booting a real career / GameDB).
+## A synthetic 28-man roster whose posFine codes span the GK/DF/MF/FW role bands, so the
+## SQUAD POS column and LINE-UP ROL column render the full CAMROL icon set (verify the
+## role-icon wiring without booting a real career / GameDB). 28 players (11 XI + 5 subs +
+## 12 reserves) overflow the LINE-UP panel so its ARROW scroll buttons render.
 func _demo_club() -> Dictionary:
 	const NAMES := ["FLOWERS", "FETTIS", "ADAMS", "KEOWN", "DIXON", "BOULD", "WINTERBURN",
 		"VIEIRA", "PETIT", "PARLOUR", "GRIMANDI", "PLATT", "WRIGHT", "OVERMARS",
-		"ANELKA", "BERGKAMP"]
+		"ANELKA", "BERGKAMP", "MANNINGER", "TAYLOR", "UPSON", "GARDE", "HUGHES",
+		"BLACK", "WREH", "MENDEZ", "MCGOWAN", "DAY", "RANKIN", "OMOYINMI"]
 	# [posFine, broad pos, isGK]
 	const ROLES := [[1, "GK", true], [1, "GK", true],
 		[2, "DF", false], [3, "DF", false], [4, "DF", false], [5, "DF", false], [6, "DF", false],
 		[7, "MF", false], [10, "MF", false], [11, "MF", false], [15, "MF", false], [8, "MF", false],
-		[9, "FW", false], [12, "FW", false], [14, "FW", false], [17, "FW", false]]
+		[9, "FW", false], [12, "FW", false], [14, "FW", false], [17, "FW", false],
+		[1, "GK", true], [1, "GK", true], [2, "DF", false], [3, "DF", false], [4, "DF", false],
+		[5, "DF", false], [7, "MF", false], [10, "MF", false], [11, "MF", false],
+		[9, "FW", false], [12, "FW", false], [14, "FW", false]]
 	var players: Array = []
 	for i in ROLES.size():
 		var r: Array = ROLES[i]

@@ -10,6 +10,12 @@ class_name LineupScreen
 ##
 ## XI + formation come from the career's Tactics; markers are placed by the engine's own
 ## mapping (marker = pitch.origin + tac*scale). Native 640x480; scales to fit its parent.
+##
+## INTERACTIVE: a real squad overflows the panel (RESERVES used to silently truncate), so
+## the original ARROW scroll buttons page the squad list (XI -> SUBSTITUTES -> RESERVES) as
+## one window; any other tap emits `back_pressed` (the display-screen tap-to-dismiss).
+
+signal back_pressed
 
 const W := 640
 const H := 480
@@ -47,6 +53,12 @@ const AVBAR_X := 360
 const ROL_X := 398
 const POS_X := 430
 const XI_Y0 := 84
+# Original ARROW scroll buttons (16x16 art), stacked in the empty right-panel band between
+# the attribute buttons (end y186) and the CAMPO pitch (top y250), at the squad table's
+# right edge so they read as the list's scrollbar. Shown only while the list overflows.
+const SCROLL_UP := Rect2(479, 190, 22, 22)
+const SCROLL_DOWN := Rect2(479, 220, 22, 22)
+const SCROLL_STEP := 3
 
 # Pitch panel (right column).
 const PITCH_POS := Vector2(482, 250)
@@ -71,6 +83,8 @@ var _division: String = ""
 var _season: String = "1997-98"
 var _week: int = 0
 var _by_id: Dictionary = {}
+var _scroll: int = 0
+var _press: String = ""
 
 
 func _ready() -> void:
@@ -80,6 +94,7 @@ func _ready() -> void:
 	_f8 = load("res://art/fonts/proman8.fnt")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2(W, H)
+	gui_input.connect(_on_input)
 	queue_redraw()
 
 
@@ -94,7 +109,108 @@ func setup(club: Dictionary, tactics: Tactics, manager: String = "", division: S
 	_by_id.clear()
 	for p in club.get("players", []):
 		_by_id[int(p.get("id", -1))] = p
+	_scroll = 0
 	queue_redraw()
+
+
+# ---- scroll model + input -----------------------------------------------
+
+## The squad list flattened to uniform 16px draw-items in render order: each XI player,
+## then a SUBSTITUTES header + bench rows, then a RESERVES header + reserve rows. Row items
+## carry a continuous `idx` for the alternating stripe; this is the source of truth for both
+## the scroll-window renderer and the overflow math.
+func _flat_items() -> Array:
+	var items: Array = []
+	var idx := 0
+	var roles: Array = _tactics.roles() if _tactics != null else []
+	var xi: Array = _tactics.xi if _tactics != null else []
+	for i in xi.size():
+		var rl: String = roles[i] if i < roles.size() else ""
+		items.append({"t": "row", "pid": int(xi[i]), "number": i + 1, "role": rl, "idx": idx})
+		idx += 1
+	# Bench + reserves: squad players not in the XI, by ability.
+	var rest: Array = []
+	for p in _club.get("players", []):
+		var pid := int(p.get("id", -1))
+		if pid >= 0 and not xi.has(pid):
+			rest.append(p)
+	rest.sort_custom(func(a, b): return _avg_of(a) > _avg_of(b))
+	items.append({"t": "sec", "label": "SUBSTITUTES"})
+	var bench := rest.slice(0, 5)
+	for j in bench.size():
+		items.append({"t": "row", "pid": int(bench[j].get("id", -1)), "number": 12 + j,
+			"role": _pos_of(bench[j]), "idx": idx})
+		idx += 1
+	items.append({"t": "sec", "label": "RESERVES"})
+	var res := rest.slice(5, rest.size())
+	for j in res.size():
+		items.append({"t": "row", "pid": int(res[j].get("id", -1)), "number": 17 + j,
+			"role": _pos_of(res[j]), "idx": idx})
+		idx += 1
+	return items
+
+
+## How many 16px rows fit between the first XI row and the table's bottom.
+func _visible_rows() -> int:
+	return int((TABLE.end.y - XI_Y0) / ROW_H)
+
+
+func _max_scroll() -> int:
+	return maxi(0, _flat_items().size() - _visible_rows())
+
+
+func _clamp_scroll() -> void:
+	_scroll = clampi(_scroll, 0, _max_scroll())
+
+
+func _scale() -> float:
+	return min(size.x / W, size.y / H) if size.x > 0 and size.y > 0 else 1.0
+
+
+func _to_design(p: Vector2) -> Vector2:
+	var s := _scale()
+	return (p - Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5)) / s
+
+
+## Which scroll button (if any) a design-space point hits. Returns "" when the list does
+## not overflow, so a tap there falls through to dismiss.
+func _hit(d: Vector2) -> String:
+	if _max_scroll() <= 0:
+		return ""
+	if SCROLL_UP.has_point(d):
+		return "up"
+	if SCROLL_DOWN.has_point(d):
+		return "down"
+	return ""
+
+
+func _on_input(e: InputEvent) -> void:
+	var pos := Vector2.ZERO
+	var pressed := false
+	var tap := false
+	if e is InputEventMouseButton:
+		pos = (e as InputEventMouseButton).position
+		pressed = (e as InputEventMouseButton).pressed
+		tap = true
+	elif e is InputEventScreenTouch:
+		pos = (e as InputEventScreenTouch).position
+		pressed = (e as InputEventScreenTouch).pressed
+		tap = true
+	if not tap:
+		return
+	if pressed:
+		_press = _hit(_to_design(pos))
+	else:
+		var a := _hit(_to_design(pos))
+		var was := _press
+		_press = ""
+		if a != "" and a == was:
+			# A scroll-button tap pages the list and is consumed (never dismisses).
+			_scroll += SCROLL_STEP if a == "down" else -SCROLL_STEP
+			_clamp_scroll()
+			queue_redraw()
+		elif was == "":
+			back_pressed.emit()
 
 
 # ---- formation geometry --------------------------------------------------
@@ -154,6 +270,7 @@ func _draw() -> void:
 	_draw_col_header()
 	_draw_squad()
 	_draw_right_panel()
+	_draw_scroll()
 
 
 func _draw_col_header() -> void:
@@ -166,41 +283,42 @@ func _draw_col_header() -> void:
 	_txt(_f10, POS_X, HDR_Y + 2, "POS", PMChrome.C_TBL_HDR_TXT, 11)
 
 
-## XI rows + SUBSTITUTES + RESERVES at the real metrics, in the white table skin.
+## XI rows + SUBSTITUTES + RESERVES at the real metrics, in the white table skin, rendered
+## as a scroll window over `_flat_items()` so a deep squad pages instead of truncating.
 func _draw_squad() -> void:
-	var roles: Array = _tactics.roles() if _tactics != null else []
-	var xi: Array = _tactics.xi if _tactics != null else []
-	var row := 0
+	var items := _flat_items()
+	_clamp_scroll()
+	var vis := _visible_rows()
 	var y := XI_Y0
-
-	for i in xi.size():
-		var rl: String = roles[i] if i < roles.size() else ""
-		_row(y, row, int(xi[i]), i + 1, rl)
+	for i in range(_scroll, mini(items.size(), _scroll + vis)):
+		var it: Dictionary = items[i]
+		if it["t"] == "sec":
+			_section(y, str(it["label"]))
+		else:
+			_row(y, int(it["idx"]), int(it["pid"]), int(it["number"]), str(it["role"]))
 		y += ROW_H
-		row += 1
 
-	# Bench + reserves: squad players not in the XI, by ability.
-	var rest: Array = []
-	for p in _club.get("players", []):
-		var pid := int(p.get("id", -1))
-		if pid >= 0 and not xi.has(pid):
-			rest.append(p)
-	rest.sort_custom(func(a, b): return _avg_of(a) > _avg_of(b))
 
-	_section(y, "SUBSTITUTES"); y += 15
-	var bench := rest.slice(0, 5)
-	for j in bench.size():
-		_row(y, row, int(bench[j].get("id", -1)), 12 + j, _pos_of(bench[j]))
-		y += ROW_H
-		row += 1
+## The original ARROW scroll buttons: up/down with on/off art for whether more list exists
+## in that direction. Drawn only while the squad list overflows the panel.
+func _draw_scroll() -> void:
+	if _max_scroll() <= 0:
+		return
+	_draw_arrow(SCROLL_UP, "scroll_up_on" if _scroll > 0 else "scroll_up_off")
+	_draw_arrow(SCROLL_DOWN, "scroll_down_on" if _scroll < _max_scroll() else "scroll_down_off")
 
-	_section(y, "RESERVES"); y += 15
-	var res := rest.slice(5, rest.size())
-	var max_rows := int((TABLE.end.y - 4 - y) / ROW_H)
-	for j in mini(res.size(), max_rows):
-		_row(y, row, int(res[j].get("id", -1)), 17 + j, _pos_of(res[j]))
-		y += ROW_H
-		row += 1
+
+func _draw_arrow(hit: Rect2, name: String) -> void:
+	var g := Rect2(hit.position + (hit.size - Vector2(16, 16)) * 0.5, Vector2(16, 16))
+	if not PMChrome.draw_icon(self, name, g):
+		# Fallback so the control still reads when the PNG is absent: a drawn triangle.
+		var up := name.begins_with("scroll_up")
+		var col := PMChrome.C_GOLD if name.ends_with("_on") else PMChrome.C_STAR_OFF
+		var c := g.get_center()
+		var pts := PackedVector2Array([Vector2(c.x, c.y - 6), Vector2(c.x - 6, c.y + 5),
+			Vector2(c.x + 6, c.y + 5)] if up else [Vector2(c.x, c.y + 6),
+			Vector2(c.x - 6, c.y - 5), Vector2(c.x + 6, c.y - 5)])
+		draw_colored_polygon(pts, col)
 
 
 func _section(y: int, label: String) -> void:
