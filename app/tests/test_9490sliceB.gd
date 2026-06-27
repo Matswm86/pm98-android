@@ -42,6 +42,7 @@ func _init() -> void:
 	_run_bi()
 	_run_gate()
 	_run_bii()
+	_run_biiarm()
 	print("")
 	if _fail == 0:
 		print("ALL PASS (%d checks)" % _pass)
@@ -294,4 +295,66 @@ func _run_bii_one(name: String, want: Dictionary) -> void:
 
 func _eq(name: String, field: String, want: int, got: int) -> void:
 	_ok(got == want, "B-ii/%s %s: got=%d (0x%x) want=%d (0x%x)" % [name, field, got, got & 0xffffffff, want, want & 0xffffffff])
+
+
+# ---- B-ii-b: marker-4 action==5 arm-2 tail -----------------------------------
+# Marker 4 (row 3, action 5, angle 0) wins; the apply temp-moves p, runs the REAL arm-2 active tail
+# (2 RNG draws), restores, then writes the 9490 locomotion. Mirrors run_9490sliceBiiarm_oracle.sh.
+const ARM_SEED := 0x4d2
+
+
+func _run_biiarm() -> void:
+	var o := {}
+	var f := FileAccess.open(_spec_path("9490sliceBiiarm_oracle.txt"), FileAccess.READ)
+	if f == null:
+		_ok(false, "B-ii-b oracle missing (run tools/re/run_9490sliceBiiarm_oracle.sh)")
+		return
+	while not f.eof_reached():
+		var line := f.get_line().strip_edges()
+		if not line.begins_with("B9490iiarm "):
+			continue
+		var parts := line.split(" ", false)
+		for tok in parts:
+			var eq := tok.find("=")
+			if eq > 0 and tok.begins_with("0x"):
+				o[tok.substr(0, eq)] = _s32(tok.substr(eq + 1).to_int())
+	if o.is_empty():
+		_ok(false, "B-ii-b oracle empty")
+		return
+
+	# Build the marker-4 fixture (mirrors the oracle pokes).
+	var m := {0x1820: 0x100000, 0x19a0: 0, 0x448: 0}
+	var ctx := {0x2b8: 0, 0x2c4: 0}
+	var teamstruct := {0: ctx}
+	var ball := {0x40: 0, 0x44: 0, 0x50: 0, 0x70: 0, 0x80: 0x1234, 0x4c: 0,
+		4: 0x10000, 8: 0, 0xc: 0, 0x20: 0x400000, 0x24: 0x400000, 0x28: 0}
+	for s in range(0x17, 0x27):
+		ball[0xc * s] = 0x400000; ball[0xc * s + 4] = 0x400000; ball[0xc * s + 8] = 0x400000
+	var sgo := 0x17 + 3                                          # row 3 -> center4 (0x9998,0,0)
+	ball[0xc * sgo] = 0x9998; ball[0xc * sgo + 4] = 0; ball[0xc * sgo + 8] = 0
+	var p := {
+		0x34: 0, 4: 0, 8: 0, 0xc: 0, 0x40: 0, 0x54: 1, 0x2bc: 1, 0x2b8: 0, 0x3a0: 50, 0x3a4: 0x100000,
+		0x20: 0x4000, 0x24: _s32(-0x2000), 0x28: 0x800, 0x18c: m, 0x190: ball, 0x188: teamstruct,
+	}
+	var rng = MatchEngine.Pm98Rng.new(ARM_SEED)
+	var sc: Array = Pm98Movement._lean9490_aim_scalars(p)
+	var grid: Array = Pm98Movement._grid9490_build(p)
+	var applied := Pm98Movement._lean9490_marker_scan_apply(p, grid, int(sc[0]), int(sc[1]), rng)
+	_ok(applied, "B-ii-b/m4: marker should apply")
+	_eq("m4", "action", int(o["0x230040"]), int(p.get(0x40, 0)))
+	_eq("m4", "reachx", int(o["0x2300a0"]), int(p.get(0xa0, 0)))
+	_eq("m4", "reachy", int(o["0x2300a4"]), int(p.get(0xa4, 0)))
+	_eq("m4", "reachz", int(o["0x2300a8"]), int(p.get(0xa8, 0)))
+	_eq("m4", "p48",    int(o["0x230048"]), int(p.get(0x48, 0)))
+	_eq("m4", "p5e",    int(o["0x23005e"]) & 0xff, int(p.get(0x5e, 0)) & 0xff)
+	_eq("m4", "p80",    int(o["0x230080"]), int(p.get(0x80, 0)))
+	_eq("m4", "p84",    int(o["0x230084"]), int(p.get(0x84, 0)))
+	_eq("m4", "p94",    int(o["0x230094"]), int(p.get(0x94, 0)))
+	_eq("m4", "p98",    int(o["0x230098"]), int(p.get(0x98, 0)))
+	_eq("m4", "p9c",    int(o["0x23009c"]), int(p.get(0x9c, 0)))
+	_eq("m4", "p66",    int(o["0x230066"]) & 0xffff, int(p.get(0x66, 0)) & 0xffff)
+	_eq("m4", "p7c",    int(o["0x23007c"]), int(p.get(0x7c, 0)))
+	_eq("m4", "ball4c", int(o["0x28004c"]), int(ball.get(0x4c, 0)))
+	_eq("m4", "ball5c", int(o["0x28005c"]), int(ball.get(0x5c, 0)))
+	_eq("m4", "rng",    int(o["0x6d3184"]) & 0xffffffff, int(rng.state) & 0xffffffff)
 
