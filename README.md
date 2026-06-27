@@ -16,9 +16,9 @@ fan remake.</sub>
 
 ## Download
 
-📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/tag/latest)** — open the link and tap the `pm98-<build>.apk` asset.
+📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-17e316f.apk)** — one tap downloads `pm98-17e316f.apk` (current build) straight to your phone.
 
-> The filename changes every build (`pm98-<commit>.apk`) on purpose, so your phone/browser can never serve a stale cached APK. Always grab the newest asset on that page.
+> Filenames change every build (`pm98-<commit>.apk`) on purpose, so your phone/browser can never serve a stale cached APK. If a newer build has landed and the direct link above 404s, grab the newest `pm98-*.apk` asset from the **[latest release page](https://github.com/Matswm86/pm98-android/releases/tag/latest)**.
 
 &nbsp;·&nbsp; [all releases](https://github.com/Matswm86/pm98-android/releases)
 
