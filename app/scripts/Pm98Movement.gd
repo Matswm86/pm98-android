@@ -5587,6 +5587,25 @@ static func possession_tail_aafd0(p: Dictionary, param2: int, rng, dat_replay: b
 	return 1
 
 
+## FUN_005b0a60 (124B switch): is the ball's CARRIER busy in an action state that should make an off-ball
+## player back off (the lean's Slice-B early-bail at decompile L121, ECX = carrier)? Pure switch over the
+## carrier's action (+0x40) against its action-timer (+0x2c); default false. Verified bit-for-bit against
+## the REAL FUN_005b0a60 by tools/re/run_b0a60_oracle.sh -> specs/b0a60_oracle.txt (test_9490sliceB.gd).
+static func _carrier_busy_b0a60(carrier: Dictionary) -> bool:
+	var action := _g(carrier, 0x40)
+	var t := _si(carrier, 0x2c)                              # action timer / counter
+	match action:
+		0xd:                  return t > 0
+		0x13:                 return t < 5
+		0x1f, 0x21, 0x2f:     return true
+		0x28, 0x29, 0x2c, 0x2d: return t > 3
+		0x2e:                 return t > 1
+		0x30, 0x33, 0x34:     return t > 6
+		0x36:                 return t < 0x14
+		0x37:                 return t < 6
+	return false
+
+
 ## FUN_005a9490 ("the lean") SLICE A -- the ACTIVE-CARRIER branch (decompile L55-120 / asm 0x5a9490-
 ## 0x5a96e0). Fires ONLY when p IS the ball's active carrier (p == ball+0x40); it steers the carried
 ## ball at the dribble target = p.pos + polar_vec(0x4ccc, p.facing) (a point 0x4ccc ahead of the
@@ -5639,4 +5658,101 @@ static func lean_9490(p: Dictionary) -> bool:
 	ball[0x9c] = tx; ball[0xa0] = ty; ball[0xa4] = tz
 	if _g(p, 0x2bc) != 0:
 		set_position_code(p, 0xb)                           # FUN_005a5430(0xb)
+	return true
+
+
+# ---- FUN_005a9490 ("the lean") SLICE B-i: off-ball gates + grid build + goal aim ------
+# When p is NOT the ball carrier, the lean steers an off-ball player onto a marker grid. Slice B-i is the
+# deterministic (RNG-free) prefix (decompile L121-220 / asm 0x5a96e1-0x5a99c5): the early-bail predicate,
+# the proximity + action gates, the two static box tables, the goal-aim angle scalars, and the 16-entry
+# rotated trajectory grid the marker scan (Slice B-ii) consumes. UNWIRED -- lean_9490 still returns false
+# for non-carriers; these helpers are oracle-locked standalone (test_9490sliceB.gd) ahead of the scan.
+
+## The two static box tables the marker scan tests local_c0 against, baked bit-for-bit from MANAGER.EXE
+## (.data, lazy-inited once at 0x5a9787 / 0x5a9839; FUN_00605ff0 builds a derived box at &DAT_005aa480/470
+## that the scan never reads, so it is a no-op here). 5 rows of 3 ints; row i is read at byte offset 0xc*i.
+##   CENTER (DAT_006744a8): the per-marker box center offset.   HALF (DAT_006742f0): the per-marker box half-size.
+const BOX9490_CENTER := [
+	[0x17fff, 0, 0x1e147], [0x4ccc, 0, 0x18000], [0x9998, 0, 0xb333], [0x2b332, 0, 0xcccc], [0x9998, 0, 0],
+]
+const BOX9490_HALF := [
+	[0x11999, 0x8000, 0x5eb8], [0x8000, 0x8000, 0x8000], [0x8000, 0x8000, 0x8000],
+	[0x9999, 0x8000, 0x4000], [0xb333, 0x8000, 0x4ccc],
+]
+
+
+## The two off-ball aim scalars (decompile L189-205 / asm 0x5a98b2-0x5a9961). The setup takes TWO headings
+## off p.pos -- A1 toward the OPPONENT goal and A2 toward the ball -- then folds them. The first
+## FUN_00590ae0 subtracts p.pos from the goal point [goalX,0,0]; the SECOND reuses ECX = &ball.x (NOT the
+## goal point), so it is the ball heading (the esp-alias trap the decompile hid). goalX =
+## goal_target_x(m+0x19a0, m+0x1820, 1 - p.team). Only the low 16 bits survive downstream:
+##   A1 = atan_angle(goalX - p.x, -p.y)              [goal heading]
+##   A2 = atan_angle(ball.x - p.x, ball.y - p.y)     [ball heading]
+##   local_e8 (s16 used by the scan heading gate)  = _s16(A1 - A2)
+##   local_ec (word written to p.facing / p+0x66)  = (A1 + trunc(_s16(A2 - A1) / 2)) & 0xffff
+## Returns [e8_s16, ec_word]. Verified bit-for-bit by run_9490sliceBi_oracle.sh (local_e8 @ 0x30802c /
+## local_ec @ 0x308028).
+static func _lean9490_aim_scalars(p: Dictionary) -> Array:
+	var m: Dictionary = _ref(p, 0x18c)
+	var ball: Dictionary = _ref(p, 0x190)
+	var goalx := goal_target_x(_g(m, 0x19a0), _g(m, 0x1820), 1 - _g(p, 0x2b8))   # opponent goal
+	var a1 := Pm98Trig.atan_angle(Pm98Trig._i32(goalx - _si(p, 4)), Pm98Trig._i32(-_si(p, 8)))
+	var a2 := Pm98Trig.atan_angle(Pm98Trig._i32(_si(ball, 4) - _si(p, 4)), Pm98Trig._i32(_si(ball, 8) - _si(p, 8)))
+	var e8 := Pm98Trig._s16(a1 - a2)
+	var ec := (a1 + Pm98Trig._tdiv(Pm98Trig._s16(a2 - a1), 2)) & 0xffff
+	return [e8, ec]
+
+
+## The 16-entry rotated trajectory grid (decompile L206-220 / asm 0x5a9965-0x5a99c3): for j=0..15 take the
+## ball's predicted-trajectory slot ball+0xc*(0x17+j), subtract p.pos, and rotate the delta by -p.facing
+## about Z (FUN_005ee670, plane 0). Returns 16 rows [x', y', z']. Structural sibling of _marker_grid_build
+## (7260) but ALWAYS rotated and with NO pass-1 goal extrapolation. The scan indexes this as local_c0[3*r].
+static func _grid9490_build(p: Dictionary) -> Array:
+	var ball: Dictionary = _ref(p, 0x190)
+	var facing := Pm98Trig._s16(_g(p, 0x34))
+	var px := _si(p, 4)
+	var py := _si(p, 8)
+	var pz := _si(p, 0xc)
+	var grid: Array = []
+	for j in range(0x10):
+		var base := 0xc * (0x17 + j)                        # ball + 0x114 + 12*j
+		var dx := Pm98Trig._i32(_si(ball, base) - px)
+		var dy := Pm98Trig._i32(_si(ball, base + 4) - py)
+		var dz := Pm98Trig._i32(_si(ball, base + 8) - pz)
+		grid.append(Pm98Trig.rot_vec3([dx, dy, dz], -facing, 0))
+	return grid
+
+
+## The off-ball gate prefix (decompile L121-150, L221-230 / asm 0x5a96e1-0x5a9a11). Returns true when an
+## off-ball (non-carrier) player reaches the marker scan, false when any gate bails it out first:
+##   1. early-bail: a real carrier that is NOT goalkeeper-context (carrier+0x2bc == 0) and is busy in a
+##      backing-off action (_carrier_busy_b0a60) -> the off-ball player yields.
+##   2. proximity: p must be inside the 0x1e0000 L-inf cube around the BALL position (asm anchors on *(p+0x190)).
+##   3. action gate: p.action in [0,3] or == 0xb or == 0x1c.
+##   4. ball guards: ball must have no foreign carrier (ball+0x40 == 0) and ball+0x70 == 0 (no anim lock).
+##   5. scan gate: p.action != 0xb AND p+0x54 != 0 AND p+0x2bc != 0 (else it skips straight to Slice C).
+## The grid + goal-aim are still COMPUTED before guards 4/5 (asm order); this predicate reports only whether
+## the scan would run. Oracle-locked via a true-entry trace (test_9490sliceB.gd, REACH rows).
+static func _lean9490_offball_reaches_scan(p: Dictionary) -> bool:
+	var ball: Dictionary = _ref(p, 0x190)
+	var carrier = ball.get(0x40, null)
+	if carrier is Dictionary and _g(carrier, 0x2bc) == 0 and _carrier_busy_b0a60(carrier):
+		return false                                        # (1) yield to a busy carrier
+	# (2) proximity cube around the BALL pos (asm: iVar10 = *(p+0x190) = ball, tests p.pos vs ball.pos)
+	for ax in 3:
+		if absi(Pm98Trig._i32(_si(p, 4 + ax * 4) - _si(ball, 4 + ax * 4))) >= 0x1e0000:
+			return false
+	var action := _g(p, 0x40)                               # (3) action gate
+	var ok := action >= 0 and action <= 3
+	if not ok and action != 0xb and action != 0x1c:
+		return false
+	# (4) ball guards -- ball+0x40 is a carrier ref (Dict) or 0; any carrier present aborts the off-ball scan.
+	var c40 = ball.get(0x40, 0)
+	if c40 is Dictionary or (c40 is int and c40 != 0):
+		return false
+	if _g(ball, 0x70) != 0:
+		return false
+	# (5) scan-entry gate
+	if action == 0xb or _g(p, 0x54) == 0 or _g(p, 0x2bc) == 0:
+		return false
 	return true

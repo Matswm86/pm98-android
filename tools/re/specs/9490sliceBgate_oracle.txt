@@ -1,0 +1,10 @@
+# Oracle FUN_005a9490 Slice B-i GATES. Row: BGATE <name> | grid=<0|1> scan=<0|1> (tracehits).
+BGATE reach | grid=1 scan=1
+BGATE prox | grid=0 scan=0
+BGATE act5 | grid=0 scan=0
+BGATE actB | grid=1 scan=0
+BGATE carrierbusy | grid=0 scan=0
+BGATE carrierfree | grid=1 scan=0
+BGATE scan54 | grid=1 scan=0
+BGATE scan2bc | grid=1 scan=0
+BGATE ball70 | grid=1 scan=0
