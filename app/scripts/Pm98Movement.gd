@@ -5756,3 +5756,112 @@ static func _lean9490_offball_reaches_scan(p: Dictionary) -> bool:
 	if action == 0xb or _g(p, 0x54) == 0 or _g(p, 0x2bc) == 0:
 		return false
 	return true
+
+
+# ---- FUN_005a9490 ("the lean") SLICE B-ii: the 5-marker SCAN + APPLY -------------------
+# Once an off-ball player reaches the scan (_lean9490_offball_reaches_scan), the lean walks 5 markers
+# i=0..4 (decompile L228-338 / asm 0x5a9a17-0x5a9d0e; the do-loop runs while ebx = 12*i < 0x3c). For each
+# marker it scores the rotated trajectory grid row MARK9490_ROW[i] against the PER-MARKER box
+# BOX9490_CENTER[i]/BOX9490_HALF[i] (ebx = 12*i indexes the box -- the `add ebx,0xc` back-edge proves it is
+# per-marker, NOT a zero global base the way the Ghidra `[ebx+0x6744a8]` render suggests) plus a heading
+# gate on the Slice-B-i aim scalar e8 vs the MARK9490_ANGLE[i] table. The FIRST marker that passes BOTH
+# gates is APPLIED and the scan stops. Markers with MARK9490_FLAG[i] != 0 first gate on _ps_goalbox(p.pos)
+# AND a half-pitch sign flip (sign(p.x) != sign(p+0x3a4)) before the box test.
+
+## DAT_006655c8 (row, int) / DAT_006655e0 (flag, byte) / DAT_006655e8 (x-offset, int) /
+## DAT_006655b0 (action, int) / DAT_00665600 (angle, signed short) -- the 5 per-marker tables, dumped
+## bit-for-bit from MANAGER.EXE (objdump -s). 7260's siblings live at 006654c0/e8/e0; these differ.
+const MARK9490_ROW := [9, 5, 4, 6, 3]
+const MARK9490_FLAG := [0, 1, 0, 1, 0]
+const MARK9490_XOFF := [0xb333, 0, 0, 0x1b333, 0x3333]
+const MARK9490_ACTION := [0x14, 0x15, 0x19, 0x16, 0x05]
+const MARK9490_ANGLE := [0x638e, -0x1555, 0x638e, 0x4000, 0]
+
+
+## The scan + apply. Returns true iff a marker was applied (the binary's bVar5 / [esp+0x13]). `grid` is the
+## 16-row rotated trajectory grid (_grid9490_build); `e8`/`ec` are the aim scalars (_lean9490_aim_scalars);
+## `rng` drives the action==5 arm-2 active tail (FUN_005aa870). The FUN_005ee670 at 0x5a9b7b is NOT a no-op:
+## it rotates the offset (local_104, local_100) IN PLACE by +p.facing (plane 0) -- it writes [esi]/[esi+4]
+## back, and even at facing 0 the cos/sin LUT (cos[0]=0x10000, sin[0x3ff]=100) applies a tiny non-identity
+## twist, so e.g. (0xb333,149) -> (0xb332,218). Oracle: tools/re/run_9490sliceBii_oracle.sh
+## (true entry 0x5a9490, reach fixture, ball.vel high so Slice C returns at 0x5aa274 leaving the apply writes
+## intact), locked in test_9490sliceB.gd (B-ii rows).
+static func _lean9490_marker_scan_apply(p: Dictionary, grid: Array, e8: int, ec: int, rng = null) -> bool:
+	var ball: Dictionary = _ref(p, 0x190)
+	for i in range(5):
+		# flag != 0 -> the goalbox + half-pitch-sign else branch must pass before the box test (L320-330).
+		if int(MARK9490_FLAG[i]) != 0:
+			if not _ps_goalbox(p, [_si(p, 4), _si(p, 8), _si(p, 0xc)]):
+				continue
+			if _sign1(_si(p, 4)) == _sign1(_si(p, 0x3a4)):
+				continue
+		var row := int(MARK9490_ROW[i])
+		var g: Array = grid[row]
+		var center: Array = BOX9490_CENTER[i]
+		var half: Array = BOX9490_HALF[i]
+		# box test: |grid[row][k] - center[k]| < half[k] for k = 0,1,2.
+		if absi(Pm98Trig._i32(int(g[0]) - int(center[0]))) >= int(half[0]):
+			continue
+		if absi(Pm98Trig._i32(int(g[1]) - int(center[1]))) >= int(half[1]):
+			continue
+		if absi(Pm98Trig._i32(int(g[2]) - int(center[2]))) >= int(half[2]):
+			continue
+		# heading gate (L256-263): e4 low16 = (angle + 0x8000) mod 2^16 == (angle - 0x8000) mod 2^16.
+		var ang := int(MARK9490_ANGLE[i])
+		var pass_hd: bool
+		if ang > 0:
+			pass_hd = absi(e8) < ang
+		elif ang < 0:
+			pass_hd = Pm98Trig._s16((ang + 0x8000) & 0xffff) < absi(e8)
+		else:
+			pass_hd = true
+		if not pass_hd:
+			continue
+		# ---- APPLY (this marker wins; the scan stops) ----
+		var fc := 0
+		var x104 := Pm98Trig._i32((int(MARK9490_XOFF[i]) - int(center[0])) + int(g[0]))
+		var y100 := Pm98Trig._i32(int(g[1]) - int(center[1]))
+		# 0x5a9b7b: rotate (local_104, local_100) IN PLACE by +p.facing (plane 0) -- NOT a no-op.
+		var off: Array = Pm98Trig.rot_vec3([x104, y100, fc], _g(p, 0x34), 0)
+		x104 = int(off[0]); y100 = int(off[1]); fc = int(off[2])
+		var ec_ap := ec & 0xffff
+		if ang < 0:
+			ec_ap = _g(p, 0x34) & 0xffff                       # local_ec low16 = p.facing
+		var action := int(MARK9490_ACTION[i])
+		if action == 5:
+			# temp-move p by the offset + drive the arm-2 active tail, then restore pos + facing.
+			var saved_face := _g(p, 0x34)
+			p[0x34] = ec_ap
+			p[4] = Pm98Trig._i32(_si(p, 4) + x104)
+			p[8] = Pm98Trig._i32(_si(p, 8) + y100)
+			p[0xc] = Pm98Trig._i32(_si(p, 0xc) + fc)
+			_arm2_active_tail(p, 1, rng)                       # FUN_005aa870(1)
+			p[4] = Pm98Trig._i32(_si(p, 4) - x104)
+			p[8] = Pm98Trig._i32(_si(p, 8) - y100)
+			p[0xc] = Pm98Trig._i32(_si(p, 0xc) - fc)
+			p[0x34] = saved_face & 0xffff
+		else:
+			if action == 0x19 and e8 < 0:
+				action = 0x1a
+			set_position_code(p, action)                       # FUN_005a5430
+		# locomotion writes (both paths), off the restored p.pos.
+		p[0x80] = 1
+		p[0x84] = row << 2
+		p[0x94] = Pm98Trig._i32(_si(p, 4) + x104)
+		p[0x66] = ec_ap & 0xffff
+		p[0x98] = Pm98Trig._i32(_si(p, 8) + y100)
+		p[0x9c] = Pm98Trig._i32(_si(p, 0xc) + fc)
+		p[0x7c] = _g(ball, 0x80)
+		# carrier handoff bookkeeping: only when the ball's +0x4c ref is THIS player and +0x44 is not.
+		if is_same(ball.get(0x4c, null), p) and not is_same(ball.get(0x44, null), p):
+			ball[0x4c] = 0
+			# DAT_006d31c4 == 0 (live): decrement one holder stat counter, increment the sibling.
+			var holder = ball.get(0x50, null)
+			if holder is Dictionary:
+				var stat: Dictionary = _ref(holder, 0x3b8)
+				if _g(stat, 0x88) != 0:
+					stat[0x88] = _g(stat, 0x88) - 1
+					stat[0x84] = _g(stat, 0x84) + 1
+			ball[0x5c] = row * 4 + 1
+		return true
+	return false

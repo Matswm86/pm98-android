@@ -41,6 +41,7 @@ func _init() -> void:
 	_run_b0a60()
 	_run_bi()
 	_run_gate()
+	_run_bii()
 	print("")
 	if _fail == 0:
 		print("ALL PASS (%d checks)" % _pass)
@@ -197,4 +198,100 @@ func _run_gate() -> void:
 			continue
 		var got := 1 if Pm98Movement._lean9490_offball_reaches_scan(p) else 0
 		_ok(got == int(o[name]), "gate/%s: reaches_scan got=%d want=%d" % [name, got, int(o[name])])
+
+
+# ---- B-ii marker scan + apply ------------------------------------------------
+# name -> fixture cfg mirroring run_9490sliceBii_oracle.sh. row < 0 -> no marker override (none).
+var _bii := {
+	"m0":    {"px": 0, "py": 0, "pz": 0, "anchor": 0x100000, "team": 0, "orient": 0, "goalx": 0x100000,
+			  "bx": 0x10000, "by": 0, "bz": 0, "ball4c_p": true,  "row": 9, "vx": 0x17fff, "vy": 0, "vz": 0x1e147},
+	"m2":    {"px": 0, "py": 0, "pz": 0, "anchor": 0x100000, "team": 0, "orient": 1, "goalx": 0x100000,
+			  "bx": 0x8000, "by": 0x60000, "bz": 0, "ball4c_p": false, "row": 4, "vx": 0x9998, "vy": 0, "vz": 0xb333},
+	"m2neg": {"px": 0, "py": 0, "pz": 0, "anchor": 0x100000, "team": 1, "orient": 1, "goalx": 0x100000,
+			  "bx": 0x8000, "by": 0x60000, "bz": 0, "ball4c_p": false, "row": 4, "vx": 0x9998, "vy": 0, "vz": 0xb333},
+	"m3":    {"px": 0x200000, "py": 0, "pz": 0, "anchor": -1, "team": 0, "orient": 0, "goalx": 0x280000,
+			  "bx": 0x210000, "by": 0, "bz": 0, "ball4c_p": false, "row": 6, "vx": 0x2b332, "vy": 0, "vz": 0xcccc,
+			  "aabb": [0, 0x300000, -0x80000, 0x80000, -0x80000, 0x80000]},
+	"none":  {"px": 0, "py": 0, "pz": 0, "anchor": 0, "team": 0, "orient": 1, "goalx": 0x100000,
+			  "bx": 0x10000, "by": 0, "bz": 0, "ball4c_p": false, "row": -1},
+}
+
+
+func _build_bii(cfg: Dictionary) -> Dictionary:
+	var m := {0x1820: int(cfg["goalx"]), 0x19a0: int(cfg["orient"])}
+	if cfg.has("aabb"):
+		var a: Array = cfg["aabb"]
+		m[0x1828] = int(a[0]); m[0x1834] = int(a[1])
+		m[0x182c] = int(a[2]); m[0x1838] = int(a[3])
+		m[0x1830] = int(a[4]); m[0x183c] = int(a[5])
+	var px := int(cfg["px"]); var py := int(cfg["py"]); var pz := int(cfg["pz"])
+	var ball := {0x40: 0, 0x44: 0, 0x50: 0, 0x70: 0, 0x80: 0x1234, 4: int(cfg["bx"]), 8: int(cfg["by"]), 0xc: int(cfg["bz"])}
+	for s in range(0x17, 0x27):                                # 16 trajectory slots FAR (p + 0x400000)
+		ball[0xc * s] = _s32(px + 0x400000)
+		ball[0xc * s + 4] = _s32(py + 0x400000)
+		ball[0xc * s + 8] = _s32(pz + 0x400000)
+	if int(cfg["row"]) >= 0:                                    # steer one row into its box
+		var sgo := 0x17 + int(cfg["row"])
+		ball[0xc * sgo] = _s32(px + int(cfg["vx"]))
+		ball[0xc * sgo + 4] = _s32(py + int(cfg["vy"]))
+		ball[0xc * sgo + 8] = _s32(pz + int(cfg["vz"]))
+	var p := {
+		0x34: 0, 4: px, 8: py, 0xc: pz, 0x40: 0, 0x54: 1, 0x2bc: 1,
+		0x2b8: int(cfg["team"]), 0x3a4: int(cfg["anchor"]), 0x18c: m, 0x190: ball,
+	}
+	ball[0x4c] = p if bool(cfg["ball4c_p"]) else 0
+	return {"p": p, "ball": ball}
+
+
+func _run_bii() -> void:
+	var o := {}
+	var f := FileAccess.open(_spec_path("9490sliceBii_oracle.txt"), FileAccess.READ)
+	if f == null:
+		_ok(false, "B-ii oracle missing (run tools/re/run_9490sliceBii_oracle.sh)")
+		return
+	while not f.eof_reached():
+		var line := f.get_line().strip_edges()
+		if not line.begins_with("B9490ii "):
+			continue
+		var parts := line.split(" ", false)
+		var kv := {}
+		for tok in parts:
+			var eq := tok.find("=")
+			if eq > 0 and tok.begins_with("0x"):
+				kv[tok.substr(0, eq)] = _s32(tok.substr(eq + 1).to_int())
+		o[parts[1]] = kv
+	if o.is_empty():
+		_ok(false, "B-ii oracle empty")
+		return
+	for name in _bii:
+		if not o.has(name):
+			_ok(false, "B-ii/%s missing from oracle" % name)
+			continue
+		_run_bii_one(name, o[name])
+
+
+func _run_bii_one(name: String, want: Dictionary) -> void:
+	var fx := _build_bii(_bii[name])
+	var p: Dictionary = fx["p"]
+	var ball: Dictionary = fx["ball"]
+	var sc: Array = Pm98Movement._lean9490_aim_scalars(p)
+	var e8 := int(sc[0])                                        # already _s16'd signed
+	var ec := int(sc[1])
+	var grid: Array = Pm98Movement._grid9490_build(p)
+	Pm98Movement._lean9490_marker_scan_apply(p, grid, e8, ec, null)
+	# Compare the apply field writes against the oracle (read at the real RET).
+	_eq(name, "action", int(want["0x230040"]), int(p.get(0x40, 0)))
+	_eq(name, "p80",    int(want["0x230080"]), int(p.get(0x80, 0)))
+	_eq(name, "p84",    int(want["0x230084"]), int(p.get(0x84, 0)))
+	_eq(name, "p94",    int(want["0x230094"]), int(p.get(0x94, 0)))
+	_eq(name, "p98",    int(want["0x230098"]), int(p.get(0x98, 0)))
+	_eq(name, "p9c",    int(want["0x23009c"]), int(p.get(0x9c, 0)))
+	_eq(name, "p66",    int(want["0x230066"]) & 0xffff, int(p.get(0x66, 0)) & 0xffff)
+	_eq(name, "p7c",    int(want["0x23007c"]), int(p.get(0x7c, 0)))
+	_eq(name, "ball4c", int(want["0x28004c"]), int(ball.get(0x4c, 0)) if not (ball.get(0x4c) is Dictionary) else -999)
+	_eq(name, "ball5c", int(want["0x28005c"]), int(ball.get(0x5c, 0)))
+
+
+func _eq(name: String, field: String, want: int, got: int) -> void:
+	_ok(got == want, "B-ii/%s %s: got=%d (0x%x) want=%d (0x%x)" % [name, field, got, got & 0xffffffff, want, want & 0xffffffff])
 
