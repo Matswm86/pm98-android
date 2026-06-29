@@ -223,6 +223,24 @@ Header **title text is white** — verified `mov ebx,0xffffff` in the column set
 border + body tint now derive from its real COLORREF (replacing the prior single invented
 blue `C_PANEL`/`C_HDR`). Cross-checked with a PIL mirror over the real `FONDO DBASE`.
 
+**Header title (built):** widget `this+0x5a6c`, a Proman18 string set white (`0xffffff`,
+FUN_004042d0) at rect base **(224,18)** delta **(372,39)** (objdump 0x42ae7e..0x42aea6:
+`push 0x174/0x27` then `push 0xe0/0x12`, same base=2nd / delta=1st convention as the columns).
+The string is the club/competition name (FUN_00445a90→FUN_0043b660). `DataBaseScreen.gd` now
+draws the club name in Proman18 here; the old small caption + invented `"DATA BASE"` subtitle
+(no such on-screen string in the binary) are removed. A club crest widget `this+0x5e84` blits
+top-right at ~(585,4) 58×64 — NOT built (the app's `PMChrome.draw_crest` draws a kit, not the
+MINIESC emblem; building it would mismatch).
+
+**Legend (partially reversed, NOT built):** Loop A (`0x42b16d..0x42b2d1`, 3 iters) lays 3 cells
+at **y=460** (`push 0x1cc`), x from a stack array (`mov edx,[esp+esi+0x74]`, candidate values
+10/0x5a/0xaa = 10/90/170), each `New signing`/`Youth player`/`Absence from the team`
+(PTR@0x493958) + a crest blit (FUN_00458730). The 3 x's and the cell delta need confirming
+before building. **Action buttons (NOT placeable here):** Loop B (`0x42b2d7..0x42b385`, 4 iters)
+only sets cell TEXT (FUN_0044d4e0) on widgets `this+0x742c` — it does NOT position them
+(`[edi+0xc0]` is not called), so the 7 button rects (`nuevo fichaje`…`menos jugadores`) live in
+another function and remain to be reversed.
+
 **Still open (not yet reversed):** the column widget's actual *paint slot* (a per-object
 function pointer, NOT `[edi+0xc0]` which is the rect/title/colour SETTER, and NOT
 `FUN_0045b080` which is a sibling called directly). So whether the real body is a *solid*

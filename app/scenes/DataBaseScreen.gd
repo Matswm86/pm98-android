@@ -51,7 +51,7 @@ const C_HDR_TXT := Color(1, 1, 1)                # white — verified 0xffffff i
 const C_ROW_A := Color(0, 0, 0, 0.18)            # faint row banding (neutral, readability)
 const C_ROW_TXT := Color(0.95, 0.97, 1.0)
 const C_SEP := Color(1, 1, 1, 0.16)
-const C_CAPTION := Color(0.92, 0.96, 1.0)
+const C_TITLE := Color(1, 1, 1)   # club-name title — verified 0xffffff (FUN_004042d0)
 const C_BTN := Color(0.13, 0.27, 0.56)
 const C_BTN_HI := Color(0.42, 0.58, 0.86)
 const C_BTN_LO := Color(0.05, 0.10, 0.26)
@@ -60,6 +60,7 @@ const C_GOLD := Color(1.0, 0.84, 0.22)
 var _bg: Texture2D
 var _f10: Font
 var _f12: Font
+var _f18: Font
 var _club: Dictionary = {}
 var _press := ""
 var _rows: Array = []   # [{r: Rect2 (design space), p: Dictionary}] for row taps
@@ -69,6 +70,7 @@ func _ready() -> void:
 	_bg = load("res://art/screens/fondo_dbase.png") if ResourceLoader.exists("res://art/screens/fondo_dbase.png") else null
 	_f10 = PMChrome.font("10")
 	_f12 = PMChrome.font("12")
+	_f18 = PMChrome.font("18")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2(W, H)
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -163,11 +165,14 @@ func _draw() -> void:
 	else:
 		draw_rect(Rect2(0, 0, W, H), Color(0.36, 0.42, 0.56), true)
 
-	# Club caption across the thin top strip above the GOALKEEPERS column.
+	# Header title: the club/competition name in Proman18, white, in the top strip to the
+	# right of the GOALKEEPERS column. Widget this+0x5a6c, rect base (224,18) delta (372,39)
+	# (FUN_0042aba0 0x42ae7e..0x42aea6), colour 0xffffff (FUN_004042d0). No "DATA BASE"
+	# subtitle exists in the binary — that was invented; removed.
 	var cap := str(_club.get("name", "")).to_upper()
 	if cap != "":
-		_txt(_f12, 222, 2, cap, C_CAPTION, 13)
-		_txt(_f10, 222, 18, "DATA BASE", Color(0.70, 0.80, 0.96), 10)
+		var tf: Font = _f18 if _f18 != null else _f12
+		_txt(tf, 224, 18 + 10, cap, C_TITLE, 18)
 
 	_rows.clear()
 	for col in COLS:
