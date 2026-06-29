@@ -144,6 +144,14 @@ jobs:
             timeout 120 "$GITHUB_WORKSPACE/godot" --rendering-driver opengl3 \
             --resolution 1280x720 --path . --script res://tests/shot_screens.gd \
             2>&1 | tee shot_art.log || true
+          # DATA BASE squad view (reversed dbasewin.exe): the four GK/DF/MF/FW columns over
+          # FONDO DBASE, rendered in-engine from a synthetic squad (no full game_db load).
+          PM98_SHOT_DIR="$PWD/shots" LIBGL_ALWAYS_SOFTWARE=1 \
+            xvfb-run -a -s "-screen 0 1280x720x24" \
+            timeout 120 "$GITHUB_WORKSPACE/godot" --rendering-driver opengl3 \
+            --resolution 1280x720 --path . --script res://tests/shot_database.gd \
+            2>&1 | tee shot_db.log || true
+          echo "--- DATABASE diagnostics ---"; grep -iE "DB-SHOT|SHOT .*png|SCRIPT ERROR|error" shot_db.log | head -20 || true
           echo "--- captured ---"; ls -la shots/
           test -s shots/boot_720.png
 

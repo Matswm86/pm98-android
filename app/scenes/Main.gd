@@ -26,6 +26,7 @@ var _career: Career = null              # active managed career, null on the men
 var _hub: MenuScreen = null             # persistent MENUPRINCIPAL hub while in a career
 var _browse: BrowseScreen = null        # active PM98-chrome browse/select overlay (Track B)
 var _seleccion: SeleccionScreen = null  # active new-career SELECCION overlay (faithful art)
+var _database: DataBaseScreen = null    # active DATA BASE squad-view overlay (reversed dbasewin)
 
 @onready var _title: Label = $Root/TopBar/Title
 @onready var _subtitle: Label = $Root/TopBar/Subtitle
@@ -796,10 +797,11 @@ func _mount_browse(title: String, subtitle: String, rows: Array,
 ## Free every front-of-house overlay (browse + title + seleccion) before the career hub.
 func _clear_front_overlays() -> void:
 	for c in get_children():
-		if c is BrowseScreen or c is TitleScreen or c is SeleccionScreen:
+		if c is BrowseScreen or c is TitleScreen or c is SeleccionScreen or c is DataBaseScreen:
 			c.queue_free()
 	_browse = null
 	_seleccion = null
+	_database = null
 
 ## Add a full-rect art overlay that frees on any tap (the display-only screen pattern).
 func _mount_tap_overlay(scr: Control) -> void:
@@ -821,6 +823,23 @@ func _open_squad(club: Dictionary, manager: String, cash: String, youth_enabled 
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
 	scr.youth_pressed.connect(_show_youth_screen)
 	scr.player_pressed.connect(_open_player_info.bind(club))
+
+## The DATA BASE squad view (the reversed dbasewin.exe browser) for a club dict: the four
+## GOALKEEPERS/DEFENDERS/MIDFIELDERS/FORWARDS columns over FONDO DBASE. A row raises that
+## player's FICHA; RETURN or a tap on empty space dismisses. See DataBaseScreen.gd.
+func _open_database_squad(club: Dictionary) -> void:
+	if _database != null and is_instance_valid(_database):
+		_database.queue_free()
+	_database = load("res://scenes/DataBaseScreen.gd").new()
+	_database.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_database)
+	_database.setup(club)
+	_database.back_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		if _database != null and is_instance_valid(_database):
+			_database.queue_free()
+		_database = null)
+	_database.player_pressed.connect(_open_player_info.bind(club))
 
 ## PLAYER INFORMATION (FICHA) overlay for one squad player, raised over the SQUAD screen.
 ## tier (for value/wage) comes from the club's division; OK / a tap dismisses it.
@@ -935,7 +954,7 @@ func _db_league_select(league: Dictionary, item: Dictionary) -> void:
 		"watch":
 			_show_match_pick(league, null)
 		"club":
-			_open_squad(item["club"], "", "")
+			_open_database_squad(item["club"])
 
 ## Database browse of the international clubs by nation (B3).
 func _show_db_intl() -> void:
@@ -955,7 +974,7 @@ func _show_db_country(country: String) -> void:
 	for c in cl:
 		rows.append({"text": c["name"], "value": "%d" % (c.get("players", []) as Array).size()})
 	_mount_browse(country.to_upper(), "%d clubs  -  tap for the squad" % cl.size(), rows,
-		func(i: int) -> void: _open_squad(cl[i], "", ""),
+		func(i: int) -> void: _open_database_squad(cl[i]),
 		func() -> void: _show_db_intl())
 
 

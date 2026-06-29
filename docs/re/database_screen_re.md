@@ -1,6 +1,7 @@
 # DATA BASE screen — reverse-engineering notes (the REAL target)
 
-Status: **architecture VERIFIED FROM SOURCE 2026-06-29. Layout reverse = NOT STARTED.**
+Status: **architecture + 4-column squad-view layout VERIFIED FROM SOURCE 2026-06-29.
+`DataBaseScreen.gd` BUILT + wired (session 4).**
 This file supersedes the "PCF5 mode inside MANAGER.EXE" plan in
 `handoff-pm98-title-hitfix-database-pcf5-2026-06-29` and the MASTER handoff's Track B —
 that plan was **wrong** (see "Correction" below).
@@ -172,8 +173,35 @@ list itself is the **model→sort→render** trio below. Saved decompilations:
 position-sorted, Proman10 @18 px pitch (list) or Futuri18 @40 px + crest/photo
 (photo), columns anchored at the four base-x's above. Row content = name (measured,
 clamped) + crest/photo by team/player id. **This is the layout to build to — reversed,
-not eyeballed.** Remaining: the exact column header strings (msg ids 0xdd–0xe0) and
-the `FUN_00445f10` id→photo lookup table (maps list id → `MINIFOTO`/`MINIESC` entry).
+not eyeballed.**
+
+## VERIFIED 2026-06-29 (session 4): the 4 column screen rects + headers + sort key
+The column **screen rects** were the missing literal (FUN_0042b540 places rows relative
+to the column widget; the widget's own rect is set in **FUN_0042aba0** at 0x42af54..0x42b0df).
+Each is built `widget.AddItem(parent, rect, title, style=0x808, id=0)` via vtable **+0xc0**
+(`FUN_0045b080`, a property-setter that stores the rect — not the paint slot), with the rect
+normalized by `FUN_00404180(base=2nd-Point-pushed, delta=1st)`:
+
+| col | offset | base | delta | rect (l,t,r,b) | title (str) | cat |
+|---|---|---|---|---|---|---|
+| GK  | +0x45f4 | (6,13)   | (208,115) | **(6,13,214,128)**   | `GOALKEEPERS` @0x493900 | 0 |
+| DEF | +0x4a0c | (6,140)  | (209,315) | **(6,140,215,455)**  | `DEFENDERS` @0x493910   | 1 |
+| MID | +0x4e24 | (218,140)| (209,315) | **(218,140,427,455)**| `MIDFIELDERS` @0x493920 | 2 |
+| FWD | +0x523c | (430,140)| (209,277) | **(430,140,639,417)**| `FORWARDS` @0x493930    | 3 |
+
+So GK = a wide-short box top-left (≤5 rows); DEF/MID/FWD = three tall side-by-side columns.
+The screen also draws `MANAGER`/`THE SQUAD` labels (str 0x493940/0x493948) + a `Calend8`
+caption (str 0x493a78). **Sort = alphabetical by name**: `FUN_0042c540` adds `0xc` to both
+entries (= name @+0xc) and calls the `lstrcmp` import `ds:0x4840c8`. Category 0/1/2/3 in
+`FUN_0042c200` = GK/DEF/MID/FWD (matches game_db `pos` GK/DF/MF/FW). Header msg-id boxes
+(0xdd–0xe0) are small per-column badges at base(0xa2,2) — not the visible title.
+
+⇒ **Built**: `app/scenes/DataBaseScreen.gd` (FONDO DBASE bg + the 4 rects above + Proman10
+LISTS rows + MINIFOTO thumbnail by `photoId` + alpha sort), wired into `Main.gd`
+(`_open_database_squad`, replacing the invented `_open_squad` on the DATA BASE browse club
+taps). Render harness `app/tests/shot_database.gd` (+ a screenshot.yml step). Remaining for a
+future pass: the **PHOTOS mode** (Futuri18, 40 px rows), the country→league→team picker art
+(SELECCION_FONDO), and HISTORY/PROGRESS/SEGUIMIENTO.
 
 ## Reverse plan (remaining)
 1. ~~Find the loader~~ DONE: it's `blitBitmap`/`SetFont`/`Point`/`Rect` at literal coords, per
