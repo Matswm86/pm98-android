@@ -293,6 +293,19 @@ using the **actual `calend8` atlas + extracted badges** (`/tmp/.../db_mirror_leg
 read cleanly, no column overlap, inside 640×480. (Headless `get_image()` is null here — the
 documented GL limit — so the mirror is ground truth.)
 
+**Legend icon↔text gap (investigated, left as approximation):** the caption's exact x-inset from
+its marker is NOT a literal. The legend rows are a **distinct, simpler widget class** than the 4
+columns — dtor `FUN_00409ee0`, **vtable `0x484948`** (the columns use dtor `FUN_004320f0`); both
+share the `+0xc0` setter `FUN_0045b080`. `FUN_00458730` stores the marker as **cell content**
+(per-cell stride 0x94, image ptr @+0x80, flags @+0x90/+0x92, column array base `this+0x360`); the
+label is the widget **title**. Their relative x is computed at **paint time** inside that class's
+MFC owner-draw (a `CRect` derived from the cell), i.e. `icon_w + runtime_pad`, not a baked number.
+`FUN_0045b080` only bakes a **2px client-border** inset (`+0x88 = +0x78 + 2`), gated on style bit
+0x400000 — applicability to the legend (AddItem style 0x900) unconfirmed. Recovering the exact gap
+= decompiling vtable `0x484948`'s owner-draw painter (several more hops, may resolve to a runtime
+expr) for a 0–3px payoff → **not pursued**. `DataBaseScreen._draw_legend()` keeps `marker_w + 3` as
+the labeled approximation. (This is the same un-reversed paint slot flagged since session 5.)
+
 **Still open after session 6:** the 7 action-button bitmaps (`nuevo fichaje`…`menos jugadores`) —
 Loop B (`0x42b2d7+`) only sets their TEXT (`FUN_0044d4e0` on `this+0x742c`), never positions them,
 so the button rects live in another fn and remain to be reversed. Plus the column body paint slot
