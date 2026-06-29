@@ -203,6 +203,35 @@ taps). Render harness `app/tests/shot_database.gd` (+ a screenshot.yml step). Re
 future pass: the **PHOTOS mode** (Futuri18, 40 px rows), the country→league→team picker art
 (SELECCION_FONDO), and HISTORY/PROGRESS/SEGUIMIENTO.
 
+## VERIFIED 2026-06-29 (session 5): the 4 columns carry distinct per-group COLORREFs
+Each AddColumn call in `FUN_0042aba0` (the `call DWORD PTR [edi+0xc0]` setter, with
+`edi = *(ebp+0x45f4..)`) is preceded by **`FUN_004042b0(colorbuf, R, G, B)`**, which writes
+a **4-byte COLORREF `{R, G, B, 0x00}`** (objdump: `[eax]=R`, `[eax+1]=G`, `[eax+2]=B`,
+`[eax+3]=0`; `ret 0xc`). So every position column has its **own identity colour** — the
+original colour-codes the four groups; it does **not** use one shared blue. Reversed at the
+four call sites:
+
+| col | offset | FUN_004042b0(R,G,B) | COLORREF | hue |
+|---|---|---|---|---|
+| GK  | +0x45f4 | (0x50,0x6e,0x05) | RGB(80,110,5)  | olive green |
+| DEF | +0x4a0c | (0xd4,0x3f,0x00) | RGB(212,63,0)  | orange |
+| MID | +0x4e24 | (0xaa,0x00,0x00) | RGB(170,0,0)   | red |
+| FWD | +0x523c | (0x6c,0x15,0x15) | RGB(108,21,21) | maroon |
+
+Header **title text is white** — verified `mov ebx,0xffffff` in the column setter chain
+(`FUN_0045b080` @0x45b107). Applied in `DataBaseScreen.gd`: each column's header band +
+border + body tint now derive from its real COLORREF (replacing the prior single invented
+blue `C_PANEL`/`C_HDR`). Cross-checked with a PIL mirror over the real `FONDO DBASE`.
+
+**Still open (not yet reversed):** the column widget's actual *paint slot* (a per-object
+function pointer, NOT `[edi+0xc0]` which is the rect/title/colour SETTER, and NOT
+`FUN_0045b080` which is a sibling called directly). So whether the real body is a *solid*
+group-colour fill vs a tint vs colour only in the header band is undetermined — current
+`A_PANEL = 0.30` body alpha is a compositing choice, the only un-reversed value left on this
+screen. The legend rows (`New signing`/`Youth player`/`Absence from the team`, PTR
+@0x493958) + 7 action-button bitmaps (`nuevo fichaje`/`ascendido`/`baja`/`mas|menos
+porteros`/`mas|menos jugadores`) drawn by Loops A/B in `FUN_0042aba0` are also still unbuilt.
+
 ## Reverse plan (remaining)
 1. ~~Find the loader~~ DONE: it's `blitBitmap`/`SetFont`/`Point`/`Rect` at literal coords, per
    screen. Continue decompiling the other view fns (HISTORY/PROGRESS/SEGUIMIENTO draw routines)

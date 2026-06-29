@@ -24,11 +24,15 @@ const W := 640
 const H := 480
 
 # Column widget rects reversed from FUN_0042aba0, as Rect2(left, top, width, height).
+# Each AddColumn call (vtable [edi+0xc0]) is preceded by FUN_004042b0(color, R,G,B) which
+# writes a 4-byte COLORREF {R,G,B,0} — the per-position-group identity colour. Reversed by
+# objdump at the four call sites (0x42af6d / 0x42afcd-style); the original colour-codes the
+# four groups, it does NOT use one shared blue.
 const COLS := [
-	{"key": "GK", "title": "GOALKEEPERS", "rect": Rect2(6, 13, 208, 115)},    # ebp+0x45f4
-	{"key": "DF", "title": "DEFENDERS",   "rect": Rect2(6, 140, 209, 315)},   # ebp+0x4a0c
-	{"key": "MF", "title": "MIDFIELDERS", "rect": Rect2(218, 140, 209, 315)}, # ebp+0x4e24
-	{"key": "FW", "title": "FORWARDS",    "rect": Rect2(430, 140, 209, 277)}, # ebp+0x523c
+	{"key": "GK", "title": "GOALKEEPERS", "rect": Rect2(6, 13, 208, 115),  "col": Color8(80, 110, 5)},    # ebp+0x45f4 (0x50,0x6e,0x05)
+	{"key": "DF", "title": "DEFENDERS",   "rect": Rect2(6, 140, 209, 315), "col": Color8(212, 63, 0)},    # ebp+0x4a0c (0xd4,0x3f,0x00)
+	{"key": "MF", "title": "MIDFIELDERS", "rect": Rect2(218, 140, 209, 315), "col": Color8(170, 0, 0)},   # ebp+0x4e24 (0xaa,0x00,0x00)
+	{"key": "FW", "title": "FORWARDS",    "rect": Rect2(430, 140, 209, 277), "col": Color8(108, 21, 21)}, # ebp+0x523c (0x6c,0x15,0x15)
 ]
 # LISTS-mode row metrics reversed from FUN_0042b540 (this+0x2d4c == 0).
 const HDR_H := 19      # column title band; rows begin at FIRST_Y below the column top
@@ -38,14 +42,15 @@ const ROW_X := 3       # local_25c: cell base x within the column
 const ROW_W := 196     # local_268 (0xc4): cell width
 const RETURN_BTN := Rect2(516, 446, 118, 26)
 
-# DATA BASE palette (the blue RC_DBASE chrome over the washed FONDO photo).
-const C_PANEL := Color(0.08, 0.13, 0.30, 0.82)   # translucent list panel
-const C_PANEL_BD := Color(0.55, 0.70, 0.95, 0.90)
-const C_HDR := Color(0.13, 0.27, 0.56, 0.96)     # blue title band
-const C_HDR_TXT := Color(0.86, 0.93, 1.0)
-const C_ROW_A := Color(0.10, 0.17, 0.36, 0.40)   # faint row banding
+# DATA BASE palette. Each column's chrome is derived from its REAL per-group COLORREF (COLS
+# "col"); only the alphas below are an un-reversed compositing choice (the widget paint slot
+# at the row CWnds is not yet reversed — see docs/re/database_screen_re.md "open").
+const A_PANEL := 0.30    # body fill alpha over FONDO
+const A_HDR := 0.95      # title band alpha
+const C_HDR_TXT := Color(1, 1, 1)                # white — verified 0xffffff in the setter
+const C_ROW_A := Color(0, 0, 0, 0.18)            # faint row banding (neutral, readability)
 const C_ROW_TXT := Color(0.95, 0.97, 1.0)
-const C_SEP := Color(0.40, 0.55, 0.85, 0.30)
+const C_SEP := Color(1, 1, 1, 0.16)
 const C_CAPTION := Color(0.92, 0.96, 1.0)
 const C_BTN := Color(0.13, 0.27, 0.56)
 const C_BTN_HI := Color(0.42, 0.58, 0.86)
@@ -173,10 +178,11 @@ func _draw() -> void:
 
 func _draw_column(col: Dictionary) -> void:
 	var r: Rect2 = col["rect"]
-	# Translucent list panel + 1px border, blue title band, then the rows.
-	draw_rect(r, C_PANEL, true)
-	draw_rect(r, C_PANEL_BD, false, 1.0)
-	draw_rect(Rect2(r.position.x, r.position.y, r.size.x, HDR_H), C_HDR, true)
+	var cc: Color = col["col"]   # the reversed per-group COLORREF
+	# Body fill + 1px border + title band, all tinted from the column's real group colour.
+	draw_rect(r, Color(cc.r, cc.g, cc.b, A_PANEL), true)
+	draw_rect(r, cc.lightened(0.45), false, 1.0)
+	draw_rect(Rect2(r.position.x, r.position.y, r.size.x, HDR_H), Color(cc.r, cc.g, cc.b, A_HDR), true)
 	_txt(_f10, r.position.x + 6, r.position.y + 4, str(col["title"]), C_HDR_TXT, 11)
 
 	var players := _bucket(str(col["key"]))
