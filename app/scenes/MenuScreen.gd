@@ -1,33 +1,44 @@
 extends Control
 class_name MenuScreen
-## PM98 MAIN MENU (MENUPRINCIPAL) screen rebuilt from the ORIGINAL game art at the
-## coordinates reversed out of MANAGER.EXE (FUN_005469c0). See docs/re/menu_screen_re.md.
+## PM98 MAIN MENU (MENUPRINCIPAL) screen — the in-career management hub.
 ##
-## The management hub: 12 picture icons in two vertical bands of 3 rows per side
-## (grey label slots from trozo_fondo, mirrored for the right column), around a
-## central club panel + a four-button control bar (EXIT / SAVE GAME / NEWS /
-## CONTINUE). The static chrome (trozo + icons + captions + buttons) is baked into
-## art/screens/menu_bg.png exactly the way fondo_marble.png is; this node blits it,
-## overlays the live club panel, and turns taps into actions.
+## The static chrome (the 4 quadrants of colour-coded caption bars + the 12 picture
+## icons + the INFORMATION / MANAGER / TRANSFER MARKET / FINANCES section labels + the
+## marble background with the BARRA quadrant cross + the EXIT / SAVE GAME / NEWS /
+## CONTINUE control bar + the central club CIRCLE frame and its slot boxes) is the REAL
+## game's MENUPRINCIPAL, taken from the original 640x480 screen (data/pm98-refs/
+## real-gallery/ma_6.png) into art/screens/menu_bg.png with only the club-specific data
+## (header text + circle text + the two crests) cleared. The reversed coordinates that
+## produced this layout are in docs/re/menu_screen_re.md (FUN_005469c0).
 ##
-## Unlike the other graphical screens this one is INTERACTIVE: tapping an icon or a
-## control button emits `action_selected(action)` (the calling Main routes it). Hit
-## areas are the union of each icon's reversed picture rect and its caption rect.
-## Native 640x480; scales to fit its parent.
+## This node blits that chrome, then draws the DYNAMIC layer on top: the shared PMChrome
+## header (manager / club / date / league / week) and the central circle's live slots
+## (league position, manager, managed club + crest, next opponent + crest, opponent
+## manager / venue, CPU). Taps over an icon, its caption bar or a control button emit
+## `action_selected(action)` (Main routes it). Native 640x480; scales to fit (NEAREST).
 
 signal action_selected(action: String)
 
 const W := 640
 const H := 480
 
-const C_TITLE := Color(0.91, 0.94, 1.0)
-const C_DIM := Color(0.59, 0.69, 0.82)
-const C_CASH := Color(0.98, 0.86, 0.45)
+const C_TITLE := Color(0.96, 0.98, 1.0)
+const C_DIM := Color(0.80, 0.86, 0.95)
 const C_HILITE := Color(1.0, 1.0, 1.0, 0.22)
 
+# Grey circle-slot chrome (PL / manager / opponent-manager / CPU), matching the real
+# beveled boxes baked into menu_bg.
+const C_SLOT := Color(0.40, 0.40, 0.44)
+const C_SLOT_HI := Color(0.60, 0.60, 0.65)
+const C_SLOT_LO := Color(0.17, 0.17, 0.21)
+# Blue-grey name band (managed club / next opponent), with a pale border and white text.
+const C_BAND := Color(0.30, 0.40, 0.58)
+const C_BAND_HI := Color(0.62, 0.72, 0.88)
+const C_BAND_LO := Color(0.13, 0.20, 0.36)
+
 # Reversed icon hit areas: action -> the icon PICTURE rect (pos, size) from the two
-# FUN_00436fb0(x,y) points. Picture rects are used (not picture+caption unions) so no
-# two hit areas overlap and a tap is unambiguous; the picture is the obvious target.
+# FUN_00436fb0(x,y) points (docs/re/menu_screen_re.md). Non-overlapping; each sits on the
+# visible icon in menu_bg.
 const ICON_HITS := {
 	"results": Rect2(7, 71, 86, 60),        # MARCA
 	"table": Rect2(206, 93, 87, 72),        # CLASI
@@ -35,45 +46,66 @@ const ICON_HITS := {
 	"lineup": Rect2(535, 70, 93, 61),       # ALINE
 	"tactics": Rect2(345, 101, 93, 63),     # TACTI
 	"opponent": Rect2(536, 151, 85, 60),    # RIVAL
-	"buy": Rect2(7, 327, 85, 76),           # FICHA
-	"sell": Rect2(184, 353, 101, 78),       # VENDE
+	"buy": Rect2(7, 327, 85, 76),           # FICHA  (caption "TRANSFERS")
+	"sell": Rect2(184, 353, 101, 78),       # VENDE  (caption "PLAYERS")
 	"staff": Rect2(6, 403, 72, 62),         # EMPLE
 	"finance": Rect2(559, 328, 78, 80),     # CAJA
-	"board": Rect2(361, 370, 86, 61),       # DECIS
-	"stadium": Rect2(543, 415, 95, 61),     # ESTAD
+	"board": Rect2(361, 370, 86, 61),       # DECIS  (caption "BOARD ROOM")
+	"stadium": Rect2(543, 415, 95, 61),     # ESTAD  (caption "GROUND")
 }
-# Reversed control-bar buttons (y=255): action -> Rect2(pos, size).
+# The colour caption bar beside each icon (measured off ma_6). Added to each icon's hit
+# area so a tap on the visible label works too — bigger, unambiguous mobile targets.
+const BAR_HITS := {
+	"results": Rect2(95, 84, 132, 26),
+	"table": Rect2(100, 127, 132, 26),
+	"fixtures": Rect2(88, 171, 122, 26),
+	"lineup": Rect2(418, 84, 122, 26),
+	"tactics": Rect2(428, 127, 114, 26),
+	"opponent": Rect2(408, 171, 132, 26),
+	"buy": Rect2(50, 343, 132, 26),
+	"sell": Rect2(85, 385, 114, 26),
+	"staff": Rect2(20, 428, 165, 26),
+	"finance": Rect2(446, 344, 114, 26),
+	"board": Rect2(432, 387, 178, 26),
+	"stadium": Rect2(350, 428, 132, 26),
+}
+# Control-bar buttons (measured off ma_6: y~246, h~38).
 const CTRL_HITS := {
-	"exit": Rect2(6, 255, 79, 27),
-	"save": Rect2(92, 255, 114, 27),
-	"news": Rect2(437, 255, 95, 27),
-	"continue": Rect2(540, 255, 95, 27),
+	"exit": Rect2(6, 246, 80, 38),
+	"save": Rect2(90, 246, 114, 38),
+	"news": Rect2(430, 246, 118, 38),
+	"continue": Rect2(552, 246, 86, 38),
 }
-# Centre panel band between the two icon bands (x 214..426).
-const CX0 := 214
-const CX1 := 426
 
-# The managed club's kit (escudo), drawn in the centre panel above the club name. PM98
-# shows the club kit on MENUPRINCIPAL; the reversed menu_bg carries no kit, it's dynamic.
+# Central club CIRCLE slots (design space; over the real frame in menu_bg).
 const KIT_SRC := Rect2(0, 0, 31, 64)        # shirt half of the 48x64 MINIESC kit
-const KIT_BOX := Rect2(298, 150, 44, 60)    # centred on the CX0..CX1 column, above the name
+const R_PL := Rect2(300, 171, 52, 19)       # league position  ("PL 1")
+const R_MGR := Rect2(252, 191, 146, 22)     # the manager's name
+const R_CLUB := Rect2(248, 214, 156, 28)    # managed club name band
+const R_CLUB_CREST := Rect2(226, 214, 30, 40)
+const R_OPP := Rect2(248, 263, 156, 28)     # next-opponent name band
+const R_OPP_CREST := Rect2(398, 262, 30, 40)
+const R_OPPMGR := Rect2(256, 303, 135, 20)  # opponent manager / venue
+const R_CPU := Rect2(300, 326, 52, 19)      # opponent control type ("CPU")
 
 var _bg: Texture2D
 var _bezel: Texture2D            # marble fill for the landscape letterbox margins
-var _f14: Font
+var _f10: Font
 var _f12: Font
+var _f14: Font
 var _kit_tex: Texture2D          # the managed club's kit, or null if no art for the id
 
 var _club: String = ""
 var _club_id: int = -1
-var _manager: String = ""       # the caller passes the LEAGUE name here (central-stack subline)
-var _manager_name: String = ""  # the real manager name entered on the SELECCION screen (left plaque, line 1)
+var _league: String = ""        # league name (header right plaque)
+var _manager_name: String = ""  # the real manager name (SELECCION); header left + circle
 var _season: String = ""
 var _cash: int = 0
-var _position: String = ""
+var _position: String = ""      # "1st" / "2nd" ...
 var _week: int = 0
-var _opp_name: String = ""      # next-fixture opponent (central stack, replaces the cash figure)
+var _opp_name: String = ""      # next-fixture opponent (circle)
 var _opp_id: int = -1
+var _opp_manager: String = ""   # next-fixture opponent manager (circle), if known
 var _is_home: bool = true
 var _opp_tex: Texture2D
 var _press: String = ""        # action currently held down (for the highlight)
@@ -83,8 +115,9 @@ var _toast_msg: String = ""    # transient feedback (save / news / next match)
 func _ready() -> void:
 	_bg = load("res://art/screens/menu_bg.png")
 	_bezel = load("res://art/screens/fondo_marble.png")
-	_f14 = load("res://art/fonts/proman14.fnt")
+	_f10 = load("res://art/fonts/proman10.fnt")
 	_f12 = load("res://art/fonts/proman12.fnt")
+	_f14 = load("res://art/fonts/proman14.fnt")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2(W, H)
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -93,17 +126,19 @@ func _ready() -> void:
 
 
 ## Feed the live career chrome (club / league / season / cash / position + the next-fixture
-## opponent for the central stack + week for the calendar plaque), repaint.
-func setup(club: String, manager := "", season := "", cash := 0, position := "", club_id := -1,
-		week := 0, opp_name := "", opp_id := -1, is_home := true, manager_name := "") -> void:
+## opponent + week + the opponent manager for the circle's lower slot), repaint.
+func setup(club: String, league := "", season := "", cash := 0, position := "", club_id := -1,
+		week := 0, opp_name := "", opp_id := -1, is_home := true, manager_name := "",
+		opp_manager := "") -> void:
 	_club = club
-	_manager = manager
+	_league = league
 	_manager_name = manager_name
 	_season = season
 	_cash = cash
 	_position = position
 	_week = week
 	_opp_name = opp_name
+	_opp_manager = opp_manager
 	_is_home = is_home
 	if club_id != _club_id:
 		_club_id = club_id
@@ -116,7 +151,7 @@ func setup(club: String, manager := "", season := "", cash := 0, position := "",
 	queue_redraw()
 
 
-## Flash a transient line in the centre panel (save / news / next-match feedback) since
+## Flash a transient line in the centre circle (save / news / next-match feedback) since
 ## the hub has no green footer to write to. Auto-clears after a couple of seconds.
 func toast(msg: String) -> void:
 	_toast_msg = msg
@@ -144,13 +179,17 @@ func _to_design(p: Vector2) -> Vector2:
 	var s := _scale()
 	return (p - _origin(s)) / s
 
-## The action whose hit rect contains a design-space point, or "".
+## The action whose hit rect (control / icon picture / caption bar) contains a
+## design-space point, or "".
 func _hit(d: Vector2) -> String:
 	for a in CTRL_HITS:
 		if (CTRL_HITS[a] as Rect2).has_point(d):
 			return a
 	for a in ICON_HITS:
 		if (ICON_HITS[a] as Rect2).has_point(d):
+			return a
+	for a in BAR_HITS:
+		if (BAR_HITS[a] as Rect2).has_point(d):
 			return a
 	return ""
 
@@ -191,8 +230,59 @@ func _txt(f: Font, x: int, y_top: int, s: String, col: Color, sz: int, cw := 0) 
 	if f == null:
 		return
 	var w := f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
+	if cw > 0 and w > cw:           # shrink to fit the box rather than clip
+		sz = maxi(7, int(floor(sz * cw / w)))
+		w = f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
 	var px := x + (cw - w) * 0.5 if cw > 0 else float(x)
 	draw_string(f, Vector2(px, y_top + f.get_ascent(sz)), s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
+
+
+## A beveled rect: solid base, light top/left edge, dark bottom/right edge.
+func _bevel(r: Rect2, base: Color, hi: Color, lo: Color) -> void:
+	draw_rect(r, base, true)
+	draw_rect(Rect2(r.position.x, r.position.y, r.size.x, 1), hi, true)
+	draw_rect(Rect2(r.position.x, r.position.y, 1, r.size.y), hi, true)
+	draw_rect(Rect2(r.position.x, r.end.y - 1, r.size.x, 1), lo, true)
+	draw_rect(Rect2(r.end.x - 1, r.position.y, 1, r.size.y), lo, true)
+
+
+## A grey circle slot (PL / manager / opp-manager / CPU) with centred text.
+func _slot(r: Rect2, s: String, f: Font, sz: int) -> void:
+	if s == "":
+		return
+	_bevel(r, C_SLOT, C_SLOT_HI, C_SLOT_LO)
+	_txt(f, int(r.position.x) + 3, int(r.position.y) + int((r.size.y - sz) * 0.5) - 1,
+		s, C_TITLE, sz, int(r.size.x) - 6)
+
+
+## A blue-grey name band (managed club / next opponent) with a pale border + white text.
+func _band(r: Rect2, s: String, f: Font, sz: int) -> void:
+	if s == "":
+		return
+	_bevel(r, C_BAND, C_BAND_HI, C_BAND_LO)
+	_txt(f, int(r.position.x) + 4, int(r.position.y) + int((r.size.y - sz) * 0.5) - 1,
+		s, C_TITLE, sz, int(r.size.x) - 8)
+
+
+## A club kit (escudo) fitted, aspect-preserved, into a circle crest box.
+func _crest(tex: Texture2D, box: Rect2) -> void:
+	if tex == null:
+		return
+	var sc: float = min(box.size.x / KIT_SRC.size.x, box.size.y / KIT_SRC.size.y)
+	var kw := KIT_SRC.size.x * sc
+	var kh := KIT_SRC.size.y * sc
+	draw_texture_rect_region(tex,
+		Rect2(box.position.x + (box.size.x - kw) * 0.5,
+			box.position.y + (box.size.y - kh) * 0.5, kw, kh), KIT_SRC)
+
+
+## "PL n" from the ordinal position string ("1st" -> "PL 1"); "" when unknown.
+func _pl_text() -> String:
+	var digits := ""
+	for c in _position:
+		if c >= "0" and c <= "9":
+			digits += c
+	return "PL %s" % digits if digits != "" else ""
 
 
 func _draw() -> void:
@@ -203,62 +293,32 @@ func _draw() -> void:
 	var s := _scale()
 	draw_set_transform(_origin(s), 0.0, Vector2(s, s))
 
+	# The real MENUPRINCIPAL chrome (bars + icons + section labels + circle frame + bg).
 	if _bg != null:
 		draw_texture_rect(_bg, Rect2(0, 0, W, H), false)
 
-	# Shared plaque header overlaid on the baked bg's empty navy top strip (manager+club /
-	# calendar date / league+week), with the MANAGER MENU title. The left plaque shows the
-	# real manager name (entered on the SELECCION screen) over the club; falls back to the
-	# club centred for legacy saves with no name. _manager carries the league (right plaque).
-	PMChrome.draw_header(self, "MANAGER MENU", _manager_name, _club, _manager, _season, _week, _club_id)
+	# Shared PM98 plaque header over the cleared top band (manager+club / date / league+week).
+	PMChrome.draw_header(self, "MANAGER MENU", _manager_name, _club, _league, _season, _week, _club_id)
 
-	# The managed club's kit (escudo), centred above the central stack.
-	if _kit_tex != null:
-		var sc: float = min(KIT_BOX.size.x / KIT_SRC.size.x, KIT_BOX.size.y / KIT_SRC.size.y)
-		var kw := KIT_SRC.size.x * sc
-		var kh := KIT_SRC.size.y * sc
-		draw_texture_rect_region(_kit_tex,
-			Rect2(KIT_BOX.position.x + (KIT_BOX.size.x - kw) * 0.5,
-				KIT_BOX.position.y + (KIT_BOX.size.y - kh) * 0.5, kw, kh), KIT_SRC)
-
-	# Central stack: managed club + league + position, then the next-fixture opponent
-	# (with its crest) — the real game's centre panel, NOT the cash figure the remake showed.
-	var cw := CX1 - CX0
-	if _club != "":
-		_txt(_f14, CX0, 214, _club.substr(0, 20), C_TITLE, 15, cw)
-	var sub := _manager
-	if _position != "":
-		sub = "%s   -   %s" % [_manager, _position] if _manager != "" else _position
-	if sub != "":
-		_txt(_f12, CX0, 233, sub.substr(0, 28), C_DIM, 12, cw)
+	# Central club circle: live slots over the real frame in menu_bg.
+	_slot(R_PL, _pl_text(), _f10, 11)
+	_slot(R_MGR, _manager_name, _f12, 13)
+	_band(R_CLUB, _club, _f14, 16)
+	_crest(_kit_tex, R_CLUB_CREST)
 	if _opp_name != "":
-		if _opp_tex != null:
-			var os: float = min(26.0 / KIT_SRC.size.x, 34.0 / KIT_SRC.size.y)
-			draw_texture_rect_region(_opp_tex,
-				Rect2(CX0 + 22, 262, KIT_SRC.size.x * os, KIT_SRC.size.y * os), KIT_SRC)
-		_txt(_f12, CX0 + 6, 264, "%s" % ("vs" if _is_home else "at"), C_DIM, 12, cw)
-		_txt(_f14, CX0, 282, _opp_name.substr(0, 20), C_TITLE, 14, cw)
+		_band(R_OPP, _opp_name, _f14, 16)
+		_crest(_opp_tex, R_OPP_CREST)
+		var lower := _opp_manager if _opp_manager != "" else ("HOME" if _is_home else "AWAY")
+		_slot(R_OPPMGR, lower, _f10, 11)
+		_slot(R_CPU, "CPU", _f10, 11)
 
-	# Press highlight over the held icon / button.
+	# Press highlight over the held icon / bar / button.
 	if _press != "":
-		var r: Rect2 = ICON_HITS.get(_press, CTRL_HITS.get(_press, Rect2()))
+		var r: Rect2 = ICON_HITS.get(_press, BAR_HITS.get(_press, CTRL_HITS.get(_press, Rect2())))
 		if r.size != Vector2.ZERO:
 			draw_rect(r, C_HILITE, true)
 
-	# Transient toast in the centre gap (save / news / next-match feedback).
+	# Transient toast across the circle centre (save / news / next-match feedback).
 	if _toast_msg != "":
-		draw_rect(Rect2(120, 190, 400, 22), Color(0.0, 0.0, 0.0, 0.66), true)
-		_txt(_f12, 120, 193, _toast_msg, Color(1.0, 0.95, 0.6), 13, 400)
-
-
-static func _fmt(v: int) -> String:
-	var neg := v < 0
-	var t := str(absi(v))
-	var out := ""
-	var c := 0
-	for i in range(t.length() - 1, -1, -1):
-		out = t[i] + out
-		c += 1
-		if c % 3 == 0 and i > 0:
-			out = "," + out
-	return ("-" if neg else "") + out
+		draw_rect(Rect2(240, 232, 170, 22), Color(0.0, 0.0, 0.0, 0.72), true)
+		_txt(_f12, 240, 235, _toast_msg, Color(1.0, 0.95, 0.6), 12, 170)

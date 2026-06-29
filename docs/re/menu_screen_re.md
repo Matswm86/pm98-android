@@ -72,15 +72,32 @@ LINE-UP, TACTICS, SIGN PLAYER, STADIUM) + RESULTS for the marcador/scoreboard ic
   trozo's right half = marble), leaving the six left captions floating on bare marble.
   Verify: every caption centre must sample grey (80,80,80), not marble blue.
 
-## Build mapping (→ `app/scenes/MenuScreen.gd`)
-- The whole static chrome (trozo bands + mirror + 12 icons + captions + control bar +
-  the four FUN_004b7f40 side panels) is **baked** to `app/art/screens/menu_bg.png`
-  by `tools/re/preview_menu.py --bake`, the same one-PNG pattern as fondo_marble.png.
-- `MenuScreen.gd` blits menu_bg, overlays the live club panel (name / league / season
-  / cash / position) in the centre gap, and is INTERACTIVE: `_hit()` maps a tap (after
-  the inverse scale/offset) to an action via the reversed picture rects + control rects
-  and emits `action_selected`. Native 640×480, scales to fit (NEAREST).
-- `Main.gd` mounts it as a full-screen overlay from the career hub ("MAIN MENU (the
-  screen)") and routes actions: table→league screen, lineup→line-up screen,
-  finance→finances, buy→transfer market, tactics/sell/results→text views,
-  continue→advance week, save/news/staff/stadium/board/opponent→toast, exit→dismiss.
+## Build mapping (→ `app/scenes/MenuScreen.gd`) — 2026-06-29 rebuild
+The menu hub's full look is engine-COMPOSITED (slanted colour caption bars per group +
+the INFORMATION / MANAGER / TRANSFER MARKET / FINANCES section labels + the central club
+CIRCLE), none of which exists as a single extractable PKF asset — only the composited
+output does. The earlier `preview_menu.py --bake` (trozo bands + mirror) was an
+approximation: it left grey trozo slots showing as empty centre BLOBS and never drew the
+colour bars / section labels / circle, so it did not match the real screen (compare
+`data/pm98-refs/real-gallery/ma_6.png`).
+- **Static chrome = the real frame.** `app/art/screens/menu_bg.png` is the real game's
+  640×480 MENUPRINCIPAL (ma_6) with ONLY the club-specific data cleared (top header band
+  + the two circle crests), produced + reproducible via
+  `tools/re/build_menu_bg_from_ref.py` (ref kept at `tools/re/refs/menuprincipal_ma_6.png`).
+  This keeps the colour bars / 12 icons / section labels / control bar / circle frame +
+  slot boxes / marble + BARRA as REAL pixels.
+- `MenuScreen.gd` blits menu_bg, then draws the DYNAMIC layer: the shared
+  `PMChrome.draw_header` plaque row over the cleared top band, and the central circle's
+  live slots (league position "PL n" / manager / managed club + crest / next opponent +
+  crest / opponent-manager-or-venue / CPU) over the real circle frame. INTERACTIVE:
+  `_hit()` maps a tap to an action via the reversed icon picture rects (`ICON_HITS`), the
+  measured caption-bar rects (`BAR_HITS`, added so the visible label is also a target) and
+  the control rects (`CTRL_HITS`); emits `action_selected`. Native 640×480, scales (NEAREST).
+- Captions are the real game's: TRANSFERS / PLAYERS / GROUND map to the `buy` / `sell` /
+  `stadium` actions respectively (the icon entry names FICHA/VENDE/ESTAD are unchanged).
+- `Main.gd` mounts it as a full-screen overlay from the career hub and routes actions:
+  table→league screen, lineup→line-up screen, finance→finances, buy→transfer market,
+  tactics/sell/results→text views, continue→advance week,
+  save/news/staff/stadium/board/opponent→toast, exit→dismiss.
+- `preview_menu.py` is RETAINED (it documents the reversed per-icon/caption rects) but is
+  no longer the source of menu_bg.png.
