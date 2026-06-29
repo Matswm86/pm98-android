@@ -32,11 +32,15 @@ const C_HILITE := Color(1.0, 1.0, 1.0, 0.20)  # press feedback
 # Tuned to the real box-art title (art/screens/title/fondo7.png, from the 894x671
 # Premier Manager 98 cover resized to 640x480): the three blue ovals sit on the left,
 # the small circular SALIR glyph is baked bottom-right.
+# EXACT reversed control-table rects (title_screen_re.md §52-54: ids drawn at pos.y − 0x14,
+# size 332×45): base_datos (20,197,332,45) / liga_manager (20,255,332,45) / liga_promanager
+# (20,314,332,45). Cross-checked against fondo7.png (blue ovals at y 202/261/320). SALIR glyph
+# bottom-right at x 560..616 / y 410..458.
 const HITS := {
-	"database": Rect2(38, 92, 326, 30),         # DATA BASE        (id 20002)
-	"career_league": Rect2(38, 130, 326, 30),   # MANAGER LEAGUE   (id 20021)
-	"career_pro": Rect2(38, 167, 326, 30),      # PRO-MANAGER LEAGUE (id 20022)
-	"exit": Rect2(602, 452, 34, 24),            # SALIR glyph      (id 20026)
+	"database": Rect2(20, 197, 332, 45),        # DATA BASE        (id 20002)
+	"career_league": Rect2(20, 255, 332, 45),   # MANAGER LEAGUE   (id 20021)
+	"career_pro": Rect2(20, 314, 332, 45),      # PRO-MANAGER LEAGUE (id 20022)
+	"exit": Rect2(558, 408, 64, 54),            # SALIR glyph      (id 20026)
 }
 
 var _bg: Texture2D
