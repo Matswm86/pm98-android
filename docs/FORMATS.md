@@ -70,6 +70,32 @@ CORRECTION (S6 2026-06-15, verified vs bytes): earlier notes called DAT.PKF
   replication and/or static RE of MANAGER.EXE, NOT unpacking a PKF.
 
 ## 3. `EQUIPOS.PKF` record layout — IN PROGRESS
+
+### CONTAINER CORRECTION (session 3, 2026-06-29) — it's a plain PKF of per-team .DBC
+`EQUIPOS.PKF` is a **standard PKF container** (the same directory format as
+DAT/IMG/RECURSOS — `tools/re/pkf_unpack.py` walks it to a clean END), **NOT** the
+"20-entry SIG index + Copyright-marker scan + nested blocks" the rest of this
+section (and `tools/parse_equipos.py` / `extract_squads.py`) inferred *before* the
+PKF format was cracked. The directory enumerates **476 FILE entries named
+`EQ960<id>.DBC`**, each a contiguous, in-bounds slice = **ONE team's full record**.
+Verified this session against the bytes:
+- 476 entries; **all 476** begin with `Copyright (c)1996 Dinamic Multimedia`;
+- **exactly 476** Copyright markers in the whole blob (one per entry — no nesting);
+- 461/475 directory-contiguous (a few type-4 seeks pad the header region @0..237).
+
+So a team is an **isolated byte range keyed by its game id** — no marker-scanning or
+anchor-finding needed. The old "constant `02 9a 91 9a be 5f 68 …` 38-byte stride"
+WAS the PKF type-2 directory: that constant is the XOR-obfuscated `EQ96000X.DBC`
+name field, and the "u32 dataOffset / u32 size" are the real PKF offset+size.
+Canonical id map (cross-checked vs `tools/extract_divisions.py`): the `EQ960<id>`
+number IS the game's internal team id; **entry position 38 == `EQ960301` == the
+first English club**, i.e. `english_id == 301 + (position - 38)` (pos 38 = Blackburn,
+71 KB record). Extract per team: **`tools/re/dbc_extract.py --list | --extract OUT [ID…]`**.
+⇒ Per-team decode should slice `EQ960<id>.DBC` from the PKF directory, then parse
+the .DBC body (Copyright header + cipher strings + numeric block + squad), instead
+of scanning the 4 MB blob for Copyright markers.
+
+### (pre-crack notes below, kept for the .DBC body layout they describe)
 Contains clubs, leagues, squads, player attributes + an English bio/commentary
 text section. NOT encrypted (entropy 5.26). Confirmed content (full international
 DB, English): English divisions (Man Utd, Liverpool, Arsenal, Chelsea, Leicester,

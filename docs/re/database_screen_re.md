@@ -133,6 +133,48 @@ NOTE: `assets/strings.json` already holds all three pools but **uppercased**; th
 mixed-case (`Adrian`, `Abel`) — the tool preserves original casing. Record 0 of PAISES = `XXX`
 (no-country sentinel). The team/player records (EQUIPOS.PKF) are **still undecoded**.
 
+## VERIFIED 2026-06-29 (session 3): the player-list is a 4-column model, reversed
+Decompiled the draw chain `FUN_0042aba0` tails into. `FUN_0042aba0` is the **main
+DATA BASE screen setup** (it blits `fondo dbase.bmp` at 0,0); the scrollable player
+list itself is the **model→sort→render** trio below. Saved decompilations:
+`FUN_0042c200`, `FUN_0042b540`, `FUN_0042c030`, `FUN_0042c1c0`, `FUN_0044d4e0` in
+`docs/re/decompiled/dbasewin/`.
+
+- **Model + sort — `FUN_0042c200`**: walks a **player linked list** (next ptr at
+  player+0x54), and for each player (skip if byte@+0x20 == `'b'`) reads a **category
+  byte @+0x16** (0/1/2/3) and a **u16 id @+0x14**, copying into one of **4 arrays**
+  (`DAT_00497480 / _498 / _488 / _490`, counts `_484 / _49c / _48c / _494`).
+  Each array entry is **0x50 bytes**: `[u16 id][u32 teamIdx][u32 flag(=record@+0x4c==3)]
+  [name string @+0xc]`. Then it binary-insert-sorts each array. ⇒ the 4 lists are the
+  **4 position groups** (GK / DEF / MID / FWD).
+- **Render — `FUN_0042b540`**: lays the 4 lists into **4 on-screen columns** at base
+  widgets **`this+0x45f4 / +0x4a0c / +0x4e24 / +0x523c`**. Two modes toggled by
+  **`this+0x2d4c`** (the `LISTS`↔`PHOTOS` flag set in `FUN_0042aba0`):
+  | mode | font | row pitch (Δy) | first y | row x | col x,w | header rows |
+  |---|---|---|---|---|---|---|
+  | **LISTS** (`2d4c==0`) | `Proman10` | **0x12 (18)** | 0x15 (21) | 0x3 | x=0xc4,w=0x10 | 4 |
+  | **PHOTOS** (`2d4c!=0`) | `Futuri18` | **0x28 (40)** | 0x19 (25) | 0x9 | x=0xbb,w=0x24 | 2 |
+  Each row = a fresh `operator_new(0x418)` CWnd; y starts at *first y* and increments
+  by *row pitch* per row. Per row it calls `FUN_0042c1c0(row, mode, entry.id)` then
+  `FUN_0042c030(row, entry.name@+0xc, mode)`.
+- **Per-row crest/photo — `FUN_0042c1c0`**: `pvVar = FUN_00445f10(entry.id)` (resolve
+  club crest / player photo by id), `FUN_00458730(row, pvVar, 0,0, 0x32,0)` (blit). So
+  every list row carries its **crest/photo keyed by the entry's u16 id**.
+- **Per-row name text — `FUN_0042c030`**: measures the name in the active bitmap font
+  (`FUN_00462910` on the font obj `this+0x3d4`) and sets the row widget's rect
+  (`this+0x88..0x94`); padding differs by mode (0x29/0xa PHOTOS vs 6/2 LISTS).
+- **Cell rich-text — `FUN_0044d4e0`** (used by the squad-mgmt panel rows in
+  `FUN_0042aba0`, stride 0x4c): tokenizes the first word, uppercases it, and
+  dispatches to one of several formatters (`FUN_0044d6a0 / da80 / dcc0 / dfb0 / e260`)
+  — a markup mini-language for embedded fields. Not needed for the plain browser list.
+
+⇒ A faithful `DataBaseScreen.gd` squad view = **4 columns (GK/DEF/MID/FWD)**, each
+position-sorted, Proman10 @18 px pitch (list) or Futuri18 @40 px + crest/photo
+(photo), columns anchored at the four base-x's above. Row content = name (measured,
+clamped) + crest/photo by team/player id. **This is the layout to build to — reversed,
+not eyeballed.** Remaining: the exact column header strings (msg ids 0xdd–0xe0) and
+the `FUN_00445f10` id→photo lookup table (maps list id → `MINIFOTO`/`MINIESC` entry).
+
 ## Reverse plan (remaining)
 1. ~~Find the loader~~ DONE: it's `blitBitmap`/`SetFont`/`Point`/`Rect` at literal coords, per
    screen. Continue decompiling the other view fns (HISTORY/PROGRESS/SEGUIMIENTO draw routines)
