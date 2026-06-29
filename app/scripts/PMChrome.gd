@@ -86,6 +86,9 @@ static func font(name: String) -> Font:
 			var p := "res://art/fonts/proman%s.fnt" % n
 			if ResourceLoader.exists(p):
 				_fonts[n] = load(p)
+		# Futuri18 (DATA BASE PHOTOS-mode face) — a different family, keyed by full name.
+		if ResourceLoader.exists("res://art/fonts/futuri18.fnt"):
+			_fonts["futuri18"] = load("res://art/fonts/futuri18.fnt")
 	return _fonts.get(name)
 
 

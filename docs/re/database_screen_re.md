@@ -241,6 +241,15 @@ only sets cell TEXT (FUN_0044d4e0) on widgets `this+0x742c` — it does NOT posi
 (`[edi+0xc0]` is not called), so the 7 button rects (`nuevo fichaje`…`menos jugadores`) live in
 another function and remain to be reversed.
 
+**PHOTOS mode (built):** the alternate render of the same 4-column squad (FUN_0042b540,
+`this+0x2d4c`) — Futuri18 names, row pitch **40** (0x28), first-y **25** (0x19), row-x **9**,
+larger photo. `FUTURI18.FNT` extracted from `WINFONTS/` via `tools/re/fnt_to_bmfont.py` →
+`app/art/fonts/futuri18.{fnt,png}` (224 glyphs, h=19; sampled by eye). `DataBaseScreen.gd`
+branches both modes; toggled by a tap on the title strip (`TITLE_RECT`) — a documented mobile
+stand-in for the real LISTS/PHOTOS bitmap button (its on-screen position is not yet reversed).
+Default = LISTS. NB: `this+0x2d4c` polarity vs session-3's table is unconfirmed (FUN_0042aba0
+sets it to 1); the toggle renders both regardless, so the default is a one-line flip once known.
+
 **Still open (not yet reversed):** the column widget's actual *paint slot* (a per-object
 function pointer, NOT `[edi+0xc0]` which is the rect/title/colour SETTER, and NOT
 `FUN_0045b080` which is a sibling called directly). So whether the real body is a *solid*

@@ -34,13 +34,21 @@ const COLS := [
 	{"key": "MF", "title": "MIDFIELDERS", "rect": Rect2(218, 140, 209, 315), "col": Color8(170, 0, 0)},   # ebp+0x4e24 (0xaa,0x00,0x00)
 	{"key": "FW", "title": "FORWARDS",    "rect": Rect2(430, 140, 209, 277), "col": Color8(108, 21, 21)}, # ebp+0x523c (0x6c,0x15,0x15)
 ]
-# LISTS-mode row metrics reversed from FUN_0042b540 (this+0x2d4c == 0).
+# Row metrics reversed from FUN_0042b540 (the two modes toggled by this+0x2d4c).
 const HDR_H := 19      # column title band; rows begin at FIRST_Y below the column top
+# LISTS mode (Proman10): tight text rows, small thumbnail.
 const FIRST_Y := 21    # local_270 (0x15): first row y within the column client
 const PITCH := 18      # local_260 (0x12): Δy per row
 const ROW_X := 3       # local_25c: cell base x within the column
 const ROW_W := 196     # local_268 (0xc4): cell width
+# PHOTOS mode (Futuri18): taller rows, larger photo (RE doc session 3 table).
+const FIRST_Y_PH := 25 # 0x19
+const PITCH_PH := 40   # 0x28
+const ROW_X_PH := 9    # 0x9
 const RETURN_BTN := Rect2(516, 446, 118, 26)
+# Tapping the title strip toggles LISTS <-> PHOTOS (the real game uses a bitmap button whose
+# on-screen position is not yet reversed; this is a documented mobile stand-in, no invented art).
+const TITLE_RECT := Rect2(224, 18, 372, 39)
 
 # DATA BASE palette. Each column's chrome is derived from its REAL per-group COLORREF (COLS
 # "col"); only the alphas below are an un-reversed compositing choice (the widget paint slot
@@ -61,6 +69,8 @@ var _bg: Texture2D
 var _f10: Font
 var _f12: Font
 var _f18: Font
+var _ffut: Font   # Futuri18 — PHOTOS-mode row font
+var _photos := false
 var _club: Dictionary = {}
 var _press := ""
 var _rows: Array = []   # [{r: Rect2 (design space), p: Dictionary}] for row taps
@@ -71,6 +81,7 @@ func _ready() -> void:
 	_f10 = PMChrome.font("10")
 	_f12 = PMChrome.font("12")
 	_f18 = PMChrome.font("18")
+	_ffut = PMChrome.font("futuri18")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2(W, H)
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -141,6 +152,11 @@ func _on_input(e: InputEvent) -> void:
 		if (row["r"] as Rect2).has_point(d):
 			player_pressed.emit(row["p"])
 			return
+	# Title strip toggles LISTS <-> PHOTOS (this+0x2d4c); stand-in for the real button.
+	if TITLE_RECT.has_point(d):
+		_photos = not _photos
+		queue_redraw()
+		return
 	back_pressed.emit()
 
 
@@ -190,27 +206,36 @@ func _draw_column(col: Dictionary) -> void:
 	draw_rect(Rect2(r.position.x, r.position.y, r.size.x, HDR_H), Color(cc.r, cc.g, cc.b, A_HDR), true)
 	_txt(_f10, r.position.x + 6, r.position.y + 4, str(col["title"]), C_HDR_TXT, 11)
 
+	# Mode-selected row metrics (FUN_0042b540: LISTS vs PHOTOS, toggled by this+0x2d4c).
+	var first_y := FIRST_Y_PH if _photos else FIRST_Y
+	var pitch := PITCH_PH if _photos else PITCH
+	var row_x := ROW_X_PH if _photos else ROW_X
+	var row_w := int(r.size.x) - row_x * 2
+	var name_f: Font = (_ffut if _ffut != null else _f12) if _photos else _f10
+	var name_sz := 18 if _photos else 11
+
 	var players := _bucket(str(col["key"]))
-	var max_rows := int(floor((r.size.y - FIRST_Y) / PITCH))
-	var y := r.position.y + FIRST_Y
+	var max_rows := int(floor((r.size.y - first_y) / pitch))
+	var y := r.position.y + first_y
 	for i in players.size():
 		if i >= max_rows:
 			break
 		var p: Dictionary = players[i]
-		var row_r := Rect2(r.position.x + ROW_X, y, ROW_W, PITCH - 1)
+		var row_r := Rect2(r.position.x + row_x, y, row_w, pitch - 1)
 		_rows.append({"r": row_r, "p": p})
 		if i % 2 == 1:
 			draw_rect(row_r, C_ROW_A, true)
-		# MINIFOTO thumbnail at the row's left, fitted to the row height (FUN_0042c1c0).
+		# MINIFOTO photo at the row's left, fitted to the row height (FUN_0042c1c0).
 		var face := PMChrome.mini_face(p.get("photoId"))
-		var tx := r.position.x + ROW_X + 1
-		var th := float(PITCH - 2)
+		var tx := r.position.x + row_x + 1
+		var th := float(pitch - 4)
 		if face != null:
-			draw_texture_rect(face, Rect2(tx, y + 1, th, th), false)
-		# Name in Proman10 to the right of the thumbnail.
-		_txt(_f10, tx + th + 4, y + 2, str(p.get("name", "?")).substr(0, 18), C_ROW_TXT, 11)
-		draw_rect(Rect2(r.position.x + ROW_X, y + PITCH - 1, ROW_W, 1), C_SEP, true)
-		y += PITCH
+			draw_texture_rect(face, Rect2(tx, y + 2, th, th), false)
+		# Name to the right of the photo (Proman10 in LISTS, Futuri18 in PHOTOS).
+		var clamp := 14 if _photos else 18
+		_txt(name_f, tx + th + 4, y + (pitch - name_sz) * 0.5, str(p.get("name", "?")).substr(0, clamp), C_ROW_TXT, name_sz)
+		draw_rect(Rect2(r.position.x + row_x, y + pitch - 1, row_w, 1), C_SEP, true)
+		y += pitch
 
 
 func _draw_return() -> void:

@@ -28,6 +28,17 @@ func _run() -> void:
 	if img != null:
 		var err := img.save_png(dir.path_join("database_demo.png"))
 		print("SHOT database_demo.png err=%d %dx%d" % [err, img.get_width(), img.get_height()])
+	# Second capture: PHOTOS mode (Futuri18, 40px rows) via the title-strip toggle.
+	node._photos = true
+	node.queue_redraw()
+	for _i in 8:
+		await process_frame
+	if not headless:
+		await RenderingServer.frame_post_draw
+	var imgp := get_root().get_texture().get_image() if get_root().get_texture() != null else null
+	if imgp != null:
+		var ep := imgp.save_png(dir.path_join("database_demo_photos.png"))
+		print("SHOT database_demo_photos.png err=%d" % ep)
 	print("DB-SHOT OK headless=%s" % headless)
 	print("SHOTS DONE")
 	quit(0)
