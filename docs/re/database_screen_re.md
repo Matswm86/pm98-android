@@ -311,6 +311,61 @@ Loop B (`0x42b2d7+`) only sets their TEXT (`FUN_0044d4e0` on `this+0x742c`), nev
 so the button rects live in another fn and remain to be reversed. Plus the column body paint slot
 (the `A_PANEL=0.30` compositing choice), and HISTORY/PROGRESS/SEGUIMIENTO + the browser shell.
 
+## VERIFIED 2026-06-29 (session 7): the Loop-B "buttons" are per-column "MORE" scroll badges — BUILT
+The session-5/6 unknown (where the 4 Loop-B cells `this+0x742c` get positioned) is resolved.
+They are **not** add/remove buttons — they are **per-column overflow ("more") scroll badges**.
+
+- **Constructor `0x42aa00`** (writes vtable `0x486910` at `[this]`) allocates `this+0x742c` as a
+  **0x4c-stride cell array** (`FUN_0047e100`, elem ctor `0x44cfa0`) — the SAME lightweight-cell
+  class as the legend cells `this+0x72fc`, **not** CWnds (those are 0x418). Loop B in `FUN_0042aba0`
+  only fills their TEXT (`FUN_0044d4e0`) with the bmp paths; no rect, by design.
+- **Placement is in the render fn `FUN_0042b540`** (objdump-confirmed via the Ghidra decompile),
+  which adds **4 header items, ids 0xdd / 0xde / 0xdf / 0xe0**, one per column, each a fresh
+  `operator_new(0x418)` child positioned via the `[vt+0xc0]` setter — args
+  `(parent_col, rect, "", style=0x200000, id)`:
+
+  | id   | parent col (off) | rect base | rect delta | child `+0x54` (cell idx) | cell bmp |
+  |------|------------------|-----------|------------|--------------------------|----------|
+  | 0xdd | GK  `+0x45f4`    | (0xa2,2)=(162,2) | (0x25,0x13)=(37,19) | 0 | `MAS PORTEROS.BMP` |
+  | 0xde | DEF `+0x4a0c`    | (162,2)          | (37,19)             | 2 | `MAS JUGADORES.BMP` |
+  | 0xdf | MID `+0x4e24`    | (162,2)          | (37,19)             | 2 | `MAS JUGADORES.BMP` |
+  | 0xe0 | FWD `+0x523c`    | (162,2)          | (37,19)             | 2 | `MAS JUGADORES.BMP` |
+
+  Base (162,2) is **relative to the parent column** (the setter's 1st arg is the column widget),
+  so absolute = col-origin + (162,2): GK (168,15), DEF (168,142), MID (380,142), FWD (592,142).
+  All 4 bmps are exactly **37×19** = the rect delta, so they blit 1:1 (no stretch).
+- **Painter `FUN_0042e590`** (the owner-draw item painter, Ghidra-decompiled this session): its
+  `0xdc < id < 0xe1` branch draws cell `this+0x742c + [this+0x54]*0x4c` into the framework item
+  rect (`this+0x78`) via `FUN_0040f640` (an InvalidateRect/blit). So the badge bitmap fills the
+  reversed badge rect — position is the literal above, not a runtime expr (unlike the legend gap).
+- **Visibility = overflow.** Each item is added only under `if (cap < count)`: the GK badge when
+  `GK_count > cap` and the outfield badges when that column's `count > cap`, where `cap` is the
+  fixed visible-row cap from the same fn's row loop (`iVar8`): **GK 4 (LISTS) / 2 (PHOTOS)**,
+  **outfield 15 (LISTS) / 7 (PHOTOS)**. So "MAS" (= Spanish *more*) = a scroll-down/overflow
+  indicator. `MENOS …` (cells 1/3, *fewer*/up) are the scrolled-state counterparts; this render
+  path never places them (only the four MAS badges), so they are extracted but not wired.
+- Badge glyphs (rendered): `MAS PORTEROS` = **green** down-chevron, `MAS JUGADORES` = **red** down-
+  chevron; `MENOS …` = up-chevrons.
+
+**Built**: extracted the 4 badges → `app/art/icons/dbase_{more_gk,more_players,less_gk,less_players}.png`
+(`rc_dbase_image.py`, 37×19 each). `DataBaseScreen.gd` adds `CAP_{GK,OUT}_{LISTS,PHOTOS}` consts +
+`_row_cap()` (rows now capped at the binary's fixed cap, clamped to geometry) and, when a column's
+`players.size() > cap`, blits its MORE badge at relative (162,2) (`MORE_BADGE` const) — GK→`more_gk`,
+outfield→`more_players`. Verified: headless `--import` clean; `shot_database.gd` boot (demo bumped to
+5 GKs so the GK badge path runs) = `DB-SHOT OK`/`SHOTS DONE`, no SCRIPT ERROR. **LOOKED** at a PIL
+mirror over real `FONDO DBASE` with the actual extracted badges at the reversed absolute coords
+(`/tmp/.../db_mirror_more.png`, scratchpad, not committed): all 4 badges sit in their column-header
+top-right, fully inside the column rect (right edges 205/205/417/629 < col rights 214/215/427/639),
+read cleanly. (Headless `get_image()` is null here — the documented GL limit — so the mirror is
+ground truth.)
+
+**Still open after session 7:** the `MENOS` (scrolled-up) badges + actual list scrolling (the
+columns are capped, not yet scrollable); the column body paint slot (`A_PANEL=0.30` compositing
+choice, the last un-reversed value); HISTORY/PROGRESS/SEGUIMIENTO + the country→league→team browser
+shell. Decompiles saved: `FUN_0042e590` (item painter) + callees (`FUN_00404230/470/180/120/490/590`,
+`FUN_0040f640`) — in scratchpad this session; `FUN_0042b540` (the placement fn) already in
+`docs/re/decompiled/dbasewin/`.
+
 ## Reverse plan (remaining)
 1. ~~Find the loader~~ DONE: it's `blitBitmap`/`SetFont`/`Point`/`Rect` at literal coords, per
    screen. Continue decompiling the other view fns (HISTORY/PROGRESS/SEGUIMIENTO draw routines)

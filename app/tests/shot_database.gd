@@ -49,7 +49,9 @@ func _run() -> void:
 ## blank-frame fallback). Mirrors shot_screens._demo_club's no-real-data principle.
 func _demo_club() -> Dictionary:
 	const ROWS := [
+		# 5 GKs > the cap of 4 (LISTS) so the GK column's "more" scroll badge renders.
 		["ASHWORTH", "GK", 1851], ["BRENNAN", "GK", 9102], ["CARLTON", "GK", 0],
+		["AINSLEY", "GK", 9103], ["BOOTH", "GK", 9104],
 		["DALEY", "DF", 9285], ["EVERTON", "DF", 10009], ["FORDE", "DF", 10021],
 		["GRANGE", "DF", 10026], ["HALLAM", "DF", 8432], ["IRVINE", "DF", 8433],
 		["JARVIS", "DF", 0], ["KEMP", "MF", 9067], ["LOWRY", "MF", 9069],

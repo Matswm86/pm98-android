@@ -45,6 +45,19 @@ const ROW_W := 196     # local_268 (0xc4): cell width
 const FIRST_Y_PH := 25 # 0x19
 const PITCH_PH := 40   # 0x28
 const ROW_X_PH := 9    # 0x9
+# Fixed visible-row caps reversed from FUN_0042b540 (the row loop breaks at iVar8). The GK
+# column caps at 4 rows (LISTS) / 2 (PHOTOS); the three outfield columns at 15 / 7. These are
+# literal caps in the binary, NOT geometry — used both to cap rows and to gate the "more" badge.
+const CAP_GK_LISTS := 4    # (-(mode!=0) & 0xfffffffe) + 4, mode==0
+const CAP_GK_PHOTOS := 2   # ... mode!=0
+const CAP_OUT_LISTS := 15  # (-(mode!=0) & 0xfffffff8) + 0xf, mode==0
+const CAP_OUT_PHOTOS := 7  # ... mode!=0
+# Per-column "more" scroll badge — reversed from FUN_0042b540 (items 0xdd..0xe0). Each is a
+# fresh child of its column at relative base (0xa2,2)=(162,2), size delta (0x25,0x13)=(37,19),
+# drawn by FUN_0042e590's 0xdd..0xe0 branch from cell this+0x742c[+0x54]: GK uses cell 0
+# (MAS PORTEROS), the outfield columns use cell 2 (MAS JUGADORES). It appears only when the
+# column's player count exceeds the visible cap (the binary adds the item under `if cap < count`).
+const MORE_BADGE := Rect2(162, 2, 37, 19)
 const RETURN_BTN := Rect2(516, 446, 118, 26)
 # Tapping the title strip toggles LISTS <-> PHOTOS (the real game uses a bitmap button whose
 # on-screen position is not yet reversed; this is a documented mobile stand-in, no invented art).
@@ -129,6 +142,13 @@ func _cat_of(p: Dictionary) -> String:
 	if pos in ["GK", "DF", "MF", "FW"]:
 		return pos
 	return "GK" if p.get("isGK") else "MF"
+
+
+## Fixed visible-row cap for a column in the current mode (FUN_0042b540 iVar8).
+func _row_cap(key: String) -> int:
+	if key == "GK":
+		return CAP_GK_PHOTOS if _photos else CAP_GK_LISTS
+	return CAP_OUT_PHOTOS if _photos else CAP_OUT_LISTS
 
 
 # ---- input ---------------------------------------------------------------
@@ -231,7 +251,9 @@ func _draw_column(col: Dictionary) -> void:
 	var name_sz := 18 if _photos else 11
 
 	var players := _bucket(str(col["key"]))
-	var max_rows := int(floor((r.size.y - first_y) / pitch))
+	# Cap = the binary's fixed per-column cap, clamped to what fits the column geometry.
+	var cap := _row_cap(str(col["key"]))
+	var max_rows: int = min(int(floor((r.size.y - first_y) / pitch)), cap)
 	var y := r.position.y + first_y
 	for i in players.size():
 		if i >= max_rows:
@@ -252,6 +274,19 @@ func _draw_column(col: Dictionary) -> void:
 		_txt(name_f, tx + th + 4, y + (pitch - name_sz) * 0.5, str(p.get("name", "?")).substr(0, clamp), C_ROW_TXT, name_sz)
 		draw_rect(Rect2(r.position.x + row_x, y + pitch - 1, row_w, 1), C_SEP, true)
 		y += pitch
+
+	# "More" scroll badge in the column header when the squad overflows the cap (FUN_0042b540
+	# adds item 0xdd..0xe0 only under `if cap < count`). GK -> MAS PORTEROS, outfield -> MAS
+	# JUGADORES; both are 37x19 and blit 1:1 at the reversed relative origin (162,2).
+	if players.size() > cap:
+		var bx := r.position.x + MORE_BADGE.position.x
+		var by := r.position.y + MORE_BADGE.position.y
+		var bn := "dbase_more_gk" if str(col["key"]) == "GK" else "dbase_more_players"
+		var btex := PMChrome.icon(bn)
+		if btex != null:
+			th_blit(btex, bx, by)
+		else:
+			draw_rect(Rect2(bx, by, MORE_BADGE.size.x, MORE_BADGE.size.y), Color(0.04, 0.5, 0.2, 0.6), true)
 
 
 ## Status legend (FUN_0042aba0 Loop A): 3 cells at y=460, x=10/90/170. Each is the real 11x11
