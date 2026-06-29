@@ -50,6 +50,19 @@ const RETURN_BTN := Rect2(516, 446, 118, 26)
 # on-screen position is not yet reversed; this is a documented mobile stand-in, no invented art).
 const TITLE_RECT := Rect2(224, 18, 372, 39)
 
+# Status legend — reversed from FUN_0042aba0 Loop A (objdump 0x42b16d..0x42b2d1). Three cells
+# at y=460 (push 0x1cc), x from the stack array {0xa,0x5a,0xaa,0x118} read [esp+esi+0x74]
+# (esi=0,4,8 -> 10/90/170). Each cell = a marker bitmap blitted at the cell origin (FUN_00458730)
+# + a label drawn in Calend8 black (FUN_00456560 "Calend8" before the loop, FUN_004042d0(buf,0)).
+# Markers + labels paired from the 7-bmp array (idx 0..2) and PTR_s_New_signing @0x493958.
+const LEGEND_Y := 460   # 0x1cc
+const LEGEND := [
+	{"x": 10,  "icon": "dbase_new_signing", "label": "New signing"},            # nuevo fichaje.bmp
+	{"x": 90,  "icon": "dbase_youth",       "label": "Youth player"},           # ascendido.bmp
+	{"x": 170, "icon": "dbase_absence",     "label": "Absence from the team"},  # baja.bmp
+]
+const C_LEGEND_TXT := Color(0, 0, 0)   # FUN_004042d0(buf, 0) = black
+
 # DATA BASE palette. Each column's chrome is derived from its REAL per-group COLORREF (COLS
 # "col"); only the alphas below are an un-reversed compositing choice (the widget paint slot
 # at the row CWnds is not yet reversed — see docs/re/database_screen_re.md "open").
@@ -70,6 +83,7 @@ var _f10: Font
 var _f12: Font
 var _f18: Font
 var _ffut: Font   # Futuri18 — PHOTOS-mode row font
+var _fcal: Font   # Calend8 — legend caption font
 var _photos := false
 var _club: Dictionary = {}
 var _press := ""
@@ -82,6 +96,7 @@ func _ready() -> void:
 	_f12 = PMChrome.font("12")
 	_f18 = PMChrome.font("18")
 	_ffut = PMChrome.font("futuri18")
+	_fcal = PMChrome.font("calend8")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2(W, H)
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -194,6 +209,7 @@ func _draw() -> void:
 	for col in COLS:
 		_draw_column(col)
 
+	_draw_legend()
 	_draw_return()
 
 
@@ -236,6 +252,31 @@ func _draw_column(col: Dictionary) -> void:
 		_txt(name_f, tx + th + 4, y + (pitch - name_sz) * 0.5, str(p.get("name", "?")).substr(0, clamp), C_ROW_TXT, name_sz)
 		draw_rect(Rect2(r.position.x + row_x, y + pitch - 1, row_w, 1), C_SEP, true)
 		y += pitch
+
+
+## Status legend (FUN_0042aba0 Loop A): 3 cells at y=460, x=10/90/170. Each is the real 11x11
+## marker badge (nuevo fichaje / ascendido / baja) blitted at the cell origin + its Calend8
+## caption in black to the right. Drawn in both modes — the original sets it up once, mode-blind.
+func _draw_legend() -> void:
+	var lf: Font = _fcal if _fcal != null else _f10
+	var sz := 8
+	for cell in LEGEND:
+		var x: float = cell["x"]
+		var tex := PMChrome.icon(str(cell["icon"]))
+		var tw := 11.0
+		if tex != null:
+			th_blit(tex, x, LEGEND_Y)
+			tw = float(tex.get_width())
+		else:
+			# Art absent: a neutral placeholder square so layout still reads (no invented glyph).
+			draw_rect(Rect2(x, LEGEND_Y, 11, 11), Color(0, 0, 0, 0.25), true)
+		# Caption to the right of the marker, vertically centred against the 11px badge.
+		var ty := LEGEND_Y + (11 - sz) * 0.5
+		_txt(lf, x + tw + 3, ty, str(cell["label"]), C_LEGEND_TXT, sz)
+
+
+func th_blit(tex: Texture2D, x: float, y: float) -> void:
+	draw_texture_rect(tex, Rect2(x, y, tex.get_width(), tex.get_height()), false)
 
 
 func _draw_return() -> void:

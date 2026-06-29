@@ -259,6 +259,45 @@ screen. The legend rows (`New signing`/`Youth player`/`Absence from the team`, P
 @0x493958) + 7 action-button bitmaps (`nuevo fichaje`/`ascendido`/`baja`/`mas|menos
 porteros`/`mas|menos jugadores`) drawn by Loops A/B in `FUN_0042aba0` are also still unbuilt.
 
+## VERIFIED 2026-06-29 (session 6): the status legend (Loop A) — fully reversed + BUILT
+Objdump of `FUN_0042aba0` Loop A (`0x42b16d..0x42b2d1`) nails the last two unknowns from
+session 5 (the x-array + the marker bitmaps). The Ghidra stack-aliasing is resolved against the
+prologue writes (`0x42ac22..0x42ac77`):
+
+- **x-array** `[esp+esi+0x74]` (esi=0,4,8) = the prologue array `{0xa,0x5a,0xaa,0x118}` →
+  the 3 cells sit at **x = 10 / 90 / 170**, all at **y = 0x1cc = 460** (`push 0x1cc` @0x42b26c).
+- **marker bitmaps** `[esp+esi+0x48]` (esi=0,4,8) = the first 3 of the 7-entry bmp array
+  (`nuevo fichaje.bmp` / `ascendido.bmp` / `baja.bmp`); the other 4 (`mas|menos porteros|jugadores`)
+  are the action buttons (Loop B, still unplaced).
+- **font** = `Calend8` (`FUN_00456560(this,"Calend8")` @0x42b0e6, just before the loop);
+  **text colour = black** (`FUN_004042d0(buf, 0)` @0x42b24c).
+
+Marker↔label pairing (objdump-confirmed, PTR_s_New_signing @0x493958):
+
+| cell | x | marker bmp | dims | glyph | label (str) |
+|---|---|---|---|---|---|
+| 0 | 10  | `NUEVO FICHAJE.BMP` | 11×11 | green ◀ badge | `New signing` @0x493a6c |
+| 1 | 90  | `ASCENDIDO.BMP`     | 11×11 | blue ▲ badge  | `Youth player` @0x493a5c |
+| 2 | 170 | `BAJA.BMP`          | 11×11 | red ▼ badge   | `Absence from the team` @0x493a44 |
+
+Each marker is a solid colour-coded 11×11 badge with a white arrow (not transparent); blitted at
+the cell origin (`FUN_00458730` @0x42b2ad), label drawn to its right. Cell width auto-sizes to the
+measured text (`FUN_00462910` + 0x20 pad) — so faithful = badge at (x,460) + caption right of it.
+
+**Built**: extracted `CALEND8.FNT` → `app/art/fonts/calend8.{fnt,png}` (`fnt_to_bmfont.py`,
+224 glyphs, h=15) + the 3 markers → `app/art/icons/dbase_{new_signing,youth,absence}.png`
+(`rc_dbase_image.py`). `PMChrome.font("calend8")` loads it; `DataBaseScreen._draw_legend()` blits
+the 3 badges at (10/90/170, 460) with black Calend8 captions, in both LISTS and PHOTOS modes (the
+original runs the legend setup once, mode-blind). Verified with a PIL mirror over real FONDO DBASE
+using the **actual `calend8` atlas + extracted badges** (`/tmp/.../db_mirror_legend.png`): all 3
+read cleanly, no column overlap, inside 640×480. (Headless `get_image()` is null here — the
+documented GL limit — so the mirror is ground truth.)
+
+**Still open after session 6:** the 7 action-button bitmaps (`nuevo fichaje`…`menos jugadores`) —
+Loop B (`0x42b2d7+`) only sets their TEXT (`FUN_0044d4e0` on `this+0x742c`), never positions them,
+so the button rects live in another fn and remain to be reversed. Plus the column body paint slot
+(the `A_PANEL=0.30` compositing choice), and HISTORY/PROGRESS/SEGUIMIENTO + the browser shell.
+
 ## Reverse plan (remaining)
 1. ~~Find the loader~~ DONE: it's `blitBitmap`/`SetFont`/`Point`/`Rect` at literal coords, per
    screen. Continue decompiling the other view fns (HISTORY/PROGRESS/SEGUIMIENTO draw routines)
@@ -279,6 +318,9 @@ the `pm98_stay_true_to_original` rule forbids.
 
 ## Cheatsheet
 - Render DB art: `cd tools/re && python3 rc_dbase_image.py "FONDO DBASE.BMP" /tmp/x.png` (`--list` for all).
+- Legend assets (session 6): `cd tools/re && python3 fnt_to_bmfont.py CALEND8.FNT ../../app/art/fonts calend8`
+  + `python3 rc_dbase_image.py "NUEVO FICHAJE.BMP" ../../app/art/icons/dbase_new_signing.png`
+  (likewise `ASCENDIDO.BMP`→`dbase_youth.png`, `BAJA.BMP`→`dbase_absence.png`).
 - Decode DB text pools: `cd tools/re && python3 dmlt_decode.py` (all 3) or `dmlt_decode.py PAISES.30`.
 - dbasewin decompilations live in `docs/re/decompiled/dbasewin/` (Point/Rect/SetFont/blit + `FUN_0042aba0`).
 - Decompile dbasewin: `~/ghidra_12.1.2_PUBLIC/support/analyzeHeadless ~/ghidra-projects pm98
