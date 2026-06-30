@@ -11,6 +11,16 @@ class_name LeagueTableScreen
 ##
 ## Driven by a live standings table (Career or SeasonSim), so what you see is the real
 ## engine result in the real game's skin. Native 640x480; scales to fit its parent.
+##
+## Interactive: RETURN dismisses, and a tap on a standings row raises that club's squad.
+## (Was a display-only overlay that dismissed to the hub on ANY tap — the "nothing inside
+## works, pressing anything goes back" bug.) The division tabs are drawn as the current-
+## division indicator; cross-division switching needs the multi-division table model the
+## Career layer doesn't yet keep, so tapping another tab is a no-op for now (it does NOT
+## invent a table) — flagged for the season-loop pass.
+
+signal back_pressed              # RETURN -> dismiss
+signal club_selected(id: int)    # a standings row tap -> open that club's squad
 
 const W := 640
 const H := 480
@@ -86,7 +96,35 @@ func _ready() -> void:
 	_f8 = load("res://art/fonts/proman8.fnt")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2(W, H)
+	gui_input.connect(_on_input)
 	queue_redraw()
+
+
+# ---- input ---------------------------------------------------------------
+# RETURN dismisses; a tap on a standings row raises that club. The drawn RETURN rect is
+# the one _leader_panel paints (px=544, pw=90).
+const RETURN_BTN := Rect2(544, 446, 90, 26)
+
+func _to_design(p: Vector2) -> Vector2:
+	var s: float = min(size.x / W, size.y / H) if size.x > 0 and size.y > 0 else 1.0
+	return (p - Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5)) / s
+
+func _on_input(e: InputEvent) -> void:
+	if not (e is InputEventScreenTouch or e is InputEventMouseButton):
+		return
+	if not e.pressed:
+		return
+	var d := _to_design(e.position)
+	if RETURN_BTN.has_point(d):
+		back_pressed.emit()
+		return
+	for i in _rows.size():
+		var rr := Rect2(PANEL.position.x + 2, ROW_Y0 + i * ROW_H, PANEL.size.x - 4, ROW_H - 1)
+		if rr.has_point(d):
+			var id := int((_rows[i] as Dictionary).get("id", -1))
+			if id >= 0:
+				club_selected.emit(id)
+			return
 
 
 func setup(rows: Array, title_left: String, season: String, week_label: String,

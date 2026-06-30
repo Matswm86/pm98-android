@@ -98,6 +98,7 @@ func _on_input(e: InputEvent) -> void:
 		return
 	var d := _to_design(e.position)
 	var on_prices := BTN_PRICES.has_point(d)
+	var on_return := BTN_RETURN.has_point(d) and not on_prices
 	# The CURRENT WEEK box carries the live CASH figure; tapping it is the cheat target.
 	var on_cash := BOX_CUR.has_point(d) and not on_prices
 	if e.pressed:
@@ -116,9 +117,12 @@ func _on_input(e: InputEvent) -> void:
 			if _cash_taps >= CHEAT_TAPS:
 				_cash_taps = 0
 				cheat_cash.emit()
-		else:
+		elif on_return:
 			_cash_taps = 0
 			back_pressed.emit()
+		else:
+			# A tap on the ledger / chart is a no-op now (it was bouncing back to the hub).
+			_cash_taps = 0
 
 
 # ---- helpers -------------------------------------------------------------

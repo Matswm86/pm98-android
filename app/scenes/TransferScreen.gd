@@ -146,6 +146,8 @@ func _to_design(p: Vector2) -> Vector2:
 ## Which scroll button (if any) a design-space point hits. Returns "" when the list does
 ## not overflow, so a tap there falls through to dismiss.
 func _hit(d: Vector2) -> String:
+	if BTN_RETURN.has_point(d):
+		return "return"
 	if _max_scroll() <= 0:
 		return ""
 	if SCROLL_UP.has_point(d):
@@ -175,13 +177,15 @@ func _on_input(e: InputEvent) -> void:
 		var a := _hit(_to_design(pos))
 		var was := _press
 		_press = ""
-		if a != "" and a == was:
-			# A scroll-button tap pages the list and is consumed (never dismisses).
-			_scroll += SCROLL_STEP if a == "down" else -SCROLL_STEP
-			_clamp_scroll()
-			queue_redraw()
-		elif was == "":
-			back_pressed.emit()
+		if a == was and a != "":
+			# RETURN dismisses; a scroll-button tap pages the list. A tap on a player row or
+			# empty space is a no-op (it no longer bounces back to the hub).
+			if a == "return":
+				back_pressed.emit()
+			else:
+				_scroll += SCROLL_STEP if a == "down" else -SCROLL_STEP
+				_clamp_scroll()
+				queue_redraw()
 
 
 # ---- ordering ------------------------------------------------------------

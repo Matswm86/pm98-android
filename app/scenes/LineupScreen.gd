@@ -16,6 +16,7 @@ class_name LineupScreen
 ## one window; any other tap emits `back_pressed` (the display-screen tap-to-dismiss).
 
 signal back_pressed
+signal tactics_pressed    # the TACTICS button -> Main opens the TEAM TACTICS modal
 
 const W := 640
 const H := 480
@@ -174,7 +175,17 @@ func _to_design(p: Vector2) -> Vector2:
 
 ## Which scroll button (if any) a design-space point hits. Returns "" when the list does
 ## not overflow, so a tap there falls through to dismiss.
+## Bottom-row buttons (drawn in _draw at y=448): TACTICS left half, RETURN right half of
+## the px=480/pw=154 panel. Hit-tested so RETURN dismisses and TACTICS opens the modal,
+## instead of any tap bouncing back to the hub.
+const BTN_TACTICS := Rect2(481, 448, 75, 24)
+const BTN_RETURN := Rect2(558, 448, 75, 24)
+
 func _hit(d: Vector2) -> String:
+	if BTN_RETURN.has_point(d):
+		return "return"
+	if BTN_TACTICS.has_point(d):
+		return "tactics"
 	if _max_scroll() <= 0:
 		return ""
 	if SCROLL_UP.has_point(d):
@@ -204,13 +215,16 @@ func _on_input(e: InputEvent) -> void:
 		var a := _hit(_to_design(pos))
 		var was := _press
 		_press = ""
-		if a != "" and a == was:
-			# A scroll-button tap pages the list and is consumed (never dismisses).
-			_scroll += SCROLL_STEP if a == "down" else -SCROLL_STEP
-			_clamp_scroll()
-			queue_redraw()
-		elif was == "":
-			back_pressed.emit()
+		if a == was and a != "":
+			# RETURN dismisses, TACTICS opens the modal, a scroll-button tap pages the list.
+			# A tap on a player row or empty space is a no-op (no longer bounces to the hub).
+			match a:
+				"return": back_pressed.emit()
+				"tactics": tactics_pressed.emit()
+				_:
+					_scroll += SCROLL_STEP if a == "down" else -SCROLL_STEP
+					_clamp_scroll()
+					queue_redraw()
 
 
 # ---- formation geometry --------------------------------------------------

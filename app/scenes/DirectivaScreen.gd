@@ -7,8 +7,11 @@ class_name DirectivaScreen
 ## the bottom half (replacing the prior invented "THE BOARD EXPECTS / YOUR RECORD" text).
 ##
 ## The meter VALUES are derived from real career state (position vs the board objective +
-## form) since the Career model stores no confidence stat. Display-only; tap to dismiss.
+## form) since the Career model stores no confidence stat. Display-only; RETURN dismisses
+## (a tap on the board content is a no-op — it no longer bounces to the hub).
 ## Native 640x480; scales to fit its parent.
+
+signal back_pressed    # RETURN only -> dismiss
 
 const W := 640
 const H := 480
@@ -72,7 +75,24 @@ func _ready() -> void:
 	_f8 = load("res://art/fonts/proman8.fnt")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2(W, H)
+	gui_input.connect(_on_input)
 	queue_redraw()
+
+
+# ---- input ---------------------------------------------------------------
+## RETURN dismisses; every other tap is a no-op. Previously Main freed this overlay on ANY
+## tap, so reading the board bounced straight back to the hub.
+func _to_design(p: Vector2) -> Vector2:
+	var s: float = min(size.x / W, size.y / H) if size.x > 0 and size.y > 0 else 1.0
+	return (p - Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5)) / s
+
+func _on_input(e: InputEvent) -> void:
+	if not (e is InputEventScreenTouch or e is InputEventMouseButton):
+		return
+	if not e.pressed:
+		return
+	if BTN_RETURN.has_point(_to_design(e.position)):
+		back_pressed.emit()
 
 
 func setup(club: String, manager: String, season: String, cash: int,

@@ -12,7 +12,7 @@ class_name StadiumScreen
 ## SEATS / STAND / TIER readouts the prior build showed are dropped. Native 640x480.
 
 signal works_pressed   # the WORKS button -> Main opens the expansion options
-signal back_pressed    # RETURN, or a tap on empty space -> dismiss
+signal back_pressed    # RETURN only -> dismiss (empty taps no longer bounce to the hub)
 
 const W := 640
 const H := 480
@@ -114,13 +114,14 @@ func _to_design(p: Vector2) -> Vector2:
 	return (p - Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5)) / s
 
 func _hit(d: Vector2) -> String:
-	if BTN_WORKS.has_point(d):
+	# IMPROVE and WORKS are both "spend on the ground" — the model has one expansion lever
+	# (Career.start_works), so both open it. Only RETURN leaves; a tap on empty space or the
+	# (unmodelled) MATCH DAY control is a no-op, NOT a dismiss (it was bouncing to the hub).
+	if BTN_WORKS.has_point(d) or BTN_IMPROVE.has_point(d):
 		return "works"
 	if BTN_RETURN.has_point(d):
 		return "return"
-	if BTN_IMPROVE.has_point(d) or BTN_MATCHDAY.has_point(d):
-		return "inert"
-	return "dismiss"
+	return ""
 
 func _on_input(e: InputEvent) -> void:
 	if not (e is InputEventScreenTouch or e is InputEventMouseButton):
@@ -138,7 +139,7 @@ func _on_input(e: InputEvent) -> void:
 			return
 		match a:
 			"works": works_pressed.emit()
-			"return", "dismiss": back_pressed.emit()
+			"return": back_pressed.emit()
 
 
 # ---- helpers -------------------------------------------------------------

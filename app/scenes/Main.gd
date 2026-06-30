@@ -851,11 +851,21 @@ func _open_player_info(player: Dictionary, club: Dictionary) -> void:
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
 
 ## Reversed LEAGUE TABLES overlay for any standings array (career or a SeasonSim table).
+## RETURN dismisses; tapping a club row raises that club's DATA BASE squad (the managed
+## club shows its live roster). Was a display-only tap-to-dismiss overlay.
 func _open_table(rows: Array, title_left: String, season: String, week_label: String,
 		tier: int, my_id: int) -> void:
 	var scr: LeagueTableScreen = load("res://scenes/LeagueTableScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
 	scr.setup(rows, title_left, season, week_label, tier, my_id)
-	_mount_tap_overlay(scr)
+	scr.back_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		scr.queue_free())
+	scr.club_selected.connect(func(id: int) -> void:
+		AudioManager.ui_select()
+		var club := _club_with_roster(id) if _career != null and id == _career.club_id else GameDB.club(id)
+		_open_database_squad(club))
 
 ## Reversed FINANCES overlay for any club dict.
 func _open_finance(club: Dictionary, club_name: String, season: String) -> void:
@@ -1206,9 +1216,12 @@ func _show_lineup_screen() -> void:
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
 	scr.setup(_mgr_club(), _tactics(), "", _career.league_name, _career.season, _career.week + 1)
-	# The screen owns its input now (the ARROW scroll buttons page the squad list); a
-	# non-scroll tap emits back_pressed to dismiss the overlay.
+	# RETURN dismisses; TACTICS opens the TEAM TACTICS modal (a tap on the squad list / pitch
+	# is a no-op now, not a bounce). The ARROW buttons page the squad list.
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
+	scr.tactics_pressed.connect(func() -> void:
+		scr.queue_free()
+		_show_tactics_screen())
 
 ## The original-art TEAM TACTICS modal (ma_9) over a real LINE-UP backdrop: the ATTACK |
 ## DEFENCE control panel. Each control mutates the career Tactics live (its ratings() feed
@@ -1390,9 +1403,9 @@ func _show_directiva_screen() -> void:
 	add_child(scr)
 	scr.setup(c.club_name, "", c.season, c.cash, bp["directors"], bp["supporters"],
 		bp["rating"], c.objective_text, bp["record"], bp["position"], c.week + 1, c.league_name)
-	scr.gui_input.connect(func(e: InputEvent) -> void:
-		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
-			scr.queue_free())
+	scr.back_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		scr.queue_free())
 
 ## Derive the board view from real career state: directors confidence tracks the
 ## league position against the board objective; supporters confidence blends recent
@@ -1987,7 +2000,7 @@ func _menu_action(action: String, scr: MenuScreen) -> void:
 		"news": _show_club_news()
 		"staff": _show_staff_screen()
 		"fixtures": _show_competitions()
-		"opponent": scr.toast(_menu_next_match())
+		"opponent": _show_opponent(scr)
 		"continue":
 			if _career.season_over():
 				_push(_show_end_of_season)
@@ -2002,6 +2015,18 @@ func _menu_action(action: String, scr: MenuScreen) -> void:
 		"tactics": _push(_show_tactics)
 		"sell": _push(_show_transfers)
 		"results": _show_results_screen()
+
+## OPPONENT: scout the manager's next opponent by raising their DATA BASE squad (the
+## reversed dbasewin browser), so you can see who you're up against. A bye week has no
+## opponent, so it just reports that. (Was a dead toast that opened no screen.)
+func _show_opponent(scr: MenuScreen) -> void:
+	var fx := _career.manager_fixture()
+	if fx.is_empty():
+		scr.toast("No match this week (bye)")
+		return
+	var home: bool = int(fx[0]) == _career.club_id
+	var opp_id: int = int(fx[1]) if home else int(fx[0])
+	_open_database_squad(GameDB.club(opp_id))
 
 ## "vs Arsenal" / "at Chelsea" / "bye" for the manager's next match.
 func _menu_next_match() -> String:
