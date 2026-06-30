@@ -569,6 +569,63 @@ Decompiles saved: `FUN_00446c70`, `FUN_0045d470`, `FUN_004548c0`, `FUN_0042aa00`
 widgets (this+0x317c / +0x39ac / +0x2d64) + `FUN_00448d90`'s popup bar; then the browser shell + 3 DB
 screens. The column paint (`FUN_00402130`) is now **fully reversed and shipped** — bevel complete.
 
+## VERIFIED 2026-06-30 (session 13): the 3 bottom-right nav buttons — gaps 5 & 6 SHIPPED
+Closed gap 5 (RETURN was an INVENTED blue bevel) and gap 6 (LISTS/PHOTOS toggle was a `TITLE_RECT`
+tap stand-in) by reversing all three nav buttons in `FUN_0042aba0` from objdump (the decompiler
+lost the AddItem args to stack aliasing — `objdump for ABI truth`, again).
+
+**The three buttons (objdump `0x42acd0..0x42ae17`, AddItem = `[edi+0xc0]`):**
+
+| widget | window rect (l,t,w,h) | id | title | colours (param_7→+0x5c / param_8→+0x60) |
+|---|---|---|---|---|
+| `this+0x317c` | (431,419,94,25) | 0x68 | **LISTS/PHOTOS** (`edx`=`[esp+0x18]`, the mode string) | white / gray(144,144,144) |
+| `this+0x39ac` | (431,449,94,25) | 0x6a | **PRINT** (str 0x4938f0) | white / slate(59,85,130) |
+| `this+0x2d64` | (541,449,88,25) | 0x63 | **RETURN** (str 0x4938f8) | white / green(100,130,10) |
+
+(The session-12 handoff guessed +0x39ac=LISTS/PHOTOS; objdump corrects it: **+0x317c is the toggle**,
+its title is the mode string loaded into `edx`; +0x39ac is PRINT, +0x2d64 is RETURN.) Title strings
+read from `.rdata`: 0x4938e0 `PHOTOS`, 0x4938e8 `LISTS`, 0x4938f0 `PRINT`, 0x4938f8 `RETURN`.
+
+**The button widget CLASS (≠ the columns).** The window ctor at **`0x43a432..0x43a48d`** builds six
+widgets (`+0x2d64/+0x317c/+0x3594/+0x39ac/+0x3dc4/+0x41dc`) all via **`FUN_00454120`**, which writes
+vtable **`0x489f88`** (NOT the column vtable `0x485ed8`). Button content painter = vtable +0x10c =
+**`FUN_00457b10`** (the columns' is `FUN_00402130`). Style = **0x400800** (stored verbatim at +0xac,
+`FUN_00454200` L33); `FUN_0045b080` style&0x400000 ⇒ a **2px client inset** (+0x88..+0x94) and bakes
+5 bevel shades at +0x404..+0x414.
+
+**At-rest render = label only, no chrome (proven from `FUN_00457b10`):**
+- **Fill** (`FUN_00404b60`) is `goto`-skipped: its guard requires `this == DAT_00502018`.
+  `DAT_00502018` = the **screen window**, written **once** at screen creation (`0x4642e1`, the
+  640×480 `esi`) and cleared on destroy (`0x4643a7`) — never an item. A button is never the screen,
+  so the fill never runs (it is the screen's own bg path / a hover state).
+- **1px outline** (`FUN_00404c20`→`FUN_00404e60`) is gated on style bit **0x8000** (absent from 0x400800).
+- **Title** (`+0xb8`, `FUN_00452b90`) + the **3D bevel** (orange `FUN_004042b0(0xff,0xc0,0)` / blue
+  `(0x2a,0x3f,0xaa)` / `(0,0,0x80)` shades) are the **PRESS branch** (`+0xac & 1`), bit0 clear at rest.
+- The label-content path `FUN_0044f2b0` only fires if `FUN_00458cd0` finds an **image cell** in
+  `this+0x360` (cell+0x80); the squad-view buttons populate no cell (they pass only a `+0xb8` title),
+  so it returns 0. ⇒ **the squad-view nav buttons are hover/press-reveal: nothing at rest.**
+
+**Sibling cross-check (HISTORY/PROGRESS screen `FUN_00422390`, same widget offsets):** there the same
+buttons get bitmap icons — `+0x317c`=`ICO_DBASE.BMP`, `+0x39ac`=`ICO_IMPRESORA.BMP` (PRINT), and a
+RETURN at `+0x3594` with `ICO_VOLVER.BMP`+text. Confirms +0x39ac=PRINT and the RETURN/print roles.
+
+**Shipped (`DataBaseScreen.gd`):** removed the invented `PMChrome.bevel`+`C_GOLD` `_draw_return`,
+`RETURN_BTN` Rect2(516,446,118,26), the `TITLE_RECT` toggle stand-in, and consts `C_BTN*`/`C_GOLD`.
+Added the real `RETURN_BTN`(541,449,88,25) + `BTN_PRINT`(431,449,94,25) + `BTN_TOGGLE`(431,419,94,25)
++ `BTN_INSET`=2/`BTN_TITLE_INSET`=6 + `C_BTN_TXT`=white; `_draw_navbtns`/`_draw_navbtn` draw each
+title in Proman10 white, left-inset 8px, vertically centred, **no bevel**; `_btn_at` hit-tests the
+three real rects (RETURN→back, toggle→LISTS/PHOTOS flip, PRINT→inert: no printer on mobile). **Touch
+adaptation (documented, not invented art):** a touch device has no hover to reveal the label, so the
+real label (real text / font / +0x5c white) is shown always-visible; the press-state 3D bevel (the 5
+verified shades) is the remaining refinement. Verified: headless `shot_database.gd` = `DB-SHOT OK`/
+`SHOTS DONE`, no parse/script errors; **LOOKED** at a PIL mirror over real FONDO (`db_navbtns_zoom.png`,
+scratchpad) — LISTS/PRINT/RETURN sit in the bottom-right under the FWD column, inside 640×480, no
+overlap, white labels readable on the grid. Decompiles saved: `FUN_00437660`, `FUN_00454120`,
+`FUN_00422390`, `FUN_00457b10`, `FUN_00458cd0` (scratchpad this session).
+
+**Next (this screen):** the press-state 3D bevel (5 shades at +0x404..+0x414, `FUN_00457b10` else-branch)
+for tactile feedback; then the browser shell + HISTORY/PROGRESS/SEGUIMIENTO (the other 3 DB screens).
+
 ## Reverse plan (remaining)
 1. ~~Find the loader~~ DONE: it's `blitBitmap`/`SetFont`/`Point`/`Rect` at literal coords, per
    screen. Continue decompiling the other view fns (HISTORY/PROGRESS/SEGUIMIENTO draw routines)

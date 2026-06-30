@@ -61,10 +61,24 @@ const CAP_OUT_PHOTOS := 7  # ... mode!=0
 # (MAS PORTEROS), the outfield columns use cell 2 (MAS JUGADORES). It appears only when the
 # column's player count exceeds the visible cap (the binary adds the item under `if cap < count`).
 const MORE_BADGE := Rect2(162, 2, 37, 19)
-const RETURN_BTN := Rect2(516, 446, 118, 26)
-# Tapping the title strip toggles LISTS <-> PHOTOS (the real game uses a bitmap button whose
-# on-screen position is not yet reversed; this is a documented mobile stand-in, no invented art).
-const TITLE_RECT := Rect2(224, 18, 372, 39)
+# Bottom-right nav buttons — reversed from FUN_0042aba0 (objdump 0x42acd0..0x42ae17). All three
+# share the button widget class (ctor FUN_00454120, vtable 0x489f88, content painter FUN_00457b10
+# — NOT the column painter FUN_00402130). Each is AddItem(window_rect, title, style=0x400800, id)
+# with the DC text colour set white (FUN_004042d0(_,0xffffff)) plus a base COLORREF; the AddItem
+# stack maps param_7([esp+0x4c])=white -> +0x5c (title colour) and param_8([esp+0x50])=green
+# RGB(100,130,10) -> +0x60 (bevel base). The at-rest painter draws NO fill / border / bevel for
+# style 0x400800: the fill is gated on `this == DAT_00502018` (the screen window, set once at
+# screen creation 0x4642e1) which a button never satisfies, so FUN_00457b10 `goto`s past it; the
+# 1px outline is gated on style bit 0x8000 (absent); the title (+0xb8) and the 5 bevel shades
+# (+0x404..+0x414, FUN_0045b080) are the PRESS/HOVER state only. ⇒ a faithful button = its label
+# on the FONDO, no invented bevel. A TOUCH device has no hover to reveal it, so the real label
+# (real text / Proman10 / white +0x5c) is shown always-visible — a documented touch adaptation,
+# not invented art. Rects are the real WINDOW rects Rect2(left, top, w, h):
+const BTN_TOGGLE := Rect2(431, 419, 94, 25)  # id 0x68, title LISTS/PHOTOS (widget this+0x317c)
+const BTN_PRINT  := Rect2(431, 449, 94, 25)  # id 0x6a, title PRINT (widget this+0x39ac); inert on mobile
+const RETURN_BTN := Rect2(541, 449, 88, 25)  # id 0x63, title RETURN (widget this+0x2d64)
+const BTN_INSET := 2          # FUN_0045b080: style & 0x400000 -> 2px client inset (+0x88..+0x94)
+const BTN_TITLE_INSET := 6    # +0x3fc = 6: title inset within the content rect
 
 # Status legend — reversed from FUN_0042aba0 Loop A (objdump 0x42b16d..0x42b2d1). Three cells
 # at y=460 (push 0x1cc), x from the stack array {0xa,0x5a,0xaa,0x118} read [esp+esi+0x74]
@@ -120,10 +134,7 @@ const STATUS_BAR := [Color8(192, 192, 192), Color8(100, 130, 10), Color8(0, 0, 1
 const C_BEVEL_DARK := Color(0, 0, 0)             # FUN_004042d0(...,0) = black: frames + outline
 const C_BEVEL_HL := Color8(65, 65, 65)           # FUN_00404390(black,160) = (65,65,65): chisel highlight
 const C_TITLE := Color(1, 1, 1)   # club-name title — verified 0xffffff (FUN_004042d0)
-const C_BTN := Color(0.13, 0.27, 0.56)
-const C_BTN_HI := Color(0.42, 0.58, 0.86)
-const C_BTN_LO := Color(0.05, 0.10, 0.26)
-const C_GOLD := Color(1.0, 0.84, 0.22)
+const C_BTN_TXT := Color(1, 1, 1)  # nav-button label — +0x5c title colour = white (param_7=0xffffff)
 
 var _bg: Texture2D
 var _f10: Font
@@ -207,26 +218,39 @@ func _on_input(e: InputEvent) -> void:
 		return
 	var d := _to_design(pos)
 	if pressed:
-		_press = "return" if RETURN_BTN.has_point(d) else ""
+		_press = _btn_at(d)
 		queue_redraw()
 		return
 	var was := _press
 	_press = ""
 	queue_redraw()
-	if RETURN_BTN.has_point(d):
-		if was == "return":
-			back_pressed.emit()
+	var hit := _btn_at(d)
+	if hit != "":
+		if hit == was:
+			match hit:
+				"return":
+					back_pressed.emit()
+				"toggle":          # LISTS <-> PHOTOS (this+0x2d4c, id 0x68)
+					_photos = not _photos
+					queue_redraw()
+				# "print" (id 0x6a): the real CreateProcess/print path is inert on mobile (no printer).
 		return
 	for row in _rows:
 		if (row["r"] as Rect2).has_point(d):
 			player_pressed.emit(row["p"])
 			return
-	# Title strip toggles LISTS <-> PHOTOS (this+0x2d4c); stand-in for the real button.
-	if TITLE_RECT.has_point(d):
-		_photos = not _photos
-		queue_redraw()
-		return
 	back_pressed.emit()
+
+
+## Hit-test the three real nav buttons (FUN_0042aba0 window rects).
+func _btn_at(d: Vector2) -> String:
+	if RETURN_BTN.has_point(d):
+		return "return"
+	if BTN_TOGGLE.has_point(d):
+		return "toggle"
+	if BTN_PRINT.has_point(d):
+		return "print"
+	return ""
 
 
 # ---- drawing -------------------------------------------------------------
@@ -264,7 +288,7 @@ func _draw() -> void:
 		_draw_column(col)
 
 	_draw_legend()
-	_draw_return()
+	_draw_navbtns()
 
 
 func _draw_column(col: Dictionary) -> void:
@@ -386,7 +410,19 @@ func th_blit(tex: Texture2D, x: float, y: float) -> void:
 	draw_texture_rect(tex, Rect2(x, y, tex.get_width(), tex.get_height()), false)
 
 
-func _draw_return() -> void:
-	var rb := RETURN_BTN
-	PMChrome.bevel(self, rb, C_BTN_HI if _press == "return" else C_BTN, C_BTN_HI, C_BTN_LO)
-	_txt(_f10, rb.position.x + 34, rb.position.y + 7, "RETURN", C_GOLD, 12)
+## Bottom-right nav buttons (FUN_0042aba0). Faithful at-rest render = the title label on the FONDO,
+## no bevel/fill/border (the painter's chrome is hover/press state, unreachable for a non-screen
+## widget — see the const block). Labels: Proman10, white (+0x5c title colour), left-inset by
+## BTN_INSET + BTN_TITLE_INSET, vertically centred in the window rect. No invented bevel.
+func _draw_navbtns() -> void:
+	_draw_navbtn(RETURN_BTN, "RETURN")
+	_draw_navbtn(BTN_PRINT, "PRINT")
+	_draw_navbtn(BTN_TOGGLE, "PHOTOS" if _photos else "LISTS")
+
+
+func _draw_navbtn(rb: Rect2, label: String) -> void:
+	if _f10 == null:
+		return
+	var tx := rb.position.x + BTN_INSET + BTN_TITLE_INSET
+	var ty := rb.position.y + (rb.size.y - 11) * 0.5
+	_txt(_f10, tx, ty, label, C_BTN_TXT, 11)
