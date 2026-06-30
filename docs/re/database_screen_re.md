@@ -535,6 +535,40 @@ the only `FUN_00454200` caller that sets it) → then draw the `FUN_00404880/930
 (light top-left highlights) to complete the bevel. Then gaps 5/6 (RETURN nav-button + LISTS/PHOTOS
 toggle from `FUN_0042aba0`), then the browser shell + 3 DB screens.
 
+## VERIFIED 2026-06-30 (session 12): screen `+0x60` = 0 (BLACK) → corner chisel ornaments SHIPPED
+Closed session 11's documented gap by reversing where the DATA BASE window is created. The column's
+`+0x60` (bevel base) inherits the **screen window's** `+0x60`; the screen is created by **`FUN_00446c70`**
+(builds the full-screen rect `CRect(0,0,0x280,0x1e0)` = 640×480, then calls `FUN_0045d470`):
+
+- **`FUN_0045d470` → `FUN_00454200` passes `param_8` = 0**, so `+0x60` = **0 (black)**. Proven by objdump
+  (the decompiler mislabels the stack-passed args here, same trap as `FUN_0045b080`): `FUN_0045d470`
+  (`sub esp,0x208`) writes 0 into the `param_8` slot at `0x45d4d8` (`mov [eax],ecx`, `ecx`=0); the source
+  is `FUN_00446c70`'s `mov DWORD PTR [eax],0x0` at `0x446c82` (its arg P7=0). `FUN_00454200` then stores
+  `+0x60 = param_8 = 0` (param_8≠-1 ⇒ no inherit, no `0xc0c0c0` default). The columns pass `param_8`=-1 so
+  they inherit that **0**.
+- **Therefore the chisel colours** (base `+0x60`=black): `FUN_00404390(black,160)` (>128, lighten) =
+  **(65,65,65) dark-gray HIGHLIGHT**; factor 80/100 (≤128, darken of 0) and the raw `+0x60` fill
+  (`FUN_00404460`→`+0x60`) = **pure BLACK**. (`FUN_004042f0(+0x60,white,0xbe)` at L102 writes to a buffer
+  that is immediately overwritten — dead code; the visible colour is the `FUN_00404390` result only.)
+- **Geometry** (`FUN_00404230` confirms client origin 0,0, `iStack_18`=W, `iStack_14`=H; `FUN_0044ed40`
+  fills `[l,t,r,b)`): a **black filled title bar** `(6,6)` size `(W-12,19)` (`FUN_00402130` L171-174),
+  with a dark-gray top-left chisel highlight (h-lines `(4,4)`/`(4,5)`, corner block `(4,6)` 2×3, left
+  v-lines `(4,22)`/`(5,22)`) and a black bottom-right chisel shadow (h-lines `(5,26)`/`(6,25)`, right
+  v-lines `(W-5,5)`/`(W-6,6)`). The factor-100 detail rects (L177-243) sit **inside** the black title-bar
+  fill (black-on-black) → omitted as provably pixel-equivalent.
+
+**Shipped (`DataBaseScreen.gd`):** added `_chisel(L,T,W,H)` (called from `_draw_column` after the inset-3
+outline) + `C_BEVEL_HL = Color8(65,65,65)`. Verified: headless `shot_database.gd` = `DB-SHOT OK`/`SHOTS
+DONE`, no parse errors; **LOOKED** at a PIL mirror over the real FONDO (`db_mirror_s12.png`) — 4 columns
+each with the recessed black title bar + group-coloured title + dark-gray chisel highlight, FONDO through
+the body. Pixel-sampled: highlights = `(65,65,65)`, bar/shadows = `(0,0,0)`, exactly per the binary.
+Decompiles saved: `FUN_00446c70`, `FUN_0045d470`, `FUN_004548c0`, `FUN_0042aa00` (dbasewin dtor).
+
+**Next (this screen):** gaps 5/6 — RETURN nav-button (currently an INVENTED blue bevel/rect in
+`_draw_return`, violates the no-invented-art rule) + LISTS/PHOTOS toggle, both from `FUN_0042aba0`'s white
+widgets (this+0x317c / +0x39ac / +0x2d64) + `FUN_00448d90`'s popup bar; then the browser shell + 3 DB
+screens. The column paint (`FUN_00402130`) is now **fully reversed and shipped** — bevel complete.
+
 ## Reverse plan (remaining)
 1. ~~Find the loader~~ DONE: it's `blitBitmap`/`SetFont`/`Point`/`Rect` at literal coords, per
    screen. Continue decompiling the other view fns (HISTORY/PROGRESS/SEGUIMIENTO draw routines)

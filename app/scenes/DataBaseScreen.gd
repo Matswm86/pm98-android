@@ -106,11 +106,19 @@ const STATUS_BAR := [Color8(192, 192, 192), Color8(100, 130, 10), Color8(0, 0, 1
 #     inset-3 rect, shifted +i, alpha 192/128/64 (FUN_0043d2d0 = bottom + right 1px edges, colour
 #     0 = black via FUN_004042d0); then FUN_00404e60 a 1px BLACK outline at the inset-3 rect.
 #   * Interior is NOT filled — FUN_00404e60 draws 4 edges only, so the FONDO shows through.
-#   * Corner highlight ornaments (FUN_00404880 hline / FUN_00404930 vline / FUN_00404b30 rect,
-#     shaded from +0x60 via FUN_004042f0/FUN_00404390) are NOT drawn: +0x60 is inherited from the
-#     screen window, set at the screen's creation OUTSIDE the column code, and is not yet reversed.
-#     Drawing them would require guessing the base colour, so they are left for the next pass.
+#   * Corner chisel ornaments (FUN_00404880 hline / FUN_00404930 vline / FUN_00404b30 rect, shaded
+#     from +0x60 via FUN_00404390) — REVERSED session 12. The bevel base +0x60 is the screen
+#     window's +0x60, which is 0 (BLACK): the screen is created by FUN_00446c70 (rect 0,0,0x280,0x1e0)
+#     -> FUN_0045d470 -> FUN_00454200 with param_8 = 0 (objdump: FUN_0045d470 writes 0 into the
+#     param_8 slot at 0x45d4d8; the source is FUN_00446c70's `mov [eax],0x0` at 0x446c82). Columns
+#     pass param_8 = -1 so they INHERIT that 0. Therefore FUN_00404390(black, factor): factor 160
+#     (>128, lighten) -> (65,65,65) dark-gray HIGHLIGHT; factor 80/100 (<=128, darken of 0) -> pure
+#     BLACK shadow; the raw +0x60 fill (FUN_00404460) -> BLACK. So the header = a black filled title
+#     bar (FUN_00404b30 @line 0x402... +0x60, rect (6,6) size (W-12,19)) with a dark-gray top-left
+#     chisel highlight and a black bottom-right chisel shadow. The factor-100 detail rects sit inside
+#     the black fill (black-on-black, no visible effect) so they are omitted as provably-equivalent.
 const C_BEVEL_DARK := Color(0, 0, 0)             # FUN_004042d0(...,0) = black: frames + outline
+const C_BEVEL_HL := Color8(65, 65, 65)           # FUN_00404390(black,160) = (65,65,65): chisel highlight
 const C_TITLE := Color(1, 1, 1)   # club-name title — verified 0xffffff (FUN_004042d0)
 const C_BTN := Color(0.13, 0.27, 0.56)
 const C_BTN_HI := Color(0.42, 0.58, 0.86)
@@ -275,6 +283,7 @@ func _draw_column(col: Dictionary) -> void:
 		draw_rect(Rect2(li, bi - 1, ri - li, 1), Color(0, 0, 0, a), true)   # bottom edge
 		draw_rect(Rect2(ri - 1, tii, 1, bi - tii), Color(0, 0, 0, a), true) # right edge
 	draw_rect(Rect2(lx + 3, ty + 3, r.size.x - 6, r.size.y - 6), C_BEVEL_DARK, false)
+	_chisel(lx, ty, r.size.x, r.size.y)
 
 	# COLUMN title: per-group colour (+0x5c), inset (+9, +3) (+0x3fc = 6). FUN_00452b90.
 	_txt(_f10, lx + 9, ty + 3, str(col["title"]), col["col"], 11)
@@ -327,6 +336,29 @@ func _draw_column(col: Dictionary) -> void:
 			th_blit(btex, bx, by)
 		else:
 			draw_rect(Rect2(bx, by, MORE_BADGE.size.x, MORE_BADGE.size.y), Color(0.04, 0.5, 0.2, 0.6), true)
+
+
+## Corner chisel ornaments — reversed from FUN_00402130 (the run after the inset-3 outline). Base
+## colour = column +0x60 = 0 (BLACK, inherited from the screen window; see the header note). Client
+## coords (origin 0,0, iStack_18=W, iStack_14=H) map to absolute (L+x, T+y). FUN_0044ed40 fills
+## [l,t,r,b): hline(x,y,len)=Rect2(x,y,len,1); vline(x,y,len)=Rect2(x,y,1,len). With base black,
+## FUN_00404390(.,160)=highlight (65,65,65); factor 80/100 & the raw +0x60 fill = pure black.
+func _chisel(L: float, T: float, W: float, H: float) -> void:
+	# Black filled title bar (FUN_00404460 -> +0x60, rect (6,6) size (W-12,19); FUN_00402130 L171-174).
+	draw_rect(Rect2(L + 6, T + 6, W - 12, 19), C_BEVEL_DARK, true)
+	# Dark-gray top-left chisel highlight (factor 160) — L108/L114/L121/L135/L141.
+	draw_rect(Rect2(L + 4, T + 4, W - 8, 1), C_BEVEL_HL, true)   # top h-line  (4,4) len W-8
+	draw_rect(Rect2(L + 4, T + 5, W - 9, 1), C_BEVEL_HL, true)   # top h-line  (4,5) len W-9
+	draw_rect(Rect2(L + 4, T + 6, 2, 3), C_BEVEL_HL, true)       # corner block 2x3 at (4,6)
+	draw_rect(Rect2(L + 4, T + 22, 1, 5), C_BEVEL_HL, true)      # left v-line (4,22) len 5
+	draw_rect(Rect2(L + 5, T + 22, 1, 4), C_BEVEL_HL, true)      # left v-line (5,22) len 4
+	# Black left-edge block (raw +0x60) between the corner block and the lower v-lines — L126-129.
+	draw_rect(Rect2(L + 4, T + 9, 2, 13), C_BEVEL_DARK, true)    # (4,9) size 2x13
+	# Black bottom-right chisel shadow (factor 80) — L148/L154/L160/L166.
+	draw_rect(Rect2(L + 5, T + 26, W - 10, 1), C_BEVEL_DARK, true)   # bottom h-line (5,26) len W-10
+	draw_rect(Rect2(L + 6, T + 25, W - 11, 1), C_BEVEL_DARK, true)   # bottom h-line (6,25) len W-11
+	draw_rect(Rect2(L + W - 5, T + 5, 1, 22), C_BEVEL_DARK, true)    # right v-line (W-5,5) len 22
+	draw_rect(Rect2(L + W - 6, T + 6, 1, 21), C_BEVEL_DARK, true)    # right v-line (W-6,6) len 21
 
 
 ## Status legend (FUN_0042aba0 Loop A): 3 cells at y=460, x=10/90/170. Each is the real 11x11
