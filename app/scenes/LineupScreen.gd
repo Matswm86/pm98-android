@@ -17,6 +17,7 @@ class_name LineupScreen
 
 signal back_pressed
 signal tactics_pressed    # the TACTICS button -> Main opens the TEAM TACTICS modal
+signal xi_changed         # a player was swapped into/within the XI -> Main persists tactics
 
 const W := 640
 const H := 480
@@ -86,6 +87,7 @@ var _week: int = 0
 var _by_id: Dictionary = {}
 var _scroll: int = 0
 var _press: String = ""
+var _sel_pid: int = -1    # selected player id (-1 none); tap one then another to swap slots
 
 
 func _ready() -> void:
@@ -111,6 +113,7 @@ func setup(club: Dictionary, tactics: Tactics, manager: String = "", division: S
 	for p in club.get("players", []):
 		_by_id[int(p.get("id", -1))] = p
 	_scroll = 0
+	_sel_pid = -1
 	queue_redraw()
 
 
@@ -186,13 +189,30 @@ func _hit(d: Vector2) -> String:
 		return "return"
 	if BTN_TACTICS.has_point(d):
 		return "tactics"
-	if _max_scroll() <= 0:
-		return ""
-	if SCROLL_UP.has_point(d):
-		return "up"
-	if SCROLL_DOWN.has_point(d):
-		return "down"
+	if _max_scroll() > 0:
+		if SCROLL_UP.has_point(d):
+			return "up"
+		if SCROLL_DOWN.has_point(d):
+			return "down"
+	var fi := _row_at(d)
+	if fi >= 0:
+		return "row:%d" % fi
 	return ""
+
+
+## The flat-list index of the player row under a design-space point, or -1 (section header,
+## empty space, or outside the squad table). Mirrors `_draw_squad`'s scroll-window layout.
+func _row_at(d: Vector2) -> int:
+	if d.x < ROW_X or d.x > ROW_X + ROW_W or d.y < XI_Y0:
+		return -1
+	var v := int((d.y - XI_Y0) / ROW_H)
+	if v < 0 or v >= _visible_rows():
+		return -1
+	var i := _scroll + v
+	var items := _flat_items()
+	if i < 0 or i >= items.size() or items[i].get("t") != "row":
+		return -1
+	return i
 
 
 func _on_input(e: InputEvent) -> void:
@@ -216,15 +236,92 @@ func _on_input(e: InputEvent) -> void:
 		var was := _press
 		_press = ""
 		if a == was and a != "":
-			# RETURN dismisses, TACTICS opens the modal, a scroll-button tap pages the list.
-			# A tap on a player row or empty space is a no-op (no longer bounces to the hub).
+			# RETURN dismisses, TACTICS opens the modal, a scroll-button tap pages the list,
+			# a player-row tap selects/swaps. A tap on a section header or empty space is a
+			# no-op (no longer bounces to the hub).
 			match a:
 				"return": back_pressed.emit()
 				"tactics": tactics_pressed.emit()
-				_:
+				"up", "down":
 					_scroll += SCROLL_STEP if a == "down" else -SCROLL_STEP
 					_clamp_scroll()
 					queue_redraw()
+				_:
+					if a.begins_with("row:"):
+						_tap_row(int(a.substr(4)))
+
+
+# ---- XI editing (select-then-swap) ---------------------------------------
+# PM98's LINE-UP edit: tap a player to select (highlight), tap a second to swap them.
+# The squad object is three tiers -- XI(11) / SUBSTITUTES(+0x1930) / RESERVES(+0x1934)
+# (reversed from FUN_004fc321) -- and `Tactics.assign(slot, pid)` is the slot-put/swap
+# primitive: a bench tap onto an XI slot subs that player on; the displaced man drops out
+# of the XI (so he reappears under SUBSTITUTES, which is the derived "not in xi" set).
+
+## A tap on the player row at flat index `i`: first tap selects, a second tap swaps, a tap
+## on the already-selected player deselects.
+func _tap_row(i: int) -> void:
+	var items := _flat_items()
+	if i < 0 or i >= items.size() or items[i].get("t") != "row":
+		return
+	var pid := int(items[i]["pid"])
+	if _sel_pid < 0:
+		_sel_pid = pid
+	elif _sel_pid == pid:
+		_sel_pid = -1
+	else:
+		_try_swap(_sel_pid, pid)
+	queue_redraw()
+
+
+## Swap `sel_pid` and `tgt_pid` by routing one onto the other's XI slot. At least one must
+## already be in the XI (a slot is the target); two bench players have no slot, so the tap
+## just moves the selection. A swap that would break the GK rule (keeper only in the GK
+## slot) is rejected and the selection is kept so the user can pick a valid target.
+func _try_swap(sel_pid: int, tgt_pid: int) -> void:
+	if _tactics == null:
+		return
+	var xi: Array = _tactics.xi
+	var sel_slot := xi.find(sel_pid)
+	var tgt_slot := xi.find(tgt_pid)
+	var slot := -1
+	var mover := -1
+	if tgt_slot >= 0:
+		slot = tgt_slot
+		mover = sel_pid
+	elif sel_slot >= 0:
+		slot = sel_slot
+		mover = tgt_pid
+	else:
+		_sel_pid = tgt_pid   # both on the bench: re-select, no XI change
+		return
+	if not _swap_legal(mover, slot):
+		return
+	_tactics.assign(slot, mover)
+	_sel_pid = -1
+	xi_changed.emit()
+
+
+## Whether putting `mover` into XI `slot` keeps the line-up role-valid: the GK slot only
+## holds a keeper and an outfield slot never does. For an XI<->XI swap the displaced player
+## (who moves to `mover`'s old slot) must satisfy the same rule.
+func _swap_legal(mover: int, slot: int) -> bool:
+	if _tactics == null or slot < 0 or slot >= _tactics.xi.size():
+		return false
+	var rs: Array = _tactics.roles()
+	if _is_keeper(mover) != (rs[slot] == "GK"):
+		return false
+	var mover_slot := _tactics.xi.find(mover)
+	if mover_slot >= 0:
+		var displaced := int(_tactics.xi[slot])
+		if _is_keeper(displaced) != (rs[mover_slot] == "GK"):
+			return false
+	return true
+
+
+func _is_keeper(pid: int) -> bool:
+	var p: Variant = _by_id.get(pid)
+	return p is Dictionary and bool((p as Dictionary).get("isGK", false))
 
 
 # ---- formation geometry --------------------------------------------------
@@ -349,6 +446,10 @@ func _row(y: int, idx: int, pid: int, number: int, role: String) -> void:
 	# row background
 	var bg: Color = C_GK_ROW if is_gk else (PMChrome.C_ROW_LIGHT if idx % 2 == 0 else PMChrome.C_ROW_DARK)
 	draw_rect(Rect2(ROW_X, y, ROW_W, ROW_H - 1), bg, true)
+	if pid == _sel_pid:
+		# Selected player: the highlighted row the original draws (FUN_005da180 highlight path).
+		draw_rect(Rect2(ROW_X, y, ROW_W, ROW_H - 1), Color(1.0, 0.86, 0.22, 0.40), true)
+		draw_rect(Rect2(ROW_X, y, ROW_W, ROW_H - 1), C_GOLD, false, 1.0)
 	draw_rect(Rect2(ROW_X, y + ROW_H - 1, ROW_W, 1), PMChrome.C_ROW_SEP, true)
 	# pale-green stat band
 	draw_rect(Rect2(STAT_X0, y, STAT_X1 - STAT_X0, ROW_H - 1), C_STATBAND, true)

@@ -1215,13 +1215,19 @@ func _show_lineup_screen() -> void:
 	var scr: LineupScreen = load("res://scenes/LineupScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
-	scr.setup(_mgr_club(), _tactics(), "", _career.league_name, _career.season, _career.week + 1)
-	# RETURN dismisses; TACTICS opens the TEAM TACTICS modal (a tap on the squad list / pitch
-	# is a no-op now, not a bounce). The ARROW buttons page the squad list.
+	var tac := _tactics()
+	scr.setup(_mgr_club(), tac, "", _career.league_name, _career.season, _career.week + 1)
+	# RETURN dismisses; TACTICS opens the TEAM TACTICS modal. Tapping a player selects him;
+	# tapping a second player swaps them into/within the XI (PM98's line-up edit), persisted
+	# via Career. The ARROW buttons page the squad list.
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
 	scr.tactics_pressed.connect(func() -> void:
 		scr.queue_free()
 		_show_tactics_screen())
+	scr.xi_changed.connect(func() -> void:
+		AudioManager.ui_select()
+		_save_tactics(tac)
+		_career.save())
 
 ## The original-art TEAM TACTICS modal (ma_9) over a real LINE-UP backdrop: the ATTACK |
 ## DEFENCE control panel. Each control mutates the career Tactics live (its ratings() feed
