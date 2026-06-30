@@ -39,6 +39,19 @@ func _run() -> void:
 	if imgp != null:
 		var ep := imgp.save_png(dir.path_join("database_demo_photos.png"))
 		print("SHOT database_demo_photos.png err=%d" % ep)
+	# Third capture: RETURN held down -> exercises the pressed 3D bevel path (_draw_navbtn_pressed).
+	# (Headless get_image() is null, so no PNG; this proves the new draw path runs error-free.)
+	node._photos = false
+	node._press = "return"
+	node.queue_redraw()
+	for _i in 8:
+		await process_frame
+	if not headless:
+		await RenderingServer.frame_post_draw
+	var imgpr := get_root().get_texture().get_image() if get_root().get_texture() != null else null
+	if imgpr != null:
+		var epr := imgpr.save_png(dir.path_join("database_demo_pressed.png"))
+		print("SHOT database_demo_pressed.png err=%d" % epr)
 	print("DB-SHOT OK headless=%s" % headless)
 	print("SHOTS DONE")
 	quit(0)

@@ -80,6 +80,24 @@ const RETURN_BTN := Rect2(541, 449, 88, 25)  # id 0x63, title RETURN (widget thi
 const BTN_INSET := 2          # FUN_0045b080: style & 0x400000 -> 2px client inset (+0x88..+0x94)
 const BTN_TITLE_INSET := 6    # +0x3fc = 6: title inset within the content rect
 
+# Pressed-state 3D bevel — reversed from the FUN_00457b10 press branch (+0xac & 1),
+# objdump 0x457c4a..0x457f5a. Every colour / inset / frame-width below is a literal push
+# immediate from the binary (not invented). Draw order, straight from objdump:
+#   0x457c4a  set black; 5x FUN_0043d1f0  -> soft recess: top+right edges, alpha 10..50% (/10 step)
+#   0x457c9a  2x FUN_00404690 width 2     -> black frame on (0,0,W-6,H-6) and corner box (0,0,28,28)
+#   0x457cc1  push 0xff,0xc0,0; FUN_0045ae70(-2)+FUN_00404b30 -> orange fill of the corner box, inset 2
+#   0x457cf4  FUN_00404690 width 2; push 0x2a,0x3f,0xaa; inset 2; fill -> 2px frame + blue fill of (26,0,W-6,28)
+#   0x457d72  push 0,0,0x80 (x2 loop)     -> navy converging-bar gradient inside the band
+#   0x457e56  FUN_00452f90/452b90         -> white title (+0xb8); 0x457e9a thin +0x60 base accent
+# The widget is 25px tall but the bevel constants assume a taller button, so the 28px boxes
+# clip to H=25 exactly as the original GDI DC clips them (no scaling — authentic clip).
+const C_BTN_ORANGE := Color8(255, 192, 0)   # 0x457cd0 push 0xff,0xc0,0  -> corner-box highlight
+const C_BTN_BLUE   := Color8(42, 63, 170)   # 0x457d0c push 0x2a,0x3f,0xaa -> right band
+const C_BTN_NAVY   := Color8(0, 0, 128)     # 0x457d7a push 0,0,0x80 -> band converging-bar gradient
+const C_BTN_FRAME  := Color(0, 0, 0)        # FUN_00404690 / FUN_0043d1f0 black frames + recess
+const BTN_BEVEL_BOX := 28     # 0x1c: corner-box edge + band x-origin (local +0x1c)
+const BTN_BEVEL_PAD := 6      # band right = W-6, outer frame = (W-6, H-6)
+
 # Status legend — reversed from FUN_0042aba0 Loop A (objdump 0x42b16d..0x42b2d1). Three cells
 # at y=460 (push 0x1cc), x from the stack array {0xa,0x5a,0xaa,0x118} read [esp+esi+0x74]
 # (esi=0,4,8 -> 10/90/170). Each cell = a marker bitmap blitted at the cell origin (FUN_00458730)
@@ -415,14 +433,65 @@ func th_blit(tex: Texture2D, x: float, y: float) -> void:
 ## widget — see the const block). Labels: Proman10, white (+0x5c title colour), left-inset by
 ## BTN_INSET + BTN_TITLE_INSET, vertically centred in the window rect. No invented bevel.
 func _draw_navbtns() -> void:
-	_draw_navbtn(RETURN_BTN, "RETURN")
-	_draw_navbtn(BTN_PRINT, "PRINT")
-	_draw_navbtn(BTN_TOGGLE, "PHOTOS" if _photos else "LISTS")
+	# base colours = AddItem param_8 (+0x60) per widget, from the FUN_0042aba0 table.
+	_draw_navbtn(RETURN_BTN, "RETURN", "return", Color8(100, 130, 10))   # green
+	_draw_navbtn(BTN_PRINT, "PRINT", "print", Color8(59, 85, 130))       # slate
+	_draw_navbtn(BTN_TOGGLE, "PHOTOS" if _photos else "LISTS", "toggle", Color8(144, 144, 144))  # gray
 
 
-func _draw_navbtn(rb: Rect2, label: String) -> void:
+func _draw_navbtn(rb: Rect2, label: String, key: String, base: Color) -> void:
 	if _f10 == null:
 		return
+	if _press == key:
+		_draw_navbtn_pressed(rb, label, base)
+		return
+	# At-rest = label only on the FONDO (the painter draws no chrome for a non-screen widget).
 	var tx := rb.position.x + BTN_INSET + BTN_TITLE_INSET
 	var ty := rb.position.y + (rb.size.y - 11) * 0.5
+	_txt(_f10, tx, ty, label, C_BTN_TXT, 11)
+
+
+## Local widget rect -> design-space Rect2, bottom clipped to the button height h
+## (the original GDI DC clips the 28px bevel boxes to the 25px client area).
+func _navrect(o: Vector2, l: float, t: float, r: float, b: float, h: float) -> Rect2:
+	return Rect2(o + Vector2(l, t), Vector2(r - l, min(b, h) - t))
+
+
+## Pressed-state 3D bevel (FUN_00457b10 press branch). See the const block for the
+## objdump-verified colour/inset/order provenance. Drawn in the binary's order; the
+## navy converging-bar gradient (0x457d40 loop) is rendered as two edge bars (simplified),
+## and the white title keeps its verified at-rest inset position (the press-rect operand
+## is lost to the same stack aliasing the handoff documents) nudged +1,+1 for tactile feel.
+func _draw_navbtn_pressed(rb: Rect2, label: String, base: Color) -> void:
+	var o := rb.position
+	var w := rb.size.x
+	var h := rb.size.y
+	# 0. soft recess: 5 black top+right edges, alpha 10..50%, shrinking toward bottom-right.
+	for i in 5:
+		var col := Color(0, 0, 0, 0.1 * float(i + 1))
+		var rx: float = min(87.0 - i, w)
+		var ry: float = min(24.0 - i, h)
+		draw_rect(Rect2(o + Vector2(6, 6), Vector2(rx - 6, 1)), col, true)           # top edge
+		draw_rect(Rect2(o + Vector2(rx - 1, 6), Vector2(1, ry - 6)), col, true)       # right edge
+	# 1. outer 2px black frame (0,0,W-6,H-6).
+	draw_rect(_navrect(o, 0, 0, w - BTN_BEVEL_PAD, h - BTN_BEVEL_PAD, h), C_BTN_FRAME, false, 2.0)
+	# 2. corner box (0,0,28,28): 2px black frame + orange fill inset 2.
+	draw_rect(_navrect(o, 0, 0, BTN_BEVEL_BOX, BTN_BEVEL_BOX, h), C_BTN_FRAME, false, 2.0)
+	draw_rect(_navrect(o, 2, 2, BTN_BEVEL_BOX - 2, BTN_BEVEL_BOX - 2, h), C_BTN_ORANGE, true)
+	# 3. right band (26,0,W-6,28): 2px black frame + blue fill inset 2.
+	draw_rect(_navrect(o, BTN_BEVEL_BOX - 2, 0, w - BTN_BEVEL_PAD, BTN_BEVEL_BOX, h), C_BTN_FRAME, false, 2.0)
+	var band := _navrect(o, BTN_BEVEL_BOX, 2, w - BTN_BEVEL_PAD - 2, BTN_BEVEL_BOX - 2, h)
+	draw_rect(band, C_BTN_BLUE, true)
+	# 4. navy converging-bar gradient on the band (simplified: two edge bars, y 5..23).
+	if band.size.x > 8:
+		var by: float = o.y + 5.0
+		var bh: float = min(BTN_BEVEL_BOX - 5.0, h - 2.0) - 5.0
+		var bw: float = band.size.x * 0.28
+		draw_rect(Rect2(Vector2(band.position.x, by), Vector2(bw, bh)), Color(0, 0, 0.5, 0.55), true)
+		draw_rect(Rect2(Vector2(band.end.x - bw, by), Vector2(bw, bh)), Color(0, 0, 0.5, 0.55), true)
+	# 5. thin +0x60 base-colour accent strip along the bottom (FUN_00404b30 at 0x457ece).
+	draw_rect(_navrect(o, 2, h - 3, w - BTN_BEVEL_PAD - 2, h, h), base, true)
+	# 6. white title, nudged +1,+1 for the pressed feel.
+	var tx := o.x + BTN_INSET + BTN_TITLE_INSET + 1
+	var ty := o.y + (h - 11) * 0.5 + 1
 	_txt(_f10, tx, ty, label, C_BTN_TXT, 11)
