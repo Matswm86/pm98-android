@@ -16,8 +16,9 @@ class_name MatchOptions
 ## Routing (honest to what is buildable from the source on hand):
 ##   BRIEF    -> the built commentary MatchScreen.gd            (emits picked("brief"))
 ##   RESULTS  -> MatchScreen seeked to full time               (emits picked("results"))
-##   WATCH    -> the 2D GRAFICO simulador (DATSIM/PCF5DAT sprites) — engine-driven animation
-##              is the next build step; selecting it shows the source-status note.
+##   WATCH    -> the 2D GRAFICO simulador MatchSimulador.gd     (emits picked("watch"))
+##              real DATSIM sprites on a vectorial pitch, animated over the same
+##              MatchCommentary timeline as BRIEF (built; docs/re/match_view_re.md step 3).
 ##   HIGHLIGHTS -> the 3D engine; its Actua `.p3d` model data is absent from the PM98 disc
 ##              AND the .rar, so it cannot be ported. Selecting it shows the honest note.
 ##
@@ -45,7 +46,7 @@ const BTN_LABELS := ["WATCH", "HIGHLIGHTS", "BRIEF", "RESULTS"]
 const MODES := ["watch", "highlights", "brief", "results"]
 # Honest, RE-grounded descriptions of what each mode IS (no invented game text).
 const MODE_DESC := [
-	"WATCH: 2D graphic simulador (PCF5DAT / DATSIM sprites). Engine-driven animation is the next build step.",
+	"WATCH: 2D graphic simulador (real DATSIM sprites on the pitch), animated over the same match timeline as BRIEF.",
 	"HIGHLIGHTS: 3D engine. The Actua .p3d model data is absent from the PM98 disc and the .rar, so it cannot be ported.",
 	"BRIEF: minute-by-minute commentary: clock, half, score, possession and the events feed.",
 	"RESULTS: skip straight to the full-time result.",
@@ -65,7 +66,7 @@ const C_BTN := Color(0.10, 0.16, 0.34, 1.0)
 const C_BTN_SEL := Color(0.20, 0.34, 0.66)
 const C_BTN_HI := Color(0.30, 0.42, 0.72)
 const C_BTN_LO := Color(0.03, 0.06, 0.16)
-const C_BTN_OFF := Color(0.62, 0.66, 0.74)    # text of an unbuildable view (WATCH/HIGHLIGHTS)
+const C_BTN_OFF := Color(0.62, 0.66, 0.74)    # text of the unbuildable view (HIGHLIGHTS / 3D)
 
 var _f18: Font
 var _f12: Font
@@ -121,7 +122,8 @@ func _select(i: int) -> void:
 	match MODES[i]:
 		"brief": picked.emit("brief")
 		"results": picked.emit("results")
-		_: pass   # watch / highlights: unbuildable from source — note shown, no proceed
+		"watch": picked.emit("watch")
+		_: pass   # highlights: 3D .p3d absent from source — note shown, no proceed
 
 
 # ---- drawing -------------------------------------------------------------
@@ -163,8 +165,8 @@ func _button(i: int) -> void:
 	draw_rect(Rect2(r.position.x, r.position.y, r.size.x, 1), C_BTN_HI, true)
 	draw_rect(Rect2(r.position.x, r.end.y - 1, r.size.x, 1), C_BTN_LO, true)
 	draw_rect(r, Color(0.5, 0.6, 0.8, 0.6), false, 1.0)
-	# WATCH/HIGHLIGHTS are unbuildable from source -> dimmed label; BRIEF/RESULTS active.
-	var fg: Color = C_BTN_OFF if i < 2 else (C_GOLD if _sel == i else C_TITLE)
+	# Only HIGHLIGHTS is unbuildable (3D .p3d absent) -> dimmed; WATCH/BRIEF/RESULTS active.
+	var fg: Color = C_BTN_OFF if i == 1 else (C_GOLD if _sel == i else C_TITLE)
 	_txt(_f12, int(r.position.x), int(r.position.y) + 6, BTN_LABELS[i], fg, 13, int(r.size.x))
 
 

@@ -126,7 +126,21 @@ not dead reference.
    design space) is an app layout choice (the dialog's window position is set elsewhere, not in
    `FUN_004e2630`).
 2. **NARRACION / BRIEF** → the existing `MatchScreen.gd` (built).
-3. **GRAFICO / SIMULADOR** → restore the 2D sprite pitch from `DATSIM.PKF`/`PCF5DAT.PKF`, driven
-   by the reversed match engine's per-minute event timeline (positions interpolated from the same
-   `MatchCommentary` model the text view uses, so both views agree on the scoreline).
+3. **GRAFICO / SIMULADOR** — **DONE** (`app/scenes/MatchSimulador.gd`, reached from WATCH).
+   A side-on stadium composed **entirely from real DATSIM tiles** — no invented pitch art:
+   - players `JUG.PGF` (kit tinted per club), ball `BALON.RAW`, active marker `COFLECHA.PGF`
+     (baked earlier to `app/art/match/{player_base,player_kit,ball,arrow}.png`);
+   - sky `CIELO1.BMP`, mown grass + terrace crowd + the **`PREMIER MANAGER 98 / actua SPORTS`**
+     hoarding all cropped from `HIERPREM.RAW`, goal net from `RED.BMP` — baked by the extended
+     `tools/re/export_match_art.py` to `app/art/match/{sky,grass,crowd,board_pm98,goal_net}.png`
+     (source-exact rects in that script: `HIERPREM_GRASS/CROWD/BOARD`).
+   Player + ball motion is **interpolated from the same `MatchCommentary` timeline as BRIEF**
+   (home attacks right / away left; the attacking side = most-recent side-attributed event), so
+   the two views agree exactly on clock / score / possession. The only non-source element is the
+   band LAYOUT / camera, because `PCF5DAT`'s exact 3/4 tile-scroll camera + per-tick positional
+   stream were not reversed — same documented honesty as MatchScreen's pitch. Verified by
+   `app/tests/test_match_simulador.gd` (score/possession/attacking-side parity, ball-on-pitch,
+   button routing) + the `shot_match_simulador.gd` real GL render.
+   *Future refinement:* `HIERPREM.RAW` also holds white pitch-line grass tiles; overlaying them
+   at the right positions (penalty boxes / halfway) would replace the currently line-less grass.
 4. **HIGHLIGHTS 3D** → honest stub (`.p3d` not in source); `REPLAY` re-runs the chosen view.

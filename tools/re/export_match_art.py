@@ -11,9 +11,16 @@ player kit, and writes ready-to-use RGBA PNG atlases under app/art/match/:
   ball.png    — a single clean on-ground football, idx0/bg keyed out.
   arrow.png   — the 8-angle COFLECHA selection arrow (active-player marker).
 
-The pitch itself is drawn vectorially in MatchScreen.gd (clean broadcast pitch);
-the exact DATSIM 3/4 tile-scroll camera is documented as the next refinement in
-docs/re/match_view_re.md (same honesty as the STADIUM pre-render approach).
+  grass.png / crowd.png / board_pm98.png — REAL stadium tiles cropped from HIERPREM.RAW
+        (the PM98-skinned PC-Futbol atlas): mown grass, terrace crowd, and the
+        "PREMIER MANAGER 98 / actua SPORTS" advertising hoarding.
+  sky.png     — CIELO1.BMP, the original 640x480 sky backdrop.
+  goal_net.png— RED.BMP goal-net mesh, black backing keyed out.
+
+The WATCH simulador (app/scenes/MatchSimulador.gd) composes the side-on stadium from
+these REAL tiles — no invented pitch art. Only the tile LAYOUT / camera is the app's
+choice, because PCF5DAT's exact 3/4 tile-scroll camera was not reversed (documented in
+docs/re/match_view_re.md, same honesty as the STADIUM pre-render approach).
 """
 from __future__ import annotations
 
@@ -109,6 +116,56 @@ def ball_png(pal):
     return p
 
 
+def _raw256(name, pal):
+    """Decode a 256x256 8-bit indexed DATSIM RAW to an RGB image."""
+    b = (DATSIM / name).read_bytes()
+    img = Image.new("RGB", (256, 256))
+    ip = img.load()
+    for y in range(256):
+        for x in range(256):
+            ip[x, y] = pal[b[y * 256 + x]]
+    return img
+
+
+# Source-exact tile rects inside HIERPREM.RAW (the PM98-skinned PC-Futbol stadium atlas,
+# read off the 256x256 decode — docs/re/match_view_re.md). NOTHING here is drawn by hand;
+# every pixel is the original art. The match view tiles/positions them (layout is the app's
+# choice, the same documented honesty as the STADIUM pre-render and MatchScreen's pitch).
+HIERPREM_GRASS = (136, 224, 168, 256)     # clean mown-grass tile (lowest-variance green)
+HIERPREM_CROWD = (0, 200, 48, 248)        # packed terrace
+HIERPREM_BOARD = (128, 64, 256, 96)       # "PREMIER MANAGER 98 / actua SPORTS" hoarding
+
+
+def stadium_tiles(pal):
+    """Bake the REAL stadium tiles the WATCH simulador composes with: grass, crowd, the
+    PM98 advertising board (all from HIERPREM.RAW), the goal net (RED.BMP) and the sky
+    (CIELO1.BMP). Source pixels only — no invented pitch art."""
+    hp = _raw256("HIERPREM.RAW", pal)
+    out = []
+    grass = hp.crop(HIERPREM_GRASS)
+    grass.save(OUT / "grass.png"); out.append(OUT / "grass.png")
+    crowd = hp.crop(HIERPREM_CROWD)
+    crowd.save(OUT / "crowd.png"); out.append(OUT / "crowd.png")
+    board = hp.crop(HIERPREM_BOARD).convert("RGBA")
+    board.save(OUT / "board_pm98.png"); out.append(OUT / "board_pm98.png")
+    # sky — CIELO1.BMP is a ready 640x480 backdrop
+    Image.open(DATSIM / "CIELO1.BMP").convert("RGB").save(OUT / "sky.png")
+    out.append(OUT / "sky.png")
+    # goal net — RED.BMP left mesh panel; key the black backing to transparent so the
+    # grass reads through the mesh, and drop the strands to a translucent grey.
+    red = Image.open(DATSIM / "RED.BMP").convert("RGBA").crop((0, 0, 64, 72))
+    rp = red.load()
+    for y in range(red.height):
+        for x in range(red.width):
+            r, g, b, _a = rp[x, y]
+            if r + g + b < 60:                 # black backing -> see-through
+                rp[x, y] = (0, 0, 0, 0)
+            else:
+                rp[x, y] = (220, 224, 228, 150)   # net strands, translucent
+    red.save(OUT / "goal_net.png"); out.append(OUT / "goal_net.png")
+    return out
+
+
 def arrow_png(pal):
     fr = pgf_frames("COFLECHA.PGF")
     cw = max(W for W, H, ax, px in fr)
@@ -134,7 +191,9 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     pal = load_pal()
     pb, pk = player_layers(pal)
-    for f in (pb, pk, ball_png(pal), arrow_png(pal)):
+    wrote = [pb, pk, ball_png(pal), arrow_png(pal)]
+    wrote += stadium_tiles(pal)
+    for f in wrote:
         print("wrote", f.relative_to(ROOT), Image.open(f).size)
 
 

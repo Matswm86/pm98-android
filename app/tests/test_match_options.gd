@@ -1,8 +1,8 @@
 extends SceneTree
 ## Headless test for MATCH OPTIONS (MatchOptions.gd) — the reversed in-match view picker.
 ## Asserts the four buttons hit-test at their SOURCE-EXACT panel-local rects (from
-## FUN_004e2630, docs/re/match_view_re.md), that BRIEF/RESULTS emit picked() with the right
-## mode, and that WATCH/HIGHLIGHTS (unbuildable from source) only highlight, never proceed.
+## FUN_004e2630, docs/re/match_view_re.md), that WATCH/BRIEF/RESULTS emit picked() with the
+## right mode, and that HIGHLIGHTS (3D .p3d absent from source) only highlights, never proceeds.
 ##   ~/godot462 --headless --path app --script res://tests/test_match_options.gd
 
 
@@ -37,18 +37,18 @@ func _run() -> void:
 	# Outside the panel entirely.
 	ok = _assert(opt._btn_at(Vector2(2, 2)) == -1, "outside the panel is dead space") and ok
 
-	# Routing: BRIEF and RESULTS emit picked(); WATCH and HIGHLIGHTS do not.
+	# Routing: WATCH, BRIEF and RESULTS emit picked(); HIGHLIGHTS (3D absent) does not.
 	var got: Array = []
 	opt.picked.connect(func(m: String) -> void: got.append(m))
 
-	_tap(opt, 0)   # WATCH
-	ok = _assert(got.is_empty() and opt._sel == 0, "WATCH highlights but does not proceed") and ok
-	_tap(opt, 1)   # HIGHLIGHTS
-	ok = _assert(got.is_empty() and opt._sel == 1, "HIGHLIGHTS highlights but does not proceed") and ok
+	_tap(opt, 0)   # WATCH -> 2D simulador (now built)
+	ok = _assert(got == ["watch"] and opt._sel == 0, "WATCH emits picked(watch)") and ok
+	_tap(opt, 1)   # HIGHLIGHTS -> 3D .p3d absent: highlights only
+	ok = _assert(got == ["watch"] and opt._sel == 1, "HIGHLIGHTS highlights but does not proceed") and ok
 	_tap(opt, 2)   # BRIEF
-	ok = _assert(got == ["brief"], "BRIEF emits picked(brief)") and ok
+	ok = _assert(got == ["watch", "brief"], "BRIEF emits picked(brief)") and ok
 	_tap(opt, 3)   # RESULTS
-	ok = _assert(got == ["brief", "results"], "RESULTS emits picked(results)") and ok
+	ok = _assert(got == ["watch", "brief", "results"], "RESULTS emits picked(results)") and ok
 
 	# A press on one button released over another must NOT fire (press==release guard).
 	got.clear()

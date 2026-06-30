@@ -898,8 +898,24 @@ func _open_match(home: Dictionary, away: Dictionary, hg: int, ag: int,
 	opt.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(opt)
 	opt.picked.connect(func(mode: String) -> void:
-		if mode == "results":
-			scr.seek(90.0)
+		match mode:
+			"results":
+				scr.seek(90.0)
+			"watch":
+				# WATCH -> the 2D GRAFICO simulador, fed the same timeline as BRIEF so the
+				# two views stay in lock-step (clock/score/possession). BRIEF drops back to
+				# the commentary screen underneath; EXIT leaves the match.
+				var sim: MatchSimulador = load("res://scenes/MatchSimulador.gd").new()
+				sim.set_anchors_preset(Control.PRESET_FULL_RECT)
+				add_child(sim)
+				sim.setup(str(home.get("name", "?")), str(away.get("name", "?")), hg, ag, lines,
+					int(home.get("id", -1)), int(away.get("id", -1)))
+				sim.brief_pressed.connect(func() -> void: sim.queue_free())
+				sim.back_pressed.connect(func() -> void:
+					sim.queue_free()
+					scr.queue_free()
+					if on_back.is_valid():
+						on_back.call())
 		opt.queue_free())
 
 
