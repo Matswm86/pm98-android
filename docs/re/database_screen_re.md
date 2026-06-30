@@ -366,6 +366,54 @@ shell. Decompiles saved: `FUN_0042e590` (item painter) + callees (`FUN_00404230/
 `FUN_0040f640`) — in scratchpad this session; `FUN_0042b540` (the placement fn) already in
 `docs/re/decompiled/dbasewin/`.
 
+## VERIFIED 2026-06-30 (session 8): the column body paint slot — CLOSED (body is transparent)
+The last un-reversed value on this screen (the `A_PANEL=0.30` body-fill compositing choice) is
+now settled **from the binary**, not guessed. The column widget is its own MFC class:
+
+- **Column class** = vtable **`0x485ed8`** (set by dtor `FUN_004320f0`). Its `GetMessageMap`
+  (vtable +0x30 = `FUN_00463ce0`) returns the AFX_MSGMAP at **`0x489de0`** (base map `0x453d90`).
+- **WM_ERASEBKGND (0x0014) → `FUN_00457b00` = `return 1`.** Returning TRUE suppresses the default
+  background erase, so **the column paints NO body fill** — the parent **FONDO DBASE** (football
+  photo + faint blue grid) shows through the entire column body verbatim. ⇒ "solid fill vs tint"
+  is answered: **neither.** The body is transparent.
+- **WM_PAINT (0x000F) → `FUN_00459930`**: the normal path is clip-box / dirty-rect bookkeeping
+  (it intersects `GetClipBox` into the child at `+600` and flags `+0x42c`); the only `FillRect`
+  is `GetStockObject(4)` = **BLACK_BRUSH** over a ±0x2000 rect — an error/uninitialised fallback,
+  not the body. So the column window draws **no body, no border, no header band of its own.**
+- **The group COLORREF is still real** (per-group identity, session 5) but is consumed only as
+  **5 precomputed shades**: the setter `FUN_0045b080` calls the alpha-blend
+  **`FUN_004042f0(group, target, a)`** = `group*a/256 + target*(256-a)/256` per channel, storing
+  into the column at:
+
+  | off | target | a | = | role (reconstructed) |
+  |---|---|---|---|---|
+  | +0x404 | black | 0x98 | group*0.594 | dark border / shadow |
+  | +0x408 | white | 0x82 | group*0.508 + white*0.492 | pastel title band |
+  | +0x40c | white | 0x3e | group*0.242 + white*0.758 | light tint |
+  | +0x410 | white | 0xae | group*0.680 + white*0.320 | mid-light tint |
+  | +0x414 | (+0x5c) | 0x3e | 2nd-base*0.242 + white | secondary light tint |
+
+  (The exact slot→element assignment of band vs border is the one remaining reconstruction: the
+  column window paints none of them, so they belong to the title item whose geometry is not yet
+  pinned. But every shade is one the binary actually computes from the real group colour, and a
+  pastel band + dark border is their canonical use.)
+
+**Built**: `DataBaseScreen.gd` — removed the invented `A_PANEL=0.30` body fill (body is now
+transparent, FONDO shows through, matching ERASEBKGND=1) and the invented `A_HDR`/`lightened(0.45)`
+chrome alphas; added `_grp_shade(group, target, a_byte)` (= `FUN_004042f0`) + consts
+`SHADE_DARK_A=0x98` / `SHADE_BAND_A=0x82`; `_draw_column` now draws a pastel band (+0x408) over a
+dark 1px border (+0x404), both from the column's real group COLORREF, white title (verified).
+Verified: headless `--import` clean; `shot_database.gd` = `DB-SHOT OK`/`SHOTS DONE`, no SCRIPT
+ERROR. **LOOKED** at a PIL mirror over real FONDO DBASE with the new transparent-body + binary-
+shade chrome (`/tmp/.../db_mirror_session8.png`): all 4 columns read cleanly, the football photo +
+grid shows through the bodies (as the binary does), group identity carried by the pastel bands.
+Decompiles saved: `fn_004320f0` (dtor/vtable), `fn_0045b080` (setter), `fn_004042f0` (blend),
+`fn_00457b00` (WM_ERASEBKGND), `fn_00459930` (WM_PAINT) in `docs/re/decompiled/dbasewin/`.
+
+**Still open after session 8:** the exact band-vs-border slot assignment (needs the title-item
+painter, low payoff); the `MENOS` scrolled-up badges + real list scrolling; HISTORY / PROGRESS /
+SEGUIMIENTO + the country -> league -> team browser shell.
+
 ## Reverse plan (remaining)
 1. ~~Find the loader~~ DONE: it's `blitBitmap`/`SetFont`/`Point`/`Rect` at literal coords, per
    screen. Continue decompiling the other view fns (HISTORY/PROGRESS/SEGUIMIENTO draw routines)
