@@ -410,9 +410,40 @@ grid shows through the bodies (as the binary does), group identity carried by th
 Decompiles saved: `fn_004320f0` (dtor/vtable), `fn_0045b080` (setter), `fn_004042f0` (blend),
 `fn_00457b00` (WM_ERASEBKGND), `fn_00459930` (WM_PAINT) in `docs/re/decompiled/dbasewin/`.
 
-**Still open after session 8:** the exact band-vs-border slot assignment (needs the title-item
-painter, low payoff); the `MENOS` scrolled-up badges + real list scrolling; HISTORY / PROGRESS /
-SEGUIMIENTO + the country -> league -> team browser shell.
+**Superseded by session 9 (below):** the pastel-band + dark-border that session 8 reconstructed
+from the group shades is **WRONG for columns** — the column draws no band/border at all.
+
+## VERIFIED 2026-06-30 (session 9): the column draws NO band/border either (title text only)
+Decompiled the item content painter **`FUN_004613c0`** (the fn that reads the column's group
+shades +0x404..+0x414 — found via a displacement xref scan), and its two edge primitives
+`FUN_00461e20` (top+left edge) / `FUN_0043d2d0` (bottom+right edge). It is a classic Win32 3D
+panel painter, but **every piece of chrome is gated on style bits the column does not have**
+(column AddItem style = **0x808**, session 4):
+- **Background fill** (`FUN_00404b60`, using the per-widget colour at +0x80) is drawn only when
+  `style & 0x80800 == 0`. Column 0x808 has bit **0x800 set** -> fill **skipped**. (Matches the
+  WM_ERASEBKGND=1 finding: no body fill, FONDO shows through.)
+- **3D-bevel border** (the group-shade edges: +0x40c/+0x400 outer, +0x408/+0x404 inner, via
+  `FUN_00461e20`/`FUN_0043d2d0`) is gated on `style & 0x80000`. Column 0x808 lacks 0x80000 ->
+  **no bevel**. ⇒ the 5 group shades are **button chrome (style 0x80000 bevel-buttons), NOT
+  column chrome.** Session 8's reconstructed band+border was wrong.
+- **Per-column SetTextColor** (`FUN_00452b40(dc, +0x414)`) is gated on `(this+0x3f4 & 2) &&
+  (style & 0x200000)`. Column lacks 0x200000 -> title text uses the **inherited DC colour**
+  (the screen's text colour, set white via `FUN_004042d0(_, 0xffffff)`).
+- The column's **0x800 branch** (which it does have) draws **only the title text** (`FUN_00452b90`
+  at the item rect) over the transparent body.
+
+⇒ **A faithful column = transparent body (FONDO through) + white title text. No fill, no band, no
+border.** `DataBaseScreen.gd` updated: removed the session-8 band/border + the `_grp_shade` helper
++ `SHADE_*` consts; `_draw_column` now draws only the title over the transparent body. Verified:
+headless import clean; `shot_database.gd` = `DB-SHOT OK`/`SHOTS DONE`, no SCRIPT ERROR; **LOOKED**
+at a PIL mirror over real FONDO (`/tmp/.../db_mirror_session9.png`): white titles + status-coloured
+names lie directly on the football photo/grid (the grid carries the column structure), no panels,
+reads as a period PC-Futbol DB screen. Decompiles saved: `FUN_004613c0` (item painter),
+`FUN_00461e20` / `FUN_0043d2d0` (edge prims) in `docs/re/decompiled/dbasewin/`.
+
+**Still open after session 9:** the `MENOS` scrolled-up badges + real list scrolling; HISTORY /
+PROGRESS / SEGUIMIENTO + the country -> league -> team browser shell. (The squad-view DATA BASE
+screen is now reversed end to end: layout + rows + photos + legend + MORE badges + body/chrome.)
 
 ## Reverse plan (remaining)
 1. ~~Find the loader~~ DONE: it's `blitBitmap`/`SetFont`/`Point`/`Rect` at literal coords, per

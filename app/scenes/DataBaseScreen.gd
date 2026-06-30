@@ -35,7 +35,7 @@ const COLS := [
 	{"key": "FW", "title": "FORWARDS",    "rect": Rect2(430, 140, 209, 277), "col": Color8(108, 21, 21)}, # ebp+0x523c (0x6c,0x15,0x15)
 ]
 # Row metrics reversed from FUN_0042b540 (the two modes toggled by this+0x2d4c).
-const HDR_H := 19      # column title band; rows begin at FIRST_Y below the column top
+const HDR_H := 19      # title-text region height (informational); rows begin at FIRST_Y below it
 # LISTS mode (Proman10): tight text rows, small thumbnail.
 const FIRST_Y := 21    # local_270 (0x15): first row y within the column client
 const PITCH := 18      # local_260 (0x12): Δy per row
@@ -76,18 +76,15 @@ const LEGEND := [
 ]
 const C_LEGEND_TXT := Color(0, 0, 0)   # FUN_004042d0(buf, 0) = black
 
-# DATA BASE palette. Each column's chrome is derived from its REAL per-group COLORREF (COLS
-# "col"). The column body has NO fill: the column class WM_ERASEBKGND handler (FUN_00457b00)
-# is `return 1` (background erase suppressed), and its WM_PAINT (FUN_00459930) normal path is
-# clip/dirty bookkeeping only (the lone FillRect is a BLACK_BRUSH error fallback). So the parent
-# FONDO DBASE (football photo + faint blue grid) shows through the column body verbatim. The
-# group colour is consumed only as the 5 precomputed shades the setter FUN_0045b080 derives via
-# the alpha-blend FUN_004042f0(group, target, a): +0x404 group*0x98/256 over black (dark),
-# +0x408 group*0x82/256 over white (pastel), +0x40c group*0x3e/256 over white (light), +0x410
-# group*0xae/256 over white. Session 8 reversed; see docs/re/database_screen_re.md "session 8".
-const SHADE_DARK_A := 0x98   # +0x404: blend(group, black, 0x98/256)  -> border/shadow
-const SHADE_BAND_A := 0x82   # +0x408: blend(group, white, 0x82/256)  -> title band (pastel)
-const C_HDR_TXT := Color(1, 1, 1)                # white — verified 0xffffff in the setter
+# DATA BASE column chrome: a column draws NO body fill, NO header band, and NO border, PROVEN
+# from the item painter FUN_004613c0 (session 9). For the column item style 0x808: the background
+# fill (FUN_00404b60) is skipped because bit 0x800 is set; the 3D-bevel border (the group-shade
+# edges read from +0x404..+0x40c) is gated on style bit 0x80000, which the column lacks (the bevel
+# is button chrome, not column chrome). The column's 0x800 branch draws ONLY the title text over
+# the transparent body, so the parent FONDO DBASE (football photo + faint blue grid) shows through.
+# The per-column SetTextColor(+0x414) is gated on style 0x200000 (also absent), so the title text
+# uses the inherited DC colour, which the screen sets white (FUN_004042d0(_, 0xffffff)).
+const C_HDR_TXT := Color(1, 1, 1)                # title text — inherited DC colour, white
 const C_ROW_A := Color(0, 0, 0, 0.18)            # faint row banding (neutral, readability)
 const C_ROW_TXT := Color(0.95, 0.97, 1.0)
 const C_SEP := Color(1, 1, 1, 0.16)
@@ -242,13 +239,9 @@ func _draw() -> void:
 func _draw_column(col: Dictionary) -> void:
 	var r: Rect2 = col["rect"]
 	var cc: Color = col["col"]   # the reversed per-group COLORREF
-	# Body = NO fill: the column class WM_ERASEBKGND (FUN_00457b00) returns 1, so FONDO shows
-	# through the body verbatim. Chrome = the binary's precomputed group shades only: a pastel
-	# title band (setter +0x408) over a dark 1px border (setter +0x404). White title (verified).
-	var c_band := _grp_shade(cc, Color(1, 1, 1), SHADE_BAND_A)
-	var c_border := _grp_shade(cc, Color(0, 0, 0), SHADE_DARK_A)
-	draw_rect(Rect2(r.position.x, r.position.y, r.size.x, HDR_H), c_band, true)
-	draw_rect(r, c_border, false, 1.0)
+	# Column = transparent body + title text ONLY (no fill, no band, no border). PROVEN from the
+	# item painter FUN_004613c0 for column style 0x808 (see the palette note above): FONDO shows
+	# through, the title is drawn over it in the inherited (white) DC text colour.
 	_txt(_f10, r.position.x + 6, r.position.y + 4, str(col["title"]), C_HDR_TXT, 11)
 
 	# Mode-selected row metrics (FUN_0042b540: LISTS vs PHOTOS, toggled by this+0x2d4c).
@@ -317,14 +310,6 @@ func _draw_legend() -> void:
 		# Caption to the right of the marker, vertically centred against the 11px badge.
 		var ty := LEGEND_Y + (11 - sz) * 0.5
 		_txt(lf, x + tw + 3, ty, str(cell["label"]), C_LEGEND_TXT, sz)
-
-
-## Group-colour shade = the setter's blend FUN_004042f0: result = group*a + target*(256-a), a/256.
-## The DATA BASE column setter (FUN_0045b080) precomputes these into widget +0x404..+0x414.
-func _grp_shade(group: Color, target: Color, a_byte: int) -> Color:
-	var a := a_byte / 256.0
-	var ia := 1.0 - a
-	return Color(group.r * a + target.r * ia, group.g * a + target.g * ia, group.b * a + target.b * ia)
 
 
 func th_blit(tex: Texture2D, x: float, y: float) -> void:
