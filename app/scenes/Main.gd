@@ -890,6 +890,17 @@ func _open_match(home: Dictionary, away: Dictionary, hg: int, ag: int,
 		scr.queue_free()
 		if on_back.is_valid():
 			on_back.call())
+	# The reversed MATCH OPTIONS view picker (WATCH/HIGHLIGHTS/BRIEF/RESULTS), source-exact
+	# rects from FUN_004e2630 (docs/re/match_view_re.md). Overlays the running match: BRIEF
+	# watches the commentary, RESULTS skips to full time; WATCH/HIGHLIGHTS show their source
+	# status (2D simulador = next build step; 3D .p3d data absent).
+	var opt: MatchOptions = load("res://scenes/MatchOptions.gd").new()
+	opt.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(opt)
+	opt.picked.connect(func(mode: String) -> void:
+		if mode == "results":
+			scr.seek(90.0)
+		opt.queue_free())
 
 
 # ---- views ---------------------------------------------------------------

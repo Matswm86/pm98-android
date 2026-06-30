@@ -21,21 +21,39 @@ index `*(this+0x494)` (range 0..5) through a 6-entry jump table at **`0x4e513c`*
 (Handler ENTRY addresses are verified; the per-state *semantics* are not yet fully reversed —
 do not assume which state is which mode without confirming.)
 
-The `MATCH OPTIONS` panel title (`"MATCH OPTIONS"` @ `.data 0x657974`) is drawn by a method at
-`~0x4e6be0` via the label helper `FUN_005da180`, rect `(2,2)..(437,30)`. The option buttons are
-the adjacent `.data` string cluster (the in-match camera/presentation choices):
+The `MATCH OPTIONS` panel title (`"MATCH OPTIONS"` @ `.data 0x657974`) is drawn by the method at
+`0x4e6be0` via the label helper `FUN_005da180` into a `CRect` built inline (`left=2, top=2,
+right=0x1b5=437, bottom=0x1e=30`) — i.e. rect `(2,2)..(437,30)`. Panel inner width = **437**.
 
-| string (.data) | VA | role |
-|---|---|---|
-| `CANCEL` | 0x6578f8 | dismiss |
-| `STATIC CAMERAS` | 0x657900 | camera mode |
-| `BRIEF` | 0x657960 | brief/summary |
-| `HIGHLIGHTS` | 0x657968 | highlights |
-| `MATCH OPTIONS` | 0x657974 | panel title |
+**The view-mode toolbar — exact rects recovered 2026-06-30 (NOT assumed).** The four mode
+buttons are laid out as a single horizontal row by `FUN_004e2630` via the point/rect helpers
+`FUN_00436fb0` (writes a `{x,y}` pair, `ret 8`) and `FUN_00436fd0(rect, posPt, sizePt)` which
+builds `rect = (pos, pos+size)`. For each button the EXE emits two `FUN_00436fb0` calls — the
+**1st = size** `(w,h)`, the **2nd = position** `(x,y)` — then one `FUN_00436fd0`:
+
+| order | string (.data) | rect-build @ | pos (x,y) | size (w,h) | rect (l,t,r,b) |
+|---|---|---|---|---|---|
+| 1 | `WATCH` | 0x655fd8 | 0x4e2aad | (5,100) | (98,25) | (5,100,103,125) |
+| 2 | `HIGHLIGHTS` | 0x657968 | 0x4e2b18 | (109,100) | (98,25) | (109,100,207,125) |
+| 3 | `BRIEF` | 0x657960 | 0x4e2b86 | (214,100) | (98,25) | (214,100,312,125) |
+| 4 | `RESULTS` | 0x65429c | 0x4e2bf4 | (317,100) | (98,25) | (317,100,415,125) |
+
+So the picker row is **WATCH · HIGHLIGHTS · BRIEF · RESULTS**, four 98×25 buttons at y=100,
+x ∈ {5,109,214,317} (≈104px pitch), inside the 437-wide panel.
+
+**Two corrections to the earlier (pre-disasm) note:**
+- The earlier "`HIGHLIGHTS` pos (98,25) size (109,100)" was **transposed** — the (98,25) is the
+  shared *size* and (109,100) is HIGHLIGHTS's *position*. Verified against the rect helper's
+  `rect=(pos,pos+size)` semantics and the only self-consistent reading (4 side-by-side buttons).
+- `CANCEL` (0x6578f8) and `STATIC CAMERAS` (0x657900) are **not** buttons in this view-picker row.
+  `CANCEL` has **no** push-imm xref anywhere in `FUN_004e2630`; `STATIC CAMERAS` is pushed at
+  `0x4e3fe9` inside a *different* sub-panel (the camera tab). Don't list them as picker options.
 
 Icons `img\opciones\ico_highlights.bmp` (0x657940) + `img\premier\opciones\ico_HighlightsResumen.bmp`
-(0x657910). The `HIGHLIGHTS` button is laid at pos `(98,25)` size `(109,100)` inside `FUN_004e2630`
-(@ `0x4e2aee`, via the proven point/rect helpers `FUN_00436fb0`/`FUN_00436fd0`).
+(0x657910) decorate the HIGHLIGHTS tab. `FUN_004e2630` also builds the per-tab sub-panels
+(graphics: SKY/BOARDS/SHADOWS/PITCH DETAIL/STADIUM DETAIL; quality: HIGH/MED/LOW/MIN; camera:
+STATIC CAMERAS/SIDE 1/SIDE 2/FREE/AUTO; audio: FX/AMBIENT/COMMENTS) selected by the state index
+`*(this+0x494)` via the 6-entry jump table @ `0x4e513c`.
 
 NOTE: the `SIMULADOR` / `NARRACION SIMULADOR` / `3D ENGINE` / `GRAFICOS` strings at
 `0x659e5c..0x65a160` are the **credits screen** category headers, NOT match-picker options —
@@ -99,11 +117,15 @@ not dead reference.
 
 ## Build plan (faithful, source-only)
 
-1. **MATCH OPTIONS picker** — small overlay offering the reversed options (BRIEF / HIGHLIGHTS /
-   STATIC CAMERAS / CANCEL + the NARRACION text screen). Recover each button's exact rect from
-   `FUN_004e2630` (the HIGHLIGHTS rect is known; trace the siblings) before drawing — do NOT
-   invent coordinates.
-2. **NARRACION** → the existing `MatchScreen.gd` (built).
+1. **MATCH OPTIONS picker** — DONE (rects recovered above; overlay `app/scenes/MatchOptions.gd`).
+   The reversed row is **WATCH · HIGHLIGHTS · BRIEF · RESULTS** at the exact rects in the table
+   above. Routing: `BRIEF` → the built commentary `MatchScreen.gd`; `RESULTS` → `MatchScreen`
+   seeked to full time; `WATCH` → the 2D GRAFICO simulador (step 3, not yet built — honest
+   source-status note for now); `HIGHLIGHTS` → 3D engine (`.p3d` absent — honest note). The
+   panel's INTERNAL geometry is source-exact; its on-screen position (centred in the 640×480
+   design space) is an app layout choice (the dialog's window position is set elsewhere, not in
+   `FUN_004e2630`).
+2. **NARRACION / BRIEF** → the existing `MatchScreen.gd` (built).
 3. **GRAFICO / SIMULADOR** → restore the 2D sprite pitch from `DATSIM.PKF`/`PCF5DAT.PKF`, driven
    by the reversed match engine's per-minute event timeline (positions interpolated from the same
    `MatchCommentary` model the text view uses, so both views agree on the scoreline).
