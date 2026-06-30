@@ -83,8 +83,15 @@ prompted. Reinstalling over an older build? Uninstall the old one first.
   (last season's European Cup winners v Cup Winners' Cup winners) and the **Intercontinental
   Cup** (European Cup winners v the South American champions), one-off matches around their
   own original trophies.
-- **Watch a match:** a minute-by-minute commentary feed (goals, cards, saves,
-  corners) using the original game's own English match text, with real scorers.
+- **Watch a match:** the original's in-match **MATCH OPTIONS** view picker
+  (WATCH / HIGHLIGHTS / BRIEF / RESULTS, at the exact button coordinates reversed
+  from the executable). **BRIEF** is a minute-by-minute commentary feed (goals,
+  cards, saves, corners) in the game's own English match text with real scorers;
+  **WATCH** is the **2D graphic simulador** — a side-on stadium built from the
+  game's own sprites (players, ball, the PREMIER MANAGER 98 / actua Sports boards,
+  crowd, grass and sky), animated over the very same match timeline so the two
+  views always agree on the scoreline. (HIGHLIGHTS' 3D engine is CD-only data
+  absent from the archive.)
 - **Club finances:** income and expenses over a 52-week season, structured on the
   original game's finance ledger (tickets, TV, sponsors, wages).
 - **The original screens, rebuilt:** the Title / front-door menu, the Main Menu hub,
@@ -122,6 +129,13 @@ models) are CD-only data not present in the archive, so this is the 2D + text mo
   <img src="screens/match.png" alt="Match screen — clock, score, possession, events" width="420"/>
   <img src="screens/match_goals.png" alt="Match screen — late on, with the events feed" width="420"/>
 </p>
+
+And the **WATCH 2D simulador** reached from that picker — the side-on PC-Fútbol pitch
+the original reskins, drawn entirely from the game's own sprites and stadium tiles
+(players, ball, the PREMIER MANAGER 98 / actua Sports hoardings, crowd, grass, sky),
+animated over the same match timeline (here LIVERPOOL 1-0 EVERTON at 13'):
+
+<p><img src="screens/match_sim.png" alt="WATCH — the 2D graphic simulador, side-on stadium from the game's own art" width="640"/></p>
 
 **Injuries, suspensions and the club news feed** — the squad screen flags who's out
 (INJ/SUS, in red/orange), and the Main Menu's NEWS carries the week's injuries, bans,
