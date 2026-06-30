@@ -494,6 +494,47 @@ black names in 4 position columns, no panels/thumbnails/banding. Decompiles save
 `+0x3fc` inset, body face) to build the real bevelled column; then gaps 5/6 (RETURN nav-button art
 + LISTS/PHOTOS toggle button) from `FUN_0042aba0`. Plus the still-open browser shell + 3 DB screens.
 
+## VERIFIED 2026-06-30 (session 11): `FUN_00402130` decoded — title colour + recessed border SHIPPED
+Settled the column-ctor unknowns from disassembly (`FUN_00454200` / `FUN_0045b080` + the AddColumn
+call site `[edi+0xc0]` in `FUN_0042aba0` @0x42af40), correcting session 5's "the group colour is the
+fill":
+
+- **The AddColumn call pushes the group COLORREF as `param_7` and `-1` as `param_8`** (objdump:
+  `FUN_0042aba0` builds the colour via `FUN_004042b0(buf,R,G,B)` into a stack slot, pushes it +`-1`;
+  `FUN_0045b080` forwards them; `FUN_00454200` reads `param_7` at `[esp+0x4c]`, `param_8` at
+  `[esp+0x50]`). `FUN_00454200` stores: **`+0x5c` (title) = `param_7` = the group colour** (≠-1), and
+  **`+0x60` (bevel base) = `param_8`==-1 ⇒ INHERIT the parent's `+0x60`**. So the per-group colour
+  (GK 0x50/0x6e/05, DF 0xd4/0x3f/00, MF 0xaa/00/00, FW 0x6c/0x15/0x15) is the **TITLE** colour, NOT
+  the fill — the title is group-coloured, never white.
+- **Title inset `+0x3fc` = 6** (`FUN_0045b080` `*(this+0x3fc)=6`). Title drawn by `FUN_00452b90` at
+  client `(iStack_48 + left + 3 + 6, iStack_44 + top + 3)` = `(+9, +3)` for a normal column.
+- **Recessed border is BLACK** (`FUN_004042d0(...,0)`): `FUN_0044f830` draws 3 concentric bottom+right
+  L-shadows of the inset-3 rect, shifted +i, alpha 192/128/64 (`FUN_0043d2d0` = bottom 1px + right 1px
+  edges); then `FUN_00404bf0`→`FUN_00404e60` draws a **1px black outline** of the inset-3 rect
+  (objdump @0x40226f: colour `[esp-4]`=0, alpha `edi`=0x100 opaque). `FUN_00404e60` draws 4 edges, NOT
+  a fill ⇒ **the interior is transparent** (FONDO shows through). Session 9 was right about the
+  transparent body but wrong that there is no border/title-bar, and analysed the wrong function.
+- **Corner highlight ornaments NOT drawn (documented gap):** the `FUN_00404880` h-line / `FUN_00404930`
+  v-line / `FUN_00404b30` rect accents shade from `+0x60` via `FUN_004042f0(white,0xbe)`/`FUN_00404390`
+  (160 highlight, 80/100 shadow). `+0x60` is the screen window's inherited colour, set by `FUN_00454200`
+  at the SCREEN's creation (outside the column code) — not yet reversed. Drawing them now = guessing the
+  base colour, so the light top-left half of the bevel is left for the next pass.
+
+**Shipped (`DataBaseScreen.gd`):** `_draw_column` now draws the recessed black bevel border (3 fading
+bottom+right shadows + 1px outline at inset-3) and the group-coloured title at `(+9,+3)`; removed the
+white `C_HDR_TXT` stand-in, added `C_BEVEL_DARK`. Interior stays transparent (verified). Verified:
+headless import clean; `shot_database.gd` = `DB-SHOT OK`/`SHOTS DONE` (two "Parameter t is null" =
+known headless GL texture-null limit); **LOOKED** at a PIL mirror over the real FONDO (`db_mirror_s11`)
+— 4 black-bordered panels, group-coloured titles, black names, FONDO through the interior. Decompiles
+saved: `FUN_00454200`, `FUN_0045b080`(prior), `FUN_004589b0`, `FUN_0044ed40`, `FUN_004512f0`,
+`FUN_00404e60`/`c20`/`c70`/`bf0`/`ba0`/`b60`/`b30`/`930`/`880`/`690`/`510`/`460`/`450`/`390`/`230`/`200`/
+`042e0`, `FUN_0043d1f0`/`d240`.
+
+**Next (this screen):** reverse the screen window's `+0x60` (trace the DATA BASE window's creation,
+the only `FUN_00454200` caller that sets it) → then draw the `FUN_00404880/930/b30` corner ornaments
+(light top-left highlights) to complete the bevel. Then gaps 5/6 (RETURN nav-button + LISTS/PHOTOS
+toggle from `FUN_0042aba0`), then the browser shell + 3 DB screens.
+
 ## Reverse plan (remaining)
 1. ~~Find the loader~~ DONE: it's `blitBitmap`/`SetFont`/`Point`/`Rect` at literal coords, per
    screen. Continue decompiling the other view fns (HISTORY/PROGRESS/SEGUIMIENTO draw routines)

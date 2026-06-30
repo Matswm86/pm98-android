@@ -95,11 +95,22 @@ const C_NAME := Color(0, 0, 0)                   # +0x1fc = 0 -> black (normal r
 const C_NAME_SEL := Color8(212, 191, 0)          # 0xbfd4 -> gold (selected row; unused in static view)
 # Status -> 1px underline colour. Index by player status byte; 0 = no bar. COLORREF 0x00BBGGRR.
 const STATUS_BAR := [Color8(192, 192, 192), Color8(100, 130, 10), Color8(0, 0, 190), Color8(255, 0, 0)]
-# COLUMN header title. NOT reversed to pixels: the column body is painted by FUN_00402130 (a
-# group-coloured 3D-bevel FRAME + title, NOT the transparent body session 9 claimed); its title
-# colour (+0x5c) and inset (+0x3fc) live in the column ctor and are still UNREVERSED. The title
-# below therefore keeps the prior placement/colour as a KNOWN-UNFAITHFUL stand-in pending that pass.
-const C_HDR_TXT := Color(1, 1, 1)                # title text — UNREVERSED stand-in (see above)
+# COLUMN paint — reversed end-to-end from FUN_00402130 (column vtable 0x485ed8 slot +0x10c),
+# session 11 (disasm of FUN_00454200 / FUN_0045b080 / the AddColumn call site in FUN_0042aba0):
+#   * TITLE colour = field +0x5c = the per-group COLORREF (GK olive / DF orange / MF red / FW
+#     dark-red). FUN_00454200 stores param_7 (the AddColumn colour) at +0x5c; +0x60 (bevel base)
+#     is the inherited PARENT colour, not this. So the title is group-coloured, NOT white.
+#   * TITLE inset = field +0x3fc = 6 (FUN_0045b080). Drawn by FUN_00452b90 at client
+#     (iStack_48 + left + 3 + 6, iStack_44 + top + 3) = (+9, +3) normal (iStack_48/44 = 0).
+#   * Recessed BLACK bevel border: FUN_0044f830 draws 3 concentric bottom+right L-shadows of the
+#     inset-3 rect, shifted +i, alpha 192/128/64 (FUN_0043d2d0 = bottom + right 1px edges, colour
+#     0 = black via FUN_004042d0); then FUN_00404e60 a 1px BLACK outline at the inset-3 rect.
+#   * Interior is NOT filled — FUN_00404e60 draws 4 edges only, so the FONDO shows through.
+#   * Corner highlight ornaments (FUN_00404880 hline / FUN_00404930 vline / FUN_00404b30 rect,
+#     shaded from +0x60 via FUN_004042f0/FUN_00404390) are NOT drawn: +0x60 is inherited from the
+#     screen window, set at the screen's creation OUTSIDE the column code, and is not yet reversed.
+#     Drawing them would require guessing the base colour, so they are left for the next pass.
+const C_BEVEL_DARK := Color(0, 0, 0)             # FUN_004042d0(...,0) = black: frames + outline
 const C_TITLE := Color(1, 1, 1)   # club-name title — verified 0xffffff (FUN_004042d0)
 const C_BTN := Color(0.13, 0.27, 0.56)
 const C_BTN_HI := Color(0.42, 0.58, 0.86)
@@ -250,12 +261,23 @@ func _draw() -> void:
 
 func _draw_column(col: Dictionary) -> void:
 	var r: Rect2 = col["rect"]
-	# COLUMN header title. KNOWN-UNFAITHFUL stand-in: the real column is painted by FUN_00402130
-	# (vtable 0x485ed8 +0x10c) as a group-coloured 3D-bevel frame + title — session 9's "transparent
-	# body, no border" analyzed FUN_004613c0, which is a DIFFERENT class's painter (proven by the
-	# row-vs-column vtable diff). The bevel geometry + title colour (+0x5c) + inset (+0x3fc) are not
-	# yet reversed to pixels, so the title keeps the prior placement/colour until that pass lands.
-	_txt(_f10, r.position.x + 6, r.position.y + 4, str(col["title"]), C_HDR_TXT, 11)
+	# Recessed BLACK bevel border (FUN_00402130). FUN_0044f830: 3 fading-black bottom+right
+	# L-shadows of the inset-3 rect shifted +i (alpha 192/128/64); then FUN_00404e60: a 1px black
+	# outline at the inset-3 rect. Interior left transparent (edges only -> FONDO shows through).
+	var lx := r.position.x
+	var ty := r.position.y
+	for i in 3:
+		var a := (192.0 - 64.0 * i) / 256.0
+		var li := lx + 3 + i
+		var tii := ty + 3 + i
+		var ri := lx + r.size.x - 3 + i
+		var bi := ty + r.size.y - 3 + i
+		draw_rect(Rect2(li, bi - 1, ri - li, 1), Color(0, 0, 0, a), true)   # bottom edge
+		draw_rect(Rect2(ri - 1, tii, 1, bi - tii), Color(0, 0, 0, a), true) # right edge
+	draw_rect(Rect2(lx + 3, ty + 3, r.size.x - 6, r.size.y - 6), C_BEVEL_DARK, false)
+
+	# COLUMN title: per-group colour (+0x5c), inset (+9, +3) (+0x3fc = 6). FUN_00452b90.
+	_txt(_f10, lx + 9, ty + 3, str(col["title"]), col["col"], 11)
 
 	# Mode-selected item metrics (FUN_0042b540: LISTS vs PHOTOS, toggled by this+0x2d4c).
 	var lists := not _photos
