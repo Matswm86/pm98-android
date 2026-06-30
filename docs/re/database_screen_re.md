@@ -445,6 +445,55 @@ reads as a period PC-Futbol DB screen. Decompiles saved: `FUN_004613c0` (item pa
 PROGRESS / SEGUIMIENTO + the country -> league -> team browser shell. (The squad-view DATA BASE
 screen is now reversed end to end: layout + rows + photos + legend + MORE badges + body/chrome.)
 
+## VERIFIED 2026-06-30 (session 10): the ACTUAL paint methods — row corrected, column re-opened
+Settled the painter architecture by **diffing the row-item vtable vs the column vtable** (python
+PE-parse over `.rdata`, VMA 0x484000 @ file 0x82c00) instead of trusting a displacement xref:
+- **Item content-paint is vtable slot +0x10c** (the row and column vtables are identical except a
+  handful of slots; +0x10c is the override that differs). **Column** (vtable `0x485ed8`, confirmed
+  by ctor `FUN_004320f0`) +0x10c = **`FUN_00402130`**. **Row item** (vtable `PTR_LAB_00486a38`,
+  set in `FUN_0042b540`) +0x10c = **`FUN_0042e590`**. Both painters are **self-contained** and do
+  **NOT** call `FUN_004613c0`. ⇒ **session 9's `FUN_004613c0` is a THIRD class's painter** (it is
+  referenced only from vtable `0x48a504`, not from the column or row vtable). Session 9's style-0x808
+  gating analysis was applied to the wrong function.
+
+### ROW item paint — `FUN_0042e590` (reversed end to end; `DataBaseScreen.gd` updated)
+- **Name** = `record+0xc` (the same string `FUN_0042c030` measures in the builder), drawn by
+  `FUN_00452b90` -> glyph renderer `FUN_00470cc0`. Its colour is the DC field **`+0x1fc`**, set by
+  `FUN_00452b40(dc, uStack_40)`. `FUN_0042e590` sets `uStack_40 = 0` for a normal row (**BLACK**)
+  and `0xbfd4` (gold) ONLY when selected (`this+0x3f4 & 2`). **There is NO per-name status tint.**
+  (The session-9 "status-coloured names" and the handoff gap-3 prescription were both wrong.)
+- **LISTS mode draws NO photo.** `FUN_0042c1c0` (photo loader, `FUN_00445f10(id)`) is gated on
+  `param_1 (mode = this+0x2d4c) != 0`, and the LISTS branch of `FUN_0042e590` blits no bitmap. The
+  32x32 MINIFOTO appears ONLY in PHOTOS mode (`FUN_0044f830(dc,0,0,0x20,0x20,...)` frame + photo).
+- **Status underline bar** = `FUN_00404490(dc, pt(left,top+15), 0xc4=196, statusColour)` ->
+  `FUN_0044ed40` = a 1px x 196 bar. Drawn only `if status != 0`. Status byte = `playerRec+0x4c`:
+  1=green `0x0a8264`, 2=blue `0xbe0000`, 3=red `0x0000ff` (COLORREF 0x00BBGGRR); 0=silver, no bar.
+  `game_db` has no equivalent status field, so the bar is **wired but dormant** (all rows = 0).
+- **No alternating banding, no separators** — neither painter draws them; both were invented.
+
+### COLUMN paint — `FUN_00402130` (re-opened; session 9's "transparent body" is WRONG)
+`FUN_00402130` is a **group-coloured 3D-bevel FRAME painter**: `FUN_0044f830` draws concentric
+frames (border, via `FUN_0043d1f0`), then a long series of `FUN_00404880/930/b30` corner+edge
+draws shaded from the group COLORREF (`param_1+0x60`, blended by `FUN_004042f0`/`FUN_00404390`),
+then an optional icon (`FUN_0044f2b0`), then the **title** (`FUN_00452b90` at the item rect inset
+by `+0x3fc`) in colour **`param_1+0x5c`**. ⇒ the column is **a bevelled panel with a title**, not
+the transparent body session 9 claimed. NOT yet reversed to pixels: the exact bevel geometry, the
+body-face fill (if any), the title colour `+0x5c`, and the inset `+0x3fc` all live in the column
+ctor and need a dedicated pass. **Until then `DataBaseScreen.gd` keeps the title-only stand-in and
+flags it KNOWN-UNFAITHFUL** — a guessed bevel would be the invented-art trap, so none is shipped.
+
+**Shipped (row only):** `_draw_column` now draws black names (no thumbnail in LISTS), the dormant
+status bar, and no banding/separators; removed `C_ROW_A`/`C_ROW_TXT`/`C_SEP`, added `C_NAME`/
+`C_NAME_SEL`/`STATUS_BAR` + item metrics `ITEM_H`/`ROW_W_PH`/`ITEM_H_PH`. Verified: headless import
+clean; `shot_database.gd` = `DB-SHOT OK`/`SHOTS DONE` (the two "Parameter t is null" are the known
+headless GL texture-null limit); **LOOKED** at a PIL mirror over real FONDO (`db_mirror_s10.png`):
+black names in 4 position columns, no panels/thumbnails/banding. Decompiles saved: `FUN_00402130`,
+`FUN_00452b40`, `FUN_00452b90`, `FUN_00404490`, `FUN_0044f830`.
+
+**Next (this screen):** reverse `FUN_00402130`'s bevel + the column ctor (`+0x5c` title colour,
+`+0x3fc` inset, body face) to build the real bevelled column; then gaps 5/6 (RETURN nav-button art
++ LISTS/PHOTOS toggle button) from `FUN_0042aba0`. Plus the still-open browser shell + 3 DB screens.
+
 ## Reverse plan (remaining)
 1. ~~Find the loader~~ DONE: it's `blitBitmap`/`SetFont`/`Point`/`Rect` at literal coords, per
    screen. Continue decompiling the other view fns (HISTORY/PROGRESS/SEGUIMIENTO draw routines)

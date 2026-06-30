@@ -39,12 +39,15 @@ const HDR_H := 19      # title-text region height (informational); rows begin at
 # LISTS mode (Proman10): tight text rows, small thumbnail.
 const FIRST_Y := 21    # local_270 (0x15): first row y within the column client
 const PITCH := 18      # local_260 (0x12): Δy per row
-const ROW_X := 3       # local_25c: cell base x within the column
-const ROW_W := 196     # local_268 (0xc4): cell width
+const ROW_X := 3       # local_25c: item base x within the column
+const ROW_W := 196     # local_268 (0xc4): item width
+const ITEM_H := 16     # local_264 (0x10): item height (pitch 18 leaves a 2px gap)
 # PHOTOS mode (Futuri18): taller rows, larger photo (RE doc session 3 table).
 const FIRST_Y_PH := 25 # 0x19
 const PITCH_PH := 40   # 0x28
-const ROW_X_PH := 9    # 0x9
+const ROW_X_PH := 9    # 0x9: local_25c (PHOTOS)
+const ROW_W_PH := 187  # 0xbb: local_268 (PHOTOS)
+const ITEM_H_PH := 36  # 0x24: local_264 (PHOTOS)
 # Fixed visible-row caps reversed from FUN_0042b540 (the row loop breaks at iVar8). The GK
 # column caps at 4 rows (LISTS) / 2 (PHOTOS); the three outfield columns at 15 / 7. These are
 # literal caps in the binary, NOT geometry — used both to cap rows and to gate the "more" badge.
@@ -76,18 +79,27 @@ const LEGEND := [
 ]
 const C_LEGEND_TXT := Color(0, 0, 0)   # FUN_004042d0(buf, 0) = black
 
-# DATA BASE column chrome: a column draws NO body fill, NO header band, and NO border, PROVEN
-# from the item painter FUN_004613c0 (session 9). For the column item style 0x808: the background
-# fill (FUN_00404b60) is skipped because bit 0x800 is set; the 3D-bevel border (the group-shade
-# edges read from +0x404..+0x40c) is gated on style bit 0x80000, which the column lacks (the bevel
-# is button chrome, not column chrome). The column's 0x800 branch draws ONLY the title text over
-# the transparent body, so the parent FONDO DBASE (football photo + faint blue grid) shows through.
-# The per-column SetTextColor(+0x414) is gated on style 0x200000 (also absent), so the title text
-# uses the inherited DC colour, which the screen sets white (FUN_004042d0(_, 0xffffff)).
-const C_HDR_TXT := Color(1, 1, 1)                # title text — inherited DC colour, white
-const C_ROW_A := Color(0, 0, 0, 0.18)            # faint row banding (neutral, readability)
-const C_ROW_TXT := Color(0.95, 0.97, 1.0)
-const C_SEP := Color(1, 1, 1, 0.16)
+# ROW rendering — reversed from the ROW-ITEM paint method FUN_0042e590 (vtable PTR_LAB_00486a38
+# slot +0x10c; the row class OVERRIDES the content-paint virtual, proven by diffing the row vtable
+# against the column vtable 0x485ed8 where the same slot holds FUN_00402130). Facts (session 10):
+#   * NAME = record+0xc, drawn by FUN_00452b90 in the DC text colour (+0x1fc). FUN_0042e590 sets
+#     +0x1fc = uStack_40 = 0 (BLACK) for a normal row, 0xbfd4 (gold) only for the SELECTED row.
+#     There is NO per-name status tint (that was a mis-read); the name is plain black.
+#   * LISTS mode draws NO photo — FUN_0042c1c0 (the photo loader) is gated on mode!=0, and the
+#     LISTS branch of FUN_0042e590 blits no bitmap. The 32x32 MINIFOTO appears ONLY in PHOTOS mode.
+#   * STATUS underline bar (FUN_00404490 -> FUN_0044ed40): a 1px x 196 bar at item (left,+15) in
+#     the player STATUS colour (player+0x4c): 1=green 0x0a8264, 2=blue 0xbe0000, 3=red 0x0000ff;
+#     status 0 (silver 0xc0c0c0) draws NOTHING (gated `if status != 0`).
+#   * NO alternating row banding and NO separator lines exist in the binary — both were invented.
+const C_NAME := Color(0, 0, 0)                   # +0x1fc = 0 -> black (normal row)
+const C_NAME_SEL := Color8(212, 191, 0)          # 0xbfd4 -> gold (selected row; unused in static view)
+# Status -> 1px underline colour. Index by player status byte; 0 = no bar. COLORREF 0x00BBGGRR.
+const STATUS_BAR := [Color8(192, 192, 192), Color8(100, 130, 10), Color8(0, 0, 190), Color8(255, 0, 0)]
+# COLUMN header title. NOT reversed to pixels: the column body is painted by FUN_00402130 (a
+# group-coloured 3D-bevel FRAME + title, NOT the transparent body session 9 claimed); its title
+# colour (+0x5c) and inset (+0x3fc) live in the column ctor and are still UNREVERSED. The title
+# below therefore keeps the prior placement/colour as a KNOWN-UNFAITHFUL stand-in pending that pass.
+const C_HDR_TXT := Color(1, 1, 1)                # title text — UNREVERSED stand-in (see above)
 const C_TITLE := Color(1, 1, 1)   # club-name title — verified 0xffffff (FUN_004042d0)
 const C_BTN := Color(0.13, 0.27, 0.56)
 const C_BTN_HI := Color(0.42, 0.58, 0.86)
@@ -238,44 +250,48 @@ func _draw() -> void:
 
 func _draw_column(col: Dictionary) -> void:
 	var r: Rect2 = col["rect"]
-	var cc: Color = col["col"]   # the reversed per-group COLORREF
-	# Column = transparent body + title text ONLY (no fill, no band, no border). PROVEN from the
-	# item painter FUN_004613c0 for column style 0x808 (see the palette note above): FONDO shows
-	# through, the title is drawn over it in the inherited (white) DC text colour.
+	# COLUMN header title. KNOWN-UNFAITHFUL stand-in: the real column is painted by FUN_00402130
+	# (vtable 0x485ed8 +0x10c) as a group-coloured 3D-bevel frame + title — session 9's "transparent
+	# body, no border" analyzed FUN_004613c0, which is a DIFFERENT class's painter (proven by the
+	# row-vs-column vtable diff). The bevel geometry + title colour (+0x5c) + inset (+0x3fc) are not
+	# yet reversed to pixels, so the title keeps the prior placement/colour until that pass lands.
 	_txt(_f10, r.position.x + 6, r.position.y + 4, str(col["title"]), C_HDR_TXT, 11)
 
-	# Mode-selected row metrics (FUN_0042b540: LISTS vs PHOTOS, toggled by this+0x2d4c).
-	var first_y := FIRST_Y_PH if _photos else FIRST_Y
-	var pitch := PITCH_PH if _photos else PITCH
-	var row_x := ROW_X_PH if _photos else ROW_X
-	var row_w := int(r.size.x) - row_x * 2
-	var name_f: Font = (_ffut if _ffut != null else _f12) if _photos else _f10
-	var name_sz := 18 if _photos else 11
+	# Mode-selected item metrics (FUN_0042b540: LISTS vs PHOTOS, toggled by this+0x2d4c).
+	var lists := not _photos
+	var first_y := FIRST_Y if lists else FIRST_Y_PH
+	var pitch := PITCH if lists else PITCH_PH
+	var item_x := ROW_X if lists else ROW_X_PH
+	var item_w := ROW_W if lists else ROW_W_PH
+	var item_h := ITEM_H if lists else ITEM_H_PH
+	var name_f: Font = _f10 if lists else (_ffut if _ffut != null else _f12)
+	var name_sz := 11 if lists else 18
 
 	var players := _bucket(str(col["key"]))
 	# Cap = the binary's fixed per-column cap, clamped to what fits the column geometry.
 	var cap := _row_cap(str(col["key"]))
 	var max_rows: int = min(int(floor((r.size.y - first_y) / pitch)), cap)
-	var y := r.position.y + first_y
 	for i in players.size():
 		if i >= max_rows:
 			break
 		var p: Dictionary = players[i]
-		var row_r := Rect2(r.position.x + row_x, y, row_w, pitch - 1)
-		_rows.append({"r": row_r, "p": p})
-		if i % 2 == 1:
-			draw_rect(row_r, C_ROW_A, true)
-		# MINIFOTO photo at the row's left, fitted to the row height (FUN_0042c1c0).
-		var face := PMChrome.mini_face(p.get("photoId"))
-		var tx := r.position.x + row_x + 1
-		var th := float(pitch - 4)
-		if face != null:
-			draw_texture_rect(face, Rect2(tx, y + 2, th, th), false)
-		# Name to the right of the photo (Proman10 in LISTS, Futuri18 in PHOTOS).
-		var clamp := 14 if _photos else 18
-		_txt(name_f, tx + th + 4, y + (pitch - name_sz) * 0.5, str(p.get("name", "?")).substr(0, clamp), C_ROW_TXT, name_sz)
-		draw_rect(Rect2(r.position.x + row_x, y + pitch - 1, row_w, 1), C_SEP, true)
-		y += pitch
+		var ix := r.position.x + item_x
+		var iy := r.position.y + first_y + i * pitch
+		_rows.append({"r": Rect2(ix, iy, item_w, item_h), "p": p})
+		if lists:
+			# LISTS (Proman10): NAME ONLY, inset (+6,+2), black. No thumbnail (FUN_0042c1c0
+			# is gated on mode!=0), no banding, no separator — all of which the binary omits.
+			_txt(name_f, ix + 6, iy + 2, str(p.get("name", "?")).substr(0, 22), C_NAME, name_sz)
+			# Status underline bar (FUN_00404490): 1px x 196 at (left,+15) when status 1/2/3.
+			var st := int(p.get("status", 0))
+			if st >= 1 and st <= 3:
+				draw_rect(Rect2(ix, iy + 15, item_w, 1), STATUS_BAR[st], true)
+		else:
+			# PHOTOS (Futuri18): 32x32 MINIFOTO at the item's left, name at +40 / +10 (black).
+			var face := PMChrome.mini_face(p.get("photoId"))
+			if face != null:
+				draw_texture_rect(face, Rect2(ix, iy, 32, 32), false)
+			_txt(name_f, ix + 40, iy + 10, str(p.get("name", "?")).substr(0, 14), C_NAME, name_sz)
 
 	# "More" scroll badge in the column header when the squad overflows the cap (FUN_0042b540
 	# adds item 0xdd..0xe0 only under `if cap < count`). GK -> MAS PORTEROS, outfield -> MAS
