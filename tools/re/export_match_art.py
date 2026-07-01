@@ -5,9 +5,14 @@ Reads the originals out of DATSIM.PKF (extracted on the fly), decodes the cracke
 PGF sprite format (see pgf_decode.py / docs/re/match_view_re.md), recolours the
 player kit, and writes ready-to-use RGBA PNG atlases under app/art/match/:
 
-  player_home.png / player_away.png  — [3 anim rows x 8 direction cols] run sheet,
-        kit recoloured (home red / away blue) by luma-preserving hue shift of the
-        green placeholder kit ramp (JUG.PGF base indices 16..42).
+  player_base.png / player_kit.png  — a STYLISED 24-frame slice of JUG.PGF for the
+        side-on WATCH view, kit split off (luma layer tinted per club at runtime).
+        NOTE: this grid is an app construct, NOT the engine layout. The real engine
+        lays JUG out per-kind as [direction][phase] (direction OUTER), stores only 5
+        unique directions + a render-side horizontal mirror, and buckets direction by
+        camera-relative perspective thresholds — see docs/re/jug_render_spec.md
+        (FUN_005a5460). `fr[row*8+d]` below is the transpose of that and does not map
+        frames to compass facings; the WATCH view is a documented approximation.
   ball.png    — a single clean on-ground football, idx0/bg keyed out.
   arrow.png   — the 8-angle COFLECHA selection arrow (active-player marker).
 
@@ -36,8 +41,8 @@ OUT = ROOT / "app" / "art" / "match"
 DATSIM = Path("/tmp/datsim_out/DATSIM.PKF")
 
 CELL_W, CELL_H = 26, 52          # player cell (bottom-centre anchored)
-DIRS = 8                          # frames 0..7 == 8 compass facings (W-pattern proof)
-ANIM_ROWS = 3                     # groups 0,1,2 -> a 3-step run cycle
+DIRS = 8                          # stylised grid width; NOT engine directions
+ANIM_ROWS = 3                     # stylised grid height (see module docstring / spec)
 
 
 def load_pal(name="PALETA.ACT"):

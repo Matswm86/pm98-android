@@ -7,9 +7,12 @@ class_name MatchSimulador
 ## SOURCE FIDELITY (honest, same convention as MatchScreen's vectorial pitch):
 ##   * Player / ball / arrow sprites are the REAL DATSIM.PKF art, decoded by
 ##     tools/re/pgf_decode.py and baked by tools/re/export_match_art.py into
-##     app/art/match/{player_base,player_kit,ball,arrow}.png. JUG.PGF gives 8 compass
-##     facings x 3 run frames per 26x52 cell; the kit layer is a luma sheet the view
-##     tints per club at runtime (modulate x club colour) — exactly what the exporter
+##     app/art/match/{player_base,player_kit,ball,arrow}.png. The 26x52 sprite grid is a
+##     STYLISED 24-frame slice — the real engine lays JUG out per-kind as [direction][phase]
+##     with 5 unique dirs + mirror and camera-relative perspective bucketing (NOT an 8-compass;
+##     see docs/re/jug_render_spec.md / AUDIT A7). The pixels are real DATSIM art; the grid
+##     labelling and side-on facing are the app's approximation. The kit layer is a luma sheet
+##     the view tints per club at runtime (modulate x club colour) — exactly what the exporter
 ##     split it for. BALON.RAW -> ball.png, COFLECHA.PGF -> arrow.png (active marker).
 ##   * The pitch surface + markings are drawn vectorially. The original's exact
 ##     PCF5DAT 3/4 tile-scroll camera and its per-tick positional stream are NOT in the
@@ -471,7 +474,11 @@ func _run_phase() -> int:
 	return int(_t * 6.0) % 3
 
 
-## 8-compass facing from movement vector (down = 0). Falls back to last facing if still.
+## Side-on WATCH-view facing approximation (app construct, NOT the engine model).
+## The real engine (docs/re/jug_render_spec.md, FUN_005a5460) buckets direction by
+## camera-relative perspective thresholds, stores 5 unique dirs + a mirror, and indexes
+## JUG as [direction][phase]. This uniform-45deg atan2 is a documented stylisation for
+## the side-on view (which the engine never renders); it is NOT a source-faithful compass.
 func _facing(prev_pos, pos: Vector2) -> int:
 	if not (prev_pos is Vector2):
 		return 0

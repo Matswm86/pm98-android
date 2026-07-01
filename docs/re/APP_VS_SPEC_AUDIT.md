@@ -48,21 +48,31 @@ The side-on simulador's band layout / camera / per-tick positions are **app subs
 **Action:** never present the side-on view as source-faithful geometry; keep the documented
 "faithful substitute, not invented match data" framing (`MatchSimulador.gd:20`).
 
-### A7 — GAP · `app/scenes/MatchSimulador.gd:474-482` `_facing()` frame-index→compass order UNVERIFIED
-Verify-half done 2026-07-01: decoded + **viewed** JUG.PGF row-0 frames 0..7 (4211 frames total;
-row-0 cell dims `20,16,12,12,12,16,20,20`). They ARE 8 distinct body rotations — frame 0 is
-front/face-visible, frames 6-7 show the back of the head (facing away), 2-4 are narrow side
-profiles. **But** the width/pose distribution (wide at 0, narrow clustered at 2-4, wide at 6-7)
-does NOT match a clean 45°-per-step compass rotation, so `_facing()`'s assumption "frame 0 = down
-(+y), each +1 = +45°" is **not source-confirmed**. The true frame-index→direction mapping is the
-engine's own sprite-selection LUT (MANAGER.EXE / PCF5DAT), not yet reversed. **Action:** do NOT
-apply an invented frame remap; fix is blocked on reversing the sprite-index function. Evidence:
-`scratchpad/jug_row0_facings.png` (regenerable from DATSIM.PKF).
-**RE lead (candidates, not yet confirmed):** in `docs/re/move/`, the fns that both call the
-`FUN_0059*` `simulador.pgf`/sprite-loader region AND do direction quantization (`& 7` / `* 8`):
-`FUN_005a4600`, `FUN_005a65a0`, `FUN_005ac1a0`, `FUN_005adc60`, `FUN_005adfc0`, `FUN_005b0040`,
-`FUN_005b73a0`. Reverse whichever indexes the JUG bank by an 8-way direction to recover the true
-order before touching `_facing()`.
+### A7 — RESOLVED 2026-07-01 · engine sprite-select recovered; `_facing()` model was invented
+The engine player-draw is **`FUN_005a5460`** (`docs/re/move/fn_005a5460_FUN_005a5460.c`), reached
+via JUG loader `FUN_005923f0` (`jug.pgf`→`ctx+0x2468`) / `.PGF` parser `FUN_005d3f60`. Full recovered
+spec: **`docs/re/jug_render_spec.md`**. The frame index (`:337/343`) is
+`JUGbank + (framesPerDir[kind]*dir + base[kind] + phase) * 0x4c` — i.e. JUG is laid out per-kind as
+**`[direction][phase]` (direction OUTER)**, only **5 unique directions** are stored (`dir>4 → dir=8-dir`
++ render-side horizontal mirror, `:251-254`), and direction is bucketed by **non-uniform camera-relative
+perspective thresholds** `DAT_006653e0=[3584,13312,19456,29184,36352,46080,52224,61952]` (`:206-282`),
+not a uniform 45° `atan2`. There are two modes (8-way / 12-way) chosen per `kind`; per-kind
+`framesPerDir` (`DAT_00664fb8`) and `base` (`DAT_006744e8`, .bss/runtime) tabulated in the spec.
+**Finding:** `_facing()`'s "frame 0 = down, +45°/step" and `export_match_art.py`'s `[3×8]` /
+`fr[row*8+d]` bake are BOTH inventions (the bake is the transpose of the real layout; the "W-pattern
+proof" was a rationalisation of the mirrored half-sweep). The engine renders a pseudo-3D two-billboard
+sprite under a fixed 3/4 camera — **it has no side-on 2D view at all.**
+**Action taken:** removed the false "source-faithful compass" claims from `_facing()` +
+`export_match_art.py` (behaviour unchanged — no invented remap applied); the side-on WATCH view is now
+labelled a documented app approximation, consistent with the already-noted app-choice camera/tiling.
+
+### A8 — GAP (opened by A7) · faithful JUG render not built; side-on WATCH view is an approximation
+A source-faithful player render needs §2 `[dir][phase]` indexing + §3 mirror against a recovered
+camera angle, plus the `kind` byte (INVENTORY §5, still unconfirmed) and the un-reversed PCF5DAT 3/4
+tile-scroll camera. Until those land the WATCH sprites are a stylised slice (the baked 24 frames are
+~1-2 real directions' phases, not 8 facings). Flag, do not paper over with another guess.
+Open sub-gaps: `kind` semantics · `JUGCAM.IND` (55296 B) reader not traced · PGF header `h5∈{1,2}`
+meaning · camera-angle source (`param_2+0xdc/0xde`).
 
 ## Verified SOURCE-TRUE this pass (no action — recorded so they aren't re-flagged)
 - `app/art/kits/*.png` (92) = real **club crests** (BIGESC/MINIESC), id-named via EQUIPOS club
