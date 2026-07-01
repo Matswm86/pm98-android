@@ -296,25 +296,26 @@ Remaining:
     the 3 sibling objects** (`FUN_005a2640`; each holds ball-ptr `this+0x190`) — likely teams / a
     tracker, but not named without reading `FUN_005a2640`'s methods. **→ resolved in s7 below.**
 
-  **3-SIBLING CLASS RESOLVED 2026-07-01 (s7) — the s6 GAP "class of the 3 sibling objects" is closed.
-  It is an INDEXED family: `+0xaac`/`+0xe74` = the two teams (byte-proven), `+0x123c` = an index-0
-  non-team singleton (label still a GAP).** Construction disasm `0x5911d7-0x591242` + Ghidra
+  **3-SIBLING CLASS RESOLVED 2026-07-01 (s7, CORRECTED s8) — they are the two per-team KEEPERS + the
+  REFEREE, matching the existing `Pm98Match` port.** ⚠️ s7 first mislabelled `+0xaac`/`+0xe74` as
+  "TEAM 1/TEAM 2" — WRONG: one object per side (not 11), placed *in its own goal*, and keeper-save
+  `FUN_0058f140` runs on this class → it is the GOALKEEPER; the 20 outfield players are a separate
+  array (`Pm98Match._build_player`). Construction disasm `0x5911d7-0x591242` + Ghidra
   (`docs/re/move/siblings/fn_005a2140`,`_005b5790`,`_005a2240`,`_005b5940`,`_005a4560`; ctor
-  `move/camwriter/fn_005a2640`):
+  `move/camwriter/fn_005a2640`) + `Pm98Match.gd`/`Pm98Predicates.gd`:
   - Ctor `FUN_005a2640(this,matchctx)` → base vtables `0x639224→0x639238→0x639228`, `this+0x18c=matchctx`,
-    `this+0x190=matchctx+0x1610` (ball). Construction then stamps index `this+0x3bc`: `+0xaac`→**1**,
-    `+0xe74`→**2** (derived vtable `0x639208`); `+0x123c` gets no index + a *different* vtable `0x6391f8`.
-  - **`+0xaac` = TEAM 1, `+0xe74` = TEAM 2.** Team slot-1 `FUN_005a2140`, at reset (`DAT_006d31c4==0`),
-    positions the object at **opposite pitch ends by the 1/2 index**: idx1 `y=-0x10000-[mc+0x1824]`,
+    `this+0x190=matchctx+0x1610` (ball). Construction then stamps team index `this+0x3bc`: `+0xaac`→**1**,
+    `+0xe74`→**2** (keeper vtable `0x639208`); `+0x123c` gets no index + referee vtable `0x6391f8`.
+  - **`+0xaac` = KEEPER (team 1), `+0xe74` = KEEPER (team 2).** Keeper slot-1 `FUN_005a2140`, at reset,
+    positions each keeper **in its own goal by the 1/2 index**: idx1 `y=-0x10000-[mc+0x1824]`,
     `x=[mc+0x1820]/2`; idx2 `y=[mc+0x1824]+0x10000`, `x=-[mc+0x1820]/2` (`mc+0x1820/0x1824` = pitch
-    width / half-length, the ball's goal-geometry fields). Per-team data block `this+0x2dc =
-    [mc+0x1a5c]+(idx==1?5:6)*0x100` (base+0x500 / +0x600).
-  - **`+0x123c` = index-0 non-team singleton.** `FUN_005b5790` forces `this+0x3bc=0`, block base+0x400,
-    and positions from the **ball + restart type**: `switch([mc+0x448])` reads ball goal-geom
-    `ball+0x90/0x94/0x98` (`this+0x190`) with penalty/corner/free-kick clamps. **Human label = GAP** —
-    index-0, ball-relative, singleton; do NOT assert "referee"/"loose-ball" without a name string.
+    width / half-length). Per-keeper data block `this+0x2dc = [mc+0x1a5c]+(idx==1?5:6)*0x100`
+    (base+0x500 / +0x600). Keeper-save geometry = `FUN_0058f140`.
+  - **`+0x123c` = REFEREE.** `FUN_005b5790` forces `this+0x3bc=0`, block base+0x400, and positions from
+    the **ball + restart type**: `switch([mc+0x448])` reads ball goal-geom `ball+0x90/0x94/0x98`
+    (`this+0x190`); on free-kick/penalty (`FUN_005b5dd0`) it walks to restart target `mc+0x16a0..0x16a8`.
   - Shared per-frame quadruplet `{5a5460,5a3400,5a4560,5a4600}`; slot 2 `FUN_005a4560` copies an
     **81-dword (0x51) record** `this+0x3b0[DAT_006d31c0] → this+0x40` per frame (corrects s6's loose
     "0x1dc + idx*0x191" → base `this+0x3b0`, stride `0x51` dwords).
-  - **Still-open GAPs:** ball goal-line-cross test; C's human label; home/away ↔ team-idx 1/2 mapping;
-    `matchctx+0x1a5c` data-table provenance (zeroed `0x5912df`, filled elsewhere).
+  - **Still-open GAPs:** ball goal-line-cross test; home/away ↔ keeper-idx 1/2 mapping;
+    `matchctx+0x1a5c` provenance (embedded object, vtable `0x6267b0`, built `0x5420c5` on unverified base).

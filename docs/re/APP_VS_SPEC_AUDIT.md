@@ -185,32 +185,35 @@ Byte-search (`.text` disp `0x1614`/`0x1618`/`0x161c`) + Ghidra decompile
   from pitch half-width `matchctx+0x1820/0x1824`. `FUN_0058eca0` = `SetPossessor(this, player)` (sets
   `this+0x40=player`, bumps possession counter `this+0x80`). It is also the point all players orient
   to (AI) and the 3 sibling objects each hold a pointer to it. No other football-sim object fits.
-- **3 SIBLING OBJECTS RESOLVED 2026-07-01 (session 7) — the class of `+0xaac`/`+0xe74`/`+0x123c` is
-  an INDEXED family; the two teams are now byte-proven, C is a distinct index-0 singleton.** Evidence
-  = construction disasm at `0x5911d7-0x591242` + Ghidra decompile of the derived-vtable methods
-  (`docs/re/move/siblings/fn_005a2140` [team slot1], `_005b5790` [C slot1], `_005a2240`/`_005b5940`
-  [set-piece slot3], `_005a4560` [per-frame record copy], ctor `move/camwriter/fn_005a2640`):
+- **3 SIBLING OBJECTS RESOLVED 2026-07-01 (session 7, CORRECTED s8) — they are the two per-team
+  KEEPERS + the REFEREE, reconciled with the existing `Pm98Match` port (which already had this right).**
+  ⚠️ **s7's first pass mislabelled `+0xaac`/`+0xe74` as "TEAM 1/TEAM 2" — WRONG.** There is exactly
+  ONE object per side (not 11), it is placed *behind its own goal line* at kickoff, and the keeper-save
+  geometry `FUN_0058f140` operates on this class — so it is the GOALKEEPER, not the team. The 20 outfield
+  players live in a separate array (`Pm98Match._build_player`). Evidence = construction disasm
+  `0x5911d7-0x591242` + Ghidra (`docs/re/move/siblings/fn_005a2140`, `_005b5790`, `_005a2240`/`_005b5940`,
+  `_005a4560`; ctor `move/camwriter/fn_005a2640`) + `app/scripts/Pm98Match.gd` + `Pm98Predicates.gd`:
   - Ctor `FUN_005a2640(this, matchctx)` sets base-vtable chain `0x639224→0x639238→0x639228`, stores
-    `this+0x18c=matchctx`, `this+0x190=matchctx+0x1610` (the ball). Then construction **stamps an index
-    field `this+0x3bc`**: `+0xaac`→**1** (`0x5911f0`), `+0xe74`→**2** (`0x591219`); `+0x123c` gets
-    **no** `+0x3bc` write and a *different* derived vtable (`0x6391f8` vs `0x639208` for the two teams).
-  - **`+0xaac` = TEAM 1, `+0xe74` = TEAM 2 (proven, not "likely").** Team slot-1 (`FUN_005a2140`) at
-    kickoff/reset (`DAT_006d31c4==0`) places the object at **opposite pitch ends keyed on the 1/2 index**:
+    `this+0x18c=matchctx`, `this+0x190=matchctx+0x1610` (the ball). Then construction **stamps a team
+    index `this+0x3bc`**: `+0xaac`→**1** (`0x5911f0`), `+0xe74`→**2** (`0x591219`); `+0x123c` gets
+    **no** index and a *different* derived vtable (`0x6391f8` vs `0x639208` for the two keepers).
+  - **`+0xaac` = KEEPER (team 1), `+0xe74` = KEEPER (team 2).** Keeper slot-1 (`FUN_005a2140`) at
+    kickoff/reset (`DAT_006d31c4==0`) places each keeper **in its own goal, keyed on the 1/2 index**:
     idx 1 → `this.y = -0x10000 - [matchctx+0x1824]`, `this.x = [matchctx+0x1820]/2`; idx 2 → `this.y =
     [matchctx+0x1824]+0x10000`, `this.x = -[matchctx+0x1820]/2` (`matchctx+0x1820/0x1824` = pitch
-    width / half-length, same fields the ball uses for goal geometry). Each team selects its own 256-B
-    data block: `this+0x2dc = [matchctx+0x1a5c] + (idx==1?5:6)*0x100` (= base+0x500 / +0x600).
-  - **`+0x123c` = index-0 non-team singleton** (`FUN_005b5790` forces `this+0x3bc=0`, selects
-    block base+0x400). It positions itself **from the BALL + the restart type**: switch on
-    `[matchctx+0x448]`, cases read the ball's goal-target geometry `ball+0x90/0x94/0x98` (`this+0x190`)
-    and clamp (penalty-spot / corner / free-kick style offsets). **Human label = GAP, not source-named**
-    (index-0, ball-relative, one instance; do NOT assert "referee"/"loose-ball" without a name string).
+    width / half-length). Each keeper selects its own 256-B data block: `this+0x2dc =
+    [matchctx+0x1a5c] + (idx==1?5:6)*0x100` (= base+0x500 / +0x600). Keeper-save = `FUN_0058f140`.
+  - **`+0x123c` = REFEREE** (`FUN_005b5790` forces `this+0x3bc=0`, block base+0x400). It positions
+    itself **from the BALL + the restart type**: switch on `[matchctx+0x448]`, cases read the ball's
+    goal-target geometry `ball+0x90/0x94/0x98` (`this+0x190`) and clamp (penalty-spot / corner /
+    free-kick offsets); on free-kick/penalty (`FUN_005b5dd0`) it walks to the restart target
+    `matchctx+0x16a0..0x16a8`. (Labelled "referee" in the `Pm98Match` port; the neutral index-0 actor.)
   - All three share the per-frame quadruplet `{5a5460,5a3400,5a4560,5a4600}`; slot 2 (`FUN_005a4560`)
     copies an **81-dword (0x51) record** `this+0x3b0[DAT_006d31c0] → this+0x40` each frame (the s6
     "record copy" is this; corrected: record base `this+0x3b0`, stride `0x51` dwords, not `0x191`).
-  - GAP still open (flag, do NOT fill): a literal goal-line-cross test for the ball; C's human label;
-    home/away mapping of team-idx 1↔2; and provenance of the `matchctx+0x1a5c` data table (zeroed at
-    `0x5912df`, filled elsewhere).
+  - GAP still open (flag, do NOT fill): a literal goal-line-cross test for the ball; home/away mapping
+    of keeper-idx 1↔2; and provenance of the `matchctx+0x1a5c` data table (zeroed at `0x5912df`, an
+    embedded object w/ vtable `0x6267b0` built at `0x5420c5` on an unverified base — see s8 handoff).
 
 **Still open:** human-readable action label per kind (no name string in the engine — never
 invent one) · `player+0x2bc` band-flag meaning · `JUGCAM.IND` internal layout/consumer ·
