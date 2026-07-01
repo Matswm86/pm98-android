@@ -73,7 +73,9 @@ don't mistake them for the picker (they have no push-imm xref from the match con
    - `PCF5DAT.PKF` (314 MB) loaded by **`FUN_004f80a0`** (string @ 0x658a60, ref @ 0x4f82ed).
    - `simulador.pgf` loaded by **`FUN_005923f0`** (string @ 0x664bb8, ref @ 0x59342c).
    - Sprite set lives in `DATSIM.PKF` (1706 entries; already extracted): `BALON.RAW` (ball),
-     `CAMPINA.RAW` (pitch), `CIELO1.BMP` (sky), `COBAL1.PGF`/`COBAL2.PGF`, `COFLECHA.PGF` (arrow),
+     `CAMPINA.RAW` (countryside/skyline backdrop — trees, buildings, perimeter brick wall in
+     horizontal strips; NOT the playing surface — verified by decode, see AUDIT A2),
+     `CIELO1.BMP` (sky), `COBAL1.PGF`/`COBAL2.PGF`, `COFLECHA.PGF` (arrow),
      `COBANDER.PGF` (banner), `COPITO.PGF`, `COAMARI.PGF`… — decode via `tools/re/pgf_decode.py`.
    - Simulador commentary: WAV templates @ `0x657984..0x657a3c` (`UK\JugParad`→`PAR%05d.WAV`,
      `JugPorte`→`POR…`, `JugChut`→`CHU…`, `Marcador`→`MarV%04d.WAV`, `Golde`→`Gola%04d.WAV`) in
@@ -141,6 +143,11 @@ not dead reference.
    stream were not reversed — same documented honesty as MatchScreen's pitch. Verified by
    `app/tests/test_match_simulador.gd` (score/possession/attacking-side parity, ball-on-pitch,
    button routing) + the `shot_match_simulador.gd` real GL render.
-   *Future refinement:* `HIERPREM.RAW` also holds white pitch-line grass tiles; overlaying them
-   at the right positions (penalty boxes / halfway) would replace the currently line-less grass.
+   *No static pitch-line tiles exist in source (CORRECTION — was an invented claim, AUDIT A1).*
+   Decoding and viewing all 7 `HIER*.RAW` + `CAMPINA.RAW` shows the grass atlas is plain green
+   grass + terrace crowd + goal-net mesh + advertising boards only; a palette white-on-green
+   tile scan found zero line tiles. The side-on pitch lines are engine-drawn from the
+   un-enumerable `PCF5DAT.PKF` (SOURCE_INVENTORY §5.1-2), so they cannot be overlaid from a
+   tile and must NOT be painted in by hand. (The TOP-DOWN `CAMPO.BMP` lineup pitch DOES have
+   real source lines — that gap is the side-on view only.)
 4. **HIGHLIGHTS 3D** → honest stub (`.p3d` not in source); `REPLAY` re-runs the chosen view.
