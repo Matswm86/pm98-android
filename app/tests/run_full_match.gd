@@ -14,21 +14,36 @@ extends SceneTree
 ## wired into Pm98Driver._advance_team (test_driver_advance_engine.gd proves a 0x1d kicker advances
 ## phase 2->1 through it).
 ##
-## WHY THIS HARNESS STILL SHOWS {2: N}: the SYNTHETIC input never puts a player into the 0x1d
-## kickoff-kick state -- real kickoff placement (FUN_0044d3d0) + the outer match loop (FUN_005983f0)
-## are NOT ported here, so no taker kicks off, the ball never moves, no player reaches a shooting /
-## resolve state, and the phase-advancing paths are never organically triggered. Reaching open-play
-## phase 0 also needs resolve_post_shot's set_phase(0) (the handler cascade, Task #4b item 4, where
-## the setup_shot/resolve_post_shot leaves are still call_resolve=false stubs). Those two are the
-## remaining gaps -- NOT the +0xc dispatch, which is now correct.
+## SUPERSEDED NOTES (kept as the record):
+## * The "{2: N} forever" result predates the 06-23 vtable fix; since then the run reaches
+##   open play (phase 0 by tick ~31).
+## * The "setup_shot/resolve_post_shot leaves are still call_resolve=false stubs" claim was
+##   STALE: all 8 handler sites in Pm98Action._action_switch pass call_resolve=true (cascade
+##   oracle-GREEN via test_engine_cascade.gd). PROVEN 2026-07-01 by diag_match_states.gd:
+##   P8 enters action 0x4 at t12, setup_shot writes 13 ball landings t31-44, the kickoff
+##   kick moves the ball at t31. Still 0-0 because the shot is a minimum-power touch
+##   (synthetic attributes, touch/power=min) and after t44 the two remaining movement
+##   NO-OPs (_move_9490 lean; _move_65a0's non-taker open-play slice) leave every player
+##   static, so nobody ever reaches a shooting state again.
+##
+## NOW (2026-07-01): drives Pm98Outer.step (FUN_005983f0, the per-frame step ABOVE the
+## driver) instead of raw Pm98Driver.tick -- the outer step arms +0x1a1e on segment end
+## (restart -> kickoff placement -> clock banked +0x19a8 += +0x450) and ends the match on
+## dispatch code 10 (Pm98Dispatch._case_phase: +0x19a0-keyed half/full-time ladder at
+## +0x450 > +0x19ac). Exit criteria (plan M2): clock advances organically, halves change,
+## the match ends at code 10 -- NOT at a tick cap.
 ##
 ## Honest scope: INPUT is SYNTHETIC (attributes + no real kickoff placement), so this proves
 ## the port RUNS deterministically end-to-end, NOT bit-for-bit parity vs MANAGER.EXE. The
-## parity oracle (wine MANAGER.EXE or full PCode-emu) is step 5b/5c.
+## parity oracle (wine MANAGER.EXE or full PCode-emu) is plan M4. Goal harvesting reads the
+## raw event queue per FRAME; in the live branch each frame is 1 tick so delay-2 events are
+## always seen, but pause-branch multi-tick frames could consume events before harvesting --
+## fine today (headless PS==1 never enters the pause branch), the M5 BRIEF tap hooks the
+## dequeue fire point instead.
 ##
 ## Run: ~/godot462 --headless --path app --script res://tests/run_full_match.gd
 
-const TICK_CAP := 3000
+const FRAME_CAP := 40000
 
 
 func _init() -> void:
@@ -78,6 +93,11 @@ func _session() -> Dictionary:
 		0xff4: 0,          # pitch-type index -> +0x19ac = 0x1c20 (7200)
 		0xfa0: 1,          # play-state (1 = in play, not 0/4)
 		0xfe8: 0, 0xfec: 0, 0xff0: 0,                        # display drivers (headless)
+		# Pm98Dispatch._case_phase (+0x19a0 rung = kickoff count: 0=H1, 1=H2, 2=ET1, 3=ET2;
+		# dispatch-1 threshold = +0x19ac for rungs 0/1, /3 for rungs 2/3 = 45/45/15/15 min).
+		# session+0x44/+0x48 = extra-time/aggregate (cup) flags: BOTH 0 -> the rung-1 gate
+		# ends the match at 90' (code 10 + event 0x20 FULL TIME) = a league match. Setting
+		# 0x44=1 was empirically shown (2026-07-01) to play 45+45+15+15 into rung 3.
 		0x14: 0, 0x20: 0, 0x24: 0, 0x44: 0, 0x48: 0,
 	}
 
@@ -99,22 +119,32 @@ func _run(seed_: int) -> void:
 	var goals := [0, 0]
 	var disp := {}
 	var phase_hist := {}
+	var halves := {}
 	var over_at := -1
 	var t := 0
-	while t < TICK_CAP:
-		var ret := Pm98Driver.tick(m, rng)
+	while t < FRAME_CAP:
+		var cont := Pm98Outer.step(m, rng)               # FUN_005983f0 (one frame)
 		_harvest_goals(m, goals)
 		var ph: int = Pm98Driver._g(m, 0x448)
 		phase_hist[ph] = int(phase_hist.get(ph, 0)) + 1
+		halves[Pm98Driver._g(m, 0x19a0)] = int(halves.get(Pm98Driver._g(m, 0x19a0), 0)) + 1
 		var code: int = Pm98Driver._g(m, 0x1a38)
 		if code != 0:
 			disp[code] = int(disp.get(code, 0)) + 1
 		t += 1
-		if ret == 0:
+		if Pm98Driver._g(m, 0x1a38) == 10:               # full time (dispatch case-1 -> 10)
 			over_at = t
 			break
+		if not cont and Pm98Driver._g(m, 0x1a19) != 0:
+			break                                        # UI abort (never headless)
 
-	print("ticks run        = %d%s" % [t, "  (MATCH OVER)" if over_at > 0 else "  (HIT CAP)"])
+	var minute := 0
+	if Pm98Driver._g(m, 0x19ac) != 0:
+		minute = ((Pm98Driver._g(m, 0x19a8) + Pm98Driver._g(m, 0x450)) * 0x2d) / Pm98Driver._g(m, 0x19ac)
+	print("frames run       = %d%s" % [t, "  (FULL TIME code 10)" if over_at > 0 else "  (HIT CAP)"])
+	print("clock            = minute %d  (+0x450=%d banked +0x19a8=%d scale +0x19ac=%d)" % [
+		minute, Pm98Driver._g(m, 0x450), Pm98Driver._g(m, 0x19a8), Pm98Driver._g(m, 0x19ac)])
+	print("half counter     = %s  (+0x19a0 histogram)" % str(halves))
 	print("final score      = team0 %d : %d team1" % [goals[0], goals[1]])
 	print("phase histogram  = %s" % str(phase_hist))
 	print("dispatch freezes = %s" % str(disp))

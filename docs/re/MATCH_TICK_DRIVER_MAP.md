@@ -576,7 +576,13 @@ career-layer field; `match+0x468` is a pointer to the session, NOT the team head
   FUN_004510b0). The watched path does NOT pre-compute goals statistically.
 - The set-piece branch spins `FUN_00593ab0`, whose controller `FUN_005bce40` is the **Win32 message
   pump** (PeekMessageA/GetCursorPos/AfxGetThread) -> returns -1 headless -> the set-piece branch is a
-  no-op headless.
+  no-op headless. **⛔ CORRECTION 2026-07-01: the "no-op headless" half is WRONG.** `FUN_00593ab0`
+  (decompile regenerated s9) calls `FUN_00598740` ONCE near its top (return discarded) BEFORE the
+  pump — the sim keeps ticking through set-piece/pause frames. And the pump's -1 maps to result 10 →
+  `+0x1a38=10` → MATCH OVER (the user-quit path): a literal headless run would end the match at its
+  first wait-frame. The port (`Pm98Outer._wait_frame`) models "no input, keep playing" = pump result
+  0 (the one deliberate headless deviation, documented there). See the FUN_005983f0 section at the
+  end of this file.
 
 So a watched match must detect goals live (phase 0) yet phase 0 needs FUN_005a4600, which has no static
 caller. The only consistent resolution: **FUN_005a4600 is dispatched dynamically on the active player
@@ -636,3 +642,43 @@ function the headless port must run as its +0xc pass. Structure:
 already ported. The resolver only fires when a player reaches action-code 8/9, which requires the
 movement subtree to drive players to shooting positions -- so there is **no "score-only" shortcut**:
 the engine scores only once decide+move+action are all faithful. This is a multi-session port.
+
+---
+
+## FUN_005983f0 (the per-FRAME outer match step) PORTED -> Pm98Outer.gd (2026-07-01, s9)
+
+`FUN_005983f0` (667 B; tail-called via the 0x5910a0 thunk from the career match loop
+`FUN_0044ee70` @0x44f394) + its wait-frame `FUN_00593ab0` (184 B) are PORTED to
+`app/scripts/Pm98Outer.gd` -- `Pm98Outer.step(m, rng) -> bool` (the binary's bVar8 continue
+flag). This is the layer that (a) arms `+0x1a1e` when `FUN_00598740` returns 0 (segment over ->
+next tick runs the restart handler), and (b) surfaces dispatch code 10 (`Pm98Dispatch._case_phase`
+full-time rewrite) as match-over. TRANSCRIPTION posture (same as Pm98Driver at its birth); the
+shell-residue PCode-emu oracle is the open M2-close item.
+
+### Callee classifications (decompile-verified s9; sources in docs/re/sim + scratchpad m2dec)
+| fn | identity | headless |
+|----|----------|----------|
+| FUN_005b6ee0 x2 | per-team KIT/PALETTE refresh (session +0xfa8..+0xfba -> team+0x2f0..0x2fa + FUN_005f5520/5600) | no-op, draws 0 |
+| FUN_00451200 / FUN_004511f0 | 12-byte career thunks -> FUN_005398e0/a0 (display) | no-op |
+| FUN_00594310 / FUN_00594380 | display blit (vtable+0xc0, DAT_00666f70) / display epilogue (vtable+0xc4) | no-op |
+| FUN_00598340 | PS==2 replay-cut check -- **ONE UNBRACKETED FUN_005ec250 draw** on its ball-on-own-side path | PORTED (`_replay_cut`), seed-relevant |
+| FUN_00598690 | goal-REPLAY player: spins FUN_00598740 under DAT_006d31c4=1 over the +0x27e8/+0x27ec ring | no-op (playback mutates no live sim state) |
+| FUN_00594570(1) | event-queue FLUSH variant: fire+remove ALL, clear +0x1a2c/+0x1a30 | PORTED (`_dequeue_flush`) |
+| FUN_0044d3d0(0/1) | per-team roster TEXT/SPRITE refresh (11 slots x 0xac on the career/UI object, DAT_0066b1e0 vtable+0x118/11c) | no-op (confirms the 06-24 DISPLAY call) |
+
+### Score copy + clock/half model (settles the M2 plan wording)
+- The `puVar6 + 200`-dword stride score copy = `match+0x19b0/+0x19b4 = team0+0xc/+0x798=team1+0xc`
+  (team headers +0x46c/+0x78c, stride 0x320) -- the "displayed score" sync, run on the pause branch
+  and the replay path only.
+- The CLOCK increments inside FUN_00598740 (ported: Pm98Driver.gd L141): `+0x450` +1 per phase-0
+  non-penalty tick; minute = `(+0x19a8 + +0x450)*0x2d / +0x19ac` (FUN_00594410, display); the
+  restart handler's kickoff case banks `+0x19a8 += +0x450` and clears `+0x450`.
+- Half/full-time: dispatch 1 fires at `+0x450 >= thresh` (thresh = `+0x19ac` for +0x19a0 rungs 0/1,
+  `/3` for rungs 2/3 = 45/45/15/15 min). Rung `+0x19a0` = kickoff count: 0=H1, 1=H2, 2/3=ET halves.
+  `_case_phase` gate: session `+0x44`/`+0x48` (extra-time / aggregate-cup flags) BOTH 0 -> code 10
+  (+ event 0x20 FULL TIME) at the rung-1 boundary = a 90-minute league match. **Empirically
+  verified both ways (s9 run_full_match, seed 1): 0x44=0x48=0 -> H1+H2, FULL TIME code 10 at frame
+  16005; 0x44=1 -> 45+45+15+15 through rung 3.**
+- `+0x1a19` = the career/UI abort byte (only CLEARED in the sim corpus; set by the UI layer) --
+  headless always 0. `+0x1a20` steady-state past the first free-kick interacts with the replay-ring
+  counters (real play records, headless does not) -- OPEN caveat, guarded loudly in the port.
