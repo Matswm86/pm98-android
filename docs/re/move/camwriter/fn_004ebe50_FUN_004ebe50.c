@@ -1,0 +1,49 @@
+// FUN_004ebe50  entry=004ebe50  size=293 bytes
+
+void __fastcall FUN_004ebe50(int param_1)
+
+{
+  int iVar1;
+  int local_20c;
+  int local_208;
+  undefined1 *local_204;
+  char local_200 [500];
+  void *local_c;
+  undefined1 *puStack_8;
+  undefined4 local_4;
+  
+  puStack_8 = &LAB_00615cc6;
+  local_c = ExceptionList;
+  if (*(int *)(param_1 + 0xb0) != 0) {
+    local_20c = 0;
+    local_208 = 0;
+    local_4 = 1;
+    ExceptionList = &local_c;
+    FUN_004e7dd0();
+    sprintf(local_200,s_SFX_COMENT_UK_Pmf_E_pmf_u_wav_00657fb8);
+    iVar1 = FUN_005e2040(local_200,0x370,0,0,11000);
+    if (iVar1 != 0) {
+      iVar1 = local_208 + 1;
+      FUN_005bbf10();
+      *(undefined4 *)(local_20c + -4 + iVar1 * 4) = 0x370;
+      local_208 = iVar1;
+    }
+    local_204 = &stack0xfffffddc;
+    FUN_004ec540(&local_20c);
+    iVar1 = FUN_005e2400();
+    if (iVar1 != 0) {
+      iVar1 = FUN_005e28d0();
+      if (iVar1 == 0) {
+        FUN_004e6c20(param_1);
+      }
+    }
+    local_4 = 0xffffffff;
+    if (local_20c != 0) {
+      FUN_005bbed0();
+    }
+  }
+  ExceptionList = local_c;
+  return;
+}
+
+

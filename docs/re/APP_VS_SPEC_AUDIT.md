@@ -130,15 +130,97 @@ premise: the match camera never rotates, yaw is a constant 0.** Byte-verified st
   struct (same block zeroes the `+0x34` facing word) or a counter (`eax=[esi+0x3b8]`, `dec`); shared
   offset `0x8c` is coincidental.
 
+**VIEW-MATRIX + PROJECTION RESOLVED 2026-07-01 (session 5) — the s4 "read `FUN_005eeba0` before
+claiming the view angle" gap is closed: there is no rotation tilt anywhere in the match camera.**
+Ghidra-decompiled (`docs/re/move/fn_005eeba0/_005eea80/_005eea50/_005ee800`):
+- `FUN_005eeba0(out,eye,yaw,pitch,roll)` = fixed-point (16.16) Euler VIEW matrix
+  `V = T(-eye)·R(-yaw)·R(-pitch)·R(-roll)`; each `R` is a cos/sin-LUT (`DAT_006d31c8`) single-axis
+  rotation (matmul `FUN_005ee800`). **It takes eye + 3 angle words only — no look-at target.**
+- yaw=pitch=roll = the constant-0 words `camctrl+0x8c/0x8e/0x90` (s4) ⇒ every `R` = identity ⇒
+  **`V` = pure translation `T(-eye)`.** World-axis-aligned camera; it never rotates toward the tracked
+  actor (no look-at→Euler conversion). The on-screen "3/4" look is **not** a tilted camera.
+- The 2nd matrix `SetCamera` composes is a projection SCALE, not a tilt: `FUN_005eea50(0x10000,k,k)`
+  (diagonal builder) with `k = (ftol(width·C1@0x639ac0·C2@0x639ae0) · camctrl+0x88) >> 16`.
+- **`D` (draw device) = `camctrl = matchctx+0x27f0`, one struct** (corrects s3's "(D, cam)"): the
+  `FUN_005d7b20→_005f6230→SetCamera` chain all thiscall the same object, which is written back at
+  `+0xdc/+0xde/+0xe0` (=matchctx+0x287c…). `camctrl+0x88` ctor default = `0x10000`.
+- GAP (flag): whether `camctrl+0x88` is ever set ≠1.0 (13 `lea [esi+0x2878]` sites → `FUN_005c9f60`/
+  `_005c0d50`, a likely settings path; base `esi` unconfirmed) — a scale even if so, never a tilt.
+
+**ANCHOR-WRITER RESOLVED 2026-07-01 (session 6) — the s4/s5 "what writes the eye anchor
+`matchctx+0x1614`" GAP is closed. It is NOT a raw copy from a named "ball"; it is a vtable
+object's own per-frame position-update method. No camera-rotation implication (s5 stands).**
+Byte-search (`.text` disp `0x1614`/`0x1618`/`0x161c`) + Ghidra decompile
+(`docs/re/move/camwriter/fn_0058e2c0`, `_0058e050`, `_0058e120`, `_0058e220`, `_005902b0`,
+`_00598740`):
+- **`matchctx+0x1610` is a C++ object** (vtable `0x639080`, ctor **`FUN_0058e050`** installs
+  `[this]=0x639080`, called at `0x591254` with `this=matchctx+0x1610`; back-ptr `this+0x1d4 →
+  matchctx`). The "anchor" vec3 is the object's **position at `this+4/+8/+0xc` =
+  `matchctx+0x1614/0x1618/0x161c`** — so every store is `[this+4]`, which is exactly why a
+  matchctx-relative disp-`0x1614` byte-search finds **reads only** (all 20 hits are `mov reg,
+  [ebp+0x1614]` / `lea`, zero `mov [..+0x1614],reg`). Hypothesis from s4 GAP confirmed.
+- **Writer = vtable slot 3 (`+0xc`) = `FUN_0058e2c0`**, called per-frame at `FUN_00598740:192`
+  (`(**(code**)(*(matchctx+0x1610)+0xc))()`). It updates `this+4/+8/+0xc` two ways: **(A) lerp**
+  toward target `this+0x9c/+0xa0/+0xa4` over `this+0x6c` sub-steps (`pos += (target-pos)/n`);
+  **(B) velocity-integrate** `this+0x20/+0x24/+0x28` (`pos += vel`) **clamped to the pitch AABB
+  `matchctx+0x1828..+0x183c`** (min/max), with a fixed `±0x23d7` Z bias. Path B gates on flag
+  `this+0x63`.
+- **`matchctx+0x1610` is a UNIQUE object, not one of four of a kind** (corrects the first draft of
+  this block). Only `+0x1610` uses ctor `FUN_0058e050` / vtable `0x639080`. The 3 objects at
+  `+0xaac`/`+0xe74`/`+0x123c` are a **different class** (shared ctor **`FUN_005a2640`**, MI: installs
+  vtables `0x639224`→`0x639238`→`0x639228`) that each store **`this+0x190 = matchctx+0x1610`** (a
+  pointer to the `+0x1610` object) + `this+0x18c = matchctx`. All four implement the same per-frame
+  interface, so `FUN_00598740` calls slot 2 (`+8`) then slot 3 (`+0xc`) on all four
+  (`:182-185, 192-195`) — but they are **1 + 3, not 4-of-one**. The `+0x1610` object's position is
+  read as the camera look-at fallback (`0x597c42 lea eax,[ebp+0x1614]` → `FUN_005f57e0`) **and** the
+  player-AI orientation reference (`FUN_005b73a0:588/630`).
+- **Consumer chain (unchanged conclusion):** slot 0 (`FUN_005902b0`) READS this position, maps
+  it via `FUN_00590aa0`, and writes it into the render device at `[matchctx+0x1d4]+0x294c+0x40`
+  → drives camera POSITION only. **No rotation anywhere** — s5's "no tilt" holds.
+- **Identity = the match BALL (byte-evidence, strong).** `FUN_0058fbe0`/`FUN_0058f3c0` (methods on
+  this object) do 3D **ball physics**: position `this+4/8/c`, velocity `this+0x20/0x24/0x28`,
+  **velocity reflection at boundaries** (`this+0x24 = -this+0x24`, `this+0x28 = -this+0x28` = bounce
+  off touchline / ground), **clamp to the pitch AABB** `matchctx+0x1828..+0x183c`, an **attacking-side
+  flag** `this+0x54` vs `matchctx+0x19a0`, and **goal-target geometry** written to `this+0x90/0x94/0x98`
+  from pitch half-width `matchctx+0x1820/0x1824`. `FUN_0058eca0` = `SetPossessor(this, player)` (sets
+  `this+0x40=player`, bumps possession counter `this+0x80`). It is also the point all players orient
+  to (AI) and the 3 sibling objects each hold a pointer to it. No other football-sim object fits.
+- **3 SIBLING OBJECTS RESOLVED 2026-07-01 (session 7) — the class of `+0xaac`/`+0xe74`/`+0x123c` is
+  an INDEXED family; the two teams are now byte-proven, C is a distinct index-0 singleton.** Evidence
+  = construction disasm at `0x5911d7-0x591242` + Ghidra decompile of the derived-vtable methods
+  (`docs/re/move/siblings/fn_005a2140` [team slot1], `_005b5790` [C slot1], `_005a2240`/`_005b5940`
+  [set-piece slot3], `_005a4560` [per-frame record copy], ctor `move/camwriter/fn_005a2640`):
+  - Ctor `FUN_005a2640(this, matchctx)` sets base-vtable chain `0x639224→0x639238→0x639228`, stores
+    `this+0x18c=matchctx`, `this+0x190=matchctx+0x1610` (the ball). Then construction **stamps an index
+    field `this+0x3bc`**: `+0xaac`→**1** (`0x5911f0`), `+0xe74`→**2** (`0x591219`); `+0x123c` gets
+    **no** `+0x3bc` write and a *different* derived vtable (`0x6391f8` vs `0x639208` for the two teams).
+  - **`+0xaac` = TEAM 1, `+0xe74` = TEAM 2 (proven, not "likely").** Team slot-1 (`FUN_005a2140`) at
+    kickoff/reset (`DAT_006d31c4==0`) places the object at **opposite pitch ends keyed on the 1/2 index**:
+    idx 1 → `this.y = -0x10000 - [matchctx+0x1824]`, `this.x = [matchctx+0x1820]/2`; idx 2 → `this.y =
+    [matchctx+0x1824]+0x10000`, `this.x = -[matchctx+0x1820]/2` (`matchctx+0x1820/0x1824` = pitch
+    width / half-length, same fields the ball uses for goal geometry). Each team selects its own 256-B
+    data block: `this+0x2dc = [matchctx+0x1a5c] + (idx==1?5:6)*0x100` (= base+0x500 / +0x600).
+  - **`+0x123c` = index-0 non-team singleton** (`FUN_005b5790` forces `this+0x3bc=0`, selects
+    block base+0x400). It positions itself **from the BALL + the restart type**: switch on
+    `[matchctx+0x448]`, cases read the ball's goal-target geometry `ball+0x90/0x94/0x98` (`this+0x190`)
+    and clamp (penalty-spot / corner / free-kick style offsets). **Human label = GAP, not source-named**
+    (index-0, ball-relative, one instance; do NOT assert "referee"/"loose-ball" without a name string).
+  - All three share the per-frame quadruplet `{5a5460,5a3400,5a4560,5a4600}`; slot 2 (`FUN_005a4560`)
+    copies an **81-dword (0x51) record** `this+0x3b0[DAT_006d31c0] → this+0x40` each frame (the s6
+    "record copy" is this; corrected: record base `this+0x3b0`, stride `0x51` dwords, not `0x191`).
+  - GAP still open (flag, do NOT fill): a literal goal-line-cross test for the ball; C's human label;
+    home/away mapping of team-idx 1↔2; and provenance of the `matchctx+0x1a5c` data table (zeroed at
+    `0x5912df`, filled elsewhere).
+
 **Still open:** human-readable action label per kind (no name string in the engine — never
 invent one) · `player+0x2bc` band-flag meaning · `JUGCAM.IND` internal layout/consumer ·
-PGF header `h5∈{1,2}` · **camera POSITION-follow traced (s4):** eye = `matchctx+0x1614` vec3 +
+PGF header `h5∈{1,2}` · **camera POSITION-follow (s4/s6):** eye = `matchctx+0x1614` vec3 +
 fixed `0x500000` Z (`FUN_005f5740`); look-at = tracked actor `*(matchctx+0x43c)+4` / `*(+0x440)+4`,
-fallback anchor `+0x1614` (`FUN_005f57e0`); zoom = clamped `FUN_005edfa0(+0x2874,0x1051e)`
-(`FUN_005f5840`) — remaining GAP is *what* writes the anchor `+0x1614` (reads only in `.text` → a
-per-frame vec3 copy from the tracked object; do not name it "ball" without the copy) · the exact
-scene-graph vtable slot that sets `ecx`=a specific player (base-class stubs `0x605d96` obscure the
-static path — likely needs a dynamic trace) · PCF5DAT 3/4 camera.
+fallback anchor `+0x1614` (`FUN_005f57e0`); anchor writer = `FUN_0058e2c0` slot 3 (s6, above);
+zoom = clamped `FUN_005edfa0(+0x2874,0x1051e)` (`FUN_005f5840`) — remaining GAP is the object's
+**semantic identity** (target-setter of `this+0x9c` / the 3 sibling objects; do not name it "ball"
+without it) · the exact scene-graph vtable slot that sets `ecx`=a specific player (base-class
+stubs `0x605d96` obscure the static path — likely needs a dynamic trace) · PCF5DAT 3/4 camera.
 
 ## Verified SOURCE-TRUE this pass (no action — recorded so they aren't re-flagged)
 - `app/art/kits/*.png` (92) = real **club crests** (BIGESC/MINIESC), id-named via EQUIPOS club
