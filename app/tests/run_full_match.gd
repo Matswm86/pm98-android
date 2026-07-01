@@ -33,6 +33,14 @@ extends SceneTree
 ## +0x450 > +0x19ac). Exit criteria (plan M2): clock advances organically, halves change,
 ## the match ends at code 10 -- NOT at a tick cap.
 ##
+## s10 (2026-07-01, lean 9490 WIRED): the run now HITS THE CAP again -- H1 plays fully
+## (phase 0 x 7200, clock banked at HT) but H2 sticks in phase 2. ROOT-CAUSED by
+## diag_h2_stall.gd: restart_handler's kickoff PLACEMENT callees (FUN_0044d0d0/FUN_0044d190)
+## are modeled as no-ops, so the restart's decide pass engages the taker ~46 m from the
+## placed ball and the lean's Slice-A runaway gate correctly RELEASES it. The pre-wire
+## FT-at-16005 baseline rode on stale H1 possession (nothing cleared owner/+0x54 without
+## the lean). Fix = port the placement fns (plan M3 first item), NOT a lean revert.
+##
 ## Honest scope: INPUT is SYNTHETIC (attributes + no real kickoff placement), so this proves
 ## the port RUNS deterministically end-to-end, NOT bit-for-bit parity vs MANAGER.EXE. The
 ## parity oracle (wine MANAGER.EXE or full PCode-emu) is plan M4. Goal harvesting reads the

@@ -339,7 +339,7 @@ static func engine_tick(p: Dictionary, m: Dictionary, rng = null) -> void:
 	# --- LAB_005a4e5b (L376-425): the +0x40-gated 9490 lean + the 7260 ball-touch decision ---
 	var act := _g(p, 0x40)
 	if act != 0x1d and act != 5 and act != 0x24 and (_g(m, 0x461) & 0x40) == 0:
-		_move_9490(p)                                    # STUB
+		_move_9490(p, rng)                               # FUN_005a9490 (lean, WIRED A+B+C)
 	if _g(p, 0x2bc) == 0 and (_g(m, 0x461) & 0x40) == 0:
 		var run_7260 := true
 		if _g(m, 0x19a0) == 4:
@@ -635,7 +635,12 @@ static func _move_8680(p: Dictionary, rng) -> void:
 static func _move_65a0(p: Dictionary, m: Dictionary, arg: int, rng) -> void:
 	if not Pm98Movement.move_dispatch(p, m, arg, rng):
 		trace_calls.append(["M65a0", arg])
-static func _move_9490(_p: Dictionary) -> void: trace_calls.append(["M9490", 0])   # FUN_005a9490 (lean)
+## FUN_005a9490 ("the lean") is WIRED to the real port Pm98Movement.lean_9490(p, true, rng) -- the M9490
+## stub is retired. Carrier branch = Slice A (no RNG); off-ball branch = Slices B (gates/aim/grid/marker
+## scan+apply) + C (fast-ball clear arms / chase / take-control engage + ball-anim), threading the shared
+## match rng for the scan's arm-2 tail, the clear-arm deflection draws, and the commentary gates.
+static func _move_9490(p: Dictionary, rng) -> void:
+	Pm98Movement.lean_9490(p, true, rng)
 ## FUN_005a7260 (ball-touch/dribble/pass/shot decision). Slice 1 (L63-176) is WIRED to the real port
 ## Pm98Movement.ball_touch_7260 -- the M7260 stub is retired (run_engine_oracle.sh now runs the REAL
 ## FUN_005a7260, un-stubbed). The lazy-init + dribble-grid + execute-kick (L177-668) are DEFERRED there.

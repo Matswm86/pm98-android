@@ -43,10 +43,26 @@ deprioritised (last). Approved path: build an **end-to-end oracle**, kill-test t
    banked `+0x19a8=7200`) → H2 → **FULL TIME code 10 at frame 16005** (not the cap), deterministic.
    Remaining for M2 CLOSE: the `run_outer_oracle.sh` PCode-emu residue lock (shell branch select,
    score copy `+0x478/+0x798 → +0x19b0/+0x19b4`, `+0x1a1e` arm, return flag).
+2b. **Lean `FUN_005a9490` FULLY PORTED + WIRED. ✅ (2026-07-01, s10).** Slice C (post-scan
+   shot/clear/ball-control tail, decompile L339-553) ported (`_lean9490_slice_c` /
+   `_lean9490_clear_arms` / `_lean9490_offball` in `Pm98Movement.gd`) and oracle-locked from the
+   TRUE entry (`run_9490sliceC_oracle.sh` → `test_9490sliceC.gd`, 171 checks: 3 clear arms +
+   out-of-window + chase-0xb + low/high take-control anim + own/foreign commentary draws, RNG
+   post-state pinned per arm). `_move_9490` stub retired (`lean_9490(p, true, rng)`);
+   `run_engine_oracle.sh` regenerated un-stubbed — field-value-identical, `test_engine_tick`
+   184 GREEN. **e2e CONSEQUENCE (root-caused, diag_h2_stall.gd):** `run_full_match` now HITS CAP
+   at the H2 restart — the restart_handler's per-rung kickoff PLACEMENT callees (`FUN_0044d0d0`
+   H1 / `FUN_0044d190` H2 / `FUN_0044d250` / `FUN_0044d310`) are modeled as no-ops, so the
+   engaged taker stands ~46 m from the placed ball and the lean's Slice-A dribble-runaway gate
+   (dist > 0x10000) correctly RELEASES it → phase 2 forever. Pre-wire FT-at-16005 only worked
+   because stale H1 possession (owner/`+0x54` never cleared without the lean) survived the half.
+   The lean is source-faithful; the blocker moved into M3's placement item.
 3. **M3 — Real kickoff placement + real squad input.** Replace synthetic input: load the real
    81-dword player records + team data (`matchctx+0x1a5c` block — provenance still a GAP, resolve
    first) so the sim runs on decoded EQUIPOS attributes, not synthetic. Port the real kickoff-taker
    decision (see `[[handoff-pm98-decide-wiring-active-ptr-2026-06-24]]`, `FUN_005a7260`).
+   **FIRST (unblocks the e2e, see 2b): port the restart placement `FUN_0044d0d0`/`FUN_0044d190`
+   (+ siblings d250/d310) — players + ball to kickoff spots — in `Pm98Driver.restart_handler`.**
 4. **M4 — End-to-end ORACLE (the kill-test).** Two candidate oracles (pick the cheaper that works):
    - **(a) full PCode-emu** of `FUN_005983f0`'s whole match with all leaves REAL (no stubs), same
      seed + same initial struct, dumping scoreline + the 16-byte event queue. Reuses `PcodeEmu.java`;

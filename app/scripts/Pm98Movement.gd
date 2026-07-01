@@ -5618,12 +5618,17 @@ static func _carrier_busy_b0a60(carrier: Dictionary) -> bool:
 ##     (FUN_005ee1c0) and lerp ball.pos 1/16 toward the target (ball.pos += (target - ball.pos)/16).
 ##   * FAST: zero ball.vel, start the ball-anim (ball+0x68 = 1, ball+0x6c = DAT_00664fe4<<2 = 36, the
 ##     move target ball+0x9c/a0/a4 = target), and if p+0x2bc != 0 set_position_code(p, 0xb).
-## NON-carrier returns false (the off-ball grid/marker/tail of 9490, Slices B/C, are DEFERRED). NO RNG.
+## NON-carrier: with wire=false returns false untouched (the standalone Slice A contract test_9490.gd
+## locks); with wire=true runs the FULL off-ball branch (Slices B + C, _lean9490_offball) and returns
+## true. The carrier branch draws NO RNG; the off-ball branch draws via the scan apply + Slice C arms.
 ## Oracle: tools/re/run_9490sliceA_oracle.sh -> specs/9490sliceA_oracle.txt, locked by tests/test_9490.gd.
-static func lean_9490(p: Dictionary) -> bool:
+static func lean_9490(p: Dictionary, wire: bool = false, rng = null) -> bool:
 	var ball: Dictionary = _ref(p, 0x190)
 	if not is_same(ball.get(0x40, null), p):
-		return false                                       # not the carrier -> Slice B/C (deferred)
+		if wire:
+			_lean9490_offball(p, rng)                      # Slices B + C (full off-ball branch)
+			return true
+		return false                                       # unwired: Slice B/C deferred (old contract)
 	var dx := Pm98Trig._i32(_g(ball, 4) - _g(p, 4))
 	var dy := Pm98Trig._i32(_g(ball, 8) - _g(p, 8))
 	var dz := Pm98Trig._i32(_g(ball, 0xc) - _g(p, 0xc))
@@ -5865,3 +5870,176 @@ static func _lean9490_marker_scan_apply(p: Dictionary, grid: Array, e8: int, ec:
 			ball[0x5c] = row * 4 + 1
 		return true
 	return false
+
+
+# ---- FUN_005a9490 ("the lean") SLICE C: the post-scan shot/clear/ball-control TAIL ------
+# Decompile L339-553 / asm 0x5a9d14-0x5aa46d. Runs after the marker scan (or after the scan-entry gate
+# skipped it): C-i classifies the ball (fast / heading-away / slow), C-ii clears a fast incoming ball
+# (LAB_005aa274), C-iii takes control of a slow one (soft-carrier bookkeeping + engage + ball-anim).
+# All __thiscall ECX targets asm-verified (objdump 0x5aa274-0x5aa462): the three rotation/scale calls
+# (FUN_005ee670 / FUN_005ee7c0 / FUN_005ee1c0) all mutate ECX = ball+0x20 (ball.vel) IN PLACE, and the
+# common tail is FUN_0058ed80(this=ball, p) = _ball_transfer. FUN_0058eca0(this=ball(esi+0x190), p) =
+# _ball_engage_player (asm 0x5a9ff5). The L408 FUN_00590ae0 minuend is ECX = &ball.x (lea ecx,[ebp+4]).
+
+## C-ii -- the fast-ball CLEAR arms (LAB_005aa274, asm 0x5aa274-0x5aa462). Entered via the two C-i gotos.
+## No-op when a marker was applied (bVar5) or grid row 0 is outside the clear window (z >= 0x1b333,
+## |y| > 0x8000, |x| > 0x4ccc). Otherwise ONE RNG draw picks a deflection angle and the arm rotates
+## ball.vel in place, scales it, and credits the touch (_ball_transfer):
+##   * FAR   (z > 0x16667):                tilt_to_heading(vel, draw*0x38e/0x8000 + 0x222),  vel *= 0xa666
+##   * CLOSE (|y| <= 0x5555, |x| <= 0x3332): rot_vec3(vel, draw*0x1c72/0x8000 + 0x71c7, 0),  vel *= 0x6666
+##   * WIDE  (remaining):                   rot_vec3(vel, draw*0x1c72/0x8000 - 0xe39, 0),    vel *= 0x8ccc
+## The FUN_00590f00 audio in each arm is gated on m+0x180a (0 headless; the CLOSE arm's speed recompute
+## only selects the audio-table arg 0x663ca4/0x663ccc, so it has no headless-observable effect).
+static func _lean9490_clear_arms(p: Dictionary, grid: Array, applied: bool, rng) -> void:
+	if applied:
+		return
+	var g0: Array = grid[0]
+	var x := int(g0[0])
+	var y := int(g0[1])
+	var z := int(g0[2])
+	if z >= 0x1b333 or absi(y) > 0x8000 or absi(x) > 0x4ccc:
+		return
+	var ball: Dictionary = _ref(p, 0x190)
+	var v: Array = [_g(ball, 0x20), _g(ball, 0x24), _g(ball, 0x28)]
+	var scale: int
+	if z > 0x16667:
+		Pm98Trig.tilt_to_heading(v, _rscale15(rng.next(), 0x38e) + 0x222)   # FUN_005ee7c0
+		scale = 0xa666
+	elif absi(y) <= 0x5555 and absi(x) <= 0x3332:
+		Pm98Trig.rot_vec3(v, _rscale15(rng.next(), 0x1c72) + 0x71c7, 0)     # FUN_005ee670
+		scale = 0x6666
+	else:
+		Pm98Trig.rot_vec3(v, _rscale15(rng.next(), 0x1c72) - 0xe39, 0)      # FUN_005ee670
+		scale = 0x8ccc
+	var sv := Pm98Trig.scale_vec3(int(v[0]), int(v[1]), int(v[2]), scale)   # FUN_005ee1c0
+	ball[0x20] = sv[0]; ball[0x24] = sv[1]; ball[0x28] = sv[2]
+	_ball_transfer(ball, p)                                                 # FUN_0058ed80
+
+
+## C-i + C-iii -- the full Slice C tail. `grid` is the 16-row rotated trajectory grid (_grid9490_build),
+## `applied` is the scan's bVar5. Control flow (decompile L339-553):
+##   1. speed = planar_mag(ball.vel); threshold = (6 if ball+0x4c != p else 8) * 0x9999 / 10.
+##      speed > threshold -> CLEAR arms (goto LAB_005aa274) and return.                       (L339-347)
+##   2. moving ball heading AWAY (|heading(ball-p) - facing| > 0x38e4) while the BALL's own
+##      heading word (ball+0x34) is near facing (< 0x11c7) -> CLEAR arms and return.          (L400-416)
+##   3. p+0x2bc == 0 -> return.                                                               (L417-419)
+##   4. grid row 0 outside the catch box (z > 0x1e665 / |y| > 0x8000 / |x-0x4ccc| > 0x4ccb) or
+##      a marker applied: bail -- but a non-0xb player with grid row 2 inside the CHASE box
+##      (z <= 0xd998, |y| <= 0x8000, |x-0x4ccc| <= 0x4ccb) and ball speed >= 0x23d8 gets
+##      set_position_code(0xb) first.                                                         (L420-451)
+##   5. otherwise TAKE CONTROL: soft-carrier (ball+0x4c) bookkeeping + commentary RNG gates
+##      (one draw *1000/0x8000 vs 299 own / 199 foreign; audio gated m+0x180b = 0 headless,
+##      the FUN_005ec240/230 RNG-state save/restore around it is a no-op),                    (L452-493)
+##      engage the ball to p (FUN_0058eca0),                                                  (L494-502)
+##      and start the ball-anim: row-0 z < 0xf332 (LOW ball) -> only when planar speed > 0x2666
+##      or ball.z > 0x8000: pos code 0xb (if not already) + anim over (9 - p+0x2c)*4 ticks;
+##      z >= 0xf332 (HIGH ball) -> pos code 0xd + anim over 0x34 ticks (DAT_00664fec=0xd <<2);
+##      target = p.pos + polar(0x4ccc, facing) both ways; then ball.vel = 0.                  (L503-553)
+static func _lean9490_slice_c(p: Dictionary, grid: Array, applied: bool, rng) -> void:
+	var m: Dictionary = _ref(p, 0x18c)
+	var ball: Dictionary = _ref(p, 0x190)
+	var facing := Pm98Trig._s16(_g(p, 0x34))
+	# (1) fast incoming ball -> clear it (L339-347). threshold: 6*0x9999/10 foreign, 8*0x9999/10 own +0x4c.
+	var speed := Pm98Trig.planar_mag(_g(ball, 0x20), _g(ball, 0x24))
+	var six_or_eight := 8 if is_same(ball.get(0x4c, null), p) else 6
+	if Pm98Trig._tdiv(Pm98Trig._i32(six_or_eight * 0x9999), 10) < speed:
+		_lean9490_clear_arms(p, grid, applied, rng)
+		return
+	# (2) moving ball heading away from a player it is not facing-aligned with (L400-416).
+	if _g(ball, 0x20) != 0 or _g(ball, 0x24) != 0 or _g(ball, 0x28) != 0:
+		var a := Pm98Trig.atan_angle(Pm98Trig._i32(_si(ball, 4) - _si(p, 4)),
+				Pm98Trig._i32(_si(ball, 8) - _si(p, 8)))                    # FUN_00590ae0(ecx=&ball.x) + atan
+		if absi(Pm98Trig._s16(a - facing)) > 0x38e4 \
+				and absi(Pm98Trig._s16(_g(ball, 0x34) - facing)) < 0x11c7:
+			_lean9490_clear_arms(p, grid, applied, rng)
+			return
+	if _g(p, 0x2bc) == 0:                                                   # (3) L417
+		return
+	var g0: Array = grid[0]
+	if applied or int(g0[2]) > 0x1e665 or absi(int(g0[1])) > 0x8000 \
+			or absi(Pm98Trig._i32(int(g0[0]) - 0x4ccc)) > 0x4ccb:
+		# (4) L420-451: no catch; maybe CHASE (pos code 0xb) off grid row 2.
+		if applied or _g(p, 0x40) == 0xb:
+			return
+		var g2: Array = grid[2]
+		if int(g2[2]) > 0xd998 or absi(int(g2[1])) > 0x8000 \
+				or absi(Pm98Trig._i32(int(g2[0]) - 0x4ccc)) > 0x4ccb:
+			return
+		if Pm98Trig.planar_mag(_g(ball, 0x20), _g(ball, 0x24)) < 0x23d8:
+			return
+		set_position_code(p, 0xb)
+		return
+	# (5) TAKE CONTROL. Soft-carrier bookkeeping + commentary draws (L452-493).
+	var c4c = ball.get(0x4c, null)
+	if c4c is Dictionary and _g(m, 0x448) == 0:
+		if is_same(c4c, p):
+			# DAT_006d31c4 == 0 (live): holder stat swap, same shape as the B-ii apply (L456-465).
+			if not is_same(ball.get(0x44, null), p):
+				var holder = ball.get(0x50, null)
+				if holder is Dictionary:
+					var stat: Dictionary = _ref(holder, 0x3b8)
+					if _g(stat, 0x88) != 0:
+						stat[0x88] = _g(stat, 0x88) - 1
+						stat[0x84] = _g(stat, 0x84) + 1
+			if _g(ball, 0x62) != 0:
+				# L467-481: |p+0x3a4 + p.x| <= 0x24ffff gates ONE draw (299 gate); audio m+0x180b = 0.
+				if absi(Pm98Trig._i32(_g(p, 0x3a4) + _si(p, 4))) <= 0x24ffff \
+						and _rscale15(rng.next(), 1000) <= 299:
+					pass                                                    # FUN_004eab20 audio (headless off)
+		else:
+			# L484-491: foreign soft-carrier; draw only when opposing team AND ball+0x62 == 0 (199 gate).
+			if _g(p, 0x2b8) != _g(c4c, 0x2b8) and _g(ball, 0x62) == 0 \
+					and _rscale15(rng.next(), 1000) <= 199:
+				pass                                                        # FUN_004eac50 audio (headless off)
+	# LAB_005a9ff5: engage + ball-anim (L494-553). FUN_004e9630 audio gated m+0x448==0 && m+0x180b: no-op.
+	_ball_engage_player(ball, p)                                            # FUN_0058eca0(ball, p)
+	if int(g0[2]) < 0xf332:
+		# LOW ball: only a moving (planar speed > 0x2666) or bouncing (ball.z > 0x8000) ball is animated.
+		if Pm98Trig.planar_mag(_g(ball, 0x20), _g(ball, 0x24)) > 0x2666 or _si(ball, 0xc) > 0x8000:
+			if _g(p, 0x40) != 0xb:
+				set_position_code(p, 0xb)
+			var pol: Array = Pm98Trig.polar_vec(0x4ccc, _g(p, 0x34))        # FUN_005ee0f0
+			ball[0x68] = 1
+			ball[0x6c] = Pm98Trig._i32((9 - _g(p, 0x2c)) * 4)               # (DAT_00664fe4=9 - p+0x2c) * 4
+			ball[0x9c] = Pm98Trig._i32(_si(p, 4) + int(pol[0]))
+			ball[0xa0] = Pm98Trig._i32(_si(p, 8) + int(pol[1]))
+			ball[0xa4] = Pm98Trig._i32(_si(p, 0xc) + int(pol[2]))
+	else:
+		# HIGH ball: trap it down over a fixed 0x34-tick anim.
+		set_position_code(p, 0xd)
+		var pol2: Array = Pm98Trig.polar_vec(0x4ccc, _g(p, 0x34))           # FUN_005ee0f0
+		ball[0x68] = 1
+		ball[0x6c] = 0xd * 4                                                # DAT_00664fec = 0xd
+		ball[0x9c] = Pm98Trig._i32(_si(p, 4) + int(pol2[0]))
+		ball[0xa0] = Pm98Trig._i32(_si(p, 8) + int(pol2[1]))
+		ball[0xa4] = Pm98Trig._i32(_si(p, 0xc) + int(pol2[2]))
+	ball[0x20] = 0; ball[0x24] = 0; ball[0x28] = 0                          # L549-552
+
+
+## The FULL off-ball branch of FUN_005a9490 (gates -> aim -> grid -> scan -> Slice C), in the binary's
+## exact order. Gate structure matches _lean9490_offball_reaches_scan (which stays as the scan-reach
+## PREDICATE for the B oracles); the difference is fidelity of the returns: gates 1-3 and the ball
+## guards (L222-227) abort the whole function, while a failed SCAN-ENTRY gate (L229) still falls
+## through to Slice C with `applied` = false.
+static func _lean9490_offball(p: Dictionary, rng) -> void:
+	var ball: Dictionary = _ref(p, 0x190)
+	var carrier = ball.get(0x40, null)
+	if carrier is Dictionary and _g(carrier, 0x2bc) == 0 and _carrier_busy_b0a60(carrier):
+		return                                              # (1) yield to a busy carrier (L121)
+	for ax in 3:                                            # (2) proximity cube (L124-139)
+		if absi(Pm98Trig._i32(_si(p, 4 + ax * 4) - _si(ball, 4 + ax * 4))) >= 0x1e0000:
+			return
+	var action := _g(p, 0x40)                               # (3) action gate (L141-149)
+	if not (action >= 0 and action <= 3) and action != 0xb and action != 0x1c:
+		return
+	var sc: Array = _lean9490_aim_scalars(p)                # L189-205 (FUN_00590aa0 goal point folded in)
+	var grid: Array = _grid9490_build(p)                    # L206-220
+	var c40 = ball.get(0x40, 0)                             # L222-227 ball guards: full aborts
+	if c40 is Dictionary or (c40 is int and c40 != 0):
+		return
+	if _g(ball, 0x70) != 0:
+		return
+	var applied := false                                    # L229 scan-entry gate; fail -> straight to C
+	if action != 0xb and _g(p, 0x54) != 0 and _g(p, 0x2bc) != 0:
+		applied = _lean9490_marker_scan_apply(p, grid, int(sc[0]), int(sc[1]), rng)
+	_lean9490_slice_c(p, grid, applied, rng)

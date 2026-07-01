@@ -8,10 +8,11 @@ extends SceneTree
 ##   ~/godot462 --headless --path app --script res://tests/test_engine_tick.gd
 ##
 ## ORACLE = the REAL FUN_005a4600 under the Ghidra PCode emulator with the action handlers + resolver +
-## shot-setup + teammate-count + 2 movement fns (FUN_005a65a0/9490) + the 6 DEFERRED settle sub-leaves
-## STUBBED, run to a clean RET (tools/re/run_engine_oracle.sh -> specs/engine_oracle.txt). Three movement
+## shot-setup + teammate-count + 1 movement fn (FUN_005a65a0) + the 6 DEFERRED settle sub-leaves
+## STUBBED, run to a clean RET (tools/re/run_engine_oracle.sh -> specs/engine_oracle.txt). Four movement
 ## fns now run REAL (un-stubbed): FUN_005a7260 (Pm98Movement.ball_touch_7260), FUN_005a8f20
-## (Pm98Movement.steer_8f20), and FUN_005a8680 (Pm98Movement.settle_8680, wired via _move_8680) -- all
+## (Pm98Movement.steer_8f20), FUN_005a8680 (Pm98Movement.settle_8680, wired via _move_8680), and
+## FUN_005a9490 (Pm98Movement.lean_9490 A+B+C, wired via _move_9490, un-stubbed s10) -- all
 ## verified transitively here (settle's slice is field-inert for the settle8680 fixture: branch-2 no-snap,
 ## p+0x5d=0, its 8f20 early-returns on the pre-set +0x2d7 guard). The other stubbed leaves are NO-OPS here
 ## too, so the skeleton's field writes still match bit-for-bit. `atexit` (FUN_00605ff0, the steer

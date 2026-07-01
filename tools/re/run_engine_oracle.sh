@@ -6,7 +6,7 @@
 #
 # Leaf calls are STUBBED (PcodeEmu `stub`): the 7 action handlers (FUN_005acc40/ad010/ad970/
 # adc60/adfc0/ae4c0/ae910), the resolver case 8/9 (FUN_005aeda0), the case-0x13 shot-setup (FUN_005ac1a0),
-# the teammate-count (FUN_005b0b40), 2 movement fns (FUN_005a65a0/9490), and the 6 DEFERRED settle sub-leaves
+# the teammate-count (FUN_005b0b40), 1 movement fn (FUN_005a65a0; 9490 un-stubbed s10), and the 6 DEFERRED settle sub-leaves
 # (FUN_005b1420/5a8ac0/5aa4d0/5aa870/5aafd0/5b8ce0). Three movement fns now run REAL here (un-stubbed):
 # FUN_005a7260 (Pm98Movement.ball_touch_7260), FUN_005a8f20 (Pm98Movement.steer_8f20, body-orient steer at
 # LAB_005a4fa2 AND inside settle), and FUN_005a8680 (Pm98Movement.settle_8680, wired via _move_8680), so
@@ -44,7 +44,11 @@ STUBS=(
   "0x5ae910 0 0 AE910"     # case 0x15
   "0x5ac1a0 0 0 AC1A0"     # case 0x13 shot setup
   "0x5a65a0 0 4 M65a0"     # general move (arg = iStack_38)
-  "0x5a9490 0 0 M9490"     # lean
+  # NOTE: FUN_005a9490 (M9490, the lean) is NO LONGER STUBBED -- ported + WIRED (Pm98Movement.lean_9490
+  # (p, true, rng), called from Pm98Action._move_9490; slices A/B/C oracle-locked by run_9490sliceA/Bi/
+  # Bii/Biiarm/C_oracle.sh). It runs REAL here so test_engine_tick verifies it transitively. In these
+  # Step-1 fixtures every lean path bails without writes (case1f fails the action gate; settle8680 takes
+  # the Slice-A close-dribble return; the rest reach Slice C but return at the p+0x2bc == 0 gate).
   # FUN_005a8680 (settle) is NO LONGER STUBBED -- it is ported + WIRED (Pm98Movement.settle_8680(p, true),
   # called from Pm98Action._move_8680) and runs REAL here so test_engine_tick verifies it transitively. Its
   # body-orient steer leaf FUN_005a8f20 stays un-stubbed (runs REAL, GREEN). The OTHER six settle leaves are
@@ -110,6 +114,10 @@ zero    0x00674000 0x00001000
 maxsteps 400000
 EOF
     cat "$LUT"
+    # _ftol thunk (membts @0x252000, ptr @0x6233a4) -- the un-stubbed lean can reach FPU helpers
+    # (FUN_00436fb0) on deeper fixtures; harmless if unread, same guard as the 9490 slice oracles.
+    echo "membts 0x00252000 83EC08D93C248B042480CC0C6689442404D96C2404DB542404D92C248B44240483C408C3"
+    printf 'mem 0x%08x 4 0x%08x\n' 0x6233a4 0x252000
     for s in "${STUBS[@]}"; do echo "stub $s"; done
     printf '%s\n' "$1"
     for r in "${READS[@]}"; do echo "read_mem $r"; done
@@ -143,7 +151,7 @@ FIX=(
 
 : > "$OUT"
 echo "# Stage 3 POSITIONAL Task #1: FUN_005a4600 (engine_tick) SKELETON PCode-emu truth." >> "$OUT"
-echo "# Leaves STUBBED (action handlers + resolver + 2 movement fns + teammate-count + 6 settle sub-leaves); 7260+8f20+8680 + in-image helpers real." >> "$OUT"
+echo "# Leaves STUBBED (action handlers + resolver + 65a0 + teammate-count + 6 settle sub-leaves); 7260+8f20+8680+9490 + in-image helpers real." >> "$OUT"
 echo "# Each row: FIX <name> + verbatim CALL/STUB lines. STUB lines show selection+arg; mem[]= the field writes." >> "$OUT"
 for row in "${FIX[@]}"; do
   IFS='|' read -r NAME POKES <<<"$row"
