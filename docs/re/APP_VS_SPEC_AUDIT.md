@@ -68,11 +68,23 @@ labelled a documented app approximation, consistent with the already-noted app-c
 
 ### A8 — GAP (opened by A7) · faithful JUG render not built; side-on WATCH view is an approximation
 A source-faithful player render needs §2 `[dir][phase]` indexing + §3 mirror against a recovered
-camera angle, plus the `kind` byte (INVENTORY §5, still unconfirmed) and the un-reversed PCF5DAT 3/4
-tile-scroll camera. Until those land the WATCH sprites are a stylised slice (the baked 24 frames are
-~1-2 real directions' phases, not 8 facings). Flag, do not paper over with another guess.
-Open sub-gaps: `kind` semantics · `JUGCAM.IND` (55296 B) reader not traced · PGF header `h5∈{1,2}`
-meaning · camera-angle source (`param_2+0xdc/0xde`).
+camera angle, plus the `kind` byte and the un-reversed PCF5DAT 3/4 tile-scroll camera. Until those
+land the WATCH sprites are a stylised slice (the baked 24 frames are ~1-2 real directions' phases,
+not 8 facings). Flag, do not paper over with another guess.
+
+**PARTIALLY CLOSED 2026-07-01 (raw-binary, cross-validated):** the JUG frame-selection model is
+now fully reversed. There are **74 kinds (0..73)**, not 16 (the spec table was truncated). The
+per-kind tables (`mode`/`fpd`/`next-state`/`flag`) and the `base` frame-offset table are dumped
+straight from `.data`; `base` is filled by `FUN_005a2830` as
+`base[k] += fpd[k]*mode[k]` for `mode[k]>0`, and summing over all 74 kinds equals **4211 — the
+exact JUG.PGF header frameCount** (independently read from `DATSIM.PKF` `LFGP`@0x1547ea). `mode[k]`
+is the literal stored-direction count; negative-mode kinds are mirror-twins (0 new frames).
+Reproduce: `tools/re/dump_jug_kind_tables.py` (validates PASS). Spec updated: `jug_render_spec.md`
+§2/§3/§4a/§5. The `kind` *setters* are traced (gait `FUN_005a8f20`→0..3, set-piece
+`FUN_005a3400`/`FUN_005a7260`, GK `FUN_005a65a0`, LUT `DAT_006655b0`).
+**Still open:** human-readable action label per kind (no name string in the engine — never
+invent one) · `player+0x2bc` band-flag meaning · `JUGCAM.IND` reader not traced · PGF header
+`h5∈{1,2}` · camera-angle source (`param_2+0xdc/0xde`) + PCF5DAT 3/4 camera.
 
 ## Verified SOURCE-TRUE this pass (no action — recorded so they aren't re-flagged)
 - `app/art/kits/*.png` (92) = real **club crests** (BIGESC/MINIESC), id-named via EQUIPOS club
