@@ -136,7 +136,98 @@ Remaining:
 - **Human-readable action label per kind** — the *setters* are now traced (§4a) but the
   engine carries no per-kind name string; do not invent labels (e.g. "kind 2 = run").
 - **`player+700 (0x2bc)` boolean** meaning (splits kinds into a low/high band) — unconfirmed.
-- `JUGCAM.IND` (55296 B) role in render not yet traced to a reader (loaded by
-  `FUN_005923f0`; not shown feeding `FUN_005a5460`'s index math).
+- `JUGCAM.IND` (55296 B = 256x216, `DATSIM.PKF` @off 5311682) role **NARROWED 2026-07-01**:
+  it is **NOT a sprite/image** (decoded both orientations to noise, viewed; a width sweep
+  finds no coherent bitmap at any divisor width, min vertical-gradient >= 20). Byte profile
+  is 72% zero with ~180 distinct small **monotonically-increasing indices**, i.e. an
+  index/lookup table (consistent with the `.IND` convention). It is opened as a **FILE** at
+  sim (re)entry: the filename is built at VA `0x592a63` (its ONLY code xref) inside
+  `FUN_005923f0`'s re-entry (`+0x5fac != 0`) block and passed to the file-open method
+  `FUN_005ec020` (TLS -> `FUN_005eaf80`, handle stored at `obj+0x100`). It is **NOT read by
+  `FUN_005a5460`'s per-player frame-index math** (that path uses only `ctx+0x2468` JUG bank +
+  the `.data` kind tables + `DAT_006653e0` thresholds). STILL GAP: its internal record layout
+  and its actual consumer function.
 - PGF header `h5 ∈ {1,2}` meaning.
-- The camera angle source (`param_2 + 0xdc/0xde`) and the 3/4 tile-scroll camera (PCF5DAT).
+- Camera-angle source (`param_2 + 0xdc`) — **ORIGIN RESOLVED 2026-07-01 (s3), full write chain
+  traced byte-for-byte.** The draw `FUN_005a5460` is a virtual method reached through **four**
+  distinct vtables that all carry `0x5a5460` (whole-image search for the pointer: `.rdata`
+  `0x6391f8`, `0x639208`, `0x639228`), at **different slots** — draw is slot0 for bases
+  `0x639208`/`0x6391f8`, slot`+8` for base `0x639220`, slot`+0x10` for base `0x639218`. The two
+  `0x5946f0`/`0x5963e0` constructors build the `0x639220` variant; the match-scene constructor
+  `FUN_00591180` builds `0x639208`/`0x6391f8`/`0x639218` view-actor objects at `matchctx+{0x430,
+  0xaac,0xe74,0x123c}` (these are special actors — GK/set-piece band, kinds `0x42..0x48`; their
+  slot`+8`=`0x5a4560` is a replay ring-buffer copy, NOT the draw). Calling convention (draw
+  prologue `0x5a5460..0x5a54d8`): **`param_1 = ecx = this`; `param_2` = a caller-pushed first stack
+  arg** at `[esp+0x32c]`. `param_2` reads confirmed: `mov ax,[param_2+0xdc]` (`0x5a58d0`, 16-bit
+  yaw), `movsx eax,[param_2+0xde]` (`0x5a5978`/`0x5a5b7b`, second Euler term). Sim ctx is a
+  *separate* pointer `*(this+0x18c)` (holds `0x5fac` flag, `0x5e88` base table, JUG bank `+0x2468`).
+
+  **`param_2` = the render device object `D`**, and its `+0xdc`/`+0xde` are written by the camera
+  setter **`FUN_005d7db0` (`SetCamera`)** — proven the *sole* writer of both `+0xdc` AND `+0xde`
+  (Ghidra `FindWordStore 0xdc 0xde`). `SetCamera(this=D, pos=&cam[0x3c], yaw=param_3, pitch=param_4,
+  roll=param_5, mode=param_6)` stores `D[0x37]=(short)yaw` (`=+0xdc`), `(short)+0xde=pitch`,
+  `+0xe0=roll`, `+0xe4..+0xec=pos vec3`, `+0x100=mode`, then builds the view matrix. Arg chain
+  (all exact-disasm, not Ghidra vararg guess):
+  `sim @0x59a3c2` `lea eax,[matchctx+0x27f0]`(cam `A`) + `lea ecx,[matchctx+0x430]`(sceneRoot) +
+  `push A; push esi`(device `D`) → **`FUN_005f7150(sceneRoot, D, A)`** → `FUN_005d7b20(ecx=D,
+  stackarg=A)` → `FUN_005f6230(ecx=A=viewCtx, stackarg=D)` → `SetCamera(this=D, yaw=A+0x8c, …)`.
+  So **`D+0xdc  =  A+0x8c  =  matchctx+0x287c`** (16-bit) and `D+0xde = matchctx+0x287e`.
+  Independent cross-check: `FUN_00598740:113` copies `*(word)(matchctx+0x287c)` → `matchctx+0x181c`,
+  confirming `+0x287c` is the live camera-yaw word. `FUN_005f7150` also threads `D` down as the
+  scene-draw arg (`push edi(=D); call [sceneRoot_vt]`), so `D` reaches each player draw as `param_2`.
+  (`FUN_005a1820`, earlier suspected a camera setter, is actually an **AABB overlap test** used by
+  `FUN_00598740` to pick the view mode from the `0x134000/0x164000/0xa8000/0x38000` angle family —
+  ruled out.)
+  **YAW-WRITER RESOLVED 2026-07-01 (s4) — the match camera does NOT rotate; yaw is a constant 0.**
+  There is **no per-frame yaw writer** (the s3 "camera-follow" assumption was wrong). Proof, static
+  and byte-verified:
+  - The camera-controller sub-object `camctrl = matchctx+0x27f0` is a plain data struct (its `+0`/`+4`
+    are zeroed by its ctor, so no vtable). Every address computation of it in `.text` was found by a
+    byte-search of disp `0x27f0` (`\xf0\x27\x00\x00`) — **8 sites**: seven `lea reg,[matchctx+0x27f0]`
+    (`0x5913a5 0x59373a 0x593fa4 0x597900 0x597952 0x597c48 0x59a3c2`) + one init store
+    `0x5a0e79 mov [matchctx+0x27f0],eax`. At each `lea`, camctrl is passed straight into a thiscall/arg
+    (never stored into a persistent field), so the only code that can write `camctrl+0x8c` is one of
+    those callees: `0x5f56a0 0x5f5740 0x5f5840 0x5f57e0` (+ the read-only draw entry `0x5f7150`).
+  - Of those, **only `FUN_005f56a0` writes `+0x8c`** — and it is the camctrl **constructor/reset**:
+    `mov eax,ecx` (eax=this), then after `xor ecx,ecx` it stores `[eax+0x90]=[eax+0x8e]=[eax+0x8c]=cx=0`
+    (`0x5f5723/0x5f572a/0x5f5731`, 16-bit) — i.e. **roll=pitch=yaw = 0**, alongside its other default
+    inits (`+0x88=+0x84=+0x80=0x10000`, `+0x92=1`, position vecs zeroed).
+  - The other three camctrl methods mutate **position/target only, never orientation**:
+    `FUN_005f5740`→vec3s at `+0x54`/`+0x48`, `FUN_005f57e0`→vec3 at `+0x6c`, `FUN_005f5840`→scalar `+0x84`.
+    So the camera *pans* to follow play (position updates per frame) but its yaw/pitch/roll never change.
+  - No **matchctx-relative** store to the orientation words exists either: byte-search of disp `0x287c`
+    /`0x287e`/`0x2880` in `.text` finds a single access — `0x5989f4 mov eax,[matchctx+0x287c]`, a **read**
+    (the `+0x287c → +0x181c` copy noted above). Pitch/roll (`+0x287e`/`+0x2880`) have no direct access.
+  - Value chain closed: `FUN_005f6230` reads `yaw=*(u16)(camctrl+0x8c)`, `pitch=+0x8e`, `roll=+0x90`,
+    `param=+0x88` and calls `SetCamera`, which stores them at `D+0xdc/+0xde/+0xe0` and feeds
+    `FUN_005eeba0(pos,yaw,pitch,roll)` (the view-matrix build — so the word IS consumed, not dead).
+  - **Corollary for the DRAW:** `cameraAngle = *(short)(param_2+0xdc) = 0` for the whole match, so the
+    sprite-direction pick `uVar22 = playerFacing − cameraAngle + 0x4000` collapses to a **fixed**
+    `playerFacing + 0x4000` — the match view is orientation-fixed; no camera-angle recovery is needed
+    for the yaw. Evidence decompiles: `docs/re/move/fn_005f56a0`,`_005f5740`,`_005f5840`,`_005f57e0`,
+    `_005f6230`,`_005d7db0`.
+  - **NOTE on the s3 candidate stores:** `0x5a27ed [esi+0x8c]`, `0x5a31bc [ebp+0x8c]`, `0x5af9bf [eax+0x8c]`
+    are **NOT** camctrl writers — base `esi`/`ebp` there is a **player** struct (the same block zeroes the
+    `+0x34` facing *word*), and `eax=[esi+0x3b8]` is a counter object (`dec`); they share offset `0x8c`
+    with camctrl only numerically.
+
+  **POSITION-FOLLOW inputs traced 2026-07-01 (s4) — the camera pans by tracking a world anchor + an
+  actor, orientation still fixed:**
+  - **Eye/position** (`FUN_005f5740`, sets camctrl vec3 `+0x54`/`+0x48`): source is the vec3
+    `matchctx+0x1614` (`0x593f8e mov eax,[ebp+0x1614]; [ebp+0x1618]; [ebp+0x161c]` → local at `[esp+0x18]`),
+    with a fixed `+0x500000` added to the 3rd component (`0x593fb2 add edx,0x500000` = a constant Z/height
+    offset). So the eye sits at a fixed height above the anchor point.
+  - **Look-at/target** (`FUN_005f57e0`, sets camctrl vec3 `+0x6c`): follows a tracked **actor** — arg =
+    `*(matchctx+0x43c)+4` when that ptr is non-null and the `matchctx+0x460` band-flag ≤1
+    (`0x597c0e..0x597c31`), else `*(matchctx+0x440)+4` (`0x597c33`), else fallback to the same anchor
+    `matchctx+0x1614` (`0x597c42`). `+0x43c`/`+0x440` are actor-object pointers, `+4` is their position vec3.
+  - **Zoom/distance scalar** (`FUN_005f5840`, sets camctrl `+0x84`): a value from `FUN_005edfa0(
+    matchctx+0x2874, 0x1051e)` clamped to `[0x8000, 0x20000]` (`0x5978c2..0x597906`) — not a position.
+
+  Still open (genuine, do NOT invent): **what `matchctx+0x1614` (the eye anchor) is** — no direct store to
+  `+0x1614` exists in `.text` (byte-search finds reads only), so it is written by a per-frame vec3 copy
+  from some tracked object (ball / play centroid) via a base reg — needs that copy traced (or a dynamic
+  trace) before naming it; likewise which actors `matchctx+0x43c`/`+0x440` point to. The exact vtable slot
+  inside the generic retained-mode scene-graph traversal at which `ecx`=a specific player is set
+  (base-class stubs `0x605d96` obscure the static path — likely needs a dynamic trace); and the 3/4
+  tile-scroll camera (PCF5DAT, hard GAP).
