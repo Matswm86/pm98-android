@@ -13,6 +13,10 @@ const MAX_STADIUM := 130000   # tier-11 capacity ceiling (matches StadiumScreen.
 var club_id: int = -1
 var club_name: String = ""
 var manager_name: String = ""     # entered on the SELECCION new-career screen
+var manager_level: String = "manager"   # NIVEL dialog pick: trainer/manager/accountant/total
+var players_age: bool = false     # NIVEL "Players age ?" checkbox
+var preseason_rivals: Array = []  # PRESEASON friendly picks [{date, club_id, name}]
+                                  # (simulated once the match loop lands; stored now)
 var league_id: String = ""
 var league_name: String = ""
 var season: String = "1997-98"
@@ -1754,6 +1758,8 @@ func to_dict() -> Dictionary:
 		offers[str(pid)] = sale_offers[pid]
 	return {
 		"club_id": club_id, "club_name": club_name, "manager_name": manager_name,
+		"manager_level": manager_level, "players_age": players_age,
+		"preseason_rivals": preseason_rivals,
 		"league_id": league_id,
 		"league_name": league_name, "season": season, "year": year, "week": week,
 		"fixtures": fixtures, "table": tbl, "results": results, "cash": cash,
@@ -1798,6 +1804,9 @@ static func from_dict(d: Dictionary) -> Career:
 	c.club_id = int(d.get("club_id", -1))
 	c.club_name = d.get("club_name", "?")
 	c.manager_name = str(d.get("manager_name", ""))
+	c.manager_level = str(d.get("manager_level", "manager"))
+	c.players_age = bool(d.get("players_age", false))
+	c.preseason_rivals = d.get("preseason_rivals", [])
 	c.league_id = d.get("league_id", "")
 	c.league_name = d.get("league_name", "League")
 	c.season = d.get("season", "1997-98")

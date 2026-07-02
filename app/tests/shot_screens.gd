@@ -32,6 +32,9 @@ func _run() -> void:
 		["res://scenes/RivalScreen.gd", "rival_demo.png"],
 		["res://scenes/PlayerInfoScreen.gd", "playerinfo_demo.png"],
 		["res://scenes/CurrentOffersScreen.gd", "current_offers_demo.png"],
+		["res://scenes/NivelScreen.gd", "nivel_demo.png"],
+		["res://scenes/SeleccionScreen.gd", "seleccion_demo.png"],
+		["res://scenes/PreseasonScreen.gd", "preseason_demo.png"],
 	]
 	var club := _demo_club()
 	var tactics := Tactics.auto_pick(club)
@@ -95,6 +98,21 @@ func _run() -> void:
 				{"player": ps[13], "offers": [{"buyer_name": "ASTON VILLA",
 					"offer": 5000, "weekly_wage": 100, "years": 1, "week": 4}]},
 			], "M. MJATVEDT", "MANCHESTER UTD.", "Premier", "1997-98", 4, 40)
+		elif s[1] == "nivel_demo.png":
+			# SELECT LEVEL OF THE GAME over the title art (frame 003): a save exists so
+			# LOAD GAME renders live.
+			node.setup(true, {"club": "MANCHESTER UTD.", "name": "MWM"})
+		elif s[1] == "seleccion_demo.png":
+			# Frame-011 state: slot 1 locked, PLAYER 2 active. Synthetic 20-club division
+			# (this harness is autoload-free; kit ids 1..20 hit the real baked kit art).
+			node.setup(_demo_leagues(), true, func(_lid: String) -> Array: return _demo_division())
+			node._slots[0] = {"name": "MWM", "club": _demo_division()[0],
+				"league": _demo_leagues()[0]}
+			node._active = 1
+		elif s[1] == "preseason_demo.png":
+			node.setup("Manchester Utd.", "MWM", _demo_leagues(),
+				func(_lid: String) -> Array: return _demo_division(),
+				func(_en: String) -> Array: return [])
 		for _i in 14:
 			await process_frame
 		await RenderingServer.frame_post_draw
@@ -140,6 +158,19 @@ func _run() -> void:
 ## SQUAD POS column and LINE-UP ROL column render the full CAMROL icon set (verify the
 ## role-icon wiring without booting a real career / GameDB). 28 players (11 XI + 5 subs +
 ## 12 reserves) overflow the LINE-UP panel so its ARROW scroll buttons render.
+func _demo_leagues() -> Array:
+	return [{"id": "L1", "name": "Premier League"}, {"id": "L2", "name": "First Division"},
+		{"id": "L3", "name": "Second Division"}, {"id": "L4", "name": "Third Division"}]
+
+
+func _demo_division() -> Array:
+	# ids 100.. = the real English club id space, so the baked kit art renders.
+	var out: Array = []
+	for i in 20:
+		out.append({"id": 100 + i, "name": "CLUB %02d" % (i + 1)})
+	return out
+
+
 func _demo_club() -> Dictionary:
 	const NAMES := ["FLOWERS", "FETTIS", "ADAMS", "KEOWN", "DIXON", "BOULD", "WINTERBURN",
 		"VIEIRA", "PETIT", "PARLOUR", "GRIMANDI", "PLATT", "WRIGHT", "OVERMARS",

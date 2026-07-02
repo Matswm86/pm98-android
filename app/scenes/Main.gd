@@ -27,6 +27,11 @@ var _hub: MenuScreen = null             # persistent MENUPRINCIPAL hub while in 
 var _browse: BrowseScreen = null        # active PM98-chrome browse/select overlay (Track B)
 var _seleccion: SeleccionScreen = null  # active new-career SELECCION overlay (faithful art)
 var _database: DataBaseScreen = null    # active DATA BASE squad-view overlay (reversed dbasewin)
+var _nivel: NivelScreen = null          # SELECT LEVEL OF THE GAME dialog (over the title)
+var _preseason: PreseasonScreen = null  # "Preseason for <club>" screen
+var _pending_level := "manager"         # NIVEL pick carried through the entry flow
+var _pending_age := false               # "Players age ?" checkbox
+var _country_en_es: Dictionary = {}     # PAISES English name -> [Spanish DB names]
 
 @onready var _title: Label = $Root/TopBar/Title
 @onready var _subtitle: Label = $Root/TopBar/Subtitle
@@ -1097,7 +1102,7 @@ func _show_career_select() -> void:
 	_seleccion.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_seleccion)
 	_seleccion.setup(GameDB.leagues, Career.has_save(), GameDB.clubs_in_league)
-	_seleccion.career_begun.connect(_begin_career)
+	_seleccion.career_begun.connect(_show_preseason)
 	_seleccion.back_pressed.connect(func() -> void:
 		AudioManager.ui_select()
 		_dismiss_seleccion()
@@ -1116,11 +1121,60 @@ func _dismiss_seleccion() -> void:
 		_seleccion.queue_free()
 	_seleccion = null
 
-func _begin_career(manager_name: String, league: Dictionary, club: Dictionary) -> void:
+
+## SELECCION CONTINUE -> the "Preseason for <club>" screen (frames 012 -> 013).
+## SKIP / CONTINUE there finalises the career with the entry-flow picks attached.
+func _show_preseason(manager_name: String, league: Dictionary, club: Dictionary) -> void:
+	AudioManager.ui_select()
+	_dismiss_seleccion()
+	if _preseason != null and is_instance_valid(_preseason):
+		_preseason.queue_free()
+	_preseason = load("res://scenes/PreseasonScreen.gd").new()
+	add_child(_preseason)
+	_preseason.setup(PMChrome.title_case_name(str(club.get("name", ""))), manager_name,
+		GameDB.leagues, GameDB.clubs_in_league, _clubs_of_country_en)
+	_preseason.preseason_done.connect(func(rivals: Array) -> void:
+		if _preseason != null and is_instance_valid(_preseason):
+			_preseason.queue_free()
+		_preseason = null
+		_begin_career(manager_name, league, club, rivals))
+
+
+## Bridge a PAISES English country name (what the preseason map/strip shows) to the
+## DB's best-effort Spanish country tags via data/country_es_en.json.
+func _clubs_of_country_en(name_en: String) -> Array:
+	if _country_en_es.is_empty():
+		var f := FileAccess.open("res://data/country_es_en.json", FileAccess.READ)
+		if f != null:
+			var parsed: Variant = JSON.parse_string(f.get_as_text())
+			if typeof(parsed) == TYPE_DICTIONARY:
+				for es in parsed.get("map", {}):
+					var en := str(parsed["map"][es].get("en", ""))
+					if not _country_en_es.has(en):
+						_country_en_es[en] = []
+					_country_en_es[en].append(es)
+	var out: Array = []
+	for es2 in _country_en_es.get(name_en, []):
+		out.append_array(GameDB.clubs_in_country(str(es2)))
+	return out
+
+func _begin_career(manager_name: String, league: Dictionary, club: Dictionary,
+		preseason_rivals: Array = []) -> void:
 	AudioManager.ui_select()
 	var league_clubs := GameDB.clubs_in_league(league["id"])
 	_career = Career.create(club, league, league_clubs, GameDB.leagues)
 	_career.manager_name = manager_name
+	# Entry-flow picks (NIVEL level + Players age ? + preseason friendlies). The
+	# rivals are stored on the save; simulation lands with the match loop.
+	_career.manager_level = _pending_level
+	_career.players_age = _pending_age
+	var dates := ["1997-08-01", "1997-08-04", "1997-08-06", "1997-08-08"]
+	var rivals_meta: Array = []
+	for i in preseason_rivals.size():
+		var rc: Dictionary = preseason_rivals[i]
+		rivals_meta.append({"date": dates[i] if i < 4 else "", "club_id": int(rc.get("id", -1)),
+			"name": str(rc.get("name", ""))})
+	_career.preseason_rivals = rivals_meta
 	_career.save()
 	_dismiss_seleccion()
 	_enter_career()
@@ -1247,8 +1301,9 @@ func _show_title_screen() -> void:
 	scr.action_selected.connect(_title_action.bind(scr))
 
 ## Route a front-door tap: EXIT quits; DATA BASE drops to the home/database browser
-## beneath; either league mode starts a new career (the pro/league split isn't modelled
-## in this build, so both enter the same new-career flow).
+## beneath; either league mode raises the SELECT LEVEL OF THE GAME dialog over the
+## title (frames 002-007; the pro/league split isn't modelled in this build, so both
+## enter the same career-entry flow).
 func _title_action(action: String, scr: TitleScreen) -> void:
 	AudioManager.ui_select()
 	match action:
@@ -1259,8 +1314,43 @@ func _title_action(action: String, scr: TitleScreen) -> void:
 			if _browse == null or not is_instance_valid(_browse):
 				_show_home()
 		_:
-			scr.queue_free()
-			_show_career_select()
+			_show_nivel_screen(scr)
+
+
+## The NIVEL dialog (SELECT LEVEL OF THE GAME) as an overlay ABOVE the still-mounted
+## title screen, exactly as the original draws it over FONDO7 (frames 002-007).
+## See NivelScreen.gd / docs/re/nivel_screen_re.md.
+func _show_nivel_screen(title_scr: TitleScreen) -> void:
+	if _nivel != null and is_instance_valid(_nivel):
+		_nivel.queue_free()
+	_nivel = load("res://scenes/NivelScreen.gd").new()
+	add_child(_nivel)
+	var summary: Dictionary = {}
+	if Career.has_save():
+		var saved := Career.load_save()
+		if saved != null:
+			summary = {"club": saved.club_name, "name": saved.manager_name}
+	_nivel.setup(Career.has_save(), summary)
+	_nivel.level_chosen.connect(func(level: String, age: bool) -> void:
+		_pending_level = level
+		_pending_age = age
+		_dismiss_nivel()
+		if title_scr != null and is_instance_valid(title_scr):
+			title_scr.queue_free()
+		_show_career_select())
+	_nivel.load_game.connect(func(_slot: int) -> void:
+		_dismiss_nivel()
+		if title_scr != null and is_instance_valid(title_scr):
+			title_scr.queue_free()
+		_continue_career())
+	_nivel.cancel_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		_dismiss_nivel())   # title screen stays behind
+
+func _dismiss_nivel() -> void:
+	if _nivel != null and is_instance_valid(_nivel):
+		_nivel.queue_free()
+	_nivel = null
 
 ## The original-art LEAGUE TABLES screen over the hub, driven by the live career
 ## standings. Tap to dismiss. (See scenes/LeagueTableScreen.gd for asset provenance.)
