@@ -75,6 +75,24 @@ deprioritised (last). Approved path: build an **end-to-end oracle**, kill-test t
    1644/1668/16a0-a8 ARE ball fields) — the port's m-keys were dead on the live path; reads
    now route through `Pm98Movement._bm` (ball Dict when present, fixture m-key fallback), and
    `_ball_freeflight`'s held-flag read moved to the writers' byte-key 0x63 convention.
+2d. **FUN_005a65a0 FULL open-play port — M65a0 stub RETIRED. ✅ (2026-07-02, s12).**
+   `move_dispatch` restructured to the binary's literal top-to-bottom shape: the velocity block
+   (L43-109, the `+0x54` wander re-arm — the root gate on organic shots after the lean's engage
+   zeroes `+0x54`) now runs for EVERY dispatched player, not just the handled subset. Newly ported:
+   the param_2==0 `FUN_005b1420` gate wiring (L129-136; its return now gates the L138 fall-through),
+   the active chase-return (L153-204: own-half steer, the SIGNED `< 0x38e` facing quirk, the
+   nearest-teammate scan at `[p+0x3a4/2, 0]`, `FUN_005aa490` pass-handoff → `kick_setup` preset,
+   `p+0x63` clear), the arm-2 leaves (L206-232: 8f20/b0040 split + active sideline steer +
+   `FUN_005aa870(0)` tail), the IF-A anim-end (L394-401, `FRAME_COUNT`/`DAT_00664fb8`), the phase-2
+   holder steer (`FUN_005a8bc0`) and the FULL phase-4 free-kick run-up (L260-285,
+   `mirror_to_side`). STILL DEFERRED (trace-only): the IF-B same-team set-piece runner (L293-392)
+   and b1420's `FUN_005b1500`/`FUN_005b1c80` role sub-leaves (decompiled to `docs/re/move/`; both
+   return role-leaf bytes via the `FUN_005b41b0/41c0/4a80/4f70/3d00/3e50/5520/5150` family — their
+   own future slice; stubbed ret 1 in port AND every oracle). Oracle:
+   `run_65a0openplay_oracle.sh` → `specs/65a0openplay_oracle.txt` → `test_65a0openplay.gd` (REAL
+   `FUN_005a65a0`, only b1500/b1c80 stubbed; LCG state pinned per fixture so draw count + order are
+   locked). `run_engine_oracle.sh` regenerated with 65a0 + b1420 un-stubbed (LCG poked 0 ==
+   `engine_tick`'s default `Pm98Rng.new(0)`).
 3. **M3 — Real kickoff placement + real squad input.** Replace synthetic input: load the real
    81-dword player records + team data (`matchctx+0x1a5c` block — provenance still a GAP, resolve
    first) so the sim runs on decoded EQUIPOS attributes, not synthetic. Port the real kickoff-taker

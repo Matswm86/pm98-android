@@ -66,7 +66,10 @@ STUBS=(
   "0x5ae910 0 0 AE910"     # case 0x15 kick (off-path)
   "0x5ac1a0 0 0 SETUP"     # setup_shot (not on the kick path)
   "0x5a8680 0 0 M8680"     # settle move
-  "0x5a65a0 0 4 M65a0"     # general move
+  # FUN_005a65a0 un-stubbed (s12): the FULL move_dispatch port runs REAL, so its velocity-block rng
+  # draws land in the banked 0x6d3184 state; only b1420's b1500/b1c80 role leaves stay stubbed ret 1.
+  "0x5b1500 1 0 B1500"
+  "0x5b1c80 1 0 B1C80"
   "0x5a9490 0 0 M9490"     # lean (post-switch)
   "0x605ff0 0 0 atexit"    # FUN_005a7260 (ball-touch) now runs REAL (un-stubbed); atexit guards its steer
                            # box-init. These fixtures never reach 7260's body, so the output is unchanged.

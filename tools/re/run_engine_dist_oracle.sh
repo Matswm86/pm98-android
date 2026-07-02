@@ -63,7 +63,10 @@ STUBS=(
   "0x5ae4c0 0 0 AE4C0"     # case 0x14/0x16
   "0x5ae910 0 0 AE910"     # case 0x15
   "0x5a8680 0 0 M8680"     # settle move
-  "0x5a65a0 0 4 M65a0"     # general move
+  # FUN_005a65a0 un-stubbed (s12): the FULL move_dispatch port runs REAL, so its velocity-block rng
+  # draws land in the banked 0x6d3184 state; only b1420's b1500/b1c80 role leaves stay stubbed ret 1.
+  "0x5b1500 1 0 B1500"
+  "0x5b1c80 1 0 B1C80"
   "0x5a9490 0 0 M9490"     # lean (post-switch)
   "0x605ff0 0 0 atexit"    # 8f20 box-init fault guard (inert: facing 0)
   "0x58fda0 0 0 TRAIL"     # resolve_post_shot render trail (no sim residue)

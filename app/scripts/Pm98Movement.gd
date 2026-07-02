@@ -862,13 +862,11 @@ static func set_engagement(p: Dictionary, target_idx: int, players: Array) -> vo
 # (on-pitch -> action 4 / v54 10 / c+0x4c=target / p+0x80=1; off-pitch -> action 0x25). Locked by
 # test_kicksetup.gd. The RNG is the shared match LCG (FUN_005ec250 == MatchEngine.Pm98Rng).
 #
-# SCOPE (per handoff-pm98-kickoff-unstick-oracle-binary-verified): the kickoff-taker path is ported
-# faithfully (top guard + ACTIVE-taker velocity block + the LAB_005a6759 gates + the taker dispatch
-# L237-291 for phases 2/3/5). The LARGER open-play movement -- the NON-ACTIVE velocity sub-path
-# (L74-108), the highlight/chase-return block (L110-236), the phase-4 set-piece taker (needs the
-# FUN_005a89c0/8bc0 ball-steering leaves) and the IF-B/IF-A else arms (L293-405) -- stays DEFERRED
-# behind clear markers. move_dispatch returns false ONLY on the immediate non-active bail (no field
-# writes, no draws), so the caller records the M65a0 stub trace and test_engine_tick stays green.
+# SCOPE (s12 update): move_dispatch is now the FULL FUN_005a65a0 -- velocity block for every player,
+# both open-play arms (incl. the chase-return + FUN_005aa490 handoff and the arm-2 active AA870 tail),
+# the IF-A anim-end, and all four taker phases (2/3/4/5, incl. the phase-2 FUN_005a8bc0 holder steer
+# and the full phase-4 run-up). Only the IF-B set-piece runner (L293-392) and b1420's b1500/b1c80 role
+# sub-leaves remain deferred (trace-only via move65a0_trace). The M65a0 caller stub is retired.
 
 const KICK_PASS_INIT := 0x1f40000     # FUN_005aa680 local_28[0..4] distance seed (500.0)
 const KICK_REF_RADIUS := 0xa0000      # FUN_005aa680 polar reach ahead of the passer (10.0)
@@ -996,38 +994,38 @@ static func kick_setup(p: Dictionary, m: Dictionary) -> void:
 	p[0xb4] = 0                                             # L64: clear the pending target
 
 
-## FUN_005a65a0 (__thiscall this=player; param_2 char): the per-player movement dispatcher.
-## SCOPE: the SET-PIECE TAKER dispatch (phases 2/3/5, p == match+0x438, the kickoff unstick) PLUS the
-## open-play movement region's PORTED leaves -- the non-active interception move (FUN_005b0040), the
-## body-orient steer (FUN_005a8f20) and the active-highlight goal-anchor steer (FUN_005a89c0). Still
-## DEFERRED inside the open-play region: the param_2==0 formation gate (FUN_005b1420 + 5b1500/5b1c80),
-## the active teammate-mark (FUN_005aa490), the arm-2 active tail (FUN_005aa870), the phase-4 leaf and
-## the set-piece wall arms. Returns true when it handles the player; false for a DEFERRED player, whose
-## caller records the M65a0 stub trace.
-##
-## The HANDLE GATE (_openplay_leaf + taker_ok) is computed FIRST, read-only (no field write, no RNG), so
-## a deferred player is byte-for-byte the old stub -- crucially the velocity block's RNG draw is skipped
-## for it, which is what keeps the engine_tick/kick/cascade oracles (FUN_005a65a0 fully stubbed) green.
-## `rng` is the shared match LCG; param_2 is the highlight-bias byte (istack: 1 = near-ball/engine-ctrl).
+## FUN_005a65a0 (__thiscall this=player; param_2 char): the per-player movement dispatcher, now the
+## FULL top-to-bottom structure of the binary (s12): top guard -> velocity block for EVERY player (the
+## p+0x54 wander re-arm) -> wall-frame arms -> the open-play region (arm 1 / arm 2) -> the set-piece
+## taker phase dispatch (2/3/4/5, p == match+0x438). PORTED here: the param_2==0 FUN_005b1420 formation
+## gate (L129-136), the non-active interception move (FUN_005b0040), the active goal-anchor steer
+## (L144-152), the active chase-return with the FUN_005aa490 pass-handoff (L153-204), the arm-2 leaves
+## incl. the active sideline steer + FUN_005aa870(0) tail (L206-232), the IF-A anim-end (L394-401), the
+## phase-2 holder steer FUN_005a8bc0 and the FULL phase-4 free-kick run-up (L260-285). Still DEFERRED
+## (trace-only via move65a0_trace, no field write): the IF-B same-team set-piece runner (L293-392) and
+## b1420's b1500/b1c80 role sub-leaves (stubbed to return 1 in port AND oracle -- see
+## formation_gate_b1420; a future b1500/b1c80 port re-enables the L138 fall-through for param_2==0).
+## Always returns true (every player is handled; the M65a0 caller stub is retired). `rng` is the shared
+## match LCG; param_2 is the engine's iStack_38 (1 = chase-flagged / ball-engaged, 0 = open-play bulk).
+## Oracle: tools/re/run_65a0openplay_oracle.sh (REAL FUN_005a65a0, b1500/b1c80 stubbed ret 1) ->
+## specs/65a0openplay_oracle.txt, locked by app/tests/test_65a0openplay.gd; the taker phases 2/5 also
+## by run_kicksetup_oracle.sh -> test_kicksetup.gd.
+static var move65a0_trace: Array = []
+
+
 static func move_dispatch(p: Dictionary, m: Dictionary, param_2: int, rng) -> bool:
-	var phase := _g(m, 0x448)
+	move65a0_trace = []
 	var action := _g(p, 0x40)
 	var ctrl: Dictionary = _ref(p, 0x190)
 	# is_same (NOT ==): Dictionary == is a DEEP recursive compare that blows the stack on the cyclic
 	# player<->match<->sim graph. We need pointer identity (the binary compares pointers).
 	var is_active := is_same(ctrl.get(0x40, null), p)      # p == ball.active (L44 / L138 / L208)
-	var is_taker := is_same(m.get(0x438, null), p)
-	var taker_ok := is_taker and (phase == 2 or phase == 3 or phase == 5)
-	var op := _openplay_leaf(p, m, phase, action, ctrl, is_active, param_2)   # "" = no ported leaf
-
-	if op == "" and not taker_ok:
-		return false                                       # DEFERRED -> caller stub-traces (no writes)
-
-	var uVar2 := _g(p, 0x5c)                                # saved + restored highlight flag
+	var uVar2 := _g(p, 0x5c)                                # L35: saved + restored highlight flag
 	var gs: Dictionary = _ref(p, 0x184)                    # = the sim-ctx (gs+0x138 match, gs+8 team)
 	var bv_top := _g(gs, 0x2ee) != 0 and play_state_eq(m, 0)   # L36-42: FUN_005943b0 short-circuit
 
-	# --- velocity block (L43-109): only when !bv_top and action not 4/0x25 ---
+	# --- velocity block (L43-109): EVERY player when !bv_top and action not 4/0x25. This is the
+	# +0x54 wander re-arm (after the lean's take-control engage zeroes +0x54, only this re-arms it).
 	if not bv_top and action != 4 and action != 0x25:
 		if is_active:                                      # ACTIVE side (L44): p is the ball's active
 			var anchor := absi(Pm98Trig._i32(_g(p, 0x3a4) + _g(p, 4)))
@@ -1041,42 +1039,67 @@ static func move_dispatch(p: Dictionary, m: Dictionary, param_2: int, rng) -> bo
 		elif not _velocity_nonactive(p, m, ctrl, gs, rng):   # NON-ACTIVE (L74-106); else L107
 			p[0x54] = _rscale15(rng.next(), 2) + 0xe       # L107-108 wander
 
-	# --- LAB_005a6759 gates (L110-236) -> reach the taker dispatch ---
+	# --- LAB_005a6759 (L110-116): wall-frame routing ---
 	p[0x5c] = 0
-	if op != "":                                           # open-play movement region (L128-232)
-		_run_openplay_leaf(op, p, m)
-		p[0x5c] = uVar2                                     # restore highlight flag + return
-		return true
 	var bVar11 := _g(m, 0x461) & 0x40
 	if bVar11 != 0 and (action == 0x10 or action == 0x11 or action == 0x35):
-		# IF-A else (L394): the set-piece-frame wall player. DEFERRED (never set at a plain kickoff).
+		# IF-A else (L394-401): the set-piece-frame kicker at its LAST anim frame (DAT_00664fb8).
+		if _g(p, 0x2c) == Pm98Action.FRAME_COUNT[action] - 1:
+			p[0x30] = 0
+			if action == 0x35:
+				set_position_code(p, 0x1e)                 # L397: FUN_005a5430(0x1e)
+			p[0x48] = 0xe10
 		p[0x5c] = uVar2
 		return true
 	var special: Dictionary = _ref(m, 0x444)
 	if bVar11 != 0 and _g(p, 0x2b8) == _g(special, 0x2b8):
-		# IF-B else (L293-392): the same-team wall player. DEFERRED.
+		# IF-B else (L293-392): the same-team set-piece runner. DEFERRED (trace-only, no writes).
+		move65a0_trace.append(["IFB_RUNNER", param_2])
 		p[0x5c] = uVar2
 		return true
+
+	# --- the open-play region (L117-236) ---
+	var phase := _g(m, 0x448)
 	if _g(m, 0x19a0) != 4 and action >= 0 and action <= 3:   # IF-C (L117) + bVar14 (L118-124)
-		if (phase == 0 or phase == 6) and _g(p, 0x48) == 0:  # L127: highlight / chase-return body
-			# (L128-233) -- DEFERRED open-play movement. phase 2/3/5 (our gate) skip it -> fall through.
-			p[0x5c] = uVar2
+		if (phase == 0 or phase == 6) and _g(p, 0x48) == 0:  # L127
+			# m+0x440 is a POINTER (the highlight prepend player) -- Dict ref or 0, never int-coerce.
+			var m440: Variant = m.get(0x440, 0)
+			var has440 := (m440 is Dictionary) or (m440 is int and int(m440) != 0)
+			if not has440 or phase != 0:
+				_openplay_arm1(p, m, is_active, param_2)     # ARM 1 (L128-205)
+			else:
+				_openplay_arm2(p, m, ctrl, is_active, rng)   # ARM 2 (L206-232)
+			p[0x5c] = uVar2                                  # L233: goto LAB_005a7208
 			return true
 
-	# --- taker dispatch (L237-291): phases 2 / 3 / (4 deferred) / 5 for p == match+0x438 ---
-	if phase == 2 and _g(p, 0x40) == 0 and _g(p, 0x48) < 600:
-		var holder: Dictionary = _ref(_ref(p, 0x190), 0x4c)
-		if not holder.is_empty():
-			# FUN_005a8bc0(holder+4) ball-holder steering -- DEFERRED (controller+0x4c == 0 at kickoff).
-			pass
+	# --- taker dispatch (L237-291): phases 2 / 3 / 4 / 5 for p == match+0x438 ---
+	var is_taker := is_same(m.get(0x438, null), p)
+	if phase == 2 and is_taker and _g(p, 0x40) == 0 and _si(p, 0x48) < 600:
+		var holder: Dictionary = _ref(ctrl, 0x4c)
+		if not holder.is_empty():                            # L240-243: FUN_005a8bc0(holder+4)
+			steer_8bc0(p, [_si(holder, 4), _si(holder, 8), _si(holder, 0xc)])
 		var r2: int = rng.next()                             # L244: unconditional draw
 		if _rscale15(r2, 1000) < 0x32 or _g(p, 0x48) == 0:   # L245
 			kick_setup(p, m)                                 # FUN_005aa4d0
-	elif phase == 3:
+	elif phase == 3 and is_taker:
 		var r3: int = rng.next()
 		if _rscale15(r3, 1000) < 0x28:                       # L253-254
 			p[0x48] = 0
-	elif phase == 5:
+	elif phase == 4 and is_taker:
+		# L260-285: the free-kick run-up -- steer to the mirrored [goalx - 0xb0000, 0, 0] target
+		# (FUN_005a4510 x2, identical result), then the facing-near (SIGNED s16 < 0xe39) + rng gate.
+		var tgt: Array = mirror_to_side(_g(m, 0x19a0), _g(p, 0x2b8), \
+			[Pm98Trig._i32(_si(m, 0x1820) - 0xb0000), 0, 0])
+		steer_89c0(p, tgt, 0x5a)                             # L265: FUN_005a89c0(local_c, 0x5a)
+		var aim := Pm98Trig.atan_angle(Pm98Trig._i32(int(tgt[0]) - _si(p, 4)), \
+			Pm98Trig._i32(int(tgt[1]) - _si(p, 8)))          # L270-272: FUN_005ee080 of the pushed diff
+		if Pm98Trig._s16(aim - _g(p, 0x34)) < 0xe39 and _rscale15(rng.next(), 1000) < 200:
+			p[0x48] = 0                                      # L276
+			p[0x58] = _rscale15(rng.next(), 4) + 0xc         # L277-278
+			p[0x5c] = uVar2                                  # L281 (restore precedes the 0x54 write)
+			p[0x54] = _rscale15(rng.next(), 6) + 4           # L280/282
+			return true
+	elif phase == 5 and is_taker:
 		p[0x58] = _rscale15(rng.next(), 0x10)                # L288
 		p[0x54] = _rscale15(rng.next(), 3) + 0xd             # L290
 
@@ -1084,48 +1107,96 @@ static func move_dispatch(p: Dictionary, m: Dictionary, param_2: int, rng) -> bo
 	return true
 
 
-## Read-only classifier for the open-play movement region of FUN_005a65a0 (decompile L113-233): which
-## PORTED leaf this player reaches. "" => the taker dispatch, an UNPORTED leaf, or nothing (deferred).
-## Pure -- no field write, no RNG -- so move_dispatch can check it BEFORE the velocity draw and keep a
-## deferred player a byte-exact M65a0 stub. UNPORTED (=> ""): set-piece walls (m+0x461 & 0x40), the
-## param_2==0 formation gate FUN_005b1420 (+5b1500/5b1c80), the active teammate-mark FUN_005aa490 and
-## the arm-2 active FUN_005aa870 tail. param_2 (istack) is 1 for near-ball / engine-controller players.
-static func _openplay_leaf(p: Dictionary, m: Dictionary, phase: int, action: int,
-		ctrl: Dictionary, is_active: bool, param_2: int) -> String:
-	if (_g(m, 0x461) & 0x40) != 0:
-		return ""                                          # set-piece frame -> wall arms (deferred)
-	if _g(m, 0x19a0) == 4 or action < 0 or action > 3:
-		return ""                                          # IF-C (m+0x19a0!=4) / bVar14 (0<=action<=3)
-	if not ((phase == 0 or phase == 6) and _g(p, 0x48) == 0):
-		return ""                                          # not the open-play region (L127) -> taker
-	if _g(m, 0x440) == 0 or phase != 0:
-		# ARM 1 (L128-205)
-		if param_2 == 0:
-			return ""                                      # L129 guard -> FUN_005b1420 (UNPORTED)
-		if not is_active:
-			return "b0040"                                 # L138 non-active interception move
-		if _g(p, 0x63) == 0:
-			return "active_simple"                         # L144-150 goal-anchor steer
-		return ""                                          # active p+0x63!=0: teammate-mark aa490 (UNPORTED)
-	# ARM 2 (m+0x440!=0 && phase==0, L206-232)
+## ARM 1 of the open-play region (decompile L128-205): no highlight prepend (m+0x440 == 0) or phase 6.
+## param_2==0 first runs the FUN_005b1420 formation gate (L129-136) -- a NONZERO return ends the fn
+## (goto LAB_005a7208; with the b1500/b1c80 stubs returning 1 that is every current open-play state); a
+## zero return falls through to the SAME leaves as param_2==1. Then: non-active -> _move_b0040
+## (L138-141); active with the chase flag p+0x63 clear -> the attack goal-anchor steer (L144-152, sign
+## gate `1 - team == orient&1`); active chasing -> _active_chase_return (L153-204).
+static func _openplay_arm1(p: Dictionary, m: Dictionary, is_active: bool, param_2: int) -> void:
+	if param_2 == 0:
+		if formation_gate_b1420(p, true) != 0:             # L129-136 (b1500/b1c80 stubbed ret 1)
+			return                                         # goto LAB_005a7208
+	if not is_active:                                      # L138-141
+		_move_b0040(p)                                     # FUN_005b0040 interception/mark + steer_89c0
+		return
+	if _g(p, 0x63) == 0:                                   # L144-152: attack goal-anchor steer
+		var gx := _si(m, 0x1820)
+		if (1 - _g(p, 0x2b8)) == (_g(m, 0x19a0) & 1):      # L146 sign gate
+			gx = Pm98Trig._i32(-gx)
+		steer_89c0(p, [gx, 0, 0], 0x5a)
+		return
+	_active_chase_return(p, m)                             # L153-204
+
+
+## L153-204: the ACTIVE carrier's chase-return (p+0x63 set). Steer toward the goal anchor under the
+## OPPOSITE sign gate of L146 (L155: negate when `orient&1 == team` -- the own-half return), then, if
+## the body already faces that anchor (s16(atan(anchor - pos) - facing) < 0x38e, SIGNED not abs --
+## L168), pick the on-pitch teammate nearest the half-anchor point [p+0x3a4/2, 0] (planar, strict <,
+## init 0x12c0000) and hand the ball off: FUN_005aa490(best, 0, 0) -> kick_setup with the preset
+## receiver, or a plain kick_setup (FUN_005aa4d0) when no teammate qualifies (L194-198); either way
+## the chase flag p+0x63 clears. Facing-away: the steer alone, p+0x63 stays set (falls to
+## LAB_005a7208), matching the binary's fall-through.
+static func _active_chase_return(p: Dictionary, m: Dictionary) -> void:
+	var gx := _si(m, 0x1820)
+	if (_g(m, 0x19a0) & 1) == _g(p, 0x2b8):                # L155 sign gate (own-half return)
+		gx = Pm98Trig._i32(-gx)
+	steer_89c0(p, [gx, 0, 0], 0x5a)                        # L158-159
+	# L160-167: the same anchor re-pushed (FUN_00590aa0); FUN_00590ae0 = anchor - p.pos; atan of (dx,dy).
+	var aim := Pm98Trig.atan_angle(Pm98Trig._i32(gx - _si(p, 4)), Pm98Trig._i32(-_si(p, 8)))
+	if Pm98Trig._s16(aim - _g(p, 0x34)) >= 0x38e:          # L168 (SIGNED short compare, not abs)
+		return                                             # facing away -> fall to LAB_005a7208
+	var halfx := Pm98Trig._tdiv(_si(p, 0x3a4), 2)          # L171: iVar13 = p+0x3a4 / 2 (trunc to 0)
+	var best: Variant = null                               # local_40 = 0
+	var best_d := 0x12c0000                                # _param_2 = 300.0
+	for q in (_ref(p, 0x184).get(0, []) as Array):         # L172-193: **(p+0x184) own-team players
+		if not (q is Dictionary) or is_same(q, p):
+			continue
+		if _g(q, 0x2bc) == 0:                              # piVar8[0xad] = q+0x2bc on-pitch flag
+			continue
+		var d := Pm98Trig.planar_mag(Pm98Trig._i32(halfx - _si(q, 4)), Pm98Trig._i32(-_si(q, 8)))
+		if d < best_d:                                     # strict < (the binary recomputes; RNG-free)
+			best_d = d
+			best = q
+	if best == null:                                       # L194-198: no receiver -> plain kick setup
+		kick_setup(p, m)                                   # FUN_005aa4d0
+	else:
+		_pass_handoff_aa490(p, best, 0, 0)                 # L200: FUN_005aa490(best, 0, 0)
+	p[0x63] = 0                                            # L196/201: clear the chase flag
+
+
+## ARM 2 of the open-play region (decompile L206-232): a highlight prepend is live (m+0x440 != 0) in
+## phase 0. Non-active: body-orient toward own facing when any active carrier exists (L210-213), else
+## the interception move (L214-216). Active: steer to the sideline return point [p.x, +/-(m+0x1824), 0]
+## (sign of p.y, L218-222), and when the body faces straight across (|s16(facing -/+ 0x4000)| < 0x38e)
+## hand off to the FUN_005aa870(0) controller tail (L223-230); otherwise fall to LAB_005a7208.
+static func _openplay_arm2(p: Dictionary, m: Dictionary, ctrl: Dictionary, is_active: bool, rng) -> void:
 	if not is_active:
-		return "steer8f20" if _g(ctrl, 0x40) != 0 else "b0040"   # L210 / L214
-	return ""                                              # arm-2 active: steer_89c0 + aa870 (deferred)
+		var ca: Variant = ctrl.get(0x40, null)             # L208
+		if ca is Dictionary or (ca is int and int(ca) != 0):
+			steer_8f20(p, _g(p, 0x34) & 0xffff)            # L210-213: FUN_005a8f20(facing WORD)
+		else:
+			_move_b0040(p)                                 # L214-216
+		return
+	var ty := Pm98Trig._i32(_si(m, 0x1824) * _sign1(_si(p, 8)))   # L219-220
+	steer_89c0(p, [_si(p, 4), ty, 0], 0x5a)                # L218-222
+	if absi(Pm98Trig._s16(_g(p, 0x34) - 0x4000)) < 0x38e \
+			or absi(Pm98Trig._s16(_g(p, 0x34) + 0x4000)) < 0x38e:   # L223-227
+		_arm2_active_tail(p, 0, rng)                       # L228: FUN_005aa870(0)
 
 
-## Run the classified open-play leaf. Caller has already run the velocity block and set p[0x5c]=0, and
-## restores p[0x5c] + returns true after this. All three leaves are oracle-locked (b0040 / the trio).
-static func _run_openplay_leaf(op: String, p: Dictionary, m: Dictionary) -> void:
-	match op:
-		"b0040":
-			_move_b0040(p)                                 # FUN_005b0040 interception/mark + steer_89c0
-		"steer8f20":
-			steer_8f20(p, _g(p, 0x34) & 0xffff)            # body-orient toward own facing
-		"active_simple":
-			var gx := _g(m, 0x1820)                        # +/- goal-X anchor by team/orient (L145-148)
-			if (1 - _g(p, 0x2b8)) == (_g(m, 0x19a0) & 1):
-				gx = -gx
-			steer_89c0(p, [gx, 0, 0], 0x5a)
+## FUN_005aa490 (__thiscall this=p; target, b1, b2): the pass-handoff wrapper. Only when p is the
+## ball's active controller (p+0x190 -> +0x40 == p): preset the receiver p+0xb4 = target and the two
+## aim bytes p+0x5e / p+0x5f, then run kick_setup (FUN_005aa4d0), which consumes the preset via its
+## had_preset aim path (face += matrix angle). Decompile: docs/re/move/fn_005aa490_FUN_005aa490.c.
+static func _pass_handoff_aa490(p: Dictionary, target: Dictionary, b1: int, b2: int) -> void:
+	var ctrl: Dictionary = _ref(p, 0x190)
+	if not is_same(ctrl.get(0x40, null), p):
+		return
+	p[0xb4] = target
+	p[0x5e] = b1
+	p[0x5f] = b2
+	kick_setup(p, _ref(p, 0x18c))
 
 
 # =============================================================================
@@ -5507,7 +5578,10 @@ static func _settle_tail(p: Dictionary, m: Dictionary, gs: Dictionary, ball: Dic
 ##     (B0040, the interception/mark core, PORTED as _move_b0040), and returns 1.
 ##   * else ball+0x54 (loose-ball owning team) != p+0x2b8 (player team) -> FUN_005b1500 (B1500, UNPORTED).
 ##   * else -> FUN_005b1c80 (B1C80, UNPORTED).
-## The return byte (1, or the b1500/b1c80 return) is DISCARDED by settle. Disasm-decoded 0x5b1420..0x5b14f0:
+## The return byte (1, or the b1500/b1c80 return) is DISCARDED by settle, but READ by FUN_005a65a0's
+## L129-136 param_2==0 gate (s12): nonzero ends 65a0, zero falls through to the L138 leaves -- so the
+## b1500/b1c80 stubs returning 1 make that gate always bail, exactly like the emu oracle with the same
+## stubs; a real b1500/b1c80 port must return their true bytes. Disasm-decoded 0x5b1420..0x5b14f0:
 ## the four thiscall leaves take ECX=this only (FUN_005943b0 ECX=m; b0040/b1500/b1c80 ECX=p; no stack args).
 ## `wire`: when true the b0040 arm CALLS the real _move_b0040(p); b1500/b1c80 stay trace-only (deferred,
 ## UNPORTED). Oracle-locked (the p+0x14c counter write + leaf SELECTION + return) vs the REAL FUN_005b1420

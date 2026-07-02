@@ -6,8 +6,9 @@
 #
 # Leaf calls are STUBBED (PcodeEmu `stub`): the 7 action handlers (FUN_005acc40/ad010/ad970/
 # adc60/adfc0/ae4c0/ae910), the resolver case 8/9 (FUN_005aeda0), the case-0x13 shot-setup (FUN_005ac1a0),
-# the teammate-count (FUN_005b0b40), 1 movement fn (FUN_005a65a0; 9490 un-stubbed s10), and the 6 DEFERRED settle sub-leaves
-# (FUN_005b1420/5a8ac0/5aa4d0/5aa870/5aafd0/5b8ce0). Three movement fns now run REAL here (un-stubbed):
+# the teammate-count (FUN_005b0b40), 5 settle sub-leaves (FUN_005a8ac0/5aa4d0/5aa870/5aafd0/5b8ce0) and
+# b1420's b1500/b1c80 role sub-leaves (ret 1, mirroring the port). ALL FIVE movement fns now run REAL
+# (un-stubbed): FUN_005a65a0 (the FULL Pm98Movement.move_dispatch, s12) + FUN_005b1420 inside it, plus:
 # FUN_005a7260 (Pm98Movement.ball_touch_7260), FUN_005a8f20 (Pm98Movement.steer_8f20, body-orient steer at
 # LAB_005a4fa2 AND inside settle), and FUN_005a8680 (Pm98Movement.settle_8680, wired via _move_8680), so
 # test_engine_tick verifies all three transitively. FUN_00605ff0 (atexit) is stubbed as a fault-guard for the steer box-init it
@@ -43,7 +44,16 @@ STUBS=(
   "0x5ae4c0 0 0 AE4C0"     # case 0x14/0x16
   "0x5ae910 0 0 AE910"     # case 0x15
   "0x5ac1a0 0 0 AC1A0"     # case 0x13 shot setup
-  "0x5a65a0 0 4 M65a0"     # general move (arg = iStack_38)
+  # NOTE: FUN_005a65a0 (M65a0, the general move) is NO LONGER STUBBED (s12) -- ported + WIRED as the
+  # FULL Pm98Movement.move_dispatch (velocity block for every player, both open-play arms, IF-A, all
+  # four taker phases; oracle run_65a0openplay_oracle.sh). It runs REAL here so test_engine_tick
+  # verifies it transitively; its ONLY stubbed sub-leaves are b1420's b1500/b1c80 role leaves (below),
+  # mirroring the port's formation_gate_b1420 deferral. Its RNG draws come from the LCG @0x6d3184,
+  # poked to 0 in PTRS == the test's default MatchEngine.Pm98Rng.new(0).
+  # NOTE: FUN_005b1420 (B1420) is also un-stubbed (s12): the real fn runs (its b0040 arm is ported and
+  # wired under `wire`), with only b1500/b1c80 stubbed ret 1 exactly like the port.
+  "0x5b1500 1 0 B1500"     # b1420 role sub-leaf (UNPORTED -- port stubs ret 1, mirror here)
+  "0x5b1c80 1 0 B1C80"     # b1420 role sub-leaf (UNPORTED -- port stubs ret 1, mirror here)
   # NOTE: FUN_005a9490 (M9490, the lean) is NO LONGER STUBBED -- ported + WIRED (Pm98Movement.lean_9490
   # (p, true, rng), called from Pm98Action._move_9490; slices A/B/C oracle-locked by run_9490sliceA/Bi/
   # Bii/Biiarm/C_oracle.sh). It runs REAL here so test_engine_tick verifies it transitively. In these
@@ -54,7 +64,6 @@ STUBS=(
   # body-orient steer leaf FUN_005a8f20 stays un-stubbed (runs REAL, GREEN). The OTHER six settle leaves are
   # DEFERRED -- stubbed below (returning 0, except B1420's discarded bool 1) so the settle SELECTION + the two
   # direct writes (p+0x5d / p+0x54) are the surface; they get wired in a later gate. Argbytes per run_settle_oracle.sh.
-  "0x5b1420 1 0 B1420"     # settle: off-ball reposition gate (returns bool, discarded)
   "0x5a8ac0 0 8 M8AC0"     # settle: curve-speed windup (heading, 100)
   "0x5aa4d0 0 0 AA4D0"     # settle: kick_setup (distinct call site)
   "0x5aa870 0 4 AA870"     # settle: controller possession tail (arg 0)
@@ -133,8 +142,9 @@ run_emu() {
 
 poke() { printf 'mem 0x%08x 4 0x%08x' "$1" $(( $2 & 0xffffffff )); }
 
-# All fixtures: P+0x18c -> match, P+0x190 -> ball, P+0x184 -> gs.
-PTRS="$(poke 0x23018c 0x260000);$(poke 0x230190 0x270000);$(poke 0x230184 0x280000)"
+# All fixtures: P+0x18c -> match, P+0x190 -> ball, P+0x184 -> gs. LCG @0x6d3184 = 0 (the un-stubbed
+# 65a0 velocity block draws; matches the test's default MatchEngine.Pm98Rng.new(0)).
+PTRS="$(poke 0x23018c 0x260000);$(poke 0x230190 0x270000);$(poke 0x230184 0x280000);$(poke 0x6d3184 0)"
 
 FIX=(
 # prologue flag = 1: sign(+4) != sign(+0x3a4) and stubbed count<=1. action 2 with +0x48 locked.
@@ -151,7 +161,7 @@ FIX=(
 
 : > "$OUT"
 echo "# Stage 3 POSITIONAL Task #1: FUN_005a4600 (engine_tick) SKELETON PCode-emu truth." >> "$OUT"
-echo "# Leaves STUBBED (action handlers + resolver + 65a0 + teammate-count + 6 settle sub-leaves); 7260+8f20+8680+9490 + in-image helpers real." >> "$OUT"
+echo "# Leaves STUBBED (action handlers + resolver + teammate-count + 5 settle sub-leaves + b1500/b1c80); 65a0+b1420+7260+8f20+8680+9490 + in-image helpers real (s12). LCG seed 0." >> "$OUT"
 echo "# Each row: FIX <name> + verbatim CALL/STUB lines. STUB lines show selection+arg; mem[]= the field writes." >> "$OUT"
 for row in "${FIX[@]}"; do
   IFS='|' read -r NAME POKES <<<"$row"

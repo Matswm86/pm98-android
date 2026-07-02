@@ -629,12 +629,13 @@ static func _resolve_action(p: Dictionary, m: Dictionary, rng) -> void:
 static func _move_8680(p: Dictionary, rng) -> void:
 	Pm98Movement.settle_8680(p, true, rng)
 
-## FUN_005a65a0 (general move). The kickoff-taker slice is ported (Pm98Movement.move_dispatch); the
-## NON-active open-play movement is still DEFERRED -- move_dispatch returns false there, and we record
-## the M65a0 stub trace (with iStack_38 arg) so the test_engine_tick selection oracle stays exact.
+## FUN_005a65a0 (general move) is now WIRED to the FULL Pm98Movement.move_dispatch -- the M65a0 stub is
+## RETIRED (run_engine_oracle.sh runs the REAL FUN_005a65a0 with only its b1500/b1c80 sub-leaves
+## stubbed, mirroring the port). The velocity block (the +0x54 wander re-arm) now runs for EVERY player
+## routed here; the only still-deferred arms inside are the IF-B set-piece runner and b1420's
+## b1500/b1c80 role sub-leaves (trace-only, see Pm98Movement.move65a0_trace).
 static func _move_65a0(p: Dictionary, m: Dictionary, arg: int, rng) -> void:
-	if not Pm98Movement.move_dispatch(p, m, arg, rng):
-		trace_calls.append(["M65a0", arg])
+	Pm98Movement.move_dispatch(p, m, arg, rng)
 ## FUN_005a9490 ("the lean") is WIRED to the real port Pm98Movement.lean_9490(p, true, rng) -- the M9490
 ## stub is retired. Carrier branch = Slice A (no RNG); off-ball branch = Slices B (gates/aim/grid/marker
 ## scan+apply) + C (fast-ball clear arms / chase / take-control engage + ball-anim), threading the shared

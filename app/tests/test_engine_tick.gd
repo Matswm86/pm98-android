@@ -8,16 +8,15 @@ extends SceneTree
 ##   ~/godot462 --headless --path app --script res://tests/test_engine_tick.gd
 ##
 ## ORACLE = the REAL FUN_005a4600 under the Ghidra PCode emulator with the action handlers + resolver +
-## shot-setup + teammate-count + 1 movement fn (FUN_005a65a0) + the 6 DEFERRED settle sub-leaves
-## STUBBED, run to a clean RET (tools/re/run_engine_oracle.sh -> specs/engine_oracle.txt). Four movement
-## fns now run REAL (un-stubbed): FUN_005a7260 (Pm98Movement.ball_touch_7260), FUN_005a8f20
-## (Pm98Movement.steer_8f20), FUN_005a8680 (Pm98Movement.settle_8680, wired via _move_8680), and
-## FUN_005a9490 (Pm98Movement.lean_9490 A+B+C, wired via _move_9490, un-stubbed s10) -- all
-## verified transitively here (settle's slice is field-inert for the settle8680 fixture: branch-2 no-snap,
-## p+0x5d=0, its 8f20 early-returns on the pre-set +0x2d7 guard). The other stubbed leaves are NO-OPS here
-## too, so the skeleton's field writes still match bit-for-bit. `atexit` (FUN_00605ff0, the steer
-## box-init's static-local registration, now reachable via 7260's goal-anchor) is dropped from the
-## expected stub list (host artifact, not a game leaf).
+## shot-setup + teammate-count + 5 settle sub-leaves + b1420's b1500/b1c80 role leaves (ret 1) STUBBED,
+## run to a clean RET (tools/re/run_engine_oracle.sh -> specs/engine_oracle.txt). ALL FIVE movement fns
+## run REAL (un-stubbed): FUN_005a65a0 (the FULL Pm98Movement.move_dispatch, s12 -- its velocity-block
+## RNG draws use the LCG @0x6d3184 poked to 0 == engine_tick's default MatchEngine.Pm98Rng.new(0)),
+## FUN_005b1420 inside it, FUN_005a7260 (ball_touch_7260), FUN_005a8f20 (steer_8f20), FUN_005a8680
+## (settle_8680) and FUN_005a9490 (lean_9490 A+B+C) -- all verified transitively here. The stubbed
+## leaves are NO-OPS for these fixtures, so the skeleton's field writes still match bit-for-bit.
+## `atexit` (FUN_00605ff0, the steer box-init's static-local registration) is dropped from the expected
+## stub list (host artifact, not a game leaf).
 ##
 ## Each STUB line in the oracle records the leaf SELECTION + ORDER + arg0. We assert the ordered label
 ## list plus the two clean args -- B0B40's 0xfffe0000 and M65a0's iStack_38. (M8f20's arg is
