@@ -340,7 +340,7 @@ transitively orphaned behind it.
 - `shot_screens.gd` (the screen-render smoke): times out headless (>3 min; previously CI-green).
 
 ## B6 — BINDING VISUAL REFERENCE: full original-game walkthrough (2026-07-02)
-`screenshots/original-walkthrough-2026-07-02/` = **479 PNG frames** captured live from the
+`screenshots/original-walkthrough-2026-07-02/` = **639 PNG frames** captured live from the
 real MANAGER.EXE under Wine (this repo's `.wineprefix`, registry virtual desktop) while the
 user played through EVERY hub object + sub-screen. Auto-captured on change (~1.5s poll,
 window-id grab) + 2 user screenshots. Covers: title, SELECT LEVEL (TRAINER/MANAGER/
@@ -359,7 +359,13 @@ MATCH OPTIONS (WATCH/HIGHLIGHTS/BRIEF/RESULTS + graphics/cameras/sound + lineups
 RESULT-mode match (HALF/FULL TIME + stadium panel + man-of-match), **BRIEF-mode match**
 (clock, kits scoreline, possession bar, minute-stamped colour-coded event feed, in-match
 LINE-UP/TACTICS/MAN-TO-MAN/STATISTICS), pre-match XI-vs-XI photo screen, 3D WATCH match,
-CHARITY SHIELD trophy screen, SAVE GAME dialog.
+CHARITY SHIELD trophy screen, SAVE GAME dialog. Run 3 (+160): FINANCE income/expenses
+per-week AND per-season (per-competition sections, named transfer-sale lines, loans,
+hospitals/insurance groups), transfer-list flow (MARKET tag, "PLAYER PLACED ON TRANSFER
+MARKET" banner, TEAM OFFER screen w/ per-offer REFUSE, CPU rejection dialog), **EUROPEAN
+CUP GROUP DRAW** (ball machine, groups A-F, 1/8 FINAL), GROUND MATCH DAY (ticket price
+per fixture, sponsor-boards season offer), CAR PARK corner-level grid, foreign-league
+OFFERS browsing + Ronaldo/Weah cards, active youth-scout search, 2 more matches.
 
 **USER PRIORITY (binding, 2026-07-02):** rebuild target = *fully playable as the original
 with BRIEF + RESULT match modes*. The 3D WATCH match is explicitly LAST — the user mostly
