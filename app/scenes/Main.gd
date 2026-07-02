@@ -1062,7 +1062,7 @@ func _show_career_select() -> void:
 	_seleccion = load("res://scenes/SeleccionScreen.gd").new()
 	_seleccion.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_seleccion)
-	_seleccion.setup(GameDB.leagues, Career.has_save())
+	_seleccion.setup(GameDB.leagues, Career.has_save(), GameDB.clubs_in_league)
 	_seleccion.career_begun.connect(_begin_career)
 	_seleccion.back_pressed.connect(func() -> void:
 		AudioManager.ui_select()

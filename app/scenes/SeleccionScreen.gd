@@ -64,6 +64,8 @@ var _clubs: Array = []            # clubs of the selected league (sorted)
 var _sel: int = -1               # selected club index, -1 none
 var _has_save: bool = false
 var _press: String = ""          # held button / "club:N" / "league"
+var _clubs_of: Callable          # league_id (String) -> Array of club dicts (Main wires
+                                 # GameDB.clubs_in_league; screens stay GameDB-free)
 
 
 func _ready() -> void:
@@ -91,10 +93,12 @@ func _ready() -> void:
 	queue_redraw()
 
 
-## Feed the database (leagues + their clubs) and whether a save exists (LOAD/DELETE state).
-func setup(leagues: Array, has_save: bool) -> void:
+## Feed the database (leagues + a clubs-of-league resolver) and whether a save exists
+## (LOAD/DELETE state). clubs_of keeps this screen GameDB-free / headless-testable.
+func setup(leagues: Array, has_save: bool, clubs_of: Callable) -> void:
 	_leagues = leagues
 	_has_save = has_save
+	_clubs_of = clubs_of
 	_li = 0
 	_sel = -1
 	_load_clubs()
@@ -103,8 +107,8 @@ func setup(leagues: Array, has_save: bool) -> void:
 
 func _load_clubs() -> void:
 	_clubs = []
-	if _li >= 0 and _li < _leagues.size():
-		_clubs = GameDB.clubs_in_league(str(_leagues[_li].get("id", "")))
+	if _li >= 0 and _li < _leagues.size() and _clubs_of.is_valid():
+		_clubs = _clubs_of.call(str(_leagues[_li].get("id", "")))
 		_clubs.sort_custom(func(a, b): return str(a.get("name", "")) < str(b.get("name", "")))
 
 

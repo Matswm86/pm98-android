@@ -126,9 +126,12 @@ func _run() -> void:
 	ok = _assert(screen._scroll == 3 and not dismissed[0], "down tap pages by step, consumed") and ok
 	_tap(screen, SCROLL_UP_C)
 	ok = _assert(screen._scroll == 0 and not dismissed[0], "up tap pages back, consumed") and ok
-	# A non-arrow tap dismisses.
+	# A non-arrow tap is a no-op (RETURN exits; row/empty taps no longer bounce to the hub).
 	_tap(screen, Vector2(60, 200))
-	ok = _assert(dismissed[0], "non-arrow tap emits back_pressed") and ok
+	ok = _assert(not dismissed[0], "non-arrow tap is a no-op") and ok
+	# RETURN emits back_pressed.
+	_tap(screen, TransferScreen.BTN_RETURN.get_center())
+	ok = _assert(dismissed[0], "RETURN emits back_pressed") and ok
 	# A market that fits shows no arrows, so every tap dismisses.
 	screen.setup([big[0], big[3]], "ME", "MGR", "1997-98", 5_000_000, "OPEN", 3)
 	ok = _assert(screen._max_scroll() == 0, "small market does not overflow") and ok

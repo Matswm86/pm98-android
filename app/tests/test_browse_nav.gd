@@ -51,14 +51,16 @@ func _run() -> void:
 	ok = _assert(main._browse._rows.size() == cl.size() + 2,
 		"db-league lists sim+watch+clubs (%d)" % main._browse._rows.size()) and ok
 
-	# Browse a club -> reversed SQUAD overlay (B3 routes into the real screen).
+	# Browse a club -> the reversed dbasewin DATA BASE squad view (B3 routes into the
+	# real database browser, GK/DF/MF/FW columns; the PLANTILLA SquadScreen belongs to
+	# the in-career hub, not the database).
 	main._db_league_select(lg, {"act": "club", "club": cl[0]})
 	await process_frame
 	var sq: Node = null
 	for ch in main.get_children():
-		if ch is SquadScreen:
+		if ch is DataBaseScreen:
 			sq = ch
-	ok = _assert(sq != null, "club -> reversed SQUAD overlay") and ok
+	ok = _assert(sq != null, "club -> reversed DATA BASE squad view") and ok
 	if sq != null:
 		sq.queue_free()
 	await process_frame

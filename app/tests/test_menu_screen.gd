@@ -1,8 +1,9 @@
 extends SceneTree
 ## Headless wiring test for the MAIN MENU (MENUPRINCIPAL) screen: confirms the baked
 ## ORIGINAL-art chrome (menu_bg.png) + PROMAN fonts load, the live career chrome wires
-## in, the reversed hit rects resolve taps to the right actions (and don't overlap),
-## and the money formatter is correct.
+## in, and the reversed hit rects resolve taps to the right actions (and don't overlap).
+## (The old money-formatter asserts are gone with MenuScreen._fmt: the real hub shows
+## no cash line — ma_6 — so the rebuilt screen no longer formats money.)
 ##   ~/godot462 --headless --path app --script res://tests/test_menu_screen.gd
 
 
@@ -12,11 +13,6 @@ func _initialize() -> void:
 
 func _run() -> void:
 	var ok := true
-
-	# Money formatter (static, pure).
-	ok = _assert(MenuScreen._fmt(8000000) == "8,000,000", "fmt millions") and ok
-	ok = _assert(MenuScreen._fmt(0) == "0", "fmt zero") and ok
-	ok = _assert(MenuScreen._fmt(-1500) == "-1,500", "fmt negative") and ok
 
 	for path in ["res://art/screens/menu_bg.png", "res://art/fonts/proman14.fnt",
 			"res://art/fonts/proman12.fnt"]:

@@ -86,7 +86,9 @@ func _run() -> bool:
 	scr.setup("ARSENAL", "", "1997-98", "Highbury", 38000, 23000, 15000, 1400, "+5,000 in 3 wk")
 	ok = _assert(scr._hit(StadiumScreen.BTN_WORKS.get_center()) == "works", "WORKS button hit-tests") and ok
 	ok = _assert(scr._hit(StadiumScreen.BTN_RETURN.get_center()) == "return", "RETURN button hit-tests") and ok
-	ok = _assert(scr._hit(Vector2(320, 250)) == "dismiss", "a tap on the scene dismisses") and ok
+	# Empty-space taps are a no-op — the screen exits via RETURN only (the old
+	# tap-anywhere dismiss bounced players to the hub mid-reading).
+	ok = _assert(scr._hit(Vector2(320, 250)) == "", "an empty-space tap is a no-op") and ok
 	scr.queue_free()
 
 	print("\n%s" % ("ALL PASS" if ok else "FAILURES ABOVE"))

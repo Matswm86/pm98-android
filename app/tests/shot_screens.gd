@@ -11,6 +11,12 @@ func _initialize() -> void:
 
 
 func _run() -> void:
+	# Requires a real renderer: `await RenderingServer.frame_post_draw` never fires on the
+	# headless dummy driver, so a --headless run hangs forever. Fail loud instead.
+	if DisplayServer.get_name() == "headless":
+		print("SHOTS SKIPPED: shot_screens needs a rendering driver (xvfb/X11), not --headless")
+		quit(1)
+		return
 	var dir := OS.get_environment("PM98_SHOT_DIR")
 	if dir == "":
 		dir = "/tmp"
