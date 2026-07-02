@@ -1,12 +1,16 @@
 extends Control
 class_name SquadScreen
-## PM98 SQUAD MANAGEMENT (PLANTILLA) screen, rebuilt to match the real game's house style
-## (the white table proven on LINE-UP / TRAINING ma_7/ma_8): the shared PMChrome plaque
-## header + blue marble background over a white squad table — N. | PLAYER | AGE | EN SP ST
-## AG GU FI MO | AV (+bar) | POS — grouped into the original's own KEEPERS / DEFENDERS /
+## PM98 SQUAD MANAGEMENT (PLANTILLA) screen — the real game's CONTRACT view
+## (walkthrough frame 077_154612): the shared PMChrome plaque header + blue marble
+## background over a white table with boxed cells — N° | PLAYER | AV | MO | LOAN |
+## WAGE | YEARS(term|left) — grouped into the original's own KEEPERS / DEFENDERS /
 ## MIDFIELDERS / FORWARDS sections (the demarcación byte decoded out of EQUIPOS.PKF),
-## sorted by ability. Right: the SQUAD count, the club kit and the YOUTH TEAM / RETURN
-## buttons at their reversed positions.
+## each section in REVERSE record order (the original loader prepends to its player
+## list; frame 077 shows every section exactly file-reversed — squad_number_re.md).
+## N° is the decoded per-player squad number (EQUIPOS byte after the photo-id u16);
+## MO (morale, a dynamic save value) is NOT modelled yet and renders "-" — never
+## fabricated (APP_VS_SPEC_AUDIT B7). Right: the SQUAD count, the club kit and the
+## YOUTH TEAM / RETURN buttons at their reversed positions.
 ##
 ## Driven live by the Career roster. Native 640x480; scales to fit its parent.
 ##
@@ -21,10 +25,6 @@ signal player_pressed(player)
 const W := 640
 const H := 480
 
-const C_STATBAND := Color(0.80, 0.90, 0.78)      # pale-green stat-cell band
-const C_AVBAR := Color(0.46, 0.74, 0.32)
-const C_AVBAR_BG := Color(0.62, 0.64, 0.58)
-const C_GK_ROW := Color(0.98, 0.97, 0.80)
 const C_BTN := Color(0.18, 0.44, 0.26)           # green YOUTH button
 const C_BTN_HI := Color(0.34, 0.62, 0.40)
 const C_DKBTN := Color(0.10, 0.16, 0.32)
@@ -32,16 +32,32 @@ const C_DKBTN_HI := Color(0.34, 0.46, 0.72)
 const C_DKBTN_LO := Color(0.04, 0.08, 0.18)
 const C_PANEL_TXT := Color(0.88, 0.93, 1.0)
 const C_GOLD := Color(1.0, 0.86, 0.22)
-const C_ROLE := {"GK": Color(0.20, 0.52, 0.30), "DF": Color(0.22, 0.36, 0.66),
-	"MF": Color(0.46, 0.30, 0.62), "FW": Color(0.66, 0.24, 0.22), "OUT": Color(0.40, 0.42, 0.48)}
 
-# Player-grid columns laid into the white table. {code, x, attr_key}; x is the RIGHT edge
-# for numeric columns, LEFT edge for text columns. GU (not QU) per the real header.
-const COLS := [
-	["AGE", 176, "_age"],
-	["EN", 200, "EN"], ["SP", 224, "VE"], ["ST", 248, "RE"], ["AG", 272, "AG"],
-	["GU", 296, "CA"], ["FI", 320, "TI"], ["MO", 344, "RM"], ["AV", 372, "_avg"],
-]
+# Contract-view cell colors, sampled from walkthrough frame 077_154612 (the column
+# CODE in the header is drawn in its own value colour, like the original).
+const C_NO := Color8(0, 0, 128)                  # N° squad number (navy)
+const C_SECTION := Color8(0, 0, 190)             # KEEPERS/DEFENDERS/... labels (blue)
+const C_AV := Color8(212, 63, 0)                 # AV (orange-red)
+const C_MO := Color8(75, 109, 172)               # MO (steel blue)
+const C_LOANC := Color8(100, 130, 10)            # LOAN YES/NO (olive)
+const C_WAGE := Color8(150, 0, 0)                # WAGE (dark red)
+const C_YEARS := Color8(42, 63, 170)             # YEARS pair (blue)
+const C_EXPIRE_TXT := Color8(255, 31, 0)         # remaining year == 1: red text ...
+const C_EXPIRE_BG := Color8(255, 255, 170)       # ... on a yellow cell
+const C_CELL_BG := Color8(240, 240, 240)         # boxed cell / row fill
+const C_CELL_BRD := Color8(128, 128, 128)        # cell border grey
+
+# Contract-view cell x-spans (left, right), from the frame-077 border scan:
+# AV 273-298 | MO 298-323 | LOAN 323-359 | WAGE 359-429 | YEARS 429-454 | 454-479.
+const CELL_AV := [273, 298]
+const CELL_MO := [298, 323]
+const CELL_LOAN := [323, 359]
+const CELL_WAGE := [359, 429]
+const CELL_Y1 := [429, 454]
+const CELL_Y2 := [454, 479]
+const NO_X0 := 16                                # N° box left edge
+const NO_X1 := 46                                # N° box right edge
+
 const AVG_KEYS := ["VE", "RE", "AG", "CA", "RM", "RG", "PA", "TI"]
 
 const TABLE := Rect2(6, 50, 510, 426)
@@ -50,11 +66,7 @@ const ROW_X := 8
 const ROW_W := 506
 const ROW0_Y := 84
 const ROW_H := 16
-const NAME_X := 48
-const STAT_X0 := 184
-const STAT_X1 := 356
-const AVBAR_X := 378
-const POS_X := 414
+const NAME_X := 52
 const KIT_SRC := Rect2(0, 0, 31, 64)
 const KIT_BOX := Rect2(534, 150, 100, 130)
 const YOUTH_BTN := Rect2(522, 360, 112, 25)
@@ -69,6 +81,8 @@ var _manager: String = ""
 var _cash: String = ""
 var _season: String = "1997-98"
 var _week: int = 0
+var _tier: int = 1
+var _nos_ok := false   # club's stored squad numbers are individuated -> N° displayable
 var _youth_enabled := false
 var _press := ""
 var _kit_tex: Texture2D
@@ -87,13 +101,15 @@ func _ready() -> void:
 
 
 func setup(club: Dictionary, manager: String = "", cash: String = "", youth_enabled := false,
-		season: String = "1997-98", week: int = 0) -> void:
+		season: String = "1997-98", week: int = 0, tier: int = 1) -> void:
 	_club = club
 	_manager = manager
 	_cash = cash
 	_youth_enabled = youth_enabled
 	_season = season
 	_week = week
+	_tier = tier
+	_nos_ok = _squad_numbers_individuated()
 	var cid := int(club.get("id", -1))
 	var path := "res://art/kits/%d.png" % cid
 	_kit_tex = load(path) if cid >= 0 and ResourceLoader.exists(path) else null
@@ -156,20 +172,40 @@ func _on_input(e: InputEvent) -> void:
 
 # ---- ordering ------------------------------------------------------------
 
+## Sections in the original's display order: within each position group the rows run in
+## REVERSE roster (EQUIPOS record) order — frame 077 shows every Man Utd section exactly
+## file-reversed (the game's loader prepends onto its player list; FUN_00588580 then
+## walks that list). A player signed later (appended to the roster) thus shows first.
 func _sections() -> Array:
 	var bucket := {"GK": [], "DF": [], "MF": [], "FW": [], "OUT": []}
 	for p in _club.get("players", []):
 		if int(p.get("id", -1)) < 0:
 			continue
 		bucket[_pos_of(p)].append(p)
-	var by_avg := func(a, b): return _avg_of(a) > _avg_of(b)
 	var out: Array = []
 	for key in ["GK", "DF", "MF", "FW", "OUT"]:
 		if bucket[key].is_empty():
 			continue
-		bucket[key].sort_custom(by_avg)
+		bucket[key].reverse()
 		out.append({"key": key, "section": SECTION_LABELS[key], "players": bucket[key]})
 	return out
+
+
+## True when the club's stored squad numbers are individuated (all present, no
+## duplicates). Lower-division EQUIPOS records often leave the whole squad at the
+## 0x01 pad -> N° isn't stored there and renders "-" (squad_number_re.md).
+func _squad_numbers_individuated() -> bool:
+	var seen := {}
+	var n := 0
+	for p in _club.get("players", []):
+		if int(p.get("id", -1)) < 0:
+			continue
+		var v: Variant = p.get("squadNo")
+		if v == null:
+			return false
+		seen[int(v)] = true
+		n += 1
+	return n > 0 and seen.size() == n
 
 
 const SECTION_LABELS := {
@@ -205,18 +241,28 @@ func _draw() -> void:
 		str(_club.get("leagueName", "")), _season, _week, int(_club.get("id", -1)))
 
 	PMChrome.draw_table_panel(self, TABLE)
-	_draw_col_header()
+	var secs := _sections()
+	_draw_col_header(str(secs[0]["section"]) if not secs.is_empty() else "")
 	_draw_list()
 	_draw_side()
 
 
-func _draw_col_header() -> void:
-	PMChrome.draw_col_header(self, Rect2(TABLE.position.x + 2, HDR_Y, TABLE.size.x - 4, 16))
-	_txt(_f10, 14, HDR_Y + 2, "N.", PMChrome.C_TBL_HDR_TXT, 11)
-	_txt(_f10, NAME_X, HDR_Y + 2, "PLAYER", PMChrome.C_TBL_HDR_TXT, 11)
-	for c in COLS:
-		_txt(_f10, c[1], HDR_Y + 2, c[0], PMChrome.C_TBL_HDR_TXT, 11, true)
-	_txt(_f10, POS_X, HDR_Y + 2, "POS", PMChrome.C_TBL_HDR_TXT, 11)
+## Top header row (frame 077): N° + the first section's label + the column codes,
+## each code in its own value colour (AV red, MO blue, LOAN olive, WAGE dark red,
+## YEARS blue) on the white panel.
+func _draw_col_header(first_section: String) -> void:
+	_txt(_f10, NO_X1 - 6, HDR_Y + 2, "N°", C_NO, 11, true)
+	_txt(_f10, NAME_X, HDR_Y + 2, first_section, C_SECTION, 11)
+	_cell_code("AV", CELL_AV, C_AV)
+	_cell_code("MO", CELL_MO, C_MO)
+	_cell_code("LOAN", CELL_LOAN, C_LOANC)
+	_cell_code("WAGE", CELL_WAGE, C_WAGE)
+	_txt(_f10, (CELL_Y1[0] + CELL_Y2[1]) / 2 + 16, HDR_Y + 2, "YEARS", C_YEARS, 11, true)
+
+
+func _cell_code(code: String, span: Array, col: Color) -> void:
+	var w := _f10.get_string_size(code, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x if _f10 else 0.0
+	_txt(_f10, int((span[0] + span[1] - w) / 2.0), HDR_Y + 2, code, col, 11)
 
 
 func _draw_list() -> void:
@@ -230,66 +276,87 @@ func _draw_list() -> void:
 	var row_h: int = ROW_H if n_rows == 0 else clampi(avail / n_rows, 11, ROW_H)
 
 	var y := ROW0_Y
-	var row := 0
-	var number := 1
+	var first := true
 	for sec in secs:
-		_section(y, str(sec["section"]), row_h)
-		y += row_h
+		if not first:
+			_section(y, str(sec["section"]), row_h)
+			y += row_h
+		first = false
 		for p in sec["players"]:
 			if y + row_h > int(TABLE.end.y - 4):
 				return
-			_row(y, row, p, number, str(sec["key"]), row_h)
+			_row(y, p, str(sec["key"]), row_h)
 			y += row_h
-			row += 1
-			number += 1
 
 
+## Section band: the original draws just the blue group label on the white panel
+## (the first group's label lives in the column-header row instead).
 func _section(y: int, label: String, row_h: int) -> void:
-	draw_rect(Rect2(ROW_X, y, ROW_W, row_h - 1), PMChrome.C_ROW_DARK, true)
-	_txt(_f10, NAME_X, y + maxi(1, (row_h - 12) / 2), label, PMChrome.C_TBL_HDR, 11)
+	_txt(_f10, NAME_X, y + maxi(1, (row_h - 12) / 2), label, C_SECTION, 11)
 
 
-func _row(y: int, idx: int, p: Dictionary, number: int, key: String, row_h: int) -> void:
+## A boxed cell of the contract row: light-grey fill, grey border (frame 077 rows
+## are individual 13px boxes at 16px pitch).
+func _cell(x0: int, x1: int, y: int, row_h: int, bg: Color = C_CELL_BG) -> void:
+	var r := Rect2(x0, y, x1 - x0, row_h - 3)
+	draw_rect(r, bg, true)
+	draw_rect(r, C_CELL_BRD, false, 1.0)
+
+
+func _row(y: int, p: Dictionary, key: String, row_h: int) -> void:
 	_rows.append({"r": Rect2(ROW_X, y, ROW_W, row_h - 1), "p": p})
-	var is_gk := key == "GK"
-	var bg: Color = C_GK_ROW if is_gk else (PMChrome.C_ROW_LIGHT if idx % 2 == 0 else PMChrome.C_ROW_DARK)
-	draw_rect(Rect2(ROW_X, y, ROW_W, row_h - 1), bg, true)
-	draw_rect(Rect2(ROW_X, y + row_h - 1, ROW_W, 1), PMChrome.C_ROW_SEP, true)
-	draw_rect(Rect2(STAT_X0, y, STAT_X1 - STAT_X0, row_h - 1), C_STATBAND, true)
+	var ty: int = y + maxi(1, (row_h - 14) / 2)
 
-	var ty: int = y + maxi(1, (row_h - 12) / 2)
-	PMChrome.draw_crest(self, int(_club.get("id", -1)), Rect2(10, y, 13, row_h - 1))
-	_txt(_f10, 40, ty, str(number), PMChrome.C_ROW_TXT, 11, true)
-	_txt(_f10, NAME_X, ty, str(p.get("name", "?")).substr(0, 13), PMChrome.C_ROW_TXT, 11)
+	# N° | PLAYER | AV | MO | LOAN | WAGE | YEARS(term|left) boxed cells. A GameDB
+	# browse club has no career contract fields -> YEARS renders "-" (no fake expiry).
+	var has_contract := p.has("contract_years")
+	var expiring := has_contract and int(p.get("contract_years", 1)) <= Contract.EXPIRING_YEARS
+	_cell(NO_X0, NO_X1, y, row_h)
+	_cell(NO_X1, CELL_AV[0], y, row_h)
+	_cell(CELL_AV[0], CELL_AV[1], y, row_h)
+	_cell(CELL_MO[0], CELL_MO[1], y, row_h)
+	_cell(CELL_LOAN[0], CELL_LOAN[1], y, row_h)
+	_cell(CELL_WAGE[0], CELL_WAGE[1], y, row_h)
+	_cell(CELL_Y1[0], CELL_Y1[1], y, row_h)
+	_cell(CELL_Y2[0], CELL_Y2[1], y, row_h, C_EXPIRE_BG if expiring else C_CELL_BG)
 
-	var attrs: Dictionary = p.get("attrs", {}) if p.get("attrs") is Dictionary else {}
-	for c in COLS:
-		var key2: String = c[2]
-		var x: int = c[1]
-		var sv := ""
-		if key2 == "_age":
-			sv = str(int(p.get("age", 0)))
-		elif key2 == "_avg":
-			sv = str(_avg_of(p))
-		else:
-			var v: Variant = attrs.get(key2)
-			sv = str(int(v)) if v != null else "-"
-		_txt(_f10, x, ty, sv, PMChrome.C_ROW_TXT, 11, true)
+	# N°: the decoded EQUIPOS squad number; "-" when this club's numbers aren't
+	# individuated in the source data (never invented).
+	var no_txt := str(int(p.get("squadNo", 0))) if _nos_ok else "-"
+	_txt(_f10, NO_X1 - 6, ty, no_txt, C_NO, 11, true)
 
-	var avg := _avg_of(p)
-	draw_rect(Rect2(AVBAR_X, y + maxi(2, row_h / 2 - 3), 28, 6), C_AVBAR_BG, true)
-	draw_rect(Rect2(AVBAR_X, y + maxi(2, row_h / 2 - 3), 28.0 * clampf(avg / 99.0, 0.0, 1.0), 6), C_AVBAR, true)
-
-	# POS: the original CAMROL pitch-position icon (colour tag fallback), or the
-	# injury/suspension status when out.
+	# Name: black, like the frame; an injured/suspended player keeps the status
+	# suffix the DATA-BASE view surfaced (availability must stay visible here).
 	var st := Availability.status(p)
-	if st["state"] == "FIT":
-		var pos_cell := Rect2(POS_X, y + 1, 24, row_h - 2)
-		if not PMChrome.draw_role_icon(self, pos_cell, int(p.get("posFine", 0)), str(p.get("pos", key))):
-			draw_rect(Rect2(POS_X, y + 2, 22, row_h - 5), C_ROLE.get(key, PMChrome.C_TBL_HDR), true)
-		_txt(_f8, POS_X + 28, ty, key, PMChrome.C_ROW_TXT, 10)
-	else:
-		_txt(_f8, POS_X, ty, "%s %dw" % [st["state"], int(st["weeks"])], st["colour"], 10)
+	_txt(_f10, NAME_X, ty, str(p.get("name", "?")).substr(0, 24), Color.BLACK, 11)
+	if st["state"] != "FIT":
+		_txt(_f8, CELL_AV[0] - 52, ty, "%s %dw" % [st["state"], int(st["weeks"])], st["colour"], 10)
+
+	_txt(_f10, CELL_AV[1] - 5, ty, str(_avg_of(p)), C_AV, 11, true)
+	# MO (morale) is a dynamic save value the app doesn't model yet -> honest gap,
+	# never the unrelated static RM attribute (APP_VS_SPEC_AUDIT B7).
+	_txt(_f10, CELL_MO[1] - 5, ty, "-", C_MO, 11, true)
+	_txt(_f10, CELL_LOAN[0] + 8, ty, "YES" if p.get("on_loan") else "NO", C_LOANC, 11)
+	var wage_y := Contract.yearly(Contract.current_weekly(p, _tier))
+	_txt(_f10, CELL_WAGE[1] - 6, ty, "£%s" % _money(wage_y), C_WAGE, 11, true)
+	var left := int(p.get("contract_years", 0))
+	var term: int = maxi(int(p.get("contract_term", 0)), left)
+	_txt(_f10, CELL_Y1[1] - 8, ty, str(term) if has_contract else "-", C_YEARS, 11, true)
+	_txt(_f10, CELL_Y2[1] - 8, ty, str(left) if has_contract else "-",
+		C_EXPIRE_TXT if expiring else C_YEARS, 11, true)
+
+
+## Thousands-separated integer for the WAGE column ("£1,000,000", frame 077).
+func _money(v: int) -> String:
+	var s := str(absi(v))
+	var out := ""
+	var c := 0
+	for i in range(s.length() - 1, -1, -1):
+		out = s[i] + out
+		c += 1
+		if c % 3 == 0 and i > 0:
+			out = "," + out
+	return ("-" if v < 0 else "") + out
 
 
 func _avg_of(p: Dictionary) -> int:

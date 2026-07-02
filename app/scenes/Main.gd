@@ -819,7 +819,7 @@ func _open_squad(club: Dictionary, manager: String, cash: String, youth_enabled 
 	var scr: SquadScreen = load("res://scenes/SquadScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
-	scr.setup(club, manager, cash, youth_enabled, season, week)
+	scr.setup(club, manager, cash, youth_enabled, season, week, _career.tier if _career else 1)
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
 	scr.youth_pressed.connect(_show_youth_screen)
 	scr.player_pressed.connect(_open_player_info.bind(club))
@@ -1344,7 +1344,7 @@ func _refresh_squad_overlay() -> void:
 	for c in get_children():
 		if c is SquadScreen:
 			(c as SquadScreen).setup(_mgr_club(), "", "£%s" % _fmt_int(_career.cash), true,
-				_career.season, _career.week + 1)
+				_career.season, _career.week + 1, _career.tier)
 
 ## The STAFF (EMPLE) screen on the hub's staff icon: hire/sack the backroom team (a TRAINER
 ## speeds development, a PHYSIO cuts injuries, a YOUTH COACH improves the academy -- Staff.gd),

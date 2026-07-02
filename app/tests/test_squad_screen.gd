@@ -23,12 +23,15 @@ func _run() -> void:
 	if f == null:
 		return _assert(false, "game_db.json present")
 	var db: Dictionary = JSON.parse_string(f.get_as_text())
+	# Man Utd (id 40): the club walkthrough frame 077_154612 verifies, so its decoded
+	# squad numbers + display order can be asserted against the real screen.
 	var club: Dictionary = {}
 	for c in db.get("clubs", []):
-		if c.get("leagueId") == "eng_prem" and (c.get("players", []) as Array).size() >= 14:
+		if int(c.get("id", -1)) == 40:
 			club = c
 			break
-	ok = _assert(not club.is_empty(), "found a Premier club with a full squad") and ok
+	ok = _assert(not club.is_empty() and (club.get("players", []) as Array).size() >= 14,
+		"found Man Utd (id 40) with a full squad") and ok
 
 	var screen: SquadScreen = load("res://scenes/SquadScreen.gd").new()
 	get_root().add_child(screen)
@@ -42,7 +45,8 @@ func _run() -> void:
 	ok = _assert(screen._kit_tex != null, "club kit (escudo) loaded for the squad screen") and ok
 
 	# Sections partition the squad by the decoded demarcación (GK/DF/MF/FW): every
-	# label valid, the union = the full roster with no dup/drop, sorted within section.
+	# label valid, the union = the full roster with no dup/drop, and each section in
+	# REVERSE roster order (frame 077: the original lists every group file-reversed).
 	var secs: Array = screen._sections()
 	var valid_labels := ["KEEPERS", "DEFENDERS", "MIDFIELDERS", "FORWARDS", "OUTFIELD"]
 	ok = _assert(secs.size() >= 3, "at least three position sections (got %d)" % secs.size()) and ok
@@ -51,27 +55,50 @@ func _run() -> void:
 	var seen := {}
 	var dup := false
 	var labels_ok := true
-	var sorted_ok := true
 	for sec in secs:
 		labels_ok = labels_ok and valid_labels.has(str(sec["section"]))
-		var prev := 999
 		for p in sec["players"]:
 			total += 1
 			var pid := int(p.get("id", -1))
 			dup = dup or seen.has(pid)
 			seen[pid] = true
-			var a := screen._avg_of(p)
-			sorted_ok = sorted_ok and a <= prev
-			prev = a
 	ok = _assert(labels_ok, "every section carries a valid position label") and ok
 	ok = _assert(total == (club["players"] as Array).size(),
 		"sections cover all %d players (got %d)" % [(club["players"] as Array).size(), total]) and ok
 	ok = _assert(not dup, "no player appears in two sections") and ok
-	ok = _assert(sorted_ok, "each section sorted by ability descending") and ok
 	var gk_all_keepers := true
 	for p in secs[0]["players"]:
 		gk_all_keepers = gk_all_keepers and screen._pos_of(p) == "GK"
 	ok = _assert(gk_all_keepers, "GOALKEEPERS section holds only keepers") and ok
+
+	# Reverse-roster order = the frame-077 display order. Man Utd truth (visible rows):
+	# KEEPERS Schmeichel,Van der Gouw · MID Beckham,Scholes,Giggs,Keane,Butt,McClair ·
+	# FWD Cole,Jordi Cruyff,Solskjaer,Sheringham,Nevland.
+	var by_key := {}
+	for sec in secs:
+		by_key[str(sec["key"])] = sec["players"]
+	var gk_names: Array = (by_key.get("GK", []) as Array).map(func(p): return str(p["name"]))
+	var mf_names: Array = (by_key.get("MF", []) as Array).map(func(p): return str(p["name"]))
+	var fw_names: Array = (by_key.get("FW", []) as Array).map(func(p): return str(p["name"]))
+	ok = _assert(gk_names.slice(0, 2) == ["SCHMEICHEL", "VAN DER GOUW"],
+		"KEEPERS order matches frame 077 (%s)" % str(gk_names.slice(0, 2))) and ok
+	ok = _assert(mf_names.slice(0, 6) == ["BECKHAM", "SCHOLES", "GIGGS", "KEANE", "BUTT", "MCCLAIR"],
+		"MIDFIELDERS order matches frame 077 (%s)" % str(mf_names.slice(0, 6))) and ok
+	ok = _assert(fw_names.slice(0, 5) == ["COLE", "JORDI CRUYFF", "SOLSKJAER", "SHERINGHAM", "NEVLAND"],
+		"FORWARDS order matches frame 077 (%s)" % str(fw_names.slice(0, 5))) and ok
+
+	# Decoded squad numbers (EQUIPOS byte after the photo-id u16): frame-077 truth.
+	ok = _assert(screen._nos_ok, "Man Utd squad numbers are individuated -> N° shown") and ok
+	var no_by_name := {}
+	for p in club.get("players", []):
+		no_by_name[str(p["name"])] = p.get("squadNo")
+	for pair in [["SCHMEICHEL", 1], ["GARY NEVILLE", 2], ["BECKHAM", 7], ["GIGGS", 11],
+			["KEANE", 16], ["VAN DER GOUW", 17], ["SOLSKJAER", 20], ["BERG", 21]]:
+		ok = _assert(int(no_by_name.get(pair[0], -1)) == int(pair[1]),
+			"squadNo %s = %d" % [pair[0], pair[1]]) and ok
+
+	# WAGE column formatter matches the frame's "£1,000,000" style.
+	ok = _assert(screen._money(1000000) == "1,000,000", "money formatter groups thousands") and ok
 
 	screen.queue_redraw()
 	for _i in 3:

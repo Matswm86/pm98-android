@@ -253,6 +253,7 @@ func _seed_squad(club_dict: Dictionary) -> Array:
 		var dup: Dictionary = (p as Dictionary).duplicate(true)
 		var age := int(dup.get("age", 26))
 		dup["contract_years"] = 3 if age <= 29 else (2 if age <= 32 else 1)
+		dup["contract_term"] = dup["contract_years"]   # deal length (SQUAD MANAGEMENT YEARS col; contract_years = years LEFT)
 		dup["injured_weeks"] = 0       # availability state (Availability.gd)
 		dup["suspended_weeks"] = 0
 		dup["yellows"] = 0
@@ -921,6 +922,7 @@ func promote_youth(pid: int) -> Dictionary:
 	Youth.graduate(p)
 	p["clubId"] = club_id
 	p["contract_years"] = TransferMarket.NEW_CONTRACT_YEARS
+	p["contract_term"] = TransferMarket.NEW_CONTRACT_YEARS
 	Contract.stamp_wage(p, tier)   # a first-team wage now he's promoted
 	p["auto_renew"] = false
 	rosters[club_id].append(p)
@@ -1027,6 +1029,7 @@ func sign_player(pid: int, from_club_id: int, offer: int, rng: RandomNumberGener
 	rosters[from_club_id].erase(player)
 	player["clubId"] = club_id
 	player["contract_years"] = TransferMarket.NEW_CONTRACT_YEARS
+	player["contract_term"] = TransferMarket.NEW_CONTRACT_YEARS
 	Contract.stamp_wage(player, tier)   # his wage joins your live bill
 	player["auto_renew"] = false
 	rosters[club_id].append(player)
@@ -1069,6 +1072,7 @@ func sign_free_agent(pid: int, offer_weekly: int = -1, rng: RandomNumberGenerato
 	player.erase("free_agent")
 	player["clubId"] = club_id
 	player["contract_years"] = TransferMarket.NEW_CONTRACT_YEARS
+	player["contract_term"] = TransferMarket.NEW_CONTRACT_YEARS
 	player["wage"] = offer_weekly
 	player["auto_renew"] = false
 	rosters[club_id].append(player)
@@ -1168,6 +1172,7 @@ func accept_sale(pid: int, buyer_id: int, offer: int) -> Dictionary:
 	rosters[club_id].erase(player)
 	player["clubId"] = buyer_id
 	player["contract_years"] = TransferMarket.NEW_CONTRACT_YEARS
+	player["contract_term"] = TransferMarket.NEW_CONTRACT_YEARS
 	if rosters.has(buyer_id):
 		rosters[buyer_id].append(player)
 	cash += offer
@@ -1227,6 +1232,7 @@ func renew(pid: int, offer_weekly: int = -1, rng: RandomNumberGenerator = null) 
 		return {"ok": false, "msg": "%s has rejected your offer for renewal." % pname,
 			"demanded": int(verdict["demanded"])}
 	player["contract_years"] = Contract.NEW_TERM_YEARS
+	player["contract_term"] = Contract.NEW_TERM_YEARS
 	player["wage"] = offer_weekly
 	_log("%s has renewed his contract." % pname)
 	return {"ok": true, "msg": "%s has renewed his contract on £%s/wk." % [pname, _money(offer_weekly)],
@@ -1293,6 +1299,7 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 		var assistant_keeps := aq > 0 and ca >= 75 - aq * 3
 		if (p.get("auto_renew") or assistant_keeps) and affordable:
 			p["contract_years"] = Contract.NEW_TERM_YEARS
+			p["contract_term"] = Contract.NEW_TERM_YEARS
 			p["wage"] = demand_wk
 			var how := "auto" if p.get("auto_renew") else "assistant"
 			_news("staff" if how == "assistant" else "contract",

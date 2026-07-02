@@ -50,7 +50,16 @@ func _run() -> void:
 		if node.has_method("setup") and s[1] == "menu.png":
 			node.setup("SAMPLE FC", "Premier League", "1997-98", 1_000_000, "1st", 38)
 		elif s[1] == "squad_demo.png":
-			node.setup(club, "M. MJATVEDT", "1,000,000", false, "1997-98", 1)
+			# Contract-view fixture: individuated squad numbers + contract fields so the
+			# N°/WAGE/YEARS cells render populated (a bare GameDB club shows "-").
+			var sq: Dictionary = club.duplicate(true)
+			var i := 0
+			for p in sq.get("players", []):
+				i += 1
+				p["squadNo"] = i
+				p["contract_years"] = 1 + (i % 4)
+				p["contract_term"] = 1 + (i % 4)
+			node.setup(sq, "M. MJATVEDT", "1,000,000", false, "1997-98", 1)
 		elif s[1] == "lineup_demo.png":
 			node.setup(club, tactics, "M. MJATVEDT", "Premier League", "1997-98", 1)
 		elif s[1] == "finance_demo.png":

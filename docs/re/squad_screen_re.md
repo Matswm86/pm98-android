@@ -31,12 +31,24 @@ draw). Geometry via `CRect::CRect(left,top,right,bottom)` and the `FUN_00436fb0/
 - Right column: squad count, the reversed YOUTH TEAM button (placeholder — youth not
   built), RETURN. Driven live by the Career roster.
 
-## True columns (walkthrough evidence, run-1 frame `077_154612`)
-The real SQUAD MANAGEMENT is a **contract** view, not the attribute grid the app currently
-reuses. Columns: **N° | PLAYER | AV | MO | LOAN | WAGE | YEARS** — AV red, MO blue, LOAN
-`YES/NO`, WAGE = the YEARLY WAGE in red (`£1,000,000` etc.), YEARS = two numbers with the
-remaining year highlighted gold when it reaches 1 (contract expiring). The 4 position
-sections (KEEPERS/DEFENDERS/MIDFIELDERS/FORWARDS) and the right-margin YOUTH TEAM/RETURN
-are unchanged. Refit tracked in APP_VS_SPEC_AUDIT B7 — sourceable now except **MO**
-(PM98 morale is a dynamic save value; the app has no morale model, so MO is a gap, NOT to
-be fabricated). Wired to the hub PLAYERS button (Main `_show_squad_screen`) 2026-07-02.
+## True columns (walkthrough evidence, run-1 frame `077_154612`) — PORTED 2026-07-02
+The real SQUAD MANAGEMENT is a **contract** view, not an attribute grid. Columns:
+**N° | PLAYER | AV | MO | LOAN | WAGE | YEARS** — the SquadScreen refit now draws them
+at the frame's measured geometry (border scan: cells AV 273-298 | MO 298-323 | LOAN
+323-359 | WAGE 359-429 | YEARS 429-454 | 454-479; N° box 16-46; boxed 13px rows at
+16px pitch) with the frame-sampled colours: N° navy `(0,0,128)`, section labels blue
+`(0,0,190)`, AV `(212,63,0)`, MO `(75,109,172)`, LOAN olive `(100,130,10)`, WAGE
+`(150,0,0)`, YEARS `(42,63,170)`; an expiring contract's remaining-year cell = red
+`(255,31,0)` on yellow `(255,255,170)`. Each column CODE in the header row is drawn in
+its own value colour, and the first section's label lives in that header row.
+- **N°** = the decoded per-player squad number (`squadNo`, byte after the photo-id u16
+  — `squad_number_re.md`); `-` when the club's stored set isn't individuated.
+- **AV** = `_avg_of`; **LOAN** = YES/NO off `on_loan`; **WAGE** = `Contract.yearly(
+  current_weekly)` formatted `£1,000,000`; **YEARS** = `contract_term | contract_years`
+  (term | left, both stamped by Career; `-` for a bare GameDB browse club).
+- **MO** stays an honest `-` — morale is a dynamic save value with no app model yet
+  (do NOT show the unrelated static RM attribute). APP_VS_SPEC_AUDIT B7.
+- **Row order** = reverse record order per section (decoded, `squad_number_re.md`);
+  the ability sort is gone. Row-height compression for deep squads remains our one
+  documented deviation (the original pages/scrolls per section).
+Wired to the hub PLAYERS button (Main `_show_squad_screen`) 2026-07-02.

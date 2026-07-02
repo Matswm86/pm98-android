@@ -154,6 +154,11 @@ def main() -> None:
             "isGK": bool(p.get("isGK")),
             "media": p.get("media"),
             "photoId": p.get("photoId"),  # J96NNNNN face-bank key (English squads); faces_re.md
+            # SQUAD MANAGEMENT N. column: the byte after the photo-id u16 in the EQUIPOS
+            # record (docs/re/squad_number_re.md). Emitted verbatim; lower-division records
+            # often leave the whole squad at the 0x01 pad (not individuated), so consumers
+            # must check per-club uniqueness before displaying.
+            "squadNo": p.get("squadNo"),
             "nationality": p.get("nationality"),  # EQUIPOS cipher string; ENGLAND default
             "flagCode": flag_for(p.get("nationality"), flag_lut),  # BANDERAS index; FICHA flag
             "kind": p.get("kind"),  # FICHA NATIONAL / NON-NATIONAL flag (derived from nat)

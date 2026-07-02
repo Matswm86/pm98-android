@@ -410,15 +410,19 @@ minute — since MatchSim `goals`).
 Wiring done (B5-2): OPPONENT -> VIEW RIVAL (RivalScreen), PLAYERS -> SQUAD MANAGEMENT
 (SquadScreen). Title now the real "SQUAD MANAGEMENT" (@0x65f098). REMAINING source-gaps
 (evidenced by walkthrough run-1 frame `077_154612` = the real SQUAD MANAGEMENT):
-- **Contract columns.** The real screen's columns are **N° | PLAYER | AV | MO | LOAN |
-  WAGE | YEARS** (a contract view: AV red, MO blue, LOAN yes/no, WAGE = YEARLY WAGE red,
-  YEARS = two numbers, the remaining year highlighted gold when 1). SquadScreen still
-  shows the DATA-BASE attribute grid (AGE EN SP ST AG GU FI MO AV POS) as an approximation
-  (squad_screen_re.md). Refit sourceable now: AV=`_avg_of`, LOAN="NO" (owned), WAGE=
-  `Contract.yearly(p.wage)`, YEARS=`contract_years`. **BLOCKER: MO** — PM98 morale is a
-  dynamic save-game value; the app has NO morale model and no static attr matches the
-  frame's MO (79-99). Do NOT fabricate it; the refit needs a morale model first (or ship
-  the 5 sourceable columns and defer MO).
+- **Contract columns. SHIPPED 2026-07-02** (frame-077 geometry + colours; see
+  squad_screen_re.md "True columns" + squad_number_re.md). **N°** = the newly decoded
+  per-player squad number (EQUIPOS byte after the photo-id u16; frame truth 19/19 for
+  Man Utd incl. Berg 21 off-frame + Babb 6 extended-block cross-check); shown only for
+  clubs whose stored set is individuated (18 of 92 English clubs), `-` otherwise — the
+  original's pad-club display is UNRESOLVED, never invent a renumbering. Row order =
+  reverse record order per section (decoded from the frame; ability sort removed).
+  AV=`_avg_of`, LOAN=`on_loan` YES/NO, WAGE=`Contract.yearly(current_weekly)`,
+  YEARS=`contract_term|contract_years` (term stamped at every deal site in Career).
+  **REMAINING GAP: MO** — PM98 morale is a dynamic save-game value; the app has NO
+  morale model and no static attr matches the frame's MO (79-99). Renders `-`; do NOT
+  fabricate it. (Owner 2026-07-02: morale IS in MANAGER.EXE — RE it when convenient,
+  after the offers flow.)
 - **PLAYER INFORMATION actions.** DONE 2026-07-02. The overlay's real **RENEW / TRANSFER /
   SACK / OK** row (source rects FUN_00526a60, card-local RENEW(85,325,104,25) /
   TRANSFER(196,..) / SACK(307,..) / OK(429,..,52,25)) is now live on the manager's own

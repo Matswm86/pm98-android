@@ -285,26 +285,40 @@ def find_attr_blocks(d: bytes, lo: int, hi: int):
     return out
 
 
-def name_before(d: bytes, lo: int, Y: int):
+def name_before(d: bytes, lo: int, Y: int, archive: set[int] | None = None):
     """Forward-parse [u16 len][short][u16 len][full] ending just before the small
     field block that precedes the birth year Y. Several header alignments can fit;
     pick the one with the most total name text (the real, full name - spurious
-    alignments start mid-name and are shorter)."""
+    alignments start mid-name and are shorter).
+
+    An alignment whose h-3 u16 is a real photo id in THIS club's BIGFOTO archive
+    outranks any text-length pick: the dominant layout is [photo u16][squadNo u8]
+    [name...], so an archive hit pins the true field start. (Fixes Giggs, whose
+    trailing bio bytes pseudo-decode into a junk 10-char "full name" that outscores
+    the real GIGGS + RYAN JOSEPH GIGGS pair on text length alone.)"""
     best = None
     best_len = -1
+    best_arch = None
+    best_arch_len = -1
     for h in range(max(lo, Y - 90), Y):
         s = rdstr(d, h, 22)
         if not s:
             continue
+        cand = None
+        tot = -1
         f = rdstr(d, s[1], 48)
         if f and 2 <= Y - f[1] <= 18:
-            tot = len(s[0]) + len(f[0])
-            if tot > best_len:
-                best, best_len = (h, s[0], f[0]), tot
+            cand, tot = (h, s[0], f[0]), len(s[0]) + len(f[0])
         elif 2 <= Y - s[1] <= 18:
-            if len(s[0]) > best_len:
-                best, best_len = (h, "", s[0]), len(s[0])
-    return best
+            cand, tot = (h, "", s[0]), len(s[0])
+        if cand is None:
+            continue
+        if tot > best_len:
+            best, best_len = cand, tot
+        if archive and h - 3 >= 0 and struct.unpack_from("<H", d, h - 3)[0] in archive:
+            if tot > best_arch_len:
+                best_arch, best_arch_len = cand, tot
+    return best_arch if best_arch is not None else best
 
 
 def split_name(short_txt: str, full_txt: str):
@@ -327,7 +341,7 @@ def parse_club(d: bytes, off: int, end: int, archive: set[int] | None = None):
     seen = set()
     archive = archive or set()
     for k, Y in enumerate(anchors):
-        nb = name_before(d, prev_end, Y)
+        nb = name_before(d, prev_end, Y, archive)
         prev_end = Y + 3
         if not nb:
             continue
@@ -350,15 +364,27 @@ def parse_club(d: bytes, off: int, end: int, archive: set[int] | None = None):
         # (photo-less -> the original drew a blank frame). See docs/re/faces_re.md.
         name_start = nb[0]
         photo_id = None
+        photo_pos = None
         for back in range(3, 16, 2):
             if name_start - back < 0:
                 break
             cand = struct.unpack_from("<H", d, name_start - back)[0]
             if cand in archive:
                 photo_id = cand
+                photo_pos = name_start - back
                 break
             if back == 3 and 0 < cand <= 60000:
                 photo_id = cand  # provisional -3 fallback; an archive hit further back wins
+                photo_pos = name_start - back
+        # Squad number (the SQUAD MANAGEMENT screen's N. column): the byte right after
+        # the photo-id u16, before the name field / its small field block. Pinned by
+        # cross-validation against walkthrough frame 077_154612 (Man Utd, 19/19 shown
+        # players: Schmeichel 1 ... Solskjaer 20) + off-frame players carrying their
+        # real 97-98 numbers (Berg 21) + Babb's extended block (photo at -9, byte 0x06
+        # = his real 6). Some lower-division records leave it at the 0x01 pad for the
+        # whole squad (not individuated) -> emit verbatim; consumers must treat a
+        # non-unique set as "not stored". See docs/re/squad_number_re.md.
+        squad_no = d[photo_pos + 2] if photo_pos is not None and photo_pos + 2 < len(d) else None
         # the player's attribute row is the attr block between this anchor and the
         # next one (it follows the player's bio, before the next player's record).
         nxt = anchors[k + 1] if k + 1 < len(anchors) else end
@@ -397,6 +423,7 @@ def parse_club(d: bytes, off: int, end: int, archive: set[int] | None = None):
                 "posFine": fine,
                 "isGK": is_gk,
                 "photoId": photo_id,
+                "squadNo": squad_no,
                 "nationality": nat,
                 # KIND: the FICHA's NATIONAL / NON-NATIONAL flag - English/British players
                 # are "national" to the English game, foreigners are not.
