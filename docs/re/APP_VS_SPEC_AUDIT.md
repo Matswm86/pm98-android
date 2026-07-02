@@ -293,9 +293,9 @@ the original does · **PARTIAL** · **STUB**.
 | fixtures (CALEN) | EMPAREJAMIENTOS folder | BrowseScreen "COMPETITIONS" chooser + "SEASON FIXTURES" list, Main.gd:1569-1626 | **SUBSTITUTE** |
 | lineup (ALINE) | ALINEACION | LineupScreen (ma_7, FUN_004fc321) | TRUE |
 | tactics (TACTI) | TACTICAS folder | BrowseScreen menu wrapper → TacticsScreen modal (ma_9), Main.gd:2204-2242 | **PARTIAL** (wrapper invented; original TACTICAS screen not ported) |
-| opponent (RIVAL) | VERRIVAL folder (dedicated screen) | opens the Dbasewin DATA BASE squad browser, Main.gd:2055-2062 | **WRONG-SCREEN** |
+| opponent (RIVAL) | VERRIVAL folder (dedicated screen) | RivalScreen (VIEW RIVAL, FUN_005733d0 port; rival_screen_re.md), Main `_show_rival_screen` | **TRUE** (fixed 2026-07-02; assistant-gated report) |
 | buy (FICHA) | FICHAR | TransferScreen (ma_11) | TRUE |
-| sell (VENDE) | sell-player flow (orig. screen: unmapped — confirm in running original; OFERTAS folder likely related) | BrowseScreen menus (market/squad/free/loan/scout/shortlist/news), Main.gd:2384-2411 | **SUBSTITUTE** |
+| sell (VENDE) / PLAYERS | the hub PLAYERS button opens SQUAD MANAGEMENT (walkthrough run-1: PLAYERS -> squad list -> player -> RENEW/TRANSFER/SACK). The "sell" is the per-player TRANSFER action there, NOT a separate hub screen. | SquadScreen (SQUAD MANAGEMENT), Main `_show_squad_screen`; player tap -> PlayerInfoScreen | **TRUE (nav)** fixed 2026-07-02. GAP: SquadScreen still shows the DATA-BASE attribute columns, not the real contract columns (AV/MO/LOAN/WAGE/YEARS) — see B7; PlayerInfoScreen still OK-only (no RENEW/TRANSFER/SACK yet). |
 | staff (EMPLE) | EMPLEADOS folder | StaffScreen (strings-only, NO reversed layout; StaffScreen.gd:3-12) + invented TRAINING browse (Main.gd:2117-2160; original ENTRENAMIENTO is its own screen) | **PARTIAL/SUBSTITUTE** |
 | finance (CAJA) | CAJA | FinanceScreen (og_12) | TRUE |
 | board (DECIS) | DIRECTIVA | DirectivaScreen (ma_14; meters derived) | TRUE |
@@ -405,3 +405,22 @@ minute — since MatchSim `goals`).
 4. Close the MatchSim invented-fallback + replace fabricated commentary with the stat
    engine's real event vector (B3).
 5. Repair the parallel-stream breakage (B4) or revert the untracked menuicons stream.
+
+## B7 — SQUAD MANAGEMENT + PLAYER INFORMATION contract flow (2026-07-02, open)
+Wiring done (B5-2): OPPONENT -> VIEW RIVAL (RivalScreen), PLAYERS -> SQUAD MANAGEMENT
+(SquadScreen). Title now the real "SQUAD MANAGEMENT" (@0x65f098). REMAINING source-gaps
+(evidenced by walkthrough run-1 frame `077_154612` = the real SQUAD MANAGEMENT):
+- **Contract columns.** The real screen's columns are **N° | PLAYER | AV | MO | LOAN |
+  WAGE | YEARS** (a contract view: AV red, MO blue, LOAN yes/no, WAGE = YEARLY WAGE red,
+  YEARS = two numbers, the remaining year highlighted gold when 1). SquadScreen still
+  shows the DATA-BASE attribute grid (AGE EN SP ST AG GU FI MO AV POS) as an approximation
+  (squad_screen_re.md). Refit sourceable now: AV=`_avg_of`, LOAN="NO" (owned), WAGE=
+  `Contract.yearly(p.wage)`, YEARS=`contract_years`. **BLOCKER: MO** — PM98 morale is a
+  dynamic save-game value; the app has NO morale model and no static attr matches the
+  frame's MO (79-99). Do NOT fabricate it; the refit needs a morale model first (or ship
+  the 5 sourceable columns and defer MO).
+- **PLAYER INFORMATION actions.** The real per-player overlay (run-1: "Raimond VAN DER
+  GOUW"/"Ole Gunnar SOLSKJAER") has **RENEW / TRANSFER / SACK / OK**; TRANSFER = "PLAYER
+  PLACED ON TRANSFER MARKET" -> the TEAM OFFER accept/refuse flow (run-3). App's
+  PlayerInfoScreen is OK-only (display). Add the three actions on Career hooks (renew =
+  `_player_deal_action` renew; transfer-list + offers; sack = release + compensation).

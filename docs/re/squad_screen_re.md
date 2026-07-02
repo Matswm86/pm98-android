@@ -30,3 +30,13 @@ draw). Geometry via `CRect::CRect(left,top,right,bottom)` and the `FUN_00436fb0/
   enough to keep a deep squad's forwards on-panel (the original paged; we fit all).
 - Right column: squad count, the reversed YOUTH TEAM button (placeholder — youth not
   built), RETURN. Driven live by the Career roster.
+
+## True columns (walkthrough evidence, run-1 frame `077_154612`)
+The real SQUAD MANAGEMENT is a **contract** view, not the attribute grid the app currently
+reuses. Columns: **N° | PLAYER | AV | MO | LOAN | WAGE | YEARS** — AV red, MO blue, LOAN
+`YES/NO`, WAGE = the YEARLY WAGE in red (`£1,000,000` etc.), YEARS = two numbers with the
+remaining year highlighted gold when it reaches 1 (contract expiring). The 4 position
+sections (KEEPERS/DEFENDERS/MIDFIELDERS/FORWARDS) and the right-margin YOUTH TEAM/RETURN
+are unchanged. Refit tracked in APP_VS_SPEC_AUDIT B7 — sourceable now except **MO**
+(PM98 morale is a dynamic save value; the app has no morale model, so MO is a gap, NOT to
+be fabricated). Wired to the hub PLAYERS button (Main `_show_squad_screen`) 2026-07-02.

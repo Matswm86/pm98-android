@@ -2046,7 +2046,12 @@ func _menu_action(action: String, scr: MenuScreen) -> void:
 		"stadium": _show_stadium_screen()
 		"buy": _show_transfer_screen()
 		"tactics": _push(_show_tactics)
-		"sell": _push(_show_transfers)
+		# The hub PLAYERS button (VENDE icon, action "sell") opens the real SQUAD MANAGEMENT
+		# (PLANTILLA) screen, as the original does -- your squad, where a player tap raises his
+		# PLAYER INFORMATION (RENEW / TRANSFER / SACK; TRANSFER = list him for sale). Was the
+		# invented `_show_transfers` BrowseScreen menu (APP_VS_SPEC_AUDIT B1 SUBSTITUTE / B2
+		# orphaned SquadScreen).
+		"sell": _show_squad_screen()
 		"results": _show_results_screen()
 
 ## OPPONENT: the real VIEW RIVAL (VERRIVAL) scouting screen for the manager's next opponent

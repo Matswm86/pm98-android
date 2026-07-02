@@ -200,7 +200,8 @@ func _draw() -> void:
 	draw_set_transform(Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5), 0.0, Vector2(s, s))
 
 	PMChrome.draw_bg(self)
-	PMChrome.draw_header(self, "SQUAD", _manager, str(_club.get("name", "")),
+	# Title is the screen's own string "SQUAD MANAGEMENT" @.data 0x65f098 (squad_screen_re.md).
+	PMChrome.draw_header(self, "SQUAD MANAGEMENT", _manager, str(_club.get("name", "")),
 		str(_club.get("leagueName", "")), _season, _week, int(_club.get("id", -1)))
 
 	PMChrome.draw_table_panel(self, TABLE)

@@ -145,6 +145,35 @@ func _run() -> void:
 	main._menu_action("news", main._hub)        # info action -> hub toast (no crash, no nav)
 	await process_frame
 	ok = _assert(main._hub._toast_msg != "", "hub toast shows info feedback") and ok
+
+	# The hub PLAYERS button (VENDE icon, action "sell") opens SQUAD MANAGEMENT (SquadScreen),
+	# not the old invented BrowseScreen -- the wiring of the orphaned PLANTILLA screen.
+	main._menu_action("sell", main._hub)
+	await process_frame
+	var squad_up := false
+	for c in main.get_children():
+		if c is SquadScreen:
+			squad_up = true
+			c.queue_free()
+	ok = _assert(squad_up, "hub PLAYERS opens SQUAD MANAGEMENT (SquadScreen)") and ok
+	await process_frame
+
+	# The hub OPPONENT icon (RIVAL, action "opponent") opens VIEW RIVAL (RivalScreen), not the
+	# old DATA BASE browser -- the VERRIVAL wiring. A bye week has no opponent (toast instead).
+	var fx: Array = main._career.manager_fixture()
+	main._menu_action("opponent", main._hub)
+	await process_frame
+	if fx.is_empty():
+		ok = _assert(true, "hub OPPONENT on a bye week toasts (no rival screen)") and ok
+	else:
+		var rival_up := false
+		for c in main.get_children():
+			if c is RivalScreen:
+				rival_up = true
+				c.queue_free()
+		ok = _assert(rival_up, "hub OPPONENT opens VIEW RIVAL (RivalScreen)") and ok
+	await process_frame
+
 	# CONTINUE plays the week through the hub router (no green hub left).
 	var wk: int = main._career.week
 	main._menu_action("continue", main._hub)
