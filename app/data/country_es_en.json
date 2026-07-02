@@ -1,0 +1,241 @@
+{
+ "source": "DB (build_db best-effort Spanish) -> the game's own PAISES.30 English names; code = PAISES index",
+ "map": {
+  "Albania": {
+   "en": "ALBANIA",
+   "code": 1
+  },
+  "Alemania": {
+   "en": "GERMANY",
+   "code": 2
+  },
+  "Andorra": {
+   "en": "ANDORRA",
+   "code": 75
+  },
+  "Argentina": {
+   "en": "ARGENTINA",
+   "code": 3
+  },
+  "Austria": {
+   "en": "AUSTRIA",
+   "code": 5
+  },
+  "Azerbaiyán": {
+   "en": "AZERBAYAN",
+   "code": 6
+  },
+  "Bielorrusia": {
+   "en": "BIELORUSSIA",
+   "code": 7
+  },
+  "Bolivia": {
+   "en": "BOLIVIA",
+   "code": 8
+  },
+  "Brasil": {
+   "en": "BRAZIL",
+   "code": 10
+  },
+  "Bulgaria": {
+   "en": "BULGARIA",
+   "code": 11
+  },
+  "Bélgica": {
+   "en": "BELGIUM",
+   "code": 12
+  },
+  "Chile": {
+   "en": "CHILE",
+   "code": 14
+  },
+  "Chipre": {
+   "en": "CYPRUS",
+   "code": 15
+  },
+  "Colombia": {
+   "en": "COLOMBIA",
+   "code": 16
+  },
+  "Croacia": {
+   "en": "CROATIA",
+   "code": 17
+  },
+  "Dinamarca": {
+   "en": "DENMARK",
+   "code": 18
+  },
+  "Ecuador": {
+   "en": "ECUADOR",
+   "code": 89
+  },
+  "Escocia": {
+   "en": "SCOTLAND",
+   "code": 19
+  },
+  "Eslovaquia": {
+   "en": "SLOVAKIA",
+   "code": 20
+  },
+  "Eslovenia": {
+   "en": "SLOVENIA",
+   "code": 21
+  },
+  "España": {
+   "en": "SPAIN",
+   "code": 22
+  },
+  "Estonia": {
+   "en": "ESTONIA",
+   "code": 90
+  },
+  "Finlandia": {
+   "en": "FINLAND",
+   "code": 23
+  },
+  "Francia": {
+   "en": "FRANCE",
+   "code": 24
+  },
+  "Gales": {
+   "en": "WALES",
+   "code": 45
+  },
+  "Georgia": {
+   "en": "GEORGIA",
+   "code": 62
+  },
+  "Grecia": {
+   "en": "GREECE",
+   "code": 26
+  },
+  "Holanda": {
+   "en": "HOLLAND",
+   "code": 27
+  },
+  "Hungría": {
+   "en": "HUNGARY",
+   "code": 29
+  },
+  "Inglaterra": {
+   "en": "ENGLAND",
+   "code": 30
+  },
+  "Irlanda": {
+   "en": "REP. OF IRELAND",
+   "code": 31
+  },
+  "Irlanda del Norte": {
+   "en": "NORTH. IRELAND",
+   "code": 32
+  },
+  "Islandia": {
+   "en": "ICELAND",
+   "code": 33
+  },
+  "Islas Faroe": {
+   "en": "FAROE ISLANDS",
+   "code": 34
+  },
+  "Israel": {
+   "en": "ISRAEL",
+   "code": 35
+  },
+  "Italia": {
+   "en": "ITALY",
+   "code": 36
+  },
+  "Letonia": {
+   "en": "LETONIA",
+   "code": 112
+  },
+  "Liechtenstein": {
+   "en": "LIECHTENSTEIN",
+   "code": 77
+  },
+  "Lituania": {
+   "en": "LITHUANIA",
+   "code": 37
+  },
+  "Luxemburgo": {
+   "en": "LUXEMBOURG",
+   "code": 38
+  },
+  "Macedonia": {
+   "en": "MACEDONIA",
+   "code": 39
+  },
+  "Malta": {
+   "en": "MALTA",
+   "code": 40
+  },
+  "Moldavia": {
+   "en": "MOLDOVA",
+   "code": 42
+  },
+  "Noruega": {
+   "en": "NORWAY",
+   "code": 44
+  },
+  "Paraguay": {
+   "en": "PARAGUAY",
+   "code": 64
+  },
+  "Perú": {
+   "en": "PERU",
+   "code": 59
+  },
+  "Polonia": {
+   "en": "POLAND",
+   "code": 46
+  },
+  "Portugal": {
+   "en": "PORTUGAL",
+   "code": 47
+  },
+  "Rep. Checa": {
+   "en": "CZECH REPUBLIC",
+   "code": 48
+  },
+  "Rumania": {
+   "en": "ROMANIA",
+   "code": 49
+  },
+  "Rusia": {
+   "en": "RUSSIA",
+   "code": 50
+  },
+  "Sudáfrica": {
+   "en": "SOUTH AFRICA",
+   "code": 52
+  },
+  "Suecia": {
+   "en": "SWEDEN",
+   "code": 53
+  },
+  "Suiza": {
+   "en": "SWITZERLAND",
+   "code": 54
+  },
+  "Turquía": {
+   "en": "TURKEY",
+   "code": 55
+  },
+  "Ucrania": {
+   "en": "UKRAINE",
+   "code": 56
+  },
+  "Uruguay": {
+   "en": "URUGUAY",
+   "code": 57
+  },
+  "Venezuela": {
+   "en": "VENEZUELA",
+   "code": 72
+  },
+  "Yugoslavia": {
+   "en": "YUGOSLAVIA",
+   "code": 58
+  }
+ }
+}

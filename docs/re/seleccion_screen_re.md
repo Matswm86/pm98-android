@@ -41,12 +41,29 @@ on a single screen. Faithful rebuild collapses `_show_career_pick_league` +
 | DELETE button (+borra.bmp @0x32)    | (348,427) | 112×25 | — | red(255,31,0)  |
 | CONTINUE button        | (508, 427) | 112×25     | —        | yellow(255,255,0)|
 
-- **Team grid** (the per-club rows): built in a loop over the 4 division lists
-  (`&DAT_0066b190..0066b1a0`), widget-id base `300+index`, cell SIZE **126×25**
-  (`0x7e×0x19`), ProMan14. A second `while(i<0x14)` loop lays 20 slots in **2 columns**:
-  after row 10 (`if i==10`) x advances `+0x138 (312)` and y resets to `0x68 (104)`.
-  Difficulty/score sprites blitted per row: `seleccion\pun10/pun11/pun20/pun21.bmp`
-  (points digits) and `seleccion\bal1..bal4.bmp` (star/ball rating, loop of 4).
+- **The 20-slot grid is the PLAYER (career save) slot list, NOT a club grid**
+  (corrected 2026-07-02 against walkthrough frames 008-012: slot 1 highlighted gold,
+  frame 011 shows slot 1 filled "MWM | Manchester Utd." after CONTINUE). The
+  `while(i<0x14)` loop lays 20 numbered rows in 2 columns of 10 (after row 10 x
+  advances +312, y resets to 104). Each row: number badge + NAME cell + CLUB cell.
+  Frame-measured (008): rows y=107..263, pitch 16, bar h 12; left col badge x≈20..44,
+  name cell x≈45..149, club cell x≈150..308; right col +312.
+- **Club selection is the central white kit panel** (frame-measured x≈150..490,
+  y≈276..406): gold-framed white box, division title in gold + ball icon at top,
+  **2 rows of 10 club kits** (20 Premier clubs), tap kit → club name shown beneath
+  (frame 010 "Manchester Utd."). Division picked via 4 plaques flanking the panel:
+  Premier League (13..130) / First Division left, Second/Third Division (503..617)
+  right, rows y≈291..311 and 329..349; selected plaque text red, others white.
+- **PLAYER bar** (top, frame-measured): left arrow chip (83,66)~28×28, bar x≈118..497:
+  orange PLAYER chip x≈127..245, dark-red slot-number cell x≈247..290, black name
+  field to x≈497, right arrow ≈(502,66). Arrows cycle the active save slot.
+- CONTINUE with name+club locks the slot and advances to the next PLAYER (frame 011:
+  PLAYER 2 active); CONTINUE with the active slot empty proceeds → PRESEASON screen
+  (frames 012→013, see pretemporada_screen_re.md). Multi-player hot-seat is original
+  behaviour; the app engine is single-career for now (slot 1 real, honest gap).
+- Difficulty/score sprites for rows: `seleccion\pun10/pun11/pun20/pun21.bmp`
+  (points digits) and `seleccion\bal1..bal4.bmp` (rating balls); arrows
+  `seleccionpro\FLECHA0/1.BMP`.
 - `INFOFUT\if5maseq.htm` is the context-help anchor (ignored for the port).
 
 ## Build plan (→ a new `app/scenes/SeleccionScreen.gd`, replacing BrowseScreen's

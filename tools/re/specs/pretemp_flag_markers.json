@@ -1,0 +1,334 @@
+{
+ "source": "frame 013_154358 walkthrough 2026-07-02; identities SAD-matched vs BANDERAS flag art (Euro-47 set); map at (27,80)-(327,300)",
+ "markers": [
+  {
+   "code": 33,
+   "name": "ICELAND",
+   "x": 84,
+   "y": 94,
+   "err": 50
+  },
+  {
+   "code": 23,
+   "name": "FINLAND",
+   "x": 191,
+   "y": 132,
+   "err": 52
+  },
+  {
+   "code": 44,
+   "name": "NORWAY",
+   "x": 141,
+   "y": 142,
+   "err": 49
+  },
+  {
+   "code": 90,
+   "name": "ESTONIA",
+   "x": 186,
+   "y": 146,
+   "err": 38
+  },
+  {
+   "code": 53,
+   "name": "SWEDEN",
+   "x": 162,
+   "y": 151,
+   "err": 54
+  },
+  {
+   "code": 32,
+   "name": "NORTH. IRELAND",
+   "x": 73,
+   "y": 153,
+   "err": 67
+  },
+  {
+   "code": 19,
+   "name": "SCOTLAND",
+   "x": 98,
+   "y": 155,
+   "err": 56
+  },
+  {
+   "code": 50,
+   "name": "RUSSIA",
+   "x": 247,
+   "y": 157,
+   "err": 47
+  },
+  {
+   "code": 112,
+   "name": "LETONIA",
+   "x": 182,
+   "y": 160,
+   "err": 48
+  },
+  {
+   "code": 35,
+   "name": "ISRAEL",
+   "x": 101,
+   "y": 167,
+   "err": 63
+  },
+  {
+   "code": 31,
+   "name": "REP. OF IRELAND",
+   "x": 65,
+   "y": 168,
+   "err": 50
+  },
+  {
+   "code": 18,
+   "name": "DENMARK",
+   "x": 139,
+   "y": 168,
+   "err": 46
+  },
+  {
+   "code": 37,
+   "name": "LITHUANIA",
+   "x": 177,
+   "y": 173,
+   "err": 42
+  },
+  {
+   "code": 30,
+   "name": "ENGLAND",
+   "x": 102,
+   "y": 177,
+   "err": 66
+  },
+  {
+   "code": 45,
+   "name": "WALES",
+   "x": 86,
+   "y": 180,
+   "err": 54
+  },
+  {
+   "code": 7,
+   "name": "BIELORUSSIA",
+   "x": 192,
+   "y": 182,
+   "err": 56
+  },
+  {
+   "code": 27,
+   "name": "HOLLAND",
+   "x": 122,
+   "y": 187,
+   "err": 45
+  },
+  {
+   "code": 12,
+   "name": "BELGIUM",
+   "x": 103,
+   "y": 190,
+   "err": 31
+  },
+  {
+   "code": 46,
+   "name": "POLAND",
+   "x": 166,
+   "y": 190,
+   "err": 39
+  },
+  {
+   "code": 2,
+   "name": "GERMANY",
+   "x": 140,
+   "y": 195,
+   "err": 33
+  },
+  {
+   "code": 38,
+   "name": "LUXEMBOURG",
+   "x": 115,
+   "y": 201,
+   "err": 44
+  },
+  {
+   "code": 56,
+   "name": "UKRAINE",
+   "x": 213,
+   "y": 206,
+   "err": 47
+  },
+  {
+   "code": 48,
+   "name": "CZECH REPUBLIC",
+   "x": 155,
+   "y": 208,
+   "err": 43
+  },
+  {
+   "code": 20,
+   "name": "SLOVAKIA",
+   "x": 174,
+   "y": 210,
+   "err": 52
+  },
+  {
+   "code": 77,
+   "name": "LIECHTENSTEIN",
+   "x": 129,
+   "y": 214,
+   "err": 43
+  },
+  {
+   "code": 24,
+   "name": "FRANCE",
+   "x": 95,
+   "y": 217,
+   "err": 48
+  },
+  {
+   "code": 5,
+   "name": "AUSTRIA",
+   "x": 152,
+   "y": 222,
+   "err": 54
+  },
+  {
+   "code": 29,
+   "name": "HUNGARY",
+   "x": 173,
+   "y": 223,
+   "err": 43
+  },
+  {
+   "code": 42,
+   "name": "MOLDOVA",
+   "x": 210,
+   "y": 224,
+   "err": 36
+  },
+  {
+   "code": 54,
+   "name": "SWITZERLAND",
+   "x": 121,
+   "y": 227,
+   "err": 40
+  },
+  {
+   "code": 49,
+   "name": "ROMANIA",
+   "x": 191,
+   "y": 230,
+   "err": 40
+  },
+  {
+   "code": 62,
+   "name": "GEORGIA",
+   "x": 267,
+   "y": 232,
+   "err": 35
+  },
+  {
+   "code": 6,
+   "name": "AZERBAYAN",
+   "x": 292,
+   "y": 232,
+   "err": 42
+  },
+  {
+   "code": 21,
+   "name": "SLOVENIA",
+   "x": 148,
+   "y": 235,
+   "err": 50
+  },
+  {
+   "code": 17,
+   "name": "CROATIA",
+   "x": 164,
+   "y": 235,
+   "err": 48
+  },
+  {
+   "code": 47,
+   "name": "PORTUGAL",
+   "x": 39,
+   "y": 241,
+   "err": 39
+  },
+  {
+   "code": 58,
+   "name": "YUGOSLAVIA",
+   "x": 182,
+   "y": 243,
+   "err": 43
+  },
+  {
+   "code": 114,
+   "name": "ARMENIA",
+   "x": 277,
+   "y": 244,
+   "err": 34
+  },
+  {
+   "code": 22,
+   "name": "SPAIN",
+   "x": 61,
+   "y": 245,
+   "err": 42
+  },
+  {
+   "code": 11,
+   "name": "BULGARIA",
+   "x": 197,
+   "y": 245,
+   "err": 46
+  },
+  {
+   "code": 1,
+   "name": "ALBANIA",
+   "x": 162,
+   "y": 251,
+   "err": 35
+  },
+  {
+   "code": 36,
+   "name": "ITALY",
+   "x": 141,
+   "y": 254,
+   "err": 40
+  },
+  {
+   "code": 39,
+   "name": "MACEDONIA",
+   "x": 179,
+   "y": 256,
+   "err": 31
+  },
+  {
+   "code": 55,
+   "name": "TURKEY",
+   "x": 231,
+   "y": 264,
+   "err": 40
+  },
+  {
+   "code": 26,
+   "name": "GREECE",
+   "x": 178,
+   "y": 270,
+   "err": 58
+  },
+  {
+   "code": 15,
+   "name": "CYPRUS",
+   "x": 240,
+   "y": 283,
+   "err": 54
+  },
+  {
+   "code": 40,
+   "name": "MALTA",
+   "x": 191,
+   "y": 286,
+   "err": 45
+  }
+ ]
+}
