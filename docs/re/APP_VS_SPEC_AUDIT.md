@@ -332,12 +332,17 @@ transitively orphaned behind it.
   once the tick driver is e2e-complete.
 
 ## B4 — Not functional (current tree, verified by running)
+**STATUS 2026-07-02: ALL FOUR REPAIRED (`1e5adb3`); full suite 146/146 green. The §B3
+silent MatchSim fallback is also CLOSED (`aca1a15`: Hereford attrs recovered → all 92
+English clubs field a usable XI; Career pads roster XIs; MatchSim counts+warns).**
 - `test_menu_screen`: parse error — the parallel menuicons stream removed
   `MenuScreen._fmt` the test still calls (untracked `app/art/screens/menuicons/`).
 - `test_browse_nav`: SeleccionScreen.gd:107 "Identifier not found: GameDB" compile
   failure in test context → career-select instantiation fails inside the test.
 - `test_stadium_works` / `test_transfer_screen`: tap-dismiss/back regressions (1 FAIL each).
 - `shot_screens.gd` (the screen-render smoke): times out headless (>3 min; previously CI-green).
+  (Root cause: `frame_post_draw` never fires on the headless dummy driver — CI runs it
+  rendered under xvfb. Now guarded: headless run prints SHOTS SKIPPED and exits.)
 
 ## B6 — BINDING VISUAL REFERENCE: full original-game walkthrough (2026-07-02)
 `screenshots/original-walkthrough-2026-07-02/` = **639 PNG frames** captured live from the
@@ -370,6 +375,23 @@ OFFERS browsing + Ronaldo/Weah cards, active youth-scout search, 2 more matches.
 **USER PRIORITY (binding, 2026-07-02):** rebuild target = *fully playable as the original
 with BRIEF + RESULT match modes*. The 3D WATCH match is explicitly LAST — the user mostly
 plays BRIEF. Everything else in B5 comes first.
+
+## B4b — BRIEF/RESULT evidence note (2026-07-02, from the run-2 walkthrough frames)
+The original BRIEF EVENTS feed (run-2 sheet09, Man Utd v Sao Paulo friendly) shows
+minute-stamped lines of these kinds: Kick Off / "Shot by X (club)" / "Shot saved by
+GK (club)" / "Good run by X (club)" / "Cross by X (club)" / "Header by X (club)" /
+"X (club), injured" / "Goal by X (club)" (goal lines red/colour-coded), plus the
+possession bar and the FIRST HALF clock. The HALF TIME / FULL TIME (RESULT) panels
+show per-side BOOKINGS (name+min) and GOALS (name+min) columns, TOTAL FOULS, the
+POSSESSION % bar, the stadium panel (capacity/attendance/att. money/sponsor boards/
+sponsorship) and MAN OF THE MATCH w/ photo.
+**Engine implication:** the instant-result stat engine (Pm98StatMatch) records ONLY
+goal events (types 0-3 + pens) — shots/saves/runs/crosses/injuries/bookings/fouls/
+possession are produced by the REAL-TIME match engine the engine-RE track is porting.
+So the source-true BRIEF feed must consume the positional engine's event stream once
+it lands; MatchCommentary's RATE_* sprinkles cannot be made source-true from the
+instant-result vector alone (its GOAL lines already ride the real vector — scorer +
+minute — since MatchSim `goals`).
 
 ## B5 — Ranked fix list (user reviews; no fixes applied in this pass)
 1. Remove/replace the invented BrowseScreen surfaces that shadow REAL original screens:
