@@ -104,9 +104,11 @@ func _test_matrix_drives_built_roster() -> void:
 		them[k][0xc] = 0
 		them[k][0x34] = 0
 
-	# opponents start with NO matrix fields; the build never writes 0x17c/0x180/the dist keys.
+	# opponents start with the ctor's faithful ZERO (playerbuild_writeset.txt writes
+	# p[0x17c]=0 / p[0x180]=0 at build; disasm 0x5a2db1 region) — never the matrix seed.
+	# The matrix pass below is what raises them to MATRIX_INIT / real projections.
 	for q in them:
-		_ok(not q.has(0x17c), "pre: opponent has no nearest-opp field 0x17c")
+		_ok(int(q.get(0x17c, 0)) == 0, "pre: opponent 0x17c is the ctor zero (not matrix-seeded)")
 
 	# throttle: build_relationship_matrix runs only when (ctx[0x2e0]+1)&7 == 0.
 	t0[0x2e0] = 7
