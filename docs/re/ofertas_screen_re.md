@@ -43,11 +43,37 @@ tail shows the standard title block + a RETURN at `CRect(0x1ee,0x1ba,0x25e,0x1d3
   renew), `primasgol.bmp` (Scoring bonus), `casacoche.bmp` (House and car).
   Fonts ProMan8 for the rows.
 
-### Band layout (capture, to refine when built)
-Per band: player header row `NAME | EN SP ST AG QU FI MO AV ROLE POS` (his attribute
-strip — MO is the same dynamic-morale gap as SQUAD MANAGEMENT → render `-`), then up
-to 5 offer rows `CLUB | CLUB OFFER | YEARLY WAGE | YEARS | CLAUSES`, cells boxed in
-the house style. RETURN bottom-right.
+### Band layout (measured off the capture; BUILT 2026-07-02, CurrentOffersScreen.gd)
+Capture→design offset dx=+2 dy=+12 (anchored on the RE'd band y=98 + panel rects; the
+PNG is a 644x456 window crop). The 564x48 block = a kit-figure gutter (x 36..62, the
+band template DAT_00666f70 is un-RE'd → the club's extracted kit art stands in at the
+captured spot (40,y+1)-(58,y+24)) + the boxed rows x 63..599, four rows inside 1px
+black borders (hlines at y+13/+26/+39):
+- **Row 1 (y+1..+12)** name/attr strip: navy fill (42,95,170) x64 w272, name white at
+  x=86 (names render TITLE-CASED — the EQUIPOS cipher is single-case, the original
+  cases at render: "Southgate", frame-077 "Van der Gouw" → PMChrome.title_case_name);
+  8 white value cells x=338 pitch 25 w 24 `EN SP ST AG QU FI MO AV`, value colours
+  EN(150,0,0) SP/ST/AG/QU(100,100,140) FI(42,95,170) MO(100,130,10) AV(210,0,0);
+  ROLE cell [538,+23] olive (140,170,30) + the camrol icon (player+0x18 fine pos + 1),
+  white when the slot is empty; POS cell [562,+37] black GK/DEF/MID/FOR.
+  **MO renders `-`** — the same unmodelled dynamic-morale gap as SQUAD MANAGEMENT.
+- **Row 2 (y+14..+25)** labels row: fill (160,180,200), text (30,52,98) ProMan8,
+  CLUB / CLUB OFFER / YEARLY WAGE / YEARS centred over their row-3 cells, CLAUSES
+  centred over the whole clause region.
+- **Row 3 (y+27..+38)** ONE offer row (fills drawn even when empty, capture bands 3-5):
+  CLUB [67,w108] (200,220,240) w/ dark-navy text; CLUB OFFER [176,w115] (42,63,170) w/
+  pale (166,202,240) £; YEARLY WAGE [292,w115] (75,109,172) w/ (180,200,220) £
+  (= Contract.yearly(weekly)); YEARS [408,w36] (30,52,98) w/ white int; then light
+  cells [445,w19] [465,w29], the CLAUSES icon strip [495,w81] (4 slots of ~20px for
+  descenso/partidos/primasgol/casacoche — empty in the capture; drawn only if an offer
+  row carries `clauses`) and [577,w19].
+- **Row 4 (y+40..+46)** footer strip, fill (160,180,200).
+Panel-top column header at y=84: `NAME` (42,63,170) at x=86 + the codes over their
+cells in the value colours (hdr AV = (212,95,0), MO hdr (80,110,5), ROLE black,
+POS (128,128,128)). The original shows ONE offer row per band while the app store
+keeps ≤5 bids — the row shows the NEWEST bid; a band tap hands the full list to the
+caller for accept/refuse (the original's answer interaction is un-RE'd → interim
+browse dialogs in Main until sourced). RETURN bottom-right w/ the OFERTAS money-bag.
 
 ## App-side state (SHIPPED)
 `Career.sale_offers` (pid → up to **5** rows `{buyer_id, buyer_name, offer,
@@ -60,9 +86,12 @@ NOTE: the pre-existing `Career.pending_offers` Array is the MANAGER-JOB offers
 store — do not confuse the two.
 
 ## NEXT (build order)
-1. `CurrentOffersScreen.gd` off this geometry + the capture; wire accept/refuse to
-   `Career.accept_offer/refuse_offer`.
-2. The FICHAR hub screen (or an interim direct route to CURRENT OFFERS from the hub
-   transfer icon) — decide against the walkthrough evidence for the hub icon flow.
-3. The make-offer card (OFFER panel on the PLAYER INFO card, `make_offer_card.png`):
+1. ~~`CurrentOffersScreen.gd`~~ **SHIPPED 2026-07-02**: screen built off the measured
+   geometry above; the TRANSFER MARKET screen's CURRENT OFFERS nav button (the sourced
+   FUN_00532a50 hub route) opens it; band tap → bid-list → ACCEPT/REFUSE through
+   `Career.accept_offer/refuse_offer` (interim browse dialogs — the original's answer
+   interaction is un-RE'd). Clause icons baked (`export_icons.py`:
+   clause_{descenso,partidos,primasgol,casacoche}.png). Tests:
+   `test_current_offers_screen.gd`; render fixture `current_offers_demo.png`.
+2. The make-offer card (OFFER panel on the PLAYER INFO card, `make_offer_card.png`):
    RE `FUN_0052c66f`-region rects before build; CLAUSES checkboxes + steppers.

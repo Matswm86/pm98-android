@@ -31,6 +31,7 @@ func _run() -> void:
 		["res://scenes/TransferScreen.gd", "transfer_demo.png"],
 		["res://scenes/RivalScreen.gd", "rival_demo.png"],
 		["res://scenes/PlayerInfoScreen.gd", "playerinfo_demo.png"],
+		["res://scenes/CurrentOffersScreen.gd", "current_offers_demo.png"],
 	]
 	var club := _demo_club()
 	var tactics := Tactics.auto_pick(club)
@@ -83,6 +84,17 @@ func _run() -> void:
 			var pl: Dictionary = (dc["players"] as Array)[0]
 			pl["contract_years"] = 2
 			node.setup(pl, dc, 1, true)
+		elif s[1] == "current_offers_demo.png":
+			# CURRENT OFFERS mirroring the owner's capture: 2 listed players with a bid
+			# each + 3 empty band slots (screenshots/transfer-offers-2026-07-02).
+			var oc := _demo_club()
+			var ps: Array = oc["players"]
+			node.setup([
+				{"player": ps[2], "offers": [{"buyer_name": "ASTON VILLA",
+					"offer": 5000, "weekly_wage": 100, "years": 1, "week": 4}]},
+				{"player": ps[13], "offers": [{"buyer_name": "ASTON VILLA",
+					"offer": 5000, "weekly_wage": 100, "years": 1, "week": 4}]},
+			], "M. MJATVEDT", "MANCHESTER UTD.", "Premier", "1997-98", 4, 40)
 		for _i in 14:
 			await process_frame
 		await RenderingServer.frame_post_draw

@@ -10,10 +10,13 @@ class_name TransferScreen
 ## Driven live by Career.market() (dearest first). Native 640x480; scales to fit its parent.
 ##
 ## INTERACTIVE: the original ARROW scroll buttons page the buyable list when it overflows
-## the panel (KEEPERS off the top, the last FORWARDS into view); any other tap emits
-## `back_pressed` (the display-screen tap-to-dismiss).
+## the panel (KEEPERS off the top, the last FORWARDS into view); the CURRENT OFFERS nav
+## button opens the offers screen (`current_offers_pressed` — the sourced FICHAR-hub
+## route, docs/re/ofertas_screen_re.md); any other tap emits `back_pressed` (the
+## display-screen tap-to-dismiss).
 
 signal back_pressed
+signal current_offers_pressed
 
 const W := 640
 const H := 480
@@ -148,6 +151,8 @@ func _to_design(p: Vector2) -> Vector2:
 func _hit(d: Vector2) -> String:
 	if BTN_RETURN.has_point(d):
 		return "return"
+	if BTN_CURRENT.has_point(d):
+		return "current"
 	if _max_scroll() <= 0:
 		return ""
 	if SCROLL_UP.has_point(d):
@@ -178,10 +183,13 @@ func _on_input(e: InputEvent) -> void:
 		var was := _press
 		_press = ""
 		if a == was and a != "":
-			# RETURN dismisses; a scroll-button tap pages the list. A tap on a player row or
-			# empty space is a no-op (it no longer bounces back to the hub).
+			# RETURN dismisses; CURRENT OFFERS opens the offers screen; a scroll-button
+			# tap pages the list. A tap on a player row or empty space is a no-op (it
+			# no longer bounces back to the hub).
 			if a == "return":
 				back_pressed.emit()
+			elif a == "current":
+				current_offers_pressed.emit()
 			else:
 				_scroll += SCROLL_STEP if a == "down" else -SCROLL_STEP
 				_clamp_scroll()
@@ -355,7 +363,7 @@ func _draw_nav() -> void:
 	_txt(_f10, int(BANK_BOX.position.x) + 8, int(BANK_BOX.position.y) + 5, "BANK", C_PANEL_TXT, 11)
 	_txt(_f12, int(BANK_BOX.end.x) - 8, int(BANK_BOX.position.y) + 24, fmt_money(_cash), C_GOLD, 13, true)
 
-	_nav_btn(BTN_CURRENT, "CURRENT OFFERS", C_GOLD, _f10)
+	_nav_btn(BTN_CURRENT, "CURRENT OFFERS", C_GOLD, _f10, "", _press == "current")
 	_nav_btn(BTN_SCOUT, "SCOUT", C_PANEL_TXT, _f12, "scout")
 	_nav_btn(BTN_OFFERS, "OFFERS", C_PANEL_TXT, _f12, "offers")
 	_nav_btn(BTN_RETURN, "RETURN", C_GOLD, _f12)
@@ -367,8 +375,8 @@ func _draw_nav() -> void:
 			"%d offers left" % _offers, PMChrome.C_STAR_OFF, 10)
 
 
-func _nav_btn(r: Rect2, label: String, col: Color, f: Font, glyph := "") -> void:
-	PMChrome.bevel(self, r, C_DKBTN, C_DKBTN_HI, C_DKBTN_LO)
+func _nav_btn(r: Rect2, label: String, col: Color, f: Font, glyph := "", pressed := false) -> void:
+	PMChrome.bevel(self, r, C_DKBTN_HI if pressed else C_DKBTN, C_DKBTN_HI, C_DKBTN_LO)
 	# The original SECRETARIO magnifier / OFERTAS money-bag glyph sits to the left of the
 	# label when baked; without it the label just keeps its original inset.
 	var tx := int(r.position.x) + 10

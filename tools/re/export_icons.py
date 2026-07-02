@@ -22,6 +22,7 @@ Usage:
   export_icons.py            # bake the full set into app/art/icons/
   export_icons.py --sheet P  # also write a contact sheet to P for eyeballing
 """
+
 from __future__ import annotations
 
 import struct
@@ -40,14 +41,20 @@ PAL_NAME = "MANAGER.PAL"
 # name -> output subpath (under app/art/icons). camrol baked as camrol/camrolNN.png.
 CAMROL = [(f"CAMROL{i:02d}.BMP", f"camrol/camrol{i:02d}.png") for i in range(1, 19)]
 EXTRAS = [
-    ("FLECHAGREEN.BMP", "fin_up.png"),     # income / positive ledger row marker
-    ("FLECHARED.BMP", "fin_down.png"),     # expense / negative ledger row marker
+    ("FLECHAGREEN.BMP", "fin_up.png"),  # income / positive ledger row marker
+    ("FLECHARED.BMP", "fin_down.png"),  # expense / negative ledger row marker
     ("ARROWUPON.BMP", "scroll_up_on.png"),
     ("ARROWUPOFF.BMP", "scroll_up_off.png"),
     ("ARROWDOWNON.BMP", "scroll_down_on.png"),
     ("ARROWDOWNOFF.BMP", "scroll_down_off.png"),
-    ("SECRETARIO.BMP", "scout.png"),       # transfer SCOUT button glyph (magnifier)
-    ("OFERTAS.BMP", "offers.png"),         # transfer OFFERS button glyph (money bag)
+    ("SECRETARIO.BMP", "scout.png"),  # transfer SCOUT button glyph (magnifier)
+    ("OFERTAS.BMP", "offers.png"),  # transfer OFFERS button glyph (money bag)
+    # The four contract-CLAUSES icons FUN_00524500 loads per CURRENT OFFERS band
+    # (docs/re/ofertas_screen_re.md); the make-offer card checkboxes reuse them.
+    ("DESCENSO.BMP", "clause_descenso.png"),  # Free if relegated (down arrow)
+    ("PARTIDOS.BMP", "clause_partidos.png"),  # Matches to renew (document)
+    ("PRIMASGOL.BMP", "clause_primasgol.png"),  # Scoring bonus (ball)
+    ("CASACOCHE.BMP", "clause_casacoche.png"),  # House and car
 ]
 
 
@@ -68,8 +75,8 @@ def decode_dib(raw: bytes, pal: list[int]) -> Image.Image:
         top_down = h < 0
         h = abs(h)
     stride = ((w + 3) // 4) * 4
-    pix = raw[14 + hsz:]
-    rows = [pix[y * stride:y * stride + w] for y in range(h)]
+    pix = raw[14 + hsz :]
+    rows = [pix[y * stride : y * stride + w] for y in range(h)]
     if not top_down:
         rows = rows[::-1]
     img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
@@ -100,6 +107,7 @@ def bake(pal: list[int]) -> list[tuple[str, Image.Image]]:
 
 def contact_sheet(baked: list[tuple[str, Image.Image]], path: Path) -> None:
     from PIL import ImageDraw
+
     cell, cols, scale, pad, label = 88, 9, 4, 8, 14
     cw, ch = cell + pad, cell + pad + label
     rows = (len(baked) + cols - 1) // cols

@@ -1454,8 +1454,93 @@ func _show_transfer_screen() -> void:
 	add_child(scr)
 	scr.setup(c.market(), c.club_name, "", c.season, c.cash, win, c.offers_left, c.week + 1)
 	# The screen owns its input now (the ARROW scroll buttons page the list); a non-scroll
-	# tap emits back_pressed to dismiss the overlay.
+	# tap emits back_pressed to dismiss the overlay. CURRENT OFFERS is the sourced FICHAR
+	# hub route to the offers screen (docs/re/ofertas_screen_re.md FUN_00532a50).
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
+	scr.current_offers_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		_show_current_offers_screen())
+
+## The original-art CURRENT OFFERS (OFERTAS) screen: up to 5 transfer-listed players,
+## each band showing his attribute strip + the newest bid (CLUB | CLUB OFFER | YEARLY
+## WAGE | YEARS | CLAUSES), reversed from MANAGER.EXE + the owner's capture
+## (docs/re/ofertas_screen_re.md; CurrentOffersScreen.gd). A band tap opens the bid
+## list to ACCEPT / REFUSE (Career.accept_offer / refuse_offer — the accept/refuse
+## interaction itself is un-RE'd, so it rides the interim browse pattern); RETURN
+## dismisses back to the transfer screen.
+func _show_current_offers_screen() -> void:
+	var scr: CurrentOffersScreen = load("res://scenes/CurrentOffersScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	var feed := func() -> void:
+		var bands: Array = []
+		for pid in _career.transfer_listed:
+			var p := _career._find_in(_career.club_id, int(pid))
+			if p.is_empty():
+				continue
+			bands.append({"player": p, "offers": _career.offers_for(int(pid))})
+			if bands.size() == 5:
+				break
+		scr.setup(bands, "", _career.club_name, _career.league_name, _career.season,
+			_career.week + 1, _career.club_id)
+	feed.call()
+	scr.back_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		scr.queue_free())
+	scr.band_pressed.connect(func(player: Dictionary) -> void:
+		_browse_player_offers(int(player.get("id", -1)), str(player.get("name", "?")), feed))
+
+## The bid list for one listed player: each row a live offer; tapping one asks
+## ACCEPT (the sale, through accept_sale's squad-floor guards) or REFUSE (drops the
+## bid, the listing stays). Career state saves after either mutation.
+func _browse_player_offers(pid: int, pname: String, refresh: Callable) -> void:
+	var offers := _career.offers_for(pid)
+	if offers.is_empty():
+		_toast("No offers for %s yet." % pname)
+		return
+	var rows: Array = []
+	for o in offers:
+		rows.append({"text": "%s   £%s  -  wage £%s/wk  -  %d yrs" % [
+			str(o.get("buyer_name", "?")), _fmt_int(int(o.get("offer", 0))),
+			_fmt_int(int(o.get("weekly_wage", 0))), int(o.get("years", 0))]})
+	# Close only the browse: the offers screen stays on top (dismissing via
+	# _dismiss_career_browse would raise the hub over it).
+	_mount_browse("OFFERS  -  %s" % pname, "%d bid%s  -  tap to answer" % [
+			rows.size(), "" if rows.size() == 1 else "s"], rows,
+		func(i: int) -> void:
+			_close_browse_only()
+			_confirm_offer(pid, pname, i, refresh),
+		_close_browse_only)
+
+func _confirm_offer(pid: int, pname: String, idx: int, refresh: Callable) -> void:
+	var offers := _career.offers_for(pid)
+	if idx >= offers.size():
+		return
+	var o: Dictionary = offers[idx]
+	_mount_browse("%s  -  £%s" % [str(o.get("buyer_name", "?")), _fmt_int(int(o.get("offer", 0)))],
+		"Answer the offer for %s" % pname,
+		[{"text": "ACCEPT  -  sell for £%s" % _fmt_int(int(o.get("offer", 0)))},
+			{"text": "REFUSE  -  turn the bid down"}, {"text": "Cancel"}],
+		func(i: int) -> void:
+			_close_browse_only()
+			if i == 0:
+				var r := _career.accept_offer(pid, idx)
+				_toast(str(r.get("msg", "")))
+				if bool(r.get("ok")):
+					_career.save()
+			elif i == 1:
+				var r := _career.refuse_offer(pid, idx)
+				_toast(str(r.get("msg", "")))
+				_career.save()
+			refresh.call(),
+		_close_browse_only)
+
+## Free the browse overlay WITHOUT raising the hub (for browse flows layered over a
+## still-mounted art screen, like the CURRENT OFFERS accept/refuse dialogs).
+func _close_browse_only() -> void:
+	if _browse != null and is_instance_valid(_browse):
+		_browse.queue_free()
+	_browse = null
 
 ## The original-art BOARD OF DIRECTORS (DIRECTIVA) screen as a full-screen overlay:
 ## the three confidence/rating meters + the board's objective + your record, at the

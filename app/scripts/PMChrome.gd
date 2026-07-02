@@ -229,6 +229,22 @@ static func text(ci: CanvasItem, f: Font, x: float, y_top: float, s: String,
 	ci.draw_string(f, Vector2(px, y_top + f.get_ascent(sz)), s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
 
 
+## PM98's rendered name casing. The EQUIPOS cipher is single-case (5-bit letters,
+## tools/extract_english.py `ch()`), so game_db names arrive UPPERCASE; the real
+## screens title-case at render time with lowercase name particles (walkthrough
+## frame 077 "Van der Gouw", the CURRENT OFFERS capture "Southgate"/"Aston Villa").
+## First word always capitalised; the particle list covers the frame-verified case.
+const _NAME_PARTICLES := ["der", "de", "la", "le", "di", "da", "van", "von", "den", "dos"]
+
+static func title_case_name(s: String) -> String:
+	var words := s.split(" ", false)
+	var out := PackedStringArray()
+	for i in words.size():
+		var w := str(words[i]).to_lower()
+		out.append(w if i > 0 and w in _NAME_PARTICLES else w.capitalize())
+	return " ".join(out)
+
+
 ## A beveled rectangle: solid base, light top/left edge, dark bottom/right edge.
 static func bevel(ci: CanvasItem, r: Rect2, base: Color, hi: Color, lo: Color, bw := 1.0) -> void:
 	ci.draw_rect(r, base, true)
