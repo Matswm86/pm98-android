@@ -30,6 +30,7 @@ func _run() -> void:
 		["res://scenes/FinanceScreen.gd", "finance_demo.png"],
 		["res://scenes/TransferScreen.gd", "transfer_demo.png"],
 		["res://scenes/RivalScreen.gd", "rival_demo.png"],
+		["res://scenes/PlayerInfoScreen.gd", "playerinfo_demo.png"],
 	]
 	var club := _demo_club()
 	var tactics := Tactics.auto_pick(club)
@@ -66,6 +67,13 @@ func _run() -> void:
 			# report renders: XI table + team rating + formation dots.
 			node.setup(_demo_club(), {"id": 7, "name": "OUR CLUB"}, 5, "A. LEIGH",
 				"Premier League", "1997-98", 1)
+		elif s[1] == "playerinfo_demo.png":
+			# The PLAYER INFORMATION card for an OWN squad player -> the RENEW/TRANSFER/SACK/OK
+			# button row is live (frame 081_154619).
+			var dc := _demo_club()
+			var pl: Dictionary = (dc["players"] as Array)[0]
+			pl["contract_years"] = 2
+			node.setup(pl, dc, 1, true)
 		for _i in 14:
 			await process_frame
 		await RenderingServer.frame_post_draw

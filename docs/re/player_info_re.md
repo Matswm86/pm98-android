@@ -88,3 +88,12 @@ the broad LUT -- corrected 2026-06-26.)
   (`FINE_ROLE` in `PlayerInfoScreen.gd`); verified vs the Bakayoko reference. See positions_re.md.
 - Nationality FLAG art (`DBDAT/BANDERAS.PKF`) extracted (2026-06-26): the real waving flag
   now blits left of the country name on the FICHA. See `tools/re/export_flags.py`.
+- **Action button row (2026-07-02).** When opened from SQUAD MANAGEMENT for your OWN player,
+  the card carries **RENEW / TRANSFER / SACK / OK** (builder `FUN_00526a60`; decompile in
+  `docs/re/playerinfo/`). Card-local rects (push-tracked disasm): RENEW `(85,325) 104x25`,
+  TRANSFER `(196,325) 104x25`, SACK `(307,325) 104x25`, OK `(429,325) 52x25` — three equal
+  action buttons + a narrow OK. Wired to `Career.renew` / `toggle_listed` / `release`
+  (PlayerInfoScreen emits `renew_/transfer_/sack_requested`; Main runs the action on the live
+  roster dict). Read-only (buttons hidden) for another club's player. Frame `081_154619`.
+  GAP: the CLAUSES panel + YEARS|LEFT split + the TRANSFER->TEAM OFFER accept/refuse screen
+  (run-3) are not yet on the card — see APP_VS_SPEC_AUDIT B7.

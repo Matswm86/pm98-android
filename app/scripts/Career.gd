@@ -1176,6 +1176,37 @@ func accept_sale(pid: int, buyer_id: int, offer: int) -> Dictionary:
 	_log("%s has been signed by %s for £%s." % [player.get("name", "?"), buyer_name, _money(offer)])
 	return {"ok": true, "msg": "Sold %s to %s for £%s." % [player.get("name", "?"), buyer_name, _money(offer)]}
 
+## SACK a squad player (the PLAYER INFORMATION button): terminate his contract now. He leaves
+## for free and joins the free-agent pool; you pay off the balance of his deal as compensation
+## (COMPENSATIONS OF CONTRACT = the remaining contract years' wage). Same squad-floor guards as
+## a sale (you can't sack yourself unable to field a side / below the keeper minimum), and a
+## loaned-in player is returned, not sackable. {ok, msg, compensation}.
+func release(pid: int) -> Dictionary:
+	var player := _find_in(club_id, pid)
+	if player.is_empty():
+		return {"ok": false, "msg": "That player is not in your squad."}
+	if player.get("on_loan"):
+		return {"ok": false, "msg": "%s is only on loan; you can't sack him." % player.get("name", "?")}
+	var squad := my_squad()
+	if squad.size() <= TransferMarket.SQUAD_MIN:
+		return {"ok": false, "msg": "Your squad is too small to sack anyone (min %d)." % TransferMarket.SQUAD_MIN}
+	if player.get("isGK") and TransferMarket._count_keepers(squad) <= TransferMarket.MIN_KEEPERS:
+		return {"ok": false, "msg": "You must keep at least %d goalkeepers." % TransferMarket.MIN_KEEPERS}
+	var weekly := Contract.current_weekly(player, tier)
+	var comp := weekly * Contract.SEASON_WEEKS * maxi(1, int(player.get("contract_years", 1)))
+	var pname: String = player.get("name", "?")
+	rosters[club_id].erase(player)
+	transfer_listed.erase(pid)
+	shortlist.erase(pid)
+	player["clubId"] = -1                 # now a free agent (no club)
+	player["auto_renew"] = false
+	free_agents.append(player)
+	cash -= comp
+	_log("You have sacked %s; paid £%s compensation of contract." % [pname, _money(comp)])
+	return {"ok": true, "msg": "Sacked %s. Paid £%s compensation." % [pname, _money(comp)],
+		"compensation": comp}
+
+
 ## Offer a squad player a renewal at `offer_weekly` £/wk (default = meet his demand). It is a
 ## NEGOTIATION: he accepts at/above his wage demand, may balk just below it, and refuses a
 ## lowball -- "%s has rejected your offer for renewal." On acceptance his term resets and his

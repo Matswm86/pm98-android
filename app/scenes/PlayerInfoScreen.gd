@@ -14,9 +14,16 @@ class_name PlayerInfoScreen
 ## the attr -> card-label mapping is the one confirmed against the Babb reference. Native
 ## 640x480; scales to fit its parent.
 ##
-## INTERACTIVE: the OK button or a tap on empty space emits `back_pressed`.
+## INTERACTIVE: the source button row RENEW / TRANSFER / SACK / OK (FUN_00526a60, card-local
+## rects mapped to this full-screen card). RENEW/TRANSFER/SACK emit their request signals (Main
+## runs the Career action); OK or a tap on empty card space emits `back_pressed`. A read-only
+## card (opened from the DATA BASE / opponent browse, not your own squad) hides the three action
+## buttons -- pass `actions_enabled = false` to setup.
 
 signal back_pressed
+signal renew_requested(player)
+signal transfer_requested(player)
+signal sack_requested(player)
 
 const W := 640
 const H := 480
@@ -43,7 +50,17 @@ const C_VAL := Color(0.10, 0.13, 0.22)
 const C_GOLD := Color(1.0, 0.86, 0.22)
 
 const KIT_SRC := Rect2(0, 0, 31, 64)
-const OK_BTN := Rect2(548, 446, 86, 26)
+# The source button row RENEW / TRANSFER / SACK / OK (FUN_00526a60: card-local rects RENEW
+# (85,325,104,25), TRANSFER (196,325,104,25), SACK (307,325,104,25), OK (429,325,52,25) --
+# equal action buttons + a narrow OK). This card fills the screen, so the row sits along the
+# bottom at the same proportions.
+const RENEW_BTN := Rect2(86, 444, 118, 26)
+const TRANSFER_BTN := Rect2(210, 444, 118, 26)
+const SACK_BTN := Rect2(334, 444, 118, 26)
+const OK_BTN := Rect2(458, 444, 176, 26)
+const C_ACT := Color(0.10, 0.16, 0.32)
+const C_ACT_HI := Color(0.34, 0.46, 0.72)
+const C_ACT_LO := Color(0.04, 0.08, 0.18)
 
 # attr code -> readable; the confirmed FICHA mapping (Babb reference).
 const POS_WORD := {"GK": "GOALKEEPER", "DF": "DEFENDER", "MF": "MIDFIELDER", "FW": "FORWARD"}
@@ -67,6 +84,7 @@ var _p: Dictionary = {}
 var _club: Dictionary = {}
 var _tier: int = 1
 var _press := ""
+var _actions := false   # show RENEW/TRANSFER/SACK (only for the manager's own squad player)
 
 
 func _ready() -> void:
@@ -83,10 +101,13 @@ func _ready() -> void:
 
 
 ## Feed the player + his club (for kit/name) + league tier (for value/wage), repaint.
-func setup(player: Dictionary, club: Dictionary, tier: int = 1) -> void:
+## `actions_enabled` shows the RENEW / TRANSFER / SACK buttons (only when it's the manager's
+## own squad player); a read-only opener (opponent / DATA BASE browse) leaves them hidden.
+func setup(player: Dictionary, club: Dictionary, tier: int = 1, actions_enabled := false) -> void:
 	_p = player
 	_club = club
 	_tier = maxi(1, tier)
+	_actions = actions_enabled
 	queue_redraw()
 
 
@@ -113,15 +134,38 @@ func _on_input(e: InputEvent) -> void:
 		tap = true
 	if not tap:
 		return
-	var on_ok := OK_BTN.has_point(_to_design(pos))
+	var hit := _hit(_to_design(pos))
 	if pressed:
-		_press = "ok" if on_ok else ""
+		_press = hit
 		queue_redraw()
 	else:
+		var was := _press
 		_press = ""
 		queue_redraw()
-		# OK button or a tap anywhere on the card dismisses (display-screen pattern).
+		# A completed press+release on a button fires it; anywhere else dismisses the card.
+		if hit != "" and hit == was:
+			match hit:
+				"renew": renew_requested.emit(_p)
+				"transfer": transfer_requested.emit(_p)
+				"sack": sack_requested.emit(_p)
+				_: back_pressed.emit()
+			return
 		back_pressed.emit()
+
+
+## Which button a design-space point hits ("renew"/"transfer"/"sack"/"ok"), or "" for the card
+## body. The three action buttons only exist when `_actions` is on (own squad player).
+func _hit(d: Vector2) -> String:
+	if OK_BTN.has_point(d):
+		return "ok"
+	if _actions:
+		if RENEW_BTN.has_point(d):
+			return "renew"
+		if TRANSFER_BTN.has_point(d):
+			return "transfer"
+		if SACK_BTN.has_point(d):
+			return "sack"
+	return ""
 
 
 # ---- derived values ------------------------------------------------------
@@ -348,7 +392,9 @@ func _draw_contract() -> void:
 	var weekly := Contract.current_weekly(_p, _tier)
 	var yearly := Contract.yearly(weekly)
 	var years := int(_p.get("contract_years", 0))
-	var cols := [["VALUE", "£%s" % _money(value)], ["YEARLY WAGE", "£%s" % _money(yearly)],
+	# CLUB FEE / YEARLY WAGE / YEARS LEFT -- the frame's contract labels (CLUB FEE = the
+	# transfer value shown in the real PLAYER INFORMATION card).
+	var cols := [["CLUB FEE", "£%s" % _money(value)], ["YEARLY WAGE", "£%s" % _money(yearly)],
 		["YEARS LEFT", str(years) if years > 0 else "-"]]
 	var cw := (panel.size.x - 16) / 3.0
 	for i in 3:
@@ -360,9 +406,19 @@ func _draw_contract() -> void:
 		_txt(_f14, vb.position.x, vb.position.y + 4, str(cols[i][1]), Color(1.0, 0.92, 0.6), 15, 1, vb.size.x)
 
 
+## The source button row: RENEW / TRANSFER / SACK (own squad only) + OK. Each lifts on press.
 func _draw_ok() -> void:
+	if _actions:
+		_action_btn(RENEW_BTN, "renew", "RENEW")
+		_action_btn(TRANSFER_BTN, "transfer", "TRANSFER")
+		_action_btn(SACK_BTN, "sack", "SACK")
 	PMChrome.bevel(self, OK_BTN, C_OK_HI if _press == "ok" else C_OK, C_OK_HI, C_OK.darkened(0.4))
 	_txt(_f14, OK_BTN.position.x, OK_BTN.position.y + 5, "OK", C_GOLD, 15, 1, OK_BTN.size.x)
+
+
+func _action_btn(r: Rect2, id: String, label: String) -> void:
+	PMChrome.bevel(self, r, C_ACT_HI if _press == id else C_ACT, C_ACT_HI, C_ACT_LO)
+	_txt(_f14, r.position.x, r.position.y + 5, label, C_LABEL, 15, 1, r.size.x)
 
 
 ## Thousands-separated integer (no locale dependency).

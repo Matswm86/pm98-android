@@ -842,13 +842,47 @@ func _open_database_squad(club: Dictionary) -> void:
 	_database.player_pressed.connect(_open_player_info.bind(club))
 
 ## PLAYER INFORMATION (FICHA) overlay for one squad player, raised over the SQUAD screen.
-## tier (for value/wage) comes from the club's division; OK / a tap dismisses it.
+## tier (for value/wage) comes from the club's division; OK / a tap dismisses it. When the
+## player is one of the MANAGER'S OWN squad, the source RENEW / TRANSFER / SACK buttons are
+## live (PM98 opens these from SQUAD MANAGEMENT); for another club's player (DATA BASE /
+## opponent browse) the card is read-only. The Career hooks mutate the live roster dict (same
+## object the overlay holds), so a RENEW updates YEARS in place and a SACK removes the player.
 func _open_player_info(player: Dictionary, club: Dictionary) -> void:
 	var scr: PlayerInfoScreen = load("res://scenes/PlayerInfoScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
-	scr.setup(player, club, FinanceModel.tier_of(club, GameDB.leagues))
+	var tier := FinanceModel.tier_of(club, GameDB.leagues)
+	var own: bool = _career != null and int(club.get("id", -1)) == _career.club_id
+	scr.setup(player, club, tier, own)
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
+	if not own:
+		return
+	var pid := int(player.get("id", -1))
+	# RENEW: agree a new deal at his wage demand (his term resets); refresh the card in place.
+	scr.renew_requested.connect(func(_p: Dictionary) -> void:
+		AudioManager.ui_select()
+		var res := _career.renew(pid)
+		_career.save()
+		scr.setup(player, club, tier, true)
+		_toast(str(res.get("msg", ""))))
+	# TRANSFER: place him on (or off) the transfer market -- "PLAYER PLACED ON TRANSFER MARKET".
+	scr.transfer_requested.connect(func(_p: Dictionary) -> void:
+		AudioManager.ui_select()
+		_career.toggle_listed(pid)
+		_career.save()
+		var listed := _career.is_listed(pid)
+		scr.setup(player, club, tier, true)
+		_toast("%s placed on the transfer market." % player.get("name", "?") if listed
+			else "%s removed from the transfer list." % player.get("name", "?")))
+	# SACK: terminate his contract (compensation paid); he leaves, so close the card + refresh.
+	scr.sack_requested.connect(func(_p: Dictionary) -> void:
+		AudioManager.ui_select()
+		var res := _career.release(pid)
+		_career.save()
+		if bool(res.get("ok", false)):
+			scr.queue_free()
+			_refresh_squad_overlay()
+		_toast(str(res.get("msg", ""))))
 
 ## Reversed LEAGUE TABLES overlay for any standings array (career or a SeasonSim table).
 ## RETURN dismisses; tapping a club row raises that club's DATA BASE squad (the managed

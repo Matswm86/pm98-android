@@ -419,8 +419,14 @@ Wiring done (B5-2): OPPONENT -> VIEW RIVAL (RivalScreen), PLAYERS -> SQUAD MANAG
   dynamic save-game value; the app has NO morale model and no static attr matches the
   frame's MO (79-99). Do NOT fabricate it; the refit needs a morale model first (or ship
   the 5 sourceable columns and defer MO).
-- **PLAYER INFORMATION actions.** The real per-player overlay (run-1: "Raimond VAN DER
-  GOUW"/"Ole Gunnar SOLSKJAER") has **RENEW / TRANSFER / SACK / OK**; TRANSFER = "PLAYER
-  PLACED ON TRANSFER MARKET" -> the TEAM OFFER accept/refuse flow (run-3). App's
-  PlayerInfoScreen is OK-only (display). Add the three actions on Career hooks (renew =
-  `_player_deal_action` renew; transfer-list + offers; sack = release + compensation).
+- **PLAYER INFORMATION actions.** DONE 2026-07-02. The overlay's real **RENEW / TRANSFER /
+  SACK / OK** row (source rects FUN_00526a60, card-local RENEW(85,325,104,25) /
+  TRANSFER(196,..) / SACK(307,..) / OK(429,..,52,25)) is now live on the manager's own
+  squad player: RENEW = `Career.renew` (meet his demand), TRANSFER = `Career.toggle_listed`
+  ("placed on the transfer market"), SACK = new `Career.release` (compensation of contract;
+  he joins the free-agent pool; squad-floor + keeper-min + on-loan guards). Card is
+  read-only (buttons hidden) for another club's player. CLUB FEE label fixed (was VALUE).
+  REMAINING: the TRANSFER->offers negotiation (solicit_sale/accept_sale exist; the TEAM
+  OFFER accept/refuse screen from run-3 is still only reachable via the old transfers
+  browse) and the CLAUSES panel (Free-if-relegated / Matches-to-renew / Scoring bonus /
+  House-and-car) + the YEARS|LEFT split are not yet on the card.
