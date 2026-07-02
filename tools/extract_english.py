@@ -363,6 +363,20 @@ def parse_club(d: bytes, off: int, end: int, archive: set[int] | None = None):
         # next one (it follows the player's bio, before the next player's record).
         nxt = anchors[k + 1] if k + 1 < len(anchors) else end
         row = next((w for j, w in attr_blocks if Y < j < nxt), None)
+        if row is None:
+            # COMPACT fallback: one English record (idx 118 HEREFORD U., 1277 bytes,
+            # zero 6c6b blocks) stores its players Spanish-style with the attr row
+            # in-line at Y+4..Y+13 + 0x01 terminator (extract_squads.py layout; same
+            # VE..PO order). Strict validation keeps extended records immune: their
+            # Y+4 is a length-prefixed string whose high len byte is 0 -> fails 1-99.
+            w = list(d[Y + 4 : Y + 14])
+            if (
+                len(w) == 10
+                and all(1 <= b <= 99 for b in w)
+                and Y + 14 < len(d)
+                and d[Y + 14] == 0x01
+            ):
+                row = w
         pos = POS_NAMES.get(d[Y - 3]) if Y - 3 >= 0 else None
         # pos==0 (GK) is the authoritative keeper marker; it fixes outfielders with a
         # high goalkeeping attribute (e.g. Grimandi PO=65) that PO>50 alone mislabels.

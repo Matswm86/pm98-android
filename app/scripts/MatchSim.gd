@@ -24,6 +24,10 @@ extends RefCounted
 
 static var use_stat_engine := true
 static var _legacy_env := -1   # lazy cache of OS.has_environment("PM98_LEGACY_ENGINE")
+# Legacy results served where a caller PASSED an XI and so expected the faithful stat
+# engine (audit §B3: that fallback used to be silent). Empty XIs are the documented
+# legacy route (euro frozen-ratings opponents) and do not count.
+static var fallback_count := 0
 
 
 static func _stat_on() -> bool:
@@ -83,6 +87,12 @@ static func simulate(rng: RandomNumberGenerator, rh: Dictionary, ra: Dictionary,
 			"shots_home": 0, "shots_away": 0, "conv_home": 0, "conv_away": 0,
 			"goals": _resolve_goals(mem, xi_h, xi_a, tid_h, tid_a),
 		}
+	# LOUD fallback (never silent): a non-empty XI that fails _usable means the caller
+	# expected the faithful engine and is getting the legacy abstraction instead.
+	if _stat_on() and (not xi_h.is_empty() or not xi_a.is_empty()):
+		fallback_count += 1
+		push_warning("[MATCHSIM_FALLBACK] #%d: XI failed _usable (h=%d ok=%s, a=%d ok=%s) -> legacy result for %d v %d" % [
+			fallback_count, xi_h.size(), _usable(xi_h), xi_a.size(), _usable(xi_a), tid_h, tid_a])
 	var res := MatchEngine.simulate(rng, rh, ra, minutes)
 	res["goals"] = []
 	return res

@@ -556,7 +556,7 @@ func _mgr_featured_xi() -> Array:
 	for pid in t.xi:
 		if by_id.has(int(pid)):
 			out.append(by_id[int(pid)])
-	return out
+	return _pad_xi(out, club_id)
 
 
 # ---- living league (rival squads, #12) -----------------------------------
@@ -593,7 +593,54 @@ func _ai_featured_xi(id: int) -> Array:
 		xi.append(gks[0])
 	for i in mini(10, outfield.size()):
 		xi.append(outfield[i])
-	return xi
+	return _pad_xi(xi, id)
+
+
+## Guarantee an 11-man, stat-engine-usable XI for a roster-backed club. When the fit
+## pool cannot fill it (an injury/ban pile-up), the remaining slots are filled from the
+## rest of the squad: fit players first, then unavailable ones, attr-carrying players
+## ahead of attr-less records (one attr-less entry kicks the WHOLE fixture to the legacy
+## fallback via MatchSim._usable), best ability first. Slot 0 stays a keeper whenever
+## the squad has one. The club fields its best possible 11 rather than silently handing
+## the fixture to the abstracted legacy engine (audit §B3 fallback close).
+func _pad_xi(xi: Array, id: int) -> Array:
+	if xi.size() >= 11:
+		return xi
+	var picked: Dictionary = {}
+	for p in xi:
+		picked[int(p.get("id", -1))] = true
+	var fit_ids: Dictionary = {}
+	for p in available_squad(id):
+		fit_ids[int(p.get("id", -1))] = true
+	var rest: Array = []
+	for p in squad_of(id):
+		if not picked.has(int(p.get("id", -1))):
+			rest.append(p)
+	rest.sort_custom(func(a, b):
+		var fa := int(fit_ids.has(int(a.get("id", -1))))
+		var fb := int(fit_ids.has(int(b.get("id", -1))))
+		if fa != fb:
+			return fa > fb
+		var aa := int(not (a.get("attrs", {}) as Dictionary).is_empty())
+		var ab := int(not (b.get("attrs", {}) as Dictionary).is_empty())
+		if aa != ab:
+			return aa > ab
+		return _ai_ovr(a) > _ai_ovr(b))
+	var out := xi.duplicate()
+	for p in rest:
+		if out.size() >= 11:
+			break
+		out.append(p)
+	# Slot 0 is the keeper the stat engine rates as such: if the pad left no GK up
+	# front but the squad has one, move the best GK to the front.
+	if not out.is_empty() and not bool(out[0].get("isGK", false)):
+		for i in range(1, out.size()):
+			if bool(out[i].get("isGK", false)):
+				var gk: Dictionary = out[i]
+				out.remove_at(i)
+				out.push_front(gk)
+				break
+	return out
 
 
 ## Selection proxy for a rival player: keepers by PO, outfielders by overall ability (CA).

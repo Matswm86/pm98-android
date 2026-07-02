@@ -47,11 +47,29 @@ func _run() -> bool:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = SEED
 	var manager_games := 0
+	MatchSim.fallback_count = 0
 	while not career.season_over():
 		var res := career.advance_week(rng, clubs_by_id)
 		if not res.is_empty():
 			manager_games += 1
 	ok = _assert(manager_games == 38, "manager played 38 games (got %d)" % manager_games) and ok
+	# §B3 fallback close: across the whole season no fixture may drop to the legacy
+	# engine — every league club fields a usable (padded) XI for the stat engine.
+	ok = _assert(MatchSim.fallback_count == 0,
+		"no legacy fallback all season (got %d)" % MatchSim.fallback_count) and ok
+
+	# Guarantee-XI pad: injure the squad down to under 11 fit — the featured XI must
+	# still field 11 real roster players, keeper up front, so the stat engine keeps
+	# the fixture instead of the invented legacy fallback.
+	var c2 := Career.create(prem[1], league, prem, leagues)
+	var sq: Array = c2.my_squad()
+	for i in range(0, sq.size() - 7):   # leave only 7 fit players
+		sq[i]["injured_weeks"] = 4
+	var padded: Array = c2._mgr_featured_xi()
+	ok = _assert(padded.size() == 11, "padded XI fields 11 under mass injuries (got %d)" % padded.size()) and ok
+	ok = _assert(not padded.is_empty() and bool(padded[0].get("isGK", false)),
+		"padded XI keeps a keeper at slot 0") and ok
+	ok = _assert(MatchSim._usable(padded), "padded XI passes the stat-engine gate") and ok
 
 	# Every club played 2*(20-1) = 38 games; points conserved (3*W + D across table).
 	var games_each_ok := true

@@ -43,9 +43,21 @@ func _init() -> void:
 		"stat engine deterministic for a fixed seed")
 
 	# Unusable XI (empty) -> legacy fallback even with the flag ON (no crash, sane score).
+	# Empty XIs are the DOCUMENTED legacy route (euro frozen-ratings) — no fallback count.
+	MatchSim.fallback_count = 0
 	var rc := RandomNumberGenerator.new(); rc.seed = 5
 	var c := MatchSim.simulate(rc, rb, rb, [], [], 7, 19)
 	_ok(int(c["home_goals"]) >= 0 and int(c["away_goals"]) >= 0, "empty-XI fallback gives a score")
+	_ok(MatchSim.fallback_count == 0, "empty-XI legacy route is not counted as a fallback")
+
+	# A NON-empty XI that fails _usable is the silent-invention case the §B3 audit flagged:
+	# it must be COUNTED (and warned) so a caller expecting the stat engine can see it.
+	var rd := RandomNumberGenerator.new(); rd.seed = 6
+	var short_xi := xi.slice(0, 9)   # 9 men: fails the 11-with-attrs gate
+	var dd := MatchSim.simulate(rd, rb, rb, short_xi, xi, 7, 19)
+	_ok(int(dd["home_goals"]) >= 0 and int(dd["away_goals"]) >= 0, "short-XI fallback gives a score")
+	_ok(MatchSim.fallback_count == 1, "short-XI fallback is counted (got %d)" % MatchSim.fallback_count)
+	MatchSim.fallback_count = 0
 
 	# Flag OFF -> identical to a direct MatchEngine.simulate on the same rng stream.
 	MatchSim.use_stat_engine = false
