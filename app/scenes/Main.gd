@@ -648,7 +648,7 @@ func _free_overlays() -> void:
 				or c is FinanceScreen or c is TransferScreen or c is DirectivaScreen \
 				or c is StadiumScreen or c is CupScreen or c is YouthScreen \
 				or c is StaffScreen or c is BrowseScreen or c is TacticsScreen \
-				or c is PlayerInfoScreen:
+				or c is PlayerInfoScreen or c is RivalScreen:
 			c.queue_free()
 	_browse = null
 
@@ -2049,9 +2049,11 @@ func _menu_action(action: String, scr: MenuScreen) -> void:
 		"sell": _push(_show_transfers)
 		"results": _show_results_screen()
 
-## OPPONENT: scout the manager's next opponent by raising their DATA BASE squad (the
-## reversed dbasewin browser), so you can see who you're up against. A bye week has no
-## opponent, so it just reports that. (Was a dead toast that opened no screen.)
+## OPPONENT: the real VIEW RIVAL (VERRIVAL) scouting screen for the manager's next opponent
+## (docs/re/rival_screen_re.md; RivalScreen.gd) -- the opponent XI, team rating and formation,
+## with the report DEPTH gated by the manager's ASSISTANT (none -> the "hire an Assistant"
+## message). Replaces the WRONG-SCREEN DATA BASE browser (APP_VS_SPEC_AUDIT B1). A bye week
+## has no opponent, so it just reports that.
 func _show_opponent(scr: MenuScreen) -> void:
 	var fx := _career.manager_fixture()
 	if fx.is_empty():
@@ -2059,7 +2061,23 @@ func _show_opponent(scr: MenuScreen) -> void:
 		return
 	var home: bool = int(fx[0]) == _career.club_id
 	var opp_id: int = int(fx[1]) if home else int(fx[0])
-	_open_database_squad(GameDB.club(opp_id))
+	_show_rival_screen(_club_with_roster(opp_id))
+
+## Mount the VIEW RIVAL screen over the hub for `rival` (a roster-loaded club). RETURN
+## dismisses; TACTICS opens the manager's own TEAM TACTICS modal (as the original does).
+func _show_rival_screen(rival: Dictionary) -> void:
+	var scr: RivalScreen = load("res://scenes/RivalScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	var q := Staff.assistant_quality(_career.staff)
+	var ass := Staff.members_in_role(_career.staff, Staff.ASSISTANT)
+	var ass_name: String = str(ass[0].get("name", "")) if not ass.is_empty() else ""
+	scr.setup(rival, _mgr_club(), q, ass_name, _career.league_name, _career.season,
+		_career.week + 1)
+	scr.back_pressed.connect(func() -> void: scr.queue_free())
+	scr.tactics_pressed.connect(func() -> void:
+		scr.queue_free()
+		_show_tactics_screen())
 
 ## "vs Arsenal" / "at Chelsea" / "bye" for the manager's next match.
 func _menu_next_match() -> String:

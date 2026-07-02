@@ -29,6 +29,7 @@ func _run() -> void:
 		["res://scenes/LineupScreen.gd", "lineup_demo.png"],
 		["res://scenes/FinanceScreen.gd", "finance_demo.png"],
 		["res://scenes/TransferScreen.gd", "transfer_demo.png"],
+		["res://scenes/RivalScreen.gd", "rival_demo.png"],
 	]
 	var club := _demo_club()
 	var tactics := Tactics.auto_pick(club)
@@ -60,6 +61,11 @@ func _run() -> void:
 		elif s[1] == "transfer_demo.png":
 			node.setup(_demo_market(), "ARSENAL", "M. MJATVEDT", "1997-98", 8_500_000,
 				"OPEN", 5, 1)
+		elif s[1] == "rival_demo.png":
+			# Scout the demo club as the rival, with a hired (5-star) assistant so the full
+			# report renders: XI table + team rating + formation dots.
+			node.setup(_demo_club(), {"id": 7, "name": "OUR CLUB"}, 5, "A. LEIGH",
+				"Premier League", "1997-98", 1)
 		for _i in 14:
 			await process_frame
 		await RenderingServer.frame_post_draw
@@ -73,6 +79,18 @@ func _run() -> void:
 			scrolled_name = "transfer_scrolled.png"
 		elif s[1] == "lineup_demo.png":
 			scrolled_name = "lineup_scrolled.png"
+		# Second RIVAL capture with NO assistant hired: proves the sourced hire-Assistant
+		# message replaces the report (the defining reveal gate).
+		if s[1] == "rival_demo.png":
+			node.setup(_demo_club(), {"id": 7, "name": "OUR CLUB"}, 0, "",
+				"Premier League", "1997-98", 1)
+			node.queue_redraw()
+			for _i in 8:
+				await process_frame
+			await RenderingServer.frame_post_draw
+			var imgn := get_root().get_texture().get_image()
+			var errn := imgn.save_png(dir.path_join("rival_noassist.png"))
+			print("SHOT rival_noassist.png err=%d %dx%d" % [errn, imgn.get_width(), imgn.get_height()])
 		if scrolled_name != "":
 			node._scroll = node._max_scroll()
 			node.queue_redraw()
