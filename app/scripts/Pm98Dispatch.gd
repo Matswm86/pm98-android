@@ -147,8 +147,9 @@ static func _team_reset(_m: Dictionary) -> void:
 static func _case_buildup(m: Dictionary, rng: MatchEngine.Pm98Rng) -> void:
 	m[0x19d4] = 5
 	if _ref(m, 0x440).is_empty():
-		var vx := _g(m, 0x1630)
-		var vy := _g(m, 0x1634)
+		# match+0x1630/+0x1634 = ball vel x/y via the +0x1610 embedding (Pm98Movement._bm).
+		var vx := Pm98Movement._bm(m, 0x1630)
+		var vy := Pm98Movement._bm(m, 0x1634)
 		var theta := Pm98Trig.atan_angle(vx, vy)
 		var proj := Pm98Trig.muladd16(vx, Pm98Trig.cos_a(theta), vy, Pm98Trig.sin_a(theta))
 		if proj > 0 and _g(m, 0x165c) != 0:

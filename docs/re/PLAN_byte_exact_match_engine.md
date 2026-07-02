@@ -57,12 +57,29 @@ deprioritised (last). Approved path: build an **end-to-end oracle**, kill-test t
    (dist > 0x10000) correctly RELEASES it → phase 2 forever. Pre-wire FT-at-16005 only worked
    because stale H1 possession (owner/`+0x54` never cleared without the lean) survived the half.
    The lean is source-faithful; the blocker moved into M3's placement item.
+2c. **Restart placement PORTED + ball-embedding alias fixed. ✅ (2026-07-02, s11).** The 2b/M3
+   premise was WRONG: decompiled, `FUN_0044d0d0`/`d190`/`d250`/`d310` (ECX = session, asm
+   0x593d04..) are NOT placement — they bank the finished period into the season record
+   (`FUN_0044e440` → `DAT_0066afd0`) and rebuild the session panels (`FUN_0044d5f0`; one
+   sim-feedback write, session+0x14 = 0). RNG-clean live (`ScanRngReach.java`, real fn
+   boundaries: closure 125/4/52 fns for d0d0-family/5946d0/5946f0, ZERO `FUN_005ec250` sites;
+   the highlight replayer `FUN_0044cae0` is human-manager-gated → off). The REAL placement is
+   restart_handler's own L96-102 `FUN_005b6ba0 x2` (per-player ctor re-run IN PLACE; write-set
+   sentinel-diffed in `specs/playerbuild_writeset.txt` → `_build_player(into=)` in-place rebuild
+   + the previously missed ctor write `p[0x2c]=slot`), plus the entity vt+4 decides: BALL
+   `FUN_0058e120` (release carrier, vel 0, spot→centre at phase 2, pos=spot, +0x58=-2) and
+   KEEPER `FUN_005a2140 x2` (park at goal, pos code 0x42) — both ported into `Pm98Movement`
+   and oracle-locked (`run_restartdecide_oracle.sh` → `test_restartdecide.gd`, 122 checks;
+   referee `FUN_005b5790` skipped, outcome-irrelevant). ALSO fixed while proving it: the
+   ball-EMBEDDING alias (binary: ball object AT match+0x1610, so m+0x1614/18/1c/1630/34/
+   1644/1668/16a0-a8 ARE ball fields) — the port's m-keys were dead on the live path; reads
+   now route through `Pm98Movement._bm` (ball Dict when present, fixture m-key fallback), and
+   `_ball_freeflight`'s held-flag read moved to the writers' byte-key 0x63 convention.
 3. **M3 — Real kickoff placement + real squad input.** Replace synthetic input: load the real
    81-dword player records + team data (`matchctx+0x1a5c` block — provenance still a GAP, resolve
    first) so the sim runs on decoded EQUIPOS attributes, not synthetic. Port the real kickoff-taker
    decision (see `[[handoff-pm98-decide-wiring-active-ptr-2026-06-24]]`, `FUN_005a7260`).
-   **FIRST (unblocks the e2e, see 2b): port the restart placement `FUN_0044d0d0`/`FUN_0044d190`
-   (+ siblings d250/d310) — players + ball to kickoff spots — in `Pm98Driver.restart_handler`.**
+   ~~FIRST: port the restart placement~~ **DONE in 2c** — the e2e unblocker landed there.
 4. **M4 — End-to-end ORACLE (the kill-test).** Two candidate oracles (pick the cheaper that works):
    - **(a) full PCode-emu** of `FUN_005983f0`'s whole match with all leaves REAL (no stubs), same
      seed + same initial struct, dumping scoreline + the 16-byte event queue. Reuses `PcodeEmu.java`;

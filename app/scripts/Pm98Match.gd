@@ -614,13 +614,19 @@ static func _build_team(m: Dictionary, ti: int, lineup: Dictionary, rng: MatchEn
 	var hdr: Array = lineup.get("header", [])
 	for k in range(9):
 		team[0xbf + k] = int(hdr[k]) if k < hdr.size() else 0
-	# --- build loop: 11 formation slots, present iff record[0x44] != 0 (L47-60). ---
+	# --- build loop: 11 formation slots, present iff record[0x44] != 0 (L47-60). The binary
+	# re-runs the ctor on the SAME memory slot (base + arr_idx*0x3bc) at every restart rung,
+	# so on a REBUILD (H2/ET kickoffs) the existing player Dict for that arr_idx is reused
+	# in place -- match/ball/team references to it stay valid, exactly like binary pointers,
+	# and ctor-untouched fields keep their previous-half values (playerbuild_writeset.txt). ---
 	var slots: Array = lineup.get("slots", [])
+	var old_players: Array = team.get("players", []) if team.get("players") is Array else []
 	for slot in range(11):
 		var rec = slots[slot] if slot < slots.size() else null
 		var present: bool = rec is Dictionary and int(rec.get(0x44, 0)) != 0
 		if present:
-			players.append(_build_player(m, ti, slot, players.size(), rec))
+			var into = old_players[players.size()] if players.size() < old_players.size() else null
+			players.append(_build_player(m, ti, slot, players.size(), rec, into))
 			# active table team[0x4f+slot] (L61-74): formation slot -> built player.
 			team[0x4f + slot] = players[-1]
 		else:
@@ -658,11 +664,42 @@ static func _build_team(m: Dictionary, ti: int, lineup: Dictionary, rng: MatchEn
 ## none are read downstream. The 0xe1 ftol() field is RECOVERED (disasm 0x5a2e36, see below).
 ## `slot` is the formation slot (0 == goalkeeper, drives the GK stat branches); `arr_idx` is
 ## the player's index in the own team array (binary: (this - base)/0x3bc).
-static func _build_player(m: Dictionary, ti: int, slot: int, arr_idx: int, rec: Dictionary) -> Dictionary:
-	var p: Dictionary = {}
+##
+## `into`: the binary re-runs this ctor IN PLACE on the same player memory at every restart
+## rung (restart_handler -> FUN_005b6ba0 x2), so fields it does not write RETAIN the previous
+## half's values. Pass the existing player Dict to mirror that; null builds a fresh one (init).
+## The ctor write-set is sentinel-diffed in tools/re/specs/playerbuild_writeset.txt
+## (run_playerbuild_writeset.sh, 2026-07-02): the engine-state block below is WRITTEN every
+## build; +0x10/+0x14/+0x18, +0x44, +0x5e/+0x5f/+0x60/+0x62/+0x64..+0x67, +0x7c, +0x90..+0xa8,
+## +0x1e0..+0x1f4 and byte +0x2d7 are UNTOUCHED (an in-place rebuild must keep them).
+static func _build_player(m: Dictionary, ti: int, slot: int, arr_idx: int, rec: Dictionary,
+		into = null) -> Dictionary:
+	var p: Dictionary = into if into is Dictionary else {}
 	var rb := func(o: int) -> int: return int(rec.get(o, 0))
 	var team: Dictionary = m["sim"][ti]
 	var is_gk := slot == 0                                # param_1[0xaf] == 0
+
+	# --- ctor engine-state writes (playerbuild_writeset.txt). Zero at a fresh build, so
+	# init behavior is unchanged EXCEPT p[0x2c] = slot (disasm 0x5a2db1: mov eax,[ebp+0x2bc];
+	# mov [ebp+0x2c],eax) -- previously omitted, nonzero for every outfield slot. ---
+	p[0x4] = 0; p[0x8] = 0; p[0xc] = 0                   # actual pos (position_team places)
+	p[0x1c] = 0                                          # byte
+	p[0x20] = 0; p[0x24] = 0; p[0x28] = 0
+	p[0x2c] = slot                                       # kick-gate counter seeds at the slot #
+	p[0x30] = 0
+	p[0x34] = 0                                          # s16 facing
+	p[0x38] = 0; p[0x3c] = 0; p[0x40] = 0
+	p[0x48] = 0; p[0x4c] = 0; p[0x50] = 0
+	p[0x54] = 0; p[0x58] = 0                             # ball-control state / prev copy
+	p[0x5c] = 0; p[0x5d] = 0                             # bytes (active-lock)
+	p[0x61] = 0                                          # byte
+	p[0x68] = 0; p[0x6c] = 0
+	p[0x80] = 0; p[0x84] = 0; p[0x88] = 0; p[0x8c] = 0
+	p[0xac] = 0; p[0xb0] = 0; p[0xb4] = 0
+	p[0x17c] = 0; p[0x180] = 0
+	# bbox reset (FUN_00590aa0 @0x5a2867): min = +BIG, max = -BIG.
+	p[0x210] = SENTINEL_LO; p[0x214] = SENTINEL_LO; p[0x218] = SENTINEL_LO
+	p[0x21c] = SENTINEL_HI; p[0x220] = SENTINEL_HI; p[0x224] = SENTINEL_HI
 
 	# --- header back-pointers (L52-54): own header, opponent header, match. ---
 	p[0x184] = team                                      # param_1[0x61] = match+0x46c+ti*800

@@ -666,8 +666,10 @@ static func _dequeue(m: Dictionary) -> void:
 # FUN_00593b70 -- the one-shot match-restart / phase-reset handler. this=match.
 # Invoked from the +0x1a1e skip-tick gate. Runs the kickoff/restart placement, a full
 # match-state reset, re-seeds the movement, and (for +0x448 in {2,3,4,5,6}) draws ONE
-# unbracketed FUN_005ec250. CAVEAT: the RNG of the callees FUN_005946d0/FUN_005b6ba0/
-# FUN_0044d0d0../FUN_0044d3d0 is UNVERIFIED -- modeled as non-drawing here; position_team
+# unbracketed FUN_005ec250. Callee RNG VERIFIED 2026-07-02 (ScanRngReach.java, real fn
+# boundaries): FUN_0044d0d0-family closure 125 fns / FUN_005946d0 closure 4 /
+# FUN_005946f0 closure 52 -- ZERO FUN_005ec250 sites with the highlight replayer
+# FUN_0044cae0 gated off (headless: no human-manager flags). position_team
 # (FUN_005b73a0) DOES draw on set-piece phases and is wired with `rng`.
 # =============================================================================
 static func restart_handler(m: Dictionary, rng: MatchEngine.Pm98Rng) -> void:
@@ -679,37 +681,66 @@ static func restart_handler(m: Dictionary, rng: MatchEngine.Pm98Rng) -> void:
 		var phase := _restart_phase(rtype)            # DAT_00664070[rtype]
 		m[0x44c] = phase
 		m[0x448] = phase
-		_team_reset(m)                                # FUN_005946d0 (no-op modeled)
+		_team_reset(m)                                # FUN_005946d0 (stats banking; see below)
 		if rtype == 1:                                # KICKOFF
 			m[0x19a8] = _i(_g(m, 0x19a8) + _g(m, 0x450))
 			m[0x1a1f] = 0
 			m[0x450] = 0
 			m[0x19a4] = 0
+			# The per-rung FUN_0044d0d0/d190/d250/d310 (ECX = session, asm 0x593d04..) are NOT
+			# placement: each banks the finished period into the season record (FUN_0044e440 ->
+			# DAT_0066afd0 + per-player fitness) and rebuilds the session summary panels
+			# (FUN_0044d5f0). RNG-clean live: ScanRngReach closure 125 fns, 0 draw sites, with
+			# the highlight replayer FUN_0044cae0 gated off (DAT_00652a10 && phase{0,1[,5]} &&
+			# a HUMAN manager flag session+0x7f0/+0xf90 -- always false headless/CPU-vs-CPU).
+			# The one sim-feedback write is FUN_0044d5f0 L9: session+0x14 = 0 (read back by the
+			# ball restart decide's +0x1d8 flag) -- modeled below; the rest is display/records.
 			match _g(m, 0x19a0):
 				0:
-					pass                              # FUN_0044d0d0 placement
+					_ref(m, 0x468)[0x14] = 0          # FUN_0044d0d0 -> FUN_0044d5f0
 				1:
-					# FUN_0044d190; if team+0x44 == 0 -> +0x19a0 += 2
+					_ref(m, 0x468)[0x14] = 0          # FUN_0044d190 -> FUN_0044d5f0
+					# caller tail: if team+0x44 == 0 -> +0x19a0 += 2 (skip the ET rungs)
 					if _g(_ref(m, 0x468), 0x44) == 0:
 						m[0x19a0] = _i(_g(m, 0x19a0) + 2)
 				2:
-					pass                              # FUN_0044d250
+					_ref(m, 0x468)[0x14] = 0          # FUN_0044d250 -> FUN_0044d5f0
 				3:
-					m[0x45c] = 0                      # FUN_0044d310
+					_ref(m, 0x468)[0x14] = 0          # FUN_0044d310 -> FUN_0044d5f0
+					m[0x45c] = 0
 			m[0x19a0] = _i(_g(m, 0x19a0) + 1)
-		# 1 < rtype < 9: a 2x11 player-position snapshot/compare (FUN_0044d3d0) -- needs players.
-		# if (+0x19a0 != 4 || +0x19c0 == 0): FUN_005b6ba0 x2 (modeled non-drawing). FUN_005946f0.
+		# 1 < rtype < 9: a 2x11 player-position snapshot/compare (FUN_0044d3d0) -- feeds only
+		# the bVar3 commentary gate (display), skipped.
+		# L96-102: the ACTUAL kickoff placement -- FUN_005b6ba0 x2 (ECX = team header
+		# m+0x46c/+0x78c, asm 0x593d6e..): re-runs the per-player ctor FUN_005a2830 IN PLACE
+		# over both rosters (start positions reload, action state resets; ctor write-set
+		# pinned in specs/playerbuild_writeset.txt). 0 draws (call-graph proven, banked in
+		# _team_kickoff_reset docs). The decide + position passes below then arm the taker
+		# and spread the formations.
+		if _g(m, 0x19a0) != 4 or _g(m, 0x19c0) == 0:
+			for ti in range(2):
+				Pm98Match._team_kickoff_reset(m, ti, rng)
+		# FUN_005946f0 (collider rebuild, Pm98CollBuilder): idempotent over unchanged pitch
+		# geometry -- the STEP-1 populate_posts(m) result stands, so it is not re-run here.
 
-	# L112-122: penalty/ET ball spot.
+	# L112-122: penalty/ET ball spot. match+0x16a0/+0x16a4/+0x16a8 == ball+0x90/+0x94/+0x98
+	# (the +0x1610 embedding); write the ball Dict when populated, the match keys otherwise
+	# (shell/fixture path, matching the old model).
 	if _g(m, 0x19a0) == 4:
 		m[0x44c] = 7
 		m[0x448] = 7
 		var spot := _i(_g(m, 0x1820) - 0xb0000)
 		if _g(m, 0x45c) != 0:
 			spot = _i(-spot)
-		m[0x16a0] = spot
-		m[0x16a4] = 0
-		m[0x16a8] = 0
+		var bpen := _ball(m)
+		if not bpen.is_empty():
+			bpen[0x90] = spot
+			bpen[0x94] = 0
+			bpen[0x98] = 0
+		else:
+			m[0x16a0] = spot
+			m[0x16a4] = 0
+			m[0x16a8] = 0
 
 	# L123-148: the always-run state reset block.
 	m[0x460] = 0
@@ -723,7 +754,8 @@ static func restart_handler(m: Dictionary, rng: MatchEngine.Pm98Rng) -> void:
 	m[0x440] = 0
 	m[0x438] = 0
 	m[0x444] = 0
-	# FUN_005946f0 (modeled no-op).
+	# FUN_005946f0 = the collider builder (Pm98CollBuilder, exactly ported): rebuilds the
+	# post geometry from unchanged pitch dims -> idempotent over populate_posts(m); not re-run.
 	# +0x1a34 = timeGetTime() -- WALL CLOCK, non-deterministic. STUBBED to 0 on the headless
 	# path (nothing on the scoreline reads it); a real e2e oracle must inject the same value.
 	m[0x1a34] = 0
@@ -738,6 +770,12 @@ static func restart_handler(m: Dictionary, rng: MatchEngine.Pm98Rng) -> void:
 	m[0x27e8] = 0
 
 	# L159-184: movement re-seed (all NO-RNG; render/trail calls skipped).
+	# L159: (match+0x1610)->vt+4 = FUN_0058e120, the BALL restart decide -- releases the
+	# carrier, zeroes vel, snaps the ball to the restart spot (centre at kickoff) and arms
+	# the +0x58 = -2 prev-side sentinel. Runs BEFORE the active re-select below.
+	var brd := _ball(m)
+	if not brd.is_empty():
+		Pm98Movement.ball_restart_decide(brd, m)
 	var ctx0 := _sim_ctx(m, 0)
 	if not ctx0.is_empty():
 		m[0x438] = _active_ref(ctx0, Pm98Movement.select_active(ctx0))   # FUN_005b8f20 -> +0x438 (player ptr)
@@ -750,6 +788,11 @@ static func restart_handler(m: Dictionary, rng: MatchEngine.Pm98Rng) -> void:
 		if not ctx.is_empty():
 			_decide_team(ctx, m)
 	_position_both(m, rng)                            # FUN_005b73a0 x2 (set-piece -> draws)
+	# L172-174: sub-entity vt+4 -- keeper restart decide x2 (FUN_005a2140: park each keeper
+	# at its goal, position code 0x42) + the referee FUN_005b5790 (outcome-irrelevant, SKIP;
+	# see keeper_restart_decide docs).
+	for k in _keepers(m):
+		Pm98Movement.keeper_restart_decide(k, m)
 	m[0x458] = 0
 
 	# L185-283: the restart-type commentary tail. ONE unbracketed FUN_005ec250 (L198) fires
@@ -770,8 +813,10 @@ static func _restart_phase(rtype: int) -> int:
 	return RESTART_PHASE_TABLE[rtype] if rtype >= 0 and rtype < RESTART_PHASE_TABLE.size() else rtype
 
 
-## FUN_005946d0 team-reset: two passes of the per-player reset FUN_005a32c0 over team+4
-## players. Modeled as a no-op (a VERIFIED no-op only when team+4==0; FUN_005a32c0's RNG is
-## unverified -- the same caveat Pm98Dispatch._team_reset carries).
+## FUN_005946d0 team-reset: FUN_005b7080 x2 -> per-player FUN_005a32c0. Decompiled 2026-07-02:
+## it BANKS per-player distance/steps into the match-stats record (p+0x3b8 +0x6c/+0x70/+0x78,
+## team-header snapshot rows) and reduces the p+0x4c/+0x50 accumulators -- stats-side only;
+## no engine-read field is touched and the closure (4 fns) has ZERO RNG sites (ScanRngReach).
+## The engine port does not accumulate p+0x4c/+0x50, so the banking pass stays a no-op here.
 static func _team_reset(_m: Dictionary) -> void:
 	pass

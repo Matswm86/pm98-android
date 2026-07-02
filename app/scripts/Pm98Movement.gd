@@ -63,6 +63,20 @@ static func _g(d: Dictionary, off: int) -> int:
 	return int(d.get(off, 0))
 
 
+## Ball-embedding alias read. In the binary the ball is EMBEDDED in the match at +0x1610,
+## so match+0x16XX loads (0x1614/18/1c pos, 0x1630/34/38 vel, 0x1644 facing, 0x1668 prev
+## side, 0x16a0/a4/a8 restart spot) ARE ball fields -- always in sync. The port's ball is
+## a separate Dict (m["ball"]), so those match keys are dead on the live path; this helper
+## restores the alias by reading the ball Dict when present. Oracle fixtures that poke the
+## match keys directly (and build no m["ball"]) fall through to the match Dict unchanged.
+## NOT for m+0x1650/0x165c/0x1664: those are deliberately remodeled as player INDICES.
+static func _bm(m: Dictionary, off: int) -> int:
+	var b: Variant = m.get("ball", null)
+	if b is Dictionary:
+		return int((b as Dictionary).get(off - 0x1610, 0))
+	return int(m.get(off, 0))
+
+
 ## A player field, or 0 when idx is null (-1) / out of range.
 static func _pg(players: Array, idx: int, off: int) -> int:
 	if idx < 0 or idx >= players.size():
@@ -92,7 +106,7 @@ static func select_nearest(ctx: Dictionary, find_in_front: int) -> void:
 
 	# Entry ownership guard (cond_A && cond_B -> search; else forced owner).
 	var ctrl := int(m.get(0x1650, -1))
-	if ctrl < 0 or _g(m, 0x1664) != team:               # cond_A
+	if ctrl < 0 or _bm(m, 0x1664) != team:              # cond_A (binary: ball+0x54 via alias)
 		var other := int(m.get(0x165c, -1))
 		if other < 0 or _pg(players, other, 0x2b8) != team:   # cond_B -> search
 			best = _search(players, team, m, active, find_in_front)
@@ -111,10 +125,10 @@ static func _search(players: Array, team: int, m: Dictionary, active: int, find_
 	# find_in_front==0 + the current active is locked (player+0x5d) -> keep it.
 	if active >= 0 and _pg(players, active, 0x5d) != 0 and find_in_front == 0:
 		return active
-	var bx := _g(m, 0x1614)
-	var by := _g(m, 0x1618)
-	var bz := _g(m, 0x161c)
-	var facing := _g(m, 0x1644)
+	var bx := _bm(m, 0x1614)
+	var by := _bm(m, 0x1618)
+	var bz := _bm(m, 0x161c)
+	var facing := _bm(m, 0x1644)
 	var min_dist := MIN_DIST
 	var best := active
 	for i in players.size():
@@ -300,14 +314,14 @@ static func _select_roles(ctx: Dictionary) -> void:
 	var players: Array = ctx.get("players", [])
 	var team := _g(ctx, 0x8)
 	var m: Dictionary = ctx.get(0x138, {})
-	var bx := _g(m, 0x1614)
-	var by := _g(m, 0x1618)
-	var bz := _g(m, 0x161c)
+	var bx := _bm(m, 0x1614)
+	var by := _bm(m, 0x1618)
+	var bz := _bm(m, 0x161c)
 	var best_ball := ROLE_INIT
 	var min_anchor := ROLE_INIT
 	var max_anchor := 0
 	var ctrl := int(m.get(0x1650, -1))
-	if ctrl >= 0 and _g(m, 0x1664) == team:
+	if ctrl >= 0 and _bm(m, 0x1664) == team:
 		ctx[0x204] = ctrl
 		best_ball = 0
 	for i in players.size():
@@ -462,13 +476,16 @@ static func assign_markers(ctx: Dictionary) -> void:
 	var m: Dictionary = ctx.get(0x138, {})
 	var opp: Array = _opp_players(ctx)               # opponent roster (sim-sourced; was m[0x78c] flat)
 
-	# (poss) possession changed -> zero each OUR player's marking block.
-	if _g(m, 0x1668) != _g(m, 0x1664):
+	# (poss) possession changed -> zero each OUR player's marking block. Binary compare is
+	# ball+0x58 != ball+0x54 (via the match+0x1668/+0x1664 embedding alias); read the ball
+	# Dict for BOTH sides -- m[0x1668] has no live writer, and the restart decide's
+	# +0x58 = -2 sentinel exists exactly to force this gate after every restart.
+	if _bm(m, 0x1668) != _bm(m, 0x1664):
 		for p in players:
 			_clear_mark_block(p)
 
 	# gate: do nothing while WE hold the ball.
-	if _g(m, 0x1664) == team:
+	if _bm(m, 0x1664) == team:
 		return
 
 	# (A) clear every OUR player's marker links.
@@ -1760,7 +1777,7 @@ static func _velocity_nonactive(p: Dictionary, m: Dictionary, controller: Dictio
 	if enter:                                                    # L89-104 inner block
 		var iv2 := absi(Pm98Trig._i32(_g(p, 4) - _g(p, 0x3a4)))
 		var cond2 := iv2 > 0x13ffff or absi(Pm98Trig._i32(_g(p, 8))) > 0xbffff
-		if cond2 or _g(m, 0x1664) == _g(gs, 8):                  # L97-100: cond2 || possession -> STOP
+		if cond2 or _bm(m, 0x1664) == _g(gs, 8):                 # L97-100: cond2 || possession -> STOP
 			p[0x58] = 0
 			p[0x54] = 0
 			return true
@@ -1984,7 +2001,7 @@ static func _marker_gate_proceed(p: Dictionary) -> bool:
 	# (2) we-in-possession early-out (FUN_005b8c90).
 	var gs: Dictionary = _ref(p, 0x184)
 	var m: Dictionary = _ref(gs, 0x138)
-	if _g(m, 0x1664) == _g(gs, 8):                          # we hold the ball
+	if _bm(m, 0x1664) == _g(gs, 8):                         # we hold the ball
 		var carrier: Variant = ball.get(0x40, null)
 		if carrier != null and carrier != 0:               # ball+0x40 carrier != 0 -> tail
 			return false
@@ -2864,7 +2881,7 @@ const BALL_ROLL_STOP := 0x22         # both |vel.x| and |vel.y| below -> ball ha
 ##     vel(+0x20/+0x24/+0x28). The prologue's bbox build + temp `pos.z += 0x23d7` (0x58e437) is exactly
 ##     undone at 0x58e96c when collision is skipped, so the net z effect is just the integration here.
 static func _ball_freeflight(ball: Dictionary) -> void:
-	if (_g(ball, 0x60) >> 24) & 0xff != 0:                 # byte ball+0x63 -> held (0x58e361 jne 0x58eb93)
+	if _g(ball, 0x63) != 0:                                # byte ball+0x63 -> held (0x58e361 jne 0x58eb93)
 		_ball_tail(ball)                                  # held jmps the trail entry (NO spin), still faces+snapshots
 		return
 	_ball_collision(ball)                                 # goal/post sweep 0x58e497.. (before integration)
@@ -2977,6 +2994,77 @@ static func _ball_drift(ball: Dictionary) -> void:
 	ball[0x8c] = Pm98Trig._i32(_g(ball, 0xc) + int(p[2]))
 
 
+# ---- FUN_0058e120 BALL restart DECIDE (ball vtable+4, base 0x639080) ----------------------------
+# Dispatched ONCE per restart by FUN_00593b70 L159 ((match+0x1610)->vt+4) -- NOT per tick (the
+# per-tick +8 slot is the replay snapshot FUN_0058e220, no-op live). Live path (DAT_006d31c4==0):
+# clears the base snapshot ring (+0x38/+0x3c via FUN_005ed870) and the ball replay ring
+# (+0x1dc/+0x1e0), zeroes the hold/anim bytes (+0x5c/+0x61/+0x63/+0x64), re-derives the +0x1d8
+# spectate flag from session+0x14 (DAT_00674e7c==8 also forces 0; headless != 8 -- the flag has
+# no live consumer, kept for fidelity), releases the carrier (+0x40 via FUN_0058ed70) and the
+# owner/engage pair (+0x44/+0x48), at kickoff phase (match+0x448==2) zeroes the restart spot
+# (+0x90/+0x94/+0x98 = centre), zeroes vel (+0x20/+0x24/+0x28) and +0x4c/+0x50, then SNAPS pos
+# to the spot and arms +0x58 = -2 (prev-side sentinel: forces the assign_markers possession-
+# changed gate on the first post-restart tick). Decompile: Ghidra DecompileAt 0x58e120
+# (2026-07-02); oracle tools/re/run_restartdecide_oracle.sh -> specs/restartdecide_oracle.txt.
+
+static func ball_restart_decide(ball: Dictionary, m: Dictionary) -> void:
+	ball[0x38] = 0; ball[0x3c] = 0                        # FUN_005ed870 live arm
+	ball[0x1dc] = 0; ball[0x1e0] = 0                      # FUN_005bbf10(+0x1dc, 0) + count
+	ball[0x5c] = 0
+	ball[0x63] = 0                                        # byte (held)
+	ball[0x64] = 0                                        # byte
+	var session: Dictionary = m.get(0x468) if m.get(0x468) is Dictionary else {}
+	# byte flag: 0 when DAT_00674e7c == 8 (display view mode, m["viewmode_674e7c"], 0 headless)
+	# OR session+0x14 == 0 (zeroed by the first restart rung's FUN_0044d5f0); else 1.
+	var mode8 := int(m.get("viewmode_674e7c", 0)) == 8
+	ball[0x1d8] = 0 if (mode8 or int(session.get(0x14, 0)) == 0) else 1
+	ball[0x61] = 0                                        # byte
+	ball[0x40] = 0                                        # FUN_0058ed70: release the carrier
+	ball[0x44] = 0; ball[0x48] = 0                        # owner + engage target clear
+	# port-side control mirrors (binary: ball+0x40 == match+0x1650, ball+0x4c == match+0x165c).
+	m[0x1650] = -1
+	m[0x165c] = -1
+	if int(m.get(0x448, 0)) == 2:                         # kickoff -> spot = centre
+		ball[0x90] = 0; ball[0x94] = 0; ball[0x98] = 0
+	ball[0x20] = 0; ball[0x24] = 0; ball[0x28] = 0        # vel
+	ball[0x4c] = 0; ball[0x50] = 0
+	ball[0x4] = _g(ball, 0x90)                            # pos = restart spot
+	ball[0x58] = Pm98Trig._i32(-2)                        # prev-side sentinel 0xfffffffe
+	ball[0x8] = _g(ball, 0x94)
+	ball[0xc] = _g(ball, 0x98)
+
+
+# ---- FUN_005a2140 GOALKEEPER restart DECIDE (keeper vtable+4, base 0x639208) ---------------------
+# Dispatched ONCE per restart by FUN_00593b70 L172/L173 on the two keepers (match+0xaac/+0xe74),
+# AFTER the position_team x2 pass. Live path: clears the base snapshot ring (FUN_005ed870), zeroes
+# the slide velocity (+0x3c0) and +0x3c4, re-stamps the anim code +0x2dc = match+0x1a5c +
+# ((idx != 1) + 5) * 0x100, clears the replay ring (+0x3b0/+0x3b4), zeroes pos, sets position code
+# 0x42 (FUN_005a5430; LUT[0x42] == 0x42 so +0x2c/+0x30 survive), then places the keeper at its
+# goal: idx 1 (left/team-0 end) -> y = -(match+0x1824) - 0x10000, x = (match+0x1820)/2;
+# idx 2 -> y = +(match+0x1824) + 0x10000, x = -(match+0x1820)/2 (signed /2, trunc toward 0).
+# The REFEREE sibling FUN_005b5790 (vtable 0x6391f8, +4, L174) is NOT ported: the referee entity
+# is outcome-irrelevant (writes no ball/score/phase field -- driver-map verdict) and nothing on
+# the headless path reads its pos. Decompile: Ghidra DecompileAt 0x5a2140 (2026-07-02); oracle
+# tools/re/run_restartdecide_oracle.sh.
+
+static func keeper_restart_decide(k: Dictionary, m: Dictionary) -> void:
+	k[0x38] = 0; k[0x3c] = 0                              # FUN_005ed870 live arm
+	k[0x3c0] = 0
+	k[0x2dc] = Pm98Trig._i32(_g(m, 0x1a5c) + ((0 if _g(k, 0x3bc) == 1 else 1) + 5) * 0x100)
+	k[0x3c4] = 0
+	k[0x3b0] = 0; k[0x3b4] = 0                            # FUN_005bbf10(+0x3b0, 0) + count
+	k[0x4] = 0; k[0x8] = 0; k[0xc] = 0
+	set_position_code(k, 0x42)
+	var xscale := _si(m, 0x1820)
+	var yscale := _si(m, 0x1824)
+	if _g(k, 0x3bc) == 1:
+		k[0x8] = Pm98Trig._i32(-0x10000 - yscale)
+		k[0x4] = Pm98Trig._tdiv(xscale, 2)
+	else:
+		k[0x8] = Pm98Trig._i32(yscale + 0x10000)
+		k[0x4] = Pm98Trig._i32(-Pm98Trig._tdiv(xscale, 2))
+
+
 # ---- FUN_005a22d0 GOALKEEPER ball-tracking advance ----------------------------------------------
 # The keeper entity (match+0xaac / +0xe74, idx 1/2 in +0x3bc; vtable+0xc via FUN_005a2240 -> 5a24b0)
 # slides its x along the goal line to shadow the ball: accelerate +/-0x28f toward ball.x (gated by the
@@ -3006,8 +3094,8 @@ static func keeper_advance(k: Dictionary) -> void:
 		at_left = kx < Pm98Trig._i32(KEEP_BAND - line)
 		at_right = kx > -KEEP_BAND
 	var ky := _si(k, 0x8)
-	var bx := _si(m, 0x1614)
-	var by := _si(m, 0x1618)
+	var bx := _bm_si(m, 0x1614)
+	var by := _bm_si(m, 0x1618)
 	var proj := Pm98Trig.planar_mag(Pm98Trig._i32(bx - kx), Pm98Trig._i32(by - ky))   # FUN_005edfb0
 	var vel := _si(k, 0x3c0)
 	if proj >= KEEP_REACH:                                # 0x5a239d far: chase ball.x past a deadband
@@ -3380,6 +3468,11 @@ static func _ball_collision(ball: Dictionary) -> void:
 ## Signed-int32 field read.
 static func _si(d: Dictionary, off: int) -> int:
 	return Pm98Trig._i32(_g(d, off))
+
+
+## Signed-int32 ball-embedding alias read (see _bm).
+static func _bm_si(m: Dictionary, off: int) -> int:
+	return Pm98Trig._i32(_bm(m, off))
 
 
 ## The binary's sign bucket `((-1 < v) - 1 & 0xfffffffe) + 1`: +1 when v >= 0, -1 when v < 0.
@@ -4869,7 +4962,7 @@ static func _position_phase7_wall(ctx: Dictionary, m: Dictionary, team: int) -> 
 	var claimed := [false, false, false, false, false, false, false, false, false, false, false]
 	var goalx := _si(m, 0x1820)
 	var yscale := _si(m, 0x1824)
-	var ball := [_si(m, 0x1614), _si(m, 0x1618), _si(m, 0x161c)]
+	var ball := [_bm_si(m, 0x1614), _bm_si(m, 0x1618), _bm_si(m, 0x161c)]
 	var neg := (orient ^ (1 - side)) != 0                         # (orient&1) ^ (1-side): the wall-xy + ivar18 sign
 	for i in players.size():
 		var p: Dictionary = players[i]
@@ -4953,13 +5046,13 @@ static func _position_wall(ctx: Dictionary, m: Dictionary, team: int, rng = null
 		elif role == 10:
 			_wall_pull(p, pid, opps, opp_claimed, our_assigned, 10, ivar21)
 		elif not wall_placed and (role == 2 or role == 3):
-			if _sign1(_si(p, 0x1e4)) == _sign1(_si(m, 0x16a4)):
+			if _sign1(_si(p, 0x1e4)) == _sign1(_bm_si(m, 0x16a4)):
 				var pm: Dictionary = _ref(p, 0x18c)
 				var ivar12 := Pm98Trig._i32(0x8000 - _si(m, 0x1820))
 				if _g(p, 0x2b8) != (_g(pm, 0x19a0) & 1):
 					ivar12 = Pm98Trig._i32(-ivar12)
 				p[0x4] = ivar12
-				p[0x8] = _sign1(_si(m, 0x16a4)) * 0x40000
+				p[0x8] = _sign1(_bm_si(m, 0x16a4)) * 0x40000
 				p[0xc] = 0
 				our_assigned[pid] = true
 				wall_placed = true
@@ -5038,7 +5131,7 @@ static func _position_wall(ctx: Dictionary, m: Dictionary, team: int, rng = null
 
 	# ---- LOOP 5: facing toward ball + pairwise min-separation (ALWAYS runs) ----
 	var n := players.size()
-	var ball := [_si(m, 0x1614), _si(m, 0x1618), _si(m, 0x161c)]
+	var ball := [_bm_si(m, 0x1614), _bm_si(m, 0x1618), _bm_si(m, 0x161c)]
 	for i in n:
 		var pi: Dictionary = players[i]
 		var d: Array = Pm98Trig.vec3_sub(ball, [_si(pi, 0x4), _si(pi, 0x8), _si(pi, 0xc)])
@@ -5174,7 +5267,7 @@ static func _phase5_tail_pathA(ctx: Dictionary, m: Dictionary, _team: int) -> vo
 		Pm98Trig._i32(polar0[2] + _si(taker, 0xc)),
 	]
 	var base_angle := taker_facing + 0x4000
-	var ball := [_si(m, 0x1614), _si(m, 0x1618), _si(m, 0x161c)]
+	var ball := [_bm_si(m, 0x1614), _bm_si(m, 0x1618), _bm_si(m, 0x161c)]
 
 	# local_3c: slot[0..5] = player pointers (0 = empty), slot[6..12] = priority bytes (-1 init).
 	var slot := []
