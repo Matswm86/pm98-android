@@ -38,6 +38,7 @@ var tier: int = 1                       # division tier (all clubs here share it
 var rosters: Dictionary = {}            # club_id:int -> Array[player dict] (live squads)
 var club_names: Dictionary = {}         # club_id:int -> String
 var transfer_listed: Dictionary = {}    # pid:int -> true (your players up for sale)
+var sale_offers: Dictionary = {}        # pid:int -> Array[{buyer_id, buyer_name, offer, weekly_wage, years, week}]
 var shortlist: Array = []               # pid:int targets you're tracking
 var transfer_log: Array = []            # newest-first transfer news lines
 var offers_left: int = OFFERS_PER_WEEK  # signings the board still allows this week
@@ -391,6 +392,7 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 	cash += weekly_net
 	cash -= player_weekly_wage()        # the live squad wage bill (YEARLY WAGE / 52 per man)
 	cash -= Staff.weekly_wage(staff)   # the backroom staff wage bill (STAFF WAGES)
+	_accumulate_offers(rng)            # incoming bids on the transfer-listed (CURRENT OFFERS)
 	week += 1
 	offers_left = OFFERS_PER_WEEK   # the board's weekly signing allowance resets
 	_tick_works()                   # stadium expansion progresses a week
@@ -1146,8 +1148,78 @@ func is_listed(pid: int) -> bool:
 func toggle_listed(pid: int) -> void:
 	if transfer_listed.has(pid):
 		transfer_listed.erase(pid)
+		sale_offers.erase(pid)   # withdrawing the listing withdraws the bids
 	else:
 		transfer_listed[pid] = true
+
+
+# ---- CURRENT OFFERS (bids on your transfer-listed players) ----------------
+# The screen (FICHAR hub -> CURRENT OFFERS, FUN_00523dc4/FUN_00523ed0) shows up
+# to 5 listed players, each with up to 5 offer rows CLUB | CLUB OFFER | YEARLY
+# WAGE | YEARS | CLAUSES. The accumulation model here is OURS (calibrated to
+# TransferMarket.solicit_offer); only the screen surface is PM98's.
+
+const MAX_OFFERS_PER_PLAYER := 5     # the band has 5 offer rows
+const OFFER_CHANCE_PER_WEEK := 0.45  # a listed player draws interest most weeks
+
+## Roll this week's incoming bids on the transfer-listed players (advance_week).
+## Also drops stale entries for players no longer in the squad.
+func _accumulate_offers(rng: RandomNumberGenerator) -> void:
+	for pid in sale_offers.keys():
+		if not transfer_listed.has(pid) or _find_in(club_id, int(pid)).is_empty():
+			sale_offers.erase(pid)
+	if not transfers_open():
+		return
+	for pid in transfer_listed:
+		var p := _find_in(club_id, int(pid))
+		if p.is_empty():
+			continue
+		var lst: Array = sale_offers.get(int(pid), [])
+		if lst.size() >= MAX_OFFERS_PER_PLAYER or rng.randf() > OFFER_CHANCE_PER_WEEK:
+			continue
+		var o := TransferMarket.solicit_offer(p, rosters, club_names, tier, club_id, rng)
+		if o.is_empty():
+			continue
+		lst.append({
+			"buyer_id": int(o["buyer_id"]), "buyer_name": str(o["buyer_name"]),
+			"offer": int(o["offer"]),
+			# The terms the buyer tables for the player (YEARLY WAGE / YEARS rows).
+			"weekly_wage": Contract.market_weekly(p, tier),
+			"years": 1 + rng.randi_range(0, 2), "week": week,
+		})
+		sale_offers[int(pid)] = lst
+		_news("transfer", "%s have made an offer for %s." % [o["buyer_name"], p.get("name", "?")])
+
+## The live offer list for one of your listed players (CURRENT OFFERS rows).
+func offers_for(pid: int) -> Array:
+	return sale_offers.get(pid, [])
+
+## Accept offer #idx on player pid: the sale goes through accept_sale (same squad
+## guards) and every other bid on him lapses. {ok, msg}.
+func accept_offer(pid: int, idx: int) -> Dictionary:
+	var lst: Array = sale_offers.get(pid, [])
+	if idx < 0 or idx >= lst.size():
+		return {"ok": false, "msg": "That offer is no longer on the table."}
+	var o: Dictionary = lst[idx]
+	var res := accept_sale(pid, int(o["buyer_id"]), int(o["offer"]))
+	if res.get("ok"):
+		sale_offers.erase(pid)
+	return res
+
+## Refuse offer #idx on player pid (the bid is withdrawn; the listing stays).
+func refuse_offer(pid: int, idx: int) -> Dictionary:
+	var lst: Array = sale_offers.get(pid, [])
+	if idx < 0 or idx >= lst.size():
+		return {"ok": false, "msg": "That offer is no longer on the table."}
+	var o: Dictionary = lst[idx]
+	lst.remove_at(idx)
+	if lst.is_empty():
+		sale_offers.erase(pid)
+	else:
+		sale_offers[pid] = lst
+	var p := _find_in(club_id, pid)
+	return {"ok": true, "msg": "Refused %s's offer for %s." % [o.get("buyer_name", "?"),
+		p.get("name", "?")]}
 
 ## The best AI offer for one of your players (used by the SALE screen). {} if none.
 func solicit_sale(pid: int, rng: RandomNumberGenerator) -> Dictionary:
@@ -1677,6 +1749,9 @@ func to_dict() -> Dictionary:
 	var listed: Dictionary = {}
 	for pid in transfer_listed:
 		listed[str(pid)] = true
+	var offers: Dictionary = {}
+	for pid in sale_offers:
+		offers[str(pid)] = sale_offers[pid]
 	return {
 		"club_id": club_id, "club_name": club_name, "manager_name": manager_name,
 		"league_id": league_id,
@@ -1687,7 +1762,8 @@ func to_dict() -> Dictionary:
 		"tactics": tactics, "tier": tier, "rosters": ros, "club_names": nms,
 		"stadium_capacity": stadium_capacity, "works": works,
 		"ticket_price": ticket_price, "board_price": board_price,
-		"transfer_listed": listed, "shortlist": shortlist, "transfer_log": transfer_log,
+		"transfer_listed": listed, "sale_offers": offers,
+		"shortlist": shortlist, "transfer_log": transfer_log,
 		"offers_left": offers_left, "news_log": news_log,
 		"training_intensity": training_intensity, "youth": youth,
 		"youth_seq": youth_seq, "staff": staff, "staff_pool": staff_pool,
@@ -1809,6 +1885,9 @@ static func from_dict(d: Dictionary) -> Career:
 	c.transfer_listed = {}
 	for k in d.get("transfer_listed", {}):
 		c.transfer_listed[int(k)] = true
+	c.sale_offers = {}
+	for k in d.get("sale_offers", {}):
+		c.sale_offers[int(k)] = d["sale_offers"][k]
 	# Pre-contracts saves baked the player wage bill INTO weekly_net; the live loop now draws
 	# it separately, so add it back once on load to keep the old weekly burn unchanged. Legacy
 	# players have no stored `wage` -> current_weekly falls back to the (identical) market wage.
