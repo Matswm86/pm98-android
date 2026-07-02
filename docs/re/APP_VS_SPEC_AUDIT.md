@@ -249,5 +249,131 @@ From in-code comments (verified by grep this pass):
   HIERPREM grid = grass+boards+crowd only, zero line tiles).
 - The app's data/art is otherwise **source-traceable**; remaining items are documented
   inferences (A3, A4) or honestly-flagged gaps (A5, A6).
-- Recommended next action (separate, user-approved): apply the A1/A2 doc corrections, then
-  resume verified work (e.g. the JUG sprite facing-order check) under the binding spec.
+- ⚠️ **SUPERSEDED IN SCOPE 2026-07-02:** the pass above audited asset/data PROVENANCE only.
+  It never walked the screen NAVIGATION. The §B fan-out below audits what every home-screen
+  action actually opens vs the original — and finds the user's complaint is correct: most
+  sub-flows are invented substitutes, and many original screens are missing entirely.
+
+---
+
+# §B — HOME-SCREEN FAN-OUT RECHECK (2026-07-02, user-ordered)
+
+> Method: (1) enumerated the ORIGINAL screen set from `RECURSOS.PKF` (parsed clean: 448
+> records, 36 folder headers, 392 files, 0 errors) + `strings MANAGER.EXE` path refs;
+> (2) walked every `Main.gd:_menu_action` route (Main.gd:2026-2050) and every
+> `_mount_browse` call site; (3) traced the career match chain; (4) ran the screen test
+> suites. The original PC game is runnable locally for visual confirmation:
+> `WINEPREFIX=<repo>/.wineprefix wine drive_c/PM98/MANAGER.EXE` (~150MB RAM total).
+
+## B0 — The ORIGINAL screen inventory (source-proven)
+`RECURSOS\ICONOS\<folder>` in RECURSOS.PKF — 27 screen folders, each a real original
+screen (MANAGER.EXE holds a literal `recursos\iconos\<name>` path string for all but
+CREDITOS and MENUPCFUT5):
+ALINEACION · CAJA · CREDITOS · DIRECTIVA · EMPAREJAMIENTOS (fixtures/pairings) ·
+EMPLEADOS (staff) · ENTRENAMIENTO (training) · ESTADIO · FICHAR · HIGHLIGHTS ·
+HISTORIAL (history) · LESIONADOS (injuries) · MENUPCFUT5 · MENUPRINCIPAL · MULTAS (fines) ·
+NIVELES (objectives) · NOTICIAS (news) · OFERTAS (offers) · OPCIONES (options) ·
+PLANTILLA (squad) · SECRETARIO · SEGUROS (insurance) · SELECCION · SELECCIONPRO ·
+TACTICAS · TV · VERRIVAL (view opponent)
+plus `PREMIER\ICONOS\{MENUPRINCIPAL, NIVELES, TV, FINOBJETIVO}` + `PREMIER\SININFO`
+(PM98 English-market overrides). MARCA (results) and CLASI (league table) have no iconos
+folder — their art is in IMG.PKF (CLASIFICACION etc., per pkf_format.md).
+GAP (honest): per-folder file counts are not encoded in the PKF directory (all 392 file
+records carry zero folder-membership fields; files chunk 32/dir-chunk physically).
+
+## B1 — Per-action verdict (12 icons + 4 controls, Main.gd:2026-2050)
+Verdicts: **TRUE** = reversed original layout · **SUBSTITUTE** = invented UI standing in
+for a real original screen · **WRONG-SCREEN** = opens a different original surface than
+the original does · **PARTIAL** · **STUB**.
+
+| action (icon) | original target (evidence) | app today (cite) | verdict |
+|---|---|---|---|
+| results (MARCA) | results view, art in IMG.PKF (no iconos folder) | BrowseScreen W/D/L text list, Main.gd:2076-2095 | **SUBSTITUTE** |
+| table (CLASI) | CLASIFICACION (IMG.PKF) | LeagueTableScreen (ma_10 rebuild) | TRUE layout (data: A5 gap) |
+| fixtures (CALEN) | EMPAREJAMIENTOS folder | BrowseScreen "COMPETITIONS" chooser + "SEASON FIXTURES" list, Main.gd:1569-1626 | **SUBSTITUTE** |
+| lineup (ALINE) | ALINEACION | LineupScreen (ma_7, FUN_004fc321) | TRUE |
+| tactics (TACTI) | TACTICAS folder | BrowseScreen menu wrapper → TacticsScreen modal (ma_9), Main.gd:2204-2242 | **PARTIAL** (wrapper invented; original TACTICAS screen not ported) |
+| opponent (RIVAL) | VERRIVAL folder (dedicated screen) | opens the Dbasewin DATA BASE squad browser, Main.gd:2055-2062 | **WRONG-SCREEN** |
+| buy (FICHA) | FICHAR | TransferScreen (ma_11) | TRUE |
+| sell (VENDE) | sell-player flow (orig. screen: unmapped — confirm in running original; OFERTAS folder likely related) | BrowseScreen menus (market/squad/free/loan/scout/shortlist/news), Main.gd:2384-2411 | **SUBSTITUTE** |
+| staff (EMPLE) | EMPLEADOS folder | StaffScreen (strings-only, NO reversed layout; StaffScreen.gd:3-12) + invented TRAINING browse (Main.gd:2117-2160; original ENTRENAMIENTO is its own screen) | **PARTIAL/SUBSTITUTE** |
+| finance (CAJA) | CAJA | FinanceScreen (og_12) | TRUE |
+| board (DECIS) | DIRECTIVA | DirectivaScreen (ma_14; meters derived) | TRUE |
+| stadium (ESTAD) | ESTADIO | StadiumScreen (ma_15, FUN_0051a6e0) | TRUE |
+| NEWS (control) | NOTICIAS folder (real news screen) | invented `Career.news_log` feed in BrowseScreen, Main.gd:2100-2115 | **SUBSTITUTE** |
+| SAVE GAME (control) | original save flow | `_career.save()` + toast only, Main.gd:2030-2032 | **STUB** |
+| CONTINUE (control) | advance + match | real stat-engine result BUT invented watch/commentary (§B3) | **PARTIAL** |
+| EXIT (control) | leave to front door | flow OK, Main.gd:2029 | TRUE-ish (flow) |
+
+## B2 — Original screens with NO app counterpart at all (flag, port or drop the icon —
+never fill with invented stand-ins)
+ENTRENAMIENTO · EMPAREJAMIENTOS · NOTICIAS · TACTICAS (screen itself) · VERRIVAL ·
+HISTORIAL · LESIONADOS · MULTAS · NIVELES (objectives + PREMIER FinObjetivo "goal_game") ·
+OFERTAS · OPCIONES · SECRETARIO · SEGUROS · TV · HIGHLIGHTS · CREDITOS · SELECCIONPRO ·
+PREMIER\SININFO. Also: **SquadScreen (PLANTILLA — a TRUE ported screen!) is an orphan**,
+reachable only from the devshot list (Main.gd:544), not from the hub; YouthScreen is
+transitively orphaned behind it.
+
+## B3 — Career match trueness (the "game match isnt true" verdict)
+- **Scoreline = REAL ENGINE.** CONTINUE → `Career.advance_week` (Career.gd:374-389) →
+  `MatchSim.simulate` → **`Pm98StatMatch`** (byte-exact port of the instant-result engine
+  FUN_0044ee70 family, oracle-verified) for the manager's match AND the whole league.
+- **BUT silent fallback to an INVENTED sim**: if `_usable()` fails (XI missing attrs),
+  MatchSim.gd:86 falls back to `MatchEngine.gd` — self-declared "NOT a 1:1 port …
+  constants are ours". Must hard-fail or guarantee XIs instead.
+- **Everything the player WATCHES is invented**: `MatchCommentary.gd` fabricates event
+  rates/minutes/possession/cards (MatchCommentary.gd:14-16, 141-150); MatchScreen +
+  MatchSimulador render that fabricated timeline. The REAL positional engine port
+  (Pm98Match/Pm98Driver/Pm98Outer/Pm98Movement, 141 suites green) is **test-only** —
+  no scene reaches it. The original also has NO side-on 2D view (A7): its match view is
+  a pseudo-3D 3/4 camera (PCF5DAT camera un-reversed — gap, do not fake).
+- Honest short path: emit the stat engine's OWN recorded event vector to the result
+  screen (delete the RATE_* sprinkles); full fidelity = wire Pm98Outer/Driver into WATCH
+  once the tick driver is e2e-complete.
+
+## B4 — Not functional (current tree, verified by running)
+- `test_menu_screen`: parse error — the parallel menuicons stream removed
+  `MenuScreen._fmt` the test still calls (untracked `app/art/screens/menuicons/`).
+- `test_browse_nav`: SeleccionScreen.gd:107 "Identifier not found: GameDB" compile
+  failure in test context → career-select instantiation fails inside the test.
+- `test_stadium_works` / `test_transfer_screen`: tap-dismiss/back regressions (1 FAIL each).
+- `shot_screens.gd` (the screen-render smoke): times out headless (>3 min; previously CI-green).
+
+## B6 — BINDING VISUAL REFERENCE: full original-game walkthrough (2026-07-02)
+`screenshots/original-walkthrough-2026-07-02/` = **479 PNG frames** captured live from the
+real MANAGER.EXE under Wine (this repo's `.wineprefix`, registry virtual desktop) while the
+user played through EVERY hub object + sub-screen. Auto-captured on change (~1.5s poll,
+window-id grab) + 2 user screenshots. Covers: title, SELECT LEVEL (TRAINER/MANAGER/
+ACCOUNTANT/TOTAL + "Players age?"), LOAD GAME, ENTER NAME+SELECT TEAM, preseason friendly
+picker (Europe/S-America maps, 4 RIVAL slots), TEAMS IN CHAMPIONSHIPS, MANAGER MENU hub,
+RESULTS (matches-on-date + competition rail), LEAGUE TABLES + GOAL SCORERS (graph+compare),
+THE CALENDAR, TRANSFER MARKET + CURRENT OFFERS + SCOUT + OFFERS(map) + PLAYER INFORMATION
+offer flow (+ "F.C. Barcelona has rejected your offer" dialog + channelTV £187,500 event),
+SQUAD MANAGEMENT + contract overlay (RENEW/TRANSFER/SACK), YOUTH TEAM, CLUB PERSONNEL (all
+9 staff roles + hire overlays), LINE-UP (PARAMETERS/RATING), TRAINING (per-player focus
+grid), INJURIES (+ INSURANCE per-player), TACTICS + PREDEFINED (10 formations) + VIEW RIVAL
+(= hub OPPONENT, user-confirmed same screen), STATISTICS, MAN-TO-MAN MARKINGS (+ marking
+lines), NEWS extra, FINANCES (income/expenses week/season + balance graph), BOARD OF
+DIRECTORS (confidence meters + loans + bonuses), GROUND (works/improvements/extras),
+MATCH OPTIONS (WATCH/HIGHLIGHTS/BRIEF/RESULTS + graphics/cameras/sound + lineups ON/OFF),
+RESULT-mode match (HALF/FULL TIME + stadium panel + man-of-match), **BRIEF-mode match**
+(clock, kits scoreline, possession bar, minute-stamped colour-coded event feed, in-match
+LINE-UP/TACTICS/MAN-TO-MAN/STATISTICS), pre-match XI-vs-XI photo screen, 3D WATCH match,
+CHARITY SHIELD trophy screen, SAVE GAME dialog.
+
+**USER PRIORITY (binding, 2026-07-02):** rebuild target = *fully playable as the original
+with BRIEF + RESULT match modes*. The 3D WATCH match is explicitly LAST — the user mostly
+plays BRIEF. Everything else in B5 comes first.
+
+## B5 — Ranked fix list (user reviews; no fixes applied in this pass)
+1. Remove/replace the invented BrowseScreen surfaces that shadow REAL original screens:
+   NEWS feed, RESULTS list, COMPETITIONS/SEASON FIXTURES, TRAINING browse, sell/tactics
+   menu wrappers, JOB OFFERS / YOUR CAREER / End-of-season lists (no original counterpart
+   proven — confirm against the running original, else drop).
+2. Wire the orphaned TRUE screens: SquadScreen (PLANTILLA) into the hub where the
+   original puts it; fix opponent (RIVAL) to a VERRIVAL port, not the DB browser.
+3. Port the missing original screens B2 (evidence-first, one at a time: EMPAREJAMIENTOS,
+   NOTICIAS, ENTRENAMIENTO, TACTICAS, VERRIVAL first — they sit behind live hub buttons).
+4. Close the MatchSim invented-fallback + replace fabricated commentary with the stat
+   engine's real event vector (B3).
+5. Repair the parallel-stream breakage (B4) or revert the untracked menuicons stream.
