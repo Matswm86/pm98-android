@@ -100,12 +100,39 @@ JOBS = [
         "MANAGER.PAL",
         True,
     ),
-    # IMG.PKF PRETEMPORADA aux DM sprites (AZULBARRAS/OVER/X) decode to empty under
-    # both the VGA and RIFF palettes (pixel data reads as all idx-0 — undecoded DM
-    # variant); they are hover/fill textures the walkthrough frames show as flat
-    # fills, so the screens draw those procedurally instead. Revisit if the DM
-    # variant gets cracked.
+    # IMG.PKF PRETEMPORADA aux DM sprites: CRACKED 2026-07-03. The variant strips the
+    # 1024-byte palette table but keeps bfOffBits pointing past it (1078), so the file
+    # is SMALLER than its own claimed pixel offset — the pixel rows actually start
+    # right after the 40-byte info header at offset 54 (sizes check exactly:
+    # AZULBARRAS 38x20 pad->40*20=800=854-54; OVER 26x36 pad->28*36=1008=1062-54;
+    # X 16x16 256=310-54). decode_dm_nopal() below handles them.
+    (
+        "IMG.PKF",
+        23,
+        "AZULBARRAS.BMP",
+        "app/art/screens/pretemp/azulbarras.png",
+        "MANAGER.PAL",
+        True,
+    ),
+    ("IMG.PKF", 23, "OVER.BMP", "app/art/screens/pretemp/over.png", "MANAGER.PAL", True),
+    ("IMG.PKF", 23, "X.BMP", "app/art/screens/pretemp/x.png", "MANAGER.PAL", True),
     ("RECURSOS.PKF", None, "BORRA.BMP", "app/art/icons/borra.png", "MANAGER.PAL", True),
+    # SELECCION chrome sprites (walkthrough-verified 2026-07-03): PUN10/PUN20 are the
+    # PLAYER-bar arrow chips baked in frame 008 at abs (79,65)/(501,65) — SAD 0.0
+    # pixel-identical under MANAGER.PAL; *1 = pressed state. OVER = the gold
+    # kit-cell selection background (frame 010).
+    ("RECURSOS.PKF", 25, "PUN10.BMP", "app/art/screens/seleccion/pun10.png", "MANAGER.PAL", True),
+    ("RECURSOS.PKF", 25, "PUN11.BMP", "app/art/screens/seleccion/pun11.png", "MANAGER.PAL", True),
+    ("RECURSOS.PKF", 25, "PUN20.BMP", "app/art/screens/seleccion/pun20.png", "MANAGER.PAL", True),
+    ("RECURSOS.PKF", 25, "PUN21.BMP", "app/art/screens/seleccion/pun21.png", "MANAGER.PAL", True),
+    (
+        "RECURSOS.PKF",
+        25,
+        "OVER.BMP",
+        "app/art/screens/seleccion/kit_over.png",
+        "MANAGER.PAL",
+        False,
+    ),
 ]
 
 
@@ -121,12 +148,33 @@ def entry_by_folder(pkf: str, folder_id: int | None, name: str) -> bytes:
     raise KeyError(f"{name} (folder {folder_id}) not in {pkf}")
 
 
+def decode_dm_nopal(raw: bytes, pal: list[int], transparent: bool) -> Image.Image:
+    """DM variant with the palette table STRIPPED: bfOffBits still claims 1078 but the
+    file ends before that — pixel rows (bottom-up, 4-byte padded) start at offset 54."""
+    import struct
+
+    w, h = struct.unpack_from("<ii", raw, 18)
+    rowsz = (w + 3) & ~3
+    im = Image.frombytes("P", (w, h), raw[54 : 54 + rowsz * h], "raw", "P", rowsz, -1)
+    im.putpalette(pal)
+    rgba = im.convert("RGBA")
+    if transparent:
+        idx = im.tobytes()
+        alpha = Image.frombytes("L", im.size, bytes(0 if v == 0 else 255 for v in idx))
+        rgba.putalpha(alpha)
+    return rgba
+
+
 def render(raw: bytes, pal_name: str, transparent: bool) -> Image.Image:
     raw = bytearray(raw)
     is_dm = raw[:2] == b"DM"
+    import struct
+
+    bf_off_probe = struct.unpack_from("<I", raw, 10)[0]
+    if is_dm and len(raw) < bf_off_probe:
+        return decode_dm_nopal(bytes(raw), ea.riff_palette(pal_name), transparent)
     if is_dm:
         raw[0] = ord("B")
-    import struct
 
     hdr_size = struct.unpack_from("<I", raw, 14)[0]
     bf_off = struct.unpack_from("<I", raw, 10)[0]

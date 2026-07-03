@@ -78,3 +78,14 @@ PREMIER Presidente0/1 total0/1 + ok + carga → `app/art/screens/nivel_*.png` +
 `app/art/icons/carga.png` (force MENU.PAL; PKF folder ids: NIVELES=18,
 PREMIER-NIVELES=34, root ICONOS carga fid=2 — duplicate names across folders, so
 select by folder id, not name).
+
+## Pixel-parity pass (2026-07-03)
+
+The dialog ships as the REAL frame-003 crop (`nivel/chrome.png`, 453x415 at the
+reversed rect (93,32)) and the LOAD modal as frame 005's card
+(`nivel/load_modal.png`, bbox via diff(005,003) = (140,102) 360x276, all 8 rows
+empty = resting). Parity: **both pixel-exact** (dialog-rect ROI; the backdrop is
+TitleScreen's own story). Frame truth adopted: LOAD GAME is solid and opens the
+(empty) modal even with NO save (the walkthrough had none); bands, bullets,
+buttons and checkbox are baked — only the *1.bmp pressed art, the ok.bmp tick,
+press tints and the modal row-1 text draw dynamically.

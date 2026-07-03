@@ -76,3 +76,49 @@ new-career path)
 4. Manager-name field = an editable text box (PM98 has a name entry here).
 5. Wire `Main.gd`: `_show_home → new` mounts SeleccionScreen; CONTINUE→`_begin_career`,
    RETURN→`_show_home`. Verify by LOOKING (boot the app, screenshot).
+
+## Pixel-parity pass (2026-07-03) — chrome doctrine + new frame-derived facts
+
+The screen's static look now ships as the REAL frame-008 pixels
+(`app/art/screens/seleccion/chrome.png`, caret erased), same doctrine as
+`build_menu_bg_from_ref.py`; the dynamic layer redraws ONLY state deltas.
+Verified by `app/tests/shot_entry_parity.gd` + `tools/re/diff_entry_parity.py`:
+**seleccion_008 pixel-exact; seleccion_011 (locked state) 100px** (the PLAYER
+digit's checker two-tone dither — see below). Facts established:
+
+- **The runtime screen COMPOSITE is not reproducible from PKF blits alone**: the
+  fondo/barra render doesn't match any FONDO0-9/BARRA under any .PAL (dithered
+  remap by the engine); the frame IS the source of truth for the composite.
+- **PLAYER-bar arrows = `seleccion\pun10/pun20.bmp`** (34x29 pitch-grid chips,
+  SAD 0.0 at abs (79,65)/(501,65)); `pun11/pun21` = pressed states.
+  FLECHA0/1 (16x14) are NOT these.
+- **Panel kits = DBDAT/NANOESC.PKF** (24x32 full kit incl shorts; palette-less
+  OS/2-core DIB -> export_icons.decode_dib, MANAGER.PAL). SAD 0.0 for all 20
+  cells at **x 167+31i, y 308/345**. MINIESC (48x64) is the shirt-only art.
+  The engine adds a soft SHADOW pass that is NOT a plain palette blit (idx0
+  cells render position-parity-dithered greys), so the app ships frame-rendered
+  24x32 patches per Premier club (`app/art/kits/panel/`), nano art elsewhere.
+- **OVER.BMP (26x36) = the selection cell** behind the kit at kit-(1,2).
+- **Panel structure**: gold frame rect x 158..480 y 291..383 (line colour
+  (212,191,85)); the title composition = ball sprite at (237,272) + division
+  name at x270 (ProMan12 @ NATIVE size 13) ON the top line, which breaks at
+  FIXED x 232..405. Club-name line renders below the bottom line (gold).
+- **Taken clubs render WASHED** (50% dither toward white; frame 011's Man Utd).
+  The washed render is position-independent -> the frame-cut washed patch ships
+  (`app/art/kits/washed/`), checker approximation for unframed clubs.
+- **Filled slot style (frame 011)**: black badge/white digit; name bar (40,60,80)
+  with (200,200,240) CENTRED text; club bar (100,100,140) with (170,191,255)
+  CENTRED text. Active slot: red badge (85,0,0)/gold digit (255,223,0), bars
+  (212,159,0)/(212,191,0), white 2px outline INSIDE the bg gaps (rows y-3..y-2 &
+  y+13..y+14, cols x20..21 & 309..310). Row texts/digits = **ProMan8 at its
+  NATIVE .fnt size 11** (scaling the bitmap fonts was the whole glyph drift);
+  digit centring rounds RIGHT of centre (ceil), '1' sits one px further right.
+- **PM98 disables buttons by WASHING them toward the backdrop** (frame 008
+  CONTINUE washed vs 012 solid); the solid overlay is cut from 012 (the SEGUIR
+  ball icon ANIMATES — 011/012 differ there, excluded in the diff).
+- **PLAYER cell digit** = ProMan14 @ native 15, bright gold (255,223,0) with a
+  dark-brown (72,30,2) outline; the ORIGINAL renders it as a checker two-tone
+  dither the app approximates flat (the remaining 100px / mean-diff 22.7 in the
+  011 parity — accepted + documented).
+- Empty-slot-1 background truth (after the baked active outline leaves) comes
+  from frame 011 (`seleccion/row1_degap.png`).

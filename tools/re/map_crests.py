@@ -171,15 +171,33 @@ def main() -> None:
 
 def export_kits(id_to_code: dict[str, str]) -> None:
     """Render each mapped club's MINIESC kit (48x64, corrected VGA palette, index0
-    transparent) to app/art/kits/<club_id>.png. Runs only where the owned PKFs exist
+    transparent) to app/art/kits/<club_id>.png, plus its NANOESC full kit (24x32
+    shirt+shorts+shadow — the art the SELECCION/PRESEASON panels blit 1:1, verified
+    SAD-0.0 vs walkthrough frames 008/013 under MANAGER.PAL) to
+    app/art/kits/nano/<club_id>.png. NANOESC entries are palette-less OS/2-core
+    DIBs -> export_icons.decode_dib. Runs only where the owned PKFs exist
     (extracted/ is gitignored); the PNGs are committed, CI just regenerates .import."""
-    from export_art import render  # noqa: PLC0415 - tool-local import
+    from export_art import render, riff_palette  # noqa: PLC0415 - tool-local import
+    from export_icons import decode_dib  # noqa: PLC0415 - tool-local import
+    from pkf_unpack import parse  # noqa: PLC0415 - tool-local import
 
     KITS_DIR.mkdir(parents=True, exist_ok=True)
+    nano_dir = KITS_DIR / "nano"
+    nano_dir.mkdir(parents=True, exist_ok=True)
+    buf = (GAME / "DBDAT" / "NANOESC.PKF").read_bytes()
+    nano = {}
+    for r in parse(buf):
+        if r.get("type") == 2:
+            off, size, _fid = r["u32s"]
+            nano[r["name"]] = bytes(buf[off : off + size])
+        if r.get("end"):
+            break
+    pal = riff_palette("MANAGER.PAL")
     for cid, code in id_to_code.items():
         img = render("DBDAT/MINIESC.PKF", f"EQ96{code}.BMP", force_vga=True, transparent=True)
         img.save(KITS_DIR / f"{cid}.png")
-    print(f"exported {len(id_to_code)} kit PNGs -> {KITS_DIR.relative_to(ROOT)}")
+        decode_dib(nano[f"EQ96{code}.BMP"], pal).save(nano_dir / f"{cid}.png")
+    print(f"exported {len(id_to_code)} kit PNG pairs -> {KITS_DIR.relative_to(ROOT)} (+nano/)")
 
 
 if __name__ == "__main__":

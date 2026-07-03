@@ -1,20 +1,24 @@
 extends Control
 class_name SeleccionScreen
-## PM98 NEW-CAREER screen (SELECCION, "ENTER YOUR NAME AND SELECT A TEAM"), rebuilt
-## frame-true against walkthrough frames 008-012 (2026-07-02) at the rects reversed
-## from MANAGER.EXE (FUN_0055d560). See docs/re/seleccion_screen_re.md.
+## PM98 NEW-CAREER screen (SELECCION, "ENTER YOUR NAME AND SELECT A TEAM"). The
+## static chrome is the REAL game's fresh frame (walkthrough 008, caret erased):
+## barra + title + PLAYER bar with the PUN10/PUN20 arrow chips + 20 empty save
+## slots (slot 1 active) + Premier kit panel + division plaques + bottom row —
+## all original pixels. See docs/re/seleccion_screen_re.md and
+## tools/re/build_entry_chrome_from_frames.py.
 ##
-## Real body (frames 008-012): PLAYER name bar with arrows top-centre, TWENTY numbered
-## save slots in two columns of 10 (number badge + NAME + CLUB cells), a central white
-## kit panel showing the selected division's TWENTY club kits (tap = pick club, name
-## appears beneath), four division plaques flanking the panel, and the reversed
-## RETURN / LOAD GAME / DELETE / CONTINUE bottom row.
+## The dynamic layer redraws ONLY what differs from that resting state: slot rows
+## whose state changed (lock/advance/delete — frame 011 truth: filled = black
+## badge/white digit/gold bars/navy text; active = red badge/gold digit/gold bars/
+## white outline), the PLAYER number when it moves off 1, the kit panel + plaques
+## when the division or pick changes (selection = the original OVER.BMP gold cell,
+## frame 010), pressed arrows (PUN11/21), and the solid CONTINUE (frame 012) once
+## a slot is filled — PM98 renders disabled buttons WASHED toward the backdrop.
 ##
-## Original allows up to 20 hot-seat players; this engine holds ONE career save, so
-## slot 1 is the live slot and the rest render as the empty chrome the frames show
-## (honest gap, documented). CONTINUE with name+club locks the slot (frame 011);
-## CONTINUE with the slot list non-empty and the active slot blank starts the game
-## (frames 012 -> 013, the preseason screen).
+## Original allows 20 hot-seat players; this engine holds ONE career save, so slot
+## 1 is the live slot and the rest render as the empty chrome (honest gap).
+## CONTINUE with name+club locks the slot (frame 011); CONTINUE with the active
+## slot blank and at least one filled slot starts the game (frames 012 -> 013).
 
 signal career_begun(manager_name: String, league: Dictionary, club: Dictionary)
 signal back_pressed
@@ -24,52 +28,79 @@ signal delete_pressed
 const W := 640
 const H := 480
 
-# Reversed rects (capstone) — title/buttons; the body is frame-measured (008-012).
+# Reversed rects (capstone) — bottom row + title; body geometry frame-measured (008).
 const R_TITLE := Rect2(108, 12, 480, 27)
 const R_RETURN := Rect2(25, 427, 112, 25)
 const R_LOAD := Rect2(175, 427, 152, 25)
 const R_DELETE := Rect2(348, 427, 112, 25)
 const R_CONTINUE := Rect2(508, 427, 112, 25)
 
-# PLAYER bar (frame 008)
-const R_ARROW_L := Rect2(83, 66, 28, 28)
-const R_ARROW_R := Rect2(502, 66, 28, 28)
-const R_PLAYER := Rect2(118, 64, 380, 31)     # the full dark bar
-const R_PLAYER_CHIP := Rect2(127, 67, 118, 25)
-const R_SLOTNO := Rect2(247, 67, 44, 25)
-const R_NAME := Rect2(293, 67, 202, 25)       # LineEdit mounts here
+# PLAYER bar (frame 008): PUN arrow chips SAD-0.0 at (79,65)/(501,65) 34x29;
+# number cell frame x 251..292, name field x 293..489.
+const R_ARROW_L := Rect2(79, 65, 34, 29)
+const R_ARROW_R := Rect2(501, 65, 34, 29)
+const R_SLOTNO := Rect2(251, 67, 42, 25)
+const R_NAME := Rect2(293, 67, 197, 25)       # LineEdit mounts here
 
-# Save-slot grid (frame 008): 2 cols x 10 rows, pitch 16, bar 12
+# Save-slot grid (frame-scanned): row-1 fill y 107..118, pitch 16; badge fill
+# x 23..43, name bar 45..148, club bar 150..307 (+312 for the right column).
 const SLOT_Y0 := 107
 const SLOT_PITCH := 16
-const SLOT_H := 13
-const COL_X := [20, 332]                       # badge left edge per column
-const BADGE_W := 24
-const NAME_W := 104                            # badge_end..149
-const CLUB_W := 158                            # 150..308
+const COL_DX := 312
+const COL_X := [20, 332]                       # band left edge per column
 
-# Kit panel + plaques (frames 008/010)
+# Kit panel, SAD-0.0-anchored vs frame 008: black border (150,276)-(490,406), gold
+# rect x 158..480 / y 291..383. NANOESC kits (24x32) blit 1:1 at x 167+31i,
+# y 308/345; the OVER.BMP selection cell (26x36) sits at kit pos +(-1,-2). Ball
+# sprite at (237,272); title text x270, glyphs y 286..295, on the y291 line.
 const R_PANEL := Rect2(150, 276, 340, 130)
-const KIT_Y := [297, 342]                      # two kit rows (y top)
-const KIT_H := 40
+const KIT_X0 := 167
+const KIT_PITCH := 31
+const KIT_Y := [308, 345]
+const KIT_W := 24
+const KIT_H := 32
+const GOLD_RECT := Rect2(158, 291, 323, 93)    # x 158..480 (w=323), y 291..383 (h=93)
+const BALL_POS := Vector2(237, 272)
+const TITLE_X := 270.0
+const LINE_Y := 291
 const R_PLAQ := [Rect2(13, 291, 124, 20), Rect2(13, 329, 124, 20),
 	Rect2(503, 291, 124, 20), Rect2(503, 329, 124, 20)]
 
-const C_GOLD := Color(1.0, 0.875, 0.0)
-const C_YELLOW := Color(1.0, 1.0, 0.0)
-const C_RED := Color(1.0, 0.122, 0.0)
-const C_LOADTXT := Color8(123, 223, 82)
-const C_SLOT_BAR := Color8(150, 155, 200)      # empty slot bar (frame 008 lavender)
-const C_SLOT_SEL := Color8(230, 190, 40)       # active slot gold
+# Frame-sampled colours (tools/re/specs/entry_chrome_samples.json + frame 011)
+const C_GOLD_BAR := Color8(212, 191, 0)        # active club bar
+const C_GOLD_NAME := Color8(212, 159, 0)       # active name bar
+const C_LAV_BAR := Color8(160, 160, 200)       # empty club bar
+const C_NAME_BAR := Color8(140, 160, 180)      # empty name bar
+const C_BADGE := Color8(128, 128, 128)
+const C_BADGE_DIGIT := Color8(192, 192, 192)
+const C_BADGE_ACT := Color8(85, 0, 0)
+const C_BADGE_ACT_DIGIT := Color8(255, 223, 0)
+# filled slot (frame 011): black badge/white digit, dark-slate name bar with pale
+# lavender text, grey-lavender club bar with pale-blue text — both CENTRED
+const C_FILL_NAME_BAR := Color8(40, 60, 80)
+const C_FILL_CLUB_BAR := Color8(100, 100, 140)
+const C_FILL_NAME_TXT := Color8(200, 200, 240)
+const C_FILL_CLUB_TXT := Color8(170, 191, 255)
+const C_RULE := Color8(212, 191, 85)           # panel gold frame/rule
+const C_PANEL_TITLE := Color8(212, 191, 85)
+const C_PLAQ_SEL := Color8(255, 255, 0)
+const C_PLAQ_UNSEL := Color8(192, 192, 192)
 const C_PRESS := Color(1, 1, 1, 0.20)
 
-var _bg: Texture2D
-var _barra: Texture2D
-var _carga: Texture2D
-var _borra: Texture2D
+var _chrome: Texture2D
+var _pun: Dictionary = {}      # "11"/"21" pressed arrow art
+var _row1_degap: Texture2D     # frame-011 rows 104..121: slot 1 minus its outline
+var _player_cell: Texture2D
+var _panel_ball: Texture2D
+var _kit_over: Texture2D
+var _plaque_sel: Texture2D
+var _plaque_unsel: Texture2D
+var _continue_on: Texture2D
 var _f14: Font
 var _f12: Font
 var _f10: Font
+var _f8: Font
+var _checker: Texture2D    # 2x2 white/transparent — the taken-club kit wash (frame 011)
 var _name_edit: LineEdit
 
 var _leagues: Array = []
@@ -84,13 +115,24 @@ var _clubs_of: Callable
 
 
 func _ready() -> void:
-	_bg = load("res://art/screens/seleccion_bg.png")
-	_barra = load("res://art/screens/barra0.png")
-	_carga = load("res://art/icons/carga.png")
-	_borra = load("res://art/icons/borra.png")
+	_chrome = load("res://art/screens/seleccion/chrome.png")
+	_pun["11"] = load("res://art/screens/seleccion/pun11.png")
+	_pun["21"] = load("res://art/screens/seleccion/pun21.png")
+	_row1_degap = load("res://art/screens/seleccion/row1_degap.png")
+	_player_cell = load("res://art/screens/seleccion/player_cell.png")
+	_panel_ball = load("res://art/screens/seleccion/panel_ball.png")
+	_kit_over = load("res://art/screens/seleccion/kit_over.png")
+	_plaque_sel = load("res://art/screens/seleccion/plaque_sel.png")
+	_plaque_unsel = load("res://art/screens/seleccion/plaque_unsel.png")
+	_continue_on = load("res://art/screens/seleccion/continue_on.png")
 	_f14 = PMChrome.font("14")
 	_f12 = PMChrome.font("12")
 	_f10 = PMChrome.font("10")
+	_f8 = PMChrome.font("8")
+	var ci := Image.create(2, 2, false, Image.FORMAT_RGBA8)
+	ci.set_pixel(0, 0, Color.WHITE)
+	ci.set_pixel(1, 1, Color.WHITE)
+	_checker = ImageTexture.create_from_image(ci)
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2(W, H)
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -99,7 +141,8 @@ func _ready() -> void:
 	_name_edit = LineEdit.new()
 	_name_edit.placeholder_text = ""
 	_name_edit.max_length = 16
-	_name_edit.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	# frame 010: the typed name renders centred in the black field
+	_name_edit.alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_name_edit.add_theme_font_override("font", _f12)
 	_name_edit.add_theme_font_size_override("font_size", 13)
 	_name_edit.add_theme_color_override("font_color", Color.WHITE)
@@ -155,12 +198,13 @@ func _reposition_name() -> void:
 func _kit_cols() -> int:
 	return 10 if _clubs.size() <= 20 else int(ceil(_clubs.size() / 2.0))
 
+## The selection/tap cell (the OVER.BMP footprint, 26x36 at kit pos +(-1,-2)).
 func _kit_rect(i: int) -> Rect2:
 	var cols := _kit_cols()
-	var pitch := (R_PANEL.size.x - 24.0) / cols
+	var pitch: float = KIT_PITCH if cols == 10 else (R_PANEL.size.x - 30.0) / cols
 	var col := i % cols
 	var row := i / cols
-	return Rect2(R_PANEL.position.x + 12 + col * pitch, KIT_Y[row], pitch, KIT_H)
+	return Rect2(KIT_X0 - 1 + col * pitch, KIT_Y[row] - 2, 26, 36)
 
 func _kit_at(d: Vector2) -> int:
 	for i in _clubs.size():
@@ -246,6 +290,21 @@ func _continue() -> void:
 			return
 
 
+func _any_filled() -> bool:
+	for s2 in _slots:
+		if not s2.is_empty():
+			return true
+	return false
+
+
+func _taken_ids() -> Dictionary:
+	var out := {}
+	for s2 in _slots:
+		if not (s2 as Dictionary).is_empty():
+			out[int((s2["club"] as Dictionary).get("id", -1))] = true
+	return out
+
+
 # ---- drawing ---------------------------------------------------------------
 
 func _txt(f: Font, x: float, y_top: float, s: String, col: Color, sz: int, cw := 0.0, center := false) -> void:
@@ -258,113 +317,179 @@ func _txt(f: Font, x: float, y_top: float, s: String, col: Color, sz: int, cw :=
 	draw_string(f, Vector2(px, y_top + f.get_ascent(sz)), s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
 
 
-func _chip(r: Rect2, key: String) -> void:
-	draw_rect(r, Color8(8, 8, 14), true)
-	PMChrome.bevel(self, r, Color8(8, 8, 14), Color(0.45, 0.45, 0.5), Color(0, 0, 0))
-	if _press == key:
-		draw_rect(r, C_PRESS, true)
-
-
-func _arrow(r: Rect2, left: bool, key: String) -> void:
-	_chip(r, key)
-	var c := r.get_center()
-	var s := 7.0
-	var pts := PackedVector2Array([c + Vector2(-s if left else s, 0),
-		c + Vector2(s if left else -s, -s), c + Vector2(s if left else -s, s)])
-	draw_colored_polygon(pts, C_GOLD)
+## Ceil-centred variant for single digits (frame-verified: the original's digit
+## centring rounds right of centre).
+func _txt_fc(f: Font, x: float, y_top: float, s: String, col: Color, sz: int, cw: float) -> void:
+	if f == null:
+		return
+	var w := f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
+	var nudge := 1.0 if s == "1" else 0.0  # frame 011: '1' sits one px right of our centre
+	draw_string(f, Vector2(x + ceilf((cw - w) * 0.5) + nudge, y_top + f.get_ascent(sz)), s,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
 
 
 func _draw() -> void:
 	var s := _scale()
 	draw_set_transform(_origin(s), 0.0, Vector2(s, s))
-	if _bg != null:
-		draw_texture_rect(_bg, Rect2(0, 0, W, H), false)
-	if _barra != null:
-		draw_texture_rect(_barra, Rect2(0, 0, W, _barra.get_height()), false)
-	_txt(_f14, R_TITLE.position.x, R_TITLE.position.y, "ENTER YOUR NAME AND SELECT A TEAM",
-		Color.WHITE, 15, R_TITLE.size.x, true)
+	if _chrome != null:
+		draw_texture_rect(_chrome, Rect2(0, 0, W, H), false)
 
-	# PLAYER bar + arrows
-	draw_rect(R_PLAYER, Color(0, 0, 0), true)
-	draw_rect(R_PLAYER_CHIP, Color8(200, 110, 20), true)
-	PMChrome.bevel(self, R_PLAYER_CHIP, Color8(200, 110, 20), Color8(245, 170, 70), Color8(90, 45, 5))
-	_txt(_f12, R_PLAYER_CHIP.position.x, R_PLAYER_CHIP.position.y + 4, "PLAYER", C_GOLD,
-		14, R_PLAYER_CHIP.size.x, true)
-	draw_rect(R_SLOTNO, Color8(70, 10, 10), true)
-	_txt(_f12, R_SLOTNO.position.x, R_SLOTNO.position.y + 4, str(_active + 1), C_GOLD,
-		14, R_SLOTNO.size.x, true)
-	_arrow(R_ARROW_L, false, "prev")   # frame 008: left chip points right, right chip left
-	_arrow(R_ARROW_R, true, "next")
+	# pressed PLAYER-bar arrows -> the *1 art over the baked *0 chips
+	if _press == "prev" and _pun["11"] != null:
+		draw_texture_rect(_pun["11"], R_ARROW_L, false)
+	if _press == "next" and _pun["21"] != null:
+		draw_texture_rect(_pun["21"], R_ARROW_R, false)
 
-	# 20 numbered save slots (2 cols x 10)
+	# PLAYER number: baked '1'; redraw only when the active slot moved (frame 011:
+	# large blocky bright-gold digit with a dark-brown outline, centred in the cell)
+	if _active != 0 and _player_cell != null:
+		draw_texture_rect(_player_cell, Rect2(251, 67, 42, 25), false)
+		for off in [Vector2(-1, 0), Vector2(1, 0), Vector2(0, -1), Vector2(0, 1),
+				Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]:
+			_txt_fc(_f14, 253 + off.x, 72 + off.y, str(_active + 1), Color8(72, 30, 2), 15, 38)
+		_txt_fc(_f14, 253, 72, str(_active + 1), Color8(255, 223, 0), 15, 38)
+
+	# slot rows: redraw only rows whose state differs from the baked resting frame
+	# (slot 1 active-empty, the rest empty-inactive)
 	for i in 20:
-		var col := i / 10
-		var row := i % 10
-		var x: int = COL_X[col]
-		var y := SLOT_Y0 + row * SLOT_PITCH
+		var filled: bool = not (_slots[i] as Dictionary).is_empty()
 		var active := i == _active
-		var badge_c := Color8(170, 30, 30) if active else Color8(60, 60, 80)
-		draw_rect(Rect2(x, y, BADGE_W, SLOT_H), badge_c, true)
-		_txt(_f10, x, y, str(i + 1), Color.WHITE, 11, BADGE_W, true)
-		var bar_c := C_SLOT_SEL if active else C_SLOT_BAR
-		draw_rect(Rect2(x + BADGE_W + 1, y, NAME_W, SLOT_H), bar_c, true)
-		draw_rect(Rect2(x + BADGE_W + NAME_W + 2, y, CLUB_W, SLOT_H), bar_c, true)
-		if active:
-			draw_rect(Rect2(x, y, BADGE_W + NAME_W + CLUB_W + 2, SLOT_H), Color.WHITE, false)
-		var slot: Dictionary = _slots[i]
-		if not slot.is_empty():
-			var dark := Color8(20, 24, 60)
-			_txt(_f10, x + BADGE_W + 6, y + 1, str(slot["name"]).to_upper(), dark, 11)
-			_txt(_f10, x + BADGE_W + NAME_W + 8, y + 1,
-				PMChrome.title_case_name(str(slot["club"].get("name", ""))), dark, 11)
+		var resting := (i == 0 and active and not filled) or (i != 0 and not active and not filled)
+		if not resting:
+			_draw_slot(i, filled, active)
 
-	# central kit panel
-	draw_rect(R_PANEL, Color(0.97, 0.97, 0.95), true)
-	draw_rect(R_PANEL.grow(-6), Color8(190, 160, 60), false)
-	var lname := str(_leagues[_li].get("name", "")) if _li < _leagues.size() else ""
-	_txt(_f12, R_PANEL.position.x, R_PANEL.position.y + 8, lname, Color8(190, 150, 30),
-		14, R_PANEL.size.x, true)
+	# kit panel + plaques: baked while the resting Premier view is showing; any
+	# taken club also forces a repaint (its kit renders WASHED, frame 011)
+	if _li != 0 or _sel >= 0 or not _taken_ids().is_empty():
+		_draw_panel()
+	elif _press.begins_with("kit:"):
+		draw_rect(_kit_rect(int(_press.substr(4))), C_PRESS, true)
+	if _li != 0:
+		_draw_plaques()
+
+	# bottom row: baked; CONTINUE turns solid (frame 012) once a slot is filled
+	# (the cut is grown +2px — the chip's bevel shadow extends past the widget rect)
+	if _any_filled() and _continue_on != null:
+		draw_texture_rect(_continue_on, Rect2(506, 425, 117, 30), false)
+	for key_r in [["return", R_RETURN], ["load", R_LOAD], ["delete", R_DELETE],
+			["continue", R_CONTINUE], ["league:0", R_PLAQ[0]], ["league:1", R_PLAQ[1]],
+			["league:2", R_PLAQ[2]], ["league:3", R_PLAQ[3]]]:
+		if _press == str(key_r[0]):
+			draw_rect(key_r[1], C_PRESS, true)
+
+
+## One slot row in a non-resting state. Geometry/colours frame-scanned (008/011):
+## the black frames stay baked; only fills/digits/texts/outline are drawn. Digits +
+## row texts use the tiny 7px raster ("8" font); filled texts are CENTRED, pale
+## lavender/blue on dark bars. When slot 1 loses its baked active outline, the
+## true background rows come from the frame-011 degap strip.
+func _draw_slot(i: int, filled: bool, active: bool) -> void:
+	var col := i / 10
+	var row := i % 10
+	var x: int = COL_X[col]
+	var y := SLOT_Y0 + row * SLOT_PITCH
+	if i == 0 and not active and _row1_degap != null:
+		draw_texture(_row1_degap, Vector2(14, 104))
+	var bx := x + 3        # badge fill x (23 at col 0)
+	if active:
+		draw_rect(Rect2(bx, y, 21, 12), C_BADGE_ACT, true)
+		draw_rect(Rect2(x + 25, y, 104, 12), C_GOLD_NAME, true)
+		draw_rect(Rect2(x + 130, y, 158, 12), C_GOLD_BAR, true)
+	elif filled:
+		draw_rect(Rect2(bx, y, 21, 12), Color(0, 0, 0), true)
+		draw_rect(Rect2(x + 25, y, 104, 12), C_FILL_NAME_BAR, true)
+		draw_rect(Rect2(x + 130, y, 158, 12), C_FILL_CLUB_BAR, true)
+	else:
+		draw_rect(Rect2(bx, y, 21, 12), C_BADGE, true)
+		draw_rect(Rect2(x + 25, y, 104, 12), C_NAME_BAR, true)
+		draw_rect(Rect2(x + 130, y, 158, 12), C_LAV_BAR, true)
+	var dcol := C_BADGE_ACT_DIGIT if active else (Color.WHITE if filled else C_BADGE_DIGIT)
+	_txt_fc(_f8, bx, y + 1, str(i + 1), dcol, 11, 21)
+	if filled:
+		var slot: Dictionary = _slots[i]
+		_txt(_f8, x + 25, y + 1, str(slot["name"]).to_upper(), C_FILL_NAME_TXT, 11, 104, true)
+		_txt(_f8, x + 130, y + 1, PMChrome.title_case_name(str(slot["club"].get("name", ""))),
+			C_FILL_CLUB_TXT, 11, 158, true)
+	if active:
+		# white 2px outline INSIDE the bg gaps around the black frame (frame 011,
+		# row 2: white rows y-3..y-2 and y+13..y+14, side cols x-3..x-2 / +2)
+		draw_rect(Rect2(x, y - 3, 291, 2), Color.WHITE, true)
+		draw_rect(Rect2(x, y + 13, 291, 2), Color.WHITE, true)
+		draw_rect(Rect2(x, y - 1, 2, 14), Color.WHITE, true)
+		draw_rect(Rect2(x + 289, y - 1, 2, 14), Color.WHITE, true)
+
+
+## Full kit-panel repaint (division switched, kit picked, or a club taken): white
+## interior, the gold frame rect, ball + division title interrupting the top line
+## (frame 008 layout: line to x231, ball at 237, title from 270, line resumes 437),
+## the division's NANOESC kits 1:1, OVER.BMP behind the picked one, its name under
+## the bottom line in gold (frame 010). Taken clubs' kits render dither-washed
+## toward the panel white (frame 011).
+func _draw_panel() -> void:
+	# interior white (the 2px black outer border rows 276..277 / 404..405 stay baked)
+	draw_rect(Rect2(152, 278, 336, 126), Color.WHITE, true)
+	# gold frame as 1px filled strips (pixel-snapped; x 158..480, y 291..383)
+	draw_rect(Rect2(158, 291, 323, 1), C_RULE, true)
+	draw_rect(Rect2(158, 383, 323, 1), C_RULE, true)
+	draw_rect(Rect2(158, 291, 1, 93), C_RULE, true)
+	draw_rect(Rect2(480, 291, 1, 93), C_RULE, true)
+	var lname := PMChrome.title_case_name(str(_leagues[_li].get("name", ""))) if _li < _leagues.size() else ""
+	# the top line's two segments are FIXED: x 158..231 and 406..480 (frame 008;
+	# the white break under ball+title is static, not measured off the text)
+	draw_rect(Rect2(232, LINE_Y, 174, 1), Color.WHITE, true)
+	if _panel_ball != null:
+		draw_texture(_panel_ball, BALL_POS)
+	_txt(_f12, TITLE_X, 285, lname, C_PANEL_TITLE, 13)
+	var taken := _taken_ids()
 	for i in _clubs.size():
 		if i >= _kit_cols() * 2:
 			break
 		var kr := _kit_rect(i)
-		var tex := PMChrome.kit(int(_clubs[i].get("id", -1)))
-		if tex != null:
-			var kw := minf(kr.size.x - 4, 30.0)
-			var dst := Rect2(kr.get_center() - Vector2(kw * 0.5, KIT_H * 0.5 - 2),
-				Vector2(kw, KIT_H - 6))
-			draw_texture_rect(tex, dst, false)
-		if i == _sel:
-			draw_rect(Rect2(kr.position, Vector2(kr.size.x - 2, kr.size.y)), C_SLOT_SEL, false)
+		var cid := int(_clubs[i].get("id", -1))
+		var selected := i == _sel
+		if selected and _kit_over != null:
+			draw_texture_rect(_kit_over, kr, false)
 		elif _press == "kit:%d" % i:
 			draw_rect(kr, C_PRESS, true)
+		# frame-rendered patch (authentic shadow-on-white) when available; the
+		# transparent nano art on the gold OVER cell (a white-baked shadow would
+		# fringe) and for divisions without a frame render yet. Taken clubs use
+		# the frame-proven WASHED render where one exists (Man Utd), else
+		# nano + checker approximation.
+		var washed: bool = taken.has(cid)
+		if washed:
+			var wp := PMChrome.panel_kit(cid, "washed")
+			if wp != null:
+				draw_texture(wp, kr.position + Vector2(1, 2))
+			else:
+				var nt := PMChrome.nano_kit(cid)
+				if nt != null:
+					draw_texture(nt, kr.position + Vector2(1, 2))
+				if _checker != null:
+					draw_texture_rect(_checker, kr, true)
+		else:
+			var patch := PMChrome.panel_kit(cid)
+			if patch != null and not selected:
+				draw_texture(patch, kr.position + Vector2(1, 2))
+			else:
+				var tex := PMChrome.nano_kit(cid)
+				if tex != null:
+					draw_texture(tex, kr.position + Vector2(1, 2))
 	if _sel >= 0 and _sel < _clubs.size():
-		_txt(_f12, R_PANEL.position.x, R_PANEL.end.y - 22,
-			PMChrome.title_case_name(str(_clubs[_sel].get("name", ""))),
-			Color8(60, 80, 190), 13, R_PANEL.size.x, true)
+		_txt(_f12, R_PANEL.position.x, 388, PMChrome.title_case_name(str(_clubs[_sel].get("name", ""))),
+			C_PANEL_TITLE, 13, R_PANEL.size.x, true)
 
-	# division plaques (selected = red text, as frame 008)
+
+## Plaque repaint (division switched): state interior textures cut from the frame
+## + the label with the PROMAN raster (sel = yellow on red glow, frame 008).
+func _draw_plaques() -> void:
 	for i in R_PLAQ.size():
 		if i >= _leagues.size():
 			break
 		var pr: Rect2 = R_PLAQ[i]
-		_chip(pr, "league:%d" % i)
-		var nm2 := str(_leagues[i].get("name", ""))
-		_txt(_f10, pr.position.x, pr.position.y + 4, nm2,
-			C_RED if i == _li else Color(0.88, 0.90, 0.96), 11, pr.size.x, true)
-
-	# bottom buttons (reversed rects)
-	_button(R_RETURN, "RETURN", C_YELLOW, true, "return", null)
-	_button(R_LOAD, "LOAD GAME", C_LOADTXT, _has_save, "load", _carga)
-	_button(R_DELETE, "DELETE", C_RED, _has_save, "delete", _borra)
-	_button(R_CONTINUE, "CONTINUE", C_YELLOW, true, "continue", null)
-
-
-func _button(r: Rect2, label: String, col: Color, enabled: bool, key: String, icon: Texture2D) -> void:
-	_chip(r, key)
-	var tx := r.position.x
-	if icon != null:
-		draw_texture_rect(icon, Rect2(r.position + Vector2(7, 3), icon.get_size()), false)
-		tx += 30
-	_txt(_f12, tx, r.position.y + 5, label, col if enabled else Color(col, 0.35), 13,
-		r.size.x - (tx - r.position.x), true)
+		var tex := _plaque_sel if i == _li else _plaque_unsel
+		if tex != null:
+			draw_texture_rect(tex, Rect2(pr.position + Vector2(3, 1), Vector2(122, 21)), false)
+		_txt(_f10, pr.position.x, pr.position.y + 5,
+			PMChrome.title_case_name(str(_leagues[i].get("name", ""))),
+			C_PLAQ_SEL if i == _li else C_PLAQ_UNSEL, 10, pr.size.x, true)

@@ -64,6 +64,8 @@ const KIT_SRC := Rect2(0, 0, 31, 64)
 
 static var _fonts: Dictionary = {}
 static var _kits: Dictionary = {}
+static var _nano_kits: Dictionary = {}
+static var _panel_kits: Dictionary = {}
 static var _faces: Dictionary = {}
 static var _mini_faces: Dictionary = {}
 static var _bg: Texture2D = null
@@ -109,6 +111,32 @@ static func kit(club_id: int) -> Texture2D:
 		var p := "res://art/kits/%d.png" % club_id
 		_kits[club_id] = load(p) if ResourceLoader.exists(p) else null
 	return _kits[club_id]
+
+
+## The club's NANOESC full kit (24x32 shirt+shorts, idx0 transparent) — the art the
+## original SELECCION / PRESEASON panels blit (SAD-0.0-anchored vs frames 008/013).
+static func nano_kit(club_id: int) -> Texture2D:
+	if club_id < 0:
+		return null
+	if not _nano_kits.has(club_id):
+		var p := "res://art/kits/nano/%d.png" % club_id
+		_nano_kits[club_id] = load(p) if ResourceLoader.exists(p) else null
+	return _nano_kits[club_id]
+
+
+## The 24x32 FRAME-RENDERED panel kit (authentic soft shadow on the white panel —
+## the original's kit-blit shadow pass is not a plain palette blit and its dither
+## phase is screen-specific, so patches are baked per screen: `panel` from frame
+## 008 for SELECCION, `panel13` from frame 013 for PRESEASON). Premier clubs only;
+## callers fall back to nano_kit() for divisions no frame shows yet.
+static func panel_kit(club_id: int, bank := "panel") -> Texture2D:
+	if club_id < 0:
+		return null
+	var key := "%s/%d" % [bank, club_id]
+	if not _panel_kits.has(key):
+		var p := "res://art/kits/%s/%d.png" % [bank, club_id]
+		_panel_kits[key] = load(p) if ResourceLoader.exists(p) else null
+	return _panel_kits[key]
 
 
 ## The player's 124x182 profile photo (the original BIGFOTO mugshot), keyed by the

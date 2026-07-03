@@ -1132,7 +1132,7 @@ func _show_preseason(manager_name: String, league: Dictionary, club: Dictionary)
 	_preseason = load("res://scenes/PreseasonScreen.gd").new()
 	add_child(_preseason)
 	_preseason.setup(PMChrome.title_case_name(str(club.get("name", ""))), manager_name,
-		GameDB.leagues, GameDB.clubs_in_league, _clubs_of_country_en)
+		GameDB.leagues, GameDB.clubs_in_league, _clubs_of_country_en, int(club.get("id", -1)))
 	_preseason.preseason_done.connect(func(rivals: Array) -> void:
 		if _preseason != null and is_instance_valid(_preseason):
 			_preseason.queue_free()

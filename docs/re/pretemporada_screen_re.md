@@ -66,3 +66,31 @@ the next engine milestone (line-up handoff). The screen stores picked rivals + d
 into the career save (`preseason_rivals`); simulation of those friendlies lands with
 the match loop. SKIP/CONTINUE path fully functional. Foreign-club coverage depends on
 GameDB (England fully present; foreign clubs as available in the decoded DB).
+
+## Pixel-parity pass (2026-07-03) — chrome doctrine + new frame-derived facts
+
+Static look = the REAL frame-013 pixels (`app/art/screens/pretemp/chrome.png`;
+013 == 016 pixel-exact, so this IS the resting state, flags and all). Parity:
+**pretemp_013 pixel-exact; pretemp_015 (HUNGARY tapped) 21px** (selected-flag
+edge rows). Facts established:
+
+- **Kit panel = NANOESC art at x 13+floor(i*95/3), y 368/405** (integer pitch
+  95/3; all 20 cells SAD 0.0). The 013 panel lists the PREMIER clubs
+  (alphabetical), with the managed club's kit WASHED (Man Utd — the club was
+  taken in seleccion). Frame-rendered patches ship in `app/art/kits/panel13/`
+  (the shadow dither phase differs from seleccion's positions).
+- **Tapping a clubless country changes ONLY the strip** (frame 015: strip
+  HUNGARY, panel still ENGLAND). Strip text = ProMan12 @ native 13, white,
+  centred, y_top = strip+5.
+- **The selected country's flag renders ENLARGED at the BANDERAS native 30x20**
+  with a 1px black border at marker-(8,4) (frame 015 HUNGARY, SAD 1.01),
+  persisting while selected.
+- DELETE is baked WASHED (disabled); the solid overlay is frame 008's identical
+  seleccion chip. Division-filter re-select redraws with `div_chip.png` (label
+  inpainted) + red inner border (9,3)-(102,21) + yellow label.
+- The barra title band for a non-Man-Utd club repaints via `title_band.png`
+  (row-median-inpainted textless band — the barra gradient is horizontal per
+  row, so the inpaint is exact).
+- IMG.PKF PRETEMPORADA DM sprites CRACKED: the variant simply omits the palette
+  table (pixels at offset 54 despite bfOffBits=1078) — see export_entry_flow's
+  decode_dm_nopal. AZULBARRAS/OVER/X now ship in app/art/screens/pretemp/.

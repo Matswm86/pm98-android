@@ -107,3 +107,7 @@ tools/re/specs/_pathA_lut.txt
 tools/re/specs/_balladvance_run.*
 tools/re/specs/_balladvance_lut.txt
 tools/re/specs/_collbox_run.*
+
+# Full walkthrough capture sets (53MB+) stay local; the parity-binding frames
+# are committed under tools/re/refs/walkthrough-2026-07-02/.
+screenshots/

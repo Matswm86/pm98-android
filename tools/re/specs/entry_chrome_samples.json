@@ -1,0 +1,170 @@
+{
+ "seleccion": {
+  "slot": {
+   "y0": 107,
+   "pitch": 16,
+   "col_dx": 312,
+   "badge": [
+    23,
+    44
+   ],
+   "name": [
+    45,
+    149
+   ],
+   "club": [
+    150,
+    308
+   ],
+   "gold_bar": [
+    212,
+    191,
+    0
+   ],
+   "gold_name_bar": [
+    212,
+    159,
+    0
+   ],
+   "lav_bar": [
+    160,
+    160,
+    200
+   ],
+   "name_bar": [
+    140,
+    160,
+    180
+   ],
+   "badge_fill": [
+    128,
+    128,
+    128
+   ],
+   "badge_digit": [
+    192,
+    192,
+    192
+   ],
+   "badge_active_fill": [
+    85,
+    0,
+    0
+   ],
+   "badge_active_digit": [
+    255,
+    223,
+    0
+   ],
+   "filled_badge_fill": [
+    0,
+    0,
+    0
+   ],
+   "filled_badge_digit": [
+    255,
+    255,
+    255
+   ]
+  },
+  "panel": {
+   "gold_rect": [
+    158,
+    291,
+    480,
+    383
+   ],
+   "white": [
+    255,
+    255,
+    255
+   ],
+   "rule_color": [
+    212,
+    191,
+    85
+   ],
+   "title_color": [
+    212,
+    191,
+    85
+   ]
+  }
+ },
+ "pretemp": {
+  "rival": {
+   "x": 377,
+   "w": 228,
+   "badge_w": 24,
+   "rows": [
+    78,
+    136,
+    194,
+    252
+   ],
+   "digit_on": [
+    255,
+    255,
+    255
+   ],
+   "digit_off": [
+    220,
+    172,
+    121
+   ]
+  },
+  "panel": {
+   "interior": [
+    10,
+    338,
+    327,
+    464
+   ],
+   "white": [
+    255,
+    255,
+    255
+   ],
+   "title_color": [
+    0,
+    0,
+    160
+   ]
+  },
+  "divbtn": {
+   "sel_border": [
+    128,
+    0,
+    0
+   ],
+   "sel_border_inset": [
+    9,
+    3,
+    102,
+    21
+   ],
+   "sel_text": [
+    255,
+    255,
+    0
+   ],
+   "unsel_text": [
+    144,
+    144,
+    144
+   ]
+  },
+  "tab": {
+   "active_fill": [
+    255,
+    223,
+    0
+   ],
+   "inactive_text": [
+    201,
+    128,
+    128
+   ]
+  }
+ }
+}

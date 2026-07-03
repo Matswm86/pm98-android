@@ -1,15 +1,16 @@
 extends Control
 class_name NivelScreen
-## PM98 "SELECT LEVEL OF THE GAME" dialog (NIVELES), rebuilt from the ORIGINAL art at
-## the coordinates reversed out of MANAGER.EXE (creation fn ~0x54a580, paint 0x54ac80)
-## and verified against walkthrough frames 003/004/007. See docs/re/nivel_screen_re.md.
+## PM98 "SELECT LEVEL OF THE GAME" dialog (NIVELES). The static chrome is the REAL
+## game's own settled frame (walkthrough 003, cropped to the dialog rect reversed out
+## of MANAGER.EXE: creation fn ~0x54a580, id 1034, POS (93,32) SIZE 453x415) — see
+## docs/re/nivel_screen_re.md and tools/re/build_entry_chrome_from_frames.py. The
+## LOAD GAME modal chrome is frame 005's card (bbox via diff(005,003) = (140,102)
+## 360x276, all 8 save rows empty = the resting state).
 ##
-## Mounted as an overlay ABOVE the title screen (the original draws it over FONDO7 with
-## a short zoom-in; frame 002 caught the dialog mid-zoom at ~0.8 scale). Tapping a
-## level panel picks that game level; LOAD GAME opens the 8-row load modal (frames
-## 005/006); CANCEL returns to the title.
-##
-## Native 640x480 design space; scales to fit (NEAREST).
+## Dynamic layer only: level-panel pressed states (the original *1.bmp art), the
+## "Players age ?" tick (ok.bmp), button press tints, and the modal's row-1 text
+## when a save exists. Tapping a level panel picks it; LOAD GAME opens the modal;
+## CANCEL returns to the title. Native 640x480 design space; scales to fit (NEAREST).
 
 signal level_chosen(level: String, players_age: bool)
 signal load_game(slot: int)
@@ -18,10 +19,8 @@ signal cancel_pressed
 const W := 640
 const H := 480
 
-# Dialog container: POS (93,32) SIZE 453x415 (id 1034). fondo.bmp = 453x383 at client
-# (0,0); the strip below (client y 383..415) is painted, buttons sit on it.
+# Dialog container: POS (93,32) SIZE 453x415 (id 1034; chrome.png == this crop).
 const DLG := Rect2(93, 32, 453, 415)
-const ART_H := 383
 
 # Client rects (reversed; screen = client + DLG.position)
 const R_ENT := Rect2(30, 55, 120, 105)      # TRAINER art  (Entrenador0/1)
@@ -31,14 +30,7 @@ const R_TOT := Rect2(272, 206, 153, 128)    # TOTAL art
 const R_CHK := Rect2(14, 364, 14, 14)       # "Players age ?" checkbox (ok.bmp tick)
 const R_LOAD := Rect2(6, 385, 132, 25)      # LOAD GAME (+carga icon)
 const R_CANCEL := Rect2(143, 385, 103, 25)
-# Band caption rows measured off frame 003 (client y 32..53 / 184..205; split ~199/207)
-const BAND1_Y := 32
-const BAND2_Y := 184
-const BAND_H := 21
-const BAND_L := Rect2(2, 0, 197, 21)        # x-extent of the left band (y from BANDn_Y)
-const BAND_R := Rect2(207, 0, 244, 21)
 
-const C_NAVY := Color8(0, 0, 50)            # dialog interior base (frame sample)
 const C_LOADTXT := Color8(123, 223, 82)     # LOAD GAME text (COLOR call 0x54a63e)
 const C_CANCELTXT := Color8(255, 31, 0)     # CANCEL/DELETE red (family constant)
 const ZOOM_TIME := 0.15                     # frame 002 = mid-zoom at ~0.8 scale
@@ -49,7 +41,8 @@ const LEVELS := [
 	{"key": "accountant", "cap": "ACCOUNTANT", "rect": R_PRE, "art": "presidente"},
 	{"key": "total", "cap": "TOTAL", "rect": R_TOT, "art": "total"},
 ]
-# Per-level bullet captions (strings verbatim from MANAGER.EXE .rdata)
+# Per-level bullet captions — strings verbatim from MANAGER.EXE .rdata. They are
+# BAKED into chrome.png (original rasters); kept here as the RE record + for tests.
 const BULLETS := {
 	"trainer": ["- Automatic finances", "- Automatic contract renewal"],
 	"manager": ["- Automatic contract renewal"],
@@ -57,13 +50,22 @@ const BULLETS := {
 	"total": ["- Total control"],
 }
 
-var _fondo: Texture2D
+# LOAD GAME modal (frame 005; card bbox = diff(005,003)). Row/button rects are tap
+# targets + dynamic-text anchors over the baked card.
+const M_DLG := Rect2(140, 102, 360, 276)
+const M_ROW0_Y := 143
+const M_ROW_H := 17
+const M_GAME_X := 148
+const M_GAME_W := 205
+const M_PLAYER_W := 132
+const M_LOAD := Rect2(378, 303, 112, 25)
+const M_CANCEL := Rect2(378, 343, 112, 25)
+
+var _chrome: Texture2D
+var _modal_tex: Texture2D
 var _ok: Texture2D
-var _carga: Texture2D
-var _art: Dictionary = {}      # "entrenador0" -> Texture2D …
+var _art: Dictionary = {}      # "entrenador1" -> Texture2D (pressed states)
 var _f10: Font
-var _f12: Font
-var _f8: Font
 
 var _players_age := false
 var _press := ""               # held target key
@@ -73,16 +75,13 @@ var _save_summary: Dictionary = {}   # {name, club} of the existing save (row 1 
 var _modal := false            # LOAD GAME modal (frames 005/006) open
 
 func _ready() -> void:
-	_fondo = load("res://art/screens/nivel/fondo.png")
+	_chrome = load("res://art/screens/nivel/chrome.png")
+	_modal_tex = load("res://art/screens/nivel/load_modal.png")
 	_ok = load("res://art/screens/nivel/ok.png")
-	_carga = load("res://art/icons/carga.png")
 	for lv in LEVELS:
-		for st in 2:
-			var key: String = "%s%d" % [lv["art"], st]
-			_art[key] = load("res://art/screens/nivel/%s.png" % key)
+		var key: String = "%s1" % lv["art"]
+		_art[key] = load("res://art/screens/nivel/%s.png" % key)
 	_f10 = PMChrome.font("10")
-	_f12 = PMChrome.font("12")
-	_f8 = PMChrome.font("8")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	gui_input.connect(_on_input)
@@ -117,19 +116,6 @@ func _to_design(p: Vector2) -> Vector2:
 func _abs(r: Rect2) -> Rect2:
 	return Rect2(r.position + DLG.position, r.size)
 
-# LOAD GAME modal rects (measured off frame 005; abs 640x480 space)
-const M_DLG := Rect2(143, 97, 354, 278)
-const M_TITLE := Rect2(143, 100, 354, 21)
-const M_HDR_Y := 128
-const M_ROW0_Y := 143
-const M_ROW_H := 17
-const M_ROWS := 8
-const M_GAME_X := 148
-const M_GAME_W := 205
-const M_PLAYER_W := 132
-const M_PREVIEW := Rect2(148, 305, 225, 62)
-const M_LOAD := Rect2(378, 303, 112, 25)
-const M_CANCEL := Rect2(378, 343, 112, 25)
 
 func _target_at(d: Vector2) -> String:
 	if _modal:
@@ -143,7 +129,9 @@ func _target_at(d: Vector2) -> String:
 			return str(lv["key"])
 	# checkbox: include its caption for a fatter tap target
 	if Rect2(_abs(R_CHK).position, Vector2(120, 16)).has_point(d): return "chk"
-	if _has_save and _abs(R_LOAD).has_point(d): return "load"
+	# frame truth 003/005: LOAD GAME is solid and opens the (empty) modal even with
+	# no save — the walkthrough had none and the modal showed 8 empty rows
+	if _abs(R_LOAD).has_point(d): return "load"
 	if _abs(R_CANCEL).has_point(d): return "cancel"
 	return ""
 
@@ -191,21 +179,6 @@ func _txt(f: Font, x: float, y_top: float, s: String, col: Color, sz: int, cw :=
 		px = x + (cw - w) * 0.5
 	draw_string(f, Vector2(px, y_top + f.get_ascent(sz)), s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
 
-## The mirrored silver caption band (bright edge outward, dark toward the divider).
-func _band(r: Rect2, label: String, bright_left: bool) -> void:
-	for i in int(r.size.x):
-		var t := float(i) / maxf(1.0, r.size.x - 1)
-		if not bright_left:
-			t = 1.0 - t
-		var v := lerpf(1.0, 0.08, t)
-		draw_rect(Rect2(r.position + Vector2(i, 0), Vector2(1, r.size.y)),
-			Color(v, v, v * 1.05), true)
-	# caption text sits toward the bright end (frame 003)
-	var f := _f10
-	var w := f.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
-	var tx := r.position.x + 14.0 if bright_left else r.end.x - w - 14.0
-	_txt(f, tx, r.position.y + 5, label, Color(0.05, 0.05, 0.10), 11)
-
 
 func _draw() -> void:
 	var s := _scale()
@@ -215,102 +188,43 @@ func _draw() -> void:
 		var c := DLG.position + DLG.size * 0.5
 		draw_set_transform(_origin(s) + c * s * (1.0 - _zoom), 0.0, Vector2(s * _zoom, s * _zoom))
 
-	var o := DLG.position
-	# fondo art (453x383) + the painted bottom strip under it
-	if _fondo != null:
-		draw_texture_rect(_fondo, Rect2(o, Vector2(DLG.size.x, ART_H)), false)
-	draw_rect(Rect2(o + Vector2(0, ART_H), Vector2(DLG.size.x, DLG.size.y - ART_H)), Color8(6, 6, 22), true)
-	draw_rect(Rect2(o + Vector2(0, ART_H), Vector2(DLG.size.x, DLG.size.y - ART_H)), Color(1, 1, 1, 0.25), false)
+	# the whole resting dialog is the real frame-003 pixels
+	if _chrome != null:
+		draw_texture_rect(_chrome, DLG, false)
 
-	# title on the art's black strip
-	_txt(_f10, o.x, o.y + 6, "SELECT LEVEL OF THE GAME", Color.WHITE, 12, DLG.size.x, true)
-
-	# caption bands (drawn over the art's baked ones, which face the other way)
-	_band(Rect2(o + Vector2(BAND_L.position.x, BAND1_Y), Vector2(BAND_L.size.x, BAND_H)), "TRAINER", true)
-	_band(Rect2(o + Vector2(BAND_R.position.x, BAND1_Y), Vector2(BAND_R.size.x, BAND_H)), "MANAGER", false)
-	_band(Rect2(o + Vector2(BAND_L.position.x, BAND2_Y), Vector2(BAND_L.size.x, BAND_H)), "ACCOUNTANT", true)
-	_band(Rect2(o + Vector2(BAND_R.position.x, BAND2_Y), Vector2(BAND_R.size.x, BAND_H)), "TOTAL", false)
-
-	# level art panels (…1.bmp = the pressed/hover state)
+	# pressed level panel -> the original *1.bmp hover/pressed art
 	for lv in LEVELS:
-		var pressed := _press == str(lv["key"])
-		var tex: Texture2D = _art["%s%d" % [lv["art"], 1 if pressed else 0]]
-		if tex != null:
-			draw_texture_rect(tex, _abs(lv["rect"]), false)
+		if _press == str(lv["key"]):
+			var tex: Texture2D = _art["%s1" % lv["art"]]
+			if tex != null:
+				draw_texture_rect(tex, _abs(lv["rect"]), false)
 
-	# bullets (exact .rdata strings) just under each art
-	var bx := [o.x + 35, o.x + 284]
-	for i in LEVELS.size():
-		var lv: Dictionary = LEVELS[i]
-		var lines: Array = BULLETS[lv["key"]]
-		var r: Rect2 = _abs(lv["rect"])
-		var by := r.end.y + 4.0
-		if lines.size() == 1:
-			by += 11.0   # single bullets align with the second line (frame 003)
-		for j in lines.size():
-			_txt(_f8, bx[i % 2], by + j * 11, str(lines[j]), Color.WHITE, 9)
-
-	# Players age ? checkbox + caption
-	var chk := _abs(R_CHK)
-	draw_rect(chk, Color(0.92, 0.94, 0.97), true)
-	draw_rect(chk, Color(0.2, 0.2, 0.3), false)
+	# Players age ? tick (ok.bmp; the empty box is baked)
 	if _players_age and _ok != null:
-		draw_texture_rect(_ok, chk, false)
-	_txt(_f8, chk.end.x + 6, chk.position.y + 2, "Players age ?", Color.WHITE, 10)
+		draw_texture_rect(_ok, _abs(R_CHK), false)
 
-	# footer buttons
-	_button(_abs(R_LOAD), "LOAD GAME", C_LOADTXT, _has_save, "load", true)
-	_button(_abs(R_CANCEL), "CANCEL", C_CANCELTXT, true, "cancel", false)
+	if _press == "load":
+		draw_rect(_abs(R_LOAD), Color(1, 1, 1, 0.18), true)
+	if _press == "cancel":
+		draw_rect(_abs(R_CANCEL), Color(1, 1, 1, 0.18), true)
 
 	if _modal:
 		_draw_modal()
 
 
-func _button(r: Rect2, label: String, col: Color, enabled: bool, key: String, icon: bool) -> void:
-	draw_rect(r, Color8(10, 10, 14), true)
-	PMChrome.bevel(self, r, Color8(10, 10, 14), Color(0.45, 0.45, 0.5), Color(0, 0, 0))
-	if _press == key:
-		draw_rect(r, Color(1, 1, 1, 0.18), true)
-	var tx := r.position.x
-	if icon and _carga != null:
-		draw_texture_rect(_carga, Rect2(r.position + Vector2(6, 3), _carga.get_size()), false)
-		tx += 30
-	if not enabled:
-		col = Color(col, 0.35)
-	_txt(_f12, tx, r.position.y + 5, label, col, 13, r.size.x - (tx - r.position.x), true)
-
-
-## The LOAD GAME modal (frames 005/006): red title card, GAME|PLAYER columns, 8 save
-## rows, preview strip, LOAD/CANCEL. The engine has ONE save today -> row 1 shows it,
-## rows 2-8 draw as the empty blue bars the original shows for unused slots.
+## The LOAD GAME modal: baked frame-005 card (8 empty rows = resting). Dynamic:
+## row-1 text when the engine save exists + press tints. The engine holds ONE save
+## today -> rows 2-8 stay the baked empty bars (honest).
 func _draw_modal() -> void:
-	draw_rect(M_DLG.grow(6), Color8(12, 12, 24), true)
-	draw_rect(M_DLG.grow(6), Color(1, 1, 1, 0.35), false)
-	# red title bar with the striped end caps the Dinamic cards use
-	draw_rect(M_TITLE, Color8(150, 10, 10), true)
-	for i2 in 8:
-		var wseg := 4
-		draw_rect(Rect2(M_TITLE.position + Vector2(4 + i2 * 8, 3), Vector2(wseg, M_TITLE.size.y - 6)),
-			Color8(90, 6, 6) if i2 % 2 == 0 else Color8(200, 30, 30), true)
-		draw_rect(Rect2(Vector2(M_TITLE.end.x - 12 - i2 * 8, M_TITLE.position.y + 3), Vector2(wseg, M_TITLE.size.y - 6)),
-			Color8(90, 6, 6) if i2 % 2 == 0 else Color8(200, 30, 30), true)
-	_txt(_f12, M_TITLE.position.x, M_TITLE.position.y + 3, "LOAD GAME", Color.WHITE, 14, M_TITLE.size.x, true)
-	_txt(_f10, M_GAME_X, M_HDR_Y, "GAME", Color8(60, 80, 255), 11, M_GAME_W, true)
-	_txt(_f10, M_GAME_X + M_GAME_W + 4, M_HDR_Y, "PLAYER", Color8(60, 80, 255), 11, M_PLAYER_W, true)
-	for i in M_ROWS:
-		var y := M_ROW0_Y + i * M_ROW_H
-		var filled := i == 0 and _has_save
-		var cbar := Color8(24, 40, 140) if not filled else Color8(40, 60, 170)
-		draw_rect(Rect2(M_GAME_X, y, M_GAME_W, M_ROW_H - 3), cbar, true)
-		draw_rect(Rect2(M_GAME_X + M_GAME_W + 4, y, M_PLAYER_W, M_ROW_H - 3), Color8(90, 110, 200), true)
-		if filled:
-			if _press == "mrow0":
-				draw_rect(Rect2(M_GAME_X, y, M_GAME_W + M_PLAYER_W + 4, M_ROW_H - 3), Color(1, 1, 1, 0.2), true)
-			_txt(_f10, M_GAME_X + 6, y + 1, str(_save_summary.get("club", "SAVED GAME")), Color.WHITE, 11)
-			_txt(_f10, M_GAME_X + M_GAME_W + 10, y + 1, str(_save_summary.get("name", "")), Color.WHITE, 11)
-	# preview strip (three grey bars, as the empty preview shows in frame 005)
-	for i in 3:
-		draw_rect(Rect2(M_PREVIEW.position + Vector2(0, i * 21), Vector2(M_PREVIEW.size.x, 16)),
-			Color(0.72, 0.76, 0.84), true)
-	_button(M_LOAD, "LOAD", C_LOADTXT, _has_save, "mload", true)
-	_button(M_CANCEL, "CANCEL", C_CANCELTXT, true, "mcancel", false)
+	if _modal_tex != null:
+		draw_texture_rect(_modal_tex, M_DLG, false)
+	if _has_save:
+		var y := M_ROW0_Y
+		_txt(_f10, M_GAME_X + 6, y + 1, str(_save_summary.get("club", "SAVED GAME")), Color.WHITE, 10)
+		_txt(_f10, M_GAME_X + M_GAME_W + 10, y + 1, str(_save_summary.get("name", "")), Color.WHITE, 10)
+		if _press == "mrow0":
+			draw_rect(Rect2(M_GAME_X, y, M_GAME_W + M_PLAYER_W + 4, M_ROW_H - 3), Color(1, 1, 1, 0.2), true)
+	if _press == "mload":
+		draw_rect(M_LOAD, Color(1, 1, 1, 0.18), true)
+	if _press == "mcancel":
+		draw_rect(M_CANCEL, Color(1, 1, 1, 0.18), true)
