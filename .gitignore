@@ -111,3 +111,6 @@ tools/re/specs/_collbox_run.*
 # Full walkthrough capture sets (53MB+) stay local; the parity-binding frames
 # are committed under tools/re/refs/walkthrough-2026-07-02/.
 screenshots/
+
+# RE scratch probes (one-off disasm helpers) stay local
+tools/re/_*.py
