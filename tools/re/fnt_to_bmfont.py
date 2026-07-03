@@ -97,6 +97,14 @@ def build_atlas(fnt: Fnt, pad: int = 1):
     return atlas, meta
 
 
+# Frame-derived metric overrides: (face upper, char id) -> (xoffset, xadvance).
+# Empty today — an earlier hypothesis gave PROMAN8 '1' a bearing, but the
+# walkthrough digit runs are fully explained by the game CENTRING its value
+# strings (TEAM OFFER skill values centre on x511; see team_offer_re.md), so
+# the winfont metrics stand as stored. Kept as the hook for real cases.
+METRIC_OVERRIDES: dict = {}
+
+
 def write_bmfont(fnt: Fnt, out_dir: Path, name: str) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     atlas, meta = build_atlas(fnt)
@@ -111,9 +119,10 @@ def write_bmfont(fnt: Fnt, out_dir: Path, name: str) -> None:
         f"chars count={len(meta)}",
     ]
     for code, x, y, w, h, adv in meta:
+        xoff, adv = METRIC_OVERRIDES.get((fnt.face.upper(), code), (0, adv))
         lines.append(
             f"char id={code} x={x} y={y} width={w} height={h} "
-            f"xoffset=0 yoffset=0 xadvance={adv} page=0 chnl=15"
+            f"xoffset={xoff} yoffset=0 xadvance={adv} page=0 chnl=15"
         )
     (out_dir / f"{name}.fnt").write_text("\n".join(lines) + "\n")
     print(f"wrote {out_dir/name}.fnt + {png}  ({len(meta)} glyphs, "

@@ -6,6 +6,8 @@ extends SceneTree
 ##   seleccion_008.png  fresh (slot 1 active, PLAYER 1)          vs 008_154345
 ##   seleccion_011.png  slot 1 locked MWM/Man Utd, PLAYER 2      vs 011_154354
 ##   pretemp_013.png    fresh (Man Utd, ENGLAND panel)           vs 013_154358
+##   teamoffer_086.png  Thornley card, row-1 REFUSE (fresh)      vs 086_164647 (run 3)
+##   teamoffer_088.png  row-1 toggled ACCEPT                     vs 088_164650 (run 3)
 ## Needs a real renderer (Xvfb / local X11), same as shot_screens.gd:
 ##   PM98_SHOT_DIR=out godot --rendering-driver opengl3 --path app --script res://tests/shot_entry_parity.gd
 
@@ -85,6 +87,31 @@ func _run() -> void:
 	pre.queue_redraw()
 	await _shot(dir, "pretemp_015.png")
 	pre.queue_free()
+	await process_frame
+
+	# ---- TEAM OFFER (run-3 frames 086/088: Thornley, Aston Villa bid) -------------
+	var manu2 := {}
+	for c in gamedb.clubs_in_league(str(gamedb.leagues[0].get("id", ""))):
+		if str(c.get("name", "")).begins_with("MANCHESTER U"):
+			manu2 = c
+	var thornley := {}
+	for p in manu2.get("players", []):
+		if str(p.get("name", "")) == "THORNLEY":
+			thornley = (p as Dictionary).duplicate()
+	# the frame's live-form values (FITNESS/MORAL are dynamic; AGE as of week 3)
+	thornley["fitness"] = 67
+	thornley["morale"] = 85
+	thornley["age"] = 22
+	var toffer: TeamOfferScreen = load("res://scenes/TeamOfferScreen.gd").new()
+	_mount(toffer)
+	await process_frame
+	toffer.setup(thornley, manu2, [{"buyer_id": -1, "buyer_name": "ASTON VILLA",
+		"offer": 8644999}], 9500000, 500000, 4, 4, [0])
+	await _shot(dir, "teamoffer_086.png")
+	toffer._accept[0] = true    # frame 088: the row-1 chip toggled to ACCEPT
+	toffer.queue_redraw()
+	await _shot(dir, "teamoffer_088.png")
+	toffer.queue_free()
 	await process_frame
 
 	print("PARITY SHOTS DONE")

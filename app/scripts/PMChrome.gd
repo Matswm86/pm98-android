@@ -72,6 +72,8 @@ static var _bg: Texture2D = null
 static var _camrol: Dictionary = {}
 static var _icons: Dictionary = {}
 static var _flags: Dictionary = {}
+static var _mini_flags: Dictionary = {}
+static var _ficha_kits: Dictionary = {}
 
 # Fallback fine-position code per broad role, for records whose posFine is absent / out
 # of range. Picks a representative central CAMROL slot: GK=1, central DF=4, central
@@ -195,6 +197,32 @@ static func icon(name: String) -> Texture2D:
 		var p := "res://art/icons/%s.png" % name
 		_icons[name] = load(p) if ResourceLoader.exists(p) else null
 	return _icons[name]
+
+
+## The 14x10 MINIBAND mini flag for a country code (same PAISES index as flag();
+## baked by tools/re/export_flags.py). This is the flag the TEAM OFFER card blits
+## on its NATIONALITY band and club-offer rows (SAD 0.0 vs run-3 frame 086).
+static func mini_flag(code) -> Texture2D:
+	if code == null or int(code) < 0:
+		return null
+	var n := int(code)
+	if not _mini_flags.has(n):
+		var p := "res://art/flags/mini_%03d.png" % n
+		_mini_flags[n] = load(p) if ResourceLoader.exists(p) else null
+	return _mini_flags[n]
+
+
+## The 21x21 FRAME-RENDERED player-card kit patch (the FICHA/TEAM OFFER kit blit
+## composes a soft shadow that is not a plain palette blit — panel-kit precedent).
+## Only clubs a walkthrough frame shows carry a patch (Man Utd today); callers
+## fall back to scaled nano_kit() art for the rest.
+static func ficha_kit(club_id: int) -> Texture2D:
+	if club_id < 0:
+		return null
+	if not _ficha_kits.has(club_id):
+		var p := "res://art/kits/ficha/%d.png" % club_id
+		_ficha_kits[club_id] = load(p) if ResourceLoader.exists(p) else null
+	return _ficha_kits[club_id]
 
 
 ## Draw a flat icon fitted (aspect-preserved) and centred in a cell. Returns true if a

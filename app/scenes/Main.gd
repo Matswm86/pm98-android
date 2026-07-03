@@ -1274,6 +1274,7 @@ func _career_advance() -> void:
 	_career.save()   # autosave each week
 	if res.is_empty():
 		_show_career()   # bye / season just ended; refresh the hub in place
+		_pop_pending_team_offers()
 		return
 	_show_match_result(res)
 
@@ -1287,8 +1288,12 @@ func _show_match_result(res: Dictionary) -> void:
 	# scorers ride along in res["goals"] (empty -> narrate re-rolls by finishing weight).
 	var m := MatchCommentary.narrate(rng, home, away, int(res["hg"]), int(res["ag"]), res.get("goals", []))
 	var verdict := _result_word(int(res["hg"]), int(res["ag"]), bool(res["manager_home"]))
+	# Back at the hub, any live bids on listed players raise their TEAM OFFER
+	# cards — the original's post-match CONTINUE order (run-3 frames 085->086).
 	_open_match(home, away, int(res["hg"]), int(res["ag"]), m["lines"],
-		"%s  -  back to the dugout" % verdict, func() -> void: _show_career())
+		"%s  -  back to the dugout" % verdict, func() -> void:
+			_show_career()
+			_pop_pending_team_offers())
 
 ## The original-art TITLE / FRONT-DOOR screen as a full-screen overlay raised at boot:
 ## the PREMIER MANAGER 98 title (FONDO7) with DATA BASE / MANAGER LEAGUE /
@@ -1554,10 +1559,9 @@ func _show_transfer_screen() -> void:
 ## The original-art CURRENT OFFERS (OFERTAS) screen: up to 5 transfer-listed players,
 ## each band showing his attribute strip + the newest bid (CLUB | CLUB OFFER | YEARLY
 ## WAGE | YEARS | CLAUSES), reversed from MANAGER.EXE + the owner's capture
-## (docs/re/ofertas_screen_re.md; CurrentOffersScreen.gd). A band tap opens the bid
-## list to ACCEPT / REFUSE (Career.accept_offer / refuse_offer — the accept/refuse
-## interaction itself is un-RE'd, so it rides the interim browse pattern); RETURN
-## dismisses back to the transfer screen.
+## (docs/re/ofertas_screen_re.md; CurrentOffersScreen.gd). A band tap opens the REAL
+## TEAM OFFER answer card (TeamOfferScreen, walkthrough run-3 frames 086-092);
+## RETURN dismisses back to the transfer screen.
 func _show_current_offers_screen() -> void:
 	var scr: CurrentOffersScreen = load("res://scenes/CurrentOffersScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -1578,59 +1582,65 @@ func _show_current_offers_screen() -> void:
 		AudioManager.ui_select()
 		scr.queue_free())
 	scr.band_pressed.connect(func(player: Dictionary) -> void:
-		_browse_player_offers(int(player.get("id", -1)), str(player.get("name", "?")), feed))
+		_show_team_offer(int(player.get("id", -1)), feed))
 
-## The bid list for one listed player: each row a live offer; tapping one asks
-## ACCEPT (the sale, through accept_sale's squad-floor guards) or REFUSE (drops the
-## bid, the listing stays). Career state saves after either mutation.
-func _browse_player_offers(pid: int, pname: String, refresh: Callable) -> void:
+## The REAL TEAM OFFER answer card for one listed player's bids (TeamOfferScreen;
+## walkthrough run-3 frames 086-092 + 150-153): every offer row carries a
+## REFUSE/ACCEPT toggle (REFUSE default), OK commits all answers at once. The
+## card is modal — OK is the only exit, as in the original. Replaces the interim
+## ACCEPT/REFUSE browse dialogs (2026-07-03).
+func _show_team_offer(pid: int, refresh: Callable = Callable()) -> void:
+	var p := _career._find_in(_career.club_id, pid)
 	var offers := _career.offers_for(pid)
-	if offers.is_empty():
-		_toast("No offers for %s yet." % pname)
+	if p.is_empty() or offers.is_empty():
 		return
-	var rows: Array = []
-	for o in offers:
-		rows.append({"text": "%s   £%s  -  wage £%s/wk  -  %d yrs" % [
-			str(o.get("buyer_name", "?")), _fmt_int(int(o.get("offer", 0))),
-			_fmt_int(int(o.get("weekly_wage", 0))), int(o.get("years", 0))]})
-	# Close only the browse: the offers screen stays on top (dismissing via
-	# _dismiss_career_browse would raise the hub over it).
-	_mount_browse("OFFERS  -  %s" % pname, "%d bid%s  -  tap to answer" % [
-			rows.size(), "" if rows.size() == 1 else "s"], rows,
-		func(i: int) -> void:
-			_close_browse_only()
-			_confirm_offer(pid, pname, i, refresh),
-		_close_browse_only)
+	var scr: TeamOfferScreen = load("res://scenes/TeamOfferScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	var weekly := Contract.current_weekly(p, _career.tier)
+	# CLUB FEE = the market value, YEARS = the full term, LEFT = years remaining
+	# (our contract model's split of the original's YEARS|LEFT pair)
+	scr.setup(p, GameDB.club(_career.club_id), offers,
+		TransferMarket.value_of(p, _career.tier), Contract.yearly(weekly),
+		int(p.get("contract_term", p.get("contract_years", 0))),
+		int(p.get("contract_years", 0)))
+	scr.answered.connect(func(decisions: Array) -> void:
+		AudioManager.ui_select()
+		scr.queue_free()
+		_apply_offer_answers(pid, decisions)
+		if refresh.is_valid():
+			refresh.call())
 
-func _confirm_offer(pid: int, pname: String, idx: int, refresh: Callable) -> void:
-	var offers := _career.offers_for(pid)
-	if idx >= offers.size():
+## Apply a TEAM OFFER card's per-row answers through the Career guards. Accepts
+## run first in row order — the first sale wins and every other bid on him lapses
+## (accept_offer semantics); refused bids are dropped (the listing stays). The
+## original surfaces only the SIGNING as a message (frames 093/094), so refusals
+## stay quiet.
+func _apply_offer_answers(pid: int, decisions: Array) -> void:
+	var sold := false
+	for i in decisions.size():
+		if str(decisions[i]) == "accept" and not sold:
+			var r := _career.accept_offer(pid, i)
+			_toast(str(r.get("msg", "")))
+			sold = bool(r.get("ok"))
+	if not sold:
+		for i in range(decisions.size() - 1, -1, -1):   # high->low keeps indices live
+			if str(decisions[i]) == "refuse":
+				_career.refuse_offer(pid, i)
+	_career.save()
+
+## Pop the TEAM OFFER card for every listed player holding live bids — the
+## original raises these over the hub during CONTINUE processing (run-3 frames
+## 085->086: FULL TIME -> TEAM OFFER cards -> signing messages). One card at a
+## time; answering it (all rows default REFUSE, so OK always clears the player's
+## bid list) chains to the next.
+func _pop_pending_team_offers() -> void:
+	if _career == null:
 		return
-	var o: Dictionary = offers[idx]
-	_mount_browse("%s  -  £%s" % [str(o.get("buyer_name", "?")), _fmt_int(int(o.get("offer", 0)))],
-		"Answer the offer for %s" % pname,
-		[{"text": "ACCEPT  -  sell for £%s" % _fmt_int(int(o.get("offer", 0)))},
-			{"text": "REFUSE  -  turn the bid down"}, {"text": "Cancel"}],
-		func(i: int) -> void:
-			_close_browse_only()
-			if i == 0:
-				var r := _career.accept_offer(pid, idx)
-				_toast(str(r.get("msg", "")))
-				if bool(r.get("ok")):
-					_career.save()
-			elif i == 1:
-				var r := _career.refuse_offer(pid, idx)
-				_toast(str(r.get("msg", "")))
-				_career.save()
-			refresh.call(),
-		_close_browse_only)
-
-## Free the browse overlay WITHOUT raising the hub (for browse flows layered over a
-## still-mounted art screen, like the CURRENT OFFERS accept/refuse dialogs).
-func _close_browse_only() -> void:
-	if _browse != null and is_instance_valid(_browse):
-		_browse.queue_free()
-	_browse = null
+	for pid in _career.transfer_listed:
+		if not _career.offers_for(int(pid)).is_empty():
+			_show_team_offer(int(pid), _pop_pending_team_offers)
+			return
 
 ## The original-art BOARD OF DIRECTORS (DIRECTIVA) screen as a full-screen overlay:
 ## the three confidence/rating meters + the board's objective + your record, at the

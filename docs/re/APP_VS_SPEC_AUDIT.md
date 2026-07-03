@@ -430,7 +430,10 @@ Wiring done (B5-2): OPPONENT -> VIEW RIVAL (RivalScreen), PLAYERS -> SQUAD MANAG
   ("placed on the transfer market"), SACK = new `Career.release` (compensation of contract;
   he joins the free-agent pool; squad-floor + keeper-min + on-loan guards). Card is
   read-only (buttons hidden) for another club's player. CLUB FEE label fixed (was VALUE).
-  REMAINING: the TRANSFER->offers negotiation (solicit_sale/accept_sale exist; the TEAM
-  OFFER accept/refuse screen from run-3 is still only reachable via the old transfers
-  browse) and the CLAUSES panel (Free-if-relegated / Matches-to-renew / Scoring bonus /
-  House-and-car) + the YEARS|LEFT split are not yet on the card.
+  REMAINING (narrowed 2026-07-03): the TEAM OFFER accept/refuse screen is BUILT —
+  TeamOfferScreen at pixel parity 0px vs run-3 086/088 (see team_offer_re.md), wired
+  to CURRENT OFFERS band taps AND popped from CONTINUE after match day (frames
+  085->086); the interim ACCEPT/REFUSE browse dialogs are gone. Still owed on the
+  FICHA itself: the CLAUSES panel + YEARS|LEFT contract split (geometry now fully
+  RE'd on the TEAM OFFER card), and the signing message still rides _toast (the
+  real hub alert box, frames 093/094, is un-built).

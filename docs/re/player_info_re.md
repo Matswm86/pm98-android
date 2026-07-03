@@ -95,5 +95,8 @@ the broad LUT -- corrected 2026-06-26.)
   action buttons + a narrow OK. Wired to `Career.renew` / `toggle_listed` / `release`
   (PlayerInfoScreen emits `renew_/transfer_/sack_requested`; Main runs the action on the live
   roster dict). Read-only (buttons hidden) for another club's player. Frame `081_154619`.
-  GAP: the CLAUSES panel + YEARS|LEFT split + the TRANSFER->TEAM OFFER accept/refuse screen
-  (run-3) are not yet on the card — see APP_VS_SPEC_AUDIT B7.
+  GAP (narrowed 2026-07-03): the TRANSFER->TEAM OFFER accept/refuse screen is BUILT
+  (TeamOfferScreen, pixel-parity 0px — see team_offer_re.md, incl. the CLAUSES panel
+  + YEARS|LEFT split geometry). Remaining: porting that CLAUSES/YEARS|LEFT contract
+  layout onto THIS card (the FICHA still shows the older VALUE/WAGE/YEARS panel) —
+  see APP_VS_SPEC_AUDIT B7.

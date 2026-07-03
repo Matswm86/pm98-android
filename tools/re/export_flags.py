@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Bake the PM98 nationality FLAG art + the country-code table the FICHA uses.
 
-Two decoded game assets, both under DBDAT/ (owned game files):
+Three decoded game assets, all under DBDAT/ (owned game files):
 
   * BANDERAS.PKF  — 127 waving-flag bitmaps `BA9600NN` (index NN = the country code).
     Each is an OS/2 BITMAPCOREHEADER DIB (12-byte header, "BM" magic), 30x20, 8bpp,
@@ -9,6 +9,11 @@ Two decoded game assets, both under DBDAT/ (owned game files):
     colours come from the shared 256-colour VGA palette (DAT.PKF +0x5CA, 4-byte
     R,G,B,0 VGA-DAC order), exactly like the IMG/RECURSOS DIBs in pkf_image.py.
     (Pillow mis-decodes the OS/2-core 8bpp form, so we unpack the rows by hand.)
+
+  * MINIBAND.PKF  — the same 127 flags as flat 14x10 minis (`BA9600NN`, same code
+    order, same DIB form). This is the flag the TEAM OFFER card blits on a club-offer
+    row (SAD 0.0 vs walkthrough run-3 frame 086 at (134,371), England for Aston
+    Villa) and the map/OFFERS screens use for club nations.
 
   * PAISES.30 — the country-NAME table, parallel to the flag index. A `DMLT` header
     (u32, u32 count=128) then `count` length-prefixed (u16) strings, each XOR 0x61
@@ -18,6 +23,7 @@ Two decoded game assets, both under DBDAT/ (owned game files):
 
 Outputs:
   * app/art/flags/flag_NNN.png  (one per BANDERAS entry, real VGA colours)
+  * app/art/flags/mini_NNN.png  (one per MINIBAND entry, 14x10)
   * assets/country_codes.json   (the authoritative PAISES decode: byCode + byName)
 
 Run from the project root:  python3 tools/re/export_flags.py
@@ -96,6 +102,20 @@ def main() -> None:
         im = decode_os2_bmp(buf[off : off + size], pal)
         im.save(flags_dir / f"flag_{i:03d}.png")
         n += 1
+
+    # --- mini flags (MINIBAND.PKF, same code order, 14x10) ---
+    mbuf = (GAME / "DBDAT" / "MINIBAND.PKF").read_bytes()
+    for old in flags_dir.glob("mini_*.png"):
+        old.unlink()
+    m = 0
+    for i, (_name, off, size) in enumerate(P.files_of(mbuf)):
+        im = decode_os2_bmp(mbuf[off : off + size], pal)
+        if im.size != (14, 10):
+            raise SystemExit(f"MINIBAND entry {i}: unexpected size {im.size}")
+        im.save(flags_dir / f"mini_{i:03d}.png")
+        m += 1
+    if m != n:
+        raise SystemExit(f"MINIBAND count {m} != BANDERAS count {n}")
 
     # --- country-code table ---
     by_code = {str(i): names[i] for i in range(len(names))}

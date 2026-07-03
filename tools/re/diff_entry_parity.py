@@ -41,6 +41,25 @@ PAIRS = [
     ),
     ("pretemp_013.png", "013_154358.png", None, [], 0.0001),
     ("pretemp_015.png", "015_154401.png", None, [], 0.0005),
+    # TEAM OFFER card (run-3 frames). ROI = the modal rect (the hub behind is
+    # its own parity story). Exclusions, all documented in team_offer_re.md:
+    # WEIGHT/HEIGHT value strips (metric shown per the 2026-06-26 user call;
+    # the original converts to imperial) and the RATING box (the FICHA rating
+    # formula is un-RE'd — 79/79/81/71 fits no mean of the shown values).
+    (
+        "teamoffer_086.png",
+        "086_164647.png",
+        (98, 5, 541, 474),
+        [(182, 97, 242, 109), (247, 97, 327, 109), (482, 100, 522, 119)],
+        0.0001,
+    ),
+    (
+        "teamoffer_088.png",
+        "088_164650.png",
+        (98, 5, 541, 474),
+        [(182, 97, 242, 109), (247, 97, 327, 109), (482, 100, 522, 119)],
+        0.0001,
+    ),
 ]
 
 
