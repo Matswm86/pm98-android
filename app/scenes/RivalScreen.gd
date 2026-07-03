@@ -41,12 +41,15 @@ const TAC_H := 198.0
 const KIT_SRC := Rect2(0, 0, 31, 64)
 
 # Rival XI table (shares the LINE-UP metrics/skin; only the XI, no subs/reserves).
-const TABLE := Rect2(6, 48, 470, 232)
-const HDR_Y := 66
+# Frame at the walked-frame anchors (015_162415: border top y82, bottom y286, first
+# row y103) so the body clears the 62px match-header band. The interior row metrics
+# keep the app's reconstruction — the body parity story is separate.
+const TABLE := Rect2(6, 82, 470, 204)
+const HDR_Y := 84
 const ROW_X := 8
 const ROW_W := 466
 const ROW_H := 16
-const XI_Y0 := 84
+const XI_Y0 := 103
 const STAT_X0 := 158
 const STAT_X1 := 344
 const AVBAR_X := 360
@@ -88,6 +91,7 @@ var _assist_name: String = ""
 var _division: String = ""
 var _season: String = "1997-98"
 var _week: int = 0
+var _header: Dictionary = {}   # match-header state (PMChrome.draw_match_header)
 var _by_id: Dictionary = {}
 var _press: String = ""
 
@@ -107,7 +111,7 @@ func _ready() -> void:
 ## quality (0..5) + name that gate the report, and the calendar plaque data. The rival's XI +
 ## formation are auto-picked (the same selector MatchSim fields CPU sides with).
 func setup(rival: Dictionary, own: Dictionary, assist_quality: int, assist_name: String = "",
-		division: String = "", season: String = "1997-98", week: int = 0) -> void:
+		division: String = "", season: String = "1997-98", week: int = 0, header := {}) -> void:
 	_rival = rival
 	_own = own
 	_assist_q = maxi(0, assist_quality)
@@ -115,6 +119,15 @@ func setup(rival: Dictionary, own: Dictionary, assist_quality: int, assist_name:
 	_division = division
 	_season = season
 	_week = week
+	_header = header
+	if _header.is_empty():
+		# manager-mode default (frame 058 layout): manager + own club, own kit.
+		# Date derives from the week; the status pair is the only walked one.
+		var d := PMChrome.date_parts(season, week)
+		_header = {"mode": "manager", "top": "",
+			"bottom": PMChrome.title_case_name(str(own.get("name", ""))),
+			"club_id": int(own.get("id", -1)), "weekday": str(d["wd"]),
+			"day": str(d["day"]), "month": str(d["mon"]), "year": str(d["year"])}
 	_tactics = Tactics.auto_pick(rival) if not rival.is_empty() else null
 	_by_id.clear()
 	for p in rival.get("players", []):
@@ -230,9 +243,7 @@ func _draw() -> void:
 	draw_set_transform(Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5), 0.0, Vector2(s, s))
 
 	PMChrome.draw_bg(self)
-	# Chrome plaque shows the fixture vs-stack: rival club on top, own club below, rival crest.
-	PMChrome.draw_header(self, "VIEW RIVAL", str(_rival.get("name", "")),
-		str(_own.get("name", "")), _division, _season, _week, int(_rival.get("id", -1)))
+	PMChrome.draw_match_header(self, "viewrival", _header)
 
 	PMChrome.draw_table_panel(self, TABLE)
 	if has_report():

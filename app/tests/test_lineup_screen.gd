@@ -94,13 +94,13 @@ func _run() -> void:
 	tb.formation = "4-4-2"
 	tb.xi = range(1, 12)            # ids 1..11 are the XI
 	screen.setup(big, tb, "", "Premier")
-	ok = _assert(screen._visible_rows() == 24, "panel fits 24 rows") and ok
+	ok = _assert(screen._visible_rows() == 23, "panel fits 23 rows") and ok
 	ok = _assert(screen._flat_items().size() == 30, "flat list = 28 rows + 2 section headers") and ok
-	ok = _assert(screen._max_scroll() == 6, "max scroll = 30 - 24") and ok
+	ok = _assert(screen._max_scroll() == 7, "max scroll = 30 - 23") and ok
 	ok = _assert(screen._scroll == 0, "setup resets scroll to top") and ok
 	# Clamp at both ends.
 	screen._scroll = 999; screen._clamp_scroll()
-	ok = _assert(screen._scroll == 6, "scroll clamps to max") and ok
+	ok = _assert(screen._scroll == 7, "scroll clamps to max") and ok
 	screen._scroll = -5; screen._clamp_scroll()
 	ok = _assert(screen._scroll == 0, "scroll clamps to top") and ok
 	# Hit-test: both arrows live while overflowing.
@@ -136,8 +136,8 @@ func _run() -> void:
 	quit(0 if ok else 1)
 
 
-const SCROLL_UP_C := Vector2(479 + 11, 190 + 11)    # centre of LineupScreen.SCROLL_UP
-const SCROLL_DOWN_C := Vector2(479 + 11, 220 + 11)  # centre of LineupScreen.SCROLL_DOWN
+const SCROLL_UP_C := Vector2(441 + 11, 388 + 11)    # centre of LineupScreen.SCROLL_UP
+const SCROLL_DOWN_C := Vector2(441 + 11, 433 + 11)  # centre of LineupScreen.SCROLL_DOWN
 
 
 ## A synthetic N-man squad (player 1 a keeper, the rest outfield) with decoded attrs so

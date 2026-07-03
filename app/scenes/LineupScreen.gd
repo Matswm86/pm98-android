@@ -1,7 +1,7 @@
 extends Control
 class_name LineupScreen
 ## PM98 LINE-UP (ALINEACIÓN) screen, rebuilt to match the real game (ma_7): the shared
-## management chrome (PMChrome header + blue marble background) over the white squad
+## match-context barra (PMChrome.draw_match_header; witness frame 155_162931) over the white squad
 ## TABLE — N. | PLAYER | EN SP ST AG GU FI MO | AV (+bar) | ROL | POS — in the game's
 ## own English column codes, with STARTERS / SUBSTITUTES / RESERVES sections and the
 ## right control column (PARAMETERS / RATING, the TEAM RATING star strip, the attribute
@@ -44,8 +44,11 @@ const COLS := [
 	["GU", 278, "CA"], ["FI", 304, "TI"], ["MO", 330, "RM"], ["AV", 356, "_avg"],
 ]
 const AVG_KEYS := ["VE", "RE", "AG", "CA", "RM", "RG", "PA", "TI"]
-const TABLE := Rect2(6, 50, 470, 426)
-const HDR_Y := 66
+# Table frame at the walked-frame anchors (155_162931: border top y67, bottom y466,
+# first squad row y88) so the body clears the 62px match-header band. The interior
+# row metrics keep the app's reconstruction — the body parity story is separate.
+const TABLE := Rect2(6, 67, 470, 399)
+const HDR_Y := 70
 const ROW_X := 8
 const ROW_W := 466
 const ROW_H := 16
@@ -54,12 +57,12 @@ const STAT_X1 := 344
 const AVBAR_X := 360
 const ROL_X := 398
 const POS_X := 430
-const XI_Y0 := 84
-# Original ARROW scroll buttons (16x16 art), stacked in the empty right-panel band between
-# the attribute buttons (end y186) and the CAMPO pitch (top y250), at the squad table's
-# right edge so they read as the list's scrollbar. Shown only while the list overflows.
-const SCROLL_UP := Rect2(479, 190, 22, 22)
-const SCROLL_DOWN := Rect2(479, 220, 22, 22)
+const XI_Y0 := 88
+# Original ARROW scroll buttons (16x16 art) at the frame-walked spot (155_162931):
+# overlaying the squad table's right edge near its bottom, up ~y388 / down ~y433,
+# the original list scrollbar. Shown only while the list overflows.
+const SCROLL_UP := Rect2(441, 388, 22, 22)
+const SCROLL_DOWN := Rect2(441, 433, 22, 22)
 const SCROLL_STEP := 3
 
 # Pitch panel (right column).
@@ -84,6 +87,7 @@ var _tactics: Tactics = null
 var _division: String = ""
 var _season: String = "1997-98"
 var _week: int = 0
+var _header: Dictionary = {}   # match-header state (PMChrome.draw_match_header)
 var _by_id: Dictionary = {}
 var _scroll: int = 0
 var _press: String = ""
@@ -103,12 +107,21 @@ func _ready() -> void:
 
 ## Feed the manager's club + chosen tactics (+ season/week for the calendar plaque), repaint.
 func setup(club: Dictionary, tactics: Tactics, manager: String = "", division: String = "",
-		season: String = "1997-98", week: int = 0) -> void:
+		season: String = "1997-98", week: int = 0, header := {}) -> void:
 	_club = club
 	_tactics = tactics
 	_division = division
 	_season = season
 	_week = week
+	_header = header
+	if _header.is_empty():
+		# manager-mode default (frame 058 layout): manager + own club, own kit.
+		# Date derives from the week; the status pair is the only walked one.
+		var d := PMChrome.date_parts(season, week)
+		_header = {"mode": "manager", "top": manager,
+			"bottom": PMChrome.title_case_name(str(club.get("name", ""))),
+			"club_id": int(club.get("id", -1)), "weekday": str(d["wd"]),
+			"day": str(d["day"]), "month": str(d["mon"]), "year": str(d["year"])}
 	_by_id.clear()
 	for p in club.get("players", []):
 		_by_id[int(p.get("id", -1))] = p
@@ -374,8 +387,7 @@ func _draw() -> void:
 	draw_set_transform(Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5), 0.0, Vector2(s, s))
 
 	PMChrome.draw_bg(self)
-	PMChrome.draw_header(self, "LINE-UP", "", str(_club.get("name", "")), _division,
-		_season, _week, int(_club.get("id", -1)))
+	PMChrome.draw_match_header(self, "lineup", _header)
 
 	PMChrome.draw_table_panel(self, TABLE)
 	_draw_col_header()
@@ -516,26 +528,27 @@ func _pos_of(p: Dictionary) -> String:
 func _draw_right_panel() -> void:
 	var px := 480.0
 	var pw := 154.0
-	# PARAMETERS / RATING.
-	PMChrome.bevel(self, Rect2(px, 50, pw, 18), C_DKBTN, C_DKBTN_HI, C_BTN_LO)
-	_centre(_f12, px, pw, 52, "PARAMETERS", C_GOLD, 13)
+	# PARAMETERS / RATING at the frame-walked tops (155_162931: y70 / y95); the
+	# interior button skin keeps the app's reconstruction (body story separate).
 	PMChrome.bevel(self, Rect2(px, 70, pw, 18), C_DKBTN, C_DKBTN_HI, C_BTN_LO)
-	_centre(_f12, px, pw, 72, "RATING", C_PANEL_TXT, 13)
+	_centre(_f12, px, pw, 72, "PARAMETERS", C_GOLD, 13)
+	PMChrome.bevel(self, Rect2(px, 95, pw, 18), C_DKBTN, C_DKBTN_HI, C_BTN_LO)
+	_centre(_f12, px, pw, 97, "RATING", C_PANEL_TXT, 13)
 
-	# TEAM RATING strip with stars.
+	# TEAM RATING strip with stars (frame top y118).
 	var avg := _team_rating()
-	PMChrome.bevel(self, Rect2(px, 92, pw, 30), Color(0.10, 0.16, 0.34), C_DKBTN_HI, C_BTN_LO)
-	PMChrome.draw_crest(self, int(_club.get("id", -1)), Rect2(px + 4, 94, 18, 26))
-	_txt(_f8, int(px) + 26, 95, "TEAM RATING", C_PANEL_TXT, 10)
-	PMChrome.draw_stars(self, px + 26, 106, avg / 20.0, 11, 5)
-	_txt(_f12, int(px + pw) - 8, 100, str(avg), Color.WHITE, 14, true)
+	PMChrome.bevel(self, Rect2(px, 118, pw, 30), Color(0.10, 0.16, 0.34), C_DKBTN_HI, C_BTN_LO)
+	PMChrome.draw_crest(self, int(_club.get("id", -1)), Rect2(px + 4, 120, 18, 26))
+	_txt(_f8, int(px) + 26, 121, "TEAM RATING", C_PANEL_TXT, 10)
+	PMChrome.draw_stars(self, px + 26, 132, avg / 20.0, 11, 5)
+	_txt(_f12, int(px + pw) - 8, 126, str(avg), Color.WHITE, 14, true)
 
-	# Attribute buttons (2 cols x 3 rows).
+	# Attribute buttons (2 cols x 3 rows; frame row tops y171/196/221, 25px pitch).
 	var labels := [["HANDLING", "PASSING"], ["DRIBBLING", "HEADING"], ["TACKLING", "SHOOTING"]]
 	for r in 3:
 		for cc in 2:
 			var bx := px + cc * (pw / 2.0)
-			var by := 126 + r * 20
+			var by := 171 + r * 25
 			PMChrome.bevel(self, Rect2(bx + 1, by, pw / 2.0 - 2, 18), C_BTN, C_BTN_HI, C_BTN_LO)
 			_centre(_f8, bx, pw / 2.0, by + 3, labels[r][cc], C_PANEL_TXT, 10)
 

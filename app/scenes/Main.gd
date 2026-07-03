@@ -1372,7 +1372,8 @@ func _show_lineup_screen() -> void:
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
 	var tac := _tactics()
-	scr.setup(_mgr_club(), tac, "", _career.league_name, _career.season, _career.week + 1)
+	scr.setup(_mgr_club(), tac, _career.manager_name, _career.league_name, _career.season,
+		_career.week + 1, _match_header())
 	# RETURN dismisses; TACTICS opens the TEAM TACTICS modal. Tapping a player selects him;
 	# tapping a second player swaps them into/within the XI (PM98's line-up edit), persisted
 	# via Career. The ARROW buttons page the squad list.
@@ -1473,7 +1474,8 @@ func _show_tactics_screen() -> void:
 	var bg: LineupScreen = load("res://scenes/LineupScreen.gd").new()
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
-	bg.setup(_mgr_club(), _tactics(), "", _career.league_name, _career.season, _career.week + 1)
+	bg.setup(_mgr_club(), _tactics(), _career.manager_name, _career.league_name, _career.season,
+		_career.week + 1, _match_header())
 	var scr: TacticsScreen = load("res://scenes/TacticsScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
@@ -2423,7 +2425,7 @@ func _show_rival_screen(rival: Dictionary) -> void:
 	var ass := Staff.members_in_role(_career.staff, Staff.ASSISTANT)
 	var ass_name: String = str(ass[0].get("name", "")) if not ass.is_empty() else ""
 	scr.setup(rival, _mgr_club(), q, ass_name, _career.league_name, _career.season,
-		_career.week + 1)
+		_career.week + 1, _match_header())
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
 	scr.tactics_pressed.connect(func() -> void:
 		scr.queue_free()

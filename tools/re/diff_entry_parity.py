@@ -91,6 +91,23 @@ PAIRS = [
         [],
         0.0001,
     ),
+    # LINE-UP / VIEW RIVAL match-header rollout (run-2 frames 155/015). ROI = the
+    # 62px header band only: both screens' BODY parity stories are separate (the
+    # tables keep the app's reconstructed metrics; documented in match_header_re.md).
+    (
+        "lineup_155.png",
+        "155_162931.png",
+        (0, 0, 640, 62),
+        [],
+        0.0001,
+    ),
+    (
+        "rival_015.png",
+        "015_162415.png",
+        (0, 0, 640, 62),
+        [],
+        0.0001,
+    ),
 ]
 
 

@@ -9,6 +9,8 @@ extends SceneTree
 ##   teamoffer_086.png  Thornley card, row-1 REFUSE (fresh)      vs 086_164647 (run 3)
 ##   teamoffer_088.png  row-1 toggled ACCEPT                     vs 088_164650 (run 3)
 ##   tactics_014.png    TACTICS board, Man Utd 3-5-2, RATING     vs 014_162413 (run 2)
+##   lineup_155.png     LINE-UP, MU home vs Sao Paulo, Wed 6     vs 155_162931 (run 2, header ROI)
+##   rival_015.png      VIEW RIVAL, Barcelona vs MU, Mon 4       vs 015_162415 (run 2, header ROI)
 ## Needs a real renderer (Xvfb / local X11), same as shot_screens.gd:
 ##   PM98_SHOT_DIR=out godot --rendering-driver opengl3 --path app --script res://tests/shot_entry_parity.gd
 
@@ -176,6 +178,37 @@ func _run() -> void:
 		"status_top": "Preseason", "status_bottom": "Preparation"})
 	await _shot(dir, "tactics_014.png")
 	board.queue_free()
+	await process_frame
+
+	# ---- LINE-UP header (run-2 frame 155: MU home vs Sao Paulo, Wednesday 6) ------
+	# Header-ROI pair only: the LINE-UP body parity story is separate, so the XI is
+	# just a valid auto-pick; the diff scopes to the y<62 match-header band.
+	var lu: LineupScreen = load("res://scenes/LineupScreen.gd").new()
+	_mount(lu)
+	await process_frame
+	lu.setup(manu3, Tactics.auto_pick(manu3, "4-4-2"), "", "Premier League", "1997-98", 1,
+		{"mode": "fixture", "top": "Manchester Utd.", "bottom": "Sao Paulo",
+		"home_id": 40, "away_id": 1301, "weekday": "Wednesday", "day": "6",
+		"month": "August", "year": "1997",
+		"status_top": "Preseason", "status_bottom": "Preparation"})
+	await _shot(dir, "lineup_155.png")
+	lu.queue_free()
+	await process_frame
+
+	# ---- VIEW RIVAL header (run-2 frame 015: at F.C. Barcelona, Monday 4) ---------
+	# Header-ROI pair only (body story separate); assistant present so the report
+	# body renders, as in the frame.
+	var barca: Dictionary = gamedb.club(1000)
+	var rv: RivalScreen = load("res://scenes/RivalScreen.gd").new()
+	_mount(rv)
+	await process_frame
+	rv.setup(barca, manu3, 1, "A. Leigh", "Premier League", "1997-98", 1,
+		{"mode": "fixture", "top": "F.C. Barcelona", "bottom": "Manchester Utd.",
+		"home_id": 1000, "away_id": 40, "weekday": "Monday", "day": "4",
+		"month": "August", "year": "1997",
+		"status_top": "Preseason", "status_bottom": "Preparation"})
+	await _shot(dir, "rival_015.png")
+	rv.queue_free()
 	await process_frame
 
 	print("PARITY SHOTS DONE")
