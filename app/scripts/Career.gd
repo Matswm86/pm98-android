@@ -253,6 +253,11 @@ func _init_club(club: Dictionary, league: Dictionary, league_clubs: Array, leagu
 ## Deep-copy a club's squad into a live roster, stamping a contract length on each
 ## player (younger players are tied down longer). Never aliases GameDB's data.
 func _seed_squad(club_dict: Dictionary) -> Array:
+	# Morale/fitness kickoff = the EXE's season reset (FUN_005825c0): morale
+	# 90 + rand(10); fitness lands on 70 (halfway from a fresh 99 toward 40 —
+	# the exact value frames 081/084 pin for week 1). docs/re/morale_re.md.
+	var form_rng := RandomNumberGenerator.new()
+	form_rng.randomize()
 	var out: Array = []
 	for p in club_dict.get("players", []):
 		var dup: Dictionary = (p as Dictionary).duplicate(true)
@@ -265,6 +270,8 @@ func _seed_squad(club_dict: Dictionary) -> Array:
 		dup["dev_progress"] = 0.0      # development carry-over (Training.gd)
 		Contract.stamp_wage(dup, tier)  # his contracted weekly wage (Contract.gd)
 		dup["auto_renew"] = false      # opt-in: auto-renew an expiring deal at rollover
+		dup["morale"] = 90 + form_rng.randi_range(0, 9)
+		dup["fitness"] = 70
 		out.append(dup)
 	return out
 
@@ -377,6 +384,7 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 	# above, so the stat engine rates the same players the injury/card rolls land on).
 	var xi_of_id := func(id: int) -> Array:
 		return featured if id == club_id else (ai_featured.get(id, []) as Array)
+	var round_results: Array = []   # every fixture's score, for the morale pass below
 	for m in fixtures[week]:
 		var h := int(m[0])
 		var a := int(m[1])
@@ -390,9 +398,18 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 		var ag := int(res["away_goals"])
 		_apply(table[h], hg, ag)
 		_apply(table[a], ag, hg)
+		round_results.append({"h": h, "a": a, "hg": hg, "ag": ag})
 		if h == club_id or a == club_id:
 			manager_res = {"home_id": h, "away_id": a, "hg": hg, "ag": ag, "manager_home": h == club_id,
 				"goals": res.get("goals", [])}   # stat engine's resolved scorers for the feed (not persisted)
+	# Morale & fitness live through the round (docs/re/morale_re.md): the slot
+	# deltas + the result delta hit BOTH sides of every fixture, then the league
+	# table caps a high-flying squad's morale once 11 rounds are in. A derived
+	# RNG (seed folded with the week) keeps morale's own randomness reproducible
+	# WITHOUT reordering the shared match/injury/training stream.
+	var mrng := RandomNumberGenerator.new()
+	mrng.seed = rng.seed ^ (int(week) * 0x9E3779B1)
+	_round_morale(round_results, featured, ai_featured, mrng)
 	# Contract-clause progress counters (the FICHA's "Matches played:" / "Goals:"
 	# sub-lines): a featured man on a matches-to-renew deal logs an appearance;
 	# a scoring-bonus man logs his non-own goals. Incremented on the LIVE roster
@@ -732,6 +749,88 @@ func _apply(s: Dictionary, gf: int, ga: int) -> void:
 		s["L"] += 1
 
 
+# ---- morale & fitness (docs/re/morale_re.md) -------------------------------
+
+## The round's morale/fitness pass: both sides of every simulated fixture take
+## the slot deltas (FUN_00582690) + the club result delta (the emulated
+## FUN_004179a0 matrix), then the league table caps high morale once 11 rounds
+## are in (FUN_0057b400 + FUN_00418030). Cup ties don't move morale yet — gap
+## listed in morale_re.md.
+func _round_morale(round_results: Array, featured: Array, ai_featured: Dictionary,
+		rng: RandomNumberGenerator) -> void:
+	if rosters.is_empty():
+		return
+	for rr in round_results:
+		var hg := int(rr["hg"])
+		var ag := int(rr["ag"])
+		var hres := "W" if hg > ag else ("D" if hg == ag else "L")
+		var ares := "W" if ag > hg else ("D" if hg == ag else "L")
+		var h := int(rr["h"])
+		var a := int(rr["a"])
+		_club_match_morale(h, true, hres, featured if h == club_id else ai_featured.get(h, []))
+		_club_match_morale(a, false, ares, featured if a == club_id else ai_featured.get(a, []))
+	# Weekly league-position ceiling: over ceiling+8 bleeds -10-rand(3) a week.
+	var st := standings()
+	for i in st.size():
+		var id := int(st[i]["id"])
+		if not rosters.has(id):
+			continue
+		var ceiling := Morale.weekly_ceiling(i + 1, int(st[i]["P"]))
+		if ceiling >= Morale.CAP:
+			continue
+		for p in rosters[id]:
+			Morale.weekly_decay(p, ceiling, rng)
+
+
+## One club's post-match morale: XI men played (+3/+3), the 5 best fit
+## non-featured men sat the bench (the AI 16 is rating-picked — the original
+## drives its subs off the same FUN_00581e60 rating), the rest were out of the
+## 16; the unavailable take the injured/banned hit. Then the result delta lands
+## on EVERY man. One league -> both clubs are division band 0.
+func _club_match_morale(id: int, home: bool, result: String, xi: Array) -> void:
+	if not rosters.has(id):
+		return   # frozen euro opponents have no live roster
+	var xi_ids := {}
+	for p in xi:
+		if p is Dictionary:
+			xi_ids[int((p as Dictionary).get("id", -1))] = true
+	var rest: Array = []
+	for p in rosters[id]:
+		var pd: Dictionary = p
+		if not xi_ids.has(int(pd.get("id", -1))) and Availability.status(pd)["state"] == "FIT":
+			rest.append(pd)
+	rest.sort_custom(func(x, y): return Morale.av6(x) > Morale.av6(y))
+	var bench_ids := {}
+	for i in mini(5, rest.size()):
+		bench_ids[int((rest[i] as Dictionary).get("id", -1))] = true
+	var delta := Morale.result_delta(home, 0, 0, result)
+	for p in rosters[id]:
+		var pd: Dictionary = p
+		var pid := int(pd.get("id", -1))
+		var state := "out"
+		if Availability.status(pd)["state"] != "FIT":
+			state = "unavailable"
+		elif xi_ids.has(pid):
+			state = "played"
+		elif bench_ids.has(pid):
+			state = "bench"
+		Morale.post_match_slot(pd, state)
+		Morale.add(pd, delta)
+
+
+## A new man through the door unsettles the incumbents in his position
+## (FUN_00588ae0): applied to the manager's roster on every signing.
+func _signing_shock(newcomer: Dictionary) -> void:
+	var new_id := int(newcomer.get("id", -1))
+	for p in rosters.get(club_id, []):
+		var pd: Dictionary = p
+		if int(pd.get("id", -1)) == new_id:
+			continue
+		var d := Morale.jealousy_delta(pd, newcomer, bool(pd.get("on_loan", false)))
+		if d != 0:
+			Morale.add(pd, d)
+
+
 ## Sorted standings (Pts, then GD, GF, name) as an Array of stat rows.
 func standings() -> Array:
 	var rows: Array = table.values()
@@ -956,6 +1055,9 @@ func promote_youth(pid: int) -> Dictionary:
 	p["contract_term"] = TransferMarket.NEW_CONTRACT_YEARS
 	Contract.stamp_wage(p, tier)   # a first-team wage now he's promoted
 	p["auto_renew"] = false
+	var form_rng := RandomNumberGenerator.new()
+	form_rng.randomize()
+	Morale.ensure(p, form_rng)   # fresh dynamic form, like the season kickoff roll
 	rosters[club_id].append(p)
 	_news("youth", "%s has been promoted to the first team squad." % p.get("name", "?"))
 	_log("%s has been promoted from the youth team." % p.get("name", "?"))
@@ -1083,6 +1185,8 @@ func sign_player(pid: int, from_club_id: int, offer: int, rng: RandomNumberGener
 			if bonus > 0:
 				player["clause_bonus"] = bonus
 	player["auto_renew"] = false
+	Morale.ensure(player, rng)
+	_signing_shock(player)   # the incumbents in his position take it badly (FUN_00588ae0)
 	rosters[club_id].append(player)
 	cash -= offer
 	transfer_listed.erase(pid)
@@ -1126,6 +1230,8 @@ func sign_free_agent(pid: int, offer_weekly: int = -1, rng: RandomNumberGenerato
 	player["contract_term"] = TransferMarket.NEW_CONTRACT_YEARS
 	player["wage"] = offer_weekly
 	player["auto_renew"] = false
+	Morale.ensure(player, rng)
+	_signing_shock(player)
 	rosters[club_id].append(player)
 	_log("You have signed free agent %s on £%s/wk." % [pname, _money(offer_weekly)])
 	return {"ok": true, "msg": "You have signed %s on a free." % pname, "demanded": int(verdict["demanded"])}
@@ -1167,6 +1273,7 @@ func sign_loan(pid: int, from_club_id: int) -> Dictionary:
 	player["loan_from_name"] = parent_name
 	player["wage"] = Contract.market_weekly(player, tier)   # you pick up his wages
 	player["clubId"] = club_id
+	_signing_shock(player)   # a loan arrival unsettles the position just the same
 	rosters[club_id].append(player)
 	_log("You have taken %s on loan from %s for the season." % [player.get("name", "?"), parent_name])
 	return {"ok": true, "msg": "You have signed %s on loan." % player.get("name", "?")}
@@ -1461,6 +1568,15 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	# development carry-over is zeroed (ages just ticked, so trends re-evaluate).
 	Availability.reset(rosters.get(club_id, []))
 	Training.reset_progress(rosters.get(club_id, []))
+	# The EXE's roster reset (FUN_005825c0) re-rolls every squad's dynamic form:
+	# morale 90 + rand(10), fitness halfway back toward 40 (docs/re/morale_re.md).
+	# Own RNG (seed folded with the year) so the reset's randomness stays
+	# reproducible without perturbing the shared rollover stream downstream.
+	var srng := RandomNumberGenerator.new()
+	srng.seed = rng.seed ^ (int(year) * 0x85EBCA77)
+	for cid in rosters:
+		for p in rosters[cid]:
+			Morale.season_init(p, srng)
 	# The youth team ages a year too: anyone over the graduation age who was never
 	# promoted is released to make room, then the scout brings in a fresh crop.
 	_roll_youth(rng)

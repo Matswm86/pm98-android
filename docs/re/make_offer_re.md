@@ -144,7 +144,8 @@ excludes it).
   the FW-active / MF-washed observation; app gates on broad position FW.
 - Offer cap = cash is a hypothesis (one observation, £3.2M); source rule un-RE'd.
 - Stepper hold-repeat curve approximated (see above).
-- FICHA RATING formula un-RE'd (85 vs our 83) — parity-excluded, renders squad-AV.
+- FICHA RATING formula RE'd 2026-07-03 (FUN_00581e60 = (VE+RE+AG+CA+FI+MO)/6) —
+  parity-INCLUDED, 0px vs frames 101/113 (Taylor 85). See docs/re/morale_re.md.
 - WEIGHT/HEIGHT metric by user call — parity-excluded.
 - CANCEL / LOAN PLAYER pressed states extrapolated from OFFER's 118 ring.
 - Photo downscale kernel unknown (NEAREST fit, TEAM OFFER doctrine); no parity
@@ -157,8 +158,9 @@ excludes it).
 `shot_entry_parity.gd` states: makeoffer_101 (Taylor fresh) and makeoffer_113
 (offer 3,050,000 / wage 25,000 / Scoring bonus checked £5,000).
 `diff_entry_parity.py`: ROI = the card frame (76,48)-(564,431); exclusions =
-info coin (83,56)-(123,96) [animates], WEIGHT/HEIGHT value strips [metric],
-RATING box [formula un-RE'd]. **Both pairs: 0px — pixel-exact** (2026-07-03).
+info coin (83,56)-(123,96) [animates], WEIGHT/HEIGHT value strips [metric]. The
+RATING box is now INCLUDED (formula RE'd). **Both pairs: 0px — pixel-exact**
+(RATING included 2026-07-03).
 NOTE for iterators: Godot does NOT reimport changed art in `--script` runs —
 run `godot --headless --path app --import` after re-baking chrome or the shots
 render the stale texture.

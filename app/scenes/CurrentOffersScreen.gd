@@ -83,12 +83,13 @@ const C_DKBTN_HI := Color(0.34, 0.46, 0.72)
 const C_DKBTN_LO := Color(0.04, 0.08, 0.18)
 const C_GOLD := Color(1.0, 0.86, 0.22)
 
-# Column codes over the 8 attribute cells: [code, header colour, attrs key or ""].
-# Key mapping as the other strips (EN tackling / VE speed / RE strength / AG / CA /
-# TI finishing); MO is the unmodelled dynamic morale -> "-"; AV = the computed average.
+# Column codes over the 8 attribute cells: [code, header colour, attrs key or sentinel].
+# EN tackling / VE speed / RE strength / AG / CA; FI = live fitness, MO = live morale
+# (FUN_00582db0 base), AV = the real rating (FUN_00581e60) — all decoded 2026-07-03,
+# docs/re/morale_re.md; "-" only when the player carries no dynamic form yet.
 const ATTR_COLS := [
 	["EN", C_EN, "EN"], ["SP", C_STAT, "VE"], ["ST", C_STAT, "RE"], ["AG", C_STAT, "AG"],
-	["QU", C_STAT, "CA"], ["FI", C_FI, "TI"], ["MO", C_MO_HDR, ""], ["AV", C_AV_HDR, "_avg"],
+	["QU", C_STAT, "CA"], ["FI", C_FI, "_fit"], ["MO", C_MO_HDR, "_mo"], ["AV", C_AV_HDR, "_avg"],
 ]
 const AVG_KEYS := ["VE", "RE", "AG", "CA", "RM", "RG", "PA", "TI"]
 
@@ -310,18 +311,24 @@ func _draw_band(y0: int, band: Dictionary) -> void:
 	var ty := y0 + 2
 	_txt(_f10, NAME_HDR_X, ty, PMChrome.title_case_name(str(p.get("name", "?"))), Color.WHITE, 11)
 	var attrs: Dictionary = p.get("attrs", {}) if p.get("attrs") is Dictionary else {}
+	var has_form := p.has("morale") or p.has("fitness")
 	for i in ATTR_COLS.size():
 		var col: Array = ATTR_COLS[i]
 		var key := str(col[2])
 		var v := "-"
 		var vcol: Color = col[1]
-		if key == "_avg":
-			v = str(_avg_of(p))
-			vcol = C_AV_VAL
-		elif key == "":
-			vcol = C_MO_VAL      # MO: unmodelled dynamic morale -> honest "-"
-		elif attrs.has(key):
-			v = str(int(attrs[key]))
+		match key:
+			"_avg":
+				v = str(Morale.av6(p)) if has_form else str(_avg_of(p))
+				vcol = C_AV_VAL
+			"_fit":
+				v = str(clampi(int(p.get("fitness", 99)), 0, 99)) if has_form else "-"
+			"_mo":
+				v = str(Morale.display(p)) if has_form else "-"
+				vcol = C_MO_VAL
+			_:
+				if attrs.has(key):
+					v = str(int(attrs[key]))
 		_ctxt(_f10, ATTR_X0 + i * ATTR_PITCH, ATTR_W, ty, v, vcol, 11)
 	# Camrol role icon on the olive cell (bare cell if the art is absent).
 	PMChrome.draw_role_icon(self, Rect2(ROLE_CELL[0] + 1, y0 + 2, ROLE_CELL[1] - 2, 10),

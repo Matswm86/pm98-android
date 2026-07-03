@@ -17,10 +17,11 @@ class_name PlayerInfoScreen
 ## card keeps the old flat backdrop (`host_dims = false`, documented interim).
 ##
 ## WEIGHT/HEIGHT show METRIC (stored native units, standing user call
-## 2026-06-26) where the original converted to imperial; the RATING box renders
-## our squad-AV (the FICHA rating formula is un-RE'd) — both parity-excluded,
-## as is the animated info coin and the BIGFOTO block (downscale kernel
-## un-RE'd, NEAREST fit).
+## 2026-06-26) where the original converted to imperial (still parity-excluded).
+## The RATING box now renders the REAL formula (VE+RE+AG+CA+FITNESS+MORALE)/6
+## (FUN_00581e60, docs/re/morale_re.md) in the value-cell font — 0px vs frames
+## 081/084 (80 / 82). Still excluded: the animated info coin and the BIGFOTO
+## block (downscale kernel un-RE'd, NEAREST fit).
 ##
 ## INTERACTIVE: the source button row RENEW / TRANSFER / SACK / OK
 ## (FUN_00526a60 card-local rects at card origin (76,58)). The three action
@@ -67,7 +68,7 @@ const CLUBNAME_XY := Vector2(162, 218)
 const STAT_CX := 484.0                          # six cells, digits black
 const STAT_Y0 := 104.0
 const STAT_PITCH := 10
-const RATING_C := Vector2(525, 131)
+const RATING_C := Vector2(526, 132)
 const SKILL_Y0 := 173
 const SKILL_PITCH := 13
 const STAR_X0 := 450
@@ -124,7 +125,6 @@ var _star_half: Texture2D
 var _f8: Font
 var _f10: Font
 var _f12: Font
-var _f14: Font
 
 var _p: Dictionary = {}
 var _club: Dictionary = {}
@@ -150,7 +150,6 @@ func _ready() -> void:
 	_f8 = PMChrome.font("8")
 	_f10 = PMChrome.font("10")
 	_f12 = PMChrome.font("12")
-	_f14 = PMChrome.font("14")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2(W, H)
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -221,18 +220,16 @@ func _attr(key: String) -> int:
 	var v: Variant = _attrs().get(key)
 	return int(v) if v != null else 0
 
-## Overall rating == the squad-AV (mean of the 8 outfield attrs). The FICHA's
-## own formula is un-RE'd (frames show 80/82 where this gives 79/82) — the
-## RATING box is parity-excluded until the FUN_0052e0d0 rating read is found.
+## The REAL rating (FUN_00581e60, docs/re/morale_re.md): (VE+RE+AG+CA+FITNESS
+## +MORALE)/6 — matches frames 081/084 exactly (VdG 80, Solskjaer 82), so the
+## RATING box is parity-INCLUDED again. The card's own fitness/moral fallbacks
+## keep pre-career dicts rendering like a freshly loaded squad.
 func _rating() -> int:
 	var a := _attrs()
-	var sum := 0.0
-	var n := 0
-	for k in AVG_KEYS:
-		if a.has(k):
-			sum += float(a[k])
-			n += 1
-	return int(round(sum / n)) if n > 0 else 0
+	if a.is_empty():
+		return 0
+	return (_attr("VE") + _attr("RE") + _attr("AG") + _attr("CA")
+		+ _fitness() + _moral()) / 6
 
 ## FITNESS / MORAL are dynamic form, not static attrs; live career fields when
 ## present, else the match-fit / settled defaults of a freshly loaded squad.
@@ -338,7 +335,10 @@ func _draw_stats() -> void:
 	var rows := [_attr("VE"), _attr("RE"), _attr("AG"), _attr("CA"), _fitness(), _moral()]
 	for i in rows.size():
 		_ctxt(_f8, STAT_CX, STAT_Y0 + STAT_PITCH * i, str(rows[i]), C_BLACK, 11)
-	_ctxt(_f14, RATING_C.x, RATING_C.y, str(_rating()), C_RATING, 15)
+	# RATING = the real formula, drawn one size up from the value cells: frames
+	# 081/084 measure the RATING digit at 8px tall vs the value cells' 6px, so
+	# proman12 @13 (not the value-cell proman8) — 0px at RATING_C.
+	_ctxt(_f12, RATING_C.x, RATING_C.y, str(_rating()), C_RATING, 13)
 	# skill strip: halves = (value+1) div 10 — the rule fitting ALL star
 	# observations to date (team-offer 086/090, make-offer 101, ficha 081/084)
 	var skills := [_attr("PO"), _attr("PA"), _attr("RM"), _attr("RG"), _attr("EN"), _attr("TI")]

@@ -88,11 +88,18 @@ func _run() -> void:
 			with_bids += 1
 	ok = _assert(with_bids >= 1, "at least one band carries a live bid (got %d)" % with_bids) and ok
 
-	# The MO column stays the unmodelled-morale gap (key "", renders "-"); AV is the
-	# computed average — never a fabricated morale.
+	# MO now renders the LIVE decoded morale (FUN_00582db0; key "_mo"), FI the
+	# live fitness (key "_fit"), AV the real rating — never the static RM/TI
+	# placeholders and never a fabricated value: a player with no dynamic form
+	# still shows "-" (has_form gate). docs/re/morale_re.md.
 	var mo: Array = CurrentOffersScreen.ATTR_COLS[6]
-	ok = _assert(str(mo[0]) == "MO" and str(mo[2]) == "", "MO column renders the honest '-'") and ok
-	ok = _assert(str(CurrentOffersScreen.ATTR_COLS[7][2]) == "_avg", "AV = computed average") and ok
+	ok = _assert(str(mo[0]) == "MO" and str(mo[2]) == "_mo", "MO column = live morale") and ok
+	ok = _assert(str(CurrentOffersScreen.ATTR_COLS[5][2]) == "_fit", "FI column = live fitness") and ok
+	ok = _assert(str(CurrentOffersScreen.ATTR_COLS[7][2]) == "_avg", "AV = real rating") and ok
+	# A form-less player still renders "-" (never invented).
+	var noform := {"attrs": {"CA": 70}}
+	ok = _assert(not (noform.has("morale") or noform.has("fitness")),
+		"form-less player has no bars -> MO/FI render '-'") and ok
 
 	# POS cell labels (capture: DEF / FOR).
 	ok = _assert(screen._pos_label({"pos": "DF"}) == "DEF"

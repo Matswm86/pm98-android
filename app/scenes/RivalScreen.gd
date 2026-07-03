@@ -57,7 +57,7 @@ const ROL_X := 398
 const POS_X := 430
 const COLS := [
 	["EN", 174, "EN"], ["SP", 200, "VE"], ["ST", 226, "RE"], ["AG", 252, "AG"],
-	["GU", 278, "CA"], ["FI", 304, "TI"], ["MO", 330, "RM"], ["AV", 356, "_avg"],
+	["GU", 278, "CA"], ["FI", 304, "_fit"], ["MO", 330, "_mo"], ["AV", 356, "_avg"],
 ]
 const AVG_KEYS := ["VE", "RE", "AG", "CA", "RM", "RG", "PA", "TI"]
 
@@ -306,17 +306,23 @@ func _row(y: int, idx: int, pid: int, number: int, _role: String) -> void:
 	_txt(_f10, 48, ty, str(pl.get("name", "?")).substr(0, 13), PMChrome.C_ROW_TXT, 11)
 
 	var attrs: Dictionary = pl.get("attrs", {}) if pl.get("attrs") is Dictionary else {}
+	var has_form := pl.has("morale") or pl.has("fitness")
 	for c in COLS:
 		var key: String = c[2]
 		var x: int = c[1]
 		var sv := ""
-		if key == "_avg":
-			sv = str(_avg_of(pl))
-		else:
-			var v: Variant = attrs.get(key)
-			sv = str(int(v)) if v != null else "-"
+		match key:
+			"_avg":
+				sv = str(Morale.av6(pl)) if has_form else str(_avg_of(pl))
+			"_fit":
+				sv = str(clampi(int(pl.get("fitness", 99)), 0, 99)) if has_form else "-"
+			"_mo":
+				sv = str(Morale.display(pl)) if has_form else "-"
+			_:
+				var v: Variant = attrs.get(key)
+				sv = str(int(v)) if v != null else "-"
 		_txt(_f10, x, ty, sv, PMChrome.C_ROW_TXT, 11, true)
-	var avg := _avg_of(pl)
+	var avg := Morale.av6(pl) if has_form else _avg_of(pl)
 	draw_rect(Rect2(AVBAR_X, y + 4, 30, 7), C_AVBAR_BG, true)
 	draw_rect(Rect2(AVBAR_X, y + 4, 30.0 * clampf(avg / 99.0, 0.0, 1.0), 7), C_AVBAR, true)
 	var pos := _pos_of(pl)

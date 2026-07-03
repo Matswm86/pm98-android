@@ -41,7 +41,7 @@ const C_ROLE := {"GK": Color(0.20, 0.52, 0.30), "DEF": Color(0.22, 0.36, 0.66),
 # LEFT edge for text cols. GU (not QU) per the real header.
 const COLS := [
 	["EN", 174, "EN"], ["SP", 200, "VE"], ["ST", 226, "RE"], ["AG", 252, "AG"],
-	["GU", 278, "CA"], ["FI", 304, "TI"], ["MO", 330, "RM"], ["AV", 356, "_avg"],
+	["GU", 278, "CA"], ["FI", 304, "_fit"], ["MO", 330, "_mo"], ["AV", 356, "_avg"],
 ]
 const AVG_KEYS := ["VE", "RE", "AG", "CA", "RM", "RG", "PA", "TI"]
 # Table frame at the walked-frame anchors (155_162931: border top y67, bottom y466,
@@ -472,18 +472,27 @@ func _row(y: int, idx: int, pid: int, number: int, role: String) -> void:
 	_txt(_f10, 48, ty, str(pl.get("name", "?")).substr(0, 13), PMChrome.C_ROW_TXT, 11)
 
 	var attrs: Dictionary = pl.get("attrs", {}) if pl.get("attrs") is Dictionary else {}
+	var has_form := pl.has("morale") or pl.has("fitness")
 	for c in COLS:
 		var key: String = c[2]
 		var x: int = c[1]
 		var sv := ""
-		if key == "_avg":
-			sv = str(_avg_of(pl))
-		else:
-			var v: Variant = attrs.get(key)
-			sv = str(int(v)) if v != null else "-"
+		match key:
+			"_avg":
+				# AV = the real rating (FUN_00581e60) once the squad carries live form.
+				sv = str(Morale.av6(pl)) if has_form else str(_avg_of(pl))
+			"_fit":
+				# FITNESS is the dynamic bar, not the static TI placeholder.
+				sv = str(clampi(int(pl.get("fitness", 99)), 0, 99)) if has_form else "-"
+			"_mo":
+				# MO = live morale (FUN_00582db0 base), never the static RM attribute.
+				sv = str(Morale.display(pl)) if has_form else "-"
+			_:
+				var v: Variant = attrs.get(key)
+				sv = str(int(v)) if v != null else "-"
 		_txt(_f10, x, ty, sv, PMChrome.C_ROW_TXT, 11, true)
 	# AV bar just right of the AV value
-	var avg := _avg_of(pl)
+	var avg := Morale.av6(pl) if has_form else _avg_of(pl)
 	draw_rect(Rect2(AVBAR_X, y + 4, 30, 7), C_AVBAR_BG, true)
 	draw_rect(Rect2(AVBAR_X, y + 4, 30.0 * clampf(avg / 99.0, 0.0, 1.0), 7), C_AVBAR, true)
 	# ROL: the original CAMROL pitch-position icon (faithful), with the colour tag as

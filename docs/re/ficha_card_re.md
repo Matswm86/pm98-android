@@ -117,9 +117,12 @@ Unique to this card:
 
 ## Honest gaps
 
-- **FICHA RATING formula un-RE'd**: frames show 80 (VdG) / 82 (Solskjaer);
-  the box renders our squad-AV (51/82 — badly off for keepers) and is
-  parity-excluded. Same lever as the squad AV column (NEXT list).
+- **FICHA RATING formula RE'd (2026-07-03), parity-INCLUDED**: the box renders
+  the real `FUN_00581e60` = (VE+RE+AG+CA+FITNESS+MORALE)/6, in the value-cell
+  font (proman12 @13) at `RATING_C (526,132)` — 0px vs frames 081/084 (80 / 82).
+  The old squad-AV keeper mismatch is resolved: RATING never averaged the skill
+  attrs, it is the four core attrs + the two dynamic bars. See
+  **docs/re/morale_re.md**.
 - WEIGHT/HEIGHT metric by the standing 2026-06-26 user call (parity-excluded).
 - BIGFOTO downscale kernel un-RE'd (NEAREST fit; photo block parity-excluded).
 - Info coin animates (baked as 079's frame; parity-excluded).

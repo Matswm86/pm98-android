@@ -44,39 +44,40 @@ PAIRS = [
     # TEAM OFFER card (run-3 frames). ROI = the modal rect (the hub behind is
     # its own parity story). Exclusions, all documented in team_offer_re.md:
     # WEIGHT/HEIGHT value strips (metric shown per the 2026-06-26 user call;
-    # the original converts to imperial) and the RATING box (the FICHA rating
-    # formula is un-RE'd — 79/79/81/71 fits no mean of the shown values).
+    # the original converts to imperial). The RATING box is INCLUDED as of the
+    # morale decode: (VE+RE+AG+CA+FI+MO)/6 gives Thornley 79 = the frame
+    # (FUN_00581e60, docs/re/morale_re.md).
     (
         "teamoffer_086.png",
         "086_164647.png",
         (98, 5, 541, 474),
-        [(182, 97, 242, 109), (247, 97, 327, 109), (482, 100, 522, 119)],
+        [(182, 97, 242, 109), (247, 97, 327, 109)],
         0.0001,
     ),
     (
         "teamoffer_088.png",
         "088_164650.png",
         (98, 5, 541, 474),
-        [(182, 97, 242, 109), (247, 97, 327, 109), (482, 100, 522, 119)],
+        [(182, 97, 242, 109), (247, 97, 327, 109)],
         0.0001,
     ),
     # MAKE-OFFER card (run-3 frames). ROI = the card frame (the OFFERS browse
     # screen behind is its own parity story). Exclusions, all documented in
     # make_offer_re.md: the animated info coin, WEIGHT/HEIGHT value strips
-    # (metric per the 2026-06-26 user call) and the RATING box (FICHA rating
-    # formula un-RE'd — frame 85 vs squad-AV 83).
+    # (metric per the 2026-06-26 user call). RATING box INCLUDED as of the
+    # morale decode ((VE+RE+AG+CA+FI+MO)/6 gives Taylor 85 = the frame).
     (
         "makeoffer_101.png",
         "101_164714.png",
         (76, 48, 564, 431),
-        [(83, 56, 123, 96), (206, 117, 266, 129), (271, 117, 331, 129), (505, 120, 545, 139)],
+        [(83, 56, 123, 96), (206, 117, 266, 129), (271, 117, 331, 129)],
         0.0001,
     ),
     (
         "makeoffer_113.png",
         "113_164736.png",
         (76, 48, 564, 431),
-        [(83, 56, 123, 96), (206, 117, 266, 129), (271, 117, 331, 129), (505, 120, 545, 139)],
+        [(83, 56, 123, 96), (206, 117, 266, 129), (271, 117, 331, 129)],
         0.0001,
     ),
     # TACTICS board (run-2 frame 014), FULL FRAME: body from the tacticas bake
@@ -133,20 +134,21 @@ PAIRS = [
     # ROI = the card frame (the SQUAD MANAGEMENT screen behind palette-dims —
     # SquadScreen's own story). Exclusions, all documented in ficha_card_re.md:
     # the animated info coin, the BIGFOTO block (downscale kernel un-RE'd),
-    # WEIGHT/HEIGHT value strips (metric per the 2026-06-26 user call) and the
-    # RATING box (formula un-RE'd — frames 80/82 vs squad-AV 79/82).
+    # WEIGHT/HEIGHT value strips (metric per the 2026-06-26 user call). RATING
+    # box INCLUDED as of the morale decode: (VE+RE+AG+CA+FI+MO)/6 gives VdG 80
+    # and Solskjaer 82 = the frames (FUN_00581e60, docs/re/morale_re.md).
     (
         "ficha_081.png",
         "081_154619.png",
         (76, 58, 564, 421),
-        [(84, 65, 124, 105), (130, 68, 162, 100), (206, 126, 331, 138), (505, 129, 545, 148)],
+        [(84, 65, 124, 105), (130, 68, 162, 100), (206, 126, 331, 138)],
         0.0001,
     ),
     (
         "ficha_084.png",
         "084_154626.png",
         (76, 58, 564, 421),
-        [(84, 65, 124, 105), (130, 68, 162, 100), (206, 126, 331, 138), (505, 129, 545, 148)],
+        [(84, 65, 124, 105), (130, 68, 162, 100), (206, 126, 331, 138)],
         0.0001,
     ),
 ]

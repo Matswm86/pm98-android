@@ -109,10 +109,12 @@ minus 2).
 
 ## Honest gaps
 
-- **FICHA RATING formula un-RE'd**: frame values 79 (Thornley), 79 (McClair),
-  81 (Butt), 71 (Clegg) fit no mean of the shown attributes (squad-AV gives
-  72/80/…); the RATING box is excluded from the parity pairs and still renders
-  our squad-AV. Needs a Ghidra pass on FUN_0052e0d0's rating read.
+- **FICHA RATING formula RE'd 2026-07-03, parity-INCLUDED**: it is not a mean
+  of the shown attrs but `FUN_00581e60` = (VE+RE+AG+CA+FITNESS+MORALE)/6. With
+  the frame's live form (Thornley FI 67 / MO 85) this gives 79 = the frame,
+  0px. The old "fits no mean" puzzle is resolved — RATING folds in the two
+  dynamic bars, which the value strip shows but the naive average dropped. See
+  docs/re/morale_re.md.
 - WEIGHT/HEIGHT cells: metric by user call (parity-excluded).
 - Signing messages now raise the REAL "PREMIER MANAGER 98" hub alert box
   (frames 093/094/149) — reversed + parity-locked 2026-07-03, see

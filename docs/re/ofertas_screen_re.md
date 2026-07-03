@@ -56,7 +56,9 @@ black borders (hlines at y+13/+26/+39):
   EN(150,0,0) SP/ST/AG/QU(100,100,140) FI(42,95,170) MO(100,130,10) AV(210,0,0);
   ROLE cell [538,+23] olive (140,170,30) + the camrol icon (player+0x18 fine pos + 1),
   white when the slot is empty; POS cell [562,+37] black GK/DEF/MID/FOR.
-  **MO renders `-`** — the same unmodelled dynamic-morale gap as SQUAD MANAGEMENT.
+  **FI/MO/AV are the live dynamics** (decoded 2026-07-03, docs/re/morale_re.md):
+  FI = fitness bar, MO = morale (FUN_00582db0 base), AV = the real rating
+  (FUN_00581e60). A player with no dynamic form yet still renders `-`.
 - **Row 2 (y+14..+25)** labels row: fill (160,180,200), text (30,52,98) ProMan8,
   CLUB / CLUB OFFER / YEARLY WAGE / YEARS centred over their row-3 cells, CLAUSES
   centred over the whole clause region.

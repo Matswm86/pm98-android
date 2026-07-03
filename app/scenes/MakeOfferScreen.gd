@@ -20,8 +20,9 @@ class_name MakeOfferScreen
 ## OFFER / CANCEL / LOAN PLAYER exit; the original submits silently (119).
 ##
 ## WEIGHT/HEIGHT show METRIC (stored native units, standing user call
-## 2026-06-26) where the original converted to imperial; the RATING box renders
-## our squad-AV (the FICHA rating formula is un-RE'd) — both parity-excluded.
+## 2026-06-26) where the original converted to imperial (parity-excluded). The
+## RATING box now renders the REAL formula (VE+RE+AG+CA+FITNESS+MORALE)/6
+## (FUN_00581e60, docs/re/morale_re.md) — 0px vs frames 101/113 (Taylor 85).
 ##
 ## Signals: offer_made(offer, yearly_wage, years, clauses, bonus) / loan_requested /
 ## cancelled — `bonus` is the Scoring-bonus £ figure (0 unless that clause is
@@ -62,7 +63,7 @@ const CLUBNAME_XY := Vector2(162, 209)
 const STAT_CX := 484.0                          # six cells y96+10i
 const STAT_Y0 := 95.0
 const STAT_PITCH := 10
-const RATING_C := Vector2(525, 122)
+const RATING_C := Vector2(526, 123)
 const SKILL_Y0 := 164
 const SKILL_PITCH := 13
 const STAR_X0 := 450
@@ -122,7 +123,6 @@ var _star_half: Texture2D
 var _f8: Font
 var _f10: Font
 var _f12: Font
-var _f14: Font
 
 var _p: Dictionary = {}
 var _club: Dictionary = {}
@@ -150,7 +150,6 @@ func _ready() -> void:
 	_f8 = PMChrome.font("8")
 	_f10 = PMChrome.font("10")
 	_f12 = PMChrome.font("12")
-	_f14 = PMChrome.font("14")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2(W, H)
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -306,17 +305,14 @@ func _attr(key: String) -> int:
 	var a: Variant = _p.get("attrs", {})
 	return int((a as Dictionary).get(key, 0)) if a is Dictionary else 0
 
+# The REAL rating (FUN_00581e60, docs/re/morale_re.md): (VE+RE+AG+CA+FITNESS
+# +MORALE)/6, same fitness/moral fallbacks as the card's own value rows.
 func _rating() -> int:
-	var a: Variant = _p.get("attrs", {})
-	if not (a is Dictionary):
+	if not (_p.get("attrs", {}) is Dictionary) or (_p.get("attrs", {}) as Dictionary).is_empty():
 		return 0
-	var sum := 0.0
-	var n := 0
-	for k in ["VE", "RE", "AG", "CA", "RM", "RG", "PA", "TI"]:
-		if (a as Dictionary).has(k):
-			sum += float((a as Dictionary)[k])
-			n += 1
-	return int(round(sum / n)) if n > 0 else 0
+	return (_attr("VE") + _attr("RE") + _attr("AG") + _attr("CA")
+		+ clampi(int(_p.get("fitness", 99)), 0, 99)
+		+ clampi(int(_p.get("morale", _p.get("moral", 85))), 0, 99)) / 6
 
 
 func _draw() -> void:
@@ -400,7 +396,8 @@ func _draw_stats() -> void:
 		clampi(int(_p.get("morale", _p.get("moral", 85))), 0, 99)]
 	for i in rows.size():
 		_ctxt(_f8, STAT_CX, STAT_Y0 + STAT_PITCH * i, str(rows[i]), C_BLACK, 11)
-	_ctxt(_f14, RATING_C.x, RATING_C.y, str(_rating()), C_RATING, 15)
+	# RATING in the same small value-cell font (see PlayerInfoScreen / morale_re.md).
+	_ctxt(_f12, RATING_C.x, RATING_C.y, str(_rating()), C_RATING, 13)
 	# skill strip: halves = (value+1) div 10 — the rule fitting ALL 18 star
 	# observations across 101 + TEAM OFFER 086/090 (see make_offer_re.md)
 	var skills := [_attr("PO"), _attr("PA"), _attr("RM"), _attr("RG"), _attr("EN"), _attr("TI")]

@@ -8,9 +8,11 @@ class_name SquadScreen
 ## each section in REVERSE record order (the original loader prepends to its player
 ## list; frame 077 shows every section exactly file-reversed — squad_number_re.md).
 ## N° is the decoded per-player squad number (EQUIPOS byte after the photo-id u16);
-## MO (morale, a dynamic save value) is NOT modelled yet and renders "-" — never
-## fabricated (APP_VS_SPEC_AUDIT B7). Right: the SQUAD count, the club kit and the
-## YOUTH TEAM / RETURN buttons at their reversed positions.
+## MO is the LIVE morale (decoded 2026-07-03, docs/re/morale_re.md — the getter
+## FUN_00582db0 over the career-modelled base) and AV the real FUN_00581e60
+## rating ((VE+RE+AG+CA+FI+MO)/6, frame-confirmed 80/82). Right: the SQUAD
+## count, the club kit and the YOUTH TEAM / RETURN buttons at their reversed
+## positions.
 ##
 ## Driven live by the Career roster. Native 640x480; scales to fit its parent.
 ##
@@ -349,10 +351,15 @@ func _row(y: int, p: Dictionary, key: String, row_h: int) -> void:
 	if st["state"] != "FIT":
 		_txt(_f8, CELL_AV[0] - 52, ty, "%s %dw" % [st["state"], int(st["weeks"])], st["colour"], 10)
 
-	_txt(_f10, CELL_AV[1] - 5, ty, str(_avg_of(p)), C_AV, 11, true)
-	# MO (morale) is a dynamic save value the app doesn't model yet -> honest gap,
-	# never the unrelated static RM attribute (APP_VS_SPEC_AUDIT B7).
-	_txt(_f10, CELL_MO[1] - 5, ty, "-", C_MO, 11, true)
+	# AV = the real rating (FUN_00581e60); MO = the displayed morale base
+	# (FUN_00582db0; the finance/position display terms are decoded but held
+	# back pending frame validation — morale_re.md). Pre-career dicts without
+	# the bars still render "-".
+	var has_form := p.has("morale") or p.has("fitness")
+	_txt(_f10, CELL_AV[1] - 5, ty, str(Morale.av6(p)) if has_form else str(_avg_of(p)),
+		C_AV, 11, true)
+	_txt(_f10, CELL_MO[1] - 5, ty, str(Morale.display(p)) if has_form else "-",
+		C_MO, 11, true)
 	_txt(_f10, CELL_LOAN[0] + 8, ty, "YES" if p.get("on_loan") else "NO", C_LOANC, 11)
 	var wage_y := Contract.yearly(Contract.current_weekly(p, _tier))
 	_txt(_f10, CELL_WAGE[1] - 6, ty, "£%s" % _money(wage_y), C_WAGE, 11, true)
