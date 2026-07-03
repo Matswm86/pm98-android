@@ -103,135 +103,18 @@ prompted. Reinstalling over an older build? Uninstall the old one first.
 
 ## Screenshots
 
-> Re-rendered 2026-06-16 at the game's native 4:3 (640×480) — full screen, nothing cut off.
-
-The app, opening on the original PREMIER MANAGER 98 title, captured from the running game
-(not a mock-up):
-
-<p><img src="screens/boot_phone.png" alt="PM98 running on a phone — the title screen" width="640"/></p>
-
-The Title and the original Main Menu as the live career hub (here managing ARSENAL),
-captured from the actual Godot build:
+The career hub (the original Main Menu, running a season) and the LINE-UP screen with the
+squad, formation and pitch:
 
 <p>
-  <img src="screens/title.png" alt="Title / front-door menu" width="320"/>
-  <img src="screens/hub.png" alt="Main Menu as the live career hub" width="320"/>
+  <img src="screens/hub.png" alt="Career hub — the Main Menu running a season, with Results / League Tables / Fixtures / Line-up / Tactics / Opponent / Transfers / Finances" width="420"/>
+  <img src="screens/lineup.png" alt="LINE-UP screen — the full squad with ratings, the chosen XI, the formation and the mini-pitch" width="420"/>
 </p>
 
-The **match screen** — the original's results / commentary view, reproduced from the real
-game: the digital clock + half indicator, both clubs' shirts and score, the POSSESSION
-PERCENTAGE bar, the minute-by-minute EVENTS table (MIN | COMMENT), and REPLAY / CONTINUE /
-EXIT, over the blue stadium background. It is driven by the reverse-engineered match engine
-(real scoreline + minute-by-minute events). The game's premium 3D highlights (Actua-engine
-models) are CD-only data not present in the archive, so this is the 2D + text mode.
-
-<p>
-  <img src="screens/match.png" alt="Match screen — clock, score, possession, events" width="420"/>
-  <img src="screens/match_goals.png" alt="Match screen — late on, with the events feed" width="420"/>
-</p>
-
-And the **WATCH 2D simulador** reached from that picker — the side-on PC-Fútbol pitch
-the original reskins, drawn entirely from the game's own sprites and stadium tiles
-(players, ball, the PREMIER MANAGER 98 / actua Sports hoardings, crowd, grass, sky),
-animated over the same match timeline (here LIVERPOOL 1-0 EVERTON at 13'):
-
-<p><img src="screens/match_sim.png" alt="WATCH — the 2D graphic simulador, side-on stadium from the game's own art" width="640"/></p>
-
-**Injuries, suspensions and the club news feed** — the squad screen flags who's out
-(INJ/SUS, in red/orange), and the Main Menu's NEWS carries the week's injuries, bans,
-returns and results, colour-coded and newest-first. Captured from the running build:
-
-<p>
-  <img src="screens/squad_injuries.png" alt="Squad screen with injured/suspended players flagged" width="420"/>
-  <img src="screens/news.png" alt="Club news feed — injuries, suspensions, returns, results" width="420"/>
-</p>
-
-**Training & player development** — set the training intensity and watch your squad's
-development trend (young players improving in green, veterans fading), on the Main Menu's
-staff icon. Captured from the running build:
-
-<p>
-  <img src="screens/training.png" alt="Training screen — intensity lever and squad development trend" width="420"/>
-</p>
-
-**The youth team** — the academy crop with each prospect's current ability and a projected
-potential (star ceiling); the youth manager flags the ones READY for the first team, and a
-tap promotes them. Reached from the SQUAD screen's YOUTH TEAM button. Captured from the
-running build:
-
-<p>
-  <img src="screens/youth.png" alt="Youth team screen — prospects, potential stars, and READY/PROMOTE" width="420"/>
-</p>
-
-**The backroom staff** — hire a trainer, physio and youth coach (each with a quality and a
-wage) from the available pool; the wage bill is drawn from the bank weekly and the screen
-shows their live effect on development, injuries and the academy. On the EMPLE icon:
-
-<p>
-  <img src="screens/staff.png" alt="Staff screen — current staff, available pool, wages and live effects" width="420"/>
-</p>
-
-**Contracts & wages** — RENEW is a negotiation now: each player has a wage he wants, and he
-can reject your offer. Hold his current terms, meet his demand or better it; an unrenewed deal
-runs out and he leaves on a free, unless you set him to auto-renew. Signings and raises move a
-live weekly wage bill. Captured from the running build:
-
-<p>
-  <img src="screens/contract.png" alt="Renew negotiation — the player's current wage, his demand, and the hold/meet/better offers" width="420"/>
-</p>
-
-**The domestic cups** — the F.A. Cup (single-leg, replays then penalties) and the
-Coca-Cola Cup (two-legged, settled on aggregate), each on its own original cup screen with
-the game's own trophy: the manager's run round-by-round, the latest draw, and the status.
-Captured from the running build:
-
-<p>
-  <img src="screens/fa_cup.png" alt="F.A. Cup screen — the manager's run, the latest draw, and the trophy" width="420"/>
-  <img src="screens/coca_cola_cup.png" alt="Coca-Cola Cup screen — two-legged aggregate scorelines and the trophy" width="420"/>
-</p>
-
-**The Charity Shield** — the season's curtain-raiser, last season's champions v F.A. Cup
-winners around the game's own shield art. Captured from the running build:
-
-<p>
-  <img src="screens/charity_shield.png" alt="Charity Shield screen — champions v F.A. Cup winners, around the real shield art" width="420"/>
-</p>
-
-**European competitions** — qualify from last season's finish into the European Cup, the
-U.E.F.A. Cup or the Cup Winners' Cup: two-legged knockouts against strong foreign clubs,
-each around its own original trophy, with the reversed UEFA prize money. Captured from the
-running build (the manager's Cup Winners' Cup run):
-
-<p>
-  <img src="screens/european_cup.png" alt="European competition screen — a two-legged knockout run against foreign clubs, around the real trophy" width="420"/>
-</p>
-
-The database and the new-career club picker, all in PM98 chrome (the green data-browser
-is gone), captured from the running build:
-
-<p>
-  <img src="screens/home.png" alt="Database browse" width="240"/>
-  <img src="screens/pick_club.png" alt="Pick a club" width="240"/>
-  <img src="screens/league_table.png" alt="League table" width="240"/>
-</p>
-
-The rest of the rebuilt screens, reconstructed at the exact pixel coordinates reversed
-out of the game's executable, from its own icons, fonts and backgrounds:
-
-<p>
-  <img src="screens/lineup.png" alt="Line-up and formation" width="240"/>
-  <img src="screens/squad.png" alt="Squad management" width="240"/>
-  <img src="screens/transfer.png" alt="Transfer market" width="240"/>
-</p>
-<p>
-  <img src="screens/finance.png" alt="Club finances" width="240"/>
-  <img src="screens/directiva.png" alt="Board of Directors" width="240"/>
-  <img src="screens/stadium.png" alt="Stadium" width="240"/>
-</p>
-
-<sub>Every screenshot here is a real capture from the running Godot build (Xvfb + GL in CI) —
-not a mock-up or a preview render. On a phone each screen runs in landscape with a marble
-bezel in the side margins.</sub>
+<sub>PREMIER MANAGER 98, the game this build rebuilds screen-for-screen from the original's
+own icons, fonts and backgrounds (the reverse-engineering notes are in `docs/re/`). Original
+game © Dinamic Multimedia / Gremlin; shown here for this non-commercial fan remake. On a phone
+each screen runs in landscape with a marble bezel in the side margins.</sub>
 
 ## Status
 
