@@ -79,6 +79,17 @@ PAIRS = [
         [(83, 56, 123, 96), (206, 117, 266, 129), (271, 117, 331, 129), (505, 120, 545, 139)],
         0.0001,
     ),
+    # TACTICS board (run-2 frame 014). ROI = the body below the shared barra/header
+    # (y>=62): the barra is its own parity story (the "older screens" pass). AV
+    # values are injected frame-true in the shot (formula un-RE'd — documented in
+    # tacticas_screen_re.md); everything else renders from game_db + baked chrome.
+    (
+        "tactics_014.png",
+        "014_162413.png",
+        (0, 62, 640, 480),
+        [],
+        0.0001,
+    ),
 ]
 
 

@@ -35,8 +35,12 @@ func _run() -> void:
 	get_root().add_child(screen)
 	for _i in 3:
 		await process_frame
-	ok = _assert(screen._f12 != null and screen._f10 != null, "PROMAN fonts loaded") and ok
-	ok = _assert(screen._campo != null, "CAMPO pitch texture loaded") and ok
+	ok = _assert(screen._f12 != null and screen._f8 != null, "PROMAN fonts loaded") and ok
+	ok = _assert(screen._chrome != null, "baked chrome loaded") and ok
+	for band in ["gk", "def", "mid", "fwd"]:
+		ok = _assert(screen._rows.get(band) != null, "row template loaded: %s" % band) and ok
+	ok = _assert(screen._star_on != null and screen._star_off != null, "STARJUGON glyphs loaded") and ok
+	ok = _assert(screen._disc != null and screen._arrow != null, "DVERDE/AVERDE markers loaded") and ok
 	ok = _assert(screen._forms.size() == 10, "loaded 10 source formations (%d)" % screen._forms.size()) and ok
 	# every predefined formation name from the source table is present.
 	for name in ["3-4-3", "3-5-2", "4-3-3", "4-4-2", "5-3-2", "5-4-1", "4-2-4", "5-2-3", "4-5-1", "3-3-3-1"]:

@@ -1,0 +1,132 @@
+{
+ "body_y0": 62,
+ "row_y0": 87,
+ "row_h": 14,
+ "row_pitch": 16,
+ "row_x": [
+  8,
+  632
+ ],
+ "tints": {
+  "gk": [
+   255,
+   255,
+   170
+  ],
+  "def": [
+   220,
+   250,
+   210
+  ],
+  "mid": [
+   204,
+   204,
+   255
+  ],
+  "fwd": [
+   255,
+   191,
+   170
+  ]
+ },
+ "band_def_max_mk1x": 52,
+ "band_fwd_min_mk2x": 211,
+ "num_cx": 41,
+ "num_y": 89,
+ "name_x": 60,
+ "name_y": 89,
+ "star_x0": 172,
+ "star_pitch": 14,
+ "star_dy": 2,
+ "av_right": 369,
+ "av_y": 4,
+ "camrol_xy": [
+  375,
+  0
+ ],
+ "role_band": [
+  402,
+  566
+ ],
+ "role_y": 3,
+ "pos_box": [
+  588,
+  630
+ ],
+ "pos_y": 2,
+ "num_ink": [
+  0,
+  0,
+  128
+ ],
+ "name_ink": [
+  0,
+  0,
+  0
+ ],
+ "av_ink": [
+  210,
+  0,
+  0
+ ],
+ "role_ink": [
+  60,
+  80,
+  100
+ ],
+ "campo_xy": [
+  177,
+  305
+ ],
+ "mark_origin": [
+  187,
+  310
+ ],
+ "digit_y": 4,
+ "disc_cx": 7,
+ "arrow_cx": 5,
+ "title_bar": [
+  177,
+  275,
+  455,
+  305
+ ],
+ "param_btn": [
+  478,
+  286,
+  550,
+  309
+ ],
+ "rating_btn": [
+  558,
+  286,
+  630,
+  309
+ ],
+ "frame_avs": {
+  "SCHMEICHEL": 88,
+  "GARY NEVILLE": 81,
+  "IRWIN": 84,
+  "BERG": 85,
+  "PALLISTER": 81,
+  "BUTT": 83,
+  "BECKHAM": 87,
+  "SHERINGHAM": 80,
+  "COLE": 84,
+  "GIGGS": 87,
+  "SOLSKJAER": 85
+ },
+ "slot_shirts_014": {
+  "0": 2,
+  "1": 3,
+  "2": 21,
+  "3": 6,
+  "4": 8,
+  "5": 7,
+  "6": 10,
+  "7": 9,
+  "8": 11,
+  "9": 20,
+  "10": 1
+ }
+}

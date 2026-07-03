@@ -7,13 +7,18 @@ titled just `TACTICS %s` (club name) that shows the XI with ROLE/POS columns, a
 skill-emphasis grid, and the big pitch with the formation's two-phase markers.
 
 Binding frame: `screenshots/original-walkthrough-2026-07-02/014_162413.png`
-(Man Utd, 3-5-2). Builder: `FUN_00568800` (entry `0x568800`; the auto-analyzer
-mis-splits it as `FUN_00568a3d`). Predef overlay: `FUN_0056f4c0`. Predef repaint
-(re-lays the markers on pick): `FUN_0056ac90`. Team-tactics modal spawn from the
-`TEAM TACTICS` button here: `FUN_0056ea15`. All coords 640x480 px, lifted by the
-same push-tracking method / widget helper chain as `lineup_screen_re.md` and
-`rival_screen_re.md` (`fb0(w,h)=CSize ; fb0(x,y)=CPoint ; fd0(pos,size)=CRect ;
-(*+0xc0)=create`).
+(Man Utd, 3-5-2, RATING view). Witness frame for the star rule:
+`015_162415.png` (VIEW RIVAL shares the row star strip). Builder: `FUN_00568800`
+(entry `0x568800`; the auto-analyzer mis-splits it as `FUN_00568a3d`). Predef
+overlay: `FUN_0056f4c0`. Predef repaint: `FUN_0056ac90`. Team-tactics modal
+spawn: `FUN_0056ea15`. Row-tint picker: `FUN_004fe2d0` (decompiled 2026-07-03).
+All coords 640x480 px.
+
+**PIXEL PARITY (2026-07-03): `tactics_014` vs frame 014 = 0px — pixel-exact**
+(`tests/shot_entry_parity.gd` + `tools/re/diff_entry_parity.py`; ROI = the body
+y>=62 — the shared barra/header is its own parity story). NO exclusions; the AV
+values are injected frame-true in the shot because the AV formula is un-RE'd
+(see "Honest gaps").
 
 ## Widget rectangles (VERIFIED via push-tracking disasm of FUN_00568800)
 | element | string / bmp @VA | pos (x,y) | size (w,h) | rect |
@@ -30,87 +35,150 @@ same push-tracking method / widget helper chain as `lineup_screen_re.md` and
 | RETURN | `RETURN` @0x6549e4 | (498,440) | (112,25) | 498..610, 440..465 |
 | skill grid | HANDLING..SHOOTING | (7,275) | (156,91) | 7..163, 275..366 |
 | pitch title bar (`TACTICS 3-5-2`) | (dynamic) | (177,275) | (278,30) | 177..455, 275..305 |
-| CAMPO pitch | `tacticas\campo.bmp` (152x92, stretched) | (177,305) | (278,167) | 177..455, 305..472 |
+| CAMPO pitch | `tacticas\campo.bmp` (278x167, 1:1) | (177,305) | (278,167) | 177..455, 305..472 |
 | marker layer (child of pitch) | — | rel (10,5) | (258,154) | abs origin (187,310) |
 
-The XI **table** (top-left below the chrome) is built by the same
-`FUN_004f4db0 / FUN_004f4b00 / FUN_00465d90` squad-table helpers as LINE-UP
-(control `param+0x3e00/0x46b8/0x41f4`). Columns: `N. | PLAYER | EN SP ST AG QU FI
-MO | AV | ROLE | POS` — but unlike LINE-UP it shows the **full fine-role name** in
-the ROLE column (`GOALKEEPER / RIGHT BACK / INSIDE CENTRE LEFT / CENTRAL MIDFIELDER
-/ CENTRE FORWARD / LEFT FORWARD …` = the LONG table at `0x662db0`, indexed by
-`posFine`, see `positions_re.md`) and a left-pointing `flecha.bmp` arrow before the
-broad `POS` code (`GOAL/DEF/MID/FOR`). Only the 11 starters are listed (no
-SUBSTITUTES/RESERVES sections). `ROL.BMP` is the ROLE-column header glyph.
+## XI table (frame-measured, pixel-exact)
+Panel border x7-8 / x631-632, y67-68; column-header band y69..86 (STATIC chrome).
+11 row strips **14px tall at 16px pitch**, tops `y = 87 + 16*i`, x8..631 (the
+grey "+"-card icon at x8..25 is identical on every row — row furniture, NOT a
+crest). Columns: `N. | PLAYER | EN SP ST AG QU FI MO | AV | ROLE | POS`; unlike
+LINE-UP the ROLE column shows the **full fine-role name** (the LONG table at
+`0x662db0`, indexed by `posFine`, see positions_re.md) and a left `flecha.bmp`
+arrow before the broad `POS` code. Only the 11 starters are listed.
+
+### Row tint = the FORMATION SLOT's band, not the player's POS (FUN_004fe2d0)
+Decompiled 2026-07-03 — the recurring "why is Pallister lavender" mystery:
+```
+row 0                     -> 0xadffff  yellow  (GK row)
+slot mk1.x_raw < 0x41(65) -> 0xd6fbde  green   (DEF band)
+elif mk2.x_raw < 0x104    -> 0xffcfce  lavender(MID band)
+else                      -> 0xadbeff  salmon  (FWD band)
+```
+The thresholds test the SLOT the player occupies, not his position: in frame 014
+Pallister (POS DEF) and Sheringham (POS FOR) sit in MID slots → lavender. In
+`formations.json`'s pre-scaled 258x154 space the thresholds become
+`mk1.x < 52` / `mk2.x >= 211`. Palette-snapped fills measured off the frame:
+gk (255,255,170) · def (220,250,210) · mid (204,204,255) · fwd (255,191,170).
+
+### Faces, inks and the GDI cell centring (all frame-fit to 0px)
+| element | face | ink | placement |
+|---|---|---|---|
+| shirt N. | ProMan8 @11 | navy (0,0,128) | cell x33 w17 |
+| player name | ProMan8 @11 | black | left x67 (Title-cased) |
+| star strip | STARJUGON.BMP 14x12 | — | x172+14j, row+2 |
+| AV | ProMan8 @11 | red (210,0,0) | cell x351 w22 |
+| camrol | camrolNN 25x14 | — | (375, row+0), black backing |
+| ROLE name | **EURO8** @11 (WINFONTS/EURO8.FNT) | (60,80,100) | cell x402 w166 |
+| POS word | ProMan8 @11 | black | cell x590 w30 |
+| pitch title | ProMan12 @13 | white | centred in bar, y_top 284 |
+
+Centred cells use the GDI rule `px = x0 + (cell_w - advance_w) div 2` (integer
+floor). EURO8 was identified by per-letter painted-width match (G6 O6 A7 L4 K6
+E5 P6 R6, 8px caps) — ProMan8/10 and Calend8/12 all mismatch; exported via
+`fnt_to_bmfont.py` to `app/art/fonts/euro8.fnt`.
+
+### Star strip (RATING view) — STARJUGON, halves = (AV+1) div 10
+The row stars are `STARJUGON.BMP` / `STARJUGON-OFF.BMP` (14x12) — NOT the 10px
+STARPARON pair (which cannot produce the measured 12px gold runs; STARPARON is
+the star used by other widgets). Rule fitting all 22 observations across frames
+014+015: `halves = (AV+1) div 10`; draw `halves/2` full stars at x172+14j; an
+odd half renders as **STARJUGON-OFF — the dimmed star — at the next cell**, not
+a clipped half glyph (015 rows with AV 89/90/91 show it; rows with AV<=88 show
+nothing at cell 5). AV<=88 → exactly 4 full stars in both frames.
 
 ## PARAM. / RATING toggle (bit `0x8` of `+0x144`)
-The two top-right buttons flip the stat columns between the numeric **PARAMETERS**
-view and the star **RATING** view (frame 014 has RATING active → EN..MO render as
-`STARPARON.BMP` filled / `STARPARON-OFF.BMP` empty star strips; AV stays numeric).
-The same `+0x144` flag family gates every label in the TEAM TACTICS modal builder
-`FUN_0056ea15`.
+Frame 014 bakes RATING-active (red glow, yellow label) / PARAM.-inactive. The
+flipped state is UN-WALKED: the app overlays the frame's own buttons with the
+labels inpainted out (`plate_active/inactive.png`) + redrawn labels — documented
+extrapolation.
 
-## The pitch: two-phase formation markers (VERIFIED, the defining data)
-`recursos\iconos\tacticas\campo.bmp` (152x92) is stretched into the 278x167 pitch
-control; markers overlay the 258x154 child layer at offset (10,5). Each of the 11
-formation slots draws **two** markers from the coordinate table `DAT_00660240`
-(10 formations x 11 slots x 8 int32):
-- **Primary (defensive phase)** — fields `[4],[5]` → a green **disc** `dverde.bmp`.
-- **Secondary (attacking phase)** — fields `[6],[7]` → a green movement **arrow**
-  (`fleul/fleur/fledl/fledr.bmp` chosen by the sign of the primary→secondary delta;
-  `averde.bmp` is the horizontal variant).
+## The pitch — ERRATUM 2026-07-03 (supersedes the stretch claim)
+`recursos\iconos\tacticas\CAMPO.BMP` is a **dedicated 278x167 bitmap** blitted
+**1:1 at (177,305)** — the earlier "152x92 campo stretched into the 278x167
+control" claim was WRONG (the 152x92 CAMPO.BMP is the LINE-UP mini-pitch; the
+two live in different PKF dirs under the same name). Verified: the decoded
+278x167 art matches the frame everywhere outside the 21 marker boxes (0 stray
+px, asserted in the bake).
 
-Mapping (both `FUN_00568800` and `FUN_0056ac90`):
-`mx = raw*258/318 , my = raw*154/198`. The disc carries the player's shirt number
-(`sprintf("%u", player+0xf8)`, ProMan8). In frame 014 (3-5-2) this places the
-discs on the own half and the arrows fanning toward the opponent goal — reproduced
-exactly by our bake (discs at mk1 left, arrows at mk2 right).
+### Markers (VERIFIED, 0px)
+Marker sprites are the TACTICAS-dir **16x16** set: `DVERDE.BMP` disc (primary /
+defensive, fields [4],[5]) + `AVERDE.BMP` horizontal movement arrow (secondary /
+attacking, fields [6],[7]); `DROJA/AROJA` are the red (rival) variants and
+`fleul/fleur/fledl/fledr` (10x10) exist for un-walked states — **every arrow in
+frame 014 is the horizontal AVERDE**. Sprites draw **top-left at
+`(187 + mk.x, 310 + mk.y)` 1:1** — `formations.json` mk values are already
+pre-scaled into the 258x154 layer space by `export_formations.py`
+(`raw*258/318, raw*154/198`); the board applies NO second scaling. GK slot
+(`gk_slot`=10) parks at (0,68) and draws no arrow (mk1 == mk2).
 
-Slot ordering: rows 0..9 = the ten outfield slots, **row 10 = the goalkeeper**
-(parked at marker (0,68) = far-left centre in 9 of 10 formations; 3-3-3-1's 11th row
-is a degenerate sentinel `(1,900,900,0…)`). Baked with an explicit `gk_slot` field.
+Shirt digits: ProMan8, glyph-cell top at sprite row 2 (paints y+4..y+10), ink
+**dark-green (17,90,34) on discs, black on arrows**, `x = (win - advance_w)/2`
+truncated toward zero, and **RECT-CLIPPED to a digit window** of `win` px from
+the sprite's left edge: **16 (disc) / 13 (arrow)** — digits DO paint over grass
+at the disc's transparent corners (slot9 "20") but never beyond the window (the
+arrow "20"s lose their overhanging columns). Frame 014 slot→shirt: slots 0..9 =
+2,3,21,6,8,7,10,9,11,20; GK 1.
+
+## The pitch title bar ("TACTICS %s")
+An engine-drawn, mirror-symmetric **dithered gradient** (only 3 distinct column
+types; no clean horizontal period; no source bitmap — the IMG.PKF
+`DEGRADADO_MASK_*` entries are unrelated noise dithers). The chrome bakes the
+frame's bar with ONLY the white glyph pixels of "TACTICS 3-5-2" cleared (the
+screen repaints the identical text — parity verifies the text draw); for OTHER
+formations the screen first blits `title_bar.png`, a mirror-reconstruction of
+the bar whose centre columns are a documented approximation (un-walked titles).
 
 ## PREDEF overlay (FUN_0056f4c0) — the 10-formation picker
-Tapping PREDEF opens a centred child window (`0x1c3 x 0xfa` = 451x250 body) titled
-by `predefw*.bmp`, holding a **5-col x 2-row** grid of the 10 formation thumbnails
-+ a `CANCEL` button (`0x6578f8`, at rel (0xaa,0xda)=(170,218) size (0x6e,0x19)).
-Thumbnail k sits at `x = (k%5)*0x50 + 0x18`, `y = (k>4)*0x64 + 0x23`, size
-`0x50 x (0x4b + (k<5 ? 0x10 : 0))` — i.e. two rows of five. Names come from the
-pointer table `0x6601f8`: **3-4-3, 3-5-2, 4-3-3, 4-4-2, 5-3-2, 5-4-1, 4-2-4,
-5-2-3, 4-5-1, 3-3-3-1** (verbatim). Picking one copies that formation's 11 slot
-rows into the live XI structs and repaints the pitch via `FUN_0056ac90`.
+Tapping PREDEF opens a centred child window (`0x1c3 x 0xfa` = 451x250 body)
+holding a **5-col x 2-row** grid of the 10 formation thumbnails + a `CANCEL`
+button (`0x6578f8`, rel (0xaa,0xda) size (0x6e,0x19)). Thumbnail k at
+`x=(k%5)*0x50+0x18, y=(k>4)*0x64+0x23`. Names from the pointer table `0x6601f8`:
+**3-4-3, 3-5-2, 4-3-3, 4-4-2, 5-3-2, 5-4-1, 4-2-4, 5-2-3, 4-5-1, 3-3-3-1**.
+`PREDEFWINCAMPO.BMP` (80x75) is the thumbnail pitch art (not yet baked — the
+picker is un-walked and keeps the PMChrome-primitive look).
 
-## Baked assets (this pass)
-- `tools/re/export_formations.py` → `app/data/formations.json` (10 formations,
-  slot mk1/mk2 + gk_slot, from DAT_00660240).
-- `tools/re/export_icons.py` TACTICAS block → `app/art/icons/tacticas/*.png`
-  (predef, grabar, verrival, equipo, ali, rol, flecha, star_on/off, mk_disc,
-  mk_arrow, fle_ul/ur/dl/dr).
-- Big pitch reuses the already-baked `app/art/screens/campo.png` (= the same
-  152x92 `tacticas\campo.bmp`).
+## Baked assets (parity pass 2026-07-03)
+- `tools/re/build_tactics_chrome_from_frames.py` → `app/art/screens/tacticas/`:
+  `chrome.png` (640x418 body, rows cleared to panel white, clean campo, title
+  glyphs cleared), `row_{gk,def,mid,fwd}.png` (624x14 templates, all four
+  furniture-identical modulo tint — asserted), `star_full/star_off.png`
+  (STARJUGON pair), `campo.png` (278x167), `title_bar.png`,
+  `plate_active/inactive.png`, + `app/art/icons/tacticas/
+  {dverde,averde,droja,aroja,fleul,fleur,fledl,fledr}.png` and
+  `tactics_chrome_samples.json` (specs + app/data mirrors).
+- `tools/re/export_formations.py` → `app/data/formations.json` (unchanged).
+- `fnt_to_bmfont.py` → `app/art/fonts/euro8.fnt` + `calend12.fnt` (Calend12 was
+  a candidate for the ROLE face — kept exported, unused).
+- The pre-parity 10x10 `mk_disc/mk_arrow/star_on/star_off` icon exports were the
+  LINE-UP-dir variants — superseded for this screen.
 
 ## App mapping (→ `app/scenes/TacticsBoardScreen.gd`)
-Native 640x480, scales to fit (same transform as LINE-UP/RIVAL). Reached from the
-LINE-UP `TACTICS` button (previously that button opened the TEAM TACTICS modal
-directly; now it opens this board, whose own `TEAM TACTICS` button opens the
-modal). Buttons wire to: PREDEF → the 10-formation picker overlay (sets
-`Tactics.formation`); LOAD/SAVE → the existing `_load_tactics`/`_save_tactics`;
-TEAM TACTICS → `TacticsScreen` modal; VIEW RIVAL → `RivalScreen`; LINE-UP → back
-to `LineupScreen`; RETURN → hub. PARAM./RATING toggles the stat columns.
+Native 640x480, scales to fit. Chrome blitted at (0,62) over PMChrome bg+header
+(the barra above y62 is the older-screens parity pass). Rows = template blit by
+slot band + dynamic text/stars/camrol; markers = cached ImageTexture composites
+(sprite + rect-clipped digits). Buttons are baked chrome with live hit-rects.
+PREDEF → picker overlay; LOAD/SAVE → `_load_tactics`/`_save_tactics`;
+TEAM TACTICS → `TacticsScreen` modal; VIEW RIVAL → `RivalScreen`; LINE-UP →
+`LineupScreen`; RETURN → hub. PARAM./RATING toggles the stat columns.
 
 ## Honest gaps (documented, not faked)
-- **Per-slot ROLE reassignment arrow un-wired.** PM98's `flecha`/`flerol` arrow in
-  the POS column lets the manager re-cast a player's role within the formation; the
-  app has no per-slot role-override model (the match engine reads `posFine` from the
-  player DB, not a tactics override), so the arrow is drawn faithfully but read-only
-  — same doctrine as the deferred MO/morale and FICHA RATING gaps. The formation
-  *shape* (PREDEF) is fully wired.
-- **Formation model widened.** `Tactics.gd` shipped only 4 formations
-  (5-3-2/4-4-2/4-3-3/3-5-2) with an invented lerp-grid pitch layout; the board's
-  pitch now uses the real 10-formation `formations.json` coordinates. The 6 new
-  shapes (3-4-3, 5-4-1, 4-2-4, 5-2-3, 4-5-1, 3-3-3-1) are selectable via PREDEF and
-  drive the pitch display; the att/def ratings weighting for the new shapes reuses
-  the nearest modelled factor (documented in `Tactics.gd`).
-- **Skill-emphasis grid** (HANDLING/PASSING/DRIBBLING/HEADING/TACKLING/SHOOTING) is
-  rendered as the frame shows; in the original it filters which attribute the star
-  column reflects — wired as a display toggle over the RATING columns only.
+- **The AV formula is UN-RE'D.** No stored byte exists: English EQUIPOS records
+  carry only the 10 attrs (media is compact-record-only, and media != AV —
+  Hesp media 93 shows AV 83, Rivaldo 76 shows 90). Exhaustive integer search
+  (weights 0..4 over all 10 attrs, floor+round, per broad pos) over 22
+  frame-true samples (014 Man Utd + 015 Barcelona) finds NO weighted-mean fit;
+  Giovanni/Rivaldo share sum(VE,RE,AG,CA)=352 but show 91/90, so extra attrs
+  matter. `FUN_00582db0` (base `player+0xa6` + `FUN_00582e90` playable-pos
+  penalty + `FUN_0057b710` value/wage bonus, clamp 40..99) is a DIFFERENT
+  career-adjusted rating. The screen renders `p["av"]` when present (the parity
+  shot injects the frame values) else the app's documented attrs-mean
+  approximation — same doctrine as the FICHA RATING gap.
+- **Per-slot ROLE-reassign arrow is drawn (baked) but read-only** — the app has
+  no role-override model (the match engine reads `posFine` from the DB).
+- **PARAM. (numeric) view is un-walked on this screen** — the numeric column
+  layout mirrors the header columns; no frame binds it.
+- **LOAD TACTICS** applies the last user-saved preset; the saved-list picker
+  overlay is deferred. **Skill-emphasis grid** = baked chrome, display-only.
+- Title-bar centre columns + flipped-toggle plates are reconstructions
+  (un-walked states), per above.

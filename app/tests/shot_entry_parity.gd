@@ -8,6 +8,7 @@ extends SceneTree
 ##   pretemp_013.png    fresh (Man Utd, ENGLAND panel)           vs 013_154358
 ##   teamoffer_086.png  Thornley card, row-1 REFUSE (fresh)      vs 086_164647 (run 3)
 ##   teamoffer_088.png  row-1 toggled ACCEPT                     vs 088_164650 (run 3)
+##   tactics_014.png    TACTICS board, Man Utd 3-5-2, RATING     vs 014_162413 (run 2)
 ## Needs a real renderer (Xvfb / local X11), same as shot_screens.gd:
 ##   PM98_SHOT_DIR=out godot --rendering-driver opengl3 --path app --script res://tests/shot_entry_parity.gd
 
@@ -140,6 +141,36 @@ func _run() -> void:
 	moffer.queue_redraw()
 	await _shot(dir, "makeoffer_113.png")
 	moffer.queue_free()
+	await process_frame
+
+	# ---- TACTICS board (run-2 frame 014: Man Utd, 3-5-2, RATING view) -------------
+	var manu3 := {}
+	for c in gamedb.clubs_in_league(str(gamedb.leagues[0].get("id", ""))):
+		if str(c.get("name", "")).begins_with("MANCHESTER U"):
+			manu3 = c
+	# The frame's XI in slot order (read off the pitch discs: outfield slots 0..9 =
+	# shirts 2,3,21,6,8,7,10,9,11,20; GK 1) and its displayed AVs — the AV formula
+	# is un-RE'd (tacticas_screen_re.md), so the frame-true values are injected.
+	var frame_av := {"SCHMEICHEL": 88, "GARY NEVILLE": 81, "IRWIN": 84, "BERG": 85,
+		"PALLISTER": 81, "BUTT": 83, "BECKHAM": 87, "SHERINGHAM": 80, "COLE": 84,
+		"GIGGS": 87, "SOLSKJAER": 85}
+	var order := ["SCHMEICHEL", "GARY NEVILLE", "IRWIN", "BERG", "PALLISTER", "BUTT",
+		"BECKHAM", "SHERINGHAM", "COLE", "GIGGS", "SOLSKJAER"]
+	var xi_ids: Array = []
+	for nm in order:
+		for p in manu3.get("players", []):
+			if str(p.get("name", "")) == nm:
+				(p as Dictionary)["av"] = frame_av[nm]
+				xi_ids.append(int(p.get("id", -1)))
+	var tac := Tactics.new()
+	tac.formation = "3-5-2"
+	tac.xi = xi_ids
+	var board: TacticsBoardScreen = load("res://scenes/TacticsBoardScreen.gd").new()
+	_mount(board)
+	await process_frame
+	board.setup(manu3, tac, "", "Premier League", "1997-98", 1)
+	await _shot(dir, "tactics_014.png")
+	board.queue_free()
 	await process_frame
 
 	print("PARITY SHOTS DONE")
