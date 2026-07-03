@@ -1,0 +1,191 @@
+{
+ "band": "band.png",
+ "bandH": 62,
+ "names": {
+  "font": "proman8",
+  "top": {
+   "centreS": 107,
+   "glyphTopY": 17,
+   "ink": [
+    0,
+    0,
+    0
+   ],
+   "face": [
+    180,
+    200,
+    220
+   ]
+  },
+  "bottom": {
+   "centreS": 108,
+   "glyphTopY": 35,
+   "ink": [
+    255,
+    255,
+    255
+   ],
+   "face": [
+    80,
+    100,
+    120
+   ]
+  }
+ },
+ "calendar": {
+  "font": "proman8",
+  "centreS": 968,
+  "lines": [
+   {
+    "key": "weekday",
+    "ink": [
+     0,
+     0,
+     0
+    ],
+    "glyphTopY": 15
+   },
+   {
+    "key": "day",
+    "ink": [
+     255,
+     0,
+     0
+    ],
+    "glyphTopY": 26
+   },
+   {
+    "key": "month",
+    "ink": [
+     0,
+     0,
+     0
+    ],
+    "glyphTopY": 35
+   },
+   {
+    "key": "year",
+    "ink": [
+     42,
+     95,
+     170
+    ],
+    "glyphTopY": 46
+   }
+  ]
+ },
+ "status": {
+  "font": "calend12",
+  "centreS": 1163,
+  "top": {
+   "glyphTopY": 14,
+   "ink": [
+    0,
+    0,
+    0
+   ]
+  },
+  "bottom": {
+   "glyphTopY": 32,
+   "ink": [
+    255,
+    255,
+    255
+   ]
+  }
+ },
+ "kits": {
+  "fixture": {
+   "bank": "ridi",
+   "home": [
+    116,
+    10
+   ],
+   "away": [
+    116,
+    30
+   ]
+  },
+  "manager": {
+   "patch": "kits/header/40.png",
+   "xy": [
+    108,
+    8
+   ],
+   "nanoAnchor": [
+    114,
+    15
+   ]
+  }
+ },
+ "titles": {
+  "tactics": {
+   "x": 254,
+   "y": 22,
+   "w": 94,
+   "h": 17
+  },
+  "viewrival": {
+   "x": 240,
+   "y": 22,
+   "w": 117,
+   "h": 17
+  },
+  "lineup": {
+   "x": 254,
+   "y": 22,
+   "w": 94,
+   "h": 17
+  },
+  "mtm": {
+   "x": 173,
+   "y": 22,
+   "w": 253,
+   "h": 17
+  }
+ },
+ "witnesses": {
+  "014_162413.png": [
+   "F.C. Barcelona",
+   "Manchester Utd.",
+   "Monday",
+   "4",
+   "tactics"
+  ],
+  "015_162415.png": [
+   "F.C. Barcelona",
+   "Manchester Utd.",
+   "Monday",
+   "4",
+   "viewrival"
+  ],
+  "155_162931.png": [
+   "Manchester Utd.",
+   "Sao Paulo",
+   "Wednesday",
+   "6",
+   "lineup"
+  ],
+  "138_154814.png": [
+   "Juventus",
+   "Manchester Utd.",
+   "Friday",
+   "1",
+   "tactics"
+  ],
+  "128_154751.png": [
+   "Juventus",
+   "Manchester Utd.",
+   "Friday",
+   "1",
+   "lineup"
+  ],
+  "058_162622.png": [
+   "MWM",
+   "Manchester Utd.",
+   "Monday",
+   "4",
+   "mtm"
+  ]
+ }
+}

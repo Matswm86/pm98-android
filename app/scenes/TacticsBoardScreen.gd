@@ -102,6 +102,7 @@ var _tactics: Tactics = null
 var _division := ""
 var _season := "1997-98"
 var _week := 0
+var _header: Dictionary = {}   # match-header state (PMChrome.draw_match_header)
 var _by_id: Dictionary = {}
 var _rating_view := true   # frame default: RATING active
 var _forms: Dictionary = {}   # name -> {gk_slot, slots:[{mk1,mk2}]}
@@ -204,13 +205,22 @@ func _load_formations() -> void:
 			_forms[str(rec.get("name", ""))] = rec
 
 
-func setup(club: Dictionary, tactics: Tactics, _manager := "", division := "",
-		season := "1997-98", week := 0) -> void:
+func setup(club: Dictionary, tactics: Tactics, manager := "", division := "",
+		season := "1997-98", week := 0, header := {}) -> void:
 	_club = club
 	_tactics = tactics
 	_division = division
 	_season = season
 	_week = week
+	_header = header
+	if _header.is_empty():
+		# manager-mode default (frame 058 layout): manager + own club, own kit.
+		# Date derives from the week; the status pair is the only walked one.
+		var d := PMChrome.date_parts(season, week)
+		_header = {"mode": "manager", "top": manager,
+			"bottom": PMChrome.title_case_name(str(club.get("name", ""))),
+			"club_id": int(club.get("id", -1)), "weekday": str(d["wd"]),
+			"day": str(d["day"]), "month": str(d["mon"]), "year": str(d["year"])}
 	_by_id.clear()
 	for p in club.get("players", []):
 		_by_id[int(p.get("id", -1))] = p
@@ -300,9 +310,7 @@ func _draw() -> void:
 	draw_set_transform(_origin, 0.0, Vector2(_scale, _scale))
 	_hits.clear()
 
-	PMChrome.draw_bg(self)
-	PMChrome.draw_header(self, "TACTICS", "", str(_club.get("name", "")), _division,
-		_season, _week, int(_club.get("id", -1)))
+	PMChrome.draw_match_header(self, "tactics", _header)
 	if _chrome != null:
 		draw_texture(_chrome, Vector2(0, BODY_Y0))
 

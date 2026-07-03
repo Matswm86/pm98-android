@@ -168,7 +168,12 @@ func _run() -> void:
 	var board: TacticsBoardScreen = load("res://scenes/TacticsBoardScreen.gd").new()
 	_mount(board)
 	await process_frame
-	board.setup(manu3, tac, "", "Premier League", "1997-98", 1)
+	# frame 014 header: preseason friendly at F.C. Barcelona, Monday 4 August 1997
+	board.setup(manu3, tac, "", "Premier League", "1997-98", 1,
+		{"mode": "fixture", "top": "F.C. Barcelona", "bottom": "Manchester Utd.",
+		"home_id": 1000, "away_id": 40, "weekday": "Monday", "day": "4",
+		"month": "August", "year": "1997",
+		"status_top": "Preseason", "status_bottom": "Preparation"})
 	await _shot(dir, "tactics_014.png")
 	board.queue_free()
 	await process_frame

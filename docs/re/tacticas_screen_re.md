@@ -14,11 +14,12 @@ overlay: `FUN_0056f4c0`. Predef repaint: `FUN_0056ac90`. Team-tactics modal
 spawn: `FUN_0056ea15`. Row-tint picker: `FUN_004fe2d0` (decompiled 2026-07-03).
 All coords 640x480 px.
 
-**PIXEL PARITY (2026-07-03): `tactics_014` vs frame 014 = 0px — pixel-exact**
-(`tests/shot_entry_parity.gd` + `tools/re/diff_entry_parity.py`; ROI = the body
-y>=62 — the shared barra/header is its own parity story). NO exclusions; the AV
-values are injected frame-true in the shot because the AV formula is un-RE'd
-(see "Honest gaps").
+**PIXEL PARITY (2026-07-03): `tactics_014` vs frame 014 = 0px — pixel-exact,
+FULL FRAME** (`tests/shot_entry_parity.gd` + `tools/re/diff_entry_parity.py`;
+no ROI since the same-day barra/header pass — the shared band above y62 is
+baked + decoded in `docs/re/match_header_re.md`). NO exclusions; the AV values
+are injected frame-true in the shot because the AV formula is un-RE'd (see
+"Honest gaps").
 
 ## Widget rectangles (VERIFIED via push-tracking disasm of FUN_00568800)
 | element | string / bmp @VA | pos (x,y) | size (w,h) | rect |
@@ -154,8 +155,9 @@ picker is un-walked and keeps the PMChrome-primitive look).
   LINE-UP-dir variants — superseded for this screen.
 
 ## App mapping (→ `app/scenes/TacticsBoardScreen.gd`)
-Native 640x480, scales to fit. Chrome blitted at (0,62) over PMChrome bg+header
-(the barra above y62 is the older-screens parity pass). Rows = template blit by
+Native 640x480, scales to fit. Chrome blitted at (0,62) under the frame-baked
+match header (`PMChrome.draw_match_header`, spec in match_header_re.md;
+pixel-exact since 2026-07-03). Rows = template blit by
 slot band + dynamic text/stars/camrol; markers = cached ImageTexture composites
 (sprite + rect-clipped digits). Buttons are baked chrome with live hit-rects.
 PREDEF → picker overlay; LOAD/SAVE → `_load_tactics`/`_save_tactics`;

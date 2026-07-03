@@ -96,6 +96,9 @@ static func font(name: String) -> Font:
 		# Calend8 (DATA BASE legend caption face) — also keyed by full name.
 		if ResourceLoader.exists("res://art/fonts/calend8.fnt"):
 			_fonts["calend8"] = load("res://art/fonts/calend8.fnt")
+		# Calend12 (the 'Result' face) — the match-header status-plaque face.
+		if ResourceLoader.exists("res://art/fonts/calend12.fnt"):
+			_fonts["calend12"] = load("res://art/fonts/calend12.fnt")
 	return _fonts.get(name)
 
 
@@ -392,6 +395,114 @@ static func date_parts(season: String, week_disp: int) -> Dictionary:
 	var d := Time.get_datetime_dict_from_unix_time(t)
 	return {"wd": _WD[int(d.get("weekday", 6))], "day": int(d.get("day", 9)),
 		"mon": _MON[int(d.get("month", 8))], "year": int(d.get("year", start_year))}
+
+
+# ---- the frame-baked MATCH-CONTEXT header (barra band y0..61) -------------
+# Baked by tools/re/build_match_header_from_frames.py; every anchor below is
+# the fitted, XOR=0-asserted value from app/art/screens/header/header_samples
+# .json (binding frame 014_162413 + 5 witness frames, recomposed pixel-exact).
+# Text centring is the GDI rule px = (S - extent) / 2 (floor); extents come
+# from the exported WINFONTS BMFonts (advance == glyph width, no kerning).
+
+const HDR_NAME_TOP := {"S": 107, "y": 17}    # PROMAN8 black on (180,200,220)
+const HDR_NAME_BOT := {"S": 108, "y": 35}    # PROMAN8 white on (80,100,120)
+const HDR_CAL_S := 968                        # PROMAN8; weekday/day/month/year
+const HDR_CAL_LINES := [
+	{"key": "weekday", "y": 15, "ink": Color(0, 0, 0)},
+	{"key": "day", "y": 26, "ink": Color(1, 0, 0)},
+	{"key": "month", "y": 35, "ink": Color(0, 0, 0)},
+	{"key": "year", "y": 46, "ink": Color8(42, 95, 170)},
+]
+const HDR_STAT_S := 1163                      # Result face (calend12 export)
+const HDR_STAT_TOP_Y := 14                    # black on (127,159,85)
+const HDR_STAT_BOT_Y := 32                    # white on (85,95,0)
+const HDR_KIT_HOME := Vector2(116, 10)        # RIDIESC 17x20, 1:1, no shadow
+const HDR_KIT_AWAY := Vector2(116, 30)
+const HDR_MGR_PATCH_XY := Vector2(108, 8)     # 058 manager-mode panel patch
+const HDR_MGR_NANO_XY := Vector2(114, 15)     # nano fallback for un-walked clubs
+
+static var _hdr_band: Texture2D = null
+static var _hdr_titles: Dictionary = {}
+static var _hdr_ridi: Dictionary = {}
+static var _hdr_mgr_patch: Texture2D = null
+
+# title sprite anchors (cut offsets recorded by the bake)
+const _HDR_TITLE_XY := {"tactics": Vector2(254, 22), "viewrival": Vector2(240, 22),
+	"lineup": Vector2(254, 22), "mtm": Vector2(173, 22)}
+
+
+static func ridi_kit(club_id: int) -> Texture2D:
+	if club_id < 0:
+		return null
+	if not _hdr_ridi.has(club_id):
+		var p := "res://art/kits/ridi/%d.png" % club_id
+		_hdr_ridi[club_id] = load(p) if ResourceLoader.exists(p) else null
+	return _hdr_ridi[club_id]
+
+
+static func _hdr_title(key: String) -> Texture2D:
+	if not _hdr_titles.has(key):
+		var p := "res://art/screens/header/title_%s.png" % key
+		_hdr_titles[key] = load(p) if ResourceLoader.exists(p) else null
+	return _hdr_titles[key]
+
+
+## GDI-centred single-line text: px = (S - extent) div 2, glyph canvas top at y.
+static func _hdr_text(ci: CanvasItem, f: Font, sz: int, s: String, S: int,
+		y: int, ink: Color) -> void:
+	if f == null or s == "":
+		return
+	var w := int(f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x)
+	@warning_ignore("integer_division")
+	var px := (S - w) / 2
+	ci.draw_string(f, Vector2(px, y + f.get_ascent(sz)), s,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, sz, ink)
+
+
+## The match-context header: baked band + club/manager plaques, kit panel,
+## calendar and status texts, and the baked title sprite. `h` keys:
+##   mode "fixture"|"manager", top, bottom, home_id, away_id (fixture),
+##   club_id (manager), weekday, day, month, year, status_top, status_bottom.
+## Un-walked gaps (documented in the bake): manager-mode kits for clubs other
+## than Man Utd fall back to the shadowless NANOESC blit; in-season status
+## strings are un-walked (only Preseason/Preparation appear in the frames).
+static func draw_match_header(ci: CanvasItem, title_key: String, h: Dictionary) -> void:
+	if _hdr_band == null and ResourceLoader.exists("res://art/screens/header/band.png"):
+		_hdr_band = load("res://art/screens/header/band.png")
+	if _hdr_band != null:
+		ci.draw_texture(_hdr_band, Vector2.ZERO)
+	var f8 := font("8")
+	var fres := font("calend12")
+	_hdr_text(ci, f8, 11, str(h.get("top", "")), HDR_NAME_TOP["S"],
+		HDR_NAME_TOP["y"], Color(0, 0, 0))
+	_hdr_text(ci, f8, 11, str(h.get("bottom", "")), HDR_NAME_BOT["S"],
+		HDR_NAME_BOT["y"], Color(1, 1, 1))
+	if str(h.get("mode", "fixture")) == "manager":
+		if _hdr_mgr_patch == null and int(h.get("club_id", -1)) == 40 \
+				and ResourceLoader.exists("res://art/kits/header/40.png"):
+			_hdr_mgr_patch = load("res://art/kits/header/40.png")
+		if int(h.get("club_id", -1)) == 40 and _hdr_mgr_patch != null:
+			ci.draw_texture(_hdr_mgr_patch, HDR_MGR_PATCH_XY)
+		else:
+			var nk := nano_kit(int(h.get("club_id", -1)))
+			if nk != null:
+				ci.draw_texture(nk, HDR_MGR_NANO_XY)
+	else:
+		for pair in [[int(h.get("home_id", -1)), HDR_KIT_HOME],
+				[int(h.get("away_id", -1)), HDR_KIT_AWAY]]:
+			var kt := ridi_kit(pair[0])
+			if kt != null:
+				ci.draw_texture(kt, pair[1])
+	for line in HDR_CAL_LINES:
+		_hdr_text(ci, f8, 11, str(h.get(line["key"], "")), HDR_CAL_S,
+			line["y"], line["ink"])
+	_hdr_text(ci, fres, 15, str(h.get("status_top", "Preseason")), HDR_STAT_S,
+		HDR_STAT_TOP_Y, Color(0, 0, 0))
+	_hdr_text(ci, fres, 15, str(h.get("status_bottom", "Preparation")), HDR_STAT_S,
+		HDR_STAT_BOT_Y, Color(1, 1, 1))
+	var tt := _hdr_title(title_key)
+	if tt != null:
+		ci.draw_texture(tt, _HDR_TITLE_XY.get(title_key, Vector2.ZERO))
 
 
 # ---- the shared header ---------------------------------------------------

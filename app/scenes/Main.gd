@@ -1389,6 +1389,30 @@ func _show_lineup_screen() -> void:
 ## columns, the skill grid, PREDEF / LOAD / SAVE TACTICS, and the CAMPO pitch carrying the
 ## formation's two-phase markers (docs/re/tacticas_screen_re.md; TacticsBoardScreen.gd).
 ## This is the screen the LINE-UP / OPPONENT TACTICS button and the hub TACTICS icon open
+## Header state for the shared match-context barra (PMChrome.draw_match_header;
+## frames 014/058): the week's league fixture when one exists — every walked
+## TACTICS frame shows the fixture plaques — else the manager plaques.
+## (Preseason friendly headers from preseason_rivals are un-wired yet: the
+## friendly fixture list has no week join here; documented loose end.)
+func _match_header() -> Dictionary:
+	var d := PMChrome.date_parts(_career.season, _career.week + 1)
+	var h := {"weekday": str(d["wd"]), "day": str(d["day"]),
+		"month": str(d["mon"]), "year": str(d["year"])}
+	var fx := _career.manager_fixture()
+	if fx.is_empty():
+		h["mode"] = "manager"
+		h["top"] = _career.manager_name
+		h["bottom"] = PMChrome.title_case_name(_career.club_name)
+		h["club_id"] = _career.club_id
+	else:
+		h["mode"] = "fixture"
+		h["home_id"] = int(fx[0])
+		h["away_id"] = int(fx[1])
+		h["top"] = PMChrome.title_case_name(str(GameDB.club(int(fx[0])).get("name", "")))
+		h["bottom"] = PMChrome.title_case_name(str(GameDB.club(int(fx[1])).get("name", "")))
+	return h
+
+
 ## in the original; TEAM TACTICS on it opens the ATTACK|DEFENCE modal. PREDEF picks one of
 ## the ten source formations (real DAT_00660240 shape); LINE-UP / VIEW RIVAL / RETURN nav.
 func _show_tactics_board_screen() -> void:
@@ -1399,7 +1423,8 @@ func _show_tactics_board_screen() -> void:
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
 	var refresh := func() -> void:
-		scr.setup(_mgr_club(), _tactics(), "", _career.league_name, _career.season, _career.week + 1)
+		scr.setup(_mgr_club(), _tactics(), _career.manager_name, _career.league_name,
+			_career.season, _career.week + 1, _match_header())
 	refresh.call()
 	scr.formation_picked.connect(func(form: String) -> void:
 		var t := _tactics()
