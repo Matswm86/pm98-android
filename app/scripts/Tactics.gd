@@ -18,14 +18,26 @@ extends RefCounted
 ##
 ## GameDB-free (callers pass the club dict in) so it stays headless-testable.
 
-# PM98's four formations (verbatim): outfield line counts [DEF, MID, FWD].
+# PM98's ten predefined formations (verbatim, in the PREDEF grid order from the
+# MANAGER.EXE name table 0x6601f8): outfield line counts [DEF, MID, FWD]. The pitch
+# marker layout for each comes from the source coordinate table (app/assets/
+# formations.json, docs/re/tacticas_screen_re.md); these triples drive the auto-XI
+# fill + the att/def ratings buckets only. 3-3-3-1's two middle bands merge into MID
+# here (its pitch shape is still the source-true four-band layout from the JSON).
 const FORMATIONS := {
-	"5-3-2": [5, 3, 2],
-	"4-4-2": [4, 4, 2],
-	"4-3-3": [4, 3, 3],
+	"3-4-3": [3, 4, 3],
 	"3-5-2": [3, 5, 2],
+	"4-3-3": [4, 3, 3],
+	"4-4-2": [4, 4, 2],
+	"5-3-2": [5, 3, 2],
+	"5-4-1": [5, 4, 1],
+	"4-2-4": [4, 2, 4],
+	"5-2-3": [5, 2, 3],
+	"4-5-1": [4, 5, 1],
+	"3-3-3-1": [3, 6, 1],
 }
-const FORMATION_ORDER := ["5-3-2", "4-4-2", "4-3-3", "3-5-2"]
+const FORMATION_ORDER := ["3-4-3", "3-5-2", "4-3-3", "4-4-2", "5-3-2", "5-4-1",
+	"4-2-4", "5-2-3", "4-5-1", "3-3-3-1"]
 const DEFAULT_FORMATION := "4-4-2"
 
 const MARKINGS := ["Zonal", "Man-to-man"]
@@ -51,10 +63,16 @@ const _ROLE_DEF := {"DEF": 1.5, "MID": 1.0, "FWD": 0.5}
 # is a legible lever (not a fraction of a point). Centred on 4-4-2 = 1.0/1.0, which
 # keeps the balanced best XI at parity with team_ratings. Ours, calibrated.
 const _FORM_FACTOR := {
-	"5-3-2": [0.95, 1.05],
-	"4-4-2": [1.00, 1.00],
-	"4-3-3": [1.06, 0.94],
+	"3-4-3": [1.08, 0.90],
 	"3-5-2": [1.02, 0.98],
+	"4-3-3": [1.06, 0.94],
+	"4-4-2": [1.00, 1.00],
+	"5-3-2": [0.95, 1.05],
+	"5-4-1": [0.90, 1.10],
+	"4-2-4": [1.10, 0.88],
+	"5-2-3": [0.98, 1.04],
+	"4-5-1": [0.96, 1.06],
+	"3-3-3-1": [1.02, 0.99],
 }
 
 # Man-to-man tightens the back line at a small attacking cost (ours, calibrated).

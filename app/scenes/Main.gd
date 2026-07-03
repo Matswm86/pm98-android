@@ -1379,11 +1379,66 @@ func _show_lineup_screen() -> void:
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
 	scr.tactics_pressed.connect(func() -> void:
 		scr.queue_free()
-		_show_tactics_screen())
+		_show_tactics_board_screen())
 	scr.xi_changed.connect(func() -> void:
 		AudioManager.ui_select()
 		_save_tactics(tac)
 		_career.save())
+
+## The original-art TACTICS board (TACTICAS) over the hub: the XI with fine-ROLE / POS
+## columns, the skill grid, PREDEF / LOAD / SAVE TACTICS, and the CAMPO pitch carrying the
+## formation's two-phase markers (docs/re/tacticas_screen_re.md; TacticsBoardScreen.gd).
+## This is the screen the LINE-UP / OPPONENT TACTICS button and the hub TACTICS icon open
+## in the original; TEAM TACTICS on it opens the ATTACK|DEFENCE modal. PREDEF picks one of
+## the ten source formations (real DAT_00660240 shape); LINE-UP / VIEW RIVAL / RETURN nav.
+func _show_tactics_board_screen() -> void:
+	for c in get_children():
+		if c is TacticsBoardScreen:
+			c.queue_free()
+	var scr: TacticsBoardScreen = load("res://scenes/TacticsBoardScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	var refresh := func() -> void:
+		scr.setup(_mgr_club(), _tactics(), "", _career.league_name, _career.season, _career.week + 1)
+	refresh.call()
+	scr.formation_picked.connect(func(form: String) -> void:
+		var t := _tactics()
+		t.set_formation(form, _mgr_club())
+		_save_tactics(t)
+		_career.save()
+		refresh.call())
+	scr.save_pressed.connect(func() -> void:
+		var t := _tactics()
+		t.save_preset("%s %s" % [t.formation, t.marking])
+		_toast("Tactics saved"))
+	scr.load_pressed.connect(func() -> void:
+		var presets := Tactics.list_presets()
+		var user := presets.filter(func(p): return not bool(p.get("builtin", false)))
+		if user.is_empty():
+			_toast("No saved tactics")
+			return
+		var t := _tactics()
+		t.apply_preset(user[-1], _mgr_club())
+		_save_tactics(t)
+		_career.save()
+		_toast("Loaded %s" % str(user[-1].get("name", "tactics")))
+		refresh.call())
+	scr.team_tactics_pressed.connect(func() -> void:
+		scr.queue_free()
+		_show_tactics_screen())
+	scr.view_rival_pressed.connect(func() -> void:
+		var fx := _career.manager_fixture()
+		if fx.is_empty():
+			_toast("No match this week (bye)")
+			return
+		var home: bool = int(fx[0]) == _career.club_id
+		var opp_id: int = int(fx[1]) if home else int(fx[0])
+		scr.queue_free()
+		_show_rival_screen(_club_with_roster(opp_id)))
+	scr.lineup_pressed.connect(func() -> void:
+		scr.queue_free()
+		_show_lineup_screen())
+	scr.return_pressed.connect(func() -> void: scr.queue_free())
 
 ## The original-art TEAM TACTICS modal (ma_9) over a real LINE-UP backdrop: the ATTACK |
 ## DEFENCE control panel. Each control mutates the career Tactics live (its ratings() feed
@@ -2264,7 +2319,7 @@ func _menu_action(action: String, scr: MenuScreen) -> void:
 		"board": _show_directiva_screen()
 		"stadium": _show_stadium_screen()
 		"buy": _show_transfer_screen()
-		"tactics": _push(_show_tactics)
+		"tactics": _show_tactics_board_screen()
 		# The hub PLAYERS button (VENDE icon, action "sell") opens the real SQUAD MANAGEMENT
 		# (PLANTILLA) screen, as the original does -- your squad, where a player tap raises his
 		# PLAYER INFORMATION (RENEW / TRANSFER / SACK; TRANSFER = list him for sale). Was the
@@ -2301,7 +2356,7 @@ func _show_rival_screen(rival: Dictionary) -> void:
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
 	scr.tactics_pressed.connect(func() -> void:
 		scr.queue_free()
-		_show_tactics_screen())
+		_show_tactics_board_screen())
 
 ## "vs Arsenal" / "at Chelsea" / "bye" for the manager's next match.
 func _menu_next_match() -> String:

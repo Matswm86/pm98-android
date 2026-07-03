@@ -55,6 +55,25 @@ EXTRAS = [
     ("PARTIDOS.BMP", "clause_partidos.png"),  # Matches to renew (document)
     ("PRIMASGOL.BMP", "clause_primasgol.png"),  # Scoring bonus (ball)
     ("CASACOCHE.BMP", "clause_casacoche.png"),  # House and car
+    # TACTICAS screen (frame 014_162413; docs/re/tacticas_screen_re.md). The button
+    # glyphs the FUN_00568800 builder loads, the ROLE-column arrow, the star-rating
+    # glyphs, and the pitch marker sprites (green disc primary + diagonal movement
+    # arrows) the two-phase formation markers use.
+    ("PREDEF.BMP", "tacticas/predef.png"),  # PREDEF. TACTICS (pitch grid)
+    ("GRABAR.BMP", "tacticas/grabar.png"),  # SAVE TACTICS (floppy)
+    ("VERRIVAL.BMP", "tacticas/verrival.png"),  # VIEW RIVAL (pitch + magnifier)
+    ("EQUIPO.BMP", "tacticas/equipo.png"),  # TEAM TACTICS (pitch + arrows)
+    ("ALI.BMP", "tacticas/ali.png"),  # LINE-UP (team photo)
+    ("ROL.BMP", "tacticas/rol.png"),  # ROLE column header arrow
+    ("FLECHA.BMP", "tacticas/flecha.png"),  # POS-column left triangle
+    ("STARPARON.BMP", "tacticas/star_on.png"),  # rating star (filled)
+    ("STARPARON-OFF.BMP", "tacticas/star_off.png"),  # rating star (empty)
+    ("DVERDE.BMP", "tacticas/mk_disc.png"),  # pitch primary marker (green disc)
+    ("AVERDE.BMP", "tacticas/mk_arrow.png"),  # pitch movement marker (green arrow, horiz)
+    ("FLEUL.BMP", "tacticas/fle_ul.png"),  # movement arrow up-left
+    ("FLEUR.BMP", "tacticas/fle_ur.png"),  # movement arrow up-right
+    ("FLEDL.BMP", "tacticas/fle_dl.png"),  # movement arrow down-left
+    ("FLEDR.BMP", "tacticas/fle_dr.png"),  # movement arrow down-right
 ]
 
 

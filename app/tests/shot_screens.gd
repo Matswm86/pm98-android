@@ -30,6 +30,7 @@ func _run() -> void:
 		["res://scenes/FinanceScreen.gd", "finance_demo.png"],
 		["res://scenes/TransferScreen.gd", "transfer_demo.png"],
 		["res://scenes/RivalScreen.gd", "rival_demo.png"],
+		["res://scenes/TacticsBoardScreen.gd", "tactics_board_demo.png"],
 		["res://scenes/PlayerInfoScreen.gd", "playerinfo_demo.png"],
 		["res://scenes/CurrentOffersScreen.gd", "current_offers_demo.png"],
 		["res://scenes/NivelScreen.gd", "nivel_demo.png"],
@@ -79,6 +80,16 @@ func _run() -> void:
 			# Scout the demo club as the rival, with a hired (5-star) assistant so the full
 			# report renders: XI table + team rating + formation dots.
 			node.setup(_demo_club(), {"id": 7, "name": "OUR CLUB"}, 5, "A. LEIGH",
+				"Premier League", "1997-98", 1)
+		elif s[1] == "tactics_board_demo.png":
+			# The TACTICS board with an individuated squad (real shirt numbers) + a 3-5-2
+			# so the pitch two-phase markers + fine-ROLE column render as frame 014.
+			var tc: Dictionary = club.duplicate(true)
+			var n := 0
+			for p in tc.get("players", []):
+				n += 1
+				p["squadNo"] = n
+			node.setup(tc, Tactics.auto_pick(tc, "3-5-2"), "M. MJATVEDT",
 				"Premier League", "1997-98", 1)
 		elif s[1] == "playerinfo_demo.png":
 			# The PLAYER INFORMATION card for an OWN squad player -> the RENEW/TRANSFER/SACK/OK
