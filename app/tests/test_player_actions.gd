@@ -108,20 +108,20 @@ func _card_buttons(prem: Array) -> bool:
 
 	# Own squad player -> the three action buttons are live.
 	scr.setup(player, club, 1, true)
-	ok = _assert(scr._hit(PlayerInfoScreen.RENEW_BTN.get_center()) == "renew", "_hit RENEW") and ok
-	ok = _assert(scr._hit(PlayerInfoScreen.TRANSFER_BTN.get_center()) == "transfer", "_hit TRANSFER") and ok
-	ok = _assert(scr._hit(PlayerInfoScreen.SACK_BTN.get_center()) == "sack", "_hit SACK") and ok
-	ok = _assert(scr._hit(PlayerInfoScreen.OK_BTN.get_center()) == "ok", "_hit OK") and ok
+	ok = _assert(scr._hit((PlayerInfoScreen.BTN["renew"] as Rect2).get_center()) == "renew", "_hit RENEW") and ok
+	ok = _assert(scr._hit((PlayerInfoScreen.BTN["transfer"] as Rect2).get_center()) == "transfer", "_hit TRANSFER") and ok
+	ok = _assert(scr._hit((PlayerInfoScreen.BTN["sack"] as Rect2).get_center()) == "sack", "_hit SACK") and ok
+	ok = _assert(scr._hit((PlayerInfoScreen.BTN["ok"] as Rect2).get_center()) == "ok", "_hit OK") and ok
 
 	var got := {"renew": 0, "transfer": 0, "sack": 0, "back": 0}
 	scr.renew_requested.connect(func(_p): got["renew"] += 1)
 	scr.transfer_requested.connect(func(_p): got["transfer"] += 1)
 	scr.sack_requested.connect(func(_p): got["sack"] += 1)
 	scr.back_pressed.connect(func(): got["back"] += 1)
-	_tap(scr, PlayerInfoScreen.RENEW_BTN.get_center())
-	_tap(scr, PlayerInfoScreen.TRANSFER_BTN.get_center())
-	_tap(scr, PlayerInfoScreen.SACK_BTN.get_center())
-	_tap(scr, PlayerInfoScreen.OK_BTN.get_center())
+	_tap(scr, (PlayerInfoScreen.BTN["renew"] as Rect2).get_center())
+	_tap(scr, (PlayerInfoScreen.BTN["transfer"] as Rect2).get_center())
+	_tap(scr, (PlayerInfoScreen.BTN["sack"] as Rect2).get_center())
+	_tap(scr, (PlayerInfoScreen.BTN["ok"] as Rect2).get_center())
 	ok = _assert(got["renew"] == 1, "RENEW tap emits renew_requested") and ok
 	ok = _assert(got["transfer"] == 1, "TRANSFER tap emits transfer_requested") and ok
 	ok = _assert(got["sack"] == 1, "SACK tap emits sack_requested") and ok
@@ -130,11 +130,11 @@ func _card_buttons(prem: Array) -> bool:
 	# Read-only card (another club's player): the action buttons don't exist; taps there
 	# fall through to dismiss.
 	scr.setup(player, club, 1, false)
-	ok = _assert(scr._hit(PlayerInfoScreen.RENEW_BTN.get_center()) == "", "read-only hides RENEW") and ok
-	ok = _assert(scr._hit(PlayerInfoScreen.SACK_BTN.get_center()) == "", "read-only hides SACK") and ok
-	ok = _assert(scr._hit(PlayerInfoScreen.OK_BTN.get_center()) == "ok", "OK stays live read-only") and ok
+	ok = _assert(scr._hit((PlayerInfoScreen.BTN["renew"] as Rect2).get_center()) == "", "read-only hides RENEW") and ok
+	ok = _assert(scr._hit((PlayerInfoScreen.BTN["sack"] as Rect2).get_center()) == "", "read-only hides SACK") and ok
+	ok = _assert(scr._hit((PlayerInfoScreen.BTN["ok"] as Rect2).get_center()) == "ok", "OK stays live read-only") and ok
 	var before: int = got["back"]
-	_tap(scr, PlayerInfoScreen.RENEW_BTN.get_center())
+	_tap(scr, (PlayerInfoScreen.BTN["renew"] as Rect2).get_center())
 	ok = _assert(got["renew"] == 1 and got["back"] == before + 1,
 		"read-only RENEW-area tap dismisses, no renew") and ok
 

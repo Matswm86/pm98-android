@@ -95,8 +95,12 @@ the broad LUT -- corrected 2026-06-26.)
   action buttons + a narrow OK. Wired to `Career.renew` / `toggle_listed` / `release`
   (PlayerInfoScreen emits `renew_/transfer_/sack_requested`; Main runs the action on the live
   roster dict). Read-only (buttons hidden) for another club's player. Frame `081_154619`.
-  GAP (narrowed 2026-07-03): the TRANSFER->TEAM OFFER accept/refuse screen is BUILT
-  (TeamOfferScreen, pixel-parity 0px — see team_offer_re.md, incl. the CLAUSES panel
-  + YEARS|LEFT split geometry). Remaining: porting that CLAUSES/YEARS|LEFT contract
-  layout onto THIS card (the FICHA still shows the older VALUE/WAGE/YEARS panel) —
-  see APP_VS_SPEC_AUDIT B7.
+  GAP CLOSED 2026-07-03: the whole card was rebuilt frame-baked to **pixel parity
+  0px** vs walkthrough run-1 frames 081 (Van der Gouw) + 084 (Solskjaer), incl. the
+  CLAUSES panel + YEARS|LEFT contract split and the host palette-dim — see
+  **ficha_card_re.md** (the FICHA's own RE doc from here on). Two data corrections
+  fell out of those frames: VdG's nationality decode (HOLLAND sits in the FIRST bio
+  string of his record; the extractor now scans all three) and the KIND rule
+  (HOLLAND/NORWAY show NATIONAL → EU/EEA-1997 "comunitario" class, not
+  British-only). The FICHA RATING formula stays un-RE'd (80/82 in frames vs our
+  squad-AV; box parity-excluded).

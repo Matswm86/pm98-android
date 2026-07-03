@@ -277,16 +277,18 @@ def main() -> None:
     # screen falls back to scaled NANOESC art for the rest (documented).
     dbj = json.loads((ROOT / "app" / "data" / "game_db.json").read_text(encoding="utf-8"))
     manu = next(
-        c for lg in dbj["leagues"] for c in dbj["clubs"]
-        if c.get("name") == "MANCHESTER UTD."
+        c for lg in dbj["leagues"] for c in dbj["clubs"] if c.get("name") == "MANCHESTER UTD."
     )
-    kit_dir = ROOT / "app" / "art" / "kits" / "ficha"
-    kit_dir.mkdir(parents=True, exist_ok=True)
     # 24x33 at (112,181): covers the chrome's whole kit-erase scan window, so
     # the patch restores every pixel the erase could have whitened (the kit's
-    # shadow tail reaches y213)
-    Image.fromarray(f086[181:214, 112:136].astype("uint8")).save(kit_dir / f"{manu['id']}.png")
-    print("  app/art/kits/ficha/  frame-rendered FICHA kit patch (MANCHESTER UTD.)")
+    # shadow tail reaches y213). Screen-owned cut: app/art/kits/ficha/ holds the
+    # 32x37 CARD-slot patches (make-offer 82.png, ficha-card 40.png) — this
+    # 24x33 TEAM OFFER slot is a different window, so it lives with the screen's
+    # other state cuts (kit-bank split, 2026-07-03).
+    Image.fromarray(f086[181:214, 112:136].astype("uint8")).save(ART / f"kit_{manu['id']}.png")
+    print(
+        "  app/art/screens/teamoffer/kit_40.png  frame-rendered TEAM OFFER kit patch (MANCHESTER UTD., 24x33)"
+    )
 
     samples = {
         "modal": list(MODAL),
@@ -298,18 +300,24 @@ def main() -> None:
         "ok": list(OK),
         "clause": list(CLAUSE),
         "clause_rows_y": [244, 262, 288, 314],
-        "skill": {"y0": SKILL_Y0, "pitch": SKILL_PITCH, "star_x0": STAR_X0,
-                  "star_pitch": STAR_PITCH, "chip_x": [425, 498], "val_x": [500, 527]},
+        "skill": {
+            "y0": SKILL_Y0,
+            "pitch": SKILL_PITCH,
+            "star_x0": STAR_X0,
+            "star_pitch": STAR_PITCH,
+            "chip_x": [425, 498],
+            "val_x": [500, 527],
+        },
         "photo_block": list(pb),
-        "name_text": px(52, 160),          # white
-        "posword_text": px(76, 185),       # black
+        "name_text": px(52, 160),  # white
+        "posword_text": px(76, 185),  # black
         # text colours = the darkest pixel of each glyph region (bg is lighter)
         "rating_text": [
             int(v) for v in min(f086[101:118, 484:521].reshape(-1, 3), key=lambda p: p.sum())
         ],
         "fee_text": [
             int(v) for v in f086[250:259, 193:292].reshape(-1, 3).max(axis=0)
-        ],                                  # brightest = the gold digits
+        ],  # brightest = the gold digits
         "years_digit": [200, 230, 60],
         "left_digit": [42, 191, 85],
         "club_text": [
@@ -403,7 +411,9 @@ def return_finish(f086: np.ndarray, f150: np.ndarray, samples: dict) -> None:
         ROW0_Y0 + ROW_PITCH : ROW0_Y1 + ROW_PITCH, LIST_X0:LIST_X1
     ]
     a[370:384, CHIP[0] : CHIP[2]] = f086[WASH2_Y : WASH2_Y + ROW_PITCH, CHIP[0] : CHIP[2]]
-    a[384:386, CHIP[0] : CHIP[2]] = f086[WASH2_Y + ROW_PITCH : WASH2_Y + ROW_PITCH + 2, CHIP[0] : CHIP[2]]
+    a[384:386, CHIP[0] : CHIP[2]] = f086[
+        WASH2_Y + ROW_PITCH : WASH2_Y + ROW_PITCH + 2, CHIP[0] : CHIP[2]
+    ]
 
     save(cut(a, MODAL), "chrome.png")
 

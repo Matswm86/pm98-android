@@ -105,6 +105,7 @@ var _yearly := 0
 var _years := 0
 var _left := 0
 var _clauses: Array = []          # checked clause indices (only 0 has frame art)
+var _kit: Texture2D = null        # screen-owned 24x33 frame kit cut (kit_<id>.png)
 var _accept: Array = []           # per-offer bool, REFUSE (false) by default
 var _press := ""                  # "row0".."row4" / "ok" while held
 
@@ -137,6 +138,9 @@ func setup(player: Dictionary, club: Dictionary, offers: Array, fee: int, yearly
 		years: int, left: int, clauses: Array = []) -> void:
 	_p = player
 	_club = club
+	var cid := int(club.get("id", -1))
+	var kit_path := "res://art/screens/teamoffer/kit_%d.png" % cid
+	_kit = load(kit_path) if cid >= 0 and ResourceLoader.exists(kit_path) else null
 	_offers = offers.slice(0, N_ROWS)
 	_fee = fee
 	_yearly = yearly
@@ -270,7 +274,9 @@ func _draw_header() -> void:
 		var fh := th * sc
 		draw_texture_rect(face, Rect2(PHOTO_XY.x + 1 + (33 - fw) * 0.5,
 			PHOTO_XY.y + 1 + (33 - fh) * 0.5, fw, fh), false)
-	_txt(_f12, NAME_XY.x, NAME_XY.y, _card_name(), C_WHITE, 13)
+	# card name form: given names Title-case + surname UPPER (PMChrome.card_name,
+	# frame truth 086/090/150/152 + the 081/084 compound/two-given forms)
+	_txt(_f12, NAME_XY.x, NAME_XY.y, PMChrome.card_name(_p), C_WHITE, 13)
 	var word := str(POS_WORD.get(str(_p.get("pos", "")), ""))
 	if word == "" and _p.get("isGK", false):
 		word = "GOALKEEPER"
@@ -311,10 +317,13 @@ func _draw_identity() -> void:
 	var st_s := str(st["state"]) if st["state"] == "FIT" else "%s %dw" % [st["state"], int(st["weeks"])]
 	_ctxt(_f8, STATUS_TEXT_C.x, STATUS_TEXT_C.y, st_s, C_WHITE, 11)
 	_ctxt(_f8, INSUR_TEXT_C.x, INSUR_TEXT_C.y, "NONE", C_WHITE, 11)
-	# club kit (frame patch where one exists, scaled NANOESC otherwise) + name
-	var kit := PMChrome.ficha_kit(int(_club.get("id", -1)))
-	if kit != null:
-		draw_texture(kit, KIT_XY)
+	# club kit (frame patch where one exists, scaled NANOESC otherwise) + name.
+	# Screen-owned 24x33 cut (kit-bank split 2026-07-03): art/kits/ficha/ holds
+	# the 32x37 CARD-slot patches (make-offer / ficha card); this card's smaller
+	# slot keeps its own frame cut, cached at setup (draw-time load() blits
+	# nothing on the first presented frames — the ficha rollout caught it).
+	if _kit != null:
+		draw_texture(_kit, KIT_XY)
 	else:
 		var nano := PMChrome.nano_kit(int(_club.get("id", -1)))
 		if nano != null:
@@ -380,25 +389,6 @@ func _draw_offers() -> void:
 		var tex: Texture2D = _btn[key]
 		if tex != null:
 			draw_texture(tex, Vector2(CHIP_X, CHIP_Y0 + ROW_PITCH * i))
-
-
-## The card's name form (frame truth 086/090/150/152): given names Title-case +
-## the surname UPPER, with the Mc prefix lowered ("Ben THORNLEY",
-## "Brian John McCLAIR"). Falls back to the bare surname when the record has no
-## decoded legalName.
-func _card_name() -> String:
-	var legal := str(_p.get("legalName", "")).strip_edges()
-	if legal == "":
-		return str(_p.get("name", "?"))
-	var words := legal.split(" ", false)
-	var out := PackedStringArray()
-	for i in words.size():
-		var w := str(words[i])
-		if i == words.size() - 1:
-			out.append("Mc" + w.substr(2) if w.begins_with("MC") and w.length() > 2 else w)
-		else:
-			out.append(w.to_lower().capitalize())
-	return " ".join(out)
 
 
 func _money(v: int) -> String:

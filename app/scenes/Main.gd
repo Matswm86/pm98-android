@@ -827,7 +827,7 @@ func _open_squad(club: Dictionary, manager: String, cash: String, youth_enabled 
 	scr.setup(club, manager, cash, youth_enabled, season, week, _career.tier if _career else 1)
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
 	scr.youth_pressed.connect(_show_youth_screen)
-	scr.player_pressed.connect(_open_player_info.bind(club))
+	scr.player_pressed.connect(func(p: Dictionary) -> void: _open_player_info(p, club, scr))
 
 ## The DATA BASE squad view (the reversed dbasewin.exe browser) for a club dict: the four
 ## GOALKEEPERS/DEFENDERS/MIDFIELDERS/FORWARDS columns over FONDO DBASE. A row raises that
@@ -852,10 +852,20 @@ func _open_database_squad(club: Dictionary) -> void:
 ## live (PM98 opens these from SQUAD MANAGEMENT); for another club's player (DATA BASE /
 ## opponent browse) the card is read-only. The Career hooks mutate the live roster dict (same
 ## object the overlay holds), so a RENEW updates YEARS in place and a SACK removes the player.
-func _open_player_info(player: Dictionary, club: Dictionary) -> void:
+func _open_player_info(player: Dictionary, club: Dictionary, host: Control = null) -> void:
 	var scr: PlayerInfoScreen = load("res://scenes/PlayerInfoScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
+	# The original palette-dims the whole host screen under the card (081-vs-082
+	# walkthrough pair, exact alert LUT). SquadScreen dims itself; hosts without
+	# LUT-dim support keep the card's flat backdrop (documented interim).
+	var squad_host := host as SquadScreen
+	if squad_host != null:
+		squad_host.set_dimmed(true)
+		scr.host_dims = true
+		scr.tree_exiting.connect(func() -> void:
+			if is_instance_valid(squad_host):
+				squad_host.set_dimmed(false))
 	var tier := FinanceModel.tier_of(club, GameDB.leagues)
 	var own: bool = _career != null and int(club.get("id", -1)) == _career.club_id
 	scr.setup(player, club, tier, own)
@@ -1664,12 +1674,12 @@ func _show_make_offer_card(row: Dictionary) -> void:
 	card.cancelled.connect(func() -> void:
 		AudioManager.ui_select()
 		card.queue_free())
-	card.offer_made.connect(func(offer: int, yearly_wage: int, years: int, clauses: Array) -> void:
+	card.offer_made.connect(func(offer: int, yearly_wage: int, years: int, clauses: Array, bonus: int) -> void:
 		AudioManager.ui_select()
 		var rng := RandomNumberGenerator.new()
 		rng.randomize()
 		var res := _career.sign_player(pid, from_club, offer, rng,
-			maxi(1, yearly_wage / Contract.SEASON_WEEKS), years, clauses)
+			maxi(1, yearly_wage / Contract.SEASON_WEEKS), years, clauses, bonus)
 		_career.save()
 		card.queue_free()
 		_toast(str(res["msg"])))

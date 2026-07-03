@@ -433,7 +433,11 @@ Wiring done (B5-2): OPPONENT -> VIEW RIVAL (RivalScreen), PLAYERS -> SQUAD MANAG
   REMAINING (narrowed 2026-07-03): the TEAM OFFER accept/refuse screen is BUILT —
   TeamOfferScreen at pixel parity 0px vs run-3 086/088 (see team_offer_re.md), wired
   to CURRENT OFFERS band taps AND popped from CONTINUE after match day (frames
-  085->086); the interim ACCEPT/REFUSE browse dialogs are gone. Still owed on the
-  FICHA itself: the CLAUSES panel + YEARS|LEFT contract split (geometry now fully
-  RE'd on the TEAM OFFER card). The signing message now raises the REAL hub alert
-  box (frames 093/094/149; alert_box_re.md) — built + parity-locked 2026-07-03.
+  085->086); the interim ACCEPT/REFUSE browse dialogs are gone. The signing message
+  raises the REAL hub alert box (093/094/149; alert_box_re.md) — parity-locked
+  2026-07-03. **FICHA CLAUSES + YEARS|LEFT: SHIPPED 2026-07-03** — the whole card
+  rebuilt frame-baked to 0px vs run-1 081/084 incl. the CLAUSES column (checked/
+  washed boxes, figure labels, progress sub-lines), the YEARS|LEFT boxes, the
+  FUN_00526a60 button row with the held-OK ring, and the SquadScreen palette-dim
+  (exact alert LUT, 081-vs-082). See ficha_card_re.md. Still open there: FICHA
+  RATING formula (parity-excluded), non-EU KIND evidence, matches-to-renew target.

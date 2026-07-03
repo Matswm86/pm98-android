@@ -129,6 +129,26 @@ PAIRS = [
         [],
         0.0001,
     ),
+    # FICHA / PLAYER INFORMATION card (run-1 frames; docs/re/ficha_card_re.md).
+    # ROI = the card frame (the SQUAD MANAGEMENT screen behind palette-dims —
+    # SquadScreen's own story). Exclusions, all documented in ficha_card_re.md:
+    # the animated info coin, the BIGFOTO block (downscale kernel un-RE'd),
+    # WEIGHT/HEIGHT value strips (metric per the 2026-06-26 user call) and the
+    # RATING box (formula un-RE'd — frames 80/82 vs squad-AV 79/82).
+    (
+        "ficha_081.png",
+        "081_154619.png",
+        (76, 58, 564, 421),
+        [(84, 65, 124, 105), (130, 68, 162, 100), (206, 126, 331, 138), (505, 129, 545, 148)],
+        0.0001,
+    ),
+    (
+        "ficha_084.png",
+        "084_154626.png",
+        (76, 58, 564, 421),
+        [(84, 65, 124, 105), (130, 68, 162, 100), (206, 126, 331, 138), (505, 129, 545, 148)],
+        0.0001,
+    ),
 ]
 
 # The caption title-field speckle blues (see build_alert_chrome_from_frames.py).

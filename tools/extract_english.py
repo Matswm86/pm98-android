@@ -224,6 +224,34 @@ COUNTRIES = {
     "DR CONGO",
 }
 
+# The 1997 EU-15 + EEA class for the FICHA KIND flag (frame-evidenced NATIONAL for
+# HOLLAND 081 / NORWAY 084; see the kind comment in parse_club). UK home nations +
+# EIRE included; LIECHTENSTEIN listed for completeness (no player carries it).
+EU_EEA_1997 = {
+    "ENGLAND",
+    "WALES",
+    "SCOTLAND",
+    "NORTHERN IRELAND",
+    "EIRE",
+    "AUSTRIA",
+    "BELGIUM",
+    "DENMARK",
+    "FINLAND",
+    "FRANCE",
+    "GERMANY",
+    "GREECE",
+    "HOLLAND",
+    "ITALY",
+    "ITALIA",
+    "LUXEMBOURG",
+    "PORTUGAL",
+    "SPAIN",
+    "SWEDEN",
+    "NORWAY",
+    "ICELAND",
+    "LIECHTENSTEIN",
+}
+
 
 def physicals(d: bytes, Y: int):
     """(height_cm, weight_kg) from the two bytes right after the birth-year anchor:
@@ -254,8 +282,17 @@ def nationality(d: bytes, Y: int, hi: int):
             scan = r[1]
         else:
             scan += 1
-    if len(got) >= 3 and got[2].upper() in COUNTRIES:
-        return got[2].upper()
+    # Layouts vary: the common record carries [birthplace, prev-club, NATIONALITY]
+    # (Schmeichel GLADSAXE / BRONDBY / DENMARK), but some carry only
+    # [COUNTRY, prev-club] with no separate birthplace or nationality field --
+    # Van der Gouw's record reads ['HOLLAND', 'VITESSE', <bio text>...] and the
+    # original FICHA displays HOLLAND (walkthrough frame 081_154619), so the game
+    # takes the country name wherever it sits among the bio strings. Prefer the
+    # LAST match (the explicit 3rd-field layout wins), else any earlier string
+    # that IS a known country; English birthplaces (LEEDS, LONDON...) never match.
+    for s in reversed(got):
+        if s.upper() in COUNTRIES:
+            return s.upper()
     return "ENGLAND"
 
 
@@ -399,7 +436,7 @@ def parse_club(d: bytes, off: int, end: int, archive: set[int] | None = None):
             if (
                 len(w) == 10
                 and all(1 <= b <= 99 for b in w)
-                and Y + 14 < len(d)
+                and len(d) > Y + 14
                 and d[Y + 14] == 0x01
             ):
                 row = w
@@ -425,11 +462,15 @@ def parse_club(d: bytes, off: int, end: int, archive: set[int] | None = None):
                 "photoId": photo_id,
                 "squadNo": squad_no,
                 "nationality": nat,
-                # KIND: the FICHA's NATIONAL / NON-NATIONAL flag - English/British players
-                # are "national" to the English game, foreigners are not.
-                "kind": "NATIONAL"
-                if nat in ("ENGLAND", "WALES", "SCOTLAND", "NORTHERN IRELAND", "EIRE")
-                else "NON-NATIONAL",
+                # KIND: the FICHA's NATIONAL / NON-NATIONAL flag. Frame truth kills the
+                # old British-only rule: 081_154619 shows Van der Gouw (HOLLAND) and
+                # 084_154626 Solskjaer (NORWAY) both as NATIONAL. Interpretation: the
+                # post-Bosman EU/EEA work-permit class (the Spanish original's
+                # "comunitario" flag) -- EU-15 + EEA of 1997 count as national, the
+                # rest are NON-NATIONAL (the EXE carries that string; no non-EU player
+                # FICHA has been walked yet, so the negative side is a documented
+                # hypothesis, never observed).
+                "kind": "NATIONAL" if nat in EU_EEA_1997 else "NON-NATIONAL",
                 "heightCm": height_cm,
                 "weightKg": weight_kg,
                 "attrs": dict(zip(ATTR_NAMES, row)) if row else None,

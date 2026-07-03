@@ -393,6 +393,31 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 		if h == club_id or a == club_id:
 			manager_res = {"home_id": h, "away_id": a, "hg": hg, "ag": ag, "manager_home": h == club_id,
 				"goals": res.get("goals", [])}   # stat engine's resolved scorers for the feed (not persisted)
+	# Contract-clause progress counters (the FICHA's "Matches played:" / "Goals:"
+	# sub-lines): a featured man on a matches-to-renew deal logs an appearance;
+	# a scoring-bonus man logs his non-own goals. Incremented on the LIVE roster
+	# dicts (featured may hold fit-view copies). Our model's tracking — the
+	# original's exact counter semantics are un-RE'd beyond the frame labels.
+	if not manager_res.is_empty():
+		var featured_ids := {}
+		for p in featured:
+			if p is Dictionary:
+				featured_ids[int((p as Dictionary).get("id", -1))] = true
+		var my_side := 0 if bool(manager_res["manager_home"]) else 1
+		var scored := {}   # scorer name -> goals this match (my side, no own goals)
+		for g in manager_res.get("goals", []):
+			if int(g.get("scorer_side", -1)) == my_side and not bool(g.get("own_goal", false)):
+				var nm := str(g.get("scorer", ""))
+				scored[nm] = int(scored.get(nm, 0)) + 1
+		for p in rosters.get(club_id, []):
+			var pd: Dictionary = p
+			if not featured_ids.has(int(pd.get("id", -1))):
+				continue
+			if pd.has("clause_apps"):
+				pd["clause_apps"] = int(pd["clause_apps"]) + 1
+			var nm2 := str(pd.get("name", ""))
+			if pd.has("clause_goals") and scored.has(nm2):
+				pd["clause_goals"] = int(pd["clause_goals"]) + int(scored[nm2])
 	cash += weekly_net
 	cash -= player_weekly_wage()        # the live squad wage bill (YEARLY WAGE / 52 per man)
 	cash -= Staff.weekly_wage(staff)   # the backroom staff wage bill (STAFF WAGES)
@@ -1015,12 +1040,15 @@ func _find_in(id: int, pid: int) -> Dictionary:
 ## Returns {ok: bool, msg: String}. Enforces the board caps (deadline, weekly offer
 ## allowance, squad size, cash) before the selling club even considers the bid.
 ## The make-offer card's terms ride along: `weekly` > 0 replaces the stamped market
-## wage, `years` > 0 the default contract length, and `clauses` (checked clause
-## indices 0..3) are stored on the player (display-only until the FICHA CLAUSES
-## panel exists — the acceptance verdict stays fee-based, the original's clause
-## weighting is un-RE'd; docs/re/make_offer_re.md).
+## wage, `years` > 0 the default contract length, `clauses` (checked clause indices
+## 0..3) are stored on the player and shown on his FICHA CLAUSES panel, and `bonus`
+## is the Scoring-bonus £ figure ("Scoring bonus (£X)"). A matches-to-renew /
+## scoring-bonus deal also gets its live progress counter (`clause_apps` /
+## `clause_goals`, advanced weekly — the FICHA's "Matches played:" / "Goals:"
+## sub-lines). The acceptance verdict stays fee-based — the original's clause
+## weighting is un-RE'd (docs/re/make_offer_re.md).
 func sign_player(pid: int, from_club_id: int, offer: int, rng: RandomNumberGenerator,
-		weekly: int = -1, years: int = -1, clauses: Array = []) -> Dictionary:
+		weekly: int = -1, years: int = -1, clauses: Array = [], bonus: int = 0) -> Dictionary:
 	if not transfers_open():
 		return {"ok": false, "msg": "The transfer deadline has passed."}
 	if offers_left <= 0:
@@ -1048,6 +1076,12 @@ func sign_player(pid: int, from_club_id: int, offer: int, rng: RandomNumberGener
 		player["wage"] = weekly          # the card's negotiated YEARLY WAGE / 52
 	if not clauses.is_empty():
 		player["clauses"] = clauses.duplicate()
+		if clauses.has(1):
+			player["clause_apps"] = 0
+		if clauses.has(2):
+			player["clause_goals"] = 0
+			if bonus > 0:
+				player["clause_bonus"] = bonus
 	player["auto_renew"] = false
 	rosters[club_id].append(player)
 	cash -= offer

@@ -69,6 +69,7 @@ static var _panel_kits: Dictionary = {}
 static var _faces: Dictionary = {}
 static var _mini_faces: Dictionary = {}
 static var _bg: Texture2D = null
+static var _bg_dim: Texture2D = null
 static var _camrol: Dictionary = {}
 static var _icons: Dictionary = {}
 static var _flags: Dictionary = {}
@@ -280,6 +281,12 @@ static func set_dim(on: bool) -> void:
 static func _dc(col: Color) -> Color:
 	return PMAlert.dim_color(col) if _dim_on else col
 
+## Public LUT-dim accessor for screens that draw raw rects while a modal dims
+## them (SquadScreen under the FICHA card — the 081-vs-082 walkthrough pair
+## proves the whole host screen palette-dims through the SAME alert LUT).
+static func dim_col(col: Color) -> Color:
+	return _dc(col)
+
 
 ## Draw a string. align: 0 left (x = left), 1 centre (in box_w starting at x), 2 right (x = right edge).
 static func text(ci: CanvasItem, f: Font, x: float, y_top: float, s: String,
@@ -324,6 +331,37 @@ static func title_case_name(s: String) -> String:
 	return " ".join(out)
 
 
+## The card-header name form on the FICHA-family cards (TEAM OFFER / MAKE-OFFER /
+## PLAYER INFORMATION): given names Title-case + the SURNAME upper, where the
+## surname is the record's display `name` field — it can be multi-word.
+## Frame truth: "Ben THORNLEY" (086), "Scott TAYLOR" (101), "William (Billy)
+## McKINLAY" (owner capture), "Raimond VAN DER GOUW" (081, compound surname),
+## "Ole Gunnar SOLSKJAER" (084, two given names). Mc prefix keeps its inner
+## capital. Splitting on the last word alone breaks the 081/084 forms — the
+## surname suffix rule replaced it 2026-07-03.
+static func card_name(p: Dictionary) -> String:
+	var legal := str(p.get("legalName", "")).strip_edges()
+	if legal == "":
+		return str(p.get("name", "?"))
+	var surname := str(p.get("name", "")).strip_edges().to_upper()
+	var given := ""
+	if surname != "" and legal.to_upper().ends_with(surname):
+		given = legal.substr(0, legal.length() - surname.length()).strip_edges()
+	else:
+		var ws := legal.split(" ", false)
+		surname = str(ws[ws.size() - 1])
+		ws.remove_at(ws.size() - 1)
+		given = " ".join(ws)
+	if surname.begins_with("MC") and surname.length() > 2:
+		surname = "Mc" + surname.substr(2)
+	var out := PackedStringArray()
+	for w in given.split(" ", false):
+		out.append(str(w).to_lower().capitalize())
+	if out.is_empty():
+		return surname
+	return " ".join(out) + " " + surname
+
+
 ## A beveled rectangle: solid base, light top/left edge, dark bottom/right edge.
 static func bevel(ci: CanvasItem, r: Rect2, base: Color, hi: Color, lo: Color, bw := 1.0) -> void:
 	base = _dc(base)
@@ -338,12 +376,22 @@ static func bevel(ci: CanvasItem, r: Rect2, base: Color, hi: Color, lo: Color, b
 
 ## Fill the 640x480 content area with the management background (caller has already set
 ## the design-space transform). Falls back to a flat navy if the texture is missing.
+## Under a modal dim (set_dim), the pre-baked exact palette-dim of the same texture is
+## used (management_bg_dim.png, baked by tools/re/build_ficha_chrome_from_frames.py —
+## the MenuScreen menu_bg_dim precedent), avoiding a per-pixel runtime pass.
 static func draw_bg(ci: CanvasItem) -> void:
 	var t := bg()
+	if _dim_on:
+		if _bg_dim == null and ResourceLoader.exists("res://art/screens/ficha/management_bg_dim.png"):
+			_bg_dim = load("res://art/screens/ficha/management_bg_dim.png")
+		if _bg_dim != null:
+			t = _bg_dim
+		elif t != null:
+			t = PMAlert.dim_texture(t)
 	if t != null:
 		ci.draw_texture_rect(t, Rect2(0, 0, W, H), false)
 	else:
-		ci.draw_rect(Rect2(0, 0, W, H), Color(0.10, 0.18, 0.40), true)
+		ci.draw_rect(Rect2(0, 0, W, H), _dc(Color(0.10, 0.18, 0.40)), true)
 
 
 ## The managed club's home kit (left crop) fitted into a box, aspect-preserved.

@@ -23,11 +23,13 @@ class_name MakeOfferScreen
 ## 2026-06-26) where the original converted to imperial; the RATING box renders
 ## our squad-AV (the FICHA rating formula is un-RE'd) — both parity-excluded.
 ##
-## Signals: offer_made(offer, yearly_wage, years, clauses) / loan_requested /
-## cancelled. The caller applies the model action and frees the card — NOTE the
-## wage bar is the YEARLY figure (Contract.yearly = weekly x 52), as labelled.
+## Signals: offer_made(offer, yearly_wage, years, clauses, bonus) / loan_requested /
+## cancelled — `bonus` is the Scoring-bonus £ figure (0 unless that clause is
+## checked; the FICHA card displays it as "Scoring bonus (£X)"). The caller
+## applies the model action and frees the card — NOTE the wage bar is the
+## YEARLY figure (Contract.yearly = weekly x 52), as labelled.
 
-signal offer_made(offer: int, yearly_wage: int, years: int, clauses: Array)
+signal offer_made(offer: int, yearly_wage: int, years: int, clauses: Array, bonus: int)
 signal loan_requested
 signal cancelled
 
@@ -239,7 +241,8 @@ func _on_input(e: InputEvent) -> void:
 		"loan":
 			loan_requested.emit()
 		"offer":
-			offer_made.emit(_offer, _wage_yearly, _years, checked_clauses())
+			offer_made.emit(_offer, _wage_yearly, _years, checked_clauses(),
+				_bonus if _checked["scoring"] else 0)
 		_:
 			if was.begins_with("cb_"):
 				_toggle(was.substr(3))
@@ -337,7 +340,7 @@ func _draw_header() -> void:
 	if face != null:
 		draw_texture_rect(face, PHOTO_RECT, false)
 	# single-struck PROMAN12 — the face's natural weight IS the frame's bold look
-	_txt(_f12, NAME_XY.x, NAME_XY.y, _card_name(), C_WHITE, 13)
+	_txt(_f12, NAME_XY.x, NAME_XY.y, PMChrome.card_name(_p), C_WHITE, 13)
 	var word := str(POS_WORD.get(str(_p.get("pos", "")), ""))
 	if word == "" and _p.get("isGK", false):
 		word = "GOALKEEPER"
@@ -445,23 +448,6 @@ func _draw_pressed() -> void:
 		# (documented extrapolation, make_offer_re.md)
 		var r: Rect2 = (BTN[_press] as Rect2).grow(2.0)
 		draw_rect(r, C_RING, false, 2.0)
-
-
-## The card's name form (frame truth: "Scott TAYLOR", "William (Billy)
-## McKINLAY"): given names Title-case + surname UPPER, Mc prefix lowered.
-func _card_name() -> String:
-	var legal := str(_p.get("legalName", "")).strip_edges()
-	if legal == "":
-		return str(_p.get("name", "?"))
-	var words := legal.split(" ", false)
-	var out := PackedStringArray()
-	for i in words.size():
-		var w := str(words[i])
-		if i == words.size() - 1:
-			out.append("Mc" + w.substr(2) if w.begins_with("MC") and w.length() > 2 else w)
-		else:
-			out.append(w.to_lower().capitalize())
-	return " ".join(out)
 
 
 func _money(v: int) -> String:

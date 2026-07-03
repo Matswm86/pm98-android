@@ -127,9 +127,12 @@ excludes it).
 
 - TRANSFER MARKET row tap (TransferScreen `player_pressed`) and the text-market
   list both open the card. OFFER → `Career.sign_player(pid, from_club, offer,
-  rng, weekly, years, clauses)` (weekly/years newly honoured on success; checked
-  clause indices stored on the player as `clauses` — display-only until the
-  FICHA CLAUSES panel exists). LOAN PLAYER → `Career.sign_loan`. CANCEL closes.
+  rng, weekly, years, clauses, bonus)` — weekly/years honoured on success;
+  checked clause indices stored as `clauses`, the Scoring-bonus £ figure as
+  `clause_bonus`, and the progress counters (`clause_apps`/`clause_goals`)
+  stamped at 0 and advanced weekly. The FICHA CLAUSES panel displays all of it
+  since 2026-07-03 (ficha_card_re.md). LOAN PLAYER → `Career.sign_loan`.
+  CANCEL closes.
 - The original submits silently (119) — result messages ride the existing news
   log/toast, not a modal.
 

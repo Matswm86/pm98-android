@@ -70,7 +70,18 @@ func _run() -> void:
 		"scoring check activates its stepper at £5,000 (frame 113)") and ok
 	card._toggle("house")
 	ok = _assert(card.checked_clauses() == [2, 3], "checked clause indices") and ok
-	ok = _assert(card._card_name() == "Scott TAYLOR", "card name form") and ok
+	# card-name rule now shared (PMChrome.card_name; surname = the `name` field
+	# suffix — frame truth incl. "Raimond VAN DER GOUW" / "Ole Gunnar SOLSKJAER")
+	ok = _assert(PMChrome.card_name(taylor) == "Scott TAYLOR", "card name form") and ok
+	ok = _assert(PMChrome.card_name({"name": "VAN DER GOUW",
+		"legalName": "RAIMOND VAN DER GOUW"}) == "Raimond VAN DER GOUW",
+		"compound surname card name (081)") and ok
+	ok = _assert(PMChrome.card_name({"name": "SOLSKJAER",
+		"legalName": "OLE GUNNAR SOLSKJAER"}) == "Ole Gunnar SOLSKJAER",
+		"two given names card name (084)") and ok
+	ok = _assert(PMChrome.card_name({"name": "McKINLAY",
+		"legalName": "WILLIAM MCKINLAY"}) == "William McKINLAY",
+		"Mc surname keeps inner capital") and ok
 	card.free()
 
 	# non-forward: scoring gated off (McKinlay MF, washed label)

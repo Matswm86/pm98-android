@@ -47,9 +47,12 @@ each accepted sale then raises its own hub message box.
 - AGE/WEIGHT/HEIGHT value strips y97..108 (centres 147.5/212/287). **Metric
   shown per the 2026-06-26 user call** — the original converts to imperial;
   the parity pairs exclude the WEIGHT/HEIGHT cells.
-- Kit: 24x33 frame patch at (112,181) (`app/art/kits/ficha/`, Man Utd only —
-  panel-kit precedent; scaled NANOESC fallback for clubs no frame shows).
-  Club name PROMAN8 black, left x138 y191.
+- Kit: 24x33 frame patch at (112,181) (screen-owned
+  `art/screens/teamoffer/kit_40.png` since the 2026-07-03 kit-bank split —
+  `art/kits/ficha/` now holds the 32x37 CARD-slot patches and the two slots
+  had collided on 40.png; cached at setup — a draw-time load() blits nothing
+  on the presented frames under --script runs). Scaled NANOESC fallback for
+  clubs no frame shows. Club name PROMAN8 black, left x138 y191.
 - Stat cells x449..471 y76+10i (digits centred x460); RATING box x482..522.
 - Skill strip: all-black chips y144+13i (11 rows); star glyphs 11x8 at
   x426+14j, y chip+1 (star_full/star_half cut from the frame, SAD-0-asserted at
@@ -66,8 +69,9 @@ each accepted sale then raises its own hub message box.
   y311..322), digits PROMAN8 centred x184/x270, colours (200,230,60)/(42,191,85).
 - CLAUSES: 4 fixed labels; row-1 rect (327,244)-(440,254); clause_on cut from
   086 (checked+active), all-washed resting from 150. Only clause 0 has frame
-  art. Our Career model stores no clauses → live cards always render the
-  washed resting state (model gap, not a screen gap).
+  art. Career players signed via the MAKE-OFFER card since 2026-07-03 carry
+  `clauses` (+ `clause_bonus`/counters, shown on the FICHA — ficha_card_re.md);
+  this card still renders only clause 0's frame art, others washed.
 - Photo: 35x35 block at (106,39) (090), 33x33 interior; BIGFOTO 124x182
   downscaled by an unknown kernel — the screen's NEAREST fit is a documented
   approximation. Photo-less players (Thornley/Clegg: no face art in the bank)

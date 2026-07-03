@@ -13,6 +13,8 @@ extends SceneTree
 ##   rival_015.png      VIEW RIVAL, Barcelona vs MU, Mon 4       vs 015_162415 (run 2, header ROI)
 ##   alert_093.png      hub alert: McClair signing, OK normal    vs 093_164659 (run 3, box ROI)
 ##   alert_149.png      hub alert: 2-line rejection, OK hot      vs 149_164911 (run 3, box ROI)
+##   ficha_081.png      FICHA: Van der Gouw, Free+Matches(20), OK held  vs 081_154619 (card ROI)
+##   ficha_084.png      FICHA: Solskjaer, Free+Scoring(£5,000), OK held vs 084_154626 (card ROI)
 ## Needs a real renderer (Xvfb / local X11), same as shot_screens.gd:
 ##   PM98_SHOT_DIR=out godot --rendering-driver opengl3 --path app --script res://tests/shot_entry_parity.gd
 
@@ -236,6 +238,57 @@ func _run() -> void:
 	await _shot(dir, "alert_149.png")
 	print("ALERT-BOX 149 rect=%s" % hub._alert_box)
 	hub.queue_free()
+	await process_frame
+
+	# ---- FICHA card (run-1 frames 081/084: Van der Gouw / Solskjaer, Man Utd) -----
+	# Card-ROI pairs (the squad screen behind is the host-dim story + its own body
+	# parity). Both frames caught OK HELD (the red ring persists across captures).
+	# Contract figures + live-form values are frame-pinned (our market/wage model
+	# differs from the original save's stored figures); clauses per the frames.
+	var manu5 := {}
+	for c in gamedb.clubs_in_league(str(gamedb.leagues[0].get("id", ""))):
+		if str(c.get("name", "")).begins_with("MANCHESTER U"):
+			manu5 = c
+	var vdg := {}
+	var ole := {}
+	for p in manu5.get("players", []):
+		if str(p.get("name", "")) == "VAN DER GOUW":
+			vdg = (p as Dictionary).duplicate()
+		elif str(p.get("name", "")) == "SOLSKJAER":
+			ole = (p as Dictionary).duplicate()
+	vdg["age"] = 34
+	vdg["fitness"] = 70
+	vdg["morale"] = 94
+	vdg["clauses"] = [0, 1]
+	vdg["clause_matches"] = 20
+	vdg["clause_apps"] = 0
+	var ficha: PlayerInfoScreen = load("res://scenes/PlayerInfoScreen.gd").new()
+	ficha.host_dims = true   # ROI = the card; the LUT host-dim is SquadScreen's story
+	_mount(ficha)
+	await process_frame
+	ficha.setup(vdg, manu5, 1, true)
+	ficha._fee = 450000
+	ficha._yearly = 225000
+	ficha._years = 1
+	ficha._left = 1
+	ficha._press = "ok"
+	ficha.queue_redraw()
+	await _shot(dir, "ficha_081.png")
+	ole["age"] = 24
+	ole["fitness"] = 70
+	ole["morale"] = 90
+	ole["clauses"] = [0, 2]
+	ole["clause_bonus"] = 5000
+	ole["clause_goals"] = 0
+	ficha.setup(ole, manu5, 1, true)
+	ficha._fee = 8500000
+	ficha._yearly = 575000
+	ficha._years = 1
+	ficha._left = 1
+	ficha._press = "ok"
+	ficha.queue_redraw()
+	await _shot(dir, "ficha_084.png")
+	ficha.queue_free()
 	await process_frame
 
 	print("PARITY SHOTS DONE")

@@ -87,6 +87,12 @@ var _youth_enabled := false
 var _press := ""
 var _kit_tex: Texture2D
 var _rows: Array = []   # [{r: Rect2 (design space), p: Dictionary}] for player-row taps
+## While the FICHA card is up over this screen the ORIGINAL palette-dims the
+## whole host through the alert dim LUT (walkthrough 081-vs-082: every squad
+## colour maps through alert/dim_lut.json, zero unknowns). Main brackets the
+## card's lifetime with set_dimmed; every draw below routes its colours/
+## textures through the LUT while on.
+var _dimmed := false
 
 
 func _ready() -> void:
@@ -222,12 +228,19 @@ func _pos_of(p: Dictionary) -> String:
 
 # ---- drawing -------------------------------------------------------------
 
+func set_dimmed(on: bool) -> void:
+	if _dimmed != on:
+		_dimmed = on
+		queue_redraw()
+
+
 func _txt(f: Font, x: int, y_top: int, s: String, col: Color, sz: int, right := false) -> void:
 	if f == null:
 		return
 	var w := f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
 	var px := x - w if right else float(x)
-	draw_string(f, Vector2(px, y_top + f.get_ascent(sz)), s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
+	draw_string(f, Vector2(px, y_top + f.get_ascent(sz)), s,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, sz, PMChrome.dim_col(col))
 
 
 func _draw() -> void:
@@ -235,6 +248,9 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.05, 0.07, 0.14), true)
 	draw_set_transform(Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5), 0.0, Vector2(s, s))
 
+	# All PMChrome helpers + _txt route colours/kits through the exact dim LUT
+	# while the FICHA modal is up (MenuScreen alert precedent).
+	PMChrome.set_dim(_dimmed)
 	PMChrome.draw_bg(self)
 	# Title is the screen's own string "SQUAD MANAGEMENT" @.data 0x65f098 (squad_screen_re.md).
 	PMChrome.draw_header(self, "SQUAD MANAGEMENT", _manager, str(_club.get("name", "")),
@@ -245,6 +261,7 @@ func _draw() -> void:
 	_draw_col_header(str(secs[0]["section"]) if not secs.is_empty() else "")
 	_draw_list()
 	_draw_side()
+	PMChrome.set_dim(false)
 
 
 ## Top header row (frame 077): N° + the first section's label + the column codes,
@@ -299,8 +316,8 @@ func _section(y: int, label: String, row_h: int) -> void:
 ## are individual 13px boxes at 16px pitch).
 func _cell(x0: int, x1: int, y: int, row_h: int, bg: Color = C_CELL_BG) -> void:
 	var r := Rect2(x0, y, x1 - x0, row_h - 3)
-	draw_rect(r, bg, true)
-	draw_rect(r, C_CELL_BRD, false, 1.0)
+	draw_rect(r, PMChrome.dim_col(bg), true)
+	draw_rect(r, PMChrome.dim_col(C_CELL_BRD), false, 1.0)
 
 
 func _row(y: int, p: Dictionary, key: String, row_h: int) -> void:
@@ -389,7 +406,8 @@ func _draw_side() -> void:
 		var sc: float = min(KIT_BOX.size.x / KIT_SRC.size.x, KIT_BOX.size.y / KIT_SRC.size.y)
 		var kw := KIT_SRC.size.x * sc
 		var kh := KIT_SRC.size.y * sc
-		draw_texture_rect_region(_kit_tex,
+		var kt := PMAlert.dim_texture(_kit_tex) if _dimmed else _kit_tex
+		draw_texture_rect_region(kt,
 			Rect2(KIT_BOX.position.x + (KIT_BOX.size.x - kw) * 0.5,
 				KIT_BOX.position.y + (KIT_BOX.size.y - kh) * 0.5, kw, kh), KIT_SRC)
 
