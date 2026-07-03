@@ -108,7 +108,59 @@ PAIRS = [
         [],
         0.0001,
     ),
+    # Hub ALERT BOX (run-3 frames; docs/re/alert_box_re.md). ROI = the box rect
+    # only: the hub behind is the menu-bg parity story + the palette dim, and the
+    # +5,+5 drop-shadow band is a per-palette-index remap two RGB frames cannot
+    # disambiguate (approximated in-app; excluded here). The caption's title
+    # field carries per-draw random speckle in 4 blues (random per instance in
+    # the original), so mismatches inside the title strip where BOTH sides show
+    # one of those blues are tolerated (NOISE_ZONES below).
+    (
+        "alert_093.png",
+        "093_164659.png",
+        (173, 196, 461, 278),
+        [],
+        0.0001,
+    ),
+    (
+        "alert_149.png",
+        "149_164911.png",
+        (207, 191, 427, 283),
+        [],
+        0.0001,
+    ),
 ]
+
+# The caption title-field speckle blues (see build_alert_chrome_from_frames.py).
+NOISE_BLUES = {(42, 63, 170), (30, 52, 98), (20, 0, 90), (0, 0, 128)}
+# shot -> title-strip rect [x0,y0,x1,y1] where blue<->blue mismatches don't count.
+NOISE_ZONES = {
+    "alert_093.png": (267, 198, 394, 222),
+    "alert_149.png": (267, 193, 394, 217),
+}
+# The message's soft drop-shadow halo: the original dithers a direction-weighted
+# falloff through this grey ramp (alert_box_re.md "Message shadow" — the exact
+# per-offset stencil is un-reversed; the app approximates it with 3 double-stamped
+# diagonal layers). Within the body text zone, mismatches where BOTH sides are
+# halo greys / white are tolerated up to HALO_CAP px; message INK (black) and
+# everything else stay strict.
+HALO_GREYS = {
+    (255, 255, 255),
+    (240, 240, 240),
+    (220, 220, 220),
+    (192, 192, 192),
+    (160, 160, 164),
+    (144, 144, 144),
+    (170, 191, 170),
+    (192, 220, 192),
+    (255, 251, 240),
+    (215, 190, 220),
+}
+HALO_ZONES = {  # shot -> body text zone [x0,y0,x1,y1]
+    "alert_093.png": (175, 224, 459, 250),
+    "alert_149.png": (209, 219, 425, 255),
+}
+HALO_CAP = 1500
 
 
 def clusters(mask: np.ndarray, max_out: int = 8) -> list[str]:
@@ -161,6 +213,28 @@ def main() -> int:
         mask = d > 8
         for x0, y0, x1, y1 in excl:
             mask[y0:y1, x0:x1] = False
+        if shot in NOISE_ZONES:
+            x0, y0, x1, y1 = NOISE_ZONES[shot]
+            for yy, xx in zip(*np.where(mask[y0:y1, x0:x1])):
+                if (
+                    tuple(a[y0 + yy, x0 + xx]) in NOISE_BLUES
+                    and tuple(f[y0 + yy, x0 + xx]) in NOISE_BLUES
+                ):
+                    mask[y0 + yy, x0 + xx] = False
+        if shot in HALO_ZONES:
+            x0, y0, x1, y1 = HALO_ZONES[shot]
+            tolerated = 0
+            for yy, xx in zip(*np.where(mask[y0:y1, x0:x1])):
+                if (
+                    tuple(a[y0 + yy, x0 + xx]) in HALO_GREYS
+                    and tuple(f[y0 + yy, x0 + xx]) in HALO_GREYS
+                ):
+                    mask[y0 + yy, x0 + xx] = False
+                    tolerated += 1
+            print(f"     {shot}: {tolerated}px shadow-halo tolerated (cap {HALO_CAP})")
+            if tolerated > HALO_CAP:
+                ok = False
+                print(f"[FAIL] {shot}: halo tolerance exceeded")
         if roi is not None:
             roi_mask = np.zeros_like(mask)
             roi_mask[roi[1] : roi[3], roi[0] : roi[2]] = True

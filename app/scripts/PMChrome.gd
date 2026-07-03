@@ -268,11 +268,25 @@ static func draw_role_icon(ci: CanvasItem, r: Rect2, pos_fine: int, broad_pos :=
 
 # ---- low-level drawing helpers -------------------------------------------
 
+# Modal-dim mode (the hub behind the PMAlert box): while on, every colour and
+# kit texture these helpers emit is passed through the exact palette-dim LUT
+# (PMAlert.dim_color / dim_texture). MenuScreen brackets its draw_header call
+# with set_dim; nothing else ever turns it on.
+static var _dim_on := false
+
+static func set_dim(on: bool) -> void:
+	_dim_on = on
+
+static func _dc(col: Color) -> Color:
+	return PMAlert.dim_color(col) if _dim_on else col
+
+
 ## Draw a string. align: 0 left (x = left), 1 centre (in box_w starting at x), 2 right (x = right edge).
 static func text(ci: CanvasItem, f: Font, x: float, y_top: float, s: String,
 		col: Color, sz: int, align := 0, box_w := 0.0) -> void:
 	if f == null:
 		return
+	col = _dc(col)
 	var w := f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
 	# Auto-fit: when a box width is given and the string overflows it, shrink the font
 	# so the WHOLE label stays inside its box. Replaces the old fixed-width clipping that
@@ -300,12 +314,21 @@ static func title_case_name(s: String) -> String:
 	var out := PackedStringArray()
 	for i in words.size():
 		var w := str(words[i]).to_lower()
-		out.append(w if i > 0 and w in _NAME_PARTICLES else w.capitalize())
+		if i > 0 and w in _NAME_PARTICLES:
+			out.append(w)
+		elif w.begins_with("mc") and w.length() > 2:
+			# The real screens keep the inner capital ("McClair", alert frame 093).
+			out.append("Mc" + w.substr(2).capitalize())
+		else:
+			out.append(w.capitalize())
 	return " ".join(out)
 
 
 ## A beveled rectangle: solid base, light top/left edge, dark bottom/right edge.
 static func bevel(ci: CanvasItem, r: Rect2, base: Color, hi: Color, lo: Color, bw := 1.0) -> void:
+	base = _dc(base)
+	hi = _dc(hi)
+	lo = _dc(lo)
 	ci.draw_rect(r, base, true)
 	ci.draw_rect(Rect2(r.position.x, r.position.y, r.size.x, bw), hi, true)
 	ci.draw_rect(Rect2(r.position.x, r.position.y, bw, r.size.y), hi, true)
@@ -328,6 +351,8 @@ static func draw_crest(ci: CanvasItem, club_id: int, r: Rect2) -> void:
 	var tex := kit(club_id)
 	if tex == null:
 		return
+	if _dim_on:
+		tex = PMAlert.dim_texture(tex)
 	var sc: float = min(r.size.x / KIT_SRC.size.x, r.size.y / KIT_SRC.size.y)
 	var w := KIT_SRC.size.x * sc
 	var h := KIT_SRC.size.y * sc
@@ -556,16 +581,18 @@ static func draw_header(ci: CanvasItem, title: String, manager: String, club: St
 
 ## A tiny gold trophy glyph (bowl + handles + stem + base), top-left at (x,y), height ~h.
 static func _trophy(ci: CanvasItem, x: float, y: float, h: float) -> void:
+	var gold := _dc(C_GOLD)
+	var gold_lo := _dc(C_GOLD_LO)
 	var w := h * 0.7
 	# bowl (tapered)
 	var bowl := PackedVector2Array([
 		Vector2(x, y), Vector2(x + w, y),
 		Vector2(x + w * 0.72, y + h * 0.5), Vector2(x + w * 0.28, y + h * 0.5)])
-	ci.draw_colored_polygon(bowl, C_GOLD)
+	ci.draw_colored_polygon(bowl, gold)
 	# handles
-	ci.draw_arc(Vector2(x, y + h * 0.14), h * 0.2, -PI * 0.5, PI * 0.5, 6, C_GOLD_LO, 1.5)
-	ci.draw_arc(Vector2(x + w, y + h * 0.14), h * 0.2, PI * 0.5, PI * 1.5, 6, C_GOLD_LO, 1.5)
+	ci.draw_arc(Vector2(x, y + h * 0.14), h * 0.2, -PI * 0.5, PI * 0.5, 6, gold_lo, 1.5)
+	ci.draw_arc(Vector2(x + w, y + h * 0.14), h * 0.2, PI * 0.5, PI * 1.5, 6, gold_lo, 1.5)
 	# stem + base
-	ci.draw_rect(Rect2(x + w * 0.42, y + h * 0.5, w * 0.16, h * 0.28), C_GOLD, true)
-	ci.draw_rect(Rect2(x + w * 0.18, y + h * 0.78, w * 0.64, h * 0.22), C_GOLD, true)
-	ci.draw_rect(Rect2(x + w * 0.18, y + h * 0.78, w * 0.64, h * 0.22), C_GOLD_LO, false, 1.0)
+	ci.draw_rect(Rect2(x + w * 0.42, y + h * 0.5, w * 0.16, h * 0.28), gold, true)
+	ci.draw_rect(Rect2(x + w * 0.18, y + h * 0.78, w * 0.64, h * 0.22), gold, true)
+	ci.draw_rect(Rect2(x + w * 0.18, y + h * 0.78, w * 0.64, h * 0.22), gold_lo, false, 1.0)

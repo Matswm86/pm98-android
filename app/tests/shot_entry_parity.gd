@@ -11,6 +11,8 @@ extends SceneTree
 ##   tactics_014.png    TACTICS board, Man Utd 3-5-2, RATING     vs 014_162413 (run 2)
 ##   lineup_155.png     LINE-UP, MU home vs Sao Paulo, Wed 6     vs 155_162931 (run 2, header ROI)
 ##   rival_015.png      VIEW RIVAL, Barcelona vs MU, Mon 4       vs 015_162415 (run 2, header ROI)
+##   alert_093.png      hub alert: McClair signing, OK normal    vs 093_164659 (run 3, box ROI)
+##   alert_149.png      hub alert: 2-line rejection, OK hot      vs 149_164911 (run 3, box ROI)
 ## Needs a real renderer (Xvfb / local X11), same as shot_screens.gd:
 ##   PM98_SHOT_DIR=out godot --rendering-driver opengl3 --path app --script res://tests/shot_entry_parity.gd
 
@@ -209,6 +211,31 @@ func _run() -> void:
 		"status_top": "Preseason", "status_bottom": "Preparation"})
 	await _shot(dir, "rival_015.png")
 	rv.queue_free()
+	await process_frame
+
+	# ---- hub ALERT BOX (run-3 frames 093/149; docs/re/alert_box_re.md) -------------
+	# Box-ROI pairs: the diff scopes to the alert rect (the hub behind is menu-bg
+	# parity + the dim story; the +5,+5 shadow band is per-palette-ambiguous and
+	# excluded). 093 = the McClair signing message, OK normal. 149 = the two-line
+	# offer rejection with the OK button caught in its HOT state.
+	var hub: MenuScreen = load("res://scenes/MenuScreen.gd").new()
+	_mount(hub)
+	await process_frame
+	hub.setup("Manchester Utd.", "Premier", "1997-98", 1000000, "1st", 40,
+		3, "Leicester", 71, true, "asdf", "O`Neill")
+	hub.alert("McClair has been signed by Liverpool.")
+	hub._alert_anim = 1.0
+	hub.queue_redraw()
+	await _shot(dir, "alert_093.png")
+	print("ALERT-BOX 093 rect=%s" % hub._alert_box)
+	hub._next_alert()   # clear
+	hub.alert("Taylor, player of Blackpool,\nhas rejected your offer.")
+	hub._alert_anim = 1.0
+	hub._alert_ok_held = true   # frame 149 caught the OK button hot
+	hub.queue_redraw()
+	await _shot(dir, "alert_149.png")
+	print("ALERT-BOX 149 rect=%s" % hub._alert_box)
+	hub.queue_free()
 	await process_frame
 
 	print("PARITY SHOTS DONE")

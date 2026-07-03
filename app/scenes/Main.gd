@@ -1742,14 +1742,21 @@ func _show_team_offer(pid: int, refresh: Callable = Callable()) -> void:
 ## Apply a TEAM OFFER card's per-row answers through the Career guards. Accepts
 ## run first in row order — the first sale wins and every other bid on him lapses
 ## (accept_offer semantics); refused bids are dropped (the listing stays). The
-## original surfaces only the SIGNING as a message (frames 093/094), so refusals
-## stay quiet.
+## original surfaces only the SIGNING as a message — the hub "PREMIER MANAGER 98"
+## alert box, EXE format "%s has been signed by %s%s." (frames 093/094) — so
+## refusals stay quiet.
 func _apply_offer_answers(pid: int, decisions: Array) -> void:
 	var sold := false
 	for i in decisions.size():
 		if str(decisions[i]) == "accept" and not sold:
 			var r := _career.accept_offer(pid, i)
-			_toast(str(r.get("msg", "")))
+			if bool(r.get("ok")) and _hub != null and is_instance_valid(_hub):
+				# The EXE's own signing message (no fee), title-cased as rendered.
+				_hub.alert("%s has been signed by %s." % [
+					PMChrome.title_case_name(str(r.get("player_name", "?"))),
+					PMChrome.title_case_name(str(r.get("buyer_name", "?")))])
+			elif not bool(r.get("ok")):
+				_toast(str(r.get("msg", "")))
 			sold = bool(r.get("ok"))
 	if not sold:
 		for i in range(decisions.size() - 1, -1, -1):   # high->low keeps indices live
@@ -2368,15 +2375,17 @@ func _cup_score_for(tie: Dictionary, cid: int) -> String:
 ## Route a MENUPRINCIPAL icon/button tap from the persistent hub. The hub stays mounted:
 ## art overlays (table/line-up/finance/board/stadium/buy) mount ABOVE it and tap-dismiss
 ## back to it; still-green sub-flows (tactics/sell/results) are pushed and hide the hub
-## via _set_view (re-shown on Back); info actions toast on the hub itself; CONTINUE plays
-## the week (or opens end-of-season when the campaign is over); EXIT leaves the career.
+## via _set_view (re-shown on Back); hub feedback (save / bye / signings) raises the
+## original's modal "PREMIER MANAGER 98" alert box on the hub (docs/re/alert_box_re.md);
+## CONTINUE plays the week (or opens end-of-season when the campaign is over); EXIT
+## leaves the career.
 func _menu_action(action: String, scr: MenuScreen) -> void:
 	AudioManager.ui_select()
 	match action:
 		"exit": _leave_career()
 		"save":
 			_career.save()
-			scr.toast("Game saved")
+			scr.alert("Game saved")
 		"news": _show_club_news()
 		"staff": _show_staff_screen()
 		"fixtures": _show_competitions()
@@ -2409,7 +2418,7 @@ func _menu_action(action: String, scr: MenuScreen) -> void:
 func _show_opponent(scr: MenuScreen) -> void:
 	var fx := _career.manager_fixture()
 	if fx.is_empty():
-		scr.toast("No match this week (bye)")
+		scr.alert("No match this week (bye)")
 		return
 	var home: bool = int(fx[0]) == _career.club_id
 	var opp_id: int = int(fx[1]) if home else int(fx[0])
@@ -3330,7 +3339,9 @@ func _manager_shot() -> void:
 
 # ---- helpers -------------------------------------------------------------
 
-## Brief footer feedback (no toast widget; we reuse the footer label).
+## Brief footer feedback on the green sub-flow screens (the footer label).
+## Hub-visible feedback goes through MenuScreen.alert (the real message box)
+## instead — see _menu_action / _apply_offer_answers.
 func _toast(msg: String) -> void:
 	_footer.text = msg
 

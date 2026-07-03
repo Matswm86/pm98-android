@@ -75,11 +75,36 @@ func _run() -> void:
 	scr._on_input(_touch(Vector2(320, 180), false))
 	ok = _assert(got.is_empty(), "drag-off cancels (%s)" % str(got)) and ok
 
-	# Transient toast (used by the persistent hub for save / news / next-match feedback).
-	scr.toast("Game saved")
-	ok = _assert(scr._toast_msg == "Game saved", "toast sets the message") and ok
-	scr._clear_toast()
-	ok = _assert(scr._toast_msg == "", "toast clears") and ok
+	# The modal "PREMIER MANAGER 98" alert box (save / signing / rejection feedback;
+	# docs/re/alert_box_re.md). Messages queue; OK pops the next; input is modal.
+	scr.alert("Game saved")
+	ok = _assert(scr.alert_active(), "alert raises the modal box") and ok
+	ok = _assert(scr._alert_box.size.x == 192 and scr._alert_box.size.y == 82,
+		"short message clamps to the 160 min content width (%s)" % scr._alert_box) and ok
+	scr.alert("McClair has been signed by Liverpool.")
+	scr._alert_anim = 1.0
+	# Hub actions don't fire through the modal.
+	got.clear()
+	scr._on_input(_touch(fc, true))
+	scr._on_input(_touch(fc, false))
+	ok = _assert(got.is_empty(), "modal swallows hub taps (%s)" % str(got)) and ok
+	# OK pops the queue: next message re-measures the box (093 geometry).
+	var okc := scr._alert_ok_rect().get_center()
+	scr._on_input(_touch(okc, true))
+	scr._on_input(_touch(okc, false))
+	ok = _assert(scr.alert_active(), "OK pops to the queued message") and ok
+	ok = _assert(scr._alert_box == Rect2i(173, 196, 288, 82),
+		"signing message sizes to the frame-093 box (%s)" % scr._alert_box) and ok
+	scr._alert_anim = 1.0
+	okc = scr._alert_ok_rect().get_center()
+	scr._on_input(_touch(okc, true))
+	scr._on_input(_touch(okc, false))
+	ok = _assert(not scr.alert_active(), "OK on the last message closes the modal") and ok
+	# ... and the hub is interactive again.
+	got.clear()
+	scr._on_input(_touch(fc, true))
+	scr._on_input(_touch(fc, false))
+	ok = _assert(got == ["finance"], "hub taps work again after the modal") and ok
 
 	scr.queue_free()
 	print("\n%s" % ("ALL PASS" if ok else "FAILURES ABOVE"))

@@ -435,5 +435,5 @@ Wiring done (B5-2): OPPONENT -> VIEW RIVAL (RivalScreen), PLAYERS -> SQUAD MANAG
   to CURRENT OFFERS band taps AND popped from CONTINUE after match day (frames
   085->086); the interim ACCEPT/REFUSE browse dialogs are gone. Still owed on the
   FICHA itself: the CLAUSES panel + YEARS|LEFT contract split (geometry now fully
-  RE'd on the TEAM OFFER card), and the signing message still rides _toast (the
-  real hub alert box, frames 093/094, is un-built).
+  RE'd on the TEAM OFFER card). The signing message now raises the REAL hub alert
+  box (frames 093/094/149; alert_box_re.md) — built + parity-locked 2026-07-03.

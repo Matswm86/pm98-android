@@ -110,8 +110,10 @@ minus 2).
   72/80/…); the RATING box is excluded from the parity pairs and still renders
   our squad-AV. Needs a Ghidra pass on FUN_0052e0d0's rating read.
 - WEIGHT/HEIGHT cells: metric by user call (parity-excluded).
-- Signing/rejection hub message box still rides `_toast` (the real
-  "PREMIER MANAGER 98" alert box, frames 093/094/149, is un-built).
+- Signing messages now raise the REAL "PREMIER MANAGER 98" hub alert box
+  (frames 093/094/149) — reversed + parity-locked 2026-07-03, see
+  `alert_box_re.md`; the 149-class rejection alert (post-MAKE-OFFER) is still
+  un-wired (offer resolution timing differs in-app).
 - Foreign CPU bidders (PSV in 152) un-modelled; offer rows default to the
   ENGLAND mini unless the offer carries `flag_code`.
 - Photo downscale kernel unknown (NEAREST fit); no parity pair on a photo card.

@@ -109,11 +109,21 @@ var _opp_manager: String = ""   # next-fixture opponent manager (circle), if kno
 var _is_home: bool = true
 var _opp_tex: Texture2D
 var _press: String = ""        # action currently held down (for the highlight)
-var _toast_msg: String = ""    # transient feedback (save / news / next match)
+
+# The modal "PREMIER MANAGER 98" alert box (PMAlert; docs/re/alert_box_re.md).
+# While a message shows, the hub behind is palette-dimmed and input is modal.
+var _alert_queue: PackedStringArray = []
+var _alert_tex: ImageTexture       # finished box (normal OK state)
+var _alert_tex_hot: ImageTexture   # finished box with the OK button held
+var _alert_box: Rect2i             # design-space rect of the current box
+var _alert_anim: float = 1.0       # grow-in progress 0..1 (case 5/6 zoom)
+var _alert_ok_held := false
+var _bg_dim: Texture2D             # menu_bg through the exact dim LUT
 
 
 func _ready() -> void:
 	_bg = load("res://art/screens/menu_bg.png")
+	_bg_dim = load("res://art/screens/alert/menu_bg_dim.png")
 	_bezel = load("res://art/screens/fondo_marble.png")
 	_f10 = load("res://art/fonts/proman10.fnt")
 	_f12 = load("res://art/fonts/proman12.fnt")
@@ -151,19 +161,52 @@ func setup(club: String, league := "", season := "", cash := 0, position := "", 
 	queue_redraw()
 
 
-## Flash a transient line in the centre circle (save / news / next-match feedback) since
-## the hub has no green footer to write to. Auto-clears after a couple of seconds.
-func toast(msg: String) -> void:
-	_toast_msg = msg
-	queue_redraw()
-	var tree := get_tree()
-	if tree != null:
-		tree.create_timer(2.5).timeout.connect(_clear_toast)
+## Raise the original's modal "PREMIER MANAGER 98" alert box over the hub (frames
+## 093/094/149) — signing / rejection / save feedback. Messages queue; answering
+## OK pops the next one, which grows in again (the 094 replacement-alert zoom).
+func alert(msg: String) -> void:
+	if msg.strip_edges() == "":
+		return
+	_alert_queue.append(msg)
+	if _alert_tex == null:
+		_next_alert()
 
 
-func _clear_toast() -> void:
-	_toast_msg = ""
+func alert_active() -> bool:
+	return _alert_tex != null
+
+
+func _next_alert() -> void:
+	if _alert_queue.is_empty():
+		_alert_tex = null
+		_alert_tex_hot = null
+		set_process(false)
+		queue_redraw()
+		return
+	var msg := _alert_queue[0]
+	_alert_queue.remove_at(0)
+	_alert_box = PMAlert.box_rect(msg)
+	_alert_tex = ImageTexture.create_from_image(PMAlert.render(msg, false))
+	_alert_tex_hot = ImageTexture.create_from_image(PMAlert.render(msg, true))
+	_alert_ok_held = false
+	# FUN_005c5fd0 case 5/6: the box grows from its centre in ~15 steps of >=16ms.
+	_alert_anim = 0.0
+	set_process(true)
 	queue_redraw()
+
+
+func _process(delta: float) -> void:
+	if _alert_tex == null or _alert_anim >= 1.0:
+		set_process(false)
+		return
+	_alert_anim = minf(_alert_anim + delta / 0.25, 1.0)
+	queue_redraw()
+
+
+## The OK button rect in design space (EXE anchor: bottom-right, w-6 / h-6).
+func _alert_ok_rect() -> Rect2:
+	return Rect2(_alert_box.position.x + _alert_box.size.x - 45,
+		_alert_box.position.y + _alert_box.size.y - 22, 39, 16)
 
 
 # ---- geometry ------------------------------------------------------------
@@ -212,6 +255,22 @@ func _on_input(e: InputEvent) -> void:
 		tap = true
 	if not tap:
 		return
+	if _alert_tex != null:
+		# Modal: only the alert's OK button reacts (the original DoModal loop).
+		if _alert_anim < 1.0:
+			return
+		var over := _alert_ok_rect().has_point(_to_design(pos))
+		if pressed:
+			_alert_ok_held = over
+		else:
+			if _alert_ok_held and over:
+				var am := get_node_or_null("/root/AudioManager")
+				if am != null:
+					am.ui_select()
+				_next_alert()
+			_alert_ok_held = false
+		queue_redraw()
+		return
 	if pressed:
 		_press = _hit(_to_design(pos))
 		queue_redraw()
@@ -234,11 +293,19 @@ func _txt(f: Font, x: int, y_top: int, s: String, col: Color, sz: int, cw := 0) 
 		sz = maxi(7, int(floor(sz * cw / w)))
 		w = f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
 	var px := x + (cw - w) * 0.5 if cw > 0 else float(x)
-	draw_string(f, Vector2(px, y_top + f.get_ascent(sz)), s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
+	draw_string(f, Vector2(px, y_top + f.get_ascent(sz)), s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, _dc(col))
+
+
+## Palette-dim a colour while the modal alert is up (exact LUT; PMAlert).
+func _dc(c: Color) -> Color:
+	return PMAlert.dim_color(c) if _alert_tex != null else c
 
 
 ## A beveled rect: solid base, light top/left edge, dark bottom/right edge.
 func _bevel(r: Rect2, base: Color, hi: Color, lo: Color) -> void:
+	base = _dc(base)
+	hi = _dc(hi)
+	lo = _dc(lo)
 	draw_rect(r, base, true)
 	draw_rect(Rect2(r.position.x, r.position.y, r.size.x, 1), hi, true)
 	draw_rect(Rect2(r.position.x, r.position.y, 1, r.size.y), hi, true)
@@ -268,6 +335,8 @@ func _band(r: Rect2, s: String, f: Font, sz: int) -> void:
 func _crest(tex: Texture2D, box: Rect2) -> void:
 	if tex == null:
 		return
+	if _alert_tex != null:
+		tex = PMAlert.dim_texture(tex)
 	var sc: float = min(box.size.x / KIT_SRC.size.x, box.size.y / KIT_SRC.size.y)
 	var kw := KIT_SRC.size.x * sc
 	var kh := KIT_SRC.size.y * sc
@@ -293,11 +362,16 @@ func _draw() -> void:
 	var s := _scale()
 	draw_set_transform(_origin(s), 0.0, Vector2(s, s))
 
-	# The real MENUPRINCIPAL chrome (bars + icons + section labels + circle frame + bg).
-	if _bg != null:
-		draw_texture_rect(_bg, Rect2(0, 0, W, H), false)
+	var dimmed := _alert_tex != null
+
+	# The real MENUPRINCIPAL chrome (bars + icons + section labels + circle frame + bg);
+	# under the modal alert, the pre-baked exact palette-dim of the same frame.
+	var bg := _bg_dim if dimmed and _bg_dim != null else _bg
+	if bg != null:
+		draw_texture_rect(bg, Rect2(0, 0, W, H), false)
 
 	# Shared PM98 plaque header over the cleared top band (manager+club / date / league+week).
+	PMChrome.set_dim(dimmed)
 	PMChrome.draw_header(self, "MANAGER MENU", _manager_name, _club, _league, _season, _week, _club_id)
 
 	# Central club circle: live slots over the real frame in menu_bg.
@@ -311,14 +385,33 @@ func _draw() -> void:
 		var lower := _opp_manager if _opp_manager != "" else ("HOME" if _is_home else "AWAY")
 		_slot(R_OPPMGR, lower, _f10, 11)
 		_slot(R_CPU, "CPU", _f10, 11)
+	PMChrome.set_dim(false)
 
-	# Press highlight over the held icon / bar / button.
-	if _press != "":
+	# Press highlight over the held icon / bar / button (never under the modal).
+	if _press != "" and not dimmed:
 		var r: Rect2 = ICON_HITS.get(_press, BAR_HITS.get(_press, CTRL_HITS.get(_press, Rect2())))
 		if r.size != Vector2.ZERO:
 			draw_rect(r, C_HILITE, true)
 
-	# Transient toast across the circle centre (save / news / next-match feedback).
-	if _toast_msg != "":
-		draw_rect(Rect2(240, 232, 170, 22), Color(0.0, 0.0, 0.0, 0.72), true)
-		_txt(_f12, 240, 235, _toast_msg, Color(1.0, 0.95, 0.6), 12, 170)
+	if dimmed:
+		_draw_alert()
+
+
+## The modal alert box + its +5,+5 drop shadow. The finished box texture grows in
+## from its centre (FUN_005c5fd0 case 5/6). The shadow is an approximation: the
+## original remaps the palette per-INDEX in that band, which two RGB frames cannot
+## disambiguate (docs/re/alert_box_re.md "Drop shadow") — a 45% black overlay
+## matches the observed attenuation; the parity ROI excludes the band.
+func _draw_alert() -> void:
+	var b := Rect2(_alert_box)
+	if _alert_anim >= 1.0:
+		draw_rect(Rect2(b.position.x + b.size.x, b.position.y + 5, 5, b.size.y), Color(0, 0, 0, 0.45), true)
+		draw_rect(Rect2(b.position.x + 5, b.position.y + b.size.y, b.size.x, 5), Color(0, 0, 0, 0.45), true)
+	var tex := _alert_tex_hot if _alert_ok_held else _alert_tex
+	if tex == null:
+		return
+	# ~15 growth steps of the original zoom; each frame draws the box scaled about
+	# its centre (the engine StretchBlts the finished dialog the same way).
+	var t := clampf(_alert_anim, 0.05, 1.0)
+	var c := b.get_center()
+	draw_texture_rect(tex, Rect2(c - b.size * t * 0.5, b.size * t), false)

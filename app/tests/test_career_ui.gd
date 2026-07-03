@@ -142,9 +142,13 @@ func _run() -> void:
 	ok = _assert(main._hub != null and main._hub.visible, "hub re-raised on return to career") and ok
 	main._menu_action("save", main._hub)        # MENUPRINCIPAL SAVE button -> save path
 	ok = _assert(Career.has_save(), "career saved to disk") and ok
-	main._menu_action("news", main._hub)        # info action -> hub toast (no crash, no nav)
+	# ... and the save raises the modal "PREMIER MANAGER 98" alert box (the
+	# original's hub message box, frames 093/149 — docs/re/alert_box_re.md).
+	ok = _assert(main._hub.alert_active(), "save raises the hub alert box") and ok
+	main._hub._next_alert()                     # answer OK so the hub is live again
+	ok = _assert(not main._hub.alert_active(), "alert dismissed") and ok
+	main._menu_action("news", main._hub)        # info action (no crash, no nav)
 	await process_frame
-	ok = _assert(main._hub._toast_msg != "", "hub toast shows info feedback") and ok
 
 	# The hub PLAYERS button (VENDE icon, action "sell") opens SQUAD MANAGEMENT (SquadScreen),
 	# not the old invented BrowseScreen -- the wiring of the orphaned PLANTILLA screen.
@@ -159,12 +163,13 @@ func _run() -> void:
 	await process_frame
 
 	# The hub OPPONENT icon (RIVAL, action "opponent") opens VIEW RIVAL (RivalScreen), not the
-	# old DATA BASE browser -- the VERRIVAL wiring. A bye week has no opponent (toast instead).
+	# old DATA BASE browser -- the VERRIVAL wiring. A bye week has no opponent (alert instead).
 	var fx: Array = main._career.manager_fixture()
 	main._menu_action("opponent", main._hub)
 	await process_frame
 	if fx.is_empty():
-		ok = _assert(true, "hub OPPONENT on a bye week toasts (no rival screen)") and ok
+		ok = _assert(main._hub.alert_active(), "hub OPPONENT on a bye week raises the alert") and ok
+		main._hub._next_alert()
 	else:
 		var rival_up := false
 		for c in main.get_children():

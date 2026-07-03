@@ -1266,7 +1266,10 @@ func accept_sale(pid: int, buyer_id: int, offer: int) -> Dictionary:
 	transfer_listed.erase(pid)
 	var buyer_name: String = club_names.get(buyer_id, "?")
 	_log("%s has been signed by %s for £%s." % [player.get("name", "?"), buyer_name, _money(offer)])
-	return {"ok": true, "msg": "Sold %s to %s for £%s." % [player.get("name", "?"), buyer_name, _money(offer)]}
+	return {"ok": true, "msg": "Sold %s to %s for £%s." % [player.get("name", "?"), buyer_name, _money(offer)],
+		# For the hub alert box (EXE string "%s has been signed by %s%s.", frame 093):
+		# the view composes + cases these (names here are raw cipher-UPPERCASE).
+		"player_name": str(player.get("name", "?")), "buyer_name": buyer_name}
 
 ## SACK a squad player (the PLAYER INFORMATION button): terminate his contract now. He leaves
 ## for free and joins the free-agent pool; you pay off the balance of his deal as compensation
