@@ -53,8 +53,12 @@ each accepted sale then raises its own hub message box.
 - Stat cells x449..471 y76+10i (digits centred x460); RATING box x482..522.
 - Skill strip: all-black chips y144+13i (11 rows); star glyphs 11x8 at
   x426+14j, y chip+1 (star_full/star_half cut from the frame, SAD-0-asserted at
-  every position). **halves = value div 10** (17→½, 70→3½, 64→3, 67→3, 53→2½,
-  47→2; 090's HEADING 79→3½ confirms). Values PROMAN8 **centred x511**.
+  every position). **halves = (value+1) div 10** — CORRECTED 2026-07-03: 090's
+  HEADING 79 shows 4 FULL stars (the earlier "79→3½ confirms" was a misread),
+  and the make-offer card 101 pins 19→1 full / 79→4 full. The rule fits all 18
+  observations across 086/090/101; Thornley's six values (17, 70, 64, 67, 53,
+  47) give identical output under both rules, so the 086/088 parity pairs never
+  caught it. Values PROMAN8 **centred x511**.
 - CONTRACT: fee bar interior x156..300 y249..259 (dithered; both bars END at
   x300 — an earlier x335 reading was the checked clause's red box), wage bar
   same at y280..290; money PROMAN8 gold (255,223,0) / pale (180,200,220),

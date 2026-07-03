@@ -114,6 +114,34 @@ func _run() -> void:
 	toffer.queue_free()
 	await process_frame
 
+	# ---- MAKE-OFFER card (run-3 frames 101/113: Taylor, Blackpool) ----------------
+	var bpool := {}
+	for lg in gamedb.leagues:
+		for c in gamedb.clubs_in_league(str(lg.get("id", ""))):
+			if str(c.get("name", "")) == "BLACKPOOL":
+				bpool = c
+	var taylor := {}
+	for p in bpool.get("players", []):
+		if str(p.get("legalName", "")) == "SCOTT TAYLOR":
+			taylor = (p as Dictionary).duplicate()
+	# the frame's live-form values (FITNESS/MORAL dynamic; AGE as of week 3)
+	taylor["age"] = 21
+	taylor["fitness"] = 67
+	taylor["morale"] = 81
+	var moffer: Control = load("res://scenes/MakeOfferScreen.gd").new()
+	_mount(moffer)
+	await process_frame
+	moffer.setup(taylor, bpool, 3000000, 3200000)
+	await _shot(dir, "makeoffer_101.png")
+	# frame 113 state: offer 3,050,000 / wage 25,000 / Scoring bonus checked £5,000
+	moffer._offer = 3050000
+	moffer._wage_yearly = 25000
+	moffer._checked["scoring"] = true
+	moffer.queue_redraw()
+	await _shot(dir, "makeoffer_113.png")
+	moffer.queue_free()
+	await process_frame
+
 	print("PARITY SHOTS DONE")
 	quit(0)
 

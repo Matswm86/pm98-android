@@ -17,6 +17,7 @@ class_name TransferScreen
 
 signal back_pressed
 signal current_offers_pressed
+signal player_pressed(row: Dictionary)
 
 const W := 640
 const H := 480
@@ -184,8 +185,7 @@ func _on_input(e: InputEvent) -> void:
 		_press = ""
 		if a == was and a != "":
 			# RETURN dismisses; CURRENT OFFERS opens the offers screen; a scroll-button
-			# tap pages the list. A tap on a player row or empty space is a no-op (it
-			# no longer bounces back to the hub).
+			# tap pages the list.
 			if a == "return":
 				back_pressed.emit()
 			elif a == "current":
@@ -194,6 +194,24 @@ func _on_input(e: InputEvent) -> void:
 				_scroll += SCROLL_STEP if a == "down" else -SCROLL_STEP
 				_clamp_scroll()
 				queue_redraw()
+		elif a == "" and was == "":
+			# a tap on a player row opens the make-offer card (the original's
+			# browse-list -> card route, run-3 frame 100 -> 101); empty space
+			# stays a no-op
+			var r := _row_at(_to_design(pos))
+			if not r.is_empty():
+				player_pressed.emit(r)
+
+
+## The player row (Career.market() entry) under a design-space point, {} if none.
+func _row_at(d: Vector2) -> Dictionary:
+	if d.x < TABLE.position.x or d.x > TABLE.end.x or d.y < ROW0_Y or d.y > TABLE.end.y:
+		return {}
+	var items := _flat_items()
+	var i := _scroll + int((d.y - ROW0_Y) / ROW_H)
+	if i < 0 or i >= items.size() or str(items[i].get("t", "")) != "row":
+		return {}
+	return items[i]["r"]
 
 
 # ---- ordering ------------------------------------------------------------

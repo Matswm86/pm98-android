@@ -1014,7 +1014,13 @@ func _find_in(id: int, pid: int) -> Dictionary:
 ## Bid `offer` for player `pid` at `from_club_id`. Mutates squads + cash on success.
 ## Returns {ok: bool, msg: String}. Enforces the board caps (deadline, weekly offer
 ## allowance, squad size, cash) before the selling club even considers the bid.
-func sign_player(pid: int, from_club_id: int, offer: int, rng: RandomNumberGenerator) -> Dictionary:
+## The make-offer card's terms ride along: `weekly` > 0 replaces the stamped market
+## wage, `years` > 0 the default contract length, and `clauses` (checked clause
+## indices 0..3) are stored on the player (display-only until the FICHA CLAUSES
+## panel exists — the acceptance verdict stays fee-based, the original's clause
+## weighting is un-RE'd; docs/re/make_offer_re.md).
+func sign_player(pid: int, from_club_id: int, offer: int, rng: RandomNumberGenerator,
+		weekly: int = -1, years: int = -1, clauses: Array = []) -> Dictionary:
 	if not transfers_open():
 		return {"ok": false, "msg": "The transfer deadline has passed."}
 	if offers_left <= 0:
@@ -1034,9 +1040,14 @@ func sign_player(pid: int, from_club_id: int, offer: int, rng: RandomNumberGener
 		return {"ok": false, "msg": "%s have rejected your offer for %s." % [seller_name, player.get("name", "?")]}
 	rosters[from_club_id].erase(player)
 	player["clubId"] = club_id
-	player["contract_years"] = TransferMarket.NEW_CONTRACT_YEARS
-	player["contract_term"] = TransferMarket.NEW_CONTRACT_YEARS
+	var term := years if years > 0 else TransferMarket.NEW_CONTRACT_YEARS
+	player["contract_years"] = term
+	player["contract_term"] = term
 	Contract.stamp_wage(player, tier)   # his wage joins your live bill
+	if weekly > 0:
+		player["wage"] = weekly          # the card's negotiated YEARLY WAGE / 52
+	if not clauses.is_empty():
+		player["clauses"] = clauses.duplicate()
 	player["auto_renew"] = false
 	rosters[club_id].append(player)
 	cash -= offer

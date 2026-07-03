@@ -1610,6 +1610,52 @@ func _show_transfer_screen() -> void:
 	scr.current_offers_pressed.connect(func() -> void:
 		AudioManager.ui_select()
 		_show_current_offers_screen())
+	scr.player_pressed.connect(func(row: Dictionary) -> void:
+		AudioManager.ui_select()
+		_show_make_offer_card(row))
+
+## The REAL make-offer card (MakeOfferScreen; walkthrough run-3 101-118,
+## docs/re/make_offer_re.md): the PLAYER INFORMATION card with the OFFER panel.
+## Opens over the transfer screen from a player-row tap (the original's browse
+## list -> card route). OFFER -> Career.sign_player with the card's terms
+## (yearly wage -> weekly, years, checked clauses); LOAN PLAYER ->
+## Career.sign_loan (their first XI is never loanable, the loan_market rule);
+## CANCEL closes. The original submits silently and returns to the browse (119)
+## — our accept/reject feedback rides the existing toast, not a modal.
+func _show_make_offer_card(row: Dictionary) -> void:
+	var pid := int(row.get("pid", -1))
+	var from_club := int(row.get("club_id", -1))
+	var player := _career._find_in(from_club, pid)
+	if player.is_empty():
+		_toast("That player is no longer available.")
+		return
+	var card: MakeOfferScreen = load("res://scenes/MakeOfferScreen.gd").new()
+	card.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(card)
+	card.setup(player, {"id": from_club, "name": str(row.get("club_name", "?"))},
+		int(row.get("fee", 0)), _career.cash)
+	card.cancelled.connect(func() -> void:
+		AudioManager.ui_select()
+		card.queue_free())
+	card.offer_made.connect(func(offer: int, yearly_wage: int, years: int, clauses: Array) -> void:
+		AudioManager.ui_select()
+		var rng := RandomNumberGenerator.new()
+		rng.randomize()
+		var res := _career.sign_player(pid, from_club, offer, rng,
+			maxi(1, yearly_wage / Contract.SEASON_WEEKS), years, clauses)
+		_career.save()
+		card.queue_free()
+		_toast(str(res["msg"])))
+	card.loan_requested.connect(func() -> void:
+		AudioManager.ui_select()
+		if bool(row.get("key", false)):
+			_toast("%s will not loan out a first-team player." % str(row.get("club_name", "They")))
+			return
+		var res := _career.sign_loan(pid, from_club)
+		_career.save()
+		if res["ok"]:
+			card.queue_free()
+		_toast(str(res["msg"])))
 
 ## The original-art CURRENT OFFERS (OFERTAS) screen: up to 5 transfer-listed players,
 ## each band showing his attribute strip + the newest bid (CLUB | CLUB OFFER | YEARLY
@@ -2724,19 +2770,16 @@ func _show_market() -> void:
 	_set_view("TRANSFER MARKET", "%d players  -  * = first XI (dearer)  -  tap to bid" % rows.size(),
 		rows, payload, func(row): _push(_show_market_player.bind(row)))
 
+## The interim bid-amount submenu is retired: bidding goes through the REAL
+## make-offer card (walkthrough run-3 101-118). This menu keeps only the
+## card route + the shortlist toggle.
 func _show_market_player(row: Dictionary) -> void:
 	var key: bool = row["key"]
 	var fee: int = int(row["fee"])
 	var pid := int(row["pid"])
-	var asking := int(round(fee * (TransferMarket.KEY_PREMIUM if key else 1.0)))
 	var rows: Array = []
 	var payload: Array = []
-	rows.append("Bid the asking price      £%s" % _fmt_int(asking)); payload.append({"bid": asking})
-	rows.append("Bid above asking          £%s" % _fmt_int(_bid_round(int(asking * 1.25))))
-	payload.append({"bid": _bid_round(int(asking * 1.25))})
-	if key:
-		rows.append("Club-record bid (sure)    £%s" % _fmt_int(_bid_round(int(fee * TransferMarket.STAR_FORCE))))
-		payload.append({"bid": _bid_round(int(fee * TransferMarket.STAR_FORCE))})
+	rows.append("Make an offer"); payload.append({"card": true})
 	rows.append("%s shortlist" % ("Remove from" if _career.shortlist.has(pid) else "Add to"))
 	payload.append({"short": pid})
 	_set_view("Bid for %s" % row["name"],
@@ -2750,15 +2793,7 @@ func _market_action(row: Dictionary, it: Dictionary) -> void:
 		_career.save()
 		_show_market_player(row)
 		return
-	var rng := RandomNumberGenerator.new()
-	rng.randomize()
-	var res := _career.sign_player(int(row["pid"]), int(row["club_id"]), int(it["bid"]), rng)
-	_career.save()
-	if res["ok"]:
-		_nav.pop_back()                      # drop the bid screen
-		_push(_show_deal_result.bind(res["msg"]))
-	else:
-		_toast(res["msg"])                   # stay; try a higher bid (offers permitting)
+	_show_make_offer_card(row)
 
 ## FREE AGENTS (T2 #9): out-of-contract players you can sign for no fee, just a wage. Tap
 ## one to open the wage negotiation. Driven by Career.free_agents (released + generated).

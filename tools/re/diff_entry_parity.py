@@ -60,6 +60,25 @@ PAIRS = [
         [(182, 97, 242, 109), (247, 97, 327, 109), (482, 100, 522, 119)],
         0.0001,
     ),
+    # MAKE-OFFER card (run-3 frames). ROI = the card frame (the OFFERS browse
+    # screen behind is its own parity story). Exclusions, all documented in
+    # make_offer_re.md: the animated info coin, WEIGHT/HEIGHT value strips
+    # (metric per the 2026-06-26 user call) and the RATING box (FICHA rating
+    # formula un-RE'd — frame 85 vs squad-AV 83).
+    (
+        "makeoffer_101.png",
+        "101_164714.png",
+        (76, 48, 564, 431),
+        [(83, 56, 123, 96), (206, 117, 266, 129), (271, 117, 331, 129), (505, 120, 545, 139)],
+        0.0001,
+    ),
+    (
+        "makeoffer_113.png",
+        "113_164736.png",
+        (76, 48, 564, 431),
+        [(83, 56, 123, 96), (206, 117, 266, 129), (271, 117, 331, 129), (505, 120, 545, 139)],
+        0.0001,
+    ),
 ]
 
 

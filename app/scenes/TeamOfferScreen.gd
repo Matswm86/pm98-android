@@ -339,12 +339,14 @@ func _draw_stats() -> void:
 		_ctxt(_f8, STAT_CELL.position.x + STAT_CELL.size.x * 0.5,
 			STAT_CELL.position.y + STAT_PITCH * i, str(rows[i]), C_BLACK, 11)
 	_ctxt(_f14, RATING_C.x, RATING_C.y, str(_rating()), C_RATING, 15)
-	# skill strip: halves = value div 10 (frame-derived rule, 8 data points)
+	# skill strip: halves = (value+1) div 10 — corrected 2026-07-03 against the
+	# make-offer card (101: 19->1 full, 79->4 full; 090's HEADING 79 shows 4 FULL
+	# stars, killing the earlier div-10 reading). Fits all 18 observations.
 	var skills := [_attr("PO"), _attr("PA"), _attr("RM"), _attr("RG"), _attr("EN"), _attr("TI")]
 	for i in skills.size():
 		var v: int = skills[i]
 		var y := SKILL_Y0 + SKILL_PITCH * i
-		var halves := v / 10
+		var halves := (v + 1) / 10
 		for j in halves / 2:
 			draw_texture(_star_full, Vector2(STAR_X0 + STAR_PITCH * j, y + 1))
 		if halves % 2 == 1:
