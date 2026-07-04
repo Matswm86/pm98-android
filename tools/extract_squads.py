@@ -55,6 +55,13 @@ ACCENT = {
     0x9D: "Ö",
     0x84: "Ü",
     0xCB: "ª",
+    # Witnessed in the EQUIPOS crest-index club names (raw bytes dumped
+    # 2026-07-04, tools/re/map_crests.py): record 165 = CH[83]TEAUROUX
+    # (LB Châteauroux) and record 227 = G[97]TEBORG (IFK Göteborg) — the club
+    # identities pin the letters. Before this, rdstr rejected those headers
+    # ('+' in txt) and the clubs fell back to name '?'.
+    0x83: "Â",
+    0x97: "Ö",
 }
 SEP = "\x1f"  # marker for 0x4d, the legal-name / common-name separator
 

@@ -239,29 +239,16 @@ def pkf_entries(path: Path) -> dict:
 
 
 def club_kit_codes() -> dict[int, str]:
-    """game_db club id -> EQ96 code. English via the verified crest_codes map;
-    foreign clubs via exact name match against the EQUIPOS index records."""
+    """game_db club id -> EQ96 code, from the maps map_crests.py stores in
+    crest_codes.json: English via the verified record==id identity, foreign via
+    the positional replay of build_db.py's id assignment (names cross-checked
+    there). Every game_db club must be covered — a miss is a pipeline drift."""
     cc = json.loads((ROOT / "assets" / "crest_codes.json").read_text())
     db = json.loads((ROOT / "app" / "data" / "game_db.json").read_text())
     out = {int(k): v for k, v in cc["english"].items()}
-    by_name = {}
-    for r in cc["allRecords"]:
-        by_name.setdefault(r["name"], r["code"])
-    misses = []
-    for c in db["clubs"]:
-        cid = int(c["id"])
-        if cid in out:
-            continue
-        code = by_name.get(str(c.get("name", "")))
-        if code:
-            out[cid] = code
-        else:
-            misses.append(str(c.get("name", "")))
-    if misses:
-        print(
-            f"  (no EQ96 name match for {len(misses)} clubs — no ridi kit exported:"
-            f" {misses[:6]}{'...' if len(misses) > 6 else ''})"
-        )
+    out.update({int(k): v for k, v in cc.get("foreign", {}).items()})
+    misses = [str(c.get("name", "")) for c in db["clubs"] if int(c["id"]) not in out]
+    assert not misses, f"{len(misses)} game_db clubs without an EQ96 code: {misses[:6]}"
     return out
 
 

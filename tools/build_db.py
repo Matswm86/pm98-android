@@ -199,11 +199,25 @@ def main() -> None:
         )
 
     # --- International clubs (browseable; leagueId null, country best-effort) ---
+    # A few record headers fail extract_squads' string-validity heuristics (P.S.G.
+    # trips the alpha ratio on its dots; GALATASARAY/HAKA trip the null-padding
+    # check because 'A' ciphers to 0x00) and fall back to name '?'. The EQUIPOS
+    # crest index (assets/crest_codes.json allRecords, decoded by
+    # tools/re/map_crests.py from the same file) reads the SAME header string with
+    # a tolerant reader — recover the name from there, keyed by the record idx.
+    # Never English (English headers all parse), so club ids do not shift.
+    crest_by_record = {
+        r["record"]: r["name"]
+        for r in load("crest_codes.json")["allRecords"]
+        if r["name"] != "?"
+    }
     matched = 0
     next_id = 1000  # keep clear of English idx ids
     for t in teams_all:
         if t["name"] in english_names:
             continue  # English club: already emitted from the verified extractor
+        if t["name"] == "?" and int(t["idx"]) in crest_by_record:
+            t = {**t, "name": crest_by_record[int(t["idx"])]}
         cid = next_id
         next_id += 1
         ctry = country_for(t["name"], country_lut)

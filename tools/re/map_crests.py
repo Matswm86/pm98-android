@@ -53,10 +53,31 @@ BLOB = bytes.fromhex("bbefafa2e0fadfa3e8")  # entry offset +12
 COPY = b"Copyright (c)1996 Dinamic Multimedia"
 MM = b"Dinamic Multimedia"
 
-# club-name decode (same cipher as parse_equipos / extract_english headers)
+# club-name decode (same cipher as parse_equipos / extract_english headers).
+# Accented letters: byte = 0x80 | (0x20 word-start flag) | accent-code — the
+# SAME table extract_squads.py uses for the squad records (clear bit5 to look
+# up); an unmapped accent byte stays '+' so it can never fake a match.
 _FWD = {L: (L if L % 2 == 0 else L + 2) for L in range(26)}
 _C2 = {c: chr(65 + L) for L, c in _FWD.items()}
 _C2[1] = " "
+_ACCENT = {
+    0x80: "Á",
+    0x86: "Ç",
+    0x88: "É",
+    0x8C: "Í",
+    0x8E: "Ï",
+    0x90: "Ñ",
+    0x92: "Ó",
+    0x9B: "Ú",
+    0x9D: "Ö",
+    0x84: "Ü",
+    0xCB: "ª",
+    # Witnessed in the crest-index club names (raw bytes dumped 2026-07-04):
+    # record 165 = CH[83]TEAUROUX (LB Châteauroux) and record 227 = G[97]TEBORG
+    # (IFK Göteborg) — the club identities pin the letters.
+    0x83: "Â",
+    0x97: "Ö",
+}
 
 
 def _name(d: bytes, off: int) -> str:
@@ -72,7 +93,7 @@ def _name(d: bytes, off: int) -> str:
         if b == 0x4F:
             return "."
         if b >= 0x80:
-            return "+"
+            return _ACCENT.get(b & 0xDF, "+")
         return _C2.get(b & 0x1F, "?")
 
     return "".join(ch(d[p + 2 + k]) for k in range(ln)).strip()
@@ -138,19 +159,58 @@ def main() -> None:
             missing.append(cid)
     assert not missing, f"English game_db ids without an 03xx record: {missing}"
 
+    # Foreign clubs: POSITIONAL, not name-matched. build_db.py assigns foreign ids
+    # sequentially (1000, 1001, ...) over teams_all.json entries whose name is not
+    # an English club's, in file order; teams_all carries each entry's EQUIPOS
+    # record idx, and the crest index is one record per EQUIPOS record in record
+    # order (self-checked above: 476 codes == 476 kit filenames). Replaying the
+    # id assignment therefore maps every foreign id to its record's code exactly.
+    # Cross-check: the crest-index name must EQUAL the teams_all header name
+    # wherever both decoded (teams_all '?' headers are recovered by the index).
+    teams_all = json.loads(
+        (ROOT / "assets" / "teams_all.json").read_text(encoding="utf-8")
+    )["teams"]
+    eng_names = {
+        c["name"]
+        for c in json.loads(
+            (ROOT / "assets" / "squads_english.json").read_text(encoding="utf-8")
+        )["clubs"]
+    }
+    foreign = {}
+    recovered = []
+    next_id = 1000  # build_db.py: keep clear of English idx ids
+    for t in teams_all:
+        if t["name"] in eng_names:
+            continue
+        cid = next_id
+        next_id += 1
+        e = by_record[int(t["idx"])]
+        if t["name"] != "?":
+            assert t["name"] == e["name"], (
+                f"record {t['idx']}: teams_all {t['name']!r} != index {e['name']!r}"
+            )
+        else:
+            recovered.append((cid, t["idx"], e["name"]))
+        foreign[str(cid)] = e["code"]
+
     OUT.write_text(
         json.dumps(
             {
                 "note": "club_id -> EQ96 kit code, decoded from EQUIPOS.PKF's own club index "
-                "(dataOffset==record marker, code = XOR-deciphered DD/NN). English only "
-                "for now (the playable pyramid); see tools/re/map_crests.py. Kit PNGs are "
-                "exported id-named to app/art/kits/, so the runtime needs id, not code.",
+                "(dataOffset==record marker, code = XOR-deciphered DD/NN). English via the "
+                "record==id identity, foreign via the positional replay of build_db.py's id "
+                "assignment over teams_all record order (names cross-checked); see "
+                "tools/re/map_crests.py. Kit PNGs are exported id-named to app/art/kits/, "
+                "so the runtime needs id, not code.",
                 "verified": {
                     "indexEntries": len(idx),
                     "codesMatchKitFilenames": True,
                     "englishClubs": len(id_to_code),
+                    "foreignClubs": len(foreign),
+                    "foreignNamesCrossChecked": len(foreign) - len(recovered),
                 },
                 "english": id_to_code,
+                "foreign": foreign,
                 "allRecords": [
                     {"record": e["record"], "code": e["code"], "name": e["name"]} for e in idx
                 ],
@@ -160,13 +220,18 @@ def main() -> None:
         ),
         encoding="utf-8",
     )
-    print(f"wrote {OUT.relative_to(ROOT)}: {len(id_to_code)} English clubs mapped")
+    print(
+        f"wrote {OUT.relative_to(ROOT)}: {len(id_to_code)} English + "
+        f"{len(foreign)} foreign clubs mapped"
+    )
     for cid in list(id_to_code)[:6]:
         e = by_record[int(cid)]
         print(f"  id {cid:>3} -> EQ96{id_to_code[cid]}  {e['name']}")
+    for cid, ridx, nm in recovered:
+        print(f"  '?'-header club id {cid} (record {ridx}) named by the index: {nm!r}")
 
     if "--export" in sys.argv:
-        export_kits(id_to_code)
+        export_kits({**id_to_code, **foreign})
 
 
 def export_kits(id_to_code: dict[str, str]) -> None:

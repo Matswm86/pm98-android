@@ -17,9 +17,11 @@ class_name PreseasonScreen
 ## art; its ACTIVE tab style is procedural — no walkthrough frame shows it), and
 ## press tints.
 ##
-## Honest gaps (documented): foreign-club KIT art not extracted -> foreign country
-## = name + empty panel; S.AMERICA map has no flag markers (no capture of that
+## Honest gaps (documented): S.AMERICA map has no flag markers (no capture of that
 ## tab); friendlies are stored on the save, simulated when the match loop lands.
+## (Foreign-club kit art extracted 2026-07-04 — all 476 NANOESC kits in
+## app/art/kits/nano/, positional id->code map in tools/re/map_crests.py — so
+## foreign country panels now render kits via the nano_kit fallback.)
 
 signal preseason_done(rivals: Array)
 
