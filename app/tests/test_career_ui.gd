@@ -86,27 +86,33 @@ func _run() -> void:
 		lu.queue_free()
 	await process_frame
 
-	# Drive the tactics screens through the real UI (catches wiring bugs).
-	main._push(main._show_tactics)
+	# Drive the TACTICS board (the original-art surface) through the real UI
+	# wiring (catches wiring bugs). The interim text-menu tactics handlers were
+	# removed 2026-07-04 — the board's signals are the live path now.
+	main._show_tactics_board_screen()
 	await process_frame
-	main._show_lineup()                         # render LINE-UP
-	await process_frame
-	main._activate_formation("4-3-3")           # change shape (pops back to tactics)
-	await process_frame
-	ok = _assert(Tactics.from_dict(main._career.tactics).formation == "4-3-3",
-		"UI formation change persisted") and ok
-	main._push(main._show_lineup)
-	await process_frame
-	main._assign_slot(10, _bench_outfielder(gamedb, main))   # swap a forward
-	await process_frame
-	ok = _assert(Tactics.from_dict(main._career.tactics).validate(
-		gamedb.club(main._career.club_id)) == "", "UI line-up still valid after swap") and ok
-	main._activate_tactics({"a": "marking"})    # toggle marking in place
-	await process_frame
-	main._show_takers()
-	await process_frame
-	main._show_load_tactics()
-	await process_frame
+	var tb: Node = null
+	for ch in main.get_children():
+		if ch is TacticsBoardScreen:
+			tb = ch
+	ok = _assert(tb != null, "TACTICS board overlay mounted") and ok
+	if tb != null:
+		tb.formation_picked.emit("4-3-3")       # PREDEF pick -> set_formation + save
+		await process_frame
+		ok = _assert(Tactics.from_dict(main._career.tactics).formation == "4-3-3",
+			"UI formation change persisted") and ok
+		ok = _assert(Tactics.from_dict(main._career.tactics).validate(
+			gamedb.club(main._career.club_id)) == "",
+			"XI re-filled valid for the new shape") and ok
+		tb.save_pressed.emit()                  # SAVE TACTICS -> named preset
+		await process_frame
+		tb.load_pressed.emit()                  # LOAD TACTICS -> re-apply last preset
+		await process_frame
+		ok = _assert(Tactics.from_dict(main._career.tactics).validate(
+			gamedb.club(main._career.club_id)) == "",
+			"line-up still valid after preset LOAD") and ok
+		tb.return_pressed.emit()                # RETURN frees the board
+		await process_frame
 
 	# Drive the transfer screens (S7): market -> bid -> squad -> RENEW -> news.
 	main._push(main._show_transfers)
@@ -188,19 +194,6 @@ func _run() -> void:
 
 	print("\n%s" % ("ALL PASS" if ok else "FAILURES ABOVE"))
 	quit(0 if ok else 1)
-
-
-## A squad outfielder not currently in the manager's XI (to test a swap).
-func _bench_outfielder(gamedb: Node, main: Node) -> int:
-	var club: Dictionary = gamedb.club(main._career.club_id)
-	var t := Tactics.from_dict(main._career.tactics)
-	var in_xi: Dictionary = {}
-	for id in t.xi:
-		in_xi[int(id)] = true
-	for p in club.get("players", []):
-		if not p.get("isGK") and not in_xi.has(int(p["id"])):
-			return int(p["id"])
-	return t.xi[10]
 
 
 func _assert(cond: bool, label: String) -> bool:

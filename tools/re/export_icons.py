@@ -56,9 +56,12 @@ EXTRAS = [
     ("PRIMASGOL.BMP", "clause_primasgol.png"),  # Scoring bonus (ball)
     ("CASACOCHE.BMP", "clause_casacoche.png"),  # House and car
     # TACTICAS screen (frame 014_162413; docs/re/tacticas_screen_re.md). The button
-    # glyphs the FUN_00568800 builder loads, the ROLE-column arrow, the star-rating
-    # glyphs, and the pitch marker sprites (green disc primary + diagonal movement
-    # arrows) the two-phase formation markers use.
+    # glyphs the FUN_00568800 builder loads, the ROLE-column arrow and the
+    # POS-column triangle. The pitch markers + rating stars are NOT exported here:
+    # build_tactics_chrome_from_frames.py owns them (dverde/averde/fle* from the
+    # tacticas PKF dir; STARJUGON from the frame bake). The old mk_disc/mk_arrow/
+    # star_on/star_off/fle_ul.. exports were the wrong-dir (LINE-UP) variants and
+    # STARPARON the wrong star — retired 2026-07-04.
     ("PREDEF.BMP", "tacticas/predef.png"),  # PREDEF. TACTICS (pitch grid)
     ("GRABAR.BMP", "tacticas/grabar.png"),  # SAVE TACTICS (floppy)
     ("VERRIVAL.BMP", "tacticas/verrival.png"),  # VIEW RIVAL (pitch + magnifier)
@@ -66,14 +69,6 @@ EXTRAS = [
     ("ALI.BMP", "tacticas/ali.png"),  # LINE-UP (team photo)
     ("ROL.BMP", "tacticas/rol.png"),  # ROLE column header arrow
     ("FLECHA.BMP", "tacticas/flecha.png"),  # POS-column left triangle
-    ("STARPARON.BMP", "tacticas/star_on.png"),  # rating star (filled)
-    ("STARPARON-OFF.BMP", "tacticas/star_off.png"),  # rating star (empty)
-    ("DVERDE.BMP", "tacticas/mk_disc.png"),  # pitch primary marker (green disc)
-    ("AVERDE.BMP", "tacticas/mk_arrow.png"),  # pitch movement marker (green arrow, horiz)
-    ("FLEUL.BMP", "tacticas/fle_ul.png"),  # movement arrow up-left
-    ("FLEUR.BMP", "tacticas/fle_ur.png"),  # movement arrow up-right
-    ("FLEDL.BMP", "tacticas/fle_dl.png"),  # movement arrow down-left
-    ("FLEDR.BMP", "tacticas/fle_dr.png"),  # movement arrow down-right
 ]
 
 
