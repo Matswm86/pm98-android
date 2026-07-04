@@ -15,8 +15,9 @@ var club_name: String = ""
 var manager_name: String = ""     # entered on the SELECCION new-career screen
 var manager_level: String = "manager"   # NIVEL dialog pick: trainer/manager/accountant/total
 var players_age: bool = false     # NIVEL "Players age ?" checkbox
-var preseason_rivals: Array = []  # PRESEASON friendly picks [{date, club_id, name}]
-                                  # (simulated once the match loop lands; stored now)
+var preseason_rivals: Array = []  # PRESEASON friendly picks [{date, club_id, name, home}]
+var friendlies_played: int = 0    # picks already simulated (index into preseason_rivals)
+var friendly_results: Array = []  # played friendlies [{date, home_id, away_id, hg, ag}]
 var league_id: String = ""
 var league_name: String = ""
 var season: String = "1997-98"
@@ -331,6 +332,51 @@ func manager_fixture() -> Array:
 		if int(m[0]) == club_id or int(m[1]) == club_id:
 			return [int(m[0]), int(m[1])]
 	return []
+
+
+## The next un-played PRESEASON friendly pick, or {} once the league has kicked
+## off. Friendlies occupy the walked August dates (1/4/6/8) BEFORE round 1
+## (run-2 header witnesses: Juventus Fri 1, Barcelona Mon 4, Sao Paulo Wed 6),
+## so they gate on week == 0. Main gates hub CONTINUE on this; a direct
+## advance_week() call skips any un-played friendlies (they expire with week 0).
+func pending_friendly() -> Dictionary:
+	if week != 0 or friendlies_played >= preseason_rivals.size():
+		return {}
+	return preseason_rivals[friendlies_played]
+
+
+## Simulate the pending preseason friendly against `rival` (a roster-loaded club
+## dict — the GameDB view for foreign sides). Same engine path as a league
+## fixture: the faithful stat engine where both XIs are usable, the ratings
+## fallback otherwise; the manager fields his real repaired XI. Home/away comes
+## from the pick (witnessed continent-tab rule — see PreseasonScreen). NO league
+## table / morale / clause / cash effects: the original's friendly side-effects
+## are un-RE'd (no frame evidence); only the match itself is walked (run-2 BRIEF
+## sheet09, Man Utd v Sao Paulo). Returns the advance_week manager_res shape so
+## the same MatchScreen flow renders it, plus `friendly: true`.
+func play_friendly(rng: RandomNumberGenerator, rival: Dictionary) -> Dictionary:
+	var pick := pending_friendly()
+	if pick.is_empty():
+		return {}
+	var rid := int(pick.get("club_id", -1))
+	var at_home := bool(pick.get("home", false))
+	var my_ratings := _ratings_for(club_id)
+	var my_xi := _mgr_featured_xi()
+	var rv_ratings := MatchEngine.team_ratings(rival)
+	var rv_xi := MatchSim.xi_of(rival)
+	var h := club_id if at_home else rid
+	var a := rid if at_home else club_id
+	var res := MatchSim.simulate(rng,
+		my_ratings if at_home else rv_ratings,
+		rv_ratings if at_home else my_ratings,
+		my_xi if at_home else rv_xi,
+		rv_xi if at_home else my_xi, h, a)
+	friendlies_played += 1
+	friendly_results.append({"date": str(pick.get("date", "")), "home_id": h,
+		"away_id": a, "hg": int(res["home_goals"]), "ag": int(res["away_goals"])})
+	return {"home_id": h, "away_id": a, "hg": int(res["home_goals"]),
+		"ag": int(res["away_goals"]), "manager_home": at_home,
+		"goals": res.get("goals", []), "friendly": true}
 
 
 ## The manager's full league season for the CALENDAR view: one entry per round, in order,
@@ -1589,6 +1635,11 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	week = 0
 	finished = false
 	results.clear()
+	# Preseason friendlies were a career-entry pick; season 2+ has no re-pick UI
+	# (un-walked — the walkthrough started one career), so the slate just clears.
+	preseason_rivals.clear()
+	friendlies_played = 0
+	friendly_results.clear()
 	transfer_listed.clear()
 	offers_left = OFFERS_PER_WEEK
 	_log("--- %s season ---" % season)
@@ -1924,6 +1975,7 @@ func to_dict() -> Dictionary:
 		"club_id": club_id, "club_name": club_name, "manager_name": manager_name,
 		"manager_level": manager_level, "players_age": players_age,
 		"preseason_rivals": preseason_rivals,
+		"friendlies_played": friendlies_played, "friendly_results": friendly_results,
 		"league_id": league_id,
 		"league_name": league_name, "season": season, "year": year, "week": week,
 		"fixtures": fixtures, "table": tbl, "results": results, "cash": cash,
@@ -1971,6 +2023,8 @@ static func from_dict(d: Dictionary) -> Career:
 	c.manager_level = str(d.get("manager_level", "manager"))
 	c.players_age = bool(d.get("players_age", false))
 	c.preseason_rivals = d.get("preseason_rivals", [])
+	c.friendlies_played = int(d.get("friendlies_played", 0))
+	c.friendly_results = d.get("friendly_results", [])
 	c.league_id = d.get("league_id", "")
 	c.league_name = d.get("league_name", "League")
 	c.season = d.get("season", "1997-98")

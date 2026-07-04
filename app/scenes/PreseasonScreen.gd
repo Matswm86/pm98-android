@@ -254,7 +254,15 @@ func _on_input(e: InputEvent) -> void:
 			elif was.begins_with("kit:"):
 				var i := int(was.substr(4))
 				if _rivals.size() < 4 and i < _country_clubs.size():
-					_rivals.append(_country_clubs[i])
+					# `home` = the MANAGER hosts. Witnessed rule (run-2 match
+					# headers, top plaque = home): EUROPE-tab rivals host you
+					# (Juventus Fri 1, Barcelona Mon 4), the S.AMERICA pick
+					# visits you (Sao Paulo Wed 6, Man Utd on top). 3 witnesses
+					# — continent-tab hypothesis, documented in
+					# docs/re/pretemporada_screen_re.md.
+					var pick: Dictionary = (_country_clubs[i] as Dictionary).duplicate()
+					pick["home"] = _tab == 1
+					_rivals.append(pick)
 					queue_redraw()
 
 

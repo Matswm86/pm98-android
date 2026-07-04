@@ -72,7 +72,9 @@ this pass. Witnesses recomposed pixel-exact by the bake: 014, 015_162415
   layout; filled with the face colour (140,140,180). Never visible in-game.
 - The name/status/calendar centring rules are proven only on the walked
   strings; in-season status strings are entirely un-walked.
-- Manager-mode kit patches exist for Man Utd only (058); the hub's
-  preseason-friendly fixture header is un-wired in Main._match_header()
-  (preseason_rivals has no week join yet) — league weeks show the fixture,
-  other weeks the manager plaques.
+- Manager-mode kit patches exist for Man Utd only (058).
+- ~~Preseason-friendly fixture header un-wired~~ — CLOSED 2026-07-04:
+  `Main._next_fixture()` resolves the pending friendly first (home/away from
+  the pick's witnessed continent-tab rule), so the header shows the friendly
+  fixture exactly as the run-2 witnesses do (014/015/155/138/128); league
+  weeks show the league fixture, byes the manager plaques.

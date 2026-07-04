@@ -1175,7 +1175,7 @@ func _begin_career(manager_name: String, league: Dictionary, club: Dictionary,
 	_career = Career.create(club, league, league_clubs, GameDB.leagues)
 	_career.manager_name = manager_name
 	# Entry-flow picks (NIVEL level + Players age ? + preseason friendlies). The
-	# rivals are stored on the save; simulation lands with the match loop.
+	# rivals play out via hub CONTINUE before league round 1 (Career.play_friendly).
 	_career.manager_level = _pending_level
 	_career.players_age = _pending_age
 	var dates := ["1997-08-01", "1997-08-04", "1997-08-06", "1997-08-08"]
@@ -1183,7 +1183,7 @@ func _begin_career(manager_name: String, league: Dictionary, club: Dictionary,
 	for i in preseason_rivals.size():
 		var rc: Dictionary = preseason_rivals[i]
 		rivals_meta.append({"date": dates[i] if i < 4 else "", "club_id": int(rc.get("id", -1)),
-			"name": str(rc.get("name", ""))})
+			"name": str(rc.get("name", "")), "home": bool(rc.get("home", false))})
 	_career.preseason_rivals = rivals_meta
 	_career.save()
 	_dismiss_seleccion()
@@ -1210,7 +1210,11 @@ func _mgr_club() -> Dictionary:
 
 func _club_with_roster(id: int) -> Dictionary:
 	var base: Dictionary = GameDB.club(id).duplicate()
-	base["players"] = _career.squad_of(id)
+	# Foreign clubs (preseason friendly rivals) have no live career roster —
+	# keep the GameDB squad rather than wiping it with an empty override.
+	var live := _career.squad_of(id)
+	if not live.is_empty():
+		base["players"] = live
 	# The managed club's ground can be expanded via stadium WORKS, so its live capacity
 	# overrides the static GameDB figure (feeds finance gate income + the stadium tier).
 	if id == _career.club_id and _career.stadium_capacity > 0:
@@ -1251,8 +1255,8 @@ func _mount_hub() -> void:
 	else:
 		move_child(_hub, get_child_count() - 1)
 	_hub.visible = true
-	# Next-fixture opponent for the hub's central stack.
-	var fx := c.manager_fixture()
+	# Next-fixture opponent for the hub's central stack (pending friendly first).
+	var fx := _next_fixture()
 	var opp_name := ""
 	var opp_id := -1
 	var is_home := true
@@ -1280,6 +1284,18 @@ func _leave_career() -> void:
 func _career_advance() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
+	# A pending preseason friendly plays FIRST (the walked August dates precede
+	# round 1) through the same match flow as a league fixture — run-2 played
+	# Man Utd v Sao Paulo in BRIEF mode. League table untouched (Career).
+	var fr := _career.pending_friendly()
+	if not fr.is_empty():
+		var res_f := _career.play_friendly(rng, _club_with_roster(int(fr.get("club_id", -1))))
+		_career.save()
+		if res_f.is_empty():
+			_show_career()
+			return
+		_show_match_result(res_f)
+		return
 	var res := _career.advance_week(rng)   # ratings come from the live roster
 	_career.save()   # autosave each week
 	if res.is_empty():
@@ -1405,11 +1421,22 @@ func _show_lineup_screen() -> void:
 ## TACTICS frame shows the fixture plaques — else the manager plaques.
 ## (Preseason friendly headers from preseason_rivals are un-wired yet: the
 ## friendly fixture list has no week join here; documented loose end.)
+## [home_id, away_id] for the manager's NEXT match: a pending preseason friendly
+## first (the walked August dates precede round 1 — run-2 headers show the
+## friendly fixture on LINE-UP/TACTICS/VIEW RIVAL), else this week's league
+## fixture, else [] (bye / season over).
+func _next_fixture() -> Array:
+	var fr := _career.pending_friendly()
+	if not fr.is_empty():
+		var rid := int(fr.get("club_id", -1))
+		return [_career.club_id, rid] if bool(fr.get("home", false)) else [rid, _career.club_id]
+	return _career.manager_fixture()
+
 func _match_header() -> Dictionary:
 	var d := PMChrome.date_parts(_career.season, _career.week + 1)
 	var h := {"weekday": str(d["wd"]), "day": str(d["day"]),
 		"month": str(d["mon"]), "year": str(d["year"])}
-	var fx := _career.manager_fixture()
+	var fx := _next_fixture()
 	if fx.is_empty():
 		h["mode"] = "manager"
 		h["top"] = _career.manager_name
@@ -1463,7 +1490,7 @@ func _show_tactics_board_screen() -> void:
 		scr.queue_free()
 		_show_tactics_screen())
 	scr.view_rival_pressed.connect(func() -> void:
-		var fx := _career.manager_fixture()
+		var fx := _next_fixture()
 		if fx.is_empty():
 			_toast("No match this week (bye)")
 			return
@@ -2426,7 +2453,7 @@ func _menu_action(action: String, scr: MenuScreen) -> void:
 ## message). Replaces the WRONG-SCREEN DATA BASE browser (APP_VS_SPEC_AUDIT B1). A bye week
 ## has no opponent, so it just reports that.
 func _show_opponent(scr: MenuScreen) -> void:
-	var fx := _career.manager_fixture()
+	var fx := _next_fixture()
 	if fx.is_empty():
 		scr.alert("No match this week (bye)")
 		return
@@ -2452,7 +2479,7 @@ func _show_rival_screen(rival: Dictionary) -> void:
 
 ## "vs Arsenal" / "at Chelsea" / "bye" for the manager's next match.
 func _menu_next_match() -> String:
-	var fx := _career.manager_fixture()
+	var fx := _next_fixture()
 	if fx.is_empty():
 		return "No match this week (bye)"
 	var home: bool = int(fx[0]) == _career.club_id

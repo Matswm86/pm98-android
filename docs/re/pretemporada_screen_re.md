@@ -61,11 +61,25 @@ baked flag PNGs — do NOT hand-guess countries.
 
 ## App wiring honesty
 
-The app's Career/fixtures currently has no friendly-match support; the match loop is
-the next engine milestone (line-up handoff). The screen stores picked rivals + dates
-into the career save (`preseason_rivals`); simulation of those friendlies lands with
-the match loop. SKIP/CONTINUE path fully functional. Foreign-club coverage depends on
-GameDB (England fully present; foreign clubs as available in the decoded DB).
+**Friendly sim wired 2026-07-04** (`Career.pending_friendly`/`play_friendly` +
+`Main._career_advance`/`_next_fixture`; `tests/test_friendly.gd`): the picked rivals
+play out one per hub CONTINUE before league round 1, through the SAME match flow as a
+league fixture (stat engine where both XIs usable, ratings fallback otherwise) — run-2
+walked exactly that (Man Utd v Sao Paulo in BRIEF, sheet09). Pre-match surfaces (hub
+OPPONENT plaque, match header, VIEW RIVAL, TACTICS board) show the friendly fixture
+first, matching the run-2 headers (Juventus Fri 1 / Barcelona Mon 4 / Sao Paulo Wed 6).
+
+- **Home/away = witnessed continent-tab rule (3 witnesses, hypothesis):** EUROPE-tab
+  rivals host the manager (Juventus + Barcelona kit plaques on top), the S.AMERICA
+  pick visits (155: Man Utd on top vs Sao Paulo). Stored per pick as `home`.
+- **No league table / morale / clause / cash effects** from a friendly: the original's
+  friendly side-effects are un-RE'd (no frame evidence). Results go to a separate
+  `friendly_results` save array (not the league `results` feed).
+- Season 2+ has no re-pick UI (un-walked — one career started); `advance_season`
+  clears the slate.
+
+SKIP/CONTINUE path fully functional. Foreign-club kit + squad coverage complete since
+the 2026-07-04 kit extraction (all 476 clubs; docs/re/crests_re.md).
 
 ## Pixel-parity pass (2026-07-03) — chrome doctrine + new frame-derived facts
 
