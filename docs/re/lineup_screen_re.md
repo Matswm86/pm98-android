@@ -97,3 +97,68 @@ enforced by `Tactics.validate`'s role check, so a swap that would break it is re
   `_save_tactics` + `Career.save()`. Selected row drawn highlighted (gold tint + border).
 - Tests: `app/tests/test_lineup_xi.gd` (23 assertions: sub-on, XI↔XI, GK guard accept+reject,
   deselect, bench↔bench, signal, synthetic `_hit`/`_on_input` round-trip).
+
+## 2026-07-04 — frame-baked BODY parity pass (lineup_155 FULL FRAME 0px)
+
+Binding frame 155_162931 + witnesses 003/128/131/160; bake =
+`tools/re/build_lineup_chrome_from_frames.py` (entry-flow doctrine). Everything
+below is frame-measured/asserted; the old "Build mapping" reconstruction above
+is superseded by `app/scenes/LineupScreen.gd`'s baked pipeline.
+
+- **Row grid**: 16px units from y87 (sep / 12px fill / sep / 2px white); XI fill
+  tops y88+16i; SUBSTITUTES white band y263..285 (23px, ball + label baked as
+  `band_subs.png`), subs y287+16j; RESERVES band y366..387 (22px); res y389+16k.
+  Table borders x7-8/x463-464, y67-68/y465-466; column header band y69..86 is
+  STATIC across modes/frames/runs (asserted; stays in chrome).
+- **Tints**: XI rows tint by FORMATION-SLOT band (FUN_004fe2d0, = TACTICS);
+  SUBSTITUTES rows are UNIFORM (212,223,255), RESERVES UNIFORM (180,200,220)
+  with sep colours (120,120,160)/(100,120,140); XI seps (128,128,128). Card
+  icons FICHATIT/FICHACONV/FICHANOCONV per tier (baked in the row templates).
+- **RATING rows**: STARJUGON strip at x172+14j (glyph top fill+1), odd half =
+  STARJUGON-OFF (same pair as TACTICS); fine-role SHORT name (ProMan8, ink
+  100,120,140) right-aligned to the x349 sep; AV ProMan8 red GDI-centred in
+  (351,22); CAMROL 25x14 at x374; POS word GDI-centred in (401,34) on the tint.
+  The SHORT-role table is code-embedded (pushes at 0x567d35..0x567da8):
+  KEEPER / RIGHT BACK / LEFT BACK / SWEEPER / INS. CENT. LEFT / INS. CENT.
+  RIGHT / RIGHT MID. / INSIDE RIGHT / CENTRE FORWARD / CENTRAL MID. / LEFT
+  MID. / RIGHT WINGER / CENTRAL STRIKER / LEFT WINGER / DEF. MIDFIELDER /
+  RIGHT FORWARD / LEFT FORWARD / INSIDE LEFT (14 of 18 frame-witnessed).
+- **PARAMETERS rows** (witness 128): grey sep cols x173..323 step 25; values
+  GDI-centred per cell; inks EN (150,0,0), SP/ST/AG/GU (100,100,140),
+  FI (42,95,170), MO (80,110,5). Both toggle plates walked (155 RATING-on /
+  128 PARAM-on) + the dark-red arrow beside the ACTIVE toggle.
+- **INJURED row** (Beckham, 7 weeks): gold tint (212,191,85) + 1px black frame
+  (both in `row_inj.png`); cells [cross|count(yellow)|WEEKS(black)|FI navy|MO
+  green]; "DAYS"/"DAY"/"WEEK(S)" strings live beside the role table.
+- **SELECTED row** (Solskjaer): 2px black frame at x28-29/x437-438,
+  y fill-2..fill+13, drawn over the normal template.
+- **UNDO rule**: T/I/S is the default (003/128/131 — 131 is SELECTED and still
+  shows T/I/S); UNDO replaces the block iff a PENDING CHANGE exists — an XI
+  edit this visit (160) or an injured starter still in the XI (155).
+- **Coverage zone**: selecting a player dims his slot's coverage rect on the
+  CAMPO — rect = slot raw fields [0..3] as (x0,y0,w,h) through the marker map
+  `(4 + x*148/318, 3 + y*88/198)` (155 slot9 + 156 slot5 + 131 4-4-2 slot6 all
+  fit). The dim is a positional NOISE dither (no colour/Bayer LUT fits) —
+  walked zones ship as verbatim patches (`zone_352_9/352_5/442_6.png`);
+  un-walked zones use a majority-vote LUT (documented approximation).
+- **Markers**: DVERDE disc + AVERDE arrow per slot at raw[4..7] through the
+  same map; the SELECTED slot draws DBLANCO/ABLANCO on top of the zone,
+  undimmed; greens inside a zone dim WITH it. Bake recomposes 155's pitch to
+  0px. One palette index decodes (192,227,192) under MANAGER.PAL but renders
+  (192,220,192) on this screen (sprites + campo patched to frame truth).
+- **Right panel**: TEAM RATING strip stars = STAREQON with an engine shadow
+  ring rendered through the noise dither — position-deterministic, so walked
+  per-cell PATCHES ship (`star_eq_full_0..3/half/nude.png`, x512+15j y133);
+  value = ProMan10 right-aligned at x613 (ink 160,160,200). Name band =
+  ProMan10 white GDI-centred in (478,152), text top y158. Attr buttons: values
+  = attrs PO/PA/RM/RG/EN/TI verbatim (Solskjaer 11/72/84/81/66/79 = frame),
+  ProMan8 (42,95,170) GDI-centred in (col+47,31); stars = STARPARON(-OFF) at
+  col+10j, top btn+12, with the same noise shadow — walked strips ship
+  verbatim per halves-signature (`attr_stars_0..5.png`), un-walked counts draw
+  plain glyphs (documented).
+- **Scrollbar**: fully static across walked frames (scroll 0): DOWN box =
+  ARROWDOWNOFF verbatim at (443,434); the UP box is a composed at-limit look
+  (frame-cut `scroll_up_limit.png`); thumb/track cut for un-walked scrolls.
+- **Bench/reserve order** is save-stored (team+0x1930/0x1934) — the club dict
+  may pin `bench`/`reserves` pid arrays (the parity shot does); the app
+  default derives them by ability.

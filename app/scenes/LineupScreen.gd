@@ -1,111 +1,254 @@
 extends Control
 class_name LineupScreen
-## PM98 LINE-UP (ALINEACIÓN) screen, rebuilt to match the real game (ma_7): the shared
-## match-context barra (PMChrome.draw_match_header; witness frame 155_162931) over the white squad
-## TABLE — N. | PLAYER | EN SP ST AG GU FI MO | AV (+bar) | ROL | POS — in the game's
-## own English column codes, with STARTERS / SUBSTITUTES / RESERVES sections and the
-## right control column (PARAMETERS / RATING, the TEAM RATING star strip, the attribute
-## buttons, the CAMPO mini-pitch with the live XI markers, TRAINING / INJURIES /
-## STATISTICS and TACTICS / RETURN).
+## PM98 LINE-UP (ALINEACION) at pixel parity (binding frame 155_162931 + witnesses
+## 003/128/131/160; docs/re/lineup_screen_re.md). Static chrome = the REAL frame
+## baked verbatim below the shared match-header barra
+## (tools/re/build_lineup_chrome_from_frames.py, entry-flow doctrine): table panel,
+## column-header band, TEAM RATING strip furniture, nude attr buttons, clean CAMPO,
+## UNDO plate, scrollbar, TACTICS/RETURN. This screen draws ONLY the dynamic layer:
+##  - squad rows from frame-cut templates per tint class (FUN_004fe2d0 slot bands:
+##    gk/def/mid/fwd for the XI; uniform sub/res skins) + ProMan8 number/name,
+##    STARJUGON star strip (halves=(AV+1) div 10, odd half = the dimmed star),
+##    EURO8 fine-role SHORT name, red AV, CAMROL sprite, POS word;
+##  - the INJURED row (gold tint template: cross + count + WEEKS/DAYS boxes);
+##  - the SELECTED row's 2px black frame + the right-panel name band + attr
+##    values (attrs PO/PA/RM/RG/EN/TI — frame-verified: Solskjaer 11/72/84/81/
+##    66/79) with STARPARON stars;
+##  - the TEAM RATING strip stars (walked per-cell patches; the strip fill is a
+##    positional noise dither, so un-walked cells reuse the nearest patch) + value;
+##  - the CAMPO mini-pitch composite: green DVERDE/AVERDE markers per formation
+##    slot (mk = raw*148/318, *88/198 + (4,3)), the selected slot's coverage-ZONE
+##    overlay (walked zones = frame patches; un-walked = majority dim LUT), and
+##    the selected slot's WHITE (DBLANCO/ABLANCO) markers on top;
+##  - SUBSTITUTES / RESERVES band strips (frame-cut, ball icon + label baked);
+##  - the PARAMETERS numeric view (sep cols + per-column inks, witness 128);
+##  - state plates: PARAM-active toggles + red arrow (128) / T-I-S vs UNDO.
 ##
-## XI + formation come from the career's Tactics; markers are placed by the engine's own
-## mapping (marker = pitch.origin + tac*scale). Native 640x480; scales to fit its parent.
+## UNDO rule (walked evidence): TRAINING/INJURIES/STATISTICS show by default
+## (003/128/131 — 131 has a SELECTED player and still shows them); UNDO replaces
+## them iff the line-up has a PENDING CHANGE — an XI edit this visit (160) or an
+## injured player still occupying an XI slot (155). UNDO reverts to the entry XI.
 ##
-## INTERACTIVE: a real squad overflows the panel (RESERVES used to silently truncate), so
-## the original ARROW scroll buttons page the squad list (XI -> SUBSTITUTES -> RESERVES) as
-## one window; any other tap emits `back_pressed` (the display-screen tap-to-dismiss).
+## XI editing (select-then-swap) is unchanged: tap selects, second tap swaps via
+## Tactics.assign; the GK slot only accepts a keeper (lineup_screen_re.md).
+## Native 640x480; scales to fit its parent.
 
 signal back_pressed
-signal tactics_pressed    # the TACTICS button -> Main opens the TEAM TACTICS modal
-signal xi_changed         # a player was swapped into/within the XI -> Main persists tactics
+signal tactics_pressed    # the TACTICS button -> Main opens the TACTICS board
+signal xi_changed         # a player was swapped into/within the XI -> Main persists
 
 const W := 640
 const H := 480
+const BODY_Y0 := 62
 
-const C_GK_ROW := Color(0.98, 0.97, 0.80)        # pale-yellow goalkeeper row
-const C_STATBAND := Color(0.80, 0.90, 0.78)      # pale-green stat-cell band
-const C_AVBAR := Color(0.46, 0.74, 0.32)
-const C_AVBAR_BG := Color(0.62, 0.64, 0.58)
-const C_BTN := Color(0.20, 0.34, 0.62)           # attribute buttons (blue)
-const C_BTN_HI := Color(0.42, 0.56, 0.84)
-const C_BTN_LO := Color(0.08, 0.16, 0.34)
-const C_DKBTN := Color(0.08, 0.13, 0.26)         # dark navy buttons
-const C_DKBTN_HI := Color(0.28, 0.40, 0.66)
-const C_GOLD := Color(1.0, 0.86, 0.22)
-const C_PANEL_TXT := Color(0.88, 0.93, 1.0)
-# Role tag colours (ROL / POS).
-const C_ROLE := {"GK": Color(0.20, 0.52, 0.30), "DEF": Color(0.22, 0.36, 0.66),
-	"MID": Color(0.46, 0.30, 0.62), "FOR": Color(0.66, 0.24, 0.22)}
-
-# Table geometry (640x480). {code, x, attr_key}; x is the RIGHT edge for numeric cols,
-# LEFT edge for text cols. GU (not QU) per the real header.
-const COLS := [
-	["EN", 174, "EN"], ["SP", 200, "VE"], ["ST", 226, "RE"], ["AG", 252, "AG"],
-	["GU", 278, "CA"], ["FI", 304, "_fit"], ["MO", 330, "_mo"], ["AV", 356, "_avg"],
-]
-const AVG_KEYS := ["VE", "RE", "AG", "CA", "RM", "RG", "PA", "TI"]
-# Table frame at the walked-frame anchors (155_162931: border top y67, bottom y466,
-# first squad row y88) so the body clears the 62px match-header band. The interior
-# row metrics keep the app's reconstruction — the body parity story is separate.
-const TABLE := Rect2(6, 67, 470, 399)
-const HDR_Y := 70
-const ROW_X := 8
-const ROW_W := 466
-const ROW_H := 16
-const STAT_X0 := 158
-const STAT_X1 := 344
-const AVBAR_X := 360
-const ROL_X := 398
-const POS_X := 430
-const XI_Y0 := 88
-# Original ARROW scroll buttons (16x16 art) at the frame-walked spot (155_162931):
-# overlaying the squad table's right edge near its bottom, up ~y388 / down ~y433,
-# the original list scrollbar. Shown only while the list overflows.
-const SCROLL_UP := Rect2(441, 388, 22, 22)
-const SCROLL_DOWN := Rect2(441, 433, 22, 22)
+# ---- frame-baked geometry (lineup_chrome_samples.json) ----
+const TABLE := Rect2(6, 67, 470, 399)     # hit-test extent (borders x7..464)
+const XI_Y0 := 88                          # first XI fill top
+const ROW_PITCH := 16
+const ROW_X := 9                           # template left (card icon)
+const ROW_W := 429
+const BAND_SUB_H := 23
+const BAND_RES_H := 22
+const NUM_CELL := [33, 17]                 # GDI-centred shirt-number cell
+const NAME_X := 67
+const STAR_X0 := 172
+const STAR_PITCH := 14
+const ROLE_RIGHT := 349                    # fine-role right-aligns to the sep col
+const AV_CELL := [351, 22]
+const CAMROL_X := 374
+const POS_CELL := [401, 34]
+const NUM_SEPS := [173, 198, 223, 248, 273, 298, 323]
+const NUM_CELLS := [[174, 24], [199, 24], [224, 24], [249, 24], [274, 24], [299, 24], [324, 25]]
+const INJ_COUNT := [199, 24]               # count digits cell (yellow)
+const INJ_WEEKS := [224, 74]               # WEEKS/DAYS label cell (black)
+const INJ_FI := [299, 24]
+const INJ_MO := [324, 25]
+# right panel
+const STRIP_STAR_X0 := 512
+const STRIP_STAR_PITCH := 15
+const STRIP_STAR_Y := 133
+const STRIP_VAL_RIGHT := 613               # value right-align x (ProMan10)
+const STRIP_VAL_Y := 137
+const NAME_BAND := Rect2(478, 150, 152, 21)   # ProMan10 GDI-centred cell
+const ATTR_ROWS_Y := [171, 196, 221]
+const ATTR_COLS := [[479, 556], [557, 634]]
+const ATTR_STAR_DY := 12
+const ATTR_VAL_DY := 11
+# walked star-strip signatures + anchors (Solskjaer 155): blit the verbatim
+# frame strip when the halves count matches; plain glyphs otherwise (the
+# glyph shadow is positional noise — documented approximation)
+const ATTR_SIG := [1, 7, 8, 8, 6, 8]
+const ATTR_XY := [[479, 183], [557, 183], [479, 208], [557, 208], [479, 233], [557, 233]]
+const CAMPO_XY := Vector2i(478, 248)
+const TIS_XY := Vector2i(474, 348)
+const TOGGLE_PARAM := Rect2(477, 68, 157, 23)
+const TOGGLE_RATING := Rect2(477, 92, 157, 23)
+const ARROW_X := 464
+# scrollbar (static in chrome at scroll 0; runtime redraw when scrolled)
+const SCROLL_UP := Rect2(443, 388, 16, 16)
+const SCROLL_DOWN := Rect2(443, 434, 16, 16)
+const THUMB_STRIP_XY := Vector2i(439, 405)
 const SCROLL_STEP := 3
+const BTN_TACTICS := Rect2(481, 448, 75, 24)
+const BTN_RETURN := Rect2(558, 448, 75, 24)
+const UNDO_BTN := Rect2(478, 352, 155, 31)
+const TIS_BTNS := [Rect2(478, 352, 155, 26), Rect2(478, 380, 155, 26), Rect2(478, 408, 155, 26)]
 
-# Pitch panel (right column).
-const PITCH_POS := Vector2(482, 250)
-const CAMPO_W := 150.0
-const CAMPO_H := 92.0
-const MARK_ORIGIN := Vector2(484, 252)
-const MARK_W := 146.0
-const MARK_H := 88.0
-const TAC_W := 318.0
-const TAC_H := 198.0
-const KIT_SRC := Rect2(0, 0, 31, 64)
+# ---- frame-sampled inks ----
+const C_NUM := Color8(0, 0, 128)
+const C_NAME := Color8(0, 0, 0)
+const C_ROLE := Color8(100, 120, 140)
+const C_AV := Color8(210, 0, 0)
+const C_POS := Color8(0, 0, 0)
+const C_INJ_COUNT := Color8(255, 255, 0)
+const C_INJ_LABEL := Color8(0, 0, 0)
+const C_FI := Color8(0, 0, 128)
+const C_MO := Color8(80, 110, 5)
+const C_STRIP_VAL := Color8(160, 160, 200)
+const C_ATTR_VAL := Color8(42, 95, 170)
+const C_NAME_BAND := Color8(255, 255, 255)
+const NUM_INKS := [Color8(150, 0, 0), Color8(100, 100, 140), Color8(100, 100, 140),
+	Color8(100, 100, 140), Color8(100, 100, 140), Color8(42, 95, 170), Color8(80, 110, 5)]
+const SEP_INK := {"xi": Color8(128, 128, 128), "sub": Color8(120, 120, 160),
+	"res": Color8(100, 120, 140)}
 
-var _campo: Texture2D
-var _f12: Font
-var _f10: Font
-var _f8: Font
-var _kits: Dictionary = {}
+# fine-position (1..18) -> the SHORT role name the LINE-UP rows print (the code-
+# embedded switch at 0x567d35..; 14 of 18 frame-witnessed, index = the long table's)
+const FINE_ROLE_SHORT := ["KEEPER", "RIGHT BACK", "LEFT BACK", "SWEEPER",
+	"INS. CENT. LEFT", "INS. CENT. RIGHT", "RIGHT MID.", "INSIDE RIGHT",
+	"CENTRE FORWARD", "CENTRAL MID.", "LEFT MID.", "RIGHT WINGER",
+	"CENTRAL STRIKER", "LEFT WINGER", "DEF. MIDFIELDER", "RIGHT FORWARD",
+	"LEFT FORWARD", "INSIDE LEFT"]
+const POS_WORD := {"GK": "GOAL", "DF": "DEF", "MF": "MID", "FW": "FOR"}
+const AVG_KEYS := ["VE", "RE", "AG", "CA", "RM", "RG", "PA", "TI"]
+# PARAMETERS view value sources (form columns; FI/MO live via Morale)
+const NUM_KEYS := ["EN", "VE", "RE", "AG", "CA", "_fit", "_mo"]
+# attr-button skills: label -> attr key (frame-verified on Solskjaer 155)
+const SKILL_KEYS := ["PO", "PA", "RM", "RG", "EN", "TI"]
 
 var _club: Dictionary = {}
 var _tactics: Tactics = null
-var _division: String = ""
-var _season: String = "1997-98"
-var _week: int = 0
-var _header: Dictionary = {}   # match-header state (PMChrome.draw_match_header)
+var _division := ""
+var _season := "1997-98"
+var _week := 0
+var _header: Dictionary = {}
 var _by_id: Dictionary = {}
-var _scroll: int = 0
-var _press: String = ""
-var _sel_pid: int = -1    # selected player id (-1 none); tap one then another to swap slots
+var _scroll := 0
+var _press := ""
+var _sel_pid := -1          # selected player id (-1 none)
+var _rating_view := true    # RATING active (chrome default); false = PARAMETERS
+var _entry_xi: Array = []   # XI snapshot at setup() — the UNDO baseline
+var _forms: Dictionary = {}
+
+var _f8: Font
+var _f10: Font
+var _f12: Font
+var _feuro: Font
+var _chrome: Texture2D
+var _rows: Dictionary = {}
+var _bands: Dictionary = {}
+var _star_on: Texture2D
+var _star_off: Texture2D
+var _paron_on: Texture2D
+var _paron_off: Texture2D
+var _eq_full: Array = []
+var _eq_half: Texture2D
+var _eq_nude: Texture2D
+var _attr_strips: Array = []
+var _plate_tis: Texture2D
+var _plate_param_on: Texture2D
+var _plate_rating_off: Texture2D
+var _arrow_at: Dictionary = {}
+var _arrow_off: Dictionary = {}
+var _campo_img: Image
+var _mk_img: Dictionary = {}        # dverde/averde/dblanco/ablanco -> Image
+var _zone_patch: Dictionary = {}    # "352_9" etc -> Image
+var _zone_rects: Dictionary = {}
+var _zone_lut: Dictionary = {}      # "r,g,b" -> [r,g,b]
+var _up_limit: Texture2D
+var _thumb_strip: Texture2D
+var _track_strip: Texture2D
+var _arrow_up_off: Texture2D
+var _pitch_cache_key := ""
+var _pitch_tex: Texture2D
 
 
 func _ready() -> void:
-	_campo = load("res://art/screens/campo.png")
-	_f12 = load("res://art/fonts/proman12.fnt")
-	_f10 = load("res://art/fonts/proman10.fnt")
-	_f8 = load("res://art/fonts/proman8.fnt")
+	_f8 = PMChrome.font("8")
+	_f10 = PMChrome.font("10")
+	_f12 = PMChrome.font("12")
+	_feuro = load("res://art/fonts/euro8.fnt")
+	_chrome = load("res://art/screens/lineup/chrome.png")
+	for cls in ["gk", "def", "mid", "fwd", "inj", "sub", "res"]:
+		_rows[cls] = load("res://art/screens/lineup/row_%s.png" % cls)
+	_bands["sub"] = load("res://art/screens/lineup/band_subs.png")
+	_bands["res"] = load("res://art/screens/lineup/band_res.png")
+	_star_on = load("res://art/screens/tacticas/star_full.png")
+	_star_off = load("res://art/screens/tacticas/star_off.png")
+	_paron_on = load("res://art/screens/lineup/star_paron_on.png")
+	_paron_off = load("res://art/screens/lineup/star_paron_off.png")
+	for j in 4:
+		_eq_full.append(load("res://art/screens/lineup/star_eq_full_%d.png" % j))
+	_eq_half = load("res://art/screens/lineup/star_eq_half.png")
+	_eq_nude = load("res://art/screens/lineup/star_eq_nude.png")
+	_plate_tis = load("res://art/screens/lineup/plate_tis.png")
+	for i in 6:
+		_attr_strips.append(load("res://art/screens/lineup/attr_stars_%d.png" % i))
+	_plate_param_on = load("res://art/screens/lineup/plate_param_on.png")
+	_plate_rating_off = load("res://art/screens/lineup/plate_rating_off.png")
+	_arrow_at["param"] = load("res://art/screens/lineup/arrow_at_param.png")
+	_arrow_at["rating"] = load("res://art/screens/lineup/arrow_at_rating.png")
+	_arrow_off["param"] = load("res://art/screens/lineup/arrow_off_param.png")
+	_arrow_off["rating"] = load("res://art/screens/lineup/arrow_off_rating.png")
+	_up_limit = load("res://art/screens/lineup/scroll_up_limit.png")
+	_thumb_strip = load("res://art/screens/lineup/scroll_thumb_strip.png")
+	_track_strip = load("res://art/screens/lineup/scroll_track_strip.png")
+	_arrow_up_off = load("res://art/icons/lineup/arrow_up_off.png")
+	_campo_img = _img("res://art/screens/lineup/campo.png")
+	for nm in ["dverde", "averde", "dblanco", "ablanco"]:
+		_mk_img[nm] = _img("res://art/icons/lineup/%s.png" % nm)
+	for tag in ["352_9", "352_5", "442_6"]:
+		_zone_patch[tag] = _img("res://art/screens/lineup/zone_%s.png" % tag)
+	_load_samples()
+	_load_formations()
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2(W, H)
 	gui_input.connect(_on_input)
 	queue_redraw()
 
 
-## Feed the manager's club + chosen tactics (+ season/week for the calendar plaque), repaint.
+func _img(path: String) -> Image:
+	var t: Texture2D = load(path)
+	if t == null:
+		return null
+	var im := t.get_image()
+	im.convert(Image.FORMAT_RGBA8)
+	return im
+
+
+func _load_samples() -> void:
+	var f := FileAccess.open("res://data/lineup_chrome_samples.json", FileAccess.READ)
+	if f == null:
+		return
+	var d: Variant = JSON.parse_string(f.get_as_text())
+	if d is Dictionary:
+		_zone_lut = (d as Dictionary).get("zone_lut", {})
+		var zp: Dictionary = (d as Dictionary).get("zone_patches", {})
+		for k in zp:
+			_zone_rects[k] = zp[k]
+
+
+func _load_formations() -> void:
+	var f := FileAccess.open("res://data/formations.json", FileAccess.READ)
+	if f == null:
+		return
+	var d: Variant = JSON.parse_string(f.get_as_text())
+	if d is Dictionary:
+		for rec in (d as Dictionary).get("formations", []):
+			_forms[str(rec.get("name", ""))] = rec
+
+
+## Feed the manager's club + chosen tactics (+ season/week + match header), repaint.
 func setup(club: Dictionary, tactics: Tactics, manager: String = "", division: String = "",
 		season: String = "1997-98", week: int = 0, header := {}) -> void:
 	_club = club
@@ -115,8 +258,6 @@ func setup(club: Dictionary, tactics: Tactics, manager: String = "", division: S
 	_week = week
 	_header = header
 	if _header.is_empty():
-		# manager-mode default (frame 058 layout): manager + own club, own kit.
-		# Date derives from the week; the status pair is the only walked one.
 		var d := PMChrome.date_parts(season, week)
 		_header = {"mode": "manager", "top": manager,
 			"bottom": PMChrome.title_case_name(str(club.get("name", ""))),
@@ -127,53 +268,83 @@ func setup(club: Dictionary, tactics: Tactics, manager: String = "", division: S
 		_by_id[int(p.get("id", -1))] = p
 	_scroll = 0
 	_sel_pid = -1
+	_entry_xi = (_tactics.xi.duplicate() if _tactics != null else [])
+	_pitch_cache_key = ""
 	queue_redraw()
 
 
-# ---- scroll model + input -----------------------------------------------
+# ---- scroll model + flat item list ----------------------------------------
 
-## The squad list flattened to uniform 16px draw-items in render order: each XI player,
-## then a SUBSTITUTES header + bench rows, then a RESERVES header + reserve rows. Row items
-## carry a continuous `idx` for the alternating stripe; this is the source of truth for both
-## the scroll-window renderer and the overflow math.
+## The squad list flattened to draw-items in render order: XI rows, the
+## SUBSTITUTES band + bench rows, the RESERVES band + reserve rows. Rows are
+## 16px units; the bands are 23px/22px strips (frame-measured).
 func _flat_items() -> Array:
 	var items: Array = []
-	var idx := 0
 	var roles: Array = _tactics.roles() if _tactics != null else []
 	var xi: Array = _tactics.xi if _tactics != null else []
 	for i in xi.size():
 		var rl: String = roles[i] if i < roles.size() else ""
-		items.append({"t": "row", "pid": int(xi[i]), "number": i + 1, "role": rl, "idx": idx})
-		idx += 1
-	# Bench + reserves: squad players not in the XI, by ability.
+		items.append({"t": "row", "pid": int(xi[i]), "slot": i, "role": rl, "h": ROW_PITCH})
+	# Bench + reserves: the original squad object stores explicit lists
+	# (team+0x1930/0x1934). The club dict may pin them ("bench"/"reserves"
+	# pid arrays — the parity shot does); the app default derives them from
+	# the not-in-XI rest by ability.
 	var rest: Array = []
 	for p in _club.get("players", []):
 		var pid := int(p.get("id", -1))
 		if pid >= 0 and not xi.has(pid):
 			rest.append(p)
-	rest.sort_custom(func(a, b): return _avg_of(a) > _avg_of(b))
-	items.append({"t": "sec", "label": "SUBSTITUTES"})
-	var bench := rest.slice(0, 5)
-	for j in bench.size():
-		items.append({"t": "row", "pid": int(bench[j].get("id", -1)), "number": 12 + j,
-			"role": _pos_of(bench[j]), "idx": idx})
-		idx += 1
-	items.append({"t": "sec", "label": "RESERVES"})
-	var res := rest.slice(5, rest.size())
-	for j in res.size():
-		items.append({"t": "row", "pid": int(res[j].get("id", -1)), "number": 17 + j,
-			"role": _pos_of(res[j]), "idx": idx})
-		idx += 1
+	var bench: Array = []
+	var reserves: Array = []
+	if _club.has("bench") and _club.has("reserves"):
+		for pid in _club["bench"]:
+			if not xi.has(int(pid)) and _by_id.has(int(pid)):
+				bench.append(_by_id[int(pid)])
+		for pid in _club["reserves"]:
+			if not xi.has(int(pid)) and _by_id.has(int(pid)):
+				reserves.append(_by_id[int(pid)])
+		for p in rest:
+			if not bench.has(p) and not reserves.has(p):
+				reserves.append(p)
+	else:
+		rest.sort_custom(func(a, b): return _av_of(a) > _av_of(b))
+		bench = rest.slice(0, 5)
+		reserves = rest.slice(5, rest.size())
+	items.append({"t": "band", "label": "sub", "h": BAND_SUB_H})
+	for p in bench:
+		items.append({"t": "row", "pid": int(p.get("id", -1)), "slot": -1,
+			"tier": "sub", "h": ROW_PITCH})
+	items.append({"t": "band", "label": "res", "h": BAND_RES_H})
+	for p in reserves:
+		items.append({"t": "row", "pid": int(p.get("id", -1)), "slot": -1,
+			"tier": "res", "h": ROW_PITCH})
 	return items
 
 
-## How many 16px rows fit between the first XI row and the table's bottom.
-func _visible_rows() -> int:
-	return int((TABLE.end.y - XI_Y0) / ROW_H)
+## Items that fit between the first row top and the table bottom at a scroll.
+func _layout(scroll: int) -> Array:
+	var items := _flat_items()
+	var out: Array = []
+	var y := XI_Y0 - 1
+	for i in range(scroll, items.size()):
+		var h := int(items[i]["h"])
+		if y + h > 465:
+			break
+		var it: Dictionary = items[i]
+		it = it.duplicate()
+		it["y"] = y
+		it["i"] = i
+		out.append(it)
+		y += h
+	return out
 
 
 func _max_scroll() -> int:
-	return maxi(0, _flat_items().size() - _visible_rows())
+	var items := _flat_items()
+	var s := 0
+	while s < items.size() and _layout(s).size() < items.size() - s:
+		s += 1
+	return s
 
 
 func _clamp_scroll() -> void:
@@ -189,19 +360,17 @@ func _to_design(p: Vector2) -> Vector2:
 	return (p - Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5)) / s
 
 
-## Which scroll button (if any) a design-space point hits. Returns "" when the list does
-## not overflow, so a tap there falls through to dismiss.
-## Bottom-row buttons (drawn in _draw at y=448): TACTICS left half, RETURN right half of
-## the px=480/pw=154 panel. Hit-tested so RETURN dismisses and TACTICS opens the modal,
-## instead of any tap bouncing back to the hub.
-const BTN_TACTICS := Rect2(481, 448, 75, 24)
-const BTN_RETURN := Rect2(558, 448, 75, 24)
-
 func _hit(d: Vector2) -> String:
 	if BTN_RETURN.has_point(d):
 		return "return"
 	if BTN_TACTICS.has_point(d):
 		return "tactics"
+	if TOGGLE_PARAM.has_point(d):
+		return "param"
+	if TOGGLE_RATING.has_point(d):
+		return "rating"
+	if _pending_change() and UNDO_BTN.has_point(d):
+		return "undo"
 	if _max_scroll() > 0:
 		if SCROLL_UP.has_point(d):
 			return "up"
@@ -213,19 +382,14 @@ func _hit(d: Vector2) -> String:
 	return ""
 
 
-## The flat-list index of the player row under a design-space point, or -1 (section header,
-## empty space, or outside the squad table). Mirrors `_draw_squad`'s scroll-window layout.
+## The flat-list index of the player row under a design-space point, or -1.
 func _row_at(d: Vector2) -> int:
-	if d.x < ROW_X or d.x > ROW_X + ROW_W or d.y < XI_Y0:
+	if d.x < ROW_X or d.x > ROW_X + ROW_W:
 		return -1
-	var v := int((d.y - XI_Y0) / ROW_H)
-	if v < 0 or v >= _visible_rows():
-		return -1
-	var i := _scroll + v
-	var items := _flat_items()
-	if i < 0 or i >= items.size() or items[i].get("t") != "row":
-		return -1
-	return i
+	for it in _layout(_scroll):
+		if it["t"] == "row" and d.y >= float(it["y"]) and d.y < float(it["y"]) + 16.0:
+			return int(it["i"])
+	return -1
 
 
 func _on_input(e: InputEvent) -> void:
@@ -249,12 +413,16 @@ func _on_input(e: InputEvent) -> void:
 		var was := _press
 		_press = ""
 		if a == was and a != "":
-			# RETURN dismisses, TACTICS opens the modal, a scroll-button tap pages the list,
-			# a player-row tap selects/swaps. A tap on a section header or empty space is a
-			# no-op (no longer bounces to the hub).
 			match a:
 				"return": back_pressed.emit()
 				"tactics": tactics_pressed.emit()
+				"param":
+					_rating_view = false
+					queue_redraw()
+				"rating":
+					_rating_view = true
+					queue_redraw()
+				"undo": _undo()
 				"up", "down":
 					_scroll += SCROLL_STEP if a == "down" else -SCROLL_STEP
 					_clamp_scroll()
@@ -265,14 +433,7 @@ func _on_input(e: InputEvent) -> void:
 
 
 # ---- XI editing (select-then-swap) ---------------------------------------
-# PM98's LINE-UP edit: tap a player to select (highlight), tap a second to swap them.
-# The squad object is three tiers -- XI(11) / SUBSTITUTES(+0x1930) / RESERVES(+0x1934)
-# (reversed from FUN_004fc321) -- and `Tactics.assign(slot, pid)` is the slot-put/swap
-# primitive: a bench tap onto an XI slot subs that player on; the displaced man drops out
-# of the XI (so he reappears under SUBSTITUTES, which is the derived "not in xi" set).
 
-## A tap on the player row at flat index `i`: first tap selects, a second tap swaps, a tap
-## on the already-selected player deselects.
 func _tap_row(i: int) -> void:
 	var items := _flat_items()
 	if i < 0 or i >= items.size() or items[i].get("t") != "row":
@@ -284,13 +445,10 @@ func _tap_row(i: int) -> void:
 		_sel_pid = -1
 	else:
 		_try_swap(_sel_pid, pid)
+	_pitch_cache_key = ""
 	queue_redraw()
 
 
-## Swap `sel_pid` and `tgt_pid` by routing one onto the other's XI slot. At least one must
-## already be in the XI (a slot is the target); two bench players have no slot, so the tap
-## just moves the selection. A swap that would break the GK rule (keeper only in the GK
-## slot) is rejected and the selection is kept so the user can pick a valid target.
 func _try_swap(sel_pid: int, tgt_pid: int) -> void:
 	if _tactics == null:
 		return
@@ -306,7 +464,7 @@ func _try_swap(sel_pid: int, tgt_pid: int) -> void:
 		slot = sel_slot
 		mover = tgt_pid
 	else:
-		_sel_pid = tgt_pid   # both on the bench: re-select, no XI change
+		_sel_pid = tgt_pid
 		return
 	if not _swap_legal(mover, slot):
 		return
@@ -315,9 +473,6 @@ func _try_swap(sel_pid: int, tgt_pid: int) -> void:
 	xi_changed.emit()
 
 
-## Whether putting `mover` into XI `slot` keeps the line-up role-valid: the GK slot only
-## holds a keeper and an outfield slot never does. For an XI<->XI swap the displaced player
-## (who moves to `mover`'s old slot) must satisfy the same rule.
 func _swap_legal(mover: int, slot: int) -> bool:
 	if _tactics == null or slot < 0 or slot >= _tactics.xi.size():
 		return false
@@ -337,184 +492,40 @@ func _is_keeper(pid: int) -> bool:
 	return p is Dictionary and bool((p as Dictionary).get("isGK", false))
 
 
-# ---- formation geometry --------------------------------------------------
-
-func _slot_positions() -> Array:
+## Whether the line-up carries a pending change: an XI edit since entry, or an
+## injured player still in the XI (both walked UNDO states — 160 and 155).
+func _pending_change() -> bool:
 	if _tactics == null:
-		return []
-	var lines: Array = Tactics.FORMATIONS.get(_tactics.formation, Tactics.FORMATIONS["4-4-2"])
-	var cols := {"GK": 20.0, "DEF": 90.0, "MID": 175.0, "FWD": 262.0}
-	var out: Array = []
-	out.append(Vector2(cols["GK"], TAC_H * 0.5))
-	for role in ["DEF", "MID", "FWD"]:
-		var n := 0
-		match role:
-			"DEF": n = int(lines[0])
-			"MID": n = int(lines[1])
-			"FWD": n = int(lines[2])
-		for k in n:
-			var y: float = lerpf(TAC_H * 0.16, TAC_H * 0.84, (k + 0.5) / float(n))
-			out.append(Vector2(cols[role], y))
-	return out
+		return false
+	if _tactics.xi != _entry_xi:
+		return true
+	for pid in _tactics.xi:
+		var p: Variant = _by_id.get(int(pid))
+		if p is Dictionary and _injury_weeks(p as Dictionary) > 0:
+			return true
+	return false
 
 
-func _mark_center(tac: Vector2) -> Vector2:
-	return MARK_ORIGIN + Vector2(tac.x * MARK_W / TAC_W, tac.y * MARK_H / TAC_H)
-
-
-# ---- kits ----------------------------------------------------------------
-
-func _kit(id: int) -> Texture2D:
-	if not _kits.has(id):
-		var path := "res://art/kits/%d.png" % id
-		_kits[id] = load(path) if ResourceLoader.exists(path) else null
-	return _kits[id]
-
-
-# ---- drawing -------------------------------------------------------------
-
-func _txt(f: Font, x: int, y_top: int, s: String, col: Color, sz: int, right := false) -> void:
-	if f == null:
+func _undo() -> void:
+	if _tactics == null or _entry_xi.is_empty():
 		return
-	var w := f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
-	var px := x - w if right else float(x)
-	draw_string(f, Vector2(px, y_top + f.get_ascent(sz)), s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
+	_tactics.xi = _entry_xi.duplicate()
+	_sel_pid = -1
+	_pitch_cache_key = ""
+	xi_changed.emit()
+	queue_redraw()
 
 
-func _draw() -> void:
-	var s: float = min(size.x / W, size.y / H) if size.x > 0 and size.y > 0 else 1.0
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0.05, 0.07, 0.14), true)
-	draw_set_transform(Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5), 0.0, Vector2(s, s))
+# ---- helpers ---------------------------------------------------------------
 
-	PMChrome.draw_bg(self)
-	PMChrome.draw_match_header(self, "lineup", _header)
-
-	PMChrome.draw_table_panel(self, TABLE)
-	_draw_col_header()
-	_draw_squad()
-	_draw_right_panel()
-	_draw_scroll()
-
-
-func _draw_col_header() -> void:
-	PMChrome.draw_col_header(self, Rect2(TABLE.position.x + 2, HDR_Y, TABLE.size.x - 4, 16))
-	_txt(_f10, 14, HDR_Y + 2, "N.", PMChrome.C_TBL_HDR_TXT, 11)
-	_txt(_f10, 48, HDR_Y + 2, "PLAYER", PMChrome.C_TBL_HDR_TXT, 11)
-	for c in COLS:
-		_txt(_f10, c[1], HDR_Y + 2, c[0], PMChrome.C_TBL_HDR_TXT, 11, true)
-	_txt(_f10, ROL_X, HDR_Y + 2, "ROL", PMChrome.C_TBL_HDR_TXT, 11)
-	_txt(_f10, POS_X, HDR_Y + 2, "POS", PMChrome.C_TBL_HDR_TXT, 11)
-
-
-## XI rows + SUBSTITUTES + RESERVES at the real metrics, in the white table skin, rendered
-## as a scroll window over `_flat_items()` so a deep squad pages instead of truncating.
-func _draw_squad() -> void:
-	var items := _flat_items()
-	_clamp_scroll()
-	var vis := _visible_rows()
-	var y := XI_Y0
-	for i in range(_scroll, mini(items.size(), _scroll + vis)):
-		var it: Dictionary = items[i]
-		if it["t"] == "sec":
-			_section(y, str(it["label"]))
-		else:
-			_row(y, int(it["idx"]), int(it["pid"]), int(it["number"]), str(it["role"]))
-		y += ROW_H
-
-
-## The original ARROW scroll buttons: up/down with on/off art for whether more list exists
-## in that direction. Drawn only while the squad list overflows the panel.
-func _draw_scroll() -> void:
-	if _max_scroll() <= 0:
-		return
-	_draw_arrow(SCROLL_UP, "scroll_up_on" if _scroll > 0 else "scroll_up_off")
-	_draw_arrow(SCROLL_DOWN, "scroll_down_on" if _scroll < _max_scroll() else "scroll_down_off")
-
-
-func _draw_arrow(hit: Rect2, name: String) -> void:
-	var g := Rect2(hit.position + (hit.size - Vector2(16, 16)) * 0.5, Vector2(16, 16))
-	if not PMChrome.draw_icon(self, name, g):
-		# Fallback so the control still reads when the PNG is absent: a drawn triangle.
-		var up := name.begins_with("scroll_up")
-		var col := PMChrome.C_GOLD if name.ends_with("_on") else PMChrome.C_STAR_OFF
-		var c := g.get_center()
-		var pts := PackedVector2Array([Vector2(c.x, c.y - 6), Vector2(c.x - 6, c.y + 5),
-			Vector2(c.x + 6, c.y + 5)] if up else [Vector2(c.x, c.y + 6),
-			Vector2(c.x - 6, c.y - 5), Vector2(c.x + 6, c.y - 5)])
-		draw_colored_polygon(pts, col)
-
-
-func _section(y: int, label: String) -> void:
-	draw_rect(Rect2(ROW_X, y, ROW_W, 14), PMChrome.C_ROW_DARK, true)
-	_centre(_f10, ROW_X, ROW_W, y + 1, label, PMChrome.C_TBL_HDR, 11)
-
-
-func _row(y: int, idx: int, pid: int, number: int, role: String) -> void:
-	var p: Variant = _by_id.get(pid)
-	if p == null:
-		return
-	var pl: Dictionary = p
-	var is_gk: bool = pl.get("isGK", false)
-	# row background
-	var bg: Color = C_GK_ROW if is_gk else (PMChrome.C_ROW_LIGHT if idx % 2 == 0 else PMChrome.C_ROW_DARK)
-	draw_rect(Rect2(ROW_X, y, ROW_W, ROW_H - 1), bg, true)
-	if pid == _sel_pid:
-		# Selected player: the highlighted row the original draws (FUN_005da180 highlight path).
-		draw_rect(Rect2(ROW_X, y, ROW_W, ROW_H - 1), Color(1.0, 0.86, 0.22, 0.40), true)
-		draw_rect(Rect2(ROW_X, y, ROW_W, ROW_H - 1), C_GOLD, false, 1.0)
-	draw_rect(Rect2(ROW_X, y + ROW_H - 1, ROW_W, 1), PMChrome.C_ROW_SEP, true)
-	# pale-green stat band
-	draw_rect(Rect2(STAT_X0, y, STAT_X1 - STAT_X0, ROW_H - 1), C_STATBAND, true)
-
-	var ty := y + 2
-	PMChrome.draw_crest(self, int(_club.get("id", -1)), Rect2(10, y, 13, ROW_H - 1))
-	_txt(_f10, 44, ty, str(number), PMChrome.C_ROW_TXT, 11, true)
-	_txt(_f10, 48, ty, str(pl.get("name", "?")).substr(0, 13), PMChrome.C_ROW_TXT, 11)
-
-	var attrs: Dictionary = pl.get("attrs", {}) if pl.get("attrs") is Dictionary else {}
-	var has_form := pl.has("morale") or pl.has("fitness")
-	for c in COLS:
-		var key: String = c[2]
-		var x: int = c[1]
-		var sv := ""
-		match key:
-			"_avg":
-				# AV = the real rating (FUN_00581e60) once the squad carries live form.
-				sv = str(Morale.av6(pl)) if has_form else str(_avg_of(pl))
-			"_fit":
-				# FITNESS is the dynamic bar, not the static TI placeholder.
-				sv = str(clampi(int(pl.get("fitness", 99)), 0, 99)) if has_form else "-"
-			"_mo":
-				# MO = live morale (FUN_00582db0 base), never the static RM attribute.
-				sv = str(Morale.display(pl)) if has_form else "-"
-			_:
-				var v: Variant = attrs.get(key)
-				sv = str(int(v)) if v != null else "-"
-		_txt(_f10, x, ty, sv, PMChrome.C_ROW_TXT, 11, true)
-	# AV bar just right of the AV value
-	var avg := Morale.av6(pl) if has_form else _avg_of(pl)
-	draw_rect(Rect2(AVBAR_X, y + 4, 30, 7), C_AVBAR_BG, true)
-	draw_rect(Rect2(AVBAR_X, y + 4, 30.0 * clampf(avg / 99.0, 0.0, 1.0), 7), C_AVBAR, true)
-	# ROL: the original CAMROL pitch-position icon (faithful), with the colour tag as
-	# a fallback when the icon / fine code is unavailable. POS: the broad role text.
-	var pos := _pos_of(pl)
-	var rol_cell := Rect2(ROL_X, y + 1, 24, ROW_H - 3)
-	if not PMChrome.draw_role_icon(self, rol_cell, int(pl.get("posFine", 0)), str(pl.get("pos", ""))):
-		draw_rect(Rect2(ROL_X, y + 2, 24, ROW_H - 5), C_ROLE.get(_role_group(pos), PMChrome.C_TBL_HDR), true)
-	_txt(_f8, POS_X, ty, pos, PMChrome.C_ROW_TXT, 10)
-
-
-func _role_group(pos: String) -> String:
-	if pos == "GK":
-		return "GK"
-	if pos in ["DEF", "RB", "LB", "CB"]:
-		return "DEF"
-	if pos in ["FOR", "ST", "CF"]:
-		return "FOR"
-	return "MID"
-
-
-func _avg_of(p: Dictionary) -> int:
+## Displayed AV: frame-true "av" override wins (the formula is un-RE'd —
+## tacticas_screen_re.md); else the live rating (Morale.av6) when the squad
+## carries form, else the attrs-mean approximation.
+func _av_of(p: Dictionary) -> int:
+	if p.has("av"):
+		return int(p["av"])
+	if p.has("morale") or p.has("fitness"):
+		return Morale.av6(p)
 	var attrs: Variant = p.get("attrs", {})
 	if not (attrs is Dictionary) or (attrs as Dictionary).is_empty():
 		return 0
@@ -528,65 +539,222 @@ func _avg_of(p: Dictionary) -> int:
 	return int(round(sum / n)) if n > 0 else 0
 
 
-func _pos_of(p: Dictionary) -> String:
-	return "GK" if p.get("isGK") else "OUT"
+func _role_short(p: Dictionary) -> String:
+	var pf := int(p.get("posFine", 0))
+	if pf >= 1 and pf <= FINE_ROLE_SHORT.size():
+		return FINE_ROLE_SHORT[pf - 1]
+	return str(POS_WORD.get(str(p.get("pos", "")), "OUT"))
 
 
-# ---- right control column ------------------------------------------------
-
-func _draw_right_panel() -> void:
-	var px := 480.0
-	var pw := 154.0
-	# PARAMETERS / RATING at the frame-walked tops (155_162931: y70 / y95); the
-	# interior button skin keeps the app's reconstruction (body story separate).
-	PMChrome.bevel(self, Rect2(px, 70, pw, 18), C_DKBTN, C_DKBTN_HI, C_BTN_LO)
-	_centre(_f12, px, pw, 72, "PARAMETERS", C_GOLD, 13)
-	PMChrome.bevel(self, Rect2(px, 95, pw, 18), C_DKBTN, C_DKBTN_HI, C_BTN_LO)
-	_centre(_f12, px, pw, 97, "RATING", C_PANEL_TXT, 13)
-
-	# TEAM RATING strip with stars (frame top y118).
-	var avg := _team_rating()
-	PMChrome.bevel(self, Rect2(px, 118, pw, 30), Color(0.10, 0.16, 0.34), C_DKBTN_HI, C_BTN_LO)
-	PMChrome.draw_crest(self, int(_club.get("id", -1)), Rect2(px + 4, 120, 18, 26))
-	_txt(_f8, int(px) + 26, 121, "TEAM RATING", C_PANEL_TXT, 10)
-	PMChrome.draw_stars(self, px + 26, 132, avg / 20.0, 11, 5)
-	_txt(_f12, int(px + pw) - 8, 126, str(avg), Color.WHITE, 14, true)
-
-	# Attribute buttons (2 cols x 3 rows; frame row tops y171/196/221, 25px pitch).
-	var labels := [["HANDLING", "PASSING"], ["DRIBBLING", "HEADING"], ["TACKLING", "SHOOTING"]]
-	for r in 3:
-		for cc in 2:
-			var bx := px + cc * (pw / 2.0)
-			var by := 171 + r * 25
-			PMChrome.bevel(self, Rect2(bx + 1, by, pw / 2.0 - 2, 18), C_BTN, C_BTN_HI, C_BTN_LO)
-			_centre(_f8, bx, pw / 2.0, by + 3, labels[r][cc], C_PANEL_TXT, 10)
-
-	_draw_pitch()
-
-	# TRAINING / INJURIES / STATISTICS.
-	var rows := ["TRAINING", "INJURIES", "STATISTICS"]
-	for i in 3:
-		var by := 348 + i * 22
-		PMChrome.bevel(self, Rect2(px, by, pw, 20), C_DKBTN, C_DKBTN_HI, C_BTN_LO)
-		_txt(_f12, int(px + pw) - 8, by + 4, rows[i], C_PANEL_TXT, 12, true)
-
-	# TACTICS / RETURN.
-	for i in 2:
-		var bx := px + i * (pw / 2.0)
-		PMChrome.bevel(self, Rect2(bx + 1, 448, pw / 2.0 - 2, 24), C_DKBTN, C_DKBTN_HI, C_BTN_LO)
-		_centre(_f12, bx, pw / 2.0, 453, "TACTICS" if i == 0 else "RETURN",
-			C_GOLD if i == 1 else C_PANEL_TXT, 13)
+func _pos_word(p: Dictionary) -> String:
+	if bool(p.get("isGK", false)):
+		return "GOAL"
+	return str(POS_WORD.get(str(p.get("pos", "")), "OUT"))
 
 
-func _centre(f: Font, x: float, w: float, y_top: int, s: String, col: Color, sz: int) -> void:
+func _shirt(p: Dictionary, slot: int) -> int:
+	var no := int(p.get("squadNo", 0))
+	return no if no > 0 else slot + 1
+
+
+## Row tint band of an XI slot (FUN_004fe2d0, same rule as the TACTICS board).
+func _band_of_slot(slot_idx: int) -> String:
+	var form: String = _tactics.formation if _tactics != null else "4-4-2"
+	var rec: Variant = _forms.get(form)
+	if not (rec is Dictionary):
+		return "mid"
+	var slots: Array = (rec as Dictionary).get("slots", [])
+	if slot_idx < 0 or slot_idx >= slots.size():
+		return "mid"
+	var s: Dictionary = slots[slot_idx]
+	var mk1: Array = s.get("mk1", [0, 0])
+	var mk2: Array = s.get("mk2", [0, 0])
+	if int(mk1[0]) < 52:
+		return "def"
+	if int(mk2[0]) >= 211:
+		return "fwd"
+	return "mid"
+
+
+## GDI cell centring: px = x0 + (cw - advance) div 2 (floor).
+func _cell_centre(f: Font, s: String, x0: int, cw: int, sz := 11) -> float:
+	var w := int(f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x)
+	return float(x0 + int(floorf((cw - w) / 2.0)))
+
+
+## GDI fake-BOLD (the frame double-strikes at x and x+1): the role text, AV,
+## injured-row cells, numeric-view values and every right-panel value/name.
+func _btxt(f: Font, x: float, y_top: float, s: String, col: Color, sz: int, align := 0) -> void:
 	if f == null:
 		return
-	var tw := f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
-	draw_string(f, Vector2(x + (w - tw) * 0.5, y_top + f.get_ascent(sz)), s,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
+	var w := f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
+	var px := x
+	if align == 2:
+		px = x - (w + 1.0)
+	var yb := y_top + f.get_ascent(sz)
+	draw_string(f, Vector2(px, yb), s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
+	draw_string(f, Vector2(px + 1.0, yb), s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
 
+
+func _bcell_centre(f: Font, s: String, x0: int, cw: int, sz := 11) -> float:
+	var w := int(f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x) + 1
+	return float(x0 + int(floorf((cw - w) / 2.0)))
+
+
+func _injury_weeks(p: Dictionary) -> int:
+	return int(p.get("injured_weeks", 0))
+
+
+# ---- drawing ---------------------------------------------------------------
+
+func _draw() -> void:
+	var s := _scale()
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.05, 0.07, 0.14), true)
+	draw_set_transform(Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5), 0.0, Vector2(s, s))
+
+	PMChrome.draw_match_header(self, "lineup", _header)
+	if _chrome != null:
+		draw_texture(_chrome, Vector2(0, BODY_Y0))
+
+	_draw_items()
+	_draw_scrollbar()
+	_draw_right_panel()
+
+
+func _draw_items() -> void:
+	_clamp_scroll()
+	for it in _layout(_scroll):
+		var y := int(it["y"])   # unit top = the row's top sep line
+		if it["t"] == "band":
+			var tex: Texture2D = _bands.get(str(it["label"]))
+			if tex != null:
+				draw_texture(tex, Vector2(ROW_X, y))
+		else:
+			_draw_row(y, it)
+
+
+func _draw_row(y: int, it: Dictionary) -> void:
+	var p: Variant = _by_id.get(int(it["pid"]))
+	if p == null:
+		return
+	var pl: Dictionary = p
+	var slot := int(it["slot"])
+	var tier: String = str(it.get("tier", "xi"))
+	var injured := _injury_weeks(pl) > 0
+	var cls: String
+	if tier == "xi":
+		cls = "inj" if injured else ("gk" if slot == 0 else _band_of_slot(slot - 1))
+	else:
+		cls = "inj" if injured else tier
+	if _rows.get(cls) != null:
+		draw_texture(_rows[cls], Vector2(ROW_X, y))
+	var tint := _tint_of(cls)
+
+	# number + name (ProMan8; navy / black)
+	var num := str(_shirt(pl, slot if slot >= 0 else 11))
+	PMChrome.text(self, _f8, _cell_centre(_f8, num, NUM_CELL[0], NUM_CELL[1]), y + 2, num, C_NUM, 11)
+	PMChrome.text(self, _f8, NAME_X, y + 2,
+		PMChrome.title_case_name(str(pl.get("name", "?"))), C_NAME, 11, 0, 103.0)
+
+	var av := _av_of(pl)
+	if injured:
+		_draw_injury_cells(y, pl)
+	elif _rating_view:
+		# STARJUGON strip: halves=(AV+1) div 10; odd half = the DIMMED star.
+		var halves := (av + 1) / 10
+		for j in halves / 2:
+			draw_texture(_star_on, Vector2(STAR_X0 + STAR_PITCH * j, y + 2))
+		if halves % 2 == 1 and _star_off != null:
+			draw_texture(_star_off, Vector2(STAR_X0 + STAR_PITCH * (halves / 2), y + 2))
+		# fine-role SHORT name, right-aligned to the x349 sep (ProMan8 grey-blue)
+		PMChrome.text(self, _f8, ROLE_RIGHT, y + 2, _role_short(pl), C_ROLE, 11, 2)
+	else:
+		# PARAMETERS view (witness 128): sep cols + per-column values
+		var sep: Color = SEP_INK.get(tier, SEP_INK["xi"])
+		for sx in NUM_SEPS:
+			draw_rect(Rect2(sx, y + 1, 1, 12), sep, true)
+		var has_form := pl.has("morale") or pl.has("fitness")
+		for ci in NUM_KEYS.size():
+			var key: String = NUM_KEYS[ci]
+			var sv := ""
+			match key:
+				"_fit":
+					sv = str(clampi(int(pl.get("fitness", 99)), 0, 99)) if has_form else "-"
+				"_mo":
+					sv = str(Morale.display(pl)) if has_form else "-"
+				_:
+					var attrs: Dictionary = pl.get("attrs", {}) if pl.get("attrs") is Dictionary else {}
+					var v: Variant = attrs.get(key)
+					sv = str(int(v)) if v != null else "-"
+			PMChrome.text(self, _f8, _cell_centre(_f8, sv, NUM_CELLS[ci][0], NUM_CELLS[ci][1]),
+				y + 2, sv, NUM_INKS[ci], 11)
+
+	PMChrome.text(self, _f8, _cell_centre(_f8, str(av), AV_CELL[0], AV_CELL[1]), y + 2,
+		str(av), C_AV, 11)
+	PMChrome.draw_role_icon(self, Rect2(CAMROL_X, y, 25, 14),
+		int(pl.get("posFine", 0)), str(pl.get("pos", "")))
+	var pos_s := _pos_word(pl)
+	PMChrome.text(self, _f8, _cell_centre(_f8, pos_s, POS_CELL[0], POS_CELL[1]), y + 2,
+		pos_s, C_POS, 11)
+
+	# the SELECTED row's 2px black frame (155 Solskjaer witness)
+	if int(it["pid"]) == _sel_pid:
+		draw_rect(Rect2(28, y - 1, 411, 2), Color.BLACK, true)
+		draw_rect(Rect2(28, y + 13, 411, 2), Color.BLACK, true)
+		draw_rect(Rect2(28, y - 1, 2, 16), Color.BLACK, true)
+		draw_rect(Rect2(437, y - 1, 2, 16), Color.BLACK, true)
+
+
+func _tint_of(cls: String) -> Color:
+	match cls:
+		"gk": return Color8(255, 255, 170)
+		"def": return Color8(220, 250, 210)
+		"mid": return Color8(204, 204, 255)
+		"fwd": return Color8(255, 191, 170)
+		"inj": return Color8(212, 191, 85)
+		"sub": return Color8(212, 223, 255)
+	return Color8(180, 200, 220)
+
+
+## The injured row's dynamic digits (cross + boxes + WEEKS text are template
+## furniture; the label cell redraws for the DAYS variant).
+func _draw_injury_cells(y: int, pl: Dictionary) -> void:
+	var wks := _injury_weeks(pl)
+	PMChrome.text(self, _f8, _cell_centre(_f8, str(wks), INJ_COUNT[0], INJ_COUNT[1]), y + 2,
+		str(wks), C_INJ_COUNT, 11)
+	var label := "WEEKS" if wks != 1 else "WEEK"
+	PMChrome.text(self, _f8, _cell_centre(_f8, label, INJ_WEEKS[0], INJ_WEEKS[1]), y + 2,
+		label, C_INJ_LABEL, 11)
+	var fi := str(clampi(int(pl.get("fitness", 99)), 0, 99))
+	PMChrome.text(self, _f8, _cell_centre(_f8, fi, INJ_FI[0], INJ_FI[1]), y + 2, fi, C_FI, 11)
+	var mo := str(Morale.display(pl))
+	PMChrome.text(self, _f8, _cell_centre(_f8, mo, INJ_MO[0], INJ_MO[1]), y + 2, mo, C_MO, 11)
+	# the injured row's 1px black frame is baked in the row_inj template
+
+
+## The scrollbar is baked at scroll 0. When scrolled, restore the strip and
+## redraw thumb + up arrow (reconstruction — every walked frame is at scroll 0).
+func _draw_scrollbar() -> void:
+	if _scroll <= 0:
+		return
+	if _track_strip != null:
+		for ty in range(THUMB_STRIP_XY.y, 434, 11):
+			draw_texture_rect(_track_strip, Rect2(THUMB_STRIP_XY.x, ty, 23,
+				mini(11, 433 - ty)), false)
+	if _arrow_up_off != null:
+		draw_texture(_arrow_up_off, SCROLL_UP.position)
+	var ms := _max_scroll()
+	var t := float(_scroll) / float(ms) if ms > 0 else 0.0
+	if _thumb_strip != null:
+		draw_texture(_thumb_strip, Vector2(THUMB_STRIP_XY.x,
+			THUMB_STRIP_XY.y + int(t * (433 - 16 - THUMB_STRIP_XY.y))))
+
+
+# ---- right panel ------------------------------------------------------------
 
 func _team_rating() -> int:
+	if _club.has("team_rating"):
+		return int(_club["team_rating"])
 	var xi: Array = _tactics.xi if _tactics != null else []
 	if xi.is_empty():
 		return 0
@@ -595,32 +763,163 @@ func _team_rating() -> int:
 	for pid in xi:
 		var p: Variant = _by_id.get(int(pid))
 		if p != null:
-			sum += _avg_of(p)
+			sum += _av_of(p)
 			n += 1
 	return int(round(float(sum) / n)) if n > 0 else 0
 
 
-## CAMPO mini-pitch with the 11 XI kit markers placed by the engine mapping.
+func _draw_right_panel() -> void:
+	# toggle plates: chrome bakes RATING-active (155); flip via 128's plates
+	if not _rating_view:
+		if _plate_param_on != null:
+			draw_texture(_plate_param_on, TOGGLE_PARAM.position)
+		if _plate_rating_off != null:
+			draw_texture(_plate_rating_off, TOGGLE_RATING.position)
+		if _arrow_at["param"] != null:
+			draw_texture(_arrow_at["param"], Vector2(ARROW_X, TOGGLE_PARAM.position.y))
+		if _arrow_off["rating"] != null:
+			draw_texture(_arrow_off["rating"], Vector2(ARROW_X, TOGGLE_RATING.position.y))
+
+	# TEAM RATING strip: walked per-cell star patches + the value (ProMan8)
+	var tr := _team_rating()
+	var halves := (tr + 1) / 10
+	for j in 5:
+		var x := STRIP_STAR_X0 + STRIP_STAR_PITCH * j
+		if j < halves / 2:
+			var tex: Texture2D = _eq_full[mini(j, 3)]
+			draw_texture(tex, Vector2(x, STRIP_STAR_Y))
+		elif j == halves / 2 and halves % 2 == 1:
+			draw_texture(_eq_half, Vector2(x, STRIP_STAR_Y))
+	PMChrome.text(self, _f10, STRIP_VAL_RIGHT, STRIP_VAL_Y, str(tr), C_STRIP_VAL, 10, 2)
+
+	# name band + attr values for the selected player
+	var sel: Variant = _by_id.get(_sel_pid)
+	if sel is Dictionary:
+		var pl: Dictionary = sel
+		var nm := PMChrome.title_case_name(str(pl.get("name", "")))
+		PMChrome.text(self, _f10, _cell_centre(_f10, nm, int(NAME_BAND.position.x),
+			int(NAME_BAND.size.x), 10), 158, nm, C_NAME_BAND, 10)
+		var attrs: Dictionary = pl.get("attrs", {}) if pl.get("attrs") is Dictionary else {}
+		for i in 6:
+			var v := int(attrs.get(SKILL_KEYS[i], 0))
+			var col: Array = ATTR_COLS[i % 2]
+			var by: int = ATTR_ROWS_Y[i / 2]
+			var h2 := (v + 1) / 10
+			if h2 == int(ATTR_SIG[i]) and i < _attr_strips.size() and _attr_strips[i] != null:
+				# the walked strip verbatim (glyphs + the noise-dither shadow)
+				draw_texture(_attr_strips[i], Vector2(ATTR_XY[i][0], ATTR_XY[i][1]))
+			else:
+				# un-walked count: plain glyphs (shadow approximation documented)
+				for j in h2 / 2:
+					draw_texture(_paron_on, Vector2(col[0] + 10 * j, by + ATTR_STAR_DY))
+				if h2 % 2 == 1 and _paron_off != null:
+					draw_texture(_paron_off, Vector2(col[0] + 10 * (h2 / 2), by + ATTR_STAR_DY))
+			PMChrome.text(self, _f8, _cell_centre(_f8, str(v), col[0] + 47, 31),
+				by + ATTR_VAL_DY, str(v), C_ATTR_VAL, 11)
+
+	_draw_pitch()
+
+	# UNDO is baked in chrome; the default state overlays the T/I/S plate
+	if not _pending_change() and _plate_tis != null:
+		draw_texture(_plate_tis, Vector2(TIS_XY.x, TIS_XY.y))
+
+
+## CAMPO composite: greens per formation slot, the selected slot's coverage
+## zone (walked patch or majority-LUT dim), the selected slot's whites on top.
 func _draw_pitch() -> void:
-	if _campo != null:
-		draw_texture_rect(_campo, Rect2(PITCH_POS, Vector2(CAMPO_W, CAMPO_H)), false)
-	else:
-		draw_rect(Rect2(PITCH_POS, Vector2(CAMPO_W, CAMPO_H)), Color(0.16, 0.43, 0.27), true)
-	if _tactics == null:
+	var form: String = _tactics.formation if _tactics != null else "4-4-2"
+	var sel_slot := _sel_slot()
+	var key := "%s:%d" % [form, sel_slot]
+	if key != _pitch_cache_key or _pitch_tex == null:
+		_pitch_tex = _compose_pitch(form, sel_slot)
+		_pitch_cache_key = key
+	if _pitch_tex != null:
+		draw_texture(_pitch_tex, Vector2(CAMPO_XY))
+
+
+## The selected player's XI slot in FORMATION space (gk row -> gk_slot), or -1.
+func _sel_slot() -> int:
+	if _sel_pid < 0 or _tactics == null:
+		return -1
+	var i := _tactics.xi.find(_sel_pid)
+	if i < 0:
+		return -1
+	var rec: Variant = _forms.get(_tactics.formation)
+	var gk := int((rec as Dictionary).get("gk_slot", 10)) if rec is Dictionary else 10
+	return gk if i == 0 else i - 1
+
+
+func _mkmap(x: int, y: int) -> Vector2i:
+	return Vector2i(4 + x * 148 / 318, 3 + y * 88 / 198)
+
+
+func _compose_pitch(form: String, sel_slot: int) -> Texture2D:
+	if _campo_img == null:
+		return null
+	var img := _campo_img.duplicate() as Image
+	var rec: Variant = _forms.get(form)
+	if not (rec is Dictionary):
+		return ImageTexture.create_from_image(img)
+	var slots: Array = (rec as Dictionary).get("slots", [])
+	# arrows first, discs on top (the engine order)
+	for si in slots.size():
+		if si == sel_slot:
+			continue
+		var raw: Array = (slots[si] as Dictionary).get("raw", [])
+		if raw.size() < 8:
+			continue
+		var m1 := _mkmap(int(raw[4]), int(raw[5]))
+		var m2 := _mkmap(int(raw[6]), int(raw[7]))
+		if m2 != m1:
+			_blit(img, _mk_img["averde"], m2)
+	for si in slots.size():
+		if si == sel_slot:
+			continue
+		var raw: Array = (slots[si] as Dictionary).get("raw", [])
+		if raw.size() < 8:
+			continue
+		_blit(img, _mk_img["dverde"], _mkmap(int(raw[4]), int(raw[5])))
+	if sel_slot >= 0 and sel_slot < slots.size():
+		var raw: Array = (slots[sel_slot] as Dictionary).get("raw", [])
+		if raw.size() >= 8:
+			_apply_zone(img, form, sel_slot, raw)
+			var m2 := _mkmap(int(raw[6]), int(raw[7]))
+			var m1 := _mkmap(int(raw[4]), int(raw[5]))
+			if m2 != m1:
+				_blit(img, _mk_img["ablanco"], m2)
+			_blit(img, _mk_img["dblanco"], m1)
+	return ImageTexture.create_from_image(img)
+
+
+func _blit(dst: Image, src: Image, at: Vector2i) -> void:
+	if src == null:
 		return
-	var pos := _slot_positions()
-	var xi: Array = _tactics.xi
-	var club_id := int(_club.get("id", -1))
-	for i in mini(xi.size(), pos.size()):
-		_draw_marker(club_id, i + 1, _mark_center(pos[i]))
+	dst.blend_rect(src, Rect2i(0, 0, src.get_width(), src.get_height()), at)
 
 
-func _draw_marker(club_id: int, number: int, center: Vector2) -> void:
-	var tex := _kit(club_id)
-	if tex != null:
-		var sc: float = min(11.0 / KIT_SRC.size.x, 14.0 / KIT_SRC.size.y)
-		var w := KIT_SRC.size.x * sc
-		var h := KIT_SRC.size.y * sc
-		draw_texture_rect_region(tex, Rect2(center.x - w * 0.5, center.y - h * 0.5, w, h), KIT_SRC)
-	else:
-		draw_rect(Rect2(center.x - 5, center.y - 6, 10, 12), Color.WHITE, true)
+## The coverage-zone overlay: a walked frame patch when this (formation,slot)
+## was walked (155/156/131), else the majority dim LUT (the true dim is a
+## positional noise dither — documented approximation for un-walked zones).
+func _apply_zone(img: Image, form: String, sel_slot: int, raw: Array) -> void:
+	var tag := ""
+	if form == "3-5-2" and sel_slot == 9:
+		tag = "352_9"
+	elif form == "3-5-2" and sel_slot == 5:
+		tag = "352_5"
+	elif form == "4-4-2" and sel_slot == 6:
+		tag = "442_6"
+	if tag != "" and _zone_patch.get(tag) != null and _zone_rects.has(tag):
+		var r: Array = _zone_rects[tag]
+		var patch: Image = _zone_patch[tag]
+		img.blit_rect(patch, Rect2i(0, 0, patch.get_width(), patch.get_height()),
+			Vector2i(int(r[0]), int(r[1])))
+		return
+	var p0 := _mkmap(int(raw[0]), int(raw[1]))
+	var p1 := _mkmap(int(raw[0]) + int(raw[2]), int(raw[1]) + int(raw[3]))
+	for yy in range(p0.y, mini(p1.y, img.get_height())):
+		for xx in range(p0.x, mini(p1.x, img.get_width())):
+			var c := img.get_pixel(xx, yy)
+			var k := "%d,%d,%d" % [int(c.r * 255.0 + 0.5), int(c.g * 255.0 + 0.5), int(c.b * 255.0 + 0.5)]
+			if _zone_lut.has(k):
+				var v: Array = _zone_lut[k]
+				img.set_pixel(xx, yy, Color8(int(v[0]), int(v[1]), int(v[2])))

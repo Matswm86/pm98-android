@@ -184,17 +184,54 @@ func _run() -> void:
 	board.queue_free()
 	await process_frame
 
-	# ---- LINE-UP header (run-2 frame 155: MU home vs Sao Paulo, Wednesday 6) ------
-	# Header-ROI pair only: the LINE-UP body parity story is separate, so the XI is
-	# just a valid auto-pick; the diff scopes to the y<62 match-header band.
+	# ---- LINE-UP FULL FRAME (run-2 frame 155: MU home vs Sao Paulo, Wed 6) --------
+	# The frame's exact state: 3-5-2 XI (tactics 014 slot order), the walked AVs
+	# (the AV formula is un-RE'd — injected like tactics_014), Beckham INJURED
+	# 7 weeks (FI 82 / MO 99 -> the gold row + UNDO), Solskjaer SELECTED (2px row
+	# frame, name band, attr values, coverage zone + white markers), TEAM RATING
+	# 77, and the save's bench/reserve order pinned on the club dict.
+	var manu4: Dictionary = {}
+	for c in gamedb.clubs_in_league(str(gamedb.leagues[0].get("id", ""))):
+		if str(c.get("name", "")).begins_with("MANCHESTER U"):
+			manu4 = (c as Dictionary).duplicate()
+	var av155 := {"SCHMEICHEL": 89, "GARY NEVILLE": 82, "IRWIN": 85, "BERG": 86,
+		"PALLISTER": 82, "BUTT": 84, "BECKHAM": 88, "SHERINGHAM": 81, "COLE": 85,
+		"GIGGS": 88, "SOLSKJAER": 86, "JOHNSEN": 82, "VAN DER GOUW": 81,
+		"PHIL NEVILLE": 81, "SCHOLES": 82, "MCCLAIR": 82, "JORDI CRUYFF": 81,
+		"KEANE": 87, "MAY": 80, "CURTIS": 79}
+	var by_name := {}
+	for p in manu4.get("players", []):
+		by_name[str(p.get("name", ""))] = p
+		if av155.has(str(p.get("name", ""))):
+			(p as Dictionary)["av"] = av155[str(p.get("name", ""))]
+	var beck: Dictionary = by_name["BECKHAM"]
+	beck["injured_weeks"] = 7
+	beck["fitness"] = 82
+	beck["morale"] = 99
+	var xi155: Array = []
+	for nm in ["SCHMEICHEL", "GARY NEVILLE", "IRWIN", "BERG", "PALLISTER", "BUTT",
+			"BECKHAM", "SHERINGHAM", "COLE", "GIGGS", "SOLSKJAER"]:
+		xi155.append(int((by_name[nm] as Dictionary).get("id", -1)))
+	var pid_of := func(nm: String) -> int: return int((by_name[nm] as Dictionary).get("id", -1))
+	manu4["bench"] = [pid_of.call("JOHNSEN"), pid_of.call("VAN DER GOUW"),
+		pid_of.call("PHIL NEVILLE"), pid_of.call("SCHOLES"), pid_of.call("MCCLAIR")]
+	manu4["reserves"] = [pid_of.call("JORDI CRUYFF"), pid_of.call("KEANE"),
+		pid_of.call("MAY"), pid_of.call("CURTIS"), pid_of.call("CASPER"),
+		pid_of.call("CLEGG"), pid_of.call("NEVLAND"), pid_of.call("THORNLEY")]
+	manu4["team_rating"] = 77
+	var tac155 := Tactics.new()
+	tac155.formation = "3-5-2"
+	tac155.xi = xi155
 	var lu: LineupScreen = load("res://scenes/LineupScreen.gd").new()
 	_mount(lu)
 	await process_frame
-	lu.setup(manu3, Tactics.auto_pick(manu3, "4-4-2"), "", "Premier League", "1997-98", 1,
+	lu.setup(manu4, tac155, "", "Premier League", "1997-98", 1,
 		{"mode": "fixture", "top": "Manchester Utd.", "bottom": "Sao Paulo",
 		"home_id": 40, "away_id": 1301, "weekday": "Wednesday", "day": "6",
 		"month": "August", "year": "1997",
 		"status_top": "Preseason", "status_bottom": "Preparation"})
+	lu._sel_pid = pid_of.call("SOLSKJAER")
+	lu.queue_redraw()
 	await _shot(dir, "lineup_155.png")
 	lu.queue_free()
 	await process_frame

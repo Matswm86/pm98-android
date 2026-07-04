@@ -92,13 +92,13 @@ PAIRS = [
         [],
         0.0001,
     ),
-    # LINE-UP / VIEW RIVAL match-header rollout (run-2 frames 155/015). ROI = the
-    # 62px header band only: both screens' BODY parity stories are separate (the
-    # tables keep the app's reconstructed metrics; documented in match_header_re.md).
+    # LINE-UP FULL FRAME (run-2 frame 155): frame-baked body chrome + row
+    # templates + star/marker sprites + zone patch (build_lineup_chrome_from_
+    # frames.py); the walked AVs/team-rating injected (formula un-RE'd).
     (
         "lineup_155.png",
         "155_162931.png",
-        (0, 0, 640, 62),
+        None,
         [],
         0.0001,
     ),

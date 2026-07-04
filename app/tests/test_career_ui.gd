@@ -81,8 +81,9 @@ func _run() -> void:
 	if lu != null:
 		ok = _assert(lu._by_id.size() == main._career.squad_of(main._career.club_id).size(),
 			"line-up overlay indexed the live roster") and ok
-		ok = _assert((lu._slot_positions() as Array).size() == 11,
-			"line-up overlay placed 11 formation markers") and ok
+		var lu_tex: Texture2D = lu._compose_pitch(lu._tactics.formation, -1)
+		ok = _assert(lu_tex != null and lu_tex.get_width() == 152,
+			"line-up overlay composed the CAMPO marker pitch") and ok
 		lu.queue_free()
 	await process_frame
 

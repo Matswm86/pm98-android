@@ -93,7 +93,7 @@ func _run() -> void:
 	# --- 7. synthetic tap round-trip through _hit / _on_input -----------------
 	screen.setup(club, Tactics.auto_pick(club, "4-4-2"), "", "Premier")
 	var fi8 := _fi(screen, 8)
-	var y := LineupScreen.XI_Y0 + fi8 * LineupScreen.ROW_H + 4
+	var y := LineupScreen.XI_Y0 - 1 + fi8 * LineupScreen.ROW_PITCH + 4
 	ok = _assert(screen._hit(Vector2(60, y)) == "row:%d" % fi8, "_hit maps a click to its row") and ok
 	_tap(screen, Vector2(60, y))
 	ok = _assert(screen._sel_pid == 8, "full press+release tap selects the row") and ok
