@@ -1007,7 +1007,10 @@ func _continue_career() -> void:
 		# An in-progress career in its first seasons still gets the guaranteed gem on resume.
 		var before: int = (_career.youth as Array).size()
 		_career._ensure_wonderkid()
-		if (_career.youth as Array).size() != before:
+		# Real talents whose debut season has already passed arrive on resume too (an
+		# app update onto an in-flight save, or a pool side-loaded mid-career).
+		var caught_up: int = _career.inject_due_talents(TalentDB.talents)
+		if (_career.youth as Array).size() != before or caught_up > 0:
 			_career.save()
 		_enter_career()
 
@@ -3007,9 +3010,11 @@ func _activate_end_of_season(item: Dictionary) -> void:
 func _next_season() -> void:
 	# Carry the live squads, cash and tactics into the new season; contracts tick
 	# down and unrenewed players leave on a free (handled in Career.advance_season).
+	# TalentDB's pool rides along: real talents due in the new season arrive (empty
+	# pool -- no talent_pool.json -- injects nothing and the rollover is vanilla).
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
-	_career.advance_season(GameDB.leagues, rng, _euro_pool(), _sa_champion())
+	_career.advance_season(GameDB.leagues, rng, _euro_pool(), _sa_champion(), TalentDB.talents)
 	_career.save()
 	_enter_career()
 
@@ -3111,6 +3116,9 @@ func _accept_job(offer: Dictionary) -> void:
 	var league_clubs := GameDB.clubs_in_league(lid)
 	var reason := "sacked" if _career.sacked else ("left %s" % _career.club_name)
 	_career.take_job(club, league, league_clubs, GameDB.leagues, reason)
+	# The new division was re-seeded from the 1997 GameDB: catch up any real talents
+	# whose debut has already passed (they land at their clubs here, today's ages).
+	_career.inject_due_talents(TalentDB.talents)
 	_career.save()
 	_enter_career()
 

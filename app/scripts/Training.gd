@@ -77,6 +77,13 @@ static func train_week(rng: RandomNumberGenerator, squad: Array, intensity: Stri
 			continue   # unrated fringe player: nothing to develop
 		var age := int(p.get("age", 26))
 		var base := _base_rate(age)
+		# A dict carrying a hidden `potential` (injected real talents keep theirs; ordinary
+		# seniors never have one -- Youth.graduate erases it) HOLDS at that ceiling while
+		# he'd otherwise improve; veteran decline (negative base) still applies. Vanilla
+		# players never carry the key, so their path is bit-identical.
+		if base > 0.0 and p.has("potential") \
+				and int((attrs as Dictionary).get("CA", 0)) >= int(p["potential"]):
+			continue
 		# Trainers speed development but don't hasten decline: dev_factor applies to a
 		# positive (improving) rate only.
 		var rate := base * factor * (dev if base > 0.0 else 1.0)

@@ -56,6 +56,7 @@ var staff_pool: Array = []              # staff available to hire (refreshed eac
 var staff_seq: int = STAFF_ID_BASE      # monotonic id minter for staff candidates
 var free_agents: Array = []             # out-of-contract players you can sign for £0 + a wage
 var free_seq: int = FREE_ID_BASE        # monotonic id minter for generated free agents
+var talents_used: Dictionary = {}       # real-talent ledger: pool key -> season injected (Talent.gd)
 var fa_cup: Dictionary = {}             # the F.A. Cup bracket (Cup.gd); {} = not running
 var league_cup: Dictionary = {}         # the Coca-Cola (League) Cup bracket; {} = not running
 
@@ -202,6 +203,9 @@ func _init_club(club: Dictionary, league: Dictionary, league_clubs: Array, leagu
 	transfer_log = []
 	transfer_listed = {}
 	shortlist = []
+	# The old division's rosters (and any talents injected into them) are gone; a clean
+	# ledger lets inject_due_talents (Main, after take_job) re-deliver due talents here.
+	talents_used = {}
 	works = {}
 	offers_left = OFFERS_PER_WEEK
 	# Competitions reset: you arrive with no European qualification or honours at the new club.
@@ -1071,6 +1075,79 @@ func _has_wonderkid() -> bool:
 	return false
 
 
+# ---- real-talent injection (Talent.gd, easter-egg lane) --------------------
+
+## Deliver the real talents scheduled for the season starting now (called from
+## advance_season with TalentDB's pool; an empty pool -- no talent_pool.json --
+## makes this a no-op and the port behaves exactly as before).
+func _inject_real_talents(rng: RandomNumberGenerator, pool: Array) -> void:
+	if pool.is_empty():
+		return
+	var start_year := 1996 + year
+	for e in Talent.due(pool, start_year, talents_used):
+		_inject_talent(e, rng, start_year)
+
+
+## Catch-up delivery: every pool entry due in any season up to now that hasn't been
+## injected (job changes re-seed the division; app updates land on in-flight saves).
+## Idempotent. Returns how many arrived so the caller knows whether to save.
+func inject_due_talents(pool: Array, rng: RandomNumberGenerator = null) -> int:
+	if pool.is_empty():
+		return 0
+	if rng == null:
+		rng = RandomNumberGenerator.new()
+		rng.randomize()
+	var start_year := 1996 + year
+	var n := 0
+	for e in Talent.due_catchup(pool, start_year, talents_used):
+		if _inject_talent(e, rng, start_year):
+			n += 1
+	return n
+
+
+## Place one pool entry. Routing: the manager's own club receives a youth-age talent
+## through the faithful academy loop ("%s has joined your Youth Team."); AI clubs get
+## him straight into their live roster (their academies are off-screen). A talent whose
+## club is outside the live division is SKIPPED and stays due -- he may arrive later
+## via catch-up when the manager surfaces in his division. Returns true if placed.
+func _inject_talent(e: Dictionary, rng: RandomNumberGenerator, start_year: int) -> bool:
+	var key := Talent.key_of(e)
+	var cid := club_id if str(e.get("route", "club")) == "manager_youth" else Talent.club_of(e)
+	if not rosters.has(cid):
+		return false               # not in this division; NOT marked used (stays due)
+	# Idempotence: if he's already in the world (double call, resume), just mark the ledger.
+	var pid := int(e.get("id", 0))
+	for p in youth:
+		if int(p.get("id", -1)) == pid:
+			talents_used[key] = season
+			return false
+	for p in rosters[cid]:
+		if int(p.get("id", -1)) == pid:
+			talents_used[key] = season
+			return false
+	var pname := str(e.get("name", "?"))
+	if cid == club_id and Talent.age_in_season(e, start_year) <= Youth.GRADUATE_AGE:
+		# Your club: he comes through YOUR academy, wonderkid-style (bypasses the youth
+		# cap on purpose -- a scheduled one-off, not part of the scouted crop).
+		youth.append(Talent.make_youth(e, rng, start_year))
+		if int(e.get("tier", 4)) <= 1:
+			_news("youth", "%s, a sensational young prospect, has joined your Youth Team." % pname)
+		else:
+			_news("youth", "%s has joined your Youth Team." % pname)
+	else:
+		# An AI club (or a rare over-age arrival at yours): straight into the roster,
+		# fully contract-stamped. Full squads skip-and-retry at a later rollover.
+		if rosters[cid].size() >= TransferMarket.SQUAD_MAX:
+			return false           # NOT marked used; transfer churn usually frees room
+		rosters[cid].append(Talent.make_senior(e, rng, start_year, tier))
+		# Only headline arrivals reach the news feed (living-league quietness).
+		if int(e.get("tier", 4)) <= 2:
+			_news("youth", "%s, a highly rated youngster, has come through the ranks at %s." % [
+				pname, club_names.get(cid, "?")])
+	talents_used[key] = season
+	return true
+
+
 ## The youth players the manager can promote right now (the youth manager has flagged
 ## them ready). The screen badges these and offers PROMOTE.
 func promotable_youth() -> Array:
@@ -1546,7 +1623,7 @@ func _money(n: int) -> String:
 ## Contracts tick down; any of your players who hit zero and weren't renewed leave on
 ## a free. Fixtures, table and objective are rebuilt from the current squads.
 func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool: Array = [],
-		sa_champion: Dictionary = {}) -> void:
+		sa_champion: Dictionary = {}, talent_pool: Array = []) -> void:
 	# Capture this season's honours BEFORE the table + European brackets are rebuilt --
 	# they seed next season's Charity Shield, European qualification, and the
 	# Supercup/Intercontinental (which need this season's European winners + ratings).
@@ -1643,6 +1720,10 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	transfer_listed.clear()
 	offers_left = OFFERS_PER_WEEK
 	_log("--- %s season ---" % season)
+	# Real talents scheduled for the season just started (easter-egg lane; empty pool =
+	# the vanilla port). After the label flip so 1998-99's crop lands IN 1998-99, and
+	# before the roster views below so fixtures/objective/finances see the new arrivals.
+	_inject_real_talents(rng, talent_pool)
 
 	var ids: Array = rosters.keys()
 	var views: Array = []
@@ -1990,6 +2071,7 @@ func to_dict() -> Dictionary:
 		"training_intensity": training_intensity, "youth": youth,
 		"youth_seq": youth_seq, "staff": staff, "staff_pool": staff_pool,
 		"staff_seq": staff_seq, "free_agents": free_agents, "free_seq": free_seq,
+		"talents_used": talents_used,
 		"fa_cup": fa_cup,
 		"league_cup": league_cup,
 		"last_champion_id": last_champion_id, "last_fa_winner_id": last_fa_winner_id,
@@ -2063,6 +2145,8 @@ static func from_dict(d: Dictionary) -> Career:
 	# Pre-free-agent saves load with an empty pool; the first rollover seeds a fresh batch.
 	c.free_agents = d.get("free_agents", [])
 	c.free_seq = int(d.get("free_seq", FREE_ID_BASE))
+	# Pre-talent saves load with an empty ledger; Main's catch-up delivers anyone due.
+	c.talents_used = d.get("talents_used", {})
 	# Saves from before the cups existed load with no bracket; they stay inert this
 	# season (round_due is false on an empty dict) and are rebuilt at the next rollover.
 	c.fa_cup = d.get("fa_cup", {})
