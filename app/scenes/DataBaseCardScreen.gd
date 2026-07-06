@@ -73,12 +73,16 @@ const PD_INTL_XY := Vector2(459, 219)
 const PD_LC_XY := Vector2(196, 270)
 const PD_H_XY := Vector2(200, 318)
 const PD_W_XY := Vector2(400, 318)
-# prose
-const PROSE_X0 := 214
-const PROSE_X1 := 569
+# prose (all frame-fitted: tools/re/fit_prose_advances.py, 168/168 rows exact
+# across the 12 walked prose frames of bio-coin-walk-2026-07-06)
+const PROSE_X0 := 214            # pen origin
+const PROSE_X1 := 569            # justification flush target
+const PROSE_WRAP_CAP := 570      # natural pen-end may reach X1+1 (041 "which")
 const PROSE_Y0 := 150
 const PROSE_PITCH := 16
-const PROSE_LINES := 17          # (412-150)/16 -> visible rows in the box
+const PROSE_LINES := 14          # viewport rows 150..374 (039: rows 14/15 empty)
+const PROSE_LINE_CAP := 24       # fixed line table; overflow DROPPED (044 end)
+const BULLET_ADV := 9            # ▶ glyph advance; source spaces follow at 6px
 # career PROGRESS grid
 const CAR_COLS := [189, 252, 409, 488, 535, 573]
 const CAR_HDR := ["SEASON", "TEAM", "DIVISION", "MATCH", "GOALS"]
@@ -554,78 +558,140 @@ func _page_text() -> String:
 	return ""
 
 
-## Layout: each `*` opens a ▶ bullet paragraph; words wrap greedily into
-## [PROSE_X0..PROSE_X1]; every line except a paragraph's last is FULL-
-## JUSTIFIED by distributing the deficit across the word gaps left-to-right
-## (035/037/039-045 witnesses; exact GDI rounding pinned by the parity shots).
-## Returns [{words, bullet, justify}] per visual line.
+## Frame-fitted justification stretch (fit_prose_advances.py law 7):
+## cumulative pixels inserted after break j of n breaks for line deficit D.
+## - (D+1)/n representable in eighths -> zero-phase Bresenham on (D+1)/n
+##   (total D+1: the line's pen-end lands on 570, one px past flush);
+## - else every break gets D/n and the remainder r goes one px each to
+##   breaks floor(n*i/(r+1)), i=1..r (evenly spread, ends bare; total D).
+static func _gdi_stretch(deficit: int, n: int, j: int) -> int:
+	if deficit <= 0 or n <= 0 or j <= 0:
+		return 0
+	if (8 * (deficit + 1)) % n == 0:
+		@warning_ignore("integer_division")
+		var cum: int = (j * (deficit + 1)) / n
+		return cum
+	@warning_ignore("integer_division")
+	var base: int = deficit / n
+	var r: int = deficit % n
+	var placed := 0
+	for i in range(1, r + 1):
+		@warning_ignore("integer_division")
+		var pos: int = (n * i) / (r + 1)
+		if pos < j:
+			placed += 1
+	return j * base + placed
+
+
+## The original's layout, frame-fitted to 168/168 rows across the 12 walked
+## prose frames (tools/re/fit_prose_advances.py):
+## - '*' renders as the ▶ glyph (advance 9); the source text after it runs
+##   VERBATIM — leading spaces render 6px each and are justification breaks
+##   ("*A member" has none: 039/043 walk the no-gap case);
+## - gaps carry their literal space count (the data has double spaces);
+## - greedy wrap: break before a word whose natural pen-end would pass 570;
+## - the line table holds 24 lines; overflow is dropped and the 24th line
+##   justifies like any broken line (044: "...Manchester United were");
+## - every line justifies except a paragraph's stored last.
+## Returns [{words, gaps, lead, justify, first}] per visual line.
 func _prose_lines() -> Array:
 	var out: Array = []
 	if _fkk == null:
 		return out
-	var bullet_w := 12.0  # ▶ sprite + gap before the first word
-	for para in _page_text().split("*"):
-		var text := para.strip_edges()
-		if text == "":
+	var gap := _tw(_fkk, " ", 16)
+	var parts := _page_text().split("*")
+	for pi in range(1, parts.size()):
+		var text := String(parts[pi]).strip_edges(false, true)
+		if text.strip_edges() == "":
 			continue
-		var words := text.split(" ", false)
-		var line: Array = []
+		var lead := 0
+		while lead < text.length() and text[lead] == " ":
+			lead += 1
+		var toks := text.substr(lead).split(" ", true)
+		var words: Array = []
+		var spaces: Array = []
+		var run := 0
+		for t in toks:
+			if t == "":
+				run += 1
+				continue
+			if not words.is_empty():
+				spaces.append(run + 1)
+			words.append(String(t))
+			run = 0
+		var line_w: Array = []
+		var line_s: Array = []
 		var first := true
-		var x := PROSE_X0 + bullet_w
-		for wtxt in words:
-			var wpx := _tw(_fkk, wtxt, 16)
-			var gap := _tw(_fkk, " ", 16)
-			if not line.is_empty() and x + gap + wpx > PROSE_X1:
-				out.append({"words": line, "bullet": first and out.size() >= 0 and line == line, "justify": true, "first": first})
-				line = []
+		var x := PROSE_X0 + BULLET_ADV + gap * lead
+		for k in words.size():
+			var wpx := _tw(_fkk, words[k], 16)
+			var nsp: int = spaces[k - 1] if k > 0 else 0
+			if not line_w.is_empty() and x + gap * nsp + wpx > PROSE_WRAP_CAP:
+				out.append({"words": line_w, "gaps": line_s,
+					"lead": lead if first else 0, "justify": true, "first": first})
+				line_w = []
+				line_s = []
 				first = false
 				x = PROSE_X0
-			if not line.is_empty():
-				x += gap
+			elif not line_w.is_empty():
+				line_s.append(nsp)
+				x += gap * nsp
 			x += wpx
-			line.append(str(wtxt))
-		if not line.is_empty():
-			out.append({"words": line, "justify": false, "first": first})
-	# mark bullets: the first line of each paragraph carries the ▶
-	var seen_first := false
-	for l in out:
-		l["bullet"] = bool(l.get("first", false))
+			line_w.append(words[k])
+		if not line_w.is_empty():
+			out.append({"words": line_w, "gaps": line_s,
+				"lead": lead if first else 0, "justify": false, "first": first})
+	if out.size() > PROSE_LINE_CAP:
+		out.resize(PROSE_LINE_CAP)
+		out[PROSE_LINE_CAP - 1]["justify"] = true
 	return out
 
 
 func _draw_prose() -> void:
 	if _fkk == null:
 		return
+	# the prose page's open-right grey border (top/left/bottom only —
+	# 072/035/037: exactly rows y128+y393 x189-575 and col x189)
+	draw_rect(Rect2(189, 128, 387, 1), C_GRID, true)
+	draw_rect(Rect2(189, 129, 1, 264), C_GRID, true)
+	draw_rect(Rect2(189, 393, 387, 1), C_GRID, true)
 	var lines := _prose_lines()
 	var n := lines.size()
+	var gap := _tw(_fkk, " ", 16)
 	for row in PROSE_LINES:
 		var li: int = row + _scroll
 		if li >= n:
 			break
 		var l: Dictionary = lines[li]
 		var y := PROSE_Y0 + row * PROSE_PITCH
-		var x0 := PROSE_X0 + (12.0 if l["bullet"] else 0.0)
-		if l["bullet"]:
+		var first := bool(l["first"])
+		if first:
 			_blit("prose_bullet", Vector2(PROSE_X0, y))
 		var words: Array = l["words"]
-		var gap := _tw(_fkk, " ", 16)
-		var total := 0.0
-		for wtxt in words:
-			total += _tw(_fkk, str(wtxt), 16)
-		if bool(l["justify"]) and words.size() > 1:
-			# distribute the deficit over the gaps, remainder left-first (GDI)
-			var deficit := (PROSE_X1 - x0) - (total + gap * (words.size() - 1))
-			var base := floorf(deficit / (words.size() - 1))
-			var extra := int(deficit) - int(base) * (words.size() - 1)
-			var x := x0
-			for k in words.size():
-				_txt(_fkk, x, y, str(words[k]), Color(0, 0, 0), 16)
-				x += _tw(_fkk, str(words[k]), 16) + gap + base + (1.0 if k < extra else 0.0)
-		else:
-			var x := x0
-			for wtxt in words:
-				_txt(_fkk, x, y, str(wtxt), Color(0, 0, 0), 16)
-				x += _tw(_fkk, str(wtxt), 16) + gap
+		var gaps: Array = l["gaps"]
+		var lead: int = int(l["lead"])
+		var justify := bool(l["justify"])
+		var pen0 := PROSE_X0 + (BULLET_ADV if first else 0)
+		var nbr: int = lead
+		for g in gaps:
+			nbr += int(g)
+		var deficit := 0
+		if justify:
+			var natural := gap * nbr
+			for w in words:
+				natural += _tw(_fkk, str(w), 16)
+			deficit = int(PROSE_X1 - pen0 - natural)
+		var pen := float(pen0) + gap * lead
+		var brk := lead
+		for k in words.size():
+			if k > 0:
+				pen += gap * int(gaps[k - 1])
+				brk += int(gaps[k - 1])
+			var x := pen + (_gdi_stretch(deficit, nbr, brk) if justify else 0)
+			# -3: the original's glyph cell tops sit at PROSE_Y0-3 (+16/row):
+			# 072 'F' inks 150-159 = cell top 147 (kkita ink rows 3-12)
+			_txt(_fkk, x, y - 3, str(words[k]), Color(0, 0, 0), 16)
+			pen += _tw(_fkk, str(words[k]), 16)
 	_draw_scrollbar(n, PROSE_LINES)
 
 
@@ -653,10 +719,12 @@ func _draw_career() -> void:
 			var cell := row[k] if k < row.size() else ""
 			if cell == "":
 				continue
-			# PROMAN10, centred on the cell (GDI floor), pixel-clipped at BOTH
-			# cell edges (062 "0. Plymou" / shifted-"Wimbledon" truth)
+			# PROMAN10, centred on the cell, pixel-clipped at BOTH cell edges
+			# (062 "0. Plymou" / shifted-"Wimbledon" truth). C-style trunc
+			# toward 0, NOT floor: overflowing cells centre 1px right of
+			# floor ((-w)/2 truncates up) — the 062 clipped-cell residual
 			var wpx := _tw(_f10, cell, 10)
-			var x := cx0 + floorf((cx1 - cx0 - wpx) / 2.0)
+			var x := cx0 + int((cx1 - cx0 - wpx) / 2.0)
 			_clip_text("proman10", cell, x, y + 4,
 				Rect2(cx0, y, cx1 - cx0, CAR_ROW_H - 2), CAR_INKS[k])
 	draw_rect(Rect2(189, CAR_ROW0 + CAR_N_ROWS * CAR_ROW_H - 1, 385, 1), C_GRID, true)

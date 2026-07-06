@@ -173,21 +173,55 @@ shots `app/tests/shot_dbase_card.gd`, differ
   rects); 12 fixed grid rows; the career scrollbar chrome ≠ the prose one
   (separate stepper/slab/track cuts per view; prose carries a bar frame at
   x574..584 the career bar lacks).
-- **Parity (differ, name-box masked as speckle noise)**: 0px on
-  034 PERSONAL DATA, 055 Klinsmann tab-states, 038 CAREER, 046 NOTES.
-  Remaining: 062 (1.5k px: ±1 advance/centering on the CLIPPED shifted
-  cells), 072 + 035 + 037 (prose: line breaks, face, indents and pitch all
-  match; word x-positions off ≤2px — the justification distribution and a
-  few per-glyph advances need the GDI truth derived from unjustified frame
-  lines; fitting scripts in the differ).
+- **Parity: ALL 8 walked states 0px** (differ, name-box masked as speckle
+  noise): 034 PERSONAL DATA, 035 PROFILE, 037 HONOURS, 038 CAREER,
+  046 NOTES, 055 Klinsmann tab-states, 062 Blackwell CAREER typo-shift,
+  072 Grodas short HONOURS.
+
+## PROSE LAYOUT LAWS (2026-07-06, frame-fitted — closes the ±px lever)
+
+Derived by `tools/re/fit_prose_advances.py` from ALL 12 prose frames of the
+bio-coin walk (035-045, 056, 058, 072): **168/168 rows pixel-exact**,
+119/119 unjustified word-pair advance equations exact. Implemented 1:1 in
+`DataBaseCardScreen.gd` (`_prose_lines`/`_gdi_stretch`/`_draw_prose`).
+
+1. **Advances**: the kkita BMFont xadvance table is exact as exported
+   (space = 6). No per-glyph correction was needed — the old ±px residual
+   was never advances.
+2. **Bullet**: `*` renders as the ▶ glyph, advance 9, at x214; the source
+   text continues VERBATIM — its leading space(s) render 6px each and are
+   justification breaks ("* Peter" = 15px indent; Schmeichel internat
+   para 3 is `*A member` = NO gap, walked 039/043).
+3. **Multi-space gaps** render 6px per space (the data carries doubles);
+   each space is its own justification break.
+4. **Wrap capacity 570** (= X1+1): break before a word whose natural
+   pen-end would exceed 570 ("…Rapid Vienna which" packs to 570, 041).
+5. **Line table = 24 lines**; overflow DROPPED, and the 24th line
+   justifies like any broken line (044 end: the huge-gap "In September
+   1995 Manchester United were" is the last line ever shown).
+6. **Viewport = 14 rows** (not 17); scroll max = lines-14 (039 rows 14/15
+   empty; all three end-scroll frames sit at L-14).
+7. **Justification** (every line except a paragraph's stored last): flush
+   target 569; with deficit D over n breaks, cumulative stretch after
+   break j is
+   - `floor(j*(D+1)/n)` when `8*(D+1) % n == 0` ((D+1)/n representable in
+     eighths — always true for n=8; total D+1, pen-end lands on 570);
+   - else base `D//n` per break + remainder r placed one px each at
+     breaks `floor(n*i/(r+1))`, i=1..r (evenly spread, ends bare; total
+     D, pen-end 569).
+8. **Glyph cell tops at y147+16*row** (PROSE_Y0-3: kkita ink rows 3-12
+   land at 150+16r..; the prose `_txt` draws at y-3).
+9. **Prose page border**: open-right 1px grey(128) box — rows y128 + y393
+   spanning x189-575, column x189 (careers bake carries its own left edge;
+   this one is prose-view drawn).
+10. **Career clipped cells centre by C trunc-toward-0**, not floor:
+    `cx0 + int((cellw - wpx)/2)` — differs only when the text overflows
+    the cell (the 062 shifted rows; closed 062 to 0px).
 
 ## Open
 
 - Exact tab-enable predicate in Dbasewin (upstream of FUN_00410610) — only if the
   empirical rule ever misfires.
-- Prose justification metrics: ±1px word placement (above); derive true GDI
-  advances from unjustified lines, correct the BMFont xadvance table if any
-  glyph differs, then re-run `diff_dbase_card_parity.py --offsets`.
 - Scroll-thumb travel beyond the walked pair (038 off-0 pinned; 042 [+30px
   for 2 rows] fitted; other page sizes proportional, documented).
 - Big-flag art for un-walked countries (framed BANDERAS fallback; the 6
