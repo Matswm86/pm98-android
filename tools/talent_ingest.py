@@ -609,22 +609,37 @@ def main() -> None:
                 nat_unknown += 1
         if c["nationality"] != ENGLAND and c["nationality"].upper() not in flags:
             nat_no_flag[c["nationality"]] += 1
-        if key in by_key:  # overlapping exports: keep the earliest debut...
+        if key in by_key:
+            # Overlapping seasons: a talent starts at his ORIGIN club — the club of
+            # his EARLIEST club-bearing row (Ronaldinho: Gremio 98-99, never the
+            # PSG 01-02 row) — regardless of the order files are passed in. A
+            # club-bearing row also upgrades a clubless/free-agent entry (the
+            # 99-00 mod lists Rooney clubless at 14; 01-02 names Everton).
             t = by_key[key]
             if c["curated"]:
-                # ...but a hand-curated row replaces the bulk entry outright (the
-                # curator's club/debut/tier is the gameplay-visible truth; e.g. the
-                # 99-00 FM mod lists Rooney clubless at 14 -- curation pins Everton
-                # 2002-03 instead).
+                # A hand-curated row replaces the bulk entry outright and locks it
+                # (the curator's club/debut/tier is the gameplay-visible truth).
                 for fld in ("nationality", "pos", "isGK", "clubId", "clubName", "route", "tier"):
                     t[fld] = c[fld]
                 t["debutYear"], t["debutSeason"] = c["debutYear"], c["season"]
                 t["flagCode"] = flag_for(c["nationality"], flags)
                 t["kind"] = kind_of(c["nationality"])
+                t["curated"] = True
                 if c.get("notes"):
                     t["notes"] = c["notes"]
                 updated += 1
-            elif c["debutYear"] < int(t["debutYear"]):
+            elif t.get("curated"):
+                pass  # curation pin wins over any bulk row
+            elif c["route"] == "club" and (
+                t["route"] != "club" or c["debutYear"] < int(t["debutYear"])
+            ):
+                for fld in ("nationality", "pos", "isGK", "clubId", "clubName", "route", "tier"):
+                    t[fld] = c[fld]
+                t["debutYear"], t["debutSeason"] = c["debutYear"], c["season"]
+                t["flagCode"] = flag_for(c["nationality"], flags)
+                t["kind"] = kind_of(c["nationality"])
+                updated += 1
+            elif c["route"] == t["route"] and c["debutYear"] < int(t["debutYear"]):
                 t["debutYear"], t["debutSeason"] = c["debutYear"], c["season"]
                 updated += 1
             continue
@@ -651,6 +666,7 @@ def main() -> None:
             "potential": c["potential"],
             "heightCm": None,
             "weightKg": None,
+            "curated": c["curated"],
         }
         if c.get("notes"):
             entry["notes"] = c["notes"]
