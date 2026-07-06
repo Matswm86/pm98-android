@@ -258,10 +258,12 @@ def detect_shift(people: dict, anchors: dict[str, int]) -> int | None:
     votes = Counter()
     for props in people.values():
         fln = props.get("Pfln")
-        if isinstance(fln, str) and fln in anchors:
+        disp = f"{props.get('Pfna') or ''} {props.get('Psna') or ''}".strip()
+        name = fln if isinstance(fln, str) and fln in anchors else disp
+        if name in anchors:
             dob = props.get("Pdob")
             if isinstance(dob, tuple) and dob[0] == "date":
-                votes[dob[1] - anchors[fln]] += 1
+                votes[dob[1] - anchors[name]] += 1
     if not votes:
         return None
     shift, cnt = votes.most_common(1)[0]
