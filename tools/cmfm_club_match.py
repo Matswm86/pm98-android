@@ -24,6 +24,12 @@ Barnsley six years on), the strongest candidate wins if it dominates the best
 dissenter by DOMINANCE; otherwise the id is rejected and flagged CONFLICT.
 Club ids themselves are baseline-stable across FM21-FM26 hosts (Everton is
 650 in every era's votes) — it is only the snapshot NAME table that drifts.
+
+tools/club_map_overrides.csv is the human audit layer and ALWAYS wins over
+votes: whole-squad identification proves some accepted votes are artifacts
+(fid 1157's squad is Nakata-era Perugia; its 4 Inter votes are Perugia<->Inter
+transfers). A row with an empty pm98 column VETOES the fid (players keep
+FM#id -> free-agent route); a named pm98 column forces that club.
 """
 
 from __future__ import annotations
@@ -68,10 +74,19 @@ def club_id_of(row: dict, name_to_id: dict[str, int]) -> int | None:
     return name_to_id.get(c)
 
 
+def load_overrides() -> dict[int, str | None]:
+    path = Path(__file__).with_name("club_map_overrides.csv")
+    if not path.exists():
+        return {}
+    with open(path) as fh:
+        return {int(r["fm_id"]): r["pm98"].strip() or None for r in csv.DictReader(fh)}
+
+
 def main() -> None:
     clubs_cache = json.loads((CM / "clubs_cache.json").read_text())
     name_to_id = {v: int(k) for k, v in clubs_cache.items()}
     pm98_keys, _ = load_pm98()
+    overrides = load_overrides()
 
     votes: dict[str, dict[int, Counter]] = defaultdict(lambda: defaultdict(Counter))
     fm_names: dict[int, str] = {}
@@ -104,6 +119,14 @@ def main() -> None:
             ]
         )
         for fid in all_fids:
+            if fid in overrides:
+                club = overrides[fid]
+                if club:
+                    mapping[fid] = {"pm98": club, "votes": 0, "runnerUp": 0}
+                w.writerow(
+                    [fid, fm_names.get(fid, ""), club or "", "", "", "", "OVERRIDE", bool(club)]
+                )
+                continue
             candidates = {stem: per[fid] for stem, per in votes.items() if fid in per}
             candidates["POOLED"] = sum(candidates.values(), Counter())
             passing: dict[str, tuple[str, int, str | None, int]] = {}
@@ -139,6 +162,10 @@ def main() -> None:
                 winners = {p[0] for p in passing.values()}
                 note = f"CONFLICT {sorted(winners)}" if len(winners) > 1 else stem
                 w.writerow([fid, fm_names.get(fid, ""), club, n, run or "", rn or "", note, False])
+        for fid, club in overrides.items():  # forced overrides with no votes at all
+            if fid not in all_fids and club:
+                mapping[fid] = {"pm98": club, "votes": 0, "runnerUp": 0}
+                w.writerow([fid, fm_names.get(fid, ""), club, "", "", "", "OVERRIDE", True])
     (CM / "club_map.json").write_text(json.dumps(mapping, indent=1))
     print(f"[map] {len(mapping)} FM clubs mapped to PM98 clubs (of {len(all_fids)} with any vote)")
 
