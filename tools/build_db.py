@@ -108,6 +108,7 @@ def main() -> None:
                 "name": p["name"],
                 "pages": p["bioPages"],
                 "career": p.get("careerCsv") or "",
+                "intl": p.get("intlRaw"),
             }
         # The extended (flag==0) records store nationality ONLY for non-English
         # players — omitted == ENGLAND (extract_english rule, FICHA-frame-
@@ -233,16 +234,21 @@ def main() -> None:
     )
     assert len(sch["pages"]) == 6
     assert sch["career"].strip().splitlines()[0] == "1984,Hvidovre,1,30,0"
+    # T3-verbatim INTERNATIONAL witnesses (frames 034 Schmeichel / 050 Hiden)
+    assert sch["intl"] == "Denmark", sch["intl"]
+    hid = next(b for b in bios.values() if b["name"] == "Hiden")
+    assert hid["intl"] == "-", hid["intl"]
     bout = ASSETS / "bios.json"
     bout.write_text(
         json.dumps(
             {
                 "note": "EQUIPOS.PKF player tail T4..T9 (six bio prose pages) + T10 "
-                "(career-history CSV: season,club,div,apps,goals) VERBATIM, keyed by "
-                "game_db player id. Source dirt in the CSV ('Sin datos.'/'No data.', "
-                "typo'd separators, short rows) is kept as-is, never repaired. The "
-                "original's display surface (FICHA info coin) is un-walked/un-RE'd — "
-                "no app consumer yet.",
+                "(career-history CSV: season,club,div,apps,goals) + T3 (`intl`, the "
+                "DATA BASE card INTERNATIONAL string) VERBATIM, keyed by game_db "
+                "player id. Source dirt ('Sin datos.'/'No data.', typo'd separators, "
+                "short rows, '-'/'No' intl) is kept as-is, never repaired. Display "
+                "surface: the DATA BASE player card (DataBaseCardScreen.gd; "
+                "docs/re/dbase_player_card_re.md).",
                 "players": {str(k): v for k, v in bios.items()},
             },
             ensure_ascii=False,

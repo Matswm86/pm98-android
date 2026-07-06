@@ -1,0 +1,265 @@
+{
+ "source": "screenshots/bio-coin-walk-2026-07-06 (walked 2026-07-06) + RC_DBASE.PKF",
+ "tab_x": [
+  [
+   17,
+   85
+  ],
+  [
+   77,
+   193
+  ],
+  [
+   185,
+   261
+  ],
+  [
+   253,
+   321
+  ],
+  [
+   313,
+   397
+  ],
+  [
+   389,
+   473
+  ],
+  [
+   465,
+   557
+  ]
+ ],
+ "tab_y": [
+  71,
+  93
+ ],
+ "banner_h": 66,
+ "views": {
+  "pdata": "PERSONAL DATA",
+  "profile": "PROFILE",
+  "technical": "TECHNICAL CHARACTERISTICS",
+  "honours": "HONOURS",
+  "career": "PROGRESS",
+  "internat": "INTERNATIONAL",
+  "anecdotes": "ANECDOTES",
+  "lastseason": "LAST SEASON",
+  "notes": null
+ },
+ "pd_value_rows": [
+  [
+   190,
+   162,
+   628,
+   186
+  ],
+  [
+   190,
+   212,
+   628,
+   236
+  ],
+  [
+   190,
+   262,
+   628,
+   286
+  ],
+  [
+   190,
+   312,
+   628,
+   336
+  ]
+ ],
+ "photo_box": [
+  28,
+  126,
+  178,
+  334
+ ],
+ "role_band": [
+  30,
+  336,
+  180,
+  352
+ ],
+ "bottom_band": [
+  12,
+  405,
+  140,
+  429
+ ],
+ "btn_print": [
+  384,
+  442,
+  498,
+  470
+ ],
+ "btn_return": [
+  506,
+  442,
+  620,
+  470
+ ],
+ "fonts": {
+  "pdata_value": "PROMAN10.FNT",
+  "career_header": "PROMAN8.FNT",
+  "role_word": "PROMAN10.FNT",
+  "tab_label": "FUTCON8.FNT",
+  "prose_body": "KKITA.FNT",
+  "header_title": "PROMAN12.FNT",
+  "header_title_xy": [
+   37,
+   102
+  ],
+  "banner_name": "PROMAN18.FNT",
+  "banner_name_xy_034": [
+   144,
+   16
+  ]
+ },
+ "name_box": [
+  143,
+  8,
+  501,
+  40
+ ],
+ "kit_box": [
+  566,
+  0,
+  622,
+  66
+ ],
+ "panel": [
+  12,
+  91,
+  634,
+  416
+ ],
+ "title_bar": [
+  20,
+  96,
+  626,
+  116
+ ],
+ "prose_box": [
+  186,
+  122,
+  575,
+  412
+ ],
+ "scroll_zone": [
+  575,
+  120,
+  634,
+  414
+ ],
+ "career_zone": [
+  186,
+  120,
+  575,
+  414
+ ],
+ "career_cols": [
+  189,
+  252,
+  409,
+  488,
+  535,
+  573
+ ],
+ "career_header_band": [
+  133,
+  148
+ ],
+ "career_row0_y": 150,
+ "career_row_h": 20,
+ "career_n_rows": 12,
+ "career_hdr_blue": [
+  166,
+  202,
+  240
+ ],
+ "career_hdr_green": [
+  170,
+  191,
+  170
+ ],
+ "career_season_bg": [
+  212,
+  223,
+  255
+ ],
+ "career_inks": {
+  "season": [
+   30,
+   52,
+   98
+  ],
+  "team": [
+   0,
+   0,
+   0
+  ],
+  "division": [
+   60,
+   80,
+   100
+  ],
+  "match": [
+   0,
+   95,
+   0
+  ],
+  "goals": [
+   60,
+   80,
+   100
+  ]
+ },
+ "prose_bullet_xy": [
+  214,
+  150
+ ],
+ "prose_bullet_size": [
+  6,
+  9
+ ],
+ "prose_line0_y": 150,
+ "prose_pitch": 16,
+ "prose_x": [
+  214,
+  569
+ ],
+ "photo_xy": [
+  41,
+  137
+ ],
+ "flag_small_xy": [
+  461,
+  164
+ ],
+ "flag_big_box": [
+  405,
+  214,
+  468,
+  234
+ ],
+ "scroll_up_box": [
+  584,
+  124,
+  612,
+  150
+ ],
+ "scroll_dn_box": [
+  584,
+  384,
+  612,
+  410
+ ],
+ "campo_size": [
+  190,
+  132
+ ]
+}

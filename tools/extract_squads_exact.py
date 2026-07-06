@@ -112,6 +112,12 @@ def export_player(p: dict, flag: int) -> dict:
         "weightKg": p["weightRaw"] if p["weightRaw"] >= 0x14 else None,
         "birthplace": (p["tail"][0].strip() or None) if p["tail"] else None,
         "prevClub": (p["tail"][1].strip() or None) if p["tail"] else None,
+        # T3 VERBATIM — the DATA BASE card INTERNATIONAL box renders this string
+        # as-is ("Denmark"/"USA" when capped, the source's own "-"/"No" dirt when
+        # not; frames 034/050/055/065/068). Distinct from `nationality`, which
+        # runs the last-known-country T3..T1 rule above. build_db.py routes it
+        # into bios.json as `intl`.
+        "intlRaw": p["tail"][2] if p["tail"] and len(p["tail"]) > 2 else None,
         # T4..T9 / T10 VERBATIM (build_db.py splits them off into bios.json).
         # The career CSV carries the source's own dirt — 'Sin datos.'/'No data.'
         # sentinels, typo'd separators, short rows — kept as-is, never repaired;
