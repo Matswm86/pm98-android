@@ -127,8 +127,18 @@ func _run() -> void:
 	await process_frame
 	main._career.cash = 100_000_000             # fund a guaranteed (force-price) signing
 	var before: int = main._career.my_squad().size()
-	main._market_action(row, {"bid": int(row["fee"]) * 3})
+	# _market_action routes non-shortlist taps to the REAL make-offer card
+	# (MakeOfferScreen, walkthrough run-3 101-118) — drive its OFFER signal.
+	main._market_action(row, {})
 	await process_frame
+	var moc: Node = null
+	for ch in main.get_children():
+		if ch is MakeOfferScreen:
+			moc = ch
+	ok = _assert(moc != null, "make-offer card mounted from the market row") and ok
+	if moc != null:
+		moc.offer_made.emit(int(row["fee"]) * 3, 500_000, 3, [], 0)
+		await process_frame
 	ok = _assert(main._career.my_squad().size() == before + 1, "UI signing added a player") and ok
 	main._push(main._show_transfer_squad)
 	await process_frame

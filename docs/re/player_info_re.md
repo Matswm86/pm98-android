@@ -67,6 +67,15 @@ byte `player+0x18` and indexes the **SHORT fine-name table at `0x662df8`** (`mov
 the broad LUT -- corrected 2026-06-26.)
 
 ## Open
+- **Bio pages + career history (2026-07-06): DATA exported, DISPLAY not built.**
+  The extended EQUIPOS record's tail T4..T9 = six bio prose pages (profile /
+  style / honours / international / background / last season) and T10 = a
+  career-history CSV (season,club,div,apps,goals) — exported VERBATIM to
+  `assets/bios.json` keyed by game_db player id (2025 players, id-join
+  kill-tested). Where the original SHOWS them is un-walked: the ⓘ info coin on
+  the PLAYER INFORMATION card is never clicked in any of the 3 walkthrough
+  runs, and its renderer is un-RE'd. Do NOT invent a bio screen — RE the coin
+  handler (FUN_00526a60 region) and/or walk the original first.
 - International (compact-record) clubs carry neither photoId nor these physicals yet.
   **Verified 2026-06-26 why (not a TODO, a data-availability finding):** the compact
   Spanish/continental EQUIPOS record is `[u16 year][flag][media][10 attrs u8][01]` — it has

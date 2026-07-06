@@ -16,6 +16,13 @@ Inputs (all under assets/, derived from Mats's owned game files):
 
 Output:
   - assets/game_db.json : { meta, leagues[], clubs[] (players nested) }
+  - assets/bios.json    : game_db player id -> { name, pages[6], career } —
+                          the EQUIPOS tail T4..T9 bio prose pages + T10
+                          career-history CSV, VERBATIM (2025 extended-record
+                          players; the CSV keeps the source's own dirt).
+                          Split out so game_db stays lean; no app consumer
+                          yet — the original's display surface (the FICHA
+                          info coin) is un-walked and un-RE'd.
 
 Season is 1997-98. English clubs are division-mapped from the game's own
 league table (game keeps Hereford in Div3); every club now carries the game's
@@ -88,11 +95,20 @@ def main() -> None:
 
     clubs: list[dict] = []
     leagues: list[dict] = []
+    bios: dict[int, dict] = {}  # game_db player id -> verbatim tail content
     pid = 0
 
     def emit_player(p: dict, club_id: int, english: bool) -> dict:
         nonlocal pid
         pid += 1
+        # Split the verbatim EQUIPOS tail content off into bios.json (keyed by
+        # THIS pid, so the join is the id itself — no order replication risk).
+        if p.get("bioPages") is not None:
+            bios[pid] = {
+                "name": p["name"],
+                "pages": p["bioPages"],
+                "career": p.get("careerCsv") or "",
+            }
         # The extended (flag==0) records store nationality ONLY for non-English
         # players — omitted == ENGLAND (extract_english rule, FICHA-frame-
         # validated). Hereford's compact record stores none at all; the same
@@ -209,6 +225,32 @@ def main() -> None:
         f"(english={c['englishClubs']} intl={c['internationalClubs']}) "
         f"players={c['players']}"
     )
+
+    # ---- bios.json (kill-tested against the extractor's own witnesses) -----
+    assert len(bios) == 2025, len(bios)
+    sch = next(
+        b for b in bios.values() if b["name"] == "Schmeichel" and "Gladsaxe" in " ".join(b["pages"])
+    )
+    assert len(sch["pages"]) == 6
+    assert sch["career"].strip().splitlines()[0] == "1984,Hvidovre,1,30,0"
+    bout = ASSETS / "bios.json"
+    bout.write_text(
+        json.dumps(
+            {
+                "note": "EQUIPOS.PKF player tail T4..T9 (six bio prose pages) + T10 "
+                "(career-history CSV: season,club,div,apps,goals) VERBATIM, keyed by "
+                "game_db player id. Source dirt in the CSV ('Sin datos.'/'No data.', "
+                "typo'd separators, short rows) is kept as-is, never repaired. The "
+                "original's display surface (FICHA info coin) is un-walked/un-RE'd — "
+                "no app consumer yet.",
+                "players": {str(k): v for k, v in bios.items()},
+            },
+            ensure_ascii=False,
+            indent=1,
+        ),
+        encoding="utf-8",
+    )
+    print(f"wrote {bout.relative_to(ROOT)}: {len(bios)} player bios")
 
 
 if __name__ == "__main__":

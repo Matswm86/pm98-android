@@ -29,8 +29,11 @@ Field identities (pinned empirically this pass, 2026-07-06, not guessed):
     extract_english applies: last of T3..T1 that is a known country, else
     ENGLAND; Schmeichel DENMARK / Van der Gouw HOLLAND via T1 fallback /
     Solskjaer NORWAY == walked frames 081/084), T4..T9 six bio prose pages,
-    T10 career-history CSV (season,club,div,apps,goals) — bio pages + CSV
-    are not exported here (future player-info lever; huge).
+    T10 career-history CSV (season,club,div,apps,goals) — both exported
+    VERBATIM since 2026-07-06 (`bioPages`/`careerCsv`; build_db.py splits
+    them into assets/bios.json keyed by game_db player id). The CSV keeps
+    the source's own dirt ('Sin datos.'/'No data.' sentinels, typo'd
+    separators, short rows) — never repaired.
   - fullName packs "Legal Name, NICKNAME" with a real comma (cipher 0x4d ^
     0x61 == 0x2c): "Luis Filipe Madeira Caeiro, FIGO" — same legal/common
     split the old SEP marker encoded.
@@ -109,6 +112,12 @@ def export_player(p: dict, flag: int) -> dict:
         "weightKg": p["weightRaw"] if p["weightRaw"] >= 0x14 else None,
         "birthplace": (p["tail"][0].strip() or None) if p["tail"] else None,
         "prevClub": (p["tail"][1].strip() or None) if p["tail"] else None,
+        # T4..T9 / T10 VERBATIM (build_db.py splits them off into bios.json).
+        # The career CSV carries the source's own dirt — 'Sin datos.'/'No data.'
+        # sentinels, typo'd separators, short rows — kept as-is, never repaired;
+        # the engine's own renderer for it is un-RE'd (no walked frame shows it).
+        "bioPages": p["tail"][3:9] if p["tail"] else None,
+        "careerCsv": p["tail"][9] if p["tail"] else None,
         "attrs": dict(zip(ATTR_NAMES, p["attrs"])),
     }
 
@@ -173,6 +182,16 @@ def main() -> None:
     assert pk["Solskjaer"]["nationality"] == "NORWAY"
     assert pk["Solskjaer"]["kind"] == "NATIONAL"  # EU/EEA-1997 rule, frame 084
 
+    # 2b. Bio tail export (verbatim T4..T9 + T10; witnesses read straight off
+    #     Schmeichel's decoded record this pass — profile page opener, honours
+    #     page marker, first + last career-CSV rows).
+    sch = pk["Schmeichel"]
+    assert len(sch["bioPages"]) == 6
+    assert sch["bioPages"][0].startswith("* Peter Schmeichel currently enjoys")
+    assert 'Chosen as "Goalkeeper of the Year" 1992' in sch["bioPages"][2]
+    lines = sch["careerCsv"].strip().splitlines()
+    assert lines[0] == "1984,Hvidovre,1,30,0" and lines[-1] == "96-97,Manchester U,P,36,0"
+
     # 3. The 3 players the old cipher lost from English squads
     #    (club_tactics_re.md corruption finding). NB the game writes the
     #    apostrophe as the acute-accent glyph: 'O´Connor' (cipher 0xd5).
@@ -206,6 +225,9 @@ def main() -> None:
     ndrop = sum(len(c["dropped"]) for c in clubs)
     assert tot == 9547, tot
     assert ndrop == 189, ndrop
+    # every extended-record (flag==0 club) player carries all 6 pages + CSV
+    nbio = sum(1 for c in clubs for p in c["players"] if p["bioPages"] is not None)
+    assert nbio == 2025, nbio
     for c in clubs:
         for p in c["players"]:
             assert all(0 <= v <= 99 for v in p["attrs"].values()), (c["name"], p["name"])
