@@ -2,25 +2,30 @@
 """Consolidate the reverse-engineered PM98 asset JSON into ONE game database.
 
 Inputs (all under assets/, derived from Mats's owned game files):
-  - squads_english.json : 92 English-league clubs, 1948 players WITH attrs (the
-                          verified, attribute-rich core -> the playable pyramid)
-  - teams_all.json      : 476 detailed records (437 with squads), continental clubs
+  - squads_exact.json   : ALL 476 clubs + full squads from the EXACT engine
+                          parser (tools/extract_squads_exact.py ==
+                          MANAGER.EXE FUN_00579c70/FUN_005820f0, XOR-0x61
+                          strings, engine drop rule). Replaces the old
+                          approximate-cipher squads_english.json/teams_all.json
+                          as the squad + club-header source (2026-07-06).
   - teams_laliga.json   : capacity + founding year for the 20 La Liga clubs
-  - pcf_team_directory.json : id/name/country for 1352 clubs (best-effort country tag)
+                          (EQUIPOS carries no verified capacity field — the
+                          u32 the RE labelled capacity ranges 1..1500).
+  - divisions_english.json : idx -> division from MANAGER.EXE's own league table
+  - country_codes.json  : PAISES.30 country table (code <-> name; FICHA flags)
 
 Output:
   - assets/game_db.json : { meta, leagues[], clubs[] (players nested) }
 
-Season is 1996-97 (verified: idx 38-57 == the real 96-97 Premier League).
-English clubs are idx-ordered into the four divisions; everything else is tagged
-country-only (best-effort) under leagueId=null. Run from the project root.
+Season is 1997-98. English clubs are division-mapped from the game's own
+league table (game keeps Hereford in Div3); every club now carries the game's
+own PAISES country code (EQUIPOS header byte param_1[5] — exact, replaces the
+old best-effort directory fuzzy match). Run from the project root.
 """
 
 from __future__ import annotations
 
 import json
-import re
-import unicodedata
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -52,59 +57,13 @@ FLAG_ALIASES = {
 }
 ENGLAND_CODE = 30  # the FICHA default flag for the omitted-nationality (English) players
 
+# The 1997 EU-15 + EEA class for the FICHA KIND flag (frame-evidenced NATIONAL for
+# HOLLAND 081 / NORWAY 084; post-Bosman "comunitario" rule, extract_english.py).
+from extract_english import EU_EEA_1997  # noqa: E402
+
 
 def load(name: str):
     return json.loads((ASSETS / name).read_text(encoding="utf-8"))
-
-
-def norm(s: str) -> str:
-    """Uppercase, strip accents + punctuation + club-form noise for fuzzy match."""
-    s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode()
-    s = s.upper()
-    for junk in (
-        "F.C.",
-        "FC",
-        "C.F.",
-        "CF",
-        "R.C.",
-        "RC",
-        "A.C.",
-        "AC",
-        "U.D.",
-        "S.C.",
-        "UTD",
-        "UNITED",
-        "REAL",
-        "CLUB",
-        "DEPORTIVO",
-    ):
-        s = s.replace(junk, " ")
-    s = re.sub(r"[^A-Z0-9 ]", " ", s)
-    return re.sub(r"\s+", " ", s).strip()
-
-
-def build_country_lookup() -> dict[str, str]:
-    """Map normalised club name -> country (Spanish directory country names)."""
-    out: dict[str, str] = {}
-    for t in load("pcf_team_directory.json")["teams"]:
-        key = norm(t["name"])
-        if key and key not in out:
-            out[key] = t["country"]
-        # also index the most significant single token (handles short dir names)
-        toks = [w for w in key.split() if len(w) >= 4]
-        if toks:
-            out.setdefault(toks[0], t["country"])
-    return out
-
-
-def country_for(name: str, lut: dict[str, str]) -> str | None:
-    key = norm(name)
-    if key in lut:
-        return lut[key]
-    for tok in (w for w in key.split() if len(w) >= 4):
-        if tok in lut:
-            return lut[tok]
-    return None
 
 
 def build_flag_lookup() -> dict[str, int]:
@@ -119,58 +78,76 @@ def build_flag_lookup() -> dict[str, int]:
     return lut
 
 
-def flag_for(nationality, lut: dict[str, int]) -> int:
-    return lut.get(str(nationality or "").upper(), ENGLAND_CODE)
-
-
 def main() -> None:
-    english = load("squads_english.json")["clubs"]
-    teams_all = load("teams_all.json")["teams"]
-    laliga_caps = {t["name"]: t for t in load("teams_laliga.json")["teams"]}
-    country_lut = build_country_lookup()
+    exact = load("squads_exact.json")["clubs"]
+    laliga_caps = {t["name"].upper(): t for t in load("teams_laliga.json")["teams"]}
     flag_lut = build_flag_lookup()
     # idx -> division label, decoded from MANAGER.EXE's own league table
     div_by_idx = {int(k): v for k, v in load("divisions_english.json")["divisionByIdx"].items()}
-
-    english_names = {c["name"] for c in english}
-    by_idx = {c["idx"]: c for c in english}
+    by_idx = {c["idx"]: c for c in exact}
 
     clubs: list[dict] = []
     leagues: list[dict] = []
     pid = 0
 
-    def emit_player(p: dict, club_id: int) -> dict:
+    def emit_player(p: dict, club_id: int, english: bool) -> dict:
         nonlocal pid
         pid += 1
+        # The extended (flag==0) records store nationality ONLY for non-English
+        # players — omitted == ENGLAND (extract_english rule, FICHA-frame-
+        # validated). Hereford's compact record stores none at all; the same
+        # omitted-default applies across the English pyramid.
+        nat = p.get("nationality") or ("ENGLAND" if english else None)
         return {
             "id": pid,
             "clubId": club_id,
             "name": p["name"],
-            "legalName": p.get("legalName", p["name"]),
+            "legalName": p.get("legalName") or p["name"],
             "birthYear": p.get("birthYear"),
-            "age": p.get("age"),
-            "pos": p.get("pos"),  # GK/DF/MF/FW demarcación; null for un-decoded records
+            "birthDay": p.get("birthDay"),  # engine-defaulted when absent
+            "birthMonth": p.get("birthMonth"),
+            "age": p.get("age"),  # null = engine randomizes (25..29 at load)
+            "pos": p.get("pos"),  # GK/DF/MF/FW demarcación (band byte +0x1c)
             "posFine": p.get("posFine"),  # fine position (POS_WEIGHT scorer-roulette index)
             "isGK": bool(p.get("isGK")),
-            "media": p.get("media"),
-            "photoId": p.get("photoId"),  # J96NNNNN face-bank key (English squads); faces_re.md
-            # SQUAD MANAGEMENT N. column: the byte after the photo-id u16 in the EQUIPOS
-            # record (docs/re/squad_number_re.md). Emitted verbatim; lower-division records
-            # often leave the whole squad at the 0x01 pad (not individuated), so consumers
-            # must check per-club uniqueness before displaying.
+            "photoId": p.get("photoId"),  # the .DBC player id u16 == J96NNNNN face-bank key
+            # SQUAD MANAGEMENT N. column: the byte after the player-id u16 (+0xf8,
+            # docs/re/squad_number_re.md). Emitted verbatim; lower-division records
+            # often leave the whole squad at the 0x01 pad (not individuated), so
+            # consumers must check per-club uniqueness before displaying.
             "squadNo": p.get("squadNo"),
-            "nationality": p.get("nationality"),  # EQUIPOS cipher string; ENGLAND default
-            "flagCode": flag_for(p.get("nationality"), flag_lut),  # BANDERAS index; FICHA flag
-            "kind": p.get("kind"),  # FICHA NATIONAL / NON-NATIONAL flag (derived from nat)
-            "heightCm": p.get("heightCm"),  # EQUIPOS Y+2 byte (cm); FICHA player+0xf9
-            "weightKg": p.get("weightKg"),  # EQUIPOS Y+3 byte (kg); FICHA player+0xfa
-            # Never null: a sparse record with no decoded attribute row gets {} so every
-            # consumer's `attrs.get(key, default)` chain stays safe (a pos-decoded keeper
-            # with no attr row is still isGK, and must not crash the commentary/sort paths).
+            "nationality": nat,
+            "flagCode": flag_lut.get(str(nat or "").upper(), ENGLAND_CODE),  # BANDERAS index
+            "kind": ("NATIONAL" if nat in EU_EEA_1997 else "NON-NATIONAL") if nat else None,
+            "heightCm": p.get("heightCm"),  # +0xf9; null = engine randomizes 170..179
+            "weightKg": p.get("weightKg"),  # +0xfa; null = engine randomizes 75..84
+            "birthplace": p.get("birthplace"),  # tail T1 (extended records only)
+            "prevClub": p.get("prevClub"),  # tail T2, e.g. "Brondby (91)"
+            # Never null: every consumer's `attrs.get(key, default)` chain stays safe.
             "attrs": p.get("attrs") or {},
         }
 
+    def emit_club(c: dict, cid: int, league_id: str | None, country: str) -> dict:
+        cap = laliga_caps.get(c["name"].upper(), {})
+        return {
+            "id": cid,
+            "name": c["name"],
+            "fullName": c.get("fullName") or c["name"],  # header string 3, exact
+            "stadium": c.get("stadium"),  # header string 2, exact
+            "manager": None,  # NOT stored in EQUIPOS (block strings = chairman/sponsor/kit)
+            "chairman": c.get("chairman"),
+            "sponsor": c.get("sponsor"),
+            "kitMaker": c.get("kitMaker"),
+            "country": country,
+            "countryCode": c["countryCode"],  # PAISES.30 code (EQUIPOS header byte, exact)
+            "leagueId": league_id,
+            "capacity": cap.get("capacity"),
+            "foundingYear": cap.get("founded"),
+            "players": [emit_player(p, cid, league_id is not None) for p in c.get("players", [])],
+        }
+
     # --- English pyramid (the playable core) ---
+    english_idx = set(div_by_idx)
     for lid, lname, label, tier in ENGLISH_LEAGUES:
         club_ids = []
         for idx in sorted(i for i, lab in div_by_idx.items() if lab == label):
@@ -178,83 +155,45 @@ def main() -> None:
             if not c:
                 continue
             cid = idx  # English idx is a stable, unique club id
-            cap = laliga_caps.get(c["name"], {})  # (English clubs won't match; null cap)
-            clubs.append(
-                {
-                    "id": cid,
-                    "name": c["name"],
-                    "fullName": c.get("fullName", c["name"]),
-                    "stadium": c.get("stadium"),
-                    "manager": c.get("manager"),
-                    "country": "England",
-                    "leagueId": lid,
-                    "capacity": cap.get("capacity"),
-                    "foundingYear": cap.get("founded"),
-                    "players": [emit_player(p, cid) for p in c.get("players", [])],
-                }
-            )
+            # Pyramid clubs stay country "England" (league grouping; the exact
+            # PAISES code is on countryCode — Wrexham/Cardiff/Swansea = WALES).
+            clubs.append(emit_club(c, cid, lid, "England"))
             club_ids.append(cid)
         leagues.append(
             {"id": lid, "name": lname, "country": "England", "tier": tier, "clubIds": club_ids}
         )
 
-    # --- International clubs (browseable; leagueId null, country best-effort) ---
-    # A few record headers fail extract_squads' string-validity heuristics (P.S.G.
-    # trips the alpha ratio on its dots; GALATASARAY/HAKA trip the null-padding
-    # check because 'A' ciphers to 0x00) and fall back to name '?'. The EQUIPOS
-    # crest index (assets/crest_codes.json allRecords, decoded by
-    # tools/re/map_crests.py from the same file) reads the SAME header string with
-    # a tolerant reader — recover the name from there, keyed by the record idx.
-    # Never English (English headers all parse), so club ids do not shift.
-    crest_by_record = {
-        r["record"]: r["name"]
-        for r in load("crest_codes.json")["allRecords"]
-        if r["name"] != "?"
-    }
-    matched = 0
+    # --- International clubs (browseable; leagueId null) ---
+    # Country is the game's own PAISES.30 name via the EQUIPOS header code —
+    # exact for all 476 (replaces the old fuzzy directory match + '?' recovery).
     next_id = 1000  # keep clear of English idx ids
-    for t in teams_all:
-        if t["name"] in english_names:
-            continue  # English club: already emitted from the verified extractor
-        if t["name"] == "?" and int(t["idx"]) in crest_by_record:
-            t = {**t, "name": crest_by_record[int(t["idx"])]}
-        cid = next_id
+    for c in exact:
+        if c["idx"] in english_idx:
+            continue
+        clubs.append(emit_club(c, next_id, None, c["country"]))
         next_id += 1
-        ctry = country_for(t["name"], country_lut)
-        if ctry:
-            matched += 1
-        cap = laliga_caps.get(t["name"], {})
-        clubs.append(
-            {
-                "id": cid,
-                "name": t["name"],
-                "fullName": t.get("fullName", t["name"]),
-                "stadium": t.get("stadium"),
-                "manager": t.get("manager"),
-                "country": ctry,
-                "leagueId": None,
-                "capacity": cap.get("capacity"),
-                "foundingYear": cap.get("founded"),
-                "players": [emit_player(p, cid) for p in t.get("players", [])],
-            }
-        )
 
     intl = [c for c in clubs if c["leagueId"] is None]
     db = {
         "meta": {
             "game": "Premier Manager 98 (Dinamic Multimedia / Gremlin Interactive)",
             "season": "1997-98",
-            "source": "reverse-engineered from EQUIPOS.PKF (owned game files); personal use",
+            "source": "reverse-engineered from EQUIPOS.PKF (owned game files); personal use. "
+            "Squads + club headers via the EXACT engine parser "
+            "(tools/extract_squads_exact.py / tools/re/equipos_parse.py == "
+            "MANAGER.EXE FUN_00579c70 + FUN_005820f0, XOR-0x61 strings, "
+            "engine leaver-drop rule).",
             "note": "English divisions decoded from MANAGER.EXE's own league table "
-            "(Premier == real 97-98 top flight; game keeps Hereford in Div3); "
-            "international clubs country-tagged best-effort.",
+            "(game keeps Hereford in Div3); country = PAISES.30 name via the "
+            "EQUIPOS header country code (exact). Null birthYear/age/height/"
+            "weight/birthDay/birthMonth = the engine randomizes or defaults "
+            "these at load (FUN_005820f0) — never baked.",
             "counts": {
                 "leagues": len(leagues),
                 "clubs": len(clubs),
-                "englishClubs": sum(1 for c in clubs if c["country"] == "England"),
+                "englishClubs": sum(1 for c in clubs if c["leagueId"] is not None),
                 "internationalClubs": len(intl),
                 "players": pid,
-                "intlCountryMatchRate": round(matched / max(1, len(intl)), 3),
             },
         },
         "leagues": leagues,
@@ -270,7 +209,6 @@ def main() -> None:
         f"(english={c['englishClubs']} intl={c['internationalClubs']}) "
         f"players={c['players']}"
     )
-    print(f"  intl country-match rate: {c['intlCountryMatchRate']:.0%}")
 
 
 if __name__ == "__main__":

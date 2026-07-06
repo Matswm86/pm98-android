@@ -53,10 +53,18 @@ bVar2>=7); the ghost pass reads the SAME layout from your own Tactics
 (`FUN_0058c810` — the REAL cipher; the old `alphabet[b&0x1f]` reading in
 FORMATS.md/parse_equipos.py is an approximation of this) · name, name2, u8,
 name3, u32 (min 6000), fmt>=0x1fe: u32 (rounded to 4000s), u16 (min 0x3c), u16
-(min 0x69), u16 · flag==0: [fmt>0x207: +2] u32, skip str+4, u32 capacity, skip
-str, skip str, u16, u16, u8, tail skip 0x51/0x73/0x7b by fmt · **11 x 8 u16 slot
-block** · **7 lever bytes** · tag-2 records (`FUN_00579170`) · player records
-until tag 0 (`FUN_005820f0` / fmt>=600 `FUN_00581f80`).
+(min 0x69), u16 · flag==0: [fmt>0x207: +2] u32, skip str+4, u32 -> param_1[0x7a]
+(earlier labelled "capacity"; observed range 1..1500 — Man Utd 1500 — NOT a
+plausible seat count, display semantics UNRESOLVED), skip str, skip str, u16,
+u16, u8, tail skip 0x51/0x73/0x7b by fmt · **11 x 8 u16 slot block** · **7
+lever bytes** · tag-2 records (`FUN_00579170`) · player records until tag 0
+(`FUN_005820f0` / fmt>=600 `FUN_00581f80`).
+Header identities (pinned vs game_db + frames, 2026-07-06): name2 == STADIUM
+("Old Trafford"), name3 == FULL CLUB NAME ("Manchester United F. C."), the u8
+between them == the PAISES.30 COUNTRY CODE (all 476 resolve; Wrexham/Cardiff/
+Swansea = WALES, Celtic = SCOTLAND). The three flag==0 block strings =
+[chairman, sponsor, kit maker] ("C M Edwards", "SHARP", "UMBRO") — EQUIPOS
+stores NO manager name.
 
 ## The squad loop + player record (FUN_005820f0 — the TRUE XI)
 
@@ -77,10 +85,17 @@ u8 x3                -> +0x1a, +0x16, +0x17 (un-RE'd)
 u8  BAND             -> +0x1c: 0 GK / 1 DF / 2 MF / 3 FW (the POS column)
 u8 day, u8 month, u16 year    (engine defaults day/month when 0; randomizes
                                year outside 1901..1985 — FUN_0058df90)
-u8 x2                -> +0xf9/+0xfa (the media pair, extract_squads' Y+2/Y+3)
-flag==0 only         1 byte + 1 len-prefixed + (club==0x26ae ? XOR string
-                     : 1 len-prefixed) + 8 len-prefixed — the extended/English
-                     career-history/birthplace/bio tail, skipped unread
+u8 x2                -> +0xf9 HEIGHT cm / +0xfa WEIGHT kg (FICHA converts via
+                        FUN_0058dd70/FUN_0058de00 stone/feet; engine randomizes
+                        height 170..179 when < 150, weight 75..84 when < 20 —
+                        extract_squads' old "flag/media" reading of these two
+                        bytes is DISPROVEN; "media" was the weight byte)
+flag==0 only         1 byte + 10 len-prefixed fields, engine-skipped. DECODED
+                     2026-07-06 (extract_squads_exact.py): T1 birthplace
+                     ("Gladsaxe"), T2 previous club ("Brondby (91)"), T3
+                     NATIONALITY ("Denmark"; absent -> ENGLAND, frames 081/084),
+                     T4..T9 six bio prose pages, T10 career-history CSV
+                     (season,club,div,apps,goals — the PLAYER INFO data)
 u8 x10 attrs         VE RE AG CA RM RG PA TI EN PO (mirrored to +0x9c/+0xaa
                      rows; club 0x26e4 gets a random degrade — special id)
 ```
@@ -96,20 +111,21 @@ u8 x10 attrs         VE RE AG CA RM RG PA TI EN PO (mirrored to +0x9c/+0xaa
   counter (DAT_0066c154). Special club ids in the parser: 0x26de (validity
   exemption), 0x26ae (third string), 0x26e4 (attr degrade) — none in EQUIPOS.
 
-### game_db matching (export_club_tactics.py `match_xi`)
+### game_db mapping (order-based since the 2026-07-06 rebuild)
 
-game_db squads came from the APPROXIMATE-cipher heuristics, so the exact-cipher
-names can disagree. Cascade, each game_db player claimable once, and every
-name/attr pass requires posFine agreement (catches Swansea's corrupted 'JONES'):
-photoId == .DBC id → unique normalized name (+year) → (year, attrs) → attrs →
-full/legal containment + year. Result: 475/476 clubs slot-complete in the .DBC,
-**309/476 fully game_db-matched** (4236 posFine cross-checks). The remainder is
-pre-existing game_db squad corruption from the old cipher (German/Portuguese
-squads worst: Sammer, Effenberg, Brehme absent; Real Madrid's
-'FEARAÚLUARAÚL GONZÁL'; 3 English gaps: O'Connor/Birmingham C,
-G. Jones/Tranmere, L. Marshall/Scunthorpe) — a **game_db rebuild lever**: the
-exact parser now decodes full squads (names, birth, band, fine, attrs) for all
-476 clubs.
+game_db squads are now built from THIS SAME parser in stream order
+(tools/extract_squads_exact.py -> tools/build_db.py), so the club's k-th kept
+record IS game_db players[k]; the exporter asserts name + posFine + 10-attr
+identity on all 9547 players before trusting the order, then maps XI slot s ->
+the LAST record carrying slot byte s (engine: last writer wins). Result:
+475/476 slot-complete AND fully game_db-matched (the 1 = a .DBC that leaves a
+slot unfilled). The old `match_xi` cascade — and the corruption it compensated
+for (old-cipher squads: Sammer/Effenberg/Brehme absent, Real Madrid's
+'FEARAÚLUARAÚL GONZÁL', 3 English gaps O´Connor/Birmingham C, G. Jones/
+Tranmere, L. Marshall/Scunthorpe, Barcelona's 3 undropped leavers) — is GONE:
+the rebuild closed all of it (9 club names fixed too: 'Schalke 04',
+'Munich 1860', 'Brighton & HA' — digits/&/apostrophes the 5-bit cipher could
+not encode).
 
 ## Kill-tests (all PASS, run on every export)
 
@@ -118,8 +134,8 @@ exact parser now decodes full squads (names, birth, band, fine, attrs) for all
    `rival_chrome_samples.json`) — EXACT, both phases, all 11 slots.
 2. All 476 records parse; every coordinate inside the 318x198 design space;
    every mapped marker inside the (242,138) draw window.
-3. 467/476 decoded names == game_db.json names (the 9 = known '?'-recovered
-   records); GK slot = index 0 with mk1==mk2==(0,88) raw in ALL 476.
+3. **476/476** decoded names == game_db.json names (same decode on both sides
+   since the rebuild); GK slot = index 0 with mk1==mk2==(0,88) raw in ALL 476.
 4. Witnesses: Man Utd = stock 4-4-2 coordinates (the walked 3-5-2 in frame 014
    was that career's chosen tactic, not the shipped default). Only **19/476**
    clubs sit on stock formations — 457 carry custom layouts. Shapes present
@@ -132,8 +148,9 @@ exact parser now decodes full squads (names, birth, band, fine, attrs) for all
    walked disc/arrow numbered i+1 — EXACT, first parse.
 6. Every squad parse lands in bounds (heap use <= alloc @+0x24, cursor <=
    record end — FUN_00579c70's own success check); >= 470 slot-complete.
-7. Cross-extractor invariant: every matched player's game_db posFine == the
-   raw .DBC fine byte (4236 checks); Man Utd matches 11/11 by photoId
+7. Record<->game_db identity: same squad size, name, posFine and 10-attr row
+   for every player (9547 checks — the order-based mapping's precondition);
+   every slot-complete club fully matched (475/476); Man Utd 11/11
    (shipped XI = Schmeichel, G. Neville, Irwin, Berg, Pallister, Butt,
    Beckham, Sheringham, Cole, Giggs, Solskjaer).
 
@@ -141,8 +158,8 @@ exact parser now decodes full squads (names, birth, band, fine, attrs) for all
 
 - `tools/re/export_club_tactics.py` → `app/data/club_tactics.json` (476 clubs:
   raw slots + mapped mk1/mk2, 7 raw lever bytes, stock-formation match, and
-  `xi` (game_db player id per slot 1..11, -1 = unmatched) + `xiNames`/`xiFine`
-  (exact-cipher decode + raw fine byte, audit + rebuild feed)).
+  `xi` (game_db player id per slot 1..11, -1 only where the .DBC leaves the
+  slot unfilled) + `xiNames`/`xiFine` (record name + raw fine byte)).
 - `RivalScreen`: live rivals draw their OWN stored slots AND — when the club's
   `xi` is game_db-complete — field their SHIPPED XI (`Tactics.with_xi`), slots
   paired in NATIVE .DBC order (disc s at tactic slot s-1, `_shipped_xi`).
@@ -158,11 +175,16 @@ exact parser now decodes full squads (names, birth, band, fine, attrs) for all
 - Slot fields [0..3] un-decoded (present in stock + club tables alike).
 - The 7 lever bytes are stored RAW; byte→lever mapping is EXACT_PORT_PLAN gap B.
 - Player bytes +0x16/+0x17/+0x1a and the 6-byte fine array's entries [1..5]
-  un-RE'd; the flag==0 extended tail is skipped unread (career/birthplace/bio —
-  extract_english decodes it heuristically).
+  un-RE'd.
 - Tag-2 records (`FUN_00579170`) un-identified (parsed + skipped exactly).
-- **game_db squad corruption** (pre-existing, old-cipher): 167 clubs have XI
-  players absent/corrupted in game_db → xi holes → auto-pick fallback. The
-  exact parser decodes full squads for all 476 clubs — rebuild lever.
+- ~~game_db squad corruption~~ **CLOSED 2026-07-06**: game_db rebuilt from the
+  exact parser (extract_squads_exact.py -> build_db.py); 475/476 xi-complete,
+  leavers dropped, names/accents/digits exact, player ids renumbered
+  (1..9547; career saves are self-contained — rosters frozen at draw time).
+- The flag==0 club-block u32 (param_1[0x7a], observed 1..1500) display
+  semantics unresolved — NOT used as capacity in game_db (La Liga capacities
+  stay from teams_laliga.json).
+- Player bio pages T4..T9 + career-history CSV T10 decoded but NOT exported
+  (future PLAYER INFO lever; the tail is huge).
 - MatchSim CPU fielding still uses `Tactics.auto_pick` (own-XI fielding for
   the sim changes match outcomes — separate, sign-off-worthy change).

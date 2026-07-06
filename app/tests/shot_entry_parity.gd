@@ -69,7 +69,7 @@ func _run() -> void:
 	# frame 011 state: slot 1 locked to MWM / Manchester Utd., PLAYER 2 active
 	var manu := {}
 	for c in gamedb.clubs_in_league(str(gamedb.leagues[0].get("id", ""))):
-		if str(c.get("name", "")).begins_with("MANCHESTER U"):
+		if str(c.get("name", "")).to_upper().begins_with("MANCHESTER U"):
 			manu = c
 	sel._slots[0] = {"name": "MWM", "club": manu, "league": gamedb.leagues[0]}
 	sel._active = 1
@@ -99,11 +99,11 @@ func _run() -> void:
 	# ---- TEAM OFFER (run-3 frames 086/088: Thornley, Aston Villa bid) -------------
 	var manu2 := {}
 	for c in gamedb.clubs_in_league(str(gamedb.leagues[0].get("id", ""))):
-		if str(c.get("name", "")).begins_with("MANCHESTER U"):
+		if str(c.get("name", "")).to_upper().begins_with("MANCHESTER U"):
 			manu2 = c
 	var thornley := {}
 	for p in manu2.get("players", []):
-		if str(p.get("name", "")) == "THORNLEY":
+		if str(p.get("name", "")).to_upper() == "THORNLEY":
 			thornley = (p as Dictionary).duplicate()
 	# the frame's live-form values (FITNESS/MORAL are dynamic; AGE as of week 3)
 	thornley["fitness"] = 67
@@ -125,11 +125,11 @@ func _run() -> void:
 	var bpool := {}
 	for lg in gamedb.leagues:
 		for c in gamedb.clubs_in_league(str(lg.get("id", ""))):
-			if str(c.get("name", "")) == "BLACKPOOL":
+			if str(c.get("name", "")).to_upper() == "BLACKPOOL":
 				bpool = c
 	var taylor := {}
 	for p in bpool.get("players", []):
-		if str(p.get("legalName", "")) == "SCOTT TAYLOR":
+		if str(p.get("legalName", "")).to_upper() == "SCOTT TAYLOR":
 			taylor = (p as Dictionary).duplicate()
 	# the frame's live-form values (FITNESS/MORAL dynamic; AGE as of week 3)
 	taylor["age"] = 21
@@ -152,7 +152,7 @@ func _run() -> void:
 	# ---- TACTICS board (run-2 frame 014: Man Utd, 3-5-2, RATING view) -------------
 	var manu3 := {}
 	for c in gamedb.clubs_in_league(str(gamedb.leagues[0].get("id", ""))):
-		if str(c.get("name", "")).begins_with("MANCHESTER U"):
+		if str(c.get("name", "")).to_upper().begins_with("MANCHESTER U"):
 			manu3 = c
 	# The frame's XI in slot order (read off the pitch discs: outfield slots 0..9 =
 	# shirts 2,3,21,6,8,7,10,9,11,20; GK 1) and its displayed AVs — AV = Morale.av6
@@ -166,7 +166,7 @@ func _run() -> void:
 	var xi_ids: Array = []
 	for nm in order:
 		for p in manu3.get("players", []):
-			if str(p.get("name", "")) == nm:
+			if str(p.get("name", "")).to_upper() == nm:
 				(p as Dictionary)["av"] = frame_av[nm]
 				xi_ids.append(int(p.get("id", -1)))
 	var tac := Tactics.new()
@@ -193,7 +193,7 @@ func _run() -> void:
 	# 77, and the save's bench/reserve order pinned on the club dict.
 	var manu4: Dictionary = {}
 	for c in gamedb.clubs_in_league(str(gamedb.leagues[0].get("id", ""))):
-		if str(c.get("name", "")).begins_with("MANCHESTER U"):
+		if str(c.get("name", "")).to_upper().begins_with("MANCHESTER U"):
 			manu4 = (c as Dictionary).duplicate()
 	var av155 := {"SCHMEICHEL": 89, "GARY NEVILLE": 82, "IRWIN": 85, "BERG": 86,
 		"PALLISTER": 82, "BUTT": 84, "BECKHAM": 88, "SHERINGHAM": 81, "COLE": 85,
@@ -202,9 +202,9 @@ func _run() -> void:
 		"KEANE": 87, "MAY": 80, "CURTIS": 79}
 	var by_name := {}
 	for p in manu4.get("players", []):
-		by_name[str(p.get("name", ""))] = p
-		if av155.has(str(p.get("name", ""))):
-			(p as Dictionary)["av"] = av155[str(p.get("name", ""))]
+		by_name[str(p.get("name", "")).to_upper()] = p
+		if av155.has(str(p.get("name", "")).to_upper()):
+			(p as Dictionary)["av"] = av155[str(p.get("name", "")).to_upper()]
 	var beck: Dictionary = by_name["BECKHAM"]
 	beck["injured_weeks"] = 7
 	beck["fitness"] = 82
@@ -247,7 +247,7 @@ func _run() -> void:
 	# no selection (T/I/S default block), PARAMETERS toggle active.
 	var manu128: Dictionary = {}
 	for c in gamedb.clubs_in_league(str(gamedb.leagues[0].get("id", ""))):
-		if str(c.get("name", "")).begins_with("MANCHESTER U"):
+		if str(c.get("name", "")).to_upper().begins_with("MANCHESTER U"):
 			manu128 = (c as Dictionary).duplicate(true)
 	var mo128 := {"SCHMEICHEL": 97, "GARY NEVILLE": 95, "IRWIN": 99, "BERG": 93,
 		"PALLISTER": 93, "BUTT": 99, "BECKHAM": 99, "SHERINGHAM": 99, "COLE": 99,
@@ -256,15 +256,15 @@ func _run() -> void:
 		"KEANE": 99, "MAY": 99, "CURTIS": 99}
 	var by_name128 := {}
 	for p in manu128.get("players", []):
-		by_name128[str(p.get("name", ""))] = p
+		by_name128[str(p.get("name", "")).to_upper()] = p
 		# earlier shot blocks mutate the SHARED gamedb dicts ("av" overrides,
 		# Beckham's 155 injury) — scrub them so this pair stays formula-driven
 		(p as Dictionary).erase("av")
 		(p as Dictionary).erase("injured_weeks")
 		(p as Dictionary).erase("suspended_weeks")
-		if mo128.has(str(p.get("name", ""))):
+		if mo128.has(str(p.get("name", "")).to_upper()):
 			(p as Dictionary)["fitness"] = 70
-			(p as Dictionary)["morale"] = mo128[str(p.get("name", ""))]
+			(p as Dictionary)["morale"] = mo128[str(p.get("name", "")).to_upper()]
 	var xi128: Array = []
 	for nm in ["SCHMEICHEL", "GARY NEVILLE", "IRWIN", "BERG", "PALLISTER", "BUTT",
 			"BECKHAM", "SHERINGHAM", "COLE", "GIGGS", "SOLSKJAER"]:
@@ -307,7 +307,7 @@ func _run() -> void:
 	var bar_xi: Array = []
 	for nm in bar_order:
 		for p in barca.get("players", []):
-			if str(p.get("name", "")) == nm:
+			if str(p.get("name", "")).to_upper() == nm:
 				(p as Dictionary)["av"] = bar_av[nm]
 				bar_xi.append(int(p.get("id", -1)))
 	barca["team_rating"] = 87
@@ -365,14 +365,14 @@ func _run() -> void:
 	# differs from the original save's stored figures); clauses per the frames.
 	var manu5 := {}
 	for c in gamedb.clubs_in_league(str(gamedb.leagues[0].get("id", ""))):
-		if str(c.get("name", "")).begins_with("MANCHESTER U"):
+		if str(c.get("name", "")).to_upper().begins_with("MANCHESTER U"):
 			manu5 = c
 	var vdg := {}
 	var ole := {}
 	for p in manu5.get("players", []):
-		if str(p.get("name", "")) == "VAN DER GOUW":
+		if str(p.get("name", "")).to_upper() == "VAN DER GOUW":
 			vdg = (p as Dictionary).duplicate()
-		elif str(p.get("name", "")) == "SOLSKJAER":
+		elif str(p.get("name", "")).to_upper() == "SOLSKJAER":
 			ole = (p as Dictionary).duplicate()
 	vdg["age"] = 34
 	vdg["fitness"] = 70

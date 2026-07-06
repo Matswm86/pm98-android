@@ -47,6 +47,7 @@ func _run() -> void:
 	# Sections partition the squad by the decoded demarcación (GK/DF/MF/FW): every
 	# label valid, the union = the full roster with no dup/drop, and each section in
 	# REVERSE roster order (frame 077: the original lists every group file-reversed).
+	# Name literals = the exact-cipher mixed case (2026-07-06 game_db rebuild).
 	var secs: Array = screen._sections()
 	var valid_labels := ["KEEPERS", "DEFENDERS", "MIDFIELDERS", "FORWARDS", "OUTFIELD"]
 	ok = _assert(secs.size() >= 3, "at least three position sections (got %d)" % secs.size()) and ok
@@ -80,11 +81,11 @@ func _run() -> void:
 	var gk_names: Array = (by_key.get("GK", []) as Array).map(func(p): return str(p["name"]))
 	var mf_names: Array = (by_key.get("MF", []) as Array).map(func(p): return str(p["name"]))
 	var fw_names: Array = (by_key.get("FW", []) as Array).map(func(p): return str(p["name"]))
-	ok = _assert(gk_names.slice(0, 2) == ["SCHMEICHEL", "VAN DER GOUW"],
+	ok = _assert(gk_names.slice(0, 2) == ["Schmeichel", "Van der Gouw"],
 		"KEEPERS order matches frame 077 (%s)" % str(gk_names.slice(0, 2))) and ok
-	ok = _assert(mf_names.slice(0, 6) == ["BECKHAM", "SCHOLES", "GIGGS", "KEANE", "BUTT", "MCCLAIR"],
+	ok = _assert(mf_names.slice(0, 6) == ["Beckham", "Scholes", "Giggs", "Keane", "Butt", "McClair"],
 		"MIDFIELDERS order matches frame 077 (%s)" % str(mf_names.slice(0, 6))) and ok
-	ok = _assert(fw_names.slice(0, 5) == ["COLE", "JORDI CRUYFF", "SOLSKJAER", "SHERINGHAM", "NEVLAND"],
+	ok = _assert(fw_names.slice(0, 5) == ["Cole", "Jordi Cruyff", "Solskjaer", "Sheringham", "Nevland"],
 		"FORWARDS order matches frame 077 (%s)" % str(fw_names.slice(0, 5))) and ok
 
 	# Decoded squad numbers (EQUIPOS byte after the photo-id u16): frame-077 truth.
@@ -92,8 +93,8 @@ func _run() -> void:
 	var no_by_name := {}
 	for p in club.get("players", []):
 		no_by_name[str(p["name"])] = p.get("squadNo")
-	for pair in [["SCHMEICHEL", 1], ["GARY NEVILLE", 2], ["BECKHAM", 7], ["GIGGS", 11],
-			["KEANE", 16], ["VAN DER GOUW", 17], ["SOLSKJAER", 20], ["BERG", 21]]:
+	for pair in [["Schmeichel", 1], ["Gary Neville", 2], ["Beckham", 7], ["Giggs", 11],
+			["Keane", 16], ["Van der Gouw", 17], ["Solskjaer", 20], ["Berg", 21]]:
 		ok = _assert(int(no_by_name.get(pair[0], -1)) == int(pair[1]),
 			"squadNo %s = %d" % [pair[0], pair[1]]) and ok
 

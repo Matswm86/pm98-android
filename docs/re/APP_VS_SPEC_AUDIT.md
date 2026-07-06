@@ -25,10 +25,12 @@ backdrop (trees, buildings, a perimeter brick wall in horizontal strips), not th
 surface. **Fix:** relabel `CAMPINA.RAW` as "countryside/skyline backdrop". Evidence: viewed
 this pass (`scratchpad/campina_grid.png`).
 
-### A3 — INFERENCE · `assets/game_db.json` international club country tags
-Meta declares `intlCountryMatchRate 0.914`; 33 of 476 clubs have blank/unknown country (left
-blank, **not fabricated**). The 351 present international tags are best-effort inference, not
-all source-verified. **Action:** keep the meta flag; do not present inferred tags as decoded.
+### A3 — ~~INFERENCE~~ **CLOSED 2026-07-06** · international club country tags now EXACT
+The EQUIPOS club-record header byte (param_1[5]) is the PAISES.30 country code — all 476
+clubs resolve in the game's own table (Wrexham/Cardiff/Swansea = WALES, Celtic = SCOTLAND).
+game_db carries `countryCode` + the PAISES English name on every club; the old fuzzy
+directory inference and the `intlCountryMatchRate` meta flag are gone
+(`tools/extract_squads_exact.py` kill-tests, `docs/re/club_tactics_re.md`).
 
 ### A4 — INFERENCE · `app/data/sample_db.json` (synthetic fallback)
 `GameDB.gd:26` load order is `res://data/game_db.json` → `user://game_db.json` →
@@ -248,7 +250,8 @@ From in-code comments (verified by grep this pass):
   **Both CORRECTED 2026-07-01** (re-verified by fresh decode: CAMPINA = countryside backdrop,
   HIERPREM grid = grass+boards+crowd only, zero line tiles).
 - The app's data/art is otherwise **source-traceable**; remaining items are documented
-  inferences (A3, A4) or honestly-flagged gaps (A5, A6).
+  inferences (A4; A3 closed 2026-07-06 — country tags now exact) or honestly-flagged
+  gaps (A5, A6).
 - ⚠️ **SUPERSEDED IN SCOPE 2026-07-02:** the pass above audited asset/data PROVENANCE only.
   It never walked the screen NAVIGATION. The §B fan-out below audits what every home-screen
   action actually opens vs the original — and finds the user's complaint is correct: most

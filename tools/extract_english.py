@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 """Extract the 92 English-league club squads from EQUIPOS.PKF.
 
+⚠ SUPERSEDED as the game_db squad source (2026-07-06) by the engine-exact
+parser: tools/extract_squads_exact.py (tools/re/equipos_parse.py ==
+MANAGER.EXE FUN_00579c70/FUN_005820f0). The COUNTRIES whitelist +
+EU_EEA_1997 kind rule defined HERE remain the live nationality/kind source
+(imported by the exact extractor + build_db.py); the anchor-scan extraction
+itself is historical (it missed 3 players and misread strings across record
+boundaries — see docs/re/club_tactics_re.md).
+
 The English records (Copyright-marker records idx 38-129: Premier + Div 1/2/3)
 use an EXTENDED per-player layout, NOT the compact Spanish/Italian one:
 
@@ -315,9 +323,12 @@ def find_attr_blocks(d: bytes, lo: int, hi: int):
         # 0x01 = normal player (record-id byte follows). 0x00 = LAST player in the
         # record - only legitimate when the block abuts the next club's marker (hi);
         # accepting 0x00 anywhere lets stray bio-text `6c 6b` runs false-positive.
-        if len(w) == 10 and all(1 <= b <= 99 for b in w):
-            if term == 0x01 or (term == 0x00 and j + 13 >= hi - 1):
-                out.append((j, w))
+        if (
+            len(w) == 10
+            and all(1 <= b <= 99 for b in w)
+            and (term == 0x01 or (term == 0x00 and j + 13 >= hi - 1))
+        ):
+            out.append((j, w))
         i = j + 2
     return out
 
@@ -352,9 +363,13 @@ def name_before(d: bytes, lo: int, Y: int, archive: set[int] | None = None):
             continue
         if tot > best_len:
             best, best_len = cand, tot
-        if archive and h - 3 >= 0 and struct.unpack_from("<H", d, h - 3)[0] in archive:
-            if tot > best_arch_len:
-                best_arch, best_arch_len = cand, tot
+        if (
+            archive
+            and h - 3 >= 0
+            and struct.unpack_from("<H", d, h - 3)[0] in archive
+            and tot > best_arch_len
+        ):
+            best_arch, best_arch_len = cand, tot
     return best_arch if best_arch is not None else best
 
 

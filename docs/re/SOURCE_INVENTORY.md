@@ -75,7 +75,7 @@ Every YES was decoded and **viewed** this session (image) or printed (text); evi
 | RAW PCM audio | **YES** | `export_audio.py` (ffmpeg 6.1.1 present) | tool path + ffmpeg confirmed |
 | S3M music | **YES** | `export_audio.py` (ffmpeg libopenmpt) | tool path + ffmpeg confirmed |
 | RIFF PAL | PARTIAL | `export_art.py` | decoder present; not independently re-rendered this pass |
-| DBC team record | **PARTIAL** | `dbc_extract.py` | 476 extracted; full per-team field schema ~281/476 (`docs/FORMATS.md`) |
+| DBC team record | **YES** | `tools/re/equipos_parse.py` (== MANAGER.EXE `FUN_00579c70`/`FUN_005820f0`) | **476/476 byte-exact** since 2026-07-06: full squads (9547 players), header stadium/full-name/PAISES-country-code, XOR-0x61 strings; game_db rebuilt from it (`extract_squads_exact.py` → `build_db.py`) |
 | `SFX/*.PKF` inner WAV | **NO** | — | container lists; inner audio packing undocumented |
 | `GFX.DAT` | **NO** | — | header `01 0a 00 0a 00 04 00…`+`7f 80…`; no decoder |
 | `PCF5DAT.PKF` | **NO** | attempted `enum_pcf5dat.py` | not enumerable (§5) |
@@ -96,8 +96,11 @@ Every YES was decoded and **viewed** this session (image) or printed (text); evi
 3. **`GFX.DAT` (81 KB) — unknown format**, no decoder.
 4. **`SFX/*.PKF` inner-WAV packing** — containers list but the inner audio encoding is
    undocumented.
-5. **DBC per-team record schema ~281/476 complete** — headers 100%; remaining squad records
-   partial (`docs/FORMATS.md`).
+5. ~~DBC per-team record schema ~281/476 complete~~ **CLOSED 2026-07-06**: the engine-exact
+   parser (`tools/re/equipos_parse.py`) decodes all 476 records byte-exactly (in-bounds by
+   `FUN_00579c70`'s own success check); residue = the un-RE'd player bytes
+   +0x16/+0x17/+0x1a, fine[1..5], tag-2 side records, and the flag==0 club-block u32
+   (`docs/re/club_tactics_re.md` honest residue).
 
 ## 6. Reproduce
 - Sizes/members: `python3 tools/re/pkf_unpack.py` (root PKFs) and the parse loop over DBDAT.

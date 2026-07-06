@@ -128,7 +128,9 @@ func _run() -> void:
 				real_barca = c
 				break
 		screen.setup(real_barca, own, 2, "A. LEIGH", "Premier")
-		var want_xi := [1949, 1953, 1956, 1963, 1954, 1958, 1961, 1968, 1970, 1969, 1959]
+		# game_db ids after the 2026-07-06 exact-cipher squad rebuild (leavers
+		# dropped, ids renumbered; names/fines unchanged vs walked frame 015).
+		var want_xi := [1961, 1965, 1968, 1975, 1966, 1970, 1973, 1980, 1982, 1981, 1971]
 		var got_xi: Array = []
 		for pid in screen._tactics.xi:
 			got_xi.append(int(pid))
@@ -137,7 +139,7 @@ func _run() -> void:
 		var by_id := {}
 		for p in real_barca.get("players", []):
 			by_id[int(p.get("id", -1))] = p
-		ok = _assert(str(by_id[got_xi[3]].get("name", "")) == "GUARDIOLA",
+		ok = _assert(str(by_id[got_xi[3]].get("name", "")) == "Guardiola",
 			"row 4 = Guardiola (slot byte 4, walked frame 015)") and ok
 		var fines := []
 		for pid in got_xi:

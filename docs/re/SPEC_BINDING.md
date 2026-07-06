@@ -25,22 +25,26 @@
 - **476 clubs total** (92 English in the 4 tiers above + 384 international). English ids:
   `english_id == 301 + (position-38)`, pos 38 = Blackburn (`docs/FORMATS.md:91`). The game
   keeps Hereford in Div3 (per MANAGER.EXE's own league table — `game_db.json` meta note).
-- **8,046 players**, nested under `clubs[].players`.
-- International clubs: country tag is **best-effort inference** (meta `intlCountryMatchRate
-  0.914`; 33 clubs left blank, not fabricated). See AUDIT finding A3.
+- **9,547 players**, nested under `clubs[].players` (2026-07-06 exact-cipher rebuild:
+  engine parser `tools/re/equipos_parse.py`, engine leaver-drop rule applied — 189
+  slot>=0x62 leavers excluded, matching the squads the original fields).
+- International clubs: country is **exact** — the EQUIPOS header byte is the PAISES.30
+  country code; all 476 resolve (`countryCode` + PAISES English name on every club).
+  AUDIT finding A3 (best-effort inference) is CLOSED.
 
 ## 3. Player record (per `clubs[].players[]`; fields cited to source)
 | Field | Source |
 |---|---|
-| `name` / `legalName` | EQUIPOS DBC name cipher (pair-swapped alphabet, `docs/FORMATS.md:22`) |
-| `birthYear` / `age` | DBC media/birth block (`docs/re/player_info_re.md`) |
-| `pos` / `posFine` / `isGK` | demarcación decode (`docs/re/positions_re.md`) |
-| `media` | u8 overall rating (`docs/FORMATS.md:205`) |
+| `name` / `legalName` | EQUIPOS strings, EXACT cipher `[u16 len][bytes XOR 0x61]` (`FUN_0058c810`; mixed case + accents/digits; legal packs "Legal Name, NICKNAME" on a real comma). The old pair-swapped-alphabet reading (`docs/FORMATS.md:22`) is a superseded approximation |
+| `birthYear` / `birthDay` / `birthMonth` / `age` | player record day/month/year (`FUN_005820f0`); null = engine randomizes/defaults at load (year outside 1901..1985 → age 25..29; day/month 0 → current date) — never baked |
+| `pos` / `posFine` / `isGK` | band byte +0x1c / fine byte +0x1d+1 (demarcación, `docs/re/positions_re.md`) |
 | `attrs` (10) | u8 each, 1-99, DBC attribute row (`docs/FORMATS.md:207`, `:296`) |
-| `heightCm` / `weightKg` | FICHA physicals decode (`docs/re/ficha_physicals.md` / handoff) |
-| `photoId` | BIGFOTO/MINIFOTO bank id (`docs/re/faces_re.md`) |
-| `nationality` / `flagCode` | `DBDAT/PAISES.30` (128 countries) + `BANDERAS.PKF` |
-| `kind` | role/type classification (verify exact source byte — see GAP §5.6) |
+| `heightCm` / `weightKg` | player +0xf9/+0xfa (FICHA stone/feet converters `FUN_0058dd70`/`FUN_0058de00`; null = engine randomizes 170..179 / 75..84). The old `media` "overall rating" field was the weight byte misread — REMOVED |
+| `photoId` | the .DBC player-id u16 == BIGFOTO/MINIFOTO bank id (`docs/re/faces_re.md`); null = id 0 (engine assigns a runtime id) |
+| `squadNo` | byte +0xf8 after the player id (`docs/re/squad_number_re.md`) |
+| `nationality` / `flagCode` | extended-record tail T3 (fallback T1; omitted → ENGLAND — frames 081/084) + `DBDAT/PAISES.30` / `BANDERAS.PKF` |
+| `birthplace` / `prevClub` | extended-record tail T1 / T2 ("Gladsaxe", "Brondby (91)") |
+| `kind` | EU/EEA-1997 rule on nationality (frame-evidenced NATIONAL for HOLLAND/NORWAY; exact source byte still a GAP — see §5.6) |
 
 **Attribute legend** (Spanish DBC order → UK card label, *confirmed vs the in-game Babb
 reference card*, `docs/re/player_info_re.md:55`):

@@ -190,8 +190,22 @@ Verified capacities: Camp Nou 108428, Bernabéu 104779, Calderón 56500, Mestall
 >65535 confirm width). Output: `assets/teams_laliga.json`.
 Accent bytes (0x88=É,0x9b=Ú,...) → finish the map for clean display (cosmetic).
 
-### Player (squad) record — FULLY DECODED ✅ (`tools/extract_squads.py`)
-Squad follows the team fields, players **sorted by position** (GKs first). Full
+### Player (squad) record — SUPERSEDED by the engine-exact parse (2026-07-06)
+
+> **The anchor-heuristic layout below is historical.** The byte-exact record
+> layout is now decoded from MANAGER.EXE's own loader (`FUN_00579c70` +
+> `FUN_005820f0`, XOR-0x61 strings): see `tools/re/equipos_parse.py` +
+> `docs/re/club_tactics_re.md`. game_db is built from it
+> (`tools/extract_squads_exact.py` → `tools/build_db.py`). Two identities
+> below are DISPROVEN by the loader: the "flag/squad byte >=0x80" is the
+> HEIGHT in cm (player+0xf9; FICHA converts to feet, randomized 170..179 when
+> <150) and "media" is the WEIGHT in kg (player+0xfa; stone conversion,
+> randomized 75..84 when <20). The "3-byte player header" is the u16 player
+> id (== photoId face-bank key) + the squad-number byte (+0xf8). The old
+> 5-bit cipher was a single-case approximation — the real strings are mixed
+> case with accents/digits ("Schalke 04", "O´Connor").
+
+Squad follows the team fields, players **sorted by position** (GKs first). Old
 per-player record layout (forward-parsed, verified vs the real 97-98 squads):
 ```
 [3-byte player header]              (tag/flags; not yet decoded, just skipped)

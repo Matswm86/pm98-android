@@ -376,6 +376,10 @@ func _cell_centre(f: Font, s: String, x0: int, cw: int, sz := 11) -> float:
 	return float(x0 + int(floorf((cw - w) / 2.0)))
 
 
+## GHOST (own-team) digits only: the dim mirrored markers carry the player's
+## REAL squad number (walked run-2 own-state: MU shirts 1,2,3,21,6,8,7,10,9,
+## 11,20). Rival BRIGHT digits + the table N. column use the slot number 1..11
+## instead (frame 015) — do not route them through here.
 func _shirt(p: Dictionary, slot: int) -> int:
 	var no_v: Variant = p.get("squadNo")
 	var no := int(no_v) if (no_v is int or no_v is float) else 0
@@ -469,7 +473,11 @@ func _draw_rows() -> void:
 		if p == null:
 			continue
 		var pl: Dictionary = p
-		var num := str(_shirt(pl, i))
+		# N. column = the row/slot number 1..11, NOT the stored squad number:
+		# frame 015 reads Hesp=1..Rivaldo=11 while Barcelona's .DBC squadNos are
+		# [13,22,3,4,5,12,7,21,9,10,11]. (Pre-rebuild data had no intl squadNo,
+		# so the old _shirt fallback was accidentally frame-correct.)
+		var num := str(i + 1)
 		PMChrome.text(self, _f8, _cell_centre(_f8, num, NUM_CELL[0], NUM_CELL[1]), y + 2,
 			num, C_NUM, 11)
 		PMChrome.text(self, _f8, NAME_X, y + 2,
@@ -560,8 +568,11 @@ func _draw_right_panel() -> void:
 				draw_texture(_eq_off, Vector2(x + 1, STRIP_CELL_Y + 6))
 		PMChrome.text(self, _f10, STRIP_VAL_RIGHT, STRIP_VAL_Y, str(tr), C_STRIP_VAL, 10, 2)
 
-	# COMPUTER band is baked; a human-managed rival overdraws it (un-walked)
-	var mgr := str(_rival.get("manager", "")).strip_edges()
+	# COMPUTER band is baked; a human-managed rival overdraws it (un-walked).
+	# manager is null since the exact rebuild (EQUIPOS stores no manager) —
+	# null-safe read, else str(null) paints "<null>" over the baked band.
+	var mgr_v: Variant = _rival.get("manager")
+	var mgr := (str(mgr_v) if mgr_v != null else "").strip_edges()
 	if mgr != "":
 		draw_rect(Rect2(R_COMPUTER.position.x + 2, R_COMPUTER.position.y + 2,
 			R_COMPUTER.size.x - 4, R_COMPUTER.size.y - 4), Color8(0, 0, 128), true)
@@ -612,8 +623,9 @@ func _rival_markers() -> Array:
 	if not _club_slots.is_empty():
 		for i in mini(_tactics.xi.size(), _club_slots.size()):
 			var s: Dictionary = _club_slots[i]
-			var p: Variant = _by_id.get(int(_tactics.xi[i]))
-			var num := _shirt(p if p is Dictionary else {}, i)
+			# Rival BRIGHT digits = the slot number 1..11 (walked frame 015:
+			# discs read 1..11 while Barcelona's stored squadNos don't).
+			var num := i + 1
 			out.append({"kind": "disc", "mk": s.get("mk1", [0, 0]), "num": num})
 			out.append({"kind": "arrow", "mk": s.get("mk2", [0, 0]), "num": num})
 		return out
@@ -628,8 +640,8 @@ func _rival_markers() -> Array:
 			order.append(i)
 	for i in mini(_tactics.xi.size(), order.size()):
 		var s: Dictionary = slots[order[i]]
-		var p: Variant = _by_id.get(int(_tactics.xi[i]))
-		var num := _shirt(p if p is Dictionary else {}, i)
+		# Same frame-015 rule as the club-slots path: rival digits = slot 1..11.
+		var num := i + 1
 		out.append({"kind": "disc", "mk": s.get("mk1", [0, 0]), "num": num})
 		out.append({"kind": "arrow", "mk": s.get("mk2", [0, 0]), "num": num})
 	return out

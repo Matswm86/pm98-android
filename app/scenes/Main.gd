@@ -1153,9 +1153,15 @@ func _show_preseason(manager_name: String, league: Dictionary, club: Dictionary)
 		_begin_career(manager_name, league, club, rivals))
 
 
-## Bridge a PAISES English country name (what the preseason map/strip shows) to the
-## DB's best-effort Spanish country tags via data/country_es_en.json.
+## Clubs of a PAISES English country name (what the preseason map/strip shows).
+## Since the 2026-07-06 exact rebuild game_db stores the PAISES name itself
+## (EQUIPOS header country code) — direct lookup. The country_es_en.json bridge
+## remains only as a fallback for an owner-side-loaded pre-rebuild user:// DB
+## (whose tags were best-effort Spanish).
 func _clubs_of_country_en(name_en: String) -> Array:
+	var direct := GameDB.clubs_in_country(name_en)
+	if not direct.is_empty():
+		return direct
 	if _country_en_es.is_empty():
 		var f := FileAccess.open("res://data/country_es_en.json", FileAccess.READ)
 		if f != null:
@@ -2076,9 +2082,10 @@ func _euro_pool() -> Array:
 		out.append(e["c"])
 	return out
 
-## South American country tags in game_db (Spanish), for the Intercontinental Cup.
-const SA_COUNTRIES := ["Argentina", "Brasil", "Uruguay", "Chile", "Colombia", "Perú",
-	"Bolivia", "Paraguay", "Ecuador", "Venezuela"]
+## South American country tags in game_db (the game's own PAISES.30 English
+## spellings since the 2026-07-06 exact rebuild), for the Intercontinental Cup.
+const SA_COUNTRIES := ["ARGENTINA", "BRAZIL", "URUGUAY", "CHILE", "COLOMBIA", "PERU",
+	"BOLIVIA", "PARAGUAY", "ECUADOR", "VENEZUELA"]
 
 ## The South American champion for the Intercontinental Cup: the strongest South American
 ## club in game_db (a documented stand-in -- we don't simulate the Copa Libertadores).

@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 """Extract team records + full squads from EQUIPOS.PKF (PC Fútbol / PM98 engine).
 
+⚠ SUPERSEDED as the game_db squad source (2026-07-06) by the engine-exact
+parser: tools/extract_squads_exact.py (tools/re/equipos_parse.py ==
+MANAGER.EXE FUN_00579c70/FUN_005820f0, XOR-0x61 strings). This anchor
+heuristic misread two bytes ("flag">=0x80 is HEIGHT +0xf9; "media" is WEIGHT
++0xfa) and its 5-bit cipher was single-case (no digits/&/apostrophes).
+Kept for the La Liga capacity/founding extraction (teams_laliga.json — those
+fields are NOT in the exact club record) and as RE provenance.
+
 Writes two files:
   assets/squads_laliga.json  - the 20 SIG-indexed Spanish Primera 97-98 squads
                                (533 players, fully verified vs reality).

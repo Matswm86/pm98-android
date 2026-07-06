@@ -309,14 +309,18 @@ static func text(ci: CanvasItem, f: Font, x: float, y_top: float, s: String,
 	ci.draw_string(f, Vector2(px, y_top + f.get_ascent(sz)), s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
 
 
-## PM98's rendered name casing. The EQUIPOS cipher is single-case (5-bit letters,
-## tools/extract_english.py `ch()`), so game_db names arrive UPPERCASE; the real
-## screens title-case at render time with lowercase name particles (walkthrough
-## frame 077 "Van der Gouw", the CURRENT OFFERS capture "Southgate"/"Aston Villa").
-## First word always capitalised; the particle list covers the frame-verified case.
+## PM98's rendered name casing. Since the 2026-07-06 exact-cipher rebuild
+## (XOR 0x61, tools/re/equipos_parse.py) game_db stores the TRUE mixed-case
+## strings the original renders ("Van der Gouw" frame 077, "F.C. Barcelona"
+## frame 015) — those pass through UNCHANGED. The title-case reconstruction
+## below remains for single-case input only: talent-pool / youth / sample_db
+## names still arrive UPPERCASE (the old approximate cipher was 5-bit
+## single-case; the shim reproduces the frame-verified casing for them).
 const _NAME_PARTICLES := ["der", "de", "la", "le", "di", "da", "van", "von", "den", "dos"]
 
 static func title_case_name(s: String) -> String:
+	if s != s.to_upper():
+		return s  # already mixed case == the exact stored form; never re-case
 	var words := s.split(" ", false)
 	var out := PackedStringArray()
 	for i in words.size():
