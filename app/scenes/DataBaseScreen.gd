@@ -169,6 +169,7 @@ var _fcal: Font   # Calend8 — legend caption font
 var _photos := false
 var _club: Dictionary = {}
 var _press := ""
+var _down := false      # a press was seen; release without it is the emulated-mouse twin
 var _rows: Array = []   # [{r: Rect2 (design space), p: Dictionary}] for row taps
 
 
@@ -242,9 +243,17 @@ func _on_input(e: InputEvent) -> void:
 		return
 	var d := _to_design(pos)
 	if pressed:
+		_down = true
 		_press = _btn_at(d)
 		queue_redraw()
 		return
+	# One release per press: with emulate_mouse_from_touch (Android default) every touch
+	# also arrives as an emulated mouse event, and the row/empty-space fall-through below
+	# has no was-target to match — without this gate a row tap raised TWO stacked cards
+	# (caught by shot_dbase_card_tapthrough.gd). Same pattern as BrowseScreen._down.
+	if not _down:
+		return
+	_down = false
 	var was := _press
 	_press = ""
 	queue_redraw()

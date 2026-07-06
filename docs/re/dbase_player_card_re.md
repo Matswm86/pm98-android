@@ -178,6 +178,23 @@ shots `app/tests/shot_dbase_card.gd`, differ
   046 NOTES, 055 Klinsmann tab-states, 062 Blackwell CAREER typo-shift,
   072 Grodas short HONOURS.
 
+## TAP-THROUGH (2026-07-06) — the input path itself, driven
+
+`app/tests/shot_dbase_card_tapthrough.gd` drives the booted Main end-to-end by
+synthesized `InputEventScreenTouch` press/release (+ drag-scroll) — TITLE →
+DATA BASE → league → club → squad row → card → CAREER tab → RETURN → RETURN —
+never calling the nav methods directly (that half is `test_browse_nav.gd`).
+25 asserts + a PNG per stage (`PM98_TAP_DIR`, default `out/tap`). Needs a
+rendering driver (the squad view's row rects fill in `_draw`).
+
+**Double-fire law it caught**: with `emulate_mouse_from_touch` (Android
+default) every touch also arrives as an emulated mouse event. Release paths
+guarded by a was-target match (buttons, tabs) absorb the twin; unguarded
+fall-throughs do NOT — `DataBaseScreen`'s row/empty-space release fired twice,
+stacking TWO player cards per tap (RETURN then appeared dead). Fixed with the
+`BrowseScreen`-pattern `_down` gate; any new screen with a release fall-through
+needs the same gate, and the harness asserts exactly-one-screen per tap.
+
 ## PROSE LAYOUT LAWS (2026-07-06, frame-fitted — closes the ±px lever)
 
 Derived by `tools/re/fit_prose_advances.py` from ALL 12 prose frames of the
