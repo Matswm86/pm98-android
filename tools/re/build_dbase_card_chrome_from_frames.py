@@ -70,13 +70,13 @@ W, H = 640, 480
 # other pixels are the shared chrome). club = game_db club id for the kit patch.
 PLAYER_FRAMES = {
     "034_schmeichel_db.png": {"club": 40, "view": "pdata"},
-    "050_hiden_data.png": {"club": 24, "view": "pdata"},
-    "055_klinsmann_data.png": {"club": 46, "view": "pdata"},
-    "062_blackwell_career_typorow.png": {"club": 55, "view": "career"},
-    "063_andersson_star_p2.png": {"club": 5, "view": "pdata"},
-    "065_friedel_maybe.png": {"club": 51, "view": "pdata"},
-    "068_friedel_card.png": {"club": 26, "view": "pdata"},
-    "072_grodas_honours_short.png": {"club": 46, "view": "prose"},
+    "050_hiden_data.png": {"club": 43, "view": "pdata"},
+    "055_klinsmann_data.png": {"club": 47, "view": "pdata"},
+    "062_blackwell_career_typorow.png": {"club": 51, "view": "career"},
+    "063_andersson_star_p2.png": {"club": 38, "view": "pdata"},
+    "065_friedel_maybe.png": {"club": 63, "view": "pdata"},
+    "068_friedel_card.png": {"club": 42, "view": "pdata"},
+    "072_grodas_honours_short.png": {"club": 47, "view": "prose"},
 }
 # Frame -> selected top tab (0..6) for the Schmeichel tab walk.
 SEL_FRAMES = [
@@ -163,6 +163,14 @@ BOTTOM_BAND = (12, 405, 140, 429)  # DATA/NOTES hanging tabs band (tops overlap 
 BTN_PRINT = (384, 442, 498, 470)
 BTN_RETURN = (506, 442, 620, 470)
 
+# The four flat VALUE-BAR row bands: (y0, y1, flat colour) — spans detected
+# per band in bake_pdata (BP+DATE / AGE+NAT+INTL / LAST CLUB / HEIGHT-WEIGHT).
+PD_BARS = [
+    (163, 185, (59, 85, 130)),
+    (213, 235, (30, 52, 98)),
+    (263, 285, (0, 63, 0)),
+    (314, 333, (70, 40, 80)),
+]
 # PERSONAL DATA dynamic ROIs (inside the panel; underlay pixels here are
 # app-drawn): photo/pitch box incl. shadows + role word band under it, the
 # value texts on the bars, the two flags, and the AGE digits.
@@ -696,25 +704,39 @@ def bake_pdata() -> None:
             if cnt < (nfr // 2 + 1):
                 weak_px.append((x + x0, y + y0))
     dyn = [PHOTO_BOX, ROLE_BAND] + PD_VALUE_ROWS
-    weak_set = set()
     for x, y in weak_px:
         assert any(in_box(x, y, b) for b in dyn), f"pdata weak majority at {x},{y}"
-        weak_set.add((x, y))
-    # fill each weak (player-varying) pixel from the nearest strong pixels in
-    # its row (+-30px window mode = the local flat bar / background colour),
-    # so no witness text/flag ghosts survive in the underlay
-    for bx0, by0, bx1, by1 in PD_VALUE_ROWS:
-        for y in range(by0, by1):
-            for x in range(bx0, bx1):
-                if (x, y) not in weak_set:
-                    continue
-                win = [
-                    tuple(out[y - y0, xx - x0])
-                    for xx in range(max(bx0, x - 30), min(bx1, x + 31))
-                    if (xx, y) not in weak_set
-                ]
-                assert win, f"no strong fill source at {x},{y}"
-                out[y - y0, x - x0] = Counter(win).most_common(1)[0][0]
+    # The value bars are FLAT single-colour rects (034 histograms); EVERYTHING
+    # on them — values, flags, even substrings constant across all six
+    # witnesses ("years", which majority voting can never remove) — is
+    # app-drawn, so the underlay fills each bar rect WHOLESALE with its flat
+    # colour. Bar spans = contiguous runs of bar-coloured columns per band.
+    f34 = frame("034_schmeichel_db.png")
+    bars_meta = []
+    for by0, by1, col in PD_BARS:
+        is_bar = [
+            sum((f34[y, x] == col).all() for y in range(by0, by1)) >= 8 for x in range(186, 612)
+        ]
+        runs: list[list[int]] = []
+        for i, b in enumerate(is_bar):
+            x = 186 + i
+            if b and (not runs or x - runs[-1][1] > 4):
+                runs.append([x, x + 1])
+            elif b:
+                runs[-1][1] = x + 1
+        assert runs, f"no bar span found for colour {col}"
+        for rx0, rx1 in runs:
+            out[by0 - y0 : by1 - y0, rx0 - x0 : rx1 - x0] = col
+            bars_meta.append({"rect": [rx0, by0, rx1, by1], "rgb": list(col)})
+    # the two flag zones punch holes in the detected runs (the flag art covers
+    # the bar) — fill them with their bar colour so no witness flag ghosts
+    # survive; the app blits the flag art there.
+    out[163 - y0 : 185 - y0, 460 - x0 : 492 - x0] = PD_BARS[0][2]
+    # the framed NATIONALITY flag sits at (404,213)-(437,235); between it and
+    # the INTERNATIONAL bar (x452) the frame shows WHITE
+    out[213 - y0 : 235 - y0, 404 - x0 : 437 - x0] = PD_BARS[1][2]
+    out[213 - y0 : 235 - y0, 437 - x0 : 452 - x0] = (255, 255, 255)
+    globals()["_PD_BARS_META"] = bars_meta
     for bx0, by0, bx1, by1 in (PHOTO_BOX, ROLE_BAND):
         out[by0 - y0 : by1 - y0, bx0 - x0 : bx1 - x0] = (255, 255, 255)
     save(out, OUT / "view_pdata.png")
@@ -735,17 +757,27 @@ def bake_pdata() -> None:
 
 def bake_static_views() -> dict:
     x0, y0, x1, y1 = PANEL
-    # NOTES: the whole panel interior is static (empty new-game notebook)
-    f46 = frame("046_notes_tab.png")
-    save(f46[y0:y1, x0:x1], OUT / "view_notes.png")
+    # NOTES: the notebook is static (empty new-game file) but the photo/role
+    # column is per-player — cleared like every other view (app-drawn)
+    f46 = frame("046_notes_tab.png").copy()
+    notes = f46[y0:y1, x0:x1].copy()
+    for bx0, by0, bx1, by1 in (PHOTO_BOX, ROLE_BAND):
+        notes[by0 - y0 : by1 - y0, bx0 - x0 : bx1 - x0] = (255, 255, 255)
+    save(notes, OUT / "view_notes.png")
     # prose: interior is white + text + scrollbar; bake the EMPTY prose panel
     # from 035 with the text box and the scrollbar zone cleared to white —
     # the app draws text and scroll parts on top.
     f35 = frame("035_tab_profile.png").copy()
     prose = f35[y0:y1, x0:x1].copy()
-    PROSE_BOX = (186, 122, 575, 412)  # text zone (panel-absolute)
-    SCROLL_ZONE = (575, 120, 634, 414)
-    for bx0, by0, bx1, by1 in (PROSE_BOX, SCROLL_ZONE):
+    PROSE_BOX = (
+        186,
+        123,
+        576,
+        400,
+    )  # text zone; the grey content lines at y122/y400 + border rows stay baked
+    SCROLL_ZONE = (584, 123, 612, 410)  # exactly the steppers + track the app draws
+    # the photo/pitch + role word are per-player (app-drawn in EVERY view)
+    for bx0, by0, bx1, by1 in (PROSE_BOX, SCROLL_ZONE, PHOTO_BOX, ROLE_BAND):
         prose[by0 - y0 : by1 - y0, bx0 - x0 : bx1 - x0] = (255, 255, 255)
     save(prose, OUT / "view_prose.png")
     # prose empty-panel kill test: every prose frame equals it outside those zones
@@ -774,22 +806,28 @@ def bake_static_views() -> dict:
                 or in_box(px, py, TITLE_BAR)
             ), f"prose panel mismatch vs {n} at {px},{py}"
     print("  view_notes.png + view_prose.png baked (10-frame prose kill test OK)")
-    # career: same white panel; the table + scrollbar are app-drawn. Reuse the
-    # prose blank (identical outside the zones — asserted right above via 038?).
-    f38 = frame("038_tab_career.png")[y0:y1, x0:x1]
-    CAREER_ZONE = (186, 120, 575, 414)
-    diff = (f38 != prose).any(axis=2)
-    ys, xs = np.nonzero(diff)
-    for x, y in zip(xs.tolist(), ys.tolist()):
-        px, py = x + x0, y + y0
-        assert (
-            in_box(px, py, CAREER_ZONE)
-            or in_box(px, py, SCROLL_ZONE)
-            or in_box(px, py, PHOTO_BOX)
-            or in_box(px, py, ROLE_BAND)
-            or in_box(px, py, TITLE_BAR)
-        ), f"career-vs-prose blank mismatch at {px},{py}"
-    print("  career view uses the same blank panel (038 kill test OK)")
+    # career: its OWN blank — the career scrollbar chrome differs from the
+    # prose one (035 carries a grey/black bar frame at x574..584 that 038
+    # does not have), so the career panel is cut from 038.
+    CAREER_ZONE = (186, 123, 576, 400)
+    career = frame("038_tab_career.png")[y0:y1, x0:x1].copy()
+    for bx0, by0, bx1, by1 in (CAREER_ZONE, SCROLL_ZONE, PHOTO_BOX, ROLE_BAND):
+        career[by0 - y0 : by1 - y0, bx0 - x0 : bx1 - x0] = (255, 255, 255)
+    save(career, OUT / "view_career.png")
+    for n in ["038_tab_career.png", "042_career_scrolled.png", "062_blackwell_career_typorow.png"]:
+        f = frame(n)[y0:y1, x0:x1]
+        diff = (f != career).any(axis=2)
+        ys, xs = np.nonzero(diff)
+        for x, y in zip(xs.tolist(), ys.tolist()):
+            px, py = x + x0, y + y0
+            assert (
+                in_box(px, py, CAREER_ZONE)
+                or in_box(px, py, SCROLL_ZONE)
+                or in_box(px, py, PHOTO_BOX)
+                or in_box(px, py, ROLE_BAND)
+                or in_box(px, py, TITLE_BAR)
+            ), f"career blank mismatch vs {n} at {px},{py}"
+    print("  view_career.png baked (3-frame kill test OK)")
     return {"prose_box": PROSE_BOX, "scroll_zone": SCROLL_ZONE, "career_zone": CAREER_ZONE}
 
 
@@ -831,6 +869,83 @@ def bake_bottom() -> None:
         "  btn_print.png + btn_return.png baked (identical across frames; "
         "pressed/hover states un-walked — at-rest only)"
     )
+
+
+# ------------------------------------------- header / shadows / scrollbar --
+
+
+def bake_extras() -> dict:
+    """Career header sprite, the photo drop shadows, and the scrollbar thumb
+    (all frame cuts with cross-witness stability asserts)."""
+    info: dict = {}
+    f34 = frame("034_schmeichel_db.png")
+    f38 = frame("038_tab_career.png")
+    f42 = frame("042_career_scrolled.png")
+    f62 = frame("062_blackwell_career_typorow.png")
+    # career header band incl. its top border + column caps (static per view)
+    hdr = f38[131:150, 189:574]
+    for other, nm in ((f42, "042"), (f62, "062")):
+        assert (other[131:150, 189:574] == hdr).all(), f"career header differs vs {nm}"
+    save(hdr, OUT / "career_header.png")
+    info["career_header_xy"] = [189, 131]
+    # photo drop shadows (SOMBRA family): the non-white pixels inside the
+    # photo box but outside the photo blit, cut from 034; identical on 055
+    f55 = frame("055_klinsmann_data.png")
+    right = f34[137:332, 165:178]
+    bottom = f34[319:332, 40:165]
+    assert (f55[137:332, 165:178] == right).all(), "photo right shadow differs vs 055"
+    assert (f55[319:332, 40:165] == bottom).all(), "photo bottom shadow differs vs 055"
+    save(right, OUT / "photo_shadow_r.png")
+    save(bottom, OUT / "photo_shadow_b.png")
+    info["photo_shadow_r_xy"] = [165, 137]
+    info["photo_shadow_b_xy"] = [40, 319]
+    # scrollbar: thumb rows carry the 3D gradient face (160/144/128 columns);
+    # everything else in the track is the flat (160,160,164) gutter
+    # the scrollbar chrome is VIEW-SPECIFIC (prose carries a bar frame the
+    # career bar lacks; stepper sprites differ too) — bake both sets
+    f39 = frame("039_tab_internat.png")
+    f62b = frame("062_blackwell_career_typorow.png")
+    for nm, cut in {
+        "scrollp_up_washed": frame("035_tab_profile.png")[124:150, 584:612],
+        "scrollp_up_active": frame("043_internat_end.png")[124:150, 584:612],
+        "scrollp_dn_active": f39[384:410, 584:612],
+        "scrollp_dn_washed": frame("043_internat_end.png")[384:410, 584:612],
+        "scrollp_slab": frame("035_tab_profile.png")[150:384, 584:612],
+        "scrollc_up_washed": f38[124:150, 584:612],
+        "scrollc_up_active": f42[124:150, 584:612],
+        "scrollc_dn_active": f38[384:410, 584:612],
+        "scrollc_dn_washed": f62b[384:410, 584:612],
+        "scrollc_slab": f62b[150:384, 584:612],
+    }.items():
+        save(cut, OUT / f"{nm}.png")
+    for other in ("040_tab_anecdotes.png", "041_tab_lastseason.png"):
+        assert (frame(other)[384:410, 584:612] == f39[384:410, 584:612]).all(), (
+            f"prose dn_active differs vs {other}"
+        )
+
+    def thumb_span(f) -> tuple[int, int]:
+        rows = [
+            y
+            for y in range(150, 384)
+            if tuple(f[y, 598]) == (144, 144, 144) and tuple(f[y, 602]) == (128, 128, 128)
+        ]
+        return min(rows), max(rows)
+
+    t38 = thumb_span(f38)
+    t42 = thumb_span(f42)
+    # the whole thumb incl. its caps: rows 150..335 in 038 (off 0; the cap
+    # tops sit right under the up stepper)
+    save(f38[150:336, 584:612], OUT / "scroll_thumb.png")
+    info["thumb_obs"] = {"038": list(t38), "042": list(t42)}
+    # track strips: below the thumb (038, bottom-anchored, carries the shading
+    # above the DN stepper) and above it (042, top-anchored)
+    save(f38[336:384, 584:612], OUT / "scroll_track_below.png")
+    save(f42[150:180, 584:612], OUT / "scroll_track_above.png")
+    print(
+        f"  career_header + photo shadows + scroll thumb baked "
+        f"(thumb 038 rows {t38}, 042 rows {t42})"
+    )
+    return info
 
 
 # ------------------------------------------------- career + prose geometry -
@@ -927,7 +1042,12 @@ def _decode_core_dib(raw: bytes, pal: list) -> np.ndarray:
 
 PHOTO_XY = (41, 137)  # BIGFOTO blit origin on the card (fitted, asserted below)
 FLAG_SMALL_XY = (461, 164)  # BANDERAS 30x20 at the BIRTH PLACE bar right end
-FLAG_BIG_BOX = (405, 214, 468, 234)  # the big waving NATIONALITY flag
+FLAG_BIG_BOX = (
+    404,
+    213,
+    437,
+    235,
+)  # the framed NATIONALITY flag (BANDERAS + 1px black widget frame)
 
 
 def verify_pkf_assets() -> dict:
@@ -1058,10 +1178,13 @@ def main() -> None:
     meta.update(bake_panel_and_titles())
     print("personal data:")
     bake_pdata()
+    meta["pd_bars"] = globals().get("_PD_BARS_META", [])
     print("static views:")
     meta.update(bake_static_views())
     print("bottom:")
     bake_bottom()
+    print("extras:")
+    meta.update(bake_extras())
     print("view geometry:")
     meta.update(extract_view_geometry())
     print("PKF assets:")

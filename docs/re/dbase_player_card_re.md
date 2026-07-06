@@ -135,12 +135,65 @@ RC_DBASE.PKF (render with `tools/re/rc_dbase_image.py`): card background =
 proman12 for headers (exact per-label faces un-RE'd — pin at bake vs frames).
 Frames 034-072 are the composed truth for every layout rect.
 
+## APP BUILD (2026-07-06) — DataBaseCardScreen.gd + bake + parity harness
+
+Built: `app/scenes/DataBaseCardScreen.gd` (raised from the DATA BASE squad
+view row tap, replacing the interim FICHA hop), chrome bake
+`tools/re/build_dbase_card_chrome_from_frames.py` (kill-tested per layer),
+shots `app/tests/shot_dbase_card.gd`, differ
+`tools/re/diff_dbase_card_parity.py`. Findings pinned during the build:
+
+- **Live Dbasewin palette = LIGA_ESTRELLAS.BMP's embedded table** — BIGFOTO
+  photos + BANDERAS flags decode 0px vs the card frames with it; the DAT.PKF
+  @0x5ca palette does NOT match (3% of the Schmeichel photo off). The card
+  ships its own decoded banks `art/faces/dbcard/` (612) + `art/flags/dbcard/`.
+  (The app's FICHA faces bank is a DIFFERENT rendering — left untouched.)
+- **Fonts (mask-exact pins)**: banner name PROMAN18 (fill = per-draw engine
+  speckle in 4 greys {255,240,220,192} + band-darkening shadow — parity masks
+  the name box); tab labels FUTCON8; panel titles PROMAN12 (noise-tinted
+  white); PERSONAL DATA labels/values + career CELLS + role word PROMAN8/10;
+  prose body KKITA. `futcon8` + `kkita` BMFonts exported.
+- **Tabs = the FICHA piece widgets** (OFF 1/2/3: 8px caps + 8px tiles + 20px
+  diagonal, width 28+8N == the reversed spans). DISABLED = a parity-gated
+  palette-space halftone wash of the tab against what lies beneath — learned
+  as an exact LUT (53 keys, 0 ambiguous) and used to synthesize the un-walked
+  seam-pair positions (model exact on every observed seam; rd/dd are
+  fondo-dependent so per-position, rr/dr shared). 15 compose kill tests incl.
+  the Klinsmann mix and 062's walked (dis,sel) seam.
+- **INTERNATIONAL box = tail T3 VERBATIM** ("Denmark"/"USA"/"-"/"No";
+  witnesses 034/050/055/065/068) — exported as `intl` in bios.json.
+  NATIONALITY = the PAISES name for flagCode ("U.S.A."), value bars are flat
+  single-colour rects; both flags carry a 1px black widget frame; the big
+  NATIONALITY flag is the 30x20 BANDERAS in a 33x22 frame (not stretched).
+- **AGE = whole years at the SYSTEM clock** (62/53/52 in the 2026 captures) —
+  implemented faithfully with `now_unix` injectable for parity.
+- **Career PROGRESS**: flat comma/newline token stream, 5 cells/row (062
+  Blackwell shift reproduced); cells PROMAN10 centred per cell with TRUE
+  pixel clipping (partial glyphs at cell edges — drawn via atlas-region
+  rects); 12 fixed grid rows; the career scrollbar chrome ≠ the prose one
+  (separate stepper/slab/track cuts per view; prose carries a bar frame at
+  x574..584 the career bar lacks).
+- **Parity (differ, name-box masked as speckle noise)**: 0px on
+  034 PERSONAL DATA, 055 Klinsmann tab-states, 038 CAREER, 046 NOTES.
+  Remaining: 062 (1.5k px: ±1 advance/centering on the CLIPPED shifted
+  cells), 072 + 035 + 037 (prose: line breaks, face, indents and pitch all
+  match; word x-positions off ≤2px — the justification distribution and a
+  few per-glyph advances need the GDI truth derived from unjustified frame
+  lines; fitting scripts in the differ).
+
 ## Open
 
 - Exact tab-enable predicate in Dbasewin (upstream of FUN_00410610) — only if the
   empirical rule ever misfires.
-- Prose justification metrics (word-space distribution rounding) — pin at bake
-  parity vs 035/037/039-045.
+- Prose justification metrics: ±1px word placement (above); derive true GDI
+  advances from unjustified lines, correct the BMFont xadvance table if any
+  glyph differs, then re-run `diff_dbase_card_parity.py --offsets`.
+- Scroll-thumb travel beyond the walked pair (038 off-0 pinned; 042 [+30px
+  for 2 rows] fitted; other page sizes proportional, documented).
+- Big-flag art for un-walked countries (framed BANDERAS fallback; the 6
+  walked ones ship as frame patches).
+- Banner-name speckle: deterministic stand-in; live tap-through of the full
+  title→DB→card flow on a device still to be eyeballed.
 - SELECTION screen (kits grid + alphabet rail + ALL/NATIONAL/OVERSEAS +
   PLAYERS/SEARCH/MANAGERS) walked in the same session (030-033, 047-054,
   059-061, 064-071) — layout RE for the app's DB browser track lives in

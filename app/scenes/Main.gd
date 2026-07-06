@@ -831,7 +831,9 @@ func _open_squad(club: Dictionary, manager: String, cash: String, youth_enabled 
 
 ## The DATA BASE squad view (the reversed dbasewin.exe browser) for a club dict: the four
 ## GOALKEEPERS/DEFENDERS/MIDFIELDERS/FORWARDS columns over FONDO DBASE. A row raises that
-## player's FICHA; RETURN or a tap on empty space dismisses. See DataBaseScreen.gd.
+## player's DATA BASE card (the Dbasewin player view — bios pages + career PROGRESS,
+## DataBaseCardScreen.gd; replaced the interim FICHA hop 2026-07-06); RETURN or a tap on
+## empty space dismisses. See DataBaseScreen.gd.
 func _open_database_squad(club: Dictionary) -> void:
 	if _database != null and is_instance_valid(_database):
 		_database.queue_free()
@@ -844,7 +846,20 @@ func _open_database_squad(club: Dictionary) -> void:
 		if _database != null and is_instance_valid(_database):
 			_database.queue_free()
 		_database = null)
-	_database.player_pressed.connect(_open_player_info.bind(club))
+	_database.player_pressed.connect(_open_dbase_card.bind(club))
+
+
+## The DATA BASE player card (Dbasewin.exe; docs/re/dbase_player_card_re.md) —
+## the bios.json display surface: PERSONAL DATA + 6 prose pages + career
+## PROGRESS + NOTES over the frame-baked chrome. RETURN dismisses.
+func _open_dbase_card(player: Dictionary, club: Dictionary) -> void:
+	var scr: DataBaseCardScreen = load("res://scenes/DataBaseCardScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(player, club)
+	scr.back_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		scr.queue_free())
 
 ## PLAYER INFORMATION (FICHA) overlay for one squad player, raised over the SQUAD screen.
 ## tier (for value/wage) comes from the club's division; OK / a tap dismisses it. When the
