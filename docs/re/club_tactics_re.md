@@ -189,8 +189,10 @@ not encode).
   (extract_squads_exact `bioPages`/`careerCsv` -> build_db split; 2025
   extended-record players, all 6 pages + CSV each; id-join kill-tested,
   0 name mismatches). The CSV keeps the source's own dirt ('Sin datos.'/
-  'No data.', typo'd separators) — never repaired. NO app consumer yet:
-  the original's display surface (the FICHA info coin) is un-walked in all
-  3 runs and its renderer un-RE'd — build evidence-first before wiring.
+  'No data.', typo'd separators) — never repaired. NO app consumer yet.
+  Display surface FOUND + walked 2026-07-06: the standalone DATA BASE player
+  card (Dbasewin.exe tabs), NOT the FICHA coin (decorative, no handler) —
+  see docs/re/dbase_player_card_re.md for the walk, parser truth and
+  tab-disable rule.
 - MatchSim CPU fielding still uses `Tactics.auto_pick` (own-XI fielding for
   the sim changes match outcomes — separate, sign-off-worthy change).

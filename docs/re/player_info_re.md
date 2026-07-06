@@ -67,15 +67,15 @@ byte `player+0x18` and indexes the **SHORT fine-name table at `0x662df8`** (`mov
 the broad LUT -- corrected 2026-06-26.)
 
 ## Open
-- **Bio pages + career history (2026-07-06): DATA exported, DISPLAY not built.**
-  The extended EQUIPOS record's tail T4..T9 = six bio prose pages (profile /
-  style / honours / international / background / last season) and T10 = a
-  career-history CSV (season,club,div,apps,goals) — exported VERBATIM to
-  `assets/bios.json` keyed by game_db player id (2025 players, id-join
-  kill-tested). Where the original SHOWS them is un-walked: the ⓘ info coin on
-  the PLAYER INFORMATION card is never clicked in any of the 3 walkthrough
-  runs, and its renderer is un-RE'd. Do NOT invent a bio screen — RE the coin
-  handler (FUN_00526a60 region) and/or walk the original first.
+- **Bio pages + career history — display surface FOUND + walked 2026-07-06.**
+  The tail T4..T9 pages + T10 career CSV (exported VERBATIM to `assets/bios.json`)
+  display in the **standalone DATA BASE player card (Dbasewin.exe)** — tabs
+  PROFILE / TECHNICAL CHAR. / HONOURS / CAREER / INTERNAT. / ANECDOTES /
+  LAST SEASON. The FICHA ⓘ coin is **decorative** (FUN_00526640: 40x40 info.gif
+  widget, id -1, no handler; no player deep-link exists — the only PCF5 spawn is
+  the exit-path mode hand-off FUN_004f8750). Full RE + walked frames + tab
+  disable rule: **docs/re/dbase_player_card_re.md**. App build = DataBaseScreen
+  track, NOT the FICHA.
 - International (compact-record) clubs carry neither photoId nor these physicals yet.
   **Verified 2026-06-26 why (not a TODO, a data-availability finding):** the compact
   Spanish/continental EQUIPOS record is `[u16 year][flag][media][10 attrs u8][01]` — it has

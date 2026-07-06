@@ -125,7 +125,10 @@ Unique to this card:
   **docs/re/morale_re.md**.
 - WEIGHT/HEIGHT metric by the standing 2026-06-26 user call (parity-excluded).
 - BIGFOTO downscale kernel un-RE'd (NEAREST fit; photo block parity-excluded).
-- Info coin animates (baked as 079's frame; parity-excluded).
+- Info coin animates (baked as 079's frame; parity-excluded). RE'd 2026-07-06:
+  decorative — FUN_00526640 builds it as a 40x40 `RECURSOS\ICONOS\info.gif`
+  widget at card-local (7,7), id -1, no click handler; live clicks (single/
+  double/right) do nothing. Do NOT wire it to bios — see dbase_player_card_re.md.
 - Read-only card (DATA BASE opener) covers RENEW/TRANSFER/SACK with card
   white — that opener state is un-walked; kept app behaviour, not frame truth.
 - Dismissal animation un-evidenced; card closes instantly.
