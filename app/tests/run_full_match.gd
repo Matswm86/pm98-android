@@ -41,17 +41,35 @@ extends SceneTree
 ## FT-at-16005 baseline rode on stale H1 possession (nothing cleared owner/+0x54 without
 ## the lean). Fix = port the placement fns (plan M3 first item), NOT a lean revert.
 ##
-## Honest scope: INPUT is SYNTHETIC (attributes + no real kickoff placement), so this proves
-## the port RUNS deterministically end-to-end, NOT bit-for-bit parity vs MANAGER.EXE. The
-## parity oracle (wine MANAGER.EXE or full PCode-emu) is plan M4. Goal harvesting reads the
-## raw event queue per FRAME; in the live branch each frame is 1 tick so delay-2 events are
-## always seen, but pause-branch multi-tick frames could consume events before harvesting --
+## REAL INPUT (2026-07-07, plan M3 NEXT 2): the synthetic 4-4-2/_session builders are
+## REPLACED by Pm98LineupFeeder -- the FUN_0044d5f0 port that builds both team[0x9c]
+## lineups + the session from the exported .DBC data (game_db.json + club_tactics.json:
+## real squads, real tactic slots, real stadium pitch dims, season-init FI 70 / cap 99).
+## Fixture = Manchester Utd. (app id 40, Old Trafford 116x76) vs Liverpool (42) -- an
+## arbitrary-but-pinned eng_prem pair (the fixture generator is not ported; the pair
+## avoids the posFine-18 role-table edge: role 18 would index team[0x7f/0x80] past the
+## zeroed 0x24-entry block, which the BINARY also overruns -- 114 shipped XIs carry an
+## 18; MU/LIV max is 17). Session/lineup provenance: docs/re/session_lineup_re.md.
+##
+## Honest scope: squads/tactics/pitch/attrs are now REAL; kickoff PLACEMENT is still
+## no-op-modeled (FUN_0044d0d0/FUN_0044d190, plan M3) and fitness/morale are season-init
+## constants, so this is still NOT bit-for-bit parity vs MANAGER.EXE -- the parity oracle
+## (wine MANAGER.EXE or full PCode-emu) is plan M4. Goal harvesting reads the raw event
+## queue per FRAME; in the live branch each frame is 1 tick so delay-2 events are always
+## seen, but pause-branch multi-tick frames could consume events before harvesting --
 ## fine today (headless PS==1 never enters the pause branch), the M5 BRIEF tap hooks the
 ## dequeue fire point instead.
+##
+## RESULT (2026-07-07, seed 1, REAL squads): FULL TIME code 10 at frame 15212, minute 90,
+## halves {0: 7966, 1: 7246}, phases {2: 92, 0: 14400, 8: 720}, dispatch {1: 719, 10: 1},
+## score 0-0, kickoff draws 1084, final rng state 276518391 -- IDENTICAL across 2 runs
+## (deterministic). 0-0 persists pending the M3 kickoff-taker decision port.
 ##
 ## Run: ~/godot462 --headless --path app --script res://tests/run_full_match.gd
 
 const FRAME_CAP := 40000
+const HOME_ID := 40                                          # Manchester Utd. (eng_prem)
+const AWAY_ID := 42                                          # Liverpool (eng_prem)
 
 
 func _init() -> void:
@@ -59,65 +77,23 @@ func _init() -> void:
 	quit(0)
 
 
-## A structurally-valid player attribute record (byte-keyed, the FUN_005a2830 input). role
-## (rec[0x44]) must be != 0 to be "present"; attributes mid-range so players are non-degenerate.
-func _rec(role: int, shirt: int, px: int, py: int) -> Dictionary:
-	return {
-		0x4: shirt,                                          # shirt / id (u16)
-		0x8: px, 0xc: py, 0x10: px, 0x14: py,                # start positions (16.16)
-		0x18: px, 0x1c: py, 0x20: px, 0x24: py,
-		0x28: 0, 0x2c: 11, 0x30: 11,
-		0x34: 60, 0x35: 60, 0x36: 60, 0x37: 60, 0x38: 60,    # 0xde..0xe2 attrs
-		0x3c: 60, 0x3d: 60, 0x3e: 60, 0x3f: 60, 0x40: 65, 0x41: 60,   # 0xe3..0xe8
-		0x42: 40,                                            # fitness
-		0x44: role,                                          # demarcacion / role (present gate)
-		0x98: 0,
-	}
-
-
-## 11 records for one team: slot 0 = GK (role 1), outfield roles 2..11 in a rough 4-4-2,
-## start positions spread on a +/- half-pitch in 16.16 so they are not all at the origin.
-func _lineup(team: int) -> Dictionary:
-	var slots: Array = []
-	var sgn := 1 if team == 0 else -1                        # team0 attacks +x, team1 -x
-	var rows := [          # [role, x_m, y_m]
-		[1, -45, 0],
-		[2, -30, -20], [3, -30, -7], [4, -30, 7], [5, -30, 20],
-		[6, -5, -22], [7, -5, -7], [8, -5, 7], [9, -5, 22],
-		[10, 15, -10], [11, 15, 10],
-	]
-	for i in range(11):
-		var r: Array = rows[i]
-		slots.append(_rec(int(r[0]), team * 100 + i + 1, int(r[1]) * sgn * 0x10000, int(r[2]) * 0x10000))
-	return {"header": [0, 0, 0, 0, 0, 0, 0, 0, 0], "slots": slots}
-
-
-## A structurally-valid session / play-state object (binary: match+0x468).
-func _session() -> Dictionary:
-	return {
-		0x4c: 0x680000,    # pitch length 104.0 -> xscale 52.0
-		0x50: 0x440000,    # pitch width  68.0  -> yscale 34.0
-		0xfd0: 0, 0xfd4: 0, 0xfd8: 0, 0xfdc: 0,              # orientation
-		0xff4: 0,          # pitch-type index -> +0x19ac = 0x1c20 (7200)
-		0xfa0: 1,          # play-state (1 = in play, not 0/4)
-		0xfe8: 0, 0xfec: 0, 0xff0: 0,                        # display drivers (headless)
-		# Pm98Dispatch._case_phase (+0x19a0 rung = kickoff count: 0=H1, 1=H2, 2=ET1, 3=ET2;
-		# dispatch-1 threshold = +0x19ac for rungs 0/1, /3 for rungs 2/3 = 45/45/15/15 min).
-		# session+0x44/+0x48 = extra-time/aggregate (cup) flags: BOTH 0 -> the rung-1 gate
-		# ends the match at 90' (code 10 + event 0x20 FULL TIME) = a league match. Setting
-		# 0x44=1 was empirically shown (2026-07-01) to play 45+45+15+15 into rung 3.
-		0x14: 0, 0x20: 0, 0x24: 0, 0x44: 0, 0x48: 0,
-	}
-
-
 func _run(seed_: int) -> void:
 	var rng := MatchEngine.Pm98Rng.new(seed_)
 
+	var data := Pm98LineupFeeder.load_data()
+	var input := Pm98LineupFeeder.build(HOME_ID, AWAY_ID, data)
+	print("real input: home=%s away=%s  pitch=%dx%d (16.16 %x/%x)" % [
+		(data["clubs"][HOME_ID] as Dictionary)["name"],
+		(data["clubs"][AWAY_ID] as Dictionary)["name"],
+		int((input["session"] as Dictionary)[0x4c]) >> 16,
+		int((input["session"] as Dictionary)[0x50]) >> 16,
+		(input["session"] as Dictionary)[0x4c], (input["session"] as Dictionary)[0x50]])
+
 	var m := Pm98Match.build_match(rng)
 	Pm98CollBuilder.populate_posts(m)
-	(m["sim"][0] as Dictionary)[0x9c] = _lineup(0)           # inject BEFORE kickoff_init
-	(m["sim"][1] as Dictionary)[0x9c] = _lineup(1)
-	Pm98Match.kickoff_init(m, _session(), rng)
+	(m["sim"][0] as Dictionary)[0x9c] = (input["lineups"] as Array)[0]  # inject BEFORE kickoff_init
+	(m["sim"][1] as Dictionary)[0x9c] = (input["lineups"] as Array)[1]
+	Pm98Match.kickoff_init(m, input["session"], rng)
 
 	var built0: int = ((m["sim"][0] as Dictionary).get("players", []) as Array).size()
 	var built1: int = ((m["sim"][1] as Dictionary).get("players", []) as Array).size()

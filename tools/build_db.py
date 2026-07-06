@@ -138,6 +138,11 @@ def main() -> None:
             "kind": ("NATIONAL" if nat in EU_EEA_1997 else "NON-NATIONAL") if nat else None,
             "heightCm": p.get("heightCm"),  # +0xf9; null = engine randomizes 170..179
             "weightKg": p.get("weightKg"),  # +0xfa; null = engine randomizes 75..84
+            # .DBC +0x16/+0x17 raw (un-RE'd semantics): the match-lineup filler
+            # FUN_0044d5f0 copies them to lineup rec+0x2c/+0x30 verbatim —
+            # consumed by the real-lineup feeder (docs/re/session_lineup_re.md §3).
+            "b16": p.get("b16"),
+            "b17": p.get("b17"),
             "birthplace": p.get("birthplace"),  # tail T1 (extended records only)
             "prevClub": p.get("prevClub"),  # tail T2, e.g. "Brondby (91)"
             # Never null: every consumer's `attrs.get(key, default)` chain stays safe.

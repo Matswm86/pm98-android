@@ -196,8 +196,13 @@ def parse_club_tactic(d: bytes, dbc_id: int, collect: bool = False) -> dict:
     s.u32()  # param_1[6] (clamped to 6000 if <10 — post-read, no stream effect)
     if fmt >= 0x1FE:
         s.u32()  # param_1[7]
-    s.u16()  # +0x34
-    s.u16()  # +0x36
+    # Stadium PITCH DIMS (session_lineup_re.md §4): +0x34/+0x36 u16 pair. The
+    # engine substitutes (NOT clamps) after reading: +0x34 < 0x1e -> 0x3c,
+    # +0x36 < 0x34 -> 0x69 (fn_00579c70_FUN_00579c70.c L112-117). +0x36 is the
+    # x-axis (attack-axis) scale paired with design width 0x13e in
+    # FUN_0058c300 — venue club's pair <<16 = session+0x4c/+0x50 = pitchW/H.
+    p34 = s.u16()  # +0x34 = pitchH
+    p36 = s.u16()  # +0x36 = pitchW
     s.u16()  # param_1[0xe]
     blk_strings: list[str] = []
     capacity = None
@@ -271,6 +276,10 @@ def parse_club_tactic(d: bytes, dbc_id: int, collect: bool = False) -> dict:
         "levers": levers,
         "players": players,
         "inBounds": in_bounds,
+        # engine-effective values (substitute rule applied) + the raw pair
+        "pitchW": 0x69 if p36 < 0x34 else p36,
+        "pitchH": 0x3C if p34 < 0x1E else p34,
+        "pitchRaw": [p34, p36],
     }
     if collect:
         out.update(

@@ -89,7 +89,7 @@ time**. Per slot i (0-indexed; squad node looked up by `FUN_0057a2e0(club, i+1)`
 | +0x40 | | `player+0xa4` = **RG** |
 | +0x41 | | `player+0xa5` = **TI**; `−10` if league club (`club+0x5c != 0xffff`) and TI > 30 |
 | +0x42 | `p[0x2d0]` clamp 1..60 | byte `player+0xf8` = the .DBC u8 right after the player id (semantics open; engine clamps 1..0x3c) |
-| +0x44 | `p[0x2c8]` + present flag | `player+0x18 + 1` = **posFine+1** (1..19, never 0 when present — the presence flag `FUN_005b6ba0` tests) |
+| +0x44 | `p[0x2c8]` + present flag | `player+0x18 + 1` = **posFine** (loader copies `+0x18 ← +0x1d` = posFine−1, fn_005820f0 L64; so 1..18, never 0 when present — the presence flag `FUN_005b6ba0` tests) |
 | +0x48 | | broad role switch on `player+0x1c`: 0/1/2/3 = GK/DEF/MID/ATT |
 | +0x50..+0x64 | | prior-leg CARDS: scan fixture `+0x94` vector (stride 0xc, id at +8): type==1 → first/second yellow flags +0x50/+0x54 + minute +0x5c/+0x60; else red flag +0x58 + minute +0x64 |
 | +0x68..+0xa8 | `p[0x2da]` reads +0x98 | prior-leg EVENT entry: fixture `+0x9c` vector (stride 0x48, count +0xa0, id u16 at entry+0x44) copied verbatim (0x11 dwords); zero for a league match |
@@ -175,11 +175,17 @@ All lineup inputs are now derivable from ALREADY-EXPORTED data + known defaults:
 - XI assignment: `club_tactics.json` `xi` ✓ (slot byte `+0x19`)
 - morale/fitness/cap: runtime — season-init values known (`morale_re.md`: morale 90+rand(10),
   fitness halfway to 40 from 99 → 70, cap 99)
-- **EXPORT GAPS (3 fields, parser already reads them)**: player bytes `+0xf8` (rec+0x42),
-  `+0x16`/`+0x17` (rec+0x2c/+0x30), and the stadium pitch-dim u16 pair (parsed with mins
-  0x3c/0x69) are not yet emitted by `extract_squads_exact.py`/`export_club_tactics.py`.
+- **EXPORT GAPS — CLOSED 2026-07-07**: player `+0x16`/`+0x17` (rec+0x2c/+0x30) → game_db
+  `b16`/`b17`; stadium pitch-dim pair → `club_tactics.json` `pitch` (substitute rule, NOT a
+  plain min: `+0x34 < 0x1e → 0x3c`, `+0x36 < 0x34 → 0x69` — fn_00579c70 L112-117; Man Utd
+  116×76, Barcelona 107×72, kill-tested). CORRECTION: `+0xf8` (rec+0x42) was ALREADY
+  exported as game_db `squadNo` since commit `cc06ef4` — this doc's original gap list
+  over-counted it. Also pinned this pass: rec+0x44 = (player+0x18)+1 where the loader copies
+  `+0x18 ← +0x1d` (= posFine−1, fn_005820f0 L64), so **rec+0x44 == game_db `posFine`**
+  (1..18), not "posFine+1" as §3's wording suggested.
 - club+0x230 marking table + club+0x25c/+0x260: ctor defaults (0 → rec+0x28 = −1; 79/198).
 
-Next per plan: extend the exporters with the 3 missing fields, build the real-lineup feeder
-for `run_full_match.gd` (replacing the synthetic records), then the M4 e2e oracle (which can
-still dump a live lineup from wine as an independent cross-check of THIS map).
+Feeder shipped (2026-07-07): `app/scripts/Pm98LineupFeeder.gd` builds both lineups + session
+from game_db + club_tactics per THIS map; `run_full_match.gd` seed-1 e2e on real squads
+(MU vs LIV) reaches FULL TIME deterministically. Next: M4 e2e oracle (which can still dump a
+live lineup from wine as an independent cross-check of THIS map).

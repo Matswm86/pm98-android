@@ -110,6 +110,13 @@ def export_player(p: dict, flag: int) -> dict:
         "kind": ("NATIONAL" if nat in EU_EEA_1997 else "NON-NATIONAL") if nat else None,
         "heightCm": p["heightRaw"] if p["heightRaw"] >= 0x96 else None,
         "weightKg": p["weightRaw"] if p["weightRaw"] >= 0x14 else None,
+        # .DBC bytes +0x16/+0x17 (loader FUN_005820f0 stream bytes after the
+        # fine array + +0x1a), semantics un-RE'd. The career→match lineup
+        # filler FUN_0044d5f0 copies them VERBATIM to lineup rec+0x2c/+0x30
+        # (engine player build then reads value−1) — exported raw for the
+        # real-lineup feeder (docs/re/session_lineup_re.md §3).
+        "b16": p["b16"],
+        "b17": p["b17"],
         "birthplace": (p["tail"][0].strip() or None) if p["tail"] else None,
         "prevClub": (p["tail"][1].strip() or None) if p["tail"] else None,
         # T3 VERBATIM — the DATA BASE card INTERNATIONAL box renders this string

@@ -172,6 +172,11 @@ def main() -> None:
             "name": rec["name"],
             "slots": rec["slots"],
             "levers": rec["levers"],
+            # stadium pitch dims (.DBC header u16 pair +0x36/+0x34, engine
+            # substitute rule applied: +0x34<0x1e->0x3c, +0x36<0x34->0x69).
+            # VENUE club's pair <<16 = session+0x4c/+0x50 = the match pitch
+            # scale (docs/re/session_lineup_re.md §4). raw = [+0x34, +0x36].
+            "pitch": {"w": rec["pitchW"], "h": rec["pitchH"], "raw": rec["pitchRaw"]},
             "stockFormation": stock_match(rec["slots"], stock),
             "xi": xi,
             "xiNames": [
@@ -215,6 +220,18 @@ def main() -> None:
         for i in barca["xi"]
     ]
     assert got_pos == row_truth["pos"] == [band_of[b] for b in FRAME_015_BANDS], got_pos
+
+    # Kill-test 8: pitch dims. Range floors = the engine substitute rule
+    # (post-rule w >= 0x64 observed / h >= 0x3c); witnesses pinned empirically
+    # 2026-07-07 on the shipped EQUIPOS.PKF — Man Utd 116x76 (= Old Trafford's
+    # real 116x76yd pitch), Barcelona 107x72.
+    for c in clubs.values():
+        assert 0x64 <= c["pitch"]["w"] <= 0x75 and 0x3C <= c["pitch"]["h"] <= 0x58, (
+            c["name"],
+            c["pitch"],
+        )
+    assert clubs["40"]["pitch"]["w"] == 116 and clubs["40"]["pitch"]["h"] == 76
+    assert clubs["1000"]["pitch"]["w"] == 107 and clubs["1000"]["pitch"]["h"] == 72
 
     # Kill-test 5 (floor) + 7: coverage; order-mapping leaves NO game_db holes.
     assert xi_slots_full >= 470, f"only {xi_slots_full}/476 clubs fill all 11 slots"

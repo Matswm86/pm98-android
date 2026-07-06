@@ -104,9 +104,22 @@ deprioritised (last). Approved path: build an **end-to-end oracle**, kill-test t
    `team+0x9c` by `FUN_005b63e0` — the port's `team[0x9c]`/`session` injections are these exact
    objects. Full rec-field map (shirt/positions/roam box/VE..PO/fitness/posFine+1/role/marking/
    prior-leg events), the 318×198→pitch transform `FUN_0058c300`, venue pitch dims, and the
-   7-lever→`team[0xc1..0xc7]` header path are in the RE doc. **Remaining for M3 CLOSE:** extend
-   the exporters with 3 missing fields (player `+0xf8`, `+0x16/+0x17`, stadium dim u16s), build
-   the real-lineup feeder for `run_full_match.gd`, port the kickoff-taker decision.
+   7-lever→`team[0xc1..0xc7]` header path are in the RE doc.
+   **3b. EXPORTERS + REAL-LINEUP FEEDER SHIPPED (2026-07-07, s14).** Export gaps closed:
+   player `+0x16/+0x17` → game_db `b16/b17` (b16∈{1,2,3}, b17∈{1..6}, un-RE'd enums) and the
+   stadium pitch-dim u16 pair → `club_tactics.json` `pitch` (engine substitute rule
+   `+0x34<0x1e→0x3c` / `+0x36<0x34→0x69` from `fn_00579c70` L112-117; Man Utd 116×76 = the
+   real Old Trafford pitch in yards, Barcelona 107×72 — real per-stadium data, kill-tested).
+   `+0xf8` was ALREADY exported as `squadNo` since `cc06ef4` (the RE doc's gap list was stale
+   on that field). `app/scripts/Pm98LineupFeeder.gd` = the `FUN_0044d5f0` port (bit-exact
+   32-bit `FUN_0058c300` transform incl. the u32 mul/div overflow, `FUN_005841e0` STR gate,
+   PO/EN/TI adjusts, header x-lines + engine-order levers `[0,1,2,4,5,6,3]`, season-init
+   FI 70 / cap 99 per `morale_re.md`). `run_full_match.gd` now runs REAL squads (MU 40 vs
+   LIV 42, both eng_prem): seed-1 baseline = **FULL TIME code 10 at frame 15212, minute 90,
+   H1 7966 / H2 7246 frames, phases {2:92, 0:14400, 8:720}, 0-0, final rng 276518391** —
+   deterministic (2 identical runs). Known edge: posFine-18 XIs (114 clubs, not MU/LIV)
+   index the role table past its zeroed 0x24 block — the binary overruns there too.
+   **Remaining for M3 CLOSE:** port the kickoff-taker decision.
 4. **M4 — End-to-end ORACLE (the kill-test).** Two candidate oracles (pick the cheaper that works):
    - **(a) full PCode-emu** of `FUN_005983f0`'s whole match with all leaves REAL (no stubs), same
      seed + same initial struct, dumping scoreline + the 16-byte event queue. Reuses `PcodeEmu.java`;
