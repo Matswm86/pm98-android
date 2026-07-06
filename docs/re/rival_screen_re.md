@@ -46,24 +46,93 @@ empty). `bVar2` is the assistant's ability. The builder branches on it:
 
 The dot label is `sprintf("%u", *(byte*)(player+0xf8))` (the marker number), font ProMan8.
 
+## BODY PARITY 2026-07-06 — rival_015 FULL FRAME 0px (frame-baked rebuild)
+
+**`rival_015` vs `015_162415` = 0px, FULL FRAME, no exclusions** (was header-ROI
+only). Bake: `tools/re/build_rival_chrome_from_frames.py` (assert-driven) →
+`app/art/screens/rival/` + `rival_chrome_samples.json`. Binding frame 015
+(Barcelona, run 2); witnesses 048 (pixel-exact dup of 015, asserted), 151
+(Juventus, run 1 — everything static between the two stays in chrome), 152
+(151 + RETURN hot). Frame-decoded truth:
+
+- **Table = the LINE-UP squad-table control at +2px.** Borders x9-10/x472-473,
+  y82-83/y284-285; header band y84..101 STATIC (chrome; the numeric column
+  letters EN SP ST AG QU FI MO AV show in BOTH modes). 11 fixed row boxes at
+  16px pitch (top sep y102+16i): sep / 12px (240,240,240) fill / sep / 2px
+  white; grey box borders x31/x439; white margins x11..30, x440..471. Row
+  cells (all ProMan8 @11, ink top fill+3): N. GDI-centred [35,+17) navy · name
+  x69 black · STARJUGON x174+14j (halves=(AV+1) div 10, odd half = the DIMMED
+  star; frame-asserted on all 22 row observations) · fine-role LONG name
+  right-aligned x351 (100,120,140) · AV [353,+22) (210,0,0) · CAMROL 25x14 at
+  x376 (black backing sep..sep; row icons == camrolNN sprites, asserted for
+  the frame's 11 fine roles) · POS word [403,+34). One uniform row template
+  (`row.png`, asserted identical across all 11 rows x both frames).
+- **Right panel.** Club plate (481,155,154,18) = BLACK band, club name WHITE
+  ProMan10 @10 GDI-centred, text rows y160..167 ("F.C." stays uppercase —
+  PMChrome.title_case_name dotted-abbreviation rule). TEAM RATING strip:
+  NANOESC 24x32 kit at (485,174) WITH the engine shadow pass (SELECCION/header
+  precedent → walked club 1000 cut as `kit_1000.png`; live clubs = shadowless
+  nano blit, documented); star cells x516+15j y186..204 on a noise-dither bg
+  (walked 4-full cells cut as patches, cell 4 nude; un-walked counts fall back
+  to plain STAREQON glyphs, documented); value ProMan10 @10 (160,160,200)
+  right-aligned to x617, y_top 191. COMPUTER band static (a named rival
+  manager overdraws it — un-walked). Toggles: PARAM nude + RATING active both
+  walked RATING-side only; the flip re-uses the tactics-board doctrine
+  (label-cleared plates + redrawn labels + arrow patches; `arrow_at_param` /
+  `arrow_off_rating` are synthesized — un-walked). ASSISTANT band interior
+  (117,147,187): name WHITE ProMan10 @10 x18, stars = STARPARON @ x125+11j
+  y449 wrapped in a noise-dither shadow (walked 4-star strip cut verbatim;
+  other counts plain glyphs, documented).
+- **Pitch.** TACTICAS `CAMPO.BMP` 278x167 blitted 1:1 at (196,300); marker
+  layer (206,305) 258x154. BRIGHT = the rival XI: DVERDE disc at mk1 + AVERDE
+  arrow at mk2 per slot (discs first, arrows on top — the GK draws BOTH at the
+  same spot, arrow covering; 014's "no arrow when mk1==mk2" does NOT hold
+  here), shirt digits ProMan8 in **WHITE on both kinds** (unlike the tactics
+  board's green/black), window 16/13, glyph top sprite row 2. **Barcelona's
+  slot layout matches NO stock formation** (clubs carry their own tactic) —
+  the walked 22-marker list is bake-derived (digit identification by exact
+  composite match) and injected by the parity shot; live rivals use
+  Tactics.auto_pick (documented). **GHOST (dim) = YOUR OWN team mirrored**:
+  disc at (242-mk1.x, 138-mk1.y) + HORIZONTALLY FLIPPED arrow at
+  (242-mk2.x, 138-mk2.y) per own slot with own shirt digits — the mirror
+  constants are the decompile's `0xf2-x / 0x8a-y`; the dim pass is a
+  positional NOISE dither (multi-valued per colour, no LUT fits) → the walked
+  own-state (run-2 MU 3-5-2, shirts 1,2,3,21,6,8,7,10,9,11,20) ships as 22
+  verbatim 16x16 patches (boxes overlapping bright markers are flagged
+  POISONED and excluded from live reuse), un-walked own states use a
+  majority-vote dim LUT + dim digits (127,159,85) — documented approximation.
+  The bake PROVES the full model: campo + ghost patches + bright composites
+  recompose frame 015's pitch to **0px**.
+
+Honest gaps: AV formula + TEAM RATING source un-RE'd (walked values injected;
+live = attrs-mean approximation) · rival club tactics un-decoded (auto_pick
+live model) · PARAMETERS numeric view un-walked on this screen (cells centred
+under the header letters, lineup-128 inks) · the hire-an-Assistant state
+un-walked (kept as the text rendering) · flip-state toggle plates + arrow
+spots are reconstructions · ghost dim LUT/digit ink are approximations for
+un-walked own states.
+
 ## App mapping (-> `app/scenes/RivalScreen.gd`)
 PM98's staff EFFECTS are data-driven from the save; the app's `Staff` model is ours
 (1..5 star quality) — see `Staff.gd`. So the reveal is driven by
 `Staff.assistant_quality(career.staff)` (0..5), kept at the two states the app's data can
-render faithfully (no invented phases / arrow-directions):
+render faithfully:
 - **q == 0** -> the hire-Assistant message; no rival table / dots (sourced bVar2==0).
 - **q >= 1** -> full rival XI table + TEAM RATING + formation dots (sourced bVar2>=1 table,
   bVar2>=5 dots; a hired assistant's ability is always well above 5 in the original).
 
-GAP (honest, not faked): the original's finer tiers add a SECOND defence-phase marker set
-(the first loop's mirrored `0xf2-x`, `0x8a-y` coords, sourced bVar2>=7) so the pitch fills
-both halves, plus per-player movement arrows (`fleul/fleur/fledl/fledr.bmp`, sourced
-bVar2>=9 — visible in the walkthrough frame). Both need per-player two-phase tactic data
-PM98 does not decode for CPU clubs, so this port draws only the single nominal formation
-(`Tactics.auto_pick`) the app models; it does not invent a second phase or arrow directions.
+SUPERSEDED 2026-07-06: the "second marker phase" of the decompile is now frame-decoded
+(see BODY PARITY above) — it is YOUR OWN team's two-phase markers mirrored via the
+`0xf2-x / 0x8a-y` constants, drawn dim, NOT a rival defence phase; and the per-marker
+"arrows" in the frame are the AVERDE mk2 movement arrows (the fle* sprites stay unused
+on the walked screen). The app renders BOTH marker sets faithfully; the reveal gate
+keeps the two app states (q==0 message / q>=1 full report).
 
 Rival XI + formation come from `Tactics.auto_pick(rival_club)` (the same selector MatchSim
-fields CPU sides with). The COMPUTER/mgr box shows the rival club's `manager`, else
-`COMPUTER`. Native 640x480; scales to fit its parent (same transform as LINE-UP).
-Wired at the hub OPPONENT icon (Main `_show_opponent`), replacing the WRONG-SCREEN
-DATA BASE browser (APP_VS_SPEC_AUDIT B1). Tests: `app/tests/test_rival_screen.gd`.
+fields CPU sides with) — the walked frames prove clubs carry their OWN tactic (Barcelona's
+slot layout matches no stock formation), which PM98 does not decode: auto_pick is the
+documented live model and the parity shot injects the walked marker list. The
+COMPUTER/mgr box shows the rival club's `manager`, else `COMPUTER`. Native 640x480;
+scales to fit its parent (same transform as LINE-UP). Wired at the hub OPPONENT icon
+(Main `_show_opponent`, which also passes the manager's own Tactics for the ghost
+overlay). Tests: `app/tests/test_rival_screen.gd`.

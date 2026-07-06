@@ -38,21 +38,32 @@ func _run() -> void:
 		"assistant quality + name stored") and ok
 	ok = _assert(screen._team_rating() > 0, "team rating computed from the rival XI") and ok
 
-	# --- 3. formation geometry: 11 slots inside the marker layer ---------------
-	var slots: Array = screen._slot_positions()
-	ok = _assert(slots.size() == 11, "11 formation slots") and ok
+	# --- 3. marker geometry: disc+arrow per XI slot, all inside the 258x154 layer
+	var markers: Array = screen._rival_markers()
+	ok = _assert(markers.size() == 22, "22 rival markers (disc + arrow per slot)") and ok
 	var inside := true
-	for tac in slots:
-		var c: Vector2 = screen._mark_center(tac)
-		if c.x < RivalScreen.R_CAMPO.position.x or c.x > RivalScreen.R_CAMPO.end.x \
-				or c.y < RivalScreen.R_CAMPO.position.y or c.y > RivalScreen.R_CAMPO.end.y:
+	for m in markers:
+		var mk: Array = m["mk"]
+		if int(mk[0]) < 0 or int(mk[0]) > 242 or int(mk[1]) < 0 or int(mk[1]) > 138:
 			inside = false
-	ok = _assert(inside, "every formation dot lands inside the CAMPO pitch rect") and ok
+	ok = _assert(inside, "every marker box fits the marker layer (<=242,<=138)") and ok
 
-	# --- 5. RETURN / TACTICS hit-tests + a synthetic tap round-trip ------------
+	# --- 4. the injected walked-marker lever wins over the auto-picked layout ---
+	rival["rival_markers"] = [{"kind": "disc", "mk": [0, 68], "num": 1}]
+	screen.setup(rival, own, 2, "A. LEIGH", "Premier")
+	ok = _assert(screen._rival_markers().size() == 1, "injected rival_markers used verbatim") and ok
+	rival.erase("rival_markers")
+
+	# --- 5. RETURN / TACTICS / toggle hit-tests + a synthetic tap round-trip ----
 	ok = _assert(screen._hit(RivalScreen.R_RETURN.get_center()) == "return", "_hit RETURN") and ok
 	ok = _assert(screen._hit(RivalScreen.R_TACTICS.get_center()) == "tactics", "_hit TACTICS") and ok
+	ok = _assert(screen._hit(RivalScreen.TOGGLE_PARAM.get_center()) == "param", "_hit PARAMETERS") and ok
+	ok = _assert(screen._hit(RivalScreen.TOGGLE_RATING.get_center()) == "rating", "_hit RATING") and ok
 	ok = _assert(screen._hit(Vector2(240, 150)) == "", "a tap on the table is a no-op") and ok
+	_tap(screen, RivalScreen.TOGGLE_PARAM.get_center())
+	ok = _assert(not screen._rating_view, "PARAMETERS tap flips to the numeric view") and ok
+	_tap(screen, RivalScreen.TOGGLE_RATING.get_center())
+	ok = _assert(screen._rating_view, "RATING tap flips back") and ok
 
 	var got := {"back": 0, "tac": 0}
 	screen.back_pressed.connect(func() -> void: got["back"] += 1)

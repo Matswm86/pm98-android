@@ -2471,7 +2471,7 @@ func _show_rival_screen(rival: Dictionary) -> void:
 	var ass := Staff.members_in_role(_career.staff, Staff.ASSISTANT)
 	var ass_name: String = str(ass[0].get("name", "")) if not ass.is_empty() else ""
 	scr.setup(rival, _mgr_club(), q, ass_name, _career.league_name, _career.season,
-		_career.week + 1, _match_header())
+		_career.week + 1, _match_header(), _tactics())
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
 	scr.tactics_pressed.connect(func() -> void:
 		scr.queue_free()

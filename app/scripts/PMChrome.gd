@@ -326,6 +326,10 @@ static func title_case_name(s: String) -> String:
 		elif w.begins_with("mc") and w.length() > 2:
 			# The real screens keep the inner capital ("McClair", alert frame 093).
 			out.append("Mc" + w.substr(2).capitalize())
+		elif w.replace(".", "").length() <= w.count("."):
+			# dotted abbreviation ("F.C.", "F.") — stays uppercase ("F.C.
+			# Barcelona" on the VIEW RIVAL club plate, frame 015).
+			out.append(str(words[i]).to_upper())
 		else:
 			out.append(w.capitalize())
 	return " ".join(out)

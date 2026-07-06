@@ -236,18 +236,43 @@ func _run() -> void:
 	lu.queue_free()
 	await process_frame
 
-	# ---- VIEW RIVAL header (run-2 frame 015: at F.C. Barcelona, Monday 4) ---------
-	# Header-ROI pair only (body story separate); assistant present so the report
-	# body renders, as in the frame.
+	# ---- VIEW RIVAL FULL FRAME (run-2 frame 015: at F.C. Barcelona, Monday 4) -----
+	# The frame's exact state: Barcelona XI rows 1..11 with the walked AVs (the AV
+	# formula is un-RE'd — injected), TEAM RATING 87, assistant A. Leigh 4*, the
+	# walked marker layout (Barcelona's own tactic matches no stock formation —
+	# injected from the bake's derivation), and MU's 3-5-2 (frame 014 XI) as the
+	# OWN tactics feeding the mirrored ghost overlay.
 	var barca: Dictionary = gamedb.club(1000)
+	var bar_av := {"HESP": 83, "REIZIGER": 87, "ABELARDO": 84, "GUARDIOLA": 89,
+		"F. COUTO": 85, "SERGI": 89, "FIGO": 89, "LUIS ENRIQUE": 84,
+		"ANDERSON": 88, "GIOVANNI": 91, "RIVALDO": 90}
+	var bar_order := ["HESP", "REIZIGER", "ABELARDO", "GUARDIOLA", "F. COUTO", "SERGI",
+		"FIGO", "LUIS ENRIQUE", "ANDERSON", "GIOVANNI", "RIVALDO"]
+	var bar_xi: Array = []
+	for nm in bar_order:
+		for p in barca.get("players", []):
+			if str(p.get("name", "")) == nm:
+				(p as Dictionary)["av"] = bar_av[nm]
+				bar_xi.append(int(p.get("id", -1)))
+	barca["team_rating"] = 87
+	var rsamples := FileAccess.open("res://data/rival_chrome_samples.json", FileAccess.READ)
+	if rsamples != null:
+		var rs: Variant = JSON.parse_string(rsamples.get_as_text())
+		if rs is Dictionary:
+			barca["rival_markers"] = (rs as Dictionary).get("rival_markers_015", [])
 	var rv: RivalScreen = load("res://scenes/RivalScreen.gd").new()
 	_mount(rv)
 	await process_frame
-	rv.setup(barca, manu3, 1, "A. Leigh", "Premier League", "1997-98", 1,
+	rv.setup(barca, manu3, 4, "A. Leigh", "Premier League", "1997-98", 1,
 		{"mode": "fixture", "top": "F.C. Barcelona", "bottom": "Manchester Utd.",
 		"home_id": 1000, "away_id": 40, "weekday": "Monday", "day": "4",
 		"month": "August", "year": "1997",
-		"status_top": "Preseason", "status_bottom": "Preparation"})
+		"status_top": "Preseason", "status_bottom": "Preparation"}, tac)
+	var rtac := Tactics.new()
+	rtac.formation = "3-5-2"
+	rtac.xi = bar_xi
+	rv._tactics = rtac
+	rv.queue_redraw()
 	await _shot(dir, "rival_015.png")
 	rv.queue_free()
 	await process_frame

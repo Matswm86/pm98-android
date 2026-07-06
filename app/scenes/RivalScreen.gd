@@ -1,119 +1,252 @@
 extends Control
 class_name RivalScreen
-## PM98 VIEW RIVAL (VERRIVAL) screen -- the OPPONENT-scouting screen, rebuilt from the real
-## game (FUN_005733d0; docs/re/rival_screen_re.md). Reached from the MANAGER MENU OPPONENT
-## icon (and TACTICS -> VIEW RIVAL). Shows the next opponent's XI, team rating and formation.
+## PM98 VIEW RIVAL (VERRIVAL) screen — frame-baked body (docs/re/rival_screen_re.md;
+## build_rival_chrome_from_frames.py; binding frame 015_162415, witness 151_154848).
+## Chrome = the real frame with every career pixel cleared; this scene draws the
+## dynamic layer with the game's PROMAN fonts + RECURSOS art:
+##  - the rival XI table: the LINE-UP RATING row grammar at +2px (shirt N. navy,
+##    name black x69, STARJUGON strip x174+14j with halves=(AV+1) div 10, fine-role
+##    LONG name right-aligned to x351, AV red, CAMROL sprite, POS word),
+##  - the right panel: NANOESC kit (walked club = frame patch, shadow pass), club
+##    name on the white plate, TEAM RATING star-cell patches + value, assistant
+##    name + shadowed STARPARON stars, PARAMETERS/RATING toggle,
+##  - the big pitch: BRIGHT rival markers (DVERDE disc at mk1 + AVERDE arrow at
+##    mk2, WHITE ProMan8 shirt digits, discs first arrows on top) and the OWN
+##    team's GHOST markers mirrored (242-x, 138-y) through the engine's noise
+##    dither (walked own-state = verbatim patches; else majority-LUT approx).
 ##
-## THE DEFINING RULE (sourced): the depth of the report scales with your ASSISTANT MANAGER.
-## The original gates on `bVar2 = manager.staff_slot[8].ability` -- 0 = no assistant, then
-## rising tiers add pitch markers, a second (defence-phase) marker set and per-player movement
-## arrows. Those finer tiers need per-player two-phase tactic data PM98 does not decode for CPU
-## clubs, so this port keeps the two states the app's data can render faithfully (no invented
-## phases/arrow-directions): Staff.assistant_quality(career.staff) == 0 -> the "hire an
-## Assistant" message only; >= 1 -> the full rival XI table + team rating + formation dots.
+## THE DEFINING RULE (sourced, FUN_005733d0): report depth scales with your
+## ASSISTANT — bVar2==0 shows only the hire-an-Assistant message. The app keeps
+## the two states its data renders faithfully: q==0 message / q>=1 full report.
 ##
-## Native 640x480, scales to fit its parent (same transform as LINE-UP). Display screen:
-## RETURN dismisses, TACTICS opens the TEAM TACTICS modal; any other tap is a no-op.
+## Frame-injection levers for the parity shot (same doctrine as the AV gap):
+## per-player `av`, club `team_rating`, club `rival_markers` (the walked marker
+## list — Barcelona's slot layout matches NO stock formation; live rivals use
+## Tactics.auto_pick + formations.json, documented).
 
 signal back_pressed
 signal tactics_pressed
 
 const W := 640
 const H := 480
+const BODY_Y0 := 62
 
-# ---- source rects (FUN_005733d0, 640x480) --------------------------------
-const R_PARAMETERS := Rect2(492, 85, 134, 21)
-const R_RATING := Rect2(492, 109, 134, 21)
-const R_CLUBNAME := Rect2(481, 155, 154, 18)
-const R_RATINGSTRIP := Rect2(481, 173, 154, 32)
+# ---- table (frame-measured; the LINE-UP row grammar shifted +2px) ---------
+const ROW_Y0 := 102
+const ROW_PITCH := 16
+const ROW_X := 11
+const NUM_CELL := [35, 17]
+const NAME_X := 69
+const STAR_X0 := 174
+const STAR_PITCH := 14
+const ROLE_RIGHT := 351
+const AV_CELL := [353, 22]
+const CAMROL_X := 376
+const POS_CELL := [403, 34]
+const C_NUM := Color8(0, 0, 128)
+const C_NAME := Color8(0, 0, 0)
+const C_ROLE := Color8(100, 120, 140)
+const C_AV := Color8(210, 0, 0)
+const C_POS := Color8(0, 0, 0)
+# PARAMETERS (numeric) view is UN-WALKED on this screen: cells centred under the
+# static header letters, lineup-128 inks + sep grammar (documented approximation)
+const NUM_SEPS := [173, 198, 223, 248, 273, 299, 324]
+const NUM_CELLS := [[174, 25], [199, 25], [224, 25], [249, 25], [274, 25], [301, 25], [325, 25]]
+const NUM_INKS := [Color8(150, 0, 0), Color8(100, 100, 140), Color8(100, 100, 140),
+	Color8(100, 100, 140), Color8(100, 100, 140), Color8(42, 95, 170), Color8(80, 110, 5)]
+const NUM_KEYS := ["EN", "VE", "RE", "AG", "CA", "_fit", "_mo"]
+const SEP_INK := Color8(128, 128, 128)
+
+const FINE_ROLE := ["KEEPER", "RIGHT BACK", "LEFT BACK", "SWEEPER",
+	"INS. CENT. LEFT", "INS. CENT. RIGHT", "RIGHT MID.", "INSIDE RIGHT",
+	"CENTRE FORWARD", "CENTRAL MID.", "LEFT MID.", "RIGHT WINGER",
+	"CENTRAL STRIKER", "LEFT WINGER", "DEF. MIDFIELDER", "RIGHT FORWARD",
+	"LEFT FORWARD", "INSIDE LEFT"]
+const POS_WORD := {"GK": "GOAL", "DF": "DEF", "MF": "MID", "FW": "FOR"}
+
+# ---- right panel (FUN_005733d0 rects + frame-measured anchors) -------------
+const TOGGLE_PARAM := Rect2(492, 85, 134, 21)
+const TOGGLE_RATING := Rect2(492, 109, 134, 21)
+const ARROW_X := 479
+const CLUB_PLATE := Rect2(481, 155, 154, 18)
+const CLUB_TEXT_Y := 159
+const KIT_XY := Vector2(485, 174)
+const STRIP_CELL_X0 := 516
+const STRIP_CELL_PITCH := 15
+const STRIP_CELL_Y := 186
+const STRIP_VAL_RIGHT := 617
+const STRIP_VAL_Y := 191
+const C_STRIP_VAL := Color8(160, 160, 200)
 const R_COMPUTER := Rect2(482, 205, 152, 15)
 const R_TACTICS := Rect2(508, 395, 112, 25)
 const R_RETURN := Rect2(508, 440, 112, 25)
-const R_ATTRGRID := Rect2(9, 297, 156, 91)
-const R_ASSIST := Rect2(8, 398, 181, 69)
-const R_CAMPO := Rect2(196, 300, 278, 167)
-# marker layer: child of the campo at rel (10,5), interior 258x154, tac design space 318x198.
-const MARK_ORIGIN := Vector2(206, 305)
-const MARK_W := 258.0
-const MARK_H := 154.0
-const TAC_W := 318.0
-const TAC_H := 198.0
-const KIT_SRC := Rect2(0, 0, 31, 64)
+const C_TOGGLE_ON := Color8(255, 255, 0)
+const C_TOGGLE_OFF := Color8(160, 160, 200)
 
-# Rival XI table (shares the LINE-UP metrics/skin; only the XI, no subs/reserves).
-# Frame at the walked-frame anchors (015_162415: border top y82, bottom y286, first
-# row y103) so the body clears the 62px match-header band. The interior row metrics
-# keep the app's reconstruction — the body parity story is separate.
-const TABLE := Rect2(6, 82, 470, 204)
-const HDR_Y := 84
-const ROW_X := 8
-const ROW_W := 466
-const ROW_H := 16
-const XI_Y0 := 103
-const STAT_X0 := 158
-const STAT_X1 := 344
-const AVBAR_X := 360
-const ROL_X := 398
-const POS_X := 430
-const COLS := [
-	["EN", 174, "EN"], ["SP", 200, "VE"], ["ST", 226, "RE"], ["AG", 252, "AG"],
-	["GU", 278, "CA"], ["FI", 304, "_fit"], ["MO", 330, "_mo"], ["AV", 356, "_avg"],
-]
-const AVG_KEYS := ["VE", "RE", "AG", "CA", "RM", "RG", "PA", "TI"]
+# ---- pitch (tacticas CAMPO 1:1; marker layer 258x154) ----------------------
+const CAMPO_XY := Vector2(196, 300)
+const MARK_XY := Vector2i(206, 305)
+const MIRROR_X := 0xF2
+const MIRROR_Y := 0x8A
+const DIGIT_WIN_DISC := 16
+const DIGIT_WIN_ARROW := 13
+const GHOST_DIGIT_INK := Color8(127, 159, 85)  # dominant walked dim-digit tone (approx)
 
 const HIRE_MSG := "In order to find information about the rival team\n\nyou need to hire an Assistant."
 
-const C_GK_ROW := Color(0.98, 0.97, 0.80)
-const C_STATBAND := Color(0.80, 0.90, 0.78)
-const C_AVBAR := Color(0.46, 0.74, 0.32)
-const C_AVBAR_BG := Color(0.62, 0.64, 0.58)
-const C_BTN := Color(0.20, 0.34, 0.62)
-const C_BTN_HI := Color(0.42, 0.56, 0.84)
-const C_BTN_LO := Color(0.08, 0.16, 0.34)
-const C_DKBTN := Color(0.08, 0.13, 0.26)
-const C_DKBTN_HI := Color(0.28, 0.40, 0.66)
-const C_GOLD := Color(1.0, 0.86, 0.22)
-const C_PANEL_TXT := Color(0.88, 0.93, 1.0)
-const C_ROLE := {"GK": Color(0.20, 0.52, 0.30), "DEF": Color(0.22, 0.36, 0.66),
-	"MID": Color(0.46, 0.30, 0.62), "FOR": Color(0.66, 0.24, 0.22)}
-
-var _campo: Texture2D
-var _f12: Font
-var _f10: Font
-var _f8: Font
-var _kits: Dictionary = {}
-
 var _rival: Dictionary = {}
 var _own: Dictionary = {}
+var _own_tactics: Tactics = null
 var _tactics: Tactics = null
-var _assist_q: int = 0            # Staff.assistant_quality(career.staff), 0..5
+var _assist_q: int = 0
 var _assist_name: String = ""
 var _division: String = ""
 var _season: String = "1997-98"
 var _week: int = 0
-var _header: Dictionary = {}   # match-header state (PMChrome.draw_match_header)
+var _header: Dictionary = {}
 var _by_id: Dictionary = {}
-var _press: String = ""
+var _press := ""
+var _rating_view := true
+var _forms: Dictionary = {}
+var _samples: Dictionary = {}
+
+var _f8: Font
+var _f10: Font
+var _f12: Font
+var _chrome: Texture2D
+var _row_tex: Texture2D
+var _star_on: Texture2D
+var _star_off: Texture2D
+var _plate_on_nude: Texture2D
+var _plate_off_nude: Texture2D
+var _arrow_at_param: Texture2D
+var _arrow_off_rating: Texture2D
+var _kit_patches: Dictionary = {}
+var _nano_kits: Dictionary = {}
+var _strip_full: Array = []
+var _strip_nude: Texture2D
+var _eq_on: Texture2D
+var _eq_off: Texture2D
+var _assist_stars4: Texture2D
+var _paron_on: Texture2D
+var _paron_off: Texture2D
+var _campo_img: Image
+var _disc_img: Image
+var _arrow_img: Image
+var _arrow_flip_img: Image
+var _ghost_patch: Dictionary = {}   # "slot_phase" -> Image
+var _ghost_lut: Dictionary = {}     # "r,g,b" -> [r,g,b]
+var _digit_cells: Dictionary = {}
+var _pm8_atlas: Image
+var _pitch_cache_key := ""
+var _pitch_tex: Texture2D
 
 
 func _ready() -> void:
-	_campo = load("res://art/screens/campo.png")
-	_f12 = load("res://art/fonts/proman12.fnt")
-	_f10 = load("res://art/fonts/proman10.fnt")
-	_f8 = load("res://art/fonts/proman8.fnt")
+	_f8 = PMChrome.font("8")
+	_f10 = PMChrome.font("10")
+	_f12 = PMChrome.font("12")
+	_chrome = load("res://art/screens/rival/chrome.png")
+	_row_tex = load("res://art/screens/rival/row.png")
+	_star_on = load("res://art/screens/tacticas/star_full.png")
+	_star_off = load("res://art/screens/tacticas/star_off.png")
+	_plate_on_nude = load("res://art/screens/rival/plate_on_nude.png")
+	_plate_off_nude = load("res://art/screens/rival/plate_off_nude.png")
+	_arrow_at_param = load("res://art/screens/rival/arrow_at_param.png")
+	_arrow_off_rating = load("res://art/screens/rival/arrow_off_rating.png")
+	_kit_patches[1000] = load("res://art/screens/rival/kit_1000.png")
+	for j in 4:
+		_strip_full.append(load("res://art/screens/rival/strip_star_full_%d.png" % j))
+	_strip_nude = load("res://art/screens/rival/strip_star_nude.png")
+	_eq_on = load("res://art/screens/rival/star_eq_on.png")
+	_eq_off = load("res://art/screens/rival/star_eq_off.png")
+	_assist_stars4 = load("res://art/screens/rival/assist_stars_4.png")
+	_paron_on = load("res://art/screens/lineup/star_paron_on.png")
+	_paron_off = load("res://art/screens/lineup/star_paron_off.png")
+	_campo_img = _img("res://art/screens/rival/campo.png")
+	_disc_img = _img("res://art/icons/tacticas/dverde.png")
+	_arrow_img = _img("res://art/icons/tacticas/averde.png")
+	if _arrow_img != null:
+		_arrow_flip_img = _arrow_img.duplicate()
+		_arrow_flip_img.flip_x()
+	_load_samples()
+	_load_formations()
+	_load_digit_cells()
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2(W, H)
 	gui_input.connect(_on_input)
 	queue_redraw()
 
 
-## Feed the RIVAL club to scout, the manager's OWN club (for the chrome plaque), the assistant
-## quality (0..5) + name that gate the report, and the calendar plaque data. The rival's XI +
-## formation are auto-picked (the same selector MatchSim fields CPU sides with).
+func _img(path: String) -> Image:
+	var t: Texture2D = load(path)
+	if t == null:
+		return null
+	var im := t.get_image()
+	im.convert(Image.FORMAT_RGBA8)
+	return im
+
+
+func _load_samples() -> void:
+	var f := FileAccess.open("res://data/rival_chrome_samples.json", FileAccess.READ)
+	if f == null:
+		return
+	var d: Variant = JSON.parse_string(f.get_as_text())
+	if d is Dictionary:
+		_samples = d
+		_ghost_lut = _samples.get("ghost_lut", {})
+		for b in _ghost_lut_boxes():
+			var tag := "ghost_352_%d_%d" % [int(b["slot"]), int(b["phase"])]
+			_ghost_patch[tag] = _img("res://art/screens/rival/%s.png" % tag)
+
+
+func _ghost_lut_boxes() -> Array:
+	return (_samples.get("ghosts_352", {}) as Dictionary).get("boxes", [])
+
+
+func _load_formations() -> void:
+	var f := FileAccess.open("res://data/formations.json", FileAccess.READ)
+	if f == null:
+		return
+	var d: Variant = JSON.parse_string(f.get_as_text())
+	if d is Dictionary:
+		for rec in (d as Dictionary).get("formations", []):
+			_forms[str(rec.get("name", ""))] = rec
+
+
+## ProMan8 digit glyph cells (BMFont) for the marker-number composites.
+func _load_digit_cells() -> void:
+	var f := FileAccess.open("res://art/fonts/proman8.fnt", FileAccess.READ)
+	if f == null:
+		return
+	while not f.eof_reached():
+		var line := f.get_line()
+		if not line.begins_with("char id="):
+			continue
+		var kv := {}
+		for part in line.split(" ", false):
+			var eq := part.split("=")
+			if eq.size() == 2:
+				kv[eq[0]] = eq[1]
+		var cid := int(kv.get("id", "0"))
+		if cid >= 48 and cid <= 57:
+			_digit_cells[char(cid)] = {"x": int(kv["x"]), "y": int(kv["y"]),
+				"w": int(kv["width"]), "h": int(kv["height"]), "adv": int(kv["xadvance"])}
+	# the BMFont atlas png is importer="skip" (the .fnt loader reads it raw)
+	_pm8_atlas = Image.load_from_file("res://art/fonts/proman8.png")
+	if _pm8_atlas != null:
+		_pm8_atlas.convert(Image.FORMAT_RGBA8)
+
+
+## Feed the RIVAL club, the manager's OWN club + tactics (the ghost overlay is YOUR
+## planned shape mirrored onto the scouting pitch), the assistant gate + name, and
+## the calendar/header data.
 func setup(rival: Dictionary, own: Dictionary, assist_quality: int, assist_name: String = "",
-		division: String = "", season: String = "1997-98", week: int = 0, header := {}) -> void:
+		division: String = "", season: String = "1997-98", week: int = 0, header := {},
+		own_tactics: Tactics = null) -> void:
 	_rival = rival
 	_own = own
+	_own_tactics = own_tactics
 	_assist_q = maxi(0, assist_quality)
 	_assist_name = assist_name
 	_division = division
@@ -121,8 +254,6 @@ func setup(rival: Dictionary, own: Dictionary, assist_quality: int, assist_name:
 	_week = week
 	_header = header
 	if _header.is_empty():
-		# manager-mode default (frame 058 layout): manager + own club, own kit.
-		# Date derives from the week; the status pair is the only walked one.
 		var d := PMChrome.date_parts(season, week)
 		_header = {"mode": "manager", "top": "",
 			"bottom": PMChrome.title_case_name(str(own.get("name", ""))),
@@ -132,6 +263,7 @@ func setup(rival: Dictionary, own: Dictionary, assist_quality: int, assist_name:
 	_by_id.clear()
 	for p in rival.get("players", []):
 		_by_id[int(p.get("id", -1))] = p
+	_pitch_cache_key = ""
 	queue_redraw()
 
 
@@ -139,21 +271,22 @@ func has_report() -> bool:
 	return _assist_q > 0
 
 
-# ---- input ---------------------------------------------------------------
-
-const BTN_TACTICS := R_TACTICS
-const BTN_RETURN := R_RETURN
+# ---- input -----------------------------------------------------------------
 
 func _hit(d: Vector2) -> String:
-	if BTN_RETURN.has_point(d):
+	if R_RETURN.has_point(d):
 		return "return"
-	if BTN_TACTICS.has_point(d):
+	if R_TACTICS.has_point(d):
 		return "tactics"
+	if TOGGLE_PARAM.has_point(d):
+		return "param"
+	if TOGGLE_RATING.has_point(d):
+		return "rating"
 	return ""
 
 
 func _scale() -> float:
-	return min(size.x / W, size.y / H) if size.x > 0 and size.y > 0 else 1.0
+	return minf(size.x / W, size.y / H) if size.x > 0 and size.y > 0 else 1.0
 
 
 func _to_design(p: Vector2) -> Vector2:
@@ -185,226 +318,58 @@ func _on_input(e: InputEvent) -> void:
 			match a:
 				"return": back_pressed.emit()
 				"tactics": tactics_pressed.emit()
+				"param":
+					_rating_view = false
+					queue_redraw()
+				"rating":
+					_rating_view = true
+					queue_redraw()
 
 
-# ---- formation geometry (matches LINE-UP) --------------------------------
+# ---- helpers ----------------------------------------------------------------
 
-func _slot_positions() -> Array:
-	if _tactics == null:
-		return []
-	var lines: Array = Tactics.FORMATIONS.get(_tactics.formation, Tactics.FORMATIONS["4-4-2"])
-	var cols := {"GK": 20.0, "DEF": 90.0, "MID": 175.0, "FWD": 262.0}
-	var out: Array = []
-	out.append(Vector2(cols["GK"], TAC_H * 0.5))
-	for role in ["DEF", "MID", "FWD"]:
-		var n := 0
-		match role:
-			"DEF": n = int(lines[0])
-			"MID": n = int(lines[1])
-			"FWD": n = int(lines[2])
-		for k in n:
-			var y: float = lerpf(TAC_H * 0.16, TAC_H * 0.84, (k + 0.5) / float(n))
-			out.append(Vector2(cols[role], y))
-	return out
+func _cell_centre(f: Font, s: String, x0: int, cw: int, sz := 11) -> float:
+	var w := int(f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x)
+	return float(x0 + int(floorf((cw - w) / 2.0)))
 
 
-func _mark_center(tac: Vector2) -> Vector2:
-	return MARK_ORIGIN + Vector2(tac.x * MARK_W / TAC_W, tac.y * MARK_H / TAC_H)
+func _shirt(p: Dictionary, slot: int) -> int:
+	var no_v: Variant = p.get("squadNo")
+	var no := int(no_v) if (no_v is int or no_v is float) else 0
+	return no if no > 0 else slot + 1
 
 
-func _kit(id: int) -> Texture2D:
-	if not _kits.has(id):
-		var path := "res://art/kits/%d.png" % id
-		_kits[id] = load(path) if ResourceLoader.exists(path) else null
-	return _kits[id]
-
-
-# ---- drawing -------------------------------------------------------------
-
-func _txt(f: Font, x: int, y_top: int, s: String, col: Color, sz: int, right := false) -> void:
-	if f == null:
-		return
-	var w := f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
-	var px := x - w if right else float(x)
-	draw_string(f, Vector2(px, y_top + f.get_ascent(sz)), s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
-
-
-func _centre(f: Font, x: float, w: float, y_top: int, s: String, col: Color, sz: int) -> void:
-	if f == null:
-		return
-	var tw := f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
-	draw_string(f, Vector2(x + (w - tw) * 0.5, y_top + f.get_ascent(sz)), s,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
-
-
-func _draw() -> void:
-	var s: float = min(size.x / W, size.y / H) if size.x > 0 and size.y > 0 else 1.0
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0.05, 0.07, 0.14), true)
-	draw_set_transform(Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5), 0.0, Vector2(s, s))
-
-	PMChrome.draw_bg(self)
-	PMChrome.draw_match_header(self, "viewrival", _header)
-
-	PMChrome.draw_table_panel(self, TABLE)
-	if has_report():
-		_draw_col_header()
-		_draw_xi()
-	else:
-		_draw_hire_message()
-
-	_draw_right_panel()
-	_draw_attr_grid()
-	_draw_assistant_panel()
-	if has_report():
-		_draw_pitch()
-
-
-func _draw_hire_message() -> void:
-	var box := Rect2(TABLE.position.x + 20, TABLE.position.y + 60, TABLE.size.x - 40, 80)
-	var y := int(box.position.y)
-	for line in HIRE_MSG.split("\n"):
-		_centre(_f12, box.position.x, box.size.x, y, line, PMChrome.C_ROW_TXT, 13)
-		y += 18
-
-
-func _draw_col_header() -> void:
-	PMChrome.draw_col_header(self, Rect2(TABLE.position.x + 2, HDR_Y, TABLE.size.x - 4, 16))
-	_txt(_f10, 14, HDR_Y + 2, "N.", PMChrome.C_TBL_HDR_TXT, 11)
-	_txt(_f10, 48, HDR_Y + 2, "PLAYER", PMChrome.C_TBL_HDR_TXT, 11)
-	for c in COLS:
-		_txt(_f10, c[1], HDR_Y + 2, c[0], PMChrome.C_TBL_HDR_TXT, 11, true)
-	_txt(_f10, ROL_X, HDR_Y + 2, "ROL", PMChrome.C_TBL_HDR_TXT, 11)
-	_txt(_f10, POS_X, HDR_Y + 2, "POS", PMChrome.C_TBL_HDR_TXT, 11)
-
-
-## The 11 rival XI rows (no SUBSTITUTES / RESERVES -- VIEW RIVAL shows only the XI).
-func _draw_xi() -> void:
-	if _tactics == null:
-		return
-	var roles: Array = _tactics.roles()
-	var y := XI_Y0
-	for i in _tactics.xi.size():
-		var rl: String = roles[i] if i < roles.size() else ""
-		_row(y, i, int(_tactics.xi[i]), i + 1, rl)
-		y += ROW_H
-
-
-func _row(y: int, idx: int, pid: int, number: int, _role: String) -> void:
-	var p: Variant = _by_id.get(pid)
-	if p == null:
-		return
-	var pl: Dictionary = p
-	var is_gk: bool = pl.get("isGK", false)
-	var bg: Color = C_GK_ROW if is_gk else (PMChrome.C_ROW_LIGHT if idx % 2 == 0 else PMChrome.C_ROW_DARK)
-	draw_rect(Rect2(ROW_X, y, ROW_W, ROW_H - 1), bg, true)
-	draw_rect(Rect2(ROW_X, y + ROW_H - 1, ROW_W, 1), PMChrome.C_ROW_SEP, true)
-	draw_rect(Rect2(STAT_X0, y, STAT_X1 - STAT_X0, ROW_H - 1), C_STATBAND, true)
-
-	var ty := y + 2
-	PMChrome.draw_crest(self, int(_rival.get("id", -1)), Rect2(10, y, 13, ROW_H - 1))
-	_txt(_f10, 44, ty, str(number), PMChrome.C_ROW_TXT, 11, true)
-	_txt(_f10, 48, ty, str(pl.get("name", "?")).substr(0, 13), PMChrome.C_ROW_TXT, 11)
-
-	var attrs: Dictionary = pl.get("attrs", {}) if pl.get("attrs") is Dictionary else {}
-	var has_form := pl.has("morale") or pl.has("fitness")
-	for c in COLS:
-		var key: String = c[2]
-		var x: int = c[1]
-		var sv := ""
-		match key:
-			"_avg":
-				sv = str(Morale.av6(pl)) if has_form else str(_avg_of(pl))
-			"_fit":
-				sv = str(clampi(int(pl.get("fitness", 99)), 0, 99)) if has_form else "-"
-			"_mo":
-				sv = str(Morale.display(pl)) if has_form else "-"
-			_:
-				var v: Variant = attrs.get(key)
-				sv = str(int(v)) if v != null else "-"
-		_txt(_f10, x, ty, sv, PMChrome.C_ROW_TXT, 11, true)
-	var avg := Morale.av6(pl) if has_form else _avg_of(pl)
-	draw_rect(Rect2(AVBAR_X, y + 4, 30, 7), C_AVBAR_BG, true)
-	draw_rect(Rect2(AVBAR_X, y + 4, 30.0 * clampf(avg / 99.0, 0.0, 1.0), 7), C_AVBAR, true)
-	var pos := _pos_of(pl)
-	var rol_cell := Rect2(ROL_X, y + 1, 24, ROW_H - 3)
-	if not PMChrome.draw_role_icon(self, rol_cell, int(pl.get("posFine", 0)), str(pl.get("pos", ""))):
-		draw_rect(Rect2(ROL_X, y + 2, 24, ROW_H - 5), C_ROLE.get(_role_group(pos), PMChrome.C_TBL_HDR), true)
-	_txt(_f8, POS_X, ty, pos, PMChrome.C_ROW_TXT, 10)
-
-
-func _role_group(pos: String) -> String:
-	if pos == "GK":
-		return "GK"
-	if pos in ["DEF", "RB", "LB", "CB"]:
-		return "DEF"
-	if pos in ["FOR", "ST", "CF"]:
-		return "FOR"
-	return "MID"
-
-
-func _avg_of(p: Dictionary) -> int:
+func _av_of(p: Dictionary) -> int:
+	if p.has("av"):
+		return int(p["av"])
+	# documented approximation while the AV formula is un-RE'd (attrs mean)
 	var attrs: Variant = p.get("attrs", {})
 	if not (attrs is Dictionary) or (attrs as Dictionary).is_empty():
 		return 0
 	var a: Dictionary = attrs
 	var sum := 0.0
 	var n := 0
-	for k in AVG_KEYS:
+	for k in ["VE", "RE", "AG", "CA", "RM", "RG", "PA", "TI"]:
 		if a.has(k):
 			sum += float(a[k])
 			n += 1
 	return int(round(sum / n)) if n > 0 else 0
 
 
-func _pos_of(p: Dictionary) -> String:
-	return "GK" if p.get("isGK") else "OUT"
+func _role_name(p: Dictionary) -> String:
+	var fine := int(p.get("posFine", 0))
+	if fine >= 1 and fine <= FINE_ROLE.size():
+		return FINE_ROLE[fine - 1]
+	return str(p.get("pos", ""))
 
 
-# ---- right control column ------------------------------------------------
-
-func _draw_right_panel() -> void:
-	# PARAMETERS / RATING (source rects).
-	PMChrome.bevel(self, R_PARAMETERS, C_DKBTN, C_DKBTN_HI, C_BTN_LO)
-	_centre(_f12, R_PARAMETERS.position.x, R_PARAMETERS.size.x, int(R_PARAMETERS.position.y) + 3,
-		"PARAMETERS", C_GOLD, 13)
-	PMChrome.bevel(self, R_RATING, C_DKBTN, C_DKBTN_HI, C_BTN_LO)
-	_centre(_f12, R_RATING.position.x, R_RATING.size.x, int(R_RATING.position.y) + 3,
-		"RATING", C_PANEL_TXT, 13)
-
-	# Rival club-name box.
-	PMChrome.bevel(self, R_CLUBNAME, Color(0.10, 0.16, 0.34), C_DKBTN_HI, C_BTN_LO)
-	_centre(_f12, R_CLUBNAME.position.x, R_CLUBNAME.size.x, int(R_CLUBNAME.position.y) + 2,
-		str(_rival.get("name", "")), C_PANEL_TXT, 12)
-
-	# Crest + TEAM RATING stars + rating number.
-	PMChrome.bevel(self, R_RATINGSTRIP, Color(0.10, 0.16, 0.34), C_DKBTN_HI, C_BTN_LO)
-	PMChrome.draw_crest(self, int(_rival.get("id", -1)),
-		Rect2(R_RATINGSTRIP.position.x + 4, R_RATINGSTRIP.position.y + 3, 18, 26))
-	var avg := _team_rating()
-	_txt(_f8, int(R_RATINGSTRIP.position.x) + 26, int(R_RATINGSTRIP.position.y) + 2,
-		"TEAM RATING", C_PANEL_TXT, 10)
-	if has_report():
-		PMChrome.draw_stars(self, R_RATINGSTRIP.position.x + 26, R_RATINGSTRIP.position.y + 13,
-			avg / 20.0, 11, 5)
-		_txt(_f12, int(R_RATINGSTRIP.end.x) - 8, int(R_RATINGSTRIP.position.y) + 8,
-			str(avg), Color.WHITE, 14, true)
-
-	# COMPUTER / rival-manager box.
-	PMChrome.bevel(self, R_COMPUTER, C_DKBTN, C_DKBTN_HI, C_BTN_LO)
-	var mgr := str(_rival.get("manager", "")).strip_edges()
-	_centre(_f10, R_COMPUTER.position.x, R_COMPUTER.size.x, int(R_COMPUTER.position.y) + 1,
-		mgr if mgr != "" else "COMPUTER", C_PANEL_TXT, 11)
-
-	# TACTICS / RETURN.
-	PMChrome.bevel(self, R_TACTICS, C_DKBTN, C_DKBTN_HI, C_BTN_LO)
-	_centre(_f12, R_TACTICS.position.x, R_TACTICS.size.x, int(R_TACTICS.position.y) + 5,
-		"TACTICS", C_PANEL_TXT, 13)
-	PMChrome.bevel(self, R_RETURN, C_DKBTN, C_DKBTN_HI, C_BTN_LO)
-	_centre(_f12, R_RETURN.position.x, R_RETURN.size.x, int(R_RETURN.position.y) + 5,
-		"RETURN", C_GOLD, 13)
+func _pos_word(p: Dictionary) -> String:
+	return str(POS_WORD.get(str(p.get("pos", "")).to_upper(), str(p.get("pos", ""))))
 
 
 func _team_rating() -> int:
+	if _rival.has("team_rating"):
+		return int(_rival["team_rating"])
 	if _tactics == null:
 		return 0
 	var sum := 0
@@ -412,64 +377,388 @@ func _team_rating() -> int:
 	for pid in _tactics.xi:
 		var p: Variant = _by_id.get(int(pid))
 		if p != null:
-			sum += _avg_of(p)
+			sum += _av_of(p)
 			n += 1
 	return int(round(float(sum) / n)) if n > 0 else 0
 
 
-## The team-style attribute cells (HANDLING/PASSING/DRIBBLING/HEADING/TACKLING/SHOOTING).
-## Labels only, faithful to the original's cells (the per-team style numbers are data-driven
-## in PM98 and not decoded for CPU clubs -- shown as labelled cells, never invented values).
-func _draw_attr_grid() -> void:
-	var labels := [["HANDLING", "PASSING"], ["DRIBBLING", "HEADING"], ["TACKLING", "SHOOTING"]]
-	var cw := R_ATTRGRID.size.x / 2.0
-	var ch := R_ATTRGRID.size.y / 3.0
-	for r in 3:
-		for cc in 2:
-			var bx := R_ATTRGRID.position.x + cc * cw
-			var by := R_ATTRGRID.position.y + r * ch
-			PMChrome.bevel(self, Rect2(bx + 1, by + 1, cw - 2, ch - 2), C_BTN, C_BTN_HI, C_BTN_LO)
-			_centre(_f8, bx, cw, int(by + ch / 2.0) - 5, labels[r][cc], C_PANEL_TXT, 10)
+# ---- drawing ------------------------------------------------------------------
 
+func _draw() -> void:
+	var s := _scale()
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.05, 0.07, 0.14), true)
+	draw_set_transform(Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5), 0.0, Vector2(s, s))
 
-## The ASSISTANT panel (bottom-left): the hired assistant's name + quality stars, or an empty
-## title when none is hired (in which case the report itself is the hire-Assistant message).
-func _draw_assistant_panel() -> void:
-	PMChrome.bevel(self, R_ASSIST, Color(0.10, 0.16, 0.34), C_DKBTN_HI, C_BTN_LO)
-	_txt(_f10, int(R_ASSIST.position.x) + 6, int(R_ASSIST.position.y) + 4, "ASSISTANT",
-		C_GOLD, 11)
-	if _assist_q > 0:
-		_txt(_f10, int(R_ASSIST.position.x) + 6, int(R_ASSIST.position.y) + 24,
-			_assist_name if _assist_name != "" else "Assistant", C_PANEL_TXT, 11)
-		PMChrome.draw_stars(self, R_ASSIST.position.x + 6, R_ASSIST.position.y + 44,
-			float(_assist_q), 11, 5)
+	PMChrome.draw_match_header(self, "viewrival", _header)
+	if _chrome != null:
+		draw_texture(_chrome, Vector2(0, BODY_Y0))
 
-
-## CAMPO pitch with the rival formation kit markers (the reveal core). The original overlays a
-## second defence-phase marker set + per-player movement arrows at higher assistant tiers; that
-## needs two-phase per-player tactic data PM98 does not decode for CPU clubs, so this draws the
-## single nominal formation the app models (documented gap in rival_screen_re.md, not faked).
-func _draw_pitch() -> void:
-	if _campo != null:
-		draw_texture_rect(_campo, R_CAMPO, false)
+	if has_report():
+		_draw_rows()
+		_draw_pitch()
 	else:
-		draw_rect(R_CAMPO, Color(0.16, 0.43, 0.27), true)
+		_draw_hire_message()
+	_draw_right_panel()
+
+
+func _draw_hire_message() -> void:
+	var y := 170
+	for line in HIRE_MSG.split("\n"):
+		PMChrome.text(self, _f12, 11, y, line, Color8(0, 0, 0), 13, 1, 460.0)
+		y += 18
+
+
+func _draw_rows() -> void:
 	if _tactics == null:
 		return
-	var pos := _slot_positions()
-	var rid := int(_rival.get("id", -1))
-	for i in mini(_tactics.xi.size(), pos.size()):
-		_draw_marker(rid, i + 1, _mark_center(pos[i]))
+	for i in mini(_tactics.xi.size(), 11):
+		var y := ROW_Y0 + ROW_PITCH * i
+		var p: Variant = _by_id.get(int(_tactics.xi[i]))
+		if _row_tex != null:
+			draw_texture(_row_tex, Vector2(ROW_X, y))
+		if p == null:
+			continue
+		var pl: Dictionary = p
+		var num := str(_shirt(pl, i))
+		PMChrome.text(self, _f8, _cell_centre(_f8, num, NUM_CELL[0], NUM_CELL[1]), y + 2,
+			num, C_NUM, 11)
+		PMChrome.text(self, _f8, NAME_X, y + 2,
+			PMChrome.title_case_name(str(pl.get("name", "?"))), C_NAME, 11, 0, 103.0)
+		var av := _av_of(pl)
+		if _rating_view:
+			# STARJUGON strip: halves=(AV+1) div 10; odd half = the DIMMED star
+			var halves := (av + 1) / 10
+			for j in halves / 2:
+				draw_texture(_star_on, Vector2(STAR_X0 + STAR_PITCH * j, y + 2))
+			if halves % 2 == 1 and _star_off != null:
+				draw_texture(_star_off, Vector2(STAR_X0 + STAR_PITCH * (halves / 2), y + 2))
+			PMChrome.text(self, _f8, ROLE_RIGHT, y + 2, _role_name(pl), C_ROLE, 11, 2)
+		else:
+			for sx in NUM_SEPS:
+				draw_rect(Rect2(sx, y + 1, 1, 12), SEP_INK, true)
+			var has_form: bool = pl.has("morale") or pl.has("fitness")
+			for ci in NUM_KEYS.size():
+				var key: String = NUM_KEYS[ci]
+				var sv := ""
+				match key:
+					"_fit":
+						sv = str(clampi(int(pl.get("fitness", 99)), 0, 99)) if has_form else "-"
+					"_mo":
+						sv = str(Morale.display(pl)) if has_form else "-"
+					_:
+						var attrs: Dictionary = pl.get("attrs", {}) if pl.get("attrs") is Dictionary else {}
+						var v: Variant = attrs.get(key)
+						sv = str(int(v)) if v != null else "-"
+				PMChrome.text(self, _f8, _cell_centre(_f8, sv, NUM_CELLS[ci][0], NUM_CELLS[ci][1]),
+					y + 2, sv, NUM_INKS[ci], 11)
+		PMChrome.text(self, _f8, _cell_centre(_f8, str(av), AV_CELL[0], AV_CELL[1]), y + 2,
+			str(av), C_AV, 11)
+		PMChrome.draw_role_icon(self, Rect2(CAMROL_X, y, 25, 14),
+			int(pl.get("posFine", 0)), str(pl.get("pos", "")))
+		var pos_s := _pos_word(pl)
+		PMChrome.text(self, _f8, _cell_centre(_f8, pos_s, POS_CELL[0], POS_CELL[1]), y + 2,
+			pos_s, C_POS, 11)
 
 
-func _draw_marker(club_id: int, number: int, center: Vector2) -> void:
-	var tex := _kit(club_id)
-	if tex != null:
-		var sc: float = min(11.0 / KIT_SRC.size.x, 14.0 / KIT_SRC.size.y)
-		var w := KIT_SRC.size.x * sc
-		var h := KIT_SRC.size.y * sc
-		draw_texture_rect_region(tex, Rect2(center.x - w * 0.5, center.y - h * 0.5, w, h), KIT_SRC)
+# ---- right panel ---------------------------------------------------------------
+
+func _draw_right_panel() -> void:
+	# toggle: chrome bakes RATING-active; the flip is UN-WALKED -> label-cleared
+	# plates + redrawn labels + swapped arrow patches (tactics-board doctrine)
+	if not _rating_view:
+		if _plate_on_nude != null:
+			draw_texture(_plate_on_nude, TOGGLE_PARAM.position)
+		PMChrome.text(self, _f12, TOGGLE_PARAM.position.x, TOGGLE_PARAM.position.y + 5,
+			"PARAMETERS", C_TOGGLE_ON, 13, 1, TOGGLE_PARAM.size.x)
+		if _plate_off_nude != null:
+			draw_texture(_plate_off_nude, TOGGLE_RATING.position)
+		PMChrome.text(self, _f12, TOGGLE_RATING.position.x, TOGGLE_RATING.position.y + 5,
+			"RATING", C_TOGGLE_OFF, 13, 1, TOGGLE_RATING.size.x)
+		if _arrow_at_param != null:
+			draw_texture(_arrow_at_param, Vector2(ARROW_X, TOGGLE_PARAM.position.y))
+		if _arrow_off_rating != null:
+			draw_texture(_arrow_off_rating, Vector2(ARROW_X, TOGGLE_RATING.position.y))
+
+	# rival club name on the black plate (WHITE ink, GDI-centred)
+	var nm := PMChrome.title_case_name(str(_rival.get("name", "")))
+	PMChrome.text(self, _f10, _cell_centre(_f10, nm, int(CLUB_PLATE.position.x),
+		int(CLUB_PLATE.size.x), 10), CLUB_TEXT_Y, nm, Color8(255, 255, 255), 10)
+
+	# NANOESC kit: walked club = frame patch (engine shadow pass); else the
+	# shadowless sprite (header-bake precedent, documented)
+	var cid := int(_rival.get("id", -1))
+	if _kit_patches.has(cid) and _kit_patches[cid] != null:
+		draw_texture(_kit_patches[cid], KIT_XY)
 	else:
-		draw_rect(Rect2(center.x - 5, center.y - 6, 10, 12), Color.WHITE, true)
-	# The per-dot number (sourced: sprintf("%u", marker) on the marker layer).
-	_centre(_f8, center.x - 8, 16, int(center.y) - 5, str(number), C_GOLD, 10)
+		var kt := _nano_kit(cid)
+		if kt != null:
+			draw_texture_rect_region(kt, Rect2(KIT_XY.x, KIT_XY.y, 24, 31), Rect2(0, 0, 24, 31))
+
+	# TEAM RATING stars + value (hidden without an assistant, sourced bVar2>=1)
+	if has_report():
+		var tr := _team_rating()
+		var halves := (tr + 1) / 10
+		for j in 5:
+			var x := STRIP_CELL_X0 + STRIP_CELL_PITCH * j
+			if j < halves / 2:
+				if j < 4 and _strip_full[j] != null:
+					draw_texture(_strip_full[j], Vector2(x, STRIP_CELL_Y))
+				elif _eq_on != null:  # un-walked 5th full star: plain glyph
+					draw_texture(_eq_on, Vector2(x + 1, STRIP_CELL_Y + 6))
+			elif j == halves / 2 and halves % 2 == 1 and _eq_off != null:
+				# un-walked odd half: dimmed glyph (walked ratings show none)
+				draw_texture(_eq_off, Vector2(x + 1, STRIP_CELL_Y + 6))
+		PMChrome.text(self, _f10, STRIP_VAL_RIGHT, STRIP_VAL_Y, str(tr), C_STRIP_VAL, 10, 2)
+
+	# COMPUTER band is baked; a human-managed rival overdraws it (un-walked)
+	var mgr := str(_rival.get("manager", "")).strip_edges()
+	if mgr != "":
+		draw_rect(Rect2(R_COMPUTER.position.x + 2, R_COMPUTER.position.y + 2,
+			R_COMPUTER.size.x - 4, R_COMPUTER.size.y - 4), Color8(0, 0, 128), true)
+		PMChrome.text(self, _f10, _cell_centre(_f10, mgr, int(R_COMPUTER.position.x),
+			int(R_COMPUTER.size.x), 10), int(R_COMPUTER.position.y) + 3, mgr,
+			Color8(160, 160, 200), 10)
+
+	_draw_assistant()
+
+
+func _draw_assistant() -> void:
+	var a: Dictionary = _samples.get("assist", {})
+	if a.is_empty():
+		return
+	if _assist_name != "":
+		PMChrome.text(self, _f10, int(a["name_x"]), int(a["band"][1]) + 1,
+			PMChrome.title_case_name(_assist_name), Color8(255, 255, 255), 10, 0, 100.0)
+	var q := _assist_q
+	if q == int(a.get("walked_count", 4)) and _assist_stars4 != null:
+		# the walked 4-star strip verbatim (glyphs + noise-dither shadow)
+		draw_texture(_assist_stars4, Vector2(int(a["stars4_xy"][0]), int(a["stars4_xy"][1])))
+	else:
+		# un-walked count: plain STARPARON glyphs (shadow approx, documented)
+		for j in clampi(q, 0, 5):
+			draw_texture(_paron_on, Vector2(int(a["star_x0"]) + 11 * j, int(a["star_y"])))
+
+
+func _nano_kit(id: int) -> Texture2D:
+	if not _nano_kits.has(id):
+		var path := "res://art/kits/nano/%d.png" % id
+		_nano_kits[id] = load(path) if ResourceLoader.exists(path) else null
+	return _nano_kits[id]
+
+
+# ---- pitch ------------------------------------------------------------------------
+
+## The rival's marker list: the frame-injected walked layout when present (the
+## club's own tactic matches no stock formation), else the app's auto-picked
+## formation through formations.json (documented live model).
+func _rival_markers() -> Array:
+	if _rival.has("rival_markers"):
+		return _rival["rival_markers"]
+	var out: Array = []
+	if _tactics == null:
+		return out
+	var rec: Variant = _forms.get(_tactics.formation)
+	if rec == null:
+		return out
+	var slots: Array = (rec as Dictionary).get("slots", [])
+	var gk := int((rec as Dictionary).get("gk_slot", 10))
+	var order := [gk]
+	for i in slots.size():
+		if i != gk:
+			order.append(i)
+	for i in mini(_tactics.xi.size(), order.size()):
+		var s: Dictionary = slots[order[i]]
+		var p: Variant = _by_id.get(int(_tactics.xi[i]))
+		var num := _shirt(p if p is Dictionary else {}, i)
+		out.append({"kind": "disc", "mk": s.get("mk1", [0, 0]), "num": num})
+		out.append({"kind": "arrow", "mk": s.get("mk2", [0, 0]), "num": num})
+	return out
+
+
+## Own (ghost) slot list: [mk1, mk2, shirt] per XI slot, GK first.
+func _own_ghosts() -> Array:
+	var out: Array = []
+	if _own_tactics == null:
+		return out
+	var rec: Variant = _forms.get(_own_tactics.formation)
+	if rec == null:
+		return out
+	var slots: Array = (rec as Dictionary).get("slots", [])
+	var gk := int((rec as Dictionary).get("gk_slot", 10))
+	var order := [gk]
+	for i in slots.size():
+		if i != gk:
+			order.append(i)
+	var own_by_id := {}
+	for p in _own.get("players", []):
+		own_by_id[int(p.get("id", -1))] = p
+	for i in mini(_own_tactics.xi.size(), order.size()):
+		var s: Dictionary = slots[order[i]]
+		var p: Variant = own_by_id.get(int(_own_tactics.xi[i]))
+		var num := _shirt(p if p is Dictionary else {}, i)
+		out.append([s.get("mk1", [0, 0]), s.get("mk2", [0, 0]), num])
+	return out
+
+
+func _pitch_key(markers: Array, ghosts: Array) -> String:
+	return JSON.stringify([markers, ghosts])
+
+
+func _draw_pitch() -> void:
+	var markers := _rival_markers()
+	var ghosts := _own_ghosts()
+	if markers.is_empty() and ghosts.is_empty():
+		return
+	var key := _pitch_key(markers, ghosts)
+	if key != _pitch_cache_key or _pitch_tex == null:
+		_pitch_tex = _compose_pitch(markers, ghosts)
+		_pitch_cache_key = key
+	if _pitch_tex != null:
+		draw_texture(_pitch_tex, CAMPO_XY)
+
+
+## Compose campo + ghost pass + bright pass into one cached texture (278x167).
+func _compose_pitch(markers: Array, ghosts: Array) -> Texture2D:
+	if _campo_img == null:
+		return null
+	var img := _campo_img.duplicate() as Image
+	var mx0: int = MARK_XY.x - int(CAMPO_XY.x)
+	var my0: int = MARK_XY.y - int(CAMPO_XY.y)
+
+	# ---- ghost pass (own team mirrored, dim) --------------------------------
+	var walked: Dictionary = _samples.get("ghosts_352", {})
+	var walked_nums: Array = []
+	for n in walked.get("nums", []):
+		walked_nums.append(int(n))
+	var own_nums: Array = []
+	for g in ghosts:
+		own_nums.append(int(g[2]))
+	var own_is_walked: bool = (
+		_own_tactics != null and _own_tactics.formation == str(walked.get("formation", ""))
+		and own_nums == walked_nums
+	)
+	var rival_is_walked: bool = _rival.has("rival_markers")
+	if own_is_walked:
+		for b in walked.get("boxes", []):
+			var clean := bool(b.get("clean", false))
+			if not (clean or rival_is_walked):
+				continue
+			var tag := "ghost_352_%d_%d" % [int(b["slot"]), int(b["phase"])]
+			var patch: Image = _ghost_patch.get(tag)
+			if patch != null:
+				img.blit_rect(patch, Rect2i(0, 0, 16, 16),
+					Vector2i(mx0 + int(b["mk"][0]), my0 + int(b["mk"][1])))
+	# un-walked own states (or poisoned boxes vs a live rival): majority-LUT
+	# dim composite — a documented approximation of the engine's noise dither
+	for gi in ghosts.size():
+		var g: Array = ghosts[gi]
+		for phase in 2:
+			if own_is_walked and _has_walked_box(walked, gi, phase + 1, rival_is_walked):
+				continue
+			var mk: Array = g[phase]
+			var gx: int = MIRROR_X - int(mk[0])
+			var gy: int = MIRROR_Y - int(mk[1])
+			_blit_ghost_lut(img, mx0 + gx, my0 + gy, phase == 0, int(g[2]))
+
+	# ---- bright pass (rival; discs first, arrows on top) --------------------
+	for kind in ["disc", "arrow"]:
+		for m in markers:
+			if str(m["kind"]) != kind:
+				continue
+			var src: Image = _disc_img if kind == "disc" else _arrow_img
+			if src == null:
+				continue
+			var mark := _marker_img(src, int(m["num"]), kind == "disc")
+			_blend(img, mark, mx0 + int(m["mk"][0]), my0 + int(m["mk"][1]))
+	return ImageTexture.create_from_image(img)
+
+
+func _has_walked_box(walked: Dictionary, slot: int, phase: int, rival_is_walked: bool) -> bool:
+	for b in walked.get("boxes", []):
+		if int(b["slot"]) == slot and int(b["phase"]) == phase:
+			return bool(b.get("clean", false)) or rival_is_walked
+	return false
+
+
+## Sprite blit honouring alpha.
+func _blend(dst: Image, src: Image, x: int, y: int) -> void:
+	for yy in src.get_height():
+		for xx in src.get_width():
+			var c := src.get_pixel(xx, yy)
+			if c.a > 0.0 and x + xx >= 0 and x + xx < dst.get_width() \
+					and y + yy >= 0 and y + yy < dst.get_height():
+				dst.set_pixel(x + xx, y + yy, c)
+
+
+## Marker sprite + WHITE ProMan8 shirt digits (window 16 disc / 13 arrow, glyph
+## top at sprite row 2, GDI x=(win-adv)/2 — frame-verified on all 21 markers).
+func _marker_img(src: Image, num: int, disc: bool) -> Image:
+	var img := src.duplicate() as Image
+	if _pm8_atlas == null or _digit_cells.is_empty():
+		return img
+	var s := str(num)
+	var w := 0
+	for ch in s:
+		w += int((_digit_cells.get(ch, {}) as Dictionary).get("adv", 0))
+	var win := DIGIT_WIN_DISC if disc else DIGIT_WIN_ARROW
+	var x := int((win - w) / 2.0)
+	for ch in s:
+		var c: Dictionary = _digit_cells.get(ch, {})
+		if c.is_empty():
+			continue
+		for gy in int(c["h"]):
+			for gx in int(c["w"]):
+				if _pm8_atlas.get_pixel(int(c["x"]) + gx, int(c["y"]) + gy).a > 0.0:
+					var tx := x + gx
+					var ty := 2 + gy
+					if tx >= 0 and tx < win and ty < img.get_height():
+						img.set_pixel(tx, ty, Color.WHITE)
+		x += int(c["adv"])
+	return img
+
+
+## Ghost fallback: sprite (flipped arrow for phase 2) mapped through the
+## majority dim LUT + dim digits (documented approximation of the noise pass).
+func _blit_ghost_lut(dst: Image, x: int, y: int, disc: bool, num: int) -> void:
+	var spr: Image = _disc_img if disc else _arrow_flip_img
+	if spr == null:
+		return
+	var mark := _marker_img_ghost(spr, num, disc)
+	for yy in mark.get_height():
+		for xx in mark.get_width():
+			if x + xx < 0 or x + xx >= dst.get_width() or y + yy < 0 or y + yy >= dst.get_height():
+				continue
+			var c := mark.get_pixel(xx, yy)
+			if c.a <= 0.0:
+				continue
+			var k := "%d,%d,%d" % [int(c.r * 255.0 + 0.5), int(c.g * 255.0 + 0.5), int(c.b * 255.0 + 0.5)]
+			if _ghost_lut.has(k):
+				var v: Array = _ghost_lut[k]
+				dst.set_pixel(x + xx, y + yy, Color8(int(v[0]), int(v[1]), int(v[2])))
+			else:
+				dst.set_pixel(x + xx, y + yy, c)
+
+
+func _marker_img_ghost(src: Image, num: int, disc: bool) -> Image:
+	var img := src.duplicate() as Image
+	if _pm8_atlas == null or _digit_cells.is_empty():
+		return img
+	var s := str(num)
+	var w := 0
+	for ch in s:
+		w += int((_digit_cells.get(ch, {}) as Dictionary).get("adv", 0))
+	var win := DIGIT_WIN_DISC if disc else DIGIT_WIN_ARROW
+	var x := int((win - w) / 2.0)
+	for ch in s:
+		var c: Dictionary = _digit_cells.get(ch, {})
+		if c.is_empty():
+			continue
+		for gy in int(c["h"]):
+			for gx in int(c["w"]):
+				if _pm8_atlas.get_pixel(int(c["x"]) + gx, int(c["y"]) + gy).a > 0.0:
+					var tx := x + gx
+					var ty := 2 + gy
+					if tx >= 0 and tx < win and ty < img.get_height():
+						img.set_pixel(tx, ty, GHOST_DIGIT_INK)
+		x += int(c["adv"])
+	return img

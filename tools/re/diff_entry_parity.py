@@ -102,10 +102,15 @@ PAIRS = [
         [],
         0.0001,
     ),
+    # VIEW RIVAL FULL FRAME (run-2 frame 015): frame-baked body chrome + row
+    # template + STARJUGON/camrol row layer + right panel (kit patch, star-cell
+    # patches, assistant strip) + the proven pitch composite (bright rival
+    # markers + mirrored own-team ghost patches); walked AVs/rating/marker
+    # layout injected (AV formula + Barcelona's own tactic are un-RE'd data).
     (
         "rival_015.png",
         "015_162415.png",
-        (0, 0, 640, 62),
+        None,
         [],
         0.0001,
     ),
