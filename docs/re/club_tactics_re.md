@@ -172,10 +172,18 @@ not encode).
 
 ## Honest residue
 
-- Slot fields [0..3] un-decoded (present in stock + club tables alike).
-- The 7 lever bytes are stored RAW; byte→lever mapping is EXACT_PORT_PLAN gap B.
+- ~~Slot fields [0..3] un-decoded~~ **DECODED 2026-07-06** (`session_lineup_re.md` §3-4):
+  [0..3] = open-play x, y, dx, dy — the match lineup's ROAM BOX (min/max of transformed
+  [0]±[2], [1]±[3] → rec+0x18..+0x24); [4..7] = mk1/mk2 become the two START positions
+  (rec+0x8..+0x14). Same 318×198→pitch transform `FUN_0058c300` for all of them.
+- The 7 lever bytes are stored RAW; byte→lever mapping is EXACT_PORT_PLAN gap B — but they
+  now have a traced engine path: `FUN_0044d5f0` puts them in the lineup header in order
+  [0x1d9,0x1da,0x1db,0x1dd,0x1de,0x1df,0x1dc] → `team[0xc1..0xc7]`; `team[0xc7]` (lever
+  +0x1dc) selects the 0xe1 ftol constant (`stat_match_engine_re.md`).
 - Player bytes +0x16/+0x17/+0x1a and the 6-byte fine array's entries [1..5]
-  un-RE'd.
+  un-RE'd. (+0x16/+0x17 now have a CONSUMER: `FUN_0044d5f0` copies them to match rec
+  +0x2c/+0x30 → player +0x370/+0x36c (each −1); engine-side semantics still open. The
+  +0xf8 byte after the player id likewise feeds rec+0x42, engine-clamped 1..0x3c.)
 - Tag-2 records (`FUN_00579170`) un-identified (parsed + skipped exactly).
 - ~~game_db squad corruption~~ **CLOSED 2026-07-06**: game_db rebuilt from the
   exact parser (extract_squads_exact.py -> build_db.py); 475/476 xi-complete,

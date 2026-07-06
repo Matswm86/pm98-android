@@ -93,11 +93,20 @@ deprioritised (last). Approved path: build an **end-to-end oracle**, kill-test t
    `FUN_005a65a0`, only b1500/b1c80 stubbed; LCG state pinned per fixture so draw count + order are
    locked). `run_engine_oracle.sh` regenerated with 65a0 + b1420 un-stubbed (LCG poked 0 ==
    `engine_tick`'s default `Pm98Rng.new(0)`).
-3. **M3 — Real kickoff placement + real squad input.** Replace synthetic input: load the real
-   81-dword player records + team data (`matchctx+0x1a5c` block — provenance still a GAP, resolve
-   first) so the sim runs on decoded EQUIPOS attributes, not synthetic. Port the real kickoff-taker
+3. **M3 — Real kickoff placement + real squad input.** Replace synthetic input so the sim runs
+   on decoded EQUIPOS attributes, not synthetic. Port the real kickoff-taker
    decision (see `[[handoff-pm98-decide-wiring-active-ptr-2026-06-24]]`, `FUN_005a7260`).
    ~~FIRST: port the restart placement~~ **DONE in 2c** — the e2e unblocker landed there.
+   **3a. PROVENANCE RESOLVED (2026-07-06, s13 — `docs/re/session_lineup_re.md`).** The real
+   input is NOT the `+0x1a5c` block (that is the PALETTE table, display-only, demoted) and NOT
+   "81-dword records" (the per-actor highlight save/restore bank). It is the two **0x7a0 LINEUP
+   blocks at `session+0x58/+0x7f8`** (ctor `FUN_00449400`, filler `FUN_0044d5f0`), stored at
+   `team+0x9c` by `FUN_005b63e0` — the port's `team[0x9c]`/`session` injections are these exact
+   objects. Full rec-field map (shirt/positions/roam box/VE..PO/fitness/posFine+1/role/marking/
+   prior-leg events), the 318×198→pitch transform `FUN_0058c300`, venue pitch dims, and the
+   7-lever→`team[0xc1..0xc7]` header path are in the RE doc. **Remaining for M3 CLOSE:** extend
+   the exporters with 3 missing fields (player `+0xf8`, `+0x16/+0x17`, stadium dim u16s), build
+   the real-lineup feeder for `run_full_match.gd`, port the kickoff-taker decision.
 4. **M4 — End-to-end ORACLE (the kill-test).** Two candidate oracles (pick the cheaper that works):
    - **(a) full PCode-emu** of `FUN_005983f0`'s whole match with all leaves REAL (no stubs), same
      seed + same initial struct, dumping scoreline + the 16-byte event queue. Reuses `PcodeEmu.java`;
@@ -121,6 +130,9 @@ deprioritised (last). Approved path: build an **end-to-end oracle**, kill-test t
 - ~~`docs/re/match_engine_re.md` does not exist~~ **STALE (verified 2026-07-01): it EXISTS (16.2K)**
   — the decoded event enum, phase strings (0x65cc54–0x65ccf0), and the enqueue→dequeue call chain
   are all in it. The s8 handoff claim is retired.
-- `matchctx+0x1a5c` (per-actor 256-B data block base) provenance unresolved — embedded object,
-  vtable `0x6267b0`, built at `0x5420c5` on an unverified base. Blocks M3 real-input.
+- ~~`matchctx+0x1a5c` provenance unresolved~~ **RESOLVED 2026-07-06 (s13): the per-actor 256-B
+  PALETTE table** — align256 view of the `+0x1a54` buffer, blocks 0x000/0x200 team kits+keeper
+  palettes (`FUN_005b63e0`, `DatSim\paletas\`), 0x400 referee, 0x500/0x600 keepers. Display-only;
+  headless engine keeps `m[0x1a5c]=0`. Real M3 input = the session lineups —
+  `docs/re/session_lineup_re.md`.
 - Siblings resolved (s8): `+0xaac`/`+0xe74` = the two KEEPERS, `+0x123c` = REFEREE (not "teams").

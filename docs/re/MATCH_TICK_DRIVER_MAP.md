@@ -442,11 +442,14 @@ throwaway rng to build_match.**
 > "per-team populate") is the match **DESTRUCTOR** (frees the team-header array via
 > FUN_00605da0(match+0x46c, 800, 2, FUN_00591560)). **The real 22-player loader is the chain
 > FUN_00593600 -> FUN_005b6ba0 (per-team; builds 11 players, loop 0x764/0xac, stride 0x3bc, from the
-> squad source at team+0x9c) -> FUN_005a2830 (per-player builder).** team+0x9c (the squad source) is set
-> by the match-START caller at 0x44f1xx (the sole caller of the create-wrapper FUN_00590fc0; this=career
-> object `ebx`, ebx+0xfa0 = play-state), which loads it from the career / save subsystem -- OUTSIDE this
-> sim corpus. So a fully-standalone match-init needs that subsystem; the kill-test can instead seed the
-> player array from an oracle dump (see item 4).
+> squad source at team+0x9c) -> FUN_005a2830 (per-player builder).** ~~team+0x9c set by the 0x44f1xx
+> caller from the career/save subsystem — OUTSIDE this sim corpus~~ **PRECISED 2026-07-06
+> (`session_lineup_re.md`): team+0x9c is stored by FUN_005b63e0 (disasm 0x5934d5-0x5934fc) and points
+> at the 0x7a0 LINEUP block `session+0x58+ti*0x7a0` (session = the arg the 0x44f1xx caller passes =
+> matchctx+0x468; ebx+0xfa0 = play-state). The lineups are ctor'd by FUN_00449400 and filled by
+> FUN_0044d5f0 from the fixture global DAT_0066afd0 + each club's loaded .DBC object — the full
+> rec-field map is in that doc, so a standalone match-init no longer needs an oracle dump for the
+> data model (the dump remains useful as an independent cross-check).**
 
 3b-players. **NEXT: port the player-build chain FUN_005b6ba0 (per-team) + FUN_005a2830 (per-player).**
     FUN_005b6ba0 reads the squad header (team+0x9c: 9 dwords -> team[0xbf..199]) then builds up to 11

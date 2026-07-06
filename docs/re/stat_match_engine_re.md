@@ -285,7 +285,7 @@ base `match+0x84+i*0xac`; side 1 lines 385-665 at `match+0x7f8 + i*0x2b dwords`)
 | port field | port off | `FUN_0044d5f0` line | source (in-memory player record) |
 |------------|----------|---------------------|----------------------------------|
 | `SEL`    | `+0x88` | 175 (`iVar11+0x04`) | u16 shirt @ `player+0x00` |
-| `STR`    | `+0xbf` | 226 (`iVar11+0x3b`) | `FUN_005841e0(player)` = `mean(player+0x9c..0x9f)`, then `×3/4` in-form / `÷2` out-of-form (gated on `player+0x19<0xc`, `player+0x1c`, opponent-is-human) |
+| `STR`    | `+0xbf` | 226 (`iVar11+0x3b`) | `FUN_005841e0(player)` = `mean(player+0x9c..0x9f)`; **gate CORRECTED 2026-07-06** (`session_lineup_re.md` §5): `÷2` = role/slot GK mismatch, `×3/4` = POSITION-FIT band miss — role byte `+0x1c` vs the player's own tactic-slot grid coords (`club+(slot+2)*0x20`: DEF full iff mk1.x<0x6b, MID iff 0x59<mk1.x<0xb6, ATT iff mk2.x>0xd3). NOT fatigue/form/club-performance history — fully .DBC-derivable |
 | `GKSAVE` | `+0xc0` | 231 (`iVar11+0x3c`) | byte `player+0xa0`; **`+10` if slot 0 (GK)**, clamp 99 |
 | `PASS`   | `+0xc2` | 242 (`iVar11+0x3e`) | byte `player+0xa2` |
 | `POS`    | `+0xc8` | 251 (`iVar11+0x44`) | byte `player+0x18` **`+1`** → `POS_WEIGHT` index |
@@ -346,13 +346,16 @@ broad role = the `positions_re.md` demarcación = `game_db` `pos` (`GK/DF/MF/FW`
 (`0x584019`); read by `FUN_005841e0`/`FUN_00582db0` to resolve the club for STR scaling.
 
 **Two caveats carried into the port (documented, not guessed):**
-* **STR fatigue-scaling is a runtime club-state dependency, out of game_db scope.** For a
-  starter (`+0x19 < 0xc`) of a "real" club (`club+0x10 != 0` and `club+0x5c != 0xffff`),
-  `FUN_005841e0` reduces STR to `mean/2` (GK / slot-1 outfield) or `mean*3/4`, gated on a
-  per-slot **club-performance band table** `(+0x19+2)*0x20 + club+0x10` (fixture/fatigue
-  history). `game_db` carries no form or club-perf bands, so the faithful **baseline is the
-  plain `mean`** (the unfatigued / `goto LAB_005842f6` path); fatigue-scaling is left as a
-  runtime-only refinement.
+* ~~STR fatigue-scaling is a runtime club-state dependency~~ **CORRECTED 2026-07-06
+  (`session_lineup_re.md` §5): the gate is a POSITION-FIT band check, fully .DBC-derivable.**
+  For a starter (`+0x19 < 0xc`) of a loaded league club (`club+0x10 != 0`, `club+0x5c !=
+  0xffff`), `FUN_005841e0` compares the ROLE byte (`+0x1c`) with the player's own tactic-slot
+  block `(+0x19+2)*0x20 + club` (the SAME `+0x60+i*0x20` slot rows, raw 318×198 grid): GK/slot
+  mismatch → `mean/2`; DEF keeps full mean iff mk1.x (`block[4]`) < 0x6b, MID iff 0x59 <
+  mk1.x < 0xb6, ATT iff mk2.x (`block[6]`) > 0xd3 — else `mean*3/4`. The old
+  "club-performance band table (fixture/fatigue history)" reading of `club+0x10` was wrong:
+  `club+0x10` there is the loaded-club-record null check, and the band table is the tactic
+  slots. A game_db+club_tactics port can therefore compute the EXACT gated STR.
 * **`+0x18` is a FINER position code (0..18 → the 19-entry `POS_WEIGHT`), not the 0-3
   demarcación.** **DECODED 2026-06-23** — it is the EQUIPOS byte at `d[Y-12]` (Y = birth-year
   anchor), in both the compact and English records; cross-validation + the role partition are in

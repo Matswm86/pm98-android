@@ -317,5 +317,7 @@ Remaining:
   - Shared per-frame quadruplet `{5a5460,5a3400,5a4560,5a4600}`; slot 2 `FUN_005a4560` copies an
     **81-dword (0x51) record** `this+0x3b0[DAT_006d31c0] → this+0x40` per frame (corrects s6's loose
     "0x1dc + idx*0x191" → base `this+0x3b0`, stride `0x51` dwords).
-  - **Still-open GAPs:** ball goal-line-cross test; home/away ↔ keeper-idx 1/2 mapping;
-    `matchctx+0x1a5c` provenance (embedded object, vtable `0x6267b0`, built `0x5420c5` on unverified base).
+  - **Still-open GAPs:** ball goal-line-cross test; home/away ↔ keeper-idx 1/2 mapping.
+    ~~`matchctx+0x1a5c` provenance~~ **RESOLVED 2026-07-06: the per-actor PALETTE table** (kit bytes +
+    `DatSim\paletas\` keeper palettes, `FUN_005b63e0`; +0x400 referee, +0x500/+0x600 keepers) —
+    display-only; see `docs/re/session_lineup_re.md` §2.

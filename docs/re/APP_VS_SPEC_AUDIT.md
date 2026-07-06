@@ -214,8 +214,10 @@ Byte-search (`.text` disp `0x1614`/`0x1618`/`0x161c`) + Ghidra decompile
     copies an **81-dword (0x51) record** `this+0x3b0[DAT_006d31c0] → this+0x40` each frame (the s6
     "record copy" is this; corrected: record base `this+0x3b0`, stride `0x51` dwords, not `0x191`).
   - GAP still open (flag, do NOT fill): a literal goal-line-cross test for the ball; home/away mapping
-    of keeper-idx 1↔2; and provenance of the `matchctx+0x1a5c` data table (zeroed at `0x5912df`, an
-    embedded object w/ vtable `0x6267b0` built at `0x5420c5` on an unverified base — see s8 handoff).
+    of keeper-idx 1↔2. ~~provenance of the `matchctx+0x1a5c` data table~~ **RESOLVED 2026-07-06:
+    the per-actor PALETTE table** (align256 of the `+0x1a54` buffer; team kit bytes + `DatSim\paletas\
+    palpor%d` keeper palettes via `FUN_005b63e0`; +0x400 referee, +0x500/+0x600 keepers). Display-only
+    — no outcome consumer; see `docs/re/session_lineup_re.md` §2.
 
 **Still open:** human-readable action label per kind (no name string in the engine — never
 invent one) · `player+0x2bc` band-flag meaning · `JUGCAM.IND` internal layout/consumer ·
