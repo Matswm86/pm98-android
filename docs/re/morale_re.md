@@ -93,6 +93,43 @@ The squad screens' keeper-AV mystery (frame 80 vs our outfield-8 average 51) is
 resolved: the original never averages the 10 skill attrs — RATING/AV is the four
 CORE attrs + the two dynamic bars. Same function drives the auto-sub pick (below).
 
+### Table-paint proof + TEAM RATING (closed 2026-07-06)
+
+The squad-TABLE AV column (LINE-UP / TACTICS board / VIEW RIVAL) is the SAME
+function — traced from the paint side (decompiles in `docs/re/lineup/`):
+
+- **`FUN_004f5260`** = the boxed-row squad-table control's row painter (the
+  vtable paint the LINE-UP screen widgets dispatch to). It calls
+  `FUN_00581e60()` and draws it at rel x `0x142..0x15a` → screen **353..377 =
+  the walked AV cell [353,22)**; the numeric-mode MO cell (rel `0x128..0x140`)
+  comes from `FUN_00582db0()`; the RATING-mode star strip gets the SAME
+  `FUN_00581e60` value via the star drawer `FUN_004f79b0` (the (AV+1)/10
+  halves rule). Shirt-number byte `+0xf8` at rel 3..24, name at rel
+  `0x27..0x8e`, injured/banned branch via `FUN_005836a0` — every walked column
+  accounted for. The stored-attr weighted-mean search (tacticas_screen_re.md)
+  failed precisely because FI/MO are dynamic, not in EQUIPOS.
+- **TEAM RATING** (`FUN_004fe540`, draws the `TEAM RATING` string):
+  `FUN_0057a3a0() / 0xb` — `FUN_0057a3a0` sums `FUN_00581e60()` over the XI
+  (`+0x19 < 0xc`) SKIPPING injured/banned (`FUN_005836a0`), and the divisor is
+  a FIXED 11 regardless of how many were skipped. **Walked proof, exact:**
+  frame 155 (Beckham injured) shows 77 = (936 − 88)/11 — unreachable by any
+  mean; frame 015 shows 87 = 959/11.
+- **Beckham single-point anchor (frame 155)**: FI 82 + MO 99 + AV 88 all
+  frame-shown; core4 (game_db) = 350 → (350+82+99)/6 = **88** exact.
+- **014→155 delta**: all 11 MU AVs rise exactly +1 across the Mon-4 friendly —
+  consistent with the played +3 FI / +3 MO post-match delta (+6/6 = +1).
+- **Preseason fitness**: the Mon-4-Aug frames (014/015) need FI ≈ 95-99 on
+  several men (Giovanni AV 91 with core4 352 needs FI+MO ≥ 194), while the
+  post-kickoff FICHA frames (081/084) show FI 70 — so the `FUN_005825c0`
+  halfway-toward-40 fitness leg lands at/by season KICKOFF, not at new-game
+  creation; preseason squads sit at ~99.
+- **CPU best-XI picker `FUN_005776f0`** (rival/auto-pick side): per broad
+  group (`+0x1c`), over UNPICKED men (`+0x19 == 0x63`), takes max of
+  `FUN_00581e60() * (+0xa8 cap byte)` (falls back to adjacent groups). The
+  cap byte is 99 for everyone at init, so ordering equals pure-rating order —
+  the app's `Tactics.auto_pick` stays faithful; `+0xa8`'s career semantics
+  remain un-RE'd.
+
 ## Post-match updates (every club, every round)
 
 1. **Slot deltas** (`FUN_00582690`, per player; QU = quality byte `+0x9f`):

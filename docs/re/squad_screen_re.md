@@ -43,11 +43,14 @@ at the frame's measured geometry (border scan: cells AV 273-298 | MO 298-323 | L
 its own value colour, and the first section's label lives in that header row.
 - **N°** = the decoded per-player squad number (`squadNo`, byte after the photo-id u16
   — `squad_number_re.md`); `-` when the club's stored set isn't individuated.
-- **AV** = `_avg_of`; **LOAN** = YES/NO off `on_loan`; **WAGE** = `Contract.yearly(
-  current_weekly)` formatted `£1,000,000`; **YEARS** = `contract_term | contract_years`
+- **AV** = `Morale.av6` (the real `FUN_00581e60` rating — morale_re.md) when the
+  squad carries form, else `_avg_of` for a bare GameDB browse club; **LOAN** =
+  YES/NO off `on_loan`; **WAGE** = `Contract.yearly(current_weekly)` formatted
+  `£1,000,000`; **YEARS** = `contract_term | contract_years`
   (term | left, both stamped by Career; `-` for a bare GameDB browse club).
-- **MO** stays an honest `-` — morale is a dynamic save value with no app model yet
-  (do NOT show the unrelated static RM attribute). APP_VS_SPEC_AUDIT B7.
+- **MO** = `Morale.display` when form exists, else an honest `-` (morale is a
+  dynamic save value — morale_re.md; do NOT show the unrelated static RM
+  attribute). APP_VS_SPEC_AUDIT B7.
 - **Row order** = reverse record order per section (decoded, `squad_number_re.md`);
   the ability sort is gone. Row-height compression for deep squads remains our one
   documented deviation (the original pages/scrolls per section).

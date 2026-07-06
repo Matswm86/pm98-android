@@ -518,9 +518,10 @@ func _undo() -> void:
 
 # ---- helpers ---------------------------------------------------------------
 
-## Displayed AV: frame-true "av" override wins (the formula is un-RE'd —
-## tacticas_screen_re.md); else the live rating (Morale.av6) when the squad
-## carries form, else the attrs-mean approximation.
+## Displayed AV: frame-true "av" override wins (parity shots pin the frame's
+## dynamic FI/MO); else the real rating (Morale.av6 = FUN_00581e60 — the table
+## paint FUN_004f5260 draws this exact cell from it, morale_re.md) when the
+## squad carries form, else the attrs-mean approximation.
 func _av_of(p: Dictionary) -> int:
 	if p.has("av"):
 		return int(p["av"])
@@ -752,6 +753,10 @@ func _draw_scrollbar() -> void:
 
 # ---- right panel ------------------------------------------------------------
 
+## TEAM RATING = sum of the XI's AVs, SKIPPING injured/banned men
+## (FUN_005836a0), over a FIXED /11 (FUN_004fe540: FUN_0057a3a0() / 0xb) —
+## walked proof: frame 155 shows 77 = (936 - Beckham's 88) / 11, frame 015
+## shows 87 = 959 / 11 (morale_re.md).
 func _team_rating() -> int:
 	if _club.has("team_rating"):
 		return int(_club["team_rating"])
@@ -759,13 +764,11 @@ func _team_rating() -> int:
 	if xi.is_empty():
 		return 0
 	var sum := 0
-	var n := 0
 	for pid in xi:
 		var p: Variant = _by_id.get(int(pid))
-		if p != null:
+		if p != null and Availability.is_available(p):
 			sum += _av_of(p)
-			n += 1
-	return int(round(float(sum) / n)) if n > 0 else 0
+	return sum / 11
 
 
 func _draw_right_panel() -> void:

@@ -339,10 +339,15 @@ func _shirt(p: Dictionary, slot: int) -> int:
 	return no if no > 0 else slot + 1
 
 
+## Displayed AV: frame-true "av" override wins (parity shots pin the frame's
+## dynamic FI/MO); else the real rating (Morale.av6 = FUN_00581e60 — the table
+## paint FUN_004f5260 draws this exact cell from it, morale_re.md) when the
+## squad carries form, else the attrs-mean approximation.
 func _av_of(p: Dictionary) -> int:
 	if p.has("av"):
 		return int(p["av"])
-	# documented approximation while the AV formula is un-RE'd (attrs mean)
+	if p.has("morale") or p.has("fitness"):
+		return Morale.av6(p)
 	var attrs: Variant = p.get("attrs", {})
 	if not (attrs is Dictionary) or (attrs as Dictionary).is_empty():
 		return 0
@@ -367,19 +372,21 @@ func _pos_word(p: Dictionary) -> String:
 	return str(POS_WORD.get(str(p.get("pos", "")).to_upper(), str(p.get("pos", ""))))
 
 
+## TEAM RATING = sum of the XI's AVs, SKIPPING injured/banned men
+## (FUN_005836a0), over a FIXED /11 (FUN_004fe540: FUN_0057a3a0() / 0xb) —
+## walked proof: frame 155 shows 77 = (936 - Beckham's 88) / 11, frame 015
+## shows 87 = 959 / 11 (morale_re.md).
 func _team_rating() -> int:
 	if _rival.has("team_rating"):
 		return int(_rival["team_rating"])
 	if _tactics == null:
 		return 0
 	var sum := 0
-	var n := 0
 	for pid in _tactics.xi:
 		var p: Variant = _by_id.get(int(pid))
-		if p != null:
+		if p != null and Availability.is_available(p):
 			sum += _av_of(p)
-			n += 1
-	return int(round(float(sum) / n)) if n > 0 else 0
+	return sum / 11
 
 
 # ---- drawing ------------------------------------------------------------------

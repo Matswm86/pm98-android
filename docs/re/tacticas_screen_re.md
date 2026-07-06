@@ -165,17 +165,18 @@ TEAM TACTICS → `TacticsScreen` modal; VIEW RIVAL → `RivalScreen`; LINE-UP �
 `LineupScreen`; RETURN → hub. PARAM./RATING toggles the stat columns.
 
 ## Honest gaps (documented, not faked)
-- **The AV formula is UN-RE'D.** No stored byte exists: English EQUIPOS records
-  carry only the 10 attrs (media is compact-record-only, and media != AV —
-  Hesp media 93 shows AV 83, Rivaldo 76 shows 90). Exhaustive integer search
-  (weights 0..4 over all 10 attrs, floor+round, per broad pos) over 22
-  frame-true samples (014 Man Utd + 015 Barcelona) finds NO weighted-mean fit;
-  Giovanni/Rivaldo share sum(VE,RE,AG,CA)=352 but show 91/90, so extra attrs
-  matter. `FUN_00582db0` (base `player+0xa6` + `FUN_00582e90` playable-pos
-  penalty + `FUN_0057b710` value/wage bonus, clamp 40..99) is a DIFFERENT
-  career-adjusted rating. The screen renders `p["av"]` when present (the parity
-  shot injects the frame values) else the app's documented attrs-mean
-  approximation — same doctrine as the FICHA RATING gap.
+- **The AV formula is CLOSED (2026-07-06 — morale_re.md).** AV =
+  `FUN_00581e60` = (VE+RE+AG+CA + FITNESS + displayed-MO)/6, confirmed from
+  the paint side: the squad-table row painter `FUN_004f5260` draws that
+  function's value into the walked AV cell (rel 0x142..0x15a = screen
+  353..377) and feeds the same value to the RATING-mode star strip
+  ((AV+1)/10 halves). The 10-attr weighted-mean search recorded here failed
+  because FI/MO are DYNAMIC bytes, not EQUIPOS attrs — Giovanni 91 vs
+  Rivaldo 90 on equal core4 352 is FI/MO variation; the walked preseason
+  frames need FI ≈ 95-99 (the halfway-to-40 fitness event lands at season
+  kickoff). The screen renders `p["av"]` when present (parity shots inject
+  the frame values — the frame's exact FI/MO are not reproducible live) else
+  `Morale.av6` when the squad carries form, else the attrs-mean fallback.
 - **Per-slot ROLE-reassign arrow is drawn (baked) but read-only** — the app has
   no role-override model (the match engine reads `posFine` from the DB).
 - **PARAM. (numeric) view is un-walked on this screen** — the numeric column

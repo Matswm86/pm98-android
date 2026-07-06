@@ -155,8 +155,9 @@ func _run() -> void:
 		if str(c.get("name", "")).begins_with("MANCHESTER U"):
 			manu3 = c
 	# The frame's XI in slot order (read off the pitch discs: outfield slots 0..9 =
-	# shirts 2,3,21,6,8,7,10,9,11,20; GK 1) and its displayed AVs — the AV formula
-	# is un-RE'd (tacticas_screen_re.md), so the frame-true values are injected.
+	# shirts 2,3,21,6,8,7,10,9,11,20; GK 1) and its displayed AVs — AV = Morale.av6
+	# (FUN_00581e60), but it reads the frame's DYNAMIC FI/MO, which no fresh app
+	# state reproduces, so the frame-true values are injected (morale_re.md).
 	var frame_av := {"SCHMEICHEL": 88, "GARY NEVILLE": 81, "IRWIN": 84, "BERG": 85,
 		"PALLISTER": 81, "BUTT": 83, "BECKHAM": 87, "SHERINGHAM": 80, "COLE": 84,
 		"GIGGS": 87, "SOLSKJAER": 85}
@@ -186,7 +187,7 @@ func _run() -> void:
 
 	# ---- LINE-UP FULL FRAME (run-2 frame 155: MU home vs Sao Paulo, Wed 6) --------
 	# The frame's exact state: 3-5-2 XI (tactics 014 slot order), the walked AVs
-	# (the AV formula is un-RE'd — injected like tactics_014), Beckham INJURED
+	# (frame-dynamic FI/MO — injected like tactics_014), Beckham INJURED
 	# 7 weeks (FI 82 / MO 99 -> the gold row + UNDO), Solskjaer SELECTED (2px row
 	# frame, name band, attr values, coverage zone + white markers), TEAM RATING
 	# 77, and the save's bench/reserve order pinned on the club dict.
@@ -237,8 +238,8 @@ func _run() -> void:
 	await process_frame
 
 	# ---- VIEW RIVAL FULL FRAME (run-2 frame 015: at F.C. Barcelona, Monday 4) -----
-	# The frame's exact state: Barcelona XI rows 1..11 with the walked AVs (the AV
-	# formula is un-RE'd — injected), TEAM RATING 87, assistant A. Leigh 4*, the
+	# The frame's exact state: Barcelona XI rows 1..11 with the walked AVs (frame-
+	# dynamic FI/MO — injected), TEAM RATING 87 (= 959/11), assistant A. Leigh 4*, the
 	# walked marker layout (Barcelona's own tactic matches no stock formation —
 	# injected from the bake's derivation), and MU's 3-5-2 (frame 014 XI) as the
 	# OWN tactics feeding the mirrored ghost overlay.

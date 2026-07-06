@@ -229,12 +229,15 @@ func setup(club: Dictionary, tactics: Tactics, manager := "", division := "",
 
 # ---- helpers -------------------------------------------------------------
 
-## The displayed AV. The true in-engine formula is UN-RE'D (tacticas_screen_re.md
-## "Honest gaps"): a frame-true "av" override wins; else the app's documented
-## attrs-mean approximation.
+## Displayed AV: frame-true "av" override wins (parity shots pin the frame's
+## dynamic FI/MO); else the real rating (Morale.av6 = FUN_00581e60 — the table
+## paint FUN_004f5260 draws this exact cell from it, morale_re.md) when the
+## squad carries form, else the attrs-mean approximation.
 func _av_of(p: Dictionary) -> int:
 	if p.has("av"):
 		return int(p["av"])
+	if p.has("morale") or p.has("fitness"):
+		return Morale.av6(p)
 	var attrs: Variant = p.get("attrs", {})
 	if not (attrs is Dictionary) or (attrs as Dictionary).is_empty():
 		return 0

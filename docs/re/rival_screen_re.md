@@ -104,13 +104,20 @@ only). Bake: `tools/re/build_rival_chrome_from_frames.py` (assert-driven) →
   The bake PROVES the full model: campo + ghost patches + bright composites
   recompose frame 015's pitch to **0px**.
 
-Honest gaps: AV formula + TEAM RATING source un-RE'd (walked values injected;
-live = attrs-mean approximation) · rival club tactics un-decoded (auto_pick
-live model) · PARAMETERS numeric view un-walked on this screen (cells centred
-under the header letters, lineup-128 inks) · the hire-an-Assistant state
-un-walked (kept as the text rendering) · flip-state toggle plates + arrow
-spots are reconstructions · ghost dim LUT/digit ink are approximations for
-un-walked own states.
+Honest gaps: ~~AV formula + TEAM RATING source~~ **CLOSED 2026-07-06
+(morale_re.md)**: AV = `FUN_00581e60` (core4+FI+MO)/6 — drawn by the shared
+table row painter `FUN_004f5260`; TEAM RATING = `FUN_004fe540`:
+`FUN_0057a3a0()/0xb` (sum of XI AVs skipping injured/banned, FIXED /11 —
+walked 87 = 959/11 on this frame, 77 = (936−88)/11 on lineup-155). Walked
+values stay injected in the parity shot (frame FI/MO not reproducible live);
+live = `Morale.av6` + the sourced team-rating rule. Still open: rival club
+tactics un-decoded (auto_pick live model — `FUN_005776f0` confirms the
+in-engine picker maxes `FUN_00581e60 × (+0xa8 cap byte)` per broad group) ·
+PARAMETERS numeric view un-walked on this screen (cells centred under the
+header letters, lineup-128 inks) · the hire-an-Assistant state un-walked
+(kept as the text rendering) · flip-state toggle plates + arrow spots are
+reconstructions · ghost dim LUT/digit ink are approximations for un-walked
+own states.
 
 ## App mapping (-> `app/scenes/RivalScreen.gd`)
 PM98's staff EFFECTS are data-driven from the save; the app's `Staff` model is ours
