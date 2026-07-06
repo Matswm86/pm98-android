@@ -110,10 +110,17 @@ table row painter `FUN_004f5260`; TEAM RATING = `FUN_004fe540`:
 `FUN_0057a3a0()/0xb` (sum of XI AVs skipping injured/banned, FIXED /11 —
 walked 87 = 959/11 on this frame, 77 = (936−88)/11 on lineup-155). Walked
 values stay injected in the parity shot (frame FI/MO not reproducible live);
-live = `Morale.av6` + the sourced team-rating rule. Still open: rival club
-tactics un-decoded (auto_pick live model — `FUN_005776f0` confirms the
-in-engine picker maxes `FUN_00581e60 × (+0xa8 cap byte)` per broad group) ·
-PARAMETERS numeric view un-walked on this screen (cells centred under the
+live = `Morale.av6` + the sourced team-rating rule. ~~Rival club tactics
+un-decoded~~ **CLOSED 2026-07-06 (club_tactics_re.md)**: each club's OWN tactic
+ships in its EQUIPOS.PKF `.DBC` record (11 x 8 u16 slot block, `FUN_00579c70` /
+`FUN_0058c130`) and is what `*(screen+0x1928)` (the lazily-loaded club object,
+`FUN_005793d0` chain) holds at +0x60+i*0x20 — Barcelona's decoded block
+reproduces THIS frame's 22 walked markers EXACTLY (offset 0x6a, unique hit);
+live rivals now draw it from `app/data/club_tactics.json` (auto_pick remains
+only the XI-selection + missing-club fallback; `FUN_005776f0` confirms the
+in-engine picker maxes `FUN_00581e60 × (+0xa8 cap byte)` per broad group; the
+.DBC's TRUE XI bytes player+0x1b/+0x1d stay un-extracted — residue). Still
+open: PARAMETERS numeric view un-walked on this screen (cells centred under the
 header letters, lineup-128 inks) · the hire-an-Assistant state un-walked
 (kept as the text rendering) · flip-state toggle plates + arrow spots are
 reconstructions · ghost dim LUT/digit ink are approximations for un-walked
@@ -135,10 +142,12 @@ SUPERSEDED 2026-07-06: the "second marker phase" of the decompile is now frame-d
 on the walked screen). The app renders BOTH marker sets faithfully; the reveal gate
 keeps the two app states (q==0 message / q>=1 full report).
 
-Rival XI + formation come from `Tactics.auto_pick(rival_club)` (the same selector MatchSim
-fields CPU sides with) — the walked frames prove clubs carry their OWN tactic (Barcelona's
-slot layout matches no stock formation), which PM98 does not decode: auto_pick is the
-documented live model and the parity shot injects the walked marker list. The
+Rival marker layout comes from the club's OWN stored tactic (`club_tactics.json`, decoded
+2026-07-06 — see `club_tactics_re.md`; slots reordered GK/DEF/MID/FWD by the sourced
+FUN_004fe2d0 band rule) with `Tactics.auto_pick_shape` selecting the XI for the slot-table's
+band counts; clubs missing from the data fall back to `Tactics.auto_pick` + stock
+formations (MatchSim still fields CPU sides with auto_pick — unchanged). The parity shot
+injects the walked marker list (the frame also pins the XI). The
 COMPUTER/mgr box shows the rival club's `manager`, else `COMPUTER`. Native 640x480;
 scales to fit its parent (same transform as LINE-UP). Wired at the hub OPPONENT icon
 (Main `_show_opponent`, which also passes the manager's own Tactics for the ghost

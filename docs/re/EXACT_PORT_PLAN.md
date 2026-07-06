@@ -1105,10 +1105,11 @@ a `5b70e0; 5b73a0` pair; the 5b8bf0/5b8c20 vtable loops are driven from 0x598b35
   (`ghidra_scripts/DecompileAt.java`); port to GDScript in **integer fixed-point** (`0x10000`
   = 1 unit) with **exact RNG call order**. Port the 9 event-generators (`58e2c0 58f3c0 5909f0
   5966d0 5a50c0 5a7260 5ab5a0 5aeda0 5b41c0`).
-- **B. Tactics→sim coupling.** Find the tactics struct: grep ma_9 strings ("ATTACKING PLAY",
-  "TACKLING", "MARKING", "PRESSURISE FROM", "COUNTER ATTACK", "LONG BALL") via
-  `strings_xref.py`, xref store sites (`FindWordStore.java`) → per-club tactics offsets; find
-  read sites in the sim (`FindFieldUsers.java`) → which behavior thresholds they modify; port,
+- **B. Tactics→sim coupling.** The tactics struct is FOUND (2026-07-06, `club_tactics_re.md`):
+  it IS the 0x2a4 club object — 11 slots at +0x60+i*0x20 (mk1 +0x10/+0x14, mk2 +0x18/+0x1c)
+  and **7 lever bytes at club+0x1d9..+0x1df**, loaded from the club's EQUIPOS.PKF `.DBC`
+  (`FUN_00579c70`). Remaining: map each lever byte to its ma_9 modal row, find its sim read
+  sites (`FindFieldUsers.java` on 0x1d9..0x1df) → which behavior thresholds they modify; port,
   then replace the `Tactics.gd` `_*_FACTOR` multipliers + `ratings()` math. Keep the modal UI.
 - **C. Attribute mapping.** Map `game_db` attr codes (EN/VE/RE/AG/CA/RM/RG/PA/TI/PO) → sim
   player-struct offsets, confirmed via `005923f0` squad→match-player copy.

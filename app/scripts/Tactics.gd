@@ -169,8 +169,25 @@ static func auto_pick(club: Dictionary, form: String = DEFAULT_FORMATION) -> Tac
 	t._derive_roles(club)
 	return t
 
-## (Re)select the XI for the current formation from the club's squad.
-func _fill_xi(club: Dictionary) -> void:
+## Field an XI for an explicit outfield shape [n_def, n_mid, n_fwd]. A club's OWN
+## stored tactic (app/data/club_tactics.json, the EQUIPOS.PKF slot block) may match
+## no stock formation — 4-6-0 and 5-5-0 shapes exist in the shipped data. When the
+## counts equal a stock formation its name is kept (label + ratings factor);
+## otherwise the default label stands in and the counts still rule the fill.
+static func auto_pick_shape(club: Dictionary, n_def: int, n_mid: int, n_fwd: int) -> Tactics:
+	var t := Tactics.new()
+	for name in FORMATION_ORDER:
+		var lines: Array = FORMATIONS[name]
+		if int(lines[0]) == n_def and int(lines[1]) == n_mid and int(lines[2]) == n_fwd:
+			t.formation = name
+			break
+	t._fill_xi(club, [n_def, n_mid, n_fwd])
+	t._derive_roles(club)
+	return t
+
+## (Re)select the XI for the current formation from the club's squad. `counts`
+## overrides the formation's [DEF, MID, FWD] line counts when given (own-shape fill).
+func _fill_xi(club: Dictionary, counts: Array = []) -> void:
 	var players: Array = club.get("players", [])
 	var keepers: Array = []
 	var outfield: Array = []   # [{id, atk, def, ovr}]
@@ -190,7 +207,7 @@ func _fill_xi(club: Dictionary) -> void:
 				"pos": str(p.get("pos", ""))})
 
 	keepers.sort_custom(func(a, b): return a["po"] > b["po"])
-	var lines: Array = FORMATIONS[formation]
+	var lines: Array = counts if counts.size() == 3 else FORMATIONS[formation]
 	var n_def := int(lines[0])
 	var n_mid := int(lines[1])
 	var n_fwd := int(lines[2])

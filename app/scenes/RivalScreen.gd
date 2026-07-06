@@ -21,8 +21,11 @@ class_name RivalScreen
 ##
 ## Frame-injection levers for the parity shot (same doctrine as the AV gap):
 ## per-player `av`, club `team_rating`, club `rival_markers` (the walked marker
-## list — Barcelona's slot layout matches NO stock formation; live rivals use
-## Tactics.auto_pick + formations.json, documented).
+## list, kept because the frame also pins the XI). Live rivals draw their OWN
+## stored tactic from club_tactics.json (EQUIPOS.PKF slot table — the exact
+## struct FUN_005733d0 reads off the rival club object; Barcelona's decode
+## reproduces the walked frame-015 layout, see rival_screen_re.md); clubs
+## missing from the data fall back to Tactics.auto_pick + formations.json.
 
 signal back_pressed
 signal tactics_pressed
@@ -108,6 +111,8 @@ var _by_id: Dictionary = {}
 var _press := ""
 var _rating_view := true
 var _forms: Dictionary = {}
+var _club_tactics: Dictionary = {}  # app club id (str) -> EQUIPOS.PKF own-tactic record
+var _club_slots: Array = []         # rival's own slots, reordered [GK, DEF.., MID.., FWD..]
 var _samples: Dictionary = {}
 
 var _f8: Font
@@ -171,6 +176,7 @@ func _ready() -> void:
 		_arrow_flip_img.flip_x()
 	_load_samples()
 	_load_formations()
+	_load_club_tactics()
 	_load_digit_cells()
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2(W, H)
@@ -212,6 +218,18 @@ func _load_formations() -> void:
 	if d is Dictionary:
 		for rec in (d as Dictionary).get("formations", []):
 			_forms[str(rec.get("name", ""))] = rec
+
+
+## Every club's OWN stored tactic, decoded from the EQUIPOS.PKF per-club .DBC
+## records (tools/re/export_club_tactics.py; MANAGER.EXE FUN_00579c70 slot block —
+## the same 11x0x20 slot struct VIEW RIVAL draws from the rival club object).
+func _load_club_tactics() -> void:
+	var f := FileAccess.open("res://data/club_tactics.json", FileAccess.READ)
+	if f == null:
+		return
+	var d: Variant = JSON.parse_string(f.get_as_text())
+	if d is Dictionary:
+		_club_tactics = (d as Dictionary).get("clubs", {})
 
 
 ## ProMan8 digit glyph cells (BMFont) for the marker-number composites.
@@ -259,7 +277,20 @@ func setup(rival: Dictionary, own: Dictionary, assist_quality: int, assist_name:
 			"bottom": PMChrome.title_case_name(str(own.get("name", ""))),
 			"club_id": int(own.get("id", -1)), "weekday": str(d["wd"]),
 			"day": str(d["day"]), "month": str(d["mon"]), "year": str(d["year"])}
-	_tactics = Tactics.auto_pick(rival) if not rival.is_empty() else null
+	_club_slots = _club_slot_order(int(rival.get("id", -1)))
+	if not _club_slots.is_empty():
+		# The rival fields its OWN stored shape (band counts from the slot table);
+		# the XI is still the app's auto-pick (the .DBC per-player slot bytes —
+		# player+0x1b in FUN_00579c70's squad loop — are not extracted yet).
+		var d0 := 0
+		var m0 := 0
+		for i in range(1, _club_slots.size()):
+			match _slot_band(_club_slots[i]):
+				"DEF": d0 += 1
+				"MID": m0 += 1
+		_tactics = Tactics.auto_pick_shape(rival, d0, m0, _club_slots.size() - 1 - d0 - m0)
+	else:
+		_tactics = Tactics.auto_pick(rival) if not rival.is_empty() else null
 	_by_id.clear()
 	for p in rival.get("players", []):
 		_by_id[int(p.get("id", -1))] = p
@@ -555,14 +586,24 @@ func _nano_kit(id: int) -> Texture2D:
 
 # ---- pitch ------------------------------------------------------------------------
 
-## The rival's marker list: the frame-injected walked layout when present (the
-## club's own tactic matches no stock formation), else the app's auto-picked
-## formation through formations.json (documented live model).
+## The rival's marker list, in priority order:
+##  1. the frame-injected walked layout (parity shots pin the frame),
+##  2. the club's OWN stored tactic from EQUIPOS.PKF (club_tactics.json — the
+##     slot table VIEW RIVAL reads off the rival club object, FUN_005733d0),
+##  3. the stock formation through formations.json (clubs missing from the data).
 func _rival_markers() -> Array:
 	if _rival.has("rival_markers"):
 		return _rival["rival_markers"]
 	var out: Array = []
 	if _tactics == null:
+		return out
+	if not _club_slots.is_empty():
+		for i in mini(_tactics.xi.size(), _club_slots.size()):
+			var s: Dictionary = _club_slots[i]
+			var p: Variant = _by_id.get(int(_tactics.xi[i]))
+			var num := _shirt(p if p is Dictionary else {}, i)
+			out.append({"kind": "disc", "mk": s.get("mk1", [0, 0]), "num": num})
+			out.append({"kind": "arrow", "mk": s.get("mk2", [0, 0]), "num": num})
 		return out
 	var rec: Variant = _forms.get(_tactics.formation)
 	if rec == null:
@@ -580,6 +621,41 @@ func _rival_markers() -> Array:
 		out.append({"kind": "disc", "mk": s.get("mk1", [0, 0]), "num": num})
 		out.append({"kind": "arrow", "mk": s.get("mk2", [0, 0]), "num": num})
 	return out
+
+
+## The band a slot belongs to, by the sourced row-tint rule (FUN_004fe2d0):
+## mk1.x_raw < 0x41 -> DEF, elif mk2.x_raw < 0x104 -> MID, else FWD.
+func _slot_band(slot: Dictionary) -> String:
+	var raw: Array = slot.get("raw", [])
+	if raw.size() < 8:
+		return "MID"
+	if int(raw[4]) < 0x41:
+		return "DEF"
+	if int(raw[6]) < 0x104:
+		return "MID"
+	return "FWD"
+
+
+## The rival club's own tactic slots reordered [GK, DEF.., MID.., FWD..] so they
+## pair with the auto-picked XI order. GK = slot 0 (holds in all 476 shipped
+## records: mk1 == mk2 == the (0,68) park spot); outfield slots keep their .DBC
+## order within each band. Empty when the club is not in club_tactics.json.
+func _club_slot_order(club_id: int) -> Array:
+	var rec: Variant = _club_tactics.get(str(club_id))
+	if rec == null:
+		return []
+	var slots: Array = (rec as Dictionary).get("slots", [])
+	if slots.size() != 11:
+		return []
+	var defs: Array = []
+	var mids: Array = []
+	var fwds: Array = []
+	for i in range(1, slots.size()):
+		match _slot_band(slots[i]):
+			"DEF": defs.append(slots[i])
+			"MID": mids.append(slots[i])
+			_: fwds.append(slots[i])
+	return [slots[0]] + defs + mids + fwds
 
 
 ## Own (ghost) slot list: [mk1, mk2, shirt] per XI slot, GK first.

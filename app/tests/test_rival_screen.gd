@@ -78,6 +78,43 @@ func _run() -> void:
 	ok = _assert(screen._tactics == null and screen._team_rating() == 0,
 		"empty rival: no tactics, zero rating, no crash") and ok
 
+	# --- 7. the club's OWN stored tactic (club_tactics.json / EQUIPOS.PKF) ------
+	# Barcelona (app id 1000): custom 4-5-1 shape, layout matches no stock formation.
+	var barca := _synth_club(1000, "F.C. BARCELONA", "L. VAN GAAL", 16, [1])
+	screen.setup(barca, own, 2, "A. LEIGH", "Premier")
+	ok = _assert(screen._club_slots.size() == 11, "Barcelona: 11 own-tactic slots loaded") and ok
+	ok = _assert(screen._tactics.formation == "4-5-1",
+		"Barcelona: band shape 4-5-1 (sourced FUN_004fe2d0 thresholds)") and ok
+	var own_mks: Array = screen._rival_markers()
+	ok = _assert(own_mks.size() == 22, "Barcelona: 22 markers from the stored slots") and ok
+	var mk1s: Array = []
+	var got1: Array = []
+	for s in screen._club_slots:
+		mk1s.append((s as Dictionary)["mk1"])
+	for m in own_mks:
+		if m["kind"] == "disc":
+			got1.append(m["mk"])
+	mk1s.sort()
+	got1.sort()
+	ok = _assert(str(got1) == str(mk1s), "Barcelona: disc markers == stored mk1 set") and ok
+	var gk_mk: Array = screen._club_slots[0]["mk1"]
+	ok = _assert(int(gk_mk[0]) == 0 and int(gk_mk[1]) == 68,
+		"GK slot first (the (0,68) park spot)") and ok
+
+	# River (app id 1361): 4-6-0 — a shape with NO stock formation name; the fill
+	# must still field 11 with zero forwards, and markers must stay in the window.
+	var river := _synth_club(1361, "RIVER", "R. DIAZ", 16, [1])
+	screen.setup(river, own, 2, "A. LEIGH", "Premier")
+	ok = _assert(screen._tactics.xi.size() == 11, "4-6-0 club: XI still 11") and ok
+	var rmks: Array = screen._rival_markers()
+	ok = _assert(rmks.size() == 22, "4-6-0 club: 22 markers") and ok
+	var rin := true
+	for m in rmks:
+		var rmk: Array = m["mk"]
+		if int(rmk[0]) < 0 or int(rmk[0]) > 242 or int(rmk[1]) < 0 or int(rmk[1]) > 138:
+			rin = false
+	ok = _assert(rin, "4-6-0 club: markers inside the layer window") and ok
+
 	screen.queue_free()
 	print("\n%s" % ("ALL PASS" if ok else "FAILURES ABOVE"))
 	quit(0 if ok else 1)
