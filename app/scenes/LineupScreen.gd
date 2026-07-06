@@ -81,8 +81,8 @@ const ATTR_SIG := [1, 7, 8, 8, 6, 8]
 const ATTR_XY := [[479, 183], [557, 183], [479, 208], [557, 208], [479, 233], [557, 233]]
 const CAMPO_XY := Vector2i(478, 248)
 const TIS_XY := Vector2i(474, 348)
-const TOGGLE_PARAM := Rect2(477, 68, 157, 23)
-const TOGGLE_RATING := Rect2(477, 92, 157, 23)
+const TOGGLE_PARAM := Rect2(477, 68, 157, 24)
+const TOGGLE_RATING := Rect2(477, 92, 157, 24)
 const ARROW_X := 464
 # scrollbar (static in chrome at scroll 0; runtime redraw when scrolled)
 const SCROLL_UP := Rect2(443, 388, 16, 16)
@@ -679,6 +679,12 @@ func _draw_row(y: int, it: Dictionary) -> void:
 			var key: String = NUM_KEYS[ci]
 			var sv := ""
 			match key:
+				"EN":
+					# The EN column is the +0xa8 dynamic byte (fn_004f5260 draws
+					# it here), NOT the stored EN attr — frame 128 shows 99 on
+					# all 20 rows while stored EN varies. Init 99 (FUN_005825c0);
+					# career semantics un-RE'd.
+					sv = str(int(pl.get("en_cap", 99)))
 				"_fit":
 					sv = str(clampi(int(pl.get("fitness", 99)), 0, 99)) if has_form else "-"
 				"_mo":

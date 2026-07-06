@@ -102,6 +102,17 @@ PAIRS = [
         [],
         0.0001,
     ),
+    # LINE-UP PARAMETERS view (run-1 frame 128): the FORMULA-DRIVEN pair —
+    # only the frame-visible FI/MO dynamics are staged; the AV column is the
+    # live Morale.av6 (FUN_00581e60, frame-verified 20/20) and TEAM RATING 82
+    # the sourced sum-fit-XI/11. EN column = the +0xa8 byte (99 across).
+    (
+        "lineup_128.png",
+        "128_154751.png",
+        None,
+        [],
+        0.0001,
+    ),
     # VIEW RIVAL FULL FRAME (run-2 frame 015): frame-baked body chrome + row
     # template + STARJUGON/camrol row layer + right panel (kit patch, star-cell
     # patches, assistant strip) + the proven pitch composite (bright rival

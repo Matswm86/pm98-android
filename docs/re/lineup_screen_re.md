@@ -123,10 +123,20 @@ is superseded by `app/scenes/LineupScreen.gd`'s baked pipeline.
   RIGHT / RIGHT MID. / INSIDE RIGHT / CENTRE FORWARD / CENTRAL MID. / LEFT
   MID. / RIGHT WINGER / CENTRAL STRIKER / LEFT WINGER / DEF. MIDFIELDER /
   RIGHT FORWARD / LEFT FORWARD / INSIDE LEFT (14 of 18 frame-witnessed).
-- **PARAMETERS rows** (witness 128): grey sep cols x173..323 step 25; values
-  GDI-centred per cell; inks EN (150,0,0), SP/ST/AG/GU (100,100,140),
-  FI (42,95,170), MO (80,110,5). Both toggle plates walked (155 RATING-on /
-  128 PARAM-on) + the dark-red arrow beside the ACTIVE toggle.
+- **PARAMETERS rows** (witness 128; PARITY PAIR `lineup_128` 0px 2026-07-06):
+  grey sep cols x173..323 step 25; values GDI-centred per cell; inks
+  EN (150,0,0), SP/ST/AG/GU (100,100,140), FI (42,95,170), MO (80,110,5).
+  **Value sources pinned off `FUN_004f5260`'s numeric arm** (decompile in
+  docs/re/lineup/): EN = the `+0xa8` dynamic byte (99 across the board — NOT
+  the stored EN attr) · SP/ST/AG/QU = `+0x9c..+0x9f` = game_db VE/RE/AG/CA ·
+  FI = `+0xa7` · MO = `FUN_00582db0` · AV = `FUN_00581e60`. The 128 pair is
+  FORMULA-DRIVEN: only the frame's FI/MO dynamics are staged; AV (20/20) and
+  TEAM RATING 82 (= 910/11) come out of the live rules (morale_re.md).
+  Frame 128's formation = 4-4-2 (row tints D,D,D,D/M,M,M,F,M,F = the 4-4-2
+  slot bands; run 2 later plays 3-5-2). Both toggle plates walked (155
+  RATING-on / 128 PARAM-on) + the dark-red arrow beside the ACTIVE toggle;
+  the plate cuts include the 2px active-surround bottom rows y91..92/y114..115
+  (a 68:91/92:115 cut leaves rows 91/115 stuck in the 155 chrome state).
 - **INJURED row** (Beckham, 7 weeks): gold tint (212,191,85) + 1px black frame
   (both in `row_inj.png`); cells [cross|count(yellow)|WEEKS(black)|FI navy|MO
   green]; "DAYS"/"DAY"/"WEEK(S)" strings live beside the role table.

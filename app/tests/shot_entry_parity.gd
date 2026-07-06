@@ -237,6 +237,61 @@ func _run() -> void:
 	lu.queue_free()
 	await process_frame
 
+	# ---- LINE-UP PARAMETERS view (run-1 frame 128: MU at Juventus, Fri 1 Aug) -----
+	# FORMULA-DRIVEN pair: nothing but the frame-visible dynamics is injected.
+	# FI/MO are set to the frame's own cells (FI 70 whole squad, MO per row);
+	# every AV then comes out of the live Morale.av6 (frame-verified 20/20
+	# exact) and TEAM RATING 82 out of the sourced sum-fit-XI/11 rule — no
+	# "av"/"team_rating" overrides. EN column = the +0xa8 byte (99 across the
+	# board, en_cap default). Same XI/bench/reserve order as 155; no injury,
+	# no selection (T/I/S default block), PARAMETERS toggle active.
+	var manu128: Dictionary = {}
+	for c in gamedb.clubs_in_league(str(gamedb.leagues[0].get("id", ""))):
+		if str(c.get("name", "")).begins_with("MANCHESTER U"):
+			manu128 = (c as Dictionary).duplicate(true)
+	var mo128 := {"SCHMEICHEL": 97, "GARY NEVILLE": 95, "IRWIN": 99, "BERG": 93,
+		"PALLISTER": 93, "BUTT": 99, "BECKHAM": 99, "SHERINGHAM": 99, "COLE": 99,
+		"GIGGS": 99, "SOLSKJAER": 99, "JOHNSEN": 99, "VAN DER GOUW": 99,
+		"PHIL NEVILLE": 99, "SCHOLES": 99, "MCCLAIR": 99, "JORDI CRUYFF": 99,
+		"KEANE": 99, "MAY": 99, "CURTIS": 99}
+	var by_name128 := {}
+	for p in manu128.get("players", []):
+		by_name128[str(p.get("name", ""))] = p
+		# earlier shot blocks mutate the SHARED gamedb dicts ("av" overrides,
+		# Beckham's 155 injury) — scrub them so this pair stays formula-driven
+		(p as Dictionary).erase("av")
+		(p as Dictionary).erase("injured_weeks")
+		(p as Dictionary).erase("suspended_weeks")
+		if mo128.has(str(p.get("name", ""))):
+			(p as Dictionary)["fitness"] = 70
+			(p as Dictionary)["morale"] = mo128[str(p.get("name", ""))]
+	var xi128: Array = []
+	for nm in ["SCHMEICHEL", "GARY NEVILLE", "IRWIN", "BERG", "PALLISTER", "BUTT",
+			"BECKHAM", "SHERINGHAM", "COLE", "GIGGS", "SOLSKJAER"]:
+		xi128.append(int((by_name128[nm] as Dictionary).get("id", -1)))
+	var pid128 := func(nm: String) -> int: return int((by_name128[nm] as Dictionary).get("id", -1))
+	manu128["bench"] = [pid128.call("JOHNSEN"), pid128.call("VAN DER GOUW"),
+		pid128.call("PHIL NEVILLE"), pid128.call("SCHOLES"), pid128.call("MCCLAIR")]
+	manu128["reserves"] = [pid128.call("JORDI CRUYFF"), pid128.call("KEANE"),
+		pid128.call("MAY"), pid128.call("CURTIS"), pid128.call("CASPER"),
+		pid128.call("CLEGG"), pid128.call("NEVLAND"), pid128.call("THORNLEY")]
+	var tac128 := Tactics.new()
+	tac128.formation = "4-4-2"   # frame-proven: row tints D,D,D,D/M,M,M,F,M,F = the 4-4-2 slot bands (run-1 default; run 2 later plays 3-5-2)
+	tac128.xi = xi128
+	var lu128: LineupScreen = load("res://scenes/LineupScreen.gd").new()
+	_mount(lu128)
+	await process_frame
+	lu128.setup(manu128, tac128, "", "Premier League", "1997-98", 1,
+		{"mode": "fixture", "top": "Juventus", "bottom": "Manchester Utd.",
+		"home_id": 1021, "away_id": 40, "weekday": "Friday", "day": "1",
+		"month": "August", "year": "1997",
+		"status_top": "Preseason", "status_bottom": "Preparation"})
+	lu128._rating_view = false
+	lu128.queue_redraw()
+	await _shot(dir, "lineup_128.png")
+	lu128.queue_free()
+	await process_frame
+
 	# ---- VIEW RIVAL FULL FRAME (run-2 frame 015: at F.C. Barcelona, Monday 4) -----
 	# The frame's exact state: Barcelona XI rows 1..11 with the walked AVs (frame-
 	# dynamic FI/MO — injected), TEAM RATING 87 (= 959/11), assistant A. Leigh 4*, the

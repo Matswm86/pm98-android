@@ -118,11 +118,22 @@ function — traced from the paint side (decompiles in `docs/re/lineup/`):
   frame-shown; core4 (game_db) = 350 → (350+82+99)/6 = **88** exact.
 - **014→155 delta**: all 11 MU AVs rise exactly +1 across the Mon-4 friendly —
   consistent with the played +3 FI / +3 MO post-match delta (+6/6 = +1).
-- **Preseason fitness**: the Mon-4-Aug frames (014/015) need FI ≈ 95-99 on
-  several men (Giovanni AV 91 with core4 352 needs FI+MO ≥ 194), while the
-  post-kickoff FICHA frames (081/084) show FI 70 — so the `FUN_005825c0`
-  halfway-toward-40 fitness leg lands at/by season KICKOFF, not at new-game
-  creation; preseason squads sit at ~99.
+- **Frame-128 total validation (2026-07-06, run-1 LINE-UP PARAMETERS view,
+  Fri 1 Aug)**: all 8 numeric columns visible on 20 rows. (SP+ST+AG+QU+FI+MO)/6
+  reproduces the AV column **20/20 exact**; SP/ST/AG/QU match game_db
+  VE/RE/AG/CA (their per-cell byte sources +0x9c..+0x9f read straight off the
+  numeric arm of `FUN_004f5260`); the EN column = the `+0xa8` byte (99 on all
+  20 rows — NOT the stored EN attr); FI = 70 squad-wide; TEAM RATING 82 =
+  910/11. The parity pair `lineup_128` renders 0px WITHOUT AV/team-rating
+  injection — the live formula drives every cell.
+- **Preseason fitness, evidence-bounded**: run-1 frame 128 shows FI 70 on the
+  whole squad on Fri 1 Aug — the `FUN_005825c0` halfway-toward-40 leg HAS run
+  at new-game creation. The run-2 Mon-4-Aug MU values (FI+MO ∈ [170,180])
+  fit 70 + the friendly's played +3/+3; the run-2 Barcelona rows need FI+MO
+  up to 199 (Giovanni AV 91 / core4 352 → ≥ 194), which 70-init plus a few
+  friendlies cannot reach — the run-2 Barcelona FI/MO trajectory is an OPEN
+  residue (values stay injected in the rival_015 parity shot; no mechanism
+  claim).
 - **CPU best-XI picker `FUN_005776f0`** (rival/auto-pick side): per broad
   group (`+0x1c`), over UNPICKED men (`+0x19 == 0x63`), takes max of
   `FUN_00581e60() * (+0xa8 cap byte)` (falls back to adjacent groups). The

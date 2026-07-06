@@ -125,8 +125,11 @@ ATTR_BLOCK = (477, 168, 636, 247)
 STRIP = (478, 119, 634, 150)
 NAME_BAND = (479, 150, 636, 171)
 TIS_RECT = (474, 348, 636, 442)
-TOGGLE_PARAM = (477, 68, 634, 91)
-TOGGLE_RATING = (477, 92, 634, 115)
+# plate cuts include the 2px white active-surround bottom rows: the 155vs128
+# flip state spans y91..92 (param bottom) and y114..115 (rating bottom) — a
+# 68:91/92:115 cut leaves rows 91/115 stuck in the 155 chrome state.
+TOGGLE_PARAM = (477, 68, 634, 92)
+TOGGLE_RATING = (477, 92, 634, 116)
 ARROW_ZONE = (464, 68, 478, 116)
 
 

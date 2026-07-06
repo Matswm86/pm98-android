@@ -84,9 +84,14 @@ static func _bar_add(value: int, delta: int) -> int:
 # ---- season init (FUN_005825c0) --------------------------------------------
 
 ## New season (and new career): morale re-rolls 90 + rand(10); fitness falls
-## halfway toward 40 (a fresh 99 lands on 70 — the value frames 081/084 pin).
+## halfway toward 40 (a fresh 99 lands on 70 — the value frames 081/084 pin,
+## and lineup frame 128 shows 70 on the whole squad on 1 Aug); the +0xa8
+## companion byte resets to 99 — it is the table's EN column (fn_004f5260
+## draws +0xa8 there; frame 128 shows 99 on all 20 rows). Its career
+## semantics beyond the 99 init are un-RE'd.
 static func season_init(p: Dictionary, rng: RandomNumberGenerator) -> void:
 	p["morale"] = 90 + rng.randi_range(0, 9)
+	p["en_cap"] = 99
 	var fit := int(p.get("fitness", CAP))
 	p["fitness"] = fit + int(float(FLOOR - fit) / 2.0)
 
