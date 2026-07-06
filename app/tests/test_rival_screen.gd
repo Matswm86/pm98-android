@@ -115,6 +115,44 @@ func _run() -> void:
 			rin = false
 	ok = _assert(rin, "4-6-0 club: markers inside the layer window") and ok
 
+	# --- 8. the SHIPPED XI (club_tactics.json "xi": player+0x1b slot bytes) -----
+	# Real game_db Barcelona: the XI must be the frame-015 row order (walked ground
+	# truth), slots pair in NATIVE .DBC order (disc s at tactic slot s-1), and the
+	# synth-squad fallback above proves auto-pick still covers id-less rivals.
+	var f := FileAccess.open("res://data/game_db.json", FileAccess.READ)
+	if f != null:
+		var gdb: Variant = JSON.parse_string(f.get_as_text())
+		var real_barca: Dictionary = {}
+		for c in (gdb as Dictionary).get("clubs", []):
+			if int((c as Dictionary).get("id", -1)) == 1000:
+				real_barca = c
+				break
+		screen.setup(real_barca, own, 2, "A. LEIGH", "Premier")
+		var want_xi := [1949, 1953, 1956, 1963, 1954, 1958, 1961, 1968, 1970, 1969, 1959]
+		var got_xi: Array = []
+		for pid in screen._tactics.xi:
+			got_xi.append(int(pid))
+		ok = _assert(str(got_xi) == str(want_xi),
+			"real Barcelona: SHIPPED XI fielded (frame-015 row order)") and ok
+		var by_id := {}
+		for p in real_barca.get("players", []):
+			by_id[int(p.get("id", -1))] = p
+		ok = _assert(str(by_id[got_xi[3]].get("name", "")) == "GUARDIOLA",
+			"row 4 = Guardiola (slot byte 4, walked frame 015)") and ok
+		var fines := []
+		for pid in got_xi:
+			fines.append(int(by_id[pid].get("posFine", 0)))
+		ok = _assert(str(fines) == str([1, 2, 5, 15, 5, 3, 16, 7, 9, 13, 17]),
+			"XI posFine == walked row_truth_015.fine") and ok
+		var mks: Array = screen._rival_markers()
+		ok = _assert(mks.size() == 22, "shipped XI: 22 markers") and ok
+		var native_ok := true
+		for i in 11:
+			var d: Dictionary = mks[i * 2]
+			if str(d["mk"]) != str(screen._club_slots[i]["mk1"]) or int(d["num"]) != i + 1:
+				native_ok = false
+		ok = _assert(native_ok, "discs pair with slots in native .DBC order, num = slot") and ok
+
 	screen.queue_free()
 	print("\n%s" % ("ALL PASS" if ok else "FAILURES ABOVE"))
 	quit(0 if ok else 1)

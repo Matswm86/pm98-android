@@ -277,20 +277,32 @@ func setup(rival: Dictionary, own: Dictionary, assist_quality: int, assist_name:
 			"bottom": PMChrome.title_case_name(str(own.get("name", ""))),
 			"club_id": int(own.get("id", -1)), "weekday": str(d["wd"]),
 			"day": str(d["day"]), "month": str(d["mon"]), "year": str(d["year"])}
-	_club_slots = _club_slot_order(int(rival.get("id", -1)))
-	if not _club_slots.is_empty():
-		# The rival fields its OWN stored shape (band counts from the slot table);
-		# the XI is still the app's auto-pick (the .DBC per-player slot bytes —
-		# player+0x1b in FUN_00579c70's squad loop — are not extracted yet).
+	# The rival fields its OWN stored shape AND (when game_db-complete) its OWN
+	# SHIPPED XI — the .DBC squad records' player+0x1b slot bytes (FUN_00579c70's
+	# squad loop; XI slot s stands at tactic slot s-1, so the slots pair with the
+	# XI in NATIVE .DBC order). Clubs whose xi has game_db holes (old-cipher squad
+	# corruption, see export_club_tactics.py) keep the auto-pick + band-reorder.
+	_club_slots = []
+	_tactics = null
+	var rec: Variant = _club_tactics.get(str(int(rival.get("id", -1))))
+	var rec_slots: Array = (rec as Dictionary).get("slots", []) if rec is Dictionary else []
+	if rec_slots.size() == 11:
 		var d0 := 0
 		var m0 := 0
-		for i in range(1, _club_slots.size()):
-			match _slot_band(_club_slots[i]):
+		for i in range(1, rec_slots.size()):
+			match _slot_band(rec_slots[i]):
 				"DEF": d0 += 1
 				"MID": m0 += 1
-		_tactics = Tactics.auto_pick_shape(rival, d0, m0, _club_slots.size() - 1 - d0 - m0)
-	else:
-		_tactics = Tactics.auto_pick(rival) if not rival.is_empty() else null
+		var f0 := rec_slots.size() - 1 - d0 - m0
+		var xi_ids := _shipped_xi(rec, rival)
+		if not xi_ids.is_empty():
+			_club_slots = rec_slots
+			_tactics = Tactics.with_xi(rival, xi_ids, d0, m0, f0)
+		else:
+			_club_slots = _club_slot_order(int(rival.get("id", -1)))
+			_tactics = Tactics.auto_pick_shape(rival, d0, m0, f0)
+	elif not rival.is_empty():
+		_tactics = Tactics.auto_pick(rival)
 	_by_id.clear()
 	for p in rival.get("players", []):
 		_by_id[int(p.get("id", -1))] = p
@@ -621,6 +633,24 @@ func _rival_markers() -> Array:
 		out.append({"kind": "disc", "mk": s.get("mk1", [0, 0]), "num": num})
 		out.append({"kind": "arrow", "mk": s.get("mk2", [0, 0]), "num": num})
 	return out
+
+
+## The club's SHIPPED XI as 11 game_db ids in slot order, or [] when any slot
+## is unmatched in game_db (-1) or the id is missing from the squad dict.
+func _shipped_xi(rec: Dictionary, rival: Dictionary) -> Array:
+	var xi: Array = rec.get("xi", [])
+	if xi.size() != 11:
+		return []
+	var have := {}
+	for p in rival.get("players", []):
+		have[int(p.get("id", -1))] = true
+	var ids: Array = []
+	for v in xi:
+		var pid := int(v)
+		if pid < 0 or not have.has(pid):
+			return []
+		ids.append(pid)
+	return ids
 
 
 ## The band a slot belongs to, by the sourced row-tint rule (FUN_004fe2d0):

@@ -43,7 +43,7 @@ Verified absent from both sources: any `.p3d` 3D model / `Modelos\` folder (0 hi
 | `DBDAT/MINIESC.PKF` | RAR+ISO | 1,494,152 | 476 | Mini crests (one per club) |
 | `DBDAT/NANOESC.PKF` | RAR+ISO | 397,448 | 476 | Nano crests |
 | `DBDAT/RIDIESC.PKF` | RAR+ISO | 222,256 | 476 | Tiny crests |
-| `DBDAT/EQUIPOS.PKF` | RAR+ISO | 4,099,004 | 476 | **476 per-team `.DBC` database records** — incl. each club's OWN tactic (11x8-u16 slot block + 7 lever bytes, `FUN_00579c70`; decoded 2026-07-06 → `club_tactics_re.md`, exported to `app/data/club_tactics.json`) |
+| `DBDAT/EQUIPOS.PKF` | RAR+ISO | 4,099,004 | 476 | **476 per-team `.DBC` database records** — incl. each club's OWN tactic (11x8-u16 slot block + 7 lever bytes, `FUN_00579c70`) AND its SHIPPED XI (squad records' player+0x1b slot bytes, `FUN_005820f0`; both decoded 2026-07-06 → `club_tactics_re.md`, exported to `app/data/club_tactics.json`) |
 | `DBDAT/MINIFOTO.PKF` | RAR+ISO | 753,479 | 690 | Mini player photos |
 | `DBDAT/BIGFOTO/*.PKF` | RAR+ISO | 13,934,808 | 73 archives | Squad photo banks (EQ960301…) |
 | **`PCF5DAT.PKF`** | **ISO-only** | **314,854,588** | **unknown** | **PC Fútbol 5 engine data — NOT enumerable (§5)** |

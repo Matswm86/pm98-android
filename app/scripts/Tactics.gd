@@ -185,6 +185,24 @@ static func auto_pick_shape(club: Dictionary, n_def: int, n_mid: int, n_fwd: int
 	t._derive_roles(club)
 	return t
 
+## Field the club's SHIPPED XI verbatim (app/data/club_tactics.json "xi" — the
+## .DBC squad records' player+0x1b slot bytes, FUN_00579c70's squad loop; slot s
+## stands at tactic slot s-1). `xi_ids` = 11 game_db player ids in slot order,
+## GK first. Formation label resolved from the outfield counts like
+## auto_pick_shape (no stock name for shapes such as 4-6-0 / 5-5-0).
+static func with_xi(club: Dictionary, xi_ids: Array, n_def: int, n_mid: int, n_fwd: int) -> Tactics:
+	var t := Tactics.new()
+	for name in FORMATION_ORDER:
+		var lines: Array = FORMATIONS[name]
+		if int(lines[0]) == n_def and int(lines[1]) == n_mid and int(lines[2]) == n_fwd:
+			t.formation = name
+			break
+	t.xi.clear()
+	for pid in xi_ids:
+		t.xi.append(int(pid))
+	t._derive_roles(club)
+	return t
+
 ## (Re)select the XI for the current formation from the club's squad. `counts`
 ## overrides the formation's [DEF, MID, FWD] line counts when given (own-shape fill).
 func _fill_xi(club: Dictionary, counts: Array = []) -> void:

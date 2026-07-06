@@ -116,11 +116,17 @@ ships in its EQUIPOS.PKF `.DBC` record (11 x 8 u16 slot block, `FUN_00579c70` /
 `FUN_0058c130`) and is what `*(screen+0x1928)` (the lazily-loaded club object,
 `FUN_005793d0` chain) holds at +0x60+i*0x20 — Barcelona's decoded block
 reproduces THIS frame's 22 walked markers EXACTLY (offset 0x6a, unique hit);
-live rivals now draw it from `app/data/club_tactics.json` (auto_pick remains
-only the XI-selection + missing-club fallback; `FUN_005776f0` confirms the
-in-engine picker maxes `FUN_00581e60 × (+0xa8 cap byte)` per broad group; the
-.DBC's TRUE XI bytes player+0x1b/+0x1d stay un-extracted — residue). Still
-open: PARAMETERS numeric view un-walked on this screen (cells centred under the
+live rivals now draw it from `app/data/club_tactics.json`. ~~The .DBC's TRUE XI
+bytes player+0x1b/+0x1d un-extracted~~ **CLOSED 2026-07-06 second pass
+(club_tactics_re.md)**: the squad records' XI slot byte (player+0x1b, 1..11;
+slot s stands at tactic slot s-1) is extracted for all 476 clubs and — where
+game_db-complete (309 clubs; holes = pre-existing old-cipher game_db squad
+corruption) — fielded verbatim on this screen (`Tactics.with_xi`, native
+slot order). Barcelona's shipped XI reproduces THIS frame's 11 rows + fine
+codes + POS column EXACTLY. auto_pick remains the holes/missing-club fallback
+(`FUN_005776f0` confirms the in-engine picker maxes `FUN_00581e60 × (+0xa8 cap
+byte)` per broad group — the sim-side fielding, still app-side auto_pick).
+Still open: PARAMETERS numeric view un-walked on this screen (cells centred under the
 header letters, lineup-128 inks) · the hire-an-Assistant state un-walked
 (kept as the text rendering) · flip-state toggle plates + arrow spots are
 reconstructions · ghost dim LUT/digit ink are approximations for un-walked
