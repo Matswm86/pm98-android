@@ -161,6 +161,39 @@ static func make_senior(e: Dictionary, rng: RandomNumberGenerator, start_year: i
 	return p
 
 
+## A free-agent pool dict (TransferMarket.generate_free_agents shape) for a talent
+## whose real club does not exist in the PM98 world (route "free_agent", clubId -1):
+## he surfaces on the free-transfer market at his debut season, signable for no fee.
+## Carries `potential` so Training.gd holds his ceiling after he is signed.
+static func make_free_agent(e: Dictionary, rng: RandomNumberGenerator, start_year: int) -> Dictionary:
+	var age := age_in_season(e, start_year)
+	var is_gk := bool(e.get("isGK", false))
+	var pos := str(e.get("pos", "MF"))
+	var ca := intake_ca(e, age)
+	return {
+		"id": _int(e.get("id"), 0),
+		"clubId": -1,
+		"name": str(e.get("name", "?")),
+		"legalName": str(e.get("legalName", e.get("name", "?"))),
+		"birthYear": int(e.get("birthYear", start_year - age + 1)),
+		"age": age,
+		"pos": pos,
+		"posFine": e.get("posFine"),
+		"isGK": is_gk,
+		"nationality": str(e.get("nationality", "ENGLAND")),
+		"flagCode": int(e.get("flagCode", 30)),
+		"kind": str(e.get("kind", "NATIONAL")),
+		"attrs": make_attrs(rng, ca, pos, is_gk),
+		"potential": potential_of(e),
+		"contract_years": 0,
+		"free_agent": true,
+		"injured_weeks": 0,
+		"suspended_weeks": 0,
+		"yellows": 0,
+		"dev_progress": 0.0,
+	}
+
+
 ## A youth-team dict (Youth.gd shape) for a talent arriving through the manager's own
 ## academy -- he shows on the YOUTH TEAM screen and is promoted like any scouted kid.
 static func make_youth(e: Dictionary, rng: RandomNumberGenerator, start_year: int) -> Dictionary:

@@ -1084,7 +1084,7 @@ func _inject_real_talents(rng: RandomNumberGenerator, pool: Array) -> void:
 	if pool.is_empty():
 		return
 	var start_year := 1996 + year
-	for e in Talent.due(pool, start_year, talents_used):
+	for e in _by_tier(Talent.due(pool, start_year, talents_used)):
 		_inject_talent(e, rng, start_year)
 
 
@@ -1099,10 +1099,17 @@ func inject_due_talents(pool: Array, rng: RandomNumberGenerator = null) -> int:
 		rng.randomize()
 	var start_year := 1996 + year
 	var n := 0
-	for e in Talent.due_catchup(pool, start_year, talents_used):
+	for e in _by_tier(Talent.due_catchup(pool, start_year, talents_used)):
 		if _inject_talent(e, rng, start_year):
 			n += 1
 	return n
+
+
+## Best prospects first, so when a season delivers more talents than there is room
+## for (free-agent pool cap, full squads) the headroom goes to the biggest names.
+static func _by_tier(due: Array) -> Array:
+	due.sort_custom(func(a, b): return int(a.get("tier", 4)) < int(b.get("tier", 4)))
+	return due
 
 
 ## Place one pool entry. Routing: the manager's own club receives a youth-age talent
@@ -1112,6 +1119,8 @@ func inject_due_talents(pool: Array, rng: RandomNumberGenerator = null) -> int:
 ## via catch-up when the manager surfaces in his division. Returns true if placed.
 func _inject_talent(e: Dictionary, rng: RandomNumberGenerator, start_year: int) -> bool:
 	var key := Talent.key_of(e)
+	if str(e.get("route", "club")) == "free_agent":
+		return _inject_free_talent(e, rng, start_year)
 	var cid := club_id if str(e.get("route", "club")) == "manager_youth" else Talent.club_of(e)
 	if not rosters.has(cid):
 		return false               # not in this division; NOT marked used (stays due)
@@ -1144,6 +1153,27 @@ func _inject_talent(e: Dictionary, rng: RandomNumberGenerator, start_year: int) 
 		if int(e.get("tier", 4)) <= 2:
 			_news("youth", "%s, a highly rated youngster, has come through the ranks at %s." % [
 				pname, club_names.get(cid, "?")])
+	talents_used[key] = season
+	return true
+
+
+## A talent whose real club is outside the PM98 world (route "free_agent") arrives on
+## the free-transfer market instead. One shot: the pool resets every rollover, so if
+## nobody signs him he moves on abroad like the real market would. A full pool defers
+## him (stays due; tier-first ordering gives the headroom to the biggest names).
+func _inject_free_talent(e: Dictionary, rng: RandomNumberGenerator, start_year: int) -> bool:
+	var key := Talent.key_of(e)
+	var pid := int(e.get("id", 0))
+	for p in free_agents:
+		if int(p.get("id", -1)) == pid:
+			talents_used[key] = season   # already on the market (double call, resume)
+			return false
+	if free_agents.size() >= FREE_POOL_CAP:
+		return false                     # market full; NOT marked used (stays due)
+	free_agents.append(Talent.make_free_agent(e, rng, start_year))
+	if int(e.get("tier", 4)) <= 2:
+		_news("contract", "%s, a highly rated young player, is available on a free transfer." %
+			str(e.get("name", "?")))
 	talents_used[key] = season
 	return true
 

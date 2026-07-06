@@ -1,6 +1,9 @@
 # ── Copyrighted game data — Dinamic Multimedia. Personal use only, NEVER committed.
 extracted/
-assets/
+assets/*
+# talent_review.json is OUR curation state (club-name -> game_db id resolutions,
+# no game data in it) — versioned so pool rebuilds reproduce the club routing.
+!assets/talent_review.json
 *.iso
 *.rar
 *.PKF

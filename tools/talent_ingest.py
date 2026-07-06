@@ -15,7 +15,15 @@ Inputs (any mix, repeatable):
 
 Season per row: a Season column ("2002-03" / "2002/03"), else --season for the file.
 Tier per row: an explicit Tier column (1-5), else mapped from PA (FM 1-200 scale),
-else --default-tier.
+else --default-tier. A NEGATIVE PA is an FM random-potential code (-10..-1 whole
+stars, -95..-15 half steps, -95 = "9.5"; -10 = PA 170-200, each half-step down
+shifts the band by -10): the game rolls a real PA inside the band at new-game time,
+and so do we — deterministically from name|birthYear, so re-runs are stable.
+
+Club "FM#<id>" (or blank) = a club that does not exist in PM98's 476-club world:
+the player is pooled as a FREE AGENT (route "free_agent", clubId -1) instead of
+going through club resolution — he surfaces in the free-agent pool at his debut
+season, signable for no fee.
 
 Usage:
   python3 tools/talent_ingest.py tools/starter_talents.csv --include-eggs
@@ -24,22 +32,28 @@ Usage:
 
 Dedupe: anyone already in app/data/game_db.json (Michael Owen is at Liverpool in the
 97-98 DB) is skipped; the same talent across overlapping exports keeps his earliest
-debut season. Unresolved club names land in assets/talent_review.json -- edit its
-"resolveTo" (a club id from game_db, or -1 to drop) and re-run.
+debut season -- EXCEPT a hand-curated row (one with an explicit Tier column), which
+REPLACES the bulk-extracted entry outright (curation outranks extraction: ingest the
+FM exports first, the curated starter file last). Unresolved club names land in
+assets/talent_review.json -- edit its "resolveTo" (a club id from game_db, -1 to
+drop the players entirely, or leave null to keep them as free agents) and re-run.
 """
 
 from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import re
 import sys
 import unicodedata
+from collections import Counter
 from html.parser import HTMLParser
 from pathlib import Path
 
-from build_db import build_flag_lookup, flag_for, norm
+from build_db import ENGLAND_CODE, build_flag_lookup
+from extract_english import EU_EEA_1997
 
 ROOT = Path(__file__).resolve().parent.parent
 ASSETS = ROOT / "assets"
@@ -72,18 +86,153 @@ CLUB_OVERRIDES = {
     "REAL MADRID": "REAL MADRID C.F.",
 }
 
-# FM nationality spellings -> the game's PAISES table names (build_db.FLAG_ALIASES
-# covers the extractor's variants; these are the FM-side ones).
+# FM nationality spellings -> the game's PAISES table names (127 nations, 1997-era
+# spellings: ZAIRE, BIELORUSSIA, QUATAR, COSTA MARFIL...). Verified pair by pair
+# against assets/country_codes.json byName. A leading "THE " is stripped before
+# lookup (FM26 uses official long names). Nations absent from the 1997 table
+# (Belize, Haiti, Vanuatu...) stay unmapped -> default flag, counted + reported.
 NAT_ALIASES = {
     "IRELAND": "REP. OF IRELAND",
     "REPUBLIC OF IRELAND": "REP. OF IRELAND",
-    "IVORY COAST": "COSTA DE MARFIL",
-    "KOREA REPUBLIC": "SOUTH KOREA",
-    "SOUTH KOREA": "SOUTH KOREA",
+    "NORTHERN IRELAND": "NORTH. IRELAND",
+    "IVORY COAST": "COSTA MARFIL",
+    "COTE D'IVOIRE": "COSTA MARFIL",
     "UNITED STATES": "U.S.A.",
+    "UNITED STATES OF AMERICA": "U.S.A.",
     "USA": "U.S.A.",
-    "HOLLAND": "NETHERLANDS",
+    "NETHERLANDS": "HOLLAND",
+    "TURKIYE": "TURKEY",
+    "CZECHIA": "CZECH REPUBLIC",
+    "BOSNIA AND HERZEGOVINA": "BOSNIA",
+    "TRINIDAD AND TOBAGO": "TRINIDAD T.",
+    "AZERBAIJAN": "AZERBAYAN",
+    "DEMOCRATIC REPUBLIC OF THE CONGO": "ZAIRE",
+    "DR CONGO": "ZAIRE",
+    "REPUBLIC OF THE CONGO": "CONGO",
+    "REPUBLIC OF NORTH MACEDONIA": "MACEDONIA",
+    "NORTH MACEDONIA": "MACEDONIA",
+    "ISLAMIC REPUBLIC OF IRAN": "IRAN",
+    "CAPE VERDE": "CABO VERDE",
+    "BELARUS": "BIELORUSSIA",
+    "QATAR": "QUATAR",
+    "GUINEA-BISSAU": "GUINEA BISSAU",
+    "LATVIA": "LETONIA",
+    "TAJIKISTAN": "TADJIKISTAN",
+    "UZBEKISTAN": "UZBEKISTHAN",
+    "SURINAME": "SURINAM",
+    "NIGER": "NÍGER",
 }
+
+# Post-Bosman "comunitario" rule for the FICHA KIND flag: EU-15 + EEA in 1997
+# (same rule game_db uses). extract_english spells Ireland EIRE / NORTHERN IRELAND;
+# our canonical nats use the PAISES spellings, so both are listed.
+EU_EEA_PAISES = {"REP. OF IRELAND", "NORTH. IRELAND"}
+
+
+def canon_nat(raw: str, lut: dict[str, int]) -> str:
+    """FM nationality string -> PAISES spelling (empty stays empty)."""
+    for cand in dict.fromkeys((raw, raw[4:] if raw.startswith("THE ") else raw)):
+        cand = NAT_ALIASES.get(cand, cand)
+        if cand == ENGLAND or cand.upper() in lut:
+            return cand
+    return NAT_ALIASES.get(raw, raw)
+
+
+def kind_of(nat: str) -> str:
+    return "NATIONAL" if nat in EU_EEA_1997 or nat in EU_EEA_PAISES else "NON-NATIONAL"
+
+
+def merge_variants(talents: list[dict]) -> list[str]:
+    """Cross-file identity sweep. The three mods spell the same player differently
+    ("FAIOLI"/"FAIOHLE") and occasionally shift a birth year by one, which the
+    key-level dedupe cannot see. Conservative auto-merge, every merge logged:
+      - same (first name token, last name token, birthYear) with compatible clubs
+        (equal, or one side is a free agent), compatible nations AND similar full
+        names (token subset, or a single small-typo token: FAIOLI~FAIOHLE) -> same
+        person. First+last alone is NOT enough: Brazilian suffix last-tokens
+        (SILVA/NETO/JUNIOR) make "ANDERSON ... DA SILVA" match distinct people;
+      - identical legalName, birth years exactly 1 apart, same position, compatible
+        clubs -> same person (per-file year-shift jitter).
+    Keeps the club-routed / earliest-debut entry with the fullest spelling."""
+    logs: list[str] = []
+    dropped: set[int] = set()
+
+    def edit1(a: str, b: str) -> bool:
+        """Levenshtein distance <= 2 for short tokens (typo variants)."""
+        if abs(len(a) - len(b)) > 2:
+            return False
+        prev = list(range(len(b) + 1))
+        for i, ch in enumerate(a, 1):
+            cur = [i]
+            for j, ch2 in enumerate(b, 1):
+                cur.append(min(prev[j] + 1, cur[-1] + 1, prev[j - 1] + (ch != ch2)))
+            prev = cur
+        return prev[-1] <= 2
+
+    def similar_names(a: str, b: str) -> bool:
+        ta, tb = a.split(), b.split()
+        if set(ta) <= set(tb) or set(tb) <= set(ta):
+            return True
+        if len(ta) == len(tb):
+            diff = [(x, y) for x, y in zip(ta, tb) if x != y]
+            return len(diff) == 1 and edit1(*diff[0])
+        return False
+
+    def compatible(a: dict, b: dict) -> bool:
+        if "manager_youth" in (a["route"], b["route"]):
+            return False
+        if not similar_names(a["legalName"], b["legalName"]):
+            return False
+        ca, cb = int(a.get("clubId") or -1), int(b.get("clubId") or -1)
+        if ca > 0 and cb > 0 and ca != cb:
+            return False
+        na, nb = a["nationality"], b["nationality"]
+        unknown_a = "nat unknown" in str(a.get("notes") or "")
+        unknown_b = "nat unknown" in str(b.get("notes") or "")
+        return na == nb or unknown_a or unknown_b
+
+    def merge_group(group: list[dict]) -> None:
+        group = [t for t in group if id(t) not in dropped]
+        if len(group) < 2:
+            return
+        if not all(compatible(a, b) for a in group for b in group if a is not b):
+            return
+        keep = sorted(
+            group,
+            key=lambda t: (int(t.get("clubId") or -1) <= 0, t["debutYear"], -len(t["legalName"])),
+        )[0]
+        earliest = min(group, key=lambda t: t["debutYear"])
+        keep["debutYear"], keep["debutSeason"] = earliest["debutYear"], earliest["debutSeason"]
+        for t in group:
+            if t is not keep:
+                dropped.add(id(t))
+                logs.append(
+                    f"{t['legalName']}|{t['birthYear']} -> {keep['legalName']}|{keep['birthYear']}"
+                )
+
+    by_sig: dict[tuple, list[dict]] = {}
+    for t in talents:
+        toks = t["legalName"].split()
+        if len(toks) >= 2:
+            by_sig.setdefault((toks[0], toks[-1], t["birthYear"]), []).append(t)
+    for group in by_sig.values():
+        merge_group(group)
+
+    by_name: dict[str, list[dict]] = {}
+    for t in talents:
+        if id(t) not in dropped:
+            by_name.setdefault(t["legalName"], []).append(t)
+    for group in by_name.values():
+        if (
+            len(group) == 2
+            and abs(group[0]["birthYear"] - group[1]["birthYear"]) == 1
+            and group[0]["pos"] == group[1]["pos"]
+        ):
+            merge_group(group)
+
+    talents[:] = [t for t in talents if id(t) not in dropped]
+    return logs
+
 
 PA_TIERS = [(180, 1), (165, 2), (150, 3), (130, 4)]  # PA >= x -> tier (else 5)
 
@@ -107,6 +256,39 @@ def fold(s: str) -> str:
     """Uppercase ASCII fold for dedupe keys (build_db-style)."""
     s = unicodedata.normalize("NFKD", str(s)).encode("ascii", "ignore").decode()
     return re.sub(r"\s+", " ", s.upper()).strip()
+
+
+# Club-name fuzzy normalizer + flag resolver, carried over verbatim from the
+# pre-engine-exact build_db.py (cc06ef4 slimmed it to the EQUIPOS parser; this
+# tool is now their only consumer).
+def norm(s: str) -> str:
+    """Uppercase, strip accents + punctuation + club-form noise for fuzzy match."""
+    s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode()
+    s = s.upper()
+    for junk in (
+        "F.C.",
+        "FC",
+        "C.F.",
+        "CF",
+        "R.C.",
+        "RC",
+        "A.C.",
+        "AC",
+        "U.D.",
+        "S.C.",
+        "UTD",
+        "UNITED",
+        "REAL",
+        "CLUB",
+        "DEPORTIVO",
+    ):
+        s = s.replace(junk, " ")
+    s = re.sub(r"[^A-Z0-9 ]", " ", s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def flag_for(nationality, lut: dict[str, int]) -> int:
+    return lut.get(str(nationality or "").upper(), ENGLAND_CODE)
 
 
 def surname(full: str) -> str:
@@ -136,11 +318,29 @@ def parse_season(raw: str) -> tuple[str, int] | None:
     return f"{start}-{(start + 1) % 100:02d}", start
 
 
+def resolve_pa(row: dict) -> int | None:
+    """The row's PA as a real 1-200 value. A negative PA is an FM random-potential
+    code (-10..-1 whole stars, halves stored x10 so -95 = "9.5"; -10 = band 170-200,
+    each half-step down shifts the band by -10, every band spans 30). FM rolls a real
+    PA inside the band at new-game time; we roll seeded from name|birthYear so the
+    same player always lands on the same PA across re-runs."""
+    if not row.get("pa"):
+        return None
+    pa = int(float(row["pa"]))
+    if pa >= 0:
+        return pa
+    half_steps = (-pa) // 5 if pa <= -11 else (-pa) * 2  # -95 -> 19, -10 -> 20, -1 -> 2
+    hi = min(200, half_steps * 10)
+    lo = max(1, hi - 30)
+    seed = f"{fold(row.get('name', ''))}|{row.get('birthyear', '')}".encode()
+    return lo + int(hashlib.md5(seed).hexdigest(), 16) % (hi - lo + 1)
+
+
 def tier_for(row: dict, default: int) -> int:
     if row.get("tier"):
         return max(1, min(5, int(float(row["tier"]))))
-    if row.get("pa"):
-        pa = int(float(row["pa"]))
+    pa = resolve_pa(row)
+    if pa is not None:
         for cut, t in PA_TIERS:
             if pa >= cut:
                 return t
@@ -233,15 +433,20 @@ def club_index(db: dict) -> dict[str, dict]:
     return {norm(c["name"]): c for c in db["clubs"]}
 
 
-def resolve_club(name: str, by_norm: dict[str, dict], review: dict) -> int | None:
-    """Club name -> game_db id: overrides, review resolutions, exact norm, token subset."""
+def resolve_club(name: str, by_norm: dict[str, dict], review: dict) -> int | str | None:
+    """Club name -> game_db id: overrides, review resolutions, exact norm, token subset.
+    Returns the id, "drop" (review resolveTo -1: exclude the players entirely), or None
+    (unknown club -> the caller pools the players as free agents and lists the club in
+    the review file, where a later resolveTo re-routes them on the next rebuild)."""
     key = fold(name)
     if key in CLUB_OVERRIDES:
         key = CLUB_OVERRIDES[key]
     for res in review.get("unmatched", []):
         if fold(res.get("clubName", "")) == fold(name) and res.get("resolveTo") is not None:
             rid = int(res["resolveTo"])
-            return None if rid < 0 else rid
+            if rid == 0:  # force free agent (a fuzzy match would land on the WRONG
+                return None  # club, e.g. Dundee FC vs PM98's Dundee U.)
+            return "drop" if rid < 0 else rid
     nk = norm(key)
     if nk in by_norm:
         return int(by_norm[nk]["id"])
@@ -313,6 +518,9 @@ def main() -> None:
     by_norm = club_index(db)
     known = db_player_keys(db)
     flags = build_flag_lookup()
+    club_country = {int(cl["id"]): fold(cl.get("country") or "") for cl in db["clubs"]}
+    nat_unknown = 0
+    nat_no_flag: Counter = Counter()
     review = load_json(REVIEW_PATH, {"unmatched": []})
     pool = load_json(POOL_PATH, {"meta": {}, "talents": []})
     talents: list[dict] = pool.get("talents", [])
@@ -332,8 +540,9 @@ def main() -> None:
                 print(f"  SKIP {row['name']}: no DoB/BirthYear/Age", file=sys.stderr)
                 continue
             pos, is_gk = parse_pos(row.get("pos", "MF"))
-            nat = fold(row.get("nat", ENGLAND)) or ENGLAND
-            nat = NAT_ALIASES.get(nat, nat)
+            nat = canon_nat(fold(row.get("nat", "")), flags)  # "" = source blank
+            club = row.get("club", "").strip()
+            is_free = not club or club.upper().startswith("FM#")
             candidates.append(
                 {
                     "legal": fold(row["name"]),
@@ -342,14 +551,15 @@ def main() -> None:
                     "nationality": nat,
                     "pos": pos,
                     "isGK": is_gk,
-                    "clubName": row.get("club", ""),
-                    "clubId": "unresolved",
-                    "route": "club",
+                    "clubName": None if is_free else club,
+                    "clubId": -1 if is_free else "unresolved",
+                    "route": "free_agent" if is_free else "club",
                     "season": label,
                     "debutYear": start,
                     "tier": tier_for(row, args.default_tier),
                     "potential": None,
                     "notes": row.get("notes") or None,
+                    "curated": bool(row.get("tier")),
                 }
             )
     if args.include_eggs:
@@ -371,20 +581,50 @@ def main() -> None:
             continue
         if c["clubId"] == "unresolved":
             cid = resolve_club(c["clubName"], by_norm, review)
-            if cid is None:
-                unresolved.setdefault(c["clubName"], []).append(c["legal"])
+            if cid == "drop":
                 continue
-            c["clubId"] = cid
-            c["clubName"] = by_norm[
-                norm(
-                    next(  # canonical DB spelling
-                        cl["name"] for cl in db["clubs"] if int(cl["id"]) == cid
+            if cid is None:
+                # A club that does not exist in the PM98 world: the player goes in
+                # as a free agent (the review file can re-route him to a club id).
+                unresolved.setdefault(c["clubName"], []).append(c["legal"])
+                c["clubId"], c["clubName"], c["route"] = -1, None, "free_agent"
+            else:
+                c["clubId"] = cid
+                c["clubName"] = by_norm[
+                    norm(
+                        next(  # canonical DB spelling
+                            cl["name"] for cl in db["clubs"] if int(cl["id"]) == cid
+                        )
                     )
-                )
-            ]["name"]
-        if key in by_key:  # overlapping exports: keep the earliest debut
+                ]["name"]
+        if not c["nationality"]:
+            # Source row has no nation. The game's own omitted-nationality rule is
+            # club-based (English club -> ENGLAND, frame-validated); extend it with
+            # the club's game_db country. Clubless blanks default ENGLAND + a note.
+            cc = club_country.get(int(c["clubId"]), "") if isinstance(c["clubId"], int) else ""
+            c["nationality"] = canon_nat(cc, flags) if cc else ""
+            if not c["nationality"]:
+                c["nationality"] = ENGLAND
+                c["notes"] = ((c.get("notes") or "") + " nat unknown (source blank)").strip()
+                nat_unknown += 1
+        if c["nationality"] != ENGLAND and c["nationality"].upper() not in flags:
+            nat_no_flag[c["nationality"]] += 1
+        if key in by_key:  # overlapping exports: keep the earliest debut...
             t = by_key[key]
-            if c["debutYear"] < int(t["debutYear"]):
+            if c["curated"]:
+                # ...but a hand-curated row replaces the bulk entry outright (the
+                # curator's club/debut/tier is the gameplay-visible truth; e.g. the
+                # 99-00 FM mod lists Rooney clubless at 14 -- curation pins Everton
+                # 2002-03 instead).
+                for fld in ("nationality", "pos", "isGK", "clubId", "clubName", "route", "tier"):
+                    t[fld] = c[fld]
+                t["debutYear"], t["debutSeason"] = c["debutYear"], c["season"]
+                t["flagCode"] = flag_for(c["nationality"], flags)
+                t["kind"] = kind_of(c["nationality"])
+                if c.get("notes"):
+                    t["notes"] = c["notes"]
+                updated += 1
+            elif c["debutYear"] < int(t["debutYear"]):
                 t["debutYear"], t["debutSeason"] = c["debutYear"], c["season"]
                 updated += 1
             continue
@@ -397,7 +637,7 @@ def main() -> None:
             "birthYear": c["birthYear"],
             "nationality": c["nationality"],
             "flagCode": flag_for(c["nationality"], flags),
-            "kind": "NATIONAL" if c["nationality"] == ENGLAND else "NON-NATIONAL",
+            "kind": kind_of(c["nationality"]),
             "pos": c["pos"],
             "posFine": None,
             "isGK": c["isGK"],
@@ -418,6 +658,18 @@ def main() -> None:
         by_key[key] = entry
         added += 1
 
+    merges = merge_variants(talents)
+    if merges:
+        print(f"\ncross-file variant merges ({len(merges)}):")
+        for m in merges:
+            print(f"  {m}")
+    if nat_unknown:
+        print(f"nat unknown (blank source, no club country): {nat_unknown} rows -> ENGLAND + note")
+    if nat_no_flag:
+        print(
+            f"nations absent from the 1997 PAISES table (default flag): {dict(nat_no_flag.most_common())}"
+        )
+
     talents.sort(key=lambda t: (t["debutYear"], t["id"]))
     seasons = sorted({t["debutSeason"] for t in talents})
     pool = {
@@ -428,7 +680,11 @@ def main() -> None:
             ),
             "idBase": TALENT_ID_BASE,
             "seasons": seasons,
-            "counts": {"talents": len(talents), "unresolvedClubs": len(unresolved)},
+            "counts": {
+                "talents": len(talents),
+                "freeAgents": sum(1 for t in talents if t.get("route") == "free_agent"),
+                "unresolvedClubs": len(unresolved),
+            },
         },
         "talents": talents,
     }

@@ -81,6 +81,12 @@ func _unit_dicts() -> bool:
 		"youth dict carries the Youth.gd markers") and ok
 	ok = _assert(bool(fw["ready"]) == (int(fw["attrs"]["CA"]) >= Youth.READY_CA),
 		"ready tracks READY_CA") and ok
+	var fa := Talent.make_free_agent(
+		_entry(600931, "TEST FREEBIE", 1981, -1, 2, 1998, "MF", "free_agent"), rng, 1998)
+	ok = _assert(bool(fa["free_agent"]) and int(fa["contract_years"]) == 0
+		and int(fa["clubId"]) == -1, "free-agent dict is out-of-contract and clubless") and ok
+	ok = _assert(int(fa["potential"]) == 92 and fa.has("attrs") and fa.has("age"),
+		"free agent keeps his hidden ceiling (tier-2 92) + attrs") and ok
 	return ok
 
 
@@ -141,6 +147,7 @@ func _career_integration() -> bool:
 		_entry(600912, "HOME PRODIGY", 1982, my_id, 1, 1998),
 		_entry(600913, "FARAWAY PRODIGY", 1982, away_id, 1, 1998),
 		_entry(600914, "FUTURE PRODIGY", 1990, rival_id, 1, 2005),
+		_entry(600915, "MARKET PRODIGY", 1982, -1, 1, 1998, "FW", "free_agent"),
 	]
 
 	var rng := RandomNumberGenerator.new()
@@ -170,6 +177,16 @@ func _career_integration() -> bool:
 		"out-of-division talent stays due (not marked used)") and ok
 	ok = _assert(not career.talents_used.has("FUTURE PRODIGY|1990"),
 		"2005 debutant not delivered in 1998") and ok
+	var fa_ids: Array = career.free_agents.map(func(p): return int(p.get("id", -1)))
+	ok = _assert(fa_ids.has(600915) and career.talents_used.has("MARKET PRODIGY|1982"),
+		"clubless debutant landed on the free-transfer market") and ok
+	# News lines carry the display name ("PRODIGY"), not the legal name.
+	var market_news := false
+	for n in career.news_log:
+		if String(n.get("text", "")).contains("PRODIGY") \
+				and String(n.get("text", "")).contains("free transfer"):
+			market_news = true
+	ok = _assert(market_news, "free-agent arrival news line fired") and ok
 
 	# Save / load round-trip keeps the ledger + the injected players.
 	var path := "user://talent_test.json"
@@ -187,6 +204,15 @@ func _career_integration() -> bool:
 	var n := career.inject_due_talents(pool, rng)
 	ok = _assert(n >= 1 and career.talents_used.has("FARAWAY PRODIGY|1982"),
 		"catch-up delivers the due talent in his own division (%d arrived)" % n) and ok
+	# A full free-agent market defers a market-routed talent: he stays due.
+	var pool_fa := [_entry(600916, "DEFERRED PRODIGY", 1982, -1, 1, 1998, "FW", "free_agent")]
+	var full: Array = []
+	for i in Career.FREE_POOL_CAP:
+		full.append({"id": 900000 + i})
+	career.free_agents = full
+	ok = _assert(career.inject_due_talents(pool_fa, rng) == 0
+		and not career.talents_used.has("DEFERRED PRODIGY|1982"),
+		"full market defers the free-agent talent (stays due)") and ok
 	# We just took over HIS club, and he is still youth-age (18 after take_job's year
 	# tick) -- so he arrives through OUR academy, the faithful route.
 	var far_youth: Array = career.youth.map(func(p): return int(p["id"]))
@@ -244,23 +270,37 @@ func _pool_file() -> bool:
 	ok = _assert(typeof(parsed) == TYPE_DICTIONARY, "pool parses") and ok
 	var talents: Array = (parsed as Dictionary).get("talents", [])
 	ok = _assert(talents.size() >= 30, "starter pool carries the curated crop (%d)" % talents.size()) and ok
+	# Per-entry checks are quiet on PASS -- the shipped pool is thousands of rows.
 	var keys: Dictionary = {}
 	var ids: Dictionary = {}
+	var clean := true
 	for t in talents:
-		ok = _assert(int(t["id"]) >= Talent.TALENT_ID_BASE and int(t["id"]) < Career.FREE_ID_BASE,
-			"id %d in the talent band" % int(t["id"])) and ok
-		ok = _assert(not keys.has(t["key"]) and not ids.has(int(t["id"])),
-			"no duplicate key/id (%s)" % str(t["key"])) and ok
+		clean = _check(int(t["id"]) >= Talent.TALENT_ID_BASE and int(t["id"]) < Career.FREE_ID_BASE,
+			"id %d in the talent band" % int(t["id"])) and clean
+		clean = _check(not keys.has(t["key"]) and not ids.has(int(t["id"])),
+			"no duplicate key/id (%s)" % str(t["key"])) and clean
 		keys[t["key"]] = true
 		ids[int(t["id"])] = true
-		ok = _assert(int(t["debutYear"]) >= 1998 and int(t["tier"]) >= 1 and int(t["tier"]) <= 5,
-			"sane debut/tier for %s" % str(t["key"])) and ok
-		if str(t.get("route", "club")) == "club":
-			ok = _assert(t["clubId"] != null and int(t["clubId"]) > 0,
-				"club-routed %s carries a club id" % str(t["key"])) and ok
+		clean = _check(int(t["debutYear"]) >= 1998 and int(t["tier"]) >= 1 and int(t["tier"]) <= 5,
+			"sane debut/tier for %s" % str(t["key"])) and clean
+		var route := str(t.get("route", "club"))
+		if route == "club":
+			clean = _check(t["clubId"] != null and int(t["clubId"]) > 0,
+				"club-routed %s carries a club id" % str(t["key"])) and clean
+		elif route == "free_agent":
+			clean = _check(Talent.club_of(t) == -1,
+				"free-agent %s is clubless" % str(t["key"])) and clean
+	ok = _assert(clean, "all %d pool entries pass the schema checks" % talents.size()) and ok
 	return ok
 
 
 func _assert(cond: bool, label: String) -> bool:
 	print("  [%s] %s" % ["PASS" if cond else "FAIL", label])
+	return cond
+
+
+## Quiet assert for per-row sweeps: prints only failures.
+func _check(cond: bool, label: String) -> bool:
+	if not cond:
+		print("  [FAIL] %s" % label)
 	return cond

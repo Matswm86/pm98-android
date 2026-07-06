@@ -1,0 +1,4338 @@
+{
+  "unmatched": [
+    {
+      "clubName": "1. FC Saarbrücken",
+      "players": [
+        "CHRISTIAN WEBER",
+        "ANDREAS HAAS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "1. FC Tatran Prešov",
+      "players": [
+        "STANISLAV SESTAK"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "1. FC Union Berlin",
+      "players": [
+        "ROBERT HUTH"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "1.FC Kosice",
+      "players": [
+        "RADOSLAV ZABAVNIK",
+        "BLAZEJ VASCAK"
+      ],
+      "resolveTo": 1218
+    },
+    {
+      "clubName": "A.C. Cesena",
+      "players": [
+        "GIANNI COMANDINI",
+        "CARLO TEODORANI",
+        "MICHELE SALAFRICA",
+        "SAMUELE OLIVI",
+        "UMBERTO GRAGNANIELLO",
+        "NICOLA SANTONI",
+        "LUCA SUPRANI",
+        "NICOLA ANTONELLI",
+        "STEFANO BRAGA",
+        "THOMAS BENDONI",
+        "MIRKO LUCCHI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "ADO Den Haag",
+      "players": [
+        "ROMEO CASTELEN",
+        "RASHIDI GILKES"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "AE Kition Larnacas",
+      "players": [
+        "PARASKEVAS CHRISTOU"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "AE Larisa",
+      "players": [
+        "FANIS GEKAS",
+        "VANGELIS MORAS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "AEL Limassol",
+      "players": [
+        "ALEXIS GARPOZIS",
+        "SIMOS KRASSAS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "AO Aigaleo",
+      "players": [
+        "GIANNIS SKOPELITIS",
+        "DIMOSTHENIS MANOUSAKIS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "AO Chalkidon",
+      "players": [
+        "MEGLID MIHANI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "AO Kavala",
+      "players": [
+        "IFEANYI UDEZE",
+        "GIORGOS CHATZIZISIS",
+        "KOSTAS KONSTANTINIDIS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "APO Akratitos",
+      "players": [
+        "DIMITRIS PAPADOPOULOS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "AS Athinaikos Vyrona",
+      "players": [
+        "MANOLIS SKYVALOS",
+        "DANIEL EDUSEI",
+        "KOSTAS LYBEROPOULOS",
+        "THEOLOGOS MORAITIS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "AS Neapolis",
+      "players": [
+        "EFTHYMIS PLATAKIS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "AS Omonoia Nicosia",
+      "players": [
+        "PETROS KONNAFIS",
+        "STATHIS ALONEFTIS",
+        "ILIAS CHARALAMBOUS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "AS Racing Club (Basse-Terre)",
+      "players": [
+        "TINO COSTA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "ATP",
+      "players": [
+        "LUCAS SEVERINO",
+        "CARLOS ADRIANO DE SOUZA VIEIRA",
+        "CARLOS ADRIANO DE SOUSA",
+        "RENATO ALBUQUERQUE LIMA",
+        "THIAGO MARCELO SILVEIRA COCITO",
+        "CLEILTON EDUARDO VICENTE",
+        "JOSE FERRRAZ DO PRADO NETO",
+        "CRISTIANO APARECIDO DE CAMPOS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Aalesunds FK",
+      "players": [
+        "BJRN HELGE RIISE"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Abahani Krira Chakra Dhaka",
+      "players": [
+        "WILLY SANOU"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Aichi Gakuin University",
+      "players": [
+        "JONG TAE-SE"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Al-Ahly Sporting Club",
+      "players": [
+        "AHMAD BELAL"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Al-Arabi Sports Club",
+      "players": [
+        "WALEED HAMZAH",
+        "MASOUD ZERAEI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Al-Gharafa Sports Club",
+      "players": [
+        "HAMED SHAMI ZAHER",
+        "FAHAD AL SHAMMARI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Al-Hilal Saudi Football Club",
+      "players": [
+        "MOHAMMAD AL-SHALHOUB"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Al-Karamah Sporting Club",
+      "players": [
+        "FAWAZ MANDO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Al-Sadd Sports Club",
+      "players": [
+        "ABDULLA KONI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Al-Shabab Football Club",
+      "players": [
+        "ROBERT ZEBELYAN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Al-Wakrah Sports Club",
+      "players": [
+        "MOHAMMED AL-SULAITI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Aldershot Town",
+      "players": [
+        "GRANT CORNOCK"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Alianza FC (SLV)",
+      "players": [
+        "RAMIRO CARBALLO",
+        "WILLIAM TORRES CABRERA",
+        "DIEGO ARMANDO MEJIA",
+        "OSCAR NAVARRO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Alloa Athletic FC",
+      "players": [
+        "JAMES BAIRD"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Alzano 1909 Virescit F.C.",
+      "players": [
+        "GIOVANNI CAPUANO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Amora Futebol Clube",
+      "players": [
+        "CARLOS ALBERTO ALVES GARCIA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Anagennisi Karditsas",
+      "players": [
+        "DIMITRIS KOUTSOPOULOS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Angers Sporting Club de l'Ouest",
+      "players": [
+        "NICOLAS VALLAR"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Anorthosis Famagusta",
+      "players": [
+        "ANTONIS GIORGALLIDIS",
+        "LOUKAS LOUKA"
+      ],
+      "resolveTo": 1223
+    },
+    {
+      "clubName": "Apollon Kalamarias",
+      "players": [
+        "JOSEPH ELANGA",
+        "PATRICE ABANDA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Apollon Limassol",
+      "players": [
+        "CHRISTOS THEOFILOU",
+        "KOSTAS MAKRIDIS",
+        "CHRISTOS MARANGOS",
+        "GIORGOS MERKIS"
+      ],
+      "resolveTo": 1227
+    },
+    {
+      "clubName": "Apollon Smyrnis",
+      "players": [
+        "KOSTAS GIANNAKIS"
+      ],
+      "resolveTo": 1190
+    },
+    {
+      "clubName": "Arbeiter Sport Klub Kottingbrunn",
+      "players": [
+        "ANDREAS BUGER"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Arbroath FC",
+      "players": [
+        "ANDY WEBSTER"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Aris Limassol",
+      "players": [
+        "MARIOS NIKOLAOU"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Aris Thessalonikis",
+      "players": [
+        "APOSTOLOS LIOLIDIS",
+        "KOSTAS LOUBOUTIS",
+        "PANAGIOTIS KATSIAROS",
+        "GEORGIOS THEODORIDIS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Ashanti Gold Sporting Club",
+      "players": [
+        "ISAAC BOAKYE"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Asociación Deportivo Cali",
+      "players": [
+        "ALEXANDER VIVEROS"
+      ],
+      "resolveTo": 1316
+    },
+    {
+      "clubName": "Asociación Deportivo Pasto",
+      "players": [
+        "JOSE MORENO",
+        "NELSON RIVAS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Association Sportive Central Sport Papeete",
+      "players": [
+        "BRUNO TETUANUI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Association Sportive Dragon",
+      "players": [
+        "SAMUEL HNANYINE"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Association Sportive Magenta",
+      "players": [
+        "PIERRE WAJOKA",
+        "ANDRE SINEDO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Association Sportive Maya",
+      "players": [
+        "JOSH WAGENAAR",
+        "CAMERON MEDWIN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Association Sportive Nancy-Lorraine",
+      "players": [
+        "SOFIANE KONE",
+        "DAVID VAIRELLES",
+        "EGUTU OLISEH",
+        "MEHDI MENIRI",
+        "JEROME BOTTELIN",
+        "BERTRAND LAQUAIT"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Association Sportive Samaritaine",
+      "players": [
+        "GAEL GERMANY"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Association Sportive de Kaloum",
+      "players": [
+        "MAMADI SANGARE"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Association Sportive de Saint-Étienne Loire",
+      "players": [
+        "LUCIEN METTOMO",
+        "PAPE SARR"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Association du Servette FC",
+      "players": [
+        "PHILIPPE SENDEROS",
+        "MARTIN PETROV",
+        "DJAMEL MESBAH"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Associazione Calcio Ancona",
+      "players": [
+        "MASSIMO PACI",
+        "FRANCESCO MONTERVINO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Associazione Calcio Monza",
+      "players": [
+        "AGATINO CHIAVARO",
+        "SIMONE MAZZEI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Associazione Calcio Prato",
+      "players": [
+        "SIMONE BONOMI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Associazione Calcio Siena",
+      "players": [
+        "LAMBROS VANGELIS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Associazione Sportiva Cittadella",
+      "players": [
+        "CARMINE COPPOLA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Associazione Sportiva Livorno Calcio",
+      "players": [
+        "GIORGIO CHIELLINI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Associazione Sportiva Lucchese Libertas 1905",
+      "players": [
+        "LUCA DEL CHIARO",
+        "MARCO PEDOTTI",
+        "DANIELE LORENZINI",
+        "GABRIELE SCANDURRA",
+        "FRANCESCO MOCARELLI",
+        "FRANCESCO CALANCHI",
+        "SANDRO SORRENTINO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Associação Académica de Coimbra",
+      "players": [
+        "LUIS FILIPE ANGELO RODRIGUES FERNANDES"
+      ],
+      "resolveTo": 1091
+    },
+    {
+      "clubName": "Associação Atlética Internacional",
+      "players": [
+        "ELANO BLUMER"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Associação Desportiva de Marco de Canaveses 09",
+      "players": [
+        "VICTOR HUGO MOREIRA",
+        "MARCIO VIEIRA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Assyriska Fotbollsföreningen",
+      "players": [
+        "KENNEDY BAKIRCIOGLU"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Athlitikos Podosferikos Omilos Ellinon Lefkosias",
+      "players": [
+        "MARINOS SATSIAS",
+        "MARIOS ILIA",
+        "CONSTANTINOS CHARALAMBIDES",
+        "MICHALIS MORFIS",
+        "NEKTARIOS ALEXANDROU"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Audax Club Sportivo Italiano",
+      "players": [
+        "ROBERTO CERECEDA",
+        "LUIS MARIN",
+        "BORIS RIELOFF",
+        "JORGE CARRASCO",
+        "ALEJANDRO CARRASCO",
+        "JUAN MARTINEZ",
+        "FRANCISCO OTEIZA",
+        "JUAN ROBLEDO",
+        "MAURICIO PINO",
+        "ROBERTO VERGARA",
+        "SERGIO CONEJEROS",
+        "JORGE GARATE",
+        "NESTOR CONTRERAS",
+        "FERNANDO GUTIERREZ"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Aurora FC",
+      "players": [
+        "LUIS SWISHER",
+        "MAYNOR DAVILA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Ayr United FC",
+      "players": [
+        "MARK CAMPBELL"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "BAH",
+      "players": [
+        "DANIEL ALVES DA SILVA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "BOT",
+      "players": [],
+      "resolveTo": 1300,
+      "note": "FM unlicensed Brazil placeholder code"
+    },
+    {
+      "clubName": "Ba FC",
+      "players": [
+        "RONIL KUMAR"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Ballymoney United FC",
+      "players": [
+        "LIAM KEARNEY"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Barakaldo Club de Fútbol",
+      "players": [
+        "JOSEBA IGLESIAS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Belgrano de Córdoba",
+      "players": [
+        "DARIO ZARATE"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Belmopan Bandits FSC",
+      "players": [
+        "SHANE ORIO",
+        "ERWIN CONTRERAS",
+        "ANWAR SAYEED-HENGAR"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Benevento Calcio",
+      "players": [
+        "RAFFAELE PALLADINO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Bentleigh Greens",
+      "players": [
+        "NICK ABOUGELIS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Bidvest Wits FC",
+      "players": [
+        "ROWEN FERNANDEZ"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Birkenhead United AFC",
+      "players": [
+        "MAURI WASI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Bohemian FC",
+      "players": [
+        "SHAUN MAHER"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Boldklubben Frem",
+      "players": [
+        "MIKKEL THYGESEN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Boldklubben af 1893",
+      "players": [
+        "MORTEN JRGENSEN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Bologna FC 1909",
+      "players": [
+        "GIACOMO CIPRIANI",
+        "CRISTIAN ZACCARDO",
+        "DAVIDE PISANO",
+        "GIOVANNI POMPEI",
+        "LUCA VENTURI"
+      ],
+      "resolveTo": 1035
+    },
+    {
+      "clubName": "Bonnyrigg White Eagles",
+      "players": [
+        "DANNY VUKOVIC",
+        "ALI AKBAL",
+        "ASKIN OYGUR"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Bradford City AFC",
+      "players": [
+        "ISAIAH RANKIN",
+        "DANIEL VERITY"
+      ],
+      "resolveTo": 69
+    },
+    {
+      "clubName": "Bryne FK",
+      "players": [
+        "EIRIK SOLTVEDT",
+        "BJRN INGVAR KYDLAND"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "C.D. Águila",
+      "players": [
+        "ALEXANDER CAMPOS",
+        "SALVADOR COREAS",
+        "VICTOR FUENTES",
+        "JUAN JOSE GOMEZ"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "CD Atlético Marte",
+      "players": [
+        "OSCAR JIMENEZ",
+        "HENRY HERNANDEZ"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "CD Motagua",
+      "players": [
+        "VICTOR BERNARDEZ",
+        "JAIRO MARTINEZ",
+        "MAURICIO CASTRO",
+        "DAVID CASTELLANOS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "CD Municipal Limeño",
+      "players": [
+        "RUDIS CORRALES"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "CD Olimpia",
+      "players": [
+        "DONIS ESCOBER",
+        "BONIEK GARCIA",
+        "HENDRY THOMAS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "CD Victoria",
+      "players": [
+        "WILSON PALACIOS",
+        "WALTER MARTINEZ",
+        "MAYNOR FIGUEROA",
+        "MARVIN CHAVEZ"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "CD Árabe Unido",
+      "players": [
+        "ORLANDO RODRIGUEZ"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "CEC",
+      "players": [
+        "GEOVANI DEIBERSON MAURICIO",
+        "CLEBER MONTEIRO DE OLIVEIRA",
+        "ALONSO FERREIRA DE MATOS",
+        "LEONARDO ALVES RODRIGUES",
+        "LEANDRO VELOSO MENDONCA GAVIOLLE",
+        "SERGIO GUIMARAES DA SILVA JUNIOR",
+        "EVERSON ARANTES DE OLIVEIRA",
+        "REGINALDO TAVARES DE SOUZA"
+      ],
+      "resolveTo": 1306
+    },
+    {
+      "clubName": "CS Cartaginés",
+      "players": [
+        "DANNY FONSECA",
+        "ROY MILLER",
+        "RANDALL BRENES"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "CSD Comunicaciones",
+      "players": [
+        "FREDY THOMPSON",
+        "DWIGHT PEZZAROSSI",
+        "NESTOR MARTINEZ",
+        "MARIO RODRIGUEZ",
+        "HERNAN SANDOVAL",
+        "GUSTAVO CABRERA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "CSD Municipal",
+      "players": [
+        "CARLOS RUIZ",
+        "PAULO CESAR MOTTA",
+        "UWALDO PEREZ",
+        "CARLOS FIGUEROA",
+        "GUILLERMO RAMIREZ",
+        "CLAUDIO ALBIZURIS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "CTB",
+      "players": [
+        "ANTONIO REGINALDO MATIAS DE ARAUJO",
+        "WELTON CARLOS SILVA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Cagliari Calcio",
+      "players": [
+        "EMILIANO MELIS",
+        "ANDREA CAPONE",
+        "MOUSTAPHA KEITA",
+        "ALESSANDRO LAI",
+        "ANDREA",
+        "DANIELE CADELANO",
+        "FRANCESCO SANNA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Calcio Catania",
+      "players": [
+        "MASSIMO ZAPPINO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Castel di Sangro Cep 1953",
+      "players": [
+        "VINCENZO IAQUINTA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Castrovillari Calcio",
+      "players": [
+        "GENNARO DELVECCHIO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Cerezo Osaka",
+      "players": [
+        "AKIRA KAJI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Chemnitzer FC",
+      "players": [
+        "CHRISTIAN MULLER",
+        "STEFAN SCHUMANN",
+        "ALEXANDER HAUSCHILD"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "ChievoVerona",
+      "players": [
+        "KEWULLAY CONTEH",
+        "STEFANO FANTE",
+        "MATTIA MANZATTI",
+        "MARCELLO TURRI",
+        "LUCA VACCARI",
+        "MAST GARBA",
+        "STEFANO GARZON",
+        "SIMONE SANTIN",
+        "ANDREA CHIOPRIS GORI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Club Atlético All Boys",
+      "players": [
+        "FACUNDO DIZ"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Club Atlético Bella Vista",
+      "players": [
+        "RODRIGO PALACIO",
+        "ALEJANDRO LEMBO",
+        "SEBASTIAN SUAREZ",
+        "ELIAS FERREIRA DE SOUZA",
+        "MARCOS BASSINI",
+        "DANIEL GAMARRA",
+        "MARTIN GONGORA",
+        "ALEXIS ABRAHIM",
+        "MARCELO PICOS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Club Atlético Central Córdoba de Rosario",
+      "players": [
+        "CESAR DELGADO",
+        "SEBASTIAN GRAZZINI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Club Atlético Douglas Haig",
+      "players": [
+        "SANTIAGO MORERO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Club Atlético Huracán",
+      "players": [
+        "MARTIN RIOS",
+        "LEONARDO ORSI",
+        "NICOLAS COTERA",
+        "GUSTAVO MHAMED",
+        "EMILIANO GARRE",
+        "ALFREDO TORRES",
+        "EZEQUIEL ANDREOLI"
+      ],
+      "resolveTo": 1372
+    },
+    {
+      "clubName": "Club Atlético Monarcas Morelia",
+      "players": [
+        "EMILIO MORA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Club Atlético Nacional",
+      "players": [
+        "JUAN CAMILO ZUNIGA"
+      ],
+      "resolveTo": 1317
+    },
+    {
+      "clubName": "Club Atlético Nueva Chicago",
+      "players": [
+        "DANIEL VEGA",
+        "MARIANO DONDA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Club Atlético Osasuna Pamplona",
+      "players": [
+        "FERNANDO VIDIELLA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Club Atlético Progreso",
+      "players": [
+        "JORGE BAVA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Club Atlético River Plate Montevideo",
+      "players": [
+        "GIANCARLO MALDONADO",
+        "SANTIAGO SILVA",
+        "PABLO GRANOCHE",
+        "RICHARD PORTA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Club Atlético San Martín de San Juan",
+      "players": [
+        "LEANDRO ASAD"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Club Deportivo Alavés",
+      "players": [
+        "ISMAEL LOPEZ",
+        "ASIER SALCEDO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Club Deportivo Atlético Huila",
+      "players": [
+        "JORGE PERLAZA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Club Deportivo Badajoz",
+      "players": [
+        "SERGIO MANTECON"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Club Deportivo Godoy Cruz Antonio Tomba",
+      "players": [
+        "MARIANO TORRESI",
+        "HERNAN CABRERA",
+        "FACUNDO GAUNA",
+        "MARIANO ANTICO",
+        "DIEGO ESTRADA",
+        "DANIEL RUGGERI",
+        "DANIEL LEGUIZAMON",
+        "FACUNDO DE LA VEGA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Club Deportivo Guadalajara",
+      "players": [
+        "OMAR BRAVO",
+        "FRANCISCO JAVIER RODRIGUEZ",
+        "JORGE BARRERA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Club Deportivo Huachipato",
+      "players": [
+        "RODRIGO MILLAR",
+        "HORACIO DEL VALLE",
+        "PEDRO SANTANDER",
+        "PATRICIO NEIRA",
+        "DENIS MONTECINOS",
+        "MIGUEL CASTRO",
+        "JONATHAN NOVOA",
+        "LUIS PENA",
+        "MARIO SALGADO",
+        "LUIS SALAMANCA",
+        "CRISTIAN REYNERO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Club Deportivo Leganés",
+      "players": [
+        "JOAQUIN DONOSO ACEVEDO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Club Deportivo Lugo",
+      "players": [
+        "DIEGO LOPEZ RODRIGUEZ"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Club Deportivo Saprissa",
+      "players": [
+        "GILBERTO MARTINEZ",
+        "GABRIEL BADILLA",
+        "ARMANDO ALONSO",
+        "ALLAN ALEMAN",
+        "CHRISTIAN BOLANOS",
+        "RANDALL AZOFEIFA",
+        "ALVARO SABORIO",
+        "DANIEL COLINDRES"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Club Irapuato",
+      "players": [
+        "AURELIANO TORRES"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Club León FC",
+      "players": [
+        "ALVARO ORTIZ",
+        "JESUS MENDOZA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Club Nacional de Football",
+      "players": [
+        "GUSTAVO VARELA",
+        "WALTER COELHO"
+      ],
+      "resolveTo": 1308
+    },
+    {
+      "clubName": "Club Santos Laguna",
+      "players": [
+        "MANUEL CORONA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Club Social Deportivo y Cultural Español",
+      "players": [
+        "GASTON ESCUDERO",
+        "JUAN CARLOS CISNEROS",
+        "FRANCO ROMERO",
+        "PABLO FRANGIPANE",
+        "PABLO LOPEZ",
+        "GASTON STANG"
+      ],
+      "resolveTo": 1376
+    },
+    {
+      "clubName": "Club Social de Deportes Rangers",
+      "players": [
+        "NICOLAS PERIC",
+        "BORIS GONZALEZ",
+        "JUAN JOSE ALBORNOZ"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Club Social y Deportivo Colo-Colo",
+      "players": [
+        "CLAUDIO BRAVO",
+        "JORGE VALDIVIA",
+        "CLAUDIO MALDONADO",
+        "NICOLAS CORDOVA",
+        "SEBASTIAN GONZALEZ",
+        "MIGUEL RIFFO",
+        "EDUARDO LOBOS",
+        "MANUEL VILLALOBOS",
+        "ALEJANDRO ESCALONA",
+        "BRAULIO LEAL",
+        "ALVARO SARABIA",
+        "MIGUEL ACEVAL",
+        "LUIS MENA",
+        "LUIS IGNACIO QUINTEROS",
+        "ALONZO ZUNIGA",
+        "RODOLFO MADRID",
+        "VICTOR LOYOLA",
+        "SERGIO FERNANDEZ",
+        "CRISTIAN DIAZ",
+        "JUAN CARLOS MUNOZ",
+        "GINO REYES",
+        "RUBEN BASCUNAN",
+        "FELIPE NUNEZ"
+      ],
+      "resolveTo": 1315
+    },
+    {
+      "clubName": "Club Social y Deportivo Villa Española",
+      "players": [
+        "EGIDIO AREVALO RIOS",
+        "ERICK MARIN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Club Sport Marítimo",
+      "players": [
+        "DJAMES NASCIMENTO DA SILVA",
+        "RONALDO MARCZINSKI",
+        "JOHANN DUVEAU"
+      ],
+      "resolveTo": 1083
+    },
+    {
+      "clubName": "Club Sportif Avionnais Football",
+      "players": [
+        "JEAN-LUC LAMBOURDE"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Club Universitario de Deportes",
+      "players": [
+        "MARKO CIURLIZZA",
+        "JUAN MANUEL VARGAS",
+        "RAUL FERNANDEZ"
+      ],
+      "resolveTo": 1294
+    },
+    {
+      "clubName": "Club de Deportes Concepción",
+      "players": [
+        "DAUD GAZALE",
+        "GABRIEL VARGAS",
+        "MARCO BAUTISTA",
+        "EDZON RIQUELME",
+        "PABLO BOLADOS",
+        "ERIC OLIVARES",
+        "ALEJANDRO VRSALOVIC",
+        "DANIEL CAMPOS",
+        "RICARDO ORMENO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Club de Deportes Santiago Morning",
+      "players": [
+        "ESTEBAN PAREDES",
+        "ANDRES OROZ",
+        "OSCAR CORVALAN",
+        "VICTOR BERNAL"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Club de Fútbol Universidad Nacional",
+      "players": [
+        "GONZALO PINEDA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Clube Desportivo Santa Clara",
+      "players": [
+        "PEDRO PACHECO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Clube Desportivo das Aves",
+      "players": [
+        "RICARDO JOSE MONTEIRO FERREIRA",
+        "PAULO MIGUEL CAMPOS DE SOUSA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Clube Futebol Benfica",
+      "players": [
+        "JOSE SEMEDO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Colorado Rapids",
+      "players": [
+        "SETH TREMBLY",
+        "ADRIAN CANN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Columbus Crew Soccer Club",
+      "players": [
+        "MARIO LONGO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Como 1907",
+      "players": [
+        "LUCA SAUDATI",
+        "ALBERTO COMAZZI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Corporación Club Deportivo Tuluá",
+      "players": [
+        "LIONARD PAJOY"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Corporación Deportes Quindío",
+      "players": [
+        "WILMAN CONDE"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Cosenza Calcio",
+      "players": [
+        "MARCO MALAGO",
+        "CHRISTIAN PANNO",
+        "SERGIO D'AUTILIA",
+        "ADRIANO FIORE",
+        "MAFARAH KOFI AYEW",
+        "SILVIO VERTULLO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Crawley Town",
+      "players": [
+        "STEVE SARGENT"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Cremonese",
+      "players": [
+        "PAOLO CASTELLINI",
+        "ALESSANDRO ZOPPETTI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Cruz Azul Futbol Club",
+      "players": [
+        "HERCULEZ GOMEZ"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Cádiz Club de Fútbol",
+      "players": [
+        "JAVI MUNOZ"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Dagenham & Redbridge",
+      "players": [
+        "PAUL TERRY"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Danubio FC",
+      "players": [
+        "CHRISTIAN CALLEJAS",
+        "INTI PODESTA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Debreceni Vasutas Sport Club",
+      "players": [
+        "DANIEL TOZSER"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Defence Force",
+      "players": [
+        "CARLOS EDWARDS",
+        "MARVIN PHILLIP"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Defensor Sporting Club",
+      "players": [
+        "GONZALO SORONDO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Delfino Pescara 1936",
+      "players": [
+        "LUCA MINOPOLI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Denizlispor Kulübü",
+      "players": [
+        "BERKAY OZGUR"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Deportes Puerto Montt",
+      "players": [
+        "CLAUDIO ARRIAGADA",
+        "CARLOS OJEDA",
+        "RODRIGO SOTOMAYOR",
+        "PATRICIO GONZALEZ",
+        "CRISTIAN GUTIERREZ",
+        "RODRIGO GALLARDO",
+        "VICTOR OYARZUN",
+        "LEANDRO DELGADO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Djurgårdens Idrottsförening",
+      "players": [
+        "ANATOLI PONOMAREV"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Donawitzer Sportverein Leoben",
+      "players": [
+        "ROLAND LINZ",
+        "CHRISTIAN GRATZEI",
+        "DUBRAVKO TESEVIC",
+        "IGOR SEKIC",
+        "ROLAND RINNHOFER",
+        "DAVID SENCAR",
+        "KONSTANTIN WAWRA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Doncaster Rovers",
+      "players": [
+        "TRIS WHITMAN",
+        "PAUL ROBSON"
+      ],
+      "resolveTo": 114
+    },
+    {
+      "clubName": "Dongguk University",
+      "players": [
+        "HYO-YEON AN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Dundee FC",
+      "players": [],
+      "resolveTo": 0,
+      "note": "PM98 has only Dundee U. -- different club; force free agent"
+    },
+    {
+      "clubName": "East Fife FC",
+      "players": [
+        "JOHN MARTIN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Eintracht Frankfurt",
+      "players": [
+        "ANTONIO DA SILVA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Elche Club de Fútbol",
+      "players": [
+        "JUAN FRANCISCO MARTINEZ"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Esbjerg forenede Boldklubber",
+      "players": [
+        "JAN KRISTIANSEN",
+        "IDDI ALKHAG",
+        "MIKKEL ANDREASEN",
+        "HANS HENRIK ANDREASEN",
+        "MARTIN JENSEN",
+        "JERRY LUCENA",
+        "MORTEN SKYTTE"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Espérance Sportive de Tunis",
+      "players": [
+        "JULIUS AGHAHOWA",
+        "BOUBACAR SANOGO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Ethnikos Piraeus",
+      "players": [
+        "JOEL EPALLE"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Extremadura C.F.",
+      "players": [
+        "IKER URRAKA OLIVEIRA",
+        "JESUS VAZQUEZ",
+        "DAVID CORTES",
+        "EDUARDO MOYA CANTILLO",
+        "JONATHAN CASTRO",
+        "RUBEN TORRECILLA",
+        "GINES GARCIA MARTINEZ"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "F.C. Gualdo",
+      "players": [
+        "GIUSEPPE COZZOLINO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "FC Ararat Yerevan",
+      "players": [
+        "AGVAN MKRTCHYAN",
+        "EGHISHE MELIKYAN",
+        "VAHAGN MINASYAN",
+        "ARA VOSKANYAN",
+        "EDGAR SAFARYAN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "FC Augsburg",
+      "players": [
+        "SVEN MULLER",
+        "GROVER GIBSON",
+        "THOMAS WORLE",
+        "WOLF-MANUEL MAJUNKE",
+        "STEFAN MITTELBACH",
+        "CHRISTOPH BURKHARD",
+        "VOLKAN CUKUR"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "FC Baden 1897",
+      "players": [
+        "VEDAD IBISEVIC"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "FC Carl Zeiss Jena",
+      "players": [
+        "STEFAN BECKERT",
+        "CARSTEN SCHONEFELD"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "FC Den Bosch",
+      "players": [
+        "MARTIJN VAN STRIEN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "FC Dordrecht",
+      "players": [
+        "RACHID EL KHALIFI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "FC Hilversum",
+      "players": [
+        "STANLEY TAILOR"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "FC Hradec Králové",
+      "players": [
+        "KAREL PITAK"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "FC Lausanne-Sport",
+      "players": [
+        "REMO MEYER",
+        "TOMAS DANILEVICIUS"
+      ],
+      "resolveTo": 1160
+    },
+    {
+      "clubName": "FC Lokomotiv Moscow",
+      "players": [
+        "DMITRY BULYKIN",
+        "MARAT IZMAILOV",
+        "RUSLAN PIMENOV",
+        "DANIEL AKHTYAMOV",
+        "ILGAR ABDURAHMANOV"
+      ],
+      "resolveTo": 1101
+    },
+    {
+      "clubName": "FC Lugano",
+      "players": [
+        "MARCO PADALINO",
+        "RIJAT SHALA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "FC Mulhouse",
+      "players": [
+        "JULIEN MATTER"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "FC Nordsjælland",
+      "players": [
+        "KEVIN STUHR ELLEGAARD",
+        "DENNIS SRENSEN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "FC Paços de Ferreira",
+      "players": [
+        "MARIO SERGIO LEAL NOGUEIRA",
+        "PAULO MANUEL GONCALVES DAS NEVES"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "FC Shakhtar Donetsk",
+      "players": [
+        "ANATOLIY TYMOSCHUK",
+        "OLEKSIY BYELIK",
+        "ARTEM FEDETSKYI"
+      ],
+      "resolveTo": 1233
+    },
+    {
+      "clubName": "FC Shirak",
+      "players": [
+        "KAREN ALEKSANYAN",
+        "KAREN KHACHATRYAN",
+        "KAREN ALEXANYAN",
+        "EDVARD VARDANYAN",
+        "ARTAK GRIGORYAN",
+        "TIGRAN DAVTYAN",
+        "ANDRANIK BARIKYAN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "FC Slovan Liberec",
+      "players": [
+        "MARTIN JIRANEK"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "FC Sochaux-Montbéliard",
+      "players": [
+        "DANIJEL LJUBOJA",
+        "MICKAEL RAVAUX"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "FC Spartak Trnava",
+      "players": [
+        "KAMIL KOPUNEK"
+      ],
+      "resolveTo": 1219
+    },
+    {
+      "clubName": "FC St Pauli",
+      "players": [
+        "KARIM GUEDE",
+        "FABIAN BROCKER"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "FC Stade Nyonnais",
+      "players": [
+        "DANIEL GRECO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "FC Viktoria Plzeň",
+      "players": [
+        "DAVID LIMBERSKY"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "FC Zlín",
+      "players": [
+        "ZDENEK GRYGERA",
+        "JIRI KAUFMAN",
+        "MILAN PETRZELA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "FC de Felgueiras 1932",
+      "players": [
+        "MARCIO SANTOS",
+        "EDGAR CASEIRO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "FC de Martigues",
+      "players": [
+        "ANDRE-PIERRE GIGNAC",
+        "ABDOULAY KONKO",
+        "ROD FANNI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "FK 03 Pirmasens",
+      "players": [
+        "DOMI KUMBELA",
+        "PATRICK NOLDEN",
+        "JENS SCHAUFLER"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "FK DAC 1904 Dunajská Streda",
+      "players": [
+        "JAN DURICA",
+        "BALAZS BORBELY"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "FK Haugesund",
+      "players": [
+        "TOR ARNE ANDREASSEN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "FK Jablonec",
+      "players": [
+        "JIRI HOMOLA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "FK Jedinstvo Paraćin",
+      "players": [
+        "BORKO MILENKOVIC"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "FK Pobeda Prilep",
+      "players": [
+        "TONI MEGLENSKI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "FK Zemun",
+      "players": [
+        "IVAN PERIC"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "FLA",
+      "players": [],
+      "resolveTo": 1297,
+      "note": "FM unlicensed Brazil placeholder code"
+    },
+    {
+      "clubName": "FLU",
+      "players": [
+        "ROGER GALERA FLORES"
+      ],
+      "resolveTo": 1305
+    },
+    {
+      "clubName": "FV Hassia Bingen",
+      "players": [
+        "MARC KROG"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Falkenbergs Fotbollförening",
+      "players": [
+        "DAVID SVENSSON"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Falkirk FC",
+      "players": [
+        "ANDY SEATON"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Ferencvárosi Torna Club",
+      "players": [
+        "SZABOLCS HUSZTI"
+      ],
+      "resolveTo": 1228
+    },
+    {
+      "clubName": "Fidelis Andria",
+      "players": [
+        "GIORGIO LA VISTA",
+        "MAURO CHIODINI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Fimleikafélag Hafnarfjarðar",
+      "players": [
+        "EMIL HALLFRESSON"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Flamurtari Football Club Vlorë",
+      "players": [
+        "ORJAND BEQIRI",
+        "ROLAND NENAJ",
+        "BESMIR ARIFAJ",
+        "ESTREF BILLA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Floriana FC",
+      "players": [
+        "ETIENNE BARBARA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Foggia Calcio",
+      "players": [
+        "ALESSANDRO POTENZA",
+        "CRISTIAN AGNELLI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Football Club Libourne",
+      "players": [
+        "VINCENT GUIGNERY"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Football Club Rouen 1899",
+      "players": [
+        "FELICIEN SINGBO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Football Club Saint-Leu 95",
+      "players": [
+        "ALEXANDRE ALPHONSE"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Fortuna Düsseldorf",
+      "players": [
+        "ANDREAS GENSLER",
+        "STEPHAN BORK",
+        "GANIYU SHITTU",
+        "SOREN PIRSON"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Fotbal Club Universitatea Cluj",
+      "players": [
+        "ADRIAN PIT"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Fudbalski Klub Partizan",
+      "players": [
+        "MATEJA KEZMAN"
+      ],
+      "resolveTo": 1094
+    },
+    {
+      "clubName": "Fudbalski Klub Sarajevo",
+      "players": [
+        "FERID IDRIZOVIC"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Fudbalski klub Mogren Budva",
+      "players": [
+        "VLADO SMIT",
+        "MILAN BISEVAC",
+        "BRANISLAV VUKOMANOVIC"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Fudbalski klub Napredak Kruševac",
+      "players": [
+        "MILAN NIKOLIC",
+        "VLADE LAZAREVSKI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Fudbalski klub Rudar Pljevlja",
+      "players": [
+        "DRAGAN BOGAVAC"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Fudbalski klub Sileks Kratovo",
+      "players": [
+        "IGOR MITRESKI"
+      ],
+      "resolveTo": 1356
+    },
+    {
+      "clubName": "Fudbalski klub Vardar Skopje",
+      "players": [
+        "NDERIM NEXHIPI",
+        "ZEKIRIJA RAMADANI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Fujieda Higashi High School",
+      "players": [
+        "MAKOTO HASEBE"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Fussball Club Luzern",
+      "players": [
+        "STEPHAN LICHTSTEINER",
+        "ALEXANDER FREI",
+        "CHRISTOPH SPYCHER",
+        "DAVID ZIBUNG",
+        "CHRISTIAN SCHWEGLER"
+      ],
+      "resolveTo": 1158
+    },
+    {
+      "clubName": "Fussballclub Aarau 1902",
+      "players": [
+        "MARIO EGGIMANN",
+        "DAVID DEGEN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Fussballclub Basel 1893",
+      "players": [
+        "PHILIPP DEGEN",
+        "MARCO STRELLER",
+        "JOSE GONCALVES",
+        "MARC PFERTZEL"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Fussballclub Kufstein",
+      "players": [
+        "ROBERT MAYER"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Fussballclub Kärnten",
+      "players": [
+        "MATTHIAS DOLLINGER",
+        "KAI SCHOPPITSCH",
+        "MARIO STEINER",
+        "ALEXANDER SCHENK",
+        "SETH ABLADE",
+        "GEORG HARDING",
+        "ANDREAS RAUSCHER",
+        "JURGEN KAMPEL",
+        "RENE PARTL",
+        "REUBEN OSEKRE",
+        "MANUEL PIRMANN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Fussballclub Lendorf",
+      "players": [
+        "CHRISTOPH MORGENSTERN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Fussballclub St. Gallen 1879",
+      "players": [
+        "TRANQUILLO BARNETTA",
+        "DAVIDE CHIUMIENTO",
+        "DANIEL SEREINIG"
+      ],
+      "resolveTo": 1159
+    },
+    {
+      "clubName": "Fussballclub Zürich",
+      "players": [
+        "DANIEL GYGAX",
+        "ALAIN NEF",
+        "DAVID PALLAS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Futbalový Klub AS Trenčín",
+      "players": [
+        "MILAN IVANA",
+        "JAN KOZIAK"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Futbol Club Santa Coloma",
+      "players": [
+        "GERMAN CANAL",
+        "SEBASTIAN GOMEZ",
+        "JUAN CARLOS TOSCANO",
+        "XAVIER GIL"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Futbol Klub Shakhter Karagandy",
+      "players": [
+        "ANDREI FINONCHENKO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Futboll Klub Partizani",
+      "players": [
+        "GJERGJ MUZAKA",
+        "EDMOND KAPLLANI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Futebol Clube de Alverca - SAD",
+      "players": [
+        "PAULO SERGIO DA COSTA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "GFK Dubočica Leskovac",
+      "players": [
+        "MILOS KOCIC"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "GRE",
+      "players": [
+        "RONALDO DE ASSIS MOREIRA",
+        "PAULO CESAR FONSECA DO NASCIMENTO",
+        "GUILHERME WEISHEIMER",
+        "CARLOS ALBERTO RODRIGUES GAVIAO",
+        "CLAUDIO MEJOLARO",
+        "ANDERSON CORREA POLGA",
+        "EDER GUTERRES SILVEIRA"
+      ],
+      "resolveTo": 1302
+    },
+    {
+      "clubName": "GUA",
+      "players": [
+        "RAFAEL PEREIRA DA SILVA",
+        "LUIS FERNANDO LOJUDICE MARTINEZ",
+        "MARCOS ROBERTO PEREIRA DOS SANTOS",
+        "DIRCEU XAVIER FRANCISCO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Gamba Osaka",
+      "players": [
+        "JUNICHI INAMOTO",
+        "MASASHI OGURO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Gaziantep Spor Kulübü",
+      "players": [
+        "MUSTAFA SAHINTURK",
+        "HALIT KOPRULU",
+        "MUHARREM KASA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Gazélec FC Ajaccio",
+      "players": [
+        "HOUSSINE KHARJA",
+        "JEAN-TOUSSAINT MORETTI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Genoa C.F.C.",
+      "players": [
+        "GAETANO GRIECO",
+        "FABIO LUCCHETTA",
+        "LUCIANO VAN KALLEN",
+        "MILAN BELENKAMP",
+        "FRANCESCO PINTO",
+        "DAVIDE FEDRIGO",
+        "MATTEO MERLO",
+        "GIULIANO OLIVARELLO",
+        "DANIELE PORTANOVA",
+        "MAURIZIO BORRELLO",
+        "DAVIDE GRIPPO",
+        "NORMANDO GOMES",
+        "ALESSANDRO ZUCCHELLI",
+        "MASSIMO GALIETTI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Gençlerbirliği Spor Kulübü",
+      "players": [
+        "GEREMI SORELE NJITAP FOTSO",
+        "MEHMET OLASMS",
+        "ZIYA AYDN",
+        "HASAN BINICI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Getafe Club de Fútbol",
+      "players": [
+        "DAVID CANAS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Gil Vicente FC",
+      "players": [
+        "PAULO CESAR ROCHA ROSA",
+        "FERNANDO JORGE BATISTA PINHO VALENTE",
+        "WENDERSON DE JESUS SANTOS",
+        "DARIO FURTADO",
+        "RUI JORGE DA COSTA FIGUEIREDO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Greenock Morton FC",
+      "players": [
+        "STEVEN DOCHERTY"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Grupo Desportivo Estoril Praia",
+      "players": [
+        "PAULO FERREIRA",
+        "JORGE VIDIGAL"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "HFC Haarlem",
+      "players": [
+        "PAUL MULDERS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "HNK Cibalia",
+      "players": [
+        "MARIO BILEN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "HNK Hajduk Split",
+      "players": [
+        "STIPE PLETIKOSA",
+        "ZVONIMIR DERANJA",
+        "DARKO MILADIN",
+        "JURICA PULJIZ"
+      ],
+      "resolveTo": 1130
+    },
+    {
+      "clubName": "HNK Rijeka",
+      "players": [
+        "ANDRE MIJATOVIC",
+        "KRISTIJAN CAVAL",
+        "GORAN BRAJKOVIC",
+        "MATE BRAJKOVIC",
+        "AHMAD SHARBINI",
+        "MATKO DJARMATI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Halifax Town",
+      "players": [
+        "STEPHEN MURPHY",
+        "IAN FITZPATRICK"
+      ],
+      "resolveTo": 1328
+    },
+    {
+      "clubName": "Hammarby Idrottsförening Fotbollsförening",
+      "players": [
+        "PETER HOLM",
+        "CHARLIE EJERHOLM",
+        "SULEYMAN SLEYMAN",
+        "MIKAEL ANDERSSON",
+        "BENYAM SEYOUM"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Hellas Verona FC",
+      "players": [
+        "LUCA GIRELLI",
+        "CORRADO VENTURI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Helmond Sport",
+      "players": [
+        "DANNY VAN BAKEL",
+        "JOHN MAISANO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Hitchin Town",
+      "players": [
+        "DAVE KITSON"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "IFK Skövde FK",
+      "players": [
+        "OSCAR WENDT"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "IK Start",
+      "players": [
+        "FREDRIK HENRIKSEN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "IMG Academy Bradenton",
+      "players": [
+        "MARCO VELEZ",
+        "LAWSON VAUGHN",
+        "MIKE BANNER",
+        "NICK NOBLE",
+        "DAVID MAHONEY"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "INT",
+      "players": [
+        "FABIO ROCHEMBACK",
+        "FERNANDO DA SILVA CARDOZO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Idrottsföreningen Elfsborg",
+      "players": [
+        "STEPHANE INAGO",
+        "JOHAN SJOBERG",
+        "KRISTOFFER ARVHAGE",
+        "MARTIN STROMBERG",
+        "FREDRIK PARKHAGEN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Idrottsföreningen Kamraterna Norrköping",
+      "players": [
+        "JONAS BJURSTROM",
+        "SIMON DOGAN",
+        "JOHAN TAINIO",
+        "MATTIAS OSTBERG",
+        "DENIS ORESKOVIC",
+        "JANNE HIETANEN",
+        "HENRIK JANSSON"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Idrottsklubben Sirius",
+      "players": [
+        "PETER SJOLUND"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Impulsora del Deportivo Necaxa",
+      "players": [
+        "RODOLFO ESPINOZA",
+        "PABLO GABAS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Inglewood United",
+      "players": [
+        "JAMES HESKETH"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Iraklis Thessalonikis",
+      "players": [
+        "MICHALIS KONSTANTINOU",
+        "MICHAIL-RAZVAN BERNEANOU",
+        "THANASIS MOUTSIOS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Ismaily Sporting Club",
+      "players": [
+        "JOHN UTAKA",
+        "MOHAMED MOHSEN ABOU GREISHA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "JEF United Ichihara Chiba",
+      "players": [
+        "OVIDIU BURCA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "JUV",
+      "players": [
+        "FERNANDO MENEGAZZO",
+        "ADRIANO NEVES PEREIRA",
+        "LUCIANO PERAZZOLO SIMONETTO FONSECA",
+        "GIULIANO SABATTINI CRUZ",
+        "ANTONIO AUGUSTO",
+        "LUIZ OSCAR RAUBER FILHO",
+        "ROBERTO ALCANTARA BALLESTEROS",
+        "JOSENILDO CARLOS DE SOUZA",
+        "LUIZ FERNANDO ACUNA EGIDIO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Júbilo Iwata",
+      "players": [
+        "NAOHIRO TAKAHARA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "KFC Uerdingen 05",
+      "players": [
+        "SEBASTIAN KAUL",
+        "DUSTIN HEUN",
+        "CHRISTIAN HEGER",
+        "ERWIN BRADASCH"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "KOSSA FC",
+      "players": [
+        "JAMES NAKA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Kaizer Chiefs FC",
+      "players": [
+        "GERALD SIBEKO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Kalmar Fotbollsförening",
+      "players": [
+        "OLOF ENGBLOM",
+        "JONAS GUNNARSSON",
+        "KARL-FREDRIK KARLSSON"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Karlsruher SC",
+      "players": [
+        "SERHAT AKN",
+        "BENJAMIN AUER",
+        "MINOR DIAZ",
+        "MARTIN STOLL",
+        "MICHAEL ZEPEK",
+        "THOMAS HILLENBRAND",
+        "MARCEL RAPP",
+        "SEBASTIAN FREIS",
+        "IVAN SAENKO",
+        "RICHARD BOKATOLA-LOSSOMBO",
+        "SASCHA TRAUT",
+        "ISAAC OJIGWE"
+      ],
+      "resolveTo": 1043
+    },
+    {
+      "clubName": "Kashima Antlers F.C.",
+      "players": [
+        "MITSUO OGASAWARA",
+        "HITOSHI SOGAHATA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Kashiwa Reysol",
+      "players": [
+        "HIDEKAZU OTANI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Kickers Offenbach",
+      "players": [
+        "CHRISTIAN MULLER"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Kilikia Yerevan",
+      "players": [
+        "ARTAVAZD KARAMYAN",
+        "KAREN ZAKARYAN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Kingstonian",
+      "players": [
+        "RICHARD O'CONNOR"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Klub Sportowy Lechia Gdańsk",
+      "players": [
+        "JULCIMAR CONCEICAO DE SOUZA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Klubi Futbollistik Shkëndija",
+      "players": [
+        "RRAHMAN HALLACI",
+        "BILAL VELIJA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Klubi Sportiv Besa Kavajë",
+      "players": [
+        "PARID XHIHANI",
+        "ERAND HOXHA",
+        "MARIO BYTYCI",
+        "DRITAN KRASNIQI",
+        "FATON QORRAJ",
+        "LIRIDON AHMETI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Klubi Sportiv Besëlidhja Lezhë",
+      "players": [
+        "ROBERT GRIZHA",
+        "SEBINO PLAKU",
+        "ENTONJO PASHAJ"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Klubi i Futbollit Apolonia Fier",
+      "players": [
+        "ARTIM POLOZANI",
+        "KONSTANTIN GERGANCHEV",
+        "EDUART MICO",
+        "JULIAN GERXHO",
+        "LAERT BEJKO",
+        "GERSI ARBERI",
+        "MIRJAN BEGAJ"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Klubi i Futbollit Laçi",
+      "players": [
+        "JULIAN BRAHJA",
+        "ELTON MUCOLLARI",
+        "ELIO SHAZIVARI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Klubi i Futbollit Shkumbini",
+      "players": [
+        "BLEDI SHKEMBI",
+        "ROLAND DERVISHI",
+        "KLEMENT XHYRA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Klubi i Futbollit Tirana",
+      "players": [
+        "ANSI AGOLLI",
+        "ERVIN BULKU",
+        "REZART DABULLA",
+        "ELVIS SINA",
+        "ISLI HIDI",
+        "SOKOL BULKU",
+        "YLLI FERHATI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Klubi i futbollit Vllaznia Shkodër",
+      "players": [
+        "HAMDI SALIHI",
+        "ADMIR TELI",
+        "AMARILDO BELISHA",
+        "ERTAN DEMIRI",
+        "EDMOND DOCI",
+        "ARJON MUSTAFA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Kongsvinger IL",
+      "players": [
+        "SVEN ERIK STRE",
+        "HARALD STORMOEN",
+        "KARL ERIK RIMFELDT"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Koninklijke Atletiek Associatie Gent",
+      "players": [
+        "THOMAS CHATELLE",
+        "CEDRIC ROUSSEL",
+        "FREDERIC DUPRE"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Koninklijke Racing Club Genk",
+      "players": [
+        "BJARNI GUJONSSON",
+        "STEFAN TEELEN",
+        "JOHANNES KARL GUJONSSON"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Koninklijke Voetbal Club Westerlo",
+      "players": [
+        "BART DEELKENS",
+        "LUKAS ZELENKA",
+        "BART WILLEMSEN",
+        "DAVID BECKERS",
+        "JONATHAN BOURDON"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Kwangwoon University",
+      "players": [
+        "KI-HYEON SEOL"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Kyoto Purple Sanga",
+      "players": [
+        "JI-SUNG PARK"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "LA Galaxy",
+      "players": [
+        "DAMARCUS BEASLEY",
+        "DANNY CALIFF",
+        "PETE VAGENAS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "La Berrichonne de Châteauroux",
+      "players": [
+        "SEBASTIEN ROUDET",
+        "ALAIN BEHI"
+      ],
+      "resolveTo": 1073
+    },
+    {
+      "clubName": "La Vitréenne Football Club",
+      "players": [
+        "BENJAMIN BERNARD-HERVE"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Lancy FC",
+      "players": [
+        "ALEX GEIJO",
+        "SRDAN GLAVAS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Landskrona Boll och Idrottsällskap",
+      "players": [
+        "ALEXANDER FARNERUD"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Le Mans FC",
+      "players": [
+        "DIDIER DROGBA",
+        "CEDRIC FABIEN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Lecco 1912",
+      "players": [
+        "DANIELE PADELLI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Levante Unión Deportiva",
+      "players": [
+        "VICENTE RODRIGUEZ",
+        "ANDRES PATO",
+        "MIGUEL ANGEL",
+        "EMILIO RENTERIA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Lille Olympique Sporting Club",
+      "players": [
+        "DAVID COULIBALY",
+        "BENOIT CHEYROU",
+        "GAEL SANZ",
+        "GEOFFREY DERNIS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Linzer-Athletik-Sport-Klub",
+      "players": [
+        "MARKUS KIESENEBNER",
+        "PASCAL ORTNER",
+        "JOHANNES WOLDEAB",
+        "MARKO VUJIC",
+        "ARMIN LEITNER",
+        "DOMINIK STOBICH",
+        "PETER RIEDL",
+        "THOMAS WINKLER",
+        "ERNST KOLL",
+        "HARALD RUCKENDORFER",
+        "SLAVKO BLAZIC",
+        "CHRISTOPHER LINDENBAUER",
+        "MARCO LEOVAC",
+        "LUKAS HINTERSTEINER"
+      ],
+      "resolveTo": 1167
+    },
+    {
+      "clubName": "Lisburn Distillery FC",
+      "players": [
+        "TONY MCSHANE"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Louhans-Cuiseaux Football Club",
+      "players": [
+        "ISSA CISSOKHO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Lyn Toppfotball",
+      "players": [
+        "ALEKSANDER MIDTSIAN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Lyngby Boldklub",
+      "players": [
+        "CHRISTIAN MAGLEBY",
+        "RASMUS MARVITS",
+        "MORTEN PETERSEN",
+        "RENE SCHRDER",
+        "RONNY PETERSEN",
+        "PETER HOLM",
+        "MICHAEL LARSEN",
+        "PETER REWERS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Lüneburger SK Hansa",
+      "players": [
+        "STEFAN RICHTER"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Mansfield Town",
+      "players": [
+        "JOHNATAN MILNER",
+        "LIAM LAWRENCE",
+        "JASON SEDLAN",
+        "MICHAEL SISSON",
+        "DAVID JERVIS",
+        "SHAUN ARCHIBALD",
+        "ALISTAIR ASHER",
+        "DALE CHRISTIAN",
+        "KEVIN TYE"
+      ],
+      "resolveTo": 122
+    },
+    {
+      "clubName": "Matavera FC",
+      "players": [
+        "JOHN PAREANGA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Melbourne Knights FC",
+      "players": [
+        "ZELJKO SUSA",
+        "EUGENE GALEKOVIC",
+        "PAUL URLOVIC",
+        "RAMAZAN TAVSANCIOGLU",
+        "BILL NATSIOULAS",
+        "ADAM HREHORESIN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Merkezi Ordu İdman Klubu Bakı",
+      "players": [
+        "ZAUR TAGIZADE",
+        "JAMSHID MAHARRAMOV"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Mestský Futbalový Klub Dubnica",
+      "players": [
+        "ADAM NEMEC"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Mestský Futbalový Klub Ružomberok",
+      "players": [
+        "DUSAN SVENTO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Montauban FC Tarn et Garonne",
+      "players": [
+        "SALIM DJEFAFLIA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Montevideo Wanderers FC",
+      "players": [
+        "JORGE MARTINEZ",
+        "GABRIEL CICHERO"
+      ],
+      "resolveTo": 1309
+    },
+    {
+      "clubName": "Morski Klub Sportowy Pogoń Szczecin",
+      "players": [
+        "MARCIN LENCZEWSKI",
+        "ROBERT SIKORSKI",
+        "ARTUR BAZEJEWSKI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Málaga Club de Fútbol",
+      "players": [
+        "SERGIO CONTRERAS",
+        "JESUS GAMEZ",
+        "ALEXIS RUANO",
+        "DANI SANCHEZ",
+        "RUBEN PARRAGA",
+        "AWULEY QUAYE",
+        "MANOLO REINA",
+        "ALBERTO AGUILAR",
+        "FRANCISCO ESTEBAN",
+        "ALVARO SILVA",
+        "ANTONIO JOSE MARFIL ROCA",
+        "PEDRO JOSE PINAZO",
+        "JOSE MARIA ISAAC",
+        "LUIS JAVIER SANTAMARIA",
+        "ANTONIO CALDERON",
+        "MARCOS GUERRERO",
+        "OWUSU AFRIYIE",
+        "HIGINIO VILCHES"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "NK Olimpija Osijek",
+      "players": [
+        "DANIJEL PRANJIC"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "NK Osijek",
+      "players": [
+        "JOSIP BALATINAC"
+      ],
+      "resolveTo": 1132
+    },
+    {
+      "clubName": "NK Pomorac 1921",
+      "players": [
+        "ANTUN DUNKOVIC"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "NK Varaždin",
+      "players": [
+        "LEON BENKO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "NK Zagreb",
+      "players": [
+        "IVICA BANOVIC",
+        "MENSUR MUJDZA",
+        "DARKO PERIC",
+        "MARKO MARIC"
+      ],
+      "resolveTo": 1134
+    },
+    {
+      "clubName": "Nelson Suburbs FC",
+      "players": [
+        "HENRY FA'ARODO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Neuchâtel Xamax FCS",
+      "players": [
+        "STEVE VON BERGEN",
+        "RAINER BIELI",
+        "AUGUSTINE SIMO",
+        "HERVE BOCHUD"
+      ],
+      "resolveTo": 1157
+    },
+    {
+      "clubName": "New England Revolution",
+      "players": [
+        "TIM HOWARD"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Nikao Sokattak FC",
+      "players": [
+        "ANOANGA TISAM"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Nogometni Klub Koper",
+      "players": [
+        "ZLATKO DEDIC"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Nogometni Klub Olimpija Ljubljana",
+      "players": [
+        "JASMIN HANDANOVIC",
+        "DEJAN GRABIC"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Nogometni Klub Rudar Velenje",
+      "players": [
+        "KLEMEN LAVRIC",
+        "ALMIR SULEJMANOVIC",
+        "SHPETIM BABAJ"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Northwich Victoria",
+      "players": [
+        "ROB PELL"
+      ],
+      "resolveTo": 1335
+    },
+    {
+      "clubName": "Náutico Futebol Clube",
+      "players": [
+        "THIAGO ROCKENBACH DA SILVA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Nîmes Olympique FC",
+      "players": [
+        "ALAIN MASUDI",
+        "GUY DEMEL",
+        "FREDERIC PIQUIONNE",
+        "JULIEN RANTIER"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "O Elvas Clube Alentejano dos Desportos",
+      "players": [
+        "HENRIQUE SERENO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "O'Higgins FC",
+      "players": [
+        "CHRISTIAN GALVEZ",
+        "HECTOR BARRA",
+        "IVAN SEPULVEDA",
+        "VICTOR ARREDONDO",
+        "EDUARDO MOLINA",
+        "RODRIGO PENROZ",
+        "CRISTOBAL GONZALEZ",
+        "MARCELO LUCERO",
+        "RODRIGO RAMIREZ",
+        "MARCO RODRIGUEZ",
+        "CLAUDIO VIDELA",
+        "SERGIO VARGAS",
+        "CHRISTIAN CAMILO",
+        "LEANDRO CARRENO",
+        "PATRICIO VARGAS",
+        "LUIS MORI",
+        "JUAN LUIS LOBOS",
+        "LUIS FLORES MANZOR"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "OFK Pirin Blagoevgrad",
+      "players": [
+        "ILIYAN MITSANSKI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Odds BK",
+      "players": [
+        "JAN GUNNAR SOLLI",
+        "KNUT TELLEF SYVERTSEN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Olympique Gymnaste Club de Nice",
+      "players": [
+        "ERIC CUBILIER"
+      ],
+      "resolveTo": 1068
+    },
+    {
+      "clubName": "Olympique Noisy-le-Sec Banlieue 93",
+      "players": [
+        "HASSOUN CAMARA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Once Caldas",
+      "players": [
+        "ELKIN SOTO",
+        "SEBASTIAN CALLEJA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Ostiamare Lido Calcio",
+      "players": [
+        "DANIELE DE ROSSI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "PAE Panserraikos",
+      "players": [
+        "TASOS DENTSAS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "PAOK Thessalonikis",
+      "players": [
+        "PANTELIS KAFES",
+        "VANGELIS NASTOS",
+        "PATRICE ABANDA",
+        "GIORGOS KOULAKIOTIS"
+      ],
+      "resolveTo": 1192
+    },
+    {
+      "clubName": "PAR",
+      "players": [
+        "MARCELO DE JESUS LIMA",
+        "CEZAR ROMERO MARQUES DOS SANTOS",
+        "JOAO SIMAO PESSOA JUNIOR",
+        "DEIVISON PEDRO DE ALMEIDA",
+        "ITAMAR DOS SANTOS",
+        "ALEX CHANDRE DE OLIVEIRA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "PAS Giannina",
+      "players": [
+        "GIOURKAS SEITARIDIS",
+        "NIKOS SPYROPOULOS",
+        "ALEKOS TATSIS",
+        "XENOFON GITTAS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "PO Atsaleniou",
+      "players": [
+        "MICHALIS SIFAKIS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "PON",
+      "players": [
+        "ALEXSANDRO MARQUES DE OLIVEIRA",
+        "CARLOS EDUARDO SOARES",
+        "HUMBERTO DANIEL SOARES MARTELO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "POR",
+      "players": [
+        "LEANDRO CAMARA DO AMARAL",
+        "ELVIS ALVES PEREIRA",
+        "UANDERSON CRISTIANO SPERADIN",
+        "SANDRO CARDOSO DOS SANTOS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Padova",
+      "players": [
+        "DANIELE GASTALDELLO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Panetolikos",
+      "players": [
+        "FILIPPOS DARLAS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Panevėžio Futbolo Klubas Ekranas Panevėžys",
+      "players": [
+        "MARIUS STANKEVICIUS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Panionios G.S.S.",
+      "players": [
+        "THANASIS GAZIS",
+        "KOSTAS KAFALIS",
+        "SPYROS ZARRAS",
+        "ILIAS IOANNOU",
+        "DIMITRIS MARKESINIS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Partick Thistle FC",
+      "players": [
+        "MARTIN LAUCHLAN",
+        "ROBERT DUNN",
+        "KEVIN GAUGHAN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Pavia 1911",
+      "players": [
+        "FRANCESCO BATTAGLIA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Persepolis Football Club",
+      "players": [
+        "ALI KARIMI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Perth Glory FC",
+      "players": [
+        "GREG OWENS",
+        "LUKE TOMICH",
+        "JOSH MITCHELL",
+        "STUART MUSIALIK",
+        "DAMIAN ZANE"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Pisa Calcio",
+      "players": [
+        "CIRO CAPUANO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Profesionalen Futbolen Klub Beroe Stara Zagora",
+      "players": [
+        "MIROSLAV MINDEV"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Profesionalen Futbolen Klub Lokomotiv Sofia",
+      "players": [
+        "GEORGI PEEV"
+      ],
+      "resolveTo": 1211
+    },
+    {
+      "clubName": "Profiesjonalyj FC Krylya Sovetov Samara",
+      "players": [
+        "SERGEY IGNASHEVICH"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Puaikura FC",
+      "players": [
+        "HINOI HENRY",
+        "JUNIOR PUROKU",
+        "NIKORIMA TE MIHA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Quilmes Atlético Club",
+      "players": [
+        "JOHNNIER MONTANO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "RAAL La Louvière",
+      "players": [
+        "SILVIO PROTO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "RBC Roosendaal",
+      "players": [
+        "EDWIN DE GRAAF",
+        "PASCAL HEIJE",
+        "SANDER KELLER",
+        "RAMON LUIJTEN",
+        "DARL DOUGLAS",
+        "JOHN TAKS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "RKC Waalwijk",
+      "players": [
+        "RON HEESAKKERS",
+        "CHARLES CHIEMIEZIE"
+      ],
+      "resolveTo": 1113
+    },
+    {
+      "clubName": "Racing Club de Ferrol",
+      "players": [
+        "PABLO REY"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Raith Rovers FC",
+      "players": [
+        "PAUL SHIELDS",
+        "KEVIN BYERS",
+        "RODDY MAUGHAN",
+        "ALLAN STEWART",
+        "JAY STEIN",
+        "DEAN MCPHERSON",
+        "KEVIN MCLEISH",
+        "CRAIG SMART",
+        "ROSS VENABLES",
+        "ALLY HYND",
+        "ANDREW CLARK",
+        "STUART MORRISON",
+        "PAUL HAMPSHIRE",
+        "RUSSELL TAYLOR",
+        "PAUL WARDLAW",
+        "DAVID MCINALLY"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Ravenna Football Club 1913",
+      "players": [
+        "ZIZI ROBERTS",
+        "OMAR SAPONI",
+        "GABRIELE RUMMOLO",
+        "LORENZO FERRARI",
+        "ROBERTO FABBRI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Rayo Vallecano de Madrid",
+      "players": [
+        "ALVARO NEGREDO",
+        "ROBERTO PERAGON",
+        "FERNANDO MARQUES",
+        "DAVID FERNANDEZ",
+        "SERGIO SEGURA",
+        "IVAN AMAYA",
+        "DANIEL EVUY",
+        "RUFINO SEGOVIA",
+        "DANIEL SEGOVIA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Real Cartagena FC",
+      "players": [
+        "CARLOS VALDES"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Real Jaén Club de Fútbol",
+      "players": [
+        "EMILIO MUNOZ",
+        "JUAN VACAS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Real Mona FC",
+      "players": [
+        "KHARI STEPHENSON",
+        "ALEX THOMAS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Real Murcia Club de Fútbol",
+      "players": [
+        "IVAN LOPEZ",
+        "JOSE MARIA DIAZ MUNOZ",
+        "JUAN MORILLAS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Red Star FC",
+      "players": [
+        "FRANTZ BERTIN",
+        "MICKAEL TACALFRED",
+        "MIKAEL GERMAIN",
+        "LUDOVIC FARDIN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Reggina Calcio",
+      "players": [
+        "BRUNO CIRILLO",
+        "GIANDOMENICO MESTO",
+        "GIOVANNI MORABITO",
+        "DANIELE PECCARISI",
+        "FABIO GIUST",
+        "IVANO IDA",
+        "DANIELE MATTIELIG",
+        "SERGE DIE"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Rimini Calcio FC",
+      "players": [
+        "MATTEO BRIGHI",
+        "MARCO BRIGHI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Rochdale AFC",
+      "players": [
+        "MARK WILLIAMS",
+        "PHILIP EDGEHILL",
+        "DAVID GRAY"
+      ],
+      "resolveTo": 124
+    },
+    {
+      "clubName": "Ross County FC",
+      "players": [
+        "JOHN FRASER"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Rot Weiss Ahlen",
+      "players": [
+        "MICHAEL KAMINSKI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Royal Antwerp FC",
+      "players": [
+        "JONAS DE ROECK"
+      ],
+      "resolveTo": 1127
+    },
+    {
+      "clubName": "Royal Charleroi Sporting Club",
+      "players": [
+        "MAHAMADOU KERE",
+        "ADEM BIRINCI",
+        "GREGORY DUFER",
+        "LAURENT CIMAN",
+        "CHIRSTIAN NEGOUAI",
+        "SANDRO MARCELO",
+        "SERGE EPUTA",
+        "ALASSANE OUEDRAOGO",
+        "ENZO BIONDO",
+        "MILAN NIKOLIC",
+        "LUCIANO DJIM"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Royal Football Club de Liège",
+      "players": [
+        "LUIGI PIERONI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Royal Standard de Liège",
+      "players": [
+        "DANIEL VAN BUYTEN",
+        "JOSEPH YOBO",
+        "LOGAN BAILLY",
+        "MARC CHAUVEHEID"
+      ],
+      "resolveTo": 1123
+    },
+    {
+      "clubName": "SAN",
+      "players": [],
+      "resolveTo": 1304,
+      "note": "FM unlicensed Brazil placeholder code"
+    },
+    {
+      "clubName": "SBV Excelsior",
+      "players": [
+        "MOUNIR EL HAMDAOUI",
+        "RONNIE NOUWEN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "SC Fortuna Köln",
+      "players": [
+        "TIM WIESE",
+        "ALI MOUSAWI",
+        "ALEXANDER LEX"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "SC Paderborn 07",
+      "players": [
+        "ANTONIO DI SALVO",
+        "HENNING GRIENEISEN",
+        "MAHIR SAGLK"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "SC Pfullendorf",
+      "players": [
+        "PAVEL DAVID"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "SC Telstar",
+      "players": [
+        "ANTHONY CORREIA",
+        "FRANK KORPERSHOEK"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "SEP",
+      "players": [],
+      "resolveTo": 1299,
+      "note": "FM unlicensed Brazil placeholder code"
+    },
+    {
+      "clubName": "SG Rot-Weiss Frankfurt",
+      "players": [
+        "ANDREAS ANICIC"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "SG Wattenscheid 09",
+      "players": [
+        "HAMIT ALTINTOP"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "SKA Rostov-na-Donu",
+      "players": [
+        "SERGEY ERZRUMYAN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "SPO",
+      "players": [],
+      "resolveTo": 1301,
+      "note": "FM unlicensed Brazil placeholder code"
+    },
+    {
+      "clubName": "SPT",
+      "players": [
+        "CHRISTOFER AUGUSTO RAMOS DA SILVA",
+        "FLAVIO ROCHA GALVAO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "SSV Reutlingen 05",
+      "players": [
+        "DENIS LAPACZINSKI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "SSV Ulm 1846",
+      "players": [
+        "MARIO GOMEZ",
+        "MATTHIAS LEHMANN",
+        "THOMAS RATHGEBER",
+        "ANDREAS SPANN",
+        "MICHAEL STEGMAYER",
+        "ANDREAS SAUR",
+        "RENE OKLE",
+        "UNAL DEMIRKIRAN",
+        "BENJAMIN HUBER",
+        "HOLGER BETZ",
+        "GEROLD SKOWRANEK",
+        "ALPER BAGCECI",
+        "MARCO MANGOLD",
+        "SERDAR ERDINC",
+        "CHRISTIAN SAMEISLA",
+        "RALF ZIMMERMANN",
+        "UDO SCHROTTER",
+        "THOMAS BOCHTLER",
+        "MICHAEL SCHOFFEL",
+        "GOKHAN GUNDUZ",
+        "MARC HAMMERLE"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "SV Babelsberg 03",
+      "players": [
+        "MICHAEL LORENZ",
+        "PIT GRUNDMANN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "SV Bonlanden",
+      "players": [
+        "PANAGIOTIS DELIGIANNIDIS",
+        "PETER KEHRER",
+        "OLIVER KOSCHMIEDER"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "SV Meppen",
+      "players": [
+        "FERYDOON ZANDI",
+        "THOMAS BROKER"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "SV Wacker Burghausen",
+      "players": [
+        "JOCHEN ENDRES"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "SV Waldhof Mannheim 07",
+      "players": [
+        "HANNO BALITSCH",
+        "SELIM TEBER",
+        "CHRISTIAN FICKERT",
+        "STEPHAN MAAS",
+        "TIM BAUER",
+        "KENNETH KRONHOLM",
+        "GENNARO DE ANGELIS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "SV Wehen Wiesbaden",
+      "players": [
+        "ANTONIO DA SILVA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "SV Wilhelmshaven",
+      "players": [
+        "DAME DIOUF",
+        "BJORN WNUCK"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Saint Paul's United Strikers FC",
+      "players": [
+        "THRIZEN LEADER"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Saint Peter's Strikers FC",
+      "players": [
+        "ATIBA HARRIS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "San Francisco FC",
+      "players": [
+        "BLAS PEREZ",
+        "ALBERTO BLANCO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "San Jose Earthquakes",
+      "players": [
+        "SCOTT BOWER"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Sandonà 1922",
+      "players": [
+        "JERRY BASSO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Santa Catarina Clube",
+      "players": [
+        "AMAURI CARVALHO DE OLIVEIRA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Sapechburto Klubi Dinamo Tbilisi",
+      "players": [
+        "OTAR KHIZANEISHVILI",
+        "NIKOLOZ GELASHVILI"
+      ],
+      "resolveTo": 1284
+    },
+    {
+      "clubName": "Siirtspor",
+      "players": [
+        "HASAN KAYAALP",
+        "MUHAMMED UTLU",
+        "NACI CELIK"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Skeid Fotball",
+      "players": [
+        "ESPEN GRINA",
+        "JRGEN ISNES",
+        "MARIUS JOHANNESSEN",
+        "JUAN RENE SANTOS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Skoda Xanthi",
+      "players": [
+        "CHRISTOS PATSATZOGLOU",
+        "BILL DAMIANOS",
+        "DIMITRIOS ZOGRAFAKIS",
+        "GIORGOS EFENTOPOULOS",
+        "THEOFANIS TSOUVALIDIS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Sliema Wanderers FC",
+      "players": [
+        "MICHAEL MIFSUD"
+      ],
+      "resolveTo": 1276
+    },
+    {
+      "clubName": "Sociedad Anónima Deportiva América",
+      "players": [
+        "DAVID FERREIRA",
+        "ROBINSON ZAPATA",
+        "SERGIO HERRERA",
+        "MAURICIO ROMERO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Sociedad Deportiva Eibar",
+      "players": [
+        "JON ANSOTEGI",
+        "DAVID LAGO",
+        "DAVID MALO",
+        "ROBERTO YANGUELA",
+        "IBAN FAGOAGA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Sora Calcio 1907",
+      "players": [
+        "PALMIRO DI DIO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Southern California Seahorses",
+      "players": [
+        "RYAN MCINTOSH"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Sportclub Eendracht Aalst",
+      "players": [
+        "VLADAN KUJOVIC"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Sportclub Rheindorf Altach",
+      "players": [
+        "KLEBER DOS SANTOS"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Sporting Clube Campomaiorense",
+      "players": [
+        "CARLOS ALBERTO DA SILVA",
+        "CARLOS MIGUEL CORREIA SEMEDO",
+        "SANDRO RENATO PEREIRA PACHECO",
+        "DANIEL FILIPE BATANETE ROCHA"
+      ],
+      "resolveTo": 1092
+    },
+    {
+      "clubName": "Sporting Clube de Espinho",
+      "players": [
+        "CRISTIAN ALVAREZ"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Sportklub Niederösterreich St. Pölten",
+      "players": [
+        "THOMAS VOLLNHOFER",
+        "MARC-ANDRE UNTERHUBER",
+        "OLIVER GRAF",
+        "LUKAS MOSSNER",
+        "KARL IRNDORFER",
+        "BERTRAND NGANDJUI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Sportklub Vorwärts Steyr",
+      "players": [
+        "KENAN HASAGIC",
+        "FLAVIO BARROS SOUZA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Sportverein Wörgl",
+      "players": [
+        "HARALD PLANER",
+        "PAUL SCHNEEBERGER",
+        "MICHAEL WURZER",
+        "ELDORADO MERKOCI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "St Patrick's Athletic FC",
+      "players": [
+        "KEVIN DOYLE"
+      ],
+      "resolveTo": 1243
+    },
+    {
+      "clubName": "St. Mirren FC",
+      "players": [
+        "COLIN DREW",
+        "PAUL RUDDEN",
+        "DEREK SCRIMGOUR"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Stabæk Fotball",
+      "players": [
+        "TOBIAS LINDEROTH",
+        "CHRISTIAN WILHELMSSON",
+        "INGE ANDRE OLSEN",
+        "HENNING HAUGER",
+        "ANDREAS HAUGER",
+        "TOM STENVOLL"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Stade Brestois 29",
+      "players": [
+        "KARIM SOLTANI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Stade Lavallois Mayenne FC",
+      "players": [
+        "PHILIPPE BILLY"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Stade Malherbe Caen Calvados",
+      "players": [
+        "JEAN-PHILIPPE CAILLET",
+        "BERNARD MENDY",
+        "ANTHONY DEROIN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Stade Rennais FC",
+      "players": [
+        "SHABANI NONDA",
+        "ELI KROUPI",
+        "AMADOU N'DIAYE",
+        "CYRIL YAPI",
+        "OLIVIER DOS SANTOS"
+      ],
+      "resolveTo": 1067
+    },
+    {
+      "clubName": "Stade de Reims",
+      "players": [
+        "DAVID DUCOURTIOUX"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Strømsgodset TF",
+      "players": [
+        "CHRISTER PEDERSEN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Sutton United",
+      "players": [
+        "EDDIE HUTCHINSON"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Sydney Olympic FC",
+      "players": [
+        "BRETT EMERTON",
+        "LINDSAY WILSON",
+        "NICK CARLE",
+        "ANDREW DURANTE",
+        "ANDREW DURANTE",
+        "ANTHONY DOUMANIS",
+        "DYLAN MACALLISTER",
+        "NICK STAVROULAKIS",
+        "BRETT STUDMAN",
+        "PAUL KOHLER",
+        "GLEN MOSS",
+        "FRANCO PARISI",
+        "TRENT MCCLENAHAN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Szombathelyi Haladás",
+      "players": [
+        "DANIEL ROZSA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "TSV Alemannia Aachen",
+      "players": [
+        "UGUR INCEMAN",
+        "LUCIANO EMILIO DA SILVA",
+        "SASCHA KOCH"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Tacuarembó FC",
+      "players": [
+        "PIERRE WEBO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Tadamoun Sour Sporting Club",
+      "players": [
+        "RODA ANTAR"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Tafea FC",
+      "players": [
+        "MOISE POIDA",
+        "GRAEME DEMAS",
+        "RICHARD IWAI",
+        "FEDY VAVA",
+        "ROGER WAIWAI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Tampa Bay Mutiny",
+      "players": [
+        "ERIC QUILL"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Tatabányai SC",
+      "players": [
+        "FERENC BERES"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Tennis Borussia Berlin",
+      "players": [
+        "CHRISTIAN TIFFERT",
+        "ENRICO KERN",
+        "EMMANUEL KRONTIRIS",
+        "SEZER BADUR",
+        "PATRIK SCHOLZ"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Thunder Bay Chill",
+      "players": [
+        "JACK JEWSBURY",
+        "WILL JOHN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Tivoli Calcio 1919",
+      "players": [
+        "CHRISTIAN TERLIZZI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Tivoli Gardens FC",
+      "players": [
+        "RICARDO FULLER"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Tokyo Verdy",
+      "players": [
+        "DAIGO KOBAYASHI",
+        "ISSEY NAKAJIMA-FARRAN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Torino",
+      "players": [
+        "FEDERICO BALZARETTI",
+        "PAOLO ROSSI",
+        "STEFANO MERCURI",
+        "SIMONE IZZO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Tours FC",
+      "players": [
+        "DAVID FLEURIVAL",
+        "GILLES FABIEN",
+        "NEKI ADIPI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Treviso Foot-Ball Club 1993",
+      "players": [
+        "ANDREA COLETTO",
+        "LUCA FAVERO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "TuS Celle FC",
+      "players": [
+        "DAMIAN BREZINA",
+        "LEWIS ASAMOAH"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Turan Tovuz Idman Klubu",
+      "players": [
+        "RASHAD SADYQOV",
+        "NADIR NABIYEV",
+        "AQIL NABIYEV"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Turn- und Sportverein Hartberg",
+      "players": [
+        "WOLFGANG LUISSER"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Turun Palloseura",
+      "players": [
+        "NIKLAS MOISANDER",
+        "HENRIK MOISANDER"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "U.E. Lleida",
+      "players": [
+        "ILIJA STOLICA",
+        "OSCAR RUBIO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "U.S. Città di Palermo",
+      "players": [
+        "FRANCO BRIENZA",
+        "PIETRO ACCARDI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Union Sportive Créteil-Lusitanos Football",
+      "players": [
+        "MICKAEL TAVARES",
+        "WILFRID LOIZEAU",
+        "YANNICK BERTHIER"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Union Sportive Granvillaise",
+      "players": [
+        "YANNICK PASSAPE"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Union sportive Boulogne Côte d'Opale",
+      "players": [
+        "FRANCK RIBERY"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Unione Sportiva Pistoiese 1921",
+      "players": [
+        "ADRIAN RICCHIUTI",
+        "FRANCESCO VALIANI",
+        "MATTEO IANNITTI",
+        "EMANUELE SIMONI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Unione Sportiva Savoia 1908",
+      "players": [
+        "STEFANO FANUCCI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "União São João Esporte Clube",
+      "players": [
+        "ADRIANO FERREIRA PINTO",
+        "DANILO VALERIO SACRAMENTO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Urawa Red Diamonds",
+      "players": [
+        "SHINJI ONO",
+        "KEITA SUZUKI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "VDG",
+      "players": [
+        "PEDRO PAULO DE OLIVEIRA",
+        "SERGIO SILVA DE SOUZA JUNIOR",
+        "FILIPE ALVIM MALUF",
+        "ANTONIO GEDER MALTA CAMILO",
+        "LUIZ CLAUDIO SOARES DE BARROS",
+        "VALKMAR DA SILVA ROCHA",
+        "FLAVIO BARROS SOUZA"
+      ],
+      "resolveTo": 1298
+    },
+    {
+      "clubName": "Vasas Sport Club",
+      "players": [
+        "ATTILA SZILI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Venezia Football Club",
+      "players": [
+        "NICOLA RIATO",
+        "ANDREA DE CECCO",
+        "MAURIZIO COLETTO",
+        "STEFANO SERAFINI",
+        "MATTEO SERENA",
+        "MARCO FABRIS",
+        "MATTIA SALVAGNO",
+        "ROBERTO PINNANOSSAI",
+        "ALVISE QUINTAVALLE",
+        "ENRICO CROSATO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "VfB Lübeck",
+      "players": [
+        "RAPHAEL SCHAFER",
+        "CEDRIC MAKIADI"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "VfB Oldenburg",
+      "players": [
+        "OKTAY YILDIRIM"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "VfL Wolfsburg",
+      "players": [
+        "MARCEL MALTRITZ",
+        "JONATHAN AKONNOR",
+        "JAN SCHANDA"
+      ],
+      "resolveTo": 1054
+    },
+    {
+      "clubName": "Villarreal Club de Fútbol",
+      "players": [
+        "WALTER GAITAN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Vis Pesaro 1898",
+      "players": [
+        "IBRAHIMAN SCANDROGLIO"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Västerås SK FK",
+      "players": [
+        "FREDRIK STENMAN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Västra Frölunda IF",
+      "players": [
+        "ANDREAS SKOGDALEN",
+        "CHRISTIAN LUNDSTROM",
+        "JOAKIM PALMEREN",
+        "KARL BERGDAHL",
+        "KLAS RUBENDAHL",
+        "JONAS ENG"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Vålerenga Fotball",
+      "players": [
+        "JOHN CAREW"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Wigan Athletic FC",
+      "players": [
+        "NEIL FITZHENRY",
+        "NEIL LLOYD",
+        "SCOTT WILLIS"
+      ],
+      "resolveTo": 129
+    },
+    {
+      "clubName": "Xerez",
+      "players": [
+        "EDU AGUILAR"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Yellow Red Koninklijke Voetbalclub Mechelen",
+      "players": [
+        "BENOIT MOUKOKO WILLIAMS",
+        "TOM CALUWE",
+        "MOUSCAL MVUEZOLO",
+        "STEVEN RIBUS",
+        "MATTHIAS VAN STEENBERGHE",
+        "JOHAN DARCON",
+        "GERT VANSCHOENWINKEL",
+        "JOHNNY LEBEGGE",
+        "SERGEY KOULITCHENKO",
+        "CHRIS BRUYNINCKX",
+        "DIETER VAN DEN BROECK",
+        "KRISTOF VERMEIR",
+        "BRUNO DE ROY",
+        "KENNY VERHOEVEN"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Yokohama F. Marinos",
+      "players": [
+        "SHUNSUKE NAKAMURA",
+        "YUZO KURIHARA"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Yozgatspor Ticaret Anonim Şirketi",
+      "players": [
+        "MUSCAL MVUEZOLO",
+        "GOKHAN TOKGOZ",
+        "OZGUR BAYER",
+        "SAVAS KAYA",
+        "ILHAN OZBAY",
+        "BAYRAM OZDEN",
+        "SEVKI KOC"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Zeytinburnuspor",
+      "players": [
+        "SEDAT AGCAY"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Íþróttabandalag Vestmannaeyja",
+      "players": [
+        "GUNNAR HEIAR ORVALDSSON"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Östers Idrottsförening",
+      "players": [
+        "TOBIAS GRAHN",
+        "JOAKIM KARLSSON",
+        "PATRIK KARLSSON",
+        "DANIEL DESTEFANO",
+        "CHRISTOFFER OLOFSSON",
+        "RICHARD AXBERG",
+        "PETER KENNFORS",
+        "DANIEL EKSTRAND",
+        "ALEXANDER NECOVSKI",
+        "MARKUS JONSSON"
+      ],
+      "resolveTo": null
+    },
+    {
+      "clubName": "Újpest FC",
+      "players": [
+        "ZOLTAN SZELESI"
+      ],
+      "resolveTo": 1229
+    },
+    {
+      "clubName": "Şahdağ Qusar",
+      "players": [
+        "RAIL MALIKOV",
+        "RAMIN QULIYEV",
+        "RAMAZAN ABBASOV",
+        "RAMAL HUSEYNOV"
+      ],
+      "resolveTo": null
+    }
+  ]
+}
