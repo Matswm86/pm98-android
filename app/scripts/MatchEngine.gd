@@ -40,12 +40,28 @@ extends RefCounted
 class Pm98Rng extends RefCounted:
 	var state: int
 
+	# --- TEMP diagnostic hook (M5 RNG draw-count desync). Gated OFF by default;
+	# diag_m5_rng_callsites.gd flips _log_on to tally per-draw call-sites. Zero cost when off.
+	static var _log_on: bool = false
+	static var _draws: Array = []
+
 	func _init(seed_: int) -> void:
 		state = seed_ & 0xFFFFFFFF
 
 	## One 15-bit draw in [0, 32767] -- identical to PM98's rand().
 	func next() -> int:
 		state = (state * 214013 + 2531011) & 0xFFFFFFFF
+		if _log_on:
+			var st := get_stack()
+			var tag := "?"
+			if st.size() >= 2:
+				var f0: Dictionary = st[1]
+				tag = "%s:%d" % [str(f0.get("source", "")).get_file(), int(f0.get("line", 0))]
+				# if the immediate caller is chance_permil, credit the real caller (frame 2)
+				if str(f0.get("function", "")) == "chance_permil" and st.size() >= 3:
+					var f1: Dictionary = st[2]
+					tag = "%s:%d>chance" % [str(f1.get("source", "")).get_file(), int(f1.get("line", 0))]
+			_draws.append(tag)
 		return (state >> 16) & 0x7FFF
 
 	## PM98's probability idiom `(rand()*1000)>>15 < permil`: true w.p. permil/1000.
