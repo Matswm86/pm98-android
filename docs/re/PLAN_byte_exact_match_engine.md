@@ -145,14 +145,23 @@ deprioritised (last). Approved path: build an **end-to-end oracle**, kill-test t
    deterministic across 2 runs.** Oracle: tools/re/run_b1500family_oracle.sh (REAL
    0x5b1500/0x5b1c80 under PcodeEmu, NO stubs) → specs/b1500family_oracle.txt →
    app/tests/test_b1500family.gd.
-4. **M4 — End-to-end ORACLE (the kill-test).** Two candidate oracles (pick the cheaper that works):
-   - **(a) full PCode-emu** of `FUN_005983f0`'s whole match with all leaves REAL (no stubs), same
-     seed + same initial struct, dumping scoreline + the 16-byte event queue. Reuses `PcodeEmu.java`;
-     risk = step budget (a full match is millions of insns; may be slow/infeasible in EmulatorHelper).
-   - **(b) wine `MANAGER.EXE` harness** — run the real match engine under wine headless with a
-     controlled seed, read the scoreline + events from known match-struct addresses. Reuses the
-     06-23 wine trace tooling. Risk = driving to a match + the PCF5DAT graphics engine coupling.
-   Exit: an oracle emits a reference (scoreline, per-minute events) for a fixed seed + squads.
+4. **M4 — End-to-end ORACLE (the kill-test). ✅ DONE 2026-07-07 via option (b), wine harness.**
+   Chose (b). First reference captured: `tools/re/wine/m4_reference_villa_bolton.json` +
+   `tools/re/wine/README.md` (full harness + reproduce steps). Drove the real `MANAGER.EXE` under
+   wine (repo `.wineprefix`, `wine explorer /desktop=pm98,640x480`) to a WATCH match, attached
+   winedbg at the FIRST `0x5983f0` (outer-step) hit after KICK OFF to grab the match base
+   (`0x3dcf0b0`) + the frame-0 seed (`0x8abd86a4`) + a full rw-memory snapshot, then free-ran
+   `m4_poll.py` (reads scoreline/clock/phase/seed/event-window from `/proc/<lpid>/mem`) while
+   `autoresume.py` clicked KICK OFF at each segment/half-time pause. **Reference: Aston Villa
+   2-2 Bolton W, goals 21' Yorke / 63' Collymore / 66' Gunnlaugsson / 88' Holdsworth, FULL TIME
+   dispatch code 10 @ min 90.** On-screen event feed banked verbatim; internal phase coverage
+   {0:6572, 8:1402, 6:204, 1:160, 2:68, 5:57}. Frame-0 match-struct region + timeline saved to
+   `~/MWM-AI/data/pm98-m4-oracle/` (outside git). Caveats in the JSON: this is a REFERENCE not yet
+   a proven port parity (port runs MU/LIV seed 1, not Villa/Bolton 0x8abd86a4), and cross-drive
+   reproducibility needs the seed poked at `0x006d3184` before each run.
+   - ~~(a) full PCode-emu~~ / ~~(b) wine harness~~ — (b) won: it worked end-to-end at low cost;
+     (a) was not attempted (a full match is millions of insns, step-budget risk in EmulatorHelper).
+   Exit MET: an oracle emits a reference (scoreline, per-minute events) for a fixed seed + squads.
 5. **M5 — Parity + wire.** Kill-test: `run_full_match.gd` scoreline + event stream == oracle,
    bit-for-bit, across a seed sweep. Then wire `Pm98` engine into `Career.play_round` /
    `MatchScreen` (BRIEF) so BRIEF narrates the engine's real event queue and RESULTS shows the

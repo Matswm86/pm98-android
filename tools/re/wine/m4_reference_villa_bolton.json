@@ -1,0 +1,76 @@
+{
+  "_": "M4 end-to-end oracle reference, captured live from MANAGER.EXE under wine 2026-07-07.",
+  "harness": "tools/re/wine/ (boot/click/snap + winedbg attach + /proc/mem poll + autoresume)",
+  "match": {
+    "home": "Aston Villa",
+    "away": "Bolton W",
+    "mode": "WATCH (2D GRAFICO simulador), Manager League friendly (preseason)",
+    "frame0_seed": 2327676580,
+    "frame0_seed_hex": "0x8abd86a4",
+    "scale_0x19ac": 14400,
+    "commentary_timers_frame0": {"0x19e4": 477, "0x19e8": 950, "0x19ec": 1101},
+    "match_struct_base_this_run": "0x3dcf0b0",
+    "match_vtable": "0x6390e0"
+  },
+  "result": {
+    "final": "2-2",
+    "full_time_dispatch_code": 10,
+    "half_banked_clock_0x19a8": 14400,
+    "final_seg_clock_0x450": 14400
+  },
+  "goals": [
+    {"minute": 21, "score": "1-0", "scorer": "Yorke", "team": "Aston Villa"},
+    {"minute": 63, "score": "2-0", "scorer": "Collymore", "team": "Aston Villa"},
+    {"minute": 66, "score": "2-1", "scorer": "Gunnlaugsson", "team": "Bolton W"},
+    {"minute": 88, "score": "2-2", "scorer": "Holdsworth", "team": "Bolton W"}
+  ],
+  "event_feed_verbatim_from_screen": {
+    "first_half_14_to_21": [
+      "14 Shot by Yorke (Aston Villa)",
+      "Shot saved by Branagan (Bolton W)",
+      "16 Good run by Taylor (Aston Villa)",
+      "17 Cross by Taylor (Aston Villa)",
+      "18 Shot by Collymore (Aston Villa)",
+      "Shot rebounded off the post",
+      "Ball cleared by Thompson (Bolton W)",
+      "18 Shot by Taylor (Aston Villa)",
+      "Shot saved by Branagan (Bolton W)",
+      "20 Cross by Staunton (Aston Villa)",
+      "21 Shot by Yorke (Aston Villa)",
+      "21 Goal by Yorke (Aston Villa)"
+    ],
+    "second_half_63_to_90": [
+      "63 Shot by Collymore (Aston Villa)",
+      "63 Goal by Collymore (Aston Villa)",
+      "Shot by Gunnlaugsson (Bolton W)",
+      "66 Goal by Gunnlaugsson (Bolton W)",
+      "74 Collymore (Aston Villa) offside",
+      "Free kick taken by Gunnlaugsson",
+      "79 Shot by Gunnlaugsson (Bolton W)",
+      "Shot saved by Bosnich (Aston Villa)",
+      "83 Good defending by Thompson (Bolton W)",
+      "88 Shot by Holdsworth (Bolton W)",
+      "88 Goal by Holdsworth (Bolton W)",
+      "90 Full time"
+    ]
+  },
+  "phase_coverage_from_internal_poll": {"0": 6572, "8": 1402, "6": 204, "1": 160, "2": 68, "5": 57},
+  "score_transitions_internal": [
+    {"minute": 21, "score": "1-0", "seed_at": 1962931656},
+    {"minute": 63, "score": "2-0", "seed_at": 3805595614},
+    {"minute": 66, "score": "2-1", "seed_at": 850170717},
+    {"minute": 88, "score": "2-2", "seed_at": 3501509506}
+  ],
+  "final_seed_state": 1855796696,
+  "artifacts_outside_git": {
+    "frame0_matstruct_region": "~/MWM-AI/data/pm98-m4-oracle/frame0_matstruct_region_03b20000.bin",
+    "frame0_maps": "~/MWM-AI/data/pm98-m4-oracle/frame0_maps.txt",
+    "internal_timeline_jsonl": "~/MWM-AI/data/pm98-m4-oracle/timeline.jsonl",
+    "fulltime_png": "~/MWM-AI/data/pm98-m4-oracle/fulltime.png"
+  },
+  "caveats": [
+    "First-half minutes 0-21 were played while winedbg held breakpoints on 0x5983f0/0x5ec250 with SIGINT stops; pausing does not alter the deterministic (seed,struct)->outcome function, but the internal poller only attached at clk=6796 so the 1-0 goal minute (21) is from the on-screen feed, not the internal transition log.",
+    "This is a REFERENCE, not yet a proven port parity: the port's run_full_match.gd uses MU vs LIV seed=1. M5 must replay THIS initial struct + seed 0x8abd86a4 (Villa/Bolton) through the port and confirm it reproduces 2-2 at 21/63/66/88.",
+    "Reproducibility across re-drives is untested; to make an N>=50 kill-test the seed 0x006d3184 must be poked to a fixed value at the KICK OFF screen before each run."
+  ]
+}
