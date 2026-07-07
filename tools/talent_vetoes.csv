@@ -1,0 +1,37 @@
+Name,BirthYear,Reason
+Toefuataina Ropeti,1986,clubless CA187/PA191 SAMOA — misparse or DB oddity (FM05 extract, 07-07 handoff veto list)
+Resley Stjeward,1985,clubless PA185 HOLLAND — no trace of such a player (07-07 handoff veto list)
+Carlos Mario Naranjo,1985,clubless PA179 COLOMBIA — misparse or DB oddity (07-07 handoff veto list)
+Oscar Diaz,1986,clubless PA177 PARAGUAY — misparse or DB oddity (07-07 handoff veto list)
+Tal Segal,1985,clubless CA195/PA198 ISRAEL — misparse or DB oddity (FM06 extract, 07-07 handoff veto list)
+Deniz Tolga,1987,clubless CA186/PA192 TURKEY — misparse or DB oddity (07-07 handoff veto list)
+Thurjan Rahmani,1987,clubless PA187 BOSNIA — misparse or DB oddity (07-07 handoff veto list)
+Nicky Ioannou,1986,clubless PA184 CYPRUS — misparse or DB oddity (07-07 handoff veto list)
+Rabiu Yusuf Baita,1984,clubless PA180 NIGERIA — misparse or DB oddity (07-07 handoff veto list)
+Tigran Gharabaghtsyan,1984,clubless PA180 ARMENIA — misparse or DB oddity (07-07 handoff veto list)
+Cristiano Ronaldo dos Santos Aveiro,1985,fm05 ManUtd row — same person as curated CRISTIANO RONALDO AVEIRO pin (Sporting 02-03 origin); transfer row not origin
+Cristiano Ronaldo,1985,fm06 ManUtd row — same person as curated Sporting pin
+Robinho,1984,fm05/06 common-name row — same person as ROBSON DE SOUZA|1984 (Santos 99-00 origin)
+Maxwell Scherrer Cabelino Andrade,1982,01-02 Ajax row with year jitter — same person as |1981 Cruzeiro origin row
+Geovanni Deiberson Mauricio Gomez,1980,00-01 spelling variant — same person as GEOVANI DEIBERSON MAURICIO|1980 (Cruzeiro 98-99 origin)
+Geovanni Debeirson Mauricio,1980,01-02 Barcelona spelling variant — same person; keep Cruzeiro origin row
+Francesc Fabregas,1987,04-05 Arsenal spelling variant — curated CESC FABREGAS pin covers him
+Sebastien Deisler,1980,99-00 Hertha spelling variant — keep SEBASTIAN DEISLER (Borussia M. 98-99 origin)
+Santiago Cazorla,1984,05-06 clubless variant — keep SANTI CAZORLA (R. Oviedo 99-00 origin)
+Bojinov,1986,03-04 single-token dupe of VALERI BOJINOV (same Lecce row; nat inferred ITALY blocks auto-merge)
+Matty Etherington,1981,00-01 variant — keep MATTHEW ETHERINGTON (Tottenham 99-00 origin)
+Wesley Pina Goncalves,1984,05-06 Maccabi Haifa spelling variant of WESCLEY PINA GONCALVES (Vasco 03-04 origin)
+Lucho Gonzalez,1981,02-03 nickname row — same person as LUIS GONZALEZ (Huracán 99-00 origin)
+Alexander Hleb,1981,99-00 clubless transliteration variant — keep ALYAKSANDR HLEB (Stuttgart 00-01 origin-club row)
+Alexander Mladenov,1982,99-00 clubless transliteration variant — keep ALEKSANDAR MLADENOV (Hertha 03-04 origin-club row)
+Aleksandr Pavlenko,1985,03-04 transliteration variant — keep ALEXANDR PAVLENKO (02-03 earliest sighting)
+Jose Manuel Reina,1982,02-03 legal-name variant — keep PEPE REINA (F.C. Barcelona 99-00 origin)
+Stephen Schumacher,1984,04-05 Bradford spelling variant — keep STEVEN SCHUMACHER (Everton 02-03 origin)
+Steven Sidwell,1982,02-03 Reading variant — keep STEVE SIDWELL (Arsenal 99-00 origin)
+Gnegneri Toure,1983,02-03 partial-name row — same person as YAYA TOURE (99-00 earliest sighting)
+Luis Leonardo Messi,1987,fm05/06 bulk row — curated LIONEL MESSI pin covers him
+Thiago Emiliano da Silva de Souza,1984,02-03 extended-name variant — keep THIAGO EMILIANO DA SILVA (Fluminense 99-00 origin)
+Hallison Bruno de Melo dos Santos,1985,04-05 spelling variant — keep HALISSON BRUNO MELO DOS SANTOS (Santos 03-04 origin)
+Matuzalem Francelino da Silva,1980,01-02 Piacenza reordered-name row — keep FRANCELINO MATUZALEM DA SILVA (Nápoles 00-01 origin)
+Maximiliano Rodriguez,1981,02-03 Espanyol row — keep MAXI RODRIGUEZ (Newell's 99-00 origin)
+Maxi Lopez,1984,03-04 nickname row — keep MAXIMILIANO LOPEZ (River 99-00 origin)

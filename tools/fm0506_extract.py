@@ -189,6 +189,8 @@ def scan_name_records(data: bytes) -> list[tuple[int, int, str]]:
 
 def name_sections(recs: list[tuple[int, int, str]]) -> list[list[tuple[int, int, str]]]:
     """Split the record stream into sections at big idx drops."""
+    if not recs:
+        return []
     sections = []
     cur = [recs[0]]
     for r in recs[1:]:
@@ -425,12 +427,14 @@ def main() -> None:
             no_block += 1
             continue
         ca, pa = blk
-        nm = common.get(cm) if cm != -1 else None
+        # LEGAL name first, common name only as fallback: the shipped pool and
+        # the cmfm/cm0102 season CSVs key people by legal name ("Ronaldo de
+        # Assis Moreira"), so emitting "Ronaldinho" here breaks cross-season
+        # dedupe (03-04 vs 04-05 duplicated Robinho/Kaká-class players).
+        f, s = first.get(fn), sur.get(sn)
+        nm = f"{f} {s}" if f and s else (common.get(cm) if cm != -1 else None)
         if not nm:
-            f, s = first.get(fn), sur.get(sn)
-            if not f or not s:
-                continue
-            nm = f"{f} {s}"
+            continue
         rows.append(
             {
                 "Name": nm,

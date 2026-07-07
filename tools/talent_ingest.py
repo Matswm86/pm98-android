@@ -23,7 +23,11 @@ and so do we — deterministically from name|birthYear, so re-runs are stable.
 Club "FM#<id>" (or blank) = a club that does not exist in PM98's 476-club world:
 the player is pooled as a FREE AGENT (route "free_agent", clubId -1) instead of
 going through club resolution — he surfaces in the free-agent pool at his debut
-season, signable for no fee.
+season, signable for no fee. EXCEPT tier 5: bulk FA rows at tier 5 are dropped
+outright (printed count) — the FA market takes 18 best-first per season, regen
+FAs already fill the filler role, and with 8 bulk seasons (~100k young rows)
+they'd bloat the shipped JSON past what TalentDB can sanely parse on-device.
+Hand-curated rows are exempt, as everywhere.
 
 Usage:
   python3 tools/talent_ingest.py tools/starter_talents.csv --include-eggs
@@ -68,6 +72,24 @@ ENGLAND = "ENGLAND"
 # The live in-game wonderkid stays hardcoded in Youth.gd; never pool him.
 EXCLUDED_NAMES = {"MATS MJATVEDT", "MATS MJÅTVEDT"}
 
+# Human audit layer for junk SOURCE rows (misparse or DB oddities — e.g. the
+# clubless PA-190 unknowns the FM05/06 extraction surfaced). Keyed
+# fold(Name)|BirthYear; matching bulk rows are dropped and logged. Curated
+# rows are exempt (curation outranks vetoes). A veto that matches nothing is
+# warned about so stale entries surface.
+VETOES_PATH = Path(__file__).resolve().parent / "talent_vetoes.csv"
+
+
+def load_vetoes() -> dict[str, str]:
+    if not VETOES_PATH.exists():
+        return {}
+    with open(VETOES_PATH) as fh:
+        return {
+            f"{fold(r['Name'])}|{int(r['BirthYear'])}": (r.get("Reason") or "").strip()
+            for r in csv.DictReader(fh)
+        }
+
+
 # FM club spellings that the fuzzy matcher can't bridge to the 1997 DB names.
 CLUB_OVERRIDES = {
     "MAN UTD": "MANCHESTER UTD.",
@@ -104,6 +126,9 @@ NAT_ALIASES = {
     "TURKIYE": "TURKEY",
     "CZECHIA": "CZECH REPUBLIC",
     "BOSNIA AND HERZEGOVINA": "BOSNIA",
+    "BOSNIA-HERZEGOVINA": "BOSNIA",  # CM01/02 spelling
+    "FYR OF MACEDONIA": "MACEDONIA",  # CM01/02 spelling
+    "CHINA PR": "CHINA",  # CM01/02 spelling
     "TRINIDAD AND TOBAGO": "TRINIDAD T.",
     "AZERBAIJAN": "AZERBAYAN",
     "DEMOCRATIC REPUBLIC OF THE CONGO": "ZAIRE",
@@ -151,9 +176,15 @@ def merge_variants(talents: list[dict]) -> list[str]:
         names (token subset, or a single small-typo token: FAIOLI~FAIOHLE) -> same
         person. First+last alone is NOT enough: Brazilian suffix last-tokens
         (SILVA/NETO/JUNIOR) make "ANDERSON ... DA SILVA" match distinct people;
+      - same (last name token, birthYear) pairs that pass the same gates: catches
+        first-token variants (XABI/XABIER ALONSO) and common-name-vs-legal subsets
+        (BOJINOV vs VALERI BOJINOV) that the first-token grouping splits apart;
       - identical legalName, birth years exactly 1 apart, same position, compatible
         clubs -> same person (per-file year-shift jitter).
-    Keeps the club-routed / earliest-debut entry with the fullest spelling."""
+    Keeps the club-routed / earliest-debut entry with the fullest spelling; a
+    curated pin always survives and never has its debut backdated. Same-person
+    rows at DIFFERENT clubs (real transfers: CR7 Sporting->ManUtd) are out of
+    scope by design — cull those via tools/talent_vetoes.csv, keep the origin row."""
     logs: list[str] = []
     dropped: set[int] = set()
 
@@ -181,6 +212,8 @@ def merge_variants(talents: list[dict]) -> list[str]:
     def compatible(a: dict, b: dict) -> bool:
         if "manager_youth" in (a["route"], b["route"]):
             return False
+        if a.get("curated") and b.get("curated"):
+            return False  # two curated rows are distinct by curator intent
         if not similar_names(a["legalName"], b["legalName"]):
             return False
         ca, cb = int(a.get("clubId") or -1), int(b.get("clubId") or -1)
@@ -199,10 +232,16 @@ def merge_variants(talents: list[dict]) -> list[str]:
             return
         keep = sorted(
             group,
-            key=lambda t: (int(t.get("clubId") or -1) <= 0, t["debutYear"], -len(t["legalName"])),
+            key=lambda t: (
+                not t.get("curated"),  # a curated pin always survives the merge
+                int(t.get("clubId") or -1) <= 0,
+                t["debutYear"],
+                -len(t["legalName"]),
+            ),
         )[0]
-        earliest = min(group, key=lambda t: t["debutYear"])
-        keep["debutYear"], keep["debutSeason"] = earliest["debutYear"], earliest["debutSeason"]
+        if not keep.get("curated"):  # never backdate a curated pin's debut
+            earliest = min(group, key=lambda t: t["debutYear"])
+            keep["debutYear"], keep["debutSeason"] = earliest["debutYear"], earliest["debutSeason"]
         for t in group:
             if t is not keep:
                 dropped.add(id(t))
@@ -217,6 +256,24 @@ def merge_variants(talents: list[dict]) -> list[str]:
             by_sig.setdefault((toks[0], toks[-1], t["birthYear"]), []).append(t)
     for group in by_sig.values():
         merge_group(group)
+
+    # Second sweep keyed by (surname, birthYear) only: catches first-token variants
+    # the by_sig key splits apart (XABI/XABIER ALONSO, DINIYAR/DINIJAR, a common-name
+    # row that is a token-subset of the legal row: BOJINOV ⊆ VALERI BOJINOV,
+    # EMMANUEL ADEBAYOR ⊆ SHEYI EMMANUEL ADEBAYOR). Pairwise, same compatible()
+    # gate — full-name subset/typo + club + nation checks still guard the Brazilian
+    # suffix-surname trap the docstring warns about.
+    by_last: dict[tuple, list[dict]] = {}
+    for t in talents:
+        if id(t) not in dropped:
+            toks = t["legalName"].split()
+            by_last.setdefault((toks[-1] if toks else "?", t["birthYear"]), []).append(t)
+    for group in by_last.values():
+        if 2 <= len(group) <= 25:
+            for i, a in enumerate(group):
+                for b in group[i + 1 :]:
+                    if id(a) not in dropped and id(b) not in dropped:
+                        merge_group([a, b])
 
     by_name: dict[str, list[dict]] = {}
     for t in talents:
@@ -495,6 +552,7 @@ def egg_entries() -> list[dict]:
                 "tier": 1,
                 "potential": 96,
                 "notes": "easter egg (assets/easter_eggs.json)",
+                "curated": False,
             }
         )
     return out
@@ -528,6 +586,7 @@ def main() -> None:
     next_id = max([t["id"] for t in talents] + [TALENT_ID_BASE])
 
     candidates: list[dict] = []
+    fa_t5_dropped = 0
     for path in args.inputs:
         file_season = parse_season(args.season or "")
         for row in read_rows(path):
@@ -543,6 +602,15 @@ def main() -> None:
             nat = canon_nat(fold(row.get("nat", "")), flags)  # "" = source blank
             club = row.get("club", "").strip()
             is_free = not club or club.upper().startswith("FM#")
+            tier = tier_for(row, args.default_tier)
+            curated = bool(row.get("tier"))
+            # Free-agent tier-5 bulk rows never surface (the FA market takes 18
+            # best-first per season and regen FAs already fill the filler role),
+            # but they dominate the row count: with 8 bulk seasons they'd bloat
+            # the shipped JSON past what TalentDB can sanely parse on-device.
+            if is_free and tier == 5 and not curated:
+                fa_t5_dropped += 1
+                continue
             candidates.append(
                 {
                     "legal": fold(row["name"]),
@@ -556,10 +624,10 @@ def main() -> None:
                     "route": "free_agent" if is_free else "club",
                     "season": label,
                     "debutYear": start,
-                    "tier": tier_for(row, args.default_tier),
+                    "tier": tier,
                     "potential": None,
                     "notes": row.get("notes") or None,
-                    "curated": bool(row.get("tier")),
+                    "curated": curated,
                 }
             )
     if args.include_eggs:
@@ -567,9 +635,14 @@ def main() -> None:
 
     added = updated = skipped_known = 0
     unresolved: dict[str, list[str]] = {}
+    vetoes = load_vetoes()
+    veto_hits: Counter = Counter()
     for c in candidates:
         key = f"{c['legal']}|{c['birthYear']}"
         if c["legal"] in EXCLUDED_NAMES:
+            continue
+        if key in vetoes and not c["curated"]:
+            veto_hits[key] += 1
             continue
         # DB legalNames carry middle names ("MICHAEL JAMES OWEN"), so match on the
         # full fold OR the DB's surname-style display name + birth year. Slightly
@@ -586,6 +659,11 @@ def main() -> None:
             if cid is None:
                 # A club that does not exist in the PM98 world: the player goes in
                 # as a free agent (the review file can re-route him to a club id).
+                # Same FA tier-5 rule as at parse time — a tier-5 row that lands
+                # in the FA pool via an unresolvable club is the same dead weight.
+                if c["tier"] == 5 and not c["curated"]:
+                    fa_t5_dropped += 1
+                    continue
                 unresolved.setdefault(c["clubName"], []).append(c["legal"])
                 c["clubId"], c["clubName"], c["route"] = -1, None, "free_agent"
             else:
@@ -673,6 +751,15 @@ def main() -> None:
         talents.append(entry)
         by_key[key] = entry
         added += 1
+
+    if fa_t5_dropped:
+        print(f"\nfree-agent tier-5 bulk rows dropped (size/no-surface rule): {fa_t5_dropped:,}")
+    if vetoes:
+        print(f"\nvetoed source rows ({VETOES_PATH.name}):")
+        for k, reason in vetoes.items():
+            n = veto_hits.get(k, 0)
+            flag = "" if n else "  ⚠ MATCHED NOTHING (stale veto?)"
+            print(f"  {k}: {n} row(s) dropped — {reason}{flag}")
 
     merges = merge_variants(talents)
     if merges:
