@@ -13,7 +13,7 @@ const REF_DIR := "/home/mats/MWM-AI/data/pm98-m4-oracle/capture2"
 const STRUCT_JSON := REF_DIR + "/frame0_struct_import.json"
 const FRAME0_SEED := 0xea0d2a8d
 const TICK_CAP := 4000
-const CSV_PATH := "/tmp/claude-1000/-home-mats-MWM-AI/fdcc13a4-670d-49b7-9e8b-e0d168e1ee39/scratchpad/m5_tick_trace.csv"
+const CSV_PATH := "/tmp/claude-1000/-home-mats-MWM-AI/9d2c2b92-0f78-4b56-8a19-5fc81cea675c/scratchpad/m5_tick_trace.csv"
 
 
 var _contest_ticks := 0
