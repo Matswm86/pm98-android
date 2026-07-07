@@ -106,6 +106,40 @@ CLUB_OVERRIDES = {
     "NEWCASTLE UNITED": "NEWCASTLE UTD",
     "BARCELONA": "F.C. BARCELONA",
     "REAL MADRID": "REAL MADRID C.F.",
+    # The CM0102 (02-03) and FM06 (04-05/05-06) extracts carry FULL formal club
+    # names ("SE Palmeiras", "AS Roma", "Grêmio FBPA") that PM98 stores short.
+    # These aliases are SAFE by construction: the PM98 name is fully contained in
+    # the extract name and every extra token is a corporate affix (FC/SC/AS/...),
+    # never a geographic qualifier -- so no wrong-club risk (verified, 0 ambiguous).
+    # Uruguay's "CA River Plate" (Montevideo) is a DIFFERENT club -> left unmapped.
+    "RIVER PLATE": "River",
+    "AJ AUXERRE": "Auxerre",
+    "AS CANNES FOOTBALL": "Cannes",
+    "AS CANNES": "Cannes",
+    "AS MONACO FC": "Mónaco",
+    "AS MONACO": "Mónaco",
+    "AS ROMA": "Roma",
+    "BARROW AFC": "Barrow",
+    "CA PENAROL": "Peñarol",
+    "CR FLAMENGO": "Flamengo",
+    "CR VASCO DA GAMA": "Vasco da Gama",
+    "CRUZEIRO EC": "Cruzeiro",
+    "FENERBAHCE SK": "Fenerbahce",
+    "FLUMINENSE FOOTBALL CLUB": "Fluminense",
+    "FOOTBALL CLUB THE STRONGEST": "The Strongest",
+    "GALATASARAY SK": "Galatasaray",
+    "GREMIO FBPA": "Gremio",
+    "HELSINGBORGS IF": "Helsingborgs",
+    "IFK GOTEBORG": "Göteborg",
+    "K LIERSE SK": "Lierse",
+    "NK GORICA": "Gorica",
+    "NK PRIMORJE": "Primorje",
+    "NK VARTEKS": "Varteks",
+    "OREBRO SK": "Orebro",
+    "SANTOS FOOTBALL CLUB": "Santos",
+    "SC HEERENVEEN": "Heerenveen",
+    "SE PALMEIRAS": "Palmeiras",
+    "SK STURM GRAZ": "Sturm Graz",
 }
 
 # FM nationality spellings -> the game's PAISES table names (127 nations, 1997-era
