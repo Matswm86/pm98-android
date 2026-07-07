@@ -1622,12 +1622,39 @@ static func ball_touch_7260(p: Dictionary, rng = null) -> void:
 	if _g(p, 0x40) == 0x1d and _g(p, 0x48) == 0:
 		m[0x19dc] = 10000
 
-	# L66-134: the highlight-REPLAY prologue. Entered ONLY when m+0x448 == 6 (a replay mode the headless
-	# sim never reaches) AND action in {0x1f, 0x21, 0x1d-with-+0x48>=1}; the binary otherwise takes
-	# `goto LAB_005a73dd`. DEFERRED (its body calls the unported FUN_005aad30 / FUN_005aae40 / FUN_005b05a0).
+	# L66-134: the phase-6 keeper GOAL-KICK / THROW DISTRIBUTION. (Was WRONGLY deferred as a "replay
+	# prologue the headless sim never reaches" -- the exact wrong assumption the +0x114 trajbuf bug had.
+	# Phase 6 IS reached every match: Pm98Driver._keeper_throw_branch arms it when the keeper catches the
+	# ball, and THIS leaf releases the ball and clears phase 6 back to open play. Without it the keeper
+	# holds the ball forever = the M5 phase-6 stall.) Entered when m+0x448==6 AND the keeper's action is
+	# in {0x1f, 0x21, 0x1d-with-windup>=1}.
 	var act := _g(p, 0x40)
 	if _g(m, 0x448) == 6 and (act == 0x1f or act == 0x21 or (act == 0x1d and _si(p, 0x48) >= 1)):
-		return                                          # DEFERRED slice-N replay prologue
+		# bVar26 (L70-81): the HUMAN-controlled keeper branch -- gs+0x2ee flag AND the sub-phase
+		# predicate (play_state_eq) AND p+0x5c (the human-manager flag). Always false in headless
+		# CPU-vs-CPU; its L82-117 user-input aim path (gs+0x210..0x215 + DAT_006654b8/ba clamp) is not
+		# ported. Guard loudly if it ever fires rather than silently mis-distributing.
+		var gs2: Dictionary = _ref(p, 0x184)
+		if _g(gs2, 0x2ee) != 0 and play_state_eq(m, 0) and (_g(p, 0x5c) & 0xff) != 0:
+			push_error("ball_touch_7260 phase-6 HUMAN keeper-distribution branch not ported (headless never reaches it)")
+			return
+		# L119-134: the CPU/headless distribution.
+		if act == 0x1d:
+			return                                      # L119 -> LAB_005a73dd
+		p[0x6c] = 0                                      # L120
+		var kgoalx := _si(m, 0x1820)                    # L121-124: aim at the (team-mirrored) goal line
+		if (1 - _g(p, 0x2b8)) == (_g(m, 0x19a0) & 1):
+			kgoalx = Pm98Trig._i32(-kgoalx)
+		steer_8bc0(p, [kgoalx, 0, 0])                   # L125 FUN_00590aa0([goalx,0,0]) + L126 FUN_005a8bc0
+		if _g(p, 0x48) != 0:
+			return                                      # L127 still winding up -> LAB_005a73dd
+		if rng == null:
+			rng = MatchEngine.Pm98Rng.new(0)
+		if _rscale15(rng.next(), 1000) < 200:           # L128-129 FUN_005ec250 draw, ~20% -> path A
+			_dist_kick_aad30(p)                         # L130 short goal-kick
+		else:
+			_dist_kick_aae40(p)                         # L135 pass / blind throw
+		return
 
 	# LAB_005a73dd (L135-145): same-side test -- P.pos inside the goal box (FUN_0058fb50) AND
 	# sign(P.x) == sign(P+0x3a4).
@@ -1690,6 +1717,86 @@ static func ball_touch_7260(p: Dictionary, rng = null) -> void:
 				if rng == null:
 					rng = MatchEngine.Pm98Rng.new(0)
 				_kick_execute(p, ball, m, action, rng)  # execute-kick L544-666 (all 3 sub-arms)
+
+
+## FUN_005aad30 (__fastcall this=keeper): phase-6 goal-kick DISTRIBUTION path A (the ~20% short kick;
+## chosen by ball_touch_7260 when _rscale15(rng,1000)<200). Sets the keeper action to 0x36
+## (feed_layoff_036 -> setup_shot -> resolve_post_shot -> set_phase(0), which CLEARS phase 6), snaps a
+## short walk-up target (polar 0x40000 along facing) and launches the ball to a polar-0x39999 target.
+## All constants are decompile-literal; the polar->field split (A=player-move / B=ball-launch) is pinned
+## by tools/re/run_distkick_oracle.sh (specs/distkick_oracle.txt -> app/tests/test_distkick.gd).
+static func _dist_kick_aad30(p: Dictionary) -> void:
+	var ball: Dictionary = _ref(p, 0x190)                    # *(p + 400)
+	var facing := _g(p, 0x34)
+	var mv := Pm98Trig.polar_vec(0x40000, facing)            # FUN_005ee0f0(0x40000, facing) -> player move
+	var bl := Pm98Trig.polar_vec(0x39999, facing)            # FUN_005ee0f0(0x39999, facing) -> ball launch
+	var px := _si(p, 4)
+	var py := _si(p, 8)
+	var pz := _si(p, 0xc)
+	var bx := _si(ball, 4)
+	var by := _si(ball, 8)
+	p[0x48] = 0
+	set_position_code(p, 0x36)                               # FUN_005a5430(0x36)
+	p[0x84] = 0x80
+	p[0x94] = Pm98Trig._i32(int(mv[0]) + px)
+	p[0x80] = 1
+	p[0x98] = Pm98Trig._i32(int(mv[1]) + py)
+	p[0x9c] = Pm98Trig._i32(int(mv[2]) + pz)
+	p[0x66] = facing
+	ball[0x68] = 1
+	ball[0x6c] = 0x58
+	ball[0x9c] = Pm98Trig._i32(int(bl[0]) + bx)
+	ball[0xa0] = Pm98Trig._i32(int(bl[1]) + by)
+	ball[0xa4] = 0xb333
+	_ref(p, 0x18c)[0x19dc] = 10000
+
+
+## FUN_005aae40 (__fastcall this=keeper): phase-6 goal-kick DISTRIBUTION path B (the ~80% default). Picks
+## the nearest angle-aligned teammate from the relationship matrix (p+0xe4 dist / p+0xb8 angle, rebuilt
+## each tick by build_relationship_matrix); if none is within 0x45ffff, a blind polar-0x120000 throw. Sets
+## action 0x37 (feed_layoff_037 -> resolve -> set_phase(0), clearing phase 6) and launches the ball.
+static func _dist_kick_aae40(p: Dictionary) -> void:
+	var ball: Dictionary = _ref(p, 0x190)                    # *(p + 400)
+	var facing := _g(p, 0x34)
+	var lp := Pm98Trig.polar_vec(0x8000, facing)             # FUN_005ee0f0(0x8000, facing)
+	var px := _si(p, 4)
+	var py := _si(p, 8)
+	p[0x48] = 0
+	# scan own team for the nearest angle-aligned (|matrix-angle| < 0x1555) on-pitch teammate.
+	var gs: Dictionary = _ref(p, 0x184)
+	var players: Array = gs.get(0, [])
+	var best := {}
+	var best_d := 0x1f40000
+	for q in players:
+		if not (q is Dictionary) or is_same(q, p):
+			continue
+		if _g(q, 0x2bc) == 0:                                # +0x2bc == 0 -> off pitch
+			continue
+		var slot := _g(q, 0x2c4)
+		var team := _g(q, 0x2b8)
+		var dist := _si(p, _dist_off(slot, team))            # p+0xe4 + idx*4
+		var ang := Pm98Trig._s16(_g(p, _angle_off(slot, team)))   # p+0xb8 + idx*2
+		if absi(ang) < 0x1555 and dist < best_d:
+			best_d = dist
+			best = q
+	if best.is_empty() or best_d > 0x45ffff:
+		var bt := Pm98Trig.polar_vec(0x120000, facing)       # no eligible teammate -> blind throw target
+		p[0xa0] = Pm98Trig._i32(_si(p, 4) + int(bt[0]))
+		p[0xa4] = Pm98Trig._i32(int(bt[1]) + _si(p, 8))
+		p[0xa8] = Pm98Trig._i32(int(bt[2]) + _si(p, 0xc))
+	else:
+		ball[0x4c] = best                                    # (p+400)+0x4c = target teammate
+		p[0xa0] = _g(best, 4)
+		p[0xa4] = _g(best, 8)
+		p[0xa8] = _g(best, 0xc)
+	p[0xb4] = 0
+	set_position_code(p, 0x37)                               # FUN_005a5430(0x37)
+	ball[0x68] = 1
+	ball[0x6c] = 0x14
+	ball[0x9c] = Pm98Trig._i32(px + int(lp[0]))
+	ball[0xa0] = Pm98Trig._i32(int(lp[1]) + py)
+	ball[0xa4] = 0x9999
+	_ref(p, 0x18c)[0x19dc] = 10000
 
 
 # Static + lazy-init tables the execute-kick block indexes by the marker row p+0x44 (0..8). KICK_FRAME =
