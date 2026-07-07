@@ -2,7 +2,7 @@
 # Method + coords proven 2026-06-24 (handoff-pm98-kickoff-phase2-exit-LIVETRACED-2026-06-24):
 # COSMIC/Xwayland box -> render + synthetic clicks REQUIRE `wine explorer /desktop=pm98,640x480`
 # with the FULL windows path; bare/direct modes are unusable. MANAGER.INI must have FULL SCREEN: OFF.
-export DISPLAY=:1
+export DISPLAY="${DISPLAY:-:1}"
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 export WINEPREFIX="$REPO/.wineprefix"
 export PM98_DIR="$WINEPREFIX/drive_c/PM98"

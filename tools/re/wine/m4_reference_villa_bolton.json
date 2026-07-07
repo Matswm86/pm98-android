@@ -68,9 +68,11 @@
     "internal_timeline_jsonl": "~/MWM-AI/data/pm98-m4-oracle/timeline.jsonl",
     "fulltime_png": "~/MWM-AI/data/pm98-m4-oracle/fulltime.png"
   },
+  "perturbation_caveat_resolved_2026-07-07": "SETTLED by tools/re/wine/m4_clean_rerun_villa_bolton.json -- a same-fixture drive with ZERO winedbg breakpoints held during play reached a coherent FULL TIME (dispatch 10), and the internal score-read method agreed with the on-screen scoreboard (0-1). Nothing indicates the read-only breakpoints held over minutes 0-21 corrupted this banked 2-2. NB the clean run is a DIFFERENT seed so its scoreline (0-1) is not the 2-2; exact-reproduction still needs seed-poking (caveat 3).",
   "caveats": [
     "First-half minutes 0-21 were played while winedbg held breakpoints on 0x5983f0/0x5ec250 with SIGINT stops; pausing does not alter the deterministic (seed,struct)->outcome function, but the internal poller only attached at clk=6796 so the 1-0 goal minute (21) is from the on-screen feed, not the internal transition log.",
     "This is a REFERENCE, not yet a proven port parity: the port's run_full_match.gd uses MU vs LIV seed=1. M5 must replay THIS initial struct + seed 0x8abd86a4 (Villa/Bolton) through the port and confirm it reproduces 2-2 at 21/63/66/88.",
-    "Reproducibility across re-drives is untested; to make an N>=50 kill-test the seed 0x006d3184 must be poked to a fixed value at the KICK OFF screen before each run."
+    "Reproducibility across re-drives is untested; to make an N>=50 kill-test the seed 0x006d3184 must be poked to a fixed value at the KICK OFF screen before each run.",
+    "BLOCKER for byte-load M5 (verified 2026-07-07): the capture dumped ONLY region 0x3b20000 (the match struct). The two load-bearing inputs are OUTSIDE it and were NOT saved: the 22 player records (team0 array @0x3612400 / team1 @0x3616400, both in region 0x3520000-0x3720000) and the session/pitch object (match+0x468 -> 0x31deb8, region 0x222000-0x320000). The live seed slot 0x6d3184 (.data) was also not dumped, though the frame-0 seed VALUE 0x8abd86a4 is recorded above. Only 1 of 293 rw regions was snapshotted; the reference process is dead, so players+session are irrecoverable. Byte-loading THIS frame-0 struct into the port is therefore impossible. A usable M5 reference needs a FRESH capture with dump_mem.py FULL (>= match + player region + session region) + a poked seed for determinism, ideally captured at the first phase==0 frame so the real kickoff placement is already baked in."
   ]
 }

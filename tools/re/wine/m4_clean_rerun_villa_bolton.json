@@ -1,0 +1,58 @@
+{
+  "_": "M4 clean (breakpoint-free) re-drive, 2026-07-07 -- settles the H1-perturbation caveat on m4_reference_villa_bolton.json. Same fixture (Bolton W manager, preseason friendly at Aston Villa/Villa Park), ZERO winedbg breakpoints held during play. Match base found by m4_findbase.py (vtable 0x6390e0 + scale 14400), NOT by a winedbg breakpoint.",
+  "harness": "tools/re/wine/ (boot -> menu-nav -> m4_findbase.py -> m4_poll.py + autoresume.py). DISPLAY=:2 rootful Xwayland on cosmic-comp (no Xvfb/root needed).",
+  "match": {
+    "home": "Aston Villa",
+    "away": "Bolton W",
+    "venue": "Villa Park",
+    "mode": "WATCH (2D GRAFICO), Manager League preseason friendly",
+    "pre_kickoff_seed_0x6d3184": 472325821,
+    "match_struct_base_this_run": "0x03dbf060",
+    "match_vtable": "0x6390e0",
+    "scale_0x19ac": 14400,
+    "note_base_differs_from_reference": "reference run base was 0x3dcf0b0; heap address is per-run, the vtable VA is stable (main EXE, no ASLR under wine)."
+  },
+  "result": {
+    "final": "0-1",
+    "full_time_dispatch_code": 10,
+    "full_time_clock_0x450": 14742,
+    "banked_0x19a8": 14400,
+    "score_internal_0x478_0x798": "0-1",
+    "score_copies_0x19b0_0x19b4": "0-1",
+    "score_onscreen": "Aston Villa 0 - 1 Bolton W",
+    "onscreen_full_time_minute": "91:00"
+  },
+  "goals_internal": [
+    {"minute_est": 12.4, "half": 0, "clk": 1992, "score": "0-1", "team": "AWAY (Bolton W)", "seed_at": 1479890585}
+  ],
+  "event_feed_verbatim_from_full_time_screen": [
+    "63 Shot by Staunton (Aston Villa)",
+    "Ball cleared by Branagan (Bolton W)",
+    "Shot saved by Branagan (Bolton W)",
+    "Shot was just wide",
+    "70 Good tackle by Staunton (Aston Villa)",
+    "81 Foul by Nelson (Aston Villa)",
+    "Free kick taken by Gunnlaugsson",
+    "Shot was just wide",
+    "88 Good run by Staunton (Aston Villa)",
+    "90 Cross by Staunton (Aston Villa)",
+    "Shot saved by Branagan (Bolton W)",
+    "91 Full time"
+  ],
+  "what_this_settles": [
+    "A drive with ZERO winedbg breakpoints held during play reaches a coherent FULL TIME (dispatch code 10, clock 14400 banked, 91:00 on screen) -- same FT mechanism as the banked reference.",
+    "The reference's internal-read METHOD is sound: the poller's score offsets (+0x478/+0x798), the score copies (+0x19b0/+0x19b4), and the on-screen scoreboard ALL agree (0-1) at full time.",
+    "The 12' goal was captured live by the internal poller (sc1 0->1 at clk 1992) with NO breakpoints -- the mechanism the reference relied on works breakpoint-free.",
+    "Conclusion: nothing indicates the banked 2-2 reference was mechanically corrupted by the read-only breakpoints held over minutes 0-21."
+  ],
+  "what_this_does_NOT_prove": [
+    "This is a DIFFERENT match (pre-kickoff seed 472325821 vs the reference's post-kickoff frame-0 seed 2327676580), so the 0-1 scoreline is NOT the 2-2 and is NOT expected to be. Reproducing the EXACT 2-2 clean requires poking the seed at 0x006d3184 to the reference's pre-kickoff value, which was never captured (reference banked only the post-KICK-OFF frame-0 seed). That exact-reproduction / N>=50 determinism test remains open (plan M4 caveat 3 / M5 step 4)."
+  ],
+  "gotcha_found_this_run": "In the 2D WATCH view a center-pitch click opens the player/substitution overlay, which is MODAL and pauses the sim clock; autoresume's old center-nudge fallback triggered it and trapped the driver at 81'. Fix: autoresume now clicks ONLY the KICK OFF button (nudge removed). The overlay is dismissed by a click on an empty pitch corner (e.g. 155,460 / 60,180); after dismissal the sim resumes to FT.",
+  "artifacts_outside_git": {
+    "clean_timeline_jsonl": "~/MWM-AI/data/pm98-m4-oracle/clean_timeline.jsonl (13825 rows)",
+    "clean_fulltime_png": "~/MWM-AI/data/pm98-m4-oracle/clean_fulltime.png",
+    "clean_pre_kickoff_json": "~/MWM-AI/data/pm98-m4-oracle/clean_pre_kickoff.json",
+    "clean_full_time_json": "~/MWM-AI/data/pm98-m4-oracle/clean_full_time.json"
+  }
+}
