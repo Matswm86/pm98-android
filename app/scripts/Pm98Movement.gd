@@ -3027,9 +3027,136 @@ static func _ball_spin(ball: Dictionary) -> void:
 			ball[0x2c] = (_g(ball, 0x2c) + 1) & 0x1f
 
 
-## TAIL (0x58eb93 trail entry): trail (deferred) -> facing +0x34 = atan(vel) -> at-rest snapshot/drift.
+# ---- FUN_0058fda0: ball PREDICTED-TRAJECTORY builder (0x58eb95 trail entry) --------------------
+# Decompile docs/re/move/fn_0058fda0_FUN_0058fda0.c. Two passes over pos(+0x4/8/c)+vel(+0x20/24/28):
+#   Loop 1 (3x) segments the ball flight into up to 3 arcs (between ground bounces); per segment it
+#     computes a length and the segment-END pos+vel. Grounded (vel.z==0 && pos.z==0): the arc is a
+#     roll decelerating by a 0x22-magnitude friction step along the velocity heading; seg length =
+#     (dominant_vel / step_component) / 9. Airborne: a projectile under g=0xb2 (178); seg length =
+#     trunc((vz + sqrt(vz*vz + 2*0xb2*z0)) / 0xb2) (time to ground), then vel.xy *= 0xc51e/0x10000
+#     (0.77) and vel.z bounces to -(vz_ground * 0x9c28/0x10000) (0.61), settling to 0 below 0x28f.
+#   Loop 2 walks the 3 segments sampling every 4 "frames" into the 16 slots at ball+0x114 (vec3
+#     stride 12); grounded samples clamp the frame count to dominant_vel/step; a partial fill is
+#     padded forward with the last position. This buffer is consumed by _grid9490_build (gate-4
+#     catch zone) and the 7260 marker builders. Oracle: tools/re/run_ballpredict_oracle.sh ->
+#     specs/ballpredict_oracle.txt ; test_ballpredict.gd. Render-trail writes (+0x74/+0xa8 mid, +0x2c
+#     spin unaffected) are folded in only where the +0x114 buffer or the seg boundaries depend on them.
+const BALL_GRAV_G := 0xb2             # 178, projectile gravity magnitude used in the arc math
+const BALL_FRICT := 0x22             # roll friction step magnitude (== BALL_ROLL_STOP)
+const BALL_REST_H := 0xc51e          # horiz restitution numerator (matches BALL_BOUNCE_H)
+const BALL_REST_V := 0x9c28          # vert restitution numerator (matches BALL_BOUNCE_V)
+
+## _ftol (0x605fb0) with the CRT's round-toward-zero control word (the stub ORs RC=11) -> truncate.
+static func _traj_ftol(f: float) -> int:
+	return int(f) if f >= 0.0 else -int(-f)
+
+
+## Loop-1 half: build one flight segment from running (px,py,pz,vx,vy,vz). Returns
+## [seg_len, epx,epy,epz, evx,evy,evz] (segment length + END pos + END vel). `grounded` = vz==0 && pz==0.
+static func _traj_segment(px: int, py: int, pz: int, vx: int, vy: int, vz: int) -> Array:
+	if vz == 0 and pz == 0:                                          # GROUNDED roll (L37 branch)
+		var pol: Array = Pm98Trig.polar_vec(BALL_FRICT, Pm98Trig.atan_angle(vx, vy))   # FUN_005ee0f0
+		var cx := int(pol[0])                                        # local_c = friction step.x
+		var cy := int(pol[1])                                        # local_8 = friction step.y
+		var dx := cx if cx != 0 else 0x10000
+		var dy := cy if cy != 0 else 0x10000
+		var dom: int
+		var step: int
+		if Pm98Trig._tdiv(vy, dy) < Pm98Trig._tdiv(vx, dx):          # x-dominant (L48)
+			dom = vx; step = cx if cx != 0 else 0x10000
+		else:                                                       # y-dominant
+			dom = vy; step = cy if cy != 0 else 0x10000
+		var seg_len := Pm98Trig._tdiv(Pm98Trig._tdiv(dom, step), 9)  # (dom/step)/9
+		var epx := Pm98Trig._i32(Pm98Trig._i32(vx - Pm98Trig._tdiv(Pm98Trig._i32(seg_len * cx), 2)) * seg_len + px)
+		var evx := Pm98Trig._i32(vx - Pm98Trig._i32(seg_len * cx))
+		var epy := Pm98Trig._i32(Pm98Trig._i32(vy - Pm98Trig._tdiv(Pm98Trig._i32(seg_len * cy), 2)) * seg_len + py)
+		var evy := Pm98Trig._i32(vy - Pm98Trig._i32(seg_len * cy))
+		return [seg_len, epx, epy, 0, evx, evy, 0]
+	# AIRBORNE (L79 else). The vz<1 test (L80) only changes the render MIDPOINT (+0xa8, not read by the
+	# +0x114 buffer), so it is dropped here: the segment length + END are ALWAYS computed. Segment length
+	# = FP time-to-ground trunc((vz + sqrt(vz*vz + 356*z0)) / 178), constants decoded from ds:0x639090
+	# (-356.0) / 0x639098 (1/178); _ftol (0x605fb0) forces round-toward-zero (RC=11) so this truncates.
+	var t := _traj_ftol((float(vz) + sqrt(float(vz) * float(vz) + 2.0 * float(BALL_GRAV_G) * float(pz))) / float(BALL_GRAV_G))
+	var epx2 := Pm98Trig._i32(Pm98Trig._i32(vx * t) + px)
+	var epy2 := Pm98Trig._i32(Pm98Trig._i32(vy * t) + py)
+	var evx2 := Pm98Trig.mul16(vx, BALL_REST_H)                      # FUN_005edfa0(vx, 0xc51e)
+	var evy2 := Pm98Trig.mul16(vy, BALL_REST_H)
+	var vz_ground := Pm98Trig._i32(vz + Pm98Trig._i32(t * -BALL_GRAV_G))
+	var evz2 := Pm98Trig._i32(-Pm98Trig.mul16(vz_ground, BALL_REST_V))
+	if absi(evz2) < BALL_VZ_SETTLE:
+		evz2 = 0
+	return [t, epx2, epy2, 0, evx2, evy2, evz2]
+
+
+## Loop-1: build up to 3 segments; Loop-2: sample them (every 4 frames) into the 16-slot +0x114 buffer.
+static func _ball_predict_traj(ball: Dictionary) -> void:
+	var px := _si(ball, 4)
+	var py := _si(ball, 8)
+	var pz := _si(ball, 0xc)
+	var vx := _si(ball, 0x20)
+	var vy := _si(ball, 0x24)
+	var vz := _si(ball, 0x28)
+	# --- Loop 1: three segments from the running state ---
+	var segs: Array = []
+	var rpx := px; var rpy := py; var rpz := pz; var rvx := vx; var rvy := vy; var rvz := vz
+	for _s in range(3):
+		var seg: Array = _traj_segment(rpx, rpy, rpz, rvx, rvy, rvz)
+		segs.append(seg)
+		rpx = int(seg[1]); rpy = int(seg[2]); rpz = int(seg[3])
+		rvx = int(seg[4]); rvy = int(seg[5]); rvz = int(seg[6])
+	# --- Loop 2: sample every 4 frames across the segments into the 16 slots ---
+	var spx := px; var spy := py; var spz := pz; var svx := vx; var svy := vy; var svz := vz
+	var d := 0                                                       # iVar2: accumulated sample frame
+	var slot := 0                                                    # local_38: slots filled
+	var si := 0                                                      # local_30: segment index
+	while si < 3 and slot < 0x10:
+		var seg_len := int(segs[si][0])
+		if d < seg_len:
+			var ox: int; var oy: int; var oz: int
+			if svz == 0:                                            # grounded sample (L132 branch)
+				var pol: Array = Pm98Trig.polar_vec(BALL_FRICT, Pm98Trig.atan_angle(svx, svy))
+				var cx := int(pol[0]); var cy := int(pol[1])
+				var dx := cx if cx != 0 else 0x10000
+				var dy := cy if cy != 0 else 0x10000
+				var nf: int
+				if Pm98Trig._tdiv(svy, dy) < Pm98Trig._tdiv(svx, dx):
+					nf = Pm98Trig._tdiv(svx, cx if cx != 0 else 0x10000)
+				else:
+					nf = Pm98Trig._tdiv(svy, cy if cy != 0 else 0x10000)
+				var f := d if d < nf else nf                        # clamp frame to stop
+				ox = Pm98Trig._i32(Pm98Trig._i32(svx - Pm98Trig._tdiv(Pm98Trig._i32(f * cx), 2)) * f + spx)
+				oy = Pm98Trig._i32(Pm98Trig._i32(svy - Pm98Trig._tdiv(Pm98Trig._i32(f * cy), 2)) * f + spy)
+				oz = 0
+			else:                                                   # airborne sample (L164)
+				ox = Pm98Trig._i32(Pm98Trig._i32(svx * d) + spx)
+				oy = Pm98Trig._i32(Pm98Trig._i32(svy * d) + spy)
+				oz = Pm98Trig._i32(Pm98Trig._i32(Pm98Trig._i32(svz - Pm98Trig._tdiv(Pm98Trig._i32(d * BALL_GRAV_G), 2)) * d) + spz)
+			var base := 0x114 + 12 * slot
+			ball[base] = ox; ball[base + 4] = oy; ball[base + 8] = oz
+			d += 4
+			slot += 1
+		else:                                                       # advance to next segment (L174)
+			d -= seg_len
+			spx = int(segs[si][1]); spy = int(segs[si][2]); spz = int(segs[si][3])
+			svx = int(segs[si][4]); svy = int(segs[si][5]); svz = int(segs[si][6])
+			si += 1
+	# --- tail (L187-198): pad remaining slots forward with the last computed position ---
+	if slot < 0x10:
+		var base := 0x114 + 12 * slot
+		ball[base] = spx; ball[base + 4] = spy; ball[base + 8] = spz
+		for j in range(slot + 1, 0x10):                             # replicate last slot forward
+			var b := 0x114 + 12 * j
+			var pb := 0x114 + 12 * (j - 1)
+			ball[b] = _g(ball, pb); ball[b + 4] = _g(ball, pb + 4); ball[b + 8] = _g(ball, pb + 8)
+
+
+## TAIL (0x58eb93 trail entry): predicted-trajectory build (FUN_0058fda0) -> facing +0x34 = atan(vel)
+## -> at-rest snapshot/drift. FUN_0058fda0 is NOT pure render: its second loop fills the 16-slot
+## trajectory buffer ball+0x114..0x1d4 that _grid9490_build reads for the lean's gate-4 catch zone
+## (+ the 7260 marker builders). Deferring it left that buffer all-zero, which was M5 divergence #1's
+## root cause (the port collected the kickoff ball ~4 ticks late). Now ported + oracle-locked below.
 static func _ball_tail(ball: Dictionary) -> void:
-	# FUN_0058fda0 trail (render, +0x74/+0xa8) deferred -- writes nothing the sim/spin/facing/snapshot read.
+	_ball_predict_traj(ball)                              # 0x58eb95: FUN_0058fda0 (fills +0x114 buffer)
 	var vx := _g(ball, 0x20)
 	var vy := _g(ball, 0x24)
 	var vz := _g(ball, 0x28)
