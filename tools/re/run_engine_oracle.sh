@@ -47,13 +47,12 @@ STUBS=(
   # NOTE: FUN_005a65a0 (M65a0, the general move) is NO LONGER STUBBED (s12) -- ported + WIRED as the
   # FULL Pm98Movement.move_dispatch (velocity block for every player, both open-play arms, IF-A, all
   # four taker phases; oracle run_65a0openplay_oracle.sh). It runs REAL here so test_engine_tick
-  # verifies it transitively; its ONLY stubbed sub-leaves are b1420's b1500/b1c80 role leaves (below),
-  # mirroring the port's formation_gate_b1420 deferral. Its RNG draws come from the LCG @0x6d3184,
-  # poked to 0 in PTRS == the test's default MatchEngine.Pm98Rng.new(0).
-  # NOTE: FUN_005b1420 (B1420) is also un-stubbed (s12): the real fn runs (its b0040 arm is ported and
-  # wired under `wire`), with only b1500/b1c80 stubbed ret 1 exactly like the port.
-  "0x5b1500 1 0 B1500"     # b1420 role sub-leaf (UNPORTED -- port stubs ret 1, mirror here)
-  "0x5b1c80 1 0 B1C80"     # b1420 role sub-leaf (UNPORTED -- port stubs ret 1, mirror here)
+  # verifies it transitively. Its RNG draws come from the LCG @0x6d3184, poked to 0 in
+  # PTRS == the test's default MatchEngine.Pm98Rng.new(0).
+  # NOTE: FUN_005b1420 (B1420) is un-stubbed (s12), and since s15 so are its b1500/b1c80
+  # role sub-leaves (ports live) -- the whole off-ball subtree runs REAL.
+  # s15: b1500/b1c80 UN-STUBBED (ports live) -- the real fns run in-image on these
+  # zero-role fixtures (no marked man, role 0 -> b1500 anchor walk / b1c80 ret 0).
   # NOTE: FUN_005a9490 (M9490, the lean) is NO LONGER STUBBED -- ported + WIRED (Pm98Movement.lean_9490
   # (p, true, rng), called from Pm98Action._move_9490; slices A/B/C oracle-locked by run_9490sliceA/Bi/
   # Bii/Biiarm/C_oracle.sh). It runs REAL here so test_engine_tick verifies it transitively. In these

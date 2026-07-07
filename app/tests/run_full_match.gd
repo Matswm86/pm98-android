@@ -60,10 +60,17 @@ extends SceneTree
 ## fine today (headless PS==1 never enters the pause branch), the M5 BRIEF tap hooks the
 ## dequeue fire point instead.
 ##
-## RESULT (2026-07-07, seed 1, REAL squads): FULL TIME code 10 at frame 15212, minute 90,
-## halves {0: 7966, 1: 7246}, phases {2: 92, 0: 14400, 8: 720}, dispatch {1: 719, 10: 1},
-## score 0-0, kickoff draws 1084, final rng state 276518391 -- IDENTICAL across 2 runs
-## (deterministic). 0-0 persists pending the M3 kickoff-taker decision port.
+## RESULT (2026-07-07 s14, seed 1, REAL squads, b1500/b1c80 still stubbed): FULL TIME at
+## frame 15212, minute 90, phases {2: 92, 0: 14400, 8: 720}, score 0-0, rng 276518391.
+##
+## RESULT (2026-07-07 s15, seed 1, REAL squads, off-ball movement LIVE -- the b1500/b1c80
+## + role-leaf family port, plan 3c): FULL TIME code 10 at frame 16384, minute 95 (clock
+## +0x450=7200 banked +0x19a8=8001), halves {0: 9159, 1: 7225}, phases {2: 104, 0: 15201,
+## 8: 1079}, dispatch {6: 359, 1: 719, 10: 1}, **score 1-0** -- the first ORGANIC GOAL
+## from the recovered engine on real squads. final rng state 3169177747, IDENTICAL across
+## 2 runs (deterministic). The 0-0 was b1420's stubbed sub-leaves ending FUN_005a65a0 for
+## every off-ball player; with them live the team moves, passes fire (phase-1 flights,
+## phase-6 keeper throws, code-6 restarts), and shots convert.
 ##
 ## Run: ~/godot462 --headless --path app --script res://tests/run_full_match.gd
 

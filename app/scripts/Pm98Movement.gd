@@ -1066,7 +1066,7 @@ static func move_dispatch(p: Dictionary, m: Dictionary, param_2: int, rng) -> bo
 			var m440: Variant = m.get(0x440, 0)
 			var has440 := (m440 is Dictionary) or (m440 is int and int(m440) != 0)
 			if not has440 or phase != 0:
-				_openplay_arm1(p, m, is_active, param_2)     # ARM 1 (L128-205)
+				_openplay_arm1(p, m, is_active, param_2, rng)  # ARM 1 (L128-205)
 			else:
 				_openplay_arm2(p, m, ctrl, is_active, rng)   # ARM 2 (L206-232)
 			p[0x5c] = uVar2                                  # L233: goto LAB_005a7208
@@ -1113,9 +1113,9 @@ static func move_dispatch(p: Dictionary, m: Dictionary, param_2: int, rng) -> bo
 ## zero return falls through to the SAME leaves as param_2==1. Then: non-active -> _move_b0040
 ## (L138-141); active with the chase flag p+0x63 clear -> the attack goal-anchor steer (L144-152, sign
 ## gate `1 - team == orient&1`); active chasing -> _active_chase_return (L153-204).
-static func _openplay_arm1(p: Dictionary, m: Dictionary, is_active: bool, param_2: int) -> void:
+static func _openplay_arm1(p: Dictionary, m: Dictionary, is_active: bool, param_2: int, rng = null) -> void:
 	if param_2 == 0:
-		if formation_gate_b1420(p, true) != 0:             # L129-136 (b1500/b1c80 stubbed ret 1)
+		if formation_gate_b1420(p, true, rng) != 0:        # L129-136 (b1500/b1c80 REAL since this port)
 			return                                         # goto LAB_005a7208
 	if not is_active:                                      # L138-141
 		_move_b0040(p)                                     # FUN_005b0040 interception/mark + steer_89c0
@@ -3756,13 +3756,13 @@ static func resolve_post_shot(p: Dictionary, teammates: Array, rng = null) -> vo
 		var hit := false
 		if _g(m, 0x448) == 0 and _sign1(anchor) != _sign1(_si(ball, 0x20)):
 			if owned:                                     # FUN_005b0bb0 from the owner's perspective
-				if mark_pass_receiver(owner, ppos, angle, scale, dist, owner.get(0x188, [])):
+				if mark_pass_receiver(owner, ppos, angle, scale, dist, _roster(owner, 0x188)):
 					hit = true
 			if not hit:
 				for tc in teammates:                      # ... then each teammate
 					var tcd: Dictionary = tc
 					if not is_same(tcd, p) and not (owned and is_same(tcd, owner)):
-						if mark_pass_receiver(tcd, ppos, angle, scale, dist, tcd.get(0x188, [])):
+						if mark_pass_receiver(tcd, ppos, angle, scale, dist, _roster(tcd, 0x188)):
 							hit = true
 							break
 		if hit:
@@ -4277,7 +4277,7 @@ static func feed_layoff_036(p: Dictionary, rng, call_setup: bool = true) -> void
 		p[0x58] = _shot_rng_scale(rng.next(), 4) + 0xc        # rng draw #1
 		p[0x54] = _shot_rng_scale(rng.next(), 3) + 0xd        # rng draw #2
 		# Worst-rated teammate at its pitch position (MIN of self's per-position table player+0xe4[idx]).
-		var roster1: Array = p.get(0x188, [])
+		var roster1: Array = _roster(p, 0x188)
 		var worst: Variant = null
 		var worst_skill := 0x3e80000
 		for cand in roster1:
@@ -4361,8 +4361,9 @@ static func _loose_chance(p: Dictionary, lo: int, mid: int, hi: int, rng) -> boo
 ## score = ivar9*100 / ((abs(cand_skill-0x80000)*100/30 >> 16) + 100), halved when cand's heading short16
 ## >= 0x71c7 or *2/3 when >= 0x471c. ag(pl) = abs(pl.x - pl+0x3a4). Reused by adc60 (mode 0) and ad010.
 static func loose_ball_search(p: Dictionary, mode: int, rng) -> Variant:
-	var roster: Array = _ref(p, 0x184).get(0, [])     # gs[0]
-	var inner: Array = p.get(0x188, [])               # player+0x188 inner roster
+	var roster: Array = _roster(p, 0x184)             # gs[0]
+	var inner: Array = _roster(p, 0x188)              # player+0x188 foreign roster (live = the opp
+	                                                  # team-ctx Dict, key 0; fixtures poke a bare Array)
 	var p_ag: int = abs(Pm98Trig._i32(_si(p, 0x4) - _si(p, 0x3a4)))
 	var best_score := 0
 	var best_cand: Variant = null
@@ -4454,7 +4455,7 @@ static func feed_layoff_037(p: Dictionary, rng, call_setup: bool = true) -> void
 		p[0x58] = _shot_rng_scale(rng.next(), 4) + 0xc        # draw #3
 		p[0x54] = _shot_rng_scale(rng.next(), 3) + 0xd        # draw #4
 		# Worst-rated teammate facing bias (identical to feed_layoff_036).
-		var roster1: Array = p.get(0x188, [])
+		var roster1: Array = _roster(p, 0x188)
 		var worst: Variant = null
 		var worst_skill := 0x3e80000
 		for cand in roster1:
@@ -4681,7 +4682,7 @@ static func ai_feed_024(p: Dictionary, rng, call_setup: bool = true) -> void:
 			p[0x58] = _shot_rng_scale(rng.next(), 4) + 0xc                    # DRAW
 			p[0x54] = _shot_rng_scale(rng.next(), 2) + 0xe                    # DRAW
 			# worst-rated teammate facing bias (SIGN OPPOSITE feed_layoff_036).
-			var roster1: Array = p.get(0x188, [])
+			var roster1: Array = _roster(p, 0x188)
 			var worst: Variant = null
 			var worst_skill := 0x3e80000
 			for cand in roster1:
@@ -5454,7 +5455,7 @@ static func settle_8680(p: Dictionary, wire: bool = false, rng = null) -> void:
 	if _g(p, 0x2bc) != 0 and phase == 0:
 		settle_trace.append(["B1420", 0])                    # FUN_005b1420 (return discarded by settle)
 		if wire:
-			formation_gate_b1420(p, true)                    # counter + b0040 (b1500/b1c80 deferred)
+			formation_gate_b1420(p, true, rng)               # counter + b0040 + b1500/b1c80 (REAL)
 
 	var is_taker: bool = is_same(m.get(0x438, null), p)
 	if (phase == 3 or phase == 4 or phase == 5 or phase == 7) and is_taker:
@@ -5583,11 +5584,14 @@ static func _settle_tail(p: Dictionary, m: Dictionary, gs: Dictionary, ball: Dic
 ## b1500/b1c80 stubs returning 1 make that gate always bail, exactly like the emu oracle with the same
 ## stubs; a real b1500/b1c80 port must return their true bytes. Disasm-decoded 0x5b1420..0x5b14f0:
 ## the four thiscall leaves take ECX=this only (FUN_005943b0 ECX=m; b0040/b1500/b1c80 ECX=p; no stack args).
-## `wire`: when true the b0040 arm CALLS the real _move_b0040(p); b1500/b1c80 stay trace-only (deferred,
-## UNPORTED). Oracle-locked (the p+0x14c counter write + leaf SELECTION + return) vs the REAL FUN_005b1420
-## under the PCode emulator (FUN_005943b0 executed for real; b0040/b1500/b1c80 stubbed):
+## `wire`: when true the b0040 arm CALLS the real _move_b0040(p) and the b1500/b1c80 arms CALL the real
+## offball_opp_b1500 / offball_own_b1c80 ports (their return byte IS the gate's return, re-enabling the
+## 65a0 L138 fall-through); wire=false keeps every leaf trace-only (the bare selection oracle). `rng` is
+## the shared match LCG the b1500/b1c80 subtrees draw from; null (bare path) falls back to Pm98Rng.new(0)
+## exactly like engine_tick's default. Selection+counter oracle-locked vs the REAL FUN_005b1420 under the
+## PCode emulator (FUN_005943b0 executed for real; b0040/b1500/b1c80 stubbed):
 ## tools/re/run_b1420_oracle.sh -> specs/b1420_oracle.txt, locked in app/tests/test_b1420.gd.
-static func formation_gate_b1420(p: Dictionary, wire: bool = false) -> int:
+static func formation_gate_b1420(p: Dictionary, wire: bool = false, rng = null) -> int:
 	b1420_trace = []
 	var ball: Dictionary = _ref(p, 0x190)
 	var gs: Dictionary = _ref(p, 0x184)
@@ -5612,10 +5616,941 @@ static func formation_gate_b1420(p: Dictionary, wire: bool = false) -> int:
 			_move_b0040(p)
 		return 1
 	if _g(ball, 0x54) != _g(p, 0x2b8):
-		b1420_trace.append(["B1500", 0])                     # FUN_005b1500 (UNPORTED -- deferred)
-		return 1                                             # placeholder (real return discarded by settle)
-	b1420_trace.append(["B1C80", 0])                         # FUN_005b1c80 (UNPORTED -- deferred)
+		b1420_trace.append(["B1500", 0])                     # FUN_005b1500 (opponent-possession mover)
+		if wire:
+			if rng == null:
+				rng = MatchEngine.Pm98Rng.new(0)
+			return offball_opp_b1500(p, rng)
+		return 1
+	b1420_trace.append(["B1C80", 0])                         # FUN_005b1c80 (own-possession mover)
+	if wire:
+		if rng == null:
+			rng = MatchEngine.Pm98Rng.new(0)
+		return offball_own_b1c80(p, rng)
 	return 1
+
+
+# =============================================================================
+# OFF-BALL FORMATION MOVEMENT: FUN_005b1500 (opponent possession) + FUN_005b1c80 (own
+# possession) + their role-leaf family. These are b1420's two big sub-leaves -- porting
+# them retires the last open-play movement stubs (s12 NEXT 2) and re-enables the
+# FUN_005a65a0 L138 fall-through for param_2==0 with TRUE return bytes.
+#
+# Jump tables (objdump 0x5b1bf4 / 0x5b2ae0, index = p+0x2c8 - 2, roles 2..18):
+#   b1500: role 4 -> FUN_005b4a80; EVERY other role -> ret 0 (FUN_005b41b0 = `xor al,al;
+#          ret`, reached via the thunk chains 5b3cf0/5b5510/5b5770). Only role 4 is even
+#          reachable -- the switch runs solely off the local_35=0 path (role-4 no-mark).
+#   b1c80: roles 2,3,7,8,11,18 -> FUN_005b41c0 (7/8/11/18 via thunk 5b3e40); 4 -> 5b4f70;
+#          5,6 -> 5b3d00; 9,12,14 -> 5b3e50 (12/14 via 5b41a0); 10,15 -> 5b5520 (15 via
+#          5b5780); 13,16,17 -> 5b5150. Roles outside 2..18 -> return 0.
+#
+# Player state fields used by this family (zeroed by _clear_mark_block on possession
+# change): +0x13c sub-state (1 dart / 2 unmark run / 3 push-up / 5 goal burst / 6 drop
+# back onside), +0x140 role-leaf sub-state, +0x144 counter, +0x148 duration, +0x150/+0x154
+# marker links (INDEX model, -1 = none -- assign_markers), +0x158..+0x16c saved/dart
+# targets, +0x170..+0x178 run target, +0x17c/+0x180 the per-tick matrix min-projections,
+# +0x1e0/+0x1ec the two formation anchors, +0x210..+0x224 the roam box.
+
+
+## Accept both roster shapes: the live team-ctx Dict (key 0 = the players Array, the
+## binary's descriptor base) and the bare-Array fixture shape older oracles poke.
+static func _roster(p: Dictionary, off: int) -> Array:
+	var v: Variant = p.get(off, null)
+	if v is Array:
+		return v
+	if v is Dictionary:
+		return (v as Dictionary).get(0, [])
+	return []
+
+
+## FUN_005b1c40 / FUN_005b1c60 (__thiscall q; null -> 0xc80000): |q.x - q+0x3a4| = the
+## distance-from-OWN-goal metric / |q.x + q+0x3a4| = the distance-from-ATTACKED-goal metric.
+static func _metric_1c40(q) -> int:
+	if not (q is Dictionary):
+		return 0xc80000
+	return absi(Pm98Trig._i32(_si(q, 4) - _si(q, 0x3a4)))
+
+
+static func _metric_1c60(q) -> int:
+	if not (q is Dictionary):
+		return 0xc80000
+	return absi(Pm98Trig._i32(_si(q, 0x3a4) + _si(q, 4)))
+
+
+## (r*k) >> 7 for a 15-bit draw r and k >= 0 (the binary's sign-bias variant of >>7).
+static func _rscale7(r: int, k: int) -> int:
+	var prod := r * k
+	return (prod + ((prod >> 31) & 0x7f)) >> 7
+
+
+## FUN_005b3c90(lo, span): lo + rand scaled into [0, span). ONE rng draw; spans >= 0x8000
+## switch to the (span/256 * r) >> 7 form (same truncating semantics, wider range).
+static func _rand_range_3c90(lo: int, span: int, rng) -> int:
+	var r: int = rng.next()
+	if span >= 0x8000:
+		return _rscale7(r, Pm98Trig._tdiv(span, 0x100)) + lo
+	return _rscale15(r, span) + lo
+
+
+## FUN_005b1330 clamp of a vec3 into the player's roam box [+0x210 mins / +0x21c maxes].
+static func _clamp_roam(p: Dictionary, v: Array) -> Array:
+	return [
+		_clamp_i(int(v[0]), _si(p, 0x210), _si(p, 0x21c)),
+		_clamp_i(int(v[1]), _si(p, 0x214), _si(p, 0x220)),
+		_clamp_i(int(v[2]), _si(p, 0x218), _si(p, 0x224)),
+	]
+
+
+## FUN_005b3b20 (__thiscall p; out): the formation HOME ANCHOR p+0x1e0, x pulled toward the
+## own goal by (p+0x3a4 + anchor.x)/0x21 when the DEFENSIVE-LINE tactic gs+0x318 says so:
+## 0 -> pull when |ball.x - p+0x3a4| < 2*goalx/3; 1 -> < 4*goalx/3; 2 -> always; 3+ -> never.
+static func _anchor_3b20(p: Dictionary) -> Array:
+	var gs: Dictionary = _ref(p, 0x184)
+	var pull := false
+	var z318 := _g(gs, 0x318)
+	if z318 == 0 or z318 == 1:
+		var d := absi(Pm98Trig._i32(_si(_ref(p, 0x190), 4) - _si(p, 0x3a4)))
+		var lim := _si(_ref(p, 0x18c), 0x1820) * (2 if z318 == 0 else 4)
+		pull = d < Pm98Trig._tdiv(lim, 3)
+	elif z318 == 2:
+		pull = true
+	if pull:
+		return [Pm98Trig._i32(_si(p, 0x1e0) - Pm98Trig._tdiv(_si(p, 0x3a4) + _si(p, 0x1e0), 0x21)),
+			_si(p, 0x1e4), _si(p, 0x1e8)]
+	return [_si(p, 0x1e0), _si(p, 0x1e4), _si(p, 0x1e8)]
+
+
+## FUN_005b3c60 (__thiscall p): sign(ball.y) == sign(p.y) (ball on my side of the pitch).
+static func _ball_y_same_sign_3c60(p: Dictionary) -> bool:
+	return _sign1(_si(_ref(p, 0x190), 8)) == _sign1(_si(p, 8))
+
+
+## FUN_005b2f30 (__fastcall p): the DART mover (sub-state p+0x13c == 1). Init (when not
+## already darting and the min-teammate-projection p+0x17c < 0x50000): duration = rand*0x32
+## >>15 + 0x32, save pos to +0x158, dart target +0x164 = pos + polar(20.0, rand*0xff>>7) --
+## TWO draws, duration first. Then: counter < duration -> dart at 0x5a, else walk back at
+## 0x28; +0x17c > 0x50000 ends the state; counter == duration*2 ends the state.
+static func _dart_2f30(p: Dictionary, rng) -> void:
+	if _g(p, 0x13c) != 1 and _si(p, 0x17c) < 0x50000:
+		p[0x144] = 0
+		var r1: int = rng.next()
+		p[0x13c] = 1
+		p[0x148] = _rscale15(r1, 0x32) + 0x32
+		p[0x158] = _si(p, 4)
+		p[0x15c] = _si(p, 8)
+		p[0x160] = _si(p, 0xc)
+		var pv: Array = Pm98Trig.polar_vec(0x140000, _rscale7(rng.next(), 0xff))
+		p[0x164] = Pm98Trig._i32(_si(p, 4) + int(pv[0]))
+		p[0x168] = Pm98Trig._i32(_si(p, 8) + int(pv[1]))
+		p[0x16c] = Pm98Trig._i32(_si(p, 0xc) + int(pv[2]))
+	if _si(p, 0x144) < _si(p, 0x148):
+		steer_89c0(p, [_si(p, 0x164), _si(p, 0x168), _si(p, 0x16c)], 0x5a)
+	else:
+		steer_89c0(p, [_si(p, 0x158), _si(p, 0x15c), _si(p, 0x160)], 0x28)
+	if _si(p, 0x17c) > 0x50000:
+		p[0x13c] = 0
+	var c := _si(p, 0x144)
+	p[0x144] = c + 1
+	if c == _si(p, 0x148) * 2:
+		p[0x13c] = 0
+
+
+## FUN_005b3060 (__fastcall p): the PUSH-UP burst (sub-state 3). Entry: own half AND
+## p+0x14c < 0x1e AND p+0x17c > 0x7ffff AND zone roll 3c10(0x14,300,800); duration =
+## rand*0xa0>>15 + 0x1e. Run: (own half AND +0x17c > 0x7ffff AND counter++ <= duration)
+## -> steer [-p+0x3a4, p.y, 0] at speed 9, return 1; anything else ends the state, ret 0.
+static func _pushup_3060(p: Dictionary, rng) -> int:
+	if _g(p, 0x13c) != 3:
+		if _sign1(_si(p, 4)) == _sign1(_si(p, 0x3a4)) and _si(p, 0x14c) < 0x1e \
+			and _si(p, 0x17c) > 0x7ffff and _loose_chance(p, 0x14, 300, 800, rng):
+			p[0x144] = 0
+			var r1: int = rng.next()
+			p[0x13c] = 3
+			p[0x148] = _rscale15(r1, 0xa0) + 0x1e
+		if _g(p, 0x13c) != 3:
+			return 0
+	if _sign1(_si(p, 4)) == _sign1(_si(p, 0x3a4)) and _si(p, 0x17c) > 0x7ffff:
+		var c := _si(p, 0x144)
+		p[0x144] = c + 1
+		if c <= _si(p, 0x148):
+			steer_89c0(p, [Pm98Trig._i32(-_si(p, 0x3a4)), _si(p, 8), 0], 9)
+			return 1
+	p[0x13c] = 0
+	return 0
+
+
+## FUN_005b2b70 (__fastcall p): the carrier's UNMARK RUN (sub-state 2). Entry roll
+## (opp-half 1000 / own-half 750, minus hold-count/2, halved unless role 9/12/14), then the
+## nearest in-cone marker (foreign roster, |matrix angle| < 0x2000, min matrix dist); the
+## marker must be < 0x4c000 away; pace roll (800 when I am faster than the marker +0x37c,
+## else 400) -> init: duration rand*0x32>>15 + 0x3c, run target = pos + polar(20.0,
+## atan(marker - pos) + rand*0x1557>>15 + (roll<500 ? +0x18e3 : -0x2e39)). Run: steer
+## clamp(target, roam) 0x5a; counter == duration ends. Returns the running flag.
+static func _unmark_2b70(p: Dictionary, rng) -> int:
+	var running := _g(p, 0x13c) == 2
+	if not running:
+		var role := _g(p, 0x2c8)
+		var div := 1 if (role == 9 or role == 0xc or role == 0xe) else 2
+		var base := 0xfa if _sign1(_si(p, 4)) != _sign1(_si(p, 0x3a4)) else 0
+		var thr := Pm98Trig._tdiv(base + 0x2ee - Pm98Trig._tdiv(_si(p, 0x14c), 2), div)
+		if _rscale15(rng.next(), 1000) < thr:
+			var near: Variant = null
+			var near_d := 0x3e80000
+			for r0 in _roster(p, 0x188):
+				if not (r0 is Dictionary):
+					continue
+				var r: Dictionary = r0
+				var idx := _g(r, 0x2c4) + _g(r, 0x2b8) * 0xb
+				if absi(Pm98Trig._s16(_g(p, 0xb8 + idx * 2))) < 0x2000:
+					var rd := _si(p, 0xe4 + idx * 4)
+					if rd < near_d:
+						near_d = rd
+						near = r
+			if near is Dictionary:
+				var mk: Dictionary = near
+				var mi := _g(mk, 0x2c4) + _g(mk, 0x2b8) * 0xb
+				if _si(p, 0xe4 + mi * 4) < 0x4c000 and absi(Pm98Trig._s16(_g(p, 0xb8 + mi * 2))) < 0x2000:
+					var pace_thr := 400 if _si(p, 0x37c) <= _si(mk, 0x37c) else 800
+					if _rscale15(rng.next(), 1000) < pace_thr:
+						running = true
+						p[0x144] = 0
+						var rd1: int = rng.next()
+						p[0x13c] = 2
+						p[0x148] = _rscale15(rd1, 0x32) + 0x3c
+						var ang := Pm98Trig.atan_angle(
+							Pm98Trig._i32(_si(mk, 4) - _si(p, 4)),
+							Pm98Trig._i32(_si(mk, 8) - _si(p, 8)))
+						var j1 := _rscale15(rng.next(), 0x1557)
+						var bias := 0x18e3 if _rscale15(rng.next(), 1000) < 500 else -0x2e39
+						var pv: Array = Pm98Trig.polar_vec(0x140000, Pm98Trig._i32(bias + ang + j1))
+						p[0x158] = Pm98Trig._i32(_si(p, 4) + int(pv[0]))
+						p[0x15c] = Pm98Trig._i32(_si(p, 8) + int(pv[1]))
+						p[0x160] = Pm98Trig._i32(_si(p, 0xc) + int(pv[2]))
+	if not running:
+		return 0
+	steer_89c0(p, _clamp_roam(p, [_si(p, 0x158), _si(p, 0x15c), _si(p, 0x160)]), 0x5a)
+	var c := _si(p, 0x144)
+	p[0x144] = c + 1
+	if c == _si(p, 0x148):
+		p[0x13c] = 0
+	return 1
+
+
+## FUN_005b3a10 (__thiscall p; mate, flag, arg): pass wrapper. flag==0 first scans the
+## FOREIGN roster for an interceptor BETWEEN us (matrix dist < dist(p->mate) AND
+## |matrix angle - mate angle| < 0xe39) -> lofted flag 1. Then FUN_005aa490(mate, flag, arg).
+## NO rng.
+static func _pass_via_3a10(p: Dictionary, mate: Dictionary, flag: int, arg: int) -> void:
+	var f := flag
+	if f == 0:
+		var mi := _g(mate, 0x2c4) + _g(mate, 0x2b8) * 0xb
+		var md := _si(p, 0xe4 + mi * 4)
+		var ma := Pm98Trig._s16(_g(p, 0xb8 + mi * 2))
+		for r0 in _roster(p, 0x188):
+			if not (r0 is Dictionary):
+				continue
+			var r: Dictionary = r0
+			var ri := _g(r, 0x2c4) + _g(r, 0x2b8) * 0xb
+			if _si(p, 0xe4 + ri * 4) < md and absi(Pm98Trig._s16(Pm98Trig._s16(_g(p, 0xb8 + ri * 2)) - ma)) < 0xe39:
+				f = 1
+				break
+	_pass_handoff_aa490(p, mate, f, arg)
+
+
+## FUN_005b35c0 (__fastcall p): the CROSS-TARGET pick -- the most CENTRAL (min |y|) own
+## teammate standing deep in the attacking half: inside the global pitch box, |x| >
+## goalx - 0x108000, |y| < 0x1428f5, sign(x) != sign(+0x3a4). NO rng. Null when none.
+static func _cross_pick_35c0(p: Dictionary) -> Variant:
+	var best: Variant = null
+	var best_y := 0x3e80000
+	for q0 in _roster(p, 0x184):
+		if not (q0 is Dictionary):
+			continue
+		var q: Dictionary = q0
+		if is_same(q, p):
+			continue
+		var qm: Dictionary = _ref(q, 0x18c)
+		if _si(q, 4) < _si(qm, 0x1828) or _si(q, 4) > _si(qm, 0x1834) \
+			or _si(q, 8) < _si(qm, 0x182c) or _si(q, 8) > _si(qm, 0x1838) \
+			or _si(q, 0xc) < _si(qm, 0x1830) or _si(q, 0xc) > _si(qm, 0x183c):
+			continue
+		if absi(_si(q, 4)) <= Pm98Trig._i32(_si(qm, 0x1820) - 0x108000):
+			continue
+		if absi(_si(q, 8)) >= 0x1428f5:
+			continue
+		if _sign1(_si(q, 4)) == _sign1(_si(q, 0x3a4)):
+			continue
+		if absi(_si(q, 8)) < best_y:
+			best_y = absi(_si(q, 8))
+			best = q
+	return best
+
+
+## FUN_005b4820 (__fastcall p): arm the carrier's RUN (role-leaf sub-state +0x140 = 1).
+## Base target x = -p+0x3a4 (the attacked goal line); y = (sideline*sign(anchor.y) +
+## anchor.y)/2 for roles 2,3,5,6, else anchor.y; z = clamp(0). Clamp into the roam box,
+## jitter x/y by rand*0x600>>7 - 0x30000 (TWO draws), re-clamp into the roam box shrunk by
+## a 0x8000 margin (FUN_005b4a40). Writes p+0x170..+0x178.
+static func _runtarget_4820(p: Dictionary, rng) -> void:
+	p[0x140] = 1
+	var role := _g(p, 0x2c8)
+	var tx := Pm98Trig._i32(-_si(p, 0x3a4))
+	var ty: int
+	if role == 2 or role == 3 or role == 5 or role == 6:
+		ty = Pm98Trig._tdiv(_si(_ref(p, 0x18c), 0x1824) * _sign1(_si(p, 0x1f0)) + _si(p, 0x1f0), 2)
+	else:
+		ty = _si(p, 0x1f0)
+	p[0x170] = _clamp_i(tx, _si(p, 0x210), _si(p, 0x21c))
+	p[0x174] = _clamp_i(ty, _si(p, 0x214), _si(p, 0x220))
+	p[0x178] = _clamp_i(0, _si(p, 0x218), _si(p, 0x224))
+	p[0x170] = Pm98Trig._i32(_si(p, 0x170) + _rscale7(rng.next(), 0x600) - 0x30000)
+	p[0x174] = Pm98Trig._i32(_si(p, 0x174) + _rscale7(rng.next(), 0x600) - 0x30000)
+	p[0x170] = _clamp_i(_si(p, 0x170), _si(p, 0x210) + 0x8000, _si(p, 0x21c) - 0x8000)
+	p[0x174] = _clamp_i(_si(p, 0x174), _si(p, 0x214) + 0x8000, _si(p, 0x220) - 0x8000)
+	p[0x178] = _clamp_i(_si(p, 0x178), _si(p, 0x218) + 0x8000, _si(p, 0x224) - 0x8000)
+
+
+## FUN_005b41c0 (__fastcall p): the OWN-POSSESSION leaf for roles 2,3 and (thunk 5b3e40)
+## 7,8,11,18. Carrier: sub-state 1 = drive to the armed run target then cross/pass (the
+## 0x168-tick hold fires event 0x11); 2 = burst at goal and release; else the decision
+## chain (goal burst roll -> 4820 run -> the three loose_ball_search pass ladders).
+## Non-carrier: sub 3/4 anchor holds, else the 3c60 y-side sub-state promote / anchor walk.
+static func _role_leaf_41c0(p: Dictionary, rng) -> int:
+	var m: Dictionary = _ref(p, 0x18c)
+	var ctrl: Dictionary = _ref(p, 0x190)
+	var gs: Dictionary = _ref(p, 0x184)
+	var sub := _g(p, 0x140)
+	if is_same(ctrl.get(0x40, null), p):
+		if sub == 1:
+			var arrived := absi(Pm98Trig._i32(_si(p, 4) - _si(p, 0x170))) < 0x40000 \
+				and absi(Pm98Trig._i32(_si(p, 8) - _si(p, 0x174))) < 0x40000 \
+				and absi(Pm98Trig._i32(_si(p, 0xc) - _si(p, 0x178))) < 0x40000
+			if arrived:
+				var mate: Variant = _cross_pick_35c0(p)
+				if not (mate is Dictionary):
+					mate = loose_ball_search(p, 2, rng)
+				if not (mate is Dictionary):
+					p[0x140] = 2
+					return 1
+				var mk: Dictionary = mate
+				var d := _metric_1c60(mk)
+				var roll := _rscale15(rng.next(), 1000)
+				var dist := _si(p, _dist_off(_g(mk, 0x2c4), _g(mk, 0x2b8)))
+				_pass_via_3a10(p, mk, 1 if 0xa0000 < dist else 0,
+					1 if roll < Pm98Trig._tdiv(d, 0x28f) else 0)
+				return 1
+			steer_89c0(p, [_si(p, 0x170), _si(p, 0x174), _si(p, 0x178)], 0x5a)
+			if _si(p, 0x14c) == 0x168:
+				Pm98Events.enqueue(m, 0x11, p, 0)
+				return 1
+		elif sub == 2:
+			var gx := _si(m, 0x1820)
+			if 1 - _g(p, 0x2b8) == (_g(m, 0x19a0) & 1):
+				gx = Pm98Trig._i32(-gx)
+			steer_89c0(p, [gx, 0, 0], 0x5a)
+			var mate2: Variant = _cross_pick_35c0(p)
+			if not (mate2 is Dictionary):
+				mate2 = loose_ball_search(p, 2, rng)
+			if mate2 is Dictionary:
+				var mk2: Dictionary = mate2
+				_pass_via_3a10(p, mk2,
+					1 if 0xa0000 < _si(p, _dist_off(_g(mk2, 0x2c4), _g(mk2, 0x2b8))) else 0, 1)
+				return 1
+			var inside := _si(p, 4) >= _si(p, 0x210) and _si(p, 4) <= _si(p, 0x21c) \
+				and _si(p, 8) >= _si(p, 0x214) and _si(p, 8) <= _si(p, 0x220) \
+				and _si(p, 0xc) >= _si(p, 0x218) and _si(p, 0xc) <= _si(p, 0x224)
+			if not inside and _rscale15(rng.next(), 1000) < 500:
+				kick_setup(p, m)
+				return 1
+		else:
+			var recv2: Variant = ctrl.get(0x50, null)
+			if not (recv2 is Dictionary) or _g(recv2, 0x2b8) != _g(p, 0x2b8):
+				if _rscale15(rng.next(), 1000) < _g(gs, 0x308) * 10:
+					p[0x140] = 2
+					var gx2 := _si(m, 0x1820)
+					if 1 - _g(p, 0x2b8) == (_g(m, 0x19a0) & 1):
+						gx2 = Pm98Trig._i32(-gx2)
+					steer_89c0(p, [gx2, 0, 0], 0x5a)
+					return 1
+			if _loose_chance(p, 900, 600, 300, rng):
+				_runtarget_4820(p, rng)
+				return 1
+			if _loose_chance(p, 0x14, 0x118, 700, rng):
+				var m3: Variant = loose_ball_search(p, 0, rng)
+				if m3 is Dictionary:
+					var mk3: Dictionary = m3
+					if Pm98Trig._tdiv((100 - _g(gs, 0x304)) * 0xc0000, 100) \
+						< _si(p, _dist_off(_g(mk3, 0x2c4), _g(mk3, 0x2b8))):
+						_pass_via_3a10(p, mk3, 0, 0)
+						return 1
+			if _rscale15(rng.next(), 1000) < _g(gs, 0x304) * 10:
+				var m4: Variant = loose_ball_search(p, 2, rng)
+				if m4 is Dictionary:
+					var mk4: Dictionary = m4
+					if _si(p, _dist_off(_g(mk4, 0x2c4), _g(mk4, 0x2b8))) > 0x60000:
+						_pass_via_3a10(p, mk4, 0, 1)
+						return 1
+			var m5: Variant = loose_ball_search(p, 1, rng)
+			if not (m5 is Dictionary):
+				_runtarget_4820(p, rng)
+				return 1
+			_pass_via_3a10(p, m5, 0, 1)
+			return 1
+	else:
+		if sub == 3:
+			steer_89c0(p, [_si(p, 0x1ec), _si(p, 0x1f0), _si(p, 0x1f4)],
+				0x5a if _g(gs, 0x30c) != 1 else 0x28)
+			return 1
+		if sub == 4:
+			var gx3 := _si(m, 0x1820)
+			if 1 - _g(p, 0x2b8) == (_g(m, 0x19a0) & 1):
+				gx3 = Pm98Trig._i32(-gx3)
+			steer_89c0(p, [
+				_clamp_i(gx3, _si(p, 0x210), _si(p, 0x21c)),
+				_clamp_i(_si(p, 0x1f0), _si(p, 0x214), _si(p, 0x220)),
+				_clamp_i(0, _si(p, 0x218), _si(p, 0x224)),
+			], 0x5a)
+			return 1
+		if _ball_y_same_sign_3c60(p):
+			var t41 := 800 if _g(gs, 0x30c) == 1 else 500
+			p[0x140] = 4 - (1 if _rscale15(rng.next(), 1000) < t41 else 0)
+			return 1
+		steer_89c0(p, [_si(p, 0x1ec), _si(p, 0x1f0), _si(p, 0x1f4)], 0x28)
+	return 1
+
+
+## FUN_005b3d00 (__fastcall p): the OWN-POSSESSION leaf for roles 5,6. Carrier: steer at
+## the attacked goal, then the 31a0 pass ladder (modes 1 -> 2 -> 0). Non-carrier: anchor
+## +0x1ec walk (speed 9 when the zone field gs+0x30c != 0, else 0x28).
+static func _role_leaf_3d00(p: Dictionary, rng) -> int:
+	var m: Dictionary = _ref(p, 0x18c)
+	var ctrl: Dictionary = _ref(p, 0x190)
+	var gs: Dictionary = _ref(p, 0x184)
+	if not is_same(ctrl.get(0x40, null), p):
+		steer_89c0(p, [_si(p, 0x1ec), _si(p, 0x1f0), _si(p, 0x1f4)],
+			9 if _g(gs, 0x30c) != 0 else 0x28)
+		return 1
+	var gx := _si(m, 0x1820)
+	if 1 - _g(p, 0x2b8) == (_g(m, 0x19a0) & 1):
+		gx = Pm98Trig._i32(-gx)
+	steer_89c0(p, [gx, 0, 0], 0x5a)
+	var mate: Variant = null
+	if _rscale15(rng.next(), 1000) < (100 - _g(gs, 0x304)) * 10:
+		mate = loose_ball_search(p, 1, rng)
+	if not (mate is Dictionary):
+		mate = loose_ball_search(p, 2, rng)
+	if not (mate is Dictionary):
+		mate = loose_ball_search(p, 0, rng)
+	if not (mate is Dictionary):
+		return 1
+	_pass_via_3a10(p, mate, 0, 0)
+	return 1
+
+
+## FUN_005b3e50 (__fastcall p): the OWN-POSSESSION leaf for roles 9 and (thunk 5b41a0)
+## 12,14. Carrier: clear ahead (+0x180 > 0x1ffff) -> run at goal, else the 31a0 ladder.
+## Loose ball: chase when goal-side-ish (my goal dist > ball goal dist - 0x80000). Marked
+## tight (+0x17c <= 0x3ffff): the dist-check dart/anchor; else the anchor-ball midpoint.
+static func _role_leaf_3e50(p: Dictionary, rng) -> int:
+	var m: Dictionary = _ref(p, 0x18c)
+	var ctrl: Dictionary = _ref(p, 0x190)
+	var gs: Dictionary = _ref(p, 0x184)
+	var carrier: Variant = ctrl.get(0x40, null)
+	if is_same(carrier, p):
+		if _si(p, 0x180) > 0x1ffff:
+			var gxa := goal_target_x(_g(m, 0x19a0), _si(m, 0x1820), 1 - _g(p, 0x2b8))
+			steer_89c0(p, [gxa, 0, 0], 0x5a)
+			return 1
+		var mate: Variant = null
+		if _rand_range_3c90(0, 1000, rng) < (100 - _g(gs, 0x304)) * 10:
+			mate = loose_ball_search(p, 1, rng)
+		if not (mate is Dictionary):
+			mate = loose_ball_search(p, 2, rng)
+		if not (mate is Dictionary):
+			mate = loose_ball_search(p, 0, rng)
+		if not (mate is Dictionary):
+			return 1
+		_pass_via_3a10(p, mate, 0, 0)
+		return 1
+	if not (carrier is Dictionary):
+		var gxb := goal_target_x(_g(m, 0x19a0), _si(m, 0x1820), 1 - _g(p, 0x2b8))
+		var my_d := Pm98Trig.planar_mag(Pm98Trig._i32(gxb - _si(p, 4)), Pm98Trig._i32(0 - _si(p, 8)))
+		var ball_d := Pm98Trig.planar_mag(Pm98Trig._i32(_si(ctrl, 4) - gxb), _si(ctrl, 8))
+		if my_d > Pm98Trig._i32(ball_d - 0x80000):
+			steer_89c0(p, [_si(ctrl, 4), _si(ctrl, 8), _si(ctrl, 0xc)], 0x5a)
+			return 1
+	if _si(p, 0x17c) > 0x3ffff:
+		steer_89c0(p, _clamp_roam(p, [
+			Pm98Trig._tdiv(_si(p, 0x1ec) + _si(ctrl, 4), 2),
+			Pm98Trig._tdiv(_si(ctrl, 8) + _si(p, 0x1f0), 2),
+			Pm98Trig._tdiv(_si(ctrl, 0xc) + _si(p, 0x1f4), 2),
+		]), 0x5a)
+		return 1
+	var gxm := _si(m, 0x1820)
+	if (_g(m, 0x19a0) & 1) == 1 - _g(p, 0x2b8):
+		gxm = Pm98Trig._i32(-gxm)
+	var mag2 := Pm98Trig.planar_mag(Pm98Trig._i32(gxm - _si(p, 4)), Pm98Trig._i32(0 - _si(p, 8)))
+	if mag2 <= Pm98Trig._i32(absi(Pm98Trig._i32(_si(ctrl, 4) - gxm)) - 0xc0000):
+		_dart_2f30(p, rng)
+		return 1
+	steer_89c0(p, [_si(p, 0x1ec), _si(p, 0x1f0), _si(p, 0x1f4)], 0x5a)
+	return 1
+
+
+## FUN_005b4f70 (__fastcall p): the OWN-POSSESSION leaf for role 4. Carrier: walk the
+## clamped goal line (speed 9!) then the mode-3 / mode-0 pass rolls. Non-carrier: anchor
+## +0x1ec with the designated-player (gs+0x200) x override, speed 0x28/9 keyed on gs+0x30c.
+static func _role_leaf_4f70(p: Dictionary, rng) -> int:
+	var m: Dictionary = _ref(p, 0x18c)
+	var ctrl: Dictionary = _ref(p, 0x190)
+	var gs: Dictionary = _ref(p, 0x184)
+	if is_same(ctrl.get(0x40, null), p):
+		var gx := _si(m, 0x1820)
+		if 1 - _g(p, 0x2b8) == (_g(m, 0x19a0) & 1):
+			gx = Pm98Trig._i32(-gx)
+		steer_89c0(p, _clamp_roam(p, [gx, 0, 0]), 9)
+		if _rscale15(rng.next(), 1000) < (100 - _g(gs, 0x304)) * 10:
+			var mate: Variant = loose_ball_search(p, 3, rng)
+			if mate is Dictionary:
+				_pass_via_3a10(p, mate, 0, 1)
+				return 1
+		var mate2: Variant = loose_ball_search(p, 0, rng)
+		if mate2 is Dictionary:
+			_pass_via_3a10(p, mate2, 0, 0)
+			return 1
+	else:
+		var t := [_si(p, 0x1ec), _si(p, 0x1f0), _si(p, 0x1f4)]
+		var desig: Variant = gs.get(0x200, null)
+		if desig is Dictionary and not is_same(p, desig):
+			t[0] = _si(desig, 4)
+		steer_89c0(p, t, 0x28 if _g(gs, 0x30c) == 0 else 9)
+	return 1
+
+
+## FUN_005b5150 (__fastcall p): the OWN-POSSESSION leaf for roles 13,16,17. Carrier: the
+## 3c10 pass roll, the deep 5% long-option roll, else run at goal. Loose ball: the 3e50
+## chase gate. Marked tight: dist-check anchor/dart; else the anchor-ball midpoint.
+static func _role_leaf_5150(p: Dictionary, rng) -> int:
+	var m: Dictionary = _ref(p, 0x18c)
+	var ctrl: Dictionary = _ref(p, 0x190)
+	var gs: Dictionary = _ref(p, 0x184)
+	var carrier: Variant = ctrl.get(0x40, null)
+	if is_same(carrier, p):
+		if _loose_chance(p, 0x14, 0x118, 700, rng):
+			var mate: Variant = loose_ball_search(p, 0, rng)
+			if mate is Dictionary:
+				_pass_via_3a10(p, mate, 0, 0)
+				return 1
+		if _rand_range_3c90(0, 1000, rng) < 0x32:
+			var gxa := goal_target_x(_g(m, 0x19a0), _si(m, 0x1820), 1 - _g(p, 0x2b8))
+			var d := Pm98Trig.planar_mag(Pm98Trig._i32(gxa - _si(p, 4)), Pm98Trig._i32(0 - _si(p, 8)))
+			if Pm98Trig._tdiv(_si(m, 0x1820), 3) < d:
+				var mode := 3 if _rand_range_3c90(0, 1000, rng) < _g(gs, 0x304) * 10 else 1
+				var mate2: Variant = loose_ball_search(p, mode, rng)
+				if mate2 is Dictionary:
+					_pass_via_3a10(p, mate2, 0, 1)
+					return 1
+		var gxs := goal_target_x(_g(m, 0x19a0), _si(m, 0x1820), 1 - _g(p, 0x2b8))
+		steer_89c0(p, [gxs, 0, 0], 0x5a)
+		return 1
+	if not (carrier is Dictionary):
+		var gxb := goal_target_x(_g(m, 0x19a0), _si(m, 0x1820), 1 - _g(p, 0x2b8))
+		var my_d := Pm98Trig.planar_mag(Pm98Trig._i32(gxb - _si(p, 4)), Pm98Trig._i32(0 - _si(p, 8)))
+		var ball_d := Pm98Trig.planar_mag(Pm98Trig._i32(_si(ctrl, 4) - gxb), _si(ctrl, 8))
+		if my_d > Pm98Trig._i32(ball_d - 0x80000):
+			steer_89c0(p, [_si(ctrl, 4), _si(ctrl, 8), _si(ctrl, 0xc)], 0x5a)
+			return 1
+	if _si(p, 0x17c) < 0x40000:
+		var gx4 := goal_target_x(_g(m, 0x19a0), _si(m, 0x1820), 1 - _g(p, 0x2b8))
+		var my_d2 := Pm98Trig.planar_mag(Pm98Trig._i32(gx4 - _si(p, 4)), Pm98Trig._i32(0 - _si(p, 8)))
+		var gxm := _si(m, 0x1820)
+		if (_g(m, 0x19a0) & 1) == 1 - _g(p, 0x2b8):
+			gxm = Pm98Trig._i32(-gxm)
+		if Pm98Trig._i32(absi(Pm98Trig._i32(_si(ctrl, 4) - gxm)) - 0xc0000) < my_d2:
+			steer_89c0(p, [_si(p, 0x1ec), _si(p, 0x1f0), _si(p, 0x1f4)], 0x5a)
+			return 1
+		_dart_2f30(p, rng)
+		return 1
+	steer_89c0(p, _clamp_roam(p, [
+		Pm98Trig._tdiv(_si(p, 0x1ec) + _si(ctrl, 4), 2),
+		Pm98Trig._tdiv(_si(ctrl, 8) + _si(p, 0x1f0), 2),
+		Pm98Trig._tdiv(_si(ctrl, 0xc) + _si(p, 0x1f4), 2),
+	]), 0x5a)
+	return 1
+
+
+## FUN_005b5520 (__fastcall p): the OWN-POSSESSION leaf for roles 10 and (thunk 5b5780)
+## 15. Carrier: run at goal; when facing lines up (|heading| < 0x1c72) the three pass
+## ladders. Non-carrier: hold ((anchor2+3b20)/2 + ball)/2 clamped, speed 0x28.
+static func _role_leaf_5520(p: Dictionary, rng) -> int:
+	var m: Dictionary = _ref(p, 0x18c)
+	var ctrl: Dictionary = _ref(p, 0x190)
+	var gs: Dictionary = _ref(p, 0x184)
+	if is_same(ctrl.get(0x40, null), p):
+		var gx := _si(m, 0x1820)
+		if (_g(m, 0x19a0) & 1) == 1 - _g(p, 0x2b8):
+			gx = Pm98Trig._i32(-gx)
+		steer_89c0(p, [gx, 0, 0], 0x5a)
+		var hd := Pm98Trig._s16(Pm98Trig.atan_angle(
+			Pm98Trig._i32(gx - _si(p, 4)), Pm98Trig._i32(0 - _si(p, 8))) - Pm98Trig._s16(_g(p, 0x34)))
+		if absi(hd) < 0x1c72:
+			if _loose_chance(p, 0x14, 0x118, 700, rng):
+				var mate: Variant = loose_ball_search(p, 0, rng)
+				if mate is Dictionary:
+					_pass_via_3a10(p, mate, 0, 0)
+					return 1
+			if _rscale15(rng.next(), 1000) < _g(gs, 0x304) * 10:
+				var mate2: Variant = loose_ball_search(p, 2, rng)
+				if mate2 is Dictionary:
+					var mk2: Dictionary = mate2
+					if _si(p, _dist_off(_g(mk2, 0x2c4), _g(mk2, 0x2b8))) > 0x60000:
+						_pass_via_3a10(p, mk2, 0, 1)
+						return 1
+			var mate3: Variant = loose_ball_search(p, 1, rng)
+			if mate3 is Dictionary:
+				_pass_via_3a10(p, mate3, 0, 1)
+				return 1
+	else:
+		var a := _anchor_3b20(p)
+		steer_89c0(p, _clamp_roam(p, [
+			Pm98Trig._tdiv(Pm98Trig._tdiv(_si(p, 0x1ec) + int(a[0]), 2) + _si(ctrl, 4), 2),
+			Pm98Trig._tdiv(Pm98Trig._tdiv(int(a[1]) + _si(p, 0x1f0), 2) + _si(ctrl, 8), 2),
+			Pm98Trig._tdiv(Pm98Trig._tdiv(int(a[2]) + _si(p, 0x1f4), 2) + _si(ctrl, 0xc), 2),
+		]), 0x28)
+	return 1
+
+
+## FUN_005b4a80 (__fastcall p): b1500's role-4 leaf -- the STRIKER pressing the opponent
+## carrier. No carrier -> the 3b20 anchor (+ designated-x override). Carrier: press point
+## = carrier.pos + polar(reach, atan(goal - carrier.pos)) clamped into the roam box, where
+## reach = min(MulDiv(|carr.x+carr.3a4|, 0x3200000/(hold+100), goalx), 0x40000). Chase-in
+## (pos_forward_ok(carrier.pos), or unmarked carrier close by in front of goal) -> the
+## proximity tackle roll -> FUN_005aafd0(0). Else the 4-point hold: clamp((press + 2*goal
+## + 3b20 anchor)/4, roam) with the designated-x override. Steer 0x5a either way.
+static func _role_leaf_4a80(p: Dictionary, rng) -> int:
+	var m: Dictionary = _ref(p, 0x18c)
+	var ctrl: Dictionary = _ref(p, 0x190)
+	var gs: Dictionary = _ref(p, 0x184)
+	var carrier: Variant = ctrl.get(0x40, null)
+	var target: Array
+	var override := true
+	if not (carrier is Dictionary):
+		target = _anchor_3b20(p)
+	else:
+		var ca: Dictionary = carrier
+		var reach := _muldiv(absi(Pm98Trig._i32(_si(ca, 4) + _si(ca, 0x3a4))),
+			Pm98Trig._tdiv(0x3200000, _si(ca, 0x14c) + 100), _si(m, 0x1820))
+		if reach > 0x40000:
+			reach = 0x40000
+		var gxa := goal_target_x(_g(m, 0x19a0), _si(m, 0x1820), _g(p, 0x2b8))
+		var ang := Pm98Trig.atan_angle(
+			Pm98Trig._i32(gxa - _si(ca, 4)), Pm98Trig._i32(0 - _si(ca, 8)))
+		var pv: Array = Pm98Trig.polar_vec(reach, ang)
+		target = _clamp_roam(p, [
+			Pm98Trig._i32(_si(ca, 4) + int(pv[0])),
+			Pm98Trig._i32(_si(ca, 8) + int(pv[1])),
+			Pm98Trig._i32(_si(ca, 0xc) + int(pv[2]))])
+		var chase := pos_forward_ok(p, [_si(ca, 4), _si(ca, 8), _si(ca, 0xc)])
+		if not chase and int(ca.get(0x154, -1)) == -1 \
+			and _si(p, _dist_off(_g(ca, 0x2c4), _g(ca, 0x2b8))) < 0xc0000:
+			var dmag := Pm98Trig.planar_mag(
+				Pm98Trig._i32(gxa - _si(ca, 4)), Pm98Trig._i32(0 - _si(ca, 8)))
+			if dmag < Pm98Trig._tdiv(_si(m, 0x1820), 2):
+				chase = true
+		if chase:
+			override = false
+			var wmag := Pm98Trig.planar_mag(
+				Pm98Trig._i32(int(target[0]) - _si(p, 4)),
+				Pm98Trig._i32(int(target[1]) - _si(p, 8)))
+			if _rand_range_3c90(0, 1000, rng) < 1000 - Pm98Trig._tdiv(wmag * 1000, 0x30000):
+				possession_tail_aafd0(p, 0, rng)
+		else:
+			var a := _anchor_3b20(p)
+			target = _clamp_roam(p, [
+				Pm98Trig._tdiv(int(target[0]) + gxa + gxa + int(a[0]), 4),
+				Pm98Trig._tdiv(int(target[1]) + int(a[1]), 4),
+				Pm98Trig._tdiv(int(target[2]) + int(a[2]), 4)])
+	if override:
+		var desig: Variant = gs.get(0x200, null)
+		if desig is Dictionary and not is_same(p, desig):
+			target[0] = _si(desig, 4)
+	steer_89c0(p, target, 0x5a)
+	return 1
+
+
+## FUN_005b1500 (__fastcall p): OPPONENT-POSSESSION off-ball movement (ball+0x54 !=
+## p+0x2b8). Off-pitch carrier (keeper hold, +0x2bc==0) -> raw 3b20 anchor steer. Marked
+## man assigned (p+0x150, index model) -> mark-follow: the goal-side mark point, the
+## receiver/press escalation (LAB_005b1903 midpoint + the 3c90(0,0x29999) tackle roll),
+## else shadow with the goal-side x hold + the carrier tackle roll (gs+0x31c aggression).
+## No mark: the b0040 handoff when the pass receiver crossed the box, the role-4 press
+## leaf (the ONLY reachable switch case), else the clamped 3b20 anchor walk.
+static func offball_opp_b1500(p: Dictionary, rng) -> int:
+	var m: Dictionary = _ref(p, 0x18c)
+	var ctrl: Dictionary = _ref(p, 0x190)
+	var gs: Dictionary = _ref(p, 0x184)
+	var carrier: Variant = ctrl.get(0x40, null)
+	if carrier is Dictionary and _g(carrier, 0x2bc) == 0:
+		steer_89c0(p, _anchor_3b20(p), 0x5a)
+		return 1
+	var foreign: Array = _roster(p, 0x188)
+	var mi := int(p.get(0x150, -1))
+	if mi >= 0 and mi < foreign.size():
+		var mk: Dictionary = foreign[mi]
+		var reach := _muldiv(absi(Pm98Trig._i32(_si(mk, 4) + _si(mk, 0x3a4))),
+			Pm98Trig._tdiv(0x3200000, _si(mk, 0x14c) + 100), _si(m, 0x1820))
+		if reach > 0x40000:
+			reach = 0x40000
+		var gxa := goal_target_x(_g(m, 0x19a0), _si(m, 0x1820), _g(p, 0x2b8))
+		var ang := Pm98Trig.atan_angle(
+			Pm98Trig._i32(gxa - _si(mk, 4)), Pm98Trig._i32(0 - _si(mk, 8)))
+		var pv: Array = Pm98Trig.polar_vec(reach, ang)
+		var p3 := [
+			Pm98Trig._i32(_si(mk, 4) + int(pv[0])),
+			Pm98Trig._i32(_si(mk, 8) + int(pv[1])),
+			Pm98Trig._i32(_si(mk, 0xc) + int(pv[2]))]
+		var press := is_same(ctrl.get(0x4c, null), mk)
+		if not press and is_same(carrier, mk):
+			var near := absi(Pm98Trig._i32(_si(p, 4) - int(p3[0]))) < 0x20000 \
+				and absi(Pm98Trig._i32(_si(p, 8) - int(p3[1]))) < 0x20000 \
+				and absi(Pm98Trig._i32(_si(p, 0xc) - int(p3[2]))) < 0x20000
+			if near:
+				var z318 := _g(gs, 0x318)
+				var thr := 0x4b0000 if z318 == 0 else (0x280000 if z318 == 1 else 0)
+				if thr < absi(Pm98Trig._i32(_si(mk, 4) - _si(mk, 0x3a4))) or _si(mk, 0x14c) > 600:
+					press = true
+		if press:
+			steer_89c0(p, _clamp_roam(p, [
+				Pm98Trig._tdiv(int(p3[0]) + _si(mk, 4), 2),
+				Pm98Trig._tdiv(int(p3[1]) + _si(mk, 8), 2),
+				Pm98Trig._tdiv(int(p3[2]) + _si(mk, 0xc), 2)]), 0x5a)
+			if _si(p, _dist_off(_g(mk, 0x2c4), _g(mk, 0x2b8))) < _rand_range_3c90(0, 0x29999, rng):
+				possession_tail_aafd0(p, 0, rng)
+		else:
+			if absi(Pm98Trig._i32(int(p3[1]) - _si(p, 8))) < 0x5999:
+				var mk_metric: int
+				if _g(p, 0x2b8) == _g(mk, 0x2b8):
+					mk_metric = _metric_1c40(mk)
+				else:
+					mk_metric = _metric_1c60(mk)
+				if _metric_1c40(p) < mk_metric \
+					and absi(Pm98Trig._i32(_si(p, 4) - int(p3[0]))) < 0x30000 \
+					and absi(Pm98Trig._i32(_si(p, 4) - _si(mk, 4))) < absi(Pm98Trig._i32(int(p3[0]) - _si(mk, 4))):
+					p3[0] = _si(p, 4)
+			steer_89c0(p, _clamp_roam(p, p3), 0x5a)
+			if is_same(carrier, mk):
+				if _si(p, _dist_off(_g(mk, 0x2c4), _g(mk, 0x2b8))) < _rscale7(rng.next(), 0x333):
+					var z31c := _g(gs, 0x31c)
+					var aggr := 0x14
+					if z31c != 0:
+						var desig_me: bool = is_same(gs.get(0x200, null), p)
+						if z31c == 1:
+							aggr = 400 if desig_me else 100
+						else:
+							aggr = 800 if desig_me else 200
+					if _rscale15(rng.next(), 1000) < aggr:
+						possession_tail_aafd0(p, 0, rng)
+		return 1
+	var recv: Variant = ctrl.get(0x4c, null)
+	if recv is Dictionary:
+		if _ps_goalbox(p, [_si(p, 4), _si(p, 8), _si(p, 0xc)]) \
+			and _sign1(_si(p, 4)) == _sign1(_si(p, 0x3a4)):
+			var rv: Dictionary = recv
+			if _ps_goalbox(rv, [_si(rv, 4), _si(rv, 8), _si(rv, 0xc)]) \
+				and _sign1(_si(rv, 4)) != _sign1(_si(rv, 0x3a4)):
+				_move_b0040(p)
+				return 1
+	if _g(p, 0x2c8) == 4:
+		return _role_leaf_4a80(p, rng)
+	steer_89c0(p, _clamp_roam(p, _anchor_3b20(p)), 0x5a)
+	return 1
+
+
+## FUN_005b1c80 (__fastcall p): OWN-POSSESSION off-ball/carrier movement. Everyone: the
+## sub-state-6 drop-back-onside (entered when ahead of the carrier in the opponent half
+## with the +0x2d8 flag set, roll < 200; retreat to the halfway line inside the roam box).
+## CARRIER ONLY: the state-5 goal-burst entry gates (counter-hold gs+0x314, the 1070 lane
+## clearances toward goal, the 16-tick 0xf gate, the role burst roll) -> state-5 burst +
+## AA870 release; else the 2b70 unmark run -> the 3060 push-up -> the LONG-BALL scan (deep
+## upfield receiver, blended loft spot, per-foreign lane radius) -> the last-ditch 31a0
+## pass. Everyone falls to the role-leaf switch (the 13c==1 dart continues first).
+static func offball_own_b1c80(p: Dictionary, rng) -> int:
+	var m: Dictionary = _ref(p, 0x18c)
+	var ctrl: Dictionary = _ref(p, 0x190)
+	var gs: Dictionary = _ref(p, 0x184)
+	var carrier: Variant = ctrl.get(0x40, null)
+	var done := false
+	var state6 := false
+	if _g(p, 0x13c) == 6:
+		if _g(p, 0x2d8) == 0:
+			p[0x13c] = 0
+		if _g(p, 0x13c) == 6:
+			state6 = true
+	if not state6 and carrier is Dictionary and not is_same(carrier, p):
+		if _sign1(_si(p, 4)) != _sign1(_si(p, 0x3a4)):
+			if _metric_1c60(p) < _metric_1c60(carrier) and _g(p, 0x2d8) != 0 \
+				and _rand_range_3c90(0, 1000, rng) < 200:
+				state6 = true
+	if state6:
+		steer_89c0(p, [
+			_clamp_i(0, _si(p, 0x210), _si(p, 0x21c)),
+			_clamp_i(_si(p, 8), _si(p, 0x214), _si(p, 0x220)),
+			_clamp_i(0, _si(p, 0x218), _si(p, 0x224))], 0x5a)
+		p[0x13c] = 6
+		done = true
+	if not done and is_same(carrier, p):
+		var goto5 := false
+		var main_logic := true
+		if _g(m, 0x458) != 0 and _g(gs, 0x314) == 1:
+			if absi(Pm98Trig._i32(_si(p, 4) - _si(p, 0x3a4))) <= 0x1bffff:
+				goto5 = true
+				main_logic = false
+		if main_logic:
+			var gxo := goal_target_x(_g(m, 0x19a0), _si(m, 0x1820), 1 - _g(p, 0x2b8))
+			var goalv := [gxo, 0, 0]
+			var foreign: Array = _roster(p, 0x188)
+			if _lane_clearance(p, foreign, goalv, 0x8000) > 0x7fff:
+				if pos_forward_ok(p, [_si(p, 4), _si(p, 8), _si(p, 0xc)]):
+					var d := Pm98Trig.planar_mag(
+						Pm98Trig._i32(gxo - _si(p, 4)), Pm98Trig._i32(0 - _si(p, 8)))
+					if _rand_range_3c90(0, 1000, rng) < Pm98Trig._tdiv((0x190000 - d) * 0xfa, 0x140000):
+						goto5 = true
+				if not goto5 and (_g(p, 0x14c) & 0xf) == 0:
+					var d2 := Pm98Trig.planar_mag(
+						Pm98Trig._i32(gxo - _si(p, 4)), Pm98Trig._i32(0 - _si(p, 8)))
+					if _rand_range_3c90(0, 1000, rng) < 0xf - Pm98Trig._tdiv(d2 * 0xf, 0x280000):
+						goto5 = true
+			if not goto5:
+				var d3 := Pm98Trig.planar_mag(
+					Pm98Trig._i32(gxo - _si(p, 4)), Pm98Trig._i32(0 - _si(p, 8)))
+				if d3 < 0x1c0000 and _lane_clearance(p, foreign, goalv, 0x20000) > 0x1ffff:
+					var role := _g(p, 0x2c8)
+					var thr5 := 0x14 if (role == 9 or role == 0xc or role == 0xe) else 5
+					if _rscale15(rng.next(), 1000) < thr5:
+						goto5 = true
+		if goto5:
+			p[0x13c] = 5
+		if _g(p, 0x13c) == 5:
+			var thresh := Pm98Trig._tdiv((_si(p, 0x3a0) + _si(p, 0x388)) * 0x238e, 200) + 0x38e
+			var gx5 := goal_target_x(_g(m, 0x19a0), _si(m, 0x1820), 1 - _g(p, 0x2b8))
+			steer_89c0(p, [gx5, 0, 0], 0x5a)
+			var hd := absi(_aac00(p, [gx5, 0, 0]))
+			if _rscale15(rng.next(), 1000) < Pm98Trig._tdiv((thresh - hd) * 1000, thresh):
+				_arm2_active_tail(p, 0, rng)
+				p[0x13c] = 0
+				p[0x140] = 0
+			done = true
+		else:
+			if _unmark_2b70(p, rng) != 0 or _pushup_3060(p, rng) != 0:
+				done = true
+			elif absi(Pm98Trig._i32(_si(p, 4) - _si(p, 0x3a4))) > 0x1a0000 and _metric_1c60(p) > 0x90000:
+				var role2 := _g(p, 0x2c8)
+				var basec := 100 if (role2 == 9 or role2 == 0xc or role2 == 0xe) else 200
+				var thrA := (500 + basec) if _metric_1c60(p) < 0x140001 else (200 + basec)
+				if _rscale15(rng.next(), 1000) < thrA \
+					and _rscale15(rng.next(), 1000) < (0x7d - _g(gs, 0x304)) * 8:
+					var thrB := 800 if (role2 == 2 or role2 == 3 or role2 == 7 or role2 == 0xb) else 400
+					if _rscale15(rng.next(), 1000) < thrB:
+						# the LONG-BALL receiver scan (decompile L282-459, asm 0x5b23a0-0x5b2660).
+						var best_q: Variant = null
+						var best_r := 0
+						var best_t := [0, 0, 0]
+						var foreign2: Array = _roster(p, 0x188)
+						var p_own := _metric_1c40(p)
+						for q0 in _roster(p, 0x184):
+							if not (q0 is Dictionary):
+								continue
+							var q: Dictionary = q0
+							if _g(q, 0x2bc) == 0 or is_same(q, p):
+								continue
+							var q_up: int
+							if _g(p, 0x2b8) == _g(q, 0x2b8):
+								q_up = _metric_1c40(q)
+							else:
+								q_up = _metric_1c60(q)
+							var candidate := p_own < q_up
+							if not candidate and absi(_si(q, 8)) < absi(_si(p, 8)):
+								candidate = Pm98Trig._i32(_metric_1c60(q) - 0xc0000) < _metric_1c60(p)
+							if not candidate:
+								continue
+							var dq := _si(p, _dist_off(_g(q, 0x2c4), _g(q, 0x2b8)))
+							if dq <= 0x90000 or dq >= 0x2d0000:
+								continue
+							if _g(q, 0x2d8) != 0 and _rscale15(rng.next(), 1000) >= 200:
+								continue
+							var gxm := _si(m, 0x1820)
+							if (_g(m, 0x19a0) & 1) == 1 - _g(p, 0x2b8):
+								gxm = Pm98Trig._i32(-gxm)
+							var angq := Pm98Trig.atan_angle(
+								Pm98Trig._i32(gxm - _si(q, 4)), Pm98Trig._i32(0 - _si(q, 8)))
+							var side := 0x8000 if (_g(m, 0x19a0) & 1) != _g(p, 0x2b8) else 0
+							var blended := Pm98Trig._i32(angq + Pm98Trig._tdiv(Pm98Trig._s16(side - angq), 2))
+							var pvq: Array = Pm98Trig.polar_vec(Pm98Trig._tdiv(dq, 5), blended)
+							var spot := [
+								_clamp_i(Pm98Trig._i32(_si(p, 4) + int(pvq[0])), _si(m, 0x1828), _si(m, 0x1834)),
+								_clamp_i(Pm98Trig._i32(_si(p, 8) + int(pvq[1])), _si(m, 0x182c), _si(m, 0x1838)),
+								_clamp_i(Pm98Trig._i32(_si(p, 0xc) + int(pvq[2])), _si(m, 0x1830), _si(m, 0x183c))]
+							var aim_rel := Pm98Trig._s16(Pm98Trig.atan_angle(
+								Pm98Trig._i32(int(spot[0]) - _si(p, 4)),
+								Pm98Trig._i32(int(spot[1]) - _si(p, 8))) - Pm98Trig._s16(_g(p, 0x34)))
+							var radius := 0x3e80000
+							for r0 in foreign2:
+								if not (r0 is Dictionary):
+									continue
+								var r: Dictionary = r0
+								var ri := _g(r, 0x2c4) + _g(r, 0x2b8) * 0xb
+								if _si(p, 0xe4 + ri * 4) < 0x60000 \
+									and absi(Pm98Trig._s16(Pm98Trig._s16(_g(p, 0xb8 + ri * 2)) - aim_rel)) < 0xe3a:
+									radius = 0
+									break
+								if absi(Pm98Trig._i32(_si(r, 4) - int(spot[0]))) < radius \
+									and absi(Pm98Trig._i32(_si(r, 8) - int(spot[1]))) < radius \
+									and absi(Pm98Trig._i32(_si(r, 0xc) - int(spot[2]))) < radius:
+									var mag_r := Pm98Trig.planar_mag(
+										Pm98Trig._i32(int(spot[0]) - _si(r, 4)),
+										Pm98Trig._i32(int(spot[1]) - _si(r, 8)))
+									if mag_r <= radius:
+										radius = mag_r
+									if radius < 0x70000:
+										break
+							if radius > best_r:
+								best_r = radius
+								best_q = q
+								best_t = spot
+						if best_q is Dictionary and best_r > 0x90000:
+							var bq: Dictionary = best_q
+							if _si(p, 0x180) < _si(bq, 0x17c):
+								var att_box: bool = _ps_goalbox(p, best_t) \
+									and _sign1(int(best_t[0])) != _sign1(_si(p, 0x3a4))
+								if att_box or _si(p, 0x180) < 0xa0000:
+									var arg := 1 if _rscale15(rng.next(), 1000) < Pm98Trig._tdiv(_metric_1c60(bq), 0x28f) else 0
+									_pass_via_3a10(p, bq, 1, arg)
+									done = true
+		if not done and _si(p, 0x180) < 0x20000:
+			if _rscale15(rng.next(), 1000) < (100 - _si(p, 0x398)) * 5 \
+				and _loose_chance(p, 500, 0x2ee, 100, rng):
+				var mate: Variant = loose_ball_search(p, 0, rng)
+				if mate is Dictionary:
+					_pass_via_3a10(p, mate, 0, 0)
+					done = true
+	if done:
+		return 1
+	if _g(p, 0x13c) == 1:
+		_dart_2f30(p, rng)
+	match _g(p, 0x2c8):
+		2, 3, 7, 8, 11, 18:
+			return _role_leaf_41c0(p, rng)
+		4:
+			return _role_leaf_4f70(p, rng)
+		5, 6:
+			return _role_leaf_3d00(p, rng)
+		9, 12, 14:
+			return _role_leaf_3e50(p, rng)
+		10, 15:
+			return _role_leaf_5520(p, rng)
+		13, 16, 17:
+			return _role_leaf_5150(p, rng)
+	return 0
 
 
 static var aafd0_trace: Array = []

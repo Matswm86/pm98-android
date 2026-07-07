@@ -51,8 +51,10 @@ EOF
     # _ftol thunk (membts @0x252000, ptr @0x6233a4) -- the steering trio + atan reach FPU helpers.
     echo "membts 0x00252000 83EC08D93C248B042480CC0C6689442404D96C2404DB542404D92C248B44240483C408C3"
     printf 'mem 0x%08x 4 0x%08x\n' 0x6233a4 0x252000
-    echo "stub 0x5b1500 1 0 B1500"
-    echo "stub 0x5b1c80 1 0 B1C80"
+    # s15: b1500/b1c80 UN-STUBBED (ports live) -- the real fns run in-image. MulDiv
+    # surrogate for their mark-follow/4a80 paths (IAT import uncallable in-emu).
+    echo "membts 0x00252100 538B4C241085C97509B8FFFFFFFF5BC20C008B4424087904F7D8F7D9F76C240C8BD9D1FB85D279072BC383DA00EB0503C383D200F7F95BC20C00"
+    printf 'mem 0x%08x 4 0x%08x\n' 0x623064 0x252100
     echo "stub 0x605ff0 0 0 atexit"
     printf '%s\n' "$2"
     for r in \

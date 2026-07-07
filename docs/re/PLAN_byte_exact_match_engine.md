@@ -119,7 +119,32 @@ deprioritised (last). Approved path: build an **end-to-end oracle**, kill-test t
    H1 7966 / H2 7246 frames, phases {2:92, 0:14400, 8:720}, 0-0, final rng 276518391** —
    deterministic (2 identical runs). Known edge: posFine-18 XIs (114 clubs, not MU/LIV)
    index the role table past its zeroed 0x24 block — the binary overruns there too.
-   **Remaining for M3 CLOSE:** port the kickoff-taker decision.
+   **Remaining for M3 CLOSE:** ~~port the kickoff-taker decision~~ **DONE — CORRECTION
+   (2026-07-07, s15): the "kickoff-taker decision" framing was STALE.** FUN_005a7260 and
+   the 65a0 kickoff-taker slice (aa4d0/aa680) were already ported (s10-s12); the
+   kickoff-exit-rootcause handoff (06-24) had falsified "port 7260 to leave phase 2"
+   before the plan was written. The REAL 0-0 blocker was s12's deferred item: b1420's
+   **FUN_005b1500/FUN_005b1c80 role sub-leaves stubbed ret 1**, which ended FUN_005a65a0
+   at L129-136 for every off-ball player — the team never moved in open play, so nobody
+   ever re-reached a shooting state after the kickoff kick.
+   **3c. OFF-BALL FORMATION MOVEMENT PORTED (2026-07-07, s15).** FUN_005b1500 (opponent-
+   possession mover: keeper-hold anchor, mark-follow shadow/press/tackle, the b0040
+   receiver handoff, the role-4 FUN_005b4a80 striker press — jump table @0x5b1bf4: role 4
+   is the ONLY live leaf, all others ret 0 via the FUN_005b41b0 thunk chains) +
+   FUN_005b1c80 (own-possession: the state-6 drop-back-onside, the state-5 goal burst +
+   AA870 release, the 2b70 unmark run, the 3060 push-up, the LONG-BALL receiver scan, the
+   role-leaf switch @0x5b2ae0 → 41c0/4f70/3d00/3e50/5520/5150) + helpers (3b20 anchor,
+   2f30 dart, 3a10 pass-lane, 35c0 cross pick, 4820 run target, 3c90/1c40/1c60). Wired
+   through formation_gate_b1420(wire, rng) → 65a0 L138 fall-through live. ALSO fixed the
+   latent p+0x188 shape bug (live = the opponent team-ctx Dict, fixtures = a bare Array;
+   loose_ball_search/resolve_post_shot/feed handlers read it as Array → first live pass
+   would have crashed; now `_roster()`-tolerant). **e2e (seed 1, MU vs LIV): FULL TIME
+   code 10 at frame 16384, minute 95 (clock banked 8001+7200), phases {2:104, 0:15201,
+   8:1079}, dispatch {6:359, 1:719, 10:1}, final rng 3169177747 — and the score is
+   **1-0**: the first ORGANIC GOAL from the recovered engine on real squads,
+   deterministic across 2 runs.** Oracle: tools/re/run_b1500family_oracle.sh (REAL
+   0x5b1500/0x5b1c80 under PcodeEmu, NO stubs) → specs/b1500family_oracle.txt →
+   app/tests/test_b1500family.gd.
 4. **M4 — End-to-end ORACLE (the kill-test).** Two candidate oracles (pick the cheaper that works):
    - **(a) full PCode-emu** of `FUN_005983f0`'s whole match with all leaves REAL (no stubs), same
      seed + same initial struct, dumping scoreline + the 16-byte event queue. Reuses `PcodeEmu.java`;
