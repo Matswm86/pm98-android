@@ -125,20 +125,25 @@ func _test_b8ce0() -> void:
 # --- AA870 = _arm2_active_tail(p, 0, rng) ---------------------------------------------------------
 # Open play (phase 0), action 0x1e (passes the tail guards + the leaf's 0x13/0x1d guard), p IS the ball
 # controller (ball+0x40 == p, so the leaf's istack==0 carrier guard holds), gs+0x214 clear (AA4D0 gate
-# fails) and gs+0x215 set -> tail dispatches AA870. Branch-2 windup is skipped (action 0x1e not in 0..3),
-# so settle draws NO rng before the tail and writes nothing to p ahead of the leaf -- the wired p/ball
-# mutation must equal a DIRECT _arm2_active_tail(p, 0, rng) on an identical fixture + same seed.
+# fails) and gs+0x215 set -> tail dispatches AA870. Branch-2 windup is skipped (action 0x1e not in 0..3).
+# s15: b1420's b1500/b1c80 sub-leaves run REAL now, and this carrier fixture would enter the b1c80
+# decision chain (extra rng draws + steer writes BEFORE the tail -- exactly what the binary does too),
+# which breaks the wire==direct-leaf equivalence this test is built on. The fixture therefore takes
+# b1420's FREEZE path (gs+0x2ee set + sub-phase 0 + p+0x5c lock -- a real binary path: b1420 returns 1
+# before any leaf, draws nothing, writes nothing), so settle still reaches the tail with a virgin rng
+# and the wired p/ball mutation must equal a DIRECT _arm2_active_tail(p, 0, rng) on an identical
+# fixture + same seed. Both fixtures carry the same 0x5c/0x2ee, so the comparison stays symmetric.
 func _aa870_fixture() -> Array:
 	var ctx := {0x2b8: 0, 0x2c4: 0}                        # ctx slot/team 0 -> sVar11 = p[0xb8] (unset = 0)
 	var team_struct := {0: ctx}
 	var M := {0x448: 0, 0x1820: 0x100000, 0x19a0: 0}       # phase 0 (open play), goal-X scale, orient bit
-	var GS := {0x214: 0, 0x215: 1}                         # AA4D0 gate fails (0x214 clear); AA870 gate set
+	var GS := {0x214: 0, 0x215: 1, 0x2ee: 1}               # AA4D0 gate fails; AA870 gate set; b1420 freeze
 	var BALL := {0x20: 0x6000, 0x24: 0x1000, 0x28: -0x400, 0x4: 0x10000, 0x8: 0x8000, 0xc: -0x2000}
 	var P := {
 		0x40: 0x1e, 0x2b8: 0,
 		0x4: 0, 0x8: 0, 0xc: 0,
 		0x20: 0x4000, 0x24: -0x2000, 0x28: 0x800,
-		0x34: 0x800, 0x3a0: 40, 0x2bc: 1,
+		0x34: 0x800, 0x3a0: 40, 0x2bc: 1, 0x5c: 1,
 		0x18c: M, 0x190: BALL, 0x184: GS, 0x188: team_struct}
 	BALL[0x40] = P                                          # p IS the ball controller
 	return [P, BALL]

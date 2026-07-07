@@ -5653,13 +5653,17 @@ static func formation_gate_b1420(p: Dictionary, wire: bool = false, rng = null) 
 
 
 ## Accept both roster shapes: the live team-ctx Dict (key 0 = the players Array, the
-## binary's descriptor base) and the bare-Array fixture shape older oracles poke.
+## binary's descriptor base) and the bare-Array fixture shape older oracles poke. A
+## descriptor whose base is a SINGLE player Dict (e.g. test_settlewire's matrix-identity
+## fixture) iterates as EMPTY -- the binary's count lives at [1]/[0x4], and such fixtures
+## carry none, so count-0 is the faithful read.
 static func _roster(p: Dictionary, off: int) -> Array:
 	var v: Variant = p.get(off, null)
 	if v is Array:
 		return v
 	if v is Dictionary:
-		return (v as Dictionary).get(0, [])
+		var base: Variant = (v as Dictionary).get(0, [])
+		return base if base is Array else []
 	return []
 
 
