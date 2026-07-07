@@ -1,0 +1,6 @@
+# DECIDE slice-C CASE 2 (kickoff) NON-TAKER PCode-emu ground truth. phase=2, non-taker.
+# xscale=3768320 yscale=2359296 orient=0 team0 on-pitch. mv=+0x4/8/c ep1=+0x1e0/4/8.
+FIX slot8_real CALL 0 RET steps=572 EAX=13046 mem[0x230004:4]=4294765844 mem[0x230008:4]=4294359600 mem[0x23000c:4]=0 mem[0x2301e0:4]=4294765844 mem[0x2301e4:4]=4294359600 mem[0x2301e8:4]=0 mem[0x230040:4]=0 stubhits={0x5bbf10=2}
+FIX probe_xlo CALL 0 RET steps=560 EAX=1667 mem[0x230004:4]=4291198976 mem[0x230008:4]=4294359600 mem[0x23000c:4]=0 mem[0x2301e0:4]=4285967296 mem[0x2301e4:4]=4294359600 mem[0x2301e8:4]=0 mem[0x230040:4]=0 stubhits={0x5bbf10=2}
+FIX probe_xhi CALL 0 RET steps=574 EAX=16384 mem[0x230004:4]=0 mem[0x230008:4]=4294359600 mem[0x23000c:4]=0 mem[0x2301e0:4]=9000000 mem[0x2301e4:4]=4294359600 mem[0x2301e8:4]=0 mem[0x230040:4]=0 stubhits={0x5bbf10=2}
+FIX probe_yhi CALL 0 RET steps=573 EAX=4294951799 mem[0x230004:4]=4294765844 mem[0x230008:4]=2359296 mem[0x23000c:4]=0 mem[0x2301e0:4]=4294765844 mem[0x2301e4:4]=9000000 mem[0x2301e8:4]=0 mem[0x230040:4]=0 stubhits={0x5bbf10=2}

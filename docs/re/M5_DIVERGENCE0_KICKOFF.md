@@ -1,9 +1,52 @@
 # M5 Divergence #0 — the KICKOFF is wrong from tick 1 (2026-07-08)
 
+**RESOLVED 2026-07-08 (s26). Root cause + bit-exact fix at the bottom of this file.**
+
 **This supersedes the framing of div#1/#2/#3.** With a real per-tick ball reference for the
 correct seed (`0xea0d2a8d`) now in hand, the port is shown to diverge at the **kickoff itself**
 — every previously-chased divergence (trajbuf phantom goal, phase-6 stall, loose-ball freeze)
 was a downstream symptom of a broken opening kick.
+
+## RESOLUTION (s26) — the receiver was never stood in the centre circle
+
+Two corrections to the framing below first:
+- `(-19393,-47335)` at clk 12 is the **ball**, not slot-8. slot-8's own position at clk 12 is
+  `(-21415,-80668)` (from the reference carrier fields).
+- The **taker** (slot-9) placement was already **perfect** — port `(-26214,-39)` == real
+  `(-26214,-39)`. Only the **receiver** (slot-8) was mis-placed.
+
+**Neither "formation spread" nor "kick power" — the receiver placement.** The kickoff receiver
+must be stood in the **centre circle beside the taker**; the port left it at its DECIDE formation
+slot `(-201452,-607696)` (~9.3 units out), so `kick_setup` aimed the pass there and the opening
+kick came out ~2.5× too hard.
+
+Evidence chain (invent-nothing):
+1. PCode oracle (`tools/re/run_decideC2_oracle.sh` -> `specs/decideC2_oracle.txt`): the REAL
+   `FUN_005a3400` DECIDE case-2 non-taker places slot-8 at exactly `(-201452,-607696)` — the port
+   was already faithful there. So DECIDE is NOT the bug.
+2. Live wine capture (all-22-player poller `tools/re/wine/m5_poll_kickoff.py`): in a real match
+   the kicking team's **receiver stands at the centre circle** — Bolton run: taker slot-10 at
+   `(26214,40)`, receiver slot-9 at `(26214,98304)`; kick `|v|`≈4770 (a soft tap). Its formation
+   startA was `(-722854,-822178)`, ~16.8 units out, so it was **moved** there, not clamped.
+3. The mover = **`FUN_005b70e0`** (the restart DECIDE dispatcher), whose kickoff tail
+   (disasm 0x5b7147..0x5b71dc) finds the nearest on-pitch non-taker teammate to the restart spot
+   and teleports it to `x=±0x6666, y=±0x18000` beside the taker, chase-flag `+0x63=1`. **This tail
+   was never ported** (flagged TODO at `Pm98Driver.gd` restart_handler).
+
+**Fix:** `Pm98Movement.kickoff_partner_placement()` ports the tail; `Pm98Driver.restart_handler`
+now calls it per team after `_decide_team` (fires only for the kicking team, `match+0x45c`).
+
+**Verification (bit-exact vs the correct-seed reference):** `diag_m5_kickplace.gd` now places the
+receiver slot-8 at `(-26214,-98304)` and the kickoff ball velocity is `(-1251,-4777)` / ball
+`(-1260,-4810)` — **identical to the real game**. The ball trajectory then matches the reference
+**clk 0..11 exactly**; the first persistent divergence moved from the old clk ~601 to **clk 12**
+(the receiver's post-collection dribble — a separate open-play issue: ball goes +x vs ref -x,
+implicating the `+0x63` chase-flag / `_active_chase_return` path this fix newly exposed). No
+regressions (decideC 70 / decideCtaker 54 / 65a0openplay 760 all PASS).
+
+---
+
+## Original diagnosis (kept for the record)
 
 ## The reference (finally correct-seed)
 

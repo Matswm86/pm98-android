@@ -783,10 +783,13 @@ static func restart_handler(m: Dictionary, rng: MatchEngine.Pm98Rng) -> void:
 	# per player) + the phase-2 kickoff-partner placement tail. The old framing wrongly dismissed
 	# FUN_005b70e0 as a "render, SKIP" pass (it is vtable+4 = render only under the off-by-4 base).
 	# This decide pass is what assigns the kickoff taker its action + windup (decide_slice case 2).
-	# TODO(next): port FUN_005b70e0's kickoff-partner placement tail (nearest-teammate +0x63=1).
-	for ctx in [ctx0, _sim_ctx(m, 1)]:
+	# Each FUN_005b70e0(team) = _decide_team(team) THEN kickoff_partner_placement(team) -- the tail
+	# fires only for the kicking team (match+0x45c) and stands the receiver in the centre circle.
+	for ti in 2:
+		var ctx := ctx0 if ti == 0 else _sim_ctx(m, 1)
 		if not ctx.is_empty():
 			_decide_team(ctx, m)
+			Pm98Movement.kickoff_partner_placement(ctx, m, ti)
 	_position_both(m, rng)                            # FUN_005b73a0 x2 (set-piece -> draws)
 	# L172-174: sub-entity vt+4 -- keeper restart decide x2 (FUN_005a2140: park each keeper
 	# at its goal, position code 0x42) + the referee FUN_005b5790 (outcome-irrelevant, SKIP;

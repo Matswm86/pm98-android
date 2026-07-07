@@ -2910,6 +2910,68 @@ static func decide_slice_c(p: Dictionary, m: Dictionary) -> void:
 	_slice_c_tail(p)
 
 
+## FUN_005b70e0 kickoff-partner placement tail (disasm 0x5b7147..0x5b71dc) -- the piece the M5
+## kickoff needed (Pm98Driver restart TODO). FUN_005b70e0 = the restart DECIDE dispatcher: it runs
+## DECIDE (player vtable+4 = FUN_005a3400) for every player of ONE team (ported as _decide_team),
+## then -- ONLY when this is the KICKING team at kickoff (DAT_006d31c4==0 && match+0x448==2 &&
+## match+0x45c==team) -- stands the kickoff PARTNER (the receiver) in the centre circle beside the
+## taker. Without this the partner keeps its DECIDE formation slot (~9-16 units out), so the taker's
+## kick_setup aims there and the opening kick is ~2.5x too hard -- the M5 divergence #0 (a long over-
+## hit pass instead of a soft tap into the circle), which cascaded into div#1/#2/#3.
+##
+## The partner = the nearest ON-PITCH non-taker teammate to the restart spot (match+0x16a0/4/8). It
+## is teleported to x = (team != orient&1 ? 0xcccc : 0) - 0x6666  (i.e. +/-0x6666 by side), y =
+## (post-DECIDE y < 0 ? 0 : 0x30000) - 0x18000  (i.e. +/-0x18000, sign OPPOSITE its DECIDE y), z
+## untouched; chase flag +0x63 = 1; faces the spot (+0x34/+0x64). The taker (match+0x438 == team
+## active +0x168) is then re-faced toward the spot (+0x34/+0x64) and +0x34 alone is blended halfway
+## toward its goal-line aim. Verified: reference (Villa team0 kicks) -> receiver (-0x6666,-0x18000)
+## == (-26214,-98304); live wine capture (Bolton team1 kicks) -> (+0x6666,+0x18000) == (26214,98304).
+## Oracle source: docs/re/move/fn_005b70e0_FUN_005b70e0.c.
+static func kickoff_partner_placement(ctx: Dictionary, m: Dictionary, team_idx: int) -> void:
+	if _g(m, 0x448) != 2 or _g(m, 0x45c) != team_idx:        # L32-33 gate (DAT_006d31c4==0 live)
+		return
+	var taker: Dictionary = _ref(m, 0x438)
+	var rx := _si(m, 0x16a0); var ry := _si(m, 0x16a4); var rz := _si(m, 0x16a8)   # restart spot
+	# L34-68: nearest ON-PITCH non-taker teammate to the spot (bbox prefilter shrinks with the best).
+	var best_d := 0x27100000
+	var best: Dictionary = {}
+	for q in ctx.get("players", []):
+		if not (q is Dictionary) or is_same(q, taker):        # skip the taker (L39)
+			continue
+		if _g(q, 0x2bc) == 0:                                 # off-pitch (piVar9[0xad] == 0) -> skip
+			continue
+		var dx := Pm98Trig._i32(_si(q, 4) - rx)
+		var dy := Pm98Trig._i32(_si(q, 8) - ry)
+		var dz := Pm98Trig._i32(_si(q, 0xc) - rz)
+		if absi(dx) < best_d and absi(dy) < best_d and absi(dz) < best_d:
+			var d := Pm98Trig.planar_mag(dx, dy)              # FUN_005b1260 (planar cos/sin-LUT mag)
+			if d < best_d:
+				best_d = d
+				best = q
+	if best.is_empty():
+		return
+	var orient := _g(m, 0x19a0)
+	best[0x63] = 1                                            # L71 chase flag
+	best[0x4] = Pm98Trig._i32((0xcccc if _g(best, 0x2b8) != (orient & 1) else 0) - 0x6666)   # L72-74
+	best[0x8] = Pm98Trig._i32((0 if _si(best, 8) < 0 else 0x30000) - 0x18000)                # L75
+	# z (+0xc) is NOT written by the binary -> keep the DECIDE z.
+	var rface := Pm98Trig.atan_angle(Pm98Trig._i32(rx - _si(best, 4)), Pm98Trig._i32(ry - _si(best, 8))) & 0xffff
+	best[0x34] = rface                                        # L76-79 receiver faces the spot
+	best[0x64] = rface
+	if taker.is_empty():
+		return
+	var tface := Pm98Trig.atan_angle(Pm98Trig._i32(rx - _si(taker, 4)), Pm98Trig._i32(ry - _si(taker, 8))) & 0xffff
+	taker[0x34] = tface                                       # L80-84 taker faces the spot
+	taker[0x64] = tface
+	var goalx := _si(m, 0x1820)                               # L85-90 goal-line aim
+	if (1 - _g(taker, 0x2b8)) == (orient & 1):
+		goalx = Pm98Trig._i32(-goalx)
+	var tgoal := Pm98Trig.atan_angle(Pm98Trig._i32(goalx - _si(taker, 4)), Pm98Trig._i32(-_si(taker, 8)))
+	# L91-93: +0x34 ONLY, blended halfway (trunc-toward-zero) toward the goal aim; +0x64 keeps tface.
+	var cur := Pm98Trig._s16(taker[0x34])
+	taker[0x34] = (Pm98Trig._s16(cur + Pm98Trig._tdiv(Pm98Trig._s16(tgoal - cur), 2))) & 0xffff
+
+
 # ---- FUN_005a3400 ELSE-REPLAY branch (DAT_006d31c4 != 0) ------------------------------
 # The non-real-compute path (disasm 0x5a368c..0x5a374c). When the global replay flag
 # DAT_006d31c4 is set, the per-player DECIDE does NOT recompute a move target: it RESTORES the
