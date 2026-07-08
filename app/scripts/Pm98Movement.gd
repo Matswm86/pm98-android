@@ -1590,11 +1590,15 @@ static func _b0040_target(p: Dictionary) -> Array:
 				Pm98Trig._i32(int(point[2]) + int(fp[2]))]
 
 	# --- clamp per-axis into the pitch box m+0x1828 (lo +0x1828..30, hi +0x1834..3c) ---
+	# The bounds are SIGNED int32 (decompile `*(int*)`); the lo bounds are negative, so they MUST be
+	# sign-extended (_si). Reading them via the raw _g leaves e.g. -3768320 as unsigned 0xffc40000, which
+	# makes _clamp_i's max(lo, v) swallow every point up to the +x/+y corner (the M5 clk-12 kickoff-
+	# receiver "runs to the corner" divergence).
 	var m: Dictionary = _ref(p, 0x18c)
 	return [
-		_clamp_i(int(point[0]), _g(m, 0x1828), _g(m, 0x1834)),
-		_clamp_i(int(point[1]), _g(m, 0x182c), _g(m, 0x1838)),
-		_clamp_i(int(point[2]), _g(m, 0x1830), _g(m, 0x183c)),
+		_clamp_i(int(point[0]), _si(m, 0x1828), _si(m, 0x1834)),
+		_clamp_i(int(point[1]), _si(m, 0x182c), _si(m, 0x1838)),
+		_clamp_i(int(point[2]), _si(m, 0x1830), _si(m, 0x183c)),
 	]
 
 
