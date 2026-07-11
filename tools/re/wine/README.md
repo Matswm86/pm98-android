@@ -46,6 +46,7 @@ Render + synthetic clicks REQUIRE a wine virtual desktop with the FULL windows p
 | `m4_poll.py`        | poll the match struct -> JSONL timeline (writes on change) |
 | `m4_seedtrace.py`   | per-frame seed/clock trace via a winedbg breakpoint on 0x5983f0 |
 | `autoresume.py`     | click KICK OFF at each WATCH segment pause until FULL TIME (KICK OFF button ONLY) |
+| `m5_gdbrsp_watch.py`| HW write-watchpoint via `winedbg --gdb` + raw RSP (Z2/vCont;c); names position writers (s32) |
 
 ## Reproduce the capture
 
@@ -92,3 +93,10 @@ Render + synthetic clicks REQUIRE a wine virtual desktop with the FULL windows p
 - **The `+0x19a0` half flag stays 0 for most of the match and only flips to 1 late**
   (seen at ~74' this run); it is NOT a reliable H1/H2 gate for the poller. `+0x450` is the
   continuous match clock (0..14400 = 0..90'); full time is `+0x1a38 == 10`.
+- **Hardware watchpoints (2026-07-11, s32):** interactive winedbg `watch` is UNUSABLE on this
+  no-debug-info target (`watch *0x<addr>` → "No type or type mismatch"; `(int*)` casts fail
+  silently). Use `winedbg --gdb --no-start --port N 0xWPID` + `m5_gdbrsp_watch.py` (raw RSP:
+  Z2 watchpoint, `vCont;c`, EIP from the T05 expedited registers). Gotchas: plain `c` resumes
+  ONE thread only (game stays frozen — check utime advances before clicking); the stub accepts
+  exactly ONE connection; killing the stub (even SIGTERM) KILLS the game; attaching while
+  another winedbg probe runs (`wdbg_pid.sh`) fails with error 87 — retry after it exits.

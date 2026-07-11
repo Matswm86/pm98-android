@@ -6695,7 +6695,16 @@ static func offball_opp_b1500(p: Dictionary, rng) -> int:
 				return 1
 	if _g(p, 0x2c8) == 4:
 		return _role_leaf_4a80(p, rng)
-	steer_89c0(p, _clamp_roam(p, _anchor_3b20(p)), 0x5a)
+	# asm 0x5b1aa4-0x5b1b06: the steer target is clamp_roam(MIDPOINT(ball pos, 3b20 anchor))
+	# per component with the cdq/sub/sar truncating /2 -- NOT the raw anchor. At kickoff the
+	# anchor == own pos, so only the far midpoint lets 8f20's +0x106 speed ramp walk the
+	# unmarked off-ball players from clk 0 (the s31 t1-freeze root; live-proven by the s32
+	# hardware write-watch: mover chain b1500@0x5b1b06 -> 89c0 -> 8bc0 -> 8f20 integrate).
+	var a3: Array = _anchor_3b20(p)
+	steer_89c0(p, _clamp_roam(p, [
+		Pm98Trig._tdiv(Pm98Trig._i32(_g(ctrl, 4) + int(a3[0])), 2),
+		Pm98Trig._tdiv(Pm98Trig._i32(_g(ctrl, 8) + int(a3[1])), 2),
+		Pm98Trig._tdiv(Pm98Trig._i32(_g(ctrl, 0xc) + int(a3[2])), 2)]), 0x5a)
 	return 1
 
 
