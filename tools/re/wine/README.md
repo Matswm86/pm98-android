@@ -47,6 +47,7 @@ Render + synthetic clicks REQUIRE a wine virtual desktop with the FULL windows p
 | `m4_seedtrace.py`   | per-frame seed/clock trace via a winedbg breakpoint on 0x5983f0 |
 | `autoresume.py`     | click KICK OFF at each WATCH segment pause until FULL TIME (KICK OFF button ONLY) |
 | `m5_gdbrsp_watch.py`| HW write-watchpoint via `winedbg --gdb` + raw RSP (Z2/vCont;c); names position writers (s32) |
+| `m5_gdbrsp_seedwatch.py`| Z2 on the LCG seed 0x006d3184: one stop per RNG draw, `ret0`=[esp] names the drawing call-site (s33) |
 
 ## Reproduce the capture
 
@@ -100,3 +101,8 @@ Render + synthetic clicks REQUIRE a wine virtual desktop with the FULL windows p
   ONE thread only (game stays frozen — check utime advances before clicking); the stub accepts
   exactly ONE connection; killing the stub (even SIGTERM) KILLS the game; attaching while
   another winedbg probe runs (`wdbg_pid.sh`) fails with error 87 — retry after it exits.
+- **wine's Z2 fires on ACCESS, not just write** (s33): each rand() call stops TWICE — the
+  entry LOAD (eip 0x5ec255, seed unchanged) then the post-store trap (eip 0x5ec271 = the
+  draw). Filter on the store eip; `[esp]` at that stop is the drawing call-site (no frame).
+  Detach after `done` may still kill the game ("stub closed") — capture first, game is
+  expendable after.
