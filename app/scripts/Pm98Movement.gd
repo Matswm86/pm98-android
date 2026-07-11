@@ -5909,8 +5909,9 @@ static func formation_gate_b1420(p: Dictionary, wire: bool = false, rng = null) 
 			freeze = _settle_b(p, 0x5c)
 	if freeze:
 		return 1
-	# Exactly one positioning leaf (the disasm's mutually-exclusive arms).
-	if is_same(gs.get(0x204, null), p) and (carrier == null or carrier == 0):
+	# Exactly one positioning leaf (the disasm's mutually-exclusive arms). ball+0x40 == 0 is a
+	# POINTER null test: the port stores a Dict ref (engaged) or int 0/null — never int-compare a Dict.
+	if is_same(_desig(gs, 0x204), p) and not (carrier is Dictionary):
 		b1420_trace.append(["B0040", 0])                     # FUN_005b0040 (interception/mark; PORTED)
 		if wire:
 			_move_b0040(p)
@@ -5965,6 +5966,23 @@ static func _roster(p: Dictionary, off: int) -> Array:
 		var base: Variant = (v as Dictionary).get(0, [])
 		return base if base is Array else []
 	return []
+
+
+## Resolve a team-ctx role slot (+0x1fc/+0x200/+0x204, _select_roles) to the player Dict.
+## The binary stores PLAYER POINTERS there; the port's index model (-1/absent = none) must be
+## resolved through the ctx roster before any `p == *(gs+off)` pointer compare — an is_same
+## against the raw int is NEVER true (the s30 clk-9 extra-draw root cause: the b1420 B0040
+## designated-interceptor route was dead code, so Bolton t1.i8 pressed at clk 9 instead).
+static func _desig(gs: Dictionary, off: int) -> Variant:
+	var v: Variant = gs.get(off, null)
+	if v is Dictionary:
+		return v                                        # oracle fixtures may poke a Dict directly
+	if not (v is int) or int(v) < 0:
+		return null
+	var players: Variant = gs.get("players", gs.get(0, null))
+	if players is Array and int(v) < (players as Array).size():
+		return (players as Array)[int(v)]
+	return null
 
 
 ## FUN_005b1c40 / FUN_005b1c60 (__thiscall q; null -> 0xc80000): |q.x - q+0x3a4| = the
@@ -6575,7 +6593,7 @@ static func _role_leaf_4a80(p: Dictionary, rng) -> int:
 				Pm98Trig._tdiv(int(target[1]) + int(a[1]), 4),
 				Pm98Trig._tdiv(int(target[2]) + int(a[2]), 4)])
 	if override:
-		var desig: Variant = gs.get(0x200, null)
+		var desig: Variant = _desig(gs, 0x200)
 		if desig is Dictionary and not is_same(p, desig):
 			target[0] = _si(desig, 4)
 	steer_89c0(p, target, 0x5a)
@@ -6647,7 +6665,7 @@ static func offball_opp_b1500(p: Dictionary, rng) -> int:
 					var z31c := _g(gs, 0x31c)
 					var aggr := 0x14
 					if z31c != 0:
-						var desig_me: bool = is_same(gs.get(0x200, null), p)
+						var desig_me: bool = is_same(_desig(gs, 0x200), p)
 						if z31c == 1:
 							aggr = 400 if desig_me else 100
 						else:
@@ -7427,25 +7445,54 @@ static func _lean9490_slice_c(p: Dictionary, grid: Array, applied: bool, rng) ->
 ## PREDICATE for the B oracles); the difference is fidelity of the returns: gates 1-3 and the ball
 ## guards (L222-227) abort the whole function, while a failed SCAN-ENTRY gate (L229) still falls
 ## through to Slice C with `applied` = false.
+
+# diag_m5_g0chain.gd single-step hook: when lean_trace_on, every _lean9490_offball call appends one
+# record with its at-call inputs + the gate it exited through + the built grid/aim scalars. Zero cost off.
+static var lean_trace: Array = []
+static var lean_trace_on := false
+
+
 static func _lean9490_offball(p: Dictionary, rng) -> void:
 	var ball: Dictionary = _ref(p, 0x190)
+	var rec: Dictionary = {}
+	if lean_trace_on:
+		rec = {"p": p, "pos": [_si(p, 4), _si(p, 8), _si(p, 0xc)], "face": _g(p, 0x34) & 0xffff,
+			"act": _g(p, 0x40), "p54": _g(p, 0x54), "p2bc": _g(p, 0x2bc),
+			"bpos": [_si(ball, 4), _si(ball, 8), _si(ball, 0xc)],
+			"bvel": [_si(ball, 0x20), _si(ball, 0x24), _si(ball, 0x28)],
+			"b40": ball.get(0x40, 0), "b4c": ball.get(0x4c, 0), "b70": _g(ball, 0x70),
+			"b68": _g(ball, 0x68), "b6c": _g(ball, 0x6c),
+			"traj0": [_si(ball, 0x114), _si(ball, 0x118), _si(ball, 0x11c)], "gate": "entry"}
+		lean_trace.append(rec)
 	var carrier = ball.get(0x40, null)
 	if carrier is Dictionary and _g(carrier, 0x2bc) == 0 and _carrier_busy_b0a60(carrier):
+		if lean_trace_on: rec["gate"] = "g1_yield"
 		return                                              # (1) yield to a busy carrier (L121)
 	for ax in 3:                                            # (2) proximity cube (L124-139)
 		if absi(Pm98Trig._i32(_si(p, 4 + ax * 4) - _si(ball, 4 + ax * 4))) >= 0x1e0000:
+			if lean_trace_on: rec["gate"] = "g2_prox"
 			return
 	var action := _g(p, 0x40)                               # (3) action gate (L141-149)
 	if not (action >= 0 and action <= 3) and action != 0xb and action != 0x1c:
+		if lean_trace_on: rec["gate"] = "g3_action"
 		return
 	var sc: Array = _lean9490_aim_scalars(p)                # L189-205 (FUN_00590aa0 goal point folded in)
 	var grid: Array = _grid9490_build(p)                    # L206-220
+	if lean_trace_on:
+		rec["sc"] = sc
+		rec["g0"] = grid[0]
+		rec["g2"] = grid[2]
 	var c40 = ball.get(0x40, 0)                             # L222-227 ball guards: full aborts
 	if c40 is Dictionary or (c40 is int and c40 != 0):
+		if lean_trace_on: rec["gate"] = "g4_carrier"
 		return
 	if _g(ball, 0x70) != 0:
+		if lean_trace_on: rec["gate"] = "g4_anim"
 		return
 	var applied := false                                    # L229 scan-entry gate; fail -> straight to C
 	if action != 0xb and _g(p, 0x54) != 0 and _g(p, 0x2bc) != 0:
 		applied = _lean9490_marker_scan_apply(p, grid, int(sc[0]), int(sc[1]), rng)
+	if lean_trace_on:
+		rec["gate"] = "slice_c"
+		rec["applied"] = applied
 	_lean9490_slice_c(p, grid, applied, rng)
