@@ -129,19 +129,6 @@ func _build_ctx(o: Dictionary) -> Dictionary:
 	var dq1 := Pm98Movement._dist_off(1, 1)  # 0x114 (opp slot 1 = Q1)
 	var blk := {0x40: int(o.blk40)}          # shared controller block (player+0x190)
 	var box := {0x210: 0, 0x214: 0, 0x218: 0, 0x21c: 0x1000000, 0x220: 0x1000000, 0x224: 0x1000000}
-	var p0 := {
-		0x4: int(o.p0x), 0x8: int(o.p0z), 0xc: 0, 0x3a4: int(o.p0anchor),
-		0x2b8: 0, 0x2bc: int(o.p0onp), 0x2c4: 0, 0xb0: int(o.p0tgt), 0x1e0: 0,
-		dq0: int(o.p0q0), dq1: int(o.p0q1),
-		0x13c: int(o.p0_13c), 0x158: int(o.p0_158), 0x178: int(o.p0_178),
-	}
-	p0.merge(box)
-	var p1 := {
-		0x4: int(o.p1x), 0x8: int(o.p1z), 0xc: 0, 0x3a4: int(o.p1anchor),
-		0x2b8: 0, 0x2bc: int(o.p1onp), 0x2c4: 1, 0xb0: int(o.p1tgt), 0x1e0: 0,
-		dq0: int(o.p1q0), dq1: int(o.p1q1),
-	}
-	p1.merge(box)
 	var q0 := {
 		0x4: int(o.q0x), 0x8: int(o.q0z), 0xc: 0, 0x3a4: int(o.q0anchor),
 		0x2b8: 1, 0x2bc: 1, 0x2c4: 0, 0x154: int(o.q0taken), 0x190: blk,
@@ -152,6 +139,24 @@ func _build_ctx(o: Dictionary) -> Dictionary:
 		0x2b8: 1, 0x2bc: 1, 0x2c4: 1, 0x154: int(o.q1taken), 0x190: blk,
 		d0: int(o.q1p0), d1: int(o.q1p1),
 	}
+	# +0xb0 is the binary's current-target POINTER: poke the target Dict (fixture index
+	# 0/1 -> Q0/Q1); int 0 = the binary's NULL = none (fixture -1).
+	var qs := [q0, q1]
+	var p0tgt: Variant = qs[int(o.p0tgt)] if int(o.p0tgt) >= 0 else 0
+	var p1tgt: Variant = qs[int(o.p1tgt)] if int(o.p1tgt) >= 0 else 0
+	var p0 := {
+		0x4: int(o.p0x), 0x8: int(o.p0z), 0xc: 0, 0x3a4: int(o.p0anchor),
+		0x2b8: 0, 0x2bc: int(o.p0onp), 0x2c4: 0, 0xb0: p0tgt, 0x1e0: 0,
+		dq0: int(o.p0q0), dq1: int(o.p0q1),
+		0x13c: int(o.p0_13c), 0x158: int(o.p0_158), 0x178: int(o.p0_178),
+	}
+	p0.merge(box)
+	var p1 := {
+		0x4: int(o.p1x), 0x8: int(o.p1z), 0xc: 0, 0x3a4: int(o.p1anchor),
+		0x2b8: 0, 0x2bc: int(o.p1onp), 0x2c4: 1, 0xb0: p1tgt, 0x1e0: 0,
+		dq0: int(o.p1q0), dq1: int(o.p1q1),
+	}
+	p1.merge(box)
 	var m := {0x78c: [q0, q1], 0x165c: int(o.ball_opp), 0x1664: int(o.poss_cur), 0x1668: int(o.poss_prev), 0x1820: 0}
 	var td := {0x2fc: 0, 0x300: 0, 0x310: 0}
 	return {"players": [p0, p1], 0x8: int(o.team), 0x138: m, "team_desc": td}

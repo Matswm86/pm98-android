@@ -42,8 +42,11 @@ class Pm98Rng extends RefCounted:
 
 	# --- TEMP diagnostic hook (M5 RNG draw-count desync). Gated OFF by default;
 	# diag_m5_rng_callsites.gd flips _log_on to tally per-draw call-sites. Zero cost when off.
+	# _who: the current per-player tick owner (set by Pm98Driver._advance_team when _log_on),
+	# prefixed onto each draw tag so a draw is attributable to the player whose engine_tick drew it.
 	static var _log_on: bool = false
 	static var _draws: Array = []
+	static var _who: String = ""
 
 	func _init(seed_: int) -> void:
 		state = seed_ & 0xFFFFFFFF
@@ -61,7 +64,7 @@ class Pm98Rng extends RefCounted:
 				if str(f0.get("function", "")) == "chance_permil" and st.size() >= 3:
 					var f1: Dictionary = st[2]
 					tag = "%s:%d>chance" % [str(f1.get("source", "")).get_file(), int(f1.get("line", 0))]
-			_draws.append(tag)
+			_draws.append(_who + tag if _who != "" else tag)
 		return (state >> 16) & 0x7FFF
 
 	## PM98's probability idiom `(rand()*1000)>>15 < permil`: true w.p. permil/1000.

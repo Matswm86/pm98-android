@@ -114,14 +114,6 @@ func _build_ctx(o: Dictionary) -> Dictionary:
 	var d1 := Pm98Movement._dist_off(1, 0)   # 0xe8  (our slot 1 = P1)
 	var dq0 := Pm98Movement._dist_off(0, 1)  # 0x110 (opp slot 0 = Q0)
 	var dq1 := Pm98Movement._dist_off(1, 1)  # 0x114 (opp slot 1 = Q1)
-	var p := {
-		0x4: int(o.px), 0x8: 0x40000, 0xc: 0, 0x3a4: int(o.panchor), 0x1e0: int(o.p1e0),
-		0x2b8: 0, 0x2bc: 1, 0x2c4: 0, 0xb0: int(o.tgt),
-		0x210: int(o.bxmin), 0x214: int(o.bymin), 0x218: int(o.bzmin),
-		0x21c: int(o.bxmax), 0x220: int(o.bymax), 0x224: int(o.bzmax),
-		dq0: int(o.pq0), dq1: int(o.pq1),
-	}
-	var p1 := {0x2b8: 0, 0x2bc: 1, 0x2c4: 1, 0x4: 0, 0x8: 0, 0xc: 0, 0x3a4: 0}
 	var q0 := {
 		0x4: int(o.q0x), 0x8: int(o.q0y), 0xc: int(o.q0z), 0x3a4: int(o.q0anchor),
 		0x2b8: 1, 0x2bc: 1, 0x2c4: 0, 0x154: int(o.q0taken), d0: int(o.q0p), d1: int(o.q0p1),
@@ -130,6 +122,21 @@ func _build_ctx(o: Dictionary) -> Dictionary:
 		0x4: int(o.q1x), 0x8: int(o.q1y), 0xc: int(o.q1z), 0x3a4: int(o.q1anchor),
 		0x2b8: 1, 0x2bc: 1, 0x2c4: 1, 0x154: int(o.q1taken), d0: int(o.q1p), d1: int(o.q1p1),
 	}
+	# +0xb0 is the binary's current-target POINTER: poke the target Dict itself
+	# (o.tgt = its opp index in the oracle's world); int 0 = the binary's NULL = none.
+	var tgt_ptr: Variant = 0
+	if int(o.tgt) == 0:
+		tgt_ptr = q0
+	elif int(o.tgt) == 1:
+		tgt_ptr = q1
+	var p := {
+		0x4: int(o.px), 0x8: 0x40000, 0xc: 0, 0x3a4: int(o.panchor), 0x1e0: int(o.p1e0),
+		0x2b8: 0, 0x2bc: 1, 0x2c4: 0, 0xb0: tgt_ptr,
+		0x210: int(o.bxmin), 0x214: int(o.bymin), 0x218: int(o.bzmin),
+		0x21c: int(o.bxmax), 0x220: int(o.bymax), 0x224: int(o.bzmax),
+		dq0: int(o.pq0), dq1: int(o.pq1),
+	}
+	var p1 := {0x2b8: 0, 0x2bc: 1, 0x2c4: 1, 0x4: 0, 0x8: 0, 0xc: 0, 0x3a4: 0}
 	var m := {0x78c: [q0, q1], 0x1820: int(o.scale)}
 	var td := {0x2fc: int(o.td2fc), 0x300: int(o.td300), 0x310: int(o.m310)}
 	return {"players": [p, p1], 0x8: 0, 0x138: m, "team_desc": td}

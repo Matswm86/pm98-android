@@ -128,13 +128,16 @@ func _load_team_header(team: Dictionary, hdr: Dictionary, players: Array, ti: in
 	team[0x168] = int(hdr["active_idx_0x168"])
 	var act: Array = hdr["active_table"]
 	for slot in range(act.size()):
-		team[0x4f + slot] = players[int(act[slot])] if act[slot] is float or act[slot] is int else 0
+		var actp = players[int(act[slot])] if act[slot] is float or act[slot] is int else 0
+		team[0x4f + slot] = actp
+		team[0x13c + slot * 4] = actp
 	var rol: Array = hdr["role_table"]
 	for k in range(rol.size()):
 		team[0x5b + k] = players[int(rol[k])] if rol[k] is float or rol[k] is int else 0
 	var sh: Array = hdr["squad_header"]
 	for k in range(sh.size()):
 		team[0xbf + k] = int(sh[k])
+		team[0x2fc + k * 4] = int(sh[k])
 	team[0x2e0] = int(hdr["0x2e0"]); team[0x2ec] = int(hdr["0x2ec"])
 	team[0x2ed] = int(hdr["0x2ed"]); team[0x20c] = int(hdr["0x20c"])
 

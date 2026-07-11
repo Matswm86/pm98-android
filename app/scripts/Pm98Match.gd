@@ -610,10 +610,15 @@ static func _build_team(m: Dictionary, ti: int, lineup: Dictionary, rng: MatchEn
 	# FUN_005b6ee0 (kit colours) -> display, 0 draws, skipped. Free + re-init the roster.
 	team[0x168] = 0                                       # param_1[0x5a] = 0 (L17)
 	var players: Array = []
-	# squad-header copy team[0xbf..0xc7] = lineup.header[0..8] (L35-46). ---
+	# squad-header copy team[0xbf..0xc7] = lineup.header[0..8] (L35-46). Mirrored at the
+	# BYTE-offset keys 0x2fc..0x31c too: the b1500-family readers use byte offsets
+	# (_g(gs, 0x318) defensive-line, 0x31c aggression, 0x304, 0x314...) and never saw the
+	# dword-index keys (the s31 frozen-t1 root: the 0x318 pull never fired).
 	var hdr: Array = lineup.get("header", [])
 	for k in range(9):
-		team[0xbf + k] = int(hdr[k]) if k < hdr.size() else 0
+		var hv := int(hdr[k]) if k < hdr.size() else 0
+		team[0xbf + k] = hv
+		team[0x2fc + k * 4] = hv
 	# --- build loop: 11 formation slots, present iff record[0x44] != 0 (L47-60). The binary
 	# re-runs the ctor on the SAME memory slot (base + arr_idx*0x3bc) at every restart rung,
 	# so on a REBUILD (H2/ET kickoffs) the existing player Dict for that arr_idx is reused
@@ -628,9 +633,13 @@ static func _build_team(m: Dictionary, ti: int, lineup: Dictionary, rng: MatchEn
 			var into = old_players[players.size()] if players.size() < old_players.size() else null
 			players.append(_build_player(m, ti, slot, players.size(), rec, into))
 			# active table team[0x4f+slot] (L61-74): formation slot -> built player.
+			# Byte-offset mirror 0x13c+slot*4: decide_slice_b's +0xb0 seed reads
+			# *(p+0x188 -> +0x13c + p.2cc*4) with byte offsets.
 			team[0x4f + slot] = players[-1]
+			team[0x13c + slot * 4] = players[-1]
 		else:
 			team[0x4f + slot] = 0
+			team[0x13c + slot * 4] = 0
 	team["players"] = players
 	team[0x0] = players                                  # *param_1 = base (the array)
 	team[0x4] = players.size()                           # param_1[1] = count

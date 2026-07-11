@@ -185,7 +185,9 @@ func _load_team_header(team: Dictionary, hdr: Dictionary, players: Array, ti: in
 	# active table team[0x4f+slot] -> loaded player object (or 0):
 	var act: Array = hdr["active_table"]
 	for slot in range(act.size()):
-		team[0x4f + slot] = players[int(act[slot])] if act[slot] is float or act[slot] is int else 0
+		var actp = players[int(act[slot])] if act[slot] is float or act[slot] is int else 0
+		team[0x4f + slot] = actp
+		team[0x13c + slot * 4] = actp
 	# role table team[0x5b+k] -> loaded player object (or 0):
 	var rol: Array = hdr["role_table"]
 	for k in range(rol.size()):
@@ -194,6 +196,7 @@ func _load_team_header(team: Dictionary, hdr: Dictionary, players: Array, ti: in
 	var sh: Array = hdr["squad_header"]
 	for k in range(sh.size()):
 		team[0xbf + k] = int(sh[k])
+		team[0x2fc + k * 4] = int(sh[k])
 	team[0x2e0] = int(hdr["0x2e0"])      # relationship-matrix throttle (word 0xb8)
 	team[0x2ec] = int(hdr["0x2ec"])      # byte part-strength flag
 	team[0x2ed] = int(hdr["0x2ed"])

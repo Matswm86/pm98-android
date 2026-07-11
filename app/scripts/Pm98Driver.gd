@@ -290,8 +290,13 @@ static func _decide_team(ctx: Dictionary, m: Dictionary) -> void:
 ## and sets phase 0/1, advancing kickoff (phase 2) -> open play. Threads the shared match `rng` (the
 ## handler arms draw from the match LCG).
 static func _advance_team(ctx: Dictionary, m: Dictionary, rng = null) -> void:
-	for p in ctx.get("players", []):
-		Pm98Action.engine_tick(p, m, rng)
+	var players: Array = ctx.get("players", [])
+	for i in players.size():
+		if MatchEngine.Pm98Rng._log_on:
+			MatchEngine.Pm98Rng._who = "t%d.i%d " % [int(ctx.get(8, -1)), i]
+		Pm98Action.engine_tick(players[i], m, rng)
+	if MatchEngine.Pm98Rng._log_on:
+		MatchEngine.Pm98Rng._who = ""
 
 
 ## FUN_005b73a0 x2 (position_team for both teams). Set-piece branches draw RNG.

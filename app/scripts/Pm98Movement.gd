@@ -355,8 +355,12 @@ static func _select_roles(ctx: Dictionary) -> void:
 # 0x2fc/0x300/0x310, modelled as ctx["team_desc"]; the opponent descriptor (player
 # +0x188) = the opponent team header's players, fetched via _opp_players(ctx) (the
 # faithful m["sim"][1-team]["players"], legacy-falling-back to flat m[0x78c]). The
-# current mark target (player+0xb0) and the
-# return value are opponent INDICES (-1 = none). The 8690 relationship-matrix dists
+# current mark target (player+0xb0) is the binary's
+# POINTER field (NULL = none): FUN_005a3400 slice B seeds it raw from the team struct's
+# +0x13c table (0 in live sim), so int 0/absent = none and a fixture-poked Dict = the
+# target player -- resolved to an opp index here (the s31 t1.i3 root cause: reading the
+# raw 0 as opp INDEX 0 mark-followed the opposing KEEPER from clk 0, drifting the roster).
+# The RETURN value is an opponent INDEX (-1 = none). The 8690 relationship-matrix dists
 # at _dist_off(slot, team) are consumed for both the candidate score and reciprocity.
 # NULL CONVENTION: the binary's "already marked" test is `cand+0x154 != 0` (non-null
 # marker pointer). In the index model the marker links (+0x150/+0x154) use -1 = none
@@ -371,8 +375,15 @@ static func select_mark_target(ctx: Dictionary, p_idx: int) -> int:
 	var td: Dictionary = ctx.get("team_desc", {})
 	var p: Dictionary = players[p_idx]
 
-	# Keep the current target while it stays valid (no search).
-	var tgt_idx := int(p.get(0xb0, -1))
+	# Keep the current target while it stays valid (no search). +0xb0 pointer model:
+	# a Dict resolves to its opp index; int 0/absent = the binary's NULL = none.
+	var tgt_idx := -1
+	var tgt_v: Variant = p.get(0xb0, 0)
+	if tgt_v is Dictionary:
+		for k in opp.size():
+			if is_same(opp[k], tgt_v):
+				tgt_idx = k
+				break
 	if tgt_idx >= 0:
 		var tgt: Dictionary = opp[tgt_idx]
 		var valid: bool
