@@ -1,5 +1,9 @@
 # M5 clk-9 divergence — a single EXTRA RNG draw, and the handoff's reference-pass error (2026-07-08, s28)
 
+> **s29 (2026-07-11): candidate 2 REFUTED, candidate 1 stands — see
+> `M5_CLK9_CANDIDATE2_REFUTED.md`** (wide-q re-capture + port marker diff; also proves
+> clk 5..9 run in one sub-ms catch-up burst, so they are unobservable externally).
+
 **Supersedes the "NEXT" of `M5_DIVERGENCE_CLK12_INTERCEPT_CLAMP.md` (s27).** That handoff said the
 first remaining divergence was a "clk-16..27 cslot-8-vs-9 possession wobble" and the first big break
 was "clk 115". **Both were measured against the WRONG reference pass.** Corrected below.
