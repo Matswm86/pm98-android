@@ -1158,6 +1158,7 @@ func _show_preseason(manager_name: String, league: Dictionary, club: Dictionary)
 	if _preseason != null and is_instance_valid(_preseason):
 		_preseason.queue_free()
 	_preseason = load("res://scenes/PreseasonScreen.gd").new()
+	_preseason.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_preseason)
 	_preseason.setup(PMChrome.title_case_name(str(club.get("name", ""))), manager_name,
 		GameDB.leagues, GameDB.clubs_in_league, _clubs_of_country_en, int(club.get("id", -1)))
@@ -1379,6 +1380,7 @@ func _show_nivel_screen(title_scr: TitleScreen) -> void:
 	if _nivel != null and is_instance_valid(_nivel):
 		_nivel.queue_free()
 	_nivel = load("res://scenes/NivelScreen.gd").new()
+	_nivel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_nivel)
 	var summary: Dictionary = {}
 	if Career.has_save():
