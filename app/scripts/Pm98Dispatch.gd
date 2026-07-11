@@ -152,7 +152,17 @@ static func _case_buildup(m: Dictionary, rng: MatchEngine.Pm98Rng) -> void:
 		var vy := Pm98Movement._bm(m, 0x1634)
 		var theta := Pm98Trig.atan_angle(vx, vy)
 		var proj := Pm98Trig.muladd16(vx, Pm98Trig.cos_a(theta), vy, Pm98Trig.sin_a(theta))
-		if proj > 0 and _g(m, 0x165c) != 0:
+		# match+0x165c IS ball+0x4c (the receiver POINTER) via the +0x1610 embedding; the
+		# port's ball is a separate Dict, so read it there on the live path (the old int
+		# mirror is only poked by oracle fixtures -- and its -1 clear sentinel wrongly
+		# passed the != 0 gate, a spurious seed-bearing draw).
+		var recv_set := false
+		var bv: Variant = m.get("ball", null)
+		if bv is Dictionary:
+			recv_set = (bv as Dictionary).get(0x4c, null) is Dictionary
+		else:
+			recv_set = _g(m, 0x165c) != 0                 # oracle-fixture fallback
+		if proj > 0 and recv_set:
 			rng.next()            # FUN_005ec250 -- (roll*500)>>15==0 only picks commentary
 		Pm98Events.enqueue(m, 0, {}, 0)
 

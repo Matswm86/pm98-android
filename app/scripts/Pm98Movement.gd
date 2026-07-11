@@ -69,12 +69,25 @@ static func _g(d: Dictionary, off: int) -> int:
 ## a separate Dict (m["ball"]), so those match keys are dead on the live path; this helper
 ## restores the alias by reading the ball Dict when present. Oracle fixtures that poke the
 ## match keys directly (and build no m["ball"]) fall through to the match Dict unchanged.
-## NOT for m+0x1650/0x165c/0x1664: those are deliberately remodeled as player INDICES.
+## NOT for m+0x1650/0x1664: those are deliberately remodeled as player INDICES. m+0x165c
+## (== ball+0x4c, the receiver POINTER) is read from the ball Dict at its consumers with
+## an index-model fixture fallback -- the old always -1 mirror silenced the b1500 press
+## arm draw (s33 root fix).
 static func _bm(m: Dictionary, off: int) -> int:
 	var b: Variant = m.get("ball", null)
 	if b is Dictionary:
 		return int((b as Dictionary).get(off - 0x1610, 0))
 	return int(m.get(off, 0))
+
+
+## The roster index of a player Dict (identity compare), -1 when absent / not a Dict.
+static func _index_of(players: Array, p: Variant) -> int:
+	if not (p is Dictionary):
+		return -1
+	for i in players.size():
+		if is_same(players[i], p):
+			return i
+	return -1
 
 
 ## A player field, or 0 when idx is null (-1) / out of range.
@@ -107,11 +120,19 @@ static func select_nearest(ctx: Dictionary, find_in_front: int) -> void:
 	# Entry ownership guard (cond_A && cond_B -> search; else forced owner).
 	var ctrl := int(m.get(0x1650, -1))
 	if ctrl < 0 or _bm(m, 0x1664) != team:              # cond_A (binary: ball+0x54 via alias)
-		var other := int(m.get(0x165c, -1))
+		# cond_B: binary reads ball+0x4c (the receiver POINTER; match+0x165c is the same
+		# dword via the +0x1610 embedding, NOT a separate index -- the old int mirror had
+		# no pass-path writer, so the active never locked to the in-flight receiver).
+		var other := -1
+		var bv: Variant = m.get("ball", null)
+		if bv is Dictionary:
+			other = _index_of(players, (bv as Dictionary).get(0x4c, null))
+		else:
+			other = int(m.get(0x165c, -1))              # oracle-fixture fallback (index model)
 		if other < 0 or _pg(players, other, 0x2b8) != team:   # cond_B -> search
 			best = _search(players, team, m, active, find_in_front)
 		else:
-			best = other                                # ball owned via 0x165c
+			best = other                                # ball owned via the receiver
 	else:
 		best = ctrl                                     # ball owned via 0x1650
 
@@ -554,12 +575,19 @@ static func _clear_mark_block(p: Dictionary) -> void:
 
 ## The PASS-B "this opponent holds the ball" gate (disasm 0x5b958f..0x5b95b7). Either the
 ## opponent's controller block (q+0x190 -> +0x40) names the opponent itself, or it is the
-## ball block's other-control slot (FUN_005b70b0 +0x4c == match+0x165c).
+## ball block's designated receiver (FUN_005b70b0 +0x4c; match+0x165c is the SAME dword via
+## the +0x1610 embedding, NOT a separate index field -- the port's old m[0x165c] mirror had
+## no writer on the pass path, so the in-flight receiver never got a marker wired and the
+## b1500 press arm (the 0x5b19c7 FUN_005b3c90(0,0x29999) roll, 1 draw/clk in the live
+## s33 seed-watch, clk 89-114) never ran. Read the ball block directly.
 static func _holds_ball(m: Dictionary, opp: Array, qi: int) -> bool:
 	var blk: Dictionary = _ref(opp[qi], 0x190)
 	if is_same(blk.get(0x40, null), opp[qi]):             # ref model: ball+0x40 == this opponent
 		return true
-	return int(m.get(0x165c, -1)) == qi
+	var recv: Variant = blk.get(0x4c, null)
+	if recv is Dictionary:                                # live path: ball+0x4c receiver POINTER
+		return is_same(recv, opp[qi])
+	return int(m.get(0x165c, -1)) == qi                   # oracle-fixture fallback (index model)
 
 
 # =============================================================================
