@@ -24,7 +24,15 @@ AudioManager="*res://scripts/AudioManager.gd"
 ; nothing is ever cropped or distorted (faithful to the PC game in a window).
 window/size/viewport_width=640
 window/size/viewport_height=480
-window/handheld/orientation=0
+; resizable=false is what the Android exporter reads to stamp
+; android:resizeableActivity="false" (export_plugin.cpp reads
+; display/window/size/resizable). With targetSdk 35 + a landscape lock, leaving
+; it resizable lets the OS apply size-compat scaling on tall phones -- the
+; reported "half title screen, buttons off-picture" device bug.
+window/size/resizable=false
+; 4 = sensor_landscape: both landscape directions, never portrait (the PC game
+; is landscape-only; 0 locked one single landscape direction).
+window/handheld/orientation=4
 window/stretch/mode="canvas_items"
 window/stretch/aspect="keep"
 
