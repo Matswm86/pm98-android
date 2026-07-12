@@ -1,0 +1,74 @@
+{
+ "markers": [
+  {
+   "code": 3,
+   "name": "ARGENTINA",
+   "x": 148,
+   "y": 221,
+   "err": 0.035
+  },
+  {
+   "code": 8,
+   "name": "BOLIVIA",
+   "x": 148,
+   "y": 168,
+   "err": 0.0883
+  },
+  {
+   "code": 10,
+   "name": "BRAZIL",
+   "x": 190,
+   "y": 149,
+   "err": 0.1064
+  },
+  {
+   "code": 14,
+   "name": "CHILE",
+   "x": 131,
+   "y": 203,
+   "err": 0.0434
+  },
+  {
+   "code": 16,
+   "name": "COLOMBIA",
+   "x": 118,
+   "y": 103,
+   "err": 0.0443
+  },
+  {
+   "code": 89,
+   "name": "ECUADOR",
+   "x": 100,
+   "y": 122,
+   "err": 0.104
+  },
+  {
+   "code": 64,
+   "name": "PARAGUAY",
+   "x": 164,
+   "y": 185,
+   "err": 0.061
+  },
+  {
+   "code": 59,
+   "name": "PERU",
+   "x": 113,
+   "y": 146,
+   "err": 0.0325
+  },
+  {
+   "code": 57,
+   "name": "URUGUAY",
+   "x": 171,
+   "y": 214,
+   "err": 0.1182
+  },
+  {
+   "code": 72,
+   "name": "VENEZUELA",
+   "x": 146,
+   "y": 92,
+   "err": 0.0589
+  }
+ ]
+}

@@ -353,7 +353,9 @@ func pending_friendly() -> Dictionary:
 ## dict — the GameDB view for foreign sides). Same engine path as a league
 ## fixture: the faithful stat engine where both XIs are usable, the ratings
 ## fallback otherwise; the manager fields his real repaired XI. Home/away comes
-## from the pick (witnessed continent-tab rule — see PreseasonScreen). NO league
+## from the pick (engine club-average rule, FUN_004c7570 — see PreseasonScreen
+## and docs/re/pretemporada_screen_re.md; the old continent-tab hypothesis is
+## dead). NO league
 ## table / morale / clause / cash effects: the original's friendly side-effects
 ## are un-RE'd (no frame evidence); only the match itself is walked (run-2 BRIEF
 ## sheet09, Man Utd v Sao Paulo). Returns the advance_week manager_res shape so

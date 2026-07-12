@@ -100,6 +100,8 @@ func _run() -> void:
 		func(_lid: String) -> Array: return clubs.duplicate(),
 		func(_en: String) -> Array: return [])
 	ok = _assert(pre._markers.size() == 47, "47 Europe flag markers (frame 013 spec)") and ok
+	ok = _assert(pre._markers_sa.size() == 10,
+		"10 S.America flag markers (wine capture 2026-07-12)") and ok
 	var codes_ok := true
 	var names := {}
 	for m in pre._markers:
@@ -124,6 +126,37 @@ func _run() -> void:
 	ok = _assert(done.size() == 1 and str((done[0] as Dictionary).get("name", "")) == "CLUB 01",
 		"SKIP/CONTINUE emits the picked rivals") and ok
 	pre.queue_free()
+
+	# ---- PRESEASON venue rule (FUN_004c7570 + FUN_0057a340, captures 2026-07-12) --
+	var strong := {"id": 90, "name": "STRONG", "stadium": "Big Ground",
+		"players": [{"attrs": {"VE": 90, "RE": 90, "AG": 90, "CA": 90}}]}
+	var tiny := {"id": 91, "name": "TINY", "stadium": "Tiny Park",
+		"players": [{"attrs": {"VE": 10, "RE": 10, "AG": 10, "CA": 10}}]}
+	var twin := {"id": 92, "name": "TWIN", "stadium": "Twin Ground",
+		"players": [{"attrs": {"VE": 50, "RE": 51, "AG": 52, "CA": 53}}]}
+	var own := {"id": 93, "name": "OWN", "stadium": "Own Ground",
+		"players": [{"attrs": {"VE": 50, "RE": 51, "AG": 52, "CA": 53}}]}
+	ok = _assert(PreseasonScreen.club_av(strong) == 90 and PreseasonScreen.club_av(own) == 51,
+		"club_av = floored engine 4-attr squad average") and ok
+	var pre2: PreseasonScreen = load("res://scenes/PreseasonScreen.gd").new()
+	get_root().add_child(pre2)
+	await process_frame
+	_pin(pre2)
+	pre2.setup("Own", "MWM", leagues,
+		func(_lid: String) -> Array: return [strong, tiny, twin],
+		func(_en: String) -> Array: return [], 93, own)
+	for i in 3:
+		pre2._on_input(_tap(true, pre2._kit_rect(i).get_center()))
+		pre2._on_input(_tap(false, pre2._kit_rect(i).get_center()))
+	ok = _assert(pre2._rivals.size() == 3
+		and pre2._rivals[0].get("home") == false
+		and str(pre2._rivals[0].get("venue_stadium")) == "Big Ground"
+		and pre2._rivals[1].get("home") == true
+		and str(pre2._rivals[1].get("venue_stadium")) == "Own Ground"
+		and pre2._rivals[2].get("home") == false
+		and str(pre2._rivals[2].get("venue_stadium")) == "Twin Ground",
+		"venue = stronger club's ground; ties away (stadium line witnesses)") and ok
+	pre2.queue_free()
 
 	# ---- Career round-trip of the entry picks -----------------------------------
 	var dc := {"id": 1, "name": "CLUB 01", "capacity": 30000, "players": []}

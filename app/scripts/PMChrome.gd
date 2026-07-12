@@ -588,9 +588,43 @@ static func draw_match_header(ci: CanvasItem, title_key: String, h: Dictionary) 
 
 # ---- the shared header ---------------------------------------------------
 
+# Frame-baked top-right chrome (tools/re/build_header_topright_from_frames.py;
+# binding frame 016_162419 + the 2026-07-12 week-1 capture
+# hub_week1_inseason_bands.png): the spiral-bound white CALENDAR SHEET and the
+# lavender plaque holding two green bands + the football. Replaces the old
+# procedural grey bevels (the reported "grey bar over the calendar" defect).
+static var _hdr_sheet: Texture2D = null
+static var _hdr_plaque: Texture2D = null
+## Career phase for the plaque bands: "" = in season (league / Week N — witnessed
+## "Premier"/"Week 1"), "preseason" = the witnessed "Preseason"/"Preparation".
+static var header_phase := ""
+## Optional date override for the calendar sheet (date_from_iso shape) — the
+## original shows the pending FRIENDLY's date during preseason, not the week date.
+static var header_date: Dictionary = {}
+
+# Frame-sampled inks (app/data/header_chrome_samples.json)
+const C_SHEET_INK := Color8(0, 0, 0)
+const C_SHEET_DAY := Color8(255, 0, 0)
+const C_SHEET_YEAR := Color8(42, 95, 170)
+const C_BAND1_INK := Color8(0, 0, 0)
+const C_BAND2_INK := Color8(255, 255, 255)
+
+
+## "1997-08-01" -> the date_parts dict shape (for the preseason friendly dates).
+static func date_from_iso(iso: String) -> Dictionary:
+	var p := iso.split("-")
+	if p.size() != 3:
+		return {}
+	var t := Time.get_unix_time_from_datetime_dict({"year": int(p[0]), "month": int(p[1]),
+		"day": int(p[2]), "hour": 12, "minute": 0, "second": 0})
+	var d := Time.get_datetime_dict_from_unix_time(int(t))
+	return {"wd": _WD[int(d.get("weekday", 6))], "day": int(d.get("day", 1)),
+		"mon": _MON[int(d.get("month", 8))], "year": int(d.get("year", 1997))}
+
+
 ## The top plaque row every real management screen shares: a full-width blue title bar
-## with the screen name centred, the manager+club plaque (left), the white calendar
-## plaque (centre-right) and the green league/week plaque + trophy (right).
+## with the screen name centred, the manager+club plaque (left), the spiral calendar
+## sheet (centre-right) and the banded lavender plaque + football (right).
 ## week_disp is the 1-based week (Week 17); pass <=0 to omit the date + week.
 static func draw_header(ci: CanvasItem, title: String, manager: String, club: String,
 		league: String, season: String, week_disp: int, club_id := -1) -> void:
@@ -615,24 +649,50 @@ static func draw_header(ci: CanvasItem, title: String, manager: String, club: St
 	if club_id >= 0:
 		draw_crest(ci, club_id, Rect2(mp.end.x - 24, 5, 20, 36))
 
-	if week_disp > 0:
-		# White calendar plaque (centre-right): weekday / big red day / month / year.
-		var d := date_parts(season, week_disp)
-		var dp := Rect2(446, 2, 88, 42)
-		bevel(ci, dp, C_DATE_BG, C_DATE_HI, C_DATE_LO)
-		text(ci, f8, dp.position.x, 4, str(d["wd"]), C_DATE_TXT, 9, 1, dp.size.x)
-		text(ci, f12, dp.position.x, 13, str(d["day"]), C_DATE_DAY, 14, 1, dp.size.x)
-		text(ci, f8, dp.position.x, 28, str(d["mon"]), C_DATE_TXT, 9, 1, dp.size.x)
-		text(ci, f8, dp.position.x, 37, str(d["year"]), C_DATE_TXT, 9, 1, dp.size.x)
+	if _hdr_sheet == null and ResourceLoader.exists("res://art/screens/header/cal_sheet.png"):
+		_hdr_sheet = load("res://art/screens/header/cal_sheet.png")
+	if _hdr_plaque == null and ResourceLoader.exists("res://art/screens/header/plaque_right.png"):
+		_hdr_plaque = load("res://art/screens/header/plaque_right.png")
 
-	# Green league / week plaque (right) with a small gold trophy.
-	var lp := Rect2(538, 2, 96, 42)
-	bevel(ci, lp, C_LEAGUE, C_LEAGUE_HI, C_LEAGUE_LO)
-	# League name auto-fits the plaque (room left for the trophy at the right edge); never clipped.
-	text(ci, f10, lp.position.x + 4, 8, league, C_LEAGUE_TXT, 11, 0, lp.size.x - 22)
-	if week_disp > 0:
-		text(ci, f10, lp.position.x + 4, 26, "Week %d" % week_disp, C_LEAGUE_TXT, 11, 0, lp.size.x - 8)
-	_trophy(ci, lp.end.x - 18, 10, 13)
+	if week_disp > 0 and _hdr_sheet != null:
+		# Real spiral calendar sheet (frame 016_162419); the sheet overlaps the
+		# barra like the original — no plaque box behind it. During preseason the
+		# date is the pending friendly's (header_date), as witnessed on the hub.
+		var d := header_date if not header_date.is_empty() else date_parts(season, week_disp)
+		ci.draw_texture(_hdr_sheet, Vector2(445, 6))
+		text(ci, f8, 447, 16, str(d["wd"]), C_SHEET_INK, 9, 1, 74)
+		text(ci, f12, 447, 25, str(d["day"]), C_SHEET_DAY, 14, 1, 74)
+		text(ci, f8, 447, 38, str(d["mon"]), C_SHEET_INK, 9, 1, 74)
+		text(ci, f8, 447, 47, str(d["year"]), C_SHEET_YEAR, 9, 1, 74)
+
+	if _hdr_plaque != null:
+		# The banded lavender plaque + football (frame 016_162419). Band texts:
+		# preseason = witnessed "Preseason"/"Preparation"; in season = witnessed
+		# "Premier"/"Week 1" grammar (hub_week1_inseason_bands 2026-07-12).
+		# Centred over the band body left of the football; ±3px centring rule
+		# still to be glyph-calibrated (flagged in pretemporada_screen_re.md).
+		ci.draw_texture(_hdr_plaque, Vector2(529, 4))
+		var top_txt := "Preseason" if header_phase == "preseason" else _band_league(league)
+		var bot_txt := ""
+		if header_phase == "preseason":
+			bot_txt = "Preparation"
+		elif week_disp > 0:
+			bot_txt = "Week %d" % week_disp
+		text(ci, f10, 536, 17, top_txt, C_BAND1_INK, 11, 1, 78)
+		if bot_txt != "":
+			text(ci, f12, 536, 36, bot_txt, C_BAND2_INK, 11, 1, 78)
+
+
+## The band's short division name: "Premier" witnessed on the week-1 hub; the
+## lower divisions follow the game's own division labels (PREMIER/FIRST/SECOND/
+## THIRD, witnessed on the preseason picker buttons). Foreign names pass through.
+static func _band_league(league: String) -> String:
+	match league:
+		"Premier League": return "Premier"
+		"Division One": return "First"
+		"Division Two": return "Second"
+		"Division Three": return "Third"
+	return league
 
 
 ## A tiny gold trophy glyph (bowl + handles + stem + base), top-left at (x,y), height ~h.

@@ -17,8 +17,19 @@ class_name PreseasonScreen
 ## art; its ACTIVE tab style is procedural — no walkthrough frame shows it), and
 ## press tints.
 ##
-## Honest gaps (documented): S.AMERICA map has no flag markers (no capture of that
-## tab); friendlies are stored on the save, simulated when the match loop lands.
+## 2026-07-12 (wine captures, screenshots/wine-captures-2026-07-12/): the
+## S.AMERICA tab is now REAL pixels (tab strips + SUDAMERICA map with its 10
+## runtime flags baked + SAD-matched markers — build_pretemp_states_from_frames.py),
+## SKIP washes at 4/4 picks and CONTINUE goes hot (frame-cut states), the last
+## picked club's name renders under the kit panel (ink 120,120,160 — frame
+## pretemp_slot1), and each filled rival slot shows TWO lines: the club name and
+## the VENUE STADIUM. Home/away is the engine's club-average compare, reversed
+## from MANAGER.EXE FUN_004c7570 (docs/re/decompiled/fn_004c7570_FUN_004c7570.c):
+## venue = own club iff AV(rival) < AV(own) else the rival, where AV =
+## floor(sum(VE+RE+AG+CA over squad) / (4*n)) (FUN_0057a340). 7/7 live witnesses
+## incl. the 1-pt edge (Bolton 71 @ Wimbledon 72 -> Selhurst Park) and the tie
+## (Man Utd 81 vs Juventus 81 -> away). The old continent-tab hypothesis is DEAD
+## (Bolton picking Sao Paulo -> Morumbi, away).
 ## (Foreign-club kit art extracted 2026-07-04 — all 476 NANOESC kits in
 ## app/art/kits/nano/, positional id->code map in tools/re/map_crests.py — so
 ## foreign country panels now render kits via the nano_kit fallback.)
@@ -69,6 +80,10 @@ var _riv_head: Dictionary = {}
 var _riv_bar: Dictionary = {}
 var _div_chip: Texture2D
 var _delete_on: Texture2D
+var _skip_off: Texture2D          # 4/4 picks: SKIP washes (frame pretemp_slot4)
+var _continue_hot: Texture2D      # 4/4 picks: CONTINUE goes hot (same frame)
+var _tab_eu_off: Texture2D        # real tab strips, S.AMERICA active (2026-07-12 capture)
+var _tab_sa_on: Texture2D
 var _title_band: Texture2D
 var _f14: Font
 var _f12: Font
@@ -77,6 +92,7 @@ var _f10: Font
 var _club_name := ""
 var _manager := ""
 var _markers: Array = []          # {code,name,x,y} from the spec JSON (tap targets)
+var _markers_sa: Array = []       # S.AMERICA map markers (SAD-matched, 2026-07-12)
 var _tab := 0                     # 0=EUROPE 1=S.AMERICA
 var _country := "ENGLAND"         # country shown in the kit panel
 var _strip_country := ""          # black strip text; EMPTY until a flag is tapped (frame 013)
@@ -88,8 +104,15 @@ var _leagues: Array = []
 var _clubs_of: Callable           # league_id -> clubs
 var _clubs_of_country: Callable   # PAISES English name -> clubs (Main bridges es->en)
 var _managed_id := -1             # taken clubs (managed + picked rivals) render washed
+var _own_club: Dictionary = {}    # managed club (venue + AV for the home/away compare)
+var _own_av := 0                  # engine club average (FUN_0057a340) of the managed club
+var _last_pick := ""              # last picked club name, under the kit panel (frame truth)
 var _sel_flag: Dictionary = {}    # tapped map marker; its flag draws enlarged (frame 015)
+var _sel_tab := 0                 # which map the selected marker belongs to
 var _checker: Texture2D           # 2x2 white/transparent — the taken-club kit wash
+
+# frame-sampled: last-pick label ink (pretemp_slot1, glyph rows y 450-457)
+const C_LAST_PICK := Color8(120, 120, 160)
 
 
 func _ready() -> void:
@@ -103,6 +126,12 @@ func _ready() -> void:
 	_riv_bar["off"] = load("res://art/screens/pretemp/riv_bar_off.png")
 	_div_chip = load("res://art/screens/pretemp/div_chip.png")
 	_delete_on = load("res://art/screens/pretemp/delete_on.png")
+	_skip_off = load("res://art/screens/pretemp/skip_off.png")
+	_continue_hot = load("res://art/screens/pretemp/continue_hot.png")
+	_tab_eu_off = load("res://art/screens/pretemp/tab_eu_off.png")
+	_tab_sa_on = load("res://art/screens/pretemp/tab_sa_on.png")
+	if ResourceLoader.exists("res://art/screens/pretemp/sudamerica_flags.png"):
+		_map_sa = load("res://art/screens/pretemp/sudamerica_flags.png")
 	_title_band = load("res://art/screens/pretemp/title_band.png")
 	_f14 = PMChrome.font("14")
 	_f12 = PMChrome.font("12")
@@ -116,6 +145,11 @@ func _ready() -> void:
 		var parsed: Variant = JSON.parse_string(f.get_as_text())
 		if typeof(parsed) == TYPE_DICTIONARY:
 			_markers = parsed.get("markers", [])
+	var fsa := FileAccess.open("res://data/pretemp_flag_markers_sa.json", FileAccess.READ)
+	if fsa != null:
+		var parsed_sa: Variant = JSON.parse_string(fsa.get_as_text())
+		if typeof(parsed_sa) == TYPE_DICTIONARY:
+			_markers_sa = parsed_sa.get("markers", [])
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	gui_input.connect(_on_input)
@@ -123,15 +157,32 @@ func _ready() -> void:
 
 
 func setup(club_name: String, manager: String, leagues: Array, clubs_of: Callable,
-		clubs_of_country: Callable, managed_club_id := -1) -> void:
+		clubs_of_country: Callable, managed_club_id := -1, managed_club: Dictionary = {}) -> void:
 	_club_name = club_name
 	_manager = manager
 	_leagues = leagues
 	_clubs_of = clubs_of
 	_clubs_of_country = clubs_of_country
 	_managed_id = managed_club_id
+	_own_club = managed_club
+	_own_av = club_av(managed_club)
 	_select_england()
 	queue_redraw()
+
+
+## The engine's club average — FUN_0057a340: floor(sum of the 4 GENERAL bytes
+## (VE speed / RE stamina / AG aggression / CA quality) over the whole squad,
+## divided by 4*players). Drives the friendly venue compare (FUN_004c7570).
+static func club_av(club: Dictionary) -> int:
+	var ps: Array = club.get("players", [])
+	if ps.is_empty():
+		return 0
+	var s := 0
+	for p in ps:
+		var a: Dictionary = (p as Dictionary).get("attrs", {})
+		s += int(a.get("VE", 0)) + int(a.get("RE", 0)) + int(a.get("AG", 0)) + int(a.get("CA", 0))
+	@warning_ignore("integer_division")
+	return s / (ps.size() * 4)
 
 
 func _select_england() -> void:
@@ -167,15 +218,14 @@ func _kit_rect(i: int) -> Rect2:
 	return Rect2(x, KIT_Y[i / cols] - 2, 26, 36)
 
 func _flag_at(d: Vector2) -> Dictionary:
-	if _tab != 0:
-		return {}
-	for m in _markers:
+	for m in (_markers if _tab == 0 else _markers_sa):
 		if Rect2(float(m["x"]) - 1, float(m["y"]) - 1, 20, 15).has_point(d):
 			return m
 	return {}
 
 func _target_at(d: Vector2) -> String:
-	if R_SKIP.has_point(d): return "skip"
+	# SKIP washes out (disabled) once all 4 slots are picked (frame pretemp_slot4)
+	if R_SKIP.has_point(d) and _rivals.size() < 4: return "skip"
 	if R_CONTINUE.has_point(d): return "continue"
 	if R_DELETE.has_point(d) and not _rivals.is_empty(): return "delete"
 	if R_TAB_EU.has_point(d): return "tab:0"
@@ -221,11 +271,9 @@ func _on_input(e: InputEvent) -> void:
 			_tab = 0
 			queue_redraw()
 		"tab:1":
+			# frame truth (pretemp_samerica_tab_active): switching tabs keeps the
+			# kit panel (ENGLAND stayed) — only the map + tab strips swap
 			_tab = 1
-			_country = ""
-			_strip_country = ""
-			_sel_flag = {}
-			_country_clubs = []
 			queue_redraw()
 		_:
 			if was.begins_with("div:"):
@@ -238,9 +286,10 @@ func _on_input(e: InputEvent) -> void:
 				# strip HUNGARY, panel still ENGLAND)
 				var nm := was.substr(5)
 				_strip_country = nm
-				for m in _markers:
+				for m in (_markers if _tab == 0 else _markers_sa):
 					if str(m["name"]) == nm:
 						_sel_flag = m
+						_sel_tab = _tab
 				if nm == "ENGLAND":
 					_country = nm
 					_select_england()
@@ -254,15 +303,17 @@ func _on_input(e: InputEvent) -> void:
 			elif was.begins_with("kit:"):
 				var i := int(was.substr(4))
 				if _rivals.size() < 4 and i < _country_clubs.size():
-					# `home` = the MANAGER hosts. Witnessed rule (run-2 match
-					# headers, top plaque = home): EUROPE-tab rivals host you
-					# (Juventus Fri 1, Barcelona Mon 4), the S.AMERICA pick
-					# visits you (Sao Paulo Wed 6, Man Utd on top). 3 witnesses
-					# — continent-tab hypothesis, documented in
-					# docs/re/pretemporada_screen_re.md.
+					# `home` = the MANAGER hosts. Engine rule (MANAGER.EXE
+					# FUN_004c7570 + FUN_0057a340, docs/re/decompiled/): the
+					# friendly is played at the STRONGER club's ground —
+					# venue = own club iff AV(rival) < AV(own), ties away.
+					# 7/7 live witnesses 2026-07-12 (pretemporada_screen_re.md).
 					var pick: Dictionary = (_country_clubs[i] as Dictionary).duplicate()
-					pick["home"] = _tab == 1
+					var home := club_av(pick) < _own_av
+					pick["home"] = home
+					pick["venue_stadium"] = str((_own_club if home else pick).get("stadium", ""))
 					_rivals.append(pick)
+					_last_pick = PMChrome.title_case_name(str(pick.get("name", "")))
 					queue_redraw()
 
 
@@ -291,17 +342,20 @@ func _draw() -> void:
 		_txt(_f14, R_TITLE.position.x, R_TITLE.position.y, "Preseason for %s" % _club_name,
 			Color.WHITE, 15, R_TITLE.size.x, true)
 
-	# S.AMERICA tab active: real map art; tab styles procedural (no frame of it)
+	# S.AMERICA tab active: real pixels (2026-07-12 capture) — the SUDAMERICA map
+	# with its 10 runtime flags baked + the real tab strips
 	if _tab == 1:
 		if _map_sa != null:
 			draw_texture_rect(_map_sa, R_MAP, false)
-		else:
-			draw_rect(R_MAP, Color(0.2, 0.3, 0.5), true)
-		_swap_tabs()
+		if _tab_eu_off != null:
+			draw_texture_rect(_tab_eu_off, R_TAB_EU, false)
+		if _tab_sa_on != null:
+			draw_texture_rect(_tab_sa_on, R_TAB_SA, false)
 
 	# selected country -> its flag renders ENLARGED at the BANDERAS native 30x20
-	# (frame 015: HUNGARY at marker-(8,4) with a 1px black border), persisting
-	if _tab == 0 and not _sel_flag.is_empty():
+	# (frame 015: HUNGARY at marker-(8,4) with a 1px black border), persisting;
+	# same behaviour witnessed on the SA map (capture pretemp_brazil_panel)
+	if _sel_tab == _tab and not _sel_flag.is_empty():
 		var fx := float(_sel_flag["x"]) - 8.0
 		var fy := float(_sel_flag["y"]) - 4.0
 		draw_rect(Rect2(fx - 1, fy - 1, 32, 22), Color(0, 0, 0), true)
@@ -309,8 +363,8 @@ func _draw() -> void:
 		if ftex != null:
 			draw_texture(ftex, Vector2(fx, fy))
 	# flag press feedback (flags themselves are baked)
-	if _press.begins_with("flag:") and _tab == 0:
-		for m in _markers:
+	if _press.begins_with("flag:"):
+		for m in (_markers if _tab == 0 else _markers_sa):
 			if _press == "flag:%s" % str(m["name"]):
 				draw_rect(Rect2(float(m["x"]) - 1, float(m["y"]) - 1, 20, 15), C_PRESS, true)
 
@@ -324,6 +378,11 @@ func _draw() -> void:
 		_draw_panel()
 	elif _press.begins_with("kit:"):
 		draw_rect(_kit_rect(int(_press.substr(4))), C_PRESS, true)
+
+	# last picked club's name under the kit rows (frames pretemp_slot1/2/3: the
+	# label persists across country/tab changes; ink 120,120,160, glyphs y 450-457)
+	if _last_pick != "":
+		_txt(_f10, R_PANEL.position.x, 447, _last_pick, C_LAST_PICK, 10, R_PANEL.size.x, true)
 
 	# rival slots: baked fresh state; repaint once picks exist
 	if not _rivals.is_empty():
@@ -340,31 +399,18 @@ func _draw() -> void:
 	if not _rivals.is_empty() and _delete_on != null:
 		draw_texture_rect(_delete_on, Rect2(381, 438, 116, 30), false)
 
+	# 4/4 picks: SKIP washes out (disabled), CONTINUE goes hot (frame pretemp_slot4)
+	if _rivals.size() == 4:
+		if _skip_off != null:
+			draw_texture_rect(_skip_off, Rect2(501, 331, 116, 30), false)
+		if _continue_hot != null:
+			draw_texture_rect(_continue_hot, Rect2(501, 438, 116, 30), false)
+
 	for key_r in [["skip", R_SKIP], ["continue", R_CONTINUE], ["delete", R_DELETE],
 			["tab:0", R_TAB_EU], ["tab:1", R_TAB_SA], ["div:0", R_PREMIER],
 			["div:1", R_FIRST], ["div:2", R_SECOND], ["div:3", R_THIRD]]:
 		if _press == str(key_r[0]):
 			draw_rect(key_r[1], C_PRESS, true)
-
-
-## Tab styles when S.AMERICA is active — procedural approximation (the resting
-## EUROPE-active style is baked; no walkthrough frame shows this tab selected).
-func _swap_tabs() -> void:
-	draw_rect(R_TAB_EU, Color8(10, 10, 14), true)
-	draw_rect(R_TAB_SA, Color8(10, 10, 14), true)
-	draw_rect(R_TAB_SA.grow(-3), Color8(170, 0, 0), true)
-	_vlabel(R_TAB_EU, "EUROPE", Color(0.75, 0.75, 0.8))
-	_vlabel(R_TAB_SA, "S. AMERICA", Color(0.05, 0.05, 0.08))
-
-
-func _vlabel(r: Rect2, label: String, col: Color) -> void:
-	var s := _scale()
-	var o := _origin(s)
-	var wtxt := _f10.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x
-	var anchor := r.get_center() + Vector2(4.0, wtxt * 0.5)
-	draw_set_transform(o + anchor * s, -PI / 2, Vector2(s, s))
-	draw_string(_f10, Vector2.ZERO, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, col)
-	draw_set_transform(o, 0.0, Vector2(s, s))
 
 
 ## Kit-panel repaint (country or division changed): white interior, blue country
@@ -424,8 +470,13 @@ func _draw_rival(i: int) -> void:
 	_txt(_f14, RIV_X + RIV_W, y + 15, str(i + 1),
 		C_DIGIT_ON if active or filled else C_DIGIT_OFF, 15, BADGE_W, true)
 	if filled:
-		_txt(_f10, RIV_X + 8, y + 18, PMChrome.title_case_name(str(_rivals[i].get("name", ""))),
-			C_FILL_TEXT, 10)
+		# frame truth (pretemp_slot1..4): line 1 = the rival club, line 2 = the
+		# VENUE STADIUM (own ground iff the rival's engine AV is lower — that is
+		# how the original tells you home from away), both centred navy
+		_txt(_f10, RIV_X, y + 18, PMChrome.title_case_name(str(_rivals[i].get("name", ""))),
+			C_FILL_TEXT, 10, RIV_W, true)
+		_txt(_f10, RIV_X, y + 34, str(_rivals[i].get("venue_stadium", "")),
+			C_FILL_TEXT, 10, RIV_W, true)
 
 
 ## Division filter repaint (selection moved off PREMIER): clean chips + labels,

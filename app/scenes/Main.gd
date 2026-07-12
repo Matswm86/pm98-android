@@ -1161,7 +1161,8 @@ func _show_preseason(manager_name: String, league: Dictionary, club: Dictionary)
 	_preseason.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_preseason)
 	_preseason.setup(PMChrome.title_case_name(str(club.get("name", ""))), manager_name,
-		GameDB.leagues, GameDB.clubs_in_league, _clubs_of_country_en, int(club.get("id", -1)))
+		GameDB.leagues, GameDB.clubs_in_league, _clubs_of_country_en, int(club.get("id", -1)),
+		club)
 	_preseason.preseason_done.connect(func(rivals: Array) -> void:
 		if _preseason != null and is_instance_valid(_preseason):
 			_preseason.queue_free()
@@ -1208,7 +1209,8 @@ func _begin_career(manager_name: String, league: Dictionary, club: Dictionary,
 	for i in preseason_rivals.size():
 		var rc: Dictionary = preseason_rivals[i]
 		rivals_meta.append({"date": dates[i] if i < 4 else "", "club_id": int(rc.get("id", -1)),
-			"name": str(rc.get("name", "")), "home": bool(rc.get("home", false))})
+			"name": str(rc.get("name", "")), "home": bool(rc.get("home", false)),
+			"venue_stadium": str(rc.get("venue_stadium", ""))})
 	_career.preseason_rivals = rivals_meta
 	_career.save()
 	_dismiss_seleccion()
@@ -1280,6 +1282,13 @@ func _mount_hub() -> void:
 	else:
 		move_child(_hub, get_child_count() - 1)
 	_hub.visible = true
+	# Shared-header state: during preseason the original's plaque bands read
+	# "Preseason"/"Preparation" and the calendar sheet shows the pending
+	# FRIENDLY's date (wine captures 2026-07-12); in season, league + Week N.
+	var pf := c.pending_friendly()
+	PMChrome.header_phase = "preseason" if not pf.is_empty() else ""
+	PMChrome.header_date = PMChrome.date_from_iso(str(pf.get("date", ""))) \
+		if not pf.is_empty() else {}
 	# Next-fixture opponent for the hub's central stack (pending friendly first).
 	var fx := _next_fixture()
 	var opp_name := ""

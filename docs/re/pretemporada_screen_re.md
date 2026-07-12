@@ -69,9 +69,20 @@ walked exactly that (Man Utd v Sao Paulo in BRIEF, sheet09). Pre-match surfaces 
 OPPONENT plaque, match header, VIEW RIVAL, TACTICS board) show the friendly fixture
 first, matching the run-2 headers (Juventus Fri 1 / Barcelona Mon 4 / Sao Paulo Wed 6).
 
-- **Home/away = witnessed continent-tab rule (3 witnesses, hypothesis):** EUROPE-tab
-  rivals host the manager (Juventus + Barcelona kit plaques on top), the S.AMERICA
-  pick visits (155: Man Utd on top vs Sao Paulo). Stored per pick as `home`.
+- **Home/away + stadium line = ENGINE RULE, reversed + live-verified 2026-07-12**
+  (supersedes the earlier continent-tab hypothesis — DEAD: Bolton picking Sao Paulo
+  got "Morumbi" = away). Each filled RIVAL slot shows TWO lines: the club name and
+  the **venue stadium**. MANAGER.EXE `FUN_004c7570` (kit-click handler,
+  `docs/re/decompiled/fn_004c7570_FUN_004c7570.c`) stores the picked club id at
+  slot+0x218a0 and the VENUE club id at slot+0x218a2:
+  `venue = own club iff AV(rival) < AV(own), else the rival` (ties -> away).
+  `AV` = `FUN_0057a340` = `floor(sum(VE+RE+AG+CA over the whole squad) / (4*n))`
+  — the 4 GENERAL bytes (speed/stamina/aggression/quality) at player+0x9c..0x9f.
+  **7/7 live witnesses** (`screenshots/wine-captures-2026-07-12/`): Bolton(71) vs
+  Man Utd(81) -> Old Trafford; vs Barnet(49) -> The Reebok Stadium (home); vs
+  Sao Paulo(76) -> Morumbi; vs Wimbledon(72) -> Selhurst Park (1-pt edge, away);
+  plus run-2's Man Utd(81) vs Juventus(81) -> away (tie), vs Barcelona(82) -> away,
+  vs Sao Paulo(76) -> home. Stored per pick as `home` + `venue_stadium`.
 - **No league table / morale / clause / cash effects** from a friendly: the original's
   friendly side-effects are un-RE'd (no frame evidence). Results go to a separate
   `friendly_results` save array (not the league `results` feed).
@@ -108,3 +119,29 @@ edge rows). Facts established:
 - IMG.PKF PRETEMPORADA DM sprites CRACKED: the variant simply omits the palette
   table (pixels at offset 54 despite bfOffBits=1078) — see export_entry_flow's
   decode_dm_nopal. AZULBARRAS/OVER/X now ship in app/art/screens/pretemp/.
+
+## New states captured live 2026-07-12 (`screenshots/wine-captures-2026-07-12/`)
+
+Driven in the real MANAGER.EXE (this repo's .wineprefix, Bolton W career) —
+build script `tools/re/build_pretemp_states_from_frames.py`:
+
+- **S.AMERICA tab active — first capture** (`pretemp_samerica_tab_active.png`):
+  real tab strips baked (`tab_eu_off.png` / `tab_sa_on.png`, replacing the old
+  procedural approximation) + the SUDAMERICA map WITH its 10 runtime flags
+  (`sudamerica_flags.png`). Markers are 16x12 black-bordered rects (14x10 flag
+  interior) — structurally detected + SAD-matched per flag, written to
+  `app/data/pretemp_flag_markers_sa.json` (ARGENTINA/BOLIVIA/BRAZIL/CHILE/
+  COLOMBIA/ECUADOR/PARAGUAY/PERU/URUGUAY/VENEZUELA). Tab switch KEEPS the kit
+  panel (ENGLAND stayed on screen).
+- **Country tap on the SA map** (`pretemp_brazil_panel.png`): same grammar as
+  EU — strip names the country, enlarged 30x20 flag at marker-(8,4), panel
+  swaps when the country has clubs (BRAZIL, 10 kits, one row; division buttons
+  absent for 1-division countries). Bonus NORWAY panel: 7 clubs
+  (`pretemp_norway_panel.png`).
+- **Last-picked club label** (`pretemp_slot1/2/3...`): the picked club's name
+  renders under the kit rows (ink 120,120,160; glyph rows y 450-457), persists
+  across country/tab changes.
+- **4/4 slots full** (`pretemp_slot4_wimbledon_selhurst_away_skipwashed.png`):
+  SKIP washes out (disabled — taps rejected), CONTINUE goes hot
+  (`skip_off.png` / `continue_hot.png`). CONTINUE is otherwise identical from
+  0..3 picks (0-vs-1-pick crop diff = 0 px), so it stays live with empty slots.
