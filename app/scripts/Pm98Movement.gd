@@ -1050,6 +1050,7 @@ static func kick_setup(p: Dictionary, m: Dictionary) -> void:
 ## specs/65a0openplay_oracle.txt, locked by app/tests/test_65a0openplay.gd; the taker phases 2/5 also
 ## by run_kicksetup_oracle.sh -> test_kicksetup.gd.
 static var move65a0_trace: Array = []
+static var steer_trace: Array = []                          # diag-only (gated on Pm98Rng._log_on)
 
 
 static func move_dispatch(p: Dictionary, m: Dictionary, param_2: int, rng) -> bool:
@@ -1266,6 +1267,8 @@ static func _pass_handoff_aa490(p: Dictionary, target: Dictionary, b1: int, b2: 
 ## In phases {2,3,4,5,7} with the wall flag clear (or this player not the special-team carrier) the
 ## curve is PARKED to 0; otherwise it is the (P+0x70*P+0x3ac)/15000 * speed_scale/100 + P+0x3a8 formula.
 static func steer_89c0(p: Dictionary, target_pos: Array, speed_scale: int) -> void:
+	if MatchEngine.Pm98Rng._log_on:                          # diag-only steer trace (draw-free path)
+		steer_trace.append([MatchEngine.Pm98Rng._who, target_pos.duplicate(), speed_scale])
 	var ctrl: Dictionary = _ref(p, 0x190)
 	var m: Dictionary = _ref(p, 0x18c)
 	var scale := speed_scale
@@ -3003,8 +3006,13 @@ static func kickoff_partner_placement(ctx: Dictionary, m: Dictionary, team_idx: 
 	best[0x64] = rface
 	if taker.is_empty():
 		return
-	var tface := Pm98Trig.atan_angle(Pm98Trig._i32(rx - _si(taker, 4)), Pm98Trig._i32(ry - _si(taker, 8))) & 0xffff
-	taker[0x34] = tface                                       # L80-84 taker faces the spot
+	# Taker faces the PARTNER, not the spot (disasm 0x5b72ea: `mov ecx,esi` = partner pos is the
+	# hidden __thiscall this of FUN_00590ae0 `this - src`; Ghidra dropped ECX). Live-verified s35:
+	# silicon taker +0x64 = 0xc000 (partner straight -y), +0x34 = 0xe000 after the goal blend. The
+	# old spot-facing (0x8) skipped the 8f20 turn-in-place, arming the post-kick walk 6 ticks early.
+	var tface := Pm98Trig.atan_angle(Pm98Trig._i32(_si(best, 4) - _si(taker, 4)), \
+		Pm98Trig._i32(_si(best, 8) - _si(taker, 8))) & 0xffff
+	taker[0x34] = tface                                       # L80-84 taker faces the partner
 	taker[0x64] = tface
 	var goalx := _si(m, 0x1820)                               # L85-90 goal-line aim
 	if (1 - _g(taker, 0x2b8)) == (orient & 1):
@@ -6481,7 +6489,12 @@ static func _role_leaf_4f70(p: Dictionary, rng) -> int:
 			return 1
 	else:
 		var t := [_si(p, 0x1ec), _si(p, 0x1f0), _si(p, 0x1f4)]
-		var desig: Variant = gs.get(0x200, null)
+		# gs+0x200 (nearest-to-anchor) is a player POINTER in the binary, an int index here --
+		# resolve via _desig before the pointer compare (the s30 dead-route class; this leaf was
+		# the missed sibling: the non-designated CB's x-snap to the designate never fired, so
+		# t0.i3 ran its own far endpoint2 ramp instead of creeping to the designate's x -- the
+		# s34 wrong-mover drift).
+		var desig: Variant = _desig(gs, 0x200)
 		if desig is Dictionary and not is_same(p, desig):
 			t[0] = _si(desig, 4)
 		steer_89c0(p, t, 0x28 if _g(gs, 0x30c) == 0 else 9)
