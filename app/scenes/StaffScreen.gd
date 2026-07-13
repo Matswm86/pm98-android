@@ -21,20 +21,23 @@ class_name StaffScreen
 ## RETURN. Every label, portrait and button is baked frame pixels; nothing invented.
 ##
 ## VALUES: `personnel` maps each of the 13 role keys -> {name, stars(0..5, .5 steps),
-## wage:int}. When empty the screen shows the pristine baked frame, i.e. the WITNESSED
-## reference staff (frame 121's real Man Utd backroom) — an explicit honest-gap
-## placeholder until a per-club PM98 staff DB is extracted (see WIRING note below).
+## wage:int} for roles the MANAGER HAS HIRED. A PM98 career opens with NO staff
+## (Career.staff == []) and the manager signs them from a pool; AI/rival clubs have no
+## staff at all, so there is NO per-club staff DB (and none is needed). Every unfilled
+## role is drawn VACANT (empty bar, no name/stars/£ — frame 115's empty state); the
+## baked body is frame 121 (a fully-hired club), so its baked staff MUST be blanked per
+## slot or it would show as staff the manager never hired. Only hired roles are painted.
 ##
 ## WIRING (Main.gd owns this; NOT edited here):
-##   _show_staff_screen should call
-##     scr.setup(personnel, manager, club, season, week, club_id)
-##   where `personnel` is the managed club's real backroom (13 role keys) once the
-##   EMPLEADOS staff DB is reversed; until then pass {} for the witnessed reference.
-##   Connect: back_pressed -> dismiss (works today); role_selected(role) -> the hire
-##   overlay (frames 113-120, not yet built); sign_pressed / sack_pressed -> the
-##   selected-role hire/sack. The old hire_requested / sack_requested / training_requested
-##   signals are RETAINED below purely so the current unmodified Main.connect calls do
-##   not fault; they are never emitted (this kills the invented TRAINING browse).
+##   _show_staff_screen calls scr.setup(...) with the manager's hired staff (empty at
+##   career start -> all slots vacant, which is correct). Connect: back_pressed ->
+##   dismiss (works today); role_selected(role) -> the hire overlay (frames 110-120,
+##   NOT yet built); sign_pressed / sack_pressed -> the selected-role hire/sack. The old
+##   hire_requested / sack_requested / training_requested signals are RETAINED below so
+##   the current Main.connect calls do not fault; never emitted (kills the invented
+##   TRAINING browse). NOTE: the Career staff MODEL has only 5 roles (TRAINER/PHYSIO/
+##   YOUTH_COACH/SCOUT/ASSISTANT) vs the real game's 13 — expanding it + building the
+##   hire overlay is the remaining staff work (see docs/re/staff_re.md).
 
 # --- new signals (frame-true interactions) ---
 signal role_selected(role: String)     # tap a role/skill card -> open the hire overlay
@@ -227,20 +230,37 @@ func _stars(x_right: float, y_top: float, rating: float, bar_col: Color) -> void
 		else:
 			_star(cx, cy, r, _star_off)
 
-func _draw_slot(role: String, data: Dictionary) -> void:
-	var slot: Dictionary = _slots.get(role, {})
-	if slot.is_empty():
-		return
+## Repaint a slot's name-bar (erasing frame 121's baked name + stars) and blank the
+## baked £amount cell. The red "WAGE" label stacked above the amount is baked static
+## and kept. Left role cards (kind=role, not mirrored) have their baked name overhanging
+## the measured `bar` to the LEFT by ~30px (portrait ends x49, name starts x50, but
+## bar.x=80), so grow the left edge to cover it without clipping the portrait.
+func _blank_bar(slot: Dictionary) -> Color:
 	var b: Array = slot["bar"]
 	var bar := Rect2(b[0], b[1], b[2], b[3])
 	var bc: Array = slot.get("bar_color", [60, 60, 90])
 	var bar_col := Color8(bc[0], bc[1], bc[2])
-	# repaint the bar (grown a few px to cover the baked name + stars so a different
-	# club's staff can replace them) and blank the baked £amount cell (white row bg) —
-	# the red "WAGE" label stacked above it is baked static and kept.
-	draw_rect(Rect2(bar.position.x - 7, bar.position.y - 1, bar.size.x + 9, bar.size.y + 2), bar_col, true)
+	var left_grow := 7
+	if str(slot.get("kind", "")) == "role" and not bool(slot.get("mirror", false)):
+		left_grow = 30
+	draw_rect(Rect2(bar.position.x - left_grow, bar.position.y - 1,
+		bar.size.x + left_grow + 2, bar.size.y + 2), bar_col, true)
 	var war := float(slot["wage_amount_right"])
 	draw_rect(Rect2(war - 100, float(slot["wage_amount_y"]) - 2, 108, 13), Color8(255, 255, 255), true)
+	return bar_col
+
+## A role with no one hired: blank the bar + £cell, drawing nothing (frame-115 vacant).
+func _draw_vacant(role: String) -> void:
+	var slot: Dictionary = _slots.get(role, {})
+	if slot.is_empty():
+		return
+	_blank_bar(slot)
+
+func _draw_slot(role: String, data: Dictionary) -> void:
+	var slot: Dictionary = _slots.get(role, {})
+	if slot.is_empty():
+		return
+	var bar_col := _blank_bar(slot)
 	# name (white, left-inset in the bar)
 	_txt_left(float(slot["name_x"]), float(slot["name_y"]) - 1,
 		str(data.get("name", "")), _c_name, 11)
@@ -260,13 +280,17 @@ func _draw() -> void:
 		draw_texture(_body, Vector2(0, _body_y))
 	PMChrome.draw_header(self, "CLUB PERSONNEL", _manager, _club, _league, _season, _week, _club_id)
 
-	# Live values over the baked cells. Empty _personnel -> pristine baked frame, i.e.
-	# the witnessed reference staff (honest-gap placeholder; NOT redrawn/covered).
-	if not _personnel.is_empty():
-		for role in _slots:
-			var d: Variant = _personnel.get(role, null)
-			if d is Dictionary:
-				_draw_slot(role, d)
+	# Live values over the baked cells. The baked body is frame 121 (a fully-hired club),
+	# so EVERY unfilled role must be blanked to the vacant state (frame 115: empty bar, no
+	# name/stars, no £amount) — otherwise frame 121's baked staff would show as staff the
+	# manager never hired. A real career opens with NO staff (Career.staff == []) and the
+	# manager signs them from the pool; only hired roles are drawn.
+	for role in _slots:
+		var d: Variant = _personnel.get(role, null)
+		if d is Dictionary:
+			_draw_slot(role, d)
+		else:
+			_draw_vacant(role)
 
 	# button press feedback (buttons themselves are baked)
 	if _press.begins_with("btn:"):

@@ -3,10 +3,10 @@ extends SceneTree
 ##   DISPLAY=:1 PM98_SHOT_DIR=out ~/godot462 --rendering-driver opengl3 \
 ##       --path app --script res://tests/shot_staff.gd
 ## Emits two PNGs:
-##   staff_ref.png  = default/empty personnel -> the pristine baked frame (the witnessed
-##                    reference staff), the parity oracle vs walkthrough frame 121.
-##   staff_live.png = a synthetic OTHER-club backroom -> proves the live-value overlay
-##                    (bar/name/half-stars/wage redraw over the baked cells).
+##   staff_ref.png  = default/empty personnel -> the VACANT state a career opens in
+##                    (all bars blank, no staff hired), matching walkthrough frame 115.
+##   staff_live.png = a synthetic hired backroom -> proves the live-value overlay
+##                    (bar/name/half-stars/wage redraw over the blanked cells).
 
 func _initialize() -> void:
 	_run()
@@ -34,7 +34,7 @@ func _run() -> void:
 	node.position = Vector2.ZERO
 	node.size = Vector2(640, 480)
 
-	# 1) default: empty personnel -> pristine baked frame (witnessed Man Utd reference)
+	# 1) default: empty personnel -> the VACANT career-start state (no staff hired)
 	node.setup({}, "MWM", "Manchester Utd.", "1997-98", 1, -1)
 	await _grab(dir, "staff_ref.png")
 

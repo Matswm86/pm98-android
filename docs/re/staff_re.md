@@ -68,26 +68,40 @@ career), and — when live `personnel` data is supplied — the 13 slots' {name,
   section/role labels, WAGE labels, SIGN/SACK/RETURN — is the frame's own pixels.
 - **Shared component (differs by design):** the header barra is the app's live PMChrome
   header (same on every ported screen), not the baked original — it updates with the career.
-- **Approximated (the live-data overlay):** when a per-club `personnel` dict replaces the
-  witnessed reference, the scene repaints each name-bar with a single sampled colour (the
+- **Approximated (the live-data overlay):** when a `personnel` dict of HIRED staff is
+  supplied, the scene repaints each hired role's name-bar with a single sampled colour (the
   originals are a top-bright / bottom-dark gradient) and redraws name/half-stars/£wage;
   training rows land clean, role rows are legible with ~1px cosmetic edge tolerance.
-- **Honest gap (data):** there is NO extracted PM98 per-club staff DB (the EMPLEADOS staff
-  table is not reversed; `extracted/cm0102/.../staff.dat` is a DIFFERENT game). Until it is,
-  the screen shows the WITNESSED Man Utd reference as an explicit placeholder. The old
-  `app/scripts/Staff.gd` effect/wage model (TRAINER/PHYSIO/YOUTH_COACH/SCOUT/ASSISTANT — a
-  5-role invention) is UNRELATED to this 13-position original surface and is left untouched
-  (its `test_staff.gd` / `test_staff_roles.gd` still pass).
+- **Vacant state (correct default, CORRECTED 2026-07-14):** a PM98 career opens with **NO
+  staff** — `Career.staff == []` — and the manager signs them from a generated pool
+  (`Staff.generate_pool`); AI/rival clubs have **no staff at all**. So there is **NO
+  per-club staff DB and none is needed** (an earlier version of this doc wrongly called
+  that a data gap "blocked on PCF5DAT" — WRONG). Because the baked body is frame 121 (a
+  fully-HIRED club, captured ~10s after the walkthrough manager signed everyone — see
+  frames 110-121), every unfilled role is **blanked to the vacant state** (empty bar, no
+  name/stars/£; frame 115's empty "CURRENT …" bar). Left role cards' baked names overhang
+  the measured bar ~30px to the left (portrait ends x49, name starts x50, bar.x=80), so
+  `_blank_bar` grows the left edge for `kind=role, mirror=false` slots.
 
-## WIRING (Main.gd — not edited in this pass)
-`_show_staff_screen` should call `scr.setup(personnel, manager, club, season, week, club_id)`
-with the managed club's real 13-role backroom once the EMPLEADOS DB is reversed (pass `{}`
-for the witnessed reference until then), and connect `role_selected(role)` (hire overlay),
-`sign_pressed` / `sack_pressed`, and `back_pressed` (dismiss — works today). The old
-`hire_requested` / `sack_requested` / `training_requested` signals are RETAINED on the scene
-(never emitted) so the current unmodified Main `.connect` calls do not fault; `setup` accepts
-the old Array positional call without faulting (renders the pristine reference). This kills
-the invented TRAINING browse (`training_requested` is never emitted).
+## Remaining staff work (NOT a data gap — a build)
+1. **Model is 5 roles, real game is 13.** `app/scripts/Staff.gd` models TRAINER / PHYSIO /
+   YOUTH_COACH / SCOUT / ASSISTANT (a simplification), but frame 121 has 13: 6 skill coaches
+   (HANDLING/PASSING/DRIBBLING/HEADING/TACKLING/SHOOTING) + PHYSIOTHERAPIST + PSYCHOLOGIST +
+   ASSISTANT MANAGER + SCOUT + YOUTH TEAM MANAGER + YOUTH TEAM SCOUT + GROUNDSMAN. Expanding
+   the model to the real 13 roles is the substantive task.
+2. **Hire overlay not built.** Frames 110-120 show it: a CURRENT-`<role>` box (empty when
+   vacant) + a "`<ROLE>`s AVAILABLE" pool list with SIGN buttons + an 8-category rail + OK.
+   `role_selected(role)` should open it; `sign_pressed`/`sack_pressed` sign/sack. Until then
+   the screen renders correctly (vacant → hired) but there is no in-screen way to sign.
+
+## WIRING (Main.gd)
+`_show_staff_screen` currently passes the pre-rebuild Array positional shape; `setup` tolerates
+it (non-Dict `personnel` → empty → all slots vacant, which is CORRECT at career start). Once
+the 13-role model exists, pass the manager's hired staff as a role→{name,stars,wage} dict.
+Connect `role_selected(role)` (hire overlay, once built), `sign_pressed`/`sack_pressed`, and
+`back_pressed` (dismiss — works today). The old `hire_requested`/`sack_requested`/
+`training_requested` signals are RETAINED (never emitted) so Main's `.connect` calls do not
+fault; this kills the invented TRAINING browse.
 
 ## Tests + verification
 - `app/tests/test_staff_screen.gd` (NEW): chrome load (13 slots + buttons + REF_STAFF),
@@ -96,6 +110,7 @@ the invented TRAINING browse (`training_requested` is never emitted).
 - `app/tests/test_staff.gd` / `test_staff_roles.gd`: the legacy Staff.gd model — still PASS.
 - REAL render: `app/tests/shot_staff.gd`
   (`DISPLAY=:1 PM98_SHOT_DIR=out ~/godot462 --rendering-driver opengl3 --path app
-  --script res://tests/shot_staff.gd`) → `staff_ref.png` (pristine reference = frame 121,
-  BODY parity 100.00% exact) + `staff_live.png` (a synthetic other-club backroom, proving
-  the data-driven overlay).
+  --script res://tests/shot_staff.gd`) → `staff_ref.png` (the VACANT career-start state —
+  all 13 bars blanked, matching frame 115's empty state) + `staff_live.png` (a synthetic
+  hired backroom, proving the data-driven overlay). The baked-chrome layout itself is
+  100.00% exact-pixel vs frame 121 before the per-slot name blanking.

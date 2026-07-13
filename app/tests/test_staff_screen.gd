@@ -49,7 +49,7 @@ func _run() -> void:
 
 	# --- back-compat setup: the pre-rebuild Main Array call must not fault ---
 	scr.setup([{"id": 1}], [{"id": 2}], "", "Arsenal", "£1,000")   # old positional shape
-	ok = _assert(scr._personnel.is_empty(), "old Array setup -> pristine (no live overlay)") and ok
+	ok = _assert(scr._personnel.is_empty(), "old Array setup -> empty personnel (all slots vacant)") and ok
 	# new Dictionary call populates live data
 	scr.setup({"SCOUT": {"name": "X", "stars": 2.0, "wage": 5000}}, "MGR", "CLUB", "1997-98", 3, 7)
 	ok = _assert(scr._personnel.has("SCOUT") and scr._club == "CLUB" and scr._week == 3,
