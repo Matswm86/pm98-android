@@ -5,27 +5,28 @@ FRAME-TRUE under the frame-bake precedent used by Finance / Transfer / Squad / S
 the static chrome is the ORIGINAL pixels cut 1:1, and ONLY the dynamic layer (the
 standings rows) is redrawn live over it.
 
-## Binding source — NO WALKTHROUGH FRAME EXISTS
+## Binding source — WALKTHROUGH FRAME 045 (CORRECTED 2026-07-13)
 
-The 636-frame walkthrough (`screenshots/original-walkthrough-2026-07-02`, 3 runs) does
-**not** contain the LEAGUE TABLES screen. All 297 management-chrome frames were deduped
-to **239 distinct management screens** and every one was scanned (contact sheets in the
-session scratchpad). The screens witnessed: title / SELECT LEVEL / LOAD GAME / TRAINING /
-ENTER-NAME / LINE-UP / EUROPE map / VIEW RIVAL-SCOUT / PLAYER INFO / TEAMS IN CHAMPIONSHIPS
-/ INJURIES / **STATISTICS** (player stats for Man Utd — *not* the league table) / GROUND /
-match+half/full-time / OFFERS / CLUB PERSONNEL / MANAGER MENU hub / TACTICS / CHARITY
-SHIELD. The standings grid never appears.
-
-Per doctrine the binding source falls back to the genuine PC capture:
+> **Correction:** an earlier build of this doc claimed "no walkthrough frame exists" and
+> fell back to the PC gallery capture `ma_10.png`. That was WRONG — the sub-agent's
+> contact-sheet scan missed it. The LEAGUE TABLES screen **is** in our own walkthrough.
+> Re-found by template-matching every frame's chrome against ma_10 (main session): three
+> frames scored MAD 9.16 vs 30+ for all others.
 
 | source | size | state |
 |---|---|---|
-| **`~/MWM-AI/data/pm98-refs/real-gallery/ma_10.png`** | 640×480 PNG (native) | **BINDING.** Premier, Sat 29 Nov 1997 / Week 17, Luis Silva @ Man Utd top |
+| **`screenshots/original-walkthrough-2026-07-02/045_154505.png`** | 641×480 PNG | **BINDING (our walkthrough).** Premier, Fri 1 Aug 1997 / date-stepper 9/8/1997, manager **MWM** @ Man Utd, **pre-season all-zeros** (P/W/D/L/GF/GA/PTS all 0, empty LEADER box) — the real season-open state. Also `046_154507`, `049_154516` (identical). |
+| `~/MWM-AI/data/pm98-refs/real-gallery/ma_10.png` | 640×480 PNG | Corroborating **populated** state: Week 17, Luis Silva @ Man Utd. |
 | `hires_league_table.jpg` | 474×355 JPEG | same screen, cross-check only |
 
-Both show the **same single witnessed state: Premier**. `ma_11`/`ma_12` are TRANSFER
-MARKET / CLUB PERSONNEL, not other-division tables. So **no lower-division league-table
-state is witnessed anywhere** — see Gaps.
+Chrome of frame 045 vs ma_10 is **pixel-identical** (col-header / right-tabs / panel-frame
+MAD = 0.00; only the plaque name + date differ), so the ma_10-baked `chrome.png` is a valid
+1:1 for the walkthrough state too. Frame 045 witnesses the empty/seed state; ma_10 witnesses
+a populated state — both now covered.
+
+`ma_11`/`ma_12` are TRANSFER MARKET / CLUB PERSONNEL, not other-division tables, and
+frames 045/046/049 do NOT click into First/Second/Third. So **no lower-division
+league-table state is witnessed anywhere** — see Gaps.
 
 ## Layout (all measured off ma_10; sampling log below)
 

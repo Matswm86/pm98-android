@@ -130,7 +130,7 @@ func _run() -> void:
 			# 17): Man Utd (id 40) my club at the top, so the my-club highlight + EURO CUP /
 			# U.E.F.A. / RELEGATION zone rows render exactly as the frame. Rows are pre-sorted
 			# (the screen draws array order, as Career.standings() delivers).
-			node.setup(_demo_standings(), "MANCHESTER UTD.", "1997-98", "Week 17", 1, 40, "Luis Silva")
+			node.setup(_demo_standings(), "MANCHESTER UTD.", "1997-98", "Week 17", 1, 40, "MWM")
 		for _i in 14:
 			await process_frame
 		await RenderingServer.frame_post_draw
