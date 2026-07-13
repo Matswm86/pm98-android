@@ -1,0 +1,156 @@
+{
+  "binding_frame": "097_164707.png",
+  "note": "TRANSFER MARKET (FICHAR); list body redrawn by TransferScreen.gd from Career.market() rows. AV=CA (real); CLUB FEE/WAGE = the valuation model (accepted approximation, TransferMarket.gd); MO + YEARS|LEFT + nationality flag = honest gaps (morale is an un-RE'd dynamic save value per audit B7; buyable-player contract years + flagCode are not in the market row).",
+  "size": [
+    640,
+    480
+  ],
+  "samples": {
+    "band_navy": [
+      0,
+      0,
+      128
+    ],
+    "av_orange": [
+      212,
+      63,
+      0
+    ],
+    "mo_blue": [
+      75,
+      109,
+      172
+    ],
+    "fee_red": [
+      210,
+      0,
+      0
+    ],
+    "wage_darkred": [
+      150,
+      0,
+      0
+    ],
+    "years_navy": [
+      42,
+      63,
+      170
+    ],
+    "years_final_yellow": [
+      255,
+      255,
+      90
+    ],
+    "name_black": [
+      0,
+      0,
+      0
+    ],
+    "row_sep": [
+      176,
+      176,
+      176
+    ],
+    "panel_fill": [
+      240,
+      240,
+      240
+    ]
+  },
+  "anchors": {
+    "band_x": 50,
+    "bands": [
+      {
+        "key": "GK",
+        "label": "KEEPER",
+        "hdr_y": 72,
+        "cap": 3,
+        "slot_y": [
+          92,
+          108,
+          124
+        ]
+      },
+      {
+        "key": "DF",
+        "label": "DEFENDER",
+        "hdr_y": 140,
+        "cap": 5,
+        "slot_y": [
+          156,
+          172,
+          188,
+          204,
+          220
+        ]
+      },
+      {
+        "key": "MF",
+        "label": "MIDFIELDER",
+        "hdr_y": 236,
+        "cap": 5,
+        "slot_y": [
+          252,
+          268,
+          284,
+          300,
+          316
+        ]
+      },
+      {
+        "key": "FW",
+        "label": "FORWARD",
+        "hdr_y": 332,
+        "cap": 5,
+        "slot_y": [
+          348,
+          364,
+          380,
+          396,
+          412
+        ]
+      }
+    ],
+    "row_h": 16,
+    "row_content_h": 13,
+    "plus_xy": [
+      5,
+      91
+    ],
+    "flag_x": 34,
+    "name_x": 60,
+    "stars_x": 156,
+    "av_right": 250,
+    "mo_center": 267,
+    "fee_right": 337,
+    "wage_right": 404,
+    "years1_center": 432,
+    "years2_center": 457,
+    "row_left": 8,
+    "row_right": 495,
+    "btn_current": [
+      496,
+      287,
+      128,
+      21
+    ],
+    "btn_scout": [
+      496,
+      324,
+      128,
+      21
+    ],
+    "btn_offers": [
+      496,
+      361,
+      128,
+      21
+    ],
+    "btn_return": [
+      496,
+      441,
+      128,
+      21
+    ]
+  }
+}

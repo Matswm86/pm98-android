@@ -1,24 +1,39 @@
 extends Control
 class_name SquadScreen
-## PM98 SQUAD MANAGEMENT (PLANTILLA) screen — the real game's CONTRACT view
-## (walkthrough frame 077_154612): the shared PMChrome plaque header + blue marble
-## background over a white table with boxed cells — N° | PLAYER | AV | MO | LOAN |
-## WAGE | YEARS(term|left) — grouped into the original's own KEEPERS / DEFENDERS /
-## MIDFIELDERS / FORWARDS sections (the demarcación byte decoded out of EQUIPOS.PKF),
-## each section in REVERSE record order (the original loader prepends to its player
-## list; frame 077 shows every section exactly file-reversed — squad_number_re.md).
-## N° is the decoded per-player squad number (EQUIPOS byte after the photo-id u16);
-## MO is the LIVE morale (decoded 2026-07-03, docs/re/morale_re.md — the getter
-## FUN_00582db0 over the career-modelled base) and AV the real FUN_00581e60
-## rating ((VE+RE+AG+CA+FI+MO)/6, frame-confirmed 80/82). Right: the SQUAD
-## count, the club kit and the YOUTH TEAM / RETURN buttons at their reversed
-## positions.
+## PM98 SQUAD MANAGEMENT (PLANTILLA) — the real game's CONTRACT view, rebuilt
+## FRAME-BAKED 2026-07-13 against walkthrough run-1 frame 077_154612
+## (docs/re/squad_screen_re.md). Doctrine = RivalScreen / LineupScreen:
 ##
-## Driven live by the Career roster. Native 640x480; scales to fit its parent.
+##   * the shared SILVER header (band + manager/club plaque + crest + spiral
+##     calendar sheet + green Preseason/Preparation bands) is painted live by
+##     PMChrome.draw_match_header — the SAME header LINE-UP / VIEW RIVAL were
+##     validated 0px against (the OLD blue procedural draw_header is gone);
+##   * the SQUAD MANAGEMENT title glyphs are the frame's own bitmap, cut over
+##     band.png (art/screens/squad/title_squad.png) so they blit seamlessly;
+##   * the BODY chrome (art/screens/squad/chrome.png) is frame 077 VERBATIM —
+##     blue-marble FONDO, white boxed table panel, the N° KEEPERS AV MO LOAN
+##     WAGE YEARS column-header row (each code in its value colour), the
+##     per-section scrollbar and the YOUTH TEAM + RETURN buttons — with only the
+##     player-row grid cleared to panel white.
 ##
-## INTERACTIVE: the YOUTH TEAM button opens the youth screen (emits `youth_pressed`) when
-## youth is enabled (the managed club); the RETURN button or a tap on empty space emits
-## `back_pressed` (the display-screen tap-to-dismiss).
+## SquadScreen draws ONLY the dynamic layer on top: the DEFENDERS / MIDFIELDERS /
+## FORWARDS section bands and the player rows, each row a per-cell grid box
+## (grey-128 border, grey-240 fill, 16px pitch — the frame's own structure) with
+## the frame-sampled column colours and the real PROMAN fonts. N° | PLAYER | AV |
+## MO | LOAN | WAGE | YEARS(term|left), grouped KEEPERS / DEFENDERS /
+## MIDFIELDERS / FORWARDS (EQUIPOS demarcación), each section in REVERSE record
+## order (squad_number_re.md). Driven live by the Career roster.
+##
+## The OLD invented chrome (dark-navy management_bg, blue title bar, the
+## SQUAD-count box + club-kit right panel) is REMOVED — none of it is in the
+## frame; the frame's right column is the scrollbar + the two buttons.
+##
+## INTERACTIVE: YOUTH TEAM opens the youth screen (emits youth_pressed) on the
+## managed club; RETURN or a tap on empty space emits back_pressed; a player-row
+## tap opens his PLAYER INFORMATION (emits player_pressed). While the FICHA card
+## is up, set_dimmed routes the body + rows through the exact alert LUT
+## (081-vs-082 pair); the live silver header stays bright — draw_match_header is
+## not LUT-aware and PMChrome is out of edit scope (documented gap).
 
 signal youth_pressed
 signal back_pressed
@@ -26,81 +41,76 @@ signal player_pressed(player)
 
 const W := 640
 const H := 480
+const BODY_Y0 := 62                      # header band height (draw_match_header)
 
-const C_BTN := Color(0.18, 0.44, 0.26)           # green YOUTH button
-const C_BTN_HI := Color(0.34, 0.62, 0.40)
-const C_DKBTN := Color(0.10, 0.16, 0.32)
-const C_DKBTN_HI := Color(0.34, 0.46, 0.72)
-const C_DKBTN_LO := Color(0.04, 0.08, 0.18)
-const C_PANEL_TXT := Color(0.88, 0.93, 1.0)
-const C_GOLD := Color(1.0, 0.86, 0.22)
+# ---- frame-baked geometry (tools/re/specs/squad_chrome_samples.json) --------
+const TITLE_XY := Vector2(186, 16)       # SQUAD MANAGEMENT glyph sprite anchor
+const PANEL_Y0 := 74
+const PANEL_Y1 := 466                     # white panel bottom (rows clip here)
+const ROW0_Y := 92                        # first player-row band TOP border
+const ROW_PITCH := 16
+const ROW_X := 11                         # row band left (panel interior)
+const ROW_W := 480                        # band width x11..491 (up to scrollbar)
+const NAME_X := 52
+const YOUTH_BTN := Rect2(521, 357, 115, 25)
+const RETURN_BTN := Rect2(527, 436, 101, 29)
 
-# Contract-view cell colors, sampled from walkthrough frame 077_154612 (the column
-# CODE in the header is drawn in its own value colour, like the original).
-const C_NO := Color8(0, 0, 128)                  # N° squad number (navy)
-const C_SECTION := Color8(0, 0, 190)             # KEEPERS/DEFENDERS/... labels (blue)
-const C_AV := Color8(212, 63, 0)                 # AV (orange-red)
-const C_MO := Color8(75, 109, 172)               # MO (steel blue)
-const C_LOANC := Color8(100, 130, 10)            # LOAN YES/NO (olive)
-const C_WAGE := Color8(150, 0, 0)                # WAGE (dark red)
-const C_YEARS := Color8(42, 63, 170)             # YEARS pair (blue)
-const C_EXPIRE_TXT := Color8(255, 31, 0)         # remaining year == 1: red text ...
-const C_EXPIRE_BG := Color8(255, 255, 170)       # ... on a yellow cell
-const C_CELL_BG := Color8(240, 240, 240)         # boxed cell / row fill
-const C_CELL_BRD := Color8(128, 128, 128)        # cell border grey
-
-# Contract-view cell x-spans (left, right), from the frame-077 border scan:
-# AV 273-298 | MO 298-323 | LOAN 323-359 | WAGE 359-429 | YEARS 429-454 | 454-479.
+# cell x-spans (left, right) — frame-077 border scan (unchanged: already frame-true)
+const CELL_NO := [16, 46]
 const CELL_AV := [273, 298]
 const CELL_MO := [298, 323]
 const CELL_LOAN := [323, 359]
 const CELL_WAGE := [359, 429]
 const CELL_Y1 := [429, 454]
 const CELL_Y2 := [454, 479]
-const NO_X0 := 16                                # N° box left edge
-const NO_X1 := 46                                # N° box right edge
+
+# frame-sampled inks
+const C_NO := Color8(0, 0, 128)
+const C_SECTION := Color8(0, 0, 190)
+const C_AV := Color8(212, 63, 0)
+const C_MO := Color8(75, 109, 172)
+const C_LOANC := Color8(100, 130, 10)
+const C_WAGE := Color8(150, 0, 0)
+const C_YEARS := Color8(42, 63, 170)
+const C_EXPIRE_TXT := Color8(255, 31, 0)
+const C_EXPIRE_BG := Color8(255, 255, 170)
+const C_CELL_BG := Color8(240, 240, 240)
+const C_CELL_BRD := Color8(128, 128, 128)
+const C_PRESS := Color8(255, 0, 0)        # baked-button press ring
 
 const AVG_KEYS := ["VE", "RE", "AG", "CA", "RM", "RG", "PA", "TI"]
+const SECTION_LABELS := {
+	"GK": "KEEPERS", "DF": "DEFENDERS", "MF": "MIDFIELDERS",
+	"FW": "FORWARDS", "OUT": "OUTFIELD",
+}
 
-const TABLE := Rect2(6, 50, 510, 426)
-const HDR_Y := 66
-const ROW_X := 8
-const ROW_W := 506
-const ROW0_Y := 84
-const ROW_H := 16
-const NAME_X := 52
-const KIT_SRC := Rect2(0, 0, 31, 64)
-const KIT_BOX := Rect2(534, 150, 100, 130)
-const YOUTH_BTN := Rect2(522, 360, 112, 25)
-const RETURN_BTN := Rect2(522, 440, 112, 25)
-
+var _chrome: Texture2D
+var _chrome_dim: Texture2D
+var _title: Texture2D
+var _title_dim: Texture2D
 var _f12: Font
 var _f10: Font
 var _f8: Font
 
 var _club: Dictionary = {}
 var _manager: String = ""
-var _cash: String = ""
 var _season: String = "1997-98"
 var _week: int = 0
 var _tier: int = 1
-var _nos_ok := false   # club's stored squad numbers are individuated -> N° displayable
+var _nos_ok := false
 var _youth_enabled := false
 var _press := ""
-var _kit_tex: Texture2D
-var _rows: Array = []   # [{r: Rect2 (design space), p: Dictionary}] for player-row taps
-## While the FICHA card is up over this screen the ORIGINAL palette-dims the
-## whole host through the alert dim LUT (walkthrough 081-vs-082: every squad
-## colour maps through alert/dim_lut.json, zero unknowns). Main brackets the
-## card's lifetime with set_dimmed; every draw below routes its colours/
-## textures through the LUT while on.
+var _rows: Array = []
+var _header: Dictionary = {}
 var _dimmed := false
 
 
 func _ready() -> void:
-	_f12 = load("res://art/fonts/proman12.fnt")
-	_f10 = load("res://art/fonts/proman10.fnt")
-	_f8 = load("res://art/fonts/proman8.fnt")
+	_chrome = load("res://art/screens/squad/chrome.png")
+	_title = load("res://art/screens/squad/title_squad.png")
+	_f12 = PMChrome.font("12")
+	_f10 = PMChrome.font("10")
+	_f8 = PMChrome.font("8")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2(W, H)
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -108,19 +118,24 @@ func _ready() -> void:
 	queue_redraw()
 
 
-func setup(club: Dictionary, manager: String = "", cash: String = "", youth_enabled := false,
+func setup(club: Dictionary, manager: String = "", _cash: String = "", youth_enabled := false,
 		season: String = "1997-98", week: int = 0, tier: int = 1) -> void:
 	_club = club
 	_manager = manager
-	_cash = cash
 	_youth_enabled = youth_enabled
 	_season = season
 	_week = week
 	_tier = tier
 	_nos_ok = _squad_numbers_individuated()
-	var cid := int(club.get("id", -1))
-	var path := "res://art/kits/%d.png" % cid
-	_kit_tex = load(path) if cid >= 0 and ResourceLoader.exists(path) else null
+	# Shared silver header (LineupScreen precedent): manager plaque top, club
+	# bottom, the club crest + spiral calendar sheet from the season/week.
+	var d := PMChrome.date_parts(season, week)
+	_header = {
+		"mode": "manager", "top": manager,
+		"bottom": PMChrome.title_case_name(str(club.get("name", ""))),
+		"club_id": int(club.get("id", -1)), "weekday": str(d["wd"]),
+		"day": str(d["day"]), "month": str(d["mon"]), "year": str(d["year"]),
+	}
 	queue_redraw()
 
 
@@ -180,10 +195,8 @@ func _on_input(e: InputEvent) -> void:
 
 # ---- ordering ------------------------------------------------------------
 
-## Sections in the original's display order: within each position group the rows run in
-## REVERSE roster (EQUIPOS record) order — frame 077 shows every Man Utd section exactly
-## file-reversed (the game's loader prepends onto its player list; FUN_00588580 then
-## walks that list). A player signed later (appended to the roster) thus shows first.
+## Sections in display order; within each group REVERSE roster (EQUIPOS record)
+## order — frame 077 lists every Man Utd section file-reversed (squad_number_re.md).
 func _sections() -> Array:
 	var bucket := {"GK": [], "DF": [], "MF": [], "FW": [], "OUT": []}
 	for p in _club.get("players", []):
@@ -200,8 +213,7 @@ func _sections() -> Array:
 
 
 ## True when the club's stored squad numbers are individuated (all present, no
-## duplicates). Lower-division EQUIPOS records often leave the whole squad at the
-## 0x01 pad -> N° isn't stored there and renders "-" (squad_number_re.md).
+## duplicates); else N° renders "-" (squad_number_re.md).
 func _squad_numbers_individuated() -> bool:
 	var seen := {}
 	var n := 0
@@ -215,11 +227,6 @@ func _squad_numbers_individuated() -> bool:
 		n += 1
 	return n > 0 and seen.size() == n
 
-
-const SECTION_LABELS := {
-	"GK": "KEEPERS", "DF": "DEFENDERS", "MF": "MIDFIELDERS",
-	"FW": "FORWARDS", "OUT": "OUTFIELD",
-}
 
 func _pos_of(p: Dictionary) -> String:
 	var pos := str(p.get("pos", ""))
@@ -250,38 +257,30 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.05, 0.07, 0.14), true)
 	draw_set_transform(Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5), 0.0, Vector2(s, s))
 
-	# All PMChrome helpers + _txt route colours/kits through the exact dim LUT
-	# while the FICHA modal is up (MenuScreen alert precedent).
+	# Live silver header + the frame-cut SQUAD MANAGEMENT title. draw_match_header
+	# is not LUT-aware, so it stays bright under the FICHA dim (documented gap).
 	PMChrome.set_dim(_dimmed)
-	PMChrome.draw_bg(self)
-	# Title is the screen's own string "SQUAD MANAGEMENT" @.data 0x65f098 (squad_screen_re.md).
-	PMChrome.draw_header(self, "SQUAD MANAGEMENT", _manager, str(_club.get("name", "")),
-		str(_club.get("leagueName", "")), _season, _week, int(_club.get("id", -1)))
+	PMChrome.draw_match_header(self, "", _header)
+	var title := _title
+	if _dimmed:
+		if _title_dim == null:
+			_title_dim = PMAlert.dim_texture(_title)
+		title = _title_dim
+	if title != null:
+		draw_texture(title, TITLE_XY)
 
-	PMChrome.draw_table_panel(self, TABLE)
-	var secs := _sections()
-	_draw_col_header(str(secs[0]["section"]) if not secs.is_empty() else "")
+	# Body chrome (marble + boxed panel + column headers + scrollbar + buttons).
+	var body := _chrome
+	if _dimmed:
+		if _chrome_dim == null:
+			_chrome_dim = PMAlert.dim_texture(_chrome)
+		body = _chrome_dim
+	if body != null:
+		draw_texture(body, Vector2(0, BODY_Y0))
+
 	_draw_list()
-	_draw_side()
+	_draw_press()
 	PMChrome.set_dim(false)
-
-
-## Top header row (frame 077): N° + the first section's label + the column codes,
-## each code in its own value colour (AV red, MO blue, LOAN olive, WAGE dark red,
-## YEARS blue) on the white panel.
-func _draw_col_header(first_section: String) -> void:
-	_txt(_f10, NO_X1 - 6, HDR_Y + 2, "N°", C_NO, 11, true)
-	_txt(_f10, NAME_X, HDR_Y + 2, first_section, C_SECTION, 11)
-	_cell_code("AV", CELL_AV, C_AV)
-	_cell_code("MO", CELL_MO, C_MO)
-	_cell_code("LOAN", CELL_LOAN, C_LOANC)
-	_cell_code("WAGE", CELL_WAGE, C_WAGE)
-	_txt(_f10, (CELL_Y1[0] + CELL_Y2[1]) / 2 + 16, HDR_Y + 2, "YEARS", C_YEARS, 11, true)
-
-
-func _cell_code(code: String, span: Array, col: Color) -> void:
-	var w := _f10.get_string_size(code, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x if _f10 else 0.0
-	_txt(_f10, int((span[0] + span[1] - w) / 2.0), HDR_Y + 2, code, col, 11)
 
 
 func _draw_list() -> void:
@@ -290,9 +289,12 @@ func _draw_list() -> void:
 	var n_players := 0
 	for sec in secs:
 		n_players += (sec["players"] as Array).size()
-	var n_rows := n_players + secs.size()
-	var avail := int(TABLE.end.y - 4) - ROW0_Y
-	var row_h: int = ROW_H if n_rows == 0 else clampi(avail / n_rows, 11, ROW_H)
+	# section bands: one per group EXCEPT the first (KEEPERS is baked into the
+	# column-header row) — the original lists KEEPERS inline with the codes.
+	var n_bands := maxi(0, secs.size() - 1)
+	var n_rows := n_players + n_bands
+	var avail := (PANEL_Y1 - 2) - ROW0_Y
+	var row_h: int = ROW_PITCH if n_rows == 0 else clampi(avail / n_rows, 11, ROW_PITCH)
 
 	var y := ROW0_Y
 	var first := true
@@ -302,36 +304,32 @@ func _draw_list() -> void:
 			y += row_h
 		first = false
 		for p in sec["players"]:
-			if y + row_h > int(TABLE.end.y - 4):
+			if y + row_h > PANEL_Y1 - 2:
 				return
 			_row(y, p, str(sec["key"]), row_h)
 			y += row_h
 
 
-## Section band: the original draws just the blue group label on the white panel
-## (the first group's label lives in the column-header row instead).
+## Section band: the blue group label on the white panel (frame 077).
 func _section(y: int, label: String, row_h: int) -> void:
-	_txt(_f10, NAME_X, y + maxi(1, (row_h - 12) / 2), label, C_SECTION, 11)
+	_txt(_f10, NAME_X, y + maxi(2, (row_h - 12) / 2), label, C_SECTION, 11)
 
 
-## A boxed cell of the contract row: light-grey fill, grey border (frame 077 rows
-## are individual 13px boxes at 16px pitch).
+## A boxed row cell: grey-240 fill, grey-128 border (frame-077 per-cell boxes).
 func _cell(x0: int, x1: int, y: int, row_h: int, bg: Color = C_CELL_BG) -> void:
-	var r := Rect2(x0, y, x1 - x0, row_h - 3)
+	var r := Rect2(x0, y, x1 - x0, row_h - 2)
 	draw_rect(r, PMChrome.dim_col(bg), true)
 	draw_rect(r, PMChrome.dim_col(C_CELL_BRD), false, 1.0)
 
 
-func _row(y: int, p: Dictionary, key: String, row_h: int) -> void:
+func _row(y: int, p: Dictionary, _key: String, row_h: int) -> void:
 	_rows.append({"r": Rect2(ROW_X, y, ROW_W, row_h - 1), "p": p})
-	var ty: int = y + maxi(1, (row_h - 14) / 2)
+	var ty: int = y + maxi(2, (row_h - 12) / 2)
 
-	# N° | PLAYER | AV | MO | LOAN | WAGE | YEARS(term|left) boxed cells. A GameDB
-	# browse club has no career contract fields -> YEARS renders "-" (no fake expiry).
 	var has_contract := p.has("contract_years")
 	var expiring := has_contract and int(p.get("contract_years", 1)) <= Contract.EXPIRING_YEARS
-	_cell(NO_X0, NO_X1, y, row_h)
-	_cell(NO_X1, CELL_AV[0], y, row_h)
+	_cell(CELL_NO[0], CELL_NO[1], y, row_h)
+	_cell(CELL_NO[1], CELL_AV[0], y, row_h)              # NAME cell
 	_cell(CELL_AV[0], CELL_AV[1], y, row_h)
 	_cell(CELL_MO[0], CELL_MO[1], y, row_h)
 	_cell(CELL_LOAN[0], CELL_LOAN[1], y, row_h)
@@ -339,22 +337,17 @@ func _row(y: int, p: Dictionary, key: String, row_h: int) -> void:
 	_cell(CELL_Y1[0], CELL_Y1[1], y, row_h)
 	_cell(CELL_Y2[0], CELL_Y2[1], y, row_h, C_EXPIRE_BG if expiring else C_CELL_BG)
 
-	# N°: the decoded EQUIPOS squad number; "-" when this club's numbers aren't
-	# individuated in the source data (never invented).
+	# N°: decoded EQUIPOS squad number; "-" when this club's set isn't individuated.
 	var no_txt := str(int(p.get("squadNo", 0))) if _nos_ok else "-"
-	_txt(_f10, NO_X1 - 6, ty, no_txt, C_NO, 11, true)
+	_txt(_f10, CELL_NO[1] - 8, ty, no_txt, C_NO, 11, true)
 
-	# Name: black, like the frame; an injured/suspended player keeps the status
-	# suffix the DATA-BASE view surfaced (availability must stay visible here).
+	# Name: black; injured/suspended keeps its status suffix (availability stays visible).
 	var st := Availability.status(p)
 	_txt(_f10, NAME_X, ty, str(p.get("name", "?")).substr(0, 24), Color.BLACK, 11)
 	if st["state"] != "FIT":
 		_txt(_f8, CELL_AV[0] - 52, ty, "%s %dw" % [st["state"], int(st["weeks"])], st["colour"], 10)
 
-	# AV = the real rating (FUN_00581e60); MO = the displayed morale base
-	# (FUN_00582db0; the finance/position display terms are decoded but held
-	# back pending frame validation — morale_re.md). Pre-career dicts without
-	# the bars still render "-".
+	# AV = real rating (FUN_00581e60) with form, else _avg_of for a bare GameDB club.
 	var has_form := p.has("morale") or p.has("fitness")
 	_txt(_f10, CELL_AV[1] - 5, ty, str(Morale.av6(p)) if has_form else str(_avg_of(p)),
 		C_AV, 11, true)
@@ -368,6 +361,15 @@ func _row(y: int, p: Dictionary, key: String, row_h: int) -> void:
 	_txt(_f10, CELL_Y1[1] - 8, ty, str(term) if has_contract else "-", C_YEARS, 11, true)
 	_txt(_f10, CELL_Y2[1] - 8, ty, str(left) if has_contract else "-",
 		C_EXPIRE_TXT if expiring else C_YEARS, 11, true)
+
+
+## Baked-button press feedback: a 2px ring on the held button (the buttons
+## themselves are baked chrome; the ring is the app's tap affordance).
+func _draw_press() -> void:
+	if _press == "youth" and _youth_enabled:
+		draw_rect(YOUTH_BTN.grow(1.0), PMChrome.dim_col(C_PRESS), false, 2.0)
+	elif _press == "return":
+		draw_rect(RETURN_BTN.grow(1.0), PMChrome.dim_col(C_PRESS), false, 2.0)
 
 
 ## Thousands-separated integer for the WAGE column ("£1,000,000", frame 077).
@@ -395,35 +397,3 @@ func _avg_of(p: Dictionary) -> int:
 			sum += float(a[k])
 			n += 1
 	return int(round(sum / n)) if n > 0 else 0
-
-
-## Right column: squad count, the club kit, the YOUTH TEAM + RETURN buttons.
-func _draw_side() -> void:
-	var px := 522.0
-	var pw := 112.0
-	var n := 0
-	for p in _club.get("players", []):
-		if int(p.get("id", -1)) >= 0:
-			n += 1
-	PMChrome.bevel(self, Rect2(px, 52, pw, 44), Color(0.10, 0.16, 0.34), C_DKBTN_HI, C_DKBTN_LO)
-	_txt(_f10, int(px) + 6, 56, "SQUAD", C_PANEL_TXT, 11)
-	_txt(_f12, int(px + pw) - 8, 74, "%d players" % n, Color.WHITE, 13, true)
-
-	if _kit_tex != null:
-		var sc: float = min(KIT_BOX.size.x / KIT_SRC.size.x, KIT_BOX.size.y / KIT_SRC.size.y)
-		var kw := KIT_SRC.size.x * sc
-		var kh := KIT_SRC.size.y * sc
-		var kt := PMAlert.dim_texture(_kit_tex) if _dimmed else _kit_tex
-		draw_texture_rect_region(kt,
-			Rect2(KIT_BOX.position.x + (KIT_BOX.size.x - kw) * 0.5,
-				KIT_BOX.position.y + (KIT_BOX.size.y - kh) * 0.5, kw, kh), KIT_SRC)
-
-	var yb := YOUTH_BTN
-	var ybase := (C_BTN_HI if _press == "youth" else C_BTN) if _youth_enabled else C_DKBTN
-	PMChrome.bevel(self, yb, ybase, C_BTN_HI if _youth_enabled else C_DKBTN_HI, C_DKBTN_LO)
-	_txt(_f10, int(yb.position.x) + 10, int(yb.position.y) + 7, "YOUTH TEAM",
-		Color(0.92, 1.0, 0.94) if _youth_enabled else PMChrome.C_STAR_OFF, 11)
-
-	var rb := RETURN_BTN
-	PMChrome.bevel(self, rb, C_DKBTN_HI if _press == "return" else C_DKBTN, C_DKBTN_HI, C_DKBTN_LO)
-	_txt(_f10, int(rb.position.x) + 30, int(rb.position.y) + 7, "RETURN", C_GOLD, 12)

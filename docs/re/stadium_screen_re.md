@@ -1,77 +1,97 @@
-# GROUND (ESTADIO) screen — RE findings + rebuild
+# GROUND (ESTADIO) screen — RE findings + frame-true rebuild
 
-Status: **BUILT** (`app/scenes/StadiumScreen.gd`, `tools/re/preview_stadium.py`,
-`app/tests/test_stadium_screen.gd`). The previous note deferred this as "capacity-driven
-isometric geometry that must be reversed first" — **that premise was wrong**. There is no
-runtime isometric stand builder: the stadium is one of **12 pre-rendered scenes**, picked
-by a single capacity→tier division. Everything is reversible the normal way.
+Status: **REBUILT frame-true** (2026-07-13). Owns `app/scenes/StadiumScreen.gd`,
+`tools/re/build_stadium_chrome_from_frames.py`, `app/art/screens/stadium/chrome.png`,
+`app/tests/test_stadium_screen.gd`, `app/tests/test_stadium_works.gd`.
 
-## The real mechanism
-The drawn stadium is `ESTADIO<tier>.BMP` (RECURSOS.PKF), tier `0..11` — 12 full scenes,
-each **320×240, 8bpp, no embedded palette** (BM core header, `bfOffBits=26`). They are the
-half-res backdrop, blitted across the reversed client rect `CRect(0,0,640,480)` (set in the
-window base `FUN_004fa840`) at 2×. tier 0 = open pitch, tier 11 = covered mega-stadium.
+## Why the previous build was rejected (de-invention record)
+The prior StadiumScreen ("two-column recompose (ma_15)", commit `e03da33`) was **invented**.
+It drew a white **MATCH DAY card with a TICKET PRICE stepper** and a **SPONSOR BOARDS price
+slider** on the left, and a **CAPACITY / CAR PARK / PITCH = "NORMAL"** readout on the right.
+**None of that is on the GROUND overview.** The reference "ma_15" **does not exist** in the
+repo (no such file) — the commit's "verified vs ma_15" claim was unfounded, and the audit's
+`| stadium … | TRUE |` row was stale. Ticket price + sponsor boards belong to the *separate*
+**GROUND MATCH DAY** sub-screen (run-3 capture), not here. `SPEC_BINDING.md §6` already flagged
+the earlier "SEATS/STAND/TIER" readouts as removed-invented; this pass removes the second wave.
 
-**Palette:** MANAGER.PAL (RIFF, in DAT.PKF). The scenes omit their palette, so PIL
-synthesises a junk one — render with `export_art.py one RECURSOS.PKF "ESTADIO<n>.BMP" out.png
---pal MANAGER.PAL --force-pal` (the `--force-pal` is required; without it you get colour
-noise). MENU/DBASE/INFOSURF are byte-identical for these indices; the SIMUL*.PAL are wrong
-(red match-sim palette).
+## The binding frame (source of truth)
+`screenshots/original-walkthrough-2026-07-02/172_154930.png` — the real MANAGER.EXE GROUND
+overview, default **"WORK IN PROGRESS"** state (Man Utd / Old Trafford). Neighbours:
+`170_154926` (hub, GROUND button under FINANCES), `173_154935`/`175`/`177` (the **IMPROVE**
+dialog: IMPROVEMENTS category picker SEATS/CAR PARK/FACILITIES/SERVICES → per-category option
+cards with £cost + weeks; a **Main-owned overlay**, not this screen).
 
-**Tier formula** (reversed from the OnDraw `FUN_0051a6e0` @0x51a728, magic-division
-`(total*11) * 0x810e35c1 >> 48`, clamped):
-```
-tier = clamp( capacity * 11 / 130000 , 0 , 11 )      # 130000/11 ≈ 11818 per tier
-```
-where `capacity = stadium.field4 + stadium.field8` (seated + standing totals). We feed the
-SAME capacity the finance screen uses (`FinanceModel.summary`), so tier and finance agree.
+## Real layout (frame 172, all rects pixel-measured off the frame grid)
+Two panels on the shared BARRA header + marble background (`PMChrome.draw_header` /
+`PMChrome.draw_bg`, same as every career screen — NOT baked here).
 
-## Module map (MANAGER.EXE)
-- `FUN_0051a3e0` ctor (`operator_new(0x3a94)`); builds the picture surface at `+0x193c`.
-- `FUN_004fa840` window base — `CRect(0,0,0x280,0x1e0)` = 640×480, takes bg id `0x3a3`.
-- **`FUN_0051a6e0` = OnDraw** (the main overview). Loads `estadio<tier>.bmp` into the
-  surface (`FUN_005c9f60`, asset prefix `recursos\iconos\estadio\estadio` @0x65b234 +
-  `%d` + `.bmp`), then draws the title, info panel and 2×2 button grid.
-- `FUN_0051bd80` = the **WORKS / construction sub-view** (facility counters SEATS / CAR PARK
-  / FACILITIES / SERVICES at x6–140 + `gradas`/`parking`/`equipam`/`extras` + `Enobras`
-  under-construction overlays). **WORKS is now a live spending lever (T2 #5):** the button
-  emits `works_pressed`; `Main._show_stadium_works()` offers expansion options (+2k/+5k/+10k
-  capacity, £cost, build weeks), `Career.start_works()` pays up front, `Career._tick_works()`
-  advances it each played week, and on completion `stadium_capacity` rises and
-  `_recompute_weekly_net()` feeds the bigger gate into the books (the stadium TIER picture
-  also steps up, since it reads the same capacity). The original's exact facility-counter
-  sub-layout (4 separate gradas/parking/equipam/extras counters) is NOT reproduced — we
-  model one combined capacity lever; the in-progress state shows as a gold banner on the
-  overview. IMPROVE / MATCH DAY stay inert.
-Helper conventions (proven family): `FUN_00436fb0(x,y)` point (x = last push), first point
-made = SIZE, second = POS; `FUN_00436fd0(pos,size)` = Rect(pos, pos+size); `FUN_00437020`
-text colour; `FUN_005c06d0(...,0x32,...)` icon blit.
+**LEFT — "WORK IN PROGRESS" panel** (`x12..282, y68..466`), road-works triangle title, four
+sections each with a black title bar (coloured section icon) + **TO BE PAID** / **WEEK**
+column heads + framed value rows, then **TOTAL IMPROVEMENTS … £0** on the grey footer:
+- **SEATS** (blue), **CAR PARK** (blue, "P" icon) — one value row each
+- **FACILITIES** (green): FLOODLIGHTS / HEATING / CHANG. ROOMS / SCORE BOARD / ACCESS
+- **SERVICES** (orange): SICKROOM / CLUB SHOPS / CAFES / TOILETS
+These section + facility labels are the game's own fixed labels (frame-baked, not invented).
 
-## Reversed overlay rects (exact, from FUN_0051a6e0) — pos(left,top) size(w,h)
-- **TITLE "GROUND"** (string @0x65b19c) pos(150,16) size(297,27), ProMan14, in the BARRA.
-- **Info panel** pos(299,73) size(320,73) → (299,73,619,146), ProMan10 (ground name +
-  capacity readout).
-- **2×2 action grid**, each a button widget + its icon (`FUN_005c06d0` state 0x32),
-  label colour `(0xa0,0xa0,0xc8)` = (160,160,200):
-  - IMPROVE  (@0x65b1f8) pos(298,407) size(152,25) + `remodela.bmp`
-  - WORKS    (@0x65b1c8) pos(484,407) size(132,25) + `obras.bmp`
-  - MATCH DAY(@0x65b228) pos(298,442) size(152,25) + `diapartido.bmp`
-  - RETURN   (@0x6549e4) pos(488,442) size(124,25)
-  (The earlier note's single-column WORKS/IMPROVE/MATCH DAY at x298 y372/407/442 was a
-  mis-read — the real layout is this 2-column, 2-row grid.)
+**RIGHT — ground panel** (`x296..620`):
+- green header `y71..91` — the **ground name** (white, centred)
+- 3-row table (label cell light `200,220,240` | value cell gradient `100/80/60,…`):
+  **CAPACITY** `y94..108` → "55,300 seats", **CAR PARK** `y111..125` → "2,000 spaces",
+  **PITCH** `y128..142` → "GOOD"
+- **ESTADIO<tier> picture** `Rect2(299,148,320,240)` — the 320×240 tile drawn 1:1.
 
-## What is derived, not reversed
-GameDB stores only **total** capacity, so the seated/standing/parking split shown in the
-info panel is display-derived (`~62%` seated, rest terraces, parking ≈ capacity/27). The
-**tier** depends only on total capacity (the exact reversed formula), so the picture is
-always faithful; only the sub-split labels are estimates (flagged in `Main._show_stadium_screen`).
+**Bottom 2×2 action grid** (reversed rects from `FUN_0051a6e0`, baked icons/labels):
+IMPROVE `(298,407,152,25)` · WORKS `(484,407,132,25)` · MATCH DAY `(298,442,152,25)`
+(disabled/washed in the frame) · RETURN `(488,442,124,25)`.
 
-## Assets produced
-`app/art/screens/stadium/estadio0..11.png` (12 tiers, MANAGER.PAL) +
-`obras.png`/`remodela.png`/`diapartido.png` (button icons, idx0 transparent). The icons are
-BM-with-no-palette; the export_art `--transparent` BM path drops them, so they were extracted
-with the proven `riff_palette` + idx0→alpha directly (see git history / preview_stadium).
+## Tier picture
+`tier = clamp(capacity * 11 / 130000, 0, 11)` (reversed `FUN_0051a6e0` @0x51a728, magic
+division). 12 tiles `estadio0..11.png` (320×240, MANAGER.PAL). The frame's Old-Trafford
+render = tier 4 (real capacity 55,300). The tile matches the frame's scene (a small internal
+crop/palette offset vs the live render is an export artefact, not a placement error); it fills
+the picture box exactly and covers the baked tile so no tier bleed is possible.
 
-## Wiring
-`MENUPRINCIPAL` `stadium` action → `Main._show_stadium_screen()` (was a toast), tap-to-dismiss
-overlay, native 640×480 self-scaling + marble bezel like the other screens.
+## What is frame-true vs honest gap
+- **Frame-true (baked or reversed):** the entire body chrome — both panels, all section/
+  facility/column/button labels + icons, TOTAL IMPROVEMENTS, the green header, the table
+  frame, the 2×2 grid, the tier picture box, all rects.
+- **From real Career:** ground name = GameDB `club.stadium`; CAPACITY = `Career.stadium_capacity`;
+  tier = from that capacity. (Only **15/476** clubs carry a real `capacity` in `game_db.json`;
+  the rest — incl. Man Utd — fall back to `FinanceModel._CAP` per division, so the in-app
+  capacity/tier can differ from the frame's real 55,300/tier-4. That is a DB-layer gap, not a
+  screen bug.)
+- **HONEST GAPS (blank, never fabricated):** **CAR PARK spaces** and **PITCH quality** are in
+  no `game_db.json` field. The prior build's parking = `capacity/27` and pitch = "NORMAL" were
+  fabrications; both value cells are now left blank. **TOTAL IMPROVEMENTS** money = £0 (an
+  in-progress expansion's £cost is not threaded to this screen — see WIRING).
+
+## The chrome bake
+`tools/re/build_stadium_chrome_from_frames.py` cuts the two panels + four buttons opaque from
+frame 172 into `app/art/screens/stadium/chrome.png` (RGBA 640×480, transparent elsewhere) and
+BLANKS the dynamic cells (ground name, 3 value cells, £-total) with their frame-sampled flat
+backgrounds. StadiumScreen draws: `draw_bg` → `draw_header` → chrome → estadio<tier> →
+ground-name / capacity / £-total text → press tints. Parity vs frame 172 outside the tile:
+mean abs diff **3.96** (chrome is the frame's own pixels; residual = text-glyph rendering).
+
+## WIRING (owned by Main.gd — NOT changed here)
+`Main._show_stadium_screen()` still calls `scr.setup(club, manager, season, ground, cap,
+seated, standing, parking, works_status, ticket, board, week, league)`. The signature is
+unchanged so Main needs no edit, but **`seated / standing / parking / ticket / board` are now
+ignored** — they fed the removed invented ticket/sponsor/split readouts (Main can stop
+computing `seated`, `parking = cap/27`, `ticket_price`, `board_price` for this screen). Two
+follow-ups for full frame-truth, both Main-side:
+1. Pass **structured `Career.works` (added/cost/weeks_left)** instead of only a status string,
+   so the SEATS row can fill the exact TO BE PAID (£) / WEEK cells and TOTAL IMPROVEMENTS can
+   show the real sum. Today a non-empty `works` string is shown on the SEATS row and the money
+   total stays £0.
+2. Optionally pass the managed `club_id` to `draw_header` for the barra crest (currently −1).
+The frame-true **IMPROVE** dialog (category picker + option cards) and **GROUND MATCH DAY** /
+**CAR PARK grid** sub-screens remain Main-owned; IMPROVE + WORKS both currently open Main's
+single expansion browse (`_show_stadium_works`).
+
+## Module map (MANAGER.EXE, unchanged)
+- `FUN_0051a3e0` ctor · `FUN_004fa840` window base `CRect(0,0,640,480)` · **`FUN_0051a6e0` =
+  OnDraw** (loads `recursos\iconos\estadio\estadio%d.bmp`, draws title/panels/2×2 grid) ·
+  `FUN_0051bd80` = the IMPROVE/works construction sub-view.
+Helpers: `FUN_00436fb0`/`FUN_00436fd0` point/rect, `FUN_00437020` text colour, `FUN_005c06d0`
+icon blit. Palette MANAGER.PAL (RIFF, DAT.PKF); scenes omit palette → export with `--force-pal`.

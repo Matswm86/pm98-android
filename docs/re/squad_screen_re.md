@@ -55,3 +55,48 @@ its own value colour, and the first section's label lives in that header row.
   the ability sort is gone. Row-height compression for deep squads remains our one
   documented deviation (the original pages/scrolls per section).
 Wired to the hub PLAYERS button (Main `_show_squad_screen`) 2026-07-02.
+
+## Frame-baked rebuild — REBUILT 2026-07-13 (supersedes the "Build mapping" above)
+The chrome is now the real frame VERBATIM, not hand-drawn (RivalScreen/LineupScreen
+header-rollout doctrine). `tools/re/build_squad_chrome_from_frames.py` cuts frame
+`077_154612` into two assets under `app/art/screens/squad/`, every measured invariant
+asserted so a bad crop fails loudly (re-run is deterministic — byte-identical output):
+- **chrome.png** 640×418 = frame body y62..479 VERBATIM: blue-marble FONDO, white boxed
+  table panel, the `N° KEEPERS AV MO LOAN WAGE YEARS` column-header row (each code in its
+  value colour, KEEPERS baked inline as the frame lists it), the per-section scrollbar and
+  the YOUTH TEAM + RETURN buttons — only the player-row grid cleared to panel white.
+- **title_squad.png** = the frame's own `SQUAD MANAGEMENT` grey-emboss glyphs composited
+  over `header/band.png` (the band ghost interpolated out) so it blits seamlessly over the
+  live header.
+`SquadScreen.gd` paints ONLY the dynamic layer: the shared SILVER header via
+`PMChrome.draw_match_header` (the SAME header LINE-UP / VIEW RIVAL validated 0px against),
+the title sprite, chrome.png over `BODY_Y0=62`, then the DEFENDERS/MIDFIELDERS/FORWARDS
+section bands + per-cell player rows (grey-128 border, grey-240 fill, 16px pitch — the
+frame's own structure) at the measured cell x-spans and frame-sampled inks. The OLD
+invented chrome is GONE: the dark-navy `management_bg`, the blue title bar, the SQUAD-count
+box and the club-kit (`_kit_tex`) right panel were never in the frame — the frame's right
+column is the scrollbar + the two buttons. (The stale "Build mapping" bullets above — the
+attribute-grid columns, the squad-count box, the placeholder YOUTH button — are retained
+only as the pre-2026-07-02 history; the contract-view + frame-bake supersede them.)
+
+### Divergences / honest gaps (frame-true vs app deviation)
+- **Row-height compression** — the original pages/scrolls each section; we compress row
+  pitch (11..16px) to fit a deep squad on one panel. The one intentional layout deviation.
+- **Per-section scrollbar is baked static** (non-functional): a consequence of fitting all
+  rows — nothing to scroll. The original's live per-section paging is not reproduced.
+- **MO = `-` for a form-less club** (bare GameDB browse / the shot_screens demo fixture):
+  morale is a dynamic save value, absent until a Career carries it. Honest gap, NOT the
+  static RM attribute (APP_VS_SPEC_AUDIT B7). Real career rosters render the live MO.
+- **N° = `-` for a pad club** (squad set not individuated): what the original engine
+  displays for a `0x01`-pad squad is UNRESOLVED — no walkthrough frame of a pad club's
+  SQUAD exists (`squad_number_re.md`). Individuated clubs (Man Utd et al.) show real N°.
+- **AV for a form-less club** falls back to `_avg_of` (mean of 8 outfield attrs) rather than
+  the real `FUN_00581e60` rating, which needs FITNESS/MORAL form. Career squads use the real
+  formula (`Morale.av6`).
+- **Header stays bright under the FICHA dim**: `draw_match_header` is not LUT-aware and
+  PMChrome is out of this screen's edit scope; the body + rows dim through the exact alert
+  LUT, the silver header does not. Documented PMChrome gap.
+- **Demo/synthetic render** (`squad_demo.png`, Arsenal fixture) shows the layout frame-true
+  but with synthetic values (MO `-`, form-less AV); it is a chrome/layout witness, not a
+  data-parity capture. The data-level frame truth is asserted at BAKE time against frame 077
+  (header codes, cell separators, AV/WAGE/YEARS colours, the expiring yellow LEFT-cell).

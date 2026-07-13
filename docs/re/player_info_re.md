@@ -113,3 +113,25 @@ the broad LUT -- corrected 2026-06-26.)
   (HOLLAND/NORWAY show NATIONAL → EU/EEA-1997 "comunitario" class, not
   British-only). The FICHA RATING formula stays un-RE'd (80/82 in frames vs our
   squad-AV; box parity-excluded).
+
+## Divergences / parity status — RE-VERIFIED 2026-07-13
+The screen is `app/scenes/PlayerInfoScreen.gd` (fonts `_f8/_f10/_f12` at native .fnt
+sizes — the old `_f18` name font is gone). Verified this pass:
+- **Parity 0px** — `shot_entry_parity.gd` + `diff_entry_parity.py`: `ficha_081` vs
+  `081_154619` and `ficha_084` vs `084_154626` both **0px, pixel-exact** (ROI = the card
+  (76,58)-(564,421)). The RENEW/TRANSFER/SACK/OK row is part of that baked frame chrome, so
+  its parity is included in the 0px result.
+- **Contract overlay LIVE**: `test_player_actions.gd` ALL PASS — `_hit`/signals for RENEW,
+  TRANSFER, SACK, OK; read-only hides the three action buttons for another club's player;
+  `Career.release` guards (squad floor / keeper floor / loanee-not-sackable).
+- **RATING now RE'd + parity-INCLUDED** (superseding the "un-RE'd/excluded" line above):
+  the real `FUN_00581e60` = (VE+RE+AG+CA+FITNESS+MORAL)/6 renders 0px vs 081/084 (80/82).
+  See morale_re.md / ficha_card_re.md.
+- **Honest gaps** (full list in **ficha_card_re.md** "Honest gaps"): WEIGHT/HEIGHT shown
+  METRIC by standing user call (imperial parity-excluded); BIGFOTO downscale kernel un-RE'd
+  (NEAREST fit, photo block excluded); the info coin is decorative (FUN_00526640, id -1, no
+  handler — NOT a bio deep-link); the read-only (DATA BASE browse) opener covers the three
+  action buttons with card white — that opener state is un-walked, kept app behaviour not
+  frame truth; dismissal animation un-evidenced (closes instantly); non-EU KIND = hypothesis
+  (no non-EU FICHA walked). A form-less demo/GameDB dict renders `-` for WEIGHT/HEIGHT and
+  the match-fit/settled defaults for FITNESS/MORAL.

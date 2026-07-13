@@ -1,92 +1,101 @@
-# Backroom Staff (EMPLE) — reverse-engineering notes + model
+# CLUB PERSONNEL (EMPLEADOS / backroom staff) — reverse-engineering notes
 
-The STAFF screen is the Main Menu's EMPLE (empleados) icon. Until this session that icon
-held the *interim* training screen (flagged since the training rollout); it now opens a
-real staff screen with hire/sack, and training is nested under it (the trainer context).
+The Main Menu's **EMPLE** (empleados) icon opens the original's **CLUB PERSONNEL** screen.
+Rebuilt FRAME-TRUE 2026-07-13 from the live walkthrough, replacing the earlier
+strings-only substitute (audit `APP_VS_SPEC_AUDIT.md` B1: *"strings-only, NO reversed
+layout"* + an invented TRAINING browse on the same icon). TRAINING (ENTRENAMIENTO) is a
+SEPARATE original screen — the rebuilt CLUB PERSONNEL no longer depends on the invented
+browse and has NO training button.
 
-## Faithful surface (strings scanned from MANAGER.EXE)
+## Binding frames (owned game frames, run1 15:47)
+`screenshots/original-walkthrough-2026-07-02/`
+- **121_154736.png** — the clean CLUB PERSONNEL screen (Man Utd / MWM, 1 Aug 1997). The
+  build's binding frame.
+- **113..120** — the **hire overlay** (per role category). 113 = ASS. MANAGER, 115 = YOUTH
+  MANAGER (vacant), 117 = YOUTH TEAM SCOUT, etc.
 
-```
-STAFF / Staff Wages / STAFF WAGES / STAFF AVAILABLE / CURRENT TRAINING STAFF / TRAINING STAFF
-"1 member of staff" / " members of staff"
-TRAINER / TRAINERS / Trainer        PHYSIO. / PHYSIOTHERAPIST / PHYSIOTHERAPISTS
-SCOUT / SCOUTS                       YOUTH TEAM SCOUT / YOUTH SCOUT / SCOUTS YOUTH TEAM
-YOUTH MANAGER / YOUTH TEAM MANAGER   ASSISTANT MANAGER / ASSISTANT
-HIRE  (recursos\iconos\empleados\contratar.bmp / contratargente.bmp / contratarsacos.bmp)
-SACK  (recursos\iconos\empleados\despedir.bmp)     billete.bmp (the wage / money icon)
-emple3/emple6/emple7.bmp (role icons)              recursos\iconos\NIVELES\Entrenador0/1.bmp
-YEARLY WAGE / MONTHLY WAGE / WAGE   CONTRACT / COMPENSATIONS OF CONTRACT
-"Are you sure you want to sack him ?"
-"The directors board will not let you sack this player."
-"you have to have hired trainers."   "you need to hire an Assistant."
-"This option is automatic in the Trainer level."   Options "Automatic contract renewal"
-recursos\iconos\menuprincipal\emple{gris,on,off}.bmp   (the EMPLE menu icon states)
-```
+## The real layout (witnessed, frame 121)
+Header barra: club/manager plaque + crest, **CLUB PERSONNEL** title, calendar sheet
+(Friday 1 August 1997), Preseason / Preparation band — the shared PMChrome header.
 
-So PM98's staff are TRAINER(s), PHYSIOTHERAPIST(s), SCOUT(s), YOUTH TEAM SCOUT, YOUTH
-MANAGER and an ASSISTANT MANAGER, hired from a pool (STAFF AVAILABLE) into the backroom,
-paid STAFF WAGES, sacked for a contract COMPENSATION (with an "Are you sure ?" confirm and a
-board veto on key staff). Higher "Trainer level" automates options (e.g. auto contract
-renewal, automatic training).
+Body, on a dark panel:
+- **TRAINING STAFF** section header, then a **2-col x 3-row grid** of skill trainers. Each
+  cell = a blue skill label over a colour name-bar (white staff name at left + gold
+  half-star rating at right) with a red **WAGE** / black **£amount** block:
+  - left col:  HANDLING · DRIBBLING · TACKLING
+  - right col: PASSING · HEADING · SHOOTING
+- Seven **role cards** below, laid out **MIRRORED** left/right with the role's VGA portrait
+  on the OUTER edge (white pixels: physio in a lab coat, groundsman in green, etc.):
+  - left col (name-bar left / WAGE right):  PHYSIOTHERAPIST · ASSISTANT MANAGER ·
+    YOUTH TEAM MANAGER · GROUNDSMAN
+  - right col (WAGE left / name-bar right):  PSYCHOLOGIST · SCOUT · YOUTH TEAM SCOUT
+- Bottom-centre **SIGN** (money icon) + **SACK** buttons; bottom-right **RETURN** (globe).
 
-## What we built (and what is ours vs PM98's)
+Ratings are **0..5 in half-star steps** (a gold half-star = .5). Each role's name-bar has a
+themed colour: training bars run orange→red, PHYSIO/PSYCH lavender, ASS.MANAGER/SCOUT/
+YOUTH MANAGER steel-blue, YOUTH SCOUT mauve, GROUNDSMAN green.
 
-PM98's staff EFFECTS + wages are **data-driven** (loaded from the save), like the
-fee/finance models — nothing numeric to port. So the **surface** above is PM98's; the
-**model** is ours, in `app/scripts/Staff.gd`. Scoped to the three roles with clean hooks
-into the systems already built; a general transfer SCOUT and the ASSISTANT MANAGER
-(automation) are deferred.
+Witnessed reference staff (frame 121, Man Utd — transcribed pixel-by-pixel, SOURCE not
+invented; the parity oracle + default fixture, in `personnel_chrome.json` REF_STAFF):
+HANDLING A. Padmore ★★★ £17,000 · PASSING D. Gledhill ★★★★½ £34,000 · DRIBBLING S. Merrick
+★★★★★ £47,000 · HEADING A. Mitchell ★★★ £16,000 · TACKLING T. O'Brian ★★★★½ £21,000 ·
+SHOOTING T. Alan ★★★★½ £33,000 · PHYSIOTHERAPIST P. Gelbier ★★★★★ £45,000 · PSYCHOLOGIST
+J. Bodin ★★★★½ £15,000 · ASSISTANT MANAGER A. Leigh ★★★★ £16,000 · SCOUT K. Hatch ★★★★½
+£45,000 · YOUTH TEAM MANAGER D. Read ★★★½ £21,000 · YOUTH TEAM SCOUT W. Sugar ★★★★★
+£36,000 · GROUNDSMAN G. Debnam ★★★★½ £4,000.
 
-- **Roles + effects** (`Staff.gd`): each hired member has a role, a 1–5 **quality** and a
-  yearly **wage** (wage = base + quality·step per role). The aggregate effect scales with
-  the total quality in a role, clamped:
-  - **TRAINER** → `training_factor` (1.0 → 1.5): speeds player development. Fed into
-    `Training.train_week(..., dev_factor)` — applied to the *improvement* rate only, so a
-    trainer never hastens a veteran's decline.
-  - **PHYSIOTHERAPIST** → `physio_factor` (1.0 → 0.55): multiplies the injury risk down in
-    `Availability.roll_match` (alongside the training-intensity multiplier).
-  - **YOUTH COACH** → `youth_factor` (1.0 → 1.6): fed into `Youth.intake` (better crop) and
-    `Youth.develop_week` (faster growth).
-  - **No staff = factor 1.0 everywhere**, so training/injuries/youth keep their prior tuning
-    — staff is pure upside, not a regression.
-- **Career integration** (`Career`): a new career starts with **no staff** but a
-  `staff_pool` of `STAFF_POOL_SIZE` (6) candidates (refreshed each season). `advance_week`
-  applies the three factors and draws the weekly **STAFF WAGES** from cash. `hire_staff`
-  moves a candidate pool→staff (guarded by `STAFF_MAX`=8 and affordability — the board won't
-  fund a hire you can't pay); `sack_staff` moves him back and pays the **COMPENSATIONS OF
-  CONTRACT** (`SACK_WEEKS`=8 weeks' wage) from cash. `staff`/`staff_pool`/`staff_seq` persist
-  (candidate ids minted from `STAFF_ID_BASE`=800000); a pre-staff save loads no staff
-  (effects = 1.0) and gets a pool at the next rollover.
-- **Screen** (`app/scenes/StaffScreen.gd`): PM98 chrome, two sections — CURRENT STAFF (tap a
-  member to SACK) and STAFF AVAILABLE (tap to HIRE) — with role, quality stars and yearly
-  wage, plus a STAFF WAGES total and the live `+X% dev / −X% injuries / +X% youth` effect.
-  Interactive like `MenuScreen`. **SACK is a two-tap confirm** ("Are you sure you want to
-  sack him ?" → the row shows "SURE? SACK" until a second tap), since sacking costs money. A
-  **TRAINING** button opens the training screen (the trainer context); RETURN → hub.
+## The hire overlay (frames 113-120) — witnessed, NOT yet built
+Tapping a role opens a dialog: a purple title strip, a **CURRENT <ROLE>** box (holder name +
+stars + WAGE, empty when vacant), a **<ROLE>s AVAILABLE** list where each candidate has a
+green **SIGN** button + name + stars + WAGE, and a right-hand **category rail** —
+TRAINERS · PHYSIO. · PSYCHOLOGIST · ASS. MANAGER · SCOUT · YOUTH MAN. · YOUTH SCOUT ·
+GROUNDSMAN + **OK** (TRAINERS expands to the six skill sub-trainers). The rebuilt screen
+emits `role_selected(role)` on a card tap; the overlay panel itself is the next build step.
+
+## How it is built (PreseasonScreen / Directiva / Finance frame-bake precedent)
+`tools/re/build_staff_chrome_from_frames.py` cuts frame 121's pixels 1:1 into
+`app/art/screens/staff/personnel_body.png` (640x422, the body below the barra, drawn 1:1 at
+y58) and writes `personnel_chrome.json`: the 13 MEASURED slot rects (cross-checked by a
+structural colour-bar detector), per-slot bar colour + name/stars/wage anchors, the
+SIGN/SACK/RETURN button rects, sampled inks, and REF_STAFF. `app/scenes/StaffScreen.gd`
+draws the baked body, the live header (PMChrome.draw_header, so club/manager/date track the
+career), and — when live `personnel` data is supplied — the 13 slots' {name, half-stars,
+£wage} over the baked cells.
+
+### frame-true vs approximated vs honest-gap
+- **Frame-true (100.00% exact-pixel vs frame 121, body y58..480):** the entire CLUB
+  PERSONNEL body — TRAINING STAFF panel, all 6 skill cells, 7 role cards, portraits,
+  section/role labels, WAGE labels, SIGN/SACK/RETURN — is the frame's own pixels.
+- **Shared component (differs by design):** the header barra is the app's live PMChrome
+  header (same on every ported screen), not the baked original — it updates with the career.
+- **Approximated (the live-data overlay):** when a per-club `personnel` dict replaces the
+  witnessed reference, the scene repaints each name-bar with a single sampled colour (the
+  originals are a top-bright / bottom-dark gradient) and redraws name/half-stars/£wage;
+  training rows land clean, role rows are legible with ~1px cosmetic edge tolerance.
+- **Honest gap (data):** there is NO extracted PM98 per-club staff DB (the EMPLEADOS staff
+  table is not reversed; `extracted/cm0102/.../staff.dat` is a DIFFERENT game). Until it is,
+  the screen shows the WITNESSED Man Utd reference as an explicit placeholder. The old
+  `app/scripts/Staff.gd` effect/wage model (TRAINER/PHYSIO/YOUTH_COACH/SCOUT/ASSISTANT — a
+  5-role invention) is UNRELATED to this 13-position original surface and is left untouched
+  (its `test_staff.gd` / `test_staff_roles.gd` still pass).
+
+## WIRING (Main.gd — not edited in this pass)
+`_show_staff_screen` should call `scr.setup(personnel, manager, club, season, week, club_id)`
+with the managed club's real 13-role backroom once the EMPLEADOS DB is reversed (pass `{}`
+for the witnessed reference until then), and connect `role_selected(role)` (hire overlay),
+`sign_pressed` / `sack_pressed`, and `back_pressed` (dismiss — works today). The old
+`hire_requested` / `sack_requested` / `training_requested` signals are RETAINED on the scene
+(never emitted) so the current unmodified Main `.connect` calls do not fault; `setup` accepts
+the old Array positional call without faulting (renders the pristine reference). This kills
+the invented TRAINING browse (`training_requested` is never emitted).
 
 ## Tests + verification
-
-`app/tests/test_staff.gd` covers the unit model (candidate shape, wage monotonicity, the
-three clamped factors + no role-bleed + no-staff-is-1.0, wage totals, sack cost) and the
-Career integration (pool seeded, hire/sack with guards + compensation, the wage bill drawn
-from cash exactly, a trainer developing the squad more than none over a season with the same
-rng draws, persistence + legacy-save compat). Verified by a REAL render
-(`PM98_STAFF_SHOT=1` under opengl3, `screens/staff.png`): a hired trainer/physio/youth coach
-over an available pool, `£3,596/wk` reconciling with the three wages, and the live
-`+5% dev / −25% injuries / +12% youth` effect readout.
-
-## Automation roles — SCOUT + ASSISTANT MANAGER (T2 #10)
-Two roles previously deferred are now hireable from the same pool (they show in CURRENT
-STAFF / STAFF AVAILABLE with a role + quality + wage like the others; they carry no `_factor`
-multiplier — their effect is a hook):
-- **SCOUT** — `Career.scout_targets()` surfaces the best AFFORDABLE league targets, most able
-  first, as many as his quality (1-5). A **SCOUT REPORT** entry appears on the transfer desk
-  only when a scout is hired; tapping a target opens the bid screen.
-- **ASSISTANT MANAGER** — at the season rollover (`advance_season`) he auto-renews an expiring
-  player good enough to keep, so your stars don't walk for free unnoticed. His quality lowers
-  the CA bar (`keep_ca = 75 - quality*3`: q5 keeps CA≥60, q1 keeps CA≥72); gated on
-  affordability, same as the manual auto-renew flag.
-Helpers: `Staff.has_scout/scout_quality/has_assistant/assistant_quality`. Test:
-`app/tests/test_staff_roles.gd` (roles + wages, scout-report shape, assistant keeps an
-expiring star vs a no-assistant control where he leaves). Verified by the `PM98_STAFF_SHOT`
-render (Scout + Assistant Manager in the hired team) and a SCOUT REPORT GL capture.
+- `app/tests/test_staff_screen.gd` (NEW): chrome load (13 slots + buttons + REF_STAFF),
+  money formatter, back-compat setup, and frame-true hit-testing (role card → role_selected,
+  buttons → their signals). 17/17 PASS headless.
+- `app/tests/test_staff.gd` / `test_staff_roles.gd`: the legacy Staff.gd model — still PASS.
+- REAL render: `app/tests/shot_staff.gd`
+  (`DISPLAY=:1 PM98_SHOT_DIR=out ~/godot462 --rendering-driver opengl3 --path app
+  --script res://tests/shot_staff.gd`) → `staff_ref.png` (pristine reference = frame 121,
+  BODY parity 100.00% exact) + `staff_live.png` (a synthetic other-club backroom, proving
+  the data-driven overlay).

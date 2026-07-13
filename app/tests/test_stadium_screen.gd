@@ -1,9 +1,10 @@
 extends SceneTree
 ## Headless wiring test for the GROUND (ESTADIO) screen: confirms the reversed capacity
 ## -> tier formula matches MANAGER.EXE breakpoints, the int formatter is correct, every
-## cracked asset loads (FONDO + BARRA + all 12 ESTADIO tiers + 3 button icons + PROMAN
-## fonts), the reversed rects stay inside the 640x480 canvas, and setup() wires data +
-## loads the matching tier scene.
+## asset loads (management bg + frame-baked chrome.png + all 12 ESTADIO tiers + PROMAN
+## fonts), the reversed action-grid rects stay inside the 640x480 canvas, setup() wires
+## data + loads the matching tier scene, and the action grid hit-tests (WORKS/IMPROVE ->
+## expansion lever, RETURN -> back, MATCH DAY + empty space inert).
 ##   ~/godot462 --headless --path app --script res://tests/test_stadium_screen.gd
 
 
@@ -30,9 +31,11 @@ func _run() -> void:
 	ok = _assert(StadiumScreen.fmt_int(0) == "0", "fmt_int zero") and ok
 	ok = _assert(StadiumScreen.fmt_int(900) == "900", "fmt_int small") and ok
 
-	# Every cracked asset must exist + load.
+	# Every cracked asset must exist + load: the frame-baked body chrome, the shared
+	# management background, the PROMAN fonts the value/name text uses, all 12 tiers.
 	var assets := ["res://art/screens/management_bg.png",
-		"res://art/fonts/proman14.fnt", "res://art/fonts/proman10.fnt", "res://art/fonts/proman8.fnt"]
+		"res://art/screens/stadium/chrome.png",
+		"res://art/fonts/proman12.fnt", "res://art/fonts/proman10.fnt"]
 	for t in range(12):
 		assets.append("res://art/screens/stadium/estadio%d.png" % t)
 	for path in assets:
@@ -55,18 +58,26 @@ func _run() -> void:
 	get_root().add_child(screen)
 	for _i in 3:
 		await process_frame
-	ok = _assert(screen._f14 != null and screen._f10 != null and screen._f8 != null,
-		"PROMAN fonts loaded") and ok
+	ok = _assert(screen._f12 != null and screen._f10 != null, "PROMAN fonts loaded") and ok
+	ok = _assert(screen._chrome != null, "frame-baked GROUND chrome loaded") and ok
 	ok = _assert(PMChrome.bg() != null, "PMChrome management background loads") and ok
 
-	# setup() wires data, clamps negatives, and selects the matching tier scene.
+	# setup() wires data, clamps negatives, and selects the matching tier scene. The invented
+	# seated/standing/parking/ticket/board args are accepted (Main compat) but ignored.
 	screen.setup("Arsenal", "", "1997-98", "Highbury", 24500, 18000, -5, 900)
 	await process_frame
 	ok = _assert(screen._capacity == 24500, "capacity wired") and ok
 	ok = _assert(screen._ground == "Highbury", "ground wired") and ok
-	ok = _assert(screen._parking == 900, "parking wired") and ok
 	ok = _assert(screen._tier == 2, "tier resolved from capacity") and ok
 	ok = _assert(screen._scene != null, "tier scene loaded") and ok
+
+	# Action grid: WORKS + IMPROVE both reach the expansion lever, RETURN leaves, MATCH DAY
+	# and empty space are no-ops (they no longer bounce to the hub).
+	ok = _assert(screen._hit(StadiumScreen.BTN_WORKS.get_center()) == "works", "WORKS hit-tests") and ok
+	ok = _assert(screen._hit(StadiumScreen.BTN_IMPROVE.get_center()) == "improve", "IMPROVE hit-tests") and ok
+	ok = _assert(screen._hit(StadiumScreen.BTN_RETURN.get_center()) == "return", "RETURN hit-tests") and ok
+	ok = _assert(screen._hit(StadiumScreen.BTN_MATCHDAY.get_center()) == "", "MATCH DAY is inert") and ok
+	ok = _assert(screen._hit(StadiumScreen.SCENE_BOX.get_center()) == "", "empty-space tap is a no-op") and ok
 
 	screen.queue_redraw()
 	for _i in 3:

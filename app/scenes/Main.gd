@@ -919,11 +919,11 @@ func _open_player_info(player: Dictionary, club: Dictionary, host: Control = nul
 ## RETURN dismisses; tapping a club row raises that club's DATA BASE squad (the managed
 ## club shows its live roster). Was a display-only tap-to-dismiss overlay.
 func _open_table(rows: Array, title_left: String, season: String, week_label: String,
-		tier: int, my_id: int) -> void:
+		tier: int, my_id: int, manager: String = "") -> void:
 	var scr: LeagueTableScreen = load("res://scenes/LeagueTableScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
-	scr.setup(rows, title_left, season, week_label, tier, my_id)
+	scr.setup(rows, title_left, season, week_label, tier, my_id, manager)
 	scr.back_pressed.connect(func() -> void:
 		AudioManager.ui_select()
 		scr.queue_free())
@@ -1481,7 +1481,7 @@ func _dismiss_nivel() -> void:
 func _show_league_table_screen() -> void:
 	_open_table(_career.standings(), _career.club_name, _career.season,
 		"Week %d" % mini(_career.week + 1, _career.total_weeks()),
-		_career.tier, _career.club_id)
+		_career.tier, _career.club_id, _career.manager_name)
 
 ## The original-art LINE-UP (ALINEACIÓN) screen as a full-screen overlay: the squad
 ## list + the CAMPO mini-pitch with the chosen XI in formation, at the coordinates
@@ -1982,7 +1982,7 @@ func _show_directiva_screen() -> void:
 	var scr: DirectivaScreen = load("res://scenes/DirectivaScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
-	scr.setup(c.club_name, "", c.season, c.cash, bp["directors"], bp["supporters"],
+	scr.setup(c.club_name, c.manager_name, c.season, c.cash, bp["directors"], bp["supporters"],
 		bp["rating"], c.objective_text, bp["record"], bp["position"], c.week + 1, c.league_name)
 	scr.back_pressed.connect(func() -> void:
 		AudioManager.ui_select()
@@ -2071,7 +2071,7 @@ func _show_stadium_screen() -> void:
 	var scr: StadiumScreen = load("res://scenes/StadiumScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
-	scr.setup(_career.club_name, "", _career.season, ground,
+	scr.setup(_career.club_name, _career.manager_name, _career.season, ground,
 		cap, seated, cap - seated, int(round(cap / 27.0)), _career.works_status(),
 		int(sm.get("ticket_price", 0)), int(sm.get("board_price", 0)), _career.week + 1,
 		_career.league_name)

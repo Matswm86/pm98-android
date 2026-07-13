@@ -18,9 +18,9 @@ func _run() -> void:
 	ok = _assert(FinanceScreen.fmt_money(-1234567) == "-£1,234,567", "fmt_money negative") and ok
 	ok = _assert(FinanceScreen.fmt_money(999) == "£999", "fmt_money sub-thousand") and ok
 
-	for path in ["res://art/screens/management_bg.png",
-			"res://art/fonts/proman14.fnt", "res://art/fonts/proman12.fnt",
-			"res://art/fonts/proman10.fnt"]:
+	for path in ["res://art/screens/finance/chrome.png",
+			"res://art/fonts/calend8.fnt", "res://art/fonts/calend12.fnt",
+			"res://art/fonts/proman8.fnt"]:
 		ok = _assert(ResourceLoader.exists(path), "asset present: %s" % path) and ok
 		ok = _assert(load(path) != null, "asset loads: %s" % path) and ok
 
@@ -55,10 +55,10 @@ func _run() -> void:
 	get_root().add_child(screen)
 	for _i in 3:
 		await process_frame
-	ok = _assert(screen._f14 != null and screen._f12 != null and screen._f10 != null,
-		"PROMAN fonts loaded") and ok
-	ok = _assert(PMChrome.bg() != null, "PMChrome management background loads") and ok
-	screen.setup(sm, club["name"], "A. FERGUSON", "1997-98")
+	ok = _assert(screen._fval != null and screen._fbot != null and screen._ftot != null,
+		"value fonts loaded (calend8 / calend12 / proman8)") and ok
+	ok = _assert(screen._chrome != null, "baked finance chrome.png loads") and ok
+	screen.setup(sm, club["name"], "A. FERGUSON", "1997-98", 12_345_678, 5)
 	await process_frame
 	ok = _assert((screen._sum["income_lines"] as Array).size() == 4, "screen received the summary") and ok
 

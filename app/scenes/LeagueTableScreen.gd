@@ -1,23 +1,27 @@
 extends Control
 class_name LeagueTableScreen
-## PM98 LEAGUE TABLES screen, rebuilt to match the real game (ma_10 /
-## hires_league_table.jpg): the shared management chrome (PMChrome) — blue marble
-## background, the three top plaques (manager+club / calendar / league+week) and a
-## blue title bar — over a white-bordered table panel. Inside the panel: a "PREMIER
-## LEAGUE" + Date-stepper strip, a cream column-header row, the dark-blue alternating
-## standings rows with their crest + tan stat cells + brown POINTS cell, and the
-## EURO CUP / UEFA / RELEGATION zone tags hung on the panel's left edge. Right: the
-## LEADER card, the division tabs, GOAL SCORERS and RETURN.
+## PM98 LEAGUE TABLES (CLASIFICACION) screen, rebuilt FRAME-TRUE from the real game.
 ##
-## Driven by a live standings table (Career or SeasonSim), so what you see is the real
-## engine result in the real game's skin. Native 640x480; scales to fit its parent.
+## BINDING SOURCE: there is NO LEAGUE TABLES frame in the walkthrough (all 239 distinct
+## management screens were scanned; the standings grid never appears). The binding source
+## is therefore the genuine PC capture real-gallery/ma_10.png (Premier, Week 17), cross-
+## checked vs hires_league_table.jpg. See docs/re/league_table_screen_re.md.
 ##
-## Interactive: RETURN dismisses, and a tap on a standings row raises that club's squad.
-## (Was a display-only overlay that dismissed to the hub on ANY tap — the "nothing inside
-## works, pressing anything goes back" bug.) The division tabs are drawn as the current-
-## division indicator; cross-division switching needs the multi-division table model the
-## Career layer doesn't yet keep, so tapping another tab is a no-op for now (it does NOT
-## invent a table) — flagged for the season-loop pass.
+## The static chrome is ma_10's pixels cut 1:1 by tools/re/build_leaguetable_chrome_from_frames.py
+## into art/screens/leaguetable/chrome.png with ONLY the dynamic layers blanked (the 20
+## standings rows, the LEADER kit, the date-box digits). This scene blits that chrome at
+## 640x480, OVERDRAWS the live barra with PMChrome.draw_header (the TransferScreen pattern,
+## so manager/club/date/week track the real career), and redraws the standings rows, the
+## leader kit and the date value from Career.standings(). Every colour below was SAMPLED
+## off ma_10 (leaguetable_chrome.json) — nothing is hand-invented.
+##
+## Only Premier is witnessed. The baked chrome (PREMIER LEAGUE subtitle, Premier-selected
+## tab, EURO CUP / U.E.F.A. / RELEGATION zone-tag column) is Premier-only; a non-Premier
+## career renders Premier chrome (documented GAP). Cross-division tab switching has no
+## backing table in the Career layer, so the tabs are a no-op indicator (never invent
+## another division's table).
+##
+## Interactive: RETURN dismisses; a tap on a standings row raises that club's squad.
 
 signal back_pressed              # RETURN -> dismiss
 signal club_selected(id: int)    # a standings row tap -> open that club's squad
@@ -25,63 +29,58 @@ signal club_selected(id: int)    # a standings row tap -> open that club's squad
 const W := 640
 const H := 480
 
-# Table panel + rows.
-const C_PANEL := Color(0.90, 0.91, 0.86)         # cream table panel
-const C_PANEL_HI := Color(1.0, 1.0, 0.98)
-const C_PANEL_LO := Color(0.46, 0.48, 0.50)
-const C_PANEL_HDR := Color(0.74, 0.78, 0.84)     # column-header strip (light blue-grey)
-const C_HDR_TXT := Color(0.14, 0.24, 0.46)
-const C_SUBTITLE := Color(0.20, 0.32, 0.60)
-const C_ROW_A := Color(0.17, 0.27, 0.50)
-const C_ROW_B := Color(0.13, 0.21, 0.42)
-const C_NAME := Color(0.96, 0.98, 1.0)
-const C_CELL := Color(0.52, 0.45, 0.30)          # tan stat cell
-const C_CELL_HI := Color(0.66, 0.58, 0.40)
-const C_CELL_LO := Color(0.30, 0.25, 0.15)
-const C_CELL_TXT := Color(0.98, 0.96, 0.88)
-const C_PTS := Color(0.50, 0.20, 0.14)           # brown points cell
-const C_PTS_HI := Color(0.70, 0.32, 0.22)
-const C_PTS_TXT := Color(1.0, 0.92, 0.84)
-const C_POS_EURO := Color(1.0, 0.88, 0.30)       # yellow position number in a euro slot
-# Date stepper + zone-tag palette.
-const C_STEP_BG := Color(0.10, 0.16, 0.32)
-const C_STEP_HI := Color(0.34, 0.46, 0.72)
-const C_DATE_LBL := Color(0.96, 0.78, 0.20)
-const C_EUROTAG := Color(0.84, 0.74, 0.16)
-const C_UEFATAG := Color(0.80, 0.74, 0.26)
-const C_PROMOTAG := Color(0.22, 0.50, 0.26)
-const C_RELEGTAG := Color(0.74, 0.46, 0.20)
-const C_TAG_TXT := Color(0.12, 0.12, 0.10)
-# Right-side panel.
-const C_BTN := Color(0.10, 0.16, 0.32)
-const C_BTN_HI := Color(0.34, 0.46, 0.72)
-const C_BTN_LO := Color(0.04, 0.08, 0.18)
-const C_SEL := Color(0.50, 0.20, 0.14)
-const C_GOLD := Color(1.0, 0.86, 0.22)
+# ---- row grid + column anchors (measured off ma_10; leaguetable_chrome.json) ----
+const ROW_Y0 := 114
+const ROW_PITCH := 16
+const ROW_H := 14                     # coloured band (2px white gap below, baked)
+const POS_REGION := Rect2(73, 0, 26, ROW_H)   # POS number sub-region (x only; y set live)
+const CREST_BOX := Rect2(99, 0, 20, ROW_H)
+const NAME_X := 127
+const NAME_REGION_X0 := 123
+const NAME_REGION_X1 := 270
+# stat cells: [left_x, width]; order P W D L GF GA
+const STAT_CELLS := [[271, 23], [296, 23], [321, 23], [346, 23], [371, 34], [407, 34]]
+const PTS_CELL := [443, 38]
+const SEP_XS := [270, 295, 320, 345, 370, 406, 442, 482]
+const LEADER_KIT_BOX := Rect2(553, 97, 51, 65)
+const DATE_RIGHT := 447                # right edge for the DD/MM/YYYY value
+const DATE_Y := 76
+const RETURN_BTN := Rect2(525, 423, 99, 25)
 
-const KIT_SRC := Rect2(0, 0, 31, 64)
+# ---- palette sampled off ma_10 (leaguetable_chrome.json "samples") ----
+# normal (non-managed) row
+const C_POS_BG := Color8(180, 200, 220)
+const C_POS_INK := Color8(0, 0, 128)
+const C_NAME_BG := Color8(0, 0, 128)
+const C_NAME_INK := Color8(255, 255, 255)
+const C_SEP := Color8(0, 0, 0)
+# per-column cell [bg, ink] for P W D L GF GA
+const CELL_BG := [Color8(220, 220, 220), Color8(180, 200, 220), Color8(212, 223, 170),
+	Color8(212, 191, 170), Color8(180, 200, 220), Color8(212, 191, 170)]
+const CELL_INK := [Color8(128, 128, 128), Color8(100, 120, 140), Color8(127, 159, 85),
+	Color8(170, 127, 85), Color8(100, 120, 140), Color8(170, 127, 85)]
+const C_PTS_BG := Color8(72, 30, 2)
+const C_PTS_INK := Color8(255, 223, 0)
+# managed (my-club) row — the dark/saturated variant
+const C_MINE_POS_BG := Color8(42, 63, 170)
+const C_MINE_POS_INK := Color8(166, 202, 240)
+const C_MINE_NAME_BG := Color8(0, 0, 0)
+const MINE_CELL_BG := [Color8(80, 80, 80), Color8(80, 100, 120), Color8(80, 110, 5),
+	Color8(85, 0, 0), Color8(80, 100, 120), Color8(170, 127, 85)]
+const MINE_CELL_INK := [Color8(192, 192, 192), Color8(166, 202, 240), Color8(170, 223, 170),
+	Color8(255, 31, 0), Color8(166, 202, 240), Color8(212, 191, 170)]
+const C_MINE_PTS_BG := Color8(150, 0, 0)
+const C_MINE_PTS_INK := Color8(255, 255, 255)
+# date stepper
+const C_DATE_INK := Color8(180, 210, 50)
 
-# Panel + column geometry (640x480 design space).
-const PANEL := Rect2(6, 50, 532, 426)
-const HDR_Y := 92
-const ROW_Y0 := 110
-const ROW_H := 17
-const C_POS_R := 96          # POS number right edge
-const C_CREST_X := 100
-const C_NAME_X := 120
-const STAT_XS := [322, 350, 378, 406, 440, 474]   # P W D L GF GA right edges
-const STAT_W := 22
-const PTS_X := 510
-
-var _f24: Font
-var _f18: Font
+var _chrome: Texture2D
 var _f12: Font
-var _f10: Font
 var _f8: Font
-var _kits: Dictionary = {}
 
 var _rows: Array = []
 var _title_left: String = ""
+var _manager: String = ""       # career manager name for the two-line barra plaque ("" = sim table)
 var _season: String = "1997-98"
 var _week_label: String = ""
 var _tier: int = 1
@@ -89,25 +88,33 @@ var _my_id: int = -1
 
 
 func _ready() -> void:
-	_f24 = load("res://art/fonts/proman24.fnt")
-	_f18 = load("res://art/fonts/proman18.fnt")
-	_f12 = load("res://art/fonts/proman12.fnt")
-	_f10 = load("res://art/fonts/proman10.fnt")
-	_f8 = load("res://art/fonts/proman8.fnt")
+	_chrome = load("res://art/screens/leaguetable/chrome.png")
+	_f12 = PMChrome.font("12")
+	_f8 = PMChrome.font("8")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2(W, H)
 	gui_input.connect(_on_input)
 	queue_redraw()
 
 
+func setup(rows: Array, title_left: String, season: String, week_label: String,
+		tier: int = 1, my_id: int = -1, manager: String = "") -> void:
+	_rows = rows
+	_title_left = title_left
+	_season = season
+	_week_label = week_label
+	_tier = tier
+	_my_id = my_id
+	_manager = manager
+	queue_redraw()
+
+
 # ---- input ---------------------------------------------------------------
-# RETURN dismisses; a tap on a standings row raises that club. The drawn RETURN rect is
-# the one _leader_panel paints (px=544, pw=90).
-const RETURN_BTN := Rect2(544, 446, 90, 26)
 
 func _to_design(p: Vector2) -> Vector2:
 	var s: float = min(size.x / W, size.y / H) if size.x > 0 and size.y > 0 else 1.0
 	return (p - Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5)) / s
+
 
 func _on_input(e: InputEvent) -> void:
 	if not (e is InputEventScreenTouch or e is InputEventMouseButton):
@@ -119,7 +126,7 @@ func _on_input(e: InputEvent) -> void:
 		back_pressed.emit()
 		return
 	for i in _rows.size():
-		var rr := Rect2(PANEL.position.x + 2, ROW_Y0 + i * ROW_H, PANEL.size.x - 4, ROW_H - 1)
+		var rr := Rect2(73, ROW_Y0 + i * ROW_PITCH, 482 - 73, ROW_H)
 		if rr.has_point(d):
 			var id := int((_rows[i] as Dictionary).get("id", -1))
 			if id >= 0:
@@ -127,162 +134,81 @@ func _on_input(e: InputEvent) -> void:
 			return
 
 
-func setup(rows: Array, title_left: String, season: String, week_label: String,
-		tier: int = 1, my_id: int = -1) -> void:
-	_rows = rows
-	_title_left = title_left
-	_season = season
-	_week_label = week_label
-	_tier = tier
-	_my_id = my_id
-	queue_redraw()
-
-
-# ---- kits ----------------------------------------------------------------
-
-func _kit(id: int) -> Texture2D:
-	if not _kits.has(id):
-		var path := "res://art/kits/%d.png" % id
-		_kits[id] = load(path) if ResourceLoader.exists(path) else null
-	return _kits[id]
-
-
-func _draw_kit(id: int, x: float, y: float, box_w: float, box_h: float) -> void:
-	var tex := _kit(id)
-	if tex == null:
-		return
-	var s: float = min(box_w / KIT_SRC.size.x, box_h / KIT_SRC.size.y)
-	var w := KIT_SRC.size.x * s
-	var h := KIT_SRC.size.y * s
-	draw_texture_rect_region(tex, Rect2(x + (box_w - w) * 0.5, y + (box_h - h) * 0.5, w, h), KIT_SRC)
-
-
 # ---- drawing -------------------------------------------------------------
-
-func _txt(f: Font, x: int, y_top: int, s: String, col: Color, sz: int, right := false) -> void:
-	if f == null:
-		return
-	var w := f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
-	var px := x - w if right else float(x)
-	draw_string(f, Vector2(px, y_top + f.get_ascent(sz)), s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
-
 
 func _draw() -> void:
 	var s: float = min(size.x / W, size.y / H) if size.x > 0 and size.y > 0 else 1.0
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.05, 0.07, 0.14), true)
 	draw_set_transform(Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5), 0.0, Vector2(s, s))
 
-	PMChrome.draw_bg(self)
-	PMChrome.draw_header(self, "LEAGUE TABLES", "", _title_left, _div_name(_tier),
+	# Baked ma_10 chrome (light marble bg, panel, headers, tags, tabs, buttons).
+	if _chrome != null:
+		draw_texture(_chrome, Vector2.ZERO)
+	else:
+		draw_rect(Rect2(0, 0, W, H), Color(0.10, 0.18, 0.40), true)
+
+	# Live barra over the baked header (manager/club/date/week track the real career).
+	PMChrome.draw_header(self, "LEAGUE TABLES", _manager, _title_left, _div_name(_tier),
 		_season, _week_num(), _my_id)
 
-	# White-bordered table panel.
-	PMChrome.bevel(self, PANEL, C_PANEL, C_PANEL_HI, C_PANEL_LO, 2.0)
-	_draw_panel_strip()
-	_draw_col_header()
+	_draw_date()
 	_draw_rows()
-	_leader_panel()
+	_draw_leader_kit()
 
 
-## The strip inside the panel top: division name (left) + a Date stepper (right).
-func _draw_panel_strip() -> void:
-	_txt(_f18, 16, 54, _div_name(_tier).to_upper() + " LEAGUE", C_SUBTITLE, 18)
-	# Date stepper: "Date" label + [<] [DD/MM/YYYY] [>]
+## Redraw the Date-stepper value from the live week (green DD/MM/YYYY over the navy box).
+## NOTE the box value reads 2 days behind the header calendar sheet in ma_10 (27/11 vs
+## Sat 29/11); that offset is un-RE'd, so this mirrors the calendar sheet's date (GAP).
+func _draw_date() -> void:
 	var d := PMChrome.date_parts(_season, _week_num())
-	_txt(_f12, 318, 58, "Date", C_DATE_LBL, 13)
-	PMChrome.bevel(self, Rect2(356, 54, 16, 16), C_STEP_BG, C_STEP_HI, C_BTN_LO)
-	_txt(_f12, 360, 56, "<", Color.WHITE, 13)
-	var datebox := Rect2(374, 54, 132, 16)
-	PMChrome.bevel(self, datebox, C_STEP_BG, C_STEP_HI, C_BTN_LO)
 	var ds := "%02d/%02d/%d" % [int(d["day"]), _MONTH_NUM.get(d["mon"], 1), int(d["year"])]
-	_txt(_f12, 382, 56, ds, Color(0.86, 0.92, 1.0), 13)
-	PMChrome.bevel(self, Rect2(508, 54, 16, 16), C_STEP_BG, C_STEP_HI, C_BTN_LO)
-	_txt(_f12, 512, 56, ">", Color.WHITE, 13)
-
-
-func _draw_col_header() -> void:
-	var hr := Rect2(PANEL.position.x + 2, HDR_Y, PANEL.size.x - 4, 16)
-	PMChrome.bevel(self, hr, C_PANEL_HDR, C_PANEL_HI, C_PANEL_LO)
-	_txt(_f12, 60, HDR_Y + 2, "POS", C_HDR_TXT, 12)
-	_txt(_f12, C_NAME_X, HDR_Y + 2, "TEAM", C_HDR_TXT, 12)
-	var heads := ["P", "W", "D", "L", "GF", "GA"]
-	for c in 6:
-		_txt(_f12, STAT_XS[c], HDR_Y + 2, heads[c], C_HDR_TXT, 12, true)
-	_txt(_f12, PTS_X + 22, HDR_Y + 2, "PTS", C_HDR_TXT, 12, true)
+	PMChrome.text(self, _f12, DATE_RIGHT, DATE_Y, ds, C_DATE_INK, 12, 2)
 
 
 func _draw_rows() -> void:
-	var n := _rows.size()
-	var releg := int(SeasonSim.ZONES.get(_tier, {"releg": 3}).get("releg", 3))
-	var promo := int(SeasonSim.ZONES.get(_tier, {"promo": 0}).get("promo", 0))
-	for i in n:
+	for i in _rows.size():
+		if i >= 20:
+			break                     # only 20 baked Premier slots (see doc gap)
 		var r: Dictionary = _rows[i]
-		var y := ROW_Y0 + i * ROW_H
-		draw_rect(Rect2(PANEL.position.x + 2, y, PANEL.size.x - 4, ROW_H - 1),
-			C_ROW_A if i % 2 == 0 else C_ROW_B, true)
-		_zone_tag(i, n, promo, releg, y)
-		if int(r.get("id", -1)) == _my_id:
-			draw_rect(Rect2(PANEL.position.x + 2, y, PANEL.size.x - 4, ROW_H - 1),
-				Color(1, 1, 1, 0.10), true)
-		var euro := _tier == 1 and i < 5
-		_txt(_f12, C_POS_R, y + 2, str(i + 1), C_POS_EURO if euro else C_NAME, 13, true)
-		_draw_kit(int(r.get("id", -1)), C_CREST_X, y, 16, ROW_H - 1)
-		_txt(_f12, C_NAME_X, y + 2, str(r.get("name", "?")).substr(0, 18), C_NAME, 13)
+		var y := ROW_Y0 + i * ROW_PITCH
+		var mine := int(r.get("id", -1)) == _my_id and _my_id >= 0
+
+		# Region 1: POS number + crest.
+		draw_rect(Rect2(73, y, 122 - 73, ROW_H), C_MINE_POS_BG if mine else C_POS_BG, true)
+		PMChrome.text(self, _f12, POS_REGION.position.x, y + 1, str(i + 1),
+			C_MINE_POS_INK if mine else C_POS_INK, 12, 1, POS_REGION.size.x)
+		PMChrome.draw_crest(self, int(r.get("id", -1)), Rect2(CREST_BOX.position.x, y, CREST_BOX.size.x, ROW_H))
+
+		# Region 2: team name plate.
+		draw_rect(Rect2(NAME_REGION_X0, y, NAME_REGION_X1 - NAME_REGION_X0, ROW_H),
+			C_MINE_NAME_BG if mine else C_NAME_BG, true)
+		PMChrome.text(self, _f12, NAME_X, y + 1, str(r.get("name", "?")),
+			C_NAME_INK, 12, 0, NAME_REGION_X1 - NAME_X - 2)
+
+		# Stat cells P W D L GF GA.
 		var vals := [r.get("P", 0), r.get("W", 0), r.get("D", 0), r.get("L", 0),
 			r.get("GF", 0), r.get("GA", 0)]
 		for c in 6:
-			var x: int = STAT_XS[c]
-			PMChrome.bevel(self, Rect2(x - STAT_W + 2, y + 1, STAT_W, ROW_H - 3),
-				C_CELL, C_CELL_HI, C_CELL_LO)
-			_txt(_f12, x - 2, y + 2, str(vals[c]), C_CELL_TXT, 13, true)
-		PMChrome.bevel(self, Rect2(PTS_X, y + 1, 26, ROW_H - 3), C_PTS, C_PTS_HI, C_CELL_LO)
-		_txt(_f12, PTS_X + 22, y + 2, str(r.get("Pts", 0)), C_PTS_TXT, 13, true)
+			var cx: int = STAT_CELLS[c][0]
+			var cw: int = STAT_CELLS[c][1]
+			draw_rect(Rect2(cx, y, cw, ROW_H), (MINE_CELL_BG[c] if mine else CELL_BG[c]) as Color, true)
+			PMChrome.text(self, _f12, cx, y + 1, str(vals[c]),
+				(MINE_CELL_INK[c] if mine else CELL_INK[c]) as Color, 12, 1, cw)
+
+		# PTS cell.
+		draw_rect(Rect2(PTS_CELL[0], y, PTS_CELL[1], ROW_H), C_MINE_PTS_BG if mine else C_PTS_BG, true)
+		PMChrome.text(self, _f12, PTS_CELL[0], y + 1, str(r.get("Pts", 0)),
+			C_MINE_PTS_INK if mine else C_PTS_INK, 12, 1, PTS_CELL[1])
+
+		# Black 1px column separators (the frame's cell borders).
+		for sx in SEP_XS:
+			draw_rect(Rect2(sx, y, 1, ROW_H), C_SEP, true)
 
 
-## Zone tag hung on the panel's left edge (EURO CUP / UEFA / PROMOTION / RELEGATION).
-func _zone_tag(i: int, n: int, promo: int, releg: int, y: int) -> void:
-	var label := ""
-	var bg := C_EUROTAG
-	if _tier == 1 and i < 2:
-		label = "EURO CUP"
-	elif _tier == 1 and i < 5:
-		label = "U.E.F.A."; bg = C_UEFATAG
-	elif _tier > 1 and i < promo:
-		label = "PROMOTION"; bg = C_PROMOTAG
-	elif i >= n - releg:
-		label = "RELEGATION"; bg = C_RELEGTAG
-	if label == "":
-		return
-	var tag := Rect2(2, y + 1, 56, ROW_H - 3)
-	PMChrome.bevel(self, tag, bg, bg.lightened(0.25), bg.darkened(0.4))
-	var col := Color.WHITE if bg == C_PROMOTAG else C_TAG_TXT
-	_txt(_f8, 5, y + 3, label, col, 9)
-
-
-# Right-side LEADER panel: leader's kit + name, division tabs, GOAL SCORERS, RETURN.
-func _leader_panel() -> void:
-	var px := 544
-	var pw := 90
-	# LEADER card.
-	PMChrome.bevel(self, Rect2(px, 50, pw, 150), C_PANEL, C_PANEL_HI, C_PANEL_LO, 2.0)
-	_txt(_f12, px + 6, 54, "LEADER", C_SUBTITLE, 12)
+## The LEADER card kit = the current leader (standings[0]) fitted in the white card.
+func _draw_leader_kit() -> void:
 	if _rows.size() > 0:
-		var lead: Dictionary = _rows[0]
-		_draw_kit(int(lead.get("id", -1)), px + 21, 70, 48, 70)
-		_txt(_f8, px + 5, 180, str(lead.get("name", "?")).substr(0, 16), C_HDR_TXT, 10)
-
-	var tabs := ["Premier", "First", "Second", "Third"]
-	for t in 4:
-		var ty := 214 + t * 28
-		var sel := (t + 1) == _tier
-		PMChrome.bevel(self, Rect2(px, ty, pw, 24), C_SEL if sel else C_BTN,
-			C_PTS_HI if sel else C_BTN_HI, C_BTN_LO)
-		_txt(_f12, px + 8, ty + 5, tabs[t], C_PTS_TXT if sel else Color(0.82, 0.88, 1.0), 13)
-
-	PMChrome.bevel(self, Rect2(px, 414, pw, 24), C_BTN, C_BTN_HI, C_BTN_LO)
-	_txt(_f8, px + 4, 421, "GOAL SCORERS", Color(0.82, 0.88, 1.0), 10)
-	PMChrome.bevel(self, Rect2(px, 446, pw, 26), C_SEL, C_PTS_HI, C_CELL_LO)
-	_txt(_f12, px + 14, 451, "RETURN", C_GOLD, 14)
+		PMChrome.draw_crest(self, int((_rows[0] as Dictionary).get("id", -1)), LEADER_KIT_BOX)
 
 
 # ---- helpers -------------------------------------------------------------

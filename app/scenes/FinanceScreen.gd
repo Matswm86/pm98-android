@@ -1,74 +1,98 @@
 extends Control
 class_name FinanceScreen
-## PM98 FINANCES (CAJA — "INCOME + EXPENSES") screen, rebuilt to match the real game
-## (og_12): the finance TAB chrome (INC.+EXP. / INCOME / EXPENSES | PER WEEK / PER SEASON,
-## NOT the plaque header), two white ledger columns — a green INCOME panel and a brown
-## EXPENSES panel each ending in a coloured TOTAL bar — the WEEKLY BALANCE chart with a
-## zero axis, and the LAST WEEK / CURRENT WEEK boxes + RETURN along the bottom.
+## PM98 FINANCES ("INCOME + EXPENSES") screen, rebuilt FRAME-TRUE from the real
+## walkthrough (screenshots/original-walkthrough-2026-07-02/013_164406.png ==
+## 014_164407.png), following the PreseasonScreen frame-bake precedent.
 ##
-## Driven by FinanceModel.summary (income_lines / expense_lines / totals / weekly_balance).
-## The weekly chart plots the model's per-week balance across the season (we hold no
-## week-by-week history, so it is the honest constant our model produces, not invented
-## variation). Native 640x480; scales to fit its parent.
+## The static chrome is the ORIGINAL frame's pixels, cut 1:1 by
+## tools/re/build_finance_chrome_from_frames.py into art/screens/finance/chrome.png
+## with ONLY the dynamic value cells blanked. This scene draws that chrome at
+## 640x480 and redraws real numbers on top — nothing about the layout, labels,
+## colours, tabs, sections or chart is hand-invented.
+##
+## Binding view = INC. + EXP. / PER SEASON summary (header "SEASON YYYY . YY"),
+## chosen because FinanceModel.summary produces SEASON figures, so the model's
+## numbers land on the frame whose semantics match. The frame's own totals verify
+## the value mapping exactly (TICKETS 541,500 + PUBLICITY 9,750 + TELEVISION
+## 187,500 + SALE 9,120,000 = 9,858,750; PLAYERS' WAGE 676,442 + BONUS 5,000 +
+## STAFF WAGES 1,211 = 682,653).
+##
+## Model -> frame line mapping (docs/re/finance_screen_re.md):
+##   INCOME:  TICKETS<-gate, PUBLICITY<-boards+sponsor, TELEVISION<-tv;
+##            EUROPEAN CUP INCOME / SALE+LOAN PLAY. / INSURANCE GROUP 3 / LOANS = 0 (gap)
+##   EXPENSES: PLAYERS' WAGE<-wages, PLAYERS' BONUS<-bonus; SIGN PLAYER /
+##            CANCELLATION / PLAYERS' INCENTIVE / PLAYERS' INSURANCE / HOSPITALS /
+##            STAFF WAGES / REFORM GROUND / FINES / LOANS AND INTEREST = 0 (gap)
+## The gap lines show £0 (exactly as the frame shows them for a fresh save) — the
+## real per-line figures are a runtime float ledger the app has no save-game for
+## (docs/re/finance_constants.md), never fabricated here.
 
-signal prices_pressed   # the SET PRICES button -> Main opens the ticket/board control
-signal back_pressed     # RETURN / a tap elsewhere -> dismiss
-signal cheat_cash       # secret: 5 taps on the CURRENT WEEK cash box -> Main grants +100M
-
-const CHEAT_TAPS := 5   # taps on the live-cash box that trigger the cash cheat
+signal back_pressed      # RETURN button -> Main dismisses the screen
+signal prices_pressed    # RETAINED for Main compatibility; NOT emitted (see WIRING note)
+signal cheat_cash        # RETAINED for Main compatibility; NOT emitted (see WIRING note)
 
 const W := 640
 const H := 480
-const SEASON_WEEKS := 38
+const SEASON_WEEKS := 52   # PM98 finance loops 0x34 = 52 weeks (finance_constants.md)
 
-const C_BLUE := Color(0.16, 0.30, 0.60)
-const C_INCOME_HDR := Color(0.22, 0.50, 0.28)    # green INCOME header
-const C_INCOME_ROW := Color(0.83, 0.90, 0.82)    # pale-green income rows
-const C_EXPENSE_HDR := Color(0.52, 0.30, 0.18)   # brown EXPENSES header
-const C_EXPENSE_ROW := Color(0.90, 0.84, 0.76)   # pale-brown expense rows
-const C_ROW_TXT := Color(0.10, 0.13, 0.22)
-const C_TOTAL_INC := Color(0.20, 0.40, 0.74)     # blue TOTAL INCOME bar
-const C_TOTAL_EXP := Color(0.86, 0.78, 0.20)     # yellow TOTAL EXPENSES bar
-const C_TAB := Color(0.08, 0.12, 0.24)
-const C_TAB_HI := Color(0.30, 0.42, 0.66)
-const C_TAB_LO := Color(0.03, 0.06, 0.14)
-const C_TAB_SEL_INC := Color(0.66, 0.16, 0.14)   # selected view tab (red)
-const C_TAB_SEL_PER := Color(0.20, 0.52, 0.24)   # selected period tab (green)
-const C_PANEL_TXT := Color(0.88, 0.93, 1.0)
-const C_GOLD := Color(1.0, 0.86, 0.22)
-const C_CHART_BG := Color(0.06, 0.09, 0.18)
-const C_BAR_POS := Color(0.36, 0.54, 0.92)
-const C_BAR_NEG := Color(0.86, 0.80, 0.26)
+# ---- overlay anchors (design 640x480; measured off frame 013, and exactly the
+# cells build_finance_chrome_from_frames.py blanked) -----------------------
+const ROW_Y0 := 98
+const ROW_STEP := 16
+const VAL_DY := 0          # nudges the value text baseline inside its cell
+const INC_RIGHT := 305     # income value right edge
+const EXP_RIGHT := 601     # expense value right edge
+const TOT_Y := 283
+const TOT_INC_RIGHT := 305
+const TOT_EXP_RIGHT := 601
+const SEASON_RIGHT := 600
+const SEASON_Y := 60
+const LW_RIGHT := 245      # LAST WEEK value right edge
+const CW_RIGHT := 495      # CURRENT WEEK value right edge
+const BOT_ROW_Y := [428, 442, 454]   # INCOME / EXPENSES / CASH value tops
+const BTN_RETURN := Rect2(515, 439, 118, 24)
 
-const TITLE_Y := 30
-const INC_PANEL := Rect2(6, 46, 308, 250)
-const EXP_PANEL := Rect2(326, 46, 308, 250)
-const CHART := Rect2(6, 304, 628, 96)
-const BOX_LAST := Rect2(6, 408, 250, 58)
-const BOX_CUR := Rect2(262, 408, 250, 58)
-const BTN_RETURN := Rect2(520, 432, 114, 26)
-const BTN_PRICES := Rect2(520, 408, 114, 20)
+# chart plot (the baked blue/yellow field): +2,500K at the top of blue, 0 at the
+# axis, -2,500K at the bottom of yellow (the fixed axis the game bakes).
+const CHART_L := 64
+const CHART_R := 633
+const CHART_ZERO_Y := 353
+const CHART_TOP_Y := 333       # == +CHART_SCALE
+const CHART_BOT_Y := 377       # == -CHART_SCALE
+const CHART_SCALE := 2_500_000
 
-var _f14: Font
-var _f12: Font
-var _f10: Font
-var _f8: Font
+# frame-sampled inks
+const C_BLACK := Color(0, 0, 0)
+const C_TOTAL_INC := Color8(30, 52, 98)
+const C_TOTAL_EXP := Color8(170, 0, 0)
+const C_GOLD := Color8(255, 223, 0)
+const C_BAR_POS := Color8(60, 90, 200)
+const C_BAR_NEG := Color8(190, 60, 30)
+
+var _chrome: Texture2D
+# The real screen renders values in the narrow WINFONTS the game ships, NOT proman:
+# ledger lines = Calend8 (5px digits), bottom boxes = Calend12 (7px), totals + the
+# SEASON header = Proman8 (8px). Verified glyph-width against frame 013.
+var _fval: Font        # Calend8  — income/expense ledger values
+var _fbot: Font        # Calend12 — LAST/CURRENT WEEK values
+var _ftot: Font        # Proman8  — the two totals + SEASON
+const SZ_VAL := 15     # Calend8 native size
+const SZ_BOT := 15     # Calend12 native size
+const SZ_TOT := 11     # Proman8 native size
 
 var _sum: Dictionary = {}
-var _club: String = ""
-var _manager: String = ""
+var _club: String = ""       # not shown on this screen (kept for Main's setup call)
+var _manager: String = ""    # ditto
 var _season: String = ""
 var _cash: int = 0
 var _week: int = 0
-var _press := ""
-var _cash_taps := 0      # consecutive taps on the live-cash box (the hidden cheat counter)
 
 
 func _ready() -> void:
-	_f14 = load("res://art/fonts/proman14.fnt")
-	_f12 = load("res://art/fonts/proman12.fnt")
-	_f10 = load("res://art/fonts/proman10.fnt")
-	_f8 = load("res://art/fonts/proman8.fnt")
+	_chrome = load("res://art/screens/finance/chrome.png")
+	_fval = load("res://art/fonts/calend8.fnt")
+	_fbot = load("res://art/fonts/calend12.fnt")
+	_ftot = load("res://art/fonts/proman8.fnt")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2(W, H)
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -96,33 +120,12 @@ func _to_design(p: Vector2) -> Vector2:
 func _on_input(e: InputEvent) -> void:
 	if not (e is InputEventScreenTouch or e is InputEventMouseButton):
 		return
-	var d := _to_design(e.position)
-	var on_prices := BTN_PRICES.has_point(d)
-	var on_return := BTN_RETURN.has_point(d) and not on_prices
-	# The CURRENT WEEK box carries the live CASH figure; tapping it is the cheat target.
-	var on_cash := BOX_CUR.has_point(d) and not on_prices
 	if e.pressed:
-		_press = "prices" if on_prices else ""
-		queue_redraw()
-	else:
-		var was := _press
-		_press = ""
-		queue_redraw()
-		if on_prices and was == "prices":
-			prices_pressed.emit()
-		elif on_cash:
-			# Count consecutive taps on the cash box; the Nth fires the cheat (and is swallowed,
-			# so the screen does not dismiss). Any tap elsewhere resets the run.
-			_cash_taps += 1
-			if _cash_taps >= CHEAT_TAPS:
-				_cash_taps = 0
-				cheat_cash.emit()
-		elif on_return:
-			_cash_taps = 0
-			back_pressed.emit()
-		else:
-			# A tap on the ledger / chart is a no-op now (it was bouncing back to the hub).
-			_cash_taps = 0
+		return
+	var d := _to_design(e.position)
+	# The RETURN control is the only dismiss affordance the frame shows.
+	if BTN_RETURN.has_point(d):
+		back_pressed.emit()
 
 
 # ---- helpers -------------------------------------------------------------
@@ -140,12 +143,12 @@ static func fmt_money(v: int) -> String:
 	return "%s£%s" % ["-" if neg else "", out]
 
 
-func _txt(f: Font, x: int, y_top: int, s: String, col: Color, sz: int, right := false) -> void:
+func _txt(f: Font, x_right: int, y_top: int, s: String, col: Color, sz: int) -> void:
 	if f == null:
 		return
 	var w := f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
-	var px := x - w if right else float(x)
-	draw_string(f, Vector2(px, y_top + f.get_ascent(sz)), s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
+	draw_string(f, Vector2(x_right - w, y_top + f.get_ascent(sz)), s,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
 
 
 # ---- drawing -------------------------------------------------------------
@@ -155,133 +158,87 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.05, 0.07, 0.14), true)
 	draw_set_transform(Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5), 0.0, Vector2(s, s))
 
-	PMChrome.draw_bg(self)
-	_draw_tabs()
-
-	_txt(_f12, 12, TITLE_Y, "INCOME + EXPENSES", C_BLUE.lightened(0.3), 13)
-	_txt(_f12, W - 12, TITLE_Y, "SEASON %s" % _season, C_PANEL_TXT, 13, true)
-
-	_draw_ledger(INC_PANEL, "INCOME", _sum.get("income_lines", []), C_INCOME_HDR, C_INCOME_ROW,
-		"TOTAL INCOME", int(_sum.get("total_income", 0)), C_TOTAL_INC, "fin_up")
-	_draw_ledger(EXP_PANEL, "EXPENSES", _sum.get("expense_lines", []), C_EXPENSE_HDR, C_EXPENSE_ROW,
-		"TOTAL EXPENSES", int(_sum.get("total_expense", 0)), C_TOTAL_EXP, "fin_down")
-	_draw_chart()
-	_draw_week_boxes()
-
-
-func _draw_tabs() -> void:
-	var view := ["INC. + EXP.", "INCOME", "EXPENSES"]
-	for i in 3:
-		var r := Rect2(6 + i * 116, 4, 114, 18)
-		PMChrome.bevel(self, r, C_TAB_SEL_INC if i == 0 else C_TAB, C_TAB_HI, C_TAB_LO)
-		_centre(_f10, r, view[i], C_GOLD if i == 0 else C_PANEL_TXT, 10)
-	var per := ["PER WEEK", "PER SEASON"]
-	for i in 2:
-		var r := Rect2(406 + i * 116, 4, 114, 18)
-		PMChrome.bevel(self, r, C_TAB_SEL_PER if i == 1 else C_TAB, C_TAB_HI, C_TAB_LO)
-		_centre(_f10, r, per[i], C_GOLD if i == 1 else C_PANEL_TXT, 10)
-
-
-func _draw_ledger(panel: Rect2, title: String, lines: Array, hdr: Color, row_col: Color,
-		total_label: String, total: int, total_col: Color, marker := "") -> void:
-	PMChrome.draw_table_panel(self, panel)
-	# coloured header bar
-	var hb := Rect2(panel.position.x + 2, panel.position.y + 2, panel.size.x - 4, 18)
-	PMChrome.bevel(self, hb, hdr, hdr.lightened(0.25), hdr.darkened(0.4))
-	_centre(_f12, hb, title, Color(0.98, 1.0, 0.96), 13)
-	# rows: original FLECHAGREEN ▲ / FLECHARED ▼ marker, then label, then right £amount.
-	var y := int(panel.position.y) + 24
-	var rh := 22
-	for i in lines.size():
-		var line: Array = lines[i]
-		var rr := Rect2(panel.position.x + 4, y, panel.size.x - 8, rh - 2)
-		draw_rect(rr, row_col if i % 2 == 0 else row_col.darkened(0.06), true)
-		_draw_marker(marker, Rect2(panel.position.x + 8, y + 3, 12, 12), title == "INCOME")
-		_txt(_f10, int(panel.position.x) + 26, y + 5, str(line[0]).substr(0, 21), C_ROW_TXT, 11)
-		_txt(_f10, int(panel.end.x) - 12, y + 5, fmt_money(int(line[1])), C_ROW_TXT, 11, true)
-		y += rh
-	# total bar at the panel foot
-	var tb := Rect2(panel.position.x + 2, panel.end.y - 24, panel.size.x - 4, 20)
-	PMChrome.bevel(self, tb, total_col, total_col.lightened(0.3), total_col.darkened(0.4))
-	var tcol: Color = Color(0.06, 0.10, 0.20) if total_col == C_TOTAL_EXP else Color.WHITE
-	_txt(_f10, int(tb.position.x) + 8, int(tb.position.y) + 4, total_label, tcol, 11)
-	_txt(_f14, int(tb.end.x) - 10, int(tb.position.y) + 3, fmt_money(total), tcol, 14, true)
-
-
-## The income/expense row marker: the original FLECHAGREEN/FLECHARED sprite when baked,
-## else a drawn triangle (green ▲ up for income, red ▼ down for expense) so the row still
-## reads correctly in CI before the art is present.
-func _draw_marker(name: String, r: Rect2, up: bool) -> void:
-	if name == "" or PMChrome.draw_icon(self, name, r):
-		return
-	var col := C_INCOME_HDR.lightened(0.15) if up else Color(0.78, 0.16, 0.14)
-	var cx := r.position.x + r.size.x * 0.5
-	if up:
-		draw_colored_polygon(PackedVector2Array([Vector2(cx, r.position.y),
-			Vector2(r.end.x, r.end.y), Vector2(r.position.x, r.end.y)]), col)
+	if _chrome != null:
+		draw_texture(_chrome, Vector2.ZERO)
 	else:
-		draw_colored_polygon(PackedVector2Array([Vector2(r.position.x, r.position.y),
-			Vector2(r.end.x, r.position.y), Vector2(cx, r.end.y)]), col)
+		draw_rect(Rect2(0, 0, W, H), Color(0.10, 0.18, 0.40), true)
+
+	_draw_season()
+	_draw_ledger()
+	_draw_bottom_boxes()
+	_draw_chart()
 
 
-func _draw_chart() -> void:
-	PMChrome.bevel(self, CHART, C_CHART_BG, Color(0.2, 0.3, 0.5), Color(0.02, 0.03, 0.08))
-	_txt(_f10, int(CHART.position.x) + 8, int(CHART.position.y) + 4, "BALANCE", C_PANEL_TXT, 11)
-	_txt(_f10, int(CHART.position.x) + 200, int(CHART.position.y) + 4, "WEEKLY BALANCE TABLE",
-		C_PANEL_TXT, 11)
-	var plot := Rect2(CHART.position.x + 56, CHART.position.y + 20, CHART.size.x - 70, CHART.size.y - 30)
-	var zero_y := plot.position.y + plot.size.y * 0.5
-	# axis
-	draw_rect(Rect2(plot.position.x, zero_y, plot.size.x, 1), Color(0.5, 0.6, 0.8, 0.8), true)
-	var wk: int = int(_sum.get("weekly_balance", 0))
-	var scale := maxi(2_500_000, absi(wk) * 2)
-	_txt(_f8, int(plot.position.x) - 52, int(plot.position.y) - 2, "+%dK" % int(scale / 1000), C_BAR_POS, 9)
-	_txt(_f8, int(plot.position.x) - 52, int(zero_y) + 4, "-%dK" % int(scale / 1000), C_BAR_NEG, 9)
-	# bars: the model's constant weekly balance across the elapsed weeks
-	var weeks := clampi(_week if _week > 0 else SEASON_WEEKS, 1, SEASON_WEEKS)
-	var bw := plot.size.x / float(SEASON_WEEKS)
-	var hh := (plot.size.y * 0.5) * clampf(float(wk) / float(scale), -1.0, 1.0)
-	for i in weeks:
-		var bx := plot.position.x + i * bw
-		if hh >= 0:
-			draw_rect(Rect2(bx, zero_y - hh, bw - 1, hh), C_BAR_POS, true)
-		else:
-			draw_rect(Rect2(bx, zero_y, bw - 1, -hh), C_BAR_NEG, true)
-	# week ticks
-	for t in [1, 10, 20, 30, 40, 50]:
-		if t <= SEASON_WEEKS:
-			_txt(_f8, int(plot.position.x + t * bw), int(plot.end.y) + 1, str(t), Color(0.6, 0.7, 0.9), 9)
+func _draw_season() -> void:
+	# "1997-98" -> "SEASON 1997 · 98" (the frame's middle dot, U+00B7; the proman
+	# font carries glyph 183, so this matches the baked header exactly).
+	var txt := "SEASON"
+	var parts := _season.split("-")
+	if parts.size() == 2:
+		txt = "SEASON %s · %s" % [parts[0], parts[1]]
+	elif _season != "":
+		txt = "SEASON %s" % _season
+	_txt(_ftot, SEASON_RIGHT, SEASON_Y, txt, C_BLACK, SZ_TOT)
 
 
-func _draw_week_boxes() -> void:
+func _draw_ledger() -> void:
+	var inc: Array = _sum.get("income_lines", [])
+	var exp: Array = _sum.get("expense_lines", [])
+	# INCOME column: TICKETS, PUBLICITY, TELEVISION, then 4 honest-gap zeros.
+	var tickets := int(inc[0][1]) if inc.size() > 0 else 0
+	var publicity := (int(inc[1][1]) if inc.size() > 1 else 0) + (int(inc[2][1]) if inc.size() > 2 else 0)
+	var television := int(inc[3][1]) if inc.size() > 3 else 0
+	var income_vals := [tickets, publicity, television, 0, 0, 0, 0]
+	for i in income_vals.size():
+		_txt(_fval, INC_RIGHT, ROW_Y0 + i * ROW_STEP + VAL_DY, fmt_money(int(income_vals[i])), C_BLACK, SZ_VAL)
+
+	# EXPENSES column: PLAYERS' WAGE (row 2), PLAYERS' BONUS (row 3); rest gaps.
+	var players_wage := int(exp[0][1]) if exp.size() > 0 else 0
+	var players_bonus := int(exp[1][1]) if exp.size() > 1 else 0
+	var expense_vals := [0, 0, players_wage, players_bonus, 0, 0, 0, 0, 0, 0, 0]
+	for i in expense_vals.size():
+		_txt(_fval, EXP_RIGHT, ROW_Y0 + i * ROW_STEP + VAL_DY, fmt_money(int(expense_vals[i])), C_BLACK, SZ_VAL)
+
+	# totals (equal the summed columns; verified against the frame)
+	_txt(_ftot, TOT_INC_RIGHT, TOT_Y, fmt_money(int(_sum.get("total_income", 0))), C_TOTAL_INC, SZ_TOT)
+	_txt(_ftot, TOT_EXP_RIGHT, TOT_Y, fmt_money(int(_sum.get("total_expense", 0))), C_TOTAL_EXP, SZ_TOT)
+
+
+func _draw_bottom_boxes() -> void:
 	var inc := int(_sum.get("total_income", 0))
 	var exp := int(_sum.get("total_expense", 0))
-	var w_inc := inc / SEASON_WEEKS
-	var w_exp := exp / SEASON_WEEKS
-	_week_box(BOX_LAST, "LAST WEEK", w_inc, w_exp, _cash - (w_inc - w_exp))
-	_week_box(BOX_CUR, "CURRENT WEEK", w_inc, w_exp, _cash)
-
-	PMChrome.bevel(self, BTN_PRICES, C_TAB_HI if _press == "prices" else C_TAB, C_TAB_HI, C_TAB_LO)
-	_centre(_f10, BTN_PRICES, "SET PRICES", C_GOLD, 10)
-	PMChrome.bevel(self, BTN_RETURN, C_TAB, C_TAB_HI, C_TAB_LO)
-	_centre(_f12, BTN_RETURN, "RETURN", C_GOLD, 13)
-
-
-func _week_box(box: Rect2, title: String, inc: int, exp: int, cash: int) -> void:
-	PMChrome.bevel(self, box, Color(0.10, 0.16, 0.34), C_TAB_HI, C_TAB_LO)
-	_txt(_f10, int(box.position.x) + 8, int(box.position.y) + 3, title, C_GOLD, 11)
-	_txt(_f10, int(box.position.x) + 8, int(box.position.y) + 18, "INCOME", C_PANEL_TXT, 10)
-	_txt(_f10, int(box.end.x) - 8, int(box.position.y) + 18, fmt_money(inc), C_PANEL_TXT, 10, true)
-	_txt(_f10, int(box.position.x) + 8, int(box.position.y) + 30, "EXPENSES", C_PANEL_TXT, 10)
-	_txt(_f10, int(box.end.x) - 8, int(box.position.y) + 30, fmt_money(exp), C_PANEL_TXT, 10, true)
-	_txt(_f10, int(box.position.x) + 8, int(box.position.y) + 43, "CASH", C_PANEL_TXT, 10)
-	_txt(_f12, int(box.end.x) - 8, int(box.position.y) + 42, fmt_money(cash),
-		C_GOLD if cash >= 0 else C_BAR_NEG, 12, true)
+	# We hold no per-week history, so LAST/CURRENT weekly income+expenses are the
+	# season figures spread evenly (a flagged approximation). CASH is the real
+	# Career figure; LAST WEEK cash backs out this week's net.
+	var w_inc := int(round(inc / float(SEASON_WEEKS)))
+	var w_exp := int(round(exp / float(SEASON_WEEKS)))
+	# LAST WEEK
+	_txt(_fbot, LW_RIGHT, BOT_ROW_Y[0], fmt_money(w_inc), C_BLACK, SZ_BOT)
+	_txt(_fbot, LW_RIGHT, BOT_ROW_Y[1], fmt_money(w_exp), C_BLACK, SZ_BOT)
+	_txt(_fbot, LW_RIGHT, BOT_ROW_Y[2], fmt_money(_cash - (w_inc - w_exp)), C_GOLD, SZ_BOT)
+	# CURRENT WEEK
+	_txt(_fbot, CW_RIGHT, BOT_ROW_Y[0], fmt_money(w_inc), C_BLACK, SZ_BOT)
+	_txt(_fbot, CW_RIGHT, BOT_ROW_Y[1], fmt_money(w_exp), C_BLACK, SZ_BOT)
+	_txt(_fbot, CW_RIGHT, BOT_ROW_Y[2], fmt_money(_cash), C_GOLD, SZ_BOT)
 
 
-func _centre(f: Font, r: Rect2, s: String, col: Color, sz: int) -> void:
-	if f == null:
+## The WEEKLY BALANCE chart. HONEST GAP: PM98's chart is a per-week float ledger
+## (finance_constants.md); the app has no save-game, so FinanceModel yields only a
+## single constant `weekly_balance`. We plot that one real figure flat across the
+## elapsed weeks on the frame's fixed +/-2,500K axis — deliberately NO invented
+## week-to-week variation. When a save-game ledger exists this becomes real.
+func _draw_chart() -> void:
+	var wk := int(_sum.get("weekly_balance", 0))
+	if wk == 0:
 		return
-	var w := f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
-	draw_string(f, Vector2(r.position.x + (r.size.x - w) * 0.5, r.position.y + (r.size.y - sz) * 0.5 + f.get_ascent(sz)),
-		s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
+	var weeks := clampi(_week if _week > 0 else 1, 1, SEASON_WEEKS)
+	var wpp := float(CHART_R - CHART_L) / float(SEASON_WEEKS)
+	var up: bool = wk >= 0
+	var span: int = (CHART_ZERO_Y - CHART_TOP_Y) if up else (CHART_BOT_Y - CHART_ZERO_Y)
+	var hh: float = clampf(absf(float(wk)) / float(CHART_SCALE), 0.0, 1.0) * span
+	for i in weeks:
+		var bx := CHART_L + i * wpp
+		if up:
+			draw_rect(Rect2(bx, CHART_ZERO_Y - hh, maxf(1.0, wpp - 1.0), hh), C_BAR_POS, true)
+		else:
+			draw_rect(Rect2(bx, CHART_ZERO_Y + 1, maxf(1.0, wpp - 1.0), hh), C_BAR_NEG, true)

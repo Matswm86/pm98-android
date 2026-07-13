@@ -36,6 +36,7 @@ func _run() -> void:
 		["res://scenes/NivelScreen.gd", "nivel_demo.png"],
 		["res://scenes/SeleccionScreen.gd", "seleccion_demo.png"],
 		["res://scenes/PreseasonScreen.gd", "preseason_demo.png"],
+		["res://scenes/LeagueTableScreen.gd", "leaguetable_demo.png"],
 	]
 	var club := _demo_club()
 	var tactics := Tactics.auto_pick(club)
@@ -124,18 +125,23 @@ func _run() -> void:
 			node.setup("Manchester Utd.", "MWM", _demo_leagues(),
 				func(_lid: String) -> Array: return _demo_division(),
 				func(_en: String) -> Array: return [])
+		elif s[1] == "leaguetable_demo.png":
+			# LEAGUE TABLES mirroring the real-gallery binding frame ma_10 (Premier, Week
+			# 17): Man Utd (id 40) my club at the top, so the my-club highlight + EURO CUP /
+			# U.E.F.A. / RELEGATION zone rows render exactly as the frame. Rows are pre-sorted
+			# (the screen draws array order, as Career.standings() delivers).
+			node.setup(_demo_standings(), "MANCHESTER UTD.", "1997-98", "Week 17", 1, 40, "Luis Silva")
 		for _i in 14:
 			await process_frame
 		await RenderingServer.frame_post_draw
 		var img := get_root().get_texture().get_image()
 		var err := img.save_png(dir.path_join(s[1]))
 		print("SHOT %s err=%d %dx%d" % [s[1], err, img.get_width(), img.get_height()])
-		# Second capture paged to the bottom: proves the ARROW buttons swap to the up-on /
-		# down-off art and the top of the list (KEEPERS band / starting XI) scrolls off.
+		# Second capture paged to the bottom: proves the LINE-UP ARROW buttons swap to the
+		# up-on / down-off art and the starting XI scrolls off. (The TRANSFER MARKET list is
+		# capped [3,5,5,5]=18 and always fits, so it has no scroll capture — frame 097.)
 		var scrolled_name := ""
-		if s[1] == "transfer_demo.png":
-			scrolled_name = "transfer_scrolled.png"
-		elif s[1] == "lineup_demo.png":
+		if s[1] == "lineup_demo.png":
 			scrolled_name = "lineup_scrolled.png"
 		# Second RIVAL capture with NO assistant hired: proves the sourced hire-Assistant
 		# message replaces the report (the defining reveal gate).
@@ -179,6 +185,39 @@ func _demo_division() -> Array:
 	var out: Array = []
 	for i in 20:
 		out.append({"id": 100 + i, "name": "CLUB %02d" % (i + 1)})
+	return out
+
+
+## A 20-club Premier standings mirroring the real-gallery binding frame ma_10 (Week 17):
+## same clubs, same ids, same P/W/D/L/GF/GA/Pts on the rows the frame legibly shows, so a
+## render can be overlaid on ma_10 for a 0px column check. Keys match Career.standings().
+func _demo_standings() -> Array:
+	const T := [
+		[40, "Manchester Utd.", 15, 9, 6, 0, 29, 16, 33],
+		[46, "Arsenal", 15, 9, 4, 2, 23, 8, 31],
+		[38, "Blackburn R.", 15, 7, 4, 4, 21, 13, 25],
+		[45, "Aston Villa", 15, 7, 4, 4, 25, 18, 25],
+		[43, "Leeds Utd", 15, 7, 1, 7, 18, 12, 22],
+		[47, "Tottenham H", 15, 6, 4, 5, 14, 14, 22],
+		[44, "Newcastle Utd", 13, 5, 5, 3, 19, 16, 20],
+		[54, "Southampton", 15, 4, 8, 3, 20, 18, 20],
+		[52, "Sheffield W.", 15, 5, 5, 5, 17, 20, 20],
+		[49, "Chelsea", 15, 6, 2, 7, 20, 20, 20],
+		[59, "Bolton W", 14, 6, 1, 7, 22, 22, 19],
+		[53, "Coventry", 15, 4, 6, 5, 16, 21, 18],
+		[42, "Liverpool", 15, 5, 3, 7, 17, 18, 18],
+		[63, "Crystal Pal.", 15, 4, 5, 6, 15, 21, 17],
+		[39, "Everton", 15, 4, 4, 7, 18, 22, 16],
+		[48, "West Ham Utd", 15, 4, 4, 7, 13, 21, 16],
+		[51, "Wimbledon", 15, 3, 6, 6, 15, 24, 15],
+		[68, "Barnsley", 15, 4, 1, 10, 12, 33, 13],
+		[57, "Leicester", 14, 3, 4, 7, 15, 18, 13],
+		[56, "Derby County", 14, 2, 5, 7, 12, 21, 11],
+	]
+	var out: Array = []
+	for r in T:
+		out.append({"id": r[0], "name": r[1], "P": r[2], "W": r[3], "D": r[4],
+			"L": r[5], "GF": r[6], "GA": r[7], "Pts": r[8]})
 	return out
 
 

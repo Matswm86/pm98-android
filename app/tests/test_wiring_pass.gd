@@ -41,7 +41,7 @@ func _run() -> void:
 	# Row 0 sits at y = ROW_Y0 (110); x inside the panel.
 	_press_at(lt, Vector2(200, 114))
 	_ok(got_club[0] == 11, "league table: row tap emits club_selected(id) (got %d)" % got_club[0])
-	_press_at(lt, Vector2(560, 458))      # RETURN_BTN (544,446,90,26)
+	_press_at(lt, Vector2(574, 435))      # RETURN_BTN (525,423,99,25), frame-true anchor
 	_ok(got_back[0], "league table: RETURN emits back_pressed")
 	got_back[0] = false
 	got_club[0] = -1

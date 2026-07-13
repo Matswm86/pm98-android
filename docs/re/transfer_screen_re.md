@@ -6,6 +6,78 @@ Decompile: `docs/re/transfer/fn_00532a50_FUN_00532a50.c`. Anchored on the title
 `"TRANSFER MARKET"` @ `.data 0x65c274` and the `recursos\iconos\fichar\` assets.
 Immediates read straight from the disassembly (capstone), not the lossy decompile.
 
+## Frame-true rebuild + divergence list (2026-07-13)
+
+The old `TransferScreen.gd` was **rejected as invented**. The screen is now baked
+FRAME-TRUE from the real walkthrough, following the PreseasonScreen / FinanceScreen
+frame-bake precedent:
+
+- **Binding frame**: `screenshots/original-walkthrough-2026-07-02/097_164707.png`
+  (Man Utd, Saturday 23 August 1997, Premier / Week 3) — the real TRANSFER MARKET
+  (FICHAR) screen.
+- **Bake tool**: `tools/re/build_transfer_chrome_from_frames.py` cuts the frame's
+  pixels 1:1 into `app/art/screens/transfer/chrome.png` (barra + column headers +
+  scrollbar + nav column + FONDO all baked), blanking ONLY the KEEPER header cell +
+  the list body; the `[+]` sprite is cut to `plus.png`. The scene redraws the band
+  headers + live rows over the baked chrome.
+
+**Element-by-element: OLD (invented, rejected) → FRAME 097 (truth) → NOW (rebuilt).**
+
+| Element | OLD invented layout | FRAME 097 | Rebuilt scene |
+|---|---|---|---|
+| Columns | PLAYER / RATING / AV / MO / AGE / CLUB FEE / WAGE / CLUB | `[+]` \| flag \| Name \| ★ \| **AV MO CLUB FEE WAGE YEARS** | matches frame (baked headers) |
+| Band names | RED, **plural** (KEEPERS…) | **navy `(0,0,128)`, singular** KEEPER/DEFENDER/MIDFIELDER/FORWARD | navy singular ✓ |
+| Band caps | — | `[3,5,5,5]` fixed slots (`DAT_0065c020`), dearest first, blanks stay | `[3,5,5,5]`, dearest-first ✓ |
+| Row lead | club crest | `[+]` expand box | `plus.png` (cut 1:1) ✓ |
+| BANK box | fabricated £ box | **absent** | removed ✓ |
+| "Window: OPEN / N offers left" | fabricated text | **absent** | removed (fields kept in `setup()` sig only) ✓ |
+| Bottom strip | invented "top target" line | plain help band (baked) | baked, no invented text ✓ |
+| Nav column | — | CURRENT OFFERS / SCOUT / OFFERS / RETURN (right) | baked; hit-rects only ✓ |
+| Scrolling | ARROW up/down paging list | **inert** — 18-slot grid always fits; scrollbar is baked art | no scroll model ✓ |
+
+**Frame-measured inks / geometry (sampled off 097, dom-ink):**
+`AV = (212,63,0)` orange-red (was mis-set (210,0,0)); `MO = (75,109,172)` blue;
+`CLUB FEE = (210,0,0)` red; `WAGE = (150,0,0)` maroon (was (144,0,0)); `YEARS =
+(42,63,170)` navy; band = `(0,0,128)`. **Value grid = ProMan8** (`_f8`@8): frame packs
+`£12,500,000` into ~55px (x285..340); `_f10`@11 rendered 98px and overflowed AV/MO —
+fixed. AV right-edge x250, FEE right x337, WAGE right x404 (all verified in-shot).
+
+**FRAME-TRUE:** barra region, column headers, band names+colour, `[+]` box, star column,
+scrollbar, nav chrome, FONDO, AV value (=real CA), CLUB FEE/WAGE column placement.
+
+**Honest gaps (rendered `-`, never fabricated):**
+- **MO** — frame shows real morale (78–99); morale is an un-RE'd dynamic save value
+  (audit B7). The market row carries a `mo` field (= the `RM` attribute) but it is **not
+  confirmed to be morale**, so the scene does NOT render it under the MO header.
+- **YEARS | LEFT** — frame shows two contract-year cells (yellow on the final year);
+  buyable-player contract years are not in `Career.market()`'s row.
+- **Nationality flag** — drawn only if the row carries `flagCode`; the market row has none,
+  so the frame's per-player flags (Pukelevicius/Giglio/Nevland) are a gap.
+
+**Accepted approximations (sourced-but-not-portable):**
+- **CLUB FEE / WAGE** — from `TransferMarket`'s valuation model; PM98's real fees are
+  un-portable per-club float data (`docs/re/finance_constants.md`).
+- **Star rating** — `CA/20` mapping; the exact rating curve is un-RE'd (parity-excluded,
+  like the FICHA rating).
+- **Barra text** — the manager/club/date/week plaque is **baked** from frame 097 ("asdf" /
+  "Manchester Utd."), not redrawn live (the FinanceScreen static-barra limitation: the live
+  `PMChrome.draw_header` plaque is narrower than the frame's and let the baked crest peek
+  through). `setup()` still takes club/manager/season/week for Main's call.
+
+**Parity (rendered `transfer_demo.png` vs frame 097):** columns land under the baked
+headers with no overlap — AV_right 248 (frame 249), FEE 281–335 (frame 285–340), WAGE
+366–402 (frame 358–406), 33–36px AV→FEE gap. Structurally 1:1 with frame 097 modulo the
+honest gaps above.
+
+**WIRING (owned by Main.gd, unchanged):** `Main._show_transfer_screen()` already calls the
+8-arg `setup(market, club, manager, season, cash, window, offers, week)` and connects
+`back_pressed` (queue_free), `current_offers_pressed` (→ CURRENT OFFERS screen), and
+`player_pressed` (→ MakeOfferScreen). **SCOUT** and **OFFERS** are sourced nav buttons but
+not yet wired to a screen (scene hit-tests them, emits nothing — no-op). No Main edit was
+needed.
+
+## Reversed-source detail (below supersedes only the pre-rebuild "Build mapping")
+
 Geometry helpers (same family proven on finance/squad/lineup):
 - `FUN_00436fb0(x,y)` → a point. Pushed `push y; push x; call`.
 - `FUN_00436fd0(pos,size)` → `Rect(pos.x, pos.y, pos.x+size.x, pos.y+size.y)`.
@@ -37,6 +109,9 @@ Geometry helpers (same family proven on finance/squad/lineup):
 - **Bottom help line**: ProMan8 text band at pos=(8,440) size=(490,26).
 
 ## Build mapping (→ `app/scenes/TransferScreen.gd`)
+> ⚠ SUPERSEDED by "Frame-true rebuild + divergence list (2026-07-13)" above. The column
+> list + BANK box + plural band names below describe the **rejected invented** layout and
+> are kept only as the RE trail. The shipped screen matches frame 097, not this text.
 - FONDO + BARRA; BARRA title "TRANSFER MARKET" at (150,16) ProMan14 + manager/club/
   bank chrome.
 - List panel (8,72)..(498,435), 16 px rows, ProMan8 grid. Columns are the buyable-

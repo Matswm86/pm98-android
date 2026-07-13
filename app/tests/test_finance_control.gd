@@ -1,8 +1,14 @@
 extends SceneTree
 ## Headless test for T2 #6 — board price controls. Asserts the FinanceModel demand
 ## response (ticket price <-> attendance, board price <-> boards sold), backward
-## compatibility (no override == old figures), the Career price setters + preview + save
-## round-trip, and the FinanceScreen SET PRICES hit-testing.
+## compatibility (no override == old figures), and the Career price setters + preview
+## + save round-trip.
+##
+## NOTE: the finance-screen SET PRICES shortcut was removed in the 2026-07-13
+## frame-true rebuild (no such button exists in the real FINANCES frame; PM98 sets
+## ticket/board prices from the GROUND / improvements flow, frames 066-069). The
+## screen keeps the prices_pressed signal declared for Main compatibility; we assert
+## it still exists rather than hit-test a button.
 ##   ~/godot462 --headless --path app --script res://tests/test_finance_control.gd
 
 
@@ -66,19 +72,22 @@ func _run() -> bool:
 	ok = _assert(loaded != null and loaded.ticket_price == 35 and loaded.board_price == 2400,
 		"prices survived save/load") and ok
 
-	# FinanceScreen SET PRICES hit-testing.
+	# FinanceScreen signal surface (Main compatibility after the frame-true rebuild):
+	# prices_pressed / cheat_cash stay declared even though the frame-true screen no
+	# longer emits them, and RETURN emits back_pressed.
 	var scr: FinanceScreen = load("res://scenes/FinanceScreen.gd").new()
 	get_root().add_child(scr)
 	scr.size = Vector2(640, 480)
 	for _i in 2:
 		await process_frame
 	scr.setup(base, "ARSENAL", "", "1997-98")
+	ok = _assert(scr.has_signal("prices_pressed") and scr.has_signal("cheat_cash")
+		and scr.has_signal("back_pressed"), "screen keeps its Main-facing signals") and ok
 	var got: Array = []
-	scr.prices_pressed.connect(func() -> void: got.append("prices"))
 	scr.back_pressed.connect(func() -> void: got.append("back"))
-	scr._on_input(_touch(_design_to_local(scr, FinanceScreen.BTN_PRICES.get_center()), true))
-	scr._on_input(_touch(_design_to_local(scr, FinanceScreen.BTN_PRICES.get_center()), false))
-	ok = _assert(got == ["prices"], "SET PRICES button emits prices_pressed (%s)" % str(got)) and ok
+	scr._on_input(_touch(_design_to_local(scr, FinanceScreen.BTN_RETURN.get_center()), true))
+	scr._on_input(_touch(_design_to_local(scr, FinanceScreen.BTN_RETURN.get_center()), false))
+	ok = _assert(got == ["back"], "RETURN button emits back_pressed (%s)" % str(got)) and ok
 	scr.queue_free()
 
 	print("\n%s" % ("ALL PASS" if ok else "FAILURES ABOVE"))

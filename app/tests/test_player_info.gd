@@ -82,7 +82,10 @@ func _run() -> void:
 	get_root().add_child(screen)
 	for _i in 3:
 		await process_frame
-	ok = _assert(screen._f12 != null and screen._f18 != null, "PROMAN fonts loaded into FICHA") and ok
+	# The frame-baked FICHA rebuild (2026-07-03) draws with the native .fnt sizes
+	# proman8/10/12 (the old proman18 name font is gone) — docs/re/ficha_card_re.md.
+	ok = _assert(screen._f8 != null and screen._f10 != null and screen._f12 != null,
+		"PROMAN fonts loaded into FICHA") and ok
 	screen.setup(star, club, 1)
 	await process_frame
 	ok = _assert(screen._rating() > 0, "RATING derives a positive overall (got %d)" % screen._rating()) and ok

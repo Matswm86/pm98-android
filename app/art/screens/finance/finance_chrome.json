@@ -1,0 +1,83 @@
+{
+  "binding_frame": "013_164406.png",
+  "note": "INC.+EXP. / PER SEASON summary; dynamic values redrawn by FinanceScreen.gd from FinanceModel.summary + Career cash.",
+  "size": [
+    640,
+    480
+  ],
+  "samples": {
+    "income_ink": [
+      0,
+      0,
+      0
+    ],
+    "expense_ink": [
+      0,
+      0,
+      0
+    ],
+    "total_income_ink": [
+      30,
+      52,
+      98
+    ],
+    "total_expense_ink": [
+      170,
+      0,
+      0
+    ],
+    "season_ink": [
+      0,
+      0,
+      0
+    ],
+    "cash_gold_ink": [
+      255,
+      223,
+      0
+    ],
+    "bottom_ink": [
+      0,
+      0,
+      0
+    ],
+    "income_cell_bg": [
+      170,
+      191,
+      170
+    ],
+    "expense_cell_bg": [
+      212,
+      191,
+      170
+    ]
+  },
+  "anchors": {
+    "row_y0": 98,
+    "row_step": 16,
+    "income_right": 305,
+    "expense_right": 602,
+    "total_y": 284,
+    "total_income_right": 305,
+    "total_expense_right": 603,
+    "season_right": 600,
+    "season_y": 60,
+    "last_week_right": 246,
+    "current_week_right": 496,
+    "bottom_rows_y": [
+      [
+        428,
+        441
+      ],
+      [
+        442,
+        453
+      ],
+      [
+        454,
+        465
+      ]
+    ],
+    "chart_zero_y": 353
+  }
+}

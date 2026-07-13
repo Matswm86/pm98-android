@@ -1,19 +1,41 @@
 extends Control
 class_name TransferScreen
-## PM98 TRANSFER MARKET (FICHAR) screen, rebuilt to match the real game (ma_11): the
-## shared PMChrome plaque header + blue marble background over the white buyable-player
-## table — (crest) | NAME | ★ rating | AV | MO | AGE | CLUB FEE | WAGE | CLUB — grouped
-## into the RED position bands KEEPERS / DEFENDERS / MIDFIELDERS / FORWARDS (the [3,5,5,5]
-## camrol-role table). A selected-player detail strip runs along the bottom; the nav
-## column (CURRENT OFFERS / SCOUT / OFFERS / RETURN) + BANK sit on the right.
+## PM98 TRANSFER MARKET (FICHAR) screen, rebuilt FRAME-TRUE from the real walkthrough
+## (screenshots/original-walkthrough-2026-07-02/097_164707.png — the screen reached
+## hub -> TRANSFERS; frame 093 shows the "TRANSFER MARKET" hub region holding
+## TRANSFERS/PLAYERS/STAFF), following the PreseasonScreen / FinanceScreen frame-bake
+## precedent.
 ##
-## Driven live by Career.market() (dearest first). Native 640x480; scales to fit its parent.
+## The static chrome is the ORIGINAL frame's pixels, cut 1:1 by
+## tools/re/build_transfer_chrome_from_frames.py into art/screens/transfer/chrome.png
+## with ONLY the dynamic list body blanked. This scene draws that chrome at 640x480,
+## redraws the live barra (PMChrome.draw_header) and the buyable rows on top — nothing
+## about the panel, the AV/MO/CLUB FEE/WAGE/YEARS column headers, the scrollbar, the
+## CURRENT OFFERS / SCOUT / OFFERS / RETURN nav buttons or the stadium background is
+## hand-invented.
 ##
-## INTERACTIVE: the original ARROW scroll buttons page the buyable list when it overflows
-## the panel (KEEPERS off the top, the last FORWARDS into view); the CURRENT OFFERS nav
-## button opens the offers screen (`current_offers_pressed` — the sourced FICHAR-hub
-## route, docs/re/ofertas_screen_re.md); any other tap emits `back_pressed` (the
-## display-screen tap-to-dismiss).
+## Row (frame 097): [+] expand box | (nationality flag) | Name | gold stars |
+## AV(red) | MO(blue) | CLUB FEE(red) | WAGE(dark-red) | YEARS|LEFT (two navy cells,
+## yellow on the final year). The four BLUE position bands are SINGULAR:
+## KEEPER / DEFENDER / MIDFIELDER / FORWARD, fixed [3,5,5,5] slots each (DAT_0065c020),
+## dearest first; unfilled slots stay blank. The 18-row cap always fits the panel, so
+## the frame's scrollbar is inert baked art (never actually scrolls).
+##
+## FRAME-TRUE: layout, labels, band names, colours, [+] box, nav chrome, background.
+## APPROXIMATED (accepted): CLUB FEE / WAGE come from TransferMarket's valuation model
+## (PM98's real fees are un-portable per-club float data, docs/re/finance_constants.md);
+## the star RATING mapping is un-RE'd (parity-excluded, like the FICHA rating).
+## HONEST GAPS: MO (morale is an un-RE'd dynamic save value — audit B7 renders "-",
+## never fabricated from a static attr), YEARS|LEFT (buyable-player contract years are
+## not in Career.market()'s row), and the nationality flag (no flagCode on the row).
+##
+## Driven live by Career.market() (dearest first). Native 640x480; scales to fit parent.
+##
+## INTERACTIVE: a tap on a player row opens the make-offer card (`player_pressed`,
+## Main -> MakeOfferScreen, the original's browse-list -> card route, run-3 100->101);
+## CURRENT OFFERS opens the offers screen (`current_offers_pressed`,
+## docs/re/ofertas_screen_re.md); RETURN dismisses (`back_pressed`). SCOUT / OFFERS are
+## the sourced nav buttons but are not yet wired to a screen (no-op — see WIRING note).
 
 signal back_pressed
 signal current_offers_pressed
@@ -22,53 +44,52 @@ signal player_pressed(row: Dictionary)
 const W := 640
 const H := 480
 
-const C_SECTION := Color(0.78, 0.16, 0.14)       # RED position-band header (ma_11)
-const C_STATBAND := Color(0.86, 0.88, 0.92)
-const C_FEE := Color(0.70, 0.18, 0.12)           # red club-fee figure
-const C_WAGE := Color(0.16, 0.34, 0.20)          # green wage figure
-const C_DKBTN := Color(0.10, 0.16, 0.32)
-const C_DKBTN_HI := Color(0.34, 0.46, 0.72)
-const C_DKBTN_LO := Color(0.04, 0.08, 0.18)
-const C_GOLD := Color(1.0, 0.86, 0.22)
-const C_PANEL_TXT := Color(0.88, 0.93, 1.0)
-const C_STRIP := Color(0.90, 0.91, 0.86)
+# frame-sampled inks (app/art/screens/transfer/transfer_chrome.json)
+const C_BAND := Color8(0, 0, 128)          # KEEPER/DEFENDER/... header (navy, frame C(50,81))
+const C_AV := Color8(212, 63, 0)           # AV value (orange-red, frame dom-ink C(236,96))
+const C_MO := Color8(75, 109, 172)         # MO value (blue) — used for the gap dash
+const C_FEE := Color8(210, 0, 0)           # CLUB FEE (bright red, frame dom-ink)
+const C_WAGE := Color8(150, 0, 0)          # WAGE (dark maroon, frame dom-ink C(367,95))
+const C_YEARS := Color8(42, 63, 170)       # YEARS|LEFT cell digit (navy)
+const C_NAME := Color8(0, 0, 0)            # player name (black)
+const C_ROW_SEP := Color8(176, 176, 176)   # thin row separator
+const C_GAP := Color8(150, 150, 150)       # honest-gap dash colour
 
-const TABLE := Rect2(6, 50, 498, 384)
-const HDR_Y := 66
-const ROW_X := 8
-const ROW_W := 494
-const ROW0_Y := 84
-const ROW_H := 16
-const NAME_X := 28
-const STARS_X := 148
-const AV_X := 226
-const MO_X := 256
-const AGE_X := 292
-const FEE_X := 376
-const WAGE_X := 452
-const CLUB_X := 458
+# ---- band layout (frame 097; the fixed [3,5,5,5] slot grid, always drawn) ----
+const BAND_X := 50                          # band-header text ink-left
+const BANDS := [
+	{"key": "GK", "label": "KEEPER", "hdr_y": 72, "slot_y": [92, 108, 124]},
+	{"key": "DF", "label": "DEFENDER", "hdr_y": 140, "slot_y": [156, 172, 188, 204, 220]},
+	{"key": "MF", "label": "MIDFIELDER", "hdr_y": 236, "slot_y": [252, 268, 284, 300, 316]},
+	{"key": "FW", "label": "FORWARD", "hdr_y": 332, "slot_y": [348, 364, 380, 396, 412]},
+]
+const BAND_CAPS := {"GK": 3, "DF": 5, "MF": 5, "FW": 5}   # DAT_0065c020 slot counts
+const ROW_H := 13                           # row content height (16px pitch)
+const VAL_SZ := 8                           # value-grid font size (ProMan8, frame-measured)
+const VAL_DY := 3                           # value y-top so the baseline = the name baseline
 
-const BAND_CAPS := {"GK": 3, "DF": 5, "MF": 5, "FW": 5, "OUT": 5}
-const BAND_ORDER := ["GK", "DF", "MF", "FW", "OUT"]
-const BAND_LABELS := {
-	"GK": "KEEPERS", "DF": "DEFENDERS", "MF": "MIDFIELDERS", "FW": "FORWARDS", "OUT": "OUTFIELD",
-}
+# ---- column anchors (design coords, measured off frame 097) ----------------
+const PLUS_XY := Vector2(5, 91)             # plus.png blit origin at slot_y 92
+const FLAG_X := 34                          # nationality flag left (if flagCode)
+const NAME_X := 60
+const STARS_X := 156
+const AV_RIGHT := 250
+const MO_CENTER := 267
+const FEE_RIGHT := 337
+const WAGE_RIGHT := 404
+const YEARS1_CENTER := 432
+const YEARS2_CENTER := 457
+const ROW_LEFT := 8
+const ROW_RIGHT := 494
 
-# Right-hand nav column.
-const BANK_BOX := Rect2(510, 50, 124, 44)
-const BTN_CURRENT := Rect2(510, 286, 124, 25)
-const BTN_SCOUT := Rect2(510, 323, 124, 25)
-const BTN_OFFERS := Rect2(510, 360, 124, 25)
-const BTN_RETURN := Rect2(510, 440, 124, 25)
-# Bottom selected-player detail strip.
-const STRIP := Rect2(6, 440, 498, 26)
-# Original ARROW scroll buttons (16x16 art), in the nav gutter centred on the list height;
-# the hit rect is padded for touch and the 16px glyph is drawn centred inside it. Shown only
-# while the list overflows the panel (the original registers them on the list widget).
-const SCROLL_UP := Rect2(606, 150, 24, 22)
-const SCROLL_DOWN := Rect2(606, 206, 24, 22)
-const SCROLL_STEP := 3
+# ---- nav button hit rects (baked art; the scene only hit-tests them) --------
+const BTN_CURRENT := Rect2(496, 287, 128, 21)
+const BTN_SCOUT := Rect2(496, 324, 128, 21)
+const BTN_OFFERS := Rect2(496, 361, 128, 21)
+const BTN_RETURN := Rect2(496, 441, 128, 21)
 
+var _chrome: Texture2D
+var _plus: Texture2D
 var _f12: Font
 var _f10: Font
 var _f8: Font
@@ -77,15 +98,16 @@ var _rows: Array = []
 var _club: String = ""
 var _manager: String = ""
 var _season: String = ""
+var _cash: int = 0            # kept for Main's setup call; the frame shows no BANK box
+var _window: String = ""      # ditto (no "Window: OPEN" text on the real screen)
+var _offers: int = 0          # ditto
 var _week: int = 0
-var _cash: int = 0
-var _window: String = ""
-var _offers: int = 0
-var _scroll: int = 0
 var _press: String = ""
 
 
 func _ready() -> void:
+	_chrome = load("res://art/screens/transfer/chrome.png")
+	_plus = load("res://art/screens/transfer/plus.png")
 	_f12 = load("res://art/fonts/proman12.fnt")
 	_f10 = load("res://art/fonts/proman10.fnt")
 	_f8 = load("res://art/fonts/proman8.fnt")
@@ -106,61 +128,71 @@ func setup(market: Array, club: String, manager := "", season := "", cash := 0,
 	_window = window
 	_offers = offers
 	_week = week
-	_scroll = 0
 	queue_redraw()
 
 
-# ---- scroll model + input -----------------------------------------------
+# ---- ordering: the 4 bands, each capped [3,5,5,5], dearest first ----------
 
-## The list flattened to draw-items in render order — a {t:"hdr"} per band then its
-## {t:"row"} players, each row carrying a continuous `idx` for the alternating stripe.
-func _flat_items() -> Array:
-	var items: Array = []
-	var idx := 0
-	for sec in _sections():
-		items.append({"t": "hdr", "label": str(sec["section"])})
-		for r in sec["players"]:
-			items.append({"t": "row", "r": r, "idx": idx})
-			idx += 1
-	return items
-
-
-## How many 16px rows fit between the first row and the panel's bottom.
-func _visible_rows() -> int:
-	return int((TABLE.end.y - ROW0_Y) / ROW_H)
+## [{section, key, players}] in band order; players are the first N buyable rows of
+## that decoded position, N <= the band's slot cap (the input is already fee-sorted).
+func _sections() -> Array:
+	var bands := {"GK": [], "DF": [], "MF": [], "FW": []}
+	for r in _rows:
+		var key := _band_of(r)
+		if key != "" and bands[key].size() < int(BAND_CAPS[key]):
+			bands[key].append(r)
+	var out: Array = []
+	for b in BANDS:
+		out.append({"section": b["label"], "key": b["key"], "players": bands[b["key"]]})
+	return out
 
 
-func _max_scroll() -> int:
-	return maxi(0, _flat_items().size() - _visible_rows())
+## The 4-way position band key. Uses the decoded broad `pos`; a keeper with no pos
+## still lands in GK. An outfield row with no decoded position is skipped rather than
+## fabricated into a band.
+func _band_of(r: Dictionary) -> String:
+	var pos := str(r.get("pos", ""))
+	if pos in ["GK", "DF", "MF", "FW"]:
+		return pos
+	return "GK" if bool(r.get("isGK", false)) else ""
 
 
-func _clamp_scroll() -> void:
-	_scroll = clampi(_scroll, 0, _max_scroll())
-
-
-func _scale() -> float:
-	return min(size.x / W, size.y / H) if size.x > 0 and size.y > 0 else 1.0
-
+# ---- input ---------------------------------------------------------------
 
 func _to_design(p: Vector2) -> Vector2:
-	var s := _scale()
+	var s: float = min(size.x / W, size.y / H) if size.x > 0 and size.y > 0 else 1.0
 	return (p - Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5)) / s
 
 
-## Which scroll button (if any) a design-space point hits. Returns "" when the list does
-## not overflow, so a tap there falls through to dismiss.
-func _hit(d: Vector2) -> String:
+## Which control a design-space point hits: {a:"return|current|scout|offers|row", row?}.
+func _hit(d: Vector2) -> Dictionary:
 	if BTN_RETURN.has_point(d):
-		return "return"
+		return {"a": "return"}
 	if BTN_CURRENT.has_point(d):
-		return "current"
-	if _max_scroll() <= 0:
-		return ""
-	if SCROLL_UP.has_point(d):
-		return "up"
-	if SCROLL_DOWN.has_point(d):
-		return "down"
-	return ""
+		return {"a": "current"}
+	if BTN_SCOUT.has_point(d):
+		return {"a": "scout"}
+	if BTN_OFFERS.has_point(d):
+		return {"a": "offers"}
+	var r := _row_at(d)
+	if not r.is_empty():
+		return {"a": "row", "row": r}
+	return {"a": ""}
+
+
+## The player row under a design-space point ({} if none).
+func _row_at(d: Vector2) -> Dictionary:
+	if d.x < ROW_LEFT or d.x > ROW_RIGHT:
+		return {}
+	var secs := _sections()
+	for bi in BANDS.size():
+		var players: Array = secs[bi]["players"]
+		var slots: Array = BANDS[bi]["slot_y"]
+		for pi in mini(players.size(), slots.size()):
+			var sy := int(slots[pi])
+			if d.y >= sy - 1 and d.y <= sy + ROW_H:
+				return players[pi]
+	return {}
 
 
 func _on_input(e: InputEvent) -> void:
@@ -177,63 +209,24 @@ func _on_input(e: InputEvent) -> void:
 		tap = true
 	if not tap:
 		return
+	var hit := _hit(_to_design(pos))
+	var a := str(hit.get("a", ""))
 	if pressed:
-		_press = _hit(_to_design(pos))
-	else:
-		var a := _hit(_to_design(pos))
-		var was := _press
-		_press = ""
-		if a == was and a != "":
-			# RETURN dismisses; CURRENT OFFERS opens the offers screen; a scroll-button
-			# tap pages the list.
-			if a == "return":
-				back_pressed.emit()
-			elif a == "current":
-				current_offers_pressed.emit()
-			else:
-				_scroll += SCROLL_STEP if a == "down" else -SCROLL_STEP
-				_clamp_scroll()
-				queue_redraw()
-		elif a == "" and was == "":
-			# a tap on a player row opens the make-offer card (the original's
-			# browse-list -> card route, run-3 frame 100 -> 101); empty space
-			# stays a no-op
-			var r := _row_at(_to_design(pos))
-			if not r.is_empty():
-				player_pressed.emit(r)
-
-
-## The player row (Career.market() entry) under a design-space point, {} if none.
-func _row_at(d: Vector2) -> Dictionary:
-	if d.x < TABLE.position.x or d.x > TABLE.end.x or d.y < ROW0_Y or d.y > TABLE.end.y:
-		return {}
-	var items := _flat_items()
-	var i := _scroll + int((d.y - ROW0_Y) / ROW_H)
-	if i < 0 or i >= items.size() or str(items[i].get("t", "")) != "row":
-		return {}
-	return items[i]["r"]
-
-
-# ---- ordering ------------------------------------------------------------
-
-func _sections() -> Array:
-	var bands := {"GK": [], "DF": [], "MF": [], "FW": [], "OUT": []}
-	for r in _rows:
-		var key := _band_of(r)
-		if bands[key].size() < int(BAND_CAPS[key]):
-			bands[key].append(r)
-	var out: Array = []
-	for key in BAND_ORDER:
-		if not bands[key].is_empty():
-			out.append({"section": BAND_LABELS[key], "players": bands[key]})
-	return out
-
-
-func _band_of(r: Dictionary) -> String:
-	var pos := str(r.get("pos", ""))
-	if pos in ["GK", "DF", "MF", "FW"]:
-		return pos
-	return "GK" if bool(r.get("isGK", false)) else "OUT"
+		_press = a
+		return
+	var was := _press
+	_press = ""
+	if a == "" or a != was:
+		return
+	# RETURN dismisses; CURRENT OFFERS opens the offers screen; a row tap opens the
+	# make-offer card. SCOUT / OFFERS are sourced but not yet wired (see WIRING note).
+	match a:
+		"return":
+			back_pressed.emit()
+		"current":
+			current_offers_pressed.emit()
+		"row":
+			player_pressed.emit(hit["row"])
 
 
 # ---- helpers -------------------------------------------------------------
@@ -251,12 +244,26 @@ static func fmt_money(v: int) -> String:
 	return "%s£%s" % ["-" if neg else "", out]
 
 
-func _txt(f: Font, x: int, y_top: int, s: String, col: Color, sz: int, right := false) -> void:
+func _txt_left(f: Font, x: int, y_top: int, s: String, col: Color, sz: int) -> void:
+	if f == null:
+		return
+	draw_string(f, Vector2(x, y_top + f.get_ascent(sz)), s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
+
+
+func _txt_right(f: Font, x_right: int, y_top: int, s: String, col: Color, sz: int) -> void:
 	if f == null:
 		return
 	var w := f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
-	var px := x - w if right else float(x)
-	draw_string(f, Vector2(px, y_top + f.get_ascent(sz)), s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
+	draw_string(f, Vector2(x_right - w, y_top + f.get_ascent(sz)), s,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
+
+
+func _txt_center(f: Font, cx: int, y_top: int, s: String, col: Color, sz: int) -> void:
+	if f == null:
+		return
+	var w := f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
+	draw_string(f, Vector2(cx - w * 0.5, y_top + f.get_ascent(sz)), s,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
 
 
 # ---- drawing -------------------------------------------------------------
@@ -266,140 +273,60 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.05, 0.07, 0.14), true)
 	draw_set_transform(Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5), 0.0, Vector2(s, s))
 
-	PMChrome.draw_bg(self)
-	PMChrome.draw_header(self, "TRANSFER MARKET", _manager, _club, "Premier", _season, _week)
+	if _chrome != null:
+		draw_texture(_chrome, Vector2.ZERO)
+	else:
+		draw_rect(Rect2(0, 0, W, H), Color(0.10, 0.18, 0.40), true)
 
-	PMChrome.draw_table_panel(self, TABLE)
-	_draw_col_header()
+	# The barra (title/manager/club/date/week) is BAKED into the chrome from frame 097,
+	# the FinanceScreen precedent — its pixels ARE the original's. We do NOT redraw it
+	# with PMChrome.draw_header: that plaque is narrower than the frame's, so the baked
+	# crest + "Manchester Utd" line peeked below it. Static-barra text is the known
+	# limitation shared with FinanceScreen (see WIRING note).
 	_draw_list()
-	_draw_scroll()
-	_draw_strip()
-	_draw_nav()
-
-
-func _draw_col_header() -> void:
-	PMChrome.draw_col_header(self, Rect2(TABLE.position.x + 2, HDR_Y, TABLE.size.x - 4, 16))
-	_txt(_f10, NAME_X, HDR_Y + 2, "PLAYER", PMChrome.C_TBL_HDR_TXT, 11)
-	_txt(_f10, STARS_X, HDR_Y + 2, "RATING", PMChrome.C_TBL_HDR_TXT, 11)
-	_txt(_f10, AV_X, HDR_Y + 2, "AV", PMChrome.C_TBL_HDR_TXT, 11, true)
-	_txt(_f10, MO_X, HDR_Y + 2, "MO", PMChrome.C_TBL_HDR_TXT, 11, true)
-	_txt(_f10, AGE_X, HDR_Y + 2, "AGE", PMChrome.C_TBL_HDR_TXT, 11, true)
-	_txt(_f10, FEE_X, HDR_Y + 2, "CLUB FEE", PMChrome.C_TBL_HDR_TXT, 11, true)
-	_txt(_f10, WAGE_X, HDR_Y + 2, "WAGE", PMChrome.C_TBL_HDR_TXT, 11, true)
-	_txt(_f10, CLUB_X, HDR_Y + 2, "CLUB", PMChrome.C_TBL_HDR_TXT, 11)
 
 
 func _draw_list() -> void:
-	var items := _flat_items()
-	_clamp_scroll()
-	var vis := _visible_rows()
-	var y := ROW0_Y
-	for i in range(_scroll, mini(items.size(), _scroll + vis)):
-		var it: Dictionary = items[i]
-		if it["t"] == "hdr":
-			# RED position-band header on a light strip.
-			draw_rect(Rect2(ROW_X, y, ROW_W, ROW_H - 1), PMChrome.C_ROW_DARK, true)
-			_txt(_f10, NAME_X, y + 2, str(it["label"]), C_SECTION, 11)
-		else:
-			_row(it["r"], y, int(it["idx"]))
-		y += ROW_H
+	var secs := _sections()
+	for bi in BANDS.size():
+		var b: Dictionary = BANDS[bi]
+		# Band header (always drawn — the fixed [3,5,5,5] grid shows every band).
+		_txt_left(_f12, BAND_X, int(b["hdr_y"]) - 4, str(b["label"]), C_BAND, 12)
+		var players: Array = secs[bi]["players"]
+		var slots: Array = b["slot_y"]
+		for pi in mini(players.size(), slots.size()):
+			_draw_row(players[pi], int(slots[pi]))
 
 
-## The original ARROW scroll buttons: up/down with on/off art for whether more list exists
-## in that direction. Drawn only while the list overflows the panel.
-func _draw_scroll() -> void:
-	if _max_scroll() <= 0:
-		return
-	_draw_arrow(SCROLL_UP, "scroll_up_on" if _scroll > 0 else "scroll_up_off")
-	_draw_arrow(SCROLL_DOWN, "scroll_down_on" if _scroll < _max_scroll() else "scroll_down_off")
-
-
-func _draw_arrow(hit: Rect2, name: String) -> void:
-	var g := Rect2(hit.position + (hit.size - Vector2(16, 16)) * 0.5, Vector2(16, 16))
-	if not PMChrome.draw_icon(self, name, g):
-		# Fallback so the control still reads when the PNG is absent: a drawn triangle.
-		var up := name.begins_with("scroll_up")
-		var col := PMChrome.C_GOLD if name.ends_with("_on") else PMChrome.C_STAR_OFF
-		var c := g.get_center()
-		var pts := PackedVector2Array([Vector2(c.x, c.y - 6), Vector2(c.x - 6, c.y + 5),
-			Vector2(c.x + 6, c.y + 5)] if up else [Vector2(c.x, c.y + 6),
-			Vector2(c.x - 6, c.y - 5), Vector2(c.x + 6, c.y - 5)])
-		draw_colored_polygon(pts, col)
-
-
-func _row(r: Dictionary, y: int, idx: int) -> void:
-	draw_rect(Rect2(ROW_X, y, ROW_W, ROW_H - 1),
-		PMChrome.C_ROW_LIGHT if idx % 2 == 0 else PMChrome.C_ROW_DARK, true)
-	draw_rect(Rect2(ROW_X, y + ROW_H - 1, ROW_W, 1), PMChrome.C_ROW_SEP, true)
-	var ty := y + 2
+func _draw_row(r: Dictionary, y: int) -> void:
+	# thin top + bottom separators (the frame's row-grid lines)
+	draw_rect(Rect2(ROW_LEFT, y - 1, ROW_RIGHT - ROW_LEFT, 1), C_ROW_SEP, true)
+	draw_rect(Rect2(ROW_LEFT, y + ROW_H, ROW_RIGHT - ROW_LEFT, 1), C_ROW_SEP, true)
+	# [+] expand box (baked-cut sprite)
+	if _plus != null:
+		draw_texture(_plus, Vector2(PLUS_XY.x, y - 1))
+	# nationality flag — honest gap unless the row carries a flagCode
+	var fc: Variant = r.get("flagCode", null)
+	if fc != null:
+		var ft := PMChrome.mini_flag(fc)
+		if ft != null:
+			draw_texture(ft, Vector2(FLAG_X, y + 1))
+	# name (title-cased to the game's rendered form)
+	_txt_left(_f12, NAME_X, y + 1, PMChrome.title_case_name(str(r.get("name", "?"))), C_NAME, 12)
+	# gold star rating (mapping un-RE'd; parity-excluded like the FICHA rating)
 	var ca := int(r.get("ca", 0))
-	PMChrome.draw_crest(self, int(r.get("club_id", -1)), Rect2(10, y, 13, ROW_H - 1))
-	_txt(_f10, NAME_X, ty, str(r.get("name", "?")).substr(0, 15), PMChrome.C_ROW_TXT, 11)
-	PMChrome.draw_stars(self, STARS_X, y + 3, ca / 20.0, 9, 5)
-	_txt(_f10, AV_X, ty, str(ca), PMChrome.C_ROW_TXT, 11, true)
-	_txt(_f10, MO_X, ty, str(int(r.get("mo", 0))), PMChrome.C_ROW_TXT, 11, true)
-	_txt(_f10, AGE_X, ty, str(int(r.get("age", 0))), PMChrome.C_ROW_TXT, 11, true)
-	_txt(_f10, FEE_X, ty, fmt_money(int(r.get("fee", 0))), C_FEE, 11, true)
-	_txt(_f10, WAGE_X, ty, fmt_money(int(r.get("wage", 0))), C_WAGE, 11, true)
-	_txt(_f8, CLUB_X, ty, _fit_club(str(r.get("club_name", "")), float(int(TABLE.end.x) - CLUB_X - 2)),
-		PMChrome.C_ROW_TXT, 10)
-
-
-func _fit_club(s: String, max_w: float) -> String:
-	if _f8 == null or s == "" or max_w <= 0.0:
-		return s
-	if _f8.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x <= max_w:
-		return s
-	var toks := s.split(" ", false)
-	while toks.size() > 1:
-		toks.remove_at(toks.size() - 1)
-		var cand := " ".join(toks)
-		if _f8.get_string_size(cand, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x <= max_w:
-			return cand
-	var out := s
-	while out.length() > 1 and _f8.get_string_size(out, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x > max_w:
-		out = out.substr(0, out.length() - 1)
-	return out
-
-
-## Bottom strip: the dearest target's name + selling club (the real screen shows the
-## selected row; this display overlay features the top target).
-func _draw_strip() -> void:
-	PMChrome.bevel(self, STRIP, C_STRIP, PMChrome.C_TBL_HI, PMChrome.C_TBL_LO, 2.0)
-	if _rows.is_empty():
-		return
-	var r: Dictionary = _rows[0]
-	_txt(_f12, int(STRIP.position.x) + 12, int(STRIP.position.y) + 6,
-		str(r.get("name", "?")), PMChrome.C_ROW_TXT, 13)
-	_txt(_f12, int(STRIP.end.x) - 12, int(STRIP.position.y) + 6,
-		str(r.get("club_name", "")), PMChrome.C_TBL_HDR, 13, true)
-
-
-## Right column: BANK box + CURRENT OFFERS / SCOUT / OFFERS / RETURN nav buttons.
-func _draw_nav() -> void:
-	PMChrome.bevel(self, BANK_BOX, Color(0.10, 0.16, 0.34), C_DKBTN_HI, C_DKBTN_LO)
-	_txt(_f10, int(BANK_BOX.position.x) + 8, int(BANK_BOX.position.y) + 5, "BANK", C_PANEL_TXT, 11)
-	_txt(_f12, int(BANK_BOX.end.x) - 8, int(BANK_BOX.position.y) + 24, fmt_money(_cash), C_GOLD, 13, true)
-
-	_nav_btn(BTN_CURRENT, "CURRENT OFFERS", C_GOLD, _f10, "", _press == "current")
-	_nav_btn(BTN_SCOUT, "SCOUT", C_PANEL_TXT, _f12, "scout")
-	_nav_btn(BTN_OFFERS, "OFFERS", C_PANEL_TXT, _f12, "offers")
-	_nav_btn(BTN_RETURN, "RETURN", C_GOLD, _f12)
-
-	if _window != "":
-		_txt(_f8, int(BANK_BOX.position.x) + 4, int(BANK_BOX.end.y) + 6,
-			"Window: %s" % _window, PMChrome.C_STAR_OFF, 10)
-		_txt(_f8, int(BANK_BOX.position.x) + 4, int(BANK_BOX.end.y) + 18,
-			"%d offers left" % _offers, PMChrome.C_STAR_OFF, 10)
-
-
-func _nav_btn(r: Rect2, label: String, col: Color, f: Font, glyph := "", pressed := false) -> void:
-	PMChrome.bevel(self, r, C_DKBTN_HI if pressed else C_DKBTN, C_DKBTN_HI, C_DKBTN_LO)
-	# The original SECRETARIO magnifier / OFERTAS money-bag glyph sits to the left of the
-	# label when baked; without it the label just keeps its original inset.
-	var tx := int(r.position.x) + 10
-	if glyph != "":
-		var gr := Rect2(r.position.x + 5, r.position.y + 4, 17, 17)
-		if PMChrome.draw_icon(self, glyph, gr):
-			tx = int(gr.end.x) + 5
-	_txt(f, tx, int(r.position.y) + 6, label, col, 12)
+	PMChrome.draw_stars(self, STARS_X, y + 2, ca / 20.0, 8, 5)
+	# The AV/MO/FEE/WAGE/YEARS value grid is ProMan8 (docs/re/transfer_screen_re.md:
+	# "ProMan8 grid"); frame 097 packs "£12,500,000" into ~55px (x285..340), which _f8@8
+	# reproduces (56px) and _f10@11 does NOT (98px — it overflowed left into MO/AV). The
+	# +3 y-top keeps the baseline the wider font drew at (row-top +10, = the name baseline).
+	# AV = the real ability
+	_txt_right(_f8, AV_RIGHT, y + VAL_DY, str(ca), C_AV, VAL_SZ)
+	# MO = honest gap (morale is an un-RE'd dynamic save value — audit B7)
+	_txt_center(_f8, MO_CENTER, y + VAL_DY, "-", C_GAP, VAL_SZ)
+	# CLUB FEE / WAGE from the valuation model (accepted approximation)
+	_txt_right(_f8, FEE_RIGHT, y + VAL_DY, fmt_money(int(r.get("fee", 0))), C_FEE, VAL_SZ)
+	_txt_right(_f8, WAGE_RIGHT, y + VAL_DY, fmt_money(int(r.get("wage", 0))), C_WAGE, VAL_SZ)
+	# YEARS | LEFT = honest gap (buyable-player contract years are not in the row)
+	_txt_center(_f8, YEARS1_CENTER, y + VAL_DY, "-", C_GAP, VAL_SZ)
+	_txt_center(_f8, YEARS2_CENTER, y + VAL_DY, "-", C_GAP, VAL_SZ)

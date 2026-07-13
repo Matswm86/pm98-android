@@ -1,0 +1,292 @@
+{
+  "binding_source": "/home/mats/MWM-AI/data/pm98-refs/real-gallery/ma_10.png",
+  "note": "No walkthrough frame shows LEAGUE TABLES; binding = real-gallery ma_10.png (Premier, Week 17). Rows/leader-kit/date blanked, redrawn live by LeagueTableScreen.gd. Header overdrawn by PMChrome.draw_header.",
+  "size": [
+    640,
+    480
+  ],
+  "row_grid": {
+    "y0": 114,
+    "pitch": 16,
+    "fill_h": 14,
+    "n": 20,
+    "x0": 71,
+    "x1": 488
+  },
+  "cols": {
+    "pos_region": [
+      73,
+      122
+    ],
+    "pos_num_cx": 86,
+    "crest_box": [
+      99,
+      20
+    ],
+    "name_x": 127,
+    "name_region": [
+      123,
+      270
+    ],
+    "cells": {
+      "P": [
+        271,
+        23
+      ],
+      "W": [
+        296,
+        23
+      ],
+      "D": [
+        321,
+        23
+      ],
+      "L": [
+        346,
+        23
+      ],
+      "GF": [
+        371,
+        34
+      ],
+      "GA": [
+        407,
+        34
+      ],
+      "PTS": [
+        443,
+        38
+      ]
+    },
+    "cell_sep_x": [
+      270,
+      295,
+      320,
+      345,
+      370,
+      406,
+      442,
+      482
+    ]
+  },
+  "leader_kit_box": [
+    553,
+    97,
+    604,
+    162
+  ],
+  "date_box": [
+    342,
+    74,
+    451,
+    93
+  ],
+  "return_btn": [
+    525,
+    423,
+    99,
+    25
+  ],
+  "samples": {
+    "row_pos_bg": [
+      180,
+      200,
+      220
+    ],
+    "row_pos_ink": [
+      0,
+      0,
+      128
+    ],
+    "row_name_bg": [
+      0,
+      0,
+      128
+    ],
+    "row_name_ink": [
+      255,
+      255,
+      255
+    ],
+    "cell_p_bg": [
+      220,
+      220,
+      220
+    ],
+    "cell_p_ink": [
+      128,
+      128,
+      128
+    ],
+    "cell_w_bg": [
+      180,
+      200,
+      220
+    ],
+    "cell_w_ink": [
+      100,
+      120,
+      140
+    ],
+    "cell_d_bg": [
+      212,
+      223,
+      170
+    ],
+    "cell_d_ink": [
+      127,
+      159,
+      85
+    ],
+    "cell_l_bg": [
+      212,
+      191,
+      170
+    ],
+    "cell_l_ink": [
+      170,
+      127,
+      85
+    ],
+    "cell_gf_bg": [
+      180,
+      200,
+      220
+    ],
+    "cell_gf_ink": [
+      100,
+      120,
+      140
+    ],
+    "cell_ga_bg": [
+      212,
+      191,
+      170
+    ],
+    "cell_ga_ink": [
+      170,
+      127,
+      85
+    ],
+    "cell_pts_bg": [
+      72,
+      30,
+      2
+    ],
+    "cell_pts_ink": [
+      255,
+      223,
+      0
+    ],
+    "cell_sep": [
+      0,
+      0,
+      0
+    ],
+    "mine_pos_bg": [
+      42,
+      63,
+      170
+    ],
+    "mine_pos_ink": [
+      166,
+      202,
+      240
+    ],
+    "mine_name_bg": [
+      0,
+      0,
+      0
+    ],
+    "mine_name_ink": [
+      255,
+      255,
+      255
+    ],
+    "mine_p_bg": [
+      80,
+      80,
+      80
+    ],
+    "mine_p_ink": [
+      192,
+      192,
+      192
+    ],
+    "mine_w_bg": [
+      80,
+      100,
+      120
+    ],
+    "mine_w_ink": [
+      166,
+      202,
+      240
+    ],
+    "mine_d_bg": [
+      80,
+      110,
+      5
+    ],
+    "mine_d_ink": [
+      170,
+      223,
+      170
+    ],
+    "mine_l_bg": [
+      85,
+      0,
+      0
+    ],
+    "mine_l_ink": [
+      255,
+      31,
+      0
+    ],
+    "mine_gf_bg": [
+      80,
+      100,
+      120
+    ],
+    "mine_gf_ink": [
+      166,
+      202,
+      240
+    ],
+    "mine_ga_bg": [
+      170,
+      127,
+      85
+    ],
+    "mine_ga_ink": [
+      212,
+      191,
+      170
+    ],
+    "mine_pts_bg": [
+      150,
+      0,
+      0
+    ],
+    "mine_pts_ink": [
+      255,
+      255,
+      255
+    ],
+    "date_ink": [
+      180,
+      210,
+      50
+    ],
+    "date_bg": [
+      0,
+      0,
+      50
+    ],
+    "panel_bg": [
+      255,
+      255,
+      255
+    ]
+  }
+}

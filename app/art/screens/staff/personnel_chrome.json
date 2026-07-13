@@ -1,0 +1,421 @@
+{
+  "binding_frame": "121_154736.png",
+  "note": "CLUB PERSONNEL; PMChrome.draw_header draws the barra live; StaffScreen.gd draws 13 staff value cells over personnel_body.png at these rects.",
+  "size": [
+    640,
+    480
+  ],
+  "body_y": 58,
+  "slots": {
+    "HANDLING": {
+      "label": "HANDLING",
+      "kind": "train",
+      "mirror": false,
+      "bar": [
+        64,
+        114,
+        177,
+        14
+      ],
+      "bar_color": [
+        210,
+        95,
+        0
+      ],
+      "name_x": 70,
+      "name_y": 114,
+      "stars_right": 237,
+      "stars_y": 115,
+      "wage_amount_right": 345,
+      "wage_amount_y": 124
+    },
+    "PASSING": {
+      "label": "PASSING",
+      "kind": "train",
+      "mirror": false,
+      "bar": [
+        343,
+        114,
+        177,
+        14
+      ],
+      "bar_color": [
+        209,
+        63,
+        0
+      ],
+      "name_x": 349,
+      "name_y": 114,
+      "stars_right": 516,
+      "stars_y": 115,
+      "wage_amount_right": 615,
+      "wage_amount_y": 124
+    },
+    "DRIBBLING": {
+      "label": "DRIBBLING",
+      "kind": "train",
+      "mirror": false,
+      "bar": [
+        64,
+        149,
+        177,
+        14
+      ],
+      "bar_color": [
+        207,
+        2,
+        0
+      ],
+      "name_x": 70,
+      "name_y": 149,
+      "stars_right": 237,
+      "stars_y": 150,
+      "wage_amount_right": 345,
+      "wage_amount_y": 159
+    },
+    "HEADING": {
+      "label": "HEADING",
+      "kind": "train",
+      "mirror": false,
+      "bar": [
+        343,
+        149,
+        177,
+        14
+      ],
+      "bar_color": [
+        169,
+        1,
+        0
+      ],
+      "name_x": 349,
+      "name_y": 149,
+      "stars_right": 516,
+      "stars_y": 150,
+      "wage_amount_right": 615,
+      "wage_amount_y": 159
+    },
+    "TACKLING": {
+      "label": "TACKLING",
+      "kind": "train",
+      "mirror": false,
+      "bar": [
+        64,
+        184,
+        177,
+        14
+      ],
+      "bar_color": [
+        149,
+        1,
+        0
+      ],
+      "name_x": 70,
+      "name_y": 184,
+      "stars_right": 237,
+      "stars_y": 185,
+      "wage_amount_right": 345,
+      "wage_amount_y": 194
+    },
+    "SHOOTING": {
+      "label": "SHOOTING",
+      "kind": "train",
+      "mirror": false,
+      "bar": [
+        343,
+        184,
+        177,
+        14
+      ],
+      "bar_color": [
+        86,
+        3,
+        0
+      ],
+      "name_x": 349,
+      "name_y": 184,
+      "stars_right": 516,
+      "stars_y": 185,
+      "wage_amount_right": 615,
+      "wage_amount_y": 194
+    },
+    "PHYSIOTHERAPIST": {
+      "label": "PHYSIOTHERAPIST",
+      "kind": "role",
+      "mirror": false,
+      "bar": [
+        80,
+        252,
+        137,
+        14
+      ],
+      "bar_color": [
+        120,
+        120,
+        157
+      ],
+      "name_x": 86,
+      "name_y": 252,
+      "stars_right": 213,
+      "stars_y": 253,
+      "wage_amount_right": 340,
+      "wage_amount_y": 262
+    },
+    "PSYCHOLOGIST": {
+      "label": "PSYCHOLOGIST",
+      "kind": "role",
+      "mirror": true,
+      "bar": [
+        415,
+        252,
+        167,
+        14
+      ],
+      "bar_color": [
+        81,
+        80,
+        118
+      ],
+      "name_x": 421,
+      "name_y": 252,
+      "stars_right": 578,
+      "stars_y": 253,
+      "wage_amount_right": 402,
+      "wage_amount_y": 262
+    },
+    "ASSISTANT_MANAGER": {
+      "label": "ASSISTANT MANAGER",
+      "kind": "role",
+      "mirror": false,
+      "bar": [
+        80,
+        316,
+        137,
+        14
+      ],
+      "bar_color": [
+        117,
+        145,
+        181
+      ],
+      "name_x": 86,
+      "name_y": 316,
+      "stars_right": 213,
+      "stars_y": 317,
+      "wage_amount_right": 340,
+      "wage_amount_y": 326
+    },
+    "SCOUT": {
+      "label": "SCOUT",
+      "kind": "role",
+      "mirror": true,
+      "bar": [
+        415,
+        316,
+        167,
+        14
+      ],
+      "bar_color": [
+        60,
+        85,
+        129
+      ],
+      "name_x": 421,
+      "name_y": 316,
+      "stars_right": 578,
+      "stars_y": 317,
+      "wage_amount_right": 402,
+      "wage_amount_y": 326
+    },
+    "YOUTH_TEAM_MANAGER": {
+      "label": "YOUTH TEAM MANAGER",
+      "kind": "role",
+      "mirror": false,
+      "bar": [
+        80,
+        378,
+        137,
+        14
+      ],
+      "bar_color": [
+        43,
+        95,
+        167
+      ],
+      "name_x": 86,
+      "name_y": 378,
+      "stars_right": 213,
+      "stars_y": 379,
+      "wage_amount_right": 340,
+      "wage_amount_y": 388
+    },
+    "YOUTH_TEAM_SCOUT": {
+      "label": "YOUTH TEAM SCOUT",
+      "kind": "role",
+      "mirror": true,
+      "bar": [
+        415,
+        378,
+        167,
+        14
+      ],
+      "bar_color": [
+        110,
+        80,
+        119
+      ],
+      "name_x": 421,
+      "name_y": 378,
+      "stars_right": 578,
+      "stars_y": 379,
+      "wage_amount_right": 402,
+      "wage_amount_y": 388
+    },
+    "GROUNDSMAN": {
+      "label": "GROUNDSMAN",
+      "kind": "role",
+      "mirror": false,
+      "bar": [
+        80,
+        440,
+        137,
+        14
+      ],
+      "bar_color": [
+        2,
+        158,
+        0
+      ],
+      "name_x": 86,
+      "name_y": 440,
+      "stars_right": 213,
+      "stars_y": 441,
+      "wage_amount_right": 340,
+      "wage_amount_y": 450
+    }
+  },
+  "slot_order": [
+    "HANDLING",
+    "PASSING",
+    "DRIBBLING",
+    "HEADING",
+    "TACKLING",
+    "SHOOTING",
+    "PHYSIOTHERAPIST",
+    "PSYCHOLOGIST",
+    "ASSISTANT_MANAGER",
+    "SCOUT",
+    "YOUTH_TEAM_MANAGER",
+    "YOUTH_TEAM_SCOUT",
+    "GROUNDSMAN"
+  ],
+  "buttons": {
+    "sign": [
+      355,
+      415,
+      130,
+      24
+    ],
+    "sack": [
+      355,
+      447,
+      130,
+      24
+    ],
+    "return": [
+      515,
+      439,
+      118,
+      24
+    ]
+  },
+  "ink": {
+    "name": [
+      255,
+      255,
+      255
+    ],
+    "wage_label": [
+      200,
+      0,
+      0
+    ],
+    "wage_amount": [
+      0,
+      0,
+      0
+    ],
+    "star_on": [
+      255,
+      210,
+      40
+    ]
+  },
+  "ref_staff": {
+    "HANDLING": {
+      "name": "A. Padmore",
+      "stars": 3.0,
+      "wage": 17000
+    },
+    "PASSING": {
+      "name": "D. Gledhill",
+      "stars": 4.5,
+      "wage": 34000
+    },
+    "DRIBBLING": {
+      "name": "S. Merrick",
+      "stars": 5.0,
+      "wage": 47000
+    },
+    "HEADING": {
+      "name": "A. Mitchell",
+      "stars": 3.0,
+      "wage": 16000
+    },
+    "TACKLING": {
+      "name": "T. O'Brian",
+      "stars": 4.5,
+      "wage": 21000
+    },
+    "SHOOTING": {
+      "name": "T. Alan",
+      "stars": 4.5,
+      "wage": 33000
+    },
+    "PHYSIOTHERAPIST": {
+      "name": "P. Gelbier",
+      "stars": 5.0,
+      "wage": 45000
+    },
+    "PSYCHOLOGIST": {
+      "name": "J. Bodin",
+      "stars": 4.5,
+      "wage": 15000
+    },
+    "ASSISTANT_MANAGER": {
+      "name": "A. Leigh",
+      "stars": 4.0,
+      "wage": 16000
+    },
+    "SCOUT": {
+      "name": "K. Hatch",
+      "stars": 4.5,
+      "wage": 45000
+    },
+    "YOUTH_TEAM_MANAGER": {
+      "name": "D. Read",
+      "stars": 3.5,
+      "wage": 21000
+    },
+    "YOUTH_TEAM_SCOUT": {
+      "name": "W. Sugar",
+      "stars": 5.0,
+      "wage": 36000
+    },
+    "GROUNDSMAN": {
+      "name": "G. Debnam",
+      "stars": 4.5,
+      "wage": 4000
+    }
+  }
+}

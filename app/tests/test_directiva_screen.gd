@@ -1,8 +1,8 @@
 extends SceneTree
-## Headless wiring test for the BOARD OF DIRECTORS (DIRECTIVA) screen: confirms the
-## cracked ORIGINAL assets load (FONDO + BARRA + the 4 VGA icons + PROMAN fonts), the
-## money formatter + meter-colour helpers are correct, confidence values clamp to
-## 0..100, the reversed rects stay inside the 640x480 canvas, and setup() wires data.
+## Headless wiring test for the frame-baked BOARD OF DIRECTORS (DIRECTIVA) screen: confirms
+## the baked body chrome + PROMAN fonts load, the money formatter is correct, the confidence
+## values clamp to 0..100, the live-draw geometry (name box, RETURN hit rect, the three meter
+## descriptors) stays inside the 640x480 canvas, and setup() wires data.
 ##   ~/godot462 --headless --path app --script res://tests/test_directiva_screen.gd
 
 
@@ -18,24 +18,34 @@ func _run() -> void:
 	ok = _assert(DirectivaScreen.fmt_money(0) == "£0", "fmt_money zero") and ok
 	ok = _assert(DirectivaScreen.fmt_money(-500) == "-£500", "fmt_money negative") and ok
 
-	for path in ["res://art/screens/management_bg.png",
-			"res://art/screens/directiva/directiva.png", "res://art/screens/directiva/publico.png",
-			"res://art/fonts/proman14.fnt", "res://art/fonts/proman10.fnt",
-			"res://art/fonts/proman8.fnt"]:
+	# Frame-baked chrome + fonts present and loadable.
+	for path in ["res://art/screens/directiva/body.png",
+			"res://art/fonts/proman14.fnt", "res://art/fonts/proman12.fnt",
+			"res://art/fonts/proman10.fnt", "res://art/fonts/proman8.fnt"]:
 		ok = _assert(ResourceLoader.exists(path), "asset present: %s" % path) and ok
 		ok = _assert(load(path) != null, "asset loads: %s" % path) and ok
 
-	# Layout rects must stay inside the native 640x480 canvas.
-	var rects := {
-		"MGR_BOX": DirectivaScreen.MGR_BOX, "RAT_BOX": DirectivaScreen.RAT_BOX,
-		"DIR_BOX": DirectivaScreen.DIR_BOX, "SUP_BOX": DirectivaScreen.SUP_BOX,
-		"LOAN_PANEL": DirectivaScreen.LOAN_PANEL, "BONUS_PANEL": DirectivaScreen.BONUS_PANEL,
-		"BTN_RETURN": DirectivaScreen.BTN_RETURN,
-	}
-	for name in rects:
-		var r: Rect2 = rects[name]
+	# The body PNG is the frame cropped from y=44, so it must be 640x436.
+	var body: Texture2D = load("res://art/screens/directiva/body.png")
+	ok = _assert(body.get_width() == 640 and body.get_height() == 480 - int(DirectivaScreen.BODY_Y),
+		"body.png is 640x436") and ok
+
+	# MANAGER name box + RETURN hit rect stay inside the canvas.
+	for entry in [["MGR_BOX", DirectivaScreen.MGR_BOX], ["BTN_RETURN", DirectivaScreen.BTN_RETURN]]:
+		var r: Rect2 = entry[1]
 		ok = _assert(r.position.x >= 0 and r.position.y >= 0 and r.end.x <= 640 and r.end.y <= 480,
-			"rect in canvas: %s" % name) and ok
+			"rect in canvas: %s" % entry[0]) and ok
+
+	# Meter descriptors: block strips + value-tab digit centres stay in canvas, block palette
+	# covers the widest meter.
+	for entry in [["M_RATING", DirectivaScreen.M_RATING], ["M_DIRECTORS", DirectivaScreen.M_DIRECTORS],
+			["M_SUPPORTERS", DirectivaScreen.M_SUPPORTERS]]:
+		var m: Dictionary = entry[1]
+		var last_x: float = float(m["bx"]) + (int(m["maxb"]) - 1) * DirectivaScreen.BLOCK_PITCH + DirectivaScreen.BLOCK_W
+		ok = _assert(last_x <= 640 and float(m["dx"]) <= 640 and float(m["dy"]) <= 480,
+			"meter in canvas: %s" % entry[0]) and ok
+		ok = _assert(int(m["maxb"]) <= DirectivaScreen.BLOCK_COLS.size(),
+			"meter maxb <= palette: %s" % entry[0]) and ok
 
 	# Instantiate + feed the screen.
 	var screen: DirectivaScreen = load("res://scenes/DirectivaScreen.gd").new()
@@ -44,18 +54,16 @@ func _run() -> void:
 		await process_frame
 	ok = _assert(screen._f14 != null and screen._f10 != null and screen._f8 != null,
 		"PROMAN fonts loaded") and ok
-	ok = _assert(PMChrome.bg() != null, "PMChrome management background loads") and ok
-	ok = _assert(screen._ic_direct != null and screen._ic_public != null,
-		"DIRECTIVA icons loaded") and ok
+	ok = _assert(screen._body != null, "baked body chrome loaded") and ok
 
 	# Values clamp to 0..100, data wires through.
-	screen.setup("Arsenal", "A. WENGER", "1997-98", 4_250_000, 150, -20, 64,
-		"Finish in the top 5.", "8-3-2", "3rd")
+	screen.setup("Manchester Utd.", "MWM", "1997-98", 4_250_000, 150, -20, 71,
+		"", "0-0-0", "1st")
 	await process_frame
 	ok = _assert(screen._directors == 100, "directors clamped high") and ok
 	ok = _assert(screen._supporters == 0, "supporters clamped low") and ok
-	ok = _assert(screen._rating == 64, "rating passed through") and ok
-	ok = _assert(screen._manager == "A. WENGER", "manager wired") and ok
+	ok = _assert(screen._rating == 71, "rating passed through") and ok
+	ok = _assert(screen._manager == "MWM", "manager wired") and ok
 
 	screen.queue_redraw()
 	for _i in 3:
