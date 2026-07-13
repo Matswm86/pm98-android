@@ -144,7 +144,24 @@ func _run() -> void:
 	var inj: Dictionary = screen._by_id[int(t.xi[3])]
 	inj["injured_weeks"] = 7
 	ok = _assert(screen._pending_change(), "an injured starter arms UNDO") and ok
+	# while UNDO owns the plate the T/I/S buttons are inert (no double-binding)
+	ok = _assert(screen._hit(Vector2(555, 365)) == "undo", "pending state: plate is UNDO") and ok
 	inj.erase("injured_weeks")
+
+	# ---- T/I/S plate -> the three sub-screen signals -------------------------
+	screen.setup(club, t, "", "Premier")
+	ok = _assert(not screen._pending_change(), "fresh line-up shows the T/I/S plate") and ok
+	ok = _assert(screen._hit(Vector2(555, 365)) == "training", "TRAINING row hit-tests") and ok
+	ok = _assert(screen._hit(Vector2(555, 393)) == "injuries", "INJURIES row hit-tests") and ok
+	ok = _assert(screen._hit(Vector2(555, 421)) == "statistics", "STATISTICS row hit-tests") and ok
+	var tis := {"tr": false, "in": false, "st": false}
+	screen.training_pressed.connect(func() -> void: tis["tr"] = true)
+	screen.injuries_pressed.connect(func() -> void: tis["in"] = true)
+	screen.statistics_pressed.connect(func() -> void: tis["st"] = true)
+	_tap(screen, Vector2(555, 365))
+	_tap(screen, Vector2(555, 393))
+	_tap(screen, Vector2(555, 421))
+	ok = _assert(tis["tr"] and tis["in"] and tis["st"], "each T/I/S row emits its signal") and ok
 
 	# Force a paint pass (catches null-deref / API misuse even with the dummy driver).
 	screen.queue_redraw()

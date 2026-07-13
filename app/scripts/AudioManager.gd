@@ -26,7 +26,11 @@ const SFX := {
 
 var music_enabled := true
 var sfx_enabled := true
+var music_volume := 100          # MANAGER.INI "MUSIC VOLUME" (0-100)
+var sfx_volume := 100            # MANAGER.INI "SOUND VOLUME" (0-100)
+var transitions_enabled := true  # MANAGER.INI "TRANSITIONS"
 
+const _SETTINGS := "user://settings.cfg"
 const _MUSIC_DB := -8.0   # the module theme sits under the UI
 const _CROWD_DB := -10.0  # ambience bed, well under the event SFX
 
@@ -39,10 +43,56 @@ var _cur_music := ""
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS   # keep playing across pauses
-	_music = _mk(_MUSIC_DB)
-	_crowd = _mk(_CROWD_DB)
+	_load_settings()
+	_music = _mk(_MUSIC_DB + _vol_off(music_volume))
+	_crowd = _mk(_CROWD_DB + _vol_off(sfx_volume))
 	for _i in 6:
 		_pool.append(_mk(0.0))
+
+
+## MANAGER.INI-style 0-100 volume as a dB offset (0 -> silence).
+func _vol_off(v: int) -> float:
+	return linear_to_db(maxf(v / 100.0, 0.0001))
+
+
+func _load_settings() -> void:
+	var cf := ConfigFile.new()
+	if cf.load(_SETTINGS) != OK:
+		return
+	music_enabled = bool(cf.get_value("audio", "music_enabled", music_enabled))
+	sfx_enabled = bool(cf.get_value("audio", "sfx_enabled", sfx_enabled))
+	music_volume = clampi(int(cf.get_value("audio", "music_volume", music_volume)), 0, 100)
+	sfx_volume = clampi(int(cf.get_value("audio", "sfx_volume", sfx_volume)), 0, 100)
+	transitions_enabled = bool(cf.get_value("ui", "transitions", transitions_enabled))
+
+
+func save_settings() -> void:
+	var cf := ConfigFile.new()
+	cf.set_value("audio", "music_enabled", music_enabled)
+	cf.set_value("audio", "sfx_enabled", sfx_enabled)
+	cf.set_value("audio", "music_volume", music_volume)
+	cf.set_value("audio", "sfx_volume", sfx_volume)
+	cf.set_value("ui", "transitions", transitions_enabled)
+	cf.save(_SETTINGS)
+
+
+func set_music_volume(v: int) -> void:
+	music_volume = clampi(v, 0, 100)
+	if _music != null:
+		_music.volume_db = _MUSIC_DB + _vol_off(music_volume)
+	save_settings()
+
+
+func set_sfx_volume(v: int) -> void:
+	sfx_volume = clampi(v, 0, 100)
+	if _crowd != null:
+		_crowd.volume_db = _CROWD_DB + _vol_off(sfx_volume)
+	save_settings()
+
+
+func set_transitions(on: bool) -> void:
+	transitions_enabled = on
+	save_settings()
 
 
 func _mk(db: float) -> AudioStreamPlayer:
@@ -109,7 +159,7 @@ func sfx(key: String, vol_db := 0.0) -> void:
 	var p := _pool[_next]
 	_next = (_next + 1) % _pool.size()
 	p.stream = load(path)
-	p.volume_db = vol_db
+	p.volume_db = vol_db + _vol_off(sfx_volume)
 	p.play()
 
 
@@ -122,9 +172,13 @@ func set_music_enabled(on: bool) -> void:
 	music_enabled = on
 	if not on:
 		stop_music()
+	elif _cur_music != "":
+		play_music(_cur_music)
+	save_settings()
 
 
 func set_sfx_enabled(on: bool) -> void:
 	sfx_enabled = on
 	if not on:
 		stop_crowd()
+	save_settings()

@@ -1,0 +1,105 @@
+{
+ "training_title_xy": [
+  250,
+  22
+ ],
+ "tag_xy": {
+  "ha": [
+   289,
+   0,
+   21,
+   12
+  ],
+  "ta": [
+   289,
+   0,
+   21,
+   12
+  ],
+  "pa": [
+   289,
+   0,
+   21,
+   12
+  ],
+  "sh": [
+   289,
+   0,
+   21,
+   12
+  ]
+ },
+ "focus_row_xy": [
+  351,
+  211,
+  282,
+  16
+ ],
+ "staff_star_x1": 605,
+ "training_inks": {
+  "grid_n": [
+   0,
+   0,
+   128
+  ],
+  "grid_fi": [
+   42,
+   95,
+   170
+  ],
+  "grid_av": [
+   210,
+   0,
+   0
+  ],
+  "grid_fi_sel": [
+   92,
+   126,
+   174
+  ],
+  "grid_av_sel": [
+   255,
+   0,
+   0
+  ],
+  "rp_av": [
+   59,
+   85,
+   130
+  ],
+  "tp_digit": "sampled at runtime from chrome (60,90,0) cells"
+ },
+ "injuries_title_xy": [
+  253,
+  22
+ ],
+ "phys_star": {
+  "x0": 220,
+  "pitch": 14,
+  "y": 449
+ },
+ "stats_title_xy": [
+  237,
+  22
+ ],
+ "stats_total_band": {
+  "interior_y": [
+   425,
+   437
+  ],
+  "fill": [
+   166,
+   202,
+   240
+  ],
+  "sep_ink": [
+   30,
+   52,
+   98
+  ]
+ },
+ "stats_title_manutd_xy": [
+  157,
+  71
+ ]
+}

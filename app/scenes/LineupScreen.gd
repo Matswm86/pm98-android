@@ -36,6 +36,9 @@ class_name LineupScreen
 signal back_pressed
 signal tactics_pressed    # the TACTICS button -> Main opens the TACTICS board
 signal xi_changed         # a player was swapped into/within the XI -> Main persists
+signal training_pressed   # TRAINING  (T/I/S plate row 1) -> Main opens TrainingScreen
+signal injuries_pressed   # INJURIES  (T/I/S plate row 2) -> Main opens InjuriesScreen
+signal statistics_pressed # STATISTICS (T/I/S plate row 3) -> Main opens StatisticsScreen
 
 const W := 640
 const H := 480
@@ -371,6 +374,15 @@ func _hit(d: Vector2) -> String:
 		return "rating"
 	if _pending_change() and UNDO_BTN.has_point(d):
 		return "undo"
+	# T/I/S plate (default state — replaced by UNDO once a change is pending):
+	# rows top->bottom = TRAINING / INJURIES / STATISTICS (lineup_screen_re.md).
+	if not _pending_change():
+		if TIS_BTNS[0].has_point(d):
+			return "training"
+		if TIS_BTNS[1].has_point(d):
+			return "injuries"
+		if TIS_BTNS[2].has_point(d):
+			return "statistics"
 	if _max_scroll() > 0:
 		if SCROLL_UP.has_point(d):
 			return "up"
@@ -416,6 +428,9 @@ func _on_input(e: InputEvent) -> void:
 			match a:
 				"return": back_pressed.emit()
 				"tactics": tactics_pressed.emit()
+				"training": training_pressed.emit()
+				"injuries": injuries_pressed.emit()
+				"statistics": statistics_pressed.emit()
 				"param":
 					_rating_view = false
 					queue_redraw()

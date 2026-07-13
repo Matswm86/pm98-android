@@ -1,8 +1,9 @@
 extends SceneTree
-## Headless test for MATCH OPTIONS (MatchOptions.gd) — the reversed in-match view picker.
-## Asserts the four buttons hit-test at their SOURCE-EXACT panel-local rects (from
-## FUN_004e2630, docs/re/match_view_re.md), that WATCH/BRIEF/RESULTS emit picked() with the
-## right mode, and that HIGHLIGHTS (3D .p3d absent from source) only highlights, never proceeds.
+## Headless test for MATCH OPTIONS (MatchOptions.gd) — the rebuilt in-match presentation
+## picker (the real modal, cut verbatim to art/screens/matchflow/mo_modal.png). Asserts the
+## modal sprite loads, the WATCH/HIGHLIGHTS/BRIEF/RESULTS + CANCEL/OK hit-rects route
+## correctly, that WATCH/BRIEF/RESULTS emit picked() with the right mode, HIGHLIGHTS (3D
+## .p3d absent) only shows its honest note, and OK/CANCEL confirm/dismiss.
 ##   ~/godot462 --headless --path app --script res://tests/test_match_options.gd
 
 
@@ -13,8 +14,7 @@ func _initialize() -> void:
 func _run() -> void:
 	var ok := true
 
-	for path in ["res://art/fonts/proman18.fnt", "res://art/fonts/proman12.fnt",
-			"res://art/fonts/proman10.fnt"]:
+	for path in ["res://art/screens/matchflow/mo_modal.png", "res://art/fonts/proman10.fnt"]:
 		ok = _assert(ResourceLoader.exists(path), "asset present: %s" % path) and ok
 
 	var opt: MatchOptions = load("res://scenes/MatchOptions.gd").new()
@@ -23,46 +23,50 @@ func _run() -> void:
 	for _i in 3:
 		await process_frame
 
-	# Source-exact rects: WATCH(5,100) HIGHLIGHTS(109,100) BRIEF(214,100) RESULTS(317,100), 98x25.
-	var expect := [Rect2(5, 100, 98, 25), Rect2(109, 100, 98, 25),
-		Rect2(214, 100, 98, 25), Rect2(317, 100, 98, 25)]
-	ok = _assert(opt.BTN_RECTS == expect, "button rects are the reversed source rects") and ok
+	ok = _assert(opt._modal != null, "modal sprite (mo_modal.png) loaded") and ok
+	# Reversed source rects recorded for the record (FUN_004e2630, panel-local).
+	ok = _assert(opt.SRC_RECTS[0] == Rect2(5, 100, 98, 25) and opt.SRC_RECTS[3] == Rect2(317, 100, 98, 25),
+		"reversed source view-rects recorded") and ok
 
-	# Hit-test at each button's centre (panel-local -> design) returns that index; gaps return -1.
-	for i in expect.size():
-		var centre: Vector2 = opt.PANEL.position + (expect[i] as Rect2).get_center()
-		ok = _assert(opt._btn_at(centre) == i, "%s hit-tests to index %d" % [opt.BTN_LABELS[i], i]) and ok
-	# The ~6px gap between WATCH(right=103) and HIGHLIGHTS(left=109) is dead space.
-	ok = _assert(opt._btn_at(opt.PANEL.position + Vector2(106, 112)) == -1, "inter-button gap is dead space") and ok
-	# Outside the panel entirely.
-	ok = _assert(opt._btn_at(Vector2(2, 2)) == -1, "outside the panel is dead space") and ok
+	# Hit-testing at each target's centre returns that target; a gap returns "".
+	for m in ["watch", "highlights", "brief", "results", "cancel", "ok"]:
+		var c: Vector2 = opt._rect(m).get_center()
+		ok = _assert(opt._hit(c) == m, "%s hit-tests to itself" % m) and ok
+	ok = _assert(opt._hit(Vector2(2, 2)) == "", "outside the modal is dead space") and ok
 
-	# Routing: WATCH, BRIEF and RESULTS emit picked(); HIGHLIGHTS (3D absent) does not.
+	# Routing: WATCH/BRIEF/RESULTS emit picked(); HIGHLIGHTS only notes; CANCEL->brief.
 	var got: Array = []
 	opt.picked.connect(func(m: String) -> void: got.append(m))
 
-	_tap(opt, 0)   # WATCH -> 2D simulador (now built)
-	ok = _assert(got == ["watch"] and opt._sel == 0, "WATCH emits picked(watch)") and ok
-	_tap(opt, 1)   # HIGHLIGHTS -> 3D .p3d absent: highlights only
-	ok = _assert(got == ["watch"] and opt._sel == 1, "HIGHLIGHTS highlights but does not proceed") and ok
-	_tap(opt, 2)   # BRIEF
+	_tap(opt, "watch")
+	ok = _assert(got == ["watch"], "WATCH emits picked(watch)") and ok
+	_tap(opt, "highlights")
+	ok = _assert(got == ["watch"] and opt._note != "", "HIGHLIGHTS notes 3D-absent, does not proceed") and ok
+	_tap(opt, "brief")
 	ok = _assert(got == ["watch", "brief"], "BRIEF emits picked(brief)") and ok
-	_tap(opt, 3)   # RESULTS
+	_tap(opt, "results")
 	ok = _assert(got == ["watch", "brief", "results"], "RESULTS emits picked(results)") and ok
+	_tap(opt, "cancel")
+	ok = _assert(got[-1] == "brief", "CANCEL dismisses to the running BRIEF") and ok
 
-	# A press on one button released over another must NOT fire (press==release guard).
+	# OK confirms the current selection (BRIEF was last picked -> _sel == brief).
 	got.clear()
-	opt._on_input(_touch(opt.PANEL.position + (expect[2] as Rect2).get_center(), true))   # press BRIEF
-	opt._on_input(_touch(opt.PANEL.position + (expect[3] as Rect2).get_center(), false))  # release on RESULTS
-	ok = _assert(got.is_empty(), "press/release on different buttons does not fire") and ok
+	_tap(opt, "ok")
+	ok = _assert(got == ["results"] or got == [opt.MODES[opt._sel]], "OK confirms the current selection (%s)" % opt.MODES[opt._sel]) and ok
+
+	# A press on one target released over another must NOT fire.
+	got.clear()
+	opt._on_input(_touch(opt._rect("brief").get_center(), true))
+	opt._on_input(_touch(opt._rect("results").get_center(), false))
+	ok = _assert(got.is_empty(), "press/release on different targets does not fire") and ok
 
 	opt.queue_free()
 	print("\n%s" % ("ALL PASS" if ok else "FAILURES ABOVE"))
 	quit(0 if ok else 1)
 
 
-func _tap(opt: MatchOptions, i: int) -> void:
-	var c: Vector2 = opt.PANEL.position + (opt.BTN_RECTS[i] as Rect2).get_center()
+func _tap(opt: MatchOptions, m: String) -> void:
+	var c: Vector2 = opt._rect(m).get_center()
 	opt._on_input(_touch(c, true))
 	opt._on_input(_touch(c, false))
 

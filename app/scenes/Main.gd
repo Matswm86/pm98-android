@@ -653,7 +653,8 @@ func _free_overlays() -> void:
 				or c is FinanceScreen or c is TransferScreen or c is DirectivaScreen \
 				or c is StadiumScreen or c is CupScreen or c is YouthScreen \
 				or c is StaffScreen or c is BrowseScreen or c is TacticsScreen \
-				or c is PlayerInfoScreen or c is RivalScreen:
+				or c is PlayerInfoScreen or c is RivalScreen \
+				or c is TrainingScreen or c is InjuriesScreen or c is StatisticsScreen:
 			c.queue_free()
 	_browse = null
 
@@ -943,8 +944,11 @@ func _open_finance(club: Dictionary, club_name: String, season: String) -> void:
 ## EXIT) animated to the engine's event timeline. NOT a sprite pitch — the original's
 ## top-down 3D highlights were Actua-engine CD-only data, out of scope (see MatchScreen.gd).
 ## RETURN runs `on_back`. (`sub` unused now that the scoreline + clock live in MatchScreen.)
+## `result_data` (optional): when non-empty, the MATCH OPTIONS RESULTS tap opens the FULL TIME
+## read-out (MatchResultScreen) instead of seeking the BRIEF to 90'. Watched (non-career) matches
+## pass {} and keep the seek-to-full-time behaviour.
 func _open_match(home: Dictionary, away: Dictionary, hg: int, ag: int,
-		lines: Array, _sub: String, on_back: Callable) -> void:
+		lines: Array, _sub: String, on_back: Callable, result_data: Dictionary = {}) -> void:
 	var scr: MatchScreen = load("res://scenes/MatchScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
@@ -964,6 +968,15 @@ func _open_match(home: Dictionary, away: Dictionary, hg: int, ag: int,
 	opt.picked.connect(func(mode: String) -> void:
 		match mode:
 			"results":
+				# Career match: RESULTS -> the source-true FULL TIME read-out over the running
+				# BRIEF (which stays mounted beneath until CONTINUE). Watched match: seek to 90'.
+				if not result_data.is_empty():
+					opt.queue_free()
+					_open_result_readout(result_data, func() -> void:
+						scr.queue_free()
+						if on_back.is_valid():
+							on_back.call())
+					return
 				scr.seek(90.0)
 			"watch":
 				# WATCH -> the 2D GRAFICO simulador, fed the same timeline as BRIEF so the
@@ -1338,7 +1351,9 @@ func _career_advance() -> void:
 		return
 	_show_match_result(res)
 
-## The manager's match as a PM98-chrome read-out (B4): RETURN refreshes + raises the hub.
+## The manager's match (B4): the running BRIEF + MATCH OPTIONS, whose RESULTS tap now surfaces
+## the source-true FULL TIME read-out (MatchResultScreen; docs/re/match_flow_re.md). The BRIEF
+## feed stays honest (kept). RETURN/CONTINUE refresh + raise the hub.
 func _show_match_result(res: Dictionary) -> void:
 	var home := GameDB.club(int(res["home_id"]))
 	var away := GameDB.club(int(res["away_id"]))
@@ -1348,12 +1363,55 @@ func _show_match_result(res: Dictionary) -> void:
 	# scorers ride along in res["goals"] (empty -> narrate re-rolls by finishing weight).
 	var m := MatchCommentary.narrate(rng, home, away, int(res["hg"]), int(res["ag"]), res.get("goals", []))
 	var verdict := _result_word(int(res["hg"]), int(res["ag"]), bool(res["manager_home"]))
+	# The RESULT read-out data: fixture-mode barra (the two clubs that JUST played — note the
+	# date grammar rides _match_header, so it reads the next week's date, a documented minor
+	# gap) + the real goal vector + the Career-known STADIUM (manager-home only; away venue
+	# gate is un-modelled -> honest blank panel).
+	var hdr := _match_header()
+	hdr["mode"] = "fixture"
+	hdr["home_id"] = int(res["home_id"])
+	hdr["away_id"] = int(res["away_id"])
+	hdr["top"] = PMChrome.title_case_name(str(home.get("name", "")))
+	hdr["bottom"] = PMChrome.title_case_name(str(away.get("name", "")))
+	var result_data := {
+		"home": str(home.get("name", "?")), "away": str(away.get("name", "?")),
+		"hg": int(res["hg"]), "ag": int(res["ag"]), "goals": res.get("goals", []),
+		"home_id": int(res["home_id"]), "away_id": int(res["away_id"]),
+		"header": hdr, "stadium": _result_stadium(res),
+	}
 	# Back at the hub, any live bids on listed players raise their TEAM OFFER
 	# cards — the original's post-match CONTINUE order (run-3 frames 085->086).
 	_open_match(home, away, int(res["hg"]), int(res["ag"]), m["lines"],
 		"%s  -  back to the dugout" % verdict, func() -> void:
 			_show_career()
-			_pop_pending_team_offers())
+			_pop_pending_team_offers(), result_data)
+
+## The RESULT-mode read-out's STADIUM panel data: the managed club's own ground (Career-known
+## capacity + attendance from finance_preview) when the manager is at home. Away venues are the
+## opponent's gate, which the Career finance model doesn't produce -> {} (honest blank panel,
+## match_flow_re.md). Foreign preseason grounds are away for the manager -> also {}.
+func _result_stadium(res: Dictionary) -> Dictionary:
+	if not bool(res.get("manager_home", false)):
+		return {}
+	var fp := _career.finance_preview()
+	return {"name": str(_mgr_club().get("stadium", "")),
+		"capacity": int(fp.get("capacity", 0)), "attendance": int(fp.get("attendance", 0))}
+
+## Mount the source-true FULL TIME read-out (MatchResultScreen) over the running match, from a
+## MATCH OPTIONS RESULTS tap. `data` carries the fixture + real goal vector + stadium; CONTINUE
+## tears the whole match flow down and returns to the hub (via `on_continue`).
+func _open_result_readout(data: Dictionary, on_continue: Callable) -> void:
+	var rs: MatchResultScreen = load("res://scenes/MatchResultScreen.gd").new()
+	rs.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(rs)
+	rs.setup(str(data.get("home", "?")), str(data.get("away", "?")),
+		int(data.get("hg", 0)), int(data.get("ag", 0)), data.get("goals", []),
+		int(data.get("home_id", -1)), int(data.get("away_id", -1)),
+		data.get("header", {}), data.get("stadium", {}), false)
+	rs.continue_pressed.connect(func() -> void:
+		rs.queue_free()
+		if on_continue.is_valid():
+			on_continue.call())
 
 ## The original-art TITLE / FRONT-DOOR screen as a full-screen overlay raised at boot:
 ## the PREMIER MANAGER 98 title (FONDO7) with DATA BASE / MANAGER LEAGUE /
@@ -1446,6 +1504,53 @@ func _show_lineup_screen() -> void:
 		AudioManager.ui_select()
 		_save_tactics(tac)
 		_career.save())
+	# The LINE-UP T/I/S plate opens the three sub-screens; each RETURN reopens LINE-UP.
+	scr.training_pressed.connect(func() -> void:
+		scr.queue_free()
+		_show_training_screen())
+	scr.injuries_pressed.connect(func() -> void:
+		scr.queue_free()
+		_show_injuries_screen())
+	scr.statistics_pressed.connect(func() -> void:
+		scr.queue_free()
+		_show_statistics_screen())
+
+## The LINE-UP TRAINING sub-screen (TrainingScreen.gd; docs/re/training_screen_re.md):
+## the squad's training grid + the selected player's attribute panel over the baked
+## resting chrome. RETURN reopens LINE-UP; TACTICS opens the TEAM TACTICS board.
+func _show_training_screen() -> void:
+	var scr: TrainingScreen = load("res://scenes/TrainingScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(_mgr_club(), _career.staff, _match_header())
+	scr.back_pressed.connect(func() -> void:
+		scr.queue_free()
+		_show_lineup_screen())
+	scr.tactics_pressed.connect(func() -> void:
+		scr.queue_free()
+		_show_tactics_board_screen())
+
+## The LINE-UP INJURIES sub-screen (InjuriesScreen.gd; docs/re/injuries_screen_re.md):
+## the manager squad's injured players by section + the physio band. RETURN reopens LINE-UP.
+func _show_injuries_screen() -> void:
+	var scr: InjuriesScreen = load("res://scenes/InjuriesScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(_mgr_club(), _career.staff, _match_header())
+	scr.back_pressed.connect(func() -> void:
+		scr.queue_free()
+		_show_lineup_screen())
+
+## The LINE-UP STATISTICS sub-screen (StatisticsScreen.gd; docs/re/statistics_screen_re.md):
+## the squad roster over the baked table; per-player season stats are an honest gap (untracked).
+func _show_statistics_screen() -> void:
+	var scr: StatisticsScreen = load("res://scenes/StatisticsScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(_mgr_club(), _match_header())
+	scr.back_pressed.connect(func() -> void:
+		scr.queue_free()
+		_show_lineup_screen())
 
 ## The original-art TACTICS board (TACTICAS) over the hub: the XI with fine-ROLE / POS
 ## columns, the skill grid, PREDEF / LOAD / SAVE TACTICS, and the CAMPO pitch carrying the
@@ -1499,12 +1604,31 @@ func _show_tactics_board_screen() -> void:
 		scr.setup(_mgr_club(), _tactics(), _career.manager_name, _career.league_name,
 			_career.season, _career.week + 1, _match_header())
 	refresh.call()
-	scr.formation_picked.connect(func(form: String) -> void:
+	# Apply a chosen formation to the live career tactics + persist + refresh the board.
+	# Shared by the board's own `formation_picked` (the direct/test path) and the frame-true
+	# PredefTacticsScreen overlay below.
+	var apply_form := func(form: String) -> void:
 		var t := _tactics()
 		t.set_formation(form, _mgr_club())
 		_save_tactics(t)
 		_career.save()
-		refresh.call())
+		refresh.call()
+	scr.formation_picked.connect(apply_form)
+	# PREDEF opens the frame-true PredefTacticsScreen (10-formation picker, frame 140;
+	# docs/re/tactics_subscreens_re.md) OVER the board, superseding the board's inline
+	# disassembly-geometry picker: suppress that inline overlay (leave TacticsBoardScreen and
+	# its 0px parity + regression test untouched) and mount the frame-baked modal instead.
+	scr.predef_pressed.connect(func() -> void:
+		scr._picker_open = false
+		scr.queue_redraw()
+		var pick: PredefTacticsScreen = load("res://scenes/PredefTacticsScreen.gd").new()
+		pick.set_anchors_preset(Control.PRESET_FULL_RECT)
+		add_child(pick)
+		pick.setup(_tactics().formation)
+		pick.formation_picked.connect(func(form: String) -> void:
+			apply_form.call(form)
+			pick.queue_free())
+		pick.cancelled.connect(func() -> void: pick.queue_free()))
 	scr.save_pressed.connect(func() -> void:
 		var t := _tactics()
 		t.save_preset("%s %s" % [t.formation, t.marking])
@@ -1538,27 +1662,25 @@ func _show_tactics_board_screen() -> void:
 		_show_lineup_screen())
 	scr.return_pressed.connect(func() -> void: scr.queue_free())
 
-## The original-art TEAM TACTICS modal (ma_9) over a real LINE-UP backdrop: the ATTACK |
-## DEFENCE control panel. Each control mutates the career Tactics live (its ratings() feed
-## the match engine), persisted on `changed`; SAVE writes a named preset; OK / RETURN close
-## both overlays. (scenes/TacticsScreen.gd; the lever att/def model lives in Tactics.gd.)
+## The source-true TEAM TACTICS modal (ATTACK | DEFENCE, EQWIN* art + MANAGER.EXE label
+## block; TeamTacticsScreen.gd, docs/re/tactics_subscreens_re.md) over a real LINE-UP
+## backdrop. Each control mutates the career Tactics live (its ratings() feed the match
+## engine), persisted on `changed`; the modal's ONLY exit is the EQWINX close (emits `done`,
+## which frees both overlays) — there is no in-modal SAVE (SAVE/LOAD are BOARD buttons), so no
+## save_requested connect. Supersedes the retired TacticsScreen.gd (which invented OK/SAVE/RETURN).
 func _show_tactics_screen() -> void:
 	var bg: LineupScreen = load("res://scenes/LineupScreen.gd").new()
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 	bg.setup(_mgr_club(), _tactics(), _career.manager_name, _career.league_name, _career.season,
 		_career.week + 1, _match_header())
-	var scr: TacticsScreen = load("res://scenes/TacticsScreen.gd").new()
+	var scr: TeamTacticsScreen = load("res://scenes/TeamTacticsScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
 	scr.setup(_tactics())
 	scr.changed.connect(func(d: Dictionary) -> void:
 		_career.tactics = d
 		_career.save())
-	scr.save_requested.connect(func(d: Dictionary) -> void:
-		var t := Tactics.from_dict(d)
-		t.save_preset("%s %s" % [t.formation, t.marking])
-		_toast("Tactics saved"))
 	scr.done.connect(func() -> void:
 		scr.queue_free()
 		bg.queue_free())
@@ -2461,7 +2583,7 @@ func _menu_action(action: String, scr: MenuScreen) -> void:
 			scr.alert("Game saved")
 		"news": _show_club_news()
 		"staff": _show_staff_screen()
-		"fixtures": _show_competitions()
+		"fixtures": _show_fixtures_screen()
 		"opponent": _show_opponent(scr)
 		"continue":
 			if _career.season_over():
@@ -2523,28 +2645,119 @@ func _menu_next_match() -> String:
 	var opp := GameDB.club(opp_id)
 	return "Next: %s %s" % ["vs" if home else "at", opp.get("name", "?")]
 
-## The MENUPRINCIPAL RESULTS view (B-track): the manager's match history this season as
-## a PM98-chrome browse over the hub (win green / draw white / loss red). RETURN -> hub.
+## The MENUPRINCIPAL RESULTS view (MARCA) — the source-true matches-on-date screen
+## (ResultsScreen.gd, walkthrough frame 038; docs/re/results_screen_re.md), driven by the
+## real Career fixtures/results/week/club data. Mounts as an overlay over whatever raised it
+## (the hub, or THE CALENDAR's RESULTS button), so RETURN (back_pressed) frees it and re-raises
+## the prior screen beneath. Replaces the rejected BrowseScreen W/D/L list (APP_VS_SPEC_AUDIT B1).
 func _show_results_screen() -> void:
-	var rows: Array = []
-	var res: Array = _career.results
-	if res.is_empty():
-		rows.append({"text": "No matches played yet", "enabled": false})
-	for r in res:
-		var opp: String = str(GameDB.club(int(r["opp_id"])).get("name", "?"))
-		var mine: int = int(r["hg"]) if bool(r["home"]) else int(r["ag"])
-		var theirs: int = int(r["ag"]) if bool(r["home"]) else int(r["hg"])
-		var wdl := "W" if mine > theirs else ("D" if mine == theirs else "L")
-		var acc := Color(0.27, 1.0, 0.53) if wdl == "W" else (
-			Color(0.86, 0.90, 0.96) if wdl == "D" else Color(0.85, 0.45, 0.42))
-		rows.append({
-			"text": "Wk %2d   %s %s   %d - %d" % [
-				int(r["week"]), "v" if bool(r["home"]) else "@", opp, mine, theirs],
-			"value": wdl, "accent": acc, "enabled": false,
-		})
-	_mount_browse("%s  -  RESULTS" % _career.club_name, "Season %s" % _career.season, rows,
-		func(_i: int) -> void: pass,
-		func() -> void: _dismiss_career_browse())
+	var scr: ResultsScreen = load("res://scenes/ResultsScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(_match_header(), _career.league_name, _career.season,
+		_career.fixtures, _career.results, _career.week, _career.club_id, _career.club_names)
+	scr.back_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		scr.queue_free())
+
+## The MENUPRINCIPAL FIXTURES icon opens the source-true "THE CALENDAR" (EMPAREJAMIENTOS)
+## screen (FixturesScreen.gd, walkthrough frame 051; docs/re/fixtures_screen_re.md), replacing
+## the rejected BrowseScreen "COMPETITIONS"/"SEASON FIXTURES" SUBSTITUTE (APP_VS_SPEC_AUDIT B1).
+## Mounts over the hub; RETURN frees it, RESULTS/LEAGUE TABLES open those screens over it (so
+## their RETURN re-raises the calendar). Manager-mode barra (frame 051 shows the manager plaques).
+func _show_fixtures_screen() -> void:
+	var scr: FixturesScreen = load("res://scenes/FixturesScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	var hdr := _match_header()
+	hdr["mode"] = "manager"
+	hdr["top"] = _career.manager_name
+	hdr["bottom"] = PMChrome.title_case_name(_career.club_name)
+	hdr["club_id"] = _career.club_id
+	# TODAY = a pending preseason friendly's REAL witnessed date, else the current league round
+	# (inferred date model — see _league_round_date / calendar gap in the RE doc).
+	var today := {}
+	var pf := _career.pending_friendly()
+	if not pf.is_empty():
+		today = _iso_ymd(str(pf.get("date", "")))
+	if today.is_empty():
+		today = _league_round_date(_career.week)
+	scr.setup(hdr, _calendar_entries(), today)
+	scr.back_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		scr.queue_free())
+	scr.results_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		_show_results_screen())
+	scr.tables_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		_show_league_table_screen())
+
+## The dated fixture entries THE CALENDAR consumes, built from live Career state.
+## SOURCE-DOCTRINE NOTE (docs/re/fixtures_screen_re.md gap #4): the real 1997-98 fixture
+## SCHEDULE + per-round calendar DATES live in the engine container PCF5DAT.PKF, which is NOT
+## enumerable (SOURCE_INVENTORY §5 GAP#1); the app's own schedule is SeasonSim-generated. So
+## per-round DATES are NOT source-provable and are NOT invented into the Career model. Here:
+##   - preseason friendlies carry their REAL witnessed August dates (1/4/6/8 AUG 1997, assigned
+##     in _begin_career from the walkthrough) -> placed source-true on the AUG sheet;
+##   - league rounds are placed WEEK-ORDERED by the same inferred weekly cadence the (already
+##     shipped) RESULTS screen uses (season-start 9 AUG + round*7 days). The exact calendar-DAY
+##     of each league round is the honest gap; the WEEK STRUCTURE (one round per week) is the
+##     game's own cadence. Cups/Charity/Europe carry no derivable date yet -> omitted (gap).
+func _calendar_entries() -> Array:
+	var out: Array = []
+	var cid := _career.club_id
+	for pr in _career.preseason_rivals:
+		var ymd := _iso_ymd(str((pr as Dictionary).get("date", "")))
+		if ymd.is_empty():
+			continue
+		var rid := int((pr as Dictionary).get("club_id", -1))
+		var at_home := bool((pr as Dictionary).get("home", false))
+		out.append(_calendar_entry(ymd, "preseason", "Preseason", "Preparation",
+			cid if at_home else rid, rid if at_home else cid))
+	for e in _career.season_fixtures():
+		var ymd := _league_round_date(int(e["round"]))
+		var home := bool(e["home"])
+		out.append(_calendar_entry(ymd, "league", _career.league_name, "Week %d" % int(e["week"]),
+			cid if home else int(e["opp_id"]), int(e["opp_id"]) if home else cid))
+	return out
+
+## One calendar entry ({y,m,d, comp, comp_name, round, home_id, away_id, home, away, home_flag,
+## away_flag}); names from the live club_names (GameDB fallback for foreign friendly rivals),
+## flags from the club's real countryCode (BANDERAS id).
+func _calendar_entry(ymd: Dictionary, comp: String, comp_name: String, round_lbl: String,
+		home_id: int, away_id: int) -> Dictionary:
+	return {"y": int(ymd["y"]), "m": int(ymd["m"]), "d": int(ymd["d"]),
+		"comp": comp, "comp_name": comp_name, "round": round_lbl,
+		"home_id": home_id, "away_id": away_id,
+		"home": _club_display_name(home_id), "away": _club_display_name(away_id),
+		"home_flag": int(GameDB.club(home_id).get("countryCode", -1)),
+		"away_flag": int(GameDB.club(away_id).get("countryCode", -1))}
+
+func _club_display_name(id: int) -> String:
+	if _career.club_names.has(id):
+		return str(_career.club_names[id])
+	return str(GameDB.club(id).get("name", "?"))
+
+## The inferred calendar date of league round `r` (0-based): season-start 9 AUG of the season's
+## first year + r weeks (mirrors ResultsScreen._date_for for cross-screen consistency). The
+## exact day is the honest calendar gap (fixtures_screen_re.md); clamped to the season length.
+func _league_round_date(r: int) -> Dictionary:
+	var sy := 1997
+	if _career.season.length() >= 4 and _career.season.substr(0, 4).is_valid_int():
+		sy = int(_career.season.substr(0, 4))
+	var rr := clampi(r, 0, maxi(_career.total_weeks() - 1, 0))
+	var t0 := Time.get_unix_time_from_datetime_dict(
+		{"year": sy, "month": 8, "day": 9, "hour": 12, "minute": 0, "second": 0})
+	var dd := Time.get_datetime_dict_from_unix_time(int(t0) + rr * 7 * 86400)
+	return {"y": int(dd["year"]), "m": int(dd["month"]), "d": int(dd["day"])}
+
+## Parse an ISO "yyyy-mm-dd" into {y,m,d} ints; {} if malformed (empty date string).
+func _iso_ymd(iso: String) -> Dictionary:
+	var p := iso.split("-")
+	if p.size() != 3:
+		return {}
+	return {"y": int(p[0]), "m": int(p[1]), "d": int(p[2])}
 
 ## The MENUPRINCIPAL NEWS view: the club's news feed (injuries, suspensions, returns
 ## and the weekly result headline) as a PM98-chrome browse over the hub, newest first,

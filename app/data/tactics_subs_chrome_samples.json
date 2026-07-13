@@ -1,0 +1,350 @@
+{
+ "predef": {
+  "modal_rect": [
+   106,
+   158,
+   447,
+   249
+  ],
+  "chrome_size": [
+   447,
+   249
+  ],
+  "col_cx": [
+   61,
+   141,
+   221,
+   301,
+   381
+  ],
+  "thumb_row_y": [
+   55,
+   139
+  ],
+  "label_row_y": [
+   37,
+   196
+  ],
+  "label_h": 13,
+  "cells": [
+   {
+    "name": "3-4-3",
+    "cell": [
+     21,
+     35,
+     80,
+     72
+    ],
+    "label": [
+     21,
+     36,
+     80,
+     15
+    ]
+   },
+   {
+    "name": "3-5-2",
+    "cell": [
+     101,
+     35,
+     80,
+     72
+    ],
+    "label": [
+     101,
+     36,
+     80,
+     15
+    ]
+   },
+   {
+    "name": "4-3-3",
+    "cell": [
+     181,
+     35,
+     80,
+     72
+    ],
+    "label": [
+     181,
+     36,
+     80,
+     15
+    ]
+   },
+   {
+    "name": "4-4-2",
+    "cell": [
+     261,
+     35,
+     80,
+     72
+    ],
+    "label": [
+     261,
+     36,
+     80,
+     15
+    ]
+   },
+   {
+    "name": "5-3-2",
+    "cell": [
+     341,
+     35,
+     80,
+     72
+    ],
+    "label": [
+     341,
+     36,
+     80,
+     15
+    ]
+   },
+   {
+    "name": "5-4-1",
+    "cell": [
+     21,
+     137,
+     80,
+     74
+    ],
+    "label": [
+     21,
+     195,
+     80,
+     15
+    ]
+   },
+   {
+    "name": "4-2-4",
+    "cell": [
+     101,
+     137,
+     80,
+     74
+    ],
+    "label": [
+     101,
+     195,
+     80,
+     15
+    ]
+   },
+   {
+    "name": "5-2-3",
+    "cell": [
+     181,
+     137,
+     80,
+     74
+    ],
+    "label": [
+     181,
+     195,
+     80,
+     15
+    ]
+   },
+   {
+    "name": "4-5-1",
+    "cell": [
+     261,
+     137,
+     80,
+     74
+    ],
+    "label": [
+     261,
+     195,
+     80,
+     15
+    ]
+   },
+   {
+    "name": "3-3-3-1",
+    "cell": [
+     341,
+     137,
+     80,
+     74
+    ],
+    "label": [
+     341,
+     195,
+     80,
+     15
+    ]
+   }
+  ],
+  "cancel": [
+   166,
+   220,
+   113,
+   24
+  ],
+  "sel_fill": [
+   120,
+   120,
+   160
+  ],
+  "sel_text": [
+   255,
+   255,
+   255
+  ],
+  "sel_witness_bbox": [
+   102,
+   35,
+   80,
+   16
+  ],
+  "names": [
+   "3-4-3",
+   "3-5-2",
+   "4-3-3",
+   "4-4-2",
+   "5-3-2",
+   "5-4-1",
+   "4-2-4",
+   "5-2-3",
+   "4-5-1",
+   "3-3-3-1"
+  ]
+ },
+ "team_tactics": {
+  "SOURCE_NOTE": "UN-WALKED modal (no walkthrough frame; FUN_0056ea15 not disassembled). Piece ART is source-exact (RECURSOS EQWIN cluster); the assembled window GEOMETRY is a documented reconstruction, NOT frame-verified.",
+  "labels_va": {
+   "TEAM TACTICS": "0x25faa4",
+   "ATTACK": "0x26000c",
+   "DEFENCE": "0x260004",
+   "ATTACKING PLAY": "0x25fff4",
+   "SPECULATIVE PLAY": "0x25ffe0",
+   "MIXED PLAY": "0x25ffd4",
+   "PASSING": "0x25ffcc",
+   "LONG BALL": "0x25ffc0",
+   "COUNTER ATTACK": "0x260014",
+   "TACKLING": "0x25ffb4",
+   "SOFT": "0x25ff84",
+   "MEDIUM": "0x25ff7c",
+   "AGGRESSIVE": "0x25ff70",
+   "MARKING": "0x25ffac",
+   "ZONAL": "0x25ff68",
+   "MAN TO MAN": "0x25ff5c",
+   "CLEARANCES": "0x25ffa0",
+   "SHORT": "0x25ff54",
+   "LONG": "0x25ff4c",
+   "PRESSURISE FROM...": "0x25ff8c",
+   "OWN": "0x25ff48",
+   "MIDFIELD": "0x25ff3c",
+   "OPPONENT": "0x25c5a0"
+  },
+  "art": {
+   "EQUIPO.BMP": [
+    26,
+    15
+   ],
+   "EQWINATAQUE.BMP": [
+    198,
+    47
+   ],
+   "EQWINAZUL1.BMP": [
+    45,
+    18
+   ],
+   "EQWINAZUL2.BMP": [
+    45,
+    18
+   ],
+   "EQWINAZUL3.BMP": [
+    44,
+    18
+   ],
+   "EQWINBOTON.BMP": [
+    20,
+    17
+   ],
+   "EQWINDEFENSA.BMP": [
+    198,
+    47
+   ],
+   "EQWINDIB1.BMP": [
+    192,
+    17
+   ],
+   "EQWINDIB2.BMP": [
+    156,
+    17
+   ],
+   "EQWINDIB3.BMP": [
+    156,
+    16
+   ],
+   "EQWINDIB4.BMP": [
+    188,
+    17
+   ],
+   "EQWINFLECHA1.BMP": [
+    6,
+    11
+   ],
+   "EQWINLARGO.BMP": [
+    41,
+    21
+   ],
+   "EQWINPICOS.BMP": [
+    18,
+    18
+   ],
+   "EQWINTOQUE.BMP": [
+    41,
+    21
+   ],
+   "EQWINX.BMP": [
+    9,
+    7
+   ],
+   "PREDEFWINCAMPO.BMP": [
+    80,
+    75
+   ],
+   "PREDEFWINJUG.BMP": [
+    8,
+    7
+   ],
+   "PREDEFWINPOR.BMP": [
+    8,
+    7
+   ]
+  },
+  "row_map_inferred": {
+   "eqwin_row_tackle.png": "TACKLING (SOFT/MEDIUM/AGGRESSIVE) - 3 shoe icons",
+   "eqwin_row_marking.png": "MARKING (ZONAL/MAN TO MAN) - 1-vs-2 player icons",
+   "eqwin_row_clear.png": "CLEARANCES (SHORT/LONG)",
+   "eqwin_row_press.png": "PRESSURISE FROM... (OWN/MIDFIELD/OPPONENT) - 3 zones",
+   "eqwin_ment{1,2,3}.png": "mentality ATTACKING/SPECULATIVE/MIXED - blue tiles"
+  },
+  "checkbox_cx": {
+   "eqwin_row_tackle.png": [
+    31,
+    100,
+    180
+   ],
+   "eqwin_row_marking.png": [
+    35,
+    145
+   ],
+   "eqwin_row_clear.png": [
+    31,
+    143
+   ],
+   "eqwin_row_press.png": [
+    34,
+    105,
+    177
+   ],
+   "mentality_tile": 34
+  }
+ }
+}

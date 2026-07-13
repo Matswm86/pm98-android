@@ -1,142 +1,145 @@
 extends Control
 class_name MatchScreen
-## PM98 MATCH SCREEN — the real Premier Manager 98 "watch a match" view: a results /
-## commentary screen, NOT a sprite pitch. Reproduced from the original (see the real
-## screenshots + the reversed strings in docs/re/match_view_re.md): a digital clock +
-## half indicator, the two clubs' shirts + score, a POSSESSION PERCENTAGE bar, the
-## minute-by-minute EVENTS table (MIN | COMMENT), and REPLAY / CONTINUE / EXIT buttons,
-## over the blue stadium background (RECURSOS FONDO9.BMP).
+## PM98 BRIEF-mode match — the real Premier Manager 98 running-match read-out
+## (walkthrough frame 073_162649): a digital clock + half/state label, the two clubs'
+## kits + score, a POSSESSION bar, the minute-stamped EVENTS feed, and the in-match
+## LINE-UP / TACTICS / MAN-TO-MAN / STATISTICS controls + KICK OFF + EXIT.
 ##
-## The whole view is a PURE FUNCTION of the match minute over the MatchCommentary
-## timeline (the per-shot model lifted from MANAGER.EXE; docs/re/match_engine_re.md):
-## the EVENTS list is the timeline up to the clock, the score counts goals passed, the
-## possession bar is the share of events per side. _process just advances the clock;
-## seek()/the headless test drive the minute, so a screenshot at minute M is reproducible.
+## Static chrome is the REAL game's frame 073, baked to art/screens/matchflow/brief.png
+## by tools/re/build_match_flow_chrome_from_frames.py with only the dynamic club names +
+## the state label cleared. The screen redraws: the clock digit, the half/state label,
+## the club kits + names + score, and the EVENTS feed.
 ##
-## The original's premium 3D "highlights" (Actua-engine .p3d models) are CD-only data not
-## present in the game archive, so REPLAY is out of scope — this is the 2D + text mode.
+## EVENT-STREAM HONESTY (docs/re/APP_VS_SPEC_AUDIT.md B3/B4b): the instant-result stat
+## engine records ONLY goals (scorer + minute). So the feed shows Kick Off + the REAL
+## goal lines and nothing else — the fabricated shots/fouls/cards/corners of the old
+## MatchCommentary are DROPPED here (setup() keeps only goal-flagged lines). POSSESSION
+## is not produced by the stat engine, so the bar stays the frame's neutral 50/50 (an
+## honest gap, never eased toward invented data). Full fidelity needs the positional
+## engine's event stream (match_flow_re.md "renderable-today vs gap").
 
 signal back_pressed
 
 const W := 640
 const H := 480
-
 const MIN_PER_SEC := 3.6      # match minutes per real second (~25s for a 90' match)
-const VIS_ROWS := 12          # EVENTS rows visible in the panel
 
-# layout (640x480 design space, matched to the original screenshot)
-const CLOCK_BOX := Rect2(276, 6, 88, 34)
-const HOME_SCORE_BOX := Rect2(252, 72, 44, 40)
-const AWAY_SCORE_BOX := Rect2(344, 72, 44, 40)
-const POSS_BAR := Rect2(150, 170, 340, 18)
-const EVENTS_PANEL := Rect2(150, 224, 340, 208)
-const REPLAY_BTN := Rect2(14, 449, 118, 26)
-const CONT_BTN := Rect2(261, 449, 118, 26)
-const EXIT_BTN := Rect2(508, 449, 118, 26)
+# frame-measured geometry (tools/re/specs/match_flow_chrome_samples.json "brief")
+const CLOCK := Rect2(258, 30, 114, 70)     # LCD box (digit overpaint)
+const STATE_Y := 68                        # half/state label top
+const BAND_Y := Rect2(0, 99, 640, 37)      # black scoreline band
+const NAME_H := Vector2(76, 256)           # home name zone (x span)
+const NAME_A := Vector2(382, 586)          # away name zone (x span)
+const BOX_L := Rect2(258, 100, 62, 32)     # left score box
+const BOX_R := Rect2(322, 100, 58, 32)     # right score box
+const KIT_H := Vector2(20, 84)             # home kit anchor (escudo top-left)
+const KIT_A := Vector2(588, 84)            # away kit anchor
+const EVENTS := Rect2(312, 268, 158, 164)  # white feed body
+const EV_MIN_X := 316
+const EV_COMMENT_X := 356
+const EV_ROW_H := 15
+const VIS_ROWS := 10
 
-const C_TITLE := Color(0.98, 0.99, 1.0)
-const C_GOLD := Color(1.0, 0.86, 0.20)
-const C_NAME := Color(1.0, 1.0, 1.0)
-const C_LCD := Color(0.78, 0.86, 0.78)
-const C_LCD_BG := Color(0.06, 0.10, 0.08, 0.92)
-const C_PANEL := Color(0.86, 0.90, 0.96, 0.96)   # EVENTS table body
-const C_PANEL_HDR := Color(0.12, 0.18, 0.34, 0.96)
-const C_ROW_HI := Color(0.20, 0.34, 0.66)        # latest event row
-const C_TXT := Color(0.10, 0.12, 0.18)
-const C_POSS_H := Color(0.78, 0.12, 0.12)        # home possession (red)
-const C_POSS_A := Color(0.16, 0.56, 0.20)        # away possession (green)
-const C_BOX := Color(0.06, 0.12, 0.30, 0.92)
-const C_BOX_BD := Color(0.46, 0.60, 0.92)
-const C_BTN := Color(0.10, 0.16, 0.34, 0.92)
-const C_BTN_HI := Color(0.30, 0.42, 0.72)
-const C_BTN_LO := Color(0.03, 0.06, 0.16)
+# in-match buttons (x,y,w,h) — LINE-UP/TACTICS/MAN-TO-MAN + two STATISTICS are chrome
+# (they open sub-screens not built on this path); KICK OFF advances, EXIT leaves.
+const BTN := {
+	"lineup": Rect2(495, 227, 133, 33), "tactics": Rect2(495, 283, 133, 33),
+	"mtm": Rect2(495, 339, 133, 33), "stats_r": Rect2(495, 393, 133, 30),
+	"stats_l": Rect2(14, 393, 133, 30), "kick": Rect2(262, 442, 156, 30),
+	"exit": Rect2(508, 442, 120, 30),
+}
 
 const KIT_SRC := Rect2(0, 0, 31, 64)   # shirt half of the 48x64 MINIESC escudo
+const C_LCD := Color(0.78, 0.86, 0.78)
+const C_NAME := Color(1.0, 1.0, 1.0)
+const C_GOAL := Color(1.0, 0.60, 0.55)   # goal lines colour-coded (B4b "red/colour-coded")
+const C_TXT := Color(0.10, 0.12, 0.18)
+const C_PRESS := Color(1, 1, 1, 0.20)
 
 var _bg: Texture2D
-var _home_kit: Texture2D
-var _away_kit: Texture2D
 var _f18: Font
 var _f14: Font
 var _f12: Font
 var _f10: Font
-
 var _home := "HOME"
 var _away := "AWAY"
 var _hg := 0
 var _ag := 0
-var _home_id := -1
-var _away_id := -1
-var _lines: Array = []         # [{minute, side, text, goal?}]
-var _poss_home := 50           # home possession % at full time (for the kick-off baseline)
-
+var _home_kit: Texture2D
+var _away_kit: Texture2D
+var _feed: Array = []          # honest feed: [{minute, side, text, goal, kickoff}]
 var _minute := 0.0
-var _prev_minute := 0.0        # for firing event SFX on the frame the clock crosses them
-var _final_done := false
 var _playing := true
-var _press: int = -1           # which button is being pressed (0 replay/1 cont/2 exit)
-# AudioManager autoload looked up by path (the bare global doesn't resolve under --script).
-var _am: Node
+var _press := ""
 
 
 func _ready() -> void:
-	_bg = load("res://art/screens/match_bg.png")
-	_f18 = load("res://art/fonts/proman18.fnt") if ResourceLoader.exists("res://art/fonts/proman18.fnt") else load("res://art/fonts/proman14.fnt")
-	_f14 = load("res://art/fonts/proman14.fnt")
-	_f12 = load("res://art/fonts/proman12.fnt")
-	_f10 = load("res://art/fonts/proman10.fnt")
+	_bg = load("res://art/screens/matchflow/brief.png")
+	_f18 = PMChrome.font("18")
+	_f14 = PMChrome.font("14")
+	_f12 = PMChrome.font("12")
+	_f10 = PMChrome.font("10")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2(W, H)
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	gui_input.connect(_on_input)
-	_am = get_node_or_null(^"/root/AudioManager")
 	set_process(true)
 	queue_redraw()
 
 
-## Feed a finished fixture. lines = MatchCommentary timeline lines. home_id/away_id pull
-## each club's shirt escudo (res://art/kits/<id>.png); pass -1 for none.
+## Feed a finished fixture. `lines` = a match timeline (MatchCommentary shape or the
+## honest goal vector). Only GOAL events are kept — the fabricated RATE_* lines are
+## dropped so the feed is the stat engine's real record. home_id/away_id pull each
+## club's kit escudo.
 func setup(home_name: String, away_name: String, hg: int, ag: int, lines: Array,
 		home_id: int = -1, away_id: int = -1) -> void:
 	_home = home_name
 	_away = away_name
 	_hg = hg
 	_ag = ag
-	_lines = lines
-	_home_id = home_id
-	_away_id = away_id
 	_home_kit = _kit_tex(home_id)
 	_away_kit = _kit_tex(away_id)
-	_poss_home = _possession_home()
+	_feed = _honest_feed(lines)
 	_minute = 0.0
-	_prev_minute = 0.0
-	_final_done = false
 	_playing = true
-	# Match audio: the menu theme yields to the crowd bed, kick-off whistle blows.
-	if _am == null:
-		_am = get_node_or_null(^"/root/AudioManager")
-	if _am:
-		_am.stop_music()
-		_am.play_crowd()
-		_am.sfx("whistle")
 	queue_redraw()
 
 
-## Jump the clock to a minute (tests / screenshots). Pure: no SFX replay.
+## Build the honest feed from a timeline: a Kick Off line + one line per GOAL only.
+## Accepts both the MatchCommentary shape ({minute, side, text, goal}) and the raw
+## stat-engine goal vector ({minute, side/scorer_side, scorer, own_goal}).
+func _honest_feed(lines: Array) -> Array:
+	var out: Array = [{"minute": 0, "side": -1, "text": "KICK OFF  -  %s v %s" % [
+		_home.to_upper(), _away.to_upper()], "kickoff": true}]
+	for ln in lines:
+		if not (ln is Dictionary):
+			continue
+		var d: Dictionary = ln
+		var is_goal := bool(d.get("goal", false)) or d.has("scorer")
+		if not is_goal:
+			continue   # DROP shots/fouls/cards/corners (fabricated; not stat-engine truth)
+		var side := int(d.get("side", d.get("scorer_side", -1)))
+		var scorer := str(d.get("scorer", ""))
+		if scorer == "":   # MatchCommentary shape: "Goal by <name>"
+			scorer = str(d.get("text", "")).trim_prefix("Goal by ").strip_edges()
+		var club := _home if side == 0 else _away
+		out.append({"minute": int(d.get("minute", 0)), "side": side,
+			"text": "Goal by %s (%s)" % [scorer, club], "goal": true})
+	return out
+
+
+## Jump the clock to a minute (tests / screenshots).
 func seek(minute: float) -> void:
 	_minute = clampf(minute, 0.0, 90.0)
-	_prev_minute = _minute
-	_final_done = _minute >= 90.0
 	queue_redraw()
 
 
-# ---- data (all pure functions of the minute) -----------------------------
+# ---- pure functions of the minute ----------------------------------------
 
-## Score shown at a minute (goals already played).
 func _score_at(minute: float) -> Vector2i:
 	var h := 0
 	var a := 0
-	for ln in _lines:
+	for ln in _feed:
 		if ln.get("goal") == true and float(ln.get("minute", 0)) <= minute:
 			if int(ln["side"]) == 0:
 				h += 1
@@ -145,31 +148,9 @@ func _score_at(minute: float) -> Vector2i:
 	return Vector2i(h, a)
 
 
-## Full-match home possession %, from the share of side-attributed events (default 50).
-func _possession_home() -> int:
-	var h := 0
-	var tot := 0
-	for ln in _lines:
-		var s := int(ln.get("side", -1))
-		if s == 0 or s == 1:
-			tot += 1
-			if s == 0:
-				h += 1
-	if tot == 0:
-		return 50
-	return clampi(int(round(100.0 * h / tot)), 12, 88)
-
-
-## Possession at a minute eases from 50/50 at kick-off toward the full-match split.
-func _possession_at(minute: float) -> int:
-	var t := clampf(minute / 90.0, 0.0, 1.0)
-	return int(round(lerpf(50.0, float(_poss_home), t)))
-
-
-## EVENTS rows to show at a minute: the timeline up to the clock (newest last).
 func _events_upto(minute: float) -> Array:
 	var out: Array = []
-	for ln in _lines:
+	for ln in _feed:
 		if float(ln.get("minute", 0)) <= minute:
 			out.append(ln)
 	return out
@@ -182,32 +163,13 @@ func _half_label(minute: float) -> String:
 		return "SECOND HALF"
 	if minute >= 45.0:
 		return "HALF TIME"
+	if minute <= 0.0:
+		return "KICK OFF"
 	return "FIRST HALF"
 
 
-# ---- club shirt art ------------------------------------------------------
-
 func _kit_tex(club_id: int) -> Texture2D:
-	if club_id < 0:
-		return null
-	var path := "res://art/kits/%d.png" % club_id
-	return load(path) if ResourceLoader.exists(path) else null
-
-
-func _line_sfx(ln: Dictionary) -> String:
-	if ln.get("goal") == true:
-		return "goal"
-	var t := str(ln.get("text", ""))
-	if t.begins_with("Yellow card:"):
-		return "card_yellow"
-	if t.ends_with("sent off"):
-		return "card_red"
-	return ""
-
-
-func _exit_tree() -> void:
-	if _am:
-		_am.stop_crowd()
+	return PMChrome.kit(club_id) if club_id >= 0 else null
 
 
 # ---- clock ---------------------------------------------------------------
@@ -215,21 +177,147 @@ func _exit_tree() -> void:
 func _process(delta: float) -> void:
 	if _playing and _minute < 90.0:
 		_minute = minf(90.0, _minute + delta * MIN_PER_SEC)
-		for ln in _lines:
-			var m := float(ln.get("minute", 0))
-			if m > _prev_minute and m <= _minute:
-				var key := _line_sfx(ln)
-				if key != "" and _am:
-					_am.sfx(key)
-		_prev_minute = _minute
-		if _minute >= 90.0 and not _final_done:
-			if _am:
-				_am.sfx("whistle_final")
-			_final_done = true
 		queue_redraw()
 
 
 # ---- input ---------------------------------------------------------------
+
+func _on_input(e: InputEvent) -> void:
+	if not (e is InputEventScreenTouch or e is InputEventMouseButton):
+		return
+	var d := _to_design(e.position)
+	if e.pressed:
+		_press = _hit(d)
+	else:
+		var rel := _hit(d)
+		if rel != "" and rel == _press:
+			_activate(rel)
+		_press = ""
+	queue_redraw()
+
+
+func _hit(d: Vector2) -> String:
+	for k in BTN:
+		if (BTN[k] as Rect2).has_point(d):
+			return k
+	# tapping the feed body skips to full time (watch the whole match at once)
+	if EVENTS.has_point(d):
+		return "skip"
+	return ""
+
+
+func _activate(target: String) -> void:
+	match target:
+		"kick":
+			if _minute >= 90.0:
+				back_pressed.emit()   # CONTINUE at full time
+			else:
+				_minute = 90.0        # skip to the final result
+				_playing = false
+		"exit":
+			back_pressed.emit()
+		"skip":
+			_minute = 90.0
+			_playing = false
+		_:
+			pass   # LINE-UP/TACTICS/MAN-TO-MAN/STATISTICS: in-match chrome (no sub-screen here)
+
+
+# ---- drawing -------------------------------------------------------------
+
+func _draw() -> void:
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.04, 0.06, 0.12), true)
+	var s := _scale()
+	draw_set_transform(_origin(s), 0.0, Vector2(s, s))
+	if _bg != null:
+		draw_texture_rect(_bg, Rect2(0, 0, W, H), false)
+
+	# clock digit (over the baked LCD, which we blank first) + half/state label
+	draw_rect(Rect2(266, 18, 100, 30), Color(0.10, 0.10, 0.11), true)
+	var clock := "%02d:00" % int(_minute) if _minute < 90.0 else "90:00"
+	_txt(_f18, 266, 20, clock, C_LCD, 20, true, 100)
+	_txt(_f14, 0, STATE_Y, _half_label(_minute), C_NAME, 15, true, W)
+
+	# kits + names + score on the black band (blank the baked score-box digits first)
+	_draw_kit(_home_kit, KIT_H)
+	_draw_kit(_away_kit, KIT_A)
+	_name(int(NAME_H.x), _home.to_upper(), int(NAME_H.y) - int(NAME_H.x), false)
+	_name(int(NAME_A.y), _away.to_upper(), int(NAME_A.y) - int(NAME_A.x), true)
+	var sc := _score_at(_minute)
+	draw_rect(Rect2(BOX_L.position.x + 3, 102, BOX_L.size.x - 6, 30), Color(0, 0, 0.5), true)
+	draw_rect(Rect2(BOX_R.position.x + 3, 102, BOX_R.size.x - 6, 30), Color(0, 0, 0.5), true)
+	_txt(_f18, int(BOX_L.position.x), 104, str(sc.x), C_NAME, 22, true, int(BOX_L.size.x))
+	_txt(_f18, int(BOX_R.position.x), 104, str(sc.y), C_NAME, 22, true, int(BOX_R.size.x))
+
+	_draw_events()
+
+	if _press != "" and BTN.has(_press):
+		draw_rect(BTN[_press], C_PRESS, true)
+
+
+func _draw_events() -> void:
+	if _f10 == null:
+		return
+	var rows := _events_upto(_minute)
+	var start: int = maxi(0, rows.size() - VIS_ROWS)
+	for i in range(start, rows.size()):
+		var ln: Dictionary = rows[i]
+		var yy: int = int(EVENTS.position.y) + 2 + (i - start) * EV_ROW_H
+		var goal: bool = ln.get("goal") == true
+		var col: Color = C_GOAL if goal else C_TXT
+		var kick: bool = ln.get("kickoff", false)
+		# minute in the MIN column (goals only); comment clipped to the panel width.
+		if not kick:
+			draw_string(_f10, Vector2(EV_MIN_X, yy + _f10.get_ascent(11)), str(int(ln.get("minute", 0))),
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 11, col)
+		var cx: int = EV_MIN_X if kick else EV_COMMENT_X
+		draw_string(_f10, Vector2(cx, yy + _f10.get_ascent(11)), str(ln.get("text", "")),
+			HORIZONTAL_ALIGNMENT_LEFT, int(EVENTS.end.x) - cx - 2, 11, col)
+
+
+## Draw a club name on the black band, shrunk to fit `maxw`. right=right-align at x.
+func _name(x: int, t: String, maxw: int, right: bool) -> void:
+	if _f18 == null:
+		return
+	var sz := 20
+	while _f18.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x > maxw and sz > 9:
+		sz -= 1
+	var wd := _f18.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
+	var px := (x - wd) if right else float(x)
+	draw_string(_f18, Vector2(px, 104 + _f18.get_ascent(sz)), t, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, C_NAME)
+
+
+func _draw_kit(tex: Texture2D, at: Vector2) -> void:
+	if tex == null:
+		return
+	var sc: float = min(40.0 / KIT_SRC.size.x, 48.0 / KIT_SRC.size.y)
+	draw_texture_rect_region(tex, Rect2(at.x, at.y, KIT_SRC.size.x * sc, KIT_SRC.size.y * sc), KIT_SRC)
+
+
+## Draw text. right=centre-in-cw. When `clamp_x` is given the label is auto-shrunk to
+## fit; `right_align` right-aligns at x.
+func _txt(f: Font, x: int, y_top: int, t: String, col: Color, sz: int, center := false,
+		cw := 0, clamp_x := 0, right_align := false) -> void:
+	if f == null or t == "":
+		return
+	var maxw := 0.0
+	if clamp_x > 0:
+		maxw = float(clamp_x - x)
+	elif right_align:
+		maxw = float(x - 8)
+	if maxw > 0.0:
+		while f.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x > maxw and sz > 7:
+			sz -= 1
+	var wd := f.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
+	var px := float(x)
+	if center and cw > 0:
+		px = x + (cw - wd) * 0.5
+	elif right_align:
+		px = x - wd
+	draw_string(f, Vector2(px, y_top + f.get_ascent(sz)), t, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
+
+
+# ---- letterbox scaling ---------------------------------------------------
 
 func _scale() -> float:
 	return min(size.x / W, size.y / H) if size.x > 0 and size.y > 0 else 1.0
@@ -240,162 +328,3 @@ func _origin(s: float) -> Vector2:
 func _to_design(p: Vector2) -> Vector2:
 	var s := _scale()
 	return (p - _origin(s)) / s
-
-
-func _on_input(e: InputEvent) -> void:
-	if not (e is InputEventScreenTouch or e is InputEventMouseButton):
-		return
-	var d := _to_design(e.position)
-	if e.pressed:
-		_press = _btn_at(d)
-	else:
-		var rel := _btn_at(d)
-		if rel != -1 and rel == _press:
-			match rel:
-				0:   # REPLAY: rerun the clock from kick-off (no 3D engine; this re-watches text)
-					_minute = 0.0
-					_prev_minute = 0.0
-					_final_done = false
-					_playing = true
-				1, 2:   # CONTINUE / EXIT: leave the match
-					back_pressed.emit()
-		elif rel == -1 and _press == -1:
-			# tap the body: skip to full time and pause on the result
-			if _minute < 90.0:
-				_minute = 90.0
-				_prev_minute = 90.0
-				if not _final_done and _am:
-					_am.sfx("whistle_final")
-				_final_done = true
-		_press = -1
-	queue_redraw()
-
-
-func _btn_at(d: Vector2) -> int:
-	if REPLAY_BTN.has_point(d):
-		return 0
-	if CONT_BTN.has_point(d):
-		return 1
-	if EXIT_BTN.has_point(d):
-		return 2
-	return -1
-
-
-# ---- drawing -------------------------------------------------------------
-
-func _draw() -> void:
-	# marble-ish bezel behind the 640x480 content (landscape side margins)
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0.04, 0.06, 0.12), true)
-	var s := _scale()
-	draw_set_transform(_origin(s), 0.0, Vector2(s, s))
-
-	if _bg != null:
-		draw_texture_rect(_bg, Rect2(0, 0, W, H), false)
-	else:
-		draw_rect(Rect2(0, 0, W, H), Color(0.10, 0.16, 0.40), true)
-	# darken slightly so the white panels + text pop, like the original
-	draw_rect(Rect2(0, 0, W, H), Color(0.04, 0.06, 0.18, 0.28), true)
-
-	_draw_clock()
-	_draw_scoreline()
-	_draw_possession()
-	_draw_events()
-	_draw_buttons()
-
-
-func _draw_clock() -> void:
-	draw_rect(CLOCK_BOX, C_LCD_BG, true)
-	draw_rect(CLOCK_BOX, Color(0.5, 0.6, 0.7, 0.5), false, 1.0)
-	var clock := "%02d:00" % int(_minute) if _minute < 90.0 else "90:00"
-	_txt(_f18, int(CLOCK_BOX.position.x), int(CLOCK_BOX.position.y) + 6, clock, C_LCD, 18, false, int(CLOCK_BOX.size.x))
-	_txt(_f12, 0, int(CLOCK_BOX.end.y) + 3, _half_label(_minute), C_GOLD, 12, false, W)
-
-
-func _draw_scoreline() -> void:
-	var sc := _score_at(_minute)
-	# shirts flanking the centre
-	_draw_shirt(_home_kit, 40, 70)
-	_draw_shirt(_away_kit, W - 40 - 40, 70)
-	# names
-	_txt(_f14, 92, 82, _home.substr(0, 16), C_NAME, 16)
-	_txt(_f14, W - 92, 82, _away.substr(0, 16), C_NAME, 16, true)
-	# score boxes
-	for box in [HOME_SCORE_BOX, AWAY_SCORE_BOX]:
-		draw_rect(box, C_BOX, true)
-		draw_rect(box, C_BOX_BD, false, 2.0)
-	_txt(_f18, int(HOME_SCORE_BOX.position.x), int(HOME_SCORE_BOX.position.y) + 9, str(sc.x), C_TITLE, 20, false, int(HOME_SCORE_BOX.size.x))
-	_txt(_f18, int(AWAY_SCORE_BOX.position.x), int(AWAY_SCORE_BOX.position.y) + 9, str(sc.y), C_TITLE, 20, false, int(AWAY_SCORE_BOX.size.x))
-
-
-func _draw_shirt(tex: Texture2D, x: float, y: float) -> void:
-	if tex == null:
-		draw_rect(Rect2(x + 6, y, 28, 40), Color(0.7, 0.7, 0.75, 0.8), true)
-		return
-	var sc: float = min(40.0 / KIT_SRC.size.x, 44.0 / KIT_SRC.size.y)
-	draw_texture_rect_region(tex, Rect2(x + (40.0 - KIT_SRC.size.x * sc) * 0.5, y, KIT_SRC.size.x * sc, KIT_SRC.size.y * sc), KIT_SRC)
-
-
-func _draw_possession() -> void:
-	_txt(_f12, 0, 150, "POSSESSION PERCENTAGE", C_TITLE, 12, false, W)
-	var ph := _possession_at(_minute)
-	var split: float = POSS_BAR.size.x * ph / 100.0
-	draw_rect(Rect2(POSS_BAR.position, Vector2(split, POSS_BAR.size.y)), C_POSS_H, true)
-	draw_rect(Rect2(POSS_BAR.position.x + split, POSS_BAR.position.y, POSS_BAR.size.x - split, POSS_BAR.size.y), C_POSS_A, true)
-	draw_rect(POSS_BAR, Color(0.85, 0.9, 0.95, 0.6), false, 1.0)
-	_txt(_f12, int(POSS_BAR.position.x) - 52, int(POSS_BAR.position.y) + 2, "%d%%" % ph, C_TITLE, 13, true)
-	_txt(_f12, int(POSS_BAR.end.x) + 8, int(POSS_BAR.position.y) + 2, "%d%%" % (100 - ph), C_TITLE, 13)
-
-
-func _draw_events() -> void:
-	# "EVENTS" title (centered above the table, like the original)
-	_txt(_f14, 0, int(EVENTS_PANEL.position.y) - 34, "EVENTS", C_TITLE, 14, false, W)
-	# header
-	var hdr := Rect2(EVENTS_PANEL.position.x, EVENTS_PANEL.position.y - 16, EVENTS_PANEL.size.x, 16)
-	draw_rect(hdr, C_PANEL_HDR, true)
-	_txt(_f10, int(hdr.position.x) + 6, int(hdr.position.y) + 3, "MIN", C_TITLE, 11)
-	_txt(_f10, int(hdr.position.x) + 44, int(hdr.position.y) + 3, "COMMENT", C_TITLE, 11)
-	# body
-	draw_rect(EVENTS_PANEL, C_PANEL, true)
-	draw_rect(EVENTS_PANEL, Color(0.3, 0.4, 0.6, 0.7), false, 1.0)
-	var rows := _events_upto(_minute)
-	var start: int = maxi(0, rows.size() - VIS_ROWS)
-	var rh := EVENTS_PANEL.size.y / VIS_ROWS
-	for i in range(start, rows.size()):
-		var ln: Dictionary = rows[i]
-		var yy: float = EVENTS_PANEL.position.y + (i - start) * rh
-		var latest := i == rows.size() - 1
-		if latest:
-			draw_rect(Rect2(EVENTS_PANEL.position.x, yy, EVENTS_PANEL.size.x, rh), C_ROW_HI, true)
-		var col: Color = C_TITLE if latest else C_TXT
-		var side := int(ln.get("side", -1))
-		var mins := "" if side < 0 else "%d" % int(ln.get("minute", 0))
-		if mins != "":
-			_txt(_f10, int(EVENTS_PANEL.position.x) + 8, int(yy) + 2, mins, col, 11)
-		_txt(_f10, int(EVENTS_PANEL.position.x) + 44, int(yy) + 2, str(ln.get("text", "")).substr(0, 44), col, 11)
-
-
-func _draw_buttons() -> void:
-	_button(REPLAY_BTN, 0, "REPLAY", Color(1.0, 0.5, 0.5))
-	_button(CONT_BTN, 1, "CONTINUE", Color(0.85, 1.0, 0.9))
-	_button(EXIT_BTN, 2, "EXIT", C_GOLD)
-
-
-func _button(r: Rect2, idx: int, label: String, fg: Color) -> void:
-	var base: Color = C_BTN_HI if _press == idx else C_BTN
-	draw_rect(r, base, true)
-	draw_rect(Rect2(r.position.x, r.position.y, r.size.x, 1), C_BTN_HI, true)
-	draw_rect(Rect2(r.position.x, r.end.y - 1, r.size.x, 1), C_BTN_LO, true)
-	draw_rect(r, Color(0.5, 0.6, 0.8, 0.5), false, 1.0)
-	_txt(_f12, int(r.position.x), int(r.position.y) + 6, label, fg, 13, false, int(r.size.x))
-
-
-func _txt(f: Font, x: int, y_top: int, t: String, col: Color, sz: int, right := false, cw := 0) -> void:
-	if f == null:
-		return
-	var wd := f.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
-	var px := float(x)
-	if right:
-		px = x - wd
-	elif cw > 0:
-		px = x + (cw - wd) * 0.5
-	draw_string(f, Vector2(px, y_top + f.get_ascent(sz)), t, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)

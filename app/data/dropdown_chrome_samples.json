@@ -1,0 +1,78 @@
+{
+ "bar_rect": [
+  0,
+  0,
+  640,
+  41
+ ],
+ "box_rect": [
+  136,
+  124,
+  367,
+  220
+ ],
+ "monitor_icon": [
+  534,
+  6,
+  33,
+  32
+ ],
+ "headphones_icon": [
+  592,
+  6,
+  30,
+  30
+ ],
+ "music_slider": [
+  329,
+  195,
+  77,
+  15
+ ],
+ "sfx_slider": [
+  329,
+  236,
+  77,
+  15
+ ],
+ "music_box": [
+  393,
+  207,
+  13,
+  13
+ ],
+ "sfx_box": [
+  393,
+  248,
+  13,
+  13
+ ],
+ "trans_on_box": [
+  310,
+  287,
+  13,
+  13
+ ],
+ "trans_off_box": [
+  360,
+  287,
+  13,
+  13
+ ],
+ "ok_label": [
+  446,
+  328,
+  18,
+  7
+ ],
+ "trough_fill": [
+  0,
+  0,
+  50
+ ],
+ "frames": [
+  "hub_dropdown_bar.png",
+  "hub_dropdown_bar_2.png",
+  "dropdown_options_panel.png"
+ ]
+}

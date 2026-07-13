@@ -1,0 +1,305 @@
+{
+ "match_options": {
+  "binding_frame": "dropdown_matchoptions_match.png",
+  "modal_xy": [
+   98,
+   116
+  ],
+  "modal_wh": [
+   446,
+   258
+  ],
+  "view_row_y": [
+   279,
+   297
+  ],
+  "view_btns": {
+   "watch": [
+    116,
+    97
+   ],
+   "highlights": [
+    220,
+    97
+   ],
+   "brief": [
+    325,
+    97
+   ],
+   "results": [
+    428,
+    97
+   ]
+  },
+  "bottom_row_y": [
+   342,
+   370
+  ],
+  "bottom_btns": {
+   "lineups": [
+    109,
+    103
+   ],
+   "on": [
+    216,
+    46
+   ],
+   "cancel": [
+    323,
+    102
+   ],
+   "ok": [
+    430,
+    102
+   ]
+  },
+  "note": "Reversed FUN_004e2630 view-row rects (98x25 @ y100, panel-local x 5/109/214/317) corroborate; frame is the pixel source. Only WATCH/BRIEF/RESULTS are buildable (HIGHLIGHTS = 3D .p3d absent)."
+ },
+ "result_titles": {
+  "fulltime": {
+   "xy": [
+    244,
+    13
+   ]
+  },
+  "halftime": {
+   "xy": [
+    242,
+    13
+   ]
+  }
+ },
+ "result": {
+  "binding_frame": "match_result_fulltime.png",
+  "scoreband_y": [
+   66,
+   108
+  ],
+  "box_l": [
+   246,
+   320
+  ],
+  "box_r": [
+   339,
+   375
+  ],
+  "name_home": [
+   36,
+   244
+  ],
+  "name_away": [
+   400,
+   585
+  ],
+  "band_fill": [
+   42,
+   63,
+   170
+  ],
+  "box_fill": [
+   0,
+   0,
+   128
+  ],
+  "poss": [
+   30,
+   612,
+   116,
+   140
+  ],
+  "poss_pill": [
+   270,
+   368
+  ],
+  "cols": {
+   "hb": [
+    19,
+    144
+   ],
+   "hg": [
+    169,
+    289
+   ],
+   "ab": [
+    332,
+    457
+   ],
+   "ag": [
+    482,
+    602
+   ]
+  },
+  "row_y0": 172,
+  "row_pitch": 16,
+  "row_h": 12,
+  "n_rows": 7,
+  "fouls_y": [
+   300,
+   316
+  ],
+  "colors": {
+   "scoreband": [
+    42,
+    63,
+    170
+   ],
+   "box": [
+    0,
+    0,
+    128
+   ],
+   "cell_green": [
+    170,
+    223,
+    170
+   ],
+   "cell_blue": [
+    200,
+    220,
+    240
+   ],
+   "stadium_row": [
+    42,
+    95,
+    170
+   ]
+  },
+  "kit_home_xy": [
+   6,
+   60
+  ],
+  "kit_away_xy": [
+   590,
+   60
+  ],
+  "kit_wh": [
+   46,
+   52
+  ],
+  "continue": [
+   479,
+   439,
+   112,
+   25
+  ],
+  "stadium_panel": [
+   14,
+   292,
+   348,
+   445
+  ],
+  "stadium_icon_x": 76,
+  "stadium_body_bg": [
+   42,
+   95,
+   170
+  ],
+  "stadium_rows_y": [
+   357,
+   380,
+   396,
+   412,
+   428
+  ],
+  "motm_panel": [
+   325,
+   350,
+   604,
+   420
+  ]
+ },
+ "brief": {
+  "binding_frame": "073_162649.png",
+  "clock": [
+   258,
+   372,
+   30,
+   100
+  ],
+  "state_y": [
+   68,
+   92
+  ],
+  "band_y": [
+   99,
+   136
+  ],
+  "name_home": [
+   76,
+   256
+  ],
+  "name_away": [
+   382,
+   586
+  ],
+  "box_l": [
+   258,
+   320
+  ],
+  "box_r": [
+   322,
+   380
+  ],
+  "kit_home": [
+   8,
+   70,
+   82,
+   138
+  ],
+  "kit_away": [
+   585,
+   638,
+   82,
+   138
+  ],
+  "events": [
+   300,
+   488,
+   218,
+   435
+  ],
+  "btn_lineup": [
+   495,
+   227,
+   133,
+   33
+  ],
+  "btn_tactics": [
+   495,
+   283,
+   133,
+   33
+  ],
+  "btn_mtm": [
+   495,
+   339,
+   133,
+   33
+  ],
+  "btn_stats_r": [
+   495,
+   393,
+   133,
+   30
+  ],
+  "btn_stats_l": [
+   14,
+   393,
+   133,
+   30
+  ],
+  "btn_kick": [
+   262,
+   442,
+   156,
+   30
+  ],
+  "btn_exit": [
+   508,
+   442,
+   120,
+   30
+  ],
+  "note": "Frame 073 is KICK OFF (empty EVENTS, 0-0): the resting chrome is the frame with the club NAMES + state label cleared. The honest feed shows Kick Off + real Goal lines only; possession is a gap."
+ }
+}

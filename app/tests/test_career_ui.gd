@@ -47,14 +47,17 @@ func _run() -> void:
 		await process_frame
 	ok = _assert(main._career.week == 3, "advanced to week 3 (got %d)" % main._career.week) and ok
 
-	# B-track RESULTS view: PM98-chrome match-history browse over the hub.
+	# RESULTS view: the source-true ResultsScreen overlay over the hub (was the rejected browse).
 	main._show_results_screen()
 	await process_frame
-	ok = _assert(main._browse != null and is_instance_valid(main._browse) and main._browse is BrowseScreen,
-		"RESULTS browse overlay mounted") and ok
-	main._dismiss_career_browse()
+	var res_overlay: Node = null
+	for ch in main.get_children():
+		if ch is ResultsScreen:
+			res_overlay = ch
+	ok = _assert(res_overlay != null, "RESULTS screen overlay mounted") and ok
+	if res_overlay != null:
+		res_overlay.queue_free()
 	await process_frame
-	ok = _assert(main._browse == null, "RESULTS browse dismissed back to hub") and ok
 
 	# Original-art LEAGUE TABLES overlay (graphics reskin, S-graphics-1).
 	main._show_league_table_screen()

@@ -110,6 +110,22 @@ var _is_home: bool = true
 var _opp_tex: Texture2D
 var _press: String = ""        # action currently held down (for the highlight)
 
+# Top-edge dropdown bar (2026-07-12 live captures hub_dropdown_bar.png /
+# dropdown_matchoptions_*.png / dropdown_options_panel.png): hovering/tapping
+# the top edge slides down the PREMIER 98 bar; its MONITOR icon opens MATCH
+# OPTIONS (emitted as the "match_options" action), the HEADPHONES icon opens
+# the OPTIONS panel (OptionsPanel). The bar stays bright over the dimmed hub
+# (witnessed in the options capture). Slide duration is an approximation (the
+# capture poll can't time it); TRANSITIONS OFF makes it instant.
+const DROP_H := 41.0
+const R_DROP_MON := Rect2(534, 6, 33, 32)   # monitor icon (frame-measured)
+const R_DROP_HP := Rect2(592, 6, 30, 30)    # headphones icon
+var _drop_tex: Texture2D
+var _drop_open := false
+var _drop_anim := 0.0            # 0 = hidden, 1 = fully down
+var _drop_press := ""
+var _options: Control = null     # active OptionsPanel modal
+
 # The modal "PREMIER MANAGER 98" alert box (PMAlert; docs/re/alert_box_re.md).
 # While a message shows, the hub behind is palette-dimmed and input is modal.
 var _alert_queue: PackedStringArray = []
@@ -125,6 +141,8 @@ func _ready() -> void:
 	_bg = load("res://art/screens/menu_bg.png")
 	_bg_dim = load("res://art/screens/alert/menu_bg_dim.png")
 	_bezel = load("res://art/screens/fondo_marble.png")
+	if ResourceLoader.exists("res://art/screens/dropdown/bar.png"):
+		_drop_tex = load("res://art/screens/dropdown/bar.png")
 	_f10 = load("res://art/fonts/proman10.fnt")
 	_f12 = load("res://art/fonts/proman12.fnt")
 	_f14 = load("res://art/fonts/proman14.fnt")
