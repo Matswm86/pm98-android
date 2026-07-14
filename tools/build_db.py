@@ -62,8 +62,6 @@ FLAG_ALIASES = {
     "TRINIDAD": "TRINIDAD T.",
     "DR CONGO": "ZAIRE",
 }
-ENGLAND_CODE = 30  # the FICHA default flag for the omitted-nationality (English) players
-
 # The 1997 EU-15 + EEA class for the FICHA KIND flag (frame-evidenced NATIONAL for
 # HOLLAND 081 / NORWAY 084; post-Bosman "comunitario" rule, extract_english.py).
 from extract_english import EU_EEA_1997  # noqa: E402
@@ -89,6 +87,10 @@ def main() -> None:
     exact = load("squads_exact.json")["clubs"]
     laliga_caps = {t["name"].upper(): t for t in load("teams_laliga.json")["teams"]}
     flag_lut = build_flag_lookup()
+    # The PAISES.30 codes whose nation is EU/EEA-1997 -> FICHA KIND = NATIONAL
+    # (comunitario). flag_lut carries the Irish / N.-Irish spelling aliases, so
+    # this resolves every home-nation code (frame-validated NATIONAL, 081/084).
+    eu_codes = {flag_lut[n] for n in EU_EEA_1997 if n in flag_lut}
     # idx -> division label, decoded from MANAGER.EXE's own league table
     div_by_idx = {int(k): v for k, v in load("divisions_english.json")["divisionByIdx"].items()}
     by_idx = {c["idx"]: c for c in exact}
@@ -98,7 +100,7 @@ def main() -> None:
     bios: dict[int, dict] = {}  # game_db player id -> verbatim tail content
     pid = 0
 
-    def emit_player(p: dict, club_id: int, english: bool) -> dict:
+    def emit_player(p: dict, club_id: int) -> dict:
         nonlocal pid
         pid += 1
         # Split the verbatim EQUIPOS tail content off into bios.json (keyed by
@@ -110,11 +112,13 @@ def main() -> None:
                 "career": p.get("careerCsv") or "",
                 "intl": p.get("intlRaw"),
             }
-        # The extended (flag==0) records store nationality ONLY for non-English
-        # players — omitted == ENGLAND (extract_english rule, FICHA-frame-
-        # validated). Hereford's compact record stores none at all; the same
-        # omitted-default applies across the English pyramid.
-        nat = p.get("nationality") or ("ENGLAND" if english else None)
+        # Nationality is the engine's own per-player country code (EQUIPOS byte
+        # +0x1a == PAISES.30 code == BANDERAS flag index), decoded in the
+        # extractor for ALL 9547 players (`natCode`/`nationality`). flagCode is
+        # that raw code; KIND is its EU/EEA-1997 comunitario class. See
+        # tools/extract_squads_exact.py + docs/re/ficha_card_re.md.
+        nat = p.get("nationality")
+        code = p.get("natCode")
         return {
             "id": pid,
             "clubId": club_id,
@@ -134,8 +138,10 @@ def main() -> None:
             # consumers must check per-club uniqueness before displaying.
             "squadNo": p.get("squadNo"),
             "nationality": nat,
-            "flagCode": flag_lut.get(str(nat or "").upper(), ENGLAND_CODE),  # BANDERAS index
-            "kind": ("NATIONAL" if nat in EU_EEA_1997 else "NON-NATIONAL") if nat else None,
+            "flagCode": code,  # engine byte +0x1a == PAISES.30 code == BANDERAS index
+            "kind": ("NATIONAL" if code in eu_codes else "NON-NATIONAL")
+            if code is not None
+            else None,
             "heightCm": p.get("heightCm"),  # +0xf9; null = engine randomizes 170..179
             "weightKg": p.get("weightKg"),  # +0xfa; null = engine randomizes 75..84
             # .DBC +0x16/+0x17 raw (un-RE'd semantics): the match-lineup filler
@@ -165,7 +171,7 @@ def main() -> None:
             "leagueId": league_id,
             "capacity": cap.get("capacity"),
             "foundingYear": cap.get("founded"),
-            "players": [emit_player(p, cid, league_id is not None) for p in c.get("players", [])],
+            "players": [emit_player(p, cid) for p in c.get("players", [])],
         }
 
     # --- English pyramid (the playable core) ---

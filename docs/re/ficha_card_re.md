@@ -166,3 +166,33 @@ convention. Render-verified both paths (Schmeichel = flag+DENMARK+NATIONAL; Hesp
 **HONEST GAP / follow-up (NOT invented):** the real per-player nationality for the ~7,505 null
 players is a source-decode task (their EQUIPOS/extended records aren't run through the country
 decode yet). Until decoded, those FICHAs show "-" rather than a wrong flag.
+
+## 2026-07-14 (b) — GAP CLOSED: nationality decoded for ALL 9,547 players (EQUIPOS +0x1a)
+
+The ~7,505-player gap above is **resolved at the source**. The EQUIPOS player record carries the
+nationality as a single byte at **+0x1a** (the `parse_player` `b1a` field, previously "un-RE'd"),
+present and in valid PAISES.30 range (1..120) for **every** player, not just the 94 extended-record
+clubs. It is the SAME byte the engine reads to draw the flag: MANAGER.EXE `FUN_004f5260` reads
+`*(player+0x1a)` and passes it to `FUN_0058d270` (a bounds-checked `at()` accessor over the flag
+DIB collection — disassembled: `push edi` = the code, `cmp edi,[esi+0xc]` bounds vs count, return
+`[esi+8][edi*8]`). So +0x1a → PAISES.30 name (text) and → BANDERAS index (flag), directly.
+
+Proof it is the nationality field, three independent ways:
+1. **Coverage** — all 9,547 players have +0x1a in 1..120, **zero** out-of-range / zero null.
+2. **Agreement + correction** — matches the old bio-prose decode on 1,765/2,025, and every one of
+   the ~260 "disagreements" is the byte being *right* where the prose scan was wrong (it had
+   false-defaulted to ENGLAND or grabbed a birthplace): Yorke→TRINIDAD, Hasselbaink→SURINAM,
+   Filan→AUSTRALIA, Duff→REP. OF IRELAND, Molenaar→HOLLAND, Kinkladze→GEORGIA, Goater→BERMUDA;
+   Barnes→ENGLAND (the game's nationality, not birthplace Jamaica).
+3. **Frame-validated FICHAs preserved** — Van der Gouw 27→HOLLAND (081), Solskjaer 44→NORWAY (084),
+   Schmeichel 18→DENMARK (`player_info_ref.jpg`).
+
+Pipeline: `tools/extract_squads_exact.py` now emits `natCode` (raw +0x1a) + `nationality` (PAISES
+name) + `kind` (the EU/EEA-1997 comunitario class of that code, code-based so REP. OF IRELAND /
+NORTH. IRELAND resolve) for ALL players; `tools/build_db.py` sets `flagCode = natCode`. The old
+bio-prose `nationality_of` scan is retired (T1/T3 birthplace/`intlRaw` still exported verbatim for
+bios). The `PlayerInfoScreen.gd` "-" null-guard stays as a safety net but no longer fires in
+practice. **Render-verified** (opengl3): F.C. Barcelona's Ruud Hesp — the exact 07-14 `<NULL>` /
+ENGLAND case — now draws the Dutch flag + HOLLAND + NATIONAL; Man City's Kinkladze draws the
+Georgian flag + GEORGIA + NON-NATIONAL. Extractor + build_db kill-tests locked (Hesp, Yorke,
+Kinkladze, Keane, all-players-non-null).

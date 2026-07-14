@@ -40,15 +40,23 @@ management player struct holds height at `player+0xf9` (cm) and weight at `playe
 **We show metric directly** (`193 cm` / `101 kg`) — the native stored unit — rather than the
 original's imperial conversion (user call 2026-06-26).
 
-## Nationality — explicit string for foreigners, ENGLAND default
+## Nationality — the per-player country byte at +0x1a (ALL players; 2026-07-14)
 
-The record stores three length-prefixed cipher strings after the physicals: birthplace,
-previous club, **nationality**. English players OMIT the nationality field (it defaults to
-the league nation), so the decode reads the 3rd string and accepts it only when it is a
-known country (`COUNTRIES` whitelist in `extract_english.py`); otherwise -> `ENGLAND`. The
-home nations (WALES / SCOTLAND / EIRE / NORTHERN IRELAND) ARE tagged. Verified: Schmeichel
-DENMARK, Berg NORWAY, Van der Gouw HOLLAND. `kind` (the FICHA NATIONAL / NON-NATIONAL flag)
-derives from nationality: English/British -> NATIONAL, else NON-NATIONAL.
+**Authoritative source: EQUIPOS player record byte +0x1a** (`parse_player` `b1a`) — the engine's
+own per-player country code, present and in valid PAISES.30 range (1..120) for **every** one of the
+9,547 players, compact and extended alike. It is the byte the engine itself uses to draw the flag:
+MANAGER.EXE `FUN_004f5260` reads `*(player+0x1a)` and passes it to `FUN_0058d270` (a bounds-checked
+`at()` accessor over the flag-DIB collection). So +0x1a → `PAISES.30` name (the NATIONALITY text) →
+`BANDERAS.PKF` index (the flag). `kind` = the EU/EEA-1997 comunitario class of that code
+(NATIONAL for home-nations + EU/EEA, else NON-NATIONAL; the negative label is still un-walked).
+
+This **replaces** the earlier bio-prose scan (3rd tail string as nationality, ENGLAND default),
+which only reached the 94 extended-record clubs and mis-tagged the rest. Verified vs walked FICHAs
+(Van der Gouw 27→HOLLAND / 081, Solskjaer 44→NORWAY / 084, Schmeichel 18→DENMARK / ref) and it
+corrects the scan's false ENGLANDs (Yorke→TRINIDAD, Hasselbaink→SURINAM, Kinkladze→GEORGIA). The T1
+birthplace / T3 `intlRaw` tail strings are still exported verbatim, but for bios, not nationality.
+Pipeline: `tools/extract_squads_exact.py` (`natCode`/`nationality`/`kind`) + `build_db.py`
+(`flagCode = natCode`). Full write-up: `docs/re/ficha_card_re.md` (2026-07-14 (b)).
 
 ## Card-label -> attribute mapping (confirmed vs the Babb reference)
 
@@ -76,20 +84,16 @@ the broad LUT -- corrected 2026-06-26.)
   the exit-path mode hand-off FUN_004f8750). Full RE + walked frames + tab
   disable rule: **docs/re/dbase_player_card_re.md**. App build = DataBaseScreen
   track, NOT the FICHA.
-- International (compact-record) clubs carry neither photoId nor these physicals yet.
-  **Verified 2026-06-26 why (not a TODO, a data-availability finding):** the compact
-  Spanish/continental EQUIPOS record is `[u16 year][flag][media][10 attrs u8][01]` — it has
-  **no physical bytes at all** (height/weight live only in the EXTENDED English layout at
-  `Y+2/Y+3`), and **no per-player nationality byte**. Empirically (Barcelona dump): the `flag`
-  byte at `Y+2` ranges `0xa9..0xc2` and tracks the player's rating, not a country (it gates
-  the `media` byte's presence, `>=0xa0`); `media` (`Y+3`, 56-99, Spanish for "average") is a
-  rating field, **not** a face key (J96 photoIds run in the thousands, so a 56-99 byte cannot
-  index the 1302-face bank). So `flagCode` for every compact player is just the
-  `flag_for(None)`=`ENGLAND_CODE` fallback in `build_db.py` (cosmetically wrong: shows the
-  English flag for foreign clubs). The original game DOES display foreign nationalities, so
-  they must be stored in a **separate** DBDAT structure (candidate join: `PAISES.30` country
-  list + a parallel per-player nationality index, or `NOMBRES.30`/`APELLIDO.30` name
-  dictionaries) — a NEW RE track, not recoverable from the per-player EQUIPOS bytes.
+- ~~International (compact-record) clubs carry no per-player nationality byte; a separate DBDAT
+  structure / NEW RE track is needed.~~ **REFUTED 2026-07-14.** That 2026-06-26 conclusion rested
+  on an *approximate* compact-record model (`[u16 year][flag][media]...`) that predates the EXACT
+  engine parser (`tools/re/equipos_parse.py`). The exact record has a per-player country byte at
+  **+0x1a** for compact AND extended clubs alike (the `flag`/`media` bytes that pass mislabelled
+  are the un-RE'd `b16/b17` + attrs at different offsets). Nationality IS recoverable from the
+  per-player EQUIPOS bytes — no separate structure required. See the Nationality section above and
+  `docs/re/ficha_card_re.md`. (photoId + physicals for compact clubs remain a separate open item:
+  compact records still store no BIGFOTO key, and height/weight fall to the engine's load-time
+  randomize when < the 150cm / 20kg thresholds.)
 
 ## Done
 - The fine role-NAME LUT IS located (2026-06-26): SHORT table `0x662df8` / LONG `0x662db0`,

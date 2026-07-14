@@ -42,7 +42,7 @@
 | `heightCm` / `weightKg` | player +0xf9/+0xfa (FICHA stone/feet converters `FUN_0058dd70`/`FUN_0058de00`; null = engine randomizes 170..179 / 75..84). The old `media` "overall rating" field was the weight byte misread — REMOVED |
 | `photoId` | the .DBC player-id u16 == BIGFOTO/MINIFOTO bank id (`docs/re/faces_re.md`); null = id 0 (engine assigns a runtime id) |
 | `squadNo` | byte +0xf8 after the player id (`docs/re/squad_number_re.md`) |
-| `nationality` / `flagCode` | extended-record tail T3 (fallback T1; omitted → ENGLAND — frames 081/084) + `DBDAT/PAISES.30` / `BANDERAS.PKF` |
+| `nationality` / `flagCode` / `kind` | EQUIPOS player byte **+0x1a** (`natCode`, the engine's own per-player country code — read by MANAGER.EXE `FUN_004f5260`→`FUN_0058d270` to draw the flag) → `DBDAT/PAISES.30` name + `BANDERAS.PKF` index; `kind` = its EU/EEA-1997 comunitario class. Present for ALL 9,547 players (2026-07-14; supersedes the extended-tail-T3 / ENGLAND-default scan) |
 | `birthplace` / `prevClub` | extended-record tail T1 / T2 ("Gladsaxe", "Brondby (91)") |
 | `kind` | EU/EEA-1997 rule on nationality (frame-evidenced NATIONAL for HOLLAND/NORWAY; exact source byte still a GAP — see §5.6) |
 

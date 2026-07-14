@@ -23,17 +23,28 @@ Field identities (pinned empirically this pass, 2026-07-06, not guessed):
     exists in EQUIPOS. The u32 the RE labelled "stadium capacity"
     (param_1[0x7a]) ranges 1..1500 (Man Utd 1500) — NOT a plausible seat
     count; kept raw as `blockU32`, semantics unresolved, never consumed.
-  - player tail (flag==0 records): T1 birthplace ("Gladsaxe"; sometimes a
-    country), T2 previous club ("Brondby (91)"), T3 NATIONALITY ("Denmark";
-    'No'/absent for some — the FICHA-frame-validated rule from
-    extract_english applies: last of T3..T1 that is a known country, else
-    ENGLAND; Schmeichel DENMARK / Van der Gouw HOLLAND via T1 fallback /
-    Solskjaer NORWAY == walked frames 081/084), T4..T9 six bio prose pages,
-    T10 career-history CSV (season,club,div,apps,goals) — both exported
-    VERBATIM since 2026-07-06 (`bioPages`/`careerCsv`; build_db.py splits
-    them into assets/bios.json keyed by game_db player id). The CSV keeps
-    the source's own dirt ('Sin datos.'/'No data.' sentinels, typo'd
-    separators, short rows) — never repaired.
+  - NATIONALITY (2026-07-14): the engine's OWN per-player country code, player
+    record byte +0x1a ('b1a'), decoded through PAISES.30 — the SAME byte
+    MANAGER.EXE FUN_004f5260 reads (*(player+0x1a)) and passes to FUN_0058d270
+    (bounds-checked at() over the flag DIBs) to draw the nationality flag.
+    Present + in valid range (1..120, zero out-of-range) for ALL 9547 players,
+    so nationality/kind/flagCode now resolve for EVERY player. Replaces the old
+    bio-prose T3..T1 country scan, which only reached the 94 extended-record
+    clubs and mis-defaulted the other 382 (7505 players) to null/ENGLAND. Frame-
+    verified: Van der Gouw 27 HOLLAND (081), Solskjaer 44 NORWAY (084),
+    Schmeichel 18 DENMARK (ref); corrects the scan's false ENGLANDs (Yorke
+    TRINIDAD, Hasselbaink SURINAM, Filan AUSTRALIA; Barnes = ENGLAND, the game's
+    nationality, not birthplace JAMAICA). Emitted as `natCode` (the raw +0x1a) +
+    `nationality` (PAISES name). KIND = the EU/EEA-1997 comunitario class of that
+    code. bios below are separate, unchanged.
+  - player tail (flag==0 records): T1 birthplace ("Gladsaxe"), T2 previous club
+    ("Brondby (91)"), T3 the DATA BASE INTERNATIONAL string ("Denmark"; kept
+    VERBATIM as `intlRaw`, distinct from nationality above), T4..T9 six bio prose
+    pages, T10 career-history CSV (season,club,div,apps,goals) — all exported
+    VERBATIM since 2026-07-06 (`bioPages`/`careerCsv`; build_db.py splits them
+    into assets/bios.json keyed by game_db player id). The CSV keeps the source's
+    own dirt ('Sin datos.'/'No data.' sentinels, typo'd separators, short rows) —
+    never repaired.
   - fullName packs "Legal Name, NICKNAME" with a real comma (cipher 0x4d ^
     0x61 == 0x2c): "Luis Filipe Madeira Caeiro, FIGO" — same legal/common
     split the old SEP marker encoded.
@@ -59,24 +70,25 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 import pkf_unpack as P  # noqa: E402
 from equipos_parse import ATTR_NAMES, parse_club_tactic  # noqa: E402
-from extract_english import COUNTRIES, EU_EEA_1997  # noqa: E402
+from extract_english import EU_EEA_1997  # noqa: E402
 
 GAME = ROOT / "extracted" / "Premier Manager 98"
 OUT = ROOT / "assets" / "squads_exact.json"
 
+# PAISES.30 spells two home nations differently from the EU_EEA_1997 (English
+# whitelist) set. Map the PAISES spelling onto the set entry so the comunitario
+# (KIND) rule resolves for Irish / Northern-Irish players.
+EU_EEA_PAISES = {"NORTH. IRELAND": "NORTHERN IRELAND", "REP. OF IRELAND": "EIRE"}
 
-def nationality_of(tail: list[str] | None) -> str | None:
-    """The FICHA-frame-validated rule (extract_english.nationality, frames
-    081/084): the LAST of the first three tail fields that IS a known country
-    (T3 = the explicit nationality field wins; T1 birthplace-as-country is the
-    fallback), else the omitted default ENGLAND. None for compact records
-    (no tail — the non-English layout stores no nationality string)."""
-    if tail is None:
-        return None
-    for s in reversed(tail[:3]):
-        if s.strip().upper() in COUNTRIES:
-            return s.strip().upper()
-    return "ENGLAND"
+
+def eu_eea_codes(code2name: dict[int, str]) -> set[int]:
+    """The PAISES.30 country codes whose nation is EU/EEA-1997 (the FICHA KIND =
+    NATIONAL class; frame-validated NATIONAL for HOLLAND 081 / NORWAY 084)."""
+    out: set[int] = set()
+    for code, name in code2name.items():
+        if EU_EEA_PAISES.get(name, name) in EU_EEA_1997:
+            out.add(code)
+    return out
 
 
 def split_legal(full: str, short: str) -> tuple[str, str]:
@@ -89,11 +101,25 @@ def split_legal(full: str, short: str) -> tuple[str, str]:
     return legal or short, short
 
 
-def export_player(p: dict, flag: int) -> dict:
+def export_player(p: dict, code2name: dict[int, str], eu_codes: set[int]) -> dict:
     year = p["year"]
     ok_year = 0x76D <= year <= 0x7C1  # engine randomizes outside 1901..1985
     legal, _ = split_legal(p["fullName"], p["name"])
-    nat = nationality_of(p["tail"]) if flag == 0 else None
+    # Nationality is the engine's OWN per-player country code: player record byte
+    # +0x1a (parse_player 'b1a'), decoded through PAISES.30. This is the SAME byte
+    # the engine feeds to the flag-bank accessor to draw the nationality flag —
+    # MANAGER.EXE FUN_004f5260 reads *(player+0x1a) and passes it to FUN_0058d270
+    # (a bounds-checked vector::at over the flag DIBs). Present and in-range
+    # (1..120) for ALL 9547 players, so every player resolves. Replaces the old
+    # bio-prose T3..T1 country scan, which only covered the 94 extended-record
+    # clubs (compact records had no tail -> null) and mis-defaulted the rest to
+    # ENGLAND. Verified vs the walked FICHAs (Van der Gouw 27 HOLLAND / frame 081,
+    # Solskjaer 44 NORWAY / frame 084, Schmeichel 18 DENMARK / ref), and it
+    # corrects the scan's false ENGLANDs (Yorke TRINIDAD, Hasselbaink SURINAM,
+    # Filan AUSTRALIA; Barnes = ENGLAND, the game's nationality, not birthplace
+    # JAMAICA). natCode == +0x1a is the BANDERAS flag index (build_db flagCode).
+    code = p["b1a"]
+    nat = code2name.get(code)
     return {
         "name": p["name"],
         "legalName": legal,
@@ -107,7 +133,8 @@ def export_player(p: dict, flag: int) -> dict:
         "photoId": p["id"] if p["id"] != 0 else None,  # 0 = engine assigns
         "squadNo": p["squadNo"],
         "nationality": nat,
-        "kind": ("NATIONAL" if nat in EU_EEA_1997 else "NON-NATIONAL") if nat else None,
+        "natCode": code,  # engine byte +0x1a == PAISES.30 code == BANDERAS flag index
+        "kind": "NATIONAL" if code in eu_codes else "NON-NATIONAL",
         "heightCm": p["heightRaw"] if p["heightRaw"] >= 0x96 else None,
         "weightKg": p["weightRaw"] if p["weightRaw"] >= 0x14 else None,
         # .DBC bytes +0x16/+0x17 (loader FUN_005820f0 stream bytes after the
@@ -140,11 +167,12 @@ def main() -> None:
     entries = list(P.files_of(buf))
     assert len(entries) == 476, f"expected 476 EQUIPOS entries, got {len(entries)}"
     code2name = {
-        int(v): k
+        int(k): v
         for k, v in json.loads((ROOT / "assets" / "country_codes.json").read_text())[
-            "byName"
+            "byCode"
         ].items()
     }
+    eu_codes = eu_eea_codes(code2name)
 
     clubs = []
     for pos, (fname, off, size) in enumerate(entries):
@@ -165,7 +193,7 @@ def main() -> None:
                 "sponsor": r["blockStrings"][1] if len(r["blockStrings"]) > 1 else None,
                 "kitMaker": r["blockStrings"][2] if len(r["blockStrings"]) > 2 else None,
                 "blockU32": r["capacity"],  # param_1[0x7a]; semantics UNRESOLVED
-                "players": [export_player(p, r["flag"]) for p in r["players"]],
+                "players": [export_player(p, code2name, eu_codes) for p in r["players"]],
                 "dropped": [p["name"] for p in r["dropped"]],  # slot>=0x62 leavers
             }
         )
@@ -191,9 +219,28 @@ def main() -> None:
     assert pk["Schmeichel"]["birthplace"] == "Gladsaxe"
     assert pk["Schmeichel"]["prevClub"] == "Brondby (91)"
     assert list(pk["Beckham"]["attrs"].values()) == [90, 85, 85, 90, 86, 95, 90, 88, 72, 11]
-    assert pk["Van der Gouw"]["nationality"] == "HOLLAND"
-    assert pk["Solskjaer"]["nationality"] == "NORWAY"
+    # Nationality now off the engine's +0x1a byte (natCode == PAISES.30 code ==
+    # BANDERAS flag index). Frame-validated FICHAs preserved:
+    assert pk["Van der Gouw"]["nationality"] == "HOLLAND"  # code 27, frame 081
+    assert pk["Van der Gouw"]["natCode"] == 27
+    assert pk["Solskjaer"]["nationality"] == "NORWAY"  # code 44, frame 084
+    assert pk["Solskjaer"]["natCode"] == 44
     assert pk["Solskjaer"]["kind"] == "NATIONAL"  # EU/EEA-1997 rule, frame 084
+    assert pk["Schmeichel"]["natCode"] == 18  # DENMARK, player_info_ref.jpg
+
+    # 2c. The +0x1a byte CORRECTS the old bio-prose scan (which false-defaulted
+    #     these to ENGLAND / grabbed birthplace) — real footballing nationality:
+    assert pk["Keane"]["nationality"] == "REP. OF IRELAND" and pk["Keane"]["kind"] == "NATIONAL"
+    yorke = {p["name"]: p for p in by_name["Aston Villa"]["players"]}["Yorke"]
+    assert yorke["nationality"] == "TRINIDAD T." and yorke["kind"] == "NON-NATIONAL", yorke
+    kinky = {p["name"]: p for p in by_name["Manchester C"]["players"]}["Kinkladze"]
+    assert kinky["nationality"] == "GEORGIA" and kinky["natCode"] == 62, kinky
+
+    # 2d. The 7505 compact-record (foreign / reserve) players now resolve too —
+    #     e.g. Barcelona's Dutch keeper Hesp (the 2026-07-14 <NULL>/ENGLAND bug):
+    hesp = {p["name"]: p for p in barca["players"]}["Hesp"]
+    assert hesp["nationality"] == "HOLLAND" and hesp["natCode"] == 27, hesp
+    assert all(p["nationality"] and p["natCode"] for c in clubs for p in c["players"]), "null nat"
 
     # 2b. Bio tail export (verbatim T4..T9 + T10; witnesses read straight off
     #     Schmeichel's decoded record this pass — profile page opener, honours
@@ -263,11 +310,12 @@ def main() -> None:
             ensure_ascii=False,
         )
     )
-    n_nat = sum(1 for c in clubs for p in c["players"] if p["nationality"] not in (None, "ENGLAND"))
+    n_nat = sum(1 for c in clubs for p in c["players"] if p["nationality"] != "ENGLAND")
+    ndistinct = len({p["natCode"] for c in clubs for p in c["players"]})
     print(
         f"wrote {OUT.relative_to(ROOT)}: {len(clubs)} clubs, {tot} players "
-        f"({ndrop} engine-dropped leavers), {n_nat} explicit non-English "
-        f"nationalities — all kill-tests passed"
+        f"({ndrop} engine-dropped leavers); nationality from +0x1a for ALL "
+        f"({n_nat} non-English across {ndistinct} countries) — all kill-tests passed"
     )
 
 

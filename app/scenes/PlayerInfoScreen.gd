@@ -301,11 +301,11 @@ func _draw_identity() -> void:
 	var hcm: Variant = _p.get("heightCm")
 	_ctxt(_f8, WGT_CX, VAL_Y, ("%d kg" % int(wkg)) if wkg != null else "-", C_WHITE, 11)
 	_ctxt(_f8, HGT_CX, VAL_Y, ("%d cm" % int(hcm)) if hcm != null else "-", C_WHITE, 11)
-	# NATIONALITY (MINIBAND mini, borderless) / KIND. Undecoded records (foreign / reserve
-	# players, ~79% of the DB) carry a null nationality + kind. Show an honest "-" and draw
-	# NO flag rather than inventing a country: ENGLAND is NOT a safe default (e.g. Barcelona's
-	# Hesp is Dutch), and flagCode defaults to 30/ENGLAND in build_db. Matches the weight /
-	# height "-" gap convention. Real nationality for these players = a source-decode follow-up.
+	# NATIONALITY (MINIBAND mini, borderless) / KIND. Every player now carries a real
+	# nationality: the engine's own per-player country code (EQUIPOS byte +0x1a -> PAISES.30 ->
+	# BANDERAS flag; build_db flagCode == that code). The null-guard below is a safety net only
+	# (draw NO flag + honest "-" rather than an invented country if a record ever lacks one),
+	# matching the weight / height gap convention.
 	var nat_raw: Variant = _p.get("nationality")
 	if nat_raw != null and str(nat_raw) != "":
 		var flag := PMChrome.mini_flag(_p.get("flagCode"))
