@@ -249,6 +249,13 @@ func _clauses() -> Array:
 func _txt(f: Font, x: float, y_top: float, s: String, col: Color, sz: int) -> void:
 	PMChrome.text(self, f, x, y_top, s, col, sz)
 
+## A decoded field's upper-cased text, or "-" when the source record left it null/empty
+## (undecoded foreign/reserve players). Never invents a value. Guards the FICHA against the
+## Dictionary.get(k, default)-returns-null-when-present trap that rendered "<NULL>".
+static func _decoded_or_dash(raw: Variant) -> String:
+	return str(raw).to_upper() if raw != null and str(raw) != "" else "-"
+
+
 func _ctxt(f: Font, cx: float, y_top: float, s: String, col: Color, sz: int) -> void:
 	var w := f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
 	_txt(f, cx - w * 0.5, y_top, s, col, sz)
@@ -294,15 +301,20 @@ func _draw_identity() -> void:
 	var hcm: Variant = _p.get("heightCm")
 	_ctxt(_f8, WGT_CX, VAL_Y, ("%d kg" % int(wkg)) if wkg != null else "-", C_WHITE, 11)
 	_ctxt(_f8, HGT_CX, VAL_Y, ("%d cm" % int(hcm)) if hcm != null else "-", C_WHITE, 11)
-	# NATIONALITY (MINIBAND mini, borderless) / KIND
-	var nat := str(_p.get("nationality", "ENGLAND")).to_upper()
-	if nat == "":
-		nat = "ENGLAND"
-	var flag := PMChrome.mini_flag(_p.get("flagCode"))
-	if flag != null:
-		draw_texture(flag, NAT_FLAG)
-	_ctxt(_f8, NAT_CX, IDENT_Y, nat, C_WHITE, 11)
-	_ctxt(_f8, KIND_CX, IDENT_Y, str(_p.get("kind", "NATIONAL")).to_upper(), C_WHITE, 11)
+	# NATIONALITY (MINIBAND mini, borderless) / KIND. Undecoded records (foreign / reserve
+	# players, ~79% of the DB) carry a null nationality + kind. Show an honest "-" and draw
+	# NO flag rather than inventing a country: ENGLAND is NOT a safe default (e.g. Barcelona's
+	# Hesp is Dutch), and flagCode defaults to 30/ENGLAND in build_db. Matches the weight /
+	# height "-" gap convention. Real nationality for these players = a source-decode follow-up.
+	var nat_raw: Variant = _p.get("nationality")
+	if nat_raw != null and str(nat_raw) != "":
+		var flag := PMChrome.mini_flag(_p.get("flagCode"))
+		if flag != null:
+			draw_texture(flag, NAT_FLAG)
+		_ctxt(_f8, NAT_CX, IDENT_Y, str(nat_raw).to_upper(), C_WHITE, 11)
+	else:
+		_ctxt(_f8, NAT_CX, IDENT_Y, "-", C_WHITE, 11)
+	_ctxt(_f8, KIND_CX, IDENT_Y, _decoded_or_dash(_p.get("kind")), C_WHITE, 11)
 	# ROLE: camrol sprite (SAD 0.0; alpha-0 ring restored by the black backing)
 	draw_rect(Rect2(CAMROL_XY, Vector2(25, 14)), C_BLACK, true)
 	PMChrome.draw_role_icon(self, Rect2(CAMROL_XY, Vector2(25, 14)),

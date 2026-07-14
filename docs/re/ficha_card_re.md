@@ -144,3 +144,25 @@ goals 0, fee 8,500,000 / yearly 575,000, fitness 70 morale 90, age 24, OK
 held). `diff_entry_parity.py`: ROI = the card (76,58)-(564,421); exclusions =
 coin, photo block, WEIGHT/HEIGHT strips, RATING box. **Both pairs: 0px —
 pixel-exact** (2026-07-03).
+
+## 2026-07-14 — NATIONALITY/KIND null-guard (undecoded foreign/reserve players)
+
+The FICHA flag ART/placement is source-faithful (real BANDERAS.PKF waving flag, flush-left in
+the value band, verified vs `screens/player_info_ref.jpg` — Schmeichel renders the Dannebrog
+[code 18] + "DENMARK"). BUT the DATA is only decoded for ~2,042 of 9,547 players: the rest
+(foreign/None-league + reserves) carry `nationality: null` **and** `kind: null` in
+`game_db.json`, while `build_db` still defaults `flagCode` to 30 (ENGLAND).
+
+Before this fix that rendered as **"<NULL>"** text + an **invented ENGLAND flag** (e.g.
+Barcelona's Ruud Hesp, a Dutch keeper, showed the St George's cross). Root cause: GDScript
+`Dictionary.get(k, default)` returns `null` when the key is PRESENT with a null value, so the
+`"ENGLAND"`/`"NATIONAL"` fallbacks never fired, and the flag drew off the always-present
+`flagCode`. Fix (`PlayerInfoScreen.gd`, FICHA-side only, no db rebuild): gate the flag + country
+text on a KNOWN nationality; otherwise honest **"-"** and NO flag — never invent a country.
+`kind` shares the new `_decoded_or_dash()` helper. Matches the existing weight/height "-" gap
+convention. Render-verified both paths (Schmeichel = flag+DENMARK+NATIONAL; Hesp = "-"/"-").
+`test_player_info` guards `_decoded_or_dash(null|""|"denmark")`.
+
+**HONEST GAP / follow-up (NOT invented):** the real per-player nationality for the ~7,505 null
+players is a source-decode task (their EQUIPOS/extended records aren't run through the country
+decode yet). Until decoded, those FICHAs show "-" rather than a wrong flag.

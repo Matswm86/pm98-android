@@ -93,6 +93,13 @@ func _run() -> void:
 	ok = _assert(screen._money(14_000_000) == "14,000,000", "money formats thousands") and ok
 	ok = _assert(screen._fitness() >= 0 and screen._moral() >= 0, "FITNESS / MORAL derive") and ok
 
+	# Undecoded records (foreign/reserve players, ~79% of the DB) carry a NULL nationality +
+	# kind: the FICHA must show an honest "-" and draw NO flag, never render "<NULL>" or an
+	# invented ENGLAND flag (Dictionary.get(k, default)-returns-null-when-present trap).
+	ok = _assert(PlayerInfoScreen._decoded_or_dash(null) == "-", "null field -> '-' (not '<NULL>')") and ok
+	ok = _assert(PlayerInfoScreen._decoded_or_dash("") == "-", "empty field -> '-'") and ok
+	ok = _assert(PlayerInfoScreen._decoded_or_dash("denmark") == "DENMARK", "known field -> upper-cased") and ok
+
 	# The ROLE band shows the FINE position name (the SHORT fine-name table 0x662df8,
 	# indexed by posFine-1), not the broad word. Verified vs the Bakayoko reference.
 	ok = _assert(PlayerInfoScreen.FINE_ROLE.size() == 18, "FINE_ROLE carries the 18 fine positions") and ok
