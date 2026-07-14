@@ -118,10 +118,102 @@ def build_single():
     }
 
 
+# ---- TRAINERS layout (frame 100) -----------------------------------------
+# The TRAINERS category is a DIFFERENT plate: a CURRENT TRAINING STAFF 6-skill list
+# (each row a coloured coach bar + WAGE) over a STAFF AVAILABLE pool filtered by a
+# 2x3 skill picker, + the same right rail (TRAINERS active) + OK. All measured off
+# frame 100_154657.png (screen coords). Bar/skill/WAGE labels + money icon + rail are
+# frame pixels; only the CAREER-dynamic data (coach names/stars/wages, candidate rows)
+# is blanked and redrawn live. The skill picker's witnessed DRIBBLING blue-glow (the
+# selected filter) and HEADING white focus-ring are NEUTRALISED here so the scene can
+# draw the live selected-skill highlight over whichever skill is chosen (only DRIBBLING-
+# selected was ever witnessed, so a per-skill bake is impossible -- the live highlight
+# is a flagged approximation of the glow, docs/re/staff_re.md).
+
+# Current-coach bars: 6 rows, flat colour per row (a fixed orange->dark-red gradient by
+# position, NOT by filled state), x175..341. Sampled off frame 100.
+TR_CUR_TOPS = [136, 153, 170, 187, 204, 221]
+TR_BAR_COL = [(212, 95, 0), (212, 63, 0), (210, 0, 0), (170, 0, 0), (150, 0, 0), (85, 0, 0)]
+TR_AVL_TOPS = [275, 292, 309]
+GREEN = (127, 191, 85)     # STAFF AVAILABLE candidate name-bar fill
+# Skill-picker button rects (x, y, w, h), 2 rows x 3 cols. HANDLING (row0 col0) is the
+# clean neutral source; DRIBBLING (row0 col2) + HEADING (row1 col0) are neutralised.
+TR_BTN = [(112, 338, 82, 26), (212, 338, 82, 26), (312, 338, 82, 26),
+          (112, 370, 82, 26), (212, 370, 82, 26), (312, 370, 82, 26)]
+
+
+def _is_cyan(c):
+    r, g, b = c
+    return g > 150 and b > 200 and r < 160   # the cyan skill label (85,223,255)
+
+
+def _neutral_button(im, rect):
+    """The clean neutral button (HANDLING) with its cyan label zapped to black -> a
+    label-free button-chrome template (black bg + grid + grey bevel)."""
+    x, y, w, h = rect
+    t = im.crop((x, y, x + w, y + h)).copy()
+    tp = t.load()
+    for yy in range(h):
+        for xx in range(w):
+            if _is_cyan(tp[xx, yy]):
+                tp[xx, yy] = (0, 0, 0)
+    return t
+
+
+def _neutralise_button(im, tmpl, rect):
+    """Paste the neutral template over a highlighted button, then restore that button's
+    OWN cyan label -> a de-highlighted button keeping its real wording."""
+    x, y, w, h = rect
+    px = im.load()
+    own = {}
+    for yy in range(h):
+        for xx in range(w):
+            if _is_cyan(px[x + xx, y + yy]):
+                own[(xx, yy)] = px[x + xx, y + yy]
+    im.paste(tmpl, (x, y))
+    px = im.load()
+    for (xx, yy), c in own.items():
+        px[x + xx, y + yy] = c
+
+
+def build_trainers():
+    im = Image.open(FRAMES / "100_154657.png").convert("RGB")
+    px = im.load()
+    # blank the 6 CURRENT coach bars (name + stars) back to their flat bar colour
+    for i, top in enumerate(TR_CUR_TOPS):
+        _fill(px, (175, top - 1, 167, 14), TR_BAR_COL[i])
+        _fill(px, (352, top - 2, 82, 16), WHITE)          # CURRENT wage (black-on-white)
+    # blank the 3 AVAILABLE candidate bars + their wages (name starts x178, just right of the
+    # SIGN button's x174 border -- blank from x176 so no original-name fragment survives)
+    for top in TR_AVL_TOPS:
+        _fill(px, (176, top - 2, 167, 16), GREEN)         # candidate name-bar
+        _fill(px, (352, top - 2, 82, 16), GREY)           # candidate wage (black-on-grey)
+    # neutralise the DRIBBLING glow + HEADING focus-ring so the live highlight can move
+    tmpl = _neutral_button(im, TR_BTN[0])
+    _neutralise_button(im, tmpl, TR_BTN[2])   # DRIBBLING (selected -> neutral)
+    _neutralise_button(im, tmpl, TR_BTN[3])   # HEADING (focus-ring -> neutral)
+    im.crop((DLG[0], DLG[1], DLG[0] + DLG[2], DLG[1] + DLG[3])).save(OUT / "overlay_trainers.png")
+    return {
+        "plate": "overlay_trainers.png",
+        "dialog": list(DLG),
+        "cats": RAIL_CATS,
+        "rail": RAIL,
+        "ok": [478, 360, 90, 28],
+        "skills": ["HANDLING", "PASSING", "DRIBBLING", "HEADING", "TACKLING", "SHOOTING"],
+        "current": {"tops": TR_CUR_TOPS, "h": 12, "name_x": 178,
+                    "stars_right": 340, "wage_right": 432,
+                    "bar_col": [list(c) for c in TR_BAR_COL]},
+        "avail": {"tops": TR_AVL_TOPS, "h": 12, "name_x": 178,
+                  "stars_right": 340, "wage_right": 432,
+                  "sign": [[94, t - 2, 86, 16] for t in TR_AVL_TOPS]},
+        "picker": {"rects": [list(r) for r in TR_BTN]},
+    }
+
+
 def main():
-    spec = {"single": build_single()}
+    spec = {"single": build_single(), "trainers": build_trainers()}
     (OUT / "overlay_chrome.json").write_text(json.dumps(spec, indent=1))
-    print("wrote", len(CAT_FRAME), "single-role plates + overlay_chrome.json")
+    print("wrote", len(CAT_FRAME), "single-role plates + overlay_trainers.png + overlay_chrome.json")
 
 
 if __name__ == "__main__":

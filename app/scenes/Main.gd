@@ -1730,16 +1730,17 @@ func _show_staff_screen() -> void:
 		scr.setup(_career.staff_personnel(), _career.manager_name, _career.club_name,
 			_career.season, _career.week + 1, _career.club_id)
 	refresh.call()
-	# Tap a role card -> open the hire overlay for that role's category (frames 108-119).
+	# Tap a role card -> open the hire overlay for that role's category (frames 100 + 108-119).
+	# A coach card (a TRAINER skill) opens the TRAINERS layout with THAT skill preselected.
 	scr.role_selected.connect(func(role: String) -> void:
 		_staff_last_role = role
-		_open_staff_hire(Staff.category_of(role), refresh))
+		_open_staff_hire(Staff.category_of(role), refresh, role))
 	# The CLUB PERSONNEL SIGN button opens the hire overlay (last-viewed role, else the first
 	# single-role category); SACK sacks the last-viewed role's holder (model choice: sacking is
 	# selection-driven and the last card tapped is the selection -- docs/re/staff_re.md).
 	scr.sign_pressed.connect(func() -> void:
 		var r: String = _staff_last_role if _staff_last_role != "" else "PHYSIOTHERAPIST"
-		_open_staff_hire(Staff.category_of(r), refresh))
+		_open_staff_hire(Staff.category_of(r), refresh, r))
 	scr.sack_pressed.connect(func() -> void:
 		var m: Dictionary = Staff.member_in_role(_career.staff, _staff_last_role)
 		if not m.is_empty():
@@ -1755,18 +1756,42 @@ func _show_staff_screen() -> void:
 
 var _staff_overlay: StaffHireOverlay = null
 var _staff_last_role := ""
+var _staff_skill := "HANDLING"   # TRAINERS overlay: the skill whose AVAILABLE pool is shown
 
-## Open (or re-open) the modal hire overlay for a single-role `category`. TRAINERS has its own
-## 6-skill layout (phase 2) and is a no-op here for now. `refresh` repaints the CLUB PERSONNEL
-## screen underneath after a hire/sack.
-func _open_staff_hire(category: String, refresh: Callable) -> void:
-	if category == "TRAINERS":
-		return
+## Open (or re-open) the modal hire overlay for a `category`. TRAINERS opens its own 6-skill
+## layout (frame 100): all six coaches at once + a skill picker that filters the AVAILABLE pool
+## (`selected_skill` picks the initial skill; defaults to the last-tapped coach card). The other
+## seven are single-role. `refresh` repaints the CLUB PERSONNEL screen underneath after a hire.
+func _open_staff_hire(category: String, refresh: Callable, selected_skill: String = "") -> void:
 	_close_staff_hire()
 	var ov: StaffHireOverlay = load("res://scenes/StaffHireOverlay.gd").new()
 	ov.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(ov)
 	_staff_overlay = ov
+	if category == "TRAINERS":
+		var sk := selected_skill
+		if not Staff.is_trainer(sk):
+			sk = _staff_last_role if Staff.is_trainer(_staff_last_role) else Staff.HANDLING
+		_staff_skill = sk
+		var repaint_tr := func() -> void:
+			ov.setup("TRAINERS", {}, Staff.pool_for_role(_career.staff_pool, _staff_skill).slice(0, 3),
+				_career.staff_personnel(), _staff_skill)
+		repaint_tr.call()
+		# skill picker -> re-filter AVAILABLE to that skill (CURRENT list is unchanged).
+		ov.skill_selected.connect(func(skill: String) -> void:
+			_staff_skill = skill
+			_staff_last_role = skill
+			repaint_tr.call())
+		ov.category_selected.connect(func(cat: String) -> void:
+			_staff_last_role = cat
+			_open_staff_hire(cat, refresh))
+		ov.sign_candidate.connect(func(cid: int) -> void:
+			_career.hire_staff(int(cid))
+			_career.save()
+			refresh.call()
+			repaint_tr.call())
+		ov.ok_pressed.connect(func() -> void: _close_staff_hire())
+		return
 	var repaint := func() -> void:
 		ov.setup(category, _career.staff_personnel().get(category, {}),
 			Staff.pool_for_role(_career.staff_pool, category).slice(0, 3))

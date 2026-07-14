@@ -98,21 +98,50 @@ PHYSIOTHERAPIST → `physio_factor`, YOUTH_TEAM_MANAGER → `youth_factor`, SCOU
 → their automation. **HONEST GAP (never invented): PSYCHOLOGIST / YOUTH_TEAM_SCOUT / GROUNDSMAN
 are hireable but have no engine effect** (no decoded source data), so they are no-ops.
 
-## Hire overlay — SINGLE-ROLE built (2026-07-14), TRAINERS remaining
+## Hire overlay — SINGLE-ROLE + TRAINERS built (2026-07-14)
 `app/scenes/StaffHireOverlay.gd` + `tools/re/build_staff_overlay_chrome_from_frames.py` +
-7 baked plates `art/screens/staff/overlay_<cat>.png` + `overlay_chrome.json`. Each of the 7
-single-role categories (PHYSIOTHERAPIST 108 / PSYCHOLOGIST 110 / ASSISTANT_MANAGER 113 /
-SCOUT 114 / YOUTH_TEAM_MANAGER 115 / YOUTH_TEAM_SCOUT 117 / GROUNDSMAN 119) has its own plate:
-the ORIGINAL frame's pixels with the **baked** CURRENT/AVAILABLE header wording (irregular in
-the original — "SCOUTS YOUTH TEAM AVAILABLE", "GROUNDSMEN AVAILABLE" — so BAKED, never
-generated) + its active-red rail button; the career-dynamic zones (current holder, 3 candidate
-rows, £amounts) are blanked and redrawn live from `Staff.member_in_role` / `Staff.pool_for_role`.
-Verified by render vs frames 113 (filled) + 119 (vacant): chrome frame-true, live data
-frame-placed. `test_staff_overlay.gd` 15/15.
-- **STILL TODO: the TRAINERS layout (frame 100)** — a different plate: CURRENT TRAINING STAFF
-  6-skill list + STAFF AVAILABLE filtered by a 6-button skill picker. Tapping the TRAINERS rail
-  button is an inert no-op until that layout is built, so the 6 coach roles are not yet
-  hireable through the overlay (the model + CLUB PERSONNEL screen already show them).
+8 baked plates `art/screens/staff/overlay_<cat>.png` + `overlay_trainers.png` +
+`overlay_chrome.json`. Each of the 7 single-role categories (PHYSIOTHERAPIST 108 / PSYCHOLOGIST
+110 / ASSISTANT_MANAGER 113 / SCOUT 114 / YOUTH_TEAM_MANAGER 115 / YOUTH_TEAM_SCOUT 117 /
+GROUNDSMAN 119) has its own plate: the ORIGINAL frame's pixels with the **baked**
+CURRENT/AVAILABLE header wording (irregular in the original — "SCOUTS YOUTH TEAM AVAILABLE",
+"GROUNDSMEN AVAILABLE" — so BAKED, never generated) + its active-red rail button; the
+career-dynamic zones (current holder, 3 candidate rows, £amounts) are blanked and redrawn live
+from `Staff.member_in_role` / `Staff.pool_for_role`. Verified by render vs frames 113 (filled) +
+119 (vacant): chrome frame-true, live data frame-placed.
+
+### TRAINERS layout (frame 100) — BUILT 2026-07-14
+`overlay_trainers.png` baked from **`100_154657.png`** (run1 15:47). A DIFFERENT plate: a
+**CURRENT TRAINING STAFF** 6-skill list (HANDLING/PASSING/DRIBBLING/HEADING/TACKLING/SHOOTING,
+each a coloured coach bar x175..341 with white name + gold half-stars + right-aligned black
+£wage at x432 on the white panel) over a **STAFF AVAILABLE** pool (green candidate bars, black
+name from x178 + gold half-stars + £wage, three baked SIGN buttons) filtered by a **2×3 skill
+picker** (button rects [112/212/312 × 338/370], w82 h26), + the same 8-category right rail
+(TRAINERS active-red) + OK. Measured off frame 100 (screen coords, `overlay_chrome.json`
+`trainers`). The CURRENT bars are a FIXED orange→dark-red gradient by ROW position (not by
+filled state): (212,95,0)/(212,63,0)/(210,0,0)/(170,0,0)/(150,0,0)/(85,0,0) — baked, names
+redrawn over them for hired coaches, vacant rows left bare.
+- **frame-true chrome:** static-chrome MAD **0.60** vs frame 100 (310/144k px differ — all the
+  intentional HEADING de-border + 1px blank-fill edges). Plate placed at (67,63), scale 1.
+- **Neutralised in the bake (only DRIBBLING-selected was ever witnessed, so per-skill bake is
+  impossible):** frame 100's DRIBBLING blue-glow (the selected filter) + HEADING white focus-
+  ring are keyed out to neutral buttons (paste a label-free HANDLING template, restore each
+  button's own cyan label). The scene draws the live **selected-skill highlight** — a
+  translucent-blue fill + bright edge over the chosen skill button. **FLAGGED APPROXIMATION** of
+  the witnessed speckled glow (not pixel-reproduced). Default selected skill = the coach card
+  tapped (or HANDLING when reached via the rail); the original's true default is un-witnessed.
+- **Stars corrected (fidelity):** the original draws ONLY earned gold stars (left-aligned, + a
+  left-half for .5) — **NO grey placeholder stars** (witnessed frames 100 + 113). `_stars()`
+  now omits the off-star; this also improves the single-role overlay (same widget). The main
+  `StaffScreen.gd` (frame 121) still draws grey off-stars on live data — a SEPARATE follow-up
+  (verify vs frame 121 before changing; its baked body already carries the correct stars).
+- **Wiring (Main.gd):** the TRAINERS rail button and any coach card open `_open_staff_hire(
+  "TRAINERS", refresh, skill)`; the picker's `skill_selected` re-filters the AVAILABLE pool
+  (`Staff.pool_for_role`), a green SIGN → `Career.hire_staff`, another rail cat → switch, OK →
+  close. CURRENT shows all six coaches from `Career.staff_personnel()`.
+- `test_staff_overlay.gd` **27/27** (single + trainers hit-testing); render `shot_staff_overlay
+  .gd` → `overlay_trainers.png` reproduces frame 100 (bar/skill/WAGE chrome frame-true; font is
+  the app's shared substitute — accepted app-wide).
 
 ## WIRING (Main.gd) — BUILT
 `_show_staff_screen` passes `Career.staff_personnel()` (role→{name,stars,wage} dict) to
