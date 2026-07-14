@@ -72,6 +72,14 @@ career), and — when live `personnel` data is supplied — the 13 slots' {name,
   supplied, the scene repaints each hired role's name-bar with a single sampled colour (the
   originals are a top-bright / bottom-dark gradient) and redraws name/half-stars/£wage;
   training rows land clean, role rows are legible with ~1px cosmetic edge tolerance.
+- **Live-data stars corrected (2026-07-14, was the last-flagged follow-up):** `_stars()` used
+  to draw RIGHT-anchored gold + **grey placeholder off-stars** on hired/synthetic slots. The
+  original (frame 121) draws ONLY the earned gold stars, **LEFT-anchored** from a fixed
+  origin, unfilled slots bare (measured: step 11px, first centre = `stars_right - 53.5` for
+  the 6 skill-trainer bars, `- 49.0` for the 7 role cards). `_stars()` rewritten to match;
+  `_star_off` colour removed. Verified by re-rendering with the frame-121 REF_STAFF ratings
+  as live data: live-drawn star centres overlay frame 121's own baked stars within **≤2px on
+  all 13 slots**, no grey stars. `test_staff_screen` 17/17 still PASS.
 - **Vacant state (correct default, CORRECTED 2026-07-14):** a PM98 career opens with **NO
   staff** — `Career.staff == []` — and the manager signs them from a generated pool
   (`Staff.generate_pool`); AI/rival clubs have **no staff at all**. So there is **NO
@@ -132,9 +140,10 @@ redrawn over them for hired coaches, vacant rows left bare.
   tapped (or HANDLING when reached via the rail); the original's true default is un-witnessed.
 - **Stars corrected (fidelity):** the original draws ONLY earned gold stars (left-aligned, + a
   left-half for .5) — **NO grey placeholder stars** (witnessed frames 100 + 113). `_stars()`
-  now omits the off-star; this also improves the single-role overlay (same widget). The main
-  `StaffScreen.gd` (frame 121) still draws grey off-stars on live data — a SEPARATE follow-up
-  (verify vs frame 121 before changing; its baked body already carries the correct stars).
+  now omits the off-star; this also improves the single-role overlay (same widget). ~~The main
+  `StaffScreen.gd` (frame 121) still draws grey off-stars on live data — a SEPARATE follow-up.~~
+  **DONE 2026-07-14** — see "Live-data stars corrected" above (left-anchored, no off-star,
+  verified ≤2px vs frame 121 on all 13 slots).
 - **Wiring (Main.gd):** the TRAINERS rail button and any coach card open `_open_staff_hire(
   "TRAINERS", refresh, skill)`; the picker's `skill_selected` re-filters the AVAILABLE pool
   (`Staff.pool_for_role`), a green SIGN → `Career.hire_staff`, another rail cat → switch, OK →

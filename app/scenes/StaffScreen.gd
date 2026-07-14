@@ -61,7 +61,6 @@ var _body_y := 58
 
 var _fname: Font        # staff name + wage amount (proman)
 var _star_on := Color8(255, 210, 40)
-var _star_off := Color8(70, 70, 84)
 var _c_name := Color8(255, 255, 255)
 var _c_wage := Color8(0, 0, 0)
 
@@ -212,23 +211,24 @@ func _star(cx: float, cy: float, r: float, col: Color) -> void:
 		pts.append(Vector2(cx + cos(ang) * rad, cy + sin(ang) * rad))
 	draw_colored_polygon(pts, col)
 
-## Draw a 0..5 rating in 0.5 steps, right-anchored ending at x_right, centred on y.
-func _stars(x_right: float, y_top: float, rating: float, bar_col: Color) -> void:
-	var step := 9.0
+## Draw a 0..5 rating in 0.5 steps, LEFT-anchored from first_cx stepping right. The
+## original (frame 121_154736) draws ONLY the earned gold stars (+ a left-half for the .5) —
+## NO grey placeholder stars — and unfilled slots stay bare. Measured off frame 121: step
+## 11px, star centres left-anchored (first_cx = stars_right - 53.5 for skill-trainer bars,
+## - 49.0 for role cards; the caller supplies first_cx).
+func _stars(first_cx: float, y_top: float, rating: float, bar_col: Color) -> void:
+	var step := 11.0
 	var r := 4.0
 	var full := int(floor(rating))
 	var half := (rating - full) >= 0.5
 	var cy := y_top + 6.0
-	for i in 5:
-		var cx := x_right - (5 - i) * step + step * 0.5
-		if i < full:
-			_star(cx, cy, r, _star_on)
-		elif i == full and half:
-			# gold star with the right half masked back to the bar colour
-			_star(cx, cy, r, _star_on)
-			draw_rect(Rect2(cx, cy - r - 1, r + 2, 2 * r + 2), bar_col, true)
-		else:
-			_star(cx, cy, r, _star_off)
+	for i in full:
+		_star(first_cx + i * step, cy, r, _star_on)
+	if half:
+		# gold star with the right half masked back to the bar colour
+		var cx := first_cx + full * step
+		_star(cx, cy, r, _star_on)
+		draw_rect(Rect2(cx, cy - r - 1, r + 2, 2 * r + 2), bar_col, true)
 
 ## Repaint a slot's name-bar (erasing frame 121's baked name + stars) and blank the
 ## baked £amount cell. The red "WAGE" label stacked above the amount is baked static
@@ -264,8 +264,11 @@ func _draw_slot(role: String, data: Dictionary) -> void:
 	# name (white, left-inset in the bar)
 	_txt_left(float(slot["name_x"]), float(slot["name_y"]) - 1,
 		str(data.get("name", "")), _c_name, 11)
-	# stars (gold half-steps), right-inset in the bar
-	_stars(float(slot["stars_right"]), float(slot["stars_y"]), float(data.get("stars", 0.0)), bar_col)
+	# stars (gold half-steps), left-anchored: first centre = stars_right - offset (measured
+	# off frame 121: 53.5 for skill-trainer bars, 49.0 for role cards)
+	var star_off := 53.5 if str(slot.get("kind", "")) == "train" else 49.0
+	_stars(float(slot["stars_right"]) - star_off, float(slot["stars_y"]),
+		float(data.get("stars", 0.0)), bar_col)
 	# wage £amount (black), right-anchored; the red "WAGE" label is baked static
 	_txt_right(float(slot["wage_amount_right"]), float(slot["wage_amount_y"]),
 		_money(int(data.get("wage", 0))), _c_wage, 11)
