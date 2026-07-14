@@ -83,25 +83,45 @@ career), and — when live `personnel` data is supplied — the 13 slots' {name,
   the measured bar ~30px to the left (portrait ends x49, name starts x50, bar.x=80), so
   `_blank_bar` grows the left edge for `kind=role, mirror=false` slots.
 
-## Remaining staff work (NOT a data gap — a build)
-1. **Model is 5 roles, real game is 13.** `app/scripts/Staff.gd` models TRAINER / PHYSIO /
-   YOUTH_COACH / SCOUT / ASSISTANT (a simplification), but frame 121 has 13: 6 skill coaches
-   (HANDLING/PASSING/DRIBBLING/HEADING/TACKLING/SHOOTING) + PHYSIOTHERAPIST + PSYCHOLOGIST +
-   ASSISTANT MANAGER + SCOUT + YOUTH TEAM MANAGER + YOUTH TEAM SCOUT + GROUNDSMAN. Expanding
-   the model to the real 13 roles is the substantive task.
-2. **Hire overlay not built.** Frames 110-120 show it: a CURRENT-`<role>` box (empty when
-   vacant) + a "`<ROLE>`s AVAILABLE" pool list with SIGN buttons + an 8-category rail + OK.
-   `role_selected(role)` should open it; `sign_pressed`/`sack_pressed` sign/sack. Until then
-   the screen renders correctly (vacant → hired) but there is no in-screen way to sign.
+## Model — 13 single-occupancy roles (BUILT 2026-07-14)
+`app/scripts/Staff.gd` now models the real game's **13 single-occupancy roles** (was a 5-role
+multi-occupancy simplification): 6 skill coaches (HANDLING / PASSING / DRIBBLING / HEADING /
+TACKLING / SHOOTING) + PHYSIOTHERAPIST / PSYCHOLOGIST / ASSISTANT_MANAGER / SCOUT /
+YOUTH_TEAM_MANAGER / YOUTH_TEAM_SCOUT / GROUNDSMAN (the exact `personnel_chrome.json` keys).
+Each role holds exactly ONE member; `Career.hire_staff` REPLACES the holder (outgoing returns
+to the pool, no compensation — a SACK is the paid exit). Half-star ratings (`stars`, 1.0..5.0)
+are the witnessed display; a 1..5 `quality` is kept for the effect hooks. **What is faithful:
+the 13 role slots, single occupancy, half-star ratings, the surface strings** (all witnessed).
+**What is OURS (flagged, un-RE'd source data): the wages and the effect magnitudes** — PM98
+loads these from the save. Engine hooks preserved: the 6 coaches → `training_factor`,
+PHYSIOTHERAPIST → `physio_factor`, YOUTH_TEAM_MANAGER → `youth_factor`, SCOUT/ASSISTANT_MANAGER
+→ their automation. **HONEST GAP (never invented): PSYCHOLOGIST / YOUTH_TEAM_SCOUT / GROUNDSMAN
+are hireable but have no engine effect** (no decoded source data), so they are no-ops.
 
-## WIRING (Main.gd)
-`_show_staff_screen` currently passes the pre-rebuild Array positional shape; `setup` tolerates
-it (non-Dict `personnel` → empty → all slots vacant, which is CORRECT at career start). Once
-the 13-role model exists, pass the manager's hired staff as a role→{name,stars,wage} dict.
-Connect `role_selected(role)` (hire overlay, once built), `sign_pressed`/`sack_pressed`, and
-`back_pressed` (dismiss — works today). The old `hire_requested`/`sack_requested`/
-`training_requested` signals are RETAINED (never emitted) so Main's `.connect` calls do not
-fault; this kills the invented TRAINING browse.
+## Hire overlay — SINGLE-ROLE built (2026-07-14), TRAINERS remaining
+`app/scenes/StaffHireOverlay.gd` + `tools/re/build_staff_overlay_chrome_from_frames.py` +
+7 baked plates `art/screens/staff/overlay_<cat>.png` + `overlay_chrome.json`. Each of the 7
+single-role categories (PHYSIOTHERAPIST 108 / PSYCHOLOGIST 110 / ASSISTANT_MANAGER 113 /
+SCOUT 114 / YOUTH_TEAM_MANAGER 115 / YOUTH_TEAM_SCOUT 117 / GROUNDSMAN 119) has its own plate:
+the ORIGINAL frame's pixels with the **baked** CURRENT/AVAILABLE header wording (irregular in
+the original — "SCOUTS YOUTH TEAM AVAILABLE", "GROUNDSMEN AVAILABLE" — so BAKED, never
+generated) + its active-red rail button; the career-dynamic zones (current holder, 3 candidate
+rows, £amounts) are blanked and redrawn live from `Staff.member_in_role` / `Staff.pool_for_role`.
+Verified by render vs frames 113 (filled) + 119 (vacant): chrome frame-true, live data
+frame-placed. `test_staff_overlay.gd` 15/15.
+- **STILL TODO: the TRAINERS layout (frame 100)** — a different plate: CURRENT TRAINING STAFF
+  6-skill list + STAFF AVAILABLE filtered by a 6-button skill picker. Tapping the TRAINERS rail
+  button is an inert no-op until that layout is built, so the 6 coach roles are not yet
+  hireable through the overlay (the model + CLUB PERSONNEL screen already show them).
+
+## WIRING (Main.gd) — BUILT
+`_show_staff_screen` passes `Career.staff_personnel()` (role→{name,stars,wage} dict) to
+StaffScreen.setup. `role_selected(role)` opens `StaffHireOverlay` for `Staff.category_of(role)`;
+the overlay's `sign_candidate(id)` → `Career.hire_staff`; `category_selected` re-opens for the
+new category; `ok_pressed` / tap-outside closes. The CLUB PERSONNEL `sign_pressed` opens the
+overlay for the last-tapped role; `sack_pressed` sacks that role's holder (MODEL CHOICE:
+sacking is selection-driven, the last card tapped is the selection). The old
+`hire_requested`/`sack_requested`/`training_requested` signals are RETAINED (never emitted).
 
 ## Tests + verification
 - `app/tests/test_staff_screen.gd` (NEW): chrome load (13 slots + buttons + REF_STAFF),

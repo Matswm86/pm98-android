@@ -146,11 +146,11 @@ const WONDERKID_MAX_YEAR := 3          # the guaranteed gem is scouted within a 
 # Backroom staff: candidates are minted from their own id base; a new career starts with no
 # staff hired but a pool to hire from (refreshed each season), and a soft cap on headcount.
 const STAFF_ID_BASE := 800000
-const STAFF_POOL_SIZE := 6              # candidates available to hire at any time
+const STAFF_POOL_PER_ROLE := 3          # candidates available to hire per role at any time
 const FREE_ID_BASE := 700000           # free-agent id space (below staff/youth, above seniors)
 const FREE_POOL_SIZE := 8              # generated free agents available at any time
 const FREE_POOL_CAP := 18              # pool ceiling once your released players are added in
-const STAFF_MAX := 8                    # the directors won't fund more staff than this
+const STAFF_MAX := 13                   # the 13 single-occupancy role slots (one member each)
 
 # "The Directors will only let you make %u offer%s to sign a player per week."
 const OFFERS_PER_WEEK := 3
@@ -249,8 +249,8 @@ func _init_club(club: Dictionary, league: Dictionary, league_clubs: Array, leagu
 	youth = Youth.intake(yrng, YOUTH_SEED_COUNT, youth_seq)
 	youth_seq += YOUTH_SEED_COUNT
 	staff = []
-	staff_pool = Staff.generate_pool(yrng, staff_seq, STAFF_POOL_SIZE)
-	staff_seq += STAFF_POOL_SIZE
+	staff_pool = Staff.generate_pool(yrng, staff_seq, STAFF_POOL_PER_ROLE)
+	staff_seq += staff_pool.size()
 	free_agents = TransferMarket.generate_free_agents(yrng, FREE_POOL_SIZE, free_seq)
 	free_seq += FREE_POOL_SIZE
 
@@ -1230,9 +1230,11 @@ func staff_weekly_wage() -> int:
 func player_weekly_wage() -> int:
 	return Contract.squad_weekly_bill(my_squad(), tier)
 
-## Hire a candidate from the pool into the backroom staff. Guards the headcount cap and the
-## directors' affordability (you must be able to cover the new wage bill). Moves the member
-## out of the pool. Returns {ok, msg}.
+## Hire a candidate from the pool into the backroom staff. The 13 roles are SINGLE-OCCUPANCY
+## (frames 100 + 108-121): signing into a role that already has a holder REPLACES him -- the
+## outgoing member returns to the pool (a like-for-like swap, no compensation; a SACK is the
+## paid exit). Guards the directors' affordability (you must cover the new season's wage).
+## Moves the member out of the pool. Returns {ok, msg}.
 func hire_staff(cand_id: int) -> Dictionary:
 	var idx := -1
 	for i in staff_pool.size():
@@ -1241,17 +1243,27 @@ func hire_staff(cand_id: int) -> Dictionary:
 			break
 	if idx == -1:
 		return {"ok": false, "msg": "That member of staff is no longer available."}
-	if staff.size() >= STAFF_MAX:
-		return {"ok": false, "msg": "The directors won't fund more than %d staff." % STAFF_MAX}
 	var m: Dictionary = staff_pool[idx]
+	var role := str(m.get("role", ""))
 	# The board won't sanction a hire the club plainly can't pay for (a season's wage).
 	if int(m.get("wage", 0)) > cash:
 		return {"ok": false, "msg": "You can't afford %s's wages." % m.get("name", "?")}
 	staff_pool.remove_at(idx)
+	# Single occupancy: the incumbent in this role (if any) goes back onto the market.
+	var outgoing: Dictionary = Staff.member_in_role(staff, role)
+	if not outgoing.is_empty():
+		staff.erase(outgoing)
+		staff_pool.append(outgoing)
 	staff.append(m)
-	_news("staff", "%s has joined the club as %s." % [m.get("name", "?"), m.get("role", "staff")])
-	_log("Hired %s (%s)." % [m.get("name", "?"), m.get("role", "staff")])
-	return {"ok": true, "msg": "%s hired as %s." % [m.get("name", "?"), m.get("role", "staff")]}
+	_news("staff", "%s has joined the club as %s." % [m.get("name", "?"), Staff.label_for(role)])
+	_log("Hired %s (%s)." % [m.get("name", "?"), role])
+	return {"ok": true, "msg": "%s hired as %s." % [m.get("name", "?"), Staff.label_for(role)]}
+
+
+## The StaffScreen `personnel` payload: each hired role -> {name, stars, wage}; vacant roles
+## are absent (the screen draws them empty).
+func staff_personnel() -> Dictionary:
+	return Staff.personnel_dict(staff)
 
 ## Sack a hired staff member, paying the contract compensation (a few weeks' wage) from cash.
 ## He returns to the available pool. Returns {ok, msg}.
@@ -1269,7 +1281,7 @@ func sack_staff(member_id: int) -> Dictionary:
 	cash -= comp
 	staff_pool.append(m)
 	_news("staff", "%s has been sacked (£%s compensation)." % [m.get("name", "?"), _money(comp)])
-	_log("Sacked %s (%s); paid £%s compensation." % [m.get("name", "?"), m.get("role", "staff"), _money(comp)])
+	_log("Sacked %s (%s); paid £%s compensation." % [m.get("name", "?"), Staff.label_for(str(m.get("role", ""))), _money(comp)])
 	return {"ok": true, "msg": "%s sacked. £%s compensation paid." % [m.get("name", "?"), _money(comp)]}
 
 ## True while the transfer window is open (before deadline day).
@@ -1736,8 +1748,8 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	# promoted is released to make room, then the scout brings in a fresh crop.
 	_roll_youth(rng)
 	# A fresh batch of staff comes onto the market for the new season.
-	staff_pool = Staff.generate_pool(rng, staff_seq, STAFF_POOL_SIZE)
-	staff_seq += STAFF_POOL_SIZE
+	staff_pool = Staff.generate_pool(rng, staff_seq, STAFF_POOL_PER_ROLE)
+	staff_seq += staff_pool.size()
 
 	year += 1
 	season = _season_label(year)

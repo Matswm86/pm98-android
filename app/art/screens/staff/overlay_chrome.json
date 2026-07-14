@@ -1,0 +1,84 @@
+{
+ "single": {
+  "dialog": [
+   67,
+   63,
+   525,
+   352
+  ],
+  "cats": [
+   "TRAINERS",
+   "PHYSIOTHERAPIST",
+   "PSYCHOLOGIST",
+   "ASSISTANT_MANAGER",
+   "SCOUT",
+   "YOUTH_TEAM_MANAGER",
+   "YOUTH_TEAM_SCOUT",
+   "GROUNDSMAN"
+  ],
+  "rail": {
+   "x": 452,
+   "w": 123,
+   "y0": 104,
+   "pitch": 30,
+   "h": 22
+  },
+  "plates": {
+   "PHYSIOTHERAPIST": "overlay_physiotherapist.png",
+   "PSYCHOLOGIST": "overlay_psychologist.png",
+   "ASSISTANT_MANAGER": "overlay_assistant_manager.png",
+   "SCOUT": "overlay_scout.png",
+   "YOUTH_TEAM_MANAGER": "overlay_youth_team_manager.png",
+   "YOUTH_TEAM_SCOUT": "overlay_youth_team_scout.png",
+   "GROUNDSMAN": "overlay_groundsman.png"
+  },
+  "holder": {
+   "box": [
+    115,
+    150,
+    273,
+    20
+   ],
+   "name_x": 122,
+   "name_y": 151,
+   "stars_right": 382,
+   "stars_y": 152,
+   "wage_center": 242,
+   "wage_y": 206
+  },
+  "rows": {
+   "first_y": 301,
+   "pitch": 27,
+   "name_x": 189,
+   "name_y": 302,
+   "stars_right": 342,
+   "wage_right": 404,
+   "sign": [
+    [
+     95,
+     300,
+     88,
+     17
+    ],
+    [
+     95,
+     327,
+     88,
+     17
+    ],
+    [
+     95,
+     354,
+     88,
+     17
+    ]
+   ]
+  },
+  "ok": [
+   478,
+   360,
+   90,
+   28
+  ]
+ }
+}

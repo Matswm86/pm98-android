@@ -20,6 +20,7 @@ func _run() -> bool:
 	ok = _unit_factors() and ok
 	ok = _unit_wages() and ok
 	ok = _career_integration() and ok
+	ok = _single_occupancy() and ok
 	print("\n%s" % ("ALL PASS" if ok else "FAILURES ABOVE"))
 	return ok
 
@@ -30,23 +31,30 @@ func _unit_candidates() -> bool:
 	var ok := true
 	var rng := RandomNumberGenerator.new()
 	rng.seed = SEED
-	var pool := Staff.generate_pool(rng, 800000, 6)
-	ok = _assert(pool.size() == 6, "pool has the requested size") and ok
+	var per_role := 3
+	var pool := Staff.generate_pool(rng, 800000, per_role)
+	var want := Staff.ROLE_KEYS.size() * per_role   # 13 roles x per_role
+	ok = _assert(pool.size() == want, "pool = per_role x 13 roles (%d)" % want) and ok
 	var ids := {}
 	var roles := {}
 	var shape_ok := true
 	for m in pool:
 		ids[int(m["id"])] = true
 		roles[str(m["role"])] = true
-		for k in ["id", "role", "name", "quality", "wage"]:
+		for k in ["id", "role", "name", "stars", "quality", "wage"]:
 			shape_ok = shape_ok and m.has(k)
 		shape_ok = shape_ok and int(m["quality"]) >= Staff.QUALITY_LO and int(m["quality"]) <= Staff.QUALITY_HI
-	ok = _assert(ids.size() == 6, "pool ids unique") and ok
-	ok = _assert(shape_ok, "every candidate carries id/role/name/quality/wage in range") and ok
-	ok = _assert(roles.size() == Staff.ROLES.size(), "pool spreads across all roles") and ok
-	# Wage rises with quality for a role.
-	ok = _assert(Staff.wage_for(Staff.TRAINER, 5) > Staff.wage_for(Staff.TRAINER, 1),
+		shape_ok = shape_ok and float(m["stars"]) >= Staff.STARS_LO and float(m["stars"]) <= Staff.STARS_HI
+	ok = _assert(ids.size() == want, "pool ids unique") and ok
+	ok = _assert(shape_ok, "every candidate carries id/role/name/stars/quality/wage in range") and ok
+	ok = _assert(roles.size() == Staff.ROLE_KEYS.size(), "pool spreads across all 13 roles") and ok
+	# Wage rises with the rating for a role.
+	ok = _assert(Staff.wage_for(Staff.HANDLING, 5.0) > Staff.wage_for(Staff.HANDLING, 1.0),
 		"a better member costs more") and ok
+	# Half-star wages sit between the whole-star ones.
+	ok = _assert(Staff.wage_for(Staff.HANDLING, 4.0) < Staff.wage_for(Staff.HANDLING, 4.5)
+		and Staff.wage_for(Staff.HANDLING, 4.5) < Staff.wage_for(Staff.HANDLING, 5.0),
+		"a half-star rating prices between the whole stars") and ok
 	return ok
 
 
@@ -58,22 +66,32 @@ func _unit_factors() -> bool:
 	ok = _assert(Staff.training_factor(none) == 1.0 and Staff.physio_factor(none) == 1.0
 		and Staff.youth_factor(none) == 1.0, "no staff -> all factors are 1.0 (no regression)") and ok
 
-	var trainer := [{"id": 1, "role": Staff.TRAINER, "quality": 5, "wage": 100000}]
-	var physio := [{"id": 2, "role": Staff.PHYSIO, "quality": 5, "wage": 80000}]
-	var coach := [{"id": 3, "role": Staff.YOUTH_COACH, "quality": 5, "wage": 90000}]
-	ok = _assert(Staff.training_factor(trainer) > 1.0, "a trainer raises the development factor") and ok
+	var trainer := [{"id": 1, "role": Staff.HANDLING, "stars": 5.0, "quality": 5, "wage": 100000}]
+	var physio := [{"id": 2, "role": Staff.PHYSIOTHERAPIST, "stars": 5.0, "quality": 5, "wage": 80000}]
+	var coach := [{"id": 3, "role": Staff.YOUTH_TEAM_MANAGER, "stars": 5.0, "quality": 5, "wage": 90000}]
+	ok = _assert(Staff.training_factor(trainer) > 1.0, "a skill trainer raises the development factor") and ok
 	ok = _assert(Staff.physio_factor(physio) < 1.0, "a physio lowers the injury factor") and ok
-	ok = _assert(Staff.youth_factor(coach) > 1.0, "a youth coach raises the youth factor") and ok
+	ok = _assert(Staff.youth_factor(coach) > 1.0, "a youth team manager raises the youth factor") and ok
 
-	# Factors are clamped (a wall of trainers can't run away).
-	var many: Array = []
-	for i in 10:
-		many.append({"id": 100 + i, "role": Staff.TRAINER, "quality": 5, "wage": 100000})
-	ok = _assert(Staff.training_factor(many) <= 1.5 + 0.0001, "training factor is clamped at the cap") and ok
+	# The full six-skill coaching bench at 5 stars hits (and is clamped at) the cap.
+	var bench: Array = []
+	var i := 0
+	for skill in Staff.TRAINER_SKILLS:
+		bench.append({"id": 200 + i, "role": skill, "stars": 5.0, "quality": 5, "wage": 100000})
+		i += 1
+	ok = _assert(abs(Staff.training_factor(bench) - 1.5) < 0.0001,
+		"a full 5-star coaching bench reaches the development cap (1.5)") and ok
+	# A single coach gives only a slice of that cap (single-occupancy, not summed per member).
+	ok = _assert(Staff.training_factor(trainer) < Staff.training_factor(bench),
+		"one coach develops less than the full bench") and ok
 
 	# Roles don't bleed: a trainer doesn't move the physio/youth factor.
 	ok = _assert(Staff.physio_factor(trainer) == 1.0 and Staff.youth_factor(trainer) == 1.0,
 		"a trainer affects only the development factor") and ok
+	# New roles with no engine hook are hireable but no-op (honest gap, never invented).
+	var psych := [{"id": 9, "role": Staff.PSYCHOLOGIST, "stars": 5.0, "quality": 5, "wage": 15000}]
+	ok = _assert(Staff.training_factor(psych) == 1.0 and Staff.physio_factor(psych) == 1.0
+		and Staff.youth_factor(psych) == 1.0, "a psychologist has no engine effect (honest gap)") and ok
 	return ok
 
 
@@ -82,8 +100,8 @@ func _unit_factors() -> bool:
 func _unit_wages() -> bool:
 	var ok := true
 	var staff := [
-		{"id": 1, "role": Staff.TRAINER, "quality": 3, "wage": 75000},
-		{"id": 2, "role": Staff.PHYSIO, "quality": 2, "wage": 50000},
+		{"id": 1, "role": Staff.HANDLING, "stars": 3.0, "quality": 3, "wage": 75000},
+		{"id": 2, "role": Staff.PHYSIOTHERAPIST, "stars": 2.0, "quality": 2, "wage": 50000},
 	]
 	ok = _assert(Staff.yearly_wage(staff) == 125000, "yearly wage sums the members") and ok
 	ok = _assert(Staff.weekly_wage(staff) == int(round(125000 / 52.0)), "weekly wage = yearly / 52") and ok
@@ -116,12 +134,13 @@ func _career_integration() -> bool:
 	var career := Career.create(prem[0], league, prem, leagues)
 	var ok := true
 	ok = _assert(career.staff.is_empty(), "career starts with no staff hired") and ok
-	ok = _assert(career.staff_pool.size() == Career.STAFF_POOL_SIZE, "career seeds a hire pool") and ok
+	ok = _assert(career.staff_pool.size() == Staff.ROLE_KEYS.size() * Career.STAFF_POOL_PER_ROLE,
+		"career seeds a per-role hire pool") and ok
 
-	# Hire a trainer from the pool.
+	# Hire a skill trainer from the pool.
 	var trainer_cand: Dictionary = {}
 	for m in career.staff_pool:
-		if str(m.get("role")) == Staff.TRAINER:
+		if str(m.get("role")) == Staff.HANDLING:
 			trainer_cand = m
 			break
 	var cid := int(trainer_cand["id"])
@@ -184,8 +203,12 @@ func _career_integration() -> bool:
 func _trainer_develops_more(prem: Array, league: Dictionary, leagues: Array) -> bool:
 	var a := Career.create(prem[0], league, prem, leagues)
 	var b := Career.create(prem[0], league, prem, leagues)
-	# Give B a 5-star trainer; strip both pools so they don't diverge, and align squads.
-	b.staff = [{"id": 7, "role": Staff.TRAINER, "quality": 5, "wage": 100000}]
+	# Give B the full 5-star coaching bench (all six skills); align squads + cash.
+	b.staff = []
+	var i := 0
+	for skill in Staff.TRAINER_SKILLS:
+		b.staff.append({"id": 700 + i, "role": skill, "stars": 5.0, "quality": 5, "wage": 100000})
+		i += 1
 	b.cash = 50_000_000
 	b.rosters[b.club_id] = a.rosters[a.club_id].duplicate(true)
 	a.training_intensity = "Normal"
@@ -201,6 +224,55 @@ func _trainer_develops_more(prem: Array, league: Dictionary, leagues: Array) -> 
 			if n["kind"] == "develop": dev_b += 1
 	print("    trainer dev: none=%d trainer=%d" % [dev_a, dev_b])
 	return dev_b > dev_a
+
+
+## Single occupancy (frames 108-121): each of the 13 roles holds exactly ONE member; signing
+## into an occupied role REPLACES the holder, who returns to the pool (no compensation).
+func _single_occupancy() -> bool:
+	var f := FileAccess.open("res://data/game_db.json", FileAccess.READ)
+	var db: Dictionary = JSON.parse_string(f.get_as_text())
+	var leagues: Array = db.get("leagues", [])
+	var league: Dictionary = {}
+	for lg in leagues:
+		if lg.get("id") == "eng_prem":
+			league = lg
+	var prem: Array = []
+	for c in db.get("clubs", []):
+		if c.get("leagueId") == "eng_prem":
+			prem.append(c)
+	var career := Career.create(prem[0], league, prem, leagues)
+	career.cash = 50_000_000
+	var ok := true
+
+	# Two candidates for the SAME role (PHYSIOTHERAPIST).
+	var a := {}
+	var b := {}
+	for m in career.staff_pool:
+		if str(m.get("role")) == Staff.PHYSIOTHERAPIST:
+			if a.is_empty():
+				a = m
+			elif b.is_empty():
+				b = m
+				break
+	ok = _assert(not a.is_empty() and not b.is_empty(), "two physio candidates in the pool") and ok
+	career.hire_staff(int(a["id"]))
+	ok = _assert(Staff.members_in_role(career.staff, Staff.PHYSIOTHERAPIST).size() == 1,
+		"first physio hired -> one in the role") and ok
+	var pool_n := career.staff_pool.size()
+	career.hire_staff(int(b["id"]))                     # replace
+	ok = _assert(Staff.members_in_role(career.staff, Staff.PHYSIOTHERAPIST).size() == 1,
+		"signing a second physio REPLACES (still one in the role)") and ok
+	ok = _assert(int(Staff.member_in_role(career.staff, Staff.PHYSIOTHERAPIST)["id"]) == int(b["id"]),
+		"the new signing is the holder") and ok
+	var back := false
+	for m in career.staff_pool:
+		if int(m.get("id", -1)) == int(a["id"]):
+			back = true
+	ok = _assert(back and career.staff_pool.size() == pool_n,
+		"the replaced holder returns to the pool (net pool size unchanged)") and ok
+	ok = _assert(career.staff_personnel().has("PHYSIOTHERAPIST"),
+		"staff_personnel exposes the hired role for the screen") and ok
+	return ok
 
 
 func _assert(cond: bool, label: String) -> bool:
