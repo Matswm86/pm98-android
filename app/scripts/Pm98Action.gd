@@ -312,8 +312,12 @@ static func engine_tick(p: Dictionary, m: Dictionary, rng = null) -> void:
 			p[0x4c] = Pm98Trig._i32(_si(p, 0x4c) + 1)
 			gs[0x2e8] = Pm98Trig._i32(_g(gs, 0x2e8) + 1)
 
+	if MatchEngine.Pm98Rng._log_on:
+		Pm98Driver._bvprobe(m, "et:after_tick_action a=0x%x" % _g(p, 0x40))
 	# --- the action-code switch (L80-236): exactly one arm fires (post-tick_action +0x40) ---
 	_action_switch(p, m, gs, b, rng)
+	if MatchEngine.Pm98Rng._log_on:
+		Pm98Driver._bvprobe(m, "et:after_action_switch a=0x%x" % _g(p, 0x40))
 
 	# --- power-button accumulators (L237-266): user input via gs+0x214/+0x215; headless = both 0 ---
 	if _highlight_active(p, m, gs):
@@ -335,6 +339,8 @@ static func engine_tick(p: Dictionary, m: Dictionary, rng = null) -> void:
 		p[0xc] = Pm98Trig._i32(_si(p, 0xc) + _idiv(_si(p, 0x9c) - _si(p, 0xc), steps))
 	else:
 		_movement_decision(p, m, gs, b, rng)
+	if MatchEngine.Pm98Rng._log_on:
+		Pm98Driver._bvprobe(m, "et:after_move_or_decision a=0x%x" % _g(p, 0x40))
 
 	# --- LAB_005a4e5b (L376-425): the +0x40-gated 9490 lean + the 7260 ball-touch decision ---
 	var act := _g(p, 0x40)
@@ -347,6 +353,8 @@ static func engine_tick(p: Dictionary, m: Dictionary, rng = null) -> void:
 		if run_7260:
 			if (_g(m, 0x44c) != 7 and _g(m, 0x44c) != 5) or not _is_taker(p, m):
 				_move_7260(p, rng)                       # ball_touch_7260 (slice 1 + kick sub-arm 1)
+				if MatchEngine.Pm98Rng._log_on:
+					Pm98Driver._bvprobe(m, "et:after_move_7260 a=0x%x" % _g(p, 0x40))
 
 	# --- LAB_005a4fa2 (L426-465): the body-orient pass + the open-play power reset ---
 	_move_8f20(p, _g(p, 0x34))                            # FUN_005a8f20 body-orient steer (WORD facing)

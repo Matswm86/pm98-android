@@ -57,6 +57,22 @@ extends RefCounted
 const ENGINE_CONTINUE := 1
 const ENGINE_OVER := 0
 
+# ---- diag-only ball-velocity change probe (gated on Pm98Rng._log_on; zero effect when off) ----
+# Records a row every time ball+0x20/+0x24 changes across a tagged tick sub-phase, so a diag
+# can name the exact sub-step that first writes the kickoff velocity. Precedent: b0040_trace.
+static var ballvel_probe: Array = []                        # [tag, vx, vy] rows on change
+static var _bv_last: Array = [0, 0]                          # last (vx,vy) seen by the probe
+
+static func _bvprobe(m: Dictionary, tag: String) -> void:
+	if not MatchEngine.Pm98Rng._log_on:
+		return
+	var bb := _ball(m)
+	var vx := int(bb.get(0x20, 0))
+	var vy := int(bb.get(0x24, 0))
+	if vx != int(_bv_last[0]) or vy != int(_bv_last[1]):
+		ballvel_probe.append([tag, vx, vy])
+		_bv_last = [vx, vy]
+
 
 static func _g(d: Dictionary, off: int) -> int:
 	return int(d.get(off, 0))
@@ -110,7 +126,9 @@ static func tick(m: Dictionary, rng: MatchEngine.Pm98Rng) -> int:
 	var gate := _g(m, 0x1a1e) & 0xff
 	m[0x1a1e] = 0
 	if gate != 0:
+		_bvprobe(m, "tick:before_restart_handler")
 		restart_handler(m, rng)                       # FUN_00593b70
+		_bvprobe(m, "tick:after_restart_handler")
 		return _match_over(m)
 
 	# --- set-piece special (L70-104): phase 7, or phase 5 with +0x19cc, on the taker side,
@@ -127,7 +145,9 @@ static func tick(m: Dictionary, rng: MatchEngine.Pm98Rng) -> int:
 			if not ctx_taker.is_empty():
 				m[0x438] = _active_ref(ctx_taker, Pm98Movement.select_active(ctx_taker))   # FUN_005b8f20 -> +0x438 (player ptr)
 			# FUN_005b70e0 x2 RENDER (skip). FUN_005b73a0 x2 positioning (set-piece -> draws RNG).
+			_bvprobe(m, "tick:setpiece_before_position")
 			_position_both(m, rng)
+			_bvprobe(m, "tick:setpiece_after_position")
 			return _match_over(m)
 
 	# --- queue-exhausted early-out (L105-106): latched set-piece + replay queue drained. ---
@@ -162,14 +182,17 @@ static func tick(m: Dictionary, rng: MatchEngine.Pm98Rng) -> int:
 	# team + the ball/keeper physics, then bump the 1024-frame ring counter. ---
 	_movement_core(m, int(m.get("ring", 0)), rng)
 	m["ring"] = (int(m.get("ring", 0)) + 1) & 0x3ff   # DAT_006d31bc = (DAT_006d31bc+1)&0x3ff
+	_bvprobe(m, "tick:after_movement_core")
 
 	# --- open-play / restart classification (L209-692): exactly one dispatch code fires. ---
 	if _g(m, 0x448) == 0:
 		_classify_open_play(m, rng, b)
+	_bvprobe(m, "tick:after_classify_open_play")
 	_stat_commentary_tail(m, rng, b)                  # the 3 commentary RNG timers (self-gates phase 0)
 
 	# --- event-queue dequeue (L889) + the +0x454 cooldown decrement (L890-893). ---
 	_dequeue(m)                                        # FUN_00594570(0)
+	_bvprobe(m, "tick:after_dequeue")
 	if _g(m, 0x454) > 1 and (_g(m, 0x461) & 0x80) == 0 and (_g(m, 0x160c) & 0xff) == 0:
 		m[0x454] = _i(_g(m, 0x454) - 1)
 
@@ -245,6 +268,7 @@ static func _movement_core(m: Dictionary, ring: int, rng = null) -> void:
 	if not (sim is Array) or (sim as Array).is_empty():
 		return                                        # no match-init -> nothing to advance
 	var ctxs: Array = sim
+	_bvprobe(m, "mc:enter")
 	# The NORMAL per-tick "decide" pass FUN_005b8bf0 dispatches player vtable+8. With the
 	# wine-corrected vtable base 0x639228, vtable+8 = FUN_005a4560 (the replay record/playback
 	# pass) -- a NO-OP on the live headless path -- NOT FUN_005a3400 (the real DECIDE, which is
@@ -254,18 +278,24 @@ static func _movement_core(m: Dictionary, ring: int, rng = null) -> void:
 	# ball/GK/ref DECIDE (+8) are replay snapshot -> NO-OP live.
 	for ctx in ctxs:
 		Pm98Movement.build_relationship_matrix(ctx)   # FUN_005b8690
+	_bvprobe(m, "mc:after_relmatrix")
 	for ctx in ctxs:
 		Pm98Movement.assign_markers(ctx)              # FUN_005b94f0
+	_bvprobe(m, "mc:after_markers")
 	for ctx in ctxs:
 		_advance_team(ctx, m, rng)                     # FUN_005b8c20 -> [vtable+0xc]=FUN_005a4600 (engine_tick)
+	_bvprobe(m, "mc:after_advance_teams")
 	# sub-entity ADVANCE (+0xc): ball physics + the 2 keepers (referee skipped, outcome-irrelevant).
 	var ball := _ball(m)
 	if not ball.is_empty():
 		Pm98Movement.ball_advance(ball)               # FUN_0058e2c0
+	_bvprobe(m, "mc:after_ball_advance")
 	for k in _keepers(m):
 		Pm98Movement.keeper_advance(k)                # FUN_005a22d0 x2
+	_bvprobe(m, "mc:after_keeper_advance")
 	for ctx in ctxs:
 		Pm98Movement.select_nearest(ctx, 0)           # FUN_005b8ce0(0)
+	_bvprobe(m, "mc:after_select_nearest")
 
 
 static func _keepers(m: Dictionary) -> Array:
@@ -295,6 +325,8 @@ static func _advance_team(ctx: Dictionary, m: Dictionary, rng = null) -> void:
 		if MatchEngine.Pm98Rng._log_on:
 			MatchEngine.Pm98Rng._who = "t%d.i%d " % [int(ctx.get(8, -1)), i]
 		Pm98Action.engine_tick(players[i], m, rng)
+		if MatchEngine.Pm98Rng._log_on:
+			_bvprobe(m, "adv t%d.i%d" % [int(ctx.get(8, -1)), i])
 	if MatchEngine.Pm98Rng._log_on:
 		MatchEngine.Pm98Rng._who = ""
 
@@ -781,9 +813,14 @@ static func restart_handler(m: Dictionary, rng: MatchEngine.Pm98Rng) -> void:
 	var brd := _ball(m)
 	if not brd.is_empty():
 		Pm98Movement.ball_restart_decide(brd, m)
-	var ctx0 := _sim_ctx(m, 0)
-	if not ctx0.is_empty():
-		m[0x438] = _active_ref(ctx0, Pm98Movement.select_active(ctx0))   # FUN_005b8f20 -> +0x438 (player ptr)
+	# select_active runs on the KICKING-SIDE team, not team 0. Disasm 0x593f02-0x593f18:
+	# `mov eax,[ebp+0x45c]; lea eax,[eax+eax*4]x2; shl eax,5` = eax = 0x320 (team stride) * m[0x45c],
+	# then `lea ecx,[eax+ebp+0x46c]; call 0x5b8f20` -> the taker is picked from team[m[0x45c]]. The
+	# old `_sim_ctx(m, 0)` hardcode made the wrong team take the kickoff when m[0x45c]==1, kicking the
+	# ball into the wrong half (-x) -- the M5 s39 wrong-direction kickoff root cause.
+	var ctx_side := _sim_ctx(m, _g(m, 0x45c))
+	if not ctx_side.is_empty():
+		m[0x438] = _active_ref(ctx_side, Pm98Movement.select_active(ctx_side))   # FUN_005b8f20 -> +0x438 (player ptr)
 	# FUN_00593b70 calls FUN_005b70e0 x2 -- the DECIDE dispatcher (player vtable+4 = FUN_005a3400
 	# per player) + the phase-2 kickoff-partner placement tail. The old framing wrongly dismissed
 	# FUN_005b70e0 as a "render, SKIP" pass (it is vtable+4 = render only under the off-by-4 base).
@@ -791,7 +828,7 @@ static func restart_handler(m: Dictionary, rng: MatchEngine.Pm98Rng) -> void:
 	# Each FUN_005b70e0(team) = _decide_team(team) THEN kickoff_partner_placement(team) -- the tail
 	# fires only for the kicking team (match+0x45c) and stands the receiver in the centre circle.
 	for ti in 2:
-		var ctx := ctx0 if ti == 0 else _sim_ctx(m, 1)
+		var ctx := _sim_ctx(m, ti)
 		if not ctx.is_empty():
 			_decide_team(ctx, m)
 			Pm98Movement.kickoff_partner_placement(ctx, m, ti)

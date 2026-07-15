@@ -1052,6 +1052,7 @@ static func kick_setup(p: Dictionary, m: Dictionary) -> void:
 static var move65a0_trace: Array = []
 static var steer_trace: Array = []                          # diag-only (gated on Pm98Rng._log_on)
 static var b0040_trace: Array = []                          # diag-only: _b0040_target inputs+terms
+static var goalaim_trace: Array = []                        # diag-only: goal_aim_025 kickoff aim/target
 
 
 static func move_dispatch(p: Dictionary, m: Dictionary, param_2: int, rng) -> bool:
@@ -4923,6 +4924,17 @@ static func goal_aim_025(p: Dictionary, rng, call_setup: bool = true) -> void:
 	p[0xa0] = _g(target, 0x4)
 	p[0xa4] = _g(target, 0x8)
 	p[0xa8] = _g(target, 0xc)
+	if MatchEngine.Pm98Rng._log_on:                             # diag-only: kickoff aim/target snapshot
+		goalaim_trace.append({
+			"who": MatchEngine.Pm98Rng._who,
+			"p_team": _g(p, 0x2b8), "p_idx7": _g(p, 0x7),
+			"p_pos": [_si(p, 4), _si(p, 8)], "p_anchor_x": _si(p, 0x3a4),
+			"tgt_team": _g(target, 0x2b8), "tgt_idx7": _g(target, 0x7),
+			"tgt_pos": [_si(target, 4), _si(target, 8)],
+			"orient": _g(m, 0x19a0) & 1, "goalx": _si(m, 0x1820),
+			"redirect_5f": _g(p, 0x5f),
+			"ball_pos": [_si(ball, 4), _si(ball, 8)],
+		})
 
 	var special: bool = _g(gs, 0x2ee) != 0 and _phase0(m) and _g(p, 0x5c) != 0
 
