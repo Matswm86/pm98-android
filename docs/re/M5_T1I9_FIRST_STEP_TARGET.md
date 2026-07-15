@@ -54,3 +54,8 @@ which leaf-computation term is 1.67° off. NEXT-1 fix requires a live capture:
 
 Harness ready: `app/tests/diag_m5_t1i9.gd` (port field + target-field + ball/goal dump, clk 0-6).
 Oracle suites unaffected — no production code touched this step.
+
+**s37 UPDATE (2026-07-15): blocker CLOSED — see `M5_T1I9_STEER_TARGET_LOCALIZED.md`.**
+Live-captured t1.i9's 89c0 target: the arm-step target is port `(1647,2)` vs silicon
+`(12361,47217)`, leaf `FUN_005b0040` (`ret0=0x5b04cb` = `_b0040_target`). Unarmed step
+byte-exact; the wrong b0040 target is the root. NEXT = capture b0040's ctrl/ball INPUTS.
