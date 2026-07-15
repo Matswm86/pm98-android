@@ -32,6 +32,19 @@ var transitions_enabled := true  # MANAGER.INI "TRANSITIONS"
 # MATCH OPTIONS view mode (WATCH/HIGHLIGHTS/BRIEF/RESULTS). The original stores the
 # chosen presentation globally (MANAGER.INI); default BRIEF = the user's main play mode.
 var match_view_mode := "brief"
+# MATCH OPTIONS graphics/camera/sound sub-settings (the GRAPHICS/CAMERAS/SOUND tabs).
+# Each configures PM98's 3D/positional engine or its match audio -- both absent from the
+# source on hand -- so these are persisted (like MANAGER.INI) but honest no-ops at runtime
+# (nothing to change). See app/scenes/MatchOptions.gd for the honesty note.
+var gfx_sky := true
+var gfx_boards := true
+var gfx_shadows := true
+var pitch_detail := "high"      # HIGH/MED/LOW/MIN
+var stadium_detail := "high"    # HIGH/MED/LOW
+var snd_fx := true
+var snd_ambient := true
+var snd_comments := true
+var camera_mode := "static"     # static/auto/free
 
 const _SETTINGS := "user://settings.cfg"
 const _MUSIC_DB := -8.0   # the module theme sits under the UI
@@ -68,6 +81,15 @@ func _load_settings() -> void:
 	sfx_volume = clampi(int(cf.get_value("audio", "sfx_volume", sfx_volume)), 0, 100)
 	transitions_enabled = bool(cf.get_value("ui", "transitions", transitions_enabled))
 	match_view_mode = str(cf.get_value("match", "view_mode", match_view_mode))
+	gfx_sky = bool(cf.get_value("match", "gfx_sky", gfx_sky))
+	gfx_boards = bool(cf.get_value("match", "gfx_boards", gfx_boards))
+	gfx_shadows = bool(cf.get_value("match", "gfx_shadows", gfx_shadows))
+	pitch_detail = str(cf.get_value("match", "pitch_detail", pitch_detail))
+	stadium_detail = str(cf.get_value("match", "stadium_detail", stadium_detail))
+	snd_fx = bool(cf.get_value("match", "snd_fx", snd_fx))
+	snd_ambient = bool(cf.get_value("match", "snd_ambient", snd_ambient))
+	snd_comments = bool(cf.get_value("match", "snd_comments", snd_comments))
+	camera_mode = str(cf.get_value("match", "camera_mode", camera_mode))
 
 
 func save_settings() -> void:
@@ -78,12 +100,45 @@ func save_settings() -> void:
 	cf.set_value("audio", "sfx_volume", sfx_volume)
 	cf.set_value("ui", "transitions", transitions_enabled)
 	cf.set_value("match", "view_mode", match_view_mode)
+	cf.set_value("match", "gfx_sky", gfx_sky)
+	cf.set_value("match", "gfx_boards", gfx_boards)
+	cf.set_value("match", "gfx_shadows", gfx_shadows)
+	cf.set_value("match", "pitch_detail", pitch_detail)
+	cf.set_value("match", "stadium_detail", stadium_detail)
+	cf.set_value("match", "snd_fx", snd_fx)
+	cf.set_value("match", "snd_ambient", snd_ambient)
+	cf.set_value("match", "snd_comments", snd_comments)
+	cf.set_value("match", "camera_mode", camera_mode)
 	cf.save(_SETTINGS)
 
 
 ## Persist the chosen MATCH OPTIONS view mode (WATCH/HIGHLIGHTS/BRIEF/RESULTS).
 func set_match_view_mode(mode: String) -> void:
 	match_view_mode = mode
+	save_settings()
+
+
+## The MATCH OPTIONS graphics/camera/sound sub-settings as a dict (for the dialog).
+func match_settings() -> Dictionary:
+	return {
+		"gfx_sky": gfx_sky, "gfx_boards": gfx_boards, "gfx_shadows": gfx_shadows,
+		"pitch_detail": pitch_detail, "stadium_detail": stadium_detail,
+		"snd_fx": snd_fx, "snd_ambient": snd_ambient, "snd_comments": snd_comments,
+		"camera_mode": camera_mode,
+	}
+
+
+## Persist the MATCH OPTIONS sub-settings block (honest no-ops; see MatchOptions.gd).
+func set_match_settings(d: Dictionary) -> void:
+	if d.has("gfx_sky"): gfx_sky = bool(d["gfx_sky"])
+	if d.has("gfx_boards"): gfx_boards = bool(d["gfx_boards"])
+	if d.has("gfx_shadows"): gfx_shadows = bool(d["gfx_shadows"])
+	if d.has("pitch_detail"): pitch_detail = str(d["pitch_detail"])
+	if d.has("stadium_detail"): stadium_detail = str(d["stadium_detail"])
+	if d.has("snd_fx"): snd_fx = bool(d["snd_fx"])
+	if d.has("snd_ambient"): snd_ambient = bool(d["snd_ambient"])
+	if d.has("snd_comments"): snd_comments = bool(d["snd_comments"])
+	if d.has("camera_mode"): camera_mode = str(d["camera_mode"])
 	save_settings()
 
 

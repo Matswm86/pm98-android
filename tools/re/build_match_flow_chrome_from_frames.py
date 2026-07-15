@@ -120,6 +120,21 @@ def main() -> None:
     expect(430 <= mx1 - mx0 <= 448 and 250 <= my1 - my0 <= 264,
            f"MO modal bbox {mx0},{my0}..{mx1},{my1}")
     save(mo[my0:my1 + 1, mx0:mx1 + 1], "mo_modal.png")
+    # The GRAPHICS / CAMERAS / SOUND tabs are the SAME modal with different panel
+    # content. Cut each at the IDENTICAL bbox (so all four register pixel-exact) from
+    # its own live capture. The tab row's active-tab highlight is baked-in per capture,
+    # so switching the sprite gives the correct active-tab colour for free.
+    for tab in ("graphics", "cameras", "sound"):
+        ta = load(WCAP / f"dropdown_matchoptions_{tab}.png")
+        # confirm this capture's modal sits at the same box before cutting.
+        tb = (ta[:, :, 0] > 185) & (ta[:, :, 1] > 185) & (ta[:, :, 2] > 185)
+        tw = np.zeros_like(tb)
+        tw[112:374, 98:544] = tb[112:374, 98:544]
+        tys, txs = np.where(tw)
+        expect(abs(int(txs.min()) - mx0) <= 1 and abs(int(txs.max()) - mx1) <= 1
+               and abs(int(tys.min()) - my0) <= 1 and abs(int(tys.max()) - my1) <= 1,
+               f"MO {tab} modal bbox drift {int(txs.min())},{int(tys.min())}..{int(txs.max())},{int(tys.max())}")
+        save(ta[my0:my1 + 1, mx0:mx1 + 1], f"mo_modal_{tab}.png")
     # Hit-rects (frame-measured, modal-local). Row y-spans: view 279..297,
     # tab 312..330, bottom 342..370. View buttons x {WATCH,HIGHLIGHTS,BRIEF,
     # RESULTS}; bottom CANCEL/OK.
@@ -136,9 +151,35 @@ def main() -> None:
         "bottom_row_y": [342, 370],
         "bottom_btns": {"lineups": [109, 103], "on": [216, 46],
                         "cancel": [323, 102], "ok": [430, 102]},
+        # tab row (MATCH/GRAPHICS/CAMERAS/SOUND): same four columns as the view row,
+        # y 312..330 (bake note). Switching the sprite shows each tab's real panel.
+        "tab_row_y": [312, 330],
+        "tab_btns": {"match": [116, 97], "graphics": [220, 97],
+                     "cameras": [325, 97], "sound": [428, 97]},
+        "tab_panels": {"match": "mo_modal.png", "graphics": "mo_modal_graphics.png",
+                       "cameras": "mo_modal_cameras.png", "sound": "mo_modal_sound.png"},
+        # Per-tab controls — frame-measured from the tab captures (the RE FUN_004e2630
+        # never reversed these sub-rects, so the capture pixels are the source). Every
+        # one configures the ABSENT 3D/positional engine or its (un-built) match audio,
+        # so all are honest no-ops at runtime: the dialog tracks + persists the choice
+        # exactly like the original's MANAGER.INI, but there is no 3D view/match-audio
+        # for it to change. Rects are absolute-frame (x,y,w,h), centred on the label.
+        "graphics_controls": {
+            "sky": [191, 190, 44, 20], "boards": [191, 230, 44, 20],
+            "shadows": [191, 270, 44, 20],
+            "pitch_high": [418, 193, 48, 23], "pitch_med": [464, 193, 48, 23],
+            "pitch_low": [418, 226, 48, 23], "pitch_min": [464, 226, 48, 23],
+            "stadium_high": [398, 266, 46, 22], "stadium_med": [446, 266, 44, 22],
+            "stadium_low": [492, 266, 40, 22],
+        },
+        "camera_controls": {"auto": [122, 270, 46, 20], "free": [178, 270, 60, 20]},
+        "sound_controls": {"fx": [181, 281, 44, 20], "ambient": [299, 281, 44, 20],
+                           "comments": [427, 281, 44, 20]},
         "note": ("Reversed FUN_004e2630 view-row rects (98x25 @ y100, panel-local "
                  "x 5/109/214/317) corroborate; frame is the pixel source. Only "
-                 "WATCH/BRIEF/RESULTS are buildable (HIGHLIGHTS = 3D .p3d absent)."),
+                 "WATCH/BRIEF/RESULTS are buildable (HIGHLIGHTS = 3D .p3d absent). "
+                 "The GRAPHICS/CAMERAS/SOUND sub-controls are frame-measured (not "
+                 "in the RE) and honest no-ops (their 3D/audio target is absent)."),
     }
 
     # ======================= RESULT titles ====================================

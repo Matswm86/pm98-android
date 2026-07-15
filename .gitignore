@@ -118,3 +118,4 @@ screenshots/
 # RE scratch probes (one-off disasm helpers) stay local
 tools/re/_*.py
 out/
+scratchpad/

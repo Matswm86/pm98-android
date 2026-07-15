@@ -58,7 +58,8 @@ func _ready() -> void:
 			and not OS.has_environment("PM98_TRAIN_SHOT") and not OS.has_environment("PM98_CUP_SHOT") \
 			and not OS.has_environment("PM98_YOUTH_SHOT") and not OS.has_environment("PM98_STAFF_SHOT") \
 			and not OS.has_environment("PM98_CONTRACT_SHOT") and not OS.has_environment("PM98_SCREENS_SHOT") \
-			and not OS.has_environment("PM98_MANAGER_SHOT") and not OS.has_environment("PM98_FICHA_SHOT"):
+			and not OS.has_environment("PM98_MANAGER_SHOT") and not OS.has_environment("PM98_FICHA_SHOT") \
+			and not OS.has_environment("PM98_MATCHOPTS_SHOT"):
 		_devshot()
 
 
@@ -102,6 +103,9 @@ func _boot() -> void:
 		return
 	if OS.has_environment("PM98_FICHA_SHOT"):
 		_ficha_shot()
+		return
+	if OS.has_environment("PM98_MATCHOPTS_SHOT"):
+		_matchopts_shot()
 		return
 	var boot_shot := OS.has_environment("PM98_BOOT_SHOT")
 	if boot_shot or not OS.has_environment("PM98_SHOT_DIR"):
@@ -159,6 +163,60 @@ func _hub_shot() -> void:
 	var mounted := _hub != null and is_instance_valid(_hub) and _hub.visible
 	print("HUB-SHOT err=%d %dx%d hub_mounted=%s club=%s" % [err, w, h, str(mounted), _career.club_name])
 	get_tree().quit()
+
+
+## Faithful real-render of the MATCH OPTIONS dropdown dialog and ALL FOUR tabs, driven
+## through the REAL wiring: begin a career -> mount the hub -> route the monitor-icon
+## action (_menu_action "match_options" -> _show_match_options) -> then TAP the tab row
+## and a couple of controls through MatchOptions' real gui handler, capturing each tab.
+## Proves the settings dialog switches tabs + draws its live state in the real app scene
+## tree (not just an isolated shot). Run as the NORMAL app under Xvfb+GL: PM98_MATCHOPTS_SHOT=1.
+func _matchopts_shot() -> void:
+	var dir := OS.get_environment("PM98_SHOT_DIR")
+	if GameDB.leagues.is_empty():
+		print("MATCHOPTS-SHOT no leagues loaded")
+		get_tree().quit()
+		return
+	var lg: Dictionary = GameDB.leagues[0]
+	var clubs := GameDB.clubs_in_league(lg["id"])
+	clubs.sort_custom(func(a, b): return a["name"] < b["name"])
+	_begin_career("Manager", lg, clubs[0])
+	await _settle()
+	# the monitor icon on the hub's top dropdown routes here (Main._menu_action):
+	_menu_action("match_options", _hub)
+	await _settle()
+	var opt: MatchOptions = null
+	for c in get_children():
+		if c is MatchOptions:
+			opt = c
+	if opt == null:
+		print("MATCHOPTS-SHOT dialog did not mount")
+		get_tree().quit()
+		return
+	# [tab-row button centre, tab name, extra control taps to show live state]
+	var tabs := [
+		[Vector2(164, 321), "match", []],
+		[Vector2(268, 321), "graphics", [Vector2(213, 200), Vector2(488, 237)]],  # SKY off, PITCH MIN
+		[Vector2(373, 321), "cameras", [Vector2(145, 280)]],                       # AUTO
+		[Vector2(476, 321), "sound", [Vector2(321, 291)]],                         # AMBIENT off
+	]
+	for t in tabs:
+		_matchopts_tap(opt, t[0])                    # switch tab through the real handler
+		for extra in (t[2] as Array):
+			_matchopts_tap(opt, extra)
+		await _settle()
+		_save_shot(dir, "matchopts_%s.png" % t[1])
+	print("MATCHOPTS-SHOT done tab=%d controls=%s" % [opt._tab, str(opt._s)])
+	get_tree().quit()
+
+
+## Inject a real press+release touch at a design-space point into the dialog's gui handler.
+func _matchopts_tap(opt: MatchOptions, p: Vector2) -> void:
+	for pressed in [true, false]:
+		var e := InputEventScreenTouch.new()
+		e.position = p
+		e.pressed = pressed
+		opt._on_input(e)
 
 
 ## Faithful real-render of the Track-B browse flow: walk the REAL nav (database home ->
@@ -2696,9 +2754,10 @@ func _show_match_options(_scr: MenuScreen) -> void:
 	var opt: MatchOptions = load("res://scenes/MatchOptions.gd").new()
 	opt.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(opt)
-	opt.setup(AudioManager.match_view_mode)
-	opt.confirmed.connect(func(m: String) -> void:
+	opt.setup(AudioManager.match_view_mode, AudioManager.match_settings())
+	opt.confirmed.connect(func(m: String, settings: Dictionary) -> void:
 		AudioManager.set_match_view_mode(m)
+		AudioManager.set_match_settings(settings)
 		opt.queue_free())
 	opt.cancelled.connect(func() -> void: opt.queue_free())
 

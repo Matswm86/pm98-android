@@ -53,7 +53,131 @@
     102
    ]
   },
-  "note": "Reversed FUN_004e2630 view-row rects (98x25 @ y100, panel-local x 5/109/214/317) corroborate; frame is the pixel source. Only WATCH/BRIEF/RESULTS are buildable (HIGHLIGHTS = 3D .p3d absent)."
+  "tab_row_y": [
+   312,
+   330
+  ],
+  "tab_btns": {
+   "match": [
+    116,
+    97
+   ],
+   "graphics": [
+    220,
+    97
+   ],
+   "cameras": [
+    325,
+    97
+   ],
+   "sound": [
+    428,
+    97
+   ]
+  },
+  "tab_panels": {
+   "match": "mo_modal.png",
+   "graphics": "mo_modal_graphics.png",
+   "cameras": "mo_modal_cameras.png",
+   "sound": "mo_modal_sound.png"
+  },
+  "graphics_controls": {
+   "sky": [
+    191,
+    190,
+    44,
+    20
+   ],
+   "boards": [
+    191,
+    230,
+    44,
+    20
+   ],
+   "shadows": [
+    191,
+    270,
+    44,
+    20
+   ],
+   "pitch_high": [
+    418,
+    193,
+    48,
+    23
+   ],
+   "pitch_med": [
+    464,
+    193,
+    48,
+    23
+   ],
+   "pitch_low": [
+    418,
+    226,
+    48,
+    23
+   ],
+   "pitch_min": [
+    464,
+    226,
+    48,
+    23
+   ],
+   "stadium_high": [
+    398,
+    266,
+    46,
+    22
+   ],
+   "stadium_med": [
+    446,
+    266,
+    44,
+    22
+   ],
+   "stadium_low": [
+    492,
+    266,
+    40,
+    22
+   ]
+  },
+  "camera_controls": {
+   "auto": [
+    122,
+    270,
+    46,
+    20
+   ],
+   "free": [
+    178,
+    270,
+    60,
+    20
+   ]
+  },
+  "sound_controls": {
+   "fx": [
+    181,
+    281,
+    44,
+    20
+   ],
+   "ambient": [
+    299,
+    281,
+    44,
+    20
+   ],
+   "comments": [
+    427,
+    281,
+    44,
+    20
+   ]
+  },
+  "note": "Reversed FUN_004e2630 view-row rects (98x25 @ y100, panel-local x 5/109/214/317) corroborate; frame is the pixel source. Only WATCH/BRIEF/RESULTS are buildable (HIGHLIGHTS = 3D .p3d absent). The GRAPHICS/CAMERAS/SOUND sub-controls are frame-measured (not in the RE) and honest no-ops (their 3D/audio target is absent)."
  },
  "result_titles": {
   "fulltime": {
