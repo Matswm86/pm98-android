@@ -97,6 +97,15 @@ import does NOT restore the ball's nested controller), so the taker identity + "
 observations, NOT verified against silicon. Only silicon's ball TRAJECTORY (+x, from the captured b0040
 targets) is ground truth. Confirming silicon's taker/ball-velocity needs a live drive (ptrace_scope→0).
 
+## The kick is NOT a proximity kick (s39c)
+
+Dumped all 22 players' distance-to-ball at ticks 25/26: **no player is within 40000 units of the ball**
+(centre `(0,0)`) — the nearest is the frozen taker t0.i9 at **26214**, and none carries a kick action
+(`0x11/0x12/0x13/0x1d`). So the velocity `(−4338,12667)` is NOT set by a player reaching the ball; it is
+written by the **ball's own advance** (the `ball_advance` lerp/placement toward `+0x9c/+0xa0/+0xa4`, or the
+free-flight seed) or by the **restart/kickoff placement**. The mid-tick probe must watch `ball+0x20/0x24`
+writers, not player kick actions.
+
 ## NEXT (in order)
 
 1. **Name the exact function that writes the ball velocity `(−4338,12667)` at tick 26** (a mid-tick
