@@ -74,13 +74,36 @@ buffer aliasing is lossy, and at the kickoff centre `ball.pos ≈ 0 ≈` a short
 divergence (silicon's ball is moving), but flag it: if a stationary-ball-with-facing case is ever the
 oracle target, re-check this branch against a PcodeEmu run.
 
+## Taker trace — `app/tests/diag_m5_kickoff_taker.gd` (s39b)
+
+Follows the ball controller `ball+0x40` and t0.i9 per tick:
+
+```
+side(0x19c8)=1  0x45c=1  goal_x(0x1820)=+3768320
+t=20..25  ball [0,0] vel[0,0]  TAKER=t0.i9 facing=0x1606(31.0deg) pos=(-26214,-39) act=4 ctrl?=true
+t=26      ball kicked vel=[-4338,12667] (108.9deg)  t0.i9 UNCHANGED (facing 31, pos (-26214,-39))  ctrl?=false
+```
+
+Port-side facts (all from the port's own run):
+- The designated taker is **t0.i9** (team0 = Aston Villa, HOME), standing at `(-26214,-39)` — the **−x
+  half**, so Villa defends −x / attacks +x. It is **frozen** (never moves toward the ball, facing/action
+  constant) for all 26 ticks, then the ball is kicked at tick 26 and the controller clears.
+- The kick direction **108.9° is NOT the taker's facing (31°)** — it is an aim toward a target point, and
+  it points into Villa's OWN half (−x). Silicon's ball goes +x (75.3°, toward the attacking half). So the
+  kick-aim **X-component sign is flipped; Y matches** (~12667).
+
+CAVEAT: `ball+0x40 = t0.i9` is **port-computed** (`Pm98Match.build_match` seeds `ball[0x40]=0`; the frame-0
+import does NOT restore the ball's nested controller), so the taker identity + "frozen" are PORT
+observations, NOT verified against silicon. Only silicon's ball TRAJECTORY (+x, from the captured b0040
+targets) is ground truth. Confirming silicon's taker/ball-velocity needs a live drive (ptrace_scope→0).
+
 ## NEXT (in order)
 
-1. **Trace the kickoff kick in the port**: which player takes it, its facing/aim at the kick tick, and
-   the exact function that writes the ball's first velocity `(−4338,12667)` (`diag_m5_ball_onset`
-   pins it to tick 26). Compare the kicker's facing / attack-x-sign to silicon (live 89c0/ball-vel
-   capture, or trace the port's kickoff placement `Pm98Driver.restart_handler` +
-   `Pm98Match.kickoff_init` attack-side fields `+0x19c8/+0x45c`).
+1. **Name the exact function that writes the ball velocity `(−4338,12667)` at tick 26** (a mid-tick
+   probe of `Pm98Driver.tick`: log which team/player advance changes `ball+0x20/0x24`). The taker t0.i9
+   is frozen so the kick is NOT its `setup_kick`/`_lay_lob` off its own facing — find the pass/kickoff
+   aim that computes the target the ball is sent toward, and the **X-sign / attack-direction** term
+   (goal_x `+0x1820` is +3768320, side `+0x19c8`=1). Fix that sign so the aim points +x.
 2. Confirm whether the port kicks one tick LATE independently of the direction (silicon moving at
    tick 25, port at tick 26) — likely the same kickoff-arm-timing family as
    `M5_KICKOFF_ARM_TIMING_FIX.md`.
