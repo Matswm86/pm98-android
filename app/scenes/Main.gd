@@ -944,11 +944,18 @@ func _open_finance(club: Dictionary, club_name: String, season: String) -> void:
 ## EXIT) animated to the engine's event timeline. NOT a sprite pitch — the original's
 ## top-down 3D highlights were Actua-engine CD-only data, out of scope (see MatchScreen.gd).
 ## RETURN runs `on_back`. (`sub` unused now that the scoreline + clock live in MatchScreen.)
-## `result_data` (optional): when non-empty, the MATCH OPTIONS RESULTS tap opens the FULL TIME
-## read-out (MatchResultScreen) instead of seeking the BRIEF to 90'. Watched (non-career) matches
-## pass {} and keep the seek-to-full-time behaviour.
+## The presentation follows the stored MATCH OPTIONS view mode (BRIEF default): BRIEF runs the
+## commentary read-out; RESULTS jumps to the FULL TIME read-out (career, `result_data` non-empty)
+## or seeks the BRIEF to 90' (watched, `{}`); WATCH overlays the 2D simulador.
 func _open_match(home: Dictionary, away: Dictionary, hg: int, ag: int,
 		lines: Array, _sub: String, on_back: Callable, result_data: Dictionary = {}) -> void:
+	# The match presents in the view mode chosen in MATCH OPTIONS (persisted globally,
+	# default BRIEF) — NOT a forced per-match picker. RESULTS on a career match jumps
+	# straight to the source-true FULL TIME read-out (frame 083), no running BRIEF.
+	var mode: String = AudioManager.match_view_mode
+	if mode == "results" and not result_data.is_empty():
+		_open_result_readout(result_data, on_back)
+		return
 	var scr: MatchScreen = load("res://scenes/MatchScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
@@ -971,42 +978,26 @@ func _open_match(home: Dictionary, away: Dictionary, hg: int, ag: int,
 			scr.queue_free()
 			if on_back.is_valid():
 				on_back.call())
-	# The reversed MATCH OPTIONS view picker (WATCH/HIGHLIGHTS/BRIEF/RESULTS), source-exact
-	# rects from FUN_004e2630 (docs/re/match_view_re.md). Overlays the running match: BRIEF
-	# watches the commentary, RESULTS skips to full time; WATCH/HIGHLIGHTS show their source
-	# status (2D simulador = next build step; 3D .p3d data absent).
-	var opt: MatchOptions = load("res://scenes/MatchOptions.gd").new()
-	opt.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(opt)
-	opt.picked.connect(func(mode: String) -> void:
-		match mode:
-			"results":
-				# Career match: RESULTS -> the source-true FULL TIME read-out over the running
-				# BRIEF (which stays mounted beneath until CONTINUE). Watched match: seek to 90'.
-				if not result_data.is_empty():
-					opt.queue_free()
-					_open_result_readout(result_data, func() -> void:
-						scr.queue_free()
-						if on_back.is_valid():
-							on_back.call())
-					return
-				scr.seek(90.0)
-			"watch":
-				# WATCH -> the 2D GRAFICO simulador, fed the same timeline as BRIEF so the
-				# two views stay in lock-step (clock/score/possession). BRIEF drops back to
-				# the commentary screen underneath; EXIT leaves the match.
-				var sim: MatchSimulador = load("res://scenes/MatchSimulador.gd").new()
-				sim.set_anchors_preset(Control.PRESET_FULL_RECT)
-				add_child(sim)
-				sim.setup(str(home.get("name", "?")), str(away.get("name", "?")), hg, ag, lines,
-					int(home.get("id", -1)), int(away.get("id", -1)))
-				sim.brief_pressed.connect(func() -> void: sim.queue_free())
-				sim.back_pressed.connect(func() -> void:
-					sim.queue_free()
-					scr.queue_free()
-					if on_back.is_valid():
-						on_back.call())
-		opt.queue_free())
+	# RESULTS on a watched (non-career) match: skip the play, jump the BRIEF to full time.
+	if mode == "results":
+		scr.seek(90.0)
+		return
+	# WATCH: overlay the 2D GRAFICO simulador, fed the same timeline so both views agree on
+	# clock/score/possession. Its BRIEF button drops back to the commentary beneath; EXIT
+	# leaves the match. (HIGHLIGHTS cannot be confirmed in MATCH OPTIONS -- 3D .p3d absent -- so
+	# the stored mode is never "highlights"; BRIEF is the default running view.)
+	if mode == "watch":
+		var sim: MatchSimulador = load("res://scenes/MatchSimulador.gd").new()
+		sim.set_anchors_preset(Control.PRESET_FULL_RECT)
+		add_child(sim)
+		sim.setup(str(home.get("name", "?")), str(away.get("name", "?")), hg, ag, lines,
+			int(home.get("id", -1)), int(away.get("id", -1)))
+		sim.brief_pressed.connect(func() -> void: sim.queue_free())
+		sim.back_pressed.connect(func() -> void:
+			sim.queue_free()
+			scr.queue_free()
+			if on_back.is_valid():
+				on_back.call())
 
 
 # ---- views ---------------------------------------------------------------
@@ -2692,6 +2683,32 @@ func _menu_action(action: String, scr: MenuScreen) -> void:
 		# orphaned SquadScreen).
 		"sell": _show_squad_screen()
 		"results": _show_results_screen()
+		# Top dropdown bar: monitor icon -> MATCH OPTIONS (view-mode settings dialog),
+		# headphones icon -> the audio OPTIONS panel (MANAGER.INI volumes/transitions).
+		"match_options": _show_match_options(scr)
+		"options_audio": _show_audio_options(scr)
+
+## MATCH OPTIONS (hub dropdown monitor icon): the settings dialog where the view mode
+## (WATCH/HIGHLIGHTS/BRIEF/RESULTS) is chosen and switched, like the original PC version.
+## Opens showing the currently-stored mode; OK persists it (AudioManager), CANCEL discards.
+## The stored mode then drives how the next match presents (_open_match).
+func _show_match_options(_scr: MenuScreen) -> void:
+	var opt: MatchOptions = load("res://scenes/MatchOptions.gd").new()
+	opt.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(opt)
+	opt.setup(AudioManager.match_view_mode)
+	opt.confirmed.connect(func(m: String) -> void:
+		AudioManager.set_match_view_mode(m)
+		opt.queue_free())
+	opt.cancelled.connect(func() -> void: opt.queue_free())
+
+## OPTIONS (hub dropdown headphones icon): the audio panel (MANAGER.INI music/SFX/
+## transitions). Self-contained — it reads/writes AudioManager and dismisses on OK.
+func _show_audio_options(_scr: MenuScreen) -> void:
+	var op: OptionsPanel = load("res://scenes/OptionsPanel.gd").new()
+	op.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(op)
+	op.closed.connect(func() -> void: op.queue_free())
 
 ## OPPONENT: the real VIEW RIVAL (VERRIVAL) scouting screen for the manager's next opponent
 ## (docs/re/rival_screen_re.md; RivalScreen.gd) -- the opponent XI, team rating and formation,

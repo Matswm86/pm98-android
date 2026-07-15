@@ -29,6 +29,9 @@ var sfx_enabled := true
 var music_volume := 100          # MANAGER.INI "MUSIC VOLUME" (0-100)
 var sfx_volume := 100            # MANAGER.INI "SOUND VOLUME" (0-100)
 var transitions_enabled := true  # MANAGER.INI "TRANSITIONS"
+# MATCH OPTIONS view mode (WATCH/HIGHLIGHTS/BRIEF/RESULTS). The original stores the
+# chosen presentation globally (MANAGER.INI); default BRIEF = the user's main play mode.
+var match_view_mode := "brief"
 
 const _SETTINGS := "user://settings.cfg"
 const _MUSIC_DB := -8.0   # the module theme sits under the UI
@@ -64,6 +67,7 @@ func _load_settings() -> void:
 	music_volume = clampi(int(cf.get_value("audio", "music_volume", music_volume)), 0, 100)
 	sfx_volume = clampi(int(cf.get_value("audio", "sfx_volume", sfx_volume)), 0, 100)
 	transitions_enabled = bool(cf.get_value("ui", "transitions", transitions_enabled))
+	match_view_mode = str(cf.get_value("match", "view_mode", match_view_mode))
 
 
 func save_settings() -> void:
@@ -73,7 +77,14 @@ func save_settings() -> void:
 	cf.set_value("audio", "music_volume", music_volume)
 	cf.set_value("audio", "sfx_volume", sfx_volume)
 	cf.set_value("ui", "transitions", transitions_enabled)
+	cf.set_value("match", "view_mode", match_view_mode)
 	cf.save(_SETTINGS)
+
+
+## Persist the chosen MATCH OPTIONS view mode (WATCH/HIGHLIGHTS/BRIEF/RESULTS).
+func set_match_view_mode(mode: String) -> void:
+	match_view_mode = mode
+	save_settings()
 
 
 func set_music_volume(v: int) -> void:

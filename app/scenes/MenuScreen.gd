@@ -120,10 +120,14 @@ var _press: String = ""        # action currently held down (for the highlight)
 const DROP_H := 41.0
 const R_DROP_MON := Rect2(534, 6, 33, 32)   # monitor icon (frame-measured)
 const R_DROP_HP := Rect2(592, 6, 30, 30)    # headphones icon
+# Tapping the top edge reveals the bar (the original slides it down on top-edge hover;
+# the top band carries no active hub controls, verified — all ICON/BAR hits are y>=70).
+const R_DROP_TRIGGER := Rect2(0, 0, W, 20)
 var _drop_tex: Texture2D
 var _drop_open := false
 var _drop_anim := 0.0            # 0 = hidden, 1 = fully down
 var _drop_press := ""
+var _drop_just_opened := false   # swallow the release that completes the opening tap
 var _options: Control = null     # active OptionsPanel modal
 
 # The modal "PREMIER MANAGER 98" alert box (PMAlert; docs/re/alert_box_re.md).
@@ -214,11 +218,49 @@ func _next_alert() -> void:
 
 
 func _process(delta: float) -> void:
-	if _alert_tex == null or _alert_anim >= 1.0:
+	var busy := false
+	# alert box grow-in (FUN_005c5fd0 case 5/6)
+	if _alert_tex != null and _alert_anim < 1.0:
+		_alert_anim = minf(_alert_anim + delta / 0.25, 1.0)
+		busy = true
+	# dropdown bar slide (instant when TRANSITIONS OFF, like the original)
+	var target := 1.0 if _drop_open else 0.0
+	var am := get_node_or_null("/root/AudioManager")
+	if am != null and not am.transitions_enabled:
+		_drop_anim = target
+	elif not is_equal_approx(_drop_anim, target):
+		var step := delta / 0.18
+		_drop_anim = minf(_drop_anim + step, target) if target > _drop_anim \
+			else maxf(_drop_anim - step, target)
+		busy = true
+	if busy:
+		queue_redraw()
+	else:
 		set_process(false)
-		return
-	_alert_anim = minf(_alert_anim + delta / 0.25, 1.0)
+
+
+func _open_drop() -> void:
+	_drop_open = true
+	_drop_press = ""
+	set_process(true)
 	queue_redraw()
+
+func _close_drop() -> void:
+	_drop_open = false
+	_drop_press = ""
+	set_process(true)
+	queue_redraw()
+
+## Which dropdown target a design-space point hits when the bar is open:
+## "mon" (MATCH OPTIONS) / "hp" (audio OPTIONS) / "bar" (dead bar area) / "" (outside).
+func _drop_hit(d: Vector2) -> String:
+	if R_DROP_MON.has_point(d):
+		return "mon"
+	if R_DROP_HP.has_point(d):
+		return "hp"
+	if d.y <= DROP_H:
+		return "bar"
+	return ""
 
 
 ## The OK button rect in design space (EXE anchor: bottom-right, w-6 / h-6).
@@ -289,11 +331,37 @@ func _on_input(e: InputEvent) -> void:
 			_alert_ok_held = false
 		queue_redraw()
 		return
+	var dd := _to_design(pos)
+	# --- top dropdown bar: monitor = MATCH OPTIONS, headphones = OPTIONS (audio) ---
+	if _drop_open:
+		if pressed:
+			_drop_press = _drop_hit(dd)
+		else:
+			# The release that completes the opening tap must NOT immediately re-close.
+			if _drop_just_opened:
+				_drop_just_opened = false
+				_drop_press = ""
+				queue_redraw()
+				return
+			var dh := _drop_hit(dd)
+			var dwas := _drop_press
+			_drop_press = ""
+			_close_drop()
+			if dh == dwas and dh == "mon":
+				action_selected.emit("match_options")
+			elif dh == dwas and dh == "hp":
+				action_selected.emit("options_audio")
+		queue_redraw()
+		return
+	if pressed and R_DROP_TRIGGER.has_point(dd):
+		_open_drop()
+		_drop_just_opened = true
+		return
 	if pressed:
-		_press = _hit(_to_design(pos))
+		_press = _hit(dd)
 		queue_redraw()
 	else:
-		var a := _hit(_to_design(pos))
+		var a := _hit(dd)
 		var was := _press
 		_press = ""
 		queue_redraw()
@@ -411,8 +479,31 @@ func _draw() -> void:
 		if r.size != Vector2.ZERO:
 			draw_rect(r, C_HILITE, true)
 
+	if not dimmed:
+		_draw_dropdown()
+
 	if dimmed:
 		_draw_alert()
+
+
+## The top dropdown bar (hub_dropdown_bar.png): hidden by default, revealed by a tap on
+## the top edge, and carrying the MONITOR icon (opens MATCH OPTIONS) + HEADPHONES icon
+## (opens the audio OPTIONS panel). While open the hub behind is dimmed. When closed a
+## faint edge hint marks the pull zone (the original reveals on top-edge hover).
+func _draw_dropdown() -> void:
+	if _drop_anim <= 0.001:
+		draw_rect(Rect2(0, 0, W, 3), Color(0.45, 0.55, 0.85, 0.30), true)
+		return
+	draw_rect(Rect2(0, 0, W, H), Color(0.02, 0.03, 0.07, 0.45 * _drop_anim), true)
+	var y := -DROP_H * (1.0 - _drop_anim)
+	if _drop_tex != null:
+		draw_texture(_drop_tex, Vector2(0, y))
+	else:
+		draw_rect(Rect2(0, y, W, DROP_H), Color(0.05, 0.08, 0.22), true)
+	if _drop_press == "mon":
+		draw_rect(Rect2(R_DROP_MON.position + Vector2(0, y), R_DROP_MON.size), C_HILITE, true)
+	elif _drop_press == "hp":
+		draw_rect(Rect2(R_DROP_HP.position + Vector2(0, y), R_DROP_HP.size), C_HILITE, true)
 
 
 ## The modal alert box + its +5,+5 drop shadow. The finished box texture grows in

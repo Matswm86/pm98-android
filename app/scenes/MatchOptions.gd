@@ -14,16 +14,21 @@ class_name MatchOptions
 ## (docs/re/match_view_re.md: 98x25 buttons @ y100, panel-local x 5/109/214/317); the
 ## frame is the pixel source and the hit-rects below are frame-measured (absolute).
 ##
-## Routing (honest to what the source on hand can build):
-##   BRIEF    -> the built commentary MatchScreen (emit picked("brief"))
-##   RESULTS  -> MatchScreen seeked to full time  (emit picked("results"))
-##   WATCH    -> the 2D GRAFICO simulador          (emit picked("watch"))
+## This is the hub's MATCH OPTIONS settings dialog (opened from the top dropdown bar's
+## monitor icon), NOT a per-match popup: you SELECT a view mode and switch between them,
+## exactly like the original PC version. Tapping a mode only SELECTS it (highlight); OK
+## confirms + persists the choice, CANCEL discards. The stored mode then drives how the
+## next match presents (Main._open_match).
+##
+## View modes (honest to what the source on hand can build):
+##   BRIEF    -> the built commentary MatchScreen
+##   RESULTS  -> the instant FULL TIME read-out (no running match)
+##   WATCH    -> the 2D GRAFICO simulador
 ##   HIGHLIGHTS -> the 3D engine; its Actua `.p3d` model data is absent from the PM98
-##              disc AND the .rar, so it cannot be ported — it only highlights.
-##   CANCEL   -> dismiss to the running match (emit picked("brief"))
-##   OK       -> confirm the current selection (default BRIEF)
+##              disc AND the .rar, so it cannot be ported — it can be selected but warns.
 
-signal picked(mode: String)
+signal confirmed(mode: String)   # OK on a buildable mode: persist + close
+signal cancelled                 # CANCEL / dismiss: no change
 
 const W := 640
 const H := 480
@@ -50,6 +55,7 @@ const DEFAULT_SEL := 2   # BRIEF (the user's default play mode)
 
 const C_DIM := Color(0.02, 0.03, 0.07, 0.55)
 const C_PRESS := Color(1, 1, 1, 0.22)
+const C_SEL := Color(1.0, 0.82, 0.20)   # amber selection border on the chosen view mode
 # Honest source-status note shown when HIGHLIGHTS (3D) is tapped.
 const HL_NOTE := "HIGHLIGHTS: 3D engine. The Actua .p3d model data is absent from the PM98 disc and the .rar, so it cannot be ported."
 
@@ -66,6 +72,14 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	gui_input.connect(_on_input)
+	queue_redraw()
+
+
+## Open the dialog showing the currently-stored view mode as selected.
+func setup(current_mode: String) -> void:
+	var i := MODES.find(current_mode)
+	_sel = i if i >= 0 else DEFAULT_SEL
+	_note = ""
 	queue_redraw()
 
 
@@ -105,25 +119,24 @@ func _on_input(e: InputEvent) -> void:
 	queue_redraw()
 
 
-## Route a confirmed tap. Sets the selection and emits picked() for the buildable
-## modes; HIGHLIGHTS only shows its honest source-status note.
+## Route a confirmed tap. A view-mode tap only SELECTS that mode (like the original
+## radio row); OK confirms + persists the current selection, CANCEL discards. HIGHLIGHTS
+## can be selected but OK warns (its 3D .p3d data is absent and cannot be ported).
 func _activate(target: String) -> void:
 	_note = ""
 	match target:
-		"watch", "brief", "results":
-			_sel = MODES.find(target)
-			picked.emit(target)
-		"highlights":
-			_sel = MODES.find("highlights")
-			_note = HL_NOTE          # 3D .p3d absent — highlight only, no proceed
+		"watch", "highlights", "brief", "results":
+			_sel = MODES.find(target)   # select only; do not proceed
+			if target == "highlights":
+				_note = HL_NOTE
 		"ok":
 			var m: String = MODES[_sel]
 			if m == "highlights":
-				_note = HL_NOTE
+				_note = HL_NOTE          # 3D .p3d absent — can't confirm HIGHLIGHTS
 			else:
-				picked.emit(m)
+				confirmed.emit(m)
 		"cancel":
-			picked.emit("brief")     # dismiss to the running match
+			cancelled.emit()
 
 
 # ---- drawing -------------------------------------------------------------
@@ -134,6 +147,12 @@ func _draw() -> void:
 	draw_set_transform(_origin(s), 0.0, Vector2(s, s))
 	if _modal != null:
 		draw_texture(_modal, MODAL_XY)
+	# selection indicator: a bright border around the currently-chosen view mode
+	# (the baked frame shows RESULTS red; this shows the LIVE selection over any mode).
+	var sr := _rect(MODES[_sel])
+	if sr.size.x > 0:
+		draw_rect(sr.grow(2.0), C_SEL, false, 2.0)
+		draw_rect(sr, Color(C_SEL.r, C_SEL.g, C_SEL.b, 0.18), true)
 	# press feedback on the held target
 	if _press != "":
 		draw_rect(_rect(_press), C_PRESS, true)
