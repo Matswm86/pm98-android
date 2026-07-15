@@ -19,6 +19,7 @@ class_name MatchScreen
 ## engine's event stream (match_flow_re.md "renderable-today vs gap").
 
 signal back_pressed
+signal continue_pressed   # full time: leave the BRIEF for the separate RESULT page (frame 083)
 
 const W := 640
 const H := 480
@@ -101,7 +102,7 @@ func setup(home_name: String, away_name: String, hg: int, ag: int, lines: Array,
 	_away_kit = _kit_tex(away_id)
 	_feed = _honest_feed(lines)
 	_minute = 0.0
-	_playing = true
+	_playing = false        # frame 073: KICK OFF idle at 00:00; KICK OFF starts the stream
 	queue_redraw()
 
 
@@ -200,25 +201,20 @@ func _hit(d: Vector2) -> String:
 	for k in BTN:
 		if (BTN[k] as Rect2).has_point(d):
 			return k
-	# tapping the feed body skips to full time (watch the whole match at once)
-	if EVENTS.has_point(d):
-		return "skip"
 	return ""
 
 
 func _activate(target: String) -> void:
 	match target:
 		"kick":
+			# KICK OFF starts the match (frame 073 -> 077, events stream as the clock runs);
+			# at full time the same bottom button CONTINUES to the separate RESULT page (083).
 			if _minute >= 90.0:
-				back_pressed.emit()   # CONTINUE at full time
-			else:
-				_minute = 90.0        # skip to the final result
-				_playing = false
+				continue_pressed.emit()
+			elif not _playing:
+				_playing = true
 		"exit":
 			back_pressed.emit()
-		"skip":
-			_minute = 90.0
-			_playing = false
 		_:
 			pass   # LINE-UP/TACTICS/MAN-TO-MAN/STATISTICS: in-match chrome (no sub-screen here)
 

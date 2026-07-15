@@ -29,7 +29,7 @@ class_name FinanceScreen
 
 signal back_pressed      # RETURN button -> Main dismisses the screen
 signal prices_pressed    # RETAINED for Main compatibility; NOT emitted (see WIRING note)
-signal cheat_cash        # RETAINED for Main compatibility; NOT emitted (see WIRING note)
+signal cheat_cash        # HIDDEN gesture: 5 taps on the CURRENT WEEK / CASH cell (user-requested cheat)
 
 const W := 640
 const H := 480
@@ -49,6 +49,7 @@ const SEASON_RIGHT := 600
 const SEASON_Y := 60
 const LW_RIGHT := 245      # LAST WEEK value right edge
 const CW_RIGHT := 495      # CURRENT WEEK value right edge
+const CASH_BOX := Rect2(398, 452, 98, 18)  # CURRENT WEEK / CASH cell (frame 013) -- hidden cheat gesture
 const BOT_ROW_Y := [428, 442, 454]   # INCOME / EXPENSES / CASH value tops
 const BTN_RETURN := Rect2(515, 439, 118, 24)
 
@@ -85,6 +86,7 @@ var _club: String = ""       # not shown on this screen (kept for Main's setup c
 var _manager: String = ""    # ditto
 var _season: String = ""
 var _cash: int = 0
+var _cheat_taps: int = 0
 var _week: int = 0
 
 
@@ -126,6 +128,15 @@ func _on_input(e: InputEvent) -> void:
 	# The RETURN control is the only dismiss affordance the frame shows.
 	if BTN_RETURN.has_point(d):
 		back_pressed.emit()
+		return
+	# HIDDEN cheat (user-requested): 5 consecutive taps on the CURRENT WEEK / CASH cell.
+	if CASH_BOX.has_point(d):
+		_cheat_taps += 1
+		if _cheat_taps >= 5:
+			_cheat_taps = 0
+			cheat_cash.emit()
+	else:
+		_cheat_taps = 0
 
 
 # ---- helpers -------------------------------------------------------------

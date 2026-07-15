@@ -958,6 +958,19 @@ func _open_match(home: Dictionary, away: Dictionary, hg: int, ag: int,
 		scr.queue_free()
 		if on_back.is_valid():
 			on_back.call())
+	# Full time: the BRIEF hands off to the separate FULL TIME / RESULT page (frame 083),
+	# then CONTINUE from there returns to the hub (frame 084). Career match only has the
+	# read-out data; a watched match just leaves the running screen.
+	scr.continue_pressed.connect(func() -> void:
+		if not result_data.is_empty():
+			_open_result_readout(result_data, func() -> void:
+				scr.queue_free()
+				if on_back.is_valid():
+					on_back.call())
+		else:
+			scr.queue_free()
+			if on_back.is_valid():
+				on_back.call())
 	# The reversed MATCH OPTIONS view picker (WATCH/HIGHLIGHTS/BRIEF/RESULTS), source-exact
 	# rects from FUN_004e2630 (docs/re/match_view_re.md). Overlays the running match: BRIEF
 	# watches the commentary, RESULTS skips to full time; WATCH/HIGHLIGHTS show their source
@@ -1514,6 +1527,9 @@ func _show_lineup_screen() -> void:
 	scr.statistics_pressed.connect(func() -> void:
 		scr.queue_free()
 		_show_statistics_screen())
+	# The [+] card box beside each player opens his FICHA over the line-up (not dismissing it).
+	scr.player_info_pressed.connect(func(p: Dictionary) -> void:
+		_open_player_info(p, _mgr_club(), scr))
 
 ## The LINE-UP TRAINING sub-screen (TrainingScreen.gd; docs/re/training_screen_re.md):
 ## the squad's training grid + the selected player's attribute panel over the baked

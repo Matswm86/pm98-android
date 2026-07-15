@@ -71,18 +71,25 @@ func _run() -> void:
 	ok = _assert(absf(scr._minute - 58.0) < 0.01 and scr._score_at(scr._minute) == Vector2i(1, 1),
 		"seek(58) shows 1:1") and ok
 
-	# KICK OFF mid-match skips to full time; at full time it + EXIT emit back_pressed.
+	# KICK OFF starts the match (does NOT skip to full time). At full time the same button
+	# emits continue_pressed (-> RESULT page); EXIT emits back_pressed.
 	var backs: Array = []
+	var conts: Array = []
 	scr.back_pressed.connect(func() -> void: backs.append(true))
+	scr.continue_pressed.connect(func() -> void: conts.append(true))
 	scr.seek(20.0)
+	scr._playing = false
 	scr._on_input(_touch(scr.BTN["kick"].get_center(), true))
 	scr._on_input(_touch(scr.BTN["kick"].get_center(), false))
-	ok = _assert(scr._minute == 90.0 and backs.is_empty(), "KICK OFF mid-match skips to full time") and ok
+	ok = _assert(scr._playing and scr._minute < 90.0 and backs.is_empty() and conts.is_empty(),
+		"KICK OFF starts the match (no skip)") and ok
+	scr.seek(90.0)
 	scr._on_input(_touch(scr.BTN["kick"].get_center(), true))
 	scr._on_input(_touch(scr.BTN["kick"].get_center(), false))
+	ok = _assert(conts.size() == 1 and backs.is_empty(), "CONTINUE at full time emits continue_pressed") and ok
 	scr._on_input(_touch(scr.BTN["exit"].get_center(), true))
 	scr._on_input(_touch(scr.BTN["exit"].get_center(), false))
-	ok = _assert(backs.size() == 2, "CONTINUE (at full time) + EXIT each emit back_pressed (%d)" % backs.size()) and ok
+	ok = _assert(backs.size() == 1, "EXIT emits back_pressed") and ok
 
 	scr.queue_free()
 	print("\n%s" % ("ALL PASS" if ok else "FAILURES ABOVE"))

@@ -39,6 +39,7 @@ signal xi_changed         # a player was swapped into/within the XI -> Main pers
 signal training_pressed   # TRAINING  (T/I/S plate row 1) -> Main opens TrainingScreen
 signal injuries_pressed   # INJURIES  (T/I/S plate row 2) -> Main opens InjuriesScreen
 signal statistics_pressed # STATISTICS (T/I/S plate row 3) -> Main opens StatisticsScreen
+signal player_info_pressed(player: Dictionary) # the [+] card box at a row's left -> Main opens the FICHA
 
 const W := 640
 const H := 480
@@ -50,6 +51,7 @@ const XI_Y0 := 88                          # first XI fill top
 const ROW_PITCH := 16
 const ROW_X := 9                           # template left (card icon)
 const ROW_W := 429
+const PLUS_W := 15                         # the [+] card box (x9..24, frame 155) -> player FICHA
 const BAND_SUB_H := 23
 const BAND_RES_H := 22
 const NUM_CELL := [33, 17]                 # GDI-centred shirt-number cell
@@ -390,6 +392,10 @@ func _hit(d: Vector2) -> String:
 			return "down"
 	var fi := _row_at(d)
 	if fi >= 0:
+		# the [+] card box at the row's left opens the player's FICHA (frame 155); the rest
+		# of the row keeps the select-then-swap XI edit.
+		if d.x >= ROW_X and d.x < ROW_X + PLUS_W:
+			return "plus:%d" % fi
 		return "row:%d" % fi
 	return ""
 
@@ -443,11 +449,23 @@ func _on_input(e: InputEvent) -> void:
 					_clamp_scroll()
 					queue_redraw()
 				_:
-					if a.begins_with("row:"):
+					if a.begins_with("plus:"):
+						_tap_plus(int(a.substr(5)))
+					elif a.begins_with("row:"):
 						_tap_row(int(a.substr(4)))
 
 
 # ---- XI editing (select-then-swap) ---------------------------------------
+
+## The [+] card box: open the tapped player's FICHA (PlayerInfoScreen) over the line-up.
+func _tap_plus(i: int) -> void:
+	var items := _flat_items()
+	if i < 0 or i >= items.size() or items[i].get("t") != "row":
+		return
+	var p: Variant = _by_id.get(int(items[i]["pid"]))
+	if p is Dictionary:
+		player_info_pressed.emit(p)
+
 
 func _tap_row(i: int) -> void:
 	var items := _flat_items()
