@@ -1051,6 +1051,7 @@ static func kick_setup(p: Dictionary, m: Dictionary) -> void:
 ## by run_kicksetup_oracle.sh -> test_kicksetup.gd.
 static var move65a0_trace: Array = []
 static var steer_trace: Array = []                          # diag-only (gated on Pm98Rng._log_on)
+static var b0040_trace: Array = []                          # diag-only: _b0040_target inputs+terms
 
 
 static func move_dispatch(p: Dictionary, m: Dictionary, param_2: int, rng) -> bool:
@@ -1572,6 +1573,8 @@ static func _b0040_target(p: Dictionary) -> Array:
 	var lead := _dot3_16(rel, facedir)
 	var curve_rate := Pm98Trig._tdiv(Pm98Trig._i32(_g(p, 0x70) * _g(p, 0x3ac)), 15000) + _g(p, 0x3a8)
 	var point := [bx, by, bz]                                   # accumulator starts at ball.pos
+	var _lead0 := lead                                          # diag-only: initial lead estimate
+	var _kiters := 0                                            # diag-only: bisection iteration count
 
 	# --- CARRIER block (p+0x2bc!=0 && ctrl+0x4c==p): high/far ball -> steer ctrl+0x84 (asm 0x5b017c) ---
 	var to_common := true
@@ -1611,6 +1614,7 @@ static func _b0040_target(p: Dictionary) -> Array:
 			lead = Pm98Trig._tdiv(Pm98Trig._i32(nd + lead), 2)  # bisection
 			conv = absi(Pm98Trig._i32(lead - nd))
 			k += 1
+		_kiters = k                                         # diag-only
 
 		# marker-adjust (p+0x2bc): bump the lead distance toward a formation marker's projection
 		# (ball-relative) when it is farther along the facing. The point BASE stays ball.pos -- the
@@ -1637,11 +1641,36 @@ static func _b0040_target(p: Dictionary) -> Array:
 	# makes _clamp_i's max(lo, v) swallow every point up to the +x/+y corner (the M5 clk-12 kickoff-
 	# receiver "runs to the corner" divergence).
 	var m: Dictionary = _ref(p, 0x18c)
-	return [
+	var out := [
 		_clamp_i(int(point[0]), _si(m, 0x1828), _si(m, 0x1834)),
 		_clamp_i(int(point[1]), _si(m, 0x182c), _si(m, 0x1838)),
 		_clamp_i(int(point[2]), _si(m, 0x1830), _si(m, 0x183c)),
 	]
+	if MatchEngine.Pm98Rng._log_on:                             # diag-only: full input+term snapshot
+		b0040_trace.append({
+			"who": MatchEngine.Pm98Rng._who,
+			"p_pos": [px, py, pz],
+			"ball_pos": [bx, by, bz],
+			"ball_vel": [bvx, bvy, _g(ctrl, 0x28)],
+			"ball_face": _g(ctrl, 0x34) & 0xffff,
+			"facedir": [int(facedir[0]), int(facedir[1]), int(facedir[2])],
+			"p_2bc": _g(p, 0x2bc),
+			"ctrl_4c_is_p": is_same(ctrl.get(0x4c, null), p),
+			"p_70": _si(p, 0x70), "p_3ac": _si(p, 0x3ac), "p_3a8": _si(p, 0x3a8),
+			"curve_rate": curve_rate,
+			"carrier_84": [_si(ctrl, 0x84), _si(ctrl, 0x88), _si(ctrl, 0x8c)],
+			"mk_b0": _si(ctrl, 0xb0), "mk_bc": _si(ctrl, 0xbc),
+			"mk_cc": [_si(ctrl, 0xcc), _si(ctrl, 0xd0), _si(ctrl, 0xd4)],
+			"mk_d8": [_si(ctrl, 0xd8), _si(ctrl, 0xdc), _si(ctrl, 0xe0)],
+			"lead0": _lead0, "lead_final": lead, "kiters": _kiters,
+			"to_common": to_common,
+			"ball_stationary": (bvx == 0 and bvy == 0 and _g(ctrl, 0x28) == 0),
+			"point_preclamp": [int(point[0]), int(point[1]), int(point[2])],
+			"clamp_lo": [_si(m, 0x1828), _si(m, 0x182c), _si(m, 0x1830)],
+			"clamp_hi": [_si(m, 0x1834), _si(m, 0x1838), _si(m, 0x183c)],
+			"target": out,
+		})
+	return out
 
 
 ## FUN_005a7260 (__fastcall this=player): the per-tick BALL-TOUCH / dribble / pass / shot DECISION the

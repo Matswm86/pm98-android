@@ -6,7 +6,14 @@ Usage:
   m5_gdbrsp_steertgt.py <port> <lpid> <match_base_hex> <out.jsonl> \
       [team=1] [idx=9] [stop_clk=3] [bp_va_hex=5a89c0]
 
-s37 variant for the t1.i9 first-step steer-TARGET error (handoff-pm98-m5-t1i9-target).
+s37/s38 variant for the t1.i9 first-step steer-TARGET error (handoff-pm98-m5-t1i9-target).
+s38 ADDS the b0040 INPUT capture: at every matched 89c0 stop it also dumps the ctrl (ball)
+object (*(player+0x190)) fields _b0040_target reads -- ball_pos +4/8/c, ball_vel +0x20/24/28,
+ball_face +0x34, ctrl+0x4c==player, carrier +0x84.., markers +0xb0/bc/cc/d8 -- plus the
+player-side terms p+0x2bc/0x70/0x3ac/0x3a8. These diff 1:1 against diag_m5_b0040_inputs.gd,
+so the live drive names whether the port's (1647,2) is a wrong-INPUT (stale ball) or a
+wrong-COMPUTATION error. The port-side trace already showed ball_pos=[0,0,0] + ball_face=0
+at the arm step -> facedir=+x -> near-origin target; silicon's ball_face here is decisive.
 s36 proved (port-side) that t1.i9's one-quantum drift is a single first-step heading
 error (port 0x9ef5 vs silicon 0x9dc5, +0x130), caused by the first-step steer target
 being ~1.67 deg off port's (-142564, -218). The armwatch/dartwatch/seedwatch captures
@@ -152,6 +159,21 @@ def main() -> None:
             tgt = None
             if param2 is not None:
                 tgt = [i32_safe(param2), i32_safe(param2 + 4), i32_safe(param2 + 8)]
+            # ctrl (ball) object VA = *(player + 0x190); dump the EXACT fields the port's
+            # _b0040_target reads, so the live row diffs 1:1 vs diag_m5_b0040_inputs.gd.
+            ctrl_va = u32(target_va + 0x190)
+            ball = {
+                "ctrl_va": hex(ctrl_va),
+                "ball_pos": [i32_safe(ctrl_va + 4), i32_safe(ctrl_va + 8), i32_safe(ctrl_va + 0xC)],
+                "ball_vel": [i32_safe(ctrl_va + 0x20), i32_safe(ctrl_va + 0x24), i32_safe(ctrl_va + 0x28)],
+                "ball_face": u32(ctrl_va + 0x34) & 0xFFFF,
+                "ctrl_4c_is_p": u32(ctrl_va + 0x4C) == target_va,
+                "carrier_84": [i32_safe(ctrl_va + 0x84), i32_safe(ctrl_va + 0x88), i32_safe(ctrl_va + 0x8C)],
+                "mk_b0": i32_safe(ctrl_va + 0xB0),
+                "mk_bc": i32_safe(ctrl_va + 0xBC),
+                "mk_cc": [i32_safe(ctrl_va + 0xCC), i32_safe(ctrl_va + 0xD0), i32_safe(ctrl_va + 0xD4)],
+                "mk_d8": [i32_safe(ctrl_va + 0xD8), i32_safe(ctrl_va + 0xDC), i32_safe(ctrl_va + 0xE0)],
+            }
             row = {
                 "match": matched,
                 "stop": stops,
@@ -169,6 +191,12 @@ def main() -> None:
                 "yaw": u32(target_va + 0x64) & 0xFFFF,
                 "speed": i32_safe(target_va + 0x68),
                 "curve": i32_safe(target_va + 0x6C),
+                # player-side _b0040_target inputs (carrier gate + curve_rate terms)
+                "p_2bc": i32_safe(target_va + 0x2BC),
+                "p_70": i32_safe(target_va + 0x70),
+                "p_3ac": i32_safe(target_va + 0x3AC),
+                "p_3a8": i32_safe(target_va + 0x3A8),
+                "ball": ball,
             }
             fo.write(json.dumps(row) + "\n")
 
