@@ -123,9 +123,12 @@ func _run() -> bool:
 				print("  GOAL step=%d  %d' %s  %d-%d  clk=%d banked=%d half=%d rng=%d" % [
 					t, gd["minute"], gd["team_name"], cur[0], cur[1], gd["clk"], gd["banked"], gd["half"], gd["rng"]])
 		if t % 2000 == 0:
-			print("  ..step=%d  min=%d (clk=%d bank=%d half=%d ph=%d)  score=%d-%d  disp=%d" % [
+			var msg := "  ..step=%d  min=%d (clk=%d bank=%d half=%d ph=%d)  score=%d-%d  disp=%d head27e8=%d tail27ec=%d latch=%d" % [
 				t, ((_g(m, 0x19a8) + _g(m, 0x450)) * 0x2d) / max(1, _g(m, 0x19ac)),
-				_g(m, 0x450), _g(m, 0x19a8), _g(m, 0x19a0), _g(m, 0x448), cur[0], cur[1], _g(m, 0x1a38)])
+				_g(m, 0x450), _g(m, 0x19a8), _g(m, 0x19a0), _g(m, 0x448), cur[0], cur[1], _g(m, 0x1a38),
+				_g(m, 0x27e8), _g(m, 0x27ec), _g(m, 0x1a20)]
+			print(msg)
+			_prog(msg)   # durable progress (stdout is block-buffered under redirect)
 		if _g(m, 0x1a38) == 10:
 			over_at = t
 			break
@@ -141,7 +144,29 @@ func _run() -> bool:
 		print("  %d   %3d'   %-11s  %5d  %5d    %d    %d" % [
 			i + 1, gd["minute"], gd["team_name"], gd["clk"], gd["banked"], gd["half"], gd["rng"]])
 
+	# durable result (independent of stdout buffering)
+	var res := "RESULT steps=%d fulltime=%s score=%d-%d clk=%d banked=%d head27e8=%d tail27ec=%d latch=%d goals=%d" % [
+		t, ("YES" if over_at > 0 else "NO(CAP)"), _g(m, 0x478), _g(m, 0x798),
+		_g(m, 0x450), _g(m, 0x19a8), _g(m, 0x27e8), _g(m, 0x27ec), _g(m, 0x1a20), goals.size()]
+	_prog(res)
+	for i in range(goals.size()):
+		var gg: Dictionary = goals[i]
+		_prog("  GOAL#%d %d' %s clk=%d" % [i + 1, gg["minute"], gg["team_name"], gg["clk"]])
+
 	return _compare(goals, over_at, m, ref)
+
+
+## Durable progress/result writer (append) -- stdout is block-buffered when redirected to a file.
+func _prog(line: String) -> void:
+	var p := OS.get_environment("PM98_PROGRESS")
+	if p == "":
+		return
+	var f := FileAccess.open(p, FileAccess.READ_WRITE) if FileAccess.file_exists(p) else FileAccess.open(p, FileAccess.WRITE)
+	if f == null:
+		return
+	f.seek_end()
+	f.store_line(line)
+	f.close()
 
 
 ## Snapshot a goal at the instant Pm98Outer.step returned (score just incremented for `team`).

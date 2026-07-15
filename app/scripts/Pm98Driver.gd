@@ -47,15 +47,25 @@ extends RefCounted
 ##   Player-pointer match fields (+0x43c booked, +0x440 prepend, +0x444 scorer, +0x438
 ##   taker) are nested Dicts (or absent == null).
 ##
-## REPLAY/RECORD globals DAT_006d31c4 (playback) and DAT_00665d8c (record) are 0 in a live
-## deterministic sim, so the snapshot-ring and playback branches are SKIPPED (commented in
-## place). DISPLAY/SOUND (FUN_00590f00/f40/f60 sound, FUN_004e* commentary, all gated by
+## REPLAY/RECORD globals: playback DAT_006d31c4==0 (WATCH_PLAYBACK) so the playback branch and
+## the +0x27ec advance are skipped; record DAT_00665d8c==1 (WATCH_RECORD, LIVE-VALIDATED
+## 2026-07-15) so the tick advances the ring HEAD +0x27e8 every frame (counter only -- the
+## snapshot storage is display data). This keeps +0x27e8 > +0x27ec so the post-goal 0x1a20 latch
+## does NOT freeze the clock (Thread B fix). DISPLAY/SOUND (FUN_00590f00/f40/f60 sound, FUN_004e*
+## commentary, all gated by
 ## match+0x180a/+0x180b/+0x180c which FUN_00593a30 forces to 0 headless) are no-ops. The
 ## FUN_005ec240/FUN_005ec230 pairs that bracket skipped commentary are an RNG save/restore
 ## that net-zeros the seed and are dropped (only UNBRACKETED FUN_005ec250 advances it).
 
 const ENGINE_CONTINUE := 1
 const ENGINE_OVER := 0
+
+# Replay-record globals modeled for the WATCH match (the port reproduces WATCH, not the live/
+# highlights branch). DAT_00665d8c (record) and DAT_006d31c4 (playback) were LIVE-READ from a
+# real WATCH match 2026-07-15: record==1, playback==0. Record==1 makes the tick advance the ring
+# head +0x27e8 every frame so the post-goal latched early-out (0x1a20) releases -- see tick().
+const WATCH_RECORD := true    # DAT_00665d8c (live-read 1 in WATCH)
+const WATCH_PLAYBACK := false # DAT_006d31c4 (live-read 0 in WATCH; playback advances +0x27ec)
 
 # ---- diag-only ball-velocity change probe (gated on Pm98Rng._log_on; zero effect when off) ----
 # Records a row every time ball+0x20/+0x24 changes across a tagged tick sub-phase, so a diag
@@ -164,9 +174,18 @@ static func tick(m: Dictionary, rng: MatchEngine.Pm98Rng) -> int:
 			# FUN_00594410 commentary % -> FUN_00451180 display: no-op (guard div by +0x19ac).
 	m[0x181c] = _g(m, 0x287c)                          # L113 copy a display short
 
-	# --- replay record / playback (L114-163): SKIP in a live no-record run (DAT_00665d8c==0
-	# record flag, DAT_006d31c4==0 playback flag). The +0x27dc/+0x27e4 snapshot rings and
-	# FUN_005910c0/FUN_00591120 are not modeled here. ---
+	# --- replay record (L114-163): WATCH plays with the record flag DAT_00665d8c==1 and
+	# playback DAT_006d31c4==0 -- LIVE-VALIDATED 2026-07-15 (threadB_ring capture, Villa/Bolton
+	# WATCH: DAT_00665d8c read 1 at frame-0; +0x27e8 grew +1/frame while +0x27ec stayed 0 across
+	# a full goal->restart->resume; data in ~/MWM-AI/data/pm98-m4-oracle/threadB_ring_2026-07-15/).
+	# The record block increments the ring HEAD +0x27e8 by 1 every frame that reaches it (the
+	# 5-dword snapshot into +0x27e4 and the 12-dword +0x27dc ring are replay-display data with NO
+	# scoreline/event effect, so only the counter is modeled). +0x27ec (playback tail) advances
+	# ONLY when DAT_006d31c4!=0 (fn_00598740 L208), so it stays 0 in WATCH. This makes +0x27e8 >
+	# +0x27ec after frame 1, so the L105 latched early-out (0x1a20 set) RELEASES post-goal instead
+	# of freezing the clock -- the Thread B faithful-branch deadlock fix.
+	if WATCH_RECORD and not WATCH_PLAYBACK:            # DAT_00665d8c==1 && DAT_006d31c4==0
+		m[0x27e8] = _i(_g(m, 0x27e8) + 1)             # L136-139 ring-head advance (counter only)
 
 	# --- per-team idle counters (L164-179): if a team's +0x67c..+0x67f input bytes are all 0,
 	# bump its +0x748 idle counter; else clear it. Integer-only, no RNG, fed by nothing on the
