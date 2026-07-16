@@ -77,3 +77,72 @@ develop, promote, the guards, rollover age/release/re-scout, persistence + legac
 compat). Verified by a REAL render (`PM98_YOUTH_SHOT=1` under opengl3): the YOUTH TEAM
 screen with a READY gold prospect over four developing ones, and the SQUAD screen's now-live
 green YOUTH TEAM button (`screens/youth.png`, `screens/squad.png`).
+
+---
+
+## FRAME-TRUE SCREEN REBUILD (2026-07-16) — supersedes the screen section above
+
+The landscape-list screen described above was OUR layout, not the game's. The original
+YOUTH TEAM screen **is witnessed in the walkthrough** — main run frames `087_154632` /
+`088_154633` (RATING held) / `089_154635` (RETURN held) and run-3 frames `047_164509`
+(active scout search) / `048_164510` (SEARCH held) — and the screen was rebuilt
+frame-true against them (the earlier "staff is a separate deferred item" framing had
+gone stale once CLUB PERSONNEL shipped; the roster line "no walkthrough frame" for youth
+was never true — same lesson as league-tables' `feedback-verify-agent-not-found-claims`).
+
+**Witnessed layout** (both frames): shared live barra; SCOUT panel (portrait, black bar,
+purple name bar + gold stars, SEARCH CAPABILITY 2×3 tracks with YES/NO values, six LED
+toggles with labels, SEARCH plaque); PLAYERS FOUND panel (white interior, message);
+MANAGER panel (portrait, black bar, blue name bar + stars, "N PLAYERS" count, green
+YOUTH TEAM band, NAME/SP/ST/AG/QU/AV/ROL/WAGE/YEARS headers, 11 grey rows + folder
+icons + scrollbar); PARAMETERS/RATING plaque toggle (+ static red arrow); bottom-right
+HANDLING..SHOOTING tile grid; RETURN.
+
+**Build** (`tools/re/build_youth_chrome_from_frames.py` → `app/art/screens/youth/`):
+frame 087's body below the barra IS the authentic empty state and is baked verbatim as
+`youth_body.png` — only the six YES/NO value cells (re-striped from the tracks' own
+clean columns) and the PLAYERS FOUND interior (whited) are lifted out, because live
+values replace them. Sprites cut verbatim from the frames: available/lit LEDs, enabled
+SEARCH, PARAMETERS-unselected + RATING-selected plaques, star cells, and the three
+held-state rings (`search_held` 048 red / `rating_held` 088 white / `return_held` 089
+white). Facts decoded pixel-level along the way:
+
+- **Values are INK-CENTRED per cell** (staff-wage doctrine): NO x110..124 / YES
+  x107..127 share cx 117 (left col), cx 242 (right col). Face = **proman8 @ native 11**
+  (frame 'N' 7×7 = the atlas bitmap exactly).
+- **Message layout**: line 1 ink-centred on cx 476, line 2 LEFT-aligned to line 1's ink
+  start (087 both lines start x392; 047 both x344 — line 2 alone is NOT centred). Face =
+  **proman10 @ native 10** (frame 'e' 6×7 = its atlas; proman8 lowercase does NOT match).
+- **Star rows alternate TWO sprites** (cells 1/3/5 = A, 2/4 = B, pitch 11) on both the
+  scout and manager bars; a uniform sprite diffs on every even cell.
+- **Three LED states**: disabled (087, no scout — baked), available (047, scout hired),
+  lit (047 DRIBBLING/PASSING/SHOOTING = the selected capabilities).
+- **SEARCH has disabled art** (087 pale lettering, baked) vs enabled (047 yellow).
+- Column headers measured off the baked band: NAME x59..99, SP cx187, ST cx211.5,
+  AG cx237, QU cx262, AV cx287, ROL cx312, WAGE cx358.5, YEARS cx418.5.
+- Header seam pixel (58,522) is the ORIGINAL's own phase variance (in-season 44 vs
+  preseason 22 grey); excluded in the gate with that provenance.
+
+**Model wiring**: scout bar = `Staff.YOUTH_TEAM_SCOUT` hire, manager bar =
+`Staff.YOUTH_TEAM_MANAGER`; capabilities YES iff a scout is hired (the witnessed pair;
+a per-skill gradient is un-witnessed); LED taps toggle the search-skill selection;
+SEARCH → `Career.start_youth_search(skills)` → `youth_search` ticks in `advance_week`
+and resolves with the MANAGER.EXE strings ("finished his search" / "...hasn't found");
+the searching state renders frame 047's message. Duration (`YOUTH_SEARCH_WEEKS` = 2)
+and the find-chance (0.25 + 0.11·stars) are OUR reconstruction — the strings-decoded
+loop is the game's, the numbers are not RE'd.
+
+**Honest gaps (do NOT invent)**: filled roster-row rendering (rows witnessed EMPTY —
+values render in the game faces under the baked headers; WAGE/YEARS stay blank, youth
+contracts un-modelled); the filled PLAYERS FOUND list; frame 047's "3 PLAYERS" over an
+empty visible list (which counter that is is unresolved — live count = youth.size(),
+the oracle pins the witnessed text); the bottom-right skill-tile grid's behaviour
+(baked static, taps no-op); row-tap PROMOTE is an un-walked interaction (kept, no
+visual badge); the shared PMChrome live barra is an approximation of the original
+textured header (app-wide, tracked separately).
+
+**Verification**: `tools/re/diff_youth_parity.py` — ALL FIVE shots (`shot_youth_parity.gd`)
+diff **0px on the body** vs their binding frames (087/088/089/047/048).
+`test_youth_screen.gd` (33 asserts) covers chrome json, state machine, LED geometry,
+SEARCH signal gating, and the Career search model; `test_youth.gd` (model) + the full
+37-file screen sweep stay green. Live render re-verified via `PM98_YOUTH_SHOT=1`.

@@ -51,6 +51,7 @@ var news_log: Array = []                # newest-first club news {week,kind,text
 var training_intensity: String = Training.DEFAULT_INTENSITY   # Light/Normal/Intensive
 var youth: Array = []                   # the youth team: scouted youngsters (Youth.gd)
 var youth_seq: int = YOUTH_ID_BASE      # monotonic id minter for youth (above senior ids)
+var youth_search: Dictionary = {}       # running scout search {skills:Array, weeks:int}; {} = idle
 var staff: Array = []                   # hired backroom staff (Staff.gd)
 var staff_pool: Array = []              # staff available to hire (refreshed each season)
 var staff_seq: int = STAFF_ID_BASE      # monotonic id minter for staff candidates
@@ -141,6 +142,7 @@ const YOUTH_ID_BASE := 900000
 const YOUTH_SEED_COUNT := 5             # the academy crop a new career starts with
 const YOUTH_INTAKE_LO := 1             # a season's fresh intake (scout's haul) ...
 const YOUTH_INTAKE_HI := 3             # ... is this many youngsters
+const YOUTH_SEARCH_WEEKS := 2          # a scout search reports back after this many weeks
 const WONDERKID_MAX_YEAR := 3          # the guaranteed gem is scouted within a career's first 3 seasons
 
 # Backroom staff: candidates are minted from their own id base; a new career starts with no
@@ -523,6 +525,8 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 	# crossing the readiness line is reported so you know to look at the YOUTH TEAM screen.
 	for n in Youth.develop_week(rng, youth, Staff.youth_factor(staff)):
 		_news(n["kind"], n["text"])
+	# A running YOUTH TEAM SCOUT search ticks down and reports back (YOUTH TEAM screen).
+	_tick_youth_search(rng)
 	# F.A. Cup: any midweek tie whose scheduled league week has arrived is played
 	# now (open random draw, replays then penalties). The manager's own tie writes a
 	# news line and a cup run pays prize money; the rest resolves in the background so
@@ -1034,6 +1038,38 @@ func cycle_training() -> void:
 
 
 # ---- youth team ----------------------------------------------------------
+
+## Start a YOUTH TEAM SCOUT search (YOUTH TEAM screen's SEARCH button, frame 047's
+## "The scout is now searching..." state). Skill keys are the screen's cap_order ids.
+## No-op without a hired scout or with a search already running. The loop itself is
+## decoded from MANAGER.EXE strings (docs/re/youth_re.md): search -> "finished his
+## search" / "...hasn't found"; the duration/yield numbers are our reconstruction.
+func start_youth_search(skills: Array) -> void:
+	if youth_search.is_empty() and not Staff.member_in_role(staff, Staff.YOUTH_TEAM_SCOUT).is_empty():
+		youth_search = {"skills": skills.duplicate(), "weeks": YOUTH_SEARCH_WEEKS}
+		_news("youth", "The scout is now searching for players with selected capabilities.")
+
+## Weekly tick of a running scout search. On completion the scout either brings a
+## youngster into the youth setup (room permitting; better scouts find more often)
+## or reports back empty-handed — both with the original's news strings.
+func _tick_youth_search(rng: RandomNumberGenerator) -> void:
+	if youth_search.is_empty():
+		return
+	youth_search["weeks"] = int(youth_search.get("weeks", 1)) - 1
+	if int(youth_search["weeks"]) > 0:
+		return
+	youth_search = {}
+	var scout := Staff.member_in_role(staff, Staff.YOUTH_TEAM_SCOUT)
+	var stars := float(scout.get("stars", 0.0))
+	var room := Youth.SQUAD_CAP - youth.size()
+	if room > 0 and rng.randf() < 0.25 + 0.11 * stars:
+		for p in Youth.intake(rng, 1, youth_seq, Staff.youth_factor(staff)):
+			youth.append(p)
+			_news("youth", "The youth team scout has finished his search.")
+			_news("youth", "%s has joined your Youth Team." % p.get("name", "?"))
+		youth_seq += 1
+	else:
+		_news("youth", "The youth team scout has finished his search and hasn't found any players.")
 
 ## A season's youth turnover: every youngster ages a year; anyone over the graduation
 ## age who was never promoted is released to free a place; then the scout brings in a
@@ -2118,7 +2154,8 @@ func to_dict() -> Dictionary:
 		"shortlist": shortlist, "transfer_log": transfer_log,
 		"offers_left": offers_left, "news_log": news_log,
 		"training_intensity": training_intensity, "youth": youth,
-		"youth_seq": youth_seq, "staff": staff, "staff_pool": staff_pool,
+		"youth_seq": youth_seq, "youth_search": youth_search,
+		"staff": staff, "staff_pool": staff_pool,
 		"staff_seq": staff_seq, "free_agents": free_agents, "free_seq": free_seq,
 		"talents_used": talents_used,
 		"fa_cup": fa_cup,
@@ -2186,6 +2223,7 @@ static func from_dict(d: Dictionary) -> Career:
 	# rollover scouts a crop in. youth_seq defaults above the senior id space.
 	c.youth = d.get("youth", [])
 	c.youth_seq = int(d.get("youth_seq", YOUTH_ID_BASE))
+	c.youth_search = d.get("youth_search", {})
 	# Pre-staff saves load with no staff + an empty pool (effects default to 1.0); the
 	# first rollover refreshes a pool to hire from.
 	c.staff = d.get("staff", [])

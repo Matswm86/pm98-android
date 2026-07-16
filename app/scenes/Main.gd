@@ -1764,11 +1764,19 @@ func _show_youth_screen() -> void:
 	var scr: YouthScreen = load("res://scenes/YouthScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
-	scr.setup(_career.youth, "", _career.club_name, "£%s" % _fmt_int(_career.cash))
+	var refresh := func() -> void:
+		scr.setup(_career.youth, _career.staff, _career.manager_name, _career.club_name,
+			_career.season, _career.week + 1, _career.club_id,
+			not _career.youth_search.is_empty())
+	refresh.call()
+	scr.search_pressed.connect(func(skills: Array) -> void:
+		_career.start_youth_search(skills)
+		_career.save()
+		refresh.call())
 	scr.promote_requested.connect(func(pid: int) -> void:
 		_career.promote_youth(int(pid))
 		_career.save()
-		scr.setup(_career.youth, "", _career.club_name, "£%s" % _fmt_int(_career.cash))
+		refresh.call()
 		_refresh_squad_overlay())
 	scr.back_pressed.connect(func() -> void:
 		scr.queue_free()
