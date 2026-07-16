@@ -554,3 +554,28 @@ Bolton) → TRAINING/INJURIES/STATISTICS/TACTICS/PREDEF all mount frame-true.
 4. C2 data parity: real 97-98 fixture calendar, prior-season table seed, EQUIPOS
    contract economics, starting cash, FINANCE per-week model.
 5. FT read-out render fixes + in-match doors (need MAN-TO-MAN screen port).
+
+## C5 — User-witnessed items (2026-07-16 late session; frame-verified before logging)
+- **STAFF stars live-drift** (app/43 vs orig/45): original staff bars show few chunky
+  gold stars right-aligned (Withnail ★★, Smith ★½); app renders more, washed, smaller
+  stars overlapping the bar edge (Atkinson ~3½, Barton ~4½) + halo text style. The
+  07-16 "STAFF wages 0px vs frame 121" gate passes on the BAKED state — the LIVE
+  screen drifts. Pattern: 0px shot-parity ≠ live parity; verify by booting.
+- **Hub geometry overflow** (app/19 vs orig/31): centre-circle bars (club/opponent/
+  AWAY) are too wide, extend past the circle edge with shadows outside the frame;
+  upper-left identity block is one oversized blue panel overflowing its chrome vs the
+  original's two narrow grey bars. (On top of the C2 inverted-stack/content issues.)
+- **BRIEF feed still goals-only**: was never actually fixed — the earlier fix made
+  goal lines ride the REAL stat-engine vector (scorer+minute); the full
+  shots/saves/runs/crosses/corners feed requires the M5 positional-engine port (B4b).
+  Current rendering also truncates ("Goal by Milose", no club) though _honest_feed
+  builds "Goal by %s (%s)" — column clipping bug (MatchScreen draw).
+- **Goals credited to ONE side during BRIEF, corrected on the result page**
+  (user-witnessed): engine-league path verified OK in code (MatchSim goal dicts carry
+  credited `side`, MatchScreen._score_at splits by it; app/66 showed a correct 1-1).
+  Candidate cause for the user's runs: `MatchCommentary.gd:129` `g.get("side", 0)`
+  defaults EVERY goal to home when a path emits goal dicts without `side` — the FT
+  read-out uses stored hg/ag so the final page "corrects". Reproduce, then fix the
+  default to `scorer_side` fallback.
+- **FT read-out stadium/capacity + MAN OF THE MATCH wrong/empty** — confirmed C2 item,
+  user re-flagged; away stadium panel must FILL (original does), MoM name must render.
