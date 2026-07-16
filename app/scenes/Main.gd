@@ -2931,25 +2931,23 @@ func _iso_ymd(iso: String) -> Dictionary:
 		return {}
 	return {"y": int(p[0]), "m": int(p[1]), "d": int(p[2])}
 
-## The MENUPRINCIPAL NEWS view: the club's news feed (injuries, suspensions, returns
-## and the weekly result headline) as a PM98-chrome browse over the hub, newest first,
-## colour-coded by kind. Driven by Career.news_log. RETURN -> hub.
+## The hub NEWS control opens the original "News extra" newspaper overlay
+## (NOTICIAS; frame-baked from walkthrough 155-158 — docs/re/news_screen_re.md).
+## The hub stays visible around the page; [X] / tap-outside dismisses.
+var _news_overlay: NewsScreen = null
+
 func _show_club_news() -> void:
-	var rows: Array = []
-	var feed: Array = _career.news_log
-	if feed.is_empty():
-		rows.append({"text": "No club news yet -- play a week.", "enabled": false})
-	for n in feed:
-		var kind: String = str(n.get("kind", "")) if n is Dictionary else ""
-		var text: String = str(n.get("text", n)) if n is Dictionary else str(n)
-		var wk: int = int(n.get("week", 0)) if n is Dictionary else 0
-		rows.append({
-			"text": ("Wk %2d  %s" % [wk, text]) if wk > 0 else text,
-			"accent": _news_colour(kind), "enabled": false,
-		})
-	_mount_browse("%s  -  CLUB NEWS" % _career.club_name, "Latest first", rows,
-		func(_i: int) -> void: pass,
-		func() -> void: _dismiss_career_browse())
+	if _news_overlay != null and is_instance_valid(_news_overlay):
+		_news_overlay.queue_free()
+	var ov: NewsScreen = load("res://scenes/NewsScreen.gd").new()
+	ov.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(ov)
+	_news_overlay = ov
+	ov.setup(_career.news_log, _career.week, clampi(_career.tier - 1, 0, 3))
+	ov.back_pressed.connect(func() -> void:
+		if _news_overlay != null and is_instance_valid(_news_overlay):
+			_news_overlay.queue_free()
+		_news_overlay = null)
 
 ## The TRAINING screen on the hub's staff (EMPLE) icon. Tap the top row to cycle the
 ## training intensity (Light/Normal/Intensive -- the lever that trades faster player
@@ -2994,21 +2992,6 @@ func _show_training() -> void:
 				_career.save()
 				_show_training(),
 		func() -> void: _dismiss_career_browse())
-
-## Row accent for a news item by kind: injury red, suspension orange, return green,
-## result/other a neutral light.
-func _news_colour(kind: String) -> Color:
-	match kind:
-		"injury": return Availability.C_INJURY
-		"suspension": return Availability.C_SUSPENSION
-		"return": return Availability.C_RETURN
-		"develop": return Color(0.45, 0.82, 0.98)   # blue -- a player improved
-		"decline": return Color(0.78, 0.62, 0.42)   # bronze -- a player slipped
-		"cup": return Color(0.98, 0.86, 0.45)       # gold -- an F.A. Cup result
-		"youth": return Color(0.55, 0.85, 0.55)     # green -- youth academy news
-		"staff": return Color(0.70, 0.78, 0.95)     # steel -- backroom staff news
-		"contract": return Color(0.95, 0.80, 0.55)  # amber -- contract / wage news
-		_: return Color(0.86, 0.90, 0.96)
 
 ## Dismiss a browse overlay shown from the hub (results) and re-raise the hub beneath it.
 func _dismiss_career_browse() -> void:

@@ -305,7 +305,7 @@ the original does · **PARTIAL** · **STUB**.
 | finance (CAJA) | CAJA | FinanceScreen (og_12) | TRUE |
 | board (DECIS) | DIRECTIVA | DirectivaScreen (ma_14; meters derived) | TRUE |
 | stadium (ESTAD) | ESTADIO | StadiumScreen (ma_15, FUN_0051a6e0) | TRUE |
-| NEWS (control) | NOTICIAS folder (real news screen) | invented `Career.news_log` feed in BrowseScreen, Main.gd:2100-2115 | **SUBSTITUTE** |
+| NEWS (control) | NOTICIAS "News extra" overlay (walkthrough 155-158) | NewsScreen overlay (frame-baked pages, 0px parity x3; news_screen_re.md), Main `_show_club_news` | **TRUE** (fixed 2026-07-16) |
 | SAVE GAME (control) | original save flow | `_career.save()` + toast only, Main.gd:2030-2032 | **STUB** |
 | CONTINUE (control) | advance + match | real stat-engine result BUT invented watch/commentary (§B3) | **PARTIAL** |
 | EXIT (control) | leave to front door | flow OK, Main.gd:2029 | TRUE-ish (flow) |
