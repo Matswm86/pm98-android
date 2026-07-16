@@ -113,7 +113,8 @@ func _run() -> void:
 		and names.has("ICELAND") and names.has("ISRAEL"), "marker identities incl. frame-015 HUNGARY") and ok
 	ok = _assert(pre._country == "ENGLAND" and pre._country_clubs.size() == 20,
 		"boots on ENGLAND with the division's clubs") and ok
-	# pick two rivals + delete one; SKIP hands back the picks
+	# pick two rivals + delete one; SKIP consumes ONE slot (witnessed original
+	# semantics, audit §C2) and CONTINUE hands back the slots with the skip-hole
 	var done: Array = []
 	pre.preseason_done.connect(func(rv: Array) -> void: done.append_array(rv))
 	pre._rivals.append(clubs[0])
@@ -123,8 +124,13 @@ func _run() -> void:
 	ok = _assert(pre._rivals.size() == 1, "DELETE clears the last filled rival slot") and ok
 	pre._on_input(_tap(true, Vector2(560, 345)))    # SKIP
 	pre._on_input(_tap(false, Vector2(560, 345)))
-	ok = _assert(done.size() == 1 and str((done[0] as Dictionary).get("name", "")) == "CLUB 01",
-		"SKIP/CONTINUE emits the picked rivals") and ok
+	ok = _assert(done.is_empty(), "SKIP does not end the picker") and ok
+	ok = _assert(pre._rivals.size() == 2 and pre._rivals[1] == null,
+		"SKIP consumes one rival slot as a null hole") and ok
+	pre._on_input(_tap(true, Vector2(560, 452)))    # CONTINUE
+	pre._on_input(_tap(false, Vector2(560, 452)))
+	ok = _assert(done.size() == 2 and str((done[0] as Dictionary).get("name", "")) == "CLUB 01"
+		and done[1] == null, "CONTINUE emits picks + skip-holes in slot order") and ok
 	pre.queue_free()
 
 	# ---- PRESEASON venue rule (FUN_004c7570 + FUN_0057a340, captures 2026-07-12) --

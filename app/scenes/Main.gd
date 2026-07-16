@@ -1287,6 +1287,10 @@ func _begin_career(manager_name: String, league: Dictionary, club: Dictionary,
 	var dates := ["1997-08-01", "1997-08-04", "1997-08-06", "1997-08-08"]
 	var rivals_meta: Array = []
 	for i in preseason_rivals.size():
+		# null = a SKIPped slot (original SKIP consumes one date, audit §C2): that
+		# August date simply has no friendly; later picks keep their own slot dates.
+		if preseason_rivals[i] == null:
+			continue
 		var rc: Dictionary = preseason_rivals[i]
 		rivals_meta.append({"date": dates[i] if i < 4 else "", "club_id": int(rc.get("id", -1)),
 			"name": str(rc.get("name", "")), "home": bool(rc.get("home", false)),

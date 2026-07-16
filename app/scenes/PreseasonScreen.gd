@@ -98,7 +98,7 @@ var _country := "ENGLAND"         # country shown in the kit panel
 var _strip_country := ""          # black strip text; EMPTY until a flag is tapped (frame 013)
 var _country_clubs: Array = []    # clubs listed in the panel
 var _div := 0                     # England division filter index
-var _rivals: Array = []           # picked rival clubs (Dictionary), in slot order
+var _rivals: Array = []           # consumed slots in order: pick Dictionary, or null = SKIPped date
 var _press := ""
 var _leagues: Array = []
 var _clubs_of: Callable           # league_id -> clubs
@@ -262,7 +262,14 @@ func _on_input(e: InputEvent) -> void:
 	if was == "" or was != _target_at(d):
 		return
 	match was:
-		"skip", "continue":
+		"skip":
+			# Witnessed original semantics (parity run 2026-07-16, audit §C2): SKIP
+			# consumes ONE rival slot (its August date gets no friendly) and the
+			# active badge advances — it does NOT end the picker. A consumed-empty
+			# slot rides as null in slot order so later picks keep their own dates.
+			_rivals.append(null)
+			queue_redraw()
+		"continue":
 			preseason_done.emit(_rivals.duplicate())
 		"delete":
 			_rivals.pop_back()
@@ -422,7 +429,8 @@ func _draw_panel() -> void:
 			13, R_PANEL.size.x, true)
 	var taken := {_managed_id: true}
 	for rv in _rivals:
-		taken[int((rv as Dictionary).get("id", -1))] = true
+		if rv != null:
+			taken[int((rv as Dictionary).get("id", -1))] = true
 	for i in _country_clubs.size():
 		if i >= _kit_cols() * 2:
 			break
@@ -455,7 +463,9 @@ func _draw_panel() -> void:
 func _draw_rival(i: int) -> void:
 	var y: float = ROW_Y[i]
 	var active := i == _rivals.size()
-	var filled := i < _rivals.size()
+	# a consumed-but-SKIPped slot (null) keeps the washed empty look; only real
+	# picks light up and print the club + venue lines
+	var filled := i < _rivals.size() and _rivals[i] != null
 	var on := active or filled
 	var head: Texture2D = _riv_head["on" if on else "off"]
 	var bar: Texture2D = _riv_bar["on" if on else "off"]
