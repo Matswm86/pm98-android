@@ -80,17 +80,24 @@ bottom-left button **MANAGER INFO** (red ?) → **MANAGER HISTORY**. Frames
   `recursos\iconos\historial\flecha.bmp`, `POSITION | INTERCONT. | SUPERCUP |
   COCA COLA CUP | COMPETITION`. RECURSOS.PKF dir `HISTORIAL` = FLECHA.BMP.
 
-## Board-room entry discrepancy (OPEN — do not guess)
-Walkthrough frame `167_154921` (Manager League, **preseason** 1 Aug) shows NO
-MANAGER INFO button on BOARD OF DIRECTORS; the Promanager **week-1** capture
-(frame 14) has it. Two variables differ (mode, preseason-vs-season) — which
-one gates the button is UNRESOLVED. Also unresolved: frame 167's APPLY FOR
-LOAN middle column header reads `YEARS`; frame 14's reads `WEEK`. Both need
-either a Manager-League in-season capture or the EXE xref
-(`FUN_?` behind 0x25b674) before the app adds the button outside Promanager
-context. String 0x257844 "This option is only available in Manager League or
-in Promanager League" may relate (vs Trainer/Accountant levels), not to the
-mode split.
+## Board-room entry discrepancy — RESOLVED by witness (2026-07-16/17)
+**MANAGER INFO button = Promanager-gated** (audit §C0, s6 parity run): the
+Manager-League BOARD OF DIRECTORS witnessed at BOTH preseason
+(`parity-run-2026-07-16/orig/52_boardroom.png`) AND in-season Week 3
+(`orig/79_boardroom_inseason.png`) has NO button; the Promanager week-1
+capture (frame 14) has it. Phase eliminated as the variable.
+**APPLY FOR LOAN middle column = the same gate** (resolved s7, same captures):
+Manager League shows `N. | AMOUNT | YEARS | TO PAY | WEEK` in preseason
+(frame 167 + orig/52) AND in-season W3 (orig/79); Promanager wk1 (frame 14)
+shows `WEEK` in the middle column instead of `YEARS`. Button and loan header
+co-vary across all four witnesses.
+**Honest confound:** every Promanager witness is ALSO 3rd Division (that mode
+starts there); all ML witnesses are Premier. Mode-vs-division is not fully
+separated — a lower-division ML board (or a Premier-promoted Promanager)
+would discriminate. String 0x257844 "This option is only available in Manager
+League or in Promanager League" (vs Trainer/Accountant levels) still suggests
+level-based gating machinery exists; the EXE xref behind 0x25b674 remains the
+definitive close.
 
 ## END OF SEASON / END OF THE GAME (strings decoded, screens NOT witnessed)
 - `END OF THE SEASON` 0x25aa60 block: "The directors are pleased/disappointed
@@ -106,10 +113,15 @@ mode split.
   goal_game.bmp` (PKF dir FINOBJETIVO) = the game-completion screen.
 - Sacking is message text (0x261d44 "The Directors have held an urgent
   meeting," / 0x261d6f "and have sacked you as manager of the club.", plus the
-  squad-minimum and financial variants 0x261c90/0x261e18). **What screen
-  follows a sack is NOT witnessed and NOT string-provable** — whether the
-  original returns to OFFERS SELECTION, ends the career, or does something
-  else is an open question for the EXE sack code path.
+  squad-minimum and financial variants 0x261c90/0x261e18). **DECODED 2026-07-17
+  (see [`sack_path_re.md`](sack_path_re.md)):** the weekly board check
+  `FUN_00545fd0` (vtable 0x6338b0 slot 71) picks the message — financial
+  counter +0x224≥4 → 0x261e18, sack flag +0x294≠0 → 0x261d44/0x261d6f, squad
+  size +0x28≤15 (unless global DAT_0066b1e8 waives) → 0x261c90 — shows it in a
+  "PREMIER MANAGER 98" modal, then TEARS DOWN the surface (id 0xffff) and
+  returns. The next screen is built by the slot-0x11c caller, NOT in the sack
+  routine — **which surface follows remains open** (bounded trace list in
+  sack_path_re.md, or witness by engineering a squad-minimum sack in wine).
 
 ## SHIPPED 2026-07-16 — MANAGER HISTORY rebuilt frame-true (0px both states)
 `ManagerHistoryScreen.gd` + `tools/re/build_managerhistory_chrome_from_frames.py`
