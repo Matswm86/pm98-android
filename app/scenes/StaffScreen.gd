@@ -59,7 +59,8 @@ var _slots: Dictionary = {}
 var _buttons: Dictionary = {}
 var _body_y := 58
 
-var _fname: Font        # staff name + wage amount (proman)
+var _fname: Font        # staff name (proman)
+var _f8: Font           # wage amount (proman8 = the original's wage face, cap 8px)
 var _star_on := Color8(255, 210, 40)
 var _c_name := Color8(255, 255, 255)
 var _c_wage := Color8(0, 0, 0)
@@ -78,6 +79,7 @@ var _press := ""
 func _ready() -> void:
 	_body = load("res://art/screens/staff/personnel_body.png")
 	_fname = PMChrome.font("10")
+	_f8 = PMChrome.font("8")
 	var f := FileAccess.open("res://art/screens/staff/personnel_chrome.json", FileAccess.READ)
 	if f != null:
 		var parsed: Variant = JSON.parse_string(f.get_as_text())
@@ -202,6 +204,28 @@ func _txt_right(x_right: float, y_top: float, s: String, col: Color, sz: int) ->
 	draw_string(_fname, Vector2(x_right - w, y_top + _fname.get_ascent(sz)), s,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
 
+## Wage amount: centred on cx with its glyph TOP at y_top (frame-measured), in the
+## game face the original uses for every wage cell — proman8 at its native 11pt.
+## The original centres the INK box, not the advance box (frame 121: £45,000 ink
+## x241..291 centre 266.0 and £16,000 ink x242..289 centre 265.5 share one cx), so
+## the pen x comes from the per-char ink insets baked in wage_font_metrics.
+## Verified vs frame 121: row-profile identical (baseline = glyph top + 7).
+func _txt_center(cx: float, y_top: float, s: String, col: Color) -> void:
+	if _f8 == null:
+		return
+	var pen := cx - _f8.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x / 2.0
+	var fm: Dictionary = _spec.get("wage_font_metrics", {})
+	if not fm.is_empty() and s.length() > 0 and fm.has(s[0]) and fm.has(s[s.length() - 1]):
+		var adv := 0
+		for i in s.length() - 1:
+			adv += int((fm.get(s[i], [8, 0, 7]) as Array)[0])
+		var ink_x0 := float((fm[s[0]] as Array)[1])
+		var ink_x1 := float(adv + int((fm[s[s.length() - 1]] as Array)[2]))
+		pen = cx - (ink_x0 + ink_x1) / 2.0
+	# half-pixel centres floor (frame 121: £16,000 pen 242 from cx−23.5 = 242.5)
+	draw_string(_f8, Vector2(floorf(pen), y_top + 7), s,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 11, col)
+
 ## A small filled 5-point star, top-left cell at (x,y), width ~w. `on` = gold else off.
 func _star(cx: float, cy: float, r: float, col: Color) -> void:
 	var pts := PackedVector2Array()
@@ -241,12 +265,21 @@ func _blank_bar(slot: Dictionary) -> Color:
 	var bc: Array = slot.get("bar_color", [60, 60, 90])
 	var bar_col := Color8(bc[0], bc[1], bc[2])
 	var left_grow := 7
-	if str(slot.get("kind", "")) == "role" and not bool(slot.get("mirror", false)):
-		left_grow = 30
+	if str(slot.get("kind", "")) == "role":
+		# Mirrored role cards: the wage cell abuts the bar's LEFT edge (cell ends
+		# x413, bar starts x415) — growing left would paint bar colour over the
+		# cell's right columns (frame 121 keeps them white). Nothing is baked
+		# there, so no grow is needed on that side.
+		left_grow = 0 if bool(slot.get("mirror", false)) else 30
+	# Right extension: +1 on non-mirrored bars — their wage cell starts one column
+	# past the bar (role-L cell x218, bar ends x217; trainer-L cell x242, bar ends
+	# x241) and frame 121 keeps that first cell column white. Mirrored bars keep +2
+	# (nothing abuts their right edge but the baked portrait shadow).
+	var right_grow := 2 if bool(slot.get("mirror", false)) else 1
 	draw_rect(Rect2(bar.position.x - left_grow, bar.position.y - 1,
-		bar.size.x + left_grow + 2, bar.size.y + 2), bar_col, true)
-	var war := float(slot["wage_amount_right"])
-	draw_rect(Rect2(war - 100, float(slot["wage_amount_y"]) - 2, 108, 13), Color8(255, 255, 255), true)
+		bar.size.x + left_grow + right_grow, bar.size.y + 2), bar_col, true)
+	var wc: Array = slot["wage_cell"]
+	draw_rect(Rect2(wc[0], wc[1], wc[2], wc[3]), Color8(255, 255, 255), true)
 	return bar_col
 
 ## A role with no one hired: blank the bar + £cell, drawing nothing (frame-115 vacant).
@@ -269,9 +302,10 @@ func _draw_slot(role: String, data: Dictionary) -> void:
 	var star_off := 53.5 if str(slot.get("kind", "")) == "train" else 49.0
 	_stars(float(slot["stars_right"]) - star_off, float(slot["stars_y"]),
 		float(data.get("stars", 0.0)), bar_col)
-	# wage £amount (black), right-anchored; the red "WAGE" label is baked static
-	_txt_right(float(slot["wage_amount_right"]), float(slot["wage_amount_y"]),
-		_money(int(data.get("wage", 0))), _c_wage, 11)
+	# wage £amount (black), CENTERED in its cell like the original (frame-121 bboxes:
+	# role-L values share cx≈266 while their right edges differ — NOT right-aligned)
+	_txt_center(float(slot["wage_cx"]), float(slot["wage_top"]),
+		_money(int(data.get("wage", 0))), _c_wage)
 
 func _draw() -> void:
 	var s := _scale()

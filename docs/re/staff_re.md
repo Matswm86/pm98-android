@@ -172,3 +172,28 @@ sacking is selection-driven, the last card tapped is the selection). The old
   all 13 bars blanked, matching frame 115's empty state) + `staff_live.png` (a synthetic
   hired backroom, proving the data-driven overlay). The baked-chrome layout itself is
   100.00% exact-pixel vs frame 121 before the per-slot name blanking.
+
+## Wage-value layer made 0px source-exact (2026-07-16)
+The live wage £amounts were the last non-frame-true element of CLUB PERSONNEL. Root
+cause found by rendering the frame-121 backroom (`ref_staff`) and diffing: the old
+anchors were AUTHORED ("clear of SIGN/SACK"), not measured, and the draw was
+right-anchored while the ORIGINAL centres each amount's INK box in its cell.
+Frame-121 measurements (all 13 value bboxes):
+- role-L cell x218..308 (border 309-310), values share ink-centre **cx 266**
+  (£45,000 x241..291 / £16,000 x242..289 / £4,000 x245..287 — right edges differ,
+  so NOT right-aligned); role-R cell x336..413, **cx 374**; trainer-L **cx 287**;
+  trainer-R **cx 566** (£34,000 ink x541..591 — earlier reads to x608 were the baked
+  cell underline at y132, not text).
+- one face everywhere: **proman8 @ native 11pt** — per-row ink profile matches the
+  frame row-for-row; baseline = glyph top + 7 (tops: trainer by+8, role cell_y+11).
+- ink-centring needs the per-char ink insets (the atlas cells carry blank columns);
+  `build_staff_chrome_from_frames.py` now measures them off `proman8.png` and bakes
+  `wage_font_metrics` {ch: [xadvance, ink_lo, ink_hi]} into `personnel_chrome.json`.
+  Half-pixel centres floor (£16,000: pen = cx − 23.5 → 242, matches frame).
+- blank cells (`wage_cell`) now match the measured cells and stop short of the baked
+  underlines (trainer y132 etc.) — this also fixed live cards erasing a neighbour's
+  drawn value (the old 108-wide blanks overlapped the mirrored column: left-card
+  wages rendered truncated, e.g. "£36" for £36,500, on every hired career screen).
+Oracle: `shot_staff.gd` now also emits `staff_ref121.png` (the witnessed Man Utd
+backroom). Verified: **all 13 wage cells diff 0px vs frame 121**. Names/stars remain
+the app-wide substitute-font layer (stars ≤2px, 2026-07-14).

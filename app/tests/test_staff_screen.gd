@@ -30,6 +30,24 @@ func _run() -> void:
 		"SIGN / SACK / RETURN buttons present") and ok
 	ok = _assert(scr._body != null, "personnel_body.png baked chrome loaded") and ok
 
+	# --- wage geometry (frame-121 ink-centred cells; shot_staff ref121 = 0px oracle) ---
+	var wg := true
+	for r in expect:
+		var s: Dictionary = scr._slots[r]
+		wg = wg and s.has("wage_cx") and s.has("wage_top") \
+			and (s.get("wage_cell", []) as Array).size() == 4
+	ok = _assert(wg, "every slot carries wage_cx/wage_top/wage_cell") and ok
+	ok = _assert(int((scr._slots["PHYSIOTHERAPIST"] as Dictionary)["wage_cx"]) == 266
+		and int((scr._slots["PSYCHOLOGIST"] as Dictionary)["wage_cx"]) == 374
+		and int((scr._slots["HANDLING"] as Dictionary)["wage_cx"]) == 287
+		and int((scr._slots["PASSING"] as Dictionary)["wage_cx"]) == 566,
+		"wage cx anchors match the frame-121 ink centres (266/374/287/566)") and ok
+	var fm: Dictionary = scr._spec.get("wage_font_metrics", {})
+	var fmok := fm.size() >= 12
+	for c in ["£", ",", "0", "1", "9"]:
+		fmok = fmok and (fm.get(c, []) as Array).size() == 3
+	ok = _assert(fmok, "wage_font_metrics carries ink insets for £ , 0-9") and ok
+
 	# --- witnessed reference staff (frame 121) ---
 	var ref := scr.reference_staff()
 	ok = _assert(ref.size() == 13, "reference_staff has 13 members") and ok

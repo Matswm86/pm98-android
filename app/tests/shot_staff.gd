@@ -38,6 +38,18 @@ func _run() -> void:
 	node.setup({}, "MWM", "Manchester Utd.", "1997-98", 1, -1)
 	await _grab(dir, "staff_ref.png")
 
+	# 1b) frame-121 oracle: render the WITNESSED Man Utd backroom (ref_staff, the
+	# builder's pixel transcription of frame 121) so the live value layer (names/
+	# stars/wages) can be diffed against the original frame directly.
+	var spec_f := FileAccess.open("res://art/screens/staff/personnel_chrome.json", FileAccess.READ)
+	var ref121: Dictionary = {}
+	if spec_f != null:
+		var spec: Variant = JSON.parse_string(spec_f.get_as_text())
+		if typeof(spec) == TYPE_DICTIONARY:
+			ref121 = spec.get("ref_staff", {})
+	node.setup(ref121, "MWM", "Manchester Utd.", "1997-98", 1, -1)
+	await _grab(dir, "staff_ref121.png")
+
 	# 2) live overlay: a synthetic OTHER-club backroom over the baked cells
 	var live := {
 		"HANDLING": {"name": "R. Olsen", "stars": 2.0, "wage": 9000},

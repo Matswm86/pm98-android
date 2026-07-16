@@ -26,8 +26,14 @@
       "name_y": 114,
       "stars_right": 237,
       "stars_y": 115,
-      "wage_amount_right": 345,
-      "wage_amount_y": 124
+      "wage_cx": 287,
+      "wage_top": 122,
+      "wage_cell": [
+        242,
+        120,
+        87,
+        12
+      ]
     },
     "PASSING": {
       "label": "PASSING",
@@ -48,8 +54,14 @@
       "name_y": 114,
       "stars_right": 516,
       "stars_y": 115,
-      "wage_amount_right": 615,
-      "wage_amount_y": 124
+      "wage_cx": 566,
+      "wage_top": 122,
+      "wage_cell": [
+        522,
+        120,
+        86,
+        12
+      ]
     },
     "DRIBBLING": {
       "label": "DRIBBLING",
@@ -70,8 +82,14 @@
       "name_y": 149,
       "stars_right": 237,
       "stars_y": 150,
-      "wage_amount_right": 345,
-      "wage_amount_y": 159
+      "wage_cx": 287,
+      "wage_top": 157,
+      "wage_cell": [
+        242,
+        155,
+        87,
+        12
+      ]
     },
     "HEADING": {
       "label": "HEADING",
@@ -92,8 +110,14 @@
       "name_y": 149,
       "stars_right": 516,
       "stars_y": 150,
-      "wage_amount_right": 615,
-      "wage_amount_y": 159
+      "wage_cx": 566,
+      "wage_top": 157,
+      "wage_cell": [
+        522,
+        155,
+        86,
+        12
+      ]
     },
     "TACKLING": {
       "label": "TACKLING",
@@ -114,8 +138,14 @@
       "name_y": 184,
       "stars_right": 237,
       "stars_y": 185,
-      "wage_amount_right": 345,
-      "wage_amount_y": 194
+      "wage_cx": 287,
+      "wage_top": 192,
+      "wage_cell": [
+        242,
+        190,
+        87,
+        12
+      ]
     },
     "SHOOTING": {
       "label": "SHOOTING",
@@ -136,8 +166,14 @@
       "name_y": 184,
       "stars_right": 516,
       "stars_y": 185,
-      "wage_amount_right": 615,
-      "wage_amount_y": 194
+      "wage_cx": 566,
+      "wage_top": 192,
+      "wage_cell": [
+        522,
+        190,
+        86,
+        12
+      ]
     },
     "PHYSIOTHERAPIST": {
       "label": "PHYSIOTHERAPIST",
@@ -158,8 +194,14 @@
       "name_y": 252,
       "stars_right": 213,
       "stars_y": 253,
-      "wage_amount_right": 340,
-      "wage_amount_y": 262
+      "wage_cx": 266,
+      "wage_top": 261,
+      "wage_cell": [
+        218,
+        260,
+        91,
+        10
+      ]
     },
     "PSYCHOLOGIST": {
       "label": "PSYCHOLOGIST",
@@ -180,8 +222,14 @@
       "name_y": 252,
       "stars_right": 578,
       "stars_y": 253,
-      "wage_amount_right": 402,
-      "wage_amount_y": 262
+      "wage_cx": 374,
+      "wage_top": 261,
+      "wage_cell": [
+        336,
+        260,
+        78,
+        10
+      ]
     },
     "ASSISTANT_MANAGER": {
       "label": "ASSISTANT MANAGER",
@@ -202,8 +250,14 @@
       "name_y": 316,
       "stars_right": 213,
       "stars_y": 317,
-      "wage_amount_right": 340,
-      "wage_amount_y": 326
+      "wage_cx": 266,
+      "wage_top": 324,
+      "wage_cell": [
+        218,
+        323,
+        91,
+        10
+      ]
     },
     "SCOUT": {
       "label": "SCOUT",
@@ -224,8 +278,14 @@
       "name_y": 316,
       "stars_right": 578,
       "stars_y": 317,
-      "wage_amount_right": 402,
-      "wage_amount_y": 326
+      "wage_cx": 374,
+      "wage_top": 324,
+      "wage_cell": [
+        336,
+        323,
+        78,
+        10
+      ]
     },
     "YOUTH_TEAM_MANAGER": {
       "label": "YOUTH TEAM MANAGER",
@@ -246,8 +306,14 @@
       "name_y": 378,
       "stars_right": 213,
       "stars_y": 379,
-      "wage_amount_right": 340,
-      "wage_amount_y": 388
+      "wage_cx": 266,
+      "wage_top": 387,
+      "wage_cell": [
+        218,
+        386,
+        91,
+        10
+      ]
     },
     "YOUTH_TEAM_SCOUT": {
       "label": "YOUTH TEAM SCOUT",
@@ -268,8 +334,14 @@
       "name_y": 378,
       "stars_right": 578,
       "stars_y": 379,
-      "wage_amount_right": 402,
-      "wage_amount_y": 388
+      "wage_cx": 374,
+      "wage_top": 387,
+      "wage_cell": [
+        336,
+        386,
+        78,
+        10
+      ]
     },
     "GROUNDSMAN": {
       "label": "GROUNDSMAN",
@@ -290,8 +362,14 @@
       "name_y": 440,
       "stars_right": 213,
       "stars_y": 441,
-      "wage_amount_right": 340,
-      "wage_amount_y": 450
+      "wage_cx": 266,
+      "wage_top": 450,
+      "wage_cell": [
+        218,
+        449,
+        91,
+        10
+      ]
     }
   },
   "slot_order": [
@@ -417,5 +495,67 @@
       "stars": 4.5,
       "wage": 4000
     }
+  },
+  "wage_font_metrics": {
+    ",": [
+      4,
+      0,
+      1
+    ],
+    "0": [
+      8,
+      0,
+      6
+    ],
+    "1": [
+      5,
+      0,
+      3
+    ],
+    "2": [
+      8,
+      0,
+      6
+    ],
+    "3": [
+      8,
+      0,
+      6
+    ],
+    "4": [
+      8,
+      0,
+      6
+    ],
+    "5": [
+      8,
+      0,
+      6
+    ],
+    "6": [
+      8,
+      0,
+      6
+    ],
+    "7": [
+      8,
+      0,
+      6
+    ],
+    "8": [
+      8,
+      0,
+      6
+    ],
+    "9": [
+      8,
+      0,
+      6
+    ],
+    "\u00a3": [
+      8,
+      0,
+      6
+    ]
   }
 }
