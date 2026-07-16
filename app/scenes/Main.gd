@@ -25,6 +25,7 @@ var _on_activate: Callable
 var _career: Career = null              # active managed career, null on the menu
 var _hub: MenuScreen = null             # persistent MENUPRINCIPAL hub while in a career
 var _browse: BrowseScreen = null        # active PM98-chrome browse/select overlay (Track B)
+var _mgr_history: ManagerHistoryScreen = null   # active MANAGER HISTORY overlay (#14)
 var _seleccion: SeleccionScreen = null  # active new-career SELECCION overlay (faithful art)
 var _database: DataBaseScreen = null    # active DATA BASE squad-view overlay (reversed dbasewin)
 var _nivel: NivelScreen = null          # SELECT LEVEL OF THE GAME dialog (over the title)
@@ -711,10 +712,11 @@ func _free_overlays() -> void:
 				or c is FinanceScreen or c is TransferScreen or c is DirectivaScreen \
 				or c is StadiumScreen or c is CupScreen or c is YouthScreen \
 				or c is StaffScreen or c is BrowseScreen or c is TacticsScreen \
-				or c is PlayerInfoScreen or c is RivalScreen \
+				or c is PlayerInfoScreen or c is RivalScreen or c is ManagerHistoryScreen \
 				or c is TrainingScreen or c is InjuriesScreen or c is StatisticsScreen:
 			c.queue_free()
 	_browse = null
+	_mgr_history = null
 
 
 # ---- dev screenshot harness (inert unless PM98_SHOT_DIR is set) -----------
@@ -3523,48 +3525,50 @@ func _accept_job(offer: Dictionary) -> void:
 	_career.save()
 	_enter_career()
 
-## YOUR CAREER (#14): reputation + the current club + every past spell, most recent first.
-## The MANAGER INFO the board screen points at, here as a PM98-chrome browse.
+## MANAGER HISTORY (#14): the original screen behind the board's MANAGER INFO button
+## (live-witnessed 2026-07-16; docs/re/promanager_career_screens_re.md) — one spell row
+## per club (TEAM/DIVISION/POS./OBJ./DIRECTORS/PUBLIC) + the per-competition record
+## table with the TOTAL toggle. Replaces the invented "YOUR CAREER" browse (B5-1).
+## Board confidence was never stored for past spells, so their DIRECTORS/PUBLIC cells
+## stay honestly empty; only the current club carries the live board values.
 func _show_manager_career() -> void:
-	var rows: Array = []
-	rows.append({"text": "Reputation:  %d  -  %s" % [
-		int(round(_career.reputation)), Manager.reputation_label(_career.reputation)],
-		"accent": Color(1.0, 0.87, 0.0), "enabled": false})
-	rows.append({"text": "%s  (%s)" % [_career.club_name, _career.league_name],
-		"value": "now, season %d" % _career.seasons_at_club(),
-		"accent": Color(0.55, 0.85, 1.0), "enabled": false})
-	for i in range(_career.manager_history.size() - 1, -1, -1):
-		var h: Dictionary = _career.manager_history[i]
-		var span := str(h.get("from_season", "?"))
-		if str(h.get("to_season", "")) != span:
-			span = "%s to %s" % [span, str(h.get("to_season", ""))]
-		rows.append({
-			"text": "%s  (%s)" % [str(h.get("club_name", "?")), str(h.get("league_name", ""))],
-			"value": "%s, %s" % [span, _spell_reason(h)],
-			"accent": _spell_colour(h), "enabled": false})
-	if _career.manager_history.is_empty():
-		rows.append({"text": "Your first job  -  make your name here.", "enabled": false})
-	var clubs_managed := _career.manager_history.size() + 1
-	_mount_browse("YOUR CAREER", "%d club%s managed" % [
-		clubs_managed, "" if clubs_managed == 1 else "s"], rows,
-		func(_i: int) -> void: pass,
-		func() -> void: _dismiss_career_browse())
+	if _mgr_history != null and is_instance_valid(_mgr_history):
+		_mgr_history.queue_free()
+	var scr: ManagerHistoryScreen = load("res://scenes/ManagerHistoryScreen.gd").new()
+	_mgr_history = scr
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	var spells: Array = []
+	for h in _career.manager_history:
+		spells.append({"team": str(h.get("club_name", "?")),
+			"division": _div_short(str(h.get("league_name", ""))),
+			"pos": str(h.get("final_pos_str", "")),
+			"obj": "", "directors": "", "public": ""})
+	var bp := _board_panel()
+	spells.append({"team": _career.club_name, "division": _div_short(_career.league_name),
+		"pos": "%d%s" % [_career.position(), _ord_suffix(_career.position())],
+		"obj": "YES" if _career.objective_met() else "NO",
+		"directors": str(clampi(int(round(int(bp["directors"]) / 10.0)), 0, 10)),
+		"public": str(clampi(int(round(int(bp["supporters"]) / 10.0)), 0, 10))})
+	scr.setup(_career.manager_name, spells, _career.competition_record(),
+		_career.competition_total())
+	scr.back_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		scr.queue_free()
+		_mgr_history = null)
 
-## A short tag for how a spell ended ("sacked" / "resigned" / "left ...").
-func _spell_reason(h: Dictionary) -> String:
-	var r := str(h.get("reason", ""))
-	if r == "sacked" or r == "relegated":
-		return "%s, sacked" % str(h.get("final_pos_str", "?"))
-	return "%s, %s" % [str(h.get("final_pos_str", "?")), r]
-
-func _spell_colour(h: Dictionary) -> Color:
-	var r := str(h.get("reason", ""))
-	if r == "sacked" or r == "relegated":
-		return Color(0.92, 0.40, 0.36)   # a sacking reads red
-	return Color(0.80, 0.82, 0.88)
+## The witnessed division short-forms ("3rd Div." in OFFERS SELECTION / MANAGER
+## HISTORY; "Premier" on the news side-tabs). Foreign league names pass through.
+func _div_short(league_name: String) -> String:
+	match league_name:
+		"Premier League": return "Premier"
+		"Division One": return "1st Div."
+		"Division Two": return "2nd Div."
+		"Division Three": return "3rd Div."
+	return league_name
 
 ## Real-render of the manager-career flow (#14): take a weak club, miss the board's target,
-## be sacked, render the JOB OFFERS list, take a job, render YOUR CAREER. PM98_MANAGER_SHOT.
+## be sacked, render the JOB OFFERS list, take a job, render MANAGER HISTORY. PM98_MANAGER_SHOT.
 func _manager_shot() -> void:
 	var dir := OS.get_environment("PM98_SHOT_DIR")
 	if GameDB.leagues.is_empty():

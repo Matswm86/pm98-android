@@ -96,6 +96,8 @@ var sacked: bool = false                # set at season end when the board dismi
 var sack_reason: String = ""            # "relegated" / "missed" (for the end-of-season message)
 var headhunt_pending: bool = false      # a stronger club is courting you after a strong season
 var spell_start_year: int = 1           # the career `year` you joined the current club
+var comp_total: Dictionary = {}         # career-total per-competition record (MANAGER HISTORY
+                                        # TOTAL view); past seasons/spells fold in at rollover
 var _rep_year: int = 0                  # guard: the season `year` the board review was applied
 
 # Coca-Cola Cup options: two-legged rounds, a single-leg final, sequential round labels
@@ -968,9 +970,109 @@ func board_review() -> Dictionary:
 func offer_band() -> Dictionary:
 	return Manager.offer_band(reputation, sacked)
 
+# ---- per-competition record (MANAGER HISTORY screen) ----------------------
+# The original's lower MANAGER HISTORY table: COMPETITION | PLA WIN DR LOS GF GA
+# (witnessed 2026-07-16; docs/re/promanager_career_screens_re.md). Computed from
+# the season's REAL stored results — league `results`, each cup bracket's manager
+# ties (replays + both legs of two-legged rounds counted as their own matches, ET
+# goals folded into leg 2), and the one-off finals dicts. Nothing is estimated.
+
+const COMP_STATS := {"pla": 0, "win": 0, "dr": 0, "los": 0, "gf": 0, "ga": 0}
+
+static func _comp_acc(row: Dictionary, mine: int, theirs: int) -> void:
+	row["pla"] = int(row["pla"]) + 1
+	row["gf"] = int(row["gf"]) + mine
+	row["ga"] = int(row["ga"]) + theirs
+	if mine > theirs:
+		row["win"] = int(row["win"]) + 1
+	elif mine == theirs:
+		row["dr"] = int(row["dr"]) + 1
+	else:
+		row["los"] = int(row["los"]) + 1
+
+## The manager's matches in one cup bracket. Byes play no match; a drawn single-leg
+## tie's replay is a second match (a pens decision leaves the replay a draw); a
+## two-legged tie is two matches, extra time counting inside leg 2's score.
+func _cup_record(b: Dictionary) -> Dictionary:
+	var row := COMP_STATS.duplicate()
+	for rd in b.get("rounds", []):
+		for tie in rd.get("ties", []):
+			var t: Dictionary = tie
+			if bool(t.get("bye", false)):
+				continue
+			var home := int(t.get("home_id", -1)) == club_id
+			if not home and int(t.get("away_id", -1)) != club_id:
+				continue
+			if t.has("leg1_hg"):
+				var l2h := int(t["leg2_hg"]) + int(t.get("et_hg", 0))
+				var l2a := int(t["leg2_ag"]) + int(t.get("et_ag", 0))
+				_comp_acc(row, int(t["leg1_hg"]) if home else int(t["leg1_ag"]),
+					int(t["leg1_ag"]) if home else int(t["leg1_hg"]))
+				_comp_acc(row, l2h if home else l2a, l2a if home else l2h)
+			else:
+				_comp_acc(row, int(t.get("hg", 0)) if home else int(t.get("ag", 0)),
+					int(t.get("ag", 0)) if home else int(t.get("hg", 0)))
+				if t.has("replay_hg"):
+					_comp_acc(row, int(t["replay_hg"]) if home else int(t["replay_ag"]),
+						int(t["replay_ag"]) if home else int(t["replay_hg"]))
+	return row
+
+## A one-off final (Charity Shield / Supercup / Intercontinental): one match if the
+## manager's club was in it (a pens decision records as the draw it finished).
+func _oneoff_record(tie: Dictionary) -> Dictionary:
+	var row := COMP_STATS.duplicate()
+	if tie.is_empty():
+		return row
+	var home := int(tie.get("home_id", -1)) == club_id
+	if not home and int(tie.get("away_id", -1)) != club_id:
+		return row
+	_comp_acc(row, int(tie.get("hg", 0)) if home else int(tie.get("ag", 0)),
+		int(tie.get("ag", 0)) if home else int(tie.get("hg", 0)))
+	return row
+
+## This season's record at the current club, keyed by the screen's fixed row order.
+func competition_record() -> Dictionary:
+	var lg := COMP_STATS.duplicate()
+	for r in results:
+		_comp_acc(lg, int(r["hg"]) if bool(r["home"]) else int(r["ag"]),
+			int(r["ag"]) if bool(r["home"]) else int(r["hg"]))
+	return {
+		"league": lg,
+		"fa_cup": _cup_record(fa_cup),
+		"coca_cola": _cup_record(league_cup),
+		"charity": _oneoff_record(charity_shield),
+		"uefa": _cup_record(euro.get("uefa_cup", {})),
+		"cup_winners": _cup_record(euro.get("cup_winners_cup", {})),
+		"european_cup": _cup_record(euro.get("european_cup", {})),
+		"supercup": _oneoff_record(supercup),
+		"intercont": _oneoff_record(intercontinental),
+	}
+
+## Fold the (finished) season's record into the career total. Called once at each
+## season boundary — advance_season (staying) or record_spell (leaving) — the two
+## paths are mutually exclusive, so nothing double-counts.
+func _fold_comp_total() -> void:
+	var rec := competition_record()
+	for k in rec:
+		var tot: Dictionary = comp_total.get(k, COMP_STATS.duplicate())
+		for s in rec[k]:
+			tot[s] = int(tot.get(s, 0)) + int(rec[k][s])
+		comp_total[k] = tot
+
+## Career total INCLUDING the season in progress (the screen's TOTAL view).
+func competition_total() -> Dictionary:
+	var rec := competition_record()
+	for k in rec:
+		var tot: Dictionary = comp_total.get(k, {})
+		for s in tot:
+			rec[k][s] = int(rec[k][s]) + int(tot[s])
+	return rec
+
+
 ## Record the current club as a finished spell in the manager's history. `reason` is how it
 ## ended ("sacked" / "resigned" / "left for X"). Captures the span + the final standing.
 func record_spell(reason: String) -> void:
+	_fold_comp_total()
 	manager_history.append({
 		"club_id": club_id, "club_name": club_name, "league_name": league_name,
 		"from_season": _season_label(spell_start_year), "to_season": season,
@@ -1709,6 +1811,9 @@ func _money(n: int) -> String:
 ## a free. Fixtures, table and objective are rebuilt from the current squads.
 func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool: Array = [],
 		sa_champion: Dictionary = {}, talent_pool: Array = []) -> void:
+	# Fold the finished season's per-competition record into the career total while
+	# results/brackets still hold it (MANAGER HISTORY's TOTAL view).
+	_fold_comp_total()
 	# Capture this season's honours BEFORE the table + European brackets are rebuilt --
 	# they seed next season's Charity Shield, European qualification, and the
 	# Supercup/Intercontinental (which need this season's European winners + ratings).
@@ -2169,6 +2274,7 @@ func to_dict() -> Dictionary:
 		"euro_winner_names": _str_keyed(euro_winner_names),
 		"supercup": supercup, "intercontinental": intercontinental,
 		"reputation": reputation, "manager_history": manager_history,
+		"comp_total": comp_total,
 		"pending_offers": pending_offers, "sacked": sacked, "sack_reason": sack_reason,
 		"headhunt_pending": headhunt_pending, "spell_start_year": spell_start_year,
 		"rep_year": _rep_year,
@@ -2265,6 +2371,7 @@ static func from_dict(d: Dictionary) -> Career:
 	# spell starting in the save's own year, so an in-flight career carries on seamlessly.
 	c.reputation = float(d.get("reputation", Manager.REP_START))
 	c.manager_history = d.get("manager_history", [])
+	c.comp_total = d.get("comp_total", {})
 	c.pending_offers = d.get("pending_offers", [])
 	c.sacked = bool(d.get("sacked", false))
 	c.sack_reason = str(d.get("sack_reason", ""))

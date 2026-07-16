@@ -111,14 +111,31 @@ mode split.
   original returns to OFFERS SELECTION, ends the career, or does something
   else is an open question for the EXE sack code path.
 
-## App implications (B5-1 closure map)
-- `_show_manager_career()` (Main.gd YOUR CAREER browse) → rebuild as
-  MANAGER HISTORY frame-true. Data map: spells = `Career.manager_history` +
-  current (TEAM/DIVISION/POS./OBJ.); DIRECTORS/PUBLIC exist for the CURRENT
-  club only (past spells never stored them — render witnessed format for
-  current, honest `-` for past). Lower table: LEAGUE row computable from
-  `Career.results`; cup rows from the season's bracket state; multi-season
-  accumulation starts when the screen ships (no retroactive data — honest).
+## SHIPPED 2026-07-16 — MANAGER HISTORY rebuilt frame-true (0px both states)
+`ManagerHistoryScreen.gd` + `tools/re/build_managerhistory_chrome_from_frames.py`
+(bakes `app/art/screens/managerhistory/body.png` + `total_on.png` from frames
+15/16) + `diff_managerhistory_parity.py`: **0px on the FULL 640x480** vs both
+witnessed states. Decoded in the build:
+- Upper table: 13 rows, y=96+15r, fill h14; cells TEAM 20..117 (navy 0,0,128) /
+  DIVISION 119..201 (80,100,120) / POS. 203..243 (60,80,100) / OBJ. 245..285
+  (30,52,98) / DIRECTORS 287..369 / PUBLIC 371..453; text **proman8@11**
+  (glyph-verified), ink top = fill top+4; TEAM left-pad 3, POS. left-pad 9
+  (single-witness: centring puts "23rd" at 209, witnessed 212 — NOT centred),
+  DIVISION/OBJ./DIRECTORS/PUBLIC advance-centred floored.
+- Lower table: rows y=334+15r; data cols alternate fills PLA/DR/GF (204,204,255)
+  vs WIN/LOS/GA (180,180,220); numbers proman8@11 black, centred; plaque name
+  proman12@13 ink (30,52,98) advance-centred, baseline 33.
+- **TOTAL recolour (witnessed frame 16):** when TOTAL is lit the spell row drops
+  its gold: white on the navy cells (TEAM/OBJ.), black on the slate cells.
+  Gold is plausibly the current-spell highlight — un-witnessed beyond one row.
+- Data: `Career.competition_record()` (league `results`, cup-bracket manager
+  ties incl. replays + both legs with ET folded into leg 2, one-off finals) +
+  `comp_total` folded at each season boundary (advance_season / record_spell,
+  mutually exclusive paths), saved/loaded. TOTAL view = folded + running season.
+  Past spells' DIRECTORS/PUBLIC were never stored → honest empty cells;
+  accumulation starts at ship (no retroactive data). POSITION column stays
+  empty (filled format un-witnessed). Tests `test_manager_history_screen.gd`
+  20/20 + `test_manager`/`test_career` green; PM98_MANAGER_SHOT real-render OK.
 - `_show_job_offers()` (JOB OFFERS browse) → rebuild as OFFERS SELECTION's
   `OFFERS FOR` panel + club-detail popup chrome. The app fires it post-sack /
   headhunt (original post-sack surface unknown, above) — using the original
