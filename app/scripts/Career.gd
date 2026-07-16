@@ -266,6 +266,11 @@ func _seed_squad(club_dict: Dictionary) -> Array:
 	var out: Array = []
 	for p in club_dict.get("players", []):
 		var dup: Dictionary = (p as Dictionary).duplicate(true)
+		if dup.get("age") == null:
+			# FUN_005820f0 @0x58228a: out-of-range birth year -> age 25 + rand(0..4),
+			# substituted at record load (GameDB does this for the shipped DB; this
+			# guard covers rosters seeded from raw JSON, e.g. test harnesses).
+			dup["age"] = 25 + form_rng.randi_range(0, 4)
 		var age := int(dup.get("age", 26))
 		dup["contract_years"] = 3 if age <= 29 else (2 if age <= 32 else 1)
 		dup["contract_term"] = dup["contract_years"]   # deal length (SQUAD MANAGEMENT YEARS col; contract_years = years LEFT)

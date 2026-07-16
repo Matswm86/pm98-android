@@ -82,7 +82,7 @@ func _run() -> void:
 	await process_frame
 	var matched := false
 	for ch in main.get_children():
-		if ch is MatchScreen and str(ch._home) != "" and str(ch._away) != "" and not (ch._lines as Array).is_empty():
+		if ch is MatchScreen and str(ch._home) != "" and str(ch._away) != "" and not (ch._feed as Array).is_empty():
 			matched = true
 	ok = _assert(matched, "watch -> 2D MATCH VIEW overlay with a timeline") and ok
 

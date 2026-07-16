@@ -39,11 +39,34 @@ func _load() -> void:
 		clubs_by_id.clear()
 		for c in clubs:
 			clubs_by_id[int(c["id"])] = c
+		_apply_loader_defaults()
 		loaded_path = path
 		is_sample = path.ends_with("sample_db.json")
 		database_loaded.emit()
 		return
 	push_error("GameDB: no database file found on any search path")
+
+
+## The engine's own load-time record defaults (FUN_005820f0; docs/re/SPEC_BINDING.md
+## birthYear/age row, tools/re/equipos_parse.py header). The original never surfaces a
+## blank age/height/weight — the loader substitutes at load, per record, with rand():
+##   birth year outside 1901..1985 -> age 25 + rand(0..4)   (@0x58228a)
+##   height byte < 150cm           -> 170 + rand(0..9) cm    (@0x5822e6)
+##   weight byte < 20kg            -> 75 + rand(0..9) kg     (@0x5822e6)
+## The extractor exports exactly those cases as JSON null (extract_squads_exact.py:138),
+## so null here == "engine substitutes". Applied to the loaded records only — never
+## baked into game_db.json (SPEC_BINDING: "never baked").
+func _apply_loader_defaults() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	for c in clubs:
+		for p in c.get("players", []):
+			if p.get("age") == null:
+				p["age"] = 25 + rng.randi_range(0, 4)
+			if p.get("heightCm") == null:
+				p["heightCm"] = 170 + rng.randi_range(0, 9)
+			if p.get("weightKg") == null:
+				p["weightKg"] = 75 + rng.randi_range(0, 9)
 
 
 func season() -> String:
