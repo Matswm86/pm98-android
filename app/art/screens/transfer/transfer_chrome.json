@@ -151,6 +151,38 @@
       441,
       128,
       21
-    ]
+    ],
+    "barra": {
+      "mgr_cx": 52,
+      "mgr_y": 15,
+      "mgr_band": [
+        0,
+        15,
+        108,
+        30
+      ],
+      "club_cx": 52,
+      "club_y": 33,
+      "club_band": [
+        0,
+        33,
+        108,
+        48
+      ],
+      "crest_box": [
+        112,
+        14,
+        140,
+        47
+      ],
+      "sheet_cx": 483,
+      "sheet_wd_y": 17,
+      "sheet_day_y": 28,
+      "sheet_mon_y": 37,
+      "sheet_yr_y": 48,
+      "band_cx": 580,
+      "band1_y": 15,
+      "band2_y": 33
+    }
   }
 }

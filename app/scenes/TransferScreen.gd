@@ -88,6 +88,24 @@ const BTN_SCOUT := Rect2(496, 324, 128, 21)
 const BTN_OFFERS := Rect2(496, 361, 128, 21)
 const BTN_RETURN := Rect2(496, 441, 128, 21)
 
+# ---- live barra anchors (frame 097 ink centers/baselines; the text interiors
+# are blanked in the chrome bake so the LIVE career draws here — the stale
+# "asdf"/Man Utd fix, audit §C2 stale-career bleed) -------------------------
+const BARRA_MGR_CX := 52          # manager + club band text center
+const BARRA_MGR_BASE := 26        # "asdf" glyph rows 19..25
+const BARRA_CLUB_BASE := 44       # "Manchester Utd." glyph rows 37..43
+const BARRA_CREST := Rect2(112, 14, 28, 33)   # kit box interior
+const SHEET_CX := 483             # calendar sheet text center
+const SHEET_WD_BASE := 24         # "Saturday" caps 17..23 + descender
+const SHEET_DAY_BASE := 35        # "23" digits 28..34
+const SHEET_MON_BASE := 44        # "August" caps 37..43 + descender
+const SHEET_YR_BASE := 55         # "1997" digits 48..54
+const C_SHEET_DAY := Color8(255, 0, 0)
+const C_SHEET_YEAR := Color8(42, 95, 170)
+const BAND_CX := 580              # right-plaque band text center
+const BAND1_BASE := 26            # "Premier" glyph rows 18..25
+const BAND2_BASE := 44            # "Week 3" glyph rows 36..43
+
 var _chrome: Texture2D
 var _plus: Texture2D
 var _f12: Font
@@ -103,6 +121,8 @@ var _window: String = ""      # ditto (no "Window: OPEN" text on the real screen
 var _offers: int = 0          # ditto
 var _week: int = 0
 var _press: String = ""
+var _league: String = ""
+var _club_id: int = -1
 
 
 func _ready() -> void:
@@ -119,7 +139,7 @@ func _ready() -> void:
 
 
 func setup(market: Array, club: String, manager := "", season := "", cash := 0,
-		window := "", offers := 0, week := 0) -> void:
+		window := "", offers := 0, week := 0, league := "", club_id := -1) -> void:
 	_rows = market
 	_club = club
 	_manager = manager
@@ -128,6 +148,8 @@ func setup(market: Array, club: String, manager := "", season := "", cash := 0,
 	_window = window
 	_offers = offers
 	_week = week
+	_league = league
+	_club_id = club_id
 	queue_redraw()
 
 
@@ -266,6 +288,15 @@ func _txt_center(f: Font, cx: int, y_top: int, s: String, col: Color, sz: int) -
 		HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
 
 
+## Centered on cx with the BASELINE given directly (the barra anchors are
+## baseline-measured off the frame's own ink rows, not band tops).
+func _txt_base_center(f: Font, cx: int, baseline: int, s: String, col: Color, sz: int) -> void:
+	if f == null:
+		return
+	var w := f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
+	draw_string(f, Vector2(cx - w * 0.5, baseline), s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
+
+
 # ---- drawing -------------------------------------------------------------
 
 func _draw() -> void:
@@ -278,12 +309,44 @@ func _draw() -> void:
 	else:
 		draw_rect(Rect2(0, 0, W, H), Color(0.10, 0.18, 0.40), true)
 
-	# The barra (title/manager/club/date/week) is BAKED into the chrome from frame 097,
-	# the FinanceScreen precedent — its pixels ARE the original's. We do NOT redraw it
-	# with PMChrome.draw_header: that plaque is narrower than the frame's, so the baked
-	# crest + "Manchester Utd" line peeked below it. Static-barra text is the known
-	# limitation shared with FinanceScreen (see WIRING note).
+	# The barra FRAME (plaque bevels, spiral sheet, band plaque, trophy) is BAKED from
+	# frame 097; its career-specific TEXT interiors are blanked by the bake tool and
+	# redrawn here from the live career (the audit §C2 stale-career fix — the chrome
+	# used to carry the walkthrough's "asdf"/Man Utd/23 Aug/Week 3 on every career).
+	_draw_barra()
 	_draw_list()
+
+
+## The live barra text at the frame-measured anchors: manager/club plaque (+ kit
+## crest), the calendar sheet's date and the league/week plaque bands. Fonts/sizes
+## follow PMChrome.draw_header (the hub's proven combos); positions are baselines
+## measured off the baked frame's own ink, so the text sits where the original put it.
+func _draw_barra() -> void:
+	var f8 := PMChrome.font("8")
+	var f10 := PMChrome.font("10")
+	var f12 := PMChrome.font("12")
+	if _manager != "":
+		_txt_base_center(f12, BARRA_MGR_CX, BARRA_MGR_BASE, _manager, Color.BLACK, 12)
+	_txt_base_center(f12, BARRA_MGR_CX, BARRA_CLUB_BASE, _club, Color.WHITE, 12)
+	if _club_id >= 0:
+		PMChrome.draw_crest(self, _club_id, BARRA_CREST)
+	if _week > 0:
+		var d := PMChrome.header_date if not PMChrome.header_date.is_empty() \
+			else PMChrome.date_parts(_season, _week)
+		_txt_base_center(f8, SHEET_CX, SHEET_WD_BASE, str(d["wd"]), Color.BLACK, 9)
+		_txt_base_center(f12, SHEET_CX, SHEET_DAY_BASE, str(d["day"]), C_SHEET_DAY, 14)
+		_txt_base_center(f8, SHEET_CX, SHEET_MON_BASE, str(d["mon"]), Color.BLACK, 9)
+		_txt_base_center(f8, SHEET_CX, SHEET_YR_BASE, str(d["year"]), C_SHEET_YEAR, 9)
+	var top_txt := "Preseason" if PMChrome.header_phase == "preseason" \
+		else PMChrome._band_league(_league)
+	_txt_base_center(f10, BAND_CX, BAND1_BASE, top_txt, Color.BLACK, 11)
+	var bot_txt := ""
+	if PMChrome.header_phase == "preseason":
+		bot_txt = "Preparation"
+	elif _week > 0:
+		bot_txt = "Week %d" % _week
+	if bot_txt != "":
+		_txt_base_center(f12, BAND_CX, BAND2_BASE, bot_txt, Color.WHITE, 11)
 
 
 func _draw_list() -> void:

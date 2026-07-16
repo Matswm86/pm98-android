@@ -33,6 +33,7 @@ gap), so we clear the body to that exact colour. The scene redraws the band
 headers + filled rows over it. The column-header strip (AV..YEARS at x230..470)
 and everything outside the body is kept 1:1.
 """
+
 from __future__ import annotations
 
 import json
@@ -58,14 +59,36 @@ PANEL_FILL = (240, 240, 240)
 # A: the KEEPER band-header text on the column-header row (x8..230); keeps the
 #    AV/MO/CLUB FEE/WAGE/YEARS labels at x>=230. B: the whole list body below the
 #    column headers down to the panel's bottom border.
-BLANK_A = (8, 72, 230, 88)     # x0,y0,x1,y1
+BLANK_A = (8, 72, 230, 88)  # x0,y0,x1,y1
 # right edge stops at 473 so the frame's list SCROLLBAR (gold up/down arrows +
 # thumb at x479..486, y96..422) survives as inert baked art — the [3,5,5,5]=18
 # capped list always fits the panel, so it never actually scrolls.
 BLANK_B = (8, 88, 473, 432)
 
 # ---- the [+] row expand-box sprite ----------------------------------------
-PLUS_BOX = (5, 91, 32, 105)    # x0,y0,x1,y1 -> 27x14 cut from the frame
+PLUS_BOX = (5, 91, 32, 105)  # x0,y0,x1,y1 -> 27x14 cut from the frame
+
+# ---- barra live-text blanks (the stale-career fix, audit §C2) --------------
+# Frame 097's barra bakes the WALKTHROUGH career's text ("asdf" / Manchester
+# Utd. / Saturday 23 August 1997 / Premier Week 3), so every app career showed
+# that stale identity (parity run app/33). Blank ONLY the text interiors (band
+# fills measured flat) + the crest box; TransferScreen redraws the live values
+# at the ink anchors measured off this same frame. Borders/bevels/spiral/
+# trophy stay 1:1.
+MGR_BAND_FILL = (180, 200, 220)
+CLUB_BAND_FILL = (80, 100, 120)
+RP_TOP_FILL = (127, 159, 85)
+RP_BOT_FILL = (85, 95, 0)
+WHITE = (255, 255, 255)
+BLANK_MGR = (0, 15, 108, 30)  # "asdf" band interior (borders y14/y30 stay)
+BLANK_CLUB = (0, 33, 108, 48)  # "Manchester Utd." band interior
+BLANK_CREST = (112, 14, 140, 47)  # kit-sprite box interior (white)
+BLANK_SHEET_WD = (447, 17, 521, 26)  # "Saturday"
+BLANK_SHEET_DAY = (447, 28, 521, 35)  # "23"
+BLANK_SHEET_MON = (447, 37, 521, 46)  # "August"
+BLANK_SHEET_YR = (447, 48, 521, 55)  # "1997"
+BLANK_RP_TOP = (541, 15, 616, 30)  # "Premier" (trophy pixels start x616)
+BLANK_RP_BOT = (541, 33, 624, 48)  # "Week 3" (trophy pixels start x624)
 
 
 def fill(a: np.ndarray, rgb, x0: int, y0: int, x1: int, y1: int) -> None:
@@ -78,7 +101,7 @@ def main() -> int:
         return 1
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    im = Image.open(FRAME).convert("RGB").crop((0, 0, W, H))   # 641 -> 640
+    im = Image.open(FRAME).convert("RGB").crop((0, 0, W, H))  # 641 -> 640
     a = np.array(im)
 
     def C(x: int, y: int):
@@ -86,12 +109,12 @@ def main() -> int:
 
     # inks sampled BEFORE blanking (measured off known glyph strokes on frame 097).
     samples = {
-        "band_navy": [0, 0, 128],          # KEEPER/DEFENDER/... header text C(50,81)
-        "av_orange": [212, 63, 0],         # AV orange-red (dom-ink C(236,96))
-        "mo_blue": [75, 109, 172],         # MO value blue (dom-ink C(261,96))
-        "fee_red": [210, 0, 0],            # CLUB FEE bright red (dom-ink)
-        "wage_darkred": [150, 0, 0],       # WAGE dark maroon (dom-ink C(367,95))
-        "years_navy": [42, 63, 170],       # YEARS / LEFT cell digit
+        "band_navy": [0, 0, 128],  # KEEPER/DEFENDER/... header text C(50,81)
+        "av_orange": [212, 63, 0],  # AV orange-red (dom-ink C(236,96))
+        "mo_blue": [75, 109, 172],  # MO value blue (dom-ink C(261,96))
+        "fee_red": [210, 0, 0],  # CLUB FEE bright red (dom-ink)
+        "wage_darkred": [150, 0, 0],  # WAGE dark maroon (dom-ink C(367,95))
+        "years_navy": [42, 63, 170],  # YEARS / LEFT cell digit
         "years_final_yellow": [255, 255, 90],  # LEFT==1 cell highlight
         "name_black": [0, 0, 0],
         "row_sep": [176, 176, 176],
@@ -106,36 +129,59 @@ def main() -> int:
     fill(a, PANEL_FILL, *BLANK_A)
     fill(a, PANEL_FILL, *BLANK_B)
 
+    # blank the barra's career-specific text (the stale "asdf"/Man Utd fix).
+    fill(a, MGR_BAND_FILL, *BLANK_MGR)
+    fill(a, CLUB_BAND_FILL, *BLANK_CLUB)
+    fill(a, WHITE, *BLANK_CREST)
+    for r in (BLANK_SHEET_WD, BLANK_SHEET_DAY, BLANK_SHEET_MON, BLANK_SHEET_YR):
+        fill(a, WHITE, *r)
+    fill(a, RP_TOP_FILL, *BLANK_RP_TOP)
+    fill(a, RP_BOT_FILL, *BLANK_RP_BOT)
+
     Image.fromarray(a).save(OUT_PNG)
 
     spec = {
         "binding_frame": FRAME.name,
         "note": "TRANSFER MARKET (FICHAR); list body redrawn by TransferScreen.gd "
-                "from Career.market() rows. AV=CA (real); CLUB FEE/WAGE = the "
-                "valuation model (accepted approximation, TransferMarket.gd); "
-                "MO + YEARS|LEFT + nationality flag = honest gaps (morale is an "
-                "un-RE'd dynamic save value per audit B7; buyable-player contract "
-                "years + flagCode are not in the market row).",
+        "from Career.market() rows. AV=CA (real); CLUB FEE/WAGE = the "
+        "valuation model (accepted approximation, TransferMarket.gd); "
+        "MO + YEARS|LEFT + nationality flag = honest gaps (morale is an "
+        "un-RE'd dynamic save value per audit B7; buyable-player contract "
+        "years + flagCode are not in the market row).",
         "size": [W, H],
         "samples": samples,
         "anchors": {
             # band header text (navy), ink-left x + header-row-top y per band
             "band_x": 50,
             "bands": [
-                {"key": "GK", "label": "KEEPER", "hdr_y": 72, "cap": 3,
-                 "slot_y": [92, 108, 124]},
-                {"key": "DF", "label": "DEFENDER", "hdr_y": 140, "cap": 5,
-                 "slot_y": [156, 172, 188, 204, 220]},
-                {"key": "MF", "label": "MIDFIELDER", "hdr_y": 236, "cap": 5,
-                 "slot_y": [252, 268, 284, 300, 316]},
-                {"key": "FW", "label": "FORWARD", "hdr_y": 332, "cap": 5,
-                 "slot_y": [348, 364, 380, 396, 412]},
+                {"key": "GK", "label": "KEEPER", "hdr_y": 72, "cap": 3, "slot_y": [92, 108, 124]},
+                {
+                    "key": "DF",
+                    "label": "DEFENDER",
+                    "hdr_y": 140,
+                    "cap": 5,
+                    "slot_y": [156, 172, 188, 204, 220],
+                },
+                {
+                    "key": "MF",
+                    "label": "MIDFIELDER",
+                    "hdr_y": 236,
+                    "cap": 5,
+                    "slot_y": [252, 268, 284, 300, 316],
+                },
+                {
+                    "key": "FW",
+                    "label": "FORWARD",
+                    "hdr_y": 332,
+                    "cap": 5,
+                    "slot_y": [348, 364, 380, 396, 412],
+                },
             ],
             "row_h": 16,
             "row_content_h": 13,
-            "plus_xy": [5, 91],            # blit plus.png here (+ slot row-top delta)
-            "flag_x": 34,                  # nat. flag left (if flagCode present)
-            "name_x": 60,                  # name ink-left
+            "plus_xy": [5, 91],  # blit plus.png here (+ slot row-top delta)
+            "flag_x": 34,  # nat. flag left (if flagCode present)
+            "name_x": 60,  # name ink-left
             "stars_x": 156,
             "av_right": 250,
             "mo_center": 267,
@@ -143,12 +189,32 @@ def main() -> int:
             "wage_right": 404,
             "years1_center": 432,
             "years2_center": 457,
-            "row_left": 8, "row_right": 495,
+            "row_left": 8,
+            "row_right": 495,
             # nav button hit rects (baked art; scene only hit-tests)
             "btn_current": [496, 287, 128, 21],
             "btn_scout": [496, 324, 128, 21],
             "btn_offers": [496, 361, 128, 21],
             "btn_return": [496, 441, 128, 21],
+            # live barra text anchors (ink centers/rows measured off frame 097;
+            # the text interiors are blanked so the scene draws the LIVE career)
+            "barra": {
+                "mgr_cx": 52,
+                "mgr_y": 15,
+                "mgr_band": list(BLANK_MGR),
+                "club_cx": 52,
+                "club_y": 33,
+                "club_band": list(BLANK_CLUB),
+                "crest_box": list(BLANK_CREST),
+                "sheet_cx": 483,
+                "sheet_wd_y": 17,
+                "sheet_day_y": 28,
+                "sheet_mon_y": 37,
+                "sheet_yr_y": 48,
+                "band_cx": 580,
+                "band1_y": 15,
+                "band2_y": 33,
+            },
         },
     }
     OUT_JSON.write_text(json.dumps(spec, indent=2))

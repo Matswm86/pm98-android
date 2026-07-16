@@ -1973,7 +1973,8 @@ func _show_transfer_screen() -> void:
 	var scr: TransferScreen = load("res://scenes/TransferScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
-	scr.setup(c.market(), c.club_name, "", c.season, c.cash, win, c.offers_left, c.week + 1)
+	scr.setup(c.market(), c.club_name, c.manager_name, c.season, c.cash, win,
+		c.offers_left, c.week + 1, c.league_name, c.club_id)
 	# The screen owns its input now (the ARROW scroll buttons page the list); a non-scroll
 	# tap emits back_pressed to dismiss the overlay. CURRENT OFFERS is the sourced FICHAR
 	# hub route to the offers screen (docs/re/ofertas_screen_re.md FUN_00532a50).
