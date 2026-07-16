@@ -140,7 +140,56 @@ witnessed states. Decoded in the build:
   `OFFERS FOR` panel + club-detail popup chrome. The app fires it post-sack /
   headhunt (original post-sack surface unknown, above) — using the original
   offers chrome replaces invented chrome with witnessed chrome, flagged that
-  the original's mid-career usage is unproven.
+  the original's mid-career usage is unproven. **DONE — see below.**
+
+## SHIPPED 2026-07-16 (session 5) — OFFERS SELECTION rebuilt frame-true (0px all 5 states)
+`OffersSelectionScreen.gd` + `tools/re/build_offers_selection_chrome_from_frames.py`
++ `diff_offers_selection_parity.py`: **0px on the FULL 640x480 vs ALL FIVE
+witnessed frames** (03 empty-entry, 04 name-typed, 05 offers-for-mwm, 06
+club-detail popup, 07 offer-accepted). Decoded in the build:
+- Upper slot table: 8 row bands y=86+15r h14 (the doc's earlier "7 save slots"
+  was a miscount); cells MANAGER 88..204 / TEAM 207..341 / DIVISION 344..435 /
+  OBJECTIVE 438..595; chip 45..67 (blue 42,0,170, white digit), arrow 70..85.
+  Filled fills: MANAGER+OBJECTIVE (120,140,160), TEAM (127,159,85), DIVISION
+  (170,159,85); texts proman8@11 white, advance-centred floored, ink top +4.
+- Name-entry cell = flat black over the separators (row 1: y84..100, row 2:
+  y100..115); typed name proman8 (220,220,220) centred. The OFFERS plate's
+  dither is SCREEN-ANCHORED -> per-row baked art (off/on row 1 from frames
+  03/04, off row 2 from frame 07; a typed row-2 plate is un-witnessed).
+- Panel title = ONE proman12@13 string `OFFERS FOR %s` (the format's space
+  always present), advance-centred on x=320 floored (frame 03 pen 263 / frame
+  05 pen 243 both fit), ink (166,202,240), cap top 232.
+- OFFERS FOR rows: y=265+15r h14; chips x104..126 baked per row (the red
+  darkens down the list: 210/170/150/128), arrow x129..144 (identical to the
+  slot arrow, asserted); TEAM 147..281 / DIVISION 284..375 / OBJECTIVE 378..535,
+  proman8 black centred.
+- Popup (frame 06): box 148..491 x 174..305; headers proman10@10 centred (club
+  gold on 212,63,0; division 102,50,12 on 212,191,0), cap top 180 baseline +8;
+  4 label/value rows on a colour ramp where the two cells SWAP colours per row
+  (label ink = value fill, value ink = label fill: 200,220,240/180,200,220/
+  160,180,200/140,160,180 over 100,120,140/80,100,120/60,80,100/40,60,80);
+  values proman8 left pen 340; kit patch 47x59 at (157,205) — witnessed for
+  Brighton only -> `art/kits/offers/107.png`, scaled NANOESC fallback for other
+  clubs (documented, un-witnessed at this size); OK 403..473 x 272..299.
+- Popup modal dim: the WHOLE screen through an exact palette LUT (05/06 pair,
+  147 colours, zero ambiguity, agrees with alert/dim_lut.json on every shared
+  colour — asserted in the build) -> `dim_lut.json` + `body_dim.png`; the
+  OFFERS panel does NOT stay bright (early probe misread — black separators
+  are dim fixed-points).
+- CONTINUE lights only when an offer is ACCEPTED (frame 05 slot-filled has it
+  washed; frame 07 lit) -> `continue_on.png`. Bottom bar otherwise static
+  across all frames (asserted).
+- Godot gotcha: textures load()ed during `_draw` render as blank white in the
+  GL runner — the popup kit must be resolved in `show_popup`, not at draw time.
+- App wiring: `Main._show_job_offers()` mounts the screen with app-real data
+  (objective = `Career.objective_for` — the exact board rule, extracted static,
+  behaviour-preserving; INTIAL CASH = take_job's opening balance income/4;
+  CAPACITY from FinanceModel; MEMBERS honest "-"). Row tap accepts -> CONTINUE
+  confirms -> `_accept_job`; arrow -> popup; RETURN declines. Original offer
+  vocabulary ("Avoid Relegation"/"Mid Table") is witnessed only for the
+  fresh-manager band -> the app shows its real board objective instead.
+- Tests: `test_offers_selection_screen.gd` 29/29; career/manager suites green;
+  PM98_MANAGER_SHOT real render through the new screen OK.
 - `_show_end_of_season()` list → future: the 0x25aa60 directors' report text
   engine (needs the season-end witness first). Stays a flagged substitute.
 - Career-start: the app keeps seleccion (Manager League path, already frame-

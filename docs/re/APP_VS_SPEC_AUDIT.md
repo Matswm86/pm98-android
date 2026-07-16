@@ -403,6 +403,13 @@ minute — since MatchSim `goals`).
    NEWS feed, RESULTS list, COMPETITIONS/SEASON FIXTURES, TRAINING browse, sell/tactics
    menu wrappers, JOB OFFERS / YOUR CAREER / End-of-season lists (no original counterpart
    proven — confirm against the running original, else drop).
+   **YOUR CAREER: CLOSED 2026-07-16 s4** — original = MANAGER HISTORY, witnessed live
+   and rebuilt frame-true (0px both states; promanager_career_screens_re.md).
+   **JOB OFFERS: CLOSED 2026-07-16 s5** — original = OFFERS SELECTION, witnessed live
+   and rebuilt frame-true (0px all five states incl. the club-detail popup + palette
+   dim; the app's post-sack mount uses the witnessed chrome, original mid-career
+   surface still unknown). End-of-season list remains a flagged substitute (the
+   0x25aa60 directors'-report text engine needs a season-end witness).
 2. Wire the orphaned TRUE screens: SquadScreen (PLANTILLA) into the hub where the
    original puts it; fix opponent (RIVAL) to a VERRIVAL port, not the DB browser.
 3. Port the missing original screens B2 (evidence-first, one at a time: EMPAREJAMIENTOS,

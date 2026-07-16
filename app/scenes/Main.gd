@@ -26,6 +26,7 @@ var _career: Career = null              # active managed career, null on the men
 var _hub: MenuScreen = null             # persistent MENUPRINCIPAL hub while in a career
 var _browse: BrowseScreen = null        # active PM98-chrome browse/select overlay (Track B)
 var _mgr_history: ManagerHistoryScreen = null   # active MANAGER HISTORY overlay (#14)
+var _offers_screen: OffersSelectionScreen = null   # active OFFERS SELECTION overlay (#14)
 var _seleccion: SeleccionScreen = null  # active new-career SELECCION overlay (faithful art)
 var _database: DataBaseScreen = null    # active DATA BASE squad-view overlay (reversed dbasewin)
 var _nivel: NivelScreen = null          # SELECT LEVEL OF THE GAME dialog (over the title)
@@ -713,10 +714,12 @@ func _free_overlays() -> void:
 				or c is StadiumScreen or c is CupScreen or c is YouthScreen \
 				or c is StaffScreen or c is BrowseScreen or c is TacticsScreen \
 				or c is PlayerInfoScreen or c is RivalScreen or c is ManagerHistoryScreen \
-				or c is TrainingScreen or c is InjuriesScreen or c is StatisticsScreen:
+				or c is TrainingScreen or c is InjuriesScreen or c is StatisticsScreen \
+				or c is OffersSelectionScreen:
 			c.queue_free()
 	_browse = null
 	_mgr_history = null
+	_offers_screen = null
 
 
 # ---- dev screenshot harness (inert unless PM98_SHOT_DIR is set) -----------
@@ -3488,24 +3491,59 @@ func _league_by_id(id: String) -> Dictionary:
 			return lg
 	return {}
 
-## The JOB OFFERS list (#14): the clubs that want you. Selecting one takes the job and
-## starts your first season there. PM98-chrome browse.
+## The clubs that want you (#14) — the original OFFERS SELECTION screen's
+## "OFFERS FOR <name>" panel (live-witnessed 2026-07-16, frames 03-07;
+## docs/re/promanager_career_screens_re.md). Replaces the invented JOB OFFERS
+## browse (audit B5-1). The original fires this at the Promanager career start;
+## its post-sack surface is UNKNOWN — witnessed chrome, mid-career use flagged.
+## Row tap accepts (slot fills, CONTINUE lights, frame 07); CONTINUE takes the
+## job; the row arrow opens the witnessed club-detail popup; RETURN declines.
 func _show_job_offers() -> void:
-	var offers: Array = _career.pending_offers
+	if _offers_screen != null and is_instance_valid(_offers_screen):
+		_offers_screen.queue_free()
+	var scr: OffersSelectionScreen = load("res://scenes/OffersSelectionScreen.gd").new()
+	_offers_screen = scr
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
 	var rows: Array = []
-	var payload: Array = []
-	if offers.is_empty():
-		rows.append({"text": "No clubs have come in for you.", "enabled": false})
-		payload.append(null)
-	for o in offers:
-		rows.append({"text": str(o["club_name"]), "value": str(o["league_name"])})
-		payload.append(o)
-	var subtitle := "Choose your next club" if _career.sacked else "A new challenge, if you want it"
-	_mount_browse("JOB OFFERS", subtitle, rows,
-		func(i: int) -> void:
-			if i < payload.size() and payload[i] != null:
-				_accept_job(payload[i]),
-		func() -> void: _dismiss_career_browse())
+	for o in _career.pending_offers:
+		rows.append(_offer_row(o))
+	scr.setup(_career.manager_name, rows)
+	scr.back_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		scr.queue_free()
+		_offers_screen = null)
+	scr.accept_confirmed.connect(func(i: int) -> void:
+		AudioManager.ui_select()
+		if i >= 0 and i < _career.pending_offers.size():
+			var offer: Dictionary = _career.pending_offers[i]
+			scr.queue_free()
+			_offers_screen = null
+			_accept_job(offer))
+
+## One OFFERS FOR row + club-detail popup payload from a pending offer. All
+## values are the app's real career data in the witnessed chrome: the objective
+## is what the board will actually set (Career.objective_for), INTIAL CASH is
+## the exact opening balance take_job grants (a quarter's income), CAPACITY the
+## finance model's ground size. MEMBERS is witnessed only as "-" -> stays "-".
+func _offer_row(o: Dictionary) -> Dictionary:
+	var club := GameDB.club(int(o["club_id"]))
+	var lid := str(o["league_id"])
+	var league_clubs := GameDB.clubs_in_league(lid)
+	var obj := Career.objective_for(int(o["club_id"]), lid, league_clubs, GameDB.leagues)
+	var tier := FinanceModel.tier_of({"leagueId": lid}, GameDB.leagues)
+	var fin := FinanceModel.summary(club, tier)
+	var cap := int(fin.get("capacity", 0))
+	var stadium := str(club.get("stadium", ""))
+	return {
+		"team": str(o["club_name"]), "division": _div_short(str(o["league_name"])),
+		"division_full": str(o["league_name"]), "objective": str(obj["text"]),
+		"club_id": int(o["club_id"]),
+		"stadium": stadium if stadium != "" and stadium != "<null>" else "-",
+		"capacity": "%s seats" % Career._grp(cap) if cap > 0 else "-",
+		"members": "-",
+		"cash": "£%s" % Career._grp(int(fin.get("total_income", 0)) / 4),
+	}
 
 ## Take an offered job: rebuild the career around the new club (Career.take_job records the
 ## old spell + carries reputation/history), save, and enter the new career.

@@ -303,6 +303,16 @@ func _init_table(league_clubs: Array) -> void:
 ## Objective = finish at least as high as squad strength suggests (with leniency),
 ## phrased by where that lands in the division.
 func _set_objective(league: Dictionary, league_clubs: Array, leagues: Array) -> void:
+	var obj := objective_for(club_id, league_id, league_clubs, leagues)
+	objective_pos = int(obj["pos"])
+	objective_text = str(obj["text"])
+
+
+## The objective the board would set for `for_club_id` in its division — the
+## exact _set_objective rule, callable without a career (the OFFERS SELECTION
+## screen previews it per offered club).
+static func objective_for(for_club_id: int, for_league_id: String,
+		league_clubs: Array, leagues: Array) -> Dictionary:
 	var ranked: Array = []
 	for lc in league_clubs:
 		var r := MatchEngine.team_ratings(lc)
@@ -310,23 +320,25 @@ func _set_objective(league: Dictionary, league_clubs: Array, leagues: Array) -> 
 	ranked.sort_custom(func(a, b): return a["ovr"] > b["ovr"])
 	var strength_rank := league_clubs.size()
 	for i in ranked.size():
-		if ranked[i]["id"] == club_id:
+		if ranked[i]["id"] == for_club_id:
 			strength_rank = i + 1
 			break
 	var total := league_clubs.size()
-	objective_pos = clampi(strength_rank + 2, 1, total)
-	var tier := FinanceModel.tier_of({"leagueId": league_id}, leagues)
+	var pos := clampi(strength_rank + 2, 1, total)
+	var tier := FinanceModel.tier_of({"leagueId": for_league_id}, leagues)
 	var zone: Dictionary = SeasonSim.ZONES.get(tier, {"releg": 3})
 	var relegation: int = int(zone.get("releg", 3))
-	if objective_pos >= total - relegation:
-		objective_text = "Avoid relegation"
-		objective_pos = total - int(relegation) - 1
-	elif objective_pos <= 1:
-		objective_text = "Win the league"
-	elif objective_pos <= maxi(2, total / 5):
-		objective_text = "Finish in the top %d" % objective_pos
+	var text: String
+	if pos >= total - relegation:
+		text = "Avoid relegation"
+		pos = total - int(relegation) - 1
+	elif pos <= 1:
+		text = "Win the league"
+	elif pos <= maxi(2, total / 5):
+		text = "Finish in the top %d" % pos
 	else:
-		objective_text = "Finish %d or higher" % objective_pos
+		text = "Finish %d or higher" % pos
+	return {"pos": pos, "text": text}
 
 
 # ---- season loop ---------------------------------------------------------
