@@ -453,3 +453,104 @@ Wiring done (B5-2): OPPONENT -> VIEW RIVAL (RivalScreen), PLAYERS -> SQUAD MANAG
   FUN_00526a60 button row with the held-OK ring, and the SquadScreen palette-dim
   (exact alert LUT, 081-vs-082). See ficha_card_re.md. Still open there: FICHA
   RATING formula (parity-excluded), non-EU KIND evidence, matches-to-renew target.
+
+# §C — LIVE SIDE-BY-SIDE PARITY RUN, MANAGER LEAGUE (2026-07-16, session 6)
+
+> Method: BOTH builds driven live on this box with identical clicks (both render
+> 640x480, so one coordinate script drove both). Original: wine harness
+> (tools/re/wine/boot.sh), NEW Manager-League career, TOTAL level, "mwm" @ Bolton W,
+> played to in-season Week 3. App: current tree (@0683969), same career start, played
+> to Week 2. Frames: `screenshots/parity-run-2026-07-16/{orig,app}/` (68 + 58,
+> gitignored). Every claim below was verified against code before being written.
+
+## C0 — Handoff question RESOLVED: MANAGER INFO button is MODE-gated
+Original BOARD OF DIRECTORS witnessed in Manager League at BOTH preseason (orig/52)
+AND in-season Week 3 (orig/79): **NO MANAGER INFO button in either**. Promanager wk1
+had it (s4). ⇒ the button is Promanager-only, not phase-gated. The app (no button in
+Manager League) is CORRECT as-is; gate any future MANAGER HISTORY entry on mode.
+
+## C1 — Original screens with NO working app counterpart on this path (witnessed)
+| # | original screen (frame) | app today (verified) |
+|---|---|---|
+| 1 | GOAL SCORERS graph+list (orig/12) | button painted, dead — no screen, no code refs |
+| 2 | INSURANCE per-player (orig/17) | documented no-op (InjuriesScreen.gd:152) |
+| 3 | SCOUT search (orig/35) | "sourced but not yet wired" (TransferScreen.gd:222) |
+| 4 | OFFERS foreign-league map (orig/36) | same — unwired (TransferScreen.gd:222) |
+| 5 | GROUND IMPROVEMENTS panel: SEATS/CAR PARK/FACILITIES/SERVICES offers (orig/21) | invented "GROUND WORKS" text browse w/ invented prices (app/56) — B5-1-class stand-in still live |
+| 6 | SAVE GAME 8-slot GAME/PLAYER dialog (orig/54) | slotless toast "Game saved" (app/59) |
+| 7 | TEAMS IN CHAMPIONSHIPS (orig/06) | never shown (preseason → hub directly) |
+| 8 | START OF SEASON objectives table (orig/71) | never shown on season entry |
+| 9 | CHARITY SHIELD trophy screen (orig/70) | never shown (no Charity Shield event at all) |
+| 10 | Pre-match XI-vs-XI photo roll (orig/62-63, LINE-UPS ON) | never shown |
+| 11 | In-match MAN-TO-MAN MARKINGS (orig/66) | all 4 in-match doors dead: MatchScreen.gd:219 `_:pass` (LINE-UP/TACTICS/MAN-TO-MAN/STATISTICS) |
+| 12 | MATCH OPTIONS before EVERY match (orig/60) | screen exists but only via hub OPTIONS icon; career CONTINUE jumps straight into BRIEF (Main.gd:1015-1018, persisted mode) |
+
+## C2 — Functionality divergences (witnessed + code-verified)
+- **SKIP semantics wrong**: original SKIP advances ONE rival slot (4 individually
+  skippable dates); app SKIP == CONTINUE, ends the whole picker
+  (PreseasonScreen.gd:264-266 `"skip","continue": preseason_done.emit`). You cannot
+  schedule a friendly on a later slot while skipping an earlier one.
+- **STALE-CAREER BLEED**: fresh mwm/Bolton career, TRANSFER MARKET rendered a previous
+  session's career ("asdf" / Manchester Utd / Premier Week 3 / 23 Aug header) with its
+  transfer pool (app/33). State isolation bug between saved careers/screens.
+- **FT hand-off**: at 90:00 the bottom button still reads KICK OFF (original relabels
+  CONTINUE, orig/68); pressing EXIT silently skips the FULL TIME read-out entirely.
+- **FULL TIME read-out broken visually** (app/67 vs orig/69): score boxes overdraw the
+  name bar, possession row hidden, MAN OF THE MATCH name EMPTY, stadium panel blank on
+  away matches (original FILLS it — Villa Park data shown at Bolton's away friendly, so
+  "honest blank for away" in Main.gd:1460 is itself a parity gap), header chip stuck
+  "Preseason/Preparation" in Week 1.
+- **BRIEF feed**: goals-only (known B4b engine gap) BUT format also diverges: names
+  truncated w/o club ("Goal by Milose" vs "Goal by Milosevic (Aston Villa)"), kick-off
+  line format differs, possession bar static 50/50 all match (original live).
+- **Fixture calendar invented**: app = naive weekly-Saturday round robin (Man U W1,
+  Barnsley W2...); original = real 97-98 calendar (Southampton 9 AUG, BYE-gap, midweek
+  Thu 28 AUG, Mon 1 SEP...) (app/13 vs orig/13). Known PCF5DAT-dates gap, now witnessed.
+- **Initial league table alphabetical** + LEADER panel pre-filled w/ Arsenal shirt;
+  original seeds prior-season order (Man Utd top, Bolton 18) + EMPTY leader (app/11 vs
+  orig/11). Hub badge shows "PL 5" vs original "PL 1"; app centre stack also inverted
+  (own club TOP, no opponent-manager name, "AWAY" chip instead) (app/09 vs orig/07).
+- **Contract/finance economics not source-true**: Ward fee £350k/wage £119,600/3yr/age 28
+  vs original £50k/£15,000/2yr/27 (app/38 vs orig/38); squad wages all inflated;
+  starting cash £5.4M vs £1,960,096; FINANCE pre-books season income (tickets £8.5M @
+  1 Aug) vs original all-£0 preseason; invented line label "EUROPEAN CUP INCOME" vs
+  source "U.E.F.A. CUP INCOME" (app/50 vs orig/50).
+- **FINANCE is a single static PER-SEASON view**: PER WEEK / INCOME / EXPENSES / INC.+EXP.
+  tabs all dead (verified clicks app/51-52); original defaults to PER WEEK with the
+  week pager (orig/50). Balance graph has a white overdraw band.
+- **Invented content**: 5 fabricated youth players at career start (orig youth list
+  EMPTY, app/39 vs orig/39); staff hires posted as News-extra MARKET items (original
+  posts none after identical hires, app/58 vs orig/53); staff-hire candidate pools/wages
+  invented; GROUND capacity 35,000 vs 20,500, CAR PARK/PITCH rows empty, different
+  stadium art (app/55 vs orig/20).
+- **TEAM TACTICS overlay compressed**: option labels missing (SOFT/MEDIUM/AGGRESSIVE,
+  ZONAL/MAN TO MAN, SHORT/LONG, OWN/MIDFIELD/OPPONENT), no OK button, close-X art at
+  ~627,124 but hitbox at 528,120 (app/24, TeamTacticsScreen.gd:46) (orig/25).
+- **Header state**: date card shows next-fixture date on sub-screens (original keeps
+  current game date); header identity block shows fixture clubs on RESULTS (original
+  keeps mwm/club); SQUAD MANAGEMENT manager-name bar empty; date card art squeezed on
+  several screens (CURRENT OFFERS/YOUTH/NEWS).
+- **Default-view diffs**: LINE-UP opens RATING (original PARAMETERS); STATISTICS blank
+  cells (original renders "-" placeholders); TACTICS pitch banner "TACTICS 4-4-2"
+  (original: club name); staff SIGN overlay opens PHYSIO tab (original TRAINERS);
+  default XI/roles differ from EQUIPOS stored XI.
+- **Name entry**: only the PLAYER-banner strip accepts typing; original also accepts
+  after clicking the slot row. Name uppercased to "MWM" (original keeps "mwm").
+
+## C3 — Confirmed working end-to-end in the app this run
+New career (name/team/level) → preseason friendly + league weeks advance w/ autosave →
+BRIEF match w/ real goal vector → FT read-out reachable (via the mislabeled button) →
+hub date/phase advance → staff hire (assistant+scout) → contract card RENEW/TRANSFER/
+SACK live → News extra populates → BOARD ROOM meters/loans/bonus (bonus 2 label reads
+"for Champion"; original binds it to the club objective, "for Avoid Relegation" for
+Bolton) → TRAINING/INJURIES/STATISTICS/TACTICS/PREDEF all mount frame-true.
+
+## C4 — Suggested fix order (screen-parity first, per user's stay-true rule)
+1. C2 stale-career bleed (state corruption).
+2. C1 #7/8/9 season-flow screens (TEAMS IN CHAMPIONSHIPS, START OF SEASON, CHARITY
+   SHIELD) + #12 MATCH OPTIONS into the career CONTINUE chain + #10 XI photo roll.
+3. C1 #1-#6 missing hub sub-screens (GOAL SCORERS, INSURANCE, SCOUT, OFFERS map,
+   GROUND IMPROVEMENTS, SAVE dialog).
+4. C2 data parity: real 97-98 fixture calendar, prior-season table seed, EQUIPOS
+   contract economics, starting cash, FINANCE per-week model.
+5. FT read-out render fixes + in-match doors (need MAN-TO-MAN screen port).
