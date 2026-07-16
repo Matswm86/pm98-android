@@ -74,3 +74,41 @@ KICK OFF click does to `+0x1a1e`/`+0x1a38`/phase at a disp≠0 board. Best settl
 drive watching a **foul→free-kick resume** (`ptrace_scope=0`, m5_gdbrsp watch on `+0x1a1e`/`+0x1a38`),
 since the offline decompile of the message-pump path (`FUN_005bce40`) is display-coupled. Until then,
 the headless full-match kill-test must use the auto-advancing ps=1 branch (`PM98_FORCE_PS=1`).
+
+## 4. Sharpened root cause — 2026-07-15 (source-only, no new drive)
+
+Traced the full board-resume mechanism against the decompiles + the §1 live capture. The exact
+trigger is confirmed **display-coupled** (so the live drive is still the settling path), but the
+mechanism and a candidate headless proxy are now pinned:
+
+1. **A board is a +0x454 cooldown, not a click.** `Pm98Dispatch.dispatch` sets `+0x454 = 0x168`
+   (360; `0x2d0`/720 for a phase-boundary), phase-locks `+0x448 = 8`, and stamps `+0x1a38 = code`.
+   The tick tail decrements `+0x454` each frame (`Pm98Driver.gd:216`); `_match_over` returns
+   ENGINE_OVER (0) exactly when `+0x454 == 1`. **360 ticks ÷ ~33 fps ≈ 11 s** = the §1 capture's
+   disp-3 board span (t=59.5→70.3, clk frozen 2511 then resumed 2515). So the board length is the
+   `+0x454` cooldown.
+2. **The pause branch never converts that expiry into a restart.** In `_live_branch`, tick-ret-0
+   arms `+0x1a1e=1` → next tick `restart_handler` → `phase = RESTART_PHASE_TABLE[+0x1a38]`
+   (`{…3→6,6→2…}`, matches the capture's 8→6 and 8→2), `+0x1a38=0`, resume. But WATCH boards route
+   to `_pause_branch`, whose `_wait_frame` (FUN_00593ab0 L27-36) arms `+0x1a1e` **only when
+   `DAT_006d31c4(playback)!=0 OR pump!=0`**. §1 read playback==0 in WATCH, and headless pump is
+   hardcoded `PUMP_RESULT_HEADLESS=0` → the arm never fires → phase sticks at 8, ring `+0x27e8`
+   climbs unheeded. This is the byte-exact reason, not a modeling gap in the port.
+3. **Why the pause branch (not live) even runs the board:** `Pm98Outer.step` L78 routes to
+   `_pause_branch` when `play_state∈{0,4} OR +0x19a0==4 OR +0x1a20 latch`. A **foul (disp 5) sets up
+   a free-kick → the +0x1a20 set-piece latch**, which is cleared ONLY by `kickoff_init`
+   (FUN_00593600 L94) in the sim corpus. Headless the set-piece taker never executes (deferred
+   open-play movement), so the latch never clears and the pause loop's disp-5 break
+   (`code!=5 or +0x461&6`, bit set only in phase 0) can never satisfy → `WAIT_LOOP_GUARD`.
+4. **The disp-5@clk1600 is itself divergent.** The §1 real capture shows ONLY disp 3 and disp 6 —
+   **never disp 5**. Our sim manufactures a foul at clk 1600 that the real fixture/seed does not,
+   i.e. the stall is downstream of the deferred-movement divergence (handoff NOTE), not an
+   independent board bug.
+
+**The one unknown left = the pump's nonzero trigger** (what a real board-end / KICK-OFF posts, and
+whether it coincides with `+0x454==1`). That is NOT repo-knowable — it lives in the display/message
+path. Two faithful ways to settle it, NO guessed board-duration allowed (project doctrine):
+- **(A) live drive** (`ptrace_scope=0`, open now): watch `+0x1a1e`/`+0x1a38`/`+0x454`/phase across a
+  real foul→free-kick resume; confirm whether the arm coincides with the `+0x454` expiry.
+- **(B) wire the deferred set-piece/open-play movement** so the free-kick taker executes and clears
+  `+0x1a20` the source way — larger, and also removes the spurious disp-5@1600.
