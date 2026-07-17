@@ -122,11 +122,20 @@ static func narrate(rng: RandomNumberGenerator, home: Dictionary, away: Dictiona
 	if not engine_goals.is_empty():
 		# The stat engine already chose the scorers + minutes -- narrate THOSE.
 		for g in engine_goals:
-			var nm := str((g as Dictionary).get("scorer", "?"))
-			var club := hn if int((g as Dictionary).get("scorer_side", 0)) == 0 else an
-			var tmpl := T_OWN_GOAL if bool((g as Dictionary).get("own_goal", false)) else T_GOAL
-			events.append({"minute": int((g as Dictionary).get("minute", 1)),
-				"side": int((g as Dictionary).get("side", 0)), "text": tmpl % [nm, club], "goal": true})
+			var gd: Dictionary = g
+			var nm := str(gd.get("scorer", "?"))
+			var club := hn if int(gd.get("scorer_side", 0)) == 0 else an
+			var tmpl := T_OWN_GOAL if bool(gd.get("own_goal", false)) else T_GOAL
+			# Credited side: `side` when the producer set it; else derived from
+			# scorer_side (flipped for own goals) — never a home-0 default, which
+			# piled every goal on one side in BRIEF (audit C5 #7d).
+			var credited := int(gd.get("side", -1))
+			if credited < 0:
+				credited = int(gd.get("scorer_side", 0))
+				if bool(gd.get("own_goal", false)):
+					credited = 1 - credited
+			events.append({"minute": int(gd.get("minute", 1)),
+				"side": credited, "text": tmpl % [nm, club], "goal": true})
 	else:
 		# Legacy / no-XI fallback: scorer weighted by finishing (RM heading + TI shooting + CA).
 		for _g in home_goals:
