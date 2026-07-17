@@ -595,6 +595,7 @@ static func draw_match_header(ci: CanvasItem, title_key: String, h: Dictionary) 
 # procedural grey bevels (the reported "grey bar over the calendar" defect).
 static var _hdr_sheet: Texture2D = null
 static var _hdr_plaque: Texture2D = null
+static var _hdr_ident: Texture2D = null
 ## Career phase for the plaque bands: "" = in season (league / Week N — witnessed
 ## "Premier"/"Week 1"), "preseason" = the witnessed "Preseason"/"Preparation".
 static var header_phase := ""
@@ -628,8 +629,6 @@ static func date_from_iso(iso: String) -> Dictionary:
 ## week_disp is the 1-based week (Week 17); pass <=0 to omit the date + week.
 static func draw_header(ci: CanvasItem, title: String, manager: String, club: String,
 		league: String, season: String, week_disp: int, club_id := -1) -> void:
-	var f8 := font("8")
-	var f10 := font("10")
 	var f12 := font("12")
 	var f18 := font("18")
 
@@ -637,17 +636,26 @@ static func draw_header(ci: CanvasItem, title: String, manager: String, club: St
 	bevel(ci, Rect2(4, 10, W - 8, 28), C_BAR, C_BAR_HI, C_BAR_LO)
 	text(ci, f18, 156, 15, title.to_upper(), C_TITLE, 19, 1, 292)
 
-	# Manager / club plaque (left), with the club crest at its right edge.
-	var mp := Rect2(6, 4, 150, 38)
-	bevel(ci, mp, C_PLAQUE, C_PLAQUE_HI, C_PLAQUE_LO)
-	var tw := mp.size.x - 26   # leave room for the crest at the right edge
-	if manager != "":
-		text(ci, f12, mp.position.x, 7, manager, C_PLAQUE_TXT, 12, 1, tw)
-		text(ci, f12, mp.position.x, 22, club, C_PLAQUE_TXT, 12, 1, tw)
+	# Manager / club identity block (left): the real chrome cut from the hub
+	# frame (orig/73, tools/re/build_hub_chrome_from_frames.py) — pale name bar
+	# (dark ink) over the dark club bar (white ink), kit in the white box.
+	# Witnessed ink centres: name x54, club x58 (both proman10).
+	if _hdr_ident == null and ResourceLoader.exists("res://art/screens/hub/ident_block.png"):
+		_hdr_ident = load("res://art/screens/hub/ident_block.png")
+	if _hdr_ident != null:
+		ci.draw_texture(_hdr_ident, Vector2(0, 4))
+		draw_ident_texts(ci, manager, club, club_id)
 	else:
-		text(ci, f12, mp.position.x, 14, club, C_PLAQUE_TXT, 13, 1, tw)
-	if club_id >= 0:
-		draw_crest(ci, club_id, Rect2(mp.end.x - 24, 5, 20, 36))
+		var mp := Rect2(6, 4, 150, 38)
+		bevel(ci, mp, C_PLAQUE, C_PLAQUE_HI, C_PLAQUE_LO)
+		var tw := mp.size.x - 26   # leave room for the crest at the right edge
+		if manager != "":
+			text(ci, f12, mp.position.x, 7, manager, C_PLAQUE_TXT, 12, 1, tw)
+			text(ci, f12, mp.position.x, 22, club, C_PLAQUE_TXT, 12, 1, tw)
+		else:
+			text(ci, f12, mp.position.x, 14, club, C_PLAQUE_TXT, 13, 1, tw)
+		if club_id >= 0:
+			draw_crest(ci, club_id, Rect2(mp.end.x - 24, 5, 20, 36))
 
 	if _hdr_sheet == null and ResourceLoader.exists("res://art/screens/header/cal_sheet.png"):
 		_hdr_sheet = load("res://art/screens/header/cal_sheet.png")
@@ -656,31 +664,83 @@ static func draw_header(ci: CanvasItem, title: String, manager: String, club: St
 
 	if week_disp > 0 and _hdr_sheet != null:
 		# Real spiral calendar sheet (frame 016_162419); the sheet overlaps the
-		# barra like the original — no plaque box behind it. During preseason the
-		# date is the pending friendly's (header_date), as witnessed on the hub.
-		var d := header_date if not header_date.is_empty() else date_parts(season, week_disp)
+		# barra like the original — no plaque box behind it.
 		ci.draw_texture(_hdr_sheet, Vector2(445, 6))
-		text(ci, f8, 447, 16, str(d["wd"]), C_SHEET_INK, 9, 1, 74)
-		text(ci, f12, 447, 25, str(d["day"]), C_SHEET_DAY, 14, 1, 74)
-		text(ci, f8, 447, 38, str(d["mon"]), C_SHEET_INK, 9, 1, 74)
-		text(ci, f8, 447, 47, str(d["year"]), C_SHEET_YEAR, 9, 1, 74)
-
 	if _hdr_plaque != null:
-		# The banded lavender plaque + football (frame 016_162419). Band texts:
-		# preseason = witnessed "Preseason"/"Preparation"; in season = witnessed
-		# "Premier"/"Week 1" grammar (hub_week1_inseason_bands 2026-07-12).
-		# Centred over the band body left of the football; ±3px centring rule
-		# still to be glyph-calibrated (flagged in pretemporada_screen_re.md).
+		# The banded lavender plaque + football (frame 016_162419).
 		ci.draw_texture(_hdr_plaque, Vector2(529, 4))
-		var top_txt := "Preseason" if header_phase == "preseason" else _band_league(league)
-		var bot_txt := ""
-		if header_phase == "preseason":
-			bot_txt = "Preparation"
-		elif week_disp > 0:
-			bot_txt = "Week %d" % week_disp
-		text(ci, f10, 536, 17, top_txt, C_BAND1_INK, 11, 1, 78)
-		if bot_txt != "":
-			text(ci, f12, 536, 36, bot_txt, C_BAND2_INK, 11, 1, 78)
+	draw_sheet_band_texts(ci, league, season, week_disp)
+
+
+## The live header TEXTS alone — calendar-sheet date stack + plaque band labels.
+## Chrome-baked screens (the hub) call this directly over their real baked
+## sheet/plaque; draw_header lays the sprites first for everything else.
+## All metrics frame-measured off orig/73: date stack cx 483 (proman8, weekday
+## baseline 24 / red day 35 / month 44 / blue year 55), band labels cx 577
+## (proman10, "Premier" black baseline 26, "Week 1" white baseline 44). During
+## preseason the date is the pending friendly's (header_date), as witnessed.
+static func draw_sheet_band_texts(ci: CanvasItem, league: String, season: String,
+		week_disp: int) -> void:
+	var f8 := font("8")
+	if week_disp > 0:
+		var d := header_date if not header_date.is_empty() else date_parts(season, week_disp)
+		_ctr_txt(ci, f8, 483, 24, str(d["wd"]), C_SHEET_INK, 11)
+		_ctr_txt(ci, f8, 483, 35, str(d["day"]), C_SHEET_DAY, 11)
+		_ctr_txt(ci, f8, 483, 44, str(d["mon"]), C_SHEET_INK, 11)
+		_ctr_txt(ci, f8, 483, 55, str(d["year"]), C_SHEET_YEAR, 11)
+	var top_txt := "Preseason" if header_phase == "preseason" else _band_league(league)
+	var bot_txt := ""
+	if header_phase == "preseason":
+		bot_txt = "Preparation"
+	elif week_disp > 0:
+		bot_txt = "Week %d" % week_disp
+	_band_txt(ci, 26, top_txt, C_BAND1_INK)
+	if bot_txt != "":
+		_band_txt(ci, 44, bot_txt, C_BAND2_INK)
+
+
+## Band labels use the calend12 "Result" face (mask-matched 0px against
+## orig/73 "Premier"), centred on x580.
+static func _band_txt(ci: CanvasItem, baseline: int, t: String, col: Color) -> void:
+	var f := font("calend12")
+	if f == null or t == "":
+		return
+	var w := int(f.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x)
+	ci.draw_string(f, Vector2(580 - int((w - 2) * 0.5), baseline), t,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 15, _dc(col))
+
+
+## The identity block's live texts + kit (the block chrome itself is baked on
+## the hub, blitted by draw_header everywhere else). Name bar dark ink cx 54,
+## club bar white cx 58, kit in the white box (all frame-measured, proman10).
+static func draw_ident_texts(ci: CanvasItem, manager: String, club: String, club_id: int) -> void:
+	# proman8, both bars centred on x53 (mask-matched 0px vs orig/73).
+	var f8 := font("8")
+	if manager != "":
+		_ctr_txt(ci, f8, 53, 26, manager, C_BAND1_INK, 11)
+	_ctr_txt(ci, f8, 53, 44, club, C_BAND2_INK, 11)
+	if club_id >= 0:
+		# The original's box-filling kit render is un-extracted; the 24x32
+		# frame-rendered panel kit centred in the box comes closest (flagged;
+		# kits-sheet stretch as the non-Premier fallback).
+		var pk := panel_kit(club_id)
+		if pk != null:
+			ci.draw_texture(pk, Vector2(114, 15))
+		else:
+			var tex := kit(club_id)
+			if tex != null:
+				ci.draw_texture_rect_region(tex, Rect2(114, 15, 32, 32), Rect2(0, 0, 31, 64))
+
+
+## Witnessed centring (px = cx - int((adv-1)/2); orig/73 "mwm" -> x38,
+## "Bolton W" -> x28, "Saturday" -> x457, "Premier" -> x549).
+static func _ctr_txt(ci: CanvasItem, f: Font, cx: int, baseline: int, t: String,
+		col: Color, sz: int) -> void:
+	if f == null or t == "":
+		return
+	var w := int(f.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x) - 1
+	ci.draw_string(f, Vector2(cx - int(w * 0.5), baseline), t,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, sz, _dc(col))
 
 
 ## The band's short division name: "Premier" witnessed on the week-1 hub; the

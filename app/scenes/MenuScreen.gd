@@ -26,16 +26,6 @@ const C_TITLE := Color(0.96, 0.98, 1.0)
 const C_DIM := Color(0.80, 0.86, 0.95)
 const C_HILITE := Color(1.0, 1.0, 1.0, 0.22)
 
-# Grey circle-slot chrome (PL / manager / opponent-manager / CPU), matching the real
-# beveled boxes baked into menu_bg.
-const C_SLOT := Color(0.40, 0.40, 0.44)
-const C_SLOT_HI := Color(0.60, 0.60, 0.65)
-const C_SLOT_LO := Color(0.17, 0.17, 0.21)
-# Blue-grey name band (managed club / next opponent), with a pale border and white text.
-const C_BAND := Color(0.30, 0.40, 0.58)
-const C_BAND_HI := Color(0.62, 0.72, 0.88)
-const C_BAND_LO := Color(0.13, 0.20, 0.36)
-
 # Reversed icon hit areas: action -> the icon PICTURE rect (pos, size) from the two
 # FUN_00436fb0(x,y) points (docs/re/menu_screen_re.md). Non-overlapping; each sits on the
 # visible icon in menu_bg.
@@ -77,22 +67,47 @@ const CTRL_HITS := {
 	"continue": Rect2(552, 246, 86, 38),
 }
 
-# Central club CIRCLE slots (design space; over the real frame in menu_bg).
-const KIT_SRC := Rect2(0, 0, 31, 64)        # shirt half of the 48x64 MINIESC kit
-const R_PL := Rect2(300, 171, 52, 19)       # league position  ("PL 1")
-const R_MGR := Rect2(252, 191, 146, 22)     # the manager's name
-const R_CLUB := Rect2(248, 214, 156, 28)    # managed club name band
-const R_CLUB_CREST := Rect2(226, 214, 30, 40)
-const R_OPP := Rect2(248, 263, 156, 28)     # next-opponent name band
-const R_OPP_CREST := Rect2(398, 262, 30, 40)
-const R_OPPMGR := Rect2(256, 303, 135, 20)  # opponent manager / venue
-const R_CPU := Rect2(300, 326, 52, 19)      # opponent control type ("CPU")
+# Central club CIRCLE (design space; boxes baked in menu_bg). The original
+# stacks the HOME side on top and styles the PLAYER's half dark-with-white-ink,
+# the CPU half pale-with-black-ink (witnessed: orig/73 + promanager 13 away =
+# pale top; ma_6 home = dark top). menu_bg bakes the away arrangement; the
+# hub/circle_home overlay (cut from ma_6) repaints the circle for home. The
+# controller chips sit outermost ("CPU" / "PL n" = the entry-screen player
+# slot, witnessed "PL 1" across Premier AND 3rd-Div careers), the ► pointer
+# rides the player's manager bar. All anchors frame-measured off orig/73.
+const CIRCLE_HOME_POS := Vector2(195, 168)
+const ARROW_X := 238.0
+const ARROW_Y_TOP := 196.0                 # beside the top manager bar (home)
+const ARROW_Y_BOT := 302.0                 # beside the bottom manager bar (away)
+const CHIP_CELL := [296, 49]               # chip text cell (x0, w)
+const MGR_CELL := [250, 142]               # manager bar text cell
+const CLUB_CX := 323                       # club band ink centre (both bands)
+const CHIP_BASE_TOP := 185
+const CHIP_BASE_BOT := 342
+const MGR_BASE_TOP := 211
+const MGR_BASE_BOT := 317
+const CLUB_BASE_TOP := 240
+const CLUB_BASE_BOT := 286
+# Witnessed kit boxes: top x195-244 y200-264, bottom x395-444 y255-318. The
+# original's free-floating 50x65 hub kit render is un-extracted (the panel
+# bank bakes a white panel behind it, unusable over the circle); the kits
+# sheet's front view draws 1:1 centred on the witnessed box (flagged
+# approximation, shield-card precedent).
+const KIT_VIEW := Rect2(0, 0, 31, 64)      # front-kit view of the 48x64 sheet
+const KIT_TOP_POS := Vector2(204, 200)     # top side kit, left of the top band
+const KIT_BOT_POS := Vector2(404, 254)     # bottom side kit, right of the bottom band
+const C_INK_CPU := Color8(0, 0, 0)         # CPU half: black on the pale boxes
+const C_INK_PLAYER := Color8(255, 255, 255)  # player half: white on the dark boxes
 
 var _bg: Texture2D
 var _bezel: Texture2D            # marble fill for the landscape letterbox margins
+var _circle_home: Texture2D      # ma_6 circle overlay (player-home arrangement)
+var _arrow_tex: Texture2D        # the player-side ► pointer (cut from orig/73)
+var _f8: Font
 var _f10: Font
 var _f12: Font
 var _f14: Font
+var _fcal: Font                  # calend12: the circle manager-name face
 var _kit_tex: Texture2D          # the managed club's kit, or null if no art for the id
 
 var _club: String = ""
@@ -145,11 +160,17 @@ func _ready() -> void:
 	_bg = load("res://art/screens/menu_bg.png")
 	_bg_dim = load("res://art/screens/alert/menu_bg_dim.png")
 	_bezel = load("res://art/screens/fondo_marble.png")
+	if ResourceLoader.exists("res://art/screens/hub/circle_home.png"):
+		_circle_home = load("res://art/screens/hub/circle_home.png")
+	if ResourceLoader.exists("res://art/screens/hub/arrow.png"):
+		_arrow_tex = load("res://art/screens/hub/arrow.png")
 	if ResourceLoader.exists("res://art/screens/dropdown/bar.png"):
 		_drop_tex = load("res://art/screens/dropdown/bar.png")
+	_f8 = load("res://art/fonts/proman8.fnt")
 	_f10 = load("res://art/fonts/proman10.fnt")
 	_f12 = load("res://art/fonts/proman12.fnt")
 	_f14 = load("res://art/fonts/proman14.fnt")
+	_fcal = PMChrome.font("calend12")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2(W, H)
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -387,57 +408,35 @@ func _dc(c: Color) -> Color:
 	return PMAlert.dim_color(c) if _alert_tex != null else c
 
 
-## A beveled rect: solid base, light top/left edge, dark bottom/right edge.
-func _bevel(r: Rect2, base: Color, hi: Color, lo: Color) -> void:
-	base = _dc(base)
-	hi = _dc(hi)
-	lo = _dc(lo)
-	draw_rect(r, base, true)
-	draw_rect(Rect2(r.position.x, r.position.y, r.size.x, 1), hi, true)
-	draw_rect(Rect2(r.position.x, r.position.y, 1, r.size.y), hi, true)
-	draw_rect(Rect2(r.position.x, r.end.y - 1, r.size.x, 1), lo, true)
-	draw_rect(Rect2(r.end.x - 1, r.position.y, 1, r.size.y), lo, true)
-
-
-## A grey circle slot (PL / manager / opp-manager / CPU) with centred text.
-func _slot(r: Rect2, s: String, f: Font, sz: int) -> void:
-	if s == "":
+## Circle slot text: the original's cell centring (x0 + (cell_w - (adv-1)) / 2,
+## integer — every witnessed orig/73 + ma_6 slot label fits it exactly).
+func _cell_txt(f: Font, cell: Array, baseline: int, t: String, col: Color, sz: int) -> void:
+	if f == null or t == "":
 		return
-	_bevel(r, C_SLOT, C_SLOT_HI, C_SLOT_LO)
-	_txt(f, int(r.position.x) + 3, int(r.position.y) + int((r.size.y - sz) * 0.5) - 1,
-		s, C_TITLE, sz, int(r.size.x) - 6)
+	var w := int(f.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x) - 1
+	var px: int = int(cell[0]) + int(maxi(int(cell[1]) - w, 0) * 0.5)
+	draw_string(f, Vector2(px, baseline), t, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, PMChrome.dim_col(col))
 
 
-## A blue-grey name band (managed club / next opponent) with a pale border + white text.
-func _band(r: Rect2, s: String, f: Font, sz: int) -> void:
-	if s == "":
+## Club band text: the original's heavy flat face (un-extracted; approximated by
+## double-struck proman12 — witnessed ink centres x323 on both bands, flagged).
+func _club_txt(baseline: int, t: String, col: Color) -> void:
+	if _f12 == null or t == "":
 		return
-	_bevel(r, C_BAND, C_BAND_HI, C_BAND_LO)
-	_txt(f, int(r.position.x) + 4, int(r.position.y) + int((r.size.y - sz) * 0.5) - 1,
-		s, C_TITLE, sz, int(r.size.x) - 8)
+	var w := int(_f12.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x) + 1
+	var px: int = CLUB_CX - int(w * 0.5)
+	var c := PMChrome.dim_col(col)
+	draw_string(_f12, Vector2(px, baseline), t, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, c)
+	draw_string(_f12, Vector2(px + 1, baseline), t, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, c)
 
 
-## A club kit (escudo) fitted, aspect-preserved, into a circle crest box.
-func _crest(tex: Texture2D, box: Rect2) -> void:
+## A side's kit: the kits-sheet front view 1:1 (see KIT_TOP_POS note).
+func _kit(tex: Texture2D, pos: Vector2) -> void:
 	if tex == null:
 		return
 	if _alert_tex != null:
 		tex = PMAlert.dim_texture(tex)
-	var sc: float = min(box.size.x / KIT_SRC.size.x, box.size.y / KIT_SRC.size.y)
-	var kw := KIT_SRC.size.x * sc
-	var kh := KIT_SRC.size.y * sc
-	draw_texture_rect_region(tex,
-		Rect2(box.position.x + (box.size.x - kw) * 0.5,
-			box.position.y + (box.size.y - kh) * 0.5, kw, kh), KIT_SRC)
-
-
-## "PL n" from the ordinal position string ("1st" -> "PL 1"); "" when unknown.
-func _pl_text() -> String:
-	var digits := ""
-	for c in _position:
-		if c >= "0" and c <= "9":
-			digits += c
-	return "PL %s" % digits if digits != "" else ""
+	draw_texture_rect_region(tex, Rect2(pos, KIT_VIEW.size), KIT_VIEW)
 
 
 func _draw() -> void:
@@ -456,21 +455,42 @@ func _draw() -> void:
 	if bg != null:
 		draw_texture_rect(bg, Rect2(0, 0, W, H), false)
 
-	# Shared PM98 plaque header over the cleared top band (manager+club / date / league+week).
+	# Header: the hub chrome bakes the REAL title bar / identity block / calendar
+	# sheet / plaque (orig/73) — only the live texts + kit draw over it.
 	PMChrome.set_dim(dimmed)
-	PMChrome.draw_header(self, "MANAGER MENU", _manager_name, _club, _league, _season, _week, _club_id)
+	PMChrome.draw_ident_texts(self, _manager_name, _club, _club_id)
+	PMChrome.draw_sheet_band_texts(self, _league, _season, _week)
 
-	# Central club circle: live slots over the real frame in menu_bg.
-	_slot(R_PL, _pl_text(), _f10, 11)
-	_slot(R_MGR, _manager_name, _f12, 13)
-	_band(R_CLUB, _club, _f14, 16)
-	_crest(_kit_tex, R_CLUB_CREST)
-	if _opp_name != "":
-		_band(R_OPP, _opp_name, _f14, 16)
-		_crest(_opp_tex, R_OPP_CREST)
-		var lower := _opp_manager if _opp_manager != "" else ("HOME" if _is_home else "AWAY")
-		_slot(R_OPPMGR, lower, _f10, 11)
-		_slot(R_CPU, "CPU", _f10, 11)
+	# Central club circle: HOME side top, player's half dark (see consts block).
+	# menu_bg bakes the away arrangement; home blits the ma_6 overlay first.
+	var have_opp := _opp_name != ""
+	var player_top := have_opp and _is_home
+	if player_top and _circle_home != null:
+		var ct := PMAlert.dim_texture(_circle_home) if dimmed else _circle_home
+		draw_texture(ct, CIRCLE_HOME_POS)
+	var top_ink := C_INK_PLAYER if player_top else C_INK_CPU
+	var bot_ink := C_INK_CPU if player_top else C_INK_PLAYER
+	# db surnames render title-cased ("Ferguson"); the player's name as typed
+	# (witnessed lowercase "mwm" on orig/73).
+	var opp_mgr_disp := PMChrome.title_case_name(_opp_manager)
+	var top_club := _club if player_top else _opp_name
+	var top_mgr := _manager_name if player_top else opp_mgr_disp
+	var top_kit := _kit_tex if player_top else _opp_tex
+	var bot_club := _opp_name if player_top else _club
+	var bot_mgr := opp_mgr_disp if player_top else _manager_name
+	var bot_kit := _opp_tex if player_top else _kit_tex
+	if have_opp:
+		_cell_txt(_f8, CHIP_CELL, CHIP_BASE_TOP, "PL 1" if player_top else "CPU", top_ink, 11)
+		_cell_txt(_fcal, MGR_CELL, MGR_BASE_TOP, top_mgr, top_ink, 15)
+		_club_txt(CLUB_BASE_TOP, top_club, top_ink)
+		_kit(top_kit, KIT_TOP_POS)
+	_club_txt(CLUB_BASE_BOT, bot_club, bot_ink)
+	_kit(bot_kit, KIT_BOT_POS)
+	_cell_txt(_fcal, MGR_CELL, MGR_BASE_BOT, bot_mgr, bot_ink, 15)
+	_cell_txt(_f8, CHIP_CELL, CHIP_BASE_BOT, "CPU" if player_top else "PL 1", bot_ink, 11)
+	if _arrow_tex != null:
+		var at := PMAlert.dim_texture(_arrow_tex) if dimmed else _arrow_tex
+		draw_texture(at, Vector2(ARROW_X, ARROW_Y_TOP if player_top else ARROW_Y_BOT))
 	PMChrome.set_dim(false)
 
 	# Press highlight over the held icon / bar / button (never under the modal).
