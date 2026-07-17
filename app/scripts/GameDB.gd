@@ -40,6 +40,7 @@ func _load() -> void:
 		for c in clubs:
 			clubs_by_id[int(c["id"])] = c
 		_apply_loader_defaults()
+		_apply_real_managers()
 		loaded_path = path
 		is_sample = path.ends_with("sample_db.json")
 		database_loaded.emit()
@@ -67,6 +68,25 @@ func _apply_loader_defaults() -> void:
 				p["heightCm"] = 170 + rng.randi_range(0, 9)
 			if p.get("weightKg") == null:
 				p["weightKg"] = 75 + rng.randi_range(0, 9)
+
+
+## Fill the empty `manager` field from the source-true transcription table
+## (data/real_managers_1997.json: witnessed START OF SEASON / TEAMS IN
+## CHAMPIONSHIPS frames — English manager data is not in EQUIPOS.PKF). Clubs
+## absent from the table keep null and render an honest blank.
+func _apply_real_managers() -> void:
+	if not FileAccess.file_exists("res://data/real_managers_1997.json"):
+		return
+	var f := FileAccess.open("res://data/real_managers_1997.json", FileAccess.READ)
+	if f == null:
+		return
+	var parsed: Variant = JSON.parse_string(f.get_as_text())
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return
+	var table: Dictionary = parsed.get("managers", {})
+	for c in clubs:
+		if c.get("manager") == null and table.has(str(c.get("name", ""))):
+			c["manager"] = str(table[str(c.get("name", ""))])
 
 
 func season() -> String:

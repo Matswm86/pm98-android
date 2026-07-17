@@ -65,8 +65,13 @@ var league_cup: Dictionary = {}         # the Coca-Cola (League) Cup bracket; {}
 # Charity Shield + European qualification). -1 / [] until a first season completes.
 var last_champion_id: int = -1          # last season's league champions
 var last_fa_winner_id: int = -1         # last season's F.A. Cup winners
-var last_runners_up: Array = []         # last season's league places 2.. (for UEFA spots)
+var last_lc_winner_id: int = -1         # last season's League Cup winners (a UEFA berth)
+var last_runners_up: Array = []         # last season's league places 2.. (EC 2nd berth + UEFA)
 var charity_shield: Dictionary = {}     # the season-opener result; {} = not played
+var season_opened: bool = false         # the week-0 curtain-raiser chain (shield card +
+                                        # START OF SEASON screens) has run for this season
+var euro_seeds: Dictionary = {}         # comp_key -> domestic seed club ids (the TEAMS IN
+                                        # CHAMPIONSHIPS panels; set by mint_european_cups)
 
 # European competitions (qualified into from last season's domestic finish). Each is a
 # two-legged knockout (Cup.gd) over a field of this division's qualifier(s) + strong
@@ -218,8 +223,11 @@ func _init_club(club: Dictionary, league: Dictionary, league_clubs: Array, leagu
 	euro_names = {}
 	last_champion_id = -1
 	last_fa_winner_id = -1
+	last_lc_winner_id = -1
 	last_runners_up = []
 	charity_shield = {}
+	season_opened = false
+	euro_seeds = {}
 	euro_winner_cup = -1
 	euro_winner_cwc = -1
 	euro_winner_ratings = {}
@@ -1913,6 +1921,7 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	season = _season_label(year)
 	week = 0
 	finished = false
+	season_opened = false   # the week-0 chain (shield card + START OF SEASON) re-runs
 	results.clear()
 	# Preseason friendlies were a career-entry pick; season 2+ has no re-pick UI
 	# (un-walked — the walkthrough started one career), so the slate just clears.
@@ -1962,6 +1971,7 @@ func _capture_honours() -> void:
 		for i in range(1, s.size()):
 			last_runners_up.append(int(s[i].get("id", -1)))
 	last_fa_winner_id = Cup.champion_id(fa_cup)
+	last_lc_winner_id = Cup.champion_id(league_cup)
 
 
 ## Play the Charity Shield (champions v F.A. Cup winners) as the season's curtain-raiser.
@@ -2005,12 +2015,22 @@ func _play_charity_shield(rng: RandomNumberGenerator) -> void:
 ## comp's field = the domestic qualifier(s) + a draw of foreign clubs (distinct across our
 ## three competitions). No-op until a first season has produced honours, or if the pool is
 ## too small to fill a field. Called from advance_season after the new fixtures are set.
-func mint_european_cups(euro_pool: Array, rng: RandomNumberGenerator) -> void:
+func mint_european_cups(euro_pool: Array, rng: RandomNumberGenerator,
+		domestic_clubs: Array = []) -> void:
 	euro = {}
 	euro_ratings = {}
 	euro_names = {}
+	euro_seeds = {}
 	if last_champion_id == -1 or euro_pool.is_empty():
 		return
+	# Out-of-roster domestic seeds (a lower-division career: the honours belong to
+	# clubs outside the managed division) resolve through the same frozen-ratings
+	# path as the foreign entrants — the caller passes their GameDB club dicts.
+	for club in domestic_clubs:
+		var did := int(club.get("id", -1))
+		if did != -1 and not rosters.has(did) and not euro_ratings.has(did):
+			euro_ratings[did] = MatchEngine.team_ratings(club)
+			euro_names[did] = str(club.get("name", "?"))
 	var bag: Array = []
 	for club in euro_pool:
 		var id := int(club.get("id", -1))
@@ -2027,9 +2047,19 @@ func mint_european_cups(euro_pool: Array, rng: RandomNumberGenerator) -> void:
 		var tmp: Variant = bag[i]
 		bag[i] = bag[j]
 		bag[j] = tmp
+	# Domestic berths (the witnessed 1997-98 entry list, TEAMS IN CHAMPIONSHIPS
+	# orig/06): European Cup = champions + first runners-up (the real 97-98 2-spot
+	# format, Man Utd + Newcastle); U.E.F.A. Cup = next runners-up + the League Cup
+	# winners (Arsenal, Liverpool, Leicester, Aston Villa); Cup Winners' Cup = the
+	# F.A. Cup winners (Chelsea).
+	var uefa: Array = []
+	for cand in [_ru(1), _ru(2), last_lc_winner_id, _ru(3)]:
+		var cid := int(cand)
+		if cid != -1 and cid != last_champion_id and cid != _ru(0) and not uefa.has(cid):
+			uefa.append(cid)
 	var seeds := {
-		"european_cup": [last_champion_id],
-		"uefa_cup": last_runners_up.slice(0, UEFA_SPOTS),
+		"european_cup": [last_champion_id, _ru(0)],
+		"uefa_cup": uefa.slice(0, 4),
 		"cup_winners_cup": [_cwc_seed()],
 	}
 	var cursor := 0
@@ -2038,6 +2068,7 @@ func mint_european_cups(euro_pool: Array, rng: RandomNumberGenerator) -> void:
 		for s in seeds[key]:
 			if int(s) != -1 and not field.has(int(s)):
 				field.append(int(s))
+		euro_seeds[key] = field.duplicate()   # the domestic entrants (champs screen)
 		var need := EURO_FIELD - field.size()
 		if cursor + need > bag.size():
 			break                          # foreign pool exhausted; remaining comps skipped
@@ -2064,6 +2095,52 @@ func _cwc_seed() -> int:
 	if last_fa_winner_id != -1:
 		return last_fa_winner_id
 	return int(last_runners_up[0]) if not last_runners_up.is_empty() else -1
+
+
+## last_runners_up[i] or -1 (the qualification-list helper).
+func _ru(i: int) -> int:
+	return int(last_runners_up[i]) if i < last_runners_up.size() else -1
+
+
+## Season-1 curtain-raiser state: seed the REAL 1996-97 honours (the original
+## contests the Charity Shield + runs the European competitions from career
+## start -- witnessed TEAMS IN CHAMPIONSHIPS orig/06) and mint the season's
+## competitions from them. `honours` = {champion_id, fa_winner_id, lc_winner_id,
+## runners_up: Array, euro_cup_winner: Dictionary club, cwc_winner: Dictionary
+## club} -- ids resolved by the caller from GameDB (create() has no DB access).
+## The shield itself plays via play_season_opener on the week-0 chain.
+func open_first_season(honours: Dictionary, euro_pool: Array,
+		sa_champion: Dictionary, rng: RandomNumberGenerator,
+		domestic_clubs: Array = []) -> void:
+	last_champion_id = int(honours.get("champion_id", -1))
+	last_fa_winner_id = int(honours.get("fa_winner_id", -1))
+	last_lc_winner_id = int(honours.get("lc_winner_id", -1))
+	last_runners_up = []
+	for v in honours.get("runners_up", []):
+		last_runners_up.append(int(v))
+	mint_european_cups(euro_pool, rng, domestic_clubs)
+	# Last season's European winners (real 1996-97: Borussia D. lifted the European
+	# Cup, F.C. Barcelona the Cup Winners' Cup) contest the Supercup +
+	# Intercontinental curtain-raisers, exactly like a rollover season.
+	var ecw: Dictionary = honours.get("euro_cup_winner", {})
+	var cwcw: Dictionary = honours.get("cwc_winner", {})
+	if not ecw.is_empty():
+		euro_winner_cup = int(ecw.get("id", -1))
+		euro_winner_ratings[euro_winner_cup] = MatchEngine.team_ratings(ecw)
+		euro_winner_names[euro_winner_cup] = str(ecw.get("name", "?"))
+	if not cwcw.is_empty():
+		euro_winner_cwc = int(cwcw.get("id", -1))
+		euro_winner_ratings[euro_winner_cwc] = MatchEngine.team_ratings(cwcw)
+		euro_winner_names[euro_winner_cwc] = str(cwcw.get("name", "?"))
+	_play_euro_supercups(sa_champion, rng)
+
+
+## Play the Charity Shield on the week-0 curtain-raiser chain if it hasn't been
+## contested yet this season (season 1: honours seeded by open_first_season;
+## rollover seasons play it inside advance_season already, so this no-ops).
+func play_season_opener(rng: RandomNumberGenerator) -> void:
+	if charity_shield.is_empty():
+		_play_charity_shield(rng)
 
 
 ## Capture last season's European Cup + Cup Winners' Cup winners and FREEZE their ratings
@@ -2278,7 +2355,9 @@ func to_dict() -> Dictionary:
 		"fa_cup": fa_cup,
 		"league_cup": league_cup,
 		"last_champion_id": last_champion_id, "last_fa_winner_id": last_fa_winner_id,
+		"last_lc_winner_id": last_lc_winner_id,
 		"last_runners_up": last_runners_up, "charity_shield": charity_shield,
+		"season_opened": season_opened, "euro_seeds": euro_seeds,
 		"euro": euro, "euro_ratings": _str_keyed(euro_ratings),
 		"euro_names": _str_keyed(euro_names),
 		"euro_winner_cup": euro_winner_cup, "euro_winner_cwc": euro_winner_cwc,
@@ -2358,10 +2437,15 @@ static func from_dict(d: Dictionary) -> Career:
 	c.league_cup = d.get("league_cup", {})
 	c.last_champion_id = int(d.get("last_champion_id", -1))
 	c.last_fa_winner_id = int(d.get("last_fa_winner_id", -1))
+	c.last_lc_winner_id = int(d.get("last_lc_winner_id", -1))
 	c.last_runners_up = []
 	for v in d.get("last_runners_up", []):
 		c.last_runners_up.append(int(v))
 	c.charity_shield = d.get("charity_shield", {})
+	# Pre-chain saves load as already-opened so the curtain-raiser screens don't
+	# fire mid-season on an in-flight career.
+	c.season_opened = bool(d.get("season_opened", true))
+	c.euro_seeds = d.get("euro_seeds", {})
 	c.euro = d.get("euro", {})
 	c.euro_ratings = {}
 	for k in d.get("euro_ratings", {}):

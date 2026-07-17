@@ -715,7 +715,8 @@ func _free_overlays() -> void:
 				or c is StaffScreen or c is BrowseScreen or c is TacticsScreen \
 				or c is PlayerInfoScreen or c is RivalScreen or c is ManagerHistoryScreen \
 				or c is TrainingScreen or c is InjuriesScreen or c is StatisticsScreen \
-				or c is OffersSelectionScreen:
+				or c is OffersSelectionScreen or c is ChampsScreen \
+				or c is CharityShieldScreen or c is SeasonStartScreen:
 			c.queue_free()
 	_browse = null
 	_mgr_history = null
@@ -1296,9 +1297,27 @@ func _begin_career(manager_name: String, league: Dictionary, club: Dictionary,
 			"name": str(rc.get("name", "")), "home": bool(rc.get("home", false)),
 			"venue_stadium": str(rc.get("venue_stadium", ""))})
 	_career.preseason_rivals = rivals_meta
+	# Season-1 honours: the original contests the Charity Shield + runs the
+	# European competitions from career start, seeded with the REAL 1996-97
+	# honours (witnessed TEAMS IN CHAMPIONSHIPS, orig/06). English careers only —
+	# the honour clubs are resolved from GameDB by their game names.
+	var rng2 := RandomNumberGenerator.new()
+	rng2.randomize()
+	var hon := _english_honours_96_97()
+	if not hon.is_empty():
+		_career.open_first_season(hon, _euro_pool(), _sa_champion_1997(), rng2,
+			_honour_clubs(hon))
 	_career.save()
 	_dismiss_seleccion()
-	_enter_career()
+	# TEAMS IN CHAMPIONSHIPS opens the season chain (orig/06: preseason CONTINUE
+	# -> this sheet -> hub); the shield card + START OF SEASON ride the week-0
+	# hub entry once the preseason friendlies are done (_show_career). The shot
+	# harnesses (PM98_*_SHOT capture rigs) drive _begin_career directly and skip
+	# the chain -- they are not the real flow.
+	if OS.has_environment("PM98_SHOT_DIR"):
+		_enter_career()
+	else:
+		_show_champs_screen(func() -> void: _enter_career())
 
 ## Enter the career: drop the front-of-house browse/title overlays, reset nav so the hub
 ## sits one level under Home (Back from a green sub-flow -> hub), and raise the hub.
@@ -1351,7 +1370,33 @@ func _show_career() -> void:
 	if _browse != null and is_instance_valid(_browse):
 		_browse.queue_free()
 		_browse = null
+	# Week-0 curtain-raiser chain (audit C1 #8/#9): once the preseason friendlies
+	# are done (or none were picked), the original shows the CHARITY SHIELD
+	# CHAMPION card then START OF SEASON before the week-1 hub (orig/70-73).
+	if _career != null and not _career.season_opened and _career.week == 0 \
+			and not _career.finished and _career.pending_friendly().is_empty() \
+			and not OS.has_environment("PM98_SHOT_DIR"):
+		_run_season_open_chain()
+		return
 	_mount_hub()
+
+
+## Play the shield (season 1; rollovers already played it) and walk the witnessed
+## card -> START OF SEASON -> hub sequence. season_opened is stamped first so
+## re-entering _show_career can't loop the chain.
+func _run_season_open_chain() -> void:
+	_career.season_opened = true
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	_career.play_season_opener(rng)
+	_career.save()
+	var after_shield := func() -> void:
+		_show_season_start(func() -> void: _mount_hub())
+	var cs: Dictionary = _career.charity_shield
+	if cs.is_empty():
+		after_shield.call()
+		return
+	_show_shield_card(cs, after_shield)
 
 ## Create the persistent MENUPRINCIPAL hub on first entry (wiring its taps to _menu_action
 ## once), or raise + refresh the existing one. Kept on top of $Root so the green sub-flows
@@ -2407,6 +2452,209 @@ func _sa_champion() -> Dictionary:
 			best = c
 	return best
 
+# ---- season-entry chain (charter #4: TEAMS IN CHAMPIONSHIPS + CHARITY SHIELD
+# card + START OF SEASON, audit C1 #7/8/9) ----------------------------------
+
+## The REAL 1996-97 English honours (they seed season 1 exactly as witnessed on
+## TEAMS IN CHAMPIONSHIPS orig/06): champions Manchester Utd., F.A. Cup winners
+## Chelsea, League Cup winners Leicester, runners-up order Newcastle / Arsenal /
+## Liverpool / Aston Villa; European Cup winners Borussia D., Cup Winners' Cup
+## winners F.C. Barcelona. Resolved from GameDB by the game's own club names;
+## {} if the DB lacks them (sample DB fallback).
+func _english_honours_96_97() -> Dictionary:
+	var champ := _club_by_name("Manchester Utd.")
+	var fa := _club_by_name("Chelsea")
+	var lc := _club_by_name("Leicester")
+	var ru: Array = []
+	for n in ["Newcastle Utd", "Arsenal", "Liverpool", "Aston Villa"]:
+		var c := _club_by_name(n)
+		if not c.is_empty():
+			ru.append(int(c["id"]))
+	if champ.is_empty() or fa.is_empty() or ru.is_empty():
+		return {}
+	return {"champion_id": int(champ["id"]), "fa_winner_id": int(fa["id"]),
+		"lc_winner_id": int(lc["id"]) if not lc.is_empty() else -1,
+		"runners_up": ru,
+		"euro_cup_winner": _club_by_name("Borussia D."),
+		"cwc_winner": _club_by_name("F.C. Barcelona")}
+
+
+## GameDB club dicts for the honours' domestic clubs (frozen-rating seeds for a
+## lower-division career whose rosters don't hold them).
+func _honour_clubs(hon: Dictionary) -> Array:
+	var out: Array = []
+	var ids: Array = [int(hon.get("champion_id", -1)), int(hon.get("fa_winner_id", -1)),
+		int(hon.get("lc_winner_id", -1))]
+	for v in hon.get("runners_up", []):
+		ids.append(int(v))
+	for id in ids:
+		if int(id) != -1:
+			var c := GameDB.club(int(id))
+			if not c.is_empty():
+				out.append(c)
+	return out
+
+
+func _club_by_name(name: String) -> Dictionary:
+	for c in GameDB.clubs:
+		if str(c.get("name", "")) == name:
+			return c
+	return {}
+
+
+## The real 1997 Copa Libertadores champions (Cruzeiro -- witnessed on the
+## INTERCONTINENTAL CUP panel, orig/06); the strongest-SA stand-in otherwise.
+func _sa_champion_1997() -> Dictionary:
+	var c := _club_by_name("Cruzeiro")
+	return c if not c.is_empty() else _sa_champion()
+
+
+func _club_display_name(id: int) -> String:
+	if _career != null:
+		if _career.club_names.has(id):
+			return str(_career.club_names[id])
+		if _career.euro_names.has(id):
+			return str(_career.euro_names[id])
+	return str(GameDB.club(id).get("name", "?"))
+
+
+## The club's manager for the season sheets: the career manager for the managed
+## club, the source-true transcription table (GameDB.manager) otherwise, "" =
+## honest blank (un-witnessed clubs).
+func _mgr_of(id: int) -> String:
+	if _career != null and id == _career.club_id:
+		return _career.manager_name
+	var m: Variant = GameDB.club(id).get("manager")
+	return str(m) if m != null else ""
+
+
+## Panel entries for the TEAMS IN CHAMPIONSHIPS sheet, from the live career.
+func _champs_entries() -> Dictionary:
+	var c := _career
+	var out: Dictionary = {}
+	for key in ["european_cup", "uefa_cup", "cup_winners_cup"]:
+		var rows: Array = []
+		for id in c.euro_seeds.get(key, []):
+			rows.append([_club_display_name(int(id)), _mgr_of(int(id))])
+		out[key] = rows
+	# Charity Shield pairing (the _play_charity_shield berth rule: the Double ->
+	# the league runners-up step up).
+	var champ := c.last_champion_id
+	var fa := c.last_fa_winner_id
+	if fa == -1 or fa == champ:
+		fa = int(c.last_runners_up[0]) if not c.last_runners_up.is_empty() else -1
+	var sh: Array = []
+	for id in [champ, fa]:
+		if int(id) != -1:
+			sh.append([_club_display_name(int(id)), _mgr_of(int(id))])
+	out["charity_shield"] = sh
+	var sc: Array = []
+	for id in [c.euro_winner_cup, c.euro_winner_cwc]:
+		if int(id) != -1:
+			sc.append([str(c.euro_winner_names.get(int(id), _club_display_name(int(id)))),
+				_mgr_of(int(id))])
+	out["supercup"] = sc
+	var ic_rows: Array = []
+	if c.euro_winner_cup != -1:
+		ic_rows.append([str(c.euro_winner_names.get(c.euro_winner_cup, "?")),
+			_mgr_of(c.euro_winner_cup)])
+		var ic: Dictionary = c.intercontinental
+		if not ic.is_empty():
+			var sa_id := int(ic["winner_id"])
+			if sa_id == c.euro_winner_cup:
+				sa_id = int(ic["loser_id"])
+			ic_rows.append([str(c.euro_winner_names.get(sa_id, "?")), _mgr_of(sa_id)])
+	out["intercontinental"] = ic_rows
+	return out
+
+
+func _show_champs_screen(on_done: Callable) -> void:
+	var scr: ChampsScreen = load("res://scenes/ChampsScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(_champs_entries())
+	scr.continue_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		scr.queue_free()
+		on_done.call())
+
+
+func _show_shield_card(cs: Dictionary, on_done: Callable) -> void:
+	var w := int(cs.get("winner_id", -1))
+	var l := int(cs.get("loser_id", -1))
+	var card: CharityShieldScreen = load("res://scenes/CharityShieldScreen.gd").new()
+	card.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(card)
+	card.setup(
+		{"club": _club_display_name(w), "manager": _mgr_of(w), "club_id": w,
+			"pens": str(cs.get("decided", "")) == "pens"},
+		{"club": _club_display_name(l), "manager": _mgr_of(l), "club_id": l})
+	card.ok_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		card.queue_free()
+		on_done.call())
+
+
+## The witnessed band labels for the four English divisions (orig/71 + pro/12).
+const DIV_BAND_LABELS := {"Premier League": "PREMIER LEAGUE", "Division One": "1ST DIVISION",
+	"Division Two": "2ND DIVISION", "Division Three": "3RD DIVISION"}
+
+
+## The original's objective CATEGORIES (Champion / U.E.F.A. / Mid Table / Avoid
+## Relegation / Promotion, witnessed orig/71 + pro/12) mapped from the app's own
+## board rule (Career.objective_for) -- the original's assignment rule is
+## un-RE'd, so the categories ride our positions (documented divergence).
+func _objective_label(pos: int, total: int, tier: int) -> String:
+	var releg := int(SeasonSim.ZONES.get(tier, {"releg": 3}).get("releg", 3))
+	if pos >= total - releg - 1:
+		return "Avoid Relegation"
+	if tier == 1:
+		if pos <= 4:
+			return "Champion"
+		if pos <= 7:
+			return "U.E.F.A."
+		return "Mid Table"
+	if pos <= 3:
+		return "Promotion"
+	return "Mid Table"
+
+
+func _season_divisions() -> Array:
+	var out: Array = []
+	for lg in GameDB.leagues:
+		var lid := str(lg["id"])
+		var clubs := GameDB.clubs_in_league(lid)
+		clubs.sort_custom(func(a, b): return str(a["name"]) < str(b["name"]))
+		var tier := FinanceModel.tier_of({"leagueId": lid}, GameDB.leagues)
+		var total := clubs.size()
+		var rows: Array = []
+		for cl in clubs:
+			var cid := int(cl["id"])
+			var user: bool = _career != null and cid == _career.club_id \
+				and lid == _career.league_id
+			var pos: int = _career.objective_pos if user \
+				else int(Career.objective_for(cid, lid, clubs, GameDB.leagues)["pos"])
+			var mgr := _career.manager_name if user else _mgr_of(cid)
+			rows.append([str(cl["name"]), mgr, _objective_label(pos, total, tier), user])
+		out.append({"title": str(DIV_BAND_LABELS.get(str(lg["name"]), lg["name"])), "rows": rows})
+	return out
+
+
+func _show_season_start(on_done: Callable) -> void:
+	var scr: SeasonStartScreen = load("res://scenes/SeasonStartScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	var start_tab := 0
+	for i in GameDB.leagues.size():
+		if str(GameDB.leagues[i]["id"]) == _career.league_id:
+			start_tab = i
+	scr.setup(_season_divisions(), start_tab)
+	scr.continue_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		scr.queue_free()
+		on_done.call())
+
+
 ## A one-word status of the Charity Shield for the competitions list.
 func _charity_status_word() -> String:
 	return _oneoff_status_word(_career.charity_shield)
@@ -2915,11 +3163,6 @@ func _calendar_entry(ymd: Dictionary, comp: String, comp_name: String, round_lbl
 		"home": _club_display_name(home_id), "away": _club_display_name(away_id),
 		"home_flag": int(GameDB.club(home_id).get("countryCode", -1)),
 		"away_flag": int(GameDB.club(away_id).get("countryCode", -1))}
-
-func _club_display_name(id: int) -> String:
-	if _career.club_names.has(id):
-		return str(_career.club_names[id])
-	return str(GameDB.club(id).get("name", "?"))
 
 ## The inferred calendar date of league round `r` (0-based): season-start 9 AUG of the season's
 ## first year + r weeks (mirrors ResultsScreen._date_for for cross-screen consistency). The
