@@ -2257,7 +2257,10 @@ static func _marker_gate_proceed(p: Dictionary) -> bool:
 	var m: Dictionary = _ref(gs, 0x138)
 	if _bm(m, 0x1664) == _g(gs, 8):                         # we hold the ball
 		var carrier: Variant = ball.get(0x40, null)
-		if carrier != null and carrier != 0:               # ball+0x40 carrier != 0 -> tail
+		# ball+0x40 is a carrier POINTER in live play (Dictionary) or a raw int in the
+		# oracle fixtures; either non-null form means someone holds the ball -> tail.
+		# Mirrors the L1109/L1218 pointer-or-int idiom (Dictionary != 0 would crash).
+		if carrier is Dictionary or (carrier is int and int(carrier) != 0):   # ball+0x40 carrier != 0 -> tail
 			return false
 		if not is_same(ball.get(0x44, null), p):           # ball+0x44 != p -> tail
 			return false

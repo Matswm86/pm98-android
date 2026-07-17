@@ -406,9 +406,14 @@ static func _action_switch(p: Dictionary, m: Dictionary, gs: Dictionary, b: Dict
 		0x19, 0x1a:
 			Pm98Movement.kick_resolve(p, rng, Pm98Movement.KICK_ADFC0, true)  # FUN_005adfc0 -> resolve_post_shot
 		0x1c:
-			# only fires the rng + set_position_code(0) when the ball still carries velocity.
+			# FUN_005a4600 case 0x1c: on a MOVING ball (ctrl+0x20/24/28 != 0) draw one rng
+			# (FUN_005ec250) and, w.p. 100/1000, reset the position code to 0 (FUN_005a5430(0)).
+			# The draw is UNCONDITIONAL on the ball-moving branch (C `&&` short-circuit); the
+			# <100 permil gate only guards the set_position_code call. rng drawn from the shared
+			# match stream so downstream draws stay in lockstep.
 			if _g(b, 0x20) != 0 or _g(b, 0x24) != 0 or _g(b, 0x28) != 0:
-				push_error("engine_tick case 0x1c moving-ball arm not wired (Task #2)")
+				if rng.chance_permil(100):
+					Pm98Movement.set_position_code(p, 0)
 		0x1f, 0x21:
 			b[0x20] = 0
 			b[0x24] = 0
