@@ -579,3 +579,43 @@ Bolton) → TRAINING/INJURIES/STATISTICS/TACTICS/PREDEF all mount frame-true.
   default to `scorer_side` fallback.
 - **FT read-out stadium/capacity + MAN OF THE MATCH wrong/empty** — confirmed C2 item,
   user re-flagged; away stadium panel must FILL (original does), MoM name must render.
+
+## C6 — 2026-07-17 LIVE WITNESS corrections (wine re-drive; full detail in
+## docs/re/matchday_flow_witness_re.md; frames+videos in
+## screenshots/wine-captures-2026-07-17-matchflow/)
+
+Corrections to §C claims, from a fresh Manager-League career driven to wk-3 in
+the ORIGINAL with per-click stills and 20fps video:
+
+1. **C1 #12 is WRONG**: MATCH OPTIONS appears before the career's FIRST match
+   ONLY. Wk-1 and wk-3 CONTINUE went STRAIGHT into the stored presentation
+   (witnessed twice, no modal). 07-16 witnessed a first match and
+   over-generalized. Gate the modal on a per-career first-match flag.
+2. **C2 "FT hand-off" second half is WRONG about the original**: EXIT during a
+   match is NOT a silent result-skip and must NOT become "EXIT → read-out".
+   Witnessed: EXIT → alert "Do you want to leave the championship ?"; No →
+   resumes; Yes → TITLE SCREEN with the career abandoned UNSAVED. (The app
+   saves the week BEFORE presenting — a faithful EXIT-Yes must drop that save.)
+3. **FT button truth confirmed** (orig/68 reading stands): at 90:00 KICK OFF +
+   all doors vanish; a single CONTINUE stands in the EXIT slot → FULL TIME
+   read-out → hub.
+4. **NEW: running-state buttons**: during play EVERY button is gone except
+   EXIT (doors + left STATISTICS + KICK OFF are idle-state only). The app
+   draws all buttons all match — parity gap.
+5. **NEW: RESULTS mode has a HALF TIME stop**: roll → HALF TIME read-out
+   (CONTINUE) → FULL TIME read-out → hub. App jumps straight to full time.
+6. **NEW: the roll plays in EVERY view mode** when LINE-UPS ON (witnessed in
+   RESULTS mode). Roll spec + measured timing (≈4.3s/row, grow-in-place faces,
+   side-sliding name plates, tap-skip-to-complete, AUTO-advance after ~5-15s
+   hold) in matchday_flow_witness_re.md §4.
+7. **NEW: XI-validity gate**: CONTINUE with an injured/banned player in the XI
+   raises "The initial line-up is not correct. A player is either banned or
+   injured." BEFORE any modal/match.
+8. **Stadium panel**: second away-venue witness (The Dell filled at Bolton's
+   away league match) — the read-out stadium panel is ALWAYS the fixture home
+   club's ground, filled. Confirms the C2 flag on Main.gd's manager-home-only
+   stadium data.
+9. **Modal details**: fresh-career default mode = RESULTS + LINE-UPS ON; the
+   LINE-UPS toggle is the ON/OFF CELL only (label plate inert); a view-mode
+   tap SELECTS AND LAUNCHES immediately; OK launches with the current
+   selection; CANCEL returns to the un-advanced hub.
