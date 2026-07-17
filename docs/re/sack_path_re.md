@@ -133,9 +133,11 @@ scratchpad runs (DecompileAt on the listed VAs).
 
 **⇒ In a single-human-manager career the original returns to the MAIN MENU
 after a mid-season sack.** There is no mid-career post-sack OFFERS surface in
-the binary's control flow. (Season-END manager offers exist separately:
-`FUN_004f9800`/`FUN_004f98c0`, both gated `DAT_0066b1e4 != 0`, called from
-FUN_004f8a00's season-end path — which screens those mount was not chased.)
+the binary's control flow. (Season-END screens exist separately and are now
+fully chased — `FUN_004f9800` mounts 0x3b8 "END OF THE SEASON" and
+`FUN_004f98c0` mounts 0x3ba "END OF THE GAME", both Promanager-gated; the
+season-end OFFERS re-mount is the annual 0x3c1 OFFERS SELECTION screen. Full
+decode 2026-07-17: [`seasonend_flow_re.md`](seasonend_flow_re.md).)
 The app's post-sack OFFERS SELECTION mount is therefore a **known divergence
 from the original**, no longer "unknown".
 
@@ -230,8 +232,10 @@ squad-minimum sack (+0x28 ≤ 15) is ALWAYS armed, in both modes. Readers:
 Set by the main-menu outer loop: choice 0x4e35 → 0, choice 0x4e36 → 1 (also
 restored by the save-load path `FUN_005765f0`; a further writer
 `FUN_005454f0` is referenced only as a data pointer at 0x544e15/0x544e26 —
-un-chased). Gates: the +0x294 results review (above), season-end offers
-`FUN_004f9800`/`FUN_004f98c0`, the annual career-setup screen
+un-chased). Gates: the +0x294 results review (above), the season-end screens
+`FUN_004f9800`/`FUN_004f98c0` (= 0x3b8 END OF THE SEASON / 0x3ba END OF THE
+GAME, decoded in [`seasonend_flow_re.md`](seasonend_flow_re.md)), the annual
+career-setup screen
 (`FUN_004f9520((b1e4!=0)+0x3c0)` → screen 0x3c0 vs 0x3c1; 0x3c1 re-mounted
 each season once `DAT_0066b18c` > 0x7cd = 1997), and the hub title
 ("PROMANAGER MENU" when nonzero). All of that matches the witnessed

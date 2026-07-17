@@ -99,7 +99,14 @@ League or in Promanager League" (vs Trainer/Accountant levels) still suggests
 level-based gating machinery exists; the EXE xref behind 0x25b674 remains the
 definitive close.
 
-## END OF SEASON / END OF THE GAME (strings decoded, screens NOT witnessed)
+## END OF SEASON / END OF THE GAME (mechanism DECODED 2026-07-17, screens still un-witnessed)
+**Full decode → [`seasonend_flow_re.md`](seasonend_flow_re.md):** screen 0x3b8
+"END OF THE SEASON" (per-manager season report, `FUN_004f9800`, Promanager-
+only) and screen 0x3ba "END OF THE GAME" (`FUN_004f98c0`, mounts the season
+the Promanager level +0x28 reaches 12; level ladder `FUN_0058b2e0`). The
+season-end offers surface = the annual 0x3c1 OFFERS SELECTION re-mount, NOT a
+separate screen. Manager League careers show NONE of these. Original string
+notes kept below for provenance:
 - `END OF THE SEASON` 0x25aa60 block: "The directors are pleased/disappointed
   with the results." / "You receive a bonus of %s for last year." / "You began
   the season as {Champion of %s|%s runner up|in the %s position of %s} and
@@ -212,7 +219,11 @@ club-detail popup, 07 offer-accepted). Decoded in the build:
   fresh-manager band -> the app shows its real board objective instead.
 - Tests: `test_offers_selection_screen.gd` 29/29; career/manager suites green;
   PM98_MANAGER_SHOT real render through the new screen OK.
-- `_show_end_of_season()` list → future: the 0x25aa60 directors' report text
-  engine (needs the season-end witness first). Stays a flagged substitute.
+- `_show_end_of_season()` list → the real engine is now decoded
+  ([`seasonend_flow_re.md`](seasonend_flow_re.md): screen 0x3b8, exact text
+  assembly order + trophy-line table). BUT 0x3b8 is **Promanager-only** — a
+  faithful Manager League career shows NO end-of-season report at all; the
+  app's list stays a flagged substitute until that gating decision is made
+  (pixel witness still needs a simulated Promanager season).
 - Career-start: the app keeps seleccion (Manager League path, already frame-
   true). A future Promanager mode would use OFFERS SELECTION at start.
