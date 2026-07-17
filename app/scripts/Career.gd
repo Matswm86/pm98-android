@@ -412,7 +412,7 @@ func play_friendly(rng: RandomNumberGenerator, rival: Dictionary) -> Dictionary:
 		"away_id": a, "hg": int(res["home_goals"]), "ag": int(res["away_goals"])})
 	return {"home_id": h, "away_id": a, "hg": int(res["home_goals"]),
 		"ag": int(res["away_goals"]), "manager_home": at_home,
-		"goals": res.get("goals", []), "friendly": true}
+		"goals": res.get("goals", []), "possession": res.get("possession", []), "friendly": true}
 
 
 ## The manager's full league season for the CALENDAR view: one entry per round, in order,
@@ -483,7 +483,8 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 		round_results.append({"h": h, "a": a, "hg": hg, "ag": ag})
 		if h == club_id or a == club_id:
 			manager_res = {"home_id": h, "away_id": a, "hg": hg, "ag": ag, "manager_home": h == club_id,
-				"goals": res.get("goals", [])}   # stat engine's resolved scorers for the feed (not persisted)
+				"goals": res.get("goals", []),
+					"possession": res.get("possession", [])}   # scorers + real engine possession for the feed (not persisted)
 	# Morale & fitness live through the round (docs/re/morale_re.md): the slot
 	# deltas + the result delta hit BOTH sides of every fixture, then the league
 	# table caps a high-flying squad's morale once 11 rounds are in. A derived

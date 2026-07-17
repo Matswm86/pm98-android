@@ -33,11 +33,20 @@ const NAME_H := Vector2(76, 256)           # home name zone (x span)
 const NAME_A := Vector2(382, 586)          # away name zone (x span)
 const BOX_L := Rect2(258, 100, 62, 32)     # left score box
 const BOX_R := Rect2(322, 100, 58, 32)     # right score box
-const KIT_H := Vector2(20, 84)             # home kit anchor (escudo top-left)
-const KIT_A := Vector2(588, 84)            # away kit anchor
-const EVENTS := Rect2(312, 268, 158, 164)  # white feed body
-const EV_MIN_X := 316
-const EV_COMMENT_X := 356
+# kit = the club escudo drawn to the frame-64 bounds. The escudo's opaque kit (y24..63,
+# 40px) maps to the original's y89..142 (53px) at uniform scale ~1.32; the anchor lands
+# the opaque top at y89 (the transparent y0..23 sits above the band). x0..31 -> x14..55.
+const KIT_H := Vector2(14, 57)             # home kit anchor (escudo top-left)
+const KIT_A := Vector2(585, 57)            # away kit anchor
+const KIT_SCALE := 1.32                    # escudo-opaque(40h) -> frame-64 kit(53h)
+# feed body = the REAL EVENTS panel (frame 67): light-grey MIN column x153..198 +
+# white COMMENT column x199..467 (scrollbar x470..476). The old x312..470 rect drew
+# only the right third, so the goal line's club clipped ("Goal by Salako" -> "Goal by
+# Milose"). MIN digits right-align at x190; COMMENT left-aligns at x199 to the panel.
+const EVENTS := Rect2(153, 269, 314, 167)  # white/grey feed body (x153..467, y269..436)
+const EV_MIN_R := 190                       # minute right-edge (right-aligned in MIN col)
+const EV_COMMENT_X := 199                    # comment left edge (white column start)
+const EV_ROW_TOP := 274                      # first feed row top (frame-measured)
 const EV_ROW_H := 15
 const VIS_ROWS := 10
 
@@ -53,9 +62,26 @@ const BTN := {
 const KIT_SRC := Rect2(0, 0, 31, 64)   # shirt half of the 48x64 MINIESC escudo
 const C_LCD := Color(0.78, 0.86, 0.78)
 const C_NAME := Color(1.0, 1.0, 1.0)
-const C_GOAL := Color(1.0, 0.60, 0.55)   # goal lines colour-coded (B4b "red/colour-coded")
+const C_GOAL := Color(1, 0, 0)   # goal lines pure red (frame 67 "Goal by Blake" = 255,0,0)
 const C_TXT := Color(0.10, 0.12, 0.18)
 const C_PRESS := Color(1, 1, 1, 0.20)
+
+# POSSESSION PERCENTAGE bar (frame 67): red (home, left) | green (away, right) inside a
+# bevel, a light-red diamond pointer at the split, and a "NN %" label each side. The
+# split reads the REAL engine POSS counters (Pm98StatMatch 0x64/0x804) — not fabricated.
+# frame-measured: interior x156..482 y184..202; labels LEFT x67..118 / RIGHT x525..576.
+const POSS_L := 156                       # bar interior left / right (span 326)
+const POSS_R := 482
+const POSS_Y0 := 184
+const POSS_Y1 := 203
+const POSS_RED := Color(85.0 / 255, 0, 0)         # home fill (frame 67 = 85,0,0)
+const POSS_GRN := Color(0, 63.0 / 255, 0)         # away fill (0,63,0)
+const POSS_ARROW := Color(1.0, 159.0 / 255, 170.0 / 255)   # pointer (255,159,170)
+const POSS_LBL := Color(160.0 / 255, 180.0 / 255, 200.0 / 255)   # "NN %" light blue-grey
+const POSS_LBL_L := Rect2(67, 184, 52, 17)        # left label bbox (blanked + redrawn)
+const POSS_LBL_R := Rect2(525, 184, 52, 17)       # right label bbox
+const POSS_CLEAN_L := Vector2i(119, 149)          # glyph-free band span to sample the blank
+const POSS_CLEAN_R := Vector2i(489, 523)
 
 var _bg: Texture2D
 var _run_bg: Texture2D  # RUNNING chrome: every button vanishes except EXIT
@@ -77,6 +103,10 @@ var _minute := 0.0
 var _playing := true
 var _started := false   # KICK OFF pressed (running/paused chrome vs the idle board)
 var _press := ""
+var _poss_final := 0.5     # home possession fraction (real engine split; 0.5 = neutral gap)
+var _has_poss := false     # true when the stat engine supplied POSS counters
+var _blank_l: Array = []   # per-row band colours to erase the baked "50 %" labels
+var _blank_r: Array = []
 
 
 func _ready() -> void:
@@ -100,7 +130,7 @@ func _ready() -> void:
 ## dropped so the feed is the stat engine's real record. home_id/away_id pull each
 ## club's kit escudo.
 func setup(home_name: String, away_name: String, hg: int, ag: int, lines: Array,
-		home_id: int = -1, away_id: int = -1) -> void:
+		home_id: int = -1, away_id: int = -1, possession: Array = []) -> void:
 	_home = home_name
 	_away = away_name
 	_hg = hg
@@ -108,10 +138,44 @@ func setup(home_name: String, away_name: String, hg: int, ag: int, lines: Array,
 	_home_kit = _kit_tex(home_id)
 	_away_kit = _kit_tex(away_id)
 	_feed = _honest_feed(lines)
+	# REAL engine possession [home,away] -> the bar's final split. Empty (legacy path)
+	# leaves the honest neutral 50/50. A degenerate 0+0 also stays neutral.
+	_has_poss = possession.size() == 2 and (int(possession[0]) + int(possession[1])) > 0
+	_poss_final = (float(possession[0]) / (int(possession[0]) + int(possession[1]))) if _has_poss else 0.5
+	if _blank_l.is_empty():
+		_precompute_label_blank()
 	_minute = 0.0
 	_playing = false        # frame 073: KICK OFF idle at 00:00; KICK OFF starts the stream
 	_started = false
 	queue_redraw()
+
+
+## Cache the per-row band colours behind the baked "50 %" labels so the live bar can erase
+## them (median of a glyph-free span in the same row -> reconstructs the blue chrome band,
+## the same technique the bake tool uses). Read once from brief.png's Image.
+func _precompute_label_blank() -> void:
+	_blank_l.clear()
+	_blank_r.clear()
+	var img: Image = _bg.get_image() if _bg != null else null
+	if img == null:
+		return
+	if img.is_compressed():
+		img.decompress()
+	for y in range(int(POSS_LBL_L.position.y), int(POSS_LBL_L.end.y)):
+		_blank_l.append(_row_median(img, y, POSS_CLEAN_L.x, POSS_CLEAN_L.y))
+		_blank_r.append(_row_median(img, y, POSS_CLEAN_R.x, POSS_CLEAN_R.y))
+
+
+func _row_median(img: Image, y: int, x0: int, x1: int) -> Color:
+	var rs: Array = []
+	var gs: Array = []
+	var bs: Array = []
+	for x in range(x0, x1):
+		var c := img.get_pixel(x, y)
+		rs.append(c.r); gs.append(c.g); bs.append(c.b)
+	rs.sort(); gs.sort(); bs.sort()
+	var m := rs.size() / 2
+	return Color(rs[m], gs[m], bs[m])
 
 
 ## Build the honest feed from a timeline: a Kick Off line + one line per GOAL only.
@@ -170,6 +234,16 @@ func _events_upto(minute: float) -> Array:
 		if float(ln.get("minute", 0)) <= minute:
 			out.append(ln)
 	return out
+
+
+## Home possession fraction at `minute`: eases the neutral 50/50 kickoff toward the real
+## engine split as the clock runs (the original's bar drifts through the match; only the
+## final split is engine-known, so the path between is a display ease — never a fabricated
+## stat). Without engine counters (legacy path) it stays the honest neutral 50/50.
+func _possession_at(minute: float) -> float:
+	if not _has_poss:
+		return 0.5
+	return lerpf(0.5, _poss_final, clampf(minute / 90.0, 0.0, 1.0))
 
 
 func _half_label(minute: float) -> String:
@@ -257,6 +331,9 @@ func _draw() -> void:
 	if bg != null:
 		draw_texture_rect(bg, Rect2(0, 0, W, H), false)
 
+	# live POSSESSION bar (real engine split; neutral 50/50 when no counters)
+	_draw_possession()
+
 	# clock digit (over the baked LCD, which we blank first) + half/state label
 	draw_rect(Rect2(266, 18, 100, 30), Color(0.10, 0.10, 0.11), true)
 	var clock := "%02d:00" % int(_minute) if _minute < 90.0 else "90:00"
@@ -280,6 +357,34 @@ func _draw() -> void:
 		draw_rect(BTN[_press], C_PRESS, true)
 
 
+## Draw the live POSSESSION bar over the baked chrome: erase the baked "50 %" labels,
+## fill red|green at the current split, place the diamond pointer, and print both "NN %".
+func _draw_possession() -> void:
+	for i in _blank_l.size():
+		var yy: int = int(POSS_LBL_L.position.y) + i
+		draw_rect(Rect2(POSS_LBL_L.position.x, yy, POSS_LBL_L.size.x, 1), _blank_l[i], true)
+		draw_rect(Rect2(POSS_LBL_R.position.x, yy, POSS_LBL_R.size.x, 1), _blank_r[i], true)
+	var frac := _possession_at(_minute)
+	var span := POSS_R - POSS_L
+	var bx: int = clampi(POSS_L + int(round(span * frac)), POSS_L + 6, POSS_R - 6)
+	draw_rect(Rect2(POSS_L, POSS_Y0, bx - POSS_L, POSS_Y1 - POSS_Y0), POSS_RED, true)
+	draw_rect(Rect2(bx, POSS_Y0, POSS_R - bx, POSS_Y1 - POSS_Y0), POSS_GRN, true)
+	var cy := (POSS_Y0 + POSS_Y1) * 0.5
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(bx, POSS_Y0 - 1), Vector2(bx + 5, cy), Vector2(bx, POSS_Y1 + 1),
+		Vector2(bx - 5, cy)]), POSS_ARROW)
+	var hp: int = int(round(frac * 100.0))
+	_poss_label(hp, POSS_LBL_L)          # home % (left, red side)
+	_poss_label(100 - hp, POSS_LBL_R)    # away % (right, green side)
+
+
+func _poss_label(pct: int, box: Rect2) -> void:
+	if _f18 == null:
+		return
+	draw_string(_f18, Vector2(box.position.x, box.position.y + _f18.get_ascent(15) + 1),
+		"%d %%" % pct, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, POSS_LBL)
+
+
 func _draw_events() -> void:
 	if _f10 == null:
 		return
@@ -287,17 +392,20 @@ func _draw_events() -> void:
 	var start: int = maxi(0, rows.size() - VIS_ROWS)
 	for i in range(start, rows.size()):
 		var ln: Dictionary = rows[i]
-		var yy: int = int(EVENTS.position.y) + 2 + (i - start) * EV_ROW_H
+		var yy: int = EV_ROW_TOP + (i - start) * EV_ROW_H
 		var goal: bool = ln.get("goal") == true
 		var col: Color = C_GOAL if goal else C_TXT
 		var kick: bool = ln.get("kickoff", false)
-		# minute in the MIN column (goals only); comment clipped to the panel width.
+		var base := yy + _f10.get_ascent(11)
+		# minute right-aligned in the MIN column (goals only; Kick Off carries none)
 		if not kick:
-			draw_string(_f10, Vector2(EV_MIN_X, yy + _f10.get_ascent(11)), str(int(ln.get("minute", 0))),
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 11, col)
-		var cx: int = EV_MIN_X if kick else EV_COMMENT_X
-		draw_string(_f10, Vector2(cx, yy + _f10.get_ascent(11)), str(ln.get("text", "")),
-			HORIZONTAL_ALIGNMENT_LEFT, int(EVENTS.end.x) - cx - 2, 11, col)
+			var mtxt := str(int(ln.get("minute", 0)))
+			var mw := _f10.get_string_size(mtxt, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+			draw_string(_f10, Vector2(EV_MIN_R - mw, base), mtxt, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, col)
+		# comment left-aligned at the white column, clipped to the panel right edge
+		# (full "Goal by <scorer> (<club>)" now fits — 265px vs the old clipped 112px)
+		draw_string(_f10, Vector2(EV_COMMENT_X, base), str(ln.get("text", "")),
+			HORIZONTAL_ALIGNMENT_LEFT, int(EVENTS.end.x) - EV_COMMENT_X - 3, 11, col)
 
 
 ## Draw a club name on the black band, shrunk to fit `maxw`. right=right-align at x.
@@ -315,8 +423,8 @@ func _name(x: int, t: String, maxw: int, right: bool) -> void:
 func _draw_kit(tex: Texture2D, at: Vector2) -> void:
 	if tex == null:
 		return
-	var sc: float = min(40.0 / KIT_SRC.size.x, 48.0 / KIT_SRC.size.y)
-	draw_texture_rect_region(tex, Rect2(at.x, at.y, KIT_SRC.size.x * sc, KIT_SRC.size.y * sc), KIT_SRC)
+	draw_texture_rect_region(tex,
+		Rect2(at.x, at.y, KIT_SRC.size.x * KIT_SCALE, KIT_SRC.size.y * KIT_SCALE), KIT_SRC)
 
 
 ## Draw text. right=centre-in-cw. When `clamp_x` is given the label is auto-shrunk to

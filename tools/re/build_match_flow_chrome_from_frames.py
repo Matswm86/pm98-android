@@ -370,6 +370,17 @@ def _bake_brief() -> dict:
     # clear the "KICK OFF" half/state label (dynamic, below the clock) to the blue bg
     bg = np.median(f[BR_STATE_Y[0]:BR_STATE_Y[1], 200:236].reshape(-1, 3), axis=0).astype("uint8")
     a[BR_STATE_Y[0]:BR_STATE_Y[1], 228:410] = bg
+    # clear the frame-073 KITS (dynamic per match): the screen redraws the fixture's own
+    # escudos, so the baked home/away kits MUST go -- else the wrong club's kit shows
+    # around the redrawn one (the "Villa red" parity bug, orig/64 vs app). Reconstruct
+    # the blue chrome above/below + the black scoreband beneath, per side from an adjacent
+    # glyph-free span (same per-row median technique as the possession/stadium blanks).
+    # generous bboxes: the frame-073 kits run x8..72 / x560..640, y89..149 (wider than
+    # the BR_KIT_* label bboxes), so cover their full extent or a red sliver survives.
+    for kx0, kx1, sx0, sx1 in [(8, 74, 90, 150), (560, 640, 480, 556)]:
+        _rowmed(a, f, 80, BR_BAND_Y[0], kx0, kx1, sx0, sx1)     # blue chrome above band
+        a[BR_BAND_Y[0]:BR_BAND_Y[1], kx0:kx1] = black           # black scoreband
+        _rowmed(a, f, BR_BAND_Y[1], 150, kx0, kx1, sx0, sx1)    # blue chrome below band
     save(a, "brief.png")
     return {
         "binding_frame": F_BRIEF.name,

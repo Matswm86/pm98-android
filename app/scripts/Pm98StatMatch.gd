@@ -659,6 +659,15 @@ static func score(mem: Mem) -> Dictionary:
 	return s
 
 
+## Accumulated possession counters (FUN_00450510: M+0x64 / M+0x804,
+## docs/re/stat_match_engine_re.md L144). Side 0 = the first XI passed to build_mem
+## (home). Returns [poss_home, poss_away] as the raw i32 totals; the POSSESSION
+## PERCENTAGE bar reads home/(home+away). Byte-exact real engine output -- NOT a
+## fabricated stat, so surfacing it is faithful (the RE'd counters, not an invention).
+static func possession(mem: Mem) -> Array:
+	return [mem.s32(POSS), mem.s32(SIDE_STRIDE + POSS)]
+
+
 ## The scoreline goals (penalties excluded) as resolved records, sorted by minute, so the
 ## commentary feed can name the engine's OWN scorers instead of re-rolling its own. Each:
 ##   { minute:int, shirt:int, shot_side:int(0/1), credited_side:int(0/1), own_goal:bool }

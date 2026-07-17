@@ -280,7 +280,7 @@ func _match_shot() -> void:
 	var m := MatchCommentary.timeline(rng, home, away)
 	scr.setup(str(home.get("name", "?")), str(away.get("name", "?")),
 		int(m["home_goals"]), int(m["away_goals"]), m["lines"],
-		int(home.get("id", -1)), int(away.get("id", -1)))
+		int(home.get("id", -1)), int(away.get("id", -1)), m.get("possession", []))
 	scr.set_process(false)   # freeze the clock so seek() controls the captured minute
 	# pick a goal minute if any, else mid-match
 	var goal_min := 35
@@ -1013,7 +1013,8 @@ func _open_finance(club: Dictionary, club_name: String, season: String) -> void:
 ## commentary read-out; RESULTS jumps to the FULL TIME read-out (career, `result_data` non-empty)
 ## or seeks the BRIEF to 90' (watched, `{}`); WATCH overlays the 2D simulador.
 func _open_match(home: Dictionary, away: Dictionary, hg: int, ag: int,
-		lines: Array, _sub: String, on_back: Callable, result_data: Dictionary = {}) -> void:
+		lines: Array, _sub: String, on_back: Callable, result_data: Dictionary = {},
+		possession: Array = []) -> void:
 	# The match presents in the view mode chosen in MATCH OPTIONS (persisted globally,
 	# default BRIEF) — NOT a forced per-match picker. RESULTS on a career match jumps
 	# straight to the source-true FULL TIME read-out (frame 083), no running BRIEF.
@@ -1028,7 +1029,7 @@ func _open_match(home: Dictionary, away: Dictionary, hg: int, ag: int,
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
 	scr.setup(str(home.get("name", "?")), str(away.get("name", "?")), hg, ag, lines,
-		int(home.get("id", -1)), int(away.get("id", -1)))
+		int(home.get("id", -1)), int(away.get("id", -1)), possession)
 	scr.back_pressed.connect(func() -> void:
 		# Career match EXIT — WITNESSED (§6): the "Do you want to leave the
 		# championship ?" confirm. No -> resume; Yes -> title screen, the
@@ -1200,7 +1201,7 @@ func _play_watch_match(home: Dictionary, away: Dictionary, league: Dictionary) -
 	rng.randomize()
 	var m := MatchCommentary.timeline(rng, home, away)
 	_open_match(home, away, int(m["home_goals"]), int(m["away_goals"]), m["lines"],
-		"Full time", func() -> void: _show_match_pick(league, null))
+		"Full time", func() -> void: _show_match_pick(league, null), {}, m.get("possession", []))
 
 
 # ---- career mode ---------------------------------------------------------
@@ -1531,7 +1532,7 @@ func _show_match_result(res: Dictionary) -> void:
 			"%s  -  back to the dugout" % verdict, func() -> void:
 				_career.save()   # the deferred week autosave (EXIT-Yes never gets here)
 				_show_career()
-				_pop_pending_team_offers(), result_data)
+				_pop_pending_team_offers(), result_data, res.get("possession", []))
 	# LINE-UPS ON (charter #5, frames 61-63): the XI-vs-XI photo roll precedes
 	# the presentation in EVERY view mode — witnessed in RESULTS mode too (§4).
 	if AudioManager.lineups_on:

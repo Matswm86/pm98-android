@@ -43,10 +43,17 @@ only the dynamic club NAMES + the state label cleared (`brief.png`). The screen 
 
 - **Clock** LCD box x258..372 y30..100 (digit over-painted; proman18 approximates the
   original 7-seg face — GAP), **half/state label** below (KICK OFF / FIRST HALF / …).
-- **Scoreline** on the black band (y99..136): kits at the ends (KIT_H 8..70 / KIT_A 585..638),
+- **Scoreline** on the black band (y99..136): the fixture escudos at the ends (home
+  x14..55 / away x585..626, the escudo drawn to the frame-64 kit bounds — scale 1.32,
+  anchor y57 lands the opaque y24..63 at y89..142). The frame-073 kits are BLANKED in the
+  bake (build_match_flow: home x8..74 / away x560..640, y80..150) so the wrong club's kit
+  no longer shows around the redrawn one (the "Villa red" parity bug, charter #7c).
   home name x76..256, score boxes x258..320 + x322..380, away name x382..586.
-- **POSSESSION** bar — GAP (see below), left the frame's neutral 50/50.
-- **EVENTS** white body x312..470 y268..432, MIN col x316, COMMENT x356, clipped to the panel.
+- **POSSESSION** bar — LIVE (charter #7b): the real engine POSS counters, see below.
+- **EVENTS** white body **x153..467** y269..436 (light-grey MIN col x153..198 + white
+  COMMENT col x199..467, scrollbar x470..476): MIN right-aligned at x190, COMMENT
+  left-aligned at x199 clipped to the panel. (The old x312..470 rect drew only the right
+  third, clipping the goal line's club — "Goal by Salako" → "Goal by Milose", charter #7a.)
 - In-match buttons: LINE-UP(495,227) / TACTICS(495,283) / MAN-TO-MAN(495,339) /
   STATISTICS ×2 (495,393)+(14,393) — chrome, open no sub-screen on this path; KICK OFF
   (262,442) advances to full time / CONTINUE, EXIT(508,442) leaves.
@@ -83,7 +90,7 @@ goal events** — `{minute, side(credited 0/1), scorer, scorer_side, own_goal}` 
 | BRIEF feed: Shot / Save / Run / Cross / Header / Injury | positional engine only | **GAP** — omitted |
 | BOOKINGS (name+min) | positional engine only | **GAP** — empty chrome |
 | TOTAL FOULS | positional engine only | **GAP** — blank |
-| POSSESSION % | not produced | **GAP** — neutral empty bar |
+| POSSESSION % (BRIEF bar) | `Pm98StatMatch.possession` — the engine's own `POSS` (0x64/0x804) counters, `_stats` FUN_00450510 | **REAL** — home/(home+away); the BRIEF bar eases 50/50→final over the clock (final split is engine-exact; the per-minute path is a display ease, the instant engine having no per-minute stream) |
 | ATTENDANCE MONEY / SPONSOR BOARDS / SPONSORSHIP MONEY | per-match money not modelled | **GAP** — blank |
 | MAN OF THE MATCH | not produced | **GAP** — blank panel |
 
@@ -162,8 +169,12 @@ resolved):
   hub still Week 1 (the abandoned week not saved).
 - Remaining flags: clock digits stay the proman18 approximation (7-seg face
   un-extracted); the original deploys the hub TOP DROPDOWN BAR behind the
-  matchday modal (ours stays closed); BRIEF possession/feed richness = charter
-  #7 / M5 gap; roll corner kits = the un-extracted hi-res kit render family.
+  matchday modal (ours stays closed). **Charter #7 APPLIED 2026-07-17: BRIEF feed
+  geometry (#7a), LIVE possession from the engine POSS counters (#7b), and the
+  frame-073-kit blank + fixture-escudo redraw (#7c) are all done.** The remaining
+  feed *richness* (shot/save/cleared lines between the goals) is still the M5
+  positional-engine gap — the instant engine produces goals only, never fabricated.
+  Roll corner kits = the un-extracted hi-res kit render family.
 
 ## Charter #6 APPLIED — 2026-07-17 (RESULT read-out repairs)
 
@@ -199,8 +210,10 @@ The HALF/FULL TIME read-out is repaired against the LIVE witness run
 - **#6f HALF TIME read-out is CONTINUE-gated** (`MatchResultScreen._on_input`, both
   modes): the HT read-out is NOT a tap-anywhere dismiss -- it carries a real CONTINUE
   button + the STATISTICS/TACTICS/LINE-UP chrome (baked, inert like the BRIEF doors).
-- **Honest gaps kept (never fabricated)**: POSSESSION %, TOTAL FOULS, MAN OF THE
-  MATCH name + mug -- the instant-result stat engine produces goals only; the
+- **Honest gaps kept (never fabricated)**: POSSESSION % (the RESULT read-out's own
+  counter, distinct from the now-live BRIEF POSS bar — witness §: 57/43 vs 55/45 same
+  match), TOTAL FOULS, MAN OF THE MATCH name + mug -- the instant-result stat engine
+  produces goals only (plus the BRIEF possession counters); the
   positional match-rating stream those need is test-only (M5). The pill / header /
   generic sprite chrome renders; the values stay absent.
 

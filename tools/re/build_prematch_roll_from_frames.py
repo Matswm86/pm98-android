@@ -361,7 +361,7 @@ def main() -> None:
     diff = np.abs(ftimg - ft).sum(axis=2) > 40
     data_zones = [
         (258, 18, 114, 82),  # clock LCD + digits
-        (0, 60, 640, 80),  # state label + scoreline band + kits (y60..139)
+        (0, 60, 640, 92),  # state label + scoreline band + kits (y60..151, kits run to y149)
         (14, 180, 612, 30),  # possession row (pcts + bar arrow)
         (150, 230, 340, 210),  # events panel (header+body+scroll)
         (0, 0, 210, 16),  # F1 banner top-left antialias fringe

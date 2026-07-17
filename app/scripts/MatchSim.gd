@@ -86,6 +86,8 @@ static func simulate(rng: RandomNumberGenerator, rh: Dictionary, ra: Dictionary,
 			"away_goals": int(sc.get(tid_a & 0xFFFF, 0)),
 			"shots_home": 0, "shots_away": 0, "conv_home": 0, "conv_away": 0,
 			"goals": _resolve_goals(mem, xi_h, xi_a, tid_h, tid_a),
+			# real engine POSSESSION counters ([home,away]); the BRIEF bar reads the split.
+			"possession": Pm98StatMatch.possession(mem),
 		}
 	# LOUD fallback (never silent): a non-empty XI that fails _usable means the caller
 	# expected the faithful engine and is getting the legacy abstraction instead.
@@ -95,6 +97,7 @@ static func simulate(rng: RandomNumberGenerator, rh: Dictionary, ra: Dictionary,
 			fallback_count, xi_h.size(), _usable(xi_h), xi_a.size(), _usable(xi_a), tid_h, tid_a])
 	var res := MatchEngine.simulate(rng, rh, ra, minutes)
 	res["goals"] = []
+	res["possession"] = []   # legacy path produces no possession -> BRIEF bar stays 50/50
 	return res
 
 

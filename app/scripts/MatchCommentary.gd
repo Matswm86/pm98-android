@@ -101,7 +101,9 @@ static func timeline(rng: RandomNumberGenerator, home: Dictionary, away: Diction
 	var ar := MatchEngine.team_ratings(away)
 	var res := MatchSim.simulate(rng, hr, ar, MatchSim.xi_of(home), MatchSim.xi_of(away), \
 			int(home.get("id", 0)), int(away.get("id", 0)))
-	return narrate(rng, home, away, int(res["home_goals"]), int(res["away_goals"]), res.get("goals", []))
+	var out := narrate(rng, home, away, int(res["home_goals"]), int(res["away_goals"]), res.get("goals", []))
+	out["possession"] = res.get("possession", [])   # carry the real engine split to the BRIEF bar
+	return out
 
 
 ## Narrate a PREDETERMINED scoreline (used by career mode so the league table and
