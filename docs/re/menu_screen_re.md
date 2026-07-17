@@ -88,8 +88,10 @@ colour bars / section labels / circle, so it did not match the real screen (comp
   slot boxes / marble + BARRA as REAL pixels.
 - `MenuScreen.gd` blits menu_bg, then draws the DYNAMIC layer: the shared
   `PMChrome.draw_header` plaque row over the cleared top band, and the central circle's
-  live slots (league position "PL n" / manager / managed club + crest / next opponent +
-  crest / opponent-manager-or-venue / CPU) over the real circle frame. INTERACTIVE:
+  live slots over the real circle frame. ~~league position "PL n"~~ — REFUTED 2026-07-17:
+  the chip is the 1-based human-PLAYER slot ("PL 1" in every single-player career; "CPU"
+  for computer clubs), the stack is HOME side on top, and the full slot/colour/font
+  decode is in `hub_circle_re.md` (FUN_00549240). INTERACTIVE:
   `_hit()` maps a tap to an action via the reversed icon picture rects (`ICON_HITS`), the
   measured caption-bar rects (`BAR_HITS`, added so the visible label is also a target) and
   the control rects (`CTRL_HITS`); emits `action_selected`. Native 640×480, scales (NEAREST).
