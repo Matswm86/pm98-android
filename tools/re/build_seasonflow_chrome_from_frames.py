@@ -52,21 +52,24 @@ W, H = 640, 480
 CHAMPS_FILL = (75, 109, 172)
 # panel body blanks (x0, y0, x1, y1) -- measured off frame 06 (probe session 2026-07-17)
 CHAMPS_BLANKS = [
-    (12, 135, 233, 163),  # EUROPEAN CUP body (trophy pixels start x236)
+    # Interiors only: the band's 1px gradient edge rows stay baked (live-diff
+    # probe 2026-07-17: blanking them flat cost 442-1105 px/panel vs orig/06).
+    (12, 136, 233, 162),  # EUROPEAN CUP body (trophy pixels start x236)
     (390, 124, 621, 173),  # U.E.F.A. CUP body
-    (12, 258, 233, 276),  # CUP WINNERS' CUP body
-    (386, 254, 621, 281),  # CHARITY SHIELD body (shield art ends x382)
-    (12, 386, 233, 415),  # EUROPEAN SUPERCUP body
-    (390, 386, 621, 415),  # INTERCONTINENTAL CUP body
+    (12, 261, 233, 274),  # CUP WINNERS' CUP body
+    (386, 255, 621, 281),  # CHARITY SHIELD body (shield art ends x382)
+    (12, 388, 233, 414),  # EUROPEAN SUPERCUP body
+    (390, 388, 621, 414),  # INTERCONTINENTAL CUP body
 ]
-# live-draw anchors: [panel key, club_x, mgr_x, [row baselines]]
+# live-draw anchors: [panel key, club_x, mgr_x, [row baselines]] -- proman10@10,
+# baselines re-measured against the live render 2026-07-17 (all six panels 0px)
 CHAMPS_ANCHORS = [
-    ["european_cup", 20, 160, [146, 159]],
-    ["uefa_cup", 392, 532, [133, 146, 159, 172]],
-    ["cup_winners_cup", 20, 160, [271]],
-    ["charity_shield", 392, 532, [265, 278]],
-    ["supercup", 20, 160, [398, 411]],
-    ["intercontinental", 392, 532, [398, 411]],
+    ["european_cup", 20, 160, [145, 158]],
+    ["uefa_cup", 392, 532, [132, 145, 158, 171]],
+    ["cup_winners_cup", 20, 160, [270]],
+    ["charity_shield", 392, 532, [264, 277]],
+    ["supercup", 20, 160, [397, 410]],
+    ["intercontinental", 392, 532, [397, 410]],
 ]
 
 # CHARITY SHIELD card: dynamic zones restored with the card's own texture. The
@@ -85,15 +88,17 @@ SHIELD_ZONES = [
     ((60, 240, 140, 340), (335, 420)),  # runner-up kit box
     ((140, 267, 340, 320), (335, 420)),  # runner-up club + manager (label ends y265)
 ]
+# club lines proman12@13, manager lines proman8@11 (widths matched to frame 70:
+# Ferguson 54px, Vialli 26px); baselines re-measured against the live render.
 SHIELD_ANCHORS = {
     "kit_winner": [70, 112, 60, 84],  # x, y, w, h boxes for PMChrome.draw_crest
     "kit_runner": [70, 244, 60, 84],
     "winner_x": 147,
     "winner_base": 163,
-    "winner_mgr_base": 180,
+    "winner_mgr_base": 178,
     "runner_x": 147,
-    "runner_base": 299,
-    "runner_mgr_base": 316,
+    "runner_base": 286,
+    "runner_mgr_base": 303,
 }
 
 # START OF SEASON (PREMIER frame): table x44..483. The DIVISION NAME sits white
@@ -110,7 +115,9 @@ SEASON_ROW_Y0 = 106
 SEASON_PITCH = 16
 SEASON_BAND_H = 12
 SEASON_CELLS = [
-    ((46, 201), (0, 0, 128)),
+    # TEAM blank starts x54: the white position block x46..53 is row chrome
+    # shared by every row incl. the user row (live-diff probe 2026-07-17).
+    ((54, 201), (0, 0, 128)),
     ((202, 341), (42, 63, 170)),
     ((343, 476), (166, 202, 240)),
 ]

@@ -2536,6 +2536,8 @@ func _champs_entries() -> Dictionary:
 		var rows: Array = []
 		for id in c.euro_seeds.get(key, []):
 			rows.append([_club_display_name(int(id)), _mgr_of(int(id))])
+		if key == "european_cup":
+			rows.reverse()  # frame truth (orig/06): runners-up listed above the champions
 		out[key] = rows
 	# Charity Shield pairing (the _play_charity_shield berth rule: the Double ->
 	# the league runners-up step up).

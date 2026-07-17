@@ -19,23 +19,23 @@ const BTN_CONTINUE := Rect2(508, 438, 116, 30)
 
 # [panel key, club_x, mgr_x, [row baselines]] -- frame-measured (seasonflow json)
 const PANELS := [
-	["european_cup", 20, 160, [146, 159]],
-	["uefa_cup", 392, 532, [133, 146, 159, 172]],
-	["cup_winners_cup", 20, 160, [271]],
-	["charity_shield", 392, 532, [265, 278]],
-	["supercup", 20, 160, [398, 411]],
-	["intercontinental", 392, 532, [398, 411]],
+	["european_cup", 20, 160, [145, 158]],
+	["uefa_cup", 392, 532, [132, 145, 158, 171]],
+	["cup_winners_cup", 20, 160, [270]],
+	["charity_shield", 392, 532, [264, 277]],
+	["supercup", 20, 160, [397, 410]],
+	["intercontinental", 392, 532, [397, 410]],
 ]
 
 var _chrome: Texture2D
-var _f14: Font
+var _f10: Font
 var _entries: Dictionary = {}   # key -> [[club, manager], ...]
 var _press := false
 
 
 func _ready() -> void:
 	_chrome = load("res://art/screens/seasonflow/champs.png")
-	_f14 = PMChrome.font("14")
+	_f10 = PMChrome.font("10")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2(W, H)
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -89,5 +89,5 @@ func _draw() -> void:
 
 
 func _txt(x: int, baseline: int, t: String, col: Color) -> void:
-	if _f14 != null:
-		draw_string(_f14, Vector2(x, baseline), t, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, col)
+	if _f10 != null:
+		draw_string(_f10, Vector2(x, baseline), t, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, col)

@@ -23,13 +23,13 @@ const KIT_WINNER := Rect2(68, 116, 62, 80)
 const KIT_RUNNER := Rect2(68, 246, 62, 80)
 const TXT_X := 147
 const WINNER_BASE := 163
-const WINNER_MGR_BASE := 180
-const RUNNER_BASE := 297
-const RUNNER_MGR_BASE := 314
+const WINNER_MGR_BASE := 178
+const RUNNER_BASE := 286
+const RUNNER_MGR_BASE := 303
 
 var _chrome: Texture2D
-var _f14: Font
 var _f12: Font
+var _f8: Font
 var _winner: Dictionary = {}   # {club, manager, club_id, pens: bool}
 var _runner: Dictionary = {}
 var _press := false
@@ -37,8 +37,8 @@ var _press := false
 
 func _ready() -> void:
 	_chrome = load("res://art/screens/seasonflow/shield.png")
-	_f14 = PMChrome.font("14")
 	_f12 = PMChrome.font("12")
+	_f8 = PMChrome.font("8")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2(W, H)
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -83,15 +83,15 @@ func _draw() -> void:
 		var line := PMChrome.title_case_name(str(_winner.get("club", "?")))
 		if bool(_winner.get("pens", false)):
 			line += " (on penalties)"
-		_txt(_f14, TXT_X, WINNER_BASE, line, C_WINNER, 15)
-		_txt(_f12, TXT_X, WINNER_MGR_BASE, PMChrome.title_case_name(str(_winner.get("manager", ""))),
-			C_WINNER_MGR, 13)
+		_txt(_f12, TXT_X, WINNER_BASE, line, C_WINNER, 13)
+		_txt(_f8, TXT_X, WINNER_MGR_BASE, PMChrome.title_case_name(str(_winner.get("manager", ""))),
+			C_WINNER_MGR, 11)
 	if not _runner.is_empty():
 		PMChrome.draw_crest(self, int(_runner.get("club_id", -1)), KIT_RUNNER)
-		_txt(_f14, TXT_X, RUNNER_BASE, PMChrome.title_case_name(str(_runner.get("club", "?"))),
-			C_RUNNER, 15)
-		_txt(_f12, TXT_X, RUNNER_MGR_BASE, PMChrome.title_case_name(str(_runner.get("manager", ""))),
+		_txt(_f12, TXT_X, RUNNER_BASE, PMChrome.title_case_name(str(_runner.get("club", "?"))),
 			C_RUNNER, 13)
+		_txt(_f8, TXT_X, RUNNER_MGR_BASE, PMChrome.title_case_name(str(_runner.get("manager", ""))),
+			C_RUNNER, 11)
 	if _press:
 		draw_rect(BTN_OK, Color(1, 1, 1, 0.2), true)
 

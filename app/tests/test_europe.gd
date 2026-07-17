@@ -84,6 +84,7 @@ func _mint_and_fields() -> bool:
 	career.last_champion_id = int(div[0])
 	career.last_runners_up = [int(div[1]), int(div[2]), int(div[3])]
 	career.last_fa_winner_id = int(div[4])
+	career.last_lc_winner_id = int(div[5])
 	var rng := RandomNumberGenerator.new(); rng.seed = SEED
 	career.mint_european_cups(_fake_pool(60), rng)
 
@@ -93,11 +94,16 @@ func _mint_and_fields() -> bool:
 		var b: Dictionary = career.euro.get(key, {})
 		ok = _assert(_field(b).size() == Career.EURO_FIELD,
 			"%s field = %d clubs" % [key, Career.EURO_FIELD]) and ok
-	ok = _assert(_field(career.euro["european_cup"]).has(int(div[0])),
-		"champions seeded into the European Cup") and ok
-	ok = _assert(_field(career.euro["uefa_cup"]).has(int(div[1]))
-		and _field(career.euro["uefa_cup"]).has(int(div[2])),
-		"both runners-up seeded into the U.E.F.A. Cup") and ok
+	# The witnessed 1997-98 entry rule (TEAMS IN CHAMPIONSHIPS, orig/06):
+	# European Cup = champions + first runners-up; U.E.F.A. Cup = the next
+	# runners-up + the League Cup winners.
+	ok = _assert(_field(career.euro["european_cup"]).has(int(div[0]))
+		and _field(career.euro["european_cup"]).has(int(div[1])),
+		"champions + first runners-up seeded into the European Cup") and ok
+	ok = _assert(_field(career.euro["uefa_cup"]).has(int(div[2]))
+		and _field(career.euro["uefa_cup"]).has(int(div[3]))
+		and _field(career.euro["uefa_cup"]).has(int(div[5])),
+		"next runners-up + League Cup winners seeded into the U.E.F.A. Cup") and ok
 	ok = _assert(_field(career.euro["cup_winners_cup"]).has(int(div[4])),
 		"F.A. Cup winners seeded into the Cup Winners' Cup") and ok
 
