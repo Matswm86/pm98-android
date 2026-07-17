@@ -193,7 +193,13 @@ def parse_club_tactic(d: bytes, dbc_id: int, collect: bool = False) -> dict:
     hdr2 = s.string()  # second string (param_1[2])
     hdr_byte = s.u8()  # param_1[5]
     hdr3 = s.string()  # third string (*param_1)
-    s.u32()  # param_1[6] (clamped to 6000 if <10 — post-read, no stream effect)
+    # param_1[6] = STADIUM CAPACITY (fn_00579c70 L100-101: `if (uint)param_1[6] < 10
+    # -> param_1[6] = 6000`). Verified: 15/15 La Liga (teams_laliga.json "u32 @year-12")
+    # + witnessed English FT read-outs Old Trafford 55300 / Villa Park 39339 / The Dell
+    # 15200. NOT the later param_1[0x7a] field (`capacity` below, values 400..1500).
+    stadium_capacity = s.u32()
+    if stadium_capacity < 10:
+        stadium_capacity = 6000
     if fmt >= 0x1FE:
         s.u32()  # param_1[7]
     # Stadium PITCH DIMS (session_lineup_re.md §4): +0x34/+0x36 u16 pair. The
@@ -276,6 +282,8 @@ def parse_club_tactic(d: bytes, dbc_id: int, collect: bool = False) -> dict:
         "levers": levers,
         "players": players,
         "inBounds": in_bounds,
+        # STADIUM CAPACITY (param_1[6], <10 -> 6000 rule applied). Real, source-verified.
+        "stadiumCapacity": stadium_capacity,
         # engine-effective values (substitute rule applied) + the raw pair
         "pitchW": 0x69 if p36 < 0x34 else p36,
         "pitchH": 0x3C if p34 < 0x1E else p34,

@@ -78,7 +78,8 @@ goal events** — `{minute, side(credited 0/1), scorer, scorer_side, own_goal}` 
 | Scoreline (H-A) | `MatchSim` `home_goals`/`away_goals` | **REAL** |
 | GOALS: scorer + minute | the stat engine's goal vector | **REAL** |
 | BRIEF feed: Kick Off + Goal lines | goal vector (fabricated RATE_* dropped) | **REAL** |
-| Stadium CAPACITY / ATTENDANCE (+%) | `Career.stadium_capacity` / `finance_preview` | **REAL** (Career model) |
+| Stadium ground NAME + CAPACITY | GameDB `club.stadium` / EQUIPOS `param_1[6]` (all 476 clubs) | **REAL** (source-exact, always filled) |
+| Stadium ATTENDANCE (+%) | `finance_preview` (home) / `FinanceModel` (away) | **PROJECTION** (runtime gate un-reproducible) |
 | BRIEF feed: Shot / Save / Run / Cross / Header / Injury | positional engine only | **GAP** — omitted |
 | BOOKINGS (name+min) | positional engine only | **GAP** — empty chrome |
 | TOTAL FOULS | positional engine only | **GAP** — blank |
@@ -161,6 +162,47 @@ resolved):
   hub still Week 1 (the abandoned week not saved).
 - Remaining flags: clock digits stay the proman18 approximation (7-seg face
   un-extracted); the original deploys the hub TOP DROPDOWN BAR behind the
-  matchday modal (ours stays closed); read-out repairs = charter #6; BRIEF
-  possession/feed richness = charter #7 / M5 gap; roll corner kits = the
-  un-extracted hi-res kit render family.
+  matchday modal (ours stays closed); BRIEF possession/feed richness = charter
+  #7 / M5 gap; roll corner kits = the un-extracted hi-res kit render family.
+
+## Charter #6 APPLIED — 2026-07-17 (RESULT read-out repairs)
+
+The HALF/FULL TIME read-out is repaired against the LIVE witness run
+(`matchday_flow_witness_re.md` §5; the pixel-true stills
+`screenshots/wine-captures-2026-07-17-matchflow/results_mode_{half,full}time_readout.png`
++ `readout_fulltime_thedell_away_filled.png`):
+
+- **#6a Score-box geometry** (`build_match_flow_chrome` BOX_L/BOX_R/BOX_Y +
+  `MatchResultScreen.BOX_L/BOX_R`): the two navy boxes are x266..319 / x320..373,
+  y78..113 (frame-measured, identical across all 3 witnessed FT frames). The old
+  (246,320)/(339,375) @ y66 over-painted navy up over the name bar + left into the
+  band -- the "score-box overdraw" defect. Re-baked; boxes now land x267..318 /
+  x321..372 (0px vs witness).
+- **#6d STADIUM panel = fixture HOME club's ground, ALWAYS FILLED**
+  (`Main._result_stadium`): killed the "honest blank away" rule. Ground NAME +
+  CAPACITY are now source-exact for EVERY club (see below); manager-home reuses the
+  Career `finance_preview`, an away fixture projects the home OPPONENT's gate from
+  its tier + real capacity. The ground-name row is BLACK-on-WHITE (witnessed; was
+  drawn white-on-white = invisible). ATTENDANCE/% stay a FinanceModel PROJECTION
+  (per-match runtime gate is un-reproducible, finance_constants.md) so they will NOT
+  match the witness's runtime-sim numbers; the money/sponsor rows stay an honest gap.
+- **Real stadium capacity for all 476 clubs** (EQUIPOS `param_1[6]`, the
+  `<10 -> 6000` engine rule from fn_00579c70 L100-101 applied; `equipos_parse` +
+  `extract_squads_exact` "capacity" + `build_db`). Verified: 15/15 La Liga
+  (teams_laliga "u32 @year-12") + the witnessed English FT read-outs Old Trafford
+  55,300 / Villa Park 39,339 / The Dell 15,200. NOT the later `param_1[0x7a]` u32
+  (range 400..1500) the RE first mis-labelled capacity.
+- **#6e Header phase chip** (`Main._show_match_result`): the read-out barra's green
+  plaque is no longer stuck "Preseason"/"Preparation" in season. Friendlies keep that
+  default (witnessed 1 Aug); a LEAGUE match reads the division + the week just played
+  ("Premier"/"Week 1", 9 Aug) and the date is corrected to that Saturday.
+- **#6f HALF TIME read-out is CONTINUE-gated** (`MatchResultScreen._on_input`, both
+  modes): the HT read-out is NOT a tap-anywhere dismiss -- it carries a real CONTINUE
+  button + the STATISTICS/TACTICS/LINE-UP chrome (baked, inert like the BRIEF doors).
+- **Honest gaps kept (never fabricated)**: POSSESSION %, TOTAL FOULS, MAN OF THE
+  MATCH name + mug -- the instant-result stat engine produces goals only; the
+  positional match-rating stream those need is test-only (M5). The pill / header /
+  generic sprite chrome renders; the values stay absent.
+
+Verified LIVE-render (GL, `app/tests/shot_readout_verify.gd`): the away-league FT +
+HT read-outs match the Dell/Villa witness (score box, filled stadium, in-season chip).

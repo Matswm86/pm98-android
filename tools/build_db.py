@@ -8,9 +8,11 @@ Inputs (all under assets/, derived from Mats's owned game files):
                           strings, engine drop rule). Replaces the old
                           approximate-cipher squads_english.json/teams_all.json
                           as the squad + club-header source (2026-07-06).
-  - teams_laliga.json   : capacity + founding year for the 20 La Liga clubs
-                          (EQUIPOS carries no verified capacity field — the
-                          u32 the RE labelled capacity ranges 1..1500).
+  - teams_laliga.json   : founding year for the 20 La Liga clubs (real capacity
+                          now comes from squads_exact param_1[6] for ALL clubs,
+                          verified vs these 15 + the witnessed English grounds;
+                          the param_1[0x7a] u32 the RE first labelled capacity,
+                          range 400..1500, is a DIFFERENT unresolved field).
   - divisions_english.json : idx -> division from MANAGER.EXE's own league table
   - country_codes.json  : PAISES.30 country table (code <-> name; FICHA flags)
 
@@ -169,7 +171,12 @@ def main() -> None:
             "country": country,
             "countryCode": c["countryCode"],  # PAISES.30 code (EQUIPOS header byte, exact)
             "leagueId": league_id,
-            "capacity": cap.get("capacity"),
+            # Real stadium capacity from EQUIPOS param_1[6] (squads_exact "capacity",
+            # <10->6000 engine rule applied). Matches teams_laliga's "u32 @year-12" for
+            # all 15 Spanish + the witnessed English FT read-outs (Old Trafford 55,300,
+            # Villa Park 39,339, The Dell 15,200). foundingYear stays laliga-only (a
+            # separate real field, not yet decoded for the other 456 clubs).
+            "capacity": c.get("capacity") or cap.get("capacity"),
             "foundingYear": cap.get("founded"),
             "players": [emit_player(p, cid) for p in c.get("players", [])],
         }

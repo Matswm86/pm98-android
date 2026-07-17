@@ -220,10 +220,17 @@ def main() -> None:
 SB_Y = (66, 108)              # blue scoreline band rows
 BAND_FILL = (42, 63, 170)     # uniform scoreband blue (name rows)
 BOX_FILL = (0, 0, 128)        # score-box navy interior
-BOX_L = (246, 320)            # left score box (x span, incl white border)
-BOX_R = (339, 375)            # right score box
-NAME_H = (36, 244)            # home-name clear zone (band, left of left box)
-NAME_A = (400, 585)           # away-name clear zone (band, right of right box)
+# Score boxes frame-measured off the 3 witnessed FT read-outs (all identical:
+# match_result_fulltime.png + results_mode_fulltime_readout + readout_fulltime_thedell):
+# left white border x266..319 / navy 267..318; right x320..373 / navy 321..372; the two
+# share the middle divider. White top border y78, navy 79..112, bottom border y113.
+# (The old (246,320)/(339,375) @ y66 over-painted navy up over the name bar + left into
+# the band -- the charter #6a "score-box overdraw" bug.)
+BOX_L = (266, 319)            # left score box (x span, incl white border)
+BOX_R = (320, 373)            # right score box
+BOX_Y = (78, 113)             # box y-span (incl white top/bottom borders)
+NAME_H = (36, 265)            # home-name clear zone (band, left of left box)
+NAME_A = (374, 585)           # away-name clear zone (band, right of right box)
 POSS = (30, 612, 116, 140)    # possession band x0,x1,y0,y1
 POSS_PILL = (270, 368)        # [POSSESSION] pill x-span kept intact
 COLS = {                      # cell columns (x span); scrollbar to the right of each
@@ -270,8 +277,8 @@ def _bake_result(f: np.ndarray, out: str, full: bool) -> dict:
     a[72:107, NAME_A[0]:NAME_A[1]] = np.array(BAND_FILL, dtype="uint8")
 
     # 2) clear the two SCORE digits (box interiors -> flat navy, keep white border)
-    a[68:108, BOX_L[0] + 3:BOX_L[1] - 2] = np.array(BOX_FILL, dtype="uint8")
-    a[68:108, BOX_R[0] + 3:BOX_R[1] - 2] = np.array(BOX_FILL, dtype="uint8")
+    a[BOX_Y[0] + 2:BOX_Y[1] - 1, BOX_L[0] + 2:BOX_L[1] - 1] = np.array(BOX_FILL, dtype="uint8")
+    a[BOX_Y[0] + 2:BOX_Y[1] - 1, BOX_R[0] + 2:BOX_R[1] - 1] = np.array(BOX_FILL, dtype="uint8")
 
     # 3) GOALS + BOOKINGS cells: copy an empty cell (row 5) over every data row so
     #    the real goals / honest-empty bookings redraw clean.

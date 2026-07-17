@@ -19,15 +19,16 @@ class_name MatchResultScreen
 ## empty/absent state, never fabricated (match_flow_re.md "renderable-today vs gap").
 
 signal continue_pressed
-signal back_pressed
 
 const W := 640
 const H := 480
 
 # frame-measured geometry (tools/re/specs/match_flow_chrome_samples.json "result")
 const TITLE_XY := {"fulltime": Vector2(244, 13), "halftime": Vector2(242, 13)}
-const BOX_L := Rect2(246, 66, 74, 42)      # left score box
-const BOX_R := Rect2(339, 66, 36, 42)      # right score box
+# Score boxes frame-measured off the witnessed FT read-outs (build_match_flow_chrome
+# spec "result"): left x266..319, right x320..373, y78..113. The digit centres in the box.
+const BOX_L := Rect2(266, 78, 53, 35)      # left score box
+const BOX_R := Rect2(320, 78, 53, 35)      # right score box
 const NAME_H_X := 40                       # home name left edge
 const NAME_A_X := 604                      # away name right edge
 const KIT_H := Vector2(6, 60)              # home kit anchor (escudo top-left)
@@ -48,6 +49,7 @@ const C_NAME := Color(0.98, 0.99, 1.0)
 const C_SCORE := Color(1, 1, 1)
 const C_CELL_TXT := Color(0.10, 0.16, 0.10)   # dark text on the green GOALS cells
 const C_STAD_TXT := Color(0.90, 0.94, 1.0)    # white on the blue stadium rows
+const C_STAD_NAME := Color(0, 0, 0)           # black on the white ground-name row (witnessed)
 const C_FOULS_BG := Color8(117, 147, 187)     # TOTAL FOULS band
 const C_PRESS := Color(1, 1, 1, 0.20)
 
@@ -123,13 +125,16 @@ func _on_input(e: InputEvent) -> void:
 	if not (e is InputEventScreenTouch or e is InputEventMouseButton):
 		return
 	var d := _to_design(e.position)
+	# Both HALF TIME and FULL TIME advance on the CONTINUE button (witnessed §5: the
+	# RESULTS-mode HT read-out carries a real CONTINUE + STATISTICS/TACTICS/LINE-UP
+	# chrome -- it is NOT a tap-anywhere dismiss). The manager-side buttons are baked
+	# chrome, inert for now (their sub-screens mid-match are an un-ported gap, like the
+	# BRIEF doors); CONTINUE is the only live control.
 	if e.pressed:
-		_press = "continue" if (not _half and CONTINUE.has_point(d)) else ""
+		_press = "continue" if CONTINUE.has_point(d) else ""
 	else:
 		if _press == "continue" and CONTINUE.has_point(d):
 			continue_pressed.emit()
-		elif _press == "" and _half:
-			back_pressed.emit()   # half-time read-out dismisses on tap
 		_press = ""
 	queue_redraw()
 
@@ -169,7 +174,7 @@ func _draw() -> void:
 	# / sponsor rows are a gap -> left blank in the bake).
 	_draw_stadium()
 
-	if _press != "" and not _half:
+	if _press != "":
 		draw_rect(CONTINUE, C_PRESS, true)
 
 
@@ -186,7 +191,9 @@ func _draw_stadium() -> void:
 		return
 	var gname := str(_stadium.get("name", ""))
 	if gname != "":
-		_txt(_f8, 80, STAD_NAME_Y, gname, C_STAD_TXT, 11, false, 288)
+		# The ground-name row is WHITE with BLACK ink (witnessed OT/Villa/Dell/Reebok);
+		# only the CAPACITY/ATTENDANCE rows below are white-on-blue.
+		_txt(_f8, 80, STAD_NAME_Y, gname, C_STAD_NAME, 11, false, 288)
 	var cap := int(_stadium.get("capacity", 0))
 	var att := int(_stadium.get("attendance", 0))
 	if cap > 0:

@@ -1495,15 +1495,29 @@ func _show_match_result(res: Dictionary) -> void:
 	var m := MatchCommentary.narrate(rng, home, away, int(res["hg"]), int(res["ag"]), res.get("goals", []))
 	var verdict := _result_word(int(res["hg"]), int(res["ag"]), bool(res["manager_home"]))
 	# The RESULT read-out data: fixture-mode barra (the two clubs that JUST played — note the
-	# date grammar rides _match_header, so it reads the next week's date, a documented minor
-	# gap) + the real goal vector + the Career-known STADIUM (manager-home only; away venue
-	# gate is un-modelled -> honest blank panel).
+	# date + phase chip are corrected for the played match below) + the real goal vector +
+	# the STADIUM panel (ALWAYS the fixture HOME club's ground, charter #6d).
 	var hdr := _match_header()
 	hdr["mode"] = "fixture"
 	hdr["home_id"] = int(res["home_id"])
 	hdr["away_id"] = int(res["away_id"])
 	hdr["top"] = PMChrome.title_case_name(str(home.get("name", "")))
 	hdr["bottom"] = PMChrome.title_case_name(str(away.get("name", "")))
+	# Header phase chip (charter #6e): the read-out barra's green plaque is NOT stuck
+	# "Preseason"/"Preparation" in season. Friendlies keep that default (witnessed 1 Aug
+	# Villa friendly); a LEAGUE match reads the division + the week just played
+	# (witnessed 9 Aug Southampton away = "Premier"/"Week 1"). advance_week() has already
+	# incremented `week` to the 1-based number of the round it just played, so the date
+	# is that Saturday (date_parts week==played round), overriding _match_header's
+	# next-week grammar for this played-match read-out.
+	if not bool(res.get("friendly", false)):
+		hdr["status_top"] = PMChrome._band_league(_career.league_name)
+		hdr["status_bottom"] = "Week %d" % _career.week
+		var pd := PMChrome.date_parts(_career.season, _career.week)
+		hdr["weekday"] = str(pd["wd"])
+		hdr["day"] = str(pd["day"])
+		hdr["month"] = str(pd["mon"])
+		hdr["year"] = str(pd["year"])
 	var result_data := {
 		"home": str(home.get("name", "?")), "away": str(away.get("name", "?")),
 		"hg": int(res["hg"]), "ag": int(res["ag"]), "goals": res.get("goals", []),
@@ -1598,16 +1612,23 @@ func _cpu_xi_ids(club: Dictionary) -> Array:
 				return xi
 	return Tactics.auto_pick(club).xi
 
-## The RESULT-mode read-out's STADIUM panel data: the managed club's own ground (Career-known
-## capacity + attendance from finance_preview) when the manager is at home. Away venues are the
-## opponent's gate, which the Career finance model doesn't produce -> {} (honest blank panel,
-## match_flow_re.md). Foreign preseason grounds are away for the manager -> also {}.
+## The RESULT-mode read-out's STADIUM panel data: ALWAYS the fixture HOME club's ground,
+## filled (witnessed at AWAY matches too -- Villa Park, The Dell; kills the old "honest
+## blank away" rule, charter #6d). Ground NAME + CAPACITY are source-exact (EQUIPOS
+## param_1[6]); ATTENDANCE + % are the FinanceModel projection (per-match runtime gate is
+## not reproducible -- finance_constants.md -- so the money/sponsor rows stay an honest gap).
+## Manager-home reuses the Career finance_preview (its own board-set prices + works-expanded
+## capacity); an away fixture projects the home OPPONENT's gate from its tier + real capacity.
 func _result_stadium(res: Dictionary) -> Dictionary:
-	if not bool(res.get("manager_home", false)):
-		return {}
-	var fp := _career.finance_preview()
-	return {"name": str(_mgr_club().get("stadium", "")),
-		"capacity": int(fp.get("capacity", 0)), "attendance": int(fp.get("attendance", 0))}
+	var home_id := int(res.get("home_id", -1))
+	if home_id == _career.club_id:
+		var fp := _career.finance_preview()
+		return {"name": str(_mgr_club().get("stadium", "")),
+			"capacity": int(fp.get("capacity", 0)), "attendance": int(fp.get("attendance", 0))}
+	var club := GameDB.club(home_id)
+	var sm := FinanceModel.summary(club, FinanceModel.tier_of(club, GameDB.leagues))
+	return {"name": str(club.get("stadium", "")),
+		"capacity": int(sm.get("capacity", 0)), "attendance": int(sm.get("attendance", 0))}
 
 ## Mount the source-true FULL TIME read-out (MatchResultScreen) over the running match, from a
 ## MATCH OPTIONS RESULTS tap. `data` carries the fixture + real goal vector + stadium; CONTINUE
@@ -1624,9 +1645,9 @@ func _open_result_readout(data: Dictionary, on_continue: Callable, half := false
 		rs.queue_free()
 		if on_continue.is_valid():
 			on_continue.call()
+	# Both HALF TIME and FULL TIME advance on CONTINUE (witnessed §5: the HT read-out
+	# carries a real CONTINUE button, not a tap-anywhere dismiss).
 	rs.continue_pressed.connect(advance)
-	if half:
-		rs.back_pressed.connect(advance)   # the HALF TIME read-out advances on tap
 
 ## The HALF TIME view of a result: the same fixture with only first-half goals
 ## and the score they produce (witnessed RESULTS-mode chain, §7).

@@ -2,8 +2,8 @@ extends SceneTree
 ## Headless test for RESULT-mode (MatchResultScreen.gd) — the HALF/FULL TIME read-out.
 ## Asserts the baked chrome + HALF/FULL TIME title load, the REAL goal vector maps to the
 ## home/away GOALS columns, the score/stadium are the fed values, the money/man-of-match
-## fields stay a gap, CONTINUE (full time) emits continue_pressed and a tap on the HALF
-## TIME read-out emits back_pressed.
+## fields stay a gap, and CONTINUE emits continue_pressed at BOTH half time and full time
+## (a tap on the read-out body is a no-op -- the witnessed HT read-out is CONTINUE-gated).
 ##   ~/godot462 --headless --path app --script res://tests/test_match_result_screen.gd
 
 
@@ -74,11 +74,15 @@ func _run() -> void:
 		40, 1000, header, stadium, true)
 	await process_frame
 	ok = _assert(half._half and half._title != null, "HALF TIME mode + title loaded") and ok
-	var backs: Array = []
-	half.back_pressed.connect(func() -> void: backs.append(true))
-	half._on_input(_touch(Vector2(320, 240), true))     # tap the read-out body
+	# HALF TIME advances on the CONTINUE button (witnessed §5), NOT a tap-anywhere dismiss.
+	var hcont: Array = []
+	half.continue_pressed.connect(func() -> void: hcont.append(true))
+	half._on_input(_touch(Vector2(320, 240), true))     # tap the read-out body = no-op
 	half._on_input(_touch(Vector2(320, 240), false))
-	ok = _assert(backs.size() == 1, "HALF TIME read-out dismisses on tap") and ok
+	ok = _assert(hcont.is_empty(), "HALF TIME body tap does NOT advance") and ok
+	half._on_input(_touch(half.CONTINUE.get_center(), true))
+	half._on_input(_touch(half.CONTINUE.get_center(), false))
+	ok = _assert(hcont.size() == 1, "HALF TIME CONTINUE emits continue_pressed") and ok
 	half.queue_free()
 
 	print("\n%s" % ("ALL PASS" if ok else "FAILURES ABOVE"))

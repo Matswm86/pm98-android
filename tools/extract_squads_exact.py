@@ -192,6 +192,7 @@ def main() -> None:
                 "chairman": r["blockStrings"][0] if r["blockStrings"] else None,
                 "sponsor": r["blockStrings"][1] if len(r["blockStrings"]) > 1 else None,
                 "kitMaker": r["blockStrings"][2] if len(r["blockStrings"]) > 2 else None,
+                "capacity": r["stadiumCapacity"],  # param_1[6], real stadium capacity
                 "blockU32": r["capacity"],  # param_1[0x7a]; semantics UNRESOLVED
                 "players": [export_player(p, code2name, eu_codes) for p in r["players"]],
                 "dropped": [p["name"] for p in r["dropped"]],  # slot>=0x62 leavers
@@ -213,6 +214,12 @@ def main() -> None:
     mu = by_name["Manchester Utd."]
     assert mu["stadium"] == "Old Trafford" and mu["countryCode"] == 30
     assert mu["chairman"] == "C M Edwards" and mu["kitMaker"] == "UMBRO"
+    # Stadium capacity (param_1[6]) vs the LIVE witnessed FULL TIME read-outs
+    # (screenshots/wine-captures-2026-07-17-matchflow/): Old Trafford 55,300,
+    # Villa Park 39,339, The Dell 15,200.
+    assert mu["capacity"] == 55300, mu["capacity"]
+    assert by_name["Aston Villa"]["capacity"] == 39339, by_name["Aston Villa"]["capacity"]
+    assert by_name["Southampton"]["capacity"] == 15200, by_name["Southampton"]["capacity"]
     pk = {p["name"]: p for p in mu["players"]}
     assert pk["Schmeichel"]["attrs"]["PO"] == 91
     assert pk["Schmeichel"]["nationality"] == "DENMARK"
