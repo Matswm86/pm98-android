@@ -1,8 +1,10 @@
 # GROUND (ESTADIO) screen — RE findings + frame-true rebuild
 
-Status: **REBUILT frame-true** (2026-07-13). Owns `app/scenes/StadiumScreen.gd`,
-`tools/re/build_stadium_chrome_from_frames.py`, `app/art/screens/stadium/chrome.png`,
-`app/tests/test_stadium_screen.gd`, `app/tests/test_stadium_works.gd`.
+Status: **REBUILT frame-true** (2026-07-13; **IMPROVEMENTS view added in-screen 2026-07-17**,
+charter #8). Owns `app/scenes/StadiumScreen.gd`, `tools/re/build_stadium_chrome_from_frames.py`,
+`tools/re/build_improvements_chrome_from_frames.py`, `app/art/screens/stadium/chrome.png`,
+`app/art/screens/stadium/improvements.png`, `app/tests/test_stadium_screen.gd`,
+`app/tests/test_stadium_works.gd`, `app/tests/shot_improvements_verify.gd`.
 
 ## Why the previous build was rejected (de-invention record)
 The prior StadiumScreen ("two-column recompose (ma_15)", commit `e03da33`) was **invented**.
@@ -14,12 +16,16 @@ repo (no such file) — the commit's "verified vs ma_15" claim was unfounded, an
 **GROUND MATCH DAY** sub-screen (run-3 capture), not here. `SPEC_BINDING.md §6` already flagged
 the earlier "SEATS/STAND/TIER" readouts as removed-invented; this pass removes the second wave.
 
-## The binding frame (source of truth)
+## The binding frames (source of truth)
 `screenshots/original-walkthrough-2026-07-02/172_154930.png` — the real MANAGER.EXE GROUND
-overview, default **"WORK IN PROGRESS"** state (Man Utd / Old Trafford). Neighbours:
-`170_154926` (hub, GROUND button under FINANCES), `173_154935`/`175`/`177` (the **IMPROVE**
-dialog: IMPROVEMENTS category picker SEATS/CAR PARK/FACILITIES/SERVICES → per-category option
-cards with £cost + weeks; a **Main-owned overlay**, not this screen).
+overview, default **"WORK IN PROGRESS"** state (Man Utd / Old Trafford). `173_154935` — the
+same overview after pressing **IMPROVE**: the LEFT panel becomes the **IMPROVEMENTS** picker
+(category grid SEATS/CAR PARK/FACILITIES/SERVICES + SEATS "INCREASE THE CAPACITY" offer
+cards), the RIGHT panel + green header + 2×2 action grid unchanged. `175_154941` shows a
+ticked card (red X in the box). Neighbour `170_154926` = hub (GROUND button under FINANCES).
+**IMPROVE is an IN-SCREEN toggle of the same window, not a separate overlay** — witnessed by
+the shared right panel + action grid across 172↔173. The Bolton W parity capture
+(`screenshots/parity-run-2026-07-16/orig/21_ground_improve.png`) is the second witnessed club.
 
 ## Real layout (frame 172, all rects pixel-measured off the frame grid)
 Two panels on the shared BARRA header + marble background (`PMChrome.draw_header` /
@@ -73,21 +79,44 @@ backgrounds. StadiumScreen draws: `draw_bg` → `draw_header` → chrome → est
 ground-name / capacity / £-total text → press tints. Parity vs frame 172 outside the tile:
 mean abs diff **3.96** (chrome is the frame's own pixels; residual = text-glyph rendering).
 
-## WIRING (owned by Main.gd — NOT changed here)
-`Main._show_stadium_screen()` still calls `scr.setup(club, manager, season, ground, cap,
-seated, standing, parking, works_status, ticket, board, week, league)`. The signature is
-unchanged so Main needs no edit, but **`seated / standing / parking / ticket / board` are now
-ignored** — they fed the removed invented ticket/sponsor/split readouts (Main can stop
-computing `seated`, `parking = cap/27`, `ticket_price`, `board_price` for this screen). Two
-follow-ups for full frame-truth, both Main-side:
+## IMPROVEMENTS view (frame 173) — IN-SCREEN, rebuilt frame-true (2026-07-17)
+Pressing **IMPROVE** toggles `StadiumScreen._view` to `"improve"`; **WORKS** toggles back.
+The IMPROVE view draws `art/screens/stadium/improvements.png` (baked from frame 173 by
+`tools/re/build_improvements_chrome_from_frames.py`) over the WORK IN PROGRESS left panel;
+the shared right panel + header + 2×2 grid stay put. This **replaces the prior invented blue
+"GROUND WORKS" text browse** (`Main._show_stadium_works` + the `STADIUM_WORKS` table of
+fabricated +2,000/+5,000/+10,000-seat offers at invented £/weeks — all removed).
+
+The three SEATS offer cards carry:
+- **Seat increment +4,000 / +8,000 / +12,000** and **build time 20 / 35 / 50 weeks** — these
+  are witnessed **IDENTICAL** for Man Utd (frame 173) and Bolton W (parity/21), so they are
+  game constants and stay BAKED (`StadiumScreen.OFFER_SEATS` / `OFFER_WEEKS`).
+- **GBP price** — club-specific and **un-RE'd** for the general case (the price-compute fn is
+  NOT in the extracted disassembly; `FUN_0051bd80` is the draw fn only). Only two clubs are
+  witnessed exactly: Man Utd `£4,250,000 / £7,437,500 / £10,624,999`, Bolton W
+  `£2,750,000 / £4,812,499 / £6,875,000` (`StadiumScreen.OFFER_PRICES`). The three £ cells are
+  BLANKED in the bake and redrawn from that lookup; **any other managed club shows an HONEST
+  GAP (blank £ cell, no purchase)** rather than a fabricated price. Deriving a formula from two
+  data points and applying it to 476 clubs would be invention — deferred until the cost fn is
+  reversed. **Next RE step:** Ghidra the offer-cost function to unlock per-club prices.
+
+Ticking a witnessed card emits `improve_selected(added, cost, weeks)`; `Main._on_stadium_improve`
+runs `Career.start_works` (authoritative cash + ceiling gates), saves, and re-mounts the screen
+(now showing the WORK IN PROGRESS state). CAR PARK / FACILITIES / SERVICES tabs are **inert**
+(their offer lists are un-witnessed → not fabricated). Tests: `test_stadium_screen`
+(view toggle, card hit-test, witnessed vs honest-gap price), `test_stadium_works`, `test_wiring_pass`.
+
+## WIRING (Main.gd)
+`Main._show_stadium_screen()` calls `scr.setup(club, manager, season, ground, cap,
+seated, standing, parking, works_status, ticket, board, week, league)` (signature unchanged;
+**`seated / standing / parking / ticket / board` are ignored** — they fed removed invented
+readouts) and connects `scr.improve_selected → _on_stadium_improve` + `scr.back_pressed`.
+Remaining follow-ups, both Main-side:
 1. Pass **structured `Career.works` (added/cost/weeks_left)** instead of only a status string,
-   so the SEATS row can fill the exact TO BE PAID (£) / WEEK cells and TOTAL IMPROVEMENTS can
-   show the real sum. Today a non-empty `works` string is shown on the SEATS row and the money
-   total stays £0.
+   so the WORK IN PROGRESS ledger can fill the exact TO BE PAID (£) / WEEK cells + TOTAL. Today
+   a non-empty `works` string shows on the SEATS row and the money total stays £0.
 2. Optionally pass the managed `club_id` to `draw_header` for the barra crest (currently −1).
-The frame-true **IMPROVE** dialog (category picker + option cards) and **GROUND MATCH DAY** /
-**CAR PARK grid** sub-screens remain Main-owned; IMPROVE + WORKS both currently open Main's
-single expansion browse (`_show_stadium_works`).
+**GROUND MATCH DAY** (ticket price) + **CAR PARK grid** sub-screens remain future work.
 
 ## Module map (MANAGER.EXE, unchanged)
 - `FUN_0051a3e0` ctor · `FUN_004fa840` window base `CRect(0,0,640,480)` · **`FUN_0051a6e0` =

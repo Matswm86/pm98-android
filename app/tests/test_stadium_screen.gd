@@ -79,6 +79,32 @@ func _run() -> void:
 	ok = _assert(screen._hit(StadiumScreen.BTN_MATCHDAY.get_center()) == "", "MATCH DAY is inert") and ok
 	ok = _assert(screen._hit(StadiumScreen.SCENE_BOX.get_center()) == "", "empty-space tap is a no-op") and ok
 
+	# In the WORK-IN-PROGRESS view the offer cards are NOT live (only the action grid is).
+	ok = _assert(screen._hit(StadiumScreen.CARDS[0].get_center()) == "", "cards inert in works view") and ok
+
+	# IMPROVE view: cards + SEATS tab become live; the 3 fixed seat offers are game constants.
+	screen.open_improve()
+	ok = _assert(screen._view == "improve", "IMPROVE opens the picker in-screen") and ok
+	ok = _assert(screen._hit(StadiumScreen.CARDS[0].get_center()) == "card0", "card 0 hit-tests in improve view") and ok
+	ok = _assert(screen._hit(StadiumScreen.CARDS[2].get_center()) == "card2", "card 2 hit-tests in improve view") and ok
+	ok = _assert(screen._hit(StadiumScreen.TAB_SEATS.get_center()) == "tab_seats", "SEATS tab hit-tests") and ok
+	ok = _assert(StadiumScreen.OFFER_SEATS == [4000, 8000, 12000], "witnessed seat increments") and ok
+	ok = _assert(StadiumScreen.OFFER_WEEKS == [20, 35, 50], "witnessed build weeks") and ok
+
+	# Un-witnessed club (Arsenal) => no price => honest gap => a card tick can NOT purchase.
+	var picked := [false]
+	screen.improve_selected.connect(func(_a: int, _c: int, _w: int) -> void: picked[0] = true)
+	screen._select_card(0)
+	ok = _assert(not picked[0], "un-witnessed club: SEATS card is an honest gap (no purchase)") and ok
+
+	# Witnessed club (Bolton W): the real parity/21 price is emitted on tick.
+	screen.setup("Bolton W", "", "1997-98", "Reebok", 20500, 0, 0, 0)
+	screen.open_improve()
+	var got := [[]]
+	screen.improve_selected.connect(func(a: int, c: int, w: int) -> void: got[0] = [a, c, w])
+	screen._select_card(1)
+	ok = _assert(got[0] == [8000, 4812499, 35], "Bolton W tick emits the witnessed SEATS offer") and ok
+
 	screen.queue_redraw()
 	for _i in 3:
 		await process_frame

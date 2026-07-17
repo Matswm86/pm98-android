@@ -622,13 +622,15 @@ func _screens_shot() -> void:
 		_save_shot(dir, s[1])
 		_free_overlays()
 		await _settle()
-	# T2 #5: the stadium WORKS sub-view, then the overview with an expansion in progress.
+	# T2 #5: the in-screen IMPROVEMENTS picker, then the overview with an expansion running.
 	_career.cash = 20_000_000
 	_show_stadium_screen()
-	_show_stadium_works()
+	for c in get_children():
+		if c is StadiumScreen:
+			c.open_improve()
 	await _settle()
 	_save_shot(dir, "stadium_works.png")
-	_career.start_works(5000, 3_900_000, 13)
+	_career.start_works(8000, 7_437_500, 35)   # real Man Utd SEATS offer (frame 173)
 	_free_overlays()
 	_show_stadium_screen()
 	await _settle()
@@ -2413,12 +2415,12 @@ func _board_panel() -> Dictionary:
 ## formula (clamp(capacity*11/130000, 0, 11)) on the SAME capacity the finance screen
 ## uses. GameDB stores only total capacity, so the seated/standing/parking split is
 ## display-derived (flagged in the RE doc). Display-only; tap to dismiss.
-## Stadium expansion options (added capacity, £ cost, weeks to build). ~£780/seat.
-const STADIUM_WORKS := [
-	{"added": 2000, "cost": 1_600_000, "weeks": 6},
-	{"added": 5000, "cost": 3_900_000, "weeks": 13},
-	{"added": 10000, "cost": 7_500_000, "weeks": 24},
-]
+##
+## The IMPROVE / WORKS toggle + the SEATS offer cards now live INSIDE StadiumScreen
+## (frame-true, binding frame 173). The prior invented blue "GROUND WORKS" browse and its
+## invented offer table (+2000/+5000/+10000 seats @ fabricated £/weeks) are removed — the
+## real offers are the fixed +4,000/+8,000/+12,000 seats @ 20/35/50 weeks with witnessed
+## per-club prices, carried in StadiumScreen.OFFER_*; Main just runs Career.start_works.
 
 func _show_stadium_screen() -> void:
 	# Free any prior stadium overlay / browse so re-entry (e.g. after starting works) is clean.
@@ -2442,41 +2444,16 @@ func _show_stadium_screen() -> void:
 		cap, seated, cap - seated, int(round(cap / 27.0)), _career.works_status(),
 		int(sm.get("ticket_price", 0)), int(sm.get("board_price", 0)), _career.week + 1,
 		_career.league_name)
-	scr.works_pressed.connect(_show_stadium_works)
+	scr.improve_selected.connect(_on_stadium_improve)
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
 
-## The WORKS sub-view: pick a ground expansion (spend cash now, capacity rises after the
-## build weeks). PM98-chrome browse over the stadium overview. Reverses FUN_0051bd80's
-## intent (a real spending lever) without its facility-counter sub-layout.
-func _show_stadium_works() -> void:
-	var rows: Array = []
-	var payload: Array = []
-	if not _career.works.is_empty():
-		rows.append({"text": "Works already in progress: %s remaining" % _career.works_status(),
-			"enabled": false, "accent": Color(0.98, 0.86, 0.45)})
-		payload.append(null)
-	else:
-		for opt in STADIUM_WORKS:
-			var affordable: bool = _career.cash >= int(opt["cost"])
-			var room: bool = _career.stadium_capacity + int(opt["added"]) <= Career.MAX_STADIUM
-			rows.append({
-				"text": "Expand +%s   (~%d weeks)" % [Career._grp(int(opt["added"])), int(opt["weeks"])],
-				"value": "£%s" % Career._grp(int(opt["cost"])),
-				"enabled": affordable and room,
-				"accent": null if (affordable and room) else Color(0.6, 0.55, 0.42),
-			})
-			payload.append(opt)
-		if _career.stadium_capacity >= Career.MAX_STADIUM:
-			rows = [{"text": "The ground is already at maximum capacity.", "enabled": false}]
-			payload = [null]
-	_mount_browse("%s  -  GROUND WORKS" % _career.club_name,
-		"Spend now, capacity rises when the build completes", rows,
-		func(i: int) -> void:
-			var opt: Variant = payload[i]
-			if opt != null and _career.start_works(int(opt["added"]), int(opt["cost"]), int(opt["weeks"])):
-				_career.save()
-				_show_stadium_screen(),
-		func() -> void: _show_stadium_screen())
+## A SEATS offer card was ticked on the in-screen IMPROVEMENTS view: run the real Career
+## expansion (start_works enforces cash + ceiling), persist, and re-mount the GROUND screen
+## so it reflects the new WORK IN PROGRESS state.
+func _on_stadium_improve(added: int, cost: int, weeks: int) -> void:
+	if _career.start_works(added, cost, weeks):
+		_career.save()
+	_show_stadium_screen()
 
 ## The COMPETITIONS chooser on the hub CALEN/fixtures icon (the season-calendar slot): a
 ## PM98-chrome browse listing the two domestic cups, each routing to its CupScreen. The

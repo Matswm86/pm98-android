@@ -26,12 +26,38 @@ class_name StadiumScreen
 ## real capacity) -> honest gaps, left blank rather than fabricated (the prior cap/27 car-park
 ## and "NORMAL" pitch were invented). Native 640x480.
 
-signal works_pressed   # IMPROVE or WORKS -> Main opens the ground-expansion lever
-signal back_pressed    # RETURN only -> dismiss (empty taps do not bounce to the hub)
+## RETURN -> dismiss (empty taps do not bounce to the hub).
+signal back_pressed
+## A SEATS offer card was ticked on the IMPROVEMENTS view -> Main runs Career.start_works.
+## IMPROVE / WORKS now toggle the LEFT panel between the WORK IN PROGRESS ledger and the
+## frame-true IMPROVEMENTS category picker IN-SCREEN (frame 173), so the prior Main-owned
+## invented "GROUND WORKS" browse is gone.
+signal improve_selected(added: int, cost: int, weeks: int)
 
 const W := 640
 const H := 480
 const MAX_CAPACITY := 130000
+
+# ---- IMPROVE view (binding frame 173_154935, "SEATS" category active) -------------------
+# Category grid — only SEATS is witnessed with offers; CAR PARK / FACILITIES / SERVICES tab
+# contents are un-RE'd (honest gap, inert). Rects measured off the frame black title bars.
+const TAB_SEATS := Rect2(18, 113, 124, 18)
+# The three SEATS offer cards (whole card is the PM98 hit target) + their tick boxes.
+const CARDS := [Rect2(18, 233, 255, 55), Rect2(18, 293, 255, 55), Rect2(18, 353, 255, 55)]
+const CHECKS := [Rect2(21, 240, 12, 12), Rect2(21, 300, 12, 12), Rect2(21, 360, 12, 12)]
+# GBP price cells, blanked in the bake (seats + weeks stay baked — they are game constants,
+# witnessed identical for Man Utd frame 173 and Bolton W parity/21). Left-aligned at x60.
+const PRICE_ANCHORS := [Rect2(60, 253, 90, 13), Rect2(60, 313, 90, 13), Rect2(60, 373, 90, 13)]
+# Fixed offers (witnessed-invariant across two clubs).
+const OFFER_SEATS := [4000, 8000, 12000]
+const OFFER_WEEKS := [20, 35, 50]
+# Club-specific GBP prices — the per-club/per-capacity price formula is UN-RE'd (not in the
+# extracted disassembly), so only the two witnessed clubs carry real prices; any other
+# managed club shows an honest gap (blank £ cell, no purchase) until the formula is decoded.
+const OFFER_PRICES := {
+	"Manchester Utd.": [4250000, 7437500, 10624999],  # frame 173_154935
+	"Bolton W": [2750000, 4812499, 6875000],           # parity-run orig/21
+}
 
 # The ESTADIO<tier> scene box, pixel-measured off frame 172 (320x240 tile, drawn 1:1 over
 # the baked Old-Trafford picture so any tier fully covers it — no bleed).
@@ -54,11 +80,16 @@ const C_VALUE_TXT := Color8(200, 220, 240)
 const C_TOTAL_RED := Color8(170, 0, 0)
 const C_SEATS_INK := Color8(40, 60, 130)         # SEATS section blue (matches its column heads)
 const C_PRESS := Color(1, 1, 1, 0.18)
+const C_PRICE := Color8(150, 0, 0)               # £ offer price ink (frame-sampled)
+const C_XRED := Color8(210, 0, 0)                # ticked-box red X (frame 175)
 
 var _chrome: Texture2D
+var _improve: Texture2D
 var _scene: Texture2D
 var _f12: Font
 var _f10: Font
+var _view := "works"                             # "works" (ledger) | "improve" (picker)
+var _sel := -1                                   # ticked offer card (-1 none)
 
 var _club: String = ""
 var _manager: String = ""
@@ -74,6 +105,7 @@ var _press := ""
 
 func _ready() -> void:
 	_chrome = load("res://art/screens/stadium/chrome.png")
+	_improve = load("res://art/screens/stadium/improvements.png")
 	_f12 = PMChrome.font("12")
 	_f10 = PMChrome.font("10")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -108,6 +140,8 @@ func setup(club: String, manager: String, season: String, ground: String,
 	_capacity = maxi(0, capacity)
 	_week = week
 	_works = works
+	_view = "works"          # (re)mount always opens on the WORK IN PROGRESS ledger
+	_sel = -1
 	_load_scene()
 	queue_redraw()
 
@@ -120,16 +154,22 @@ func _to_design(p: Vector2) -> Vector2:
 
 
 func _hit(d: Vector2) -> String:
-	# Frame-true, IMPROVE (category picker) and WORKS (in-progress view) differ, but both
-	# reach the one modelled expansion lever (Main owns that dialog); WORKS keeps the "works"
-	# id the works test asserts. RETURN leaves. MATCH DAY is inert (disabled/washed in the
-	# frame) and an empty-space tap is a no-op (it used to bounce to the hub mid-reading).
-	if BTN_WORKS.has_point(d):
-		return "works"
+	# The 2x2 action grid (IMPROVE / WORKS / MATCH DAY / RETURN) is baked in BOTH views:
+	# IMPROVE + WORKS toggle the left panel in-screen (frame-true); RETURN leaves; MATCH DAY
+	# is inert (disabled/washed in the frame). In the IMPROVE view the offer cards + the SEATS
+	# tab are also live. An empty-space tap is a no-op (it used to bounce to the hub).
 	if BTN_IMPROVE.has_point(d):
 		return "improve"
+	if BTN_WORKS.has_point(d):
+		return "works"
 	if BTN_RETURN.has_point(d):
 		return "return"
+	if _view == "improve":
+		for i in CARDS.size():
+			if CARDS[i].has_point(d):
+				return "card%d" % i
+		if TAB_SEATS.has_point(d):
+			return "tab_seats"      # already active; other tabs un-witnessed -> not hit
 	return ""
 
 
@@ -145,11 +185,39 @@ func _on_input(e: InputEvent) -> void:
 		var was := _press
 		_press = ""
 		queue_redraw()
-		if a != was:
+		if a == "" or a != was:
 			return
-		match a:
-			"works", "improve": works_pressed.emit()
-			"return": back_pressed.emit()
+		if a == "improve":
+			_view = "improve"
+			queue_redraw()
+		elif a == "works":
+			_view = "works"
+			queue_redraw()
+		elif a == "return":
+			back_pressed.emit()
+		elif a.begins_with("card"):
+			_select_card(int(a.substr(4)))
+		# "tab_seats" -> no-op (SEATS is the only witnessed category)
+
+
+## Open the in-screen IMPROVEMENTS picker (as if IMPROVE were pressed) — for tests/shots.
+func open_improve() -> void:
+	_view = "improve"
+	queue_redraw()
+
+
+## Tick a SEATS offer card and ask Main to start the works. Only clubs with a WITNESSED
+## price can purchase (un-RE'd price = honest gap, no purchase). The ceiling is pre-checked
+## here; cash affordability is enforced authoritatively by Career.start_works.
+func _select_card(i: int) -> void:
+	var prices: Array = OFFER_PRICES.get(_club, [])
+	if prices.is_empty() or i < 0 or i >= OFFER_SEATS.size():
+		return
+	if _capacity + int(OFFER_SEATS[i]) > MAX_CAPACITY:
+		return
+	_sel = i
+	queue_redraw()
+	improve_selected.emit(int(OFFER_SEATS[i]), int(prices[i]), int(OFFER_WEEKS[i]))
 
 
 # ---- helpers -------------------------------------------------------------
@@ -197,21 +265,45 @@ func _draw() -> void:
 	if _scene != null:
 		draw_texture_rect(_scene, SCENE_BOX, false)
 
-	# Green header: the ground name (GameDB club.stadium; club as a fallback).
+	# Green header: the ground name (GameDB club.stadium; club as a fallback). RIGHT panel is
+	# shared by both views (not covered by the IMPROVE overlay), so it draws unconditionally.
 	_cell(_f12, R_GROUND, _ground if _ground != "" else _club, C_GROUND_TXT, 13, "centre")
 
 	# CAPACITY value (real Career). CAR PARK / PITCH stay blank — uncaptured, honest gaps.
 	_cell(_f10, R_CAP_VAL, "%s seats" % fmt_int(_capacity), C_VALUE_TXT, 11)
 
-	# TOTAL IMPROVEMENTS: £0 in the default state. An in-progress expansion (Career.works)
-	# has no £ amount threaded here (Main passes only a status string) -> the SEATS row shows
-	# the status; the money total stays honest at £0 (see WIRING note in stadium_screen_re.md).
-	_cell(_f10, R_TOTAL, "£0", C_TOTAL_RED, 11, "right")
-	if _works != "":
-		_cell(_f10, R_SEATS_VAL, _works, C_SEATS_INK, 9, "centre")
+	if _view == "improve":
+		# IMPROVEMENTS overlay (frame 173) covers the WORK IN PROGRESS left panel; redraw the
+		# club's witnessed £ prices into the blanked cells (seats + weeks stay baked). An
+		# un-witnessed club leaves the cells blank (honest gap — the price formula is un-RE'd).
+		if _improve != null:
+			draw_texture_rect(_improve, Rect2(0, 0, W, H), false)
+		var prices: Array = OFFER_PRICES.get(_club, [])
+		for i in PRICE_ANCHORS.size():
+			if not prices.is_empty():
+				_cell(_f10, PRICE_ANCHORS[i], "£%s" % fmt_int(int(prices[i])), C_PRICE, 11)
+			if _sel == i:
+				_draw_check(CHECKS[i])
+	else:
+		# WORK IN PROGRESS ledger: TOTAL IMPROVEMENTS £0 default. An in-progress expansion has
+		# no £ amount threaded here (Main passes a status string) -> the SEATS row shows the
+		# status; the money total stays honest at £0 (see WIRING note in stadium_screen_re.md).
+		_cell(_f10, R_TOTAL, "£0", C_TOTAL_RED, 11, "right")
+		if _works != "":
+			_cell(_f10, R_SEATS_VAL, _works, C_SEATS_INK, 9, "centre")
 
-	# Press feedback over the baked buttons.
-	match _press:
-		"improve": draw_rect(BTN_IMPROVE, C_PRESS, true)
-		"works": draw_rect(BTN_WORKS, C_PRESS, true)
-		"return": draw_rect(BTN_RETURN, C_PRESS, true)
+	# Press feedback over the baked buttons / cards.
+	if _press == "improve":
+		draw_rect(BTN_IMPROVE, C_PRESS, true)
+	elif _press == "works":
+		draw_rect(BTN_WORKS, C_PRESS, true)
+	elif _press == "return":
+		draw_rect(BTN_RETURN, C_PRESS, true)
+	elif _press.begins_with("card"):
+		draw_rect(CARDS[int(_press.substr(4))], C_PRESS, true)
+
+
+## Draw the ticked-box red X (frame 175) inside checkbox rect `r`.
+func _draw_check(r: Rect2) -> void:
+	draw_line(r.position, r.end, C_XRED, 2.0)
+	draw_line(Vector2(r.position.x, r.end.y), Vector2(r.end.x, r.position.y), C_XRED, 2.0)

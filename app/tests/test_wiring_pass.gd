@@ -63,25 +63,35 @@ func _run() -> void:
 	_ok(dv_back[0], "directiva: RETURN emits back_pressed")
 	dv.free()
 
-	# --- STADIUM (ground): empty tap -> no-op; RETURN -> back; WORKS -> works ---
+	# --- STADIUM (ground): empty tap -> no-op; IMPROVE+SEATS card -> improve_selected; RETURN ---
 	var st: StadiumScreen = load("res://scenes/StadiumScreen.gd").new()
 	st.size = Vector2(640, 480)
 	get_root().add_child(st)
 	st._ready()
-	st.setup("ALPHA", "M", "1997-98", "Ground", 20000, 12000, 8000, 740, "", 12, 600, 2, "Premier")
+	# Bolton W is a witnessed-price club (parity/21), so a SEATS card can be ticked.
+	st.setup("Bolton W", "M", "1997-98", "Ground", 20000, 12000, 8000, 740, "", 12, 600, 2, "Premier")
 	var st_back := [false]
-	var st_works := [false]
+	var st_pick := [[]]
 	st.back_pressed.connect(func() -> void: st_back[0] = true)
-	st.works_pressed.connect(func() -> void: st_works[0] = true)
+	st.improve_selected.connect(func(a: int, c: int, w: int) -> void: st_pick[0] = [a, c, w])
 	# Stadium needs a matching press+release (press records target, release fires).
-	for ev in [[true, Vector2(100, 100)], [false, Vector2(100, 100)]]:   # empty space
+	for ev in [[true, Vector2(100, 100)], [false, Vector2(100, 100)]]:   # empty space (works view)
 		var e := InputEventMouseButton.new()
 		e.button_index = MOUSE_BUTTON_LEFT
 		e.pressed = ev[0]
 		e.position = ev[1]
 		st._on_input(e)
 	_ok(not st_back[0], "stadium: empty tap is a no-op (no bounce)")
-	for ev in [[true, Vector2(552, 452)], [false, Vector2(552, 452)]]:   # BTN_RETURN (470,438,164,28)
+	# IMPROVE (298,407,152,25) toggles the picker; then tick the first SEATS card (18,233,255,55).
+	for pt in [Vector2(374, 419), Vector2(145, 260)]:
+		for pressed in [true, false]:
+			var e := InputEventMouseButton.new()
+			e.button_index = MOUSE_BUTTON_LEFT
+			e.pressed = pressed
+			e.position = pt
+			st._on_input(e)
+	_ok(st_pick[0] == [4000, 2750000, 20], "stadium: IMPROVE + SEATS card emits real improve_selected")
+	for ev in [[true, Vector2(550, 454)], [false, Vector2(550, 454)]]:   # BTN_RETURN (488,442,124,25)
 		var e := InputEventMouseButton.new()
 		e.button_index = MOUSE_BUTTON_LEFT
 		e.pressed = ev[0]
