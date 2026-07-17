@@ -122,3 +122,45 @@ Full fidelity of the GAP rows needs the positional match engine's event stream (
   panel is Career-known **manager-home only** (`finance_preview` capacity+attendance) — away
   venues pass `{}` (opponent gate un-modelled → honest blank panel). Watched (non-career)
   matches pass no `result_data`, so their RESULTS tap keeps the seek-to-90' behaviour.
+
+## Charter #5 APPLIED — 2026-07-17 (witness semantics, s13 app lane)
+
+The full career matchday chain is now wired per the LIVE witness run
+(`matchday_flow_witness_re.md`; every conflict in its "FOR THE APP LANE" list
+resolved):
+
+- **MATCH OPTIONS = first career match only** (`Career.match_options_shown`,
+  persisted). CANCEL -> un-advanced hub; a view-mode tap (or OK) LAUNCHES
+  immediately (`MatchOptions.launch_on_select`, matchday context only); the
+  LINE-UPS toggle is the ON/OFF cell ONLY (label plate inert); backdrop dim
+  removed (frame 60: hub behind is pixel-identical to the plain hub).
+- **Pre-match XI-vs-XI photo roll** (`LineupRollScreen.gd`) in EVERY view mode
+  when LINE-UPS is ON: ~0.9s clean fondo, ~4.3s/row (faces grow in place,
+  home first, away +1.5s; home name slides from the left on its band; away
+  name slides from the right as a white plate w/ black ink; numbers last),
+  header + manager row, ~8s hold, AUTO-advance; tap mid-roll snaps complete;
+  chrome from `tools/re/build_prematch_roll_from_frames.py` (band-translucency
+  LUT; complete-board chrome gate vs walkthrough 055 = **4px**). CPU XI = the
+  shipped .DBC XI (club_tactics.json, VIEW RIVAL rule), manager XI = Career
+  tactics; numbers = squadNo, slot 1..11 fallback.
+- **BRIEF states**: idle = full buttons (brief.png); RUNNING = EXIT only
+  (`brief_running.png`, baked from the 07-17 witness still); FULL TIME = a
+  single CONTINUE in the EXIT slot (`brief_ft.png`, baked from orig/68).
+  Feed opens with the plain "Kick Off" line.
+- **RESULTS mode**: roll -> HALF TIME read-out (first-half goals/score) ->
+  FULL TIME read-out -> hub (`Main._halftime_data`).
+- **EXIT mid-match** = "Do you want to leave the championship ?" (PMAlert
+  `yesno` render; Yes/No cells cut from the witness still, No at the OK
+  anchor). No -> resumes (match paused under the box); Yes -> TITLE SCREEN
+  with the in-flight week NOT persisted — the week autosave is DEFERRED to
+  the hub return (`_career_advance` / `_show_match_result`).
+- Verified LIVE end-to-end (fresh mwm@Bolton career, DISPLAY=:1): modal ->
+  BRIEF-tap launch -> roll -> KICK OFF -> running -> EXIT alert No-resume ->
+  FT -> read-out -> shield -> season start -> hub wk1; wk-1 CONTINUE with no
+  modal -> roll snap-tap -> auto-advance -> EXIT-Yes -> title; LOAD GAME ->
+  hub still Week 1 (the abandoned week not saved).
+- Remaining flags: clock digits stay the proman18 approximation (7-seg face
+  un-extracted); the original deploys the hub TOP DROPDOWN BAR behind the
+  matchday modal (ours stays closed); read-out repairs = charter #6; BRIEF
+  possession/feed richness = charter #7 / M5 gap; roll corner kits = the
+  un-extracted hi-res kit render family.

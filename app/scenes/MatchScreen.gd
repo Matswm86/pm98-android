@@ -58,6 +58,10 @@ const C_TXT := Color(0.10, 0.12, 0.18)
 const C_PRESS := Color(1, 1, 1, 0.20)
 
 var _bg: Texture2D
+var _run_bg: Texture2D  # RUNNING chrome: every button vanishes except EXIT
+						# (witnessed matchday_flow_witness_re §5)
+var _ft_bg: Texture2D   # FULL TIME chrome: doors/KICK OFF/STATISTICS gone,
+						# CONTINUE in the EXIT slot (parity orig/68)
 var _f18: Font
 var _f14: Font
 var _f12: Font
@@ -71,11 +75,14 @@ var _away_kit: Texture2D
 var _feed: Array = []          # honest feed: [{minute, side, text, goal, kickoff}]
 var _minute := 0.0
 var _playing := true
+var _started := false   # KICK OFF pressed (running/paused chrome vs the idle board)
 var _press := ""
 
 
 func _ready() -> void:
 	_bg = load("res://art/screens/matchflow/brief.png")
+	_run_bg = load("res://art/screens/matchflow/brief_running.png")
+	_ft_bg = load("res://art/screens/matchflow/brief_ft.png")
 	_f18 = PMChrome.font("18")
 	_f14 = PMChrome.font("14")
 	_f12 = PMChrome.font("12")
@@ -103,6 +110,7 @@ func setup(home_name: String, away_name: String, hg: int, ag: int, lines: Array,
 	_feed = _honest_feed(lines)
 	_minute = 0.0
 	_playing = false        # frame 073: KICK OFF idle at 00:00; KICK OFF starts the stream
+	_started = false
 	queue_redraw()
 
 
@@ -110,8 +118,8 @@ func setup(home_name: String, away_name: String, hg: int, ag: int, lines: Array,
 ## Accepts both the MatchCommentary shape ({minute, side, text, goal}) and the raw
 ## stat-engine goal vector ({minute, side/scorer_side, scorer, own_goal}).
 func _honest_feed(lines: Array) -> Array:
-	var out: Array = [{"minute": 0, "side": -1, "text": "KICK OFF  -  %s v %s" % [
-		_home.to_upper(), _away.to_upper()], "kickoff": true}]
+	# the witnessed feed opens with a plain "Kick Off" line (no minute, no clubs)
+	var out: Array = [{"minute": 0, "side": -1, "text": "Kick Off", "kickoff": true}]
 	for ln in lines:
 		if not (ln is Dictionary):
 			continue
@@ -133,6 +141,13 @@ func _honest_feed(lines: Array) -> Array:
 func seek(minute: float) -> void:
 	_minute = clampf(minute, 0.0, 90.0)
 	queue_redraw()
+
+
+## Pause/resume the running clock (the leave-championship alert holds the
+## match while it is up; witnessed §6 "No -> resumes").
+func set_paused(p: bool) -> void:
+	if _started and _minute < 90.0:
+		_playing = not p
 
 
 # ---- pure functions of the minute ----------------------------------------
@@ -198,6 +213,11 @@ func _on_input(e: InputEvent) -> void:
 
 
 func _hit(d: Vector2) -> String:
+	# FULL TIME (orig/68): a single CONTINUE stands in the EXIT slot.
+	# RUNNING (witness §5): every button vanishes except EXIT.
+	# Only the idle pre-kick board has the full button set.
+	if _minute >= 90.0 or _started:
+		return "exit" if (BTN["exit"] as Rect2).has_point(d) else ""
 	for k in BTN:
 		if (BTN[k] as Rect2).has_point(d):
 			return k
@@ -207,14 +227,18 @@ func _hit(d: Vector2) -> String:
 func _activate(target: String) -> void:
 	match target:
 		"kick":
-			# KICK OFF starts the match (frame 073 -> 077, events stream as the clock runs);
-			# at full time the same bottom button CONTINUES to the separate RESULT page (083).
+			# KICK OFF starts the match (frame 073 -> 077, events stream as the clock runs).
+			if not _playing:
+				_playing = true
+				_started = true
+		"exit":
+			# At FULL TIME the EXIT slot holds CONTINUE (orig/68) -> the RESULT
+			# read-out. Before full time EXIT leaves the running view (the career
+			# path still presents the read-out — Main routes back_pressed there).
 			if _minute >= 90.0:
 				continue_pressed.emit()
-			elif not _playing:
-				_playing = true
-		"exit":
-			back_pressed.emit()
+			else:
+				back_pressed.emit()
 		_:
 			pass   # LINE-UP/TACTICS/MAN-TO-MAN/STATISTICS: in-match chrome (no sub-screen here)
 
@@ -225,8 +249,13 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.04, 0.06, 0.12), true)
 	var s := _scale()
 	draw_set_transform(_origin(s), 0.0, Vector2(s, s))
-	if _bg != null:
-		draw_texture_rect(_bg, Rect2(0, 0, W, H), false)
+	var bg := _bg
+	if _minute >= 90.0 and _ft_bg != null:
+		bg = _ft_bg
+	elif _started and _run_bg != null:
+		bg = _run_bg
+	if bg != null:
+		draw_texture_rect(bg, Rect2(0, 0, W, H), false)
 
 	# clock digit (over the baked LCD, which we blank first) + half/state label
 	draw_rect(Rect2(266, 18, 100, 30), Color(0.10, 0.10, 0.11), true)

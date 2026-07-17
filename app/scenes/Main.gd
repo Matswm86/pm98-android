@@ -33,6 +33,7 @@ var _nivel: NivelScreen = null          # SELECT LEVEL OF THE GAME dialog (over 
 var _preseason: PreseasonScreen = null  # "Preseason for <club>" screen
 var _pending_level := "manager"         # NIVEL pick carried through the entry flow
 var _pending_age := false               # "Players age ?" checkbox
+var _club_tactics_db = null             # club_tactics.json clubs (lazy; roll CPU XI)
 var _country_en_es: Dictionary = {}     # PAISES English name -> [Spanish DB names]
 
 @onready var _title: Label = $Root/TopBar/Title
@@ -1018,7 +1019,10 @@ func _open_match(home: Dictionary, away: Dictionary, hg: int, ag: int,
 	# straight to the source-true FULL TIME read-out (frame 083), no running BRIEF.
 	var mode: String = AudioManager.match_view_mode
 	if mode == "results" and not result_data.is_empty():
-		_open_result_readout(result_data, on_back)
+		# WITNESSED (§7): RESULTS mode stops at a HALF TIME read-out first, then
+		# the FULL TIME read-out, then the hub — not a straight jump to full time.
+		_open_result_readout(_halftime_data(result_data), func() -> void:
+			_open_result_readout(result_data, on_back), true)
 		return
 	var scr: MatchScreen = load("res://scenes/MatchScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -1026,7 +1030,13 @@ func _open_match(home: Dictionary, away: Dictionary, hg: int, ag: int,
 	scr.setup(str(home.get("name", "?")), str(away.get("name", "?")), hg, ag, lines,
 		int(home.get("id", -1)), int(away.get("id", -1)))
 	scr.back_pressed.connect(func() -> void:
-		scr.queue_free()
+		# Career match EXIT — WITNESSED (§6): the "Do you want to leave the
+		# championship ?" confirm. No -> resume; Yes -> title screen, the
+		# in-flight week NOT persisted (the save is deferred to the hub return).
+		if not result_data.is_empty():
+			_confirm_leave_match(scr)
+			return
+		scr.queue_free()   # watched (non-career) match: EXIT just leaves
 		if on_back.is_valid():
 			on_back.call())
 	# Full time: the BRIEF hands off to the separate FULL TIME / RESULT page (frame 083),
@@ -1452,19 +1462,22 @@ func _career_advance() -> void:
 	# A pending preseason friendly plays FIRST (the walked August dates precede
 	# round 1) through the same match flow as a league fixture — run-2 played
 	# Man Utd v Sao Paulo in BRIEF mode. League table untouched (Career).
+	# The autosave is DEFERRED to the hub return (_show_match_result's on_back):
+	# witnessed §6 — EXIT-Yes abandons the in-flight week UNSAVED, so the disk
+	# must still hold the pre-CONTINUE career while the match presents.
 	var fr := _career.pending_friendly()
 	if not fr.is_empty():
 		var res_f := _career.play_friendly(rng, _club_with_roster(int(fr.get("club_id", -1))))
-		_career.save()
 		if res_f.is_empty():
+			_career.save()
 			_show_career()
 			return
 		_show_match_result(res_f)
 		return
 	var res := _career.advance_week(rng)   # ratings come from the live roster
-	_career.save()   # autosave each week
 	if res.is_empty():
-		_show_career()   # bye / season just ended; refresh the hub in place
+		_career.save()   # bye / season end: no presentation, save immediately
+		_show_career()   # refresh the hub in place
 		_pop_pending_team_offers()
 		return
 	_show_match_result(res)
@@ -1499,10 +1512,91 @@ func _show_match_result(res: Dictionary) -> void:
 	}
 	# Back at the hub, any live bids on listed players raise their TEAM OFFER
 	# cards — the original's post-match CONTINUE order (run-3 frames 085->086).
-	_open_match(home, away, int(res["hg"]), int(res["ag"]), m["lines"],
-		"%s  -  back to the dugout" % verdict, func() -> void:
-			_show_career()
-			_pop_pending_team_offers(), result_data)
+	var open_match := func() -> void:
+		_open_match(home, away, int(res["hg"]), int(res["ag"]), m["lines"],
+			"%s  -  back to the dugout" % verdict, func() -> void:
+				_career.save()   # the deferred week autosave (EXIT-Yes never gets here)
+				_show_career()
+				_pop_pending_team_offers(), result_data)
+	# LINE-UPS ON (charter #5, frames 61-63): the XI-vs-XI photo roll precedes
+	# the presentation in EVERY view mode — witnessed in RESULTS mode too (§4).
+	if AudioManager.lineups_on:
+		_show_lineup_roll(int(res["home_id"]), int(res["away_id"]), open_match)
+	else:
+		open_match.call()
+
+## Mount the pre-match XI-vs-XI photo roll (LineupRollScreen) for a fixture; a tap
+## on the complete state tears it down and continues into the match via `on_done`.
+func _show_lineup_roll(home_id: int, away_id: int, on_done: Callable) -> void:
+	var home := _club_with_roster(home_id)
+	var away := _club_with_roster(away_id)
+	var scr: LineupRollScreen = load("res://scenes/LineupRollScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(PMChrome.title_case_name(str(home.get("name", ""))),
+		PMChrome.title_case_name(str(away.get("name", ""))),
+		_roll_manager(home), _roll_manager(away), home_id, away_id,
+		_roll_xi(home), _roll_xi(away))
+	scr.done.connect(func() -> void:
+		scr.queue_free()
+		if on_done.is_valid():
+			on_done.call())
+
+## The manager name shown under a club on the roll header: the career's entered
+## name for the managed club (witness "mwm"/"MWM" as typed), the GameDB manager
+## for CPU clubs (witness "Gregory", "Van Gaal").
+func _roll_manager(club: Dictionary) -> String:
+	if _career != null and int(club.get("id", -1)) == _career.club_id:
+		return _career.manager_name
+	return str(club.get("manager", ""))
+
+## A club's starting XI as roll rows [{num, name, photo_id}] in slot order (GK
+## first): the manager's own Career tactics XI, or the CPU club's SHIPPED XI
+## (club_tactics.json, the same rule VIEW RIVAL fields), else auto-pick. Shirt
+## numbers are the EQUIPOS squadNo; clubs without one show slot 1..11 (witness:
+## F.C. Barcelona ran 1..11 while Manchester Utd. wore real squad numbers).
+func _roll_xi(club: Dictionary) -> Array:
+	var ids: Array = []
+	if _career != null and int(club.get("id", -1)) == _career.club_id:
+		ids = _tactics().xi
+	else:
+		ids = _cpu_xi_ids(club)
+	var by_id := {}
+	for p in club.get("players", []):
+		by_id[int(p.get("id", -1))] = p
+	var out: Array = []
+	for i in mini(11, ids.size()):
+		var p: Dictionary = by_id.get(int(ids[i]), {})
+		var num := int(p.get("squadNo", 0))
+		out.append({"num": num if num > 0 else i + 1,
+			"name": str(p.get("name", "")), "photo_id": p.get("photoId")})
+	return out
+
+## A CPU club's XI ids: the shipped .DBC slot XI when game_db-complete (the
+## VIEW RIVAL rule, docs/re/rival_screen_re.md), else Tactics auto-pick.
+func _cpu_xi_ids(club: Dictionary) -> Array:
+	if _club_tactics_db == null:
+		_club_tactics_db = {}
+		var f := FileAccess.open("res://data/club_tactics.json", FileAccess.READ)
+		if f != null:
+			var d: Variant = JSON.parse_string(f.get_as_text())
+			if d is Dictionary:
+				_club_tactics_db = (d as Dictionary).get("clubs", {})
+	var rec: Variant = _club_tactics_db.get(str(int(club.get("id", -1))))
+	if rec is Dictionary:
+		var xi: Array = (rec as Dictionary).get("xi", [])
+		if xi.size() == 11:
+			var have := {}
+			for p in club.get("players", []):
+				have[int(p.get("id", -1))] = true
+			var ok := true
+			for v in xi:
+				if int(v) < 0 or not have.has(int(v)):
+					ok = false
+					break
+			if ok:
+				return xi
+	return Tactics.auto_pick(club).xi
 
 ## The RESULT-mode read-out's STADIUM panel data: the managed club's own ground (Career-known
 ## capacity + attendance from finance_preview) when the manager is at home. Away venues are the
@@ -1518,18 +1612,67 @@ func _result_stadium(res: Dictionary) -> Dictionary:
 ## Mount the source-true FULL TIME read-out (MatchResultScreen) over the running match, from a
 ## MATCH OPTIONS RESULTS tap. `data` carries the fixture + real goal vector + stadium; CONTINUE
 ## tears the whole match flow down and returns to the hub (via `on_continue`).
-func _open_result_readout(data: Dictionary, on_continue: Callable) -> void:
+func _open_result_readout(data: Dictionary, on_continue: Callable, half := false) -> void:
 	var rs: MatchResultScreen = load("res://scenes/MatchResultScreen.gd").new()
 	rs.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(rs)
 	rs.setup(str(data.get("home", "?")), str(data.get("away", "?")),
 		int(data.get("hg", 0)), int(data.get("ag", 0)), data.get("goals", []),
 		int(data.get("home_id", -1)), int(data.get("away_id", -1)),
-		data.get("header", {}), data.get("stadium", {}), false)
-	rs.continue_pressed.connect(func() -> void:
+		data.get("header", {}), data.get("stadium", {}), half)
+	var advance := func() -> void:
 		rs.queue_free()
 		if on_continue.is_valid():
-			on_continue.call())
+			on_continue.call()
+	rs.continue_pressed.connect(advance)
+	if half:
+		rs.back_pressed.connect(advance)   # the HALF TIME read-out advances on tap
+
+## The HALF TIME view of a result: the same fixture with only first-half goals
+## and the score they produce (witnessed RESULTS-mode chain, §7).
+func _halftime_data(data: Dictionary) -> Dictionary:
+	var ht := data.duplicate()
+	var goals: Array = []
+	var hg := 0
+	var ag := 0
+	for g in data.get("goals", []):
+		if int(g.get("minute", 0)) <= 45:
+			goals.append(g)
+			if int(g.get("side", 0)) == 0:
+				hg += 1
+			else:
+				ag += 1
+	ht["goals"] = goals
+	ht["hg"] = hg
+	ht["ag"] = ag
+	return ht
+
+## EXIT during a career match: the witnessed leave-championship confirm (§6).
+## The match pauses under the box; No resumes it; Yes drops to the title
+## screen with the in-flight week NOT persisted (save is deferred to the hub
+## return, so the disk still holds the pre-CONTINUE career).
+func _confirm_leave_match(scr: MatchScreen) -> void:
+	scr.set_paused(true)
+	var cf: LeaveConfirm = load("res://scenes/LeaveConfirm.gd").new()
+	add_child(cf)
+	cf.no_pressed.connect(func() -> void:
+		cf.queue_free()
+		scr.set_paused(false))
+	cf.yes_pressed.connect(func() -> void:
+		cf.queue_free()
+		scr.queue_free()
+		_abandon_career_to_title())
+
+## Witnessed §6 "Yes": abandon the career to the TITLE SCREEN without saving —
+## the in-flight week is lost; "Continue career" reloads the pre-week save.
+func _abandon_career_to_title() -> void:
+	if _hub != null and is_instance_valid(_hub):
+		_hub.queue_free()
+	_hub = null
+	_career = null
+	_nav = [_show_home]
+	_show_home()
+	_show_title_screen()
 
 ## The original-art TITLE / FRONT-DOOR screen as a full-screen overlay raised at boot:
 ## the PREMIER MANAGER 98 title (FONDO7) with DATA BASE / MANAGER LEAGUE /
@@ -2995,6 +3138,19 @@ func _menu_action(action: String, scr: MenuScreen) -> void:
 		"continue":
 			if _career.season_over():
 				_push(_show_end_of_season)
+			elif _next_fixture().is_empty():
+				_career_advance()          # bye week: no match -> no MATCH OPTIONS
+			elif _xi_has_unavailable():
+				# WITNESSED (matchday_flow_witness_re §3): the XI-validity gate
+				# fires BEFORE the modal/launch — CONTINUE with a banned/injured
+				# player in the saved XI raises the standard alert and the week
+				# does NOT advance until the LINE-UP is fixed.
+				scr.alert("The initial line-up is not correct. A player is either banned or injured.")
+			elif not _career.match_options_shown:
+				# WITNESSED (matchday_flow_witness_re §1): MATCH OPTIONS raises on
+				# the career's FIRST match only, over the undimmed hub (frame 60).
+				# Every later CONTINUE goes straight into the stored presentation.
+				_show_matchday_options()
 			else:
 				_career_advance()
 		"table": _show_league_table_screen()
@@ -3029,6 +3185,24 @@ func _show_match_options(_scr: MenuScreen) -> void:
 		AudioManager.set_match_view_mode(m)
 		AudioManager.set_match_settings(settings)
 		opt.queue_free())
+	opt.cancelled.connect(func() -> void: opt.queue_free())
+
+## Matchday MATCH OPTIONS (charter #5, frame 60; witnessed §1-2): raised by the
+## hub CONTINUE on the career's FIRST match only. A view-mode tap (or OK)
+## persists the choice and LAUNCHES the week immediately; CANCEL dismisses
+## back to the hub without advancing (re-CONTINUE re-opens it).
+func _show_matchday_options() -> void:
+	var opt: MatchOptions = load("res://scenes/MatchOptions.gd").new()
+	opt.set_anchors_preset(Control.PRESET_FULL_RECT)
+	opt.launch_on_select = true
+	add_child(opt)
+	opt.setup(AudioManager.match_view_mode, AudioManager.match_settings())
+	opt.confirmed.connect(func(m: String, settings: Dictionary) -> void:
+		AudioManager.set_match_view_mode(m)
+		AudioManager.set_match_settings(settings)
+		_career.match_options_shown = true
+		opt.queue_free()
+		_career_advance())
 	opt.cancelled.connect(func() -> void: opt.queue_free())
 
 ## OPTIONS (hub dropdown headphones icon): the audio panel (MANAGER.INI music/SFX/
@@ -3268,6 +3442,21 @@ func _tactics() -> Tactics:
 	if _career.tactics.is_empty():
 		_career.tactics = Tactics.auto_pick(_mgr_club()).to_dict()
 	return Tactics.from_dict(_career.tactics)
+
+## True when the SAVED tactics XI fields a banned/injured player — the hub
+## CONTINUE gate (witnessed §3). Auto-pick (empty tactics) selects fit players
+## only; ids no longer on the roster are left to the existing repair paths.
+func _xi_has_unavailable() -> bool:
+	if _career.tactics.is_empty():
+		return false
+	var by_id := {}
+	for p in _mgr_club().get("players", []):
+		by_id[int(p.get("id", -1))] = p
+	for pid in Tactics.from_dict(_career.tactics).xi:
+		var pl: Dictionary = by_id.get(int(pid), {})
+		if not pl.is_empty() and not Availability.is_available(pl):
+			return true
+	return false
 
 func _save_tactics(t: Tactics) -> void:
 	_career.tactics = t.to_dict()

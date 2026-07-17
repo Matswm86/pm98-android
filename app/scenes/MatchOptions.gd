@@ -42,6 +42,11 @@ class_name MatchOptions
 signal confirmed(mode: String, settings: Dictionary)   # OK: persist mode + control block
 signal cancelled                                        # CANCEL / dismiss: no change
 
+## Matchday context (witnessed §2): a view-mode tap SELECTS AND LAUNCHES
+## immediately (confirmed fires on the tap, no OK needed); OK launches the
+## current selection. The hub-dropdown settings context keeps select-then-OK.
+var launch_on_select := false
+
 const W := 640
 const H := 480
 
@@ -61,6 +66,11 @@ const TAB_Y := Vector2(312, 330)    # tab row (all tabs)
 const BOT_Y := Vector2(342, 370)    # CANCEL / OK row (all tabs)
 const CANCEL := Vector2(323, 102)   # x, w
 const OK := Vector2(430, 102)
+# The LINE-UPS ON/OFF cell (frame 60; toggles the pre-match XI-vs-XI photo
+# roll). WITNESSED (matchday_flow_witness_re §2): only the small CELL toggles
+# — the LINE-UPS label plate is INERT (two clicks at (162,356) changed
+# nothing). Cell ~x222..268 y341..369.
+const LINEUPS_ON := Rect2(222, 341, 46, 28)
 
 # view-mode order + the reversed source rects (panel-local), kept for the record.
 const MODES := ["watch", "highlights", "brief", "results"]
@@ -90,14 +100,14 @@ const SND_TOGGLES := {   # ON/OFF toggles (default ON)
 }
 
 # Default control block (mirrors the baked ON/HIGH/static resting state).
+# `lineups` IS live: ON shows the pre-match XI-vs-XI photo roll (LineupRollScreen).
 const DEFAULTS := {
 	"gfx_sky": true, "gfx_boards": true, "gfx_shadows": true,
 	"pitch_detail": "high", "stadium_detail": "high",
 	"snd_fx": true, "snd_ambient": true, "snd_comments": true,
-	"camera_mode": "static",
+	"camera_mode": "static", "lineups": true,
 }
 
-const C_DIM := Color(0.02, 0.03, 0.07, 0.55)
 const C_PRESS := Color(1, 1, 1, 0.22)
 const C_SEL := Color(1.0, 0.82, 0.20)          # amber selection border
 const C_OFF_FILL := Color(0.05, 0.05, 0.08)    # painted over an ON plate when OFF
@@ -164,7 +174,7 @@ const VIEW := {"watch": 0, "highlights": 1, "brief": 2, "results": 3}
 ## Which target a design-space point hits ("" if none). Namespaced so the router knows
 ## what a hit means: tab:<name>, view:<mode>, gfx_*, pitch:<q>, stad:<q>, cam:<m>, snd_*.
 func _hit(d: Vector2) -> String:
-	# tab row + CANCEL/OK are live on every tab
+	# tab row + CANCEL/OK + LINE-UPS are live on every tab
 	for name in TABS:
 		if _col_rect(name, TAB_Y).has_point(d):
 			return "tab:" + name
@@ -172,6 +182,8 @@ func _hit(d: Vector2) -> String:
 		return "cancel"
 	if _rect("ok").has_point(d):
 		return "ok"
+	if LINEUPS_ON.has_point(d):   # the label plate is INERT (witnessed)
+		return "lineups"
 	# per-tab interactive controls
 	match _tab:
 		0:
@@ -241,11 +253,17 @@ func _activate(target: String) -> void:
 	if GFX_TOGGLES.has(target) or SND_TOGGLES.has(target):
 		_s[target] = not bool(_s.get(target, true))
 		return
+	if target == "lineups":
+		_s["lineups"] = not bool(_s.get("lineups", true))
+		return
 	match target:
 		"watch", "highlights", "brief", "results":
-			_sel = MODES.find(target)   # select the view mode only
+			_sel = MODES.find(target)
 			if target == "highlights":
 				_note = HL_NOTE
+			elif launch_on_select:
+				# matchday: the tap launches immediately (witnessed §2)
+				confirmed.emit(target, _s.duplicate())
 		"ok":
 			var m: String = MODES[_sel]
 			if m == "highlights":
@@ -259,7 +277,8 @@ func _activate(target: String) -> void:
 # ---- drawing -------------------------------------------------------------
 
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, size), C_DIM, true)
+	# NO backdrop dim: frame 60 shows the hub behind the modal pixel-identical
+	# to the plain hub (verified vs orig/07 — 0.0 diff).
 	var s := _scale()
 	draw_set_transform(_origin(s), 0.0, Vector2(s, s))
 	var tex: Texture2D = _tabtex[_tab] if _tab < _tabtex.size() else null
@@ -270,6 +289,8 @@ func _draw() -> void:
 		1: _draw_graphics_tab()
 		2: _draw_cameras_tab()
 		3: _draw_sound_tab()
+	# LINE-UPS toggle (all tabs): the baked plate reads ON; only OFF overrides.
+	_draw_toggle(LINEUPS_ON, bool(_s.get("lineups", true)))
 	# press feedback on the held target
 	if _press != "":
 		var pr := _press_rect(_press)
@@ -350,6 +371,8 @@ func _press_rect(name: String) -> Rect2:
 		return GFX_TOGGLES[name]
 	if SND_TOGGLES.has(name):
 		return SND_TOGGLES[name]
+	if name == "lineups":
+		return LINEUPS_ON
 	if VIEW.has(name):
 		return _col_rect(name, VIEW_Y)
 	return _rect(name)

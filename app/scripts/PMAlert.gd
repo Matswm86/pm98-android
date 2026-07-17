@@ -46,6 +46,8 @@ static var _title_img: Image
 static var _icon_img: Image
 static var _ok_img: Image
 static var _ok_hot_img: Image
+static var _yes_img: Image     # confirm-box "Yes" cell (44x16, witnessed)
+static var _no_img: Image      # confirm-box "No" cell (39x16 at the OK anchor)
 static var _glyphs := {}               # char code -> {rect: Rect2i, adv: int}
 static var _font_page: Image
 static var _dim := {}                  # "r,g,b" -> Color (exact palette dim)
@@ -60,11 +62,13 @@ static func _load() -> void:
 	_icon_img = (load("res://art/screens/alert/icoexcl.png") as Texture2D).get_image()
 	_ok_img = (load("res://art/screens/alert/ok.png") as Texture2D).get_image()
 	_ok_hot_img = (load("res://art/screens/alert/ok_hot.png") as Texture2D).get_image()
+	_yes_img = (load("res://art/screens/alert/yes.png") as Texture2D).get_image()
+	_no_img = (load("res://art/screens/alert/no.png") as Texture2D).get_image()
 	# The font page is importer="skip" (the BMFont reads it), so load raw bytes.
 	_font_page = Image.new()
 	_font_page.load_png_from_buffer(
 		FileAccess.get_file_as_bytes("res://art/fonts/proman10.png"))
-	for img in [_title_img, _icon_img, _ok_img, _ok_hot_img, _font_page]:
+	for img in [_title_img, _icon_img, _ok_img, _ok_hot_img, _yes_img, _no_img, _font_page]:
 		if img.is_compressed():
 			img.decompress()
 	var fnt := FileAccess.get_file_as_string("res://art/fonts/proman10.fnt")
@@ -160,7 +164,9 @@ static func _rail_pattern(rail_w: int) -> Array[bool]:
 
 
 ## Render the finished alert into an Image (the original draws once, then blits).
-static func render(msg: String, ok_hot := false) -> Image:
+## `yesno` renders the witnessed confirm variant (Yes/No cells, no OK) — the
+## "Do you want to leave the championship ?" box (matchday_flow_witness_re §6).
+static func render(msg: String, ok_hot := false, yesno := false) -> Image:
 	_load()
 	var box := box_rect(msg)
 	var w := box.size.x
@@ -212,10 +218,25 @@ static func render(msg: String, ok_hot := false) -> Image:
 		pen_x -= 1
 	for li in lines.size():
 		_draw_line(img, lines[li], pen_x, body_t + 6 + li * 10, box.position)
-	# OK button at the EXE's (w-6, h-6) bottom-right anchor
-	var ok := _ok_hot_img if ok_hot else _ok_img
-	img.blit_rect(ok, Rect2i(0, 0, 39, 16), Vector2i(w - 45, h - 22))
+	# OK button at the EXE's (w-6, h-6) bottom-right anchor — or the witnessed
+	# Yes/No pair (No sits exactly at the OK anchor, Yes 44x16 at w-94).
+	if yesno:
+		img.blit_rect(_yes_img, Rect2i(0, 0, 44, 16), Vector2i(w - 94, h - 22))
+		img.blit_rect(_no_img, Rect2i(0, 0, 39, 16), Vector2i(w - 45, h - 22))
+	else:
+		var ok := _ok_hot_img if ok_hot else _ok_img
+		img.blit_rect(ok, Rect2i(0, 0, 39, 16), Vector2i(w - 45, h - 22))
 	return img
+
+
+## Design-space hit rects for the confirm box's Yes / No cells.
+static func yes_rect(msg: String) -> Rect2:
+	var b := box_rect(msg)
+	return Rect2(b.position.x + b.size.x - 94, b.position.y + b.size.y - 22, 44, 16)
+
+static func no_rect(msg: String) -> Rect2:
+	var b := box_rect(msg)
+	return Rect2(b.position.x + b.size.x - 45, b.position.y + b.size.y - 22, 39, 16)
 
 
 ## One Proman10 message line at cell (x, y). Shadow layer k (k = 3 lightest .. 1)

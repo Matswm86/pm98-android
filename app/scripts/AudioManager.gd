@@ -45,6 +45,7 @@ var snd_fx := true
 var snd_ambient := true
 var snd_comments := true
 var camera_mode := "static"     # static/auto/free
+var lineups_on := true          # LINE-UPS: pre-match XI-vs-XI photo roll (live consumer)
 
 const _SETTINGS := "user://settings.cfg"
 const _MUSIC_DB := -8.0   # the module theme sits under the UI
@@ -90,6 +91,7 @@ func _load_settings() -> void:
 	snd_ambient = bool(cf.get_value("match", "snd_ambient", snd_ambient))
 	snd_comments = bool(cf.get_value("match", "snd_comments", snd_comments))
 	camera_mode = str(cf.get_value("match", "camera_mode", camera_mode))
+	lineups_on = bool(cf.get_value("match", "lineups", lineups_on))
 
 
 func save_settings() -> void:
@@ -109,6 +111,7 @@ func save_settings() -> void:
 	cf.set_value("match", "snd_ambient", snd_ambient)
 	cf.set_value("match", "snd_comments", snd_comments)
 	cf.set_value("match", "camera_mode", camera_mode)
+	cf.set_value("match", "lineups", lineups_on)
 	cf.save(_SETTINGS)
 
 
@@ -124,7 +127,7 @@ func match_settings() -> Dictionary:
 		"gfx_sky": gfx_sky, "gfx_boards": gfx_boards, "gfx_shadows": gfx_shadows,
 		"pitch_detail": pitch_detail, "stadium_detail": stadium_detail,
 		"snd_fx": snd_fx, "snd_ambient": snd_ambient, "snd_comments": snd_comments,
-		"camera_mode": camera_mode,
+		"camera_mode": camera_mode, "lineups": lineups_on,
 	}
 
 
@@ -139,6 +142,7 @@ func set_match_settings(d: Dictionary) -> void:
 	if d.has("snd_ambient"): snd_ambient = bool(d["snd_ambient"])
 	if d.has("snd_comments"): snd_comments = bool(d["snd_comments"])
 	if d.has("camera_mode"): camera_mode = str(d["camera_mode"])
+	if d.has("lineups"): lineups_on = bool(d["lineups"])
 	save_settings()
 
 

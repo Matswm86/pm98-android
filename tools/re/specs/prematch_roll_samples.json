@@ -1,0 +1,66 @@
+{
+ "_source": {
+  "empty": "screenshots/parity-run-2026-07-16/orig/61_prematch.png",
+  "full_a": "screenshots/parity-run-2026-07-16/orig/63_kickoff.png",
+  "full_b": "screenshots/original-walkthrough-2026-07-02/055_162612.png",
+  "empty2": "screenshots/original-walkthrough-2026-07-02/054_162610.png",
+  "empty3": "screenshots/parity-run-2026-07-16/orig/74_wk1_match.png",
+  "ft": "screenshots/parity-run-2026-07-16/orig/68_brief_later.png"
+ },
+ "rows": 11,
+ "row0_y": 84,
+ "row_pitch": 36,
+ "band_h": 32,
+ "cell": {
+  "w": 32,
+  "home_x": 284,
+  "away_x": 324
+ },
+ "text": {
+  "font": "proman14",
+  "name_ink_top_off": 10,
+  "home_name_right": 255,
+  "away_name_left": 386,
+  "home_num_cx": 40.5,
+  "away_num_cx": 597.5,
+  "num_color": [
+   85,
+   143,
+   255
+  ],
+  "title_ink": [
+   23,
+   33
+  ],
+  "title_home_right": 276,
+  "title_away_left": 364,
+  "mgr_ink": [
+   57,
+   68
+  ],
+  "mgr_home_right": 249,
+  "mgr_away_left": 390,
+  "mgr_color": [
+   105,
+   137,
+   181
+  ]
+ },
+ "title_strip": [
+  13,
+  46
+ ],
+ "hdr_kit_w": 84,
+ "cell_outline": {
+  "x": 283,
+  "w": 74,
+  "y_off": -1,
+  "h": 34,
+  "color": [
+   0,
+   0,
+   0
+  ]
+ },
+ "band_lut_mismatch": 0.00423
+}

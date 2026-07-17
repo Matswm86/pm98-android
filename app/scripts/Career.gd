@@ -14,6 +14,7 @@ var club_id: int = -1
 var club_name: String = ""
 var manager_name: String = ""     # entered on the SELECCION new-career screen
 var manager_level: String = "manager"   # NIVEL dialog pick: trainer/manager/accountant/total
+var match_options_shown: bool = false   # MATCH OPTIONS modal = career's FIRST match only (witnessed)
 var players_age: bool = false     # NIVEL "Players age ?" checkbox
 var preseason_rivals: Array = []  # PRESEASON friendly picks [{date, club_id, name, home}]
 var friendlies_played: int = 0    # picks already simulated (index into preseason_rivals)
@@ -2334,6 +2335,7 @@ func to_dict() -> Dictionary:
 	return {
 		"club_id": club_id, "club_name": club_name, "manager_name": manager_name,
 		"manager_level": manager_level, "players_age": players_age,
+		"match_options_shown": match_options_shown,
 		"preseason_rivals": preseason_rivals,
 		"friendlies_played": friendlies_played, "friendly_results": friendly_results,
 		"league_id": league_id,
@@ -2386,6 +2388,7 @@ static func from_dict(d: Dictionary) -> Career:
 	c.club_name = d.get("club_name", "?")
 	c.manager_name = str(d.get("manager_name", ""))
 	c.manager_level = str(d.get("manager_level", "manager"))
+	c.match_options_shown = bool(d.get("match_options_shown", false))
 	c.players_age = bool(d.get("players_age", false))
 	c.preseason_rivals = d.get("preseason_rivals", [])
 	c.friendlies_played = int(d.get("friendlies_played", 0))
