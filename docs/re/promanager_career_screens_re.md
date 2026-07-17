@@ -118,10 +118,19 @@ definitive close.
   `FUN_00545fd0` (vtable 0x6338b0 slot 71) picks the message — financial
   counter +0x224≥4 → 0x261e18, sack flag +0x294≠0 → 0x261d44/0x261d6f, squad
   size +0x28≤15 (unless global DAT_0066b1e8 waives) → 0x261c90 — shows it in a
-  "PREMIER MANAGER 98" modal, then TEARS DOWN the surface (id 0xffff) and
-  returns. The next screen is built by the slot-0x11c caller, NOT in the sack
-  routine — **which surface follows remains open** (bounded trace list in
-  sack_path_re.md, or witness by engineering a squad-minimum sack in wine).
+  "PREMIER MANAGER 98" modal, then detaches the human manager from the club
+  (club+0x5c := 0xffff) and frees the club's management data.
+  **RESOLVED 2026-07-17 session 2 (full caller-chain trace in
+  sack_path_re.md):** the career screen driver `FUN_004f96c0` detects the
+  detach after the hub screen returns; with another human manager alive the
+  game continues with them, with none it throws code 0x4e3e, which the season
+  orchestrator catches and returns — the outer loop then re-mounts the MAIN
+  MENU. **Post-sack surface = MAIN MENU** (single-manager career). The app's
+  post-sack OFFERS SELECTION mount is a documented divergence. Bonus decode:
+  +0x224 = consecutive negative-balance weeks (financial sack at 4),
+  +0x294 = board results-review flag (warnings wk 10/18/30, sack reviews wk
+  14/22/26/34 vs board-expectation band club+0x58), squad-min waiver
+  DAT_0066b1e8 is a dead dev flag (never nonzero in retail).
 
 ## SHIPPED 2026-07-16 — MANAGER HISTORY rebuilt frame-true (0px both states)
 `ManagerHistoryScreen.gd` + `tools/re/build_managerhistory_chrome_from_frames.py`
@@ -150,9 +159,10 @@ witnessed states. Decoded in the build:
   20/20 + `test_manager`/`test_career` green; PM98_MANAGER_SHOT real-render OK.
 - `_show_job_offers()` (JOB OFFERS browse) → rebuild as OFFERS SELECTION's
   `OFFERS FOR` panel + club-detail popup chrome. The app fires it post-sack /
-  headhunt (original post-sack surface unknown, above) — using the original
-  offers chrome replaces invented chrome with witnessed chrome, flagged that
-  the original's mid-career usage is unproven. **DONE — see below.**
+  headhunt (original post-sack surface = MAIN MENU, proven 07-17 s2 above —
+  the offers mount is an app-side divergence) — using the original offers
+  chrome replaces invented chrome with witnessed chrome; the original's
+  mid-career usage is now DISPROVEN, not merely unproven. **DONE — see below.**
 
 ## SHIPPED 2026-07-16 (session 5) — OFFERS SELECTION rebuilt frame-true (0px all 5 states)
 `OffersSelectionScreen.gd` + `tools/re/build_offers_selection_chrome_from_frames.py`
