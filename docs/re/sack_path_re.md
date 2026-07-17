@@ -170,7 +170,27 @@ week block** — compared against `_DAT_00638de0` = **0.0** (verified in
 
 ⇒ **financial sack = 4 consecutive weeks with negative bank balance.**
 `DAT_0066b1f8` writers: `FUN_005765f0` (save-load path via `FUN_005602e0`)
-and an undefined-code region 0x54aa29..0x54aad4 (4 writes) — un-chased.
+and the region 0x54aa10..0x54aae8 — **CHASED 2026-07-17 (s10): these are the
+four NIVELES "SELECT LEVEL OF THE GAME" choice handlers** (witness frame
+`screenshots/promanager-career-2026-07-16/02_select_level_of_the_game.png`;
+handler-table DATA refs 0x54a486/0x54a521; each handler ends
+`FUN_005bd200(1)` = dialog unlink + result). Combos (asm-verified):
+
+| handler | b1f4 | b1f8 | b1ec | = witnessed level caption |
+|---|---|---|---|---|
+| 0x54aa10 | 1 | **1** | 0 | TRAINER — "Automatic finances / Automatic contract renewal" |
+| 0x54aa60 | 1 | 0 | 0 | MANAGER — "Automatic contract renewal" |
+| 0x54aab0 | 0 | 0 | 1 | ACCOUNTANT — "Automatic tactics and squad" |
+| 0x54aad0 | 0 | 0 | 0 | TOTAL — "Total control" |
+
+⇒ **`DAT_0066b1f8` = the "Automatic finances" option (TRAINER level)** —
+auto-managed finances is WHY it bypasses the financial sack. New global ids:
+**`DAT_0066b1f4` = automatic contract renewal** (TRAINER+MANAGER),
+**`DAT_0066b1ec` = automatic tactics and squad** (ACCOUNTANT). Guard
+`DAT_00658a44` = players-age-OFF (¬bit4 of screen+0x3f4, setter 0x54a9f0);
+TRAINER/MANAGER with "Players age ?" ON are refused with the modal
+*"Options "Automatic contract renewal"\nand "Players age" are not
+compatible."* (VA 0x65e8bc).
 
 ### +0x294 — board results-review sack flag
 
@@ -178,7 +198,12 @@ Set in **`FUN_0057a980`** (per-club weekly update), gated on
 `DAT_0066b1e4 != 0` (mode, below) AND `club+0x50 == DAT_0066b1dc` (club's
 division == division being updated) AND week > 9
 (`FUN_0057d5a0` = `FUN_00586960(club->0x50)` = the division's current
-week/round; internals un-chased). Fixed-week schedule — club+0x58 = the
+week/round; **internals CHASED 2026-07-17 (s10)**: per-division (0-3 only)
+cache of division vtable +0x150 = `FUN_00415510` — scan rounds 0..count
+(+0x148), return the FIRST round whose date passes `FUN_004ecf20` (≥ today),
+clamped to last round; cached per exact game date, invalidated by
+`FUN_004ecf70` date-equality against `DAT_0066b18c`, value slots this+0xc,
+date stamps this+0x44). Fixed-week schedule — club+0x58 = the
 board-expectation BAND, club+0x50 = division index into `DAT_0066b190[]`:
 
 | week | bands checked | action |
@@ -200,9 +225,17 @@ of the team and they expect better results."*
 (league vtable +0x88(club id)) vs band threshold:
 
 - division 0 (Premier): band 1 → pos > 8; band 2 → pos > 15; band ≥3 →
-  pos > 17; band 0 → points-based: 7+ points behind a reference club taken
-  from the week-N standings (reference resolution decompiler-obscured —
-  un-chased, do not guess).
+  pos > 17; band 0 → points-based, **reference RESOLVED 2026-07-17 (s10) at
+  asm level (0x57d400-0x57d476)**: division vtable +0x168 = `FUN_00415a00`
+  builds a club-id table insertion-sorted by LEAGUE POINTS computed from
+  played fixtures (`FUN_00441c70` sort, key `FUN_00440720`: home/away W/D/L
+  → points values snapshot+0x18/+0x1a/+0x1c; fixture records: home +0x38,
+  away +0x3a, goals +0x3c/+0x3d, played +0x40); the reference = the FIRST
+  entry (`word [table+0]`) = **the league points-leader as of week−1**, and
+  the trip condition is `leader_points ≥ own_points + 7` (both via division
+  +0x188 = `FUN_00416490` points-as-of-week; positions via +0x88 likewise
+  take (club, week−1)). Equal-points tie order = insertion-sort stability
+  over the snapshot's input club list (un-chased which input order).
 - divisions 1/2/3: first band of the division (4/7/10) → pos > 6; second
   band (5/8/0xb) → pos > 13; else → pos > 15.
 - division > 3: never (no board review).

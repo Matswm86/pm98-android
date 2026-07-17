@@ -19,7 +19,11 @@ Promanager League, manager "mwm", TOTAL level, Players-age default OFF).
 
 ## Screen 1 — OFFERS SELECTION (Promanager career start)
 Route: title → PRO-MANAGER LEAGUE → SELECT LEVEL OF THE GAME (NIVELES) → pick
-level → **OFFERS SELECTION**. Witness frames 03–07.
+level → **OFFERS SELECTION**. Witness frames 03–07. (NIVELES levels decoded
+2026-07-17: TRAINER/MANAGER/ACCOUNTANT/TOTAL map to the automation globals
+b1f4/b1f8/b1ec — incl. b1f8 "Automatic finances" = the financial-sack bypass;
+handler table + "Players age" incompatibility modal in
+[`sack_path_re.md`](sack_path_re.md) §+0x224.)
 
 - Header: green-pitch plaque "Promanager League" top-left, title
   `OFFERS SELECTION` (0x25e5bc), ball icon top-right.

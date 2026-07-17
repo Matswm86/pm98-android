@@ -29,6 +29,10 @@ the binary this session; nothing inferred from memory.
 
 Decompile-verified order (season loop, label 0x4f8af4):
 
+0. Before the setup screen (fresh game): `FUN_004f8f60` = new-game init —
+   `srand(time(NULL) * 0x7b)` (CRT rand seeded from wall clock; the match
+   engine's own seed @0x6d3184 is separate) and game date := 1 Jan 1997
+   (`DAT_0066b18c` = {year 0x7cd, month 1, day 1}), week `DAT_0066b1d8` := 0.
 1. First entry: `FUN_004f9520((b1e4!=0)+0x3c0)` — career setup.
    Factory ids: **0x3c0** (ctor `FUN_0055d340`, vtable 0x626330, init
    `FUN_0055d560` = "ENTER YOUR NAME AND SELECT A TEAM", Manager/League
