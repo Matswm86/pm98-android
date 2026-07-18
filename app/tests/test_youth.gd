@@ -127,8 +127,14 @@ func _career_integration() -> bool:
 
 	var career := Career.create(prem[0], league, prem, leagues)
 	var ok := true
-	ok = _assert(career.youth.size() == Career.YOUTH_SEED_COUNT,
-		"career seeds the academy (%d youth)" % career.youth.size()) and ok
+	# A career starts with an EMPTY youth list (witnessed orig/39, parity run
+	# 2026-07-16); the machinery below is exercised on a manually scouted crop.
+	ok = _assert(career.youth.size() == 0,
+		"career starts with an empty academy (witnessed)") and ok
+	var seed_rng := RandomNumberGenerator.new()
+	seed_rng.seed = SEED
+	career.youth = Youth.intake(seed_rng, 5, career.youth_seq)
+	career.youth_seq += 5
 	var above_senior := true
 	for p in career.youth:
 		above_senior = above_senior and int(p["id"]) >= Career.YOUTH_ID_BASE

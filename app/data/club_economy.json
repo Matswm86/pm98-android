@@ -1,0 +1,379 @@
+{
+"_source": "EQUIPOS club-header budget u32 (param_1[0x7a]) + START OF SEASON witness frames 2026-07-19; see tools/re/export_club_economy.py",
+"clubs": {
+"100": {
+"budget": 225,
+"objective": "Avoid Relegation"
+},
+"101": {
+"budget": 225,
+"objective": "Mid Table"
+},
+"102": {
+"budget": 225,
+"objective": "Mid Table"
+},
+"103": {
+"budget": 225,
+"objective": "Promotion"
+},
+"104": {
+"budget": 225,
+"objective": "Avoid Relegation"
+},
+"105": {
+"budget": 225,
+"objective": "Avoid Relegation"
+},
+"106": {
+"budget": 150,
+"objective": "Mid Table"
+},
+"107": {
+"budget": 150,
+"objective": "Avoid Relegation"
+},
+"108": {
+"budget": 150,
+"objective": "Mid Table"
+},
+"109": {
+"budget": 150,
+"objective": "Promotion"
+},
+"110": {
+"budget": 150,
+"objective": "Avoid Relegation"
+},
+"111": {
+"budget": 150,
+"objective": "Promotion"
+},
+"112": {
+"budget": 150,
+"objective": "Mid Table"
+},
+"113": {
+"budget": 150,
+"objective": "Mid Table"
+},
+"114": {
+"budget": 150,
+"objective": "Avoid Relegation"
+},
+"115": {
+"budget": 150,
+"objective": "Avoid Relegation"
+},
+"116": {
+"budget": 150,
+"objective": "Promotion"
+},
+"117": {
+"budget": 150,
+"objective": "Avoid Relegation"
+},
+"119": {
+"budget": 150,
+"objective": "Mid Table"
+},
+"120": {
+"budget": 150,
+"objective": "Mid Table"
+},
+"121": {
+"budget": 150,
+"objective": "Mid Table"
+},
+"122": {
+"budget": 150,
+"objective": "Mid Table"
+},
+"123": {
+"budget": 150,
+"objective": "Mid Table"
+},
+"124": {
+"budget": 150,
+"objective": "Mid Table"
+},
+"125": {
+"budget": 150,
+"objective": "Mid Table"
+},
+"126": {
+"budget": 150,
+"objective": "Mid Table"
+},
+"127": {
+"budget": 150,
+"objective": "Promotion"
+},
+"128": {
+"budget": 150,
+"objective": "Avoid Relegation"
+},
+"129": {
+"budget": 150,
+"objective": "Avoid Relegation"
+},
+"1333": {
+"budget": 1,
+"objective": "Avoid Relegation"
+},
+"1381": {
+"budget": 75
+},
+"1383": {
+"budget": 1
+},
+"38": {
+"budget": 800,
+"objective": "U.E.F.A."
+},
+"39": {
+"budget": 1000,
+"objective": "Mid Table"
+},
+"40": {
+"budget": 1500,
+"objective": "Champion"
+},
+"41": {
+"budget": 1000,
+"objective": "Promotion"
+},
+"42": {
+"budget": 1500,
+"objective": "Champion"
+},
+"43": {
+"budget": 800,
+"objective": "Mid Table"
+},
+"44": {
+"budget": 1200,
+"objective": "Champion"
+},
+"45": {
+"budget": 1000,
+"objective": "U.E.F.A."
+},
+"46": {
+"budget": 1200,
+"objective": "Champion"
+},
+"47": {
+"budget": 1000,
+"objective": "U.E.F.A."
+},
+"48": {
+"budget": 600,
+"objective": "Mid Table"
+},
+"49": {
+"budget": 1000,
+"objective": "Champion"
+},
+"50": {
+"budget": 800,
+"objective": "Promotion"
+},
+"51": {
+"budget": 700,
+"objective": "Mid Table"
+},
+"52": {
+"budget": 700,
+"objective": "Mid Table"
+},
+"53": {
+"budget": 600,
+"objective": "Mid Table"
+},
+"54": {
+"budget": 600,
+"objective": "Avoid Relegation"
+},
+"55": {
+"budget": 600,
+"objective": "Promotion"
+},
+"56": {
+"budget": 600,
+"objective": "Mid Table"
+},
+"57": {
+"budget": 600,
+"objective": "Mid Table"
+},
+"58": {
+"budget": 400,
+"objective": "Promotion"
+},
+"59": {
+"budget": 400,
+"objective": "Avoid Relegation"
+},
+"60": {
+"budget": 400,
+"objective": "Promotion"
+},
+"61": {
+"budget": 400,
+"objective": "Promotion"
+},
+"62": {
+"budget": 400,
+"objective": "Mid Table"
+},
+"63": {
+"budget": 400,
+"objective": "Avoid Relegation"
+},
+"64": {
+"budget": 400,
+"objective": "Promotion"
+},
+"65": {
+"budget": 400,
+"objective": "Avoid Relegation"
+},
+"66": {
+"budget": 400,
+"objective": "Promotion"
+},
+"67": {
+"budget": 400,
+"objective": "Avoid Relegation"
+},
+"68": {
+"budget": 400,
+"objective": "Avoid Relegation"
+},
+"69": {
+"budget": 400,
+"objective": "Avoid Relegation"
+},
+"70": {
+"budget": 400,
+"objective": "Mid Table"
+},
+"71": {
+"budget": 400,
+"objective": "Mid Table"
+},
+"72": {
+"budget": 400,
+"objective": "Promotion"
+},
+"73": {
+"budget": 400,
+"objective": "Mid Table"
+},
+"74": {
+"budget": 400,
+"objective": "Mid Table"
+},
+"75": {
+"budget": 400,
+"objective": "Avoid Relegation"
+},
+"76": {
+"budget": 400,
+"objective": "Avoid Relegation"
+},
+"77": {
+"budget": 400,
+"objective": "Promotion"
+},
+"78": {
+"budget": 400,
+"objective": "Mid Table"
+},
+"79": {
+"budget": 400,
+"objective": "Mid Table"
+},
+"80": {
+"budget": 400,
+"objective": "Mid Table"
+},
+"81": {
+"budget": 400,
+"objective": "Promotion"
+},
+"82": {
+"budget": 225,
+"objective": "Promotion"
+},
+"83": {
+"budget": 225,
+"objective": "Mid Table"
+},
+"84": {
+"budget": 225,
+"objective": "Promotion"
+},
+"85": {
+"budget": 225,
+"objective": "Promotion"
+},
+"86": {
+"budget": 225,
+"objective": "Avoid Relegation"
+},
+"87": {
+"budget": 225,
+"objective": "Mid Table"
+},
+"88": {
+"budget": 225,
+"objective": "Avoid Relegation"
+},
+"89": {
+"budget": 225,
+"objective": "Mid Table"
+},
+"90": {
+"budget": 225,
+"objective": "Mid Table"
+},
+"91": {
+"budget": 225,
+"objective": "Mid Table"
+},
+"92": {
+"budget": 225,
+"objective": "Promotion"
+},
+"93": {
+"budget": 225,
+"objective": "Mid Table"
+},
+"94": {
+"budget": 225,
+"objective": "Promotion"
+},
+"95": {
+"budget": 225,
+"objective": "Promotion"
+},
+"96": {
+"budget": 225,
+"objective": "Avoid Relegation"
+},
+"97": {
+"budget": 225,
+"objective": "Mid Table"
+},
+"98": {
+"budget": 225,
+"objective": "Promotion"
+},
+"99": {
+"budget": 225,
+"objective": "Promotion"
+}
+}
+}

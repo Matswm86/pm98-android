@@ -161,7 +161,9 @@ const INTERCONTINENTAL_PRIZE := 750_000 # Intercontinental Cup (Euro Cup winner 
 # so a promoted youngster never collides with a real player. Each career starts with a
 # small academy intake; a fresh crop is scouted in at every season rollover.
 const YOUTH_ID_BASE := 900000
-const YOUTH_SEED_COUNT := 5             # the academy crop a new career starts with
+const YOUTH_SEED_COUNT := 0             # a career starts with an EMPTY youth list (witnessed
+                                        # orig/39, parity run 2026-07-16); the first rollover
+                                        # scouts the first crop in
 const YOUTH_INTAKE_LO := 1             # a season's fresh intake (scout's haul) ...
 const YOUTH_INTAKE_HI := 3             # ... is this many youngsters
 const YOUTH_SEARCH_WEEKS := 2          # a scout search reports back after this many weeks
@@ -262,14 +264,22 @@ func _init_club(club: Dictionary, league: Dictionary, league_clubs: Array, leagu
 	fa_cup = Cup.create(ids, fixtures.size())
 	league_cup = Cup.create(ids, fixtures.size(), LEAGUE_CUP_OPTS)
 	_init_table(league_clubs)
-	_set_objective(league, league_clubs, leagues)
+	_set_objective(club, league, league_clubs, leagues)
 	var fin := FinanceModel.summary(club, tier)
 	# weekly_net is the per-week finance delta WITHOUT the player wage bill -- player wages
 	# are drawn live from the squad each week (so signings + renewal raises move the bill),
 	# so we add the seed squad's wages back into the projected balance here. For an unchanged
 	# squad the live deduction equals this added-back figure, i.e. identical to the old net.
 	weekly_net = int(fin["weekly_balance"]) + int(fin["weekly_wages"])
-	cash = int(fin.get("total_income", 0)) / 4   # opening balance ~ a quarter's income
+	# STARTING CASH = the club's EQUIPOS budget u32 x 5000 — live-witnessed 2026-07-19
+	# (Bolton 400 -> £2,000,000; A.Villa 1000 -> £5,000,000; Arsenal 1200 -> £6,000,000;
+	# frames in screenshots/wine-captures-2026-07-19-economics/). Clubs without the
+	# budget field (non-English records) keep the old projected-income fallback.
+	var budget := int(club.get("budget", 0))
+	if budget > 0:
+		cash = budget * 5000
+	else:
+		cash = int(fin.get("total_income", 0)) / 4   # un-decoded fallback
 	stadium_capacity = int(fin.get("capacity", 0))   # ground starts at the club's known size
 	ticket_price = int(fin.get("ticket_price", 0))   # prices start at the division defaults
 	board_price = int(fin.get("board_price", 0))
@@ -327,12 +337,38 @@ func _init_table(league_clubs: Array) -> void:
 		}
 
 
-## Objective = finish at least as high as squad strength suggests (with leniency),
-## phrased by where that lands in the division.
-func _set_objective(league: Dictionary, league_clubs: Array, leagues: Array) -> void:
+## Board objective. English league clubs carry the game's OWN objective label
+## (START OF SEASON, all four divisions live-witnessed 2026-07-19 — frames
+## s29..s32 in screenshots/wine-captures-2026-07-19-economics/, exported into
+## club_economy.json by tools/re/export_club_economy.py): Champion / U.E.F.A. /
+## Promotion / Mid Table / Avoid Relegation. Clubs without a witnessed label
+## (non-English) keep the strength-ranked fallback below.
+func _set_objective(club: Dictionary, league: Dictionary, league_clubs: Array, leagues: Array) -> void:
+	var label := str(club.get("objective", ""))
+	if label != "":
+		objective_text = label
+		objective_pos = _objective_pos_for(label, league_clubs.size())
+		return
 	var obj := objective_for(club_id, league_id, league_clubs, leagues)
 	objective_pos = int(obj["pos"])
 	objective_text = str(obj["text"])
+
+
+## The finish position the app holds the board's label to (sack/bonus checks).
+## The LABEL is source data; this int mapping is the app's mechanic.
+func _objective_pos_for(label: String, total: int) -> int:
+	match label:
+		"Champion":
+			return 1
+		"Promotion":
+			return 3        # automatic spots + playoff round
+		"U.E.F.A.":
+			return 6
+		"Mid Table":
+			return maxi(1, total / 2)
+		_:                  # Avoid Relegation: stay above the drop zone
+			var zone: Dictionary = SeasonSim.ZONES.get(tier, {"releg": 3})
+			return maxi(1, total - int(zone.get("releg", 3)) - 1)
 
 
 ## The objective the board would set for `for_club_id` in its division — the
@@ -2300,7 +2336,9 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	league_cup = Cup.create(ids, fixtures.size(), LEAGUE_CUP_OPTS)
 	_init_table(views)
 	var league := {"id": league_id, "name": league_name, "tier": tier}
-	_set_objective(league, views, leagues)
+	# Season 2+: the witnessed labels are the 1997-98 board table; later seasons'
+	# boards are un-witnessed, so the strength-ranked fallback applies ({} club).
+	_set_objective({}, league, views, leagues)
 	var fin := FinanceModel.summary(club_view(club_id), tier)
 	weekly_net = int(fin["weekly_balance"]) + int(fin["weekly_wages"])  # wage-free; wages drawn live
 	# Refit the XI to the (possibly changed) squad while keeping the shape.

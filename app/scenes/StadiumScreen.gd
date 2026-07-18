@@ -51,12 +51,23 @@ const PRICE_ANCHORS := [Rect2(60, 253, 90, 13), Rect2(60, 313, 90, 13), Rect2(60
 # Fixed offers (witnessed-invariant across two clubs).
 const OFFER_SEATS := [4000, 8000, 12000]
 const OFFER_WEEKS := [20, 35, 50]
-# Club-specific GBP prices — the per-club/per-capacity price formula is UN-RE'd (not in the
-# extracted disassembly), so only the two witnessed clubs carry real prices; any other
-# managed club shows an honest gap (blank £ cell, no purchase) until the formula is decoded.
-const OFFER_PRICES := {
-	"Manchester Utd.": [4250000, 7437500, 10624999],  # frame 173_154935
-	"Bolton W": [2750000, 4812499, 6875000],           # parity-run orig/21
+# Seat prices are TIERED by the club's board-objective label — DECODED from the
+# live wine campaign 2026-07-19 (screenshots/wine-captures-2026-07-19-economics/):
+# all four Premier tiers witnessed on real careers, base +£500k per tier, cards
+# x1 / x1.75 / x2.5 with the engine's own float-truncation dirt kept verbatim:
+#   Champion   4,250,000 / 7,437,500 / 10,624,999   (Arsenal s12 == ManU frame 173)
+#   U.E.F.A.   3,750,000 / 6,562,499 /  9,375,000   (A.Villa s24)
+#   Mid Table  3,250,000 / 5,687,500 /  8,124,999   (Wimbledon s28)
+#   Avoid Rel. 2,750,000 / 4,812,499 /  6,875,000   (Bolton parity-run orig/21)
+# "Promotion" (lower-division top tier) is UN-WITNESSED on this screen; it maps to
+# the U.E.F.A. slot (same 3rd rank) as a FLAGGED inference until a lower-division
+# ground is witnessed.
+const TIER_PRICES := {
+	"Champion": [4250000, 7437500, 10624999],
+	"U.E.F.A.": [3750000, 6562499, 9375000],
+	"Promotion": [3750000, 6562499, 9375000],   # FLAGGED inference (rank-3 slot)
+	"Mid Table": [3250000, 5687500, 8124999],
+	"Avoid Relegation": [2750000, 4812499, 6875000],
 }
 
 # The ESTADIO<tier> scene box, pixel-measured off frame 172 (320x240 tile, drawn 1:1 over
@@ -100,6 +111,7 @@ var _capacity: int = 0
 var _tier: int = 0
 var _week: int = 0
 var _works: String = ""
+var _objective: String = ""                      # board-objective label -> price tier
 var _press := ""
 
 
@@ -131,12 +143,13 @@ func _load_scene() -> void:
 ## / board are ignored — they fed the removed invented ticket-price + sponsor + split readouts.
 func setup(club: String, manager: String, season: String, ground: String,
 		capacity: int, _seated: int, _standing: int, _parking: int, works := "",
-		_ticket := 0, _board := 0, week := 0, league := "") -> void:
+		_ticket := 0, _board := 0, week := 0, league := "", objective := "") -> void:
 	_club = club
 	_manager = manager
 	_season = season
 	_ground = ground
 	_league = league
+	_objective = objective
 	_capacity = maxi(0, capacity)
 	_week = week
 	_works = works
@@ -209,8 +222,14 @@ func open_improve() -> void:
 ## Tick a SEATS offer card and ask Main to start the works. Only clubs with a WITNESSED
 ## price can purchase (un-RE'd price = honest gap, no purchase). The ceiling is pre-checked
 ## here; cash affordability is enforced authoritatively by Career.start_works.
+## The club's seat-offer prices: the witnessed board-objective tier. No label
+## (a club outside the witnessed English set) -> honest gap (blank, inert).
+func _prices() -> Array:
+	return TIER_PRICES.get(_objective, [])
+
+
 func _select_card(i: int) -> void:
-	var prices: Array = OFFER_PRICES.get(_club, [])
+	var prices: Array = _prices()
 	if prices.is_empty() or i < 0 or i >= OFFER_SEATS.size():
 		return
 	if _capacity + int(OFFER_SEATS[i]) > MAX_CAPACITY:
@@ -278,7 +297,7 @@ func _draw() -> void:
 		# un-witnessed club leaves the cells blank (honest gap — the price formula is un-RE'd).
 		if _improve != null:
 			draw_texture_rect(_improve, Rect2(0, 0, W, H), false)
-		var prices: Array = OFFER_PRICES.get(_club, [])
+		var prices: Array = _prices()
 		for i in PRICE_ANCHORS.size():
 			if not prices.is_empty():
 				_cell(_f10, PRICE_ANCHORS[i], "£%s" % fmt_int(int(prices[i])), C_PRICE, 11)

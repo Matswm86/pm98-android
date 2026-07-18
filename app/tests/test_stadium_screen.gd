@@ -95,15 +95,24 @@ func _run() -> void:
 	var picked := [false]
 	screen.improve_selected.connect(func(_a: int, _c: int, _w: int) -> void: picked[0] = true)
 	screen._select_card(0)
-	ok = _assert(not picked[0], "un-witnessed club: SEATS card is an honest gap (no purchase)") and ok
+	ok = _assert(not picked[0], "no objective label: SEATS card is an honest gap (no purchase)") and ok
 
-	# Witnessed club (Bolton W): the real parity/21 price is emitted on tick.
-	screen.setup("Bolton W", "", "1997-98", "Reebok", 20500, 0, 0, 0)
+	# Tiered prices (wine campaign 2026-07-19): the objective label picks the
+	# witnessed price row — Avoid Relegation == the Bolton parity/21 numbers.
+	screen.setup("Bolton W", "", "1997-98", "Reebok", 20500, 0, 0, 0, "",
+		0, 0, 0, "", "Avoid Relegation")
 	screen.open_improve()
 	var got := [[]]
 	screen.improve_selected.connect(func(a: int, c: int, w: int) -> void: got[0] = [a, c, w])
 	screen._select_card(1)
-	ok = _assert(got[0] == [8000, 4812499, 35], "Bolton W tick emits the witnessed SEATS offer") and ok
+	ok = _assert(got[0] == [8000, 4812499, 35], "Avoid Relegation tick emits the witnessed SEATS offer") and ok
+	# All four witnessed tiers resolve to their frame prices.
+	screen._objective = "Champion"
+	ok = _assert(screen._prices() == [4250000, 7437500, 10624999], "Champion tier = Arsenal/ManU frames") and ok
+	screen._objective = "U.E.F.A."
+	ok = _assert(screen._prices() == [3750000, 6562499, 9375000], "U.E.F.A. tier = Villa s24") and ok
+	screen._objective = "Mid Table"
+	ok = _assert(screen._prices() == [3250000, 5687500, 8124999], "Mid Table tier = Wimbledon s28") and ok
 
 	screen.queue_redraw()
 	for _i in 3:

@@ -41,6 +41,7 @@ func _load() -> void:
 			clubs_by_id[int(c["id"])] = c
 		_apply_loader_defaults()
 		_apply_real_managers()
+		_apply_club_economy()
 		loaded_path = path
 		is_sample = path.ends_with("sample_db.json")
 		database_loaded.emit()
@@ -57,6 +58,31 @@ func _load() -> void:
 ## The extractor exports exactly those cases as JSON null (extract_squads_exact.py:138),
 ## so null here == "engine substitutes". Applied to the loaded records only — never
 ## baked into game_db.json (SPEC_BINDING: "never baked").
+## Merge per-club ECONOMY source data (club_economy.json, exported by
+## tools/re/export_club_economy.py) into the club dicts: `budget` (EQUIPOS
+## header u32 — starting cash = budget x 5000, live-witnessed 2026-07-19) and
+## `objective` (the START OF SEASON board label, all four English divisions
+## witnessed). Clubs absent from the file just miss the keys (fallback paths).
+func _apply_club_economy() -> void:
+	if not FileAccess.file_exists("res://data/club_economy.json"):
+		return
+	var f := FileAccess.open("res://data/club_economy.json", FileAccess.READ)
+	if f == null:
+		return
+	var parsed: Variant = JSON.parse_string(f.get_as_text())
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return
+	var rows: Dictionary = parsed.get("clubs", {})
+	for id_str in rows:
+		var c: Dictionary = clubs_by_id.get(int(id_str), {})
+		if c.is_empty():
+			continue
+		var row: Dictionary = rows[id_str]
+		c["budget"] = int(row.get("budget", 0))
+		if row.has("objective"):
+			c["objective"] = str(row["objective"])
+
+
 func _apply_loader_defaults() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
