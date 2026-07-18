@@ -45,8 +45,15 @@ const STEP_CAP := 60000
 const STRIDE := 0x3bc
 
 
+## PM98_SEEDTRACE=<path>: one line per outer step -- "step clk banked half rng.state" --
+## for offline diff against the oracle's polled (clk, seed) timeline (capture2/timeline.jsonl).
+var _trace: FileAccess = null
+
+
 func _init() -> void:
 	var ok := _run()
+	if _trace != null:
+		_trace.close()
 	quit(0 if ok else 1)
 
 
@@ -107,6 +114,10 @@ func _run() -> bool:
 		(dump["match"] as Dictionary).size(), rng.state,
 		_g(m, 0x19ac), _g(m, 0x448), int(session.get(0xfa0, -1))])
 
+	var tp := OS.get_environment("PM98_SEEDTRACE")
+	if tp != "":
+		_trace = FileAccess.open(tp, FileAccess.WRITE)
+
 	var goals: Array = []
 	var prev := [_g(m, 0x478), _g(m, 0x798)]
 	var over_at := -1
@@ -114,6 +125,8 @@ func _run() -> bool:
 	while t < STEP_CAP:
 		Pm98Outer.step(m, rng)
 		t += 1
+		if _trace != null:
+			_trace.store_line("%d %d %d %d %d" % [t, _g(m, 0x450), _g(m, 0x19a8), _g(m, 0x19a0), rng.state])
 		var cur := [_g(m, 0x478), _g(m, 0x798)]
 		for team in range(2):
 			while cur[team] > (prev[team] as int):

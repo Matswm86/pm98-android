@@ -390,9 +390,12 @@ static func _action_switch(p: Dictionary, m: Dictionary, gs: Dictionary, b: Dict
 					if prepend is Dictionary and is_same(prepend, p):   # match+0x440 == player
 						p[0x48] = 5000
 					else:
-						# NOTE: a live windup here would draw 1 rng (FUN_005ec250); Step-1 fixtures
-						# avoid this arm (bVar17 false), so the rng wire lands with Task #2.
-						push_error("engine_tick case 6/7 windup-draw arm not wired (Task #2)")
+						# FUN_005a4600 case 6/7 windup: p+0x48 = rand-scaled (0x78 - p[0x380])*2
+						# + 0x1e -- one FUN_005ec250 draw through the >= 0x8000 overflow split
+						# (identical structure to _shot_rng_scale; signed compare puts negative
+						# spans through the < 0x8000 arm, _tdiv truncates toward zero as the
+						# binary's sign-bias masks do).
+						p[0x48] = Pm98Movement._shot_rng_scale(rng.next(), (0x78 - _si(p, 0x380)) * 2) + 0x1e
 				elif _si(p, 0x48) < 10:
 					m[0x461] = _g(m, 0x461) & 0xf7
 		8, 9:

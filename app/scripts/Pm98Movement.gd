@@ -1985,7 +1985,14 @@ static func _kick_pass(p: Dictionary, ball: Dictionary, m: Dictionary, power: in
 	var radius := Pm98Trig._tdiv(power * 0x4d03, 200)
 	var vel: Array = Pm98Trig.polar_vec(radius, aim)             # FUN_005ee0f0 -> [polx, poly, 0]
 	Pm98Events.keeper_event(ball, 1)                             # FUN_005909f0(1) (no-op, keeper null)
-	if _si(ball, 0x4c) == 0 and _si(ball, 0x50) != 0:            # keeper-target clear (L620-623)
+	# ball+0x4c (owner) / +0x50 (keeper) are POINTERS in live play, bare ints in the
+	# oracle fixtures -- null-test via the L1109/L1218 pointer-or-int idiom (s42 keeper_save
+	# fix; int(Dictionary) crashes).
+	var owner_v: Variant = ball.get(0x4c, null)
+	var keep_v: Variant = ball.get(0x50, null)
+	var owner_set: bool = owner_v is Dictionary or (owner_v is int and int(owner_v) != 0)
+	var keep_set: bool = keep_v is Dictionary or (keep_v is int and int(keep_v) != 0)
+	if not owner_set and keep_set:                               # keeper-target clear (L620-623)
 		ball[0x50] = 0
 	m[0x461] = _g(m, 0x461) | 0x20                              # kick-consumed bit (L626)
 	# Rotate the launch vector about Y -- RNG draw 3 (FUN_005ee6e0 in place; v[1] fixed, v[0]/v[2] mix).
