@@ -1454,6 +1454,30 @@ func staff_weekly_wage() -> int:
 func player_weekly_wage() -> int:
 	return Contract.squad_weekly_bill(my_squad(), tier)
 
+
+# ---- player insurance (INSURANCE screen) ---------------------------------
+
+## Flat monthly policy prices, GROUP 1/2/3 — witnessed game CONSTANTS (the
+## 2026-07-18 wine run: Ward £1,250 vs Frandsen £14,583 monthly wage see the
+## SAME £200/£500/£1,000). Premium CHARGING cadence + the injury payout flow
+## are un-RE'd — no money moves yet (documented gap, insurance_screen_re.md).
+const INSURANCE_PRICES := {1: 200, 2: 500, 3: 1000}
+
+## Set a squad player's INSURANCE POLICY group (0 = uninsured, 1-3). Stored on
+## his dict (`insurance_group`) like `wage`, so it persists with the roster.
+func set_insurance(pid: int, group: int) -> bool:
+	if group < 0 or group > 3:
+		return false
+	for p in my_squad():
+		var pd: Dictionary = p
+		if int(pd.get("id", -1)) == pid:
+			if group == 0:
+				pd.erase("insurance_group")
+			else:
+				pd["insurance_group"] = group
+			return true
+	return false
+
 ## Hire a candidate from the pool into the backroom staff. The 13 roles are SINGLE-OCCUPANCY
 ## (frames 100 + 108-121): signing into a role that already has a holder REPLACES him -- the
 ## outgoing member returns to the pool (a like-for-like swap, no compensation; a SACK is the

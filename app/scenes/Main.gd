@@ -1852,6 +1852,24 @@ func _show_injuries_screen() -> void:
 	scr.back_pressed.connect(func() -> void:
 		scr.queue_free()
 		_show_lineup_screen())
+	scr.insurance_pressed.connect(func() -> void:
+		scr.queue_free()
+		_show_insurance_screen())
+
+## The INSURANCE screen (InsuranceScreen.gd; docs/re/insurance_screen_re.md):
+## the squad with per-player INSURANCE POLICY groups (flat £200/£500/£1,000
+## monthly). RETURN reopens INJURIES (witnessed 39 -> 40 back path).
+func _show_insurance_screen() -> void:
+	var scr: InsuranceScreen = load("res://scenes/InsuranceScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(_mgr_club(), _career.tier, _match_header())
+	scr.policy_selected.connect(func(pid: int, group: int) -> void:
+		_career.set_insurance(pid, group)
+		_career.save())
+	scr.back_pressed.connect(func() -> void:
+		scr.queue_free()
+		_show_injuries_screen())
 
 ## The LINE-UP STATISTICS sub-screen (StatisticsScreen.gd; docs/re/statistics_screen_re.md):
 ## the squad roster over the baked table; per-player season stats are an honest gap (untracked).

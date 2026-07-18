@@ -1,0 +1,333 @@
+{
+ "binding_sources": {
+  "body": "wine-captures-2026-07-18-goalscorers/34_insure_ward.png",
+  "resting_twin": "33_insurance.png (differs only at the PARAM. focus border)",
+  "modal": "35_insure_ward2.png",
+  "modal_selected": "36_group1_sel.png",
+  "insured_row": "37_after_ok.png",
+  "flat_price_proof": "38_frandsen_policy.png"
+ },
+ "size": [
+  640,
+  480
+ ],
+ "body_y0": 62,
+ "title_xy": [
+  239,
+  22
+ ],
+ "sections": [
+  {
+   "key": "gk",
+   "y0": 87,
+   "slots": 3
+  },
+  {
+   "key": "def",
+   "y0": 151,
+   "slots": 5
+  },
+  {
+   "key": "mid",
+   "y0": 247,
+   "slots": 5
+  },
+  {
+   "key": "fwd",
+   "y0": 343,
+   "slots": 4
+  }
+ ],
+ "row": {
+  "pitch": 16,
+  "box_h": 14,
+  "strip_x": 7,
+  "strip_w": 596
+ },
+ "cells": {
+  "num": [
+   30,
+   60
+  ],
+  "name": [
+   62,
+   173
+  ],
+  "EN": [
+   174,
+   198
+  ],
+  "SP": [
+   199,
+   223
+  ],
+  "ST": [
+   224,
+   248
+  ],
+  "AG": [
+   249,
+   273
+  ],
+  "QU": [
+   274,
+   298
+  ],
+  "FI": [
+   299,
+   323
+  ],
+  "MO": [
+   324,
+   349
+  ],
+  "AV": [
+   350,
+   374
+  ],
+  "age": [
+   375,
+   410
+  ],
+  "wage": [
+   411,
+   474
+  ],
+  "arrow": [
+   474,
+   503
+  ],
+  "doc": [
+   502,
+   535
+  ],
+  "cost": [
+   536,
+   602
+  ]
+ },
+ "insured": {
+  "doc_fill": [
+   170,
+   223,
+   170
+  ],
+  "cost_fill": [
+   192,
+   192,
+   192
+  ],
+  "doc_row_xy": [
+   511,
+   2
+  ],
+  "digit_x": 524,
+  "digit_ink_1": [
+   60,
+   90,
+   0
+  ],
+  "btn_digit_inks": {
+   "1": [
+    60,
+    90,
+    0
+   ],
+   "2": [
+    0,
+    0,
+    128
+   ],
+   "3": [
+    85,
+    0,
+    0
+   ]
+  },
+  "cost_ink": [
+   170,
+   63,
+   85
+  ]
+ },
+ "scroll": {
+  "x0": 609,
+  "w": 16,
+  "up_off_h": 17,
+  "dn_off_h": 18,
+  "dn_on_h": 15,
+  "track_bg": [
+   120,
+   140,
+   160
+  ],
+  "note": "scrollable: up 16px + border + track + border + dn 15px; slider h=floor(track*slots/total) off=floor(track*first/total) (reproduces DEF 25px + FOR 20px); up-enabled = vflip(dn_on), pattern-derived (both witnesses at first=0)"
+ },
+ "modal": {
+  "box": [
+   104,
+   86,
+   555,
+   393
+  ],
+  "name_band": [
+   148,
+   121,
+   339,
+   136
+  ],
+  "right_band": [
+   341,
+   121,
+   505,
+   136
+  ],
+  "wage_val": [
+   148,
+   149,
+   339,
+   161
+  ],
+  "cost_val": [
+   341,
+   149,
+   505,
+   161
+  ],
+  "group_btns": {
+   "0": [
+    128,
+    361,
+    90,
+    22
+   ],
+   "1": [
+    230,
+    361,
+    32,
+    22
+   ],
+   "2": [
+    270,
+    361,
+    32,
+    22
+   ],
+   "3": [
+    310,
+    361,
+    32,
+    22
+   ]
+  },
+  "ok_btn": [
+   458,
+   357,
+   92,
+   30
+  ],
+  "doc_modal_xy": [
+   345,
+   123
+  ],
+  "sel_border": [
+   255,
+   31,
+   0
+  ]
+ },
+ "prices": {
+  "1": 200,
+  "2": 500,
+  "3": 1000
+ },
+ "samples": {
+  "row_inks": {
+   "num": [
+    0,
+    0,
+    128
+   ],
+   "name": [
+    0,
+    0,
+    0
+   ],
+   "EN": [
+    150,
+    0,
+    0
+   ],
+   "SP": [
+    100,
+    100,
+    140
+   ],
+   "ST": [
+    100,
+    100,
+    140
+   ],
+   "AG": [
+    100,
+    100,
+    140
+   ],
+   "QU": [
+    100,
+    100,
+    140
+   ],
+   "FI": [
+    42,
+    95,
+    170
+   ],
+   "MO": [
+    80,
+    110,
+    5
+   ],
+   "AV": [
+    210,
+    0,
+    0
+   ],
+   "age": [
+    128,
+    128,
+    128
+   ],
+   "wage": [
+    128,
+    128,
+    128
+   ]
+  },
+  "row_fill": [
+   240,
+   240,
+   240
+  ],
+  "modal_name_ink": [
+   30,
+   52,
+   98
+  ],
+  "modal_right_ink": [
+   59,
+   85,
+   130
+  ],
+  "modal_wage_val_ink": [
+   0,
+   0,
+   0
+  ],
+  "modal_cost_val_ink": [
+   0,
+   0,
+   0
+  ]
+ }
+}

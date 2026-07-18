@@ -14,11 +14,14 @@ class_name InjuriesScreen
 ##
 ## HONEST GAPS (flagged, never invented — injuries_screen_re.md §Gaps): the app's
 ## Availability model stores only injured_weeks, so TYPE OF INJURY (no injury-type
-## string), PHYS. (treatment checkbox), and the PRICE / INSUR. / COST insurance
-## economy have no source and stay as resting furniture. INSURANCE is a documented
-## no-op. Suspensions are NOT injuries and are excluded. Native 640x480.
+## string), PHYS. (treatment checkbox), and this list's PRICE / INSUR. / COST
+## columns have no source and stay as resting furniture. The INSURANCE button
+## opens the real INSURANCE screen (InsuranceScreen.gd, ported 2026-07-18 from
+## wine witnesses 33-39). Suspensions are NOT injuries and are excluded.
+## Native 640x480.
 
 signal back_pressed        # RETURN -> Main reopens LINE-UP
+signal insurance_pressed   # INSURANCE -> Main mounts the INSURANCE screen
 
 const W := 640
 const H := 480
@@ -149,8 +152,7 @@ func _on_input(e: InputEvent) -> void:
 		"return":
 			back_pressed.emit()
 		"insurance":
-			# GAP: the app models no insurance economy; INSURANCE is a documented no-op.
-			pass
+			insurance_pressed.emit()
 
 
 # ---- drawing --------------------------------------------------------------
