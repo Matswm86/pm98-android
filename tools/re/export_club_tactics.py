@@ -185,6 +185,12 @@ def main() -> None:
             "xiFine": [
                 rec["players"][slot_idx[s]]["fine"] if s in slot_idx else 0 for s in range(1, 12)
             ],
+            # Raw .DBC slot byte per kept player, in record order (== game_db
+            # squad order). 1..11 = shipped XI, 12..16 = stored bench; >= 17 is
+            # a permutation the ENGINE discards — display renumbers those 17..N
+            # in record order (offers_map_re.md, witnessed 28/28 on the OFFERS
+            # browse lists of Blackpool frame 100 + Barcelona wine 46).
+            "squadSlots": [p["slot"] for p in rec["players"]],
         }
 
     # Kill-test 2: Barcelona vs the walked rival_015 frame bake.
@@ -208,6 +214,38 @@ def main() -> None:
 
     # Kill-test 3 (coverage): every club's name agreed.
     assert name_hits == 476, f"only {name_hits}/476 names match game_db.json"
+
+    # Kill-test 9: the OFFERS-browse display-number rule (offers_map_re.md).
+    # display(k) = slot_k if slot_k <= 16, else 17 + rank of k among slot >= 17
+    # players in record order. Witnessed 28/28: run-3 frame 100 (Blackpool) +
+    # wine 46 (Barcelona), including the raw-byte permutations the engine
+    # discards (Taylor/Malkin 17<->19; Ciric/Óscar/Celades/Roger -> 20/21/22/23).
+    def display_numbers(slots: list[int]) -> list[int]:
+        out, nxt = [], 17
+        for s in slots:
+            if s <= 16:
+                out.append(s)
+            else:
+                out.append(nxt)
+                nxt += 1
+        return out
+
+    WITNESS_NUMBERS = {
+        # app_id -> {player name: displayed number}
+        "82": {"Preece": 9, "Malkin": 19, "Ormerod": 12, "Conroy": 18, "Taylor": 17,
+               "Bonner": 11, "Philpott": 7, "Brabin": 16, "Clarkson": 8, "Russell": 10,
+               "Lydiate": 4, "Bradshaw": 5, "Bryan": 14, "Butler": 6},
+        "1000": {"Pizzi": 16, "Anderson": 9, "Giovanni": 10, "Luis Enrique": 8,
+                 "Roger": 23, "Celades": 22, "De la Peña": 14, "Óscar": 21,
+                 "Guardiola": 4, "Amor": 15, "Figo": 7, "Ciric": 20, "Rivaldo": 11,
+                 "Sergi": 6},
+    }
+    for cid, wit in WITNESS_NUMBERS.items():
+        names = [p["name"] for p in db_clubs[int(cid)]["players"]]
+        nums = display_numbers(clubs[cid]["squadSlots"])
+        got = dict(zip(names, nums))
+        for nm, want in wit.items():
+            assert got[nm] == want, f"club {cid} {nm}: display {got[nm]} != witnessed {want}"
 
     # Kill-test 4: Barcelona TRUE XI == the walked frame 015 rows.
     assert barca["xiNames"] == FRAME_015_XI, barca["xiNames"]

@@ -55,6 +55,14 @@ var training_intensity: String = Training.DEFAULT_INTENSITY   # Light/Normal/Int
 var youth: Array = []                   # the youth team: scouted youngsters (Youth.gd)
 var youth_seq: int = YOUTH_ID_BASE      # monotonic id minter for youth (above senior ids)
 var youth_search: Dictionary = {}       # running scout search {skills:Array, weeks:int}; {} = idle
+var scout_search: Dictionary = {}       # SENIOR scout search {criteria:Dictionary, due_week:int};
+                                        # {} = idle (SCOUT screen, docs/re/scout_screen_re.md)
+var scout_results: Array = []           # last finished search's rows (persist until a new search)
+var pending_alerts: Array = []          # queued hub "PREMIER MANAGER 98" alert texts; Main
+                                        # raises + clears them when the hub next shows (the
+                                        # witnessed post-flow timing, scout_screen_re.md 78)
+var external_signed: Dictionary = {}    # pid -> true: players bought off static (non-roster)
+                                        # squads via the OFFERS browse (hidden from re-browse)
 var staff: Array = []                   # hired backroom staff (Staff.gd)
 var staff_pool: Array = []              # staff available to hire (refreshed each season)
 var staff_seq: int = STAFF_ID_BASE      # monotonic id minter for staff candidates
@@ -219,6 +227,10 @@ func _init_club(club: Dictionary, league: Dictionary, league_clubs: Array, leagu
 	# ledger lets inject_due_talents (Main, after take_job) re-deliver due talents here.
 	talents_used = {}
 	works = {}
+	scout_search = {}
+	scout_results = []
+	pending_alerts = []
+	external_signed = {}
 	offers_left = OFFERS_PER_WEEK
 	# Competitions reset: you arrive with no European qualification or honours at the new club.
 	euro = {}
@@ -564,6 +576,8 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 		_news(n["kind"], n["text"])
 	# A running YOUTH TEAM SCOUT search ticks down and reports back (YOUTH TEAM screen).
 	_tick_youth_search(rng)
+	# A running SENIOR scout search completes on its due week (SCOUT screen).
+	_tick_scout_search()
 	# F.A. Cup: any midweek tie whose scheduled league week has arrived is played
 	# now (open random draw, replays then penalties). The manager's own tie writes a
 	# news line and a cup run pays prize money; the rest resolves in the background so
@@ -1254,6 +1268,111 @@ func _tick_youth_search(rng: RandomNumberGenerator) -> void:
 	else:
 		_news("youth", "The youth team scout has finished his search and hasn't found any players.")
 
+
+# ---- the SENIOR scout search (SCOUT screen, docs/re/scout_screen_re.md) ----
+
+## Witnessed duration with the ★★★ scout: armed week 3, still searching after
+## one advance, finished-alert after the second (frames 68/73/78). Quality
+## dependence is un-witnessed — flat 2 weeks, documented.
+const SCOUT_SEARCH_WEEKS := 2
+
+## Arm a search. criteria: {pos:String(""|GK/DF/MF/FW), age:int(0=off, max),
+## role:int(0=off, posFine), quality:int(0=off, min 1-5), price:int(0=off, max
+## fee), leagues:Array[String] (league ids)}. The screen enforces the witnessed
+## validation (>=1 criteria toggle ON) before calling this. `foreign_clubs` =
+## GameDB club dicts of any checked NON-own division (Career never reads
+## GameDB itself — Main bridges): those divisions are static, so their matches
+## freeze into the search now; the own division scans LIVE rosters at the due
+## week (morale/contracts move until then).
+func start_scout_search(criteria: Dictionary, foreign_clubs: Array = []) -> void:
+	var frozen: Array = []
+	for club in foreign_clubs:
+		var cd: Dictionary = club
+		for p in cd.get("players", []):
+			var row := _scout_row(p, int(cd.get("id", -1)), str(cd.get("name", "?")), cd, false)
+			if _scout_match(row, p, criteria):
+				frozen.append(row)
+	scout_search = {"criteria": criteria.duplicate(true),
+		"due_week": week + SCOUT_SEARCH_WEEKS, "frozen": frozen}
+
+func scout_searching() -> bool:
+	return not scout_search.is_empty()
+
+func _tick_scout_search() -> void:
+	if scout_search.is_empty():
+		return
+	if week < int(scout_search.get("due_week", 0)):
+		return
+	scout_results = _scout_scan_own(scout_search.get("criteria", {}))
+	scout_results.append_array(scout_search.get("frozen", []))
+	scout_search = {}
+	# The witnessed hub alert (78) — raised by Main when the hub next shows.
+	pending_alerts.append("The scout has finished his search.")
+	_news("transfer", "The scout has finished his search.")
+
+## Scan the manager's own division (live rosters, own club excluded) when it is
+## among the checked leagues. The original's result order is un-RE'd
+## (scout_screen_re.md) — this is the app's own scan order, documented.
+func _scout_scan_own(criteria: Dictionary) -> Array:
+	var out: Array = []
+	if not criteria.get("leagues", []).has(league_id):
+		return out
+	for cid in rosters:
+		if int(cid) == club_id:
+			continue
+		var cv := club_view(int(cid))
+		for p in rosters[cid]:
+			var row := _scout_row(p, int(cid), str(club_names.get(int(cid), "?")), cv, true)
+			if _scout_match(row, p, criteria):
+				out.append(row)
+	return out
+
+## One PLAYERS FOUND row. AV = floor((VE+RE+AG+CA)/4) — the witnessed formula
+## (8/8 GK rows exact). Fee/wage = the valuation model (the real figures are
+## un-portable per-club float data — TransferScreen precedent).
+func _scout_row(p: Dictionary, cid: int, cname: String, club_v: Dictionary, live: bool) -> Dictionary:
+	var a: Dictionary = p.get("attrs", {})
+	var av := int((int(a.get("VE", 0)) + int(a.get("RE", 0)) + int(a.get("AG", 0)) + int(a.get("CA", 0))) / 4.0)
+	var is_key := TransferMarket.is_key_player(club_v, int(p.get("id", -1)))
+	return {
+		"pid": int(p.get("id", -1)),
+		"club_id": cid,
+		"club_name": cname,
+		"name": str(p.get("name", "?")),
+		"flagCode": p.get("flagCode"),
+		"nationality": str(p.get("nationality", "")),
+		"pos": str(p.get("pos", "")),
+		"posFine": int(p.get("posFine", 0)),
+		"age": int(p.get("age", 26)),
+		"av": av,
+		"ca": int(a.get("CA", 0)),
+		"mo": int(p.get("morale")) if live and p.get("morale") != null else -1,
+		"fee": TransferMarket.asking_price(p, is_key, tier),
+		"wage": TransferMarket.wage_yearly(p, tier),
+		"years": int(p.get("contract_term", 0)) if live else 0,
+		"left": int(p.get("contract_years", 0)) if live else 0,
+		"key": is_key,
+	}
+
+func _scout_match(row: Dictionary, p: Dictionary, criteria: Dictionary) -> bool:
+	var pos := str(criteria.get("pos", ""))
+	if pos != "" and str(p.get("pos", "")) != pos:
+		return false
+	var role := int(criteria.get("role", 0))
+	if role > 0 and int(p.get("posFine", 0)) != role:
+		return false
+	var max_age := int(criteria.get("age", 0))
+	if max_age > 0 and int(row["age"]) > max_age:
+		return false
+	var min_quality := int(criteria.get("quality", 0))
+	if min_quality > 0 and int(ceil(int(row["ca"]) / 20.0)) < min_quality:
+		return false
+	var max_price := int(criteria.get("price", 0))
+	if max_price > 0 and int(row["fee"]) > max_price:
+		return false
+	return true
+
+
 ## A season's youth turnover: every youngster ages a year; anyone over the graduation
 ## age who was never promoted is released to free a place; then the scout brings in a
 ## fresh crop (capped at the youth squad size). News lines either way.
@@ -1608,6 +1727,64 @@ func sign_player(pid: int, from_club_id: int, offer: int, rng: RandomNumberGener
 	shortlist.erase(pid)
 	_log("You have signed %s from %s for £%s." % [player.get("name", "?"), seller_name, _money(offer)])
 	return {"ok": true, "msg": "You have signed %s." % player.get("name", "?")}
+
+## Bid for a player OUTSIDE the live rosters — the OFFERS map browse (any
+## non-own-division English club or a foreign club, docs/re/offers_map_re.md).
+## `player` is the GameDB player dict, `selling_club` the GameDB club dict.
+## Same board guards + TransferMarket evaluation as sign_player; on success a
+## COPY joins the live squad through the _seed_squad stamping (the source club
+## is static data — our foreign/other-division clubs don't mutate, the same
+## documented scope as "AI clubs don't develop"). `external_signed` hides him
+## from future browses of that static squad.
+func sign_external(player: Dictionary, selling_club: Dictionary, offer: int,
+		rng: RandomNumberGenerator, weekly: int = -1, years: int = -1,
+		clauses: Array = [], bonus: int = 0) -> Dictionary:
+	if not transfers_open():
+		return {"ok": false, "msg": "The transfer deadline has passed."}
+	if offers_left <= 0:
+		return {"ok": false, "msg": "The Directors will only let you make %d offers to sign a player per week." % OFFERS_PER_WEEK}
+	if my_squad().size() >= TransferMarket.SQUAD_MAX:
+		return {"ok": false, "msg": "Your squad is full (%d), the maximum allowed. You can not sign more." % TransferMarket.SQUAD_MAX}
+	if offer > cash:
+		return {"ok": false, "msg": "You do not have enough money to make this offer."}
+	var pid := int(player.get("id", -1))
+	if external_signed.has(pid) or not _find_in(club_id, pid).is_empty():
+		return {"ok": false, "msg": "That player is no longer available."}
+	offers_left -= 1   # an offer counts whether or not it is accepted
+	var is_key := TransferMarket.is_key_player(selling_club, pid)
+	var verdict := TransferMarket.evaluate_offer(player, offer, is_key, tier, rng)
+	var seller_name := str(selling_club.get("name", "?"))
+	if not verdict["accepted"]:
+		return {"ok": false, "msg": "%s have rejected your offer for %s." % [seller_name, player.get("name", "?")]}
+	var joined: Dictionary = player.duplicate(true)
+	joined["clubId"] = club_id
+	var term := years if years > 0 else TransferMarket.NEW_CONTRACT_YEARS
+	joined["contract_years"] = term
+	joined["contract_term"] = term
+	joined["injured_weeks"] = 0
+	joined["suspended_weeks"] = 0
+	joined["yellows"] = 0
+	joined["dev_progress"] = 0.0
+	joined["auto_renew"] = false
+	Contract.stamp_wage(joined, tier)
+	if weekly > 0:
+		joined["wage"] = weekly
+	if not clauses.is_empty():
+		joined["clauses"] = clauses.duplicate()
+		if clauses.has(1):
+			joined["clause_apps"] = 0
+		if clauses.has(2):
+			joined["clause_goals"] = 0
+			if bonus > 0:
+				joined["clause_bonus"] = bonus
+	Morale.ensure(joined, rng)
+	joined["fitness"] = 70
+	_signing_shock(joined)
+	rosters[club_id].append(joined)
+	cash -= offer
+	external_signed[pid] = true
+	_log("You have signed %s from %s for £%s." % [joined.get("name", "?"), seller_name, _money(offer)])
+	return {"ok": true, "msg": "You have signed %s." % joined.get("name", "?")}
 
 ## Sign a free agent for NO fee on `offer_weekly` £/wk (default = his demand). It is a wage
 ## NEGOTIATION (reuses Contract.evaluate_renewal): he accepts at/above his demand, may balk
@@ -2436,6 +2613,8 @@ func to_dict() -> Dictionary:
 		"offers_left": offers_left, "news_log": news_log,
 		"training_intensity": training_intensity, "youth": youth,
 		"youth_seq": youth_seq, "youth_search": youth_search,
+		"scout_search": scout_search, "scout_results": scout_results,
+		"pending_alerts": pending_alerts, "external_signed": _str_keyed(external_signed),
 		"staff": staff, "staff_pool": staff_pool,
 		"staff_seq": staff_seq, "free_agents": free_agents, "free_seq": free_seq,
 		"talents_used": talents_used,
@@ -2510,6 +2689,12 @@ static func from_dict(d: Dictionary) -> Career:
 	c.youth = d.get("youth", [])
 	c.youth_seq = int(d.get("youth_seq", YOUTH_ID_BASE))
 	c.youth_search = d.get("youth_search", {})
+	# Pre-SCOUT-screen saves load idle with no results (inert until a search).
+	c.scout_search = d.get("scout_search", {})
+	c.scout_results = d.get("scout_results", [])
+	c.pending_alerts = d.get("pending_alerts", [])
+	for k in d.get("external_signed", {}):
+		c.external_signed[int(k)] = true
 	# Pre-staff saves load with no staff + an empty pool (effects default to 1.0); the
 	# first rollover refreshes a pool to hire from.
 	c.staff = d.get("staff", [])

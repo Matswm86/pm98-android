@@ -34,11 +34,14 @@ class_name TransferScreen
 ## INTERACTIVE: a tap on a player row opens the make-offer card (`player_pressed`,
 ## Main -> MakeOfferScreen, the original's browse-list -> card route, run-3 100->101);
 ## CURRENT OFFERS opens the offers screen (`current_offers_pressed`,
-## docs/re/ofertas_screen_re.md); RETURN dismisses (`back_pressed`). SCOUT / OFFERS are
-## the sourced nav buttons but are not yet wired to a screen (no-op — see WIRING note).
+## docs/re/ofertas_screen_re.md); RETURN dismisses (`back_pressed`). SCOUT opens the
+## hire-gated search screen (`scout_pressed`, docs/re/scout_screen_re.md); OFFERS the
+## map browse (`offers_pressed`, docs/re/offers_map_re.md).
 
 signal back_pressed
 signal current_offers_pressed
+signal scout_pressed
+signal offers_pressed
 signal player_pressed(row: Dictionary)
 
 const W := 640
@@ -240,13 +243,17 @@ func _on_input(e: InputEvent) -> void:
 	_press = ""
 	if a == "" or a != was:
 		return
-	# RETURN dismisses; CURRENT OFFERS opens the offers screen; a row tap opens the
-	# make-offer card. SCOUT / OFFERS are sourced but not yet wired (see WIRING note).
+	# RETURN dismisses; CURRENT OFFERS opens the offers screen; SCOUT / OFFERS open
+	# their screens; a row tap opens the make-offer card.
 	match a:
 		"return":
 			back_pressed.emit()
 		"current":
 			current_offers_pressed.emit()
+		"scout":
+			scout_pressed.emit()
+		"offers":
+			offers_pressed.emit()
 		"row":
 			player_pressed.emit(hit["row"])
 

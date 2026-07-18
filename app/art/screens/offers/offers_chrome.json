@@ -1,0 +1,75 @@
+{
+ "row_box_x": [
+  342,
+  586
+ ],
+ "row_y0": 105,
+ "row_pitch": 16,
+ "n_rows": 14,
+ "camrol_x": 587,
+ "scroll_x": [
+  615,
+  630
+ ],
+ "scroll_up_y": 105,
+ "scroll_dn_y": 311,
+ "scroll_track_y": [
+  121,
+  311
+ ],
+ "title_cx": 485,
+ "title_ink_y": 83,
+ "btn_x": [
+  362,
+  480
+ ],
+ "btn_tops": [
+  345,
+  375,
+  405,
+  435
+ ],
+ "btn_h": 28,
+ "press_ring": "2px black rect on (342, row_top-1, 245, 16)",
+ "inks": {
+  "title_navy": [
+   0,
+   0,
+   160
+  ],
+  "num_navy": [
+   0,
+   0,
+   128
+  ],
+  "name_black": [
+   0,
+   0,
+   0
+  ],
+  "av_red": [
+   212,
+   63,
+   0
+  ],
+  "row_fill": [
+   240,
+   240,
+   240
+  ],
+  "row_border": [
+   128,
+   128,
+   128
+  ],
+  "label_under_grid": [
+   120,
+   120,
+   160
+  ]
+ },
+ "num_cx": 354,
+ "name_x": 380,
+ "stars_x": 488,
+ "av_right": 581
+}

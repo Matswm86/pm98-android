@@ -1453,6 +1453,14 @@ func _mount_hub() -> void:
 	_hub.setup(c.club_name, c.league_name, c.season, c.cash,
 		"%d%s" % [c.position(), _ord_suffix(c.position())], c.club_id,
 		c.week + 1, opp_name, opp_id, is_home, c.manager_name, opp_mgr)
+	# Queued career alerts (the scout's "finished his search", ...) raise as the
+	# witnessed hub "PREMIER MANAGER 98" boxes once the hub is up (witness 78,
+	# docs/re/scout_screen_re.md).
+	if not c.pending_alerts.is_empty():
+		for msg in c.pending_alerts:
+			_hub.alert(str(msg))
+		c.pending_alerts = []
+		c.save()
 	AudioManager.play_music()   # resume the menu theme on return from a match
 
 ## The hub SAVE GAME 10-slot dialog (SaveGameDialog.gd;
@@ -2262,6 +2270,12 @@ func _show_transfer_screen() -> void:
 	scr.current_offers_pressed.connect(func() -> void:
 		AudioManager.ui_select()
 		_show_current_offers_screen())
+	scr.scout_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		_show_scout_screen())
+	scr.offers_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		_show_offers_screen())
 	scr.player_pressed.connect(func(row: Dictionary) -> void:
 		AudioManager.ui_select()
 		_show_make_offer_card(row))
@@ -2305,6 +2319,110 @@ func _show_make_offer_card(row: Dictionary) -> void:
 			return
 		var res := _career.sign_loan(pid, from_club)
 		_career.save()
+		if res["ok"]:
+			card.queue_free()
+		_toast(str(res["msg"])))
+
+## The SCOUT screen (docs/re/scout_screen_re.md): hire-gated criteria panel +
+## the async search. SEARCH arms Career.start_scout_search (any checked
+## non-own division's static GameDB clubs are bridged in and freeze at arm
+## time); the finished hub alert rides Career.pending_alerts. A result-row tap
+## opens the make-offer card — scout rows carry the market-row shape
+## (pid/club_id/club_name/fee/key), so the existing card route applies
+## (witness 82).
+func _show_scout_screen() -> void:
+	var c := _career
+	var scr: ScoutScreen = load("res://scenes/ScoutScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(Staff.member_in_role(c.staff, Staff.SCOUT_ROLE), c.scout_searching(),
+		c.scout_results, c.club_name, c.manager_name, c.season, c.week + 1,
+		c.league_name, c.club_id)
+	scr.back_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		scr.queue_free())
+	scr.search_started.connect(func(criteria: Dictionary) -> void:
+		AudioManager.ui_select()
+		var foreign: Array = []
+		for lid in criteria.get("leagues", []):
+			if str(lid) != c.league_id:
+				foreign.append_array(GameDB.clubs_in_league(str(lid)))
+		c.start_scout_search(criteria, foreign)
+		c.save())
+	scr.player_pressed.connect(func(row: Dictionary) -> void:
+		AudioManager.ui_select()
+		_show_make_offer_card(row))
+
+## The OFFERS map-browse screen (docs/re/offers_map_re.md): country flags ->
+## kit grid -> squad list -> the make-offer card (witness 47 = MakeOfferScreen,
+## run-3 100->101). Buys route through sign_player when the club has a LIVE
+## roster (the manager's own division), else sign_external (static clubs —
+## foreign / other divisions).
+func _show_offers_screen() -> void:
+	var c := _career
+	var scr: OffersScreen = load("res://scenes/OffersScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	var own_div := 0
+	for i in GameDB.leagues.size():
+		if str(GameDB.leagues[i].get("id", "")) == c.league_id:
+			own_div = i
+	var hidden := {}
+	for pid in c.external_signed:
+		hidden[int(pid)] = true
+	for p in c.my_squad():
+		hidden[int(p.get("id", -1))] = true
+	scr.setup(GameDB.leagues, GameDB.clubs_in_league, _clubs_of_country_en,
+		own_div, c.club_id, hidden, c.club_name, c.manager_name, c.season,
+		c.week + 1, c.league_name, c.club_id)
+	scr.back_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		scr.queue_free())
+	scr.player_pressed.connect(func(player: Dictionary, club: Dictionary) -> void:
+		AudioManager.ui_select()
+		_show_browse_offer_card(player, club, scr))
+
+## The make-offer card over the OFFERS browse for a player on a club WITHOUT a
+## live roster path decision: own-division clubs resolve through the live
+## roster (sign_player — AI transfers may have moved the man, witnessed-safe
+## "no longer available"), anything else through sign_external.
+func _show_browse_offer_card(player: Dictionary, club: Dictionary, host: Control) -> void:
+	var c := _career
+	var cid := int(club.get("id", -1))
+	var pid := int(player.get("id", -1))
+	var is_key := TransferMarket.is_key_player(club, pid)
+	var fee := TransferMarket.asking_price(player, is_key, c.tier)
+	var card: MakeOfferScreen = load("res://scenes/MakeOfferScreen.gd").new()
+	card.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(card)
+	card.setup(player, {"id": cid, "name": str(club.get("name", "?"))}, fee, c.cash)
+	card.cancelled.connect(func() -> void:
+		AudioManager.ui_select()
+		card.queue_free())
+	card.offer_made.connect(func(offer: int, yearly_wage: int, years: int, clauses: Array, bonus: int) -> void:
+		AudioManager.ui_select()
+		var rng := RandomNumberGenerator.new()
+		rng.randomize()
+		var res: Dictionary
+		if c.rosters.has(cid):
+			res = c.sign_player(pid, cid, offer, rng,
+				maxi(1, yearly_wage / Contract.SEASON_WEEKS), years, clauses, bonus)
+		else:
+			res = c.sign_external(player, club, offer, rng,
+				maxi(1, yearly_wage / Contract.SEASON_WEEKS), years, clauses, bonus)
+		c.save()
+		card.queue_free()
+		if bool(res.get("ok", false)) and host != null and is_instance_valid(host):
+			(host as OffersScreen).setup_refresh_hidden(pid)
+		_toast(str(res["msg"])))
+	card.loan_requested.connect(func() -> void:
+		AudioManager.ui_select()
+		if not c.rosters.has(cid):
+			# loans out of static (foreign / other-division) clubs are un-modeled
+			_toast("%s will not loan out their players." % str(club.get("name", "They")))
+			return
+		var res := c.sign_loan(pid, cid)
+		c.save()
 		if res["ok"]:
 			card.queue_free()
 		_toast(str(res["msg"])))
