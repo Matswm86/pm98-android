@@ -1455,6 +1455,21 @@ func _mount_hub() -> void:
 		c.week + 1, opp_name, opp_id, is_home, c.manager_name, opp_mgr)
 	AudioManager.play_music()   # resume the menu theme on return from a match
 
+## The hub SAVE GAME 10-slot dialog (SaveGameDialog.gd;
+## docs/re/savegame_dialog_re.md): over the LIVE undimmed hub (witness 51).
+## SAVE writes the tapped slot with the typed GAME name (+ refreshes the
+## autosave so Continue never lags a just-saved slot); CANCEL just closes.
+func _show_save_dialog() -> void:
+	var dlg: SaveGameDialog = load("res://scenes/SaveGameDialog.gd").new()
+	dlg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(dlg)
+	dlg.setup(Career.slot_metas(), _career.manager_name)
+	dlg.save_requested.connect(func(slot: int, save_name: String) -> void:
+		_career.save_slot(slot, save_name)
+		_career.save())
+	dlg.closed.connect(func() -> void:
+		dlg.queue_free())
+
 ## Leave the career back to the database/home browser (MENUPRINCIPAL EXIT). Saves first,
 ## frees the hub, clears the active career.
 func _leave_career() -> void:
@@ -1747,7 +1762,7 @@ func _show_nivel_screen(title_scr: TitleScreen) -> void:
 		var saved := Career.load_save()
 		if saved != null:
 			summary = {"club": saved.club_name, "name": saved.manager_name}
-	_nivel.setup(Career.has_save(), summary)
+	_nivel.setup(Career.has_save(), summary, Career.slot_metas())
 	_nivel.level_chosen.connect(func(level: String, age: bool) -> void:
 		_pending_level = level
 		_pending_age = age
@@ -1755,10 +1770,15 @@ func _show_nivel_screen(title_scr: TitleScreen) -> void:
 		if title_scr != null and is_instance_valid(title_scr):
 			title_scr.queue_free()
 		_show_career_select())
-	_nivel.load_game.connect(func(_slot: int) -> void:
+	_nivel.load_game.connect(func(slot: int) -> void:
 		_dismiss_nivel()
 		if title_scr != null and is_instance_valid(title_scr):
 			title_scr.queue_free()
+		# slot -1 = the legacy autosave row; 0-9 = a SAVE GAME dialog slot
+		if slot >= 0:
+			var c := Career.load_slot(slot)
+			if c != null:
+				c.save()        # the loaded slot becomes the live autosave
 		_continue_career())
 	_nivel.cancel_pressed.connect(func() -> void:
 		AudioManager.ui_select()
@@ -3170,8 +3190,7 @@ func _menu_action(action: String, scr: MenuScreen) -> void:
 	match action:
 		"exit": _leave_career()
 		"save":
-			_career.save()
-			scr.alert("Game saved")
+			_show_save_dialog()
 		"news": _show_club_news()
 		"staff": _show_staff_screen()
 		"fixtures": _show_fixtures_screen()

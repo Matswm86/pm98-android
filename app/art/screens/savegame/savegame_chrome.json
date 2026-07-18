@@ -1,0 +1,66 @@
+{
+ "binding_sources": {
+  "chrome": "wine-captures-2026-07-18-goalscorers/51_savegame.png",
+  "armed": "52_slot1.png",
+  "typed": "53_slot1_typed.png",
+  "hub_ref": "50_hub4.png",
+  "cancel": "55_save_cancelled.png"
+ },
+ "card": [
+  140,
+  102,
+  500,
+  378
+ ],
+ "slots": {
+  "row0_y": 144,
+  "pitch": 16,
+  "fill_h": 12,
+  "n": 10,
+  "game_cell": [
+   148,
+   350
+  ],
+  "player_cell": [
+   351,
+   489
+  ]
+ },
+ "buttons": {
+  "save": [
+   388,
+   306,
+   102,
+   26
+  ],
+  "cancel": [
+   388,
+   344,
+   102,
+   26
+  ]
+ },
+ "inks": {
+  "game_fill": [
+   0,
+   0,
+   160
+  ],
+  "player_fill": [
+   75,
+   109,
+   172
+  ],
+  "armed_fill": [
+   0,
+   0,
+   0
+  ],
+  "text": [
+   255,
+   255,
+   255
+  ]
+ },
+ "notes": "hub beneath stays UNDIMMED (50-vs-51 out-of-card diffs = the hub's own animated stadium + captions covered by the card); populated-slot text rendering is unwitnessed (wine could not save) -> white centred per-cell, the typed-name grammar."
+}

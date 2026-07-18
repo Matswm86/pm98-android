@@ -5,7 +5,8 @@ class_name NivelScreen
 ## of MANAGER.EXE: creation fn ~0x54a580, id 1034, POS (93,32) SIZE 453x415) — see
 ## docs/re/nivel_screen_re.md and tools/re/build_entry_chrome_from_frames.py. The
 ## LOAD GAME modal chrome is frame 005's card (bbox via diff(005,003) = (140,102)
-## 360x276, all 8 save rows empty = the resting state).
+## 360x276, all TEN save rows empty = the resting state; the same card chassis
+## as the SAVE GAME dialog, whose witness 51 pins rows y144 + 16k).
 ##
 ## Dynamic layer only: level-panel pressed states (the original *1.bmp art), the
 ## "Players age ?" tick (ok.bmp), button press tints, and the modal's row-1 text
@@ -54,7 +55,7 @@ const BULLETS := {
 # targets + dynamic-text anchors over the baked card.
 const M_DLG := Rect2(140, 102, 360, 276)
 const M_ROW0_Y := 143
-const M_ROW_H := 17
+const M_ROW_H := 16    # true card pitch (SAVE GAME witness 51: rows y144+16k)
 const M_GAME_X := 148
 const M_GAME_W := 205
 const M_PLAYER_W := 132
@@ -72,6 +73,7 @@ var _press := ""               # held target key
 var _zoom := 0.8               # opening zoom (0.8 -> 1.0, centre-anchored)
 var _has_save := false
 var _save_summary: Dictionary = {}   # {name, club} of the existing save (row 1 of modal)
+var _slots: Array = []               # 10 SAVE GAME slot metas ({} or {game, player})
 var _modal := false            # LOAD GAME modal (frames 005/006) open
 
 func _ready() -> void:
@@ -94,11 +96,33 @@ func _set_zoom(v: float) -> void:
 	queue_redraw()
 
 
-## has_save + a one-line summary ({name, club}) for the load modal's first row.
-func setup(has_save: bool, save_summary: Dictionary = {}) -> void:
+## has_save + a one-line summary ({name, club}) for the load modal's legacy
+## autosave row, plus the 10 SAVE GAME dialog slot metas ({} or {game, player};
+## Career.slot_metas). Slot rows list user saves; the autosave summary shows on
+## row 0 only while slot 0 is empty (compat with pre-slot saves).
+func setup(has_save: bool, save_summary: Dictionary = {}, slots: Array = []) -> void:
 	_has_save = has_save
 	_save_summary = save_summary
+	_slots = []
+	for i in 10:
+		_slots.append(slots[i] if i < slots.size() and slots[i] is Dictionary else {})
 	queue_redraw()
+
+
+func _any_loadable() -> bool:
+	for k in 10:
+		if _row_kind(k) != "":
+			return true
+	return false
+
+
+## What the load modal's row k lists: "slot" k, the legacy "auto" save, or "".
+func _row_kind(k: int) -> String:
+	if not (_slots[k] as Dictionary).is_empty():
+		return "slot"
+	if k == 0 and _has_save:
+		return "auto"
+	return ""
 
 
 # ---- geometry --------------------------------------------------------------
@@ -119,10 +143,12 @@ func _abs(r: Rect2) -> Rect2:
 
 func _target_at(d: Vector2) -> String:
 	if _modal:
-		if M_LOAD.has_point(d) and _has_save: return "mload"
+		if M_LOAD.has_point(d) and _any_loadable(): return "mload"
 		if M_CANCEL.has_point(d): return "mcancel"
-		if _has_save and Rect2(M_GAME_X, M_ROW0_Y, M_GAME_W + M_PLAYER_W + 4, M_ROW_H).has_point(d):
-			return "mrow0"
+		for k in 10:
+			if _row_kind(k) != "" and Rect2(M_GAME_X, M_ROW0_Y + M_ROW_H * k,
+					M_GAME_W + M_PLAYER_W + 4, M_ROW_H).has_point(d):
+				return "mrow:%d" % k
 		return ""
 	for lv in LEVELS:
 		if _abs(lv["rect"]).has_point(d):
@@ -161,9 +187,14 @@ func _on_input(e: InputEvent) -> void:
 		"mcancel":
 			_modal = false
 			queue_redraw()
-		"mload", "mrow0":
-			if _has_save:
-				load_game.emit(0)
+		"mload":
+			for k in 10:
+				if _row_kind(k) != "":
+					load_game.emit(k if _row_kind(k) == "slot" else -1)
+					break
+		_ when was.begins_with("mrow:"):
+			var k := int(was.split(":")[1])
+			load_game.emit(k if _row_kind(k) == "slot" else -1)
 		_:
 			level_chosen.emit(was, _players_age)
 
@@ -218,12 +249,20 @@ func _draw() -> void:
 func _draw_modal() -> void:
 	if _modal_tex != null:
 		draw_texture_rect(_modal_tex, M_DLG, false)
-	if _has_save:
-		var y := M_ROW0_Y
-		_txt(_f10, M_GAME_X + 6, y + 1, str(_save_summary.get("club", "SAVED GAME")), Color.WHITE, 10)
-		_txt(_f10, M_GAME_X + M_GAME_W + 10, y + 1, str(_save_summary.get("name", "")), Color.WHITE, 10)
-		if _press == "mrow0":
-			draw_rect(Rect2(M_GAME_X, y, M_GAME_W + M_PLAYER_W + 4, M_ROW_H - 3), Color(1, 1, 1, 0.2), true)
+	for k in 10:
+		var kind := _row_kind(k)
+		if kind == "":
+			continue
+		var y := M_ROW0_Y + M_ROW_H * k
+		if kind == "slot":
+			var m: Dictionary = _slots[k]
+			_txt(_f10, M_GAME_X + 6, y + 1, str(m.get("game", "")), Color.WHITE, 10)
+			_txt(_f10, M_GAME_X + M_GAME_W + 10, y + 1, str(m.get("player", "")), Color.WHITE, 10)
+		else:
+			_txt(_f10, M_GAME_X + 6, y + 1, str(_save_summary.get("club", "SAVED GAME")), Color.WHITE, 10)
+			_txt(_f10, M_GAME_X + M_GAME_W + 10, y + 1, str(_save_summary.get("name", "")), Color.WHITE, 10)
+		if _press == "mrow:%d" % k:
+			draw_rect(Rect2(M_GAME_X, y, M_GAME_W + M_PLAYER_W + 4, M_ROW_H - 2), Color(1, 1, 1, 0.2), true)
 	if _press == "mload":
 		draw_rect(M_LOAD, Color(1, 1, 1, 0.18), true)
 	if _press == "mcancel":

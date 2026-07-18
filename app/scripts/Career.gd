@@ -2598,6 +2598,61 @@ func save(path: String = SAVE_PATH) -> void:
 	if f != null:
 		f.store_string(JSON.stringify(to_dict()))
 
+
+# ---- SAVE GAME slots (the 10-slot dialog; witnessed 2026-07-18) -----------
+# user://career.json stays the app's autosave/Continue spine; the TEN dialog
+# slots are explicit user saves (the original's GAME/PLAYER rows). A sidecar
+# index keeps the dialog metadata cheap (self-heals by scanning slot files).
+
+const SLOT_PATH := "user://career_slot_%d.json"     # slot 0-9
+const SLOT_INDEX_PATH := "user://career_slots.json"
+
+## Write this career to a dialog slot with the typed GAME name.
+func save_slot(slot: int, save_name: String) -> void:
+	if slot < 0 or slot > 9:
+		return
+	var d := to_dict()
+	d["save_name"] = save_name
+	var f := FileAccess.open(SLOT_PATH % slot, FileAccess.WRITE)
+	if f != null:
+		f.store_string(JSON.stringify(d))
+	var idx := _slot_index()
+	idx[str(slot)] = {"game": save_name, "player": manager_name}
+	var fi := FileAccess.open(SLOT_INDEX_PATH, FileAccess.WRITE)
+	if fi != null:
+		fi.store_string(JSON.stringify(idx))
+
+static func load_slot(slot: int) -> Career:
+	return load_save(SLOT_PATH % slot)
+
+## Metadata for the 10 dialog rows: {} for an empty slot, else {game, player}.
+static func slot_metas() -> Array:
+	var idx := _slot_index()
+	var out: Array = []
+	for i in 10:
+		var m: Variant = idx.get(str(i))
+		out.append(m if m is Dictionary and FileAccess.file_exists(SLOT_PATH % i) else {})
+	return out
+
+## The sidecar index; rebuilt from the slot files when missing (compat).
+static func _slot_index() -> Dictionary:
+	if FileAccess.file_exists(SLOT_INDEX_PATH):
+		var raw := FileAccess.get_file_as_string(SLOT_INDEX_PATH)
+		if raw.strip_edges() != "":
+			var parsed: Variant = JSON.parse_string(raw)
+			if parsed is Dictionary:
+				return parsed
+	var idx: Dictionary = {}
+	for i in 10:
+		if not FileAccess.file_exists(SLOT_PATH % i):
+			continue
+		var d: Variant = JSON.parse_string(
+			FileAccess.get_file_as_string(SLOT_PATH % i))
+		if d is Dictionary:
+			idx[str(i)] = {"game": str(d.get("save_name", "")),
+				"player": str(d.get("manager_name", ""))}
+	return idx
+
 static func load_save(path: String = SAVE_PATH) -> Career:
 	if not FileAccess.file_exists(path):
 		return null
