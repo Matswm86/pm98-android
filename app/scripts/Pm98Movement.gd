@@ -80,6 +80,21 @@ static func _bm(m: Dictionary, off: int) -> int:
 	return int(m.get(off, 0))
 
 
+## Controller-INDEX alias read. Binary: match+0x1650 IS ball+0x40 (the +0x1610 embedding), so
+## every open-play engage/release updates it implicitly. The port's m[0x1650] index mirror only
+## has the set-piece writers (_decide_slice_c_taker / ball_restart_decide), so on the open-play
+## path it froze on the kickoff taker -- _select_roles then designated the WRONG gs+0x204
+## interceptor forever (s45 root cause: t0.i9, the clk-0 taker, ran b0040 at the clk-47 shot
+## release instead of the live carrier t0.i8 -- the corner-dart fork). Same class as the s33
+## m[0x165c] receiver-mirror fix: read the ball block, keep the poked index for bare fixtures.
+static func _ctrl_index(m: Dictionary) -> int:
+	var b: Variant = m.get("ball", null)
+	if b is Dictionary:
+		var c: Variant = (b as Dictionary).get(0x40, null)
+		return _g(c, 0x2c4) if c is Dictionary else -1
+	return int(m.get(0x1650, -1))
+
+
 ## The roster index of a player Dict (identity compare), -1 when absent / not a Dict.
 static func _index_of(players: Array, p: Variant) -> int:
 	if not (p is Dictionary):
@@ -118,7 +133,7 @@ static func select_nearest(ctx: Dictionary, find_in_front: int) -> void:
 	var best := active                                  # iVar6 = iVar8
 
 	# Entry ownership guard (cond_A && cond_B -> search; else forced owner).
-	var ctrl := int(m.get(0x1650, -1))
+	var ctrl := _ctrl_index(m)
 	if ctrl < 0 or _bm(m, 0x1664) != team:              # cond_A (binary: ball+0x54 via alias)
 		# cond_B: binary reads ball+0x4c (the receiver POINTER; match+0x165c is the same
 		# dword via the +0x1610 embedding, NOT a separate index -- the old int mirror had
@@ -341,7 +356,7 @@ static func _select_roles(ctx: Dictionary) -> void:
 	var best_ball := ROLE_INIT
 	var min_anchor := ROLE_INIT
 	var max_anchor := 0
-	var ctrl := int(m.get(0x1650, -1))
+	var ctrl := _ctrl_index(m)
 	if ctrl >= 0 and _bm(m, 0x1664) == team:
 		ctx[0x204] = ctrl
 		best_ball = 0
