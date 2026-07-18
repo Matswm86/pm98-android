@@ -25,6 +25,7 @@ class_name LeagueTableScreen
 
 signal back_pressed              # RETURN -> dismiss
 signal club_selected(id: int)    # a standings row tap -> open that club's squad
+signal scorers_pressed           # GOAL SCORERS button -> the scorers graph+list screen
 
 const W := 640
 const H := 480
@@ -46,6 +47,7 @@ const LEADER_KIT_BOX := Rect2(553, 97, 51, 65)
 const DATE_RIGHT := 447                # right edge for the DD/MM/YYYY value
 const DATE_Y := 76
 const RETURN_BTN := Rect2(525, 423, 99, 25)
+const SCORERS_BTN := Rect2(525, 354, 99, 24)   # GOAL SCORERS (baked; league_table_screen_re.md)
 
 # ---- palette sampled off ma_10 (leaguetable_chrome.json "samples") ----
 # normal (non-managed) row
@@ -124,6 +126,9 @@ func _on_input(e: InputEvent) -> void:
 	var d := _to_design(e.position)
 	if RETURN_BTN.has_point(d):
 		back_pressed.emit()
+		return
+	if SCORERS_BTN.has_point(d):
+		scorers_pressed.emit()
 		return
 	for i in _rows.size():
 		var rr := Rect2(73, ROW_Y0 + i * ROW_PITCH, 482 - 73, ROW_H)

@@ -27,6 +27,8 @@ var week: int = 0                 # index of the NEXT round to play
 var fixtures: Array = []          # Array[round]; round = Array[[home_id, away_id]]
 var table: Dictionary = {}        # club_id:int -> stat row
 var results: Array = []           # manager's played results [{week,opp_id,home,hg,ag}]
+var scorer_log: Array = []        # every league goal, all fixtures: {week,scorer,club,minute,h,a}
+                                  # (own goals excluded; feeds GOAL SCORERS, witnessed 2026-07-18)
 var cash: int = 0                 # running bank balance
 var weekly_net: int = 0           # per-week finance delta (from FinanceModel)
 var objective_pos: int = 17       # board wants: finish at least this high (1-based)
@@ -481,6 +483,17 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 		_apply(table[h], hg, ag)
 		_apply(table[a], ag, hg)
 		round_results.append({"h": h, "a": a, "hg": hg, "ag": ag})
+		# GOAL SCORERS ledger: every league goal of every fixture, credited to the
+		# player who took the shot; own goals are NOT chart-credited (the conceding-
+		# side scorer would be wrong on a scorers chart — witness discussion in
+		# docs/re/goalscorers_screen_re.md). week+1 = this round's 1-based number.
+		for g in res.get("goals", []):
+			var gd: Dictionary = g
+			if bool(gd.get("own_goal", false)):
+				continue
+			scorer_log.append({"week": week + 1, "scorer": str(gd.get("scorer", "?")),
+				"club": h if int(gd.get("scorer_side", 0)) == 0 else a,
+				"minute": int(gd.get("minute", 0)), "h": h, "a": a})
 		if h == club_id or a == club_id:
 			manager_res = {"home_id": h, "away_id": a, "hg": hg, "ag": ag, "manager_home": h == club_id,
 				"goals": res.get("goals", []),
@@ -930,6 +943,52 @@ func standings() -> Array:
 			return a["GF"] > b["GF"]
 		return a["name"] < b["name"])
 	return rows
+
+## GOAL SCORERS ranking off the scorer_log ledger: goals desc, ties in first-to-reach-
+## that-count order (frames 18/87 of the 2026-07-18 witness run are consistent with
+## this; the original's exact tiebreak is not exhaustively provable — RE doc §list).
+## Rows: [{name, club_id, goals, legal}]; the screen shows at most its 14 witnessed bars.
+func league_scorers() -> Array:
+	var agg: Dictionary = {}
+	for i in scorer_log.size():
+		var e: Dictionary = scorer_log[i]
+		var key := "%s|%d" % [str(e.get("scorer", "?")), int(e.get("club", -1))]
+		if not agg.has(key):
+			agg[key] = {"name": str(e.get("scorer", "?")), "club_id": int(e.get("club", -1)),
+				"goals": 0, "last": 0}
+		agg[key]["goals"] = int(agg[key]["goals"]) + 1
+		agg[key]["last"] = i
+	var rows: Array = agg.values()
+	rows.sort_custom(func(x, y):
+		if int(x["goals"]) != int(y["goals"]):
+			return int(x["goals"]) > int(y["goals"])
+		return int(x["last"]) < int(y["last"]))
+	for r in rows:
+		r["legal"] = _legal_name(int(r["club_id"]), str(r["name"]))
+	return rows
+
+
+## Per-player goal entries for the goal-log popup, keyed "surname|club_id".
+## Entry: {week, minute, h, a} (h/a = the fixture's club ids, popup MATCH columns).
+func scorer_goal_dict() -> Dictionary:
+	var out: Dictionary = {}
+	for e in scorer_log:
+		var key := "%s|%d" % [str(e.get("scorer", "?")), int(e.get("club", -1))]
+		if not out.has(key):
+			out[key] = []
+		(out[key] as Array).append({"week": int(e.get("week", 0)), "minute": int(e.get("minute", 0)),
+			"h": int(e.get("h", -1)), "a": int(e.get("a", -1))})
+	return out
+
+
+## Full legal name ("Stuart Edward RIPLEY", popup title) for a rostered surname;
+## falls back to the surname when the player left the roster (sold/retired).
+func _legal_name(cid: int, surname: String) -> String:
+	for p in rosters.get(cid, []):
+		if p is Dictionary and str((p as Dictionary).get("name", "")) == surname:
+			return str((p as Dictionary).get("legalName", surname))
+	return surname
+
 
 ## Manager's current league position (1-based).
 func position() -> int:
@@ -2342,6 +2401,7 @@ func to_dict() -> Dictionary:
 		"league_id": league_id,
 		"league_name": league_name, "season": season, "year": year, "week": week,
 		"fixtures": fixtures, "table": tbl, "results": results, "cash": cash,
+		"scorer_log": scorer_log,
 		"weekly_net": weekly_net, "objective_pos": objective_pos,
 		"objective_text": objective_text, "finished": finished,
 		"tactics": tactics, "tier": tier, "rosters": ros, "club_names": nms,
@@ -2401,6 +2461,7 @@ static func from_dict(d: Dictionary) -> Career:
 	c.week = int(d.get("week", 0))
 	c.fixtures = d.get("fixtures", [])
 	c.results = d.get("results", [])
+	c.scorer_log = d.get("scorer_log", [])   # pre-goalscorers saves load with an empty chart
 	c.cash = int(d.get("cash", 0))
 	c.weekly_net = int(d.get("weekly_net", 0))
 	c.objective_pos = int(d.get("objective_pos", 17))

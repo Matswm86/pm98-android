@@ -998,6 +998,14 @@ func _open_table(rows: Array, title_left: String, season: String, week_label: St
 		AudioManager.ui_select()
 		var club := _club_with_roster(id) if _career != null and id == _career.club_id else GameDB.club(id)
 		_open_database_squad(club))
+	# GOAL SCORERS (witnessed 2026-07-18: LEAGUE TABLES button -> graph+list screen;
+	# RETURN goes back to LEAGUE TABLES). Career only — a simulated season table has
+	# no goal ledger, so the button stays inert there (honest gap, RE doc).
+	scr.scorers_pressed.connect(func() -> void:
+		if _career == null or my_id != _career.club_id:
+			return
+		AudioManager.ui_select()
+		_show_goal_scorers_screen())
 
 ## Reversed FINANCES overlay for any club dict.
 func _open_finance(club: Dictionary, club_name: String, season: String) -> void:
@@ -1767,6 +1775,22 @@ func _show_league_table_screen() -> void:
 	_open_table(_career.standings(), _career.club_name, _career.season,
 		"Week %d" % mini(_career.week + 1, _career.total_weeks()),
 		_career.tier, _career.club_id, _career.manager_name)
+
+## GOAL SCORERS (LEAGUE TABLES sub-screen; docs/re/goalscorers_screen_re.md): the
+## league-wide scorer chart + compare graph + per-player goal-log popup, fed by the
+## Career scorer_log ledger. Mounts OVER the league table; RETURN frees it so the
+## table beneath re-raises (the witnessed back path, frame 29 of the witness run).
+func _show_goal_scorers_screen() -> void:
+	var scr: GoalScorersScreen = load("res://scenes/GoalScorersScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(_career.league_scorers(), _career.scorer_goal_dict(), _career.club_names,
+		_career.week, _career.manager_name, _career.club_name, _career.tier,
+		_career.season, "Week %d" % mini(_career.week + 1, _career.total_weeks()),
+		_career.club_id)
+	scr.back_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		scr.queue_free())
 
 ## The original-art LINE-UP (ALINEACIÓN) screen as a full-screen overlay: the squad
 ## list + the CAMPO mini-pitch with the chosen XI in formation, at the coordinates
