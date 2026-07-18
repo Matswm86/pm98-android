@@ -112,7 +112,9 @@ REF_STAFF = {
     "PASSING": {"name": "D. Gledhill", "stars": 4.5, "wage": 34000},
     "DRIBBLING": {"name": "S. Merrick", "stars": 5.0, "wage": 47000},
     "HEADING": {"name": "A. Mitchell", "stars": 3.0, "wage": 16000},
-    "TACKLING": {"name": "T. O'Brian", "stars": 4.5, "wage": 21000},
+    # 3.5 + lowercase b re-verified vs frames 103/105/121 2026-07-18 (an earlier
+    # transcription said 4.5 "O'Brian" — wrong; APELLIDO.30 row is "O'brian").
+    "TACKLING": {"name": "T. O'brian", "stars": 3.5, "wage": 21000},
     "SHOOTING": {"name": "T. Alan", "stars": 4.5, "wage": 33000},
     "PHYSIOTHERAPIST": {"name": "P. Gelbier", "stars": 5.0, "wage": 45000},
     "PSYCHOLOGIST": {"name": "J. Bodin", "stars": 4.5, "wage": 15000},

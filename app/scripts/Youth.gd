@@ -63,21 +63,15 @@ const ATTR_FLOOR := 20
 # The trainable attribute codes (PO tracks separately for keepers, like Training).
 const _OUTFIELD_CODES := ["VE", "RE", "AG", "CA", "RM", "RG", "PA", "TI", "EN"]
 
-# Regen name pools -- English-style forenames + surnames so a fresh intake reads like a
-# crop of academy kids (PM98 generates regen youth names the same way; these are ours).
-const _FORENAMES := [
-	"DANNY", "LEE", "CRAIG", "JAMIE", "RYAN", "KEVIN", "SCOTT", "DEAN", "WAYNE", "GARY",
-	"NEIL", "STUART", "MARK", "PAUL", "STEVE", "DAVID", "MICHAEL", "ANDY", "RICHARD",
-	"CHRIS", "JASON", "DARREN", "SIMON", "NICK", "ADAM", "LUKE", "BEN", "JACK", "TOM",
-	"JOE", "HARRY", "GEORGE", "ASHLEY", "CARL", "ROSS", "OWEN", "ROBBIE", "JORDAN",
-]
-const _SURNAMES := [
-	"WALSH", "HUGHES", "BARNES", "CLARKE", "REID", "MURPHY", "FOSTER", "PRICE", "GRAY",
-	"WALLACE", "HOLMES", "DUNNE", "BENNETT", "FLETCHER", "WARD", "PHILLIPS", "PARKER",
-	"COLE", "DIXON", "CARROLL", "HARPER", "SHARP", "FENTON", "DOYLE", "KEANE", "RILEY",
-	"NOLAN", "QUINN", "BYRNE", "MULLEN", "HASLAM", "WHELAN", "CONNOLLY", "BRADY", "REEVES",
-	"SPENCER", "MOONEY", "GALLAGHER", "SUTTON", "HACKETT", "PALMER", "ROWLEY", "STOKES",
-]
+# Generated names come from the game's OWN tables (DBDAT/NOMBRES.30 + APELLIDO.30 via
+# Staff.name_pools() -> res://data/name_pools.json) — the tables the original's staff-hire
+# candidates were proven to draw from (docs/re/staff_re.md, 2026-07-18). "Forename Surname",
+# the tables' own casing.
+static func _gen_name(rng: RandomNumberGenerator) -> String:
+	var p: Dictionary = Staff.name_pools()
+	var fores: Array = p["forenames"]
+	var surs: Array = p["surnames"]
+	return "%s %s" % [fores[rng.randi() % fores.size()], surs[rng.randi() % surs.size()]]
 
 
 # ---- intake --------------------------------------------------------------
@@ -101,8 +95,7 @@ static func _make_player(rng: RandomNumberGenerator, id: int, factor: float) -> 
 	var potential := mini(POTENTIAL_CAP, ca + pot_bonus)
 	return {
 		"id": id,
-		"name": "%s %s" % [_FORENAMES[rng.randi() % _FORENAMES.size()],
-			_SURNAMES[rng.randi() % _SURNAMES.size()]],
+		"name": _gen_name(rng),
 		"age": rng.randi_range(INTAKE_AGE_LO, INTAKE_AGE_HI),
 		"isGK": is_gk,
 		"pos": random_pos(rng, is_gk),

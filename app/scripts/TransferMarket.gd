@@ -295,8 +295,7 @@ static func generate_free_agents(rng: RandomNumberGenerator, count: int, first_i
 		var ca := rng.randi_range(FA_CA_LO, FA_CA_HI)
 		out.append({
 			"id": first_id + i,
-			"name": "%s %s" % [Youth._FORENAMES[rng.randi() % Youth._FORENAMES.size()],
-				Youth._SURNAMES[rng.randi() % Youth._SURNAMES.size()]],
+			"name": Youth._gen_name(rng),
 			"age": rng.randi_range(FA_AGE_LO, FA_AGE_HI),
 			"isGK": is_gk,
 			"pos": Youth.random_pos(rng, is_gk),

@@ -38,11 +38,14 @@ YOUTH MANAGER steel-blue, YOUTH SCOUT mauve, GROUNDSMAN green.
 Witnessed reference staff (frame 121, Man Utd — transcribed pixel-by-pixel, SOURCE not
 invented; the parity oracle + default fixture, in `personnel_chrome.json` REF_STAFF):
 HANDLING A. Padmore ★★★ £17,000 · PASSING D. Gledhill ★★★★½ £34,000 · DRIBBLING S. Merrick
-★★★★★ £47,000 · HEADING A. Mitchell ★★★ £16,000 · TACKLING T. O'Brian ★★★★½ £21,000 ·
+★★★★★ £47,000 · HEADING A. Mitchell ★★★ £16,000 · TACKLING T. O'brian ★★★½ £21,000 ·
 SHOOTING T. Alan ★★★★½ £33,000 · PHYSIOTHERAPIST P. Gelbier ★★★★★ £45,000 · PSYCHOLOGIST
 J. Bodin ★★★★½ £15,000 · ASSISTANT MANAGER A. Leigh ★★★★ £16,000 · SCOUT K. Hatch ★★★★½
 £45,000 · YOUTH TEAM MANAGER D. Read ★★★½ £21,000 · YOUTH TEAM SCOUT W. Sugar ★★★★★
 £36,000 · GROUNDSMAN G. Debnam ★★★★½ £4,000.
+**CORRECTED 2026-07-18:** O'brian is **★★★½** (3 gold + a half, re-verified by zoom on
+frames 103, 105 AND 121 — an earlier read said ★★★★½) and the b is lowercase (the
+APELLIDO.30 row is `O'brian`); REF_STAFF + `personnel_chrome.json` fixed.
 
 ## The hire overlay (frames 113-120) — witnessed, NOT yet built
 Tapping a role opens a dialog: a purple title strip, a **CURRENT <ROLE>** box (holder name +
@@ -91,6 +94,68 @@ career), and — when live `personnel` data is supplied — the 13 slots' {name,
   the measured bar ~30px to the left (portrait ends x49, name starts x50, bar.x=80), so
   `_blank_bar` grows the left edge for `kind=role, mirror=false` slots.
 
+## The real candidate pools (WITNESSED 2026-07-18, charter #9)
+
+Two independent careers' hire lists were transcribed frame-by-frame: **run1 Man Utd**
+(frames 095-120, 1 Aug 1997 — the walkthrough manager signs all 13 roles) and the **wine
+Bolton career** (`wine-captures-2026-07-18-goalscorers/` 56-59, Week 3). Every row below
+is read off the original's own pixels (zoomed 3x; half-star = the half glyph).
+
+**Man Utd pools (all 13 — frames 095/097/099/101/103/105 trainers, 107/110/112/115/117/119
+singles):**
+
+| Pool | Candidates (name ★ £/yr, list order) |
+|---|---|
+| HANDLING | T. Munt 1.5 £5,000 · A. Padmore 3.0 £17,000 · T. Watkinson 1.0 £4,000 |
+| PASSING | D. Gledhill 4.5 £34,000 · L. Adams 1.5 £6,000 · Y. Jumblat 4.0 £27,000 |
+| DRIBBLING | P. Wren 4.5 £41,000 · S. Merrick 5.0 £47,000 · L. Gledhill 1.0 £3,000 |
+| HEADING | A. Mitchell 3.0 £16,000 · C. Somers 1.5 £6,000 · J. Young 1.0 £3,000 |
+| TACKLING | D. Swann 3.0 £19,000 · G. Willis 1.0 £3,000 · T. O'brian 3.5 £21,000 |
+| SHOOTING | T. Alan 4.5 £33,000 · P. Powell 2.5 £13,000 · G. Dale 2.5 £12,000 |
+| PHYSIOTHERAPIST | P. Gelbier 5.0 £45,000 · B. Woolrich 2.0 £9,000 · R. Dwyer 3.0 £16,000 |
+| PSYCHOLOGIST | S. Norton 2.0 £6,000 · P. Keen 2.0 £6,000 · J. Bodin 4.5 £15,000 |
+| ASS. MANAGER | A. Leigh 4.0 £16,000 · P. Wright 2.0 £7,000 · L. Malik 2.5 £9,000 |
+| SCOUT | G. Young 1.0 £4,000 · J. Loxton 2.0 £8,000 · K. Hatch 4.5 £45,000* |
+| YOUTH MANAGER | D. Read 3.5 £21,000 · T. Snell 2.5 £12,000 · M. Mcgrath 3.0 £20,000 |
+| YOUTH SCOUT | M. Dearing 1.5 £6,000 · W. Sugar 5.0 £36,000 · L. Larson 1.5 £7,000 |
+| GROUNDSMAN | A. Dongle 3.0 £2,000 · J. Davies 1.0 £1,000 · G. Debnam 4.5 £4,000 |
+
+*Hatch's row itself wasn't captured (frame 114 is post-sign); his 4.5/£45,000 is frame
+121's hired card. **Bolton pools (partial):** HANDLING T. Savage 5.0 £52,000 · R. Robinson
+3.0 £19,000 · B. Rogers 5.0 £52,000 (56/57) · SCOUT R. Robson 1.5 £6,000 · J. Gomez 1.0
+£4,000 · K. Burrowes 3.0 £20,000 (58/59).
+
+**Mechanics decoded from the sequences:**
+- **Each of the six trainer SKILLS has its OWN 3-candidate pool** (HANDLING's list ≠
+  PASSING's ≠ DRIBBLING's...), same as each single role.
+- **Signing REMOVES the candidate; the pool does NOT refill** — the remaining rows shift
+  up and the third row goes empty (witnessed after every one of the 15 signings). Refill
+  cadence over later weeks is un-witnessed.
+- **List order is NOT rating-sorted** (HANDLING 1.5/3.0/1.0; YOUTH MANAGER 3.5/2.5/3.0) —
+  generation order.
+- **Wages are per-candidate**, not a function of stars: three 3.0-star trainers earn
+  £16k/£17k/£19k in one career and £19k (Robinson) in the other; 5.0-star trainers £47k
+  (Merrick) vs £52k (Savage, Rogers). Role classes scale differently (4.5★: trainer
+  £33-41k, SCOUT £45k, PSYCHOLOGIST £15k, GROUNDSMAN £4k). All witnessed wages are round
+  £1,000s.
+- **Two careers → two different pools**: pools are generated per-career.
+
+**The name bank is the game's own:** all 43 witnessed candidate surnames are rows of
+`DBDAT/APELLIDO.30` (327 surnames; DMLT, XOR 0x61 — incl. `O'brian` via the escape byte
+0x46^0x61=`'`), and the forename initials fit `NOMBRES.30` (148 forenames, e.g. Y. =
+York/Yakub). Probability of 43/43 by coincidence ≈ 0. Exported verbatim by
+`tools/re/export_staff_names.py` → `app/data/name_pools.json`.
+
+**App model (Staff.gd, rebuilt 2026-07-18):** candidates draw name = table forename
+initial + table surname; wage = `_WAGE_ANCHORS` — the exact witnessed (stars→wage) points
+per role class (the 6 trainer skills share one class), interpolated between anchors, rng
+within a band where several wages were witnessed at one rating, snapped to £1,000.
+`pool_for_role` returns generation order (the stars-descending sort was killed). Youth
+regen + free-agent names now draw from the same real tables (`Youth._gen_name`).
+**FITTED (flagged, un-RE'd):** the star-rating distribution (uniform 1.0-5.0), wages
+between/beyond witnessed anchors, per-career regeneration timing. The exe's own generator
+was not reversed.
+
 ## Model — 13 single-occupancy roles (BUILT 2026-07-14)
 `app/scripts/Staff.gd` now models the real game's **13 single-occupancy roles** (was a 5-role
 multi-occupancy simplification): 6 skill coaches (HANDLING / PASSING / DRIBBLING / HEADING /
@@ -99,9 +164,11 @@ YOUTH_TEAM_MANAGER / YOUTH_TEAM_SCOUT / GROUNDSMAN (the exact `personnel_chrome.
 Each role holds exactly ONE member; `Career.hire_staff` REPLACES the holder (outgoing returns
 to the pool, no compensation — a SACK is the paid exit). Half-star ratings (`stars`, 1.0..5.0)
 are the witnessed display; a 1..5 `quality` is kept for the effect hooks. **What is faithful:
-the 13 role slots, single occupancy, half-star ratings, the surface strings** (all witnessed).
-**What is OURS (flagged, un-RE'd source data): the wages and the effect magnitudes** — PM98
-loads these from the save. Engine hooks preserved: the 6 coaches → `training_factor`,
+the 13 role slots, single occupancy, half-star ratings, the surface strings** (all witnessed)
+**+ since 2026-07-18 the pool mechanics, the real name bank and the witnessed wage anchors**
+(see "The real candidate pools" above). **What is OURS (flagged, un-RE'd): the effect
+magnitudes** (PM98 loads these from the save) and the fitted gaps flagged above. Engine
+hooks preserved: the 6 coaches → `training_factor`,
 PHYSIOTHERAPIST → `physio_factor`, YOUTH_TEAM_MANAGER → `youth_factor`, SCOUT/ASSISTANT_MANAGER
 → their automation. **HONEST GAP (never invented): PSYCHOLOGIST / YOUTH_TEAM_SCOUT / GROUNDSMAN
 are hireable but have no engine effect** (no decoded source data), so they are no-ops.

@@ -17,6 +17,7 @@ func _initialize() -> void:
 func _run() -> bool:
 	var ok := true
 	ok = _unit_candidates() and ok
+	ok = _unit_witnessed_pools() and ok
 	ok = _unit_factors() and ok
 	ok = _unit_wages() and ok
 	ok = _career_integration() and ok
@@ -55,6 +56,71 @@ func _unit_candidates() -> bool:
 	ok = _assert(Staff.wage_for(Staff.HANDLING, 4.0) < Staff.wage_for(Staff.HANDLING, 4.5)
 		and Staff.wage_for(Staff.HANDLING, 4.5) < Staff.wage_for(Staff.HANDLING, 5.0),
 		"a half-star rating prices between the whole stars") and ok
+	return ok
+
+
+# ---- unit: the witnessed pools (docs/re/staff_re.md "The real candidate pools") ----
+
+## KILL-TEST vs the 2026-07-18 witness pass: candidate names come from the game's own
+## DBDAT tables, wage_for reproduces every single-valued witnessed (stars -> wage) anchor
+## exactly, banded anchors bound the rng draw, and the pool keeps generation order.
+func _unit_witnessed_pools() -> bool:
+	var ok := true
+	var pools := Staff.name_pools()
+	var fores: Array = pools["forenames"]
+	var surs: Array = pools["surnames"]
+	ok = _assert(fores.size() == 148 and surs.size() == 327,
+		"name_pools.json = the real NOMBRES.30 (148) + APELLIDO.30 (327)") and ok
+	# The witnessed hire-list surnames are table rows (sample across both careers).
+	var have := true
+	for s in ["Padmore", "Gelbier", "Jumblat", "Debnam", "O'brian", "Savage", "Mcgrath",
+			"Burrowes", "Dongle", "Watkinson"]:
+		have = have and surs.has(s)
+	ok = _assert(have, "witnessed candidate surnames are APELLIDO.30 rows") and ok
+	# Generated candidate names are 'I. Surname' with a table surname.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = SEED
+	var names_ok := true
+	for _i in 30:
+		var m := Staff.make_candidate(rng, 1, Staff.SCOUT_ROLE)
+		var nm := str(m["name"])
+		names_ok = names_ok and nm.substr(1, 2) == ". " and surs.has(nm.substr(3))
+	ok = _assert(names_ok, "candidate names = forename initial + real table surname") and ok
+	# Exact single-valued witnessed anchors (no rng -> the anchor itself).
+	var exact := [
+		[Staff.TACKLING, 3.5, 21000], [Staff.SHOOTING, 4.0, 27000],
+		[Staff.PHYSIOTHERAPIST, 2.0, 9000], [Staff.PHYSIOTHERAPIST, 3.0, 16000],
+		[Staff.PHYSIOTHERAPIST, 5.0, 45000], [Staff.PSYCHOLOGIST, 2.0, 6000],
+		[Staff.PSYCHOLOGIST, 4.5, 15000], [Staff.ASSISTANT_MANAGER, 2.0, 7000],
+		[Staff.ASSISTANT_MANAGER, 2.5, 9000], [Staff.ASSISTANT_MANAGER, 4.0, 16000],
+		[Staff.SCOUT_ROLE, 1.0, 4000], [Staff.SCOUT_ROLE, 2.0, 8000],
+		[Staff.SCOUT_ROLE, 3.0, 20000], [Staff.SCOUT_ROLE, 4.5, 45000],
+		[Staff.YOUTH_TEAM_MANAGER, 2.5, 12000], [Staff.YOUTH_TEAM_MANAGER, 3.0, 20000],
+		[Staff.YOUTH_TEAM_MANAGER, 3.5, 21000], [Staff.YOUTH_TEAM_SCOUT, 5.0, 36000],
+		[Staff.GROUNDSMAN, 1.0, 1000], [Staff.GROUNDSMAN, 3.0, 2000],
+		[Staff.GROUNDSMAN, 4.5, 4000],
+	]
+	var anchors_ok := true
+	for e in exact:
+		if Staff.wage_for(e[0], e[1]) != e[2]:
+			anchors_ok = false
+			print("    anchor MISS %s %.1f -> %d (want %d)" % [e[0], e[1], Staff.wage_for(e[0], e[1]), e[2]])
+	ok = _assert(anchors_ok, "every single-valued witnessed anchor reproduces exactly") and ok
+	# Banded anchors bound the per-candidate draw (trainer 5.0 witnessed £47k-£52k).
+	var band_ok := true
+	for _i in 40:
+		var w := Staff.wage_for(Staff.DRIBBLING, 5.0, rng)
+		band_ok = band_ok and w >= 47000 and w <= 52000 and w % 1000 == 0
+	ok = _assert(band_ok, "trainer 5.0 draws inside the witnessed £47k-£52k band, round £1,000") and ok
+	# Pool order = generation order (the witnessed lists are NOT rating-sorted).
+	var pool := [
+		{"id": 1, "role": Staff.HANDLING, "stars": 1.5, "wage": 5000},
+		{"id": 2, "role": Staff.HANDLING, "stars": 3.0, "wage": 17000},
+		{"id": 3, "role": Staff.HANDLING, "stars": 1.0, "wage": 4000},
+	]
+	var got := Staff.pool_for_role(pool, Staff.HANDLING)
+	ok = _assert(int(got[0]["id"]) == 1 and int(got[1]["id"]) == 2 and int(got[2]["id"]) == 3,
+		"pool_for_role keeps generation order (witnessed 1.5 / 3.0 / 1.0)") and ok
 	return ok
 
 

@@ -18,12 +18,28 @@ extends RefCounted
 ## GROUNDSMAN, SIGN / SACK, WAGE, COMPENSATIONS OF CONTRACT, "Are you sure you want to sack
 ## him ?", "1 member of staff" / "%d members of staff", "you have to have hired trainers.",
 ## "you need to hire an Assistant."  The 13 role slots + half-star ratings + single-occupancy
-## are the ORIGINAL's; PM98's staff EFFECTS + WAGES are data-driven (loaded from the save,
-## un-RE'd), so the numeric model below is OURS -- only the surface is PM98's. Roles with a
-## clean hook into the existing engine carry an effect (trainers -> development, physio ->
-## injuries, youth manager -> academy, scout / assistant -> automation); PSYCHOLOGIST /
-## YOUTH_TEAM_SCOUT / GROUNDSMAN are hireable but their engine effect is an HONEST GAP (no
-## decoded source data), so they are no-ops -- never invent a number for them.
+## are the ORIGINAL's.
+##
+## CANDIDATE POOLS (real, 2026-07-18 — docs/re/staff_re.md "The real candidate pools"):
+## the original's hire lists were witnessed across TWO careers (Man Utd run1 frames 095-120,
+## Bolton wine 56-59): every role — each of the six trainer SKILLS included — has its OWN
+## 3-candidate pool, a signed candidate is REMOVED and the pool does NOT refill (the row
+## goes empty), list order is generation order (NOT rating-sorted), and wages are
+## PER-CANDIDATE (three 3.0-star trainers at £16k/£17k/£19k; 5.0-star trainers £47k one
+## career, £52k the other). Names come from the game's OWN tables — all 43 witnessed
+## candidate surnames are rows of DBDAT/APELLIDO.30 (incl. the escape-byte "O'brian"),
+## exported with the forename table to res://data/name_pools.json. Candidate wages here
+## are drawn from _WAGE_ANCHORS: the exact witnessed (stars -> wage) points per role,
+## interpolated between anchors — the original's generator itself is un-RE'd, so anything
+## BETWEEN witnessed points is fitted, never asserted. Whether pools ever refill across
+## weeks is un-witnessed; new careers/seasons regenerate (the two careers differ).
+##
+## PM98's staff EFFECTS are data-driven (loaded from the save, un-RE'd), so the effect
+## numerics below are OURS -- only the surface + pool mechanics above are PM98's. Roles
+## with a clean hook into the existing engine carry an effect (trainers -> development,
+## physio -> injuries, youth manager -> academy, scout / assistant -> automation);
+## PSYCHOLOGIST / YOUTH_TEAM_SCOUT / GROUNDSMAN are hireable but their engine effect is an
+## HONEST GAP (no decoded source data), so they are no-ops -- never invent a number for them.
 ##
 ## GameDB-free, pure functions over plain dicts -> headless-testable (tests/test_staff.gd).
 
@@ -78,23 +94,39 @@ const _LABEL := {
 	GROUNDSMAN: "GROUNDSMAN",
 }
 
-# Per-role tuning. wage = wage_base + round(stars * wage_step) (a seasonal wage; OURS).
-# effect params (step/lo/hi) apply only to the four effect-bearing hooks; the rest are wage-
-# only (HONEST GAP -- no engine effect, never invented).
+# Role blurbs for the effect hooks (the app's own UI hint text, not original strings).
 const _DEF := {
-	HANDLING: {"wage_base": 6000, "wage_step": 7000},
-	PASSING: {"wage_base": 6000, "wage_step": 7000},
-	DRIBBLING: {"wage_base": 6000, "wage_step": 7000},
-	HEADING: {"wage_base": 6000, "wage_step": 7000},
-	TACKLING: {"wage_base": 6000, "wage_step": 7000},
-	SHOOTING: {"wage_base": 6000, "wage_step": 7000},
-	PHYSIOTHERAPIST: {"wage_base": 8000, "wage_step": 8000, "blurb": "cuts injury risk"},
-	PSYCHOLOGIST: {"wage_base": 4000, "wage_step": 3000, "blurb": "boosts morale (no engine effect yet)"},
-	ASSISTANT_MANAGER: {"wage_base": 5000, "wage_step": 4000, "blurb": "auto-renews your stars"},
-	SCOUT_ROLE: {"wage_base": 8000, "wage_step": 8000, "blurb": "finds transfer targets"},
-	YOUTH_TEAM_MANAGER: {"wage_base": 6000, "wage_step": 4000, "blurb": "improves the academy"},
-	YOUTH_TEAM_SCOUT: {"wage_base": 6000, "wage_step": 7000, "blurb": "scouts youngsters (no engine effect yet)"},
-	GROUNDSMAN: {"wage_base": 1000, "wage_step": 800, "blurb": "keeps the pitch (no engine effect yet)"},
+	PHYSIOTHERAPIST: {"blurb": "cuts injury risk"},
+	PSYCHOLOGIST: {"blurb": "boosts morale (no engine effect yet)"},
+	ASSISTANT_MANAGER: {"blurb": "auto-renews your stars"},
+	SCOUT_ROLE: {"blurb": "finds transfer targets"},
+	YOUTH_TEAM_MANAGER: {"blurb": "improves the academy"},
+	YOUTH_TEAM_SCOUT: {"blurb": "scouts youngsters (no engine effect yet)"},
+	GROUNDSMAN: {"blurb": "keeps the pitch (no engine effect yet)"},
+}
+
+# WITNESSED wage anchors: every (stars -> yearly wage) pair read off the original's own
+# hire lists (Man Utd run1 frames 095-121 + Bolton wine 56-59, docs/re/staff_re.md).
+# [stars, lo, hi] — lo==hi where one value was witnessed, a band where several were
+# (e.g. 3.0-star trainers £16k Mitchell / £17k Padmore / £19k Swann+Robinson). wage_for
+# interpolates between a role's own anchors; the six trainer skills share one class (the
+# same STAFF AVAILABLE list UI serves all six, and the two careers' trainer wages lie on
+# one curve). Values between/beyond anchors are FITTED — the exe's generator is un-RE'd.
+const _WAGE_ANCHORS := {
+	"TRAINER": [
+		[1.0, 3000, 4000], [1.5, 5000, 6000], [2.5, 12000, 13000], [3.0, 16000, 19000],
+		[3.5, 21000, 21000], [4.0, 27000, 27000], [4.5, 33000, 41000], [5.0, 47000, 52000],
+	],
+	PHYSIOTHERAPIST: [[2.0, 9000, 9000], [3.0, 16000, 16000], [5.0, 45000, 45000]],
+	PSYCHOLOGIST: [[2.0, 6000, 6000], [4.5, 15000, 15000]],
+	ASSISTANT_MANAGER: [[2.0, 7000, 7000], [2.5, 9000, 9000], [4.0, 16000, 16000]],
+	SCOUT_ROLE: [
+		[1.0, 4000, 4000], [1.5, 6000, 6000], [2.0, 8000, 8000],
+		[3.0, 20000, 20000], [4.5, 45000, 45000],
+	],
+	YOUTH_TEAM_MANAGER: [[2.5, 12000, 12000], [3.0, 20000, 20000], [3.5, 21000, 21000]],
+	YOUTH_TEAM_SCOUT: [[1.5, 6000, 7000], [5.0, 36000, 36000]],
+	GROUNDSMAN: [[1.0, 1000, 1000], [3.0, 2000, 2000], [4.5, 4000, 4000]],
 }
 
 const QUALITY_LO := 1
@@ -104,18 +136,20 @@ const STARS_HI := 5.0
 const SEASON_WEEKS := 52   # wages are yearly; weekly = / SEASON_WEEKS (matches FinanceModel)
 const SACK_WEEKS := 8      # COMPENSATIONS OF CONTRACT: sacking pays this many weeks' wage
 
-# Staff name pools (English-style), ours -- PM98 generates staff names the same way.
-const _FORENAMES := [
-	"BRIAN", "ROY", "TERRY", "DON", "ERIC", "GRAHAM", "PETER", "ALAN", "KEITH", "DEREK",
-	"GORDON", "MALCOLM", "TREVOR", "BARRY", "RON", "GEOFF", "STAN", "NORMAN", "CLIVE", "LEN",
-	"FRANK", "ARTHUR", "HOWARD", "VICTOR", "DENIS", "JOHN", "BOB", "JIM", "TED", "WALTER",
-]
-const _SURNAMES := [
-	"ATKINSON", "ROBSON", "GREENWOOD", "VENABLES", "ARMFIELD", "SAUNDERS", "HOWE", "REVIE",
-	"MERCER", "NICHOLSON", "SHANKLY", "PAISLEY", "CLOUGH", "TAYLOR", "WATERS", "BURKINSHAW",
-	"SEXTON", "DOCHERTY", "ALLISON", "WADDINGTON", "MILNE", "CATTERICK", "STEIN", "BUSBY",
-	"GRADI", "BASSETT", "BOND", "MACARI", "PLEAT", "BARTON", "HODGSON", "WILKINS",
-]
+# The ORIGINAL name tables (DBDAT/NOMBRES.30 + APELLIDO.30, XOR-0x61 DMLT records),
+# exported verbatim by tools/re/export_staff_names.py. All 43 witnessed hire-list
+# surnames (Padmore, Gelbier, Jumblat, Debnam, O'brian, Savage, ...) are rows here.
+const _NAME_POOLS_PATH := "res://data/name_pools.json"
+static var _name_pools: Dictionary = {}
+
+static func name_pools() -> Dictionary:
+	if _name_pools.is_empty():
+		var f := FileAccess.open(_NAME_POOLS_PATH, FileAccess.READ)
+		assert(f != null, "name_pools.json missing")
+		var d: Variant = JSON.parse_string(f.get_as_text())
+		assert(d is Dictionary and not (d as Dictionary).is_empty(), "name_pools.json bad")
+		_name_pools = d
+	return _name_pools
 
 
 # ---- role helpers --------------------------------------------------------
@@ -131,20 +165,28 @@ static func category_of(role: String) -> String:
 static func label_for(role: String) -> String:
 	return str(_LABEL.get(role, role))
 
-## An "A. Name" style forename-initial + surname, matching the original's short staff names.
+## An "A. Padmore" style forename-initial + surname — the witnessed hire-list format —
+## drawn from the game's OWN name tables (name_pools.json). Surnames keep their table
+## bytes exactly ("O'brian", "Mcgrath" — the original's own casing).
 static func _short_name(rng: RandomNumberGenerator) -> String:
-	var fore: String = _FORENAMES[rng.randi() % _FORENAMES.size()]
-	var sur: String = _SURNAMES[rng.randi() % _SURNAMES.size()]
-	return "%s. %s" % [fore.substr(0, 1), sur.capitalize()]
+	var p := name_pools()
+	var fores: Array = p["forenames"]
+	var surs: Array = p["surnames"]
+	var fore: String = fores[rng.randi() % fores.size()]
+	var sur: String = surs[rng.randi() % surs.size()]
+	return "%s. %s" % [fore.substr(0, 1), sur]
 
 
 # ---- candidate generation ------------------------------------------------
 
-## Half-star rating (1.0 .. 5.0 in 0.5 steps), the witnessed display granularity.
+## Half-star rating (1.0 .. 5.0 in 0.5 steps), the witnessed display granularity. The
+## distribution is FITTED (uniform is consistent with the 48 witnessed candidates,
+## range 1.0-5.0, mid-heavy); the original's generator is un-RE'd.
 static func _rand_stars(rng: RandomNumberGenerator) -> float:
 	return rng.randi_range(2, 10) * 0.5   # 1.0 .. 5.0 in half steps
 
-## A hireable staff candidate for `role` with a random half-star rating + matching wage.
+## A hireable staff candidate for `role` with a half-star rating + a wage drawn from the
+## witnessed anchor curve (per-candidate, like the original's — see _WAGE_ANCHORS).
 static func make_candidate(rng: RandomNumberGenerator, id: int, role: String) -> Dictionary:
 	var stars := _rand_stars(rng)
 	return {
@@ -153,7 +195,7 @@ static func make_candidate(rng: RandomNumberGenerator, id: int, role: String) ->
 		"name": _short_name(rng),
 		"stars": stars,
 		"quality": clampi(int(round(stars)), QUALITY_LO, QUALITY_HI),
-		"wage": wage_for(role, stars),
+		"wage": wage_for(role, stars, rng),
 	}
 
 
@@ -169,11 +211,42 @@ static func generate_pool(rng: RandomNumberGenerator, first_id: int, per_role: i
 	return out
 
 
-## Yearly wage for a role at a rating (accepts a 1-5 int quality or a 0.5-step star float).
-static func wage_for(role: String, rating: float) -> int:
-	var d: Dictionary = _DEF.get(role, _DEF[HANDLING])
+## Yearly wage for a role at a rating (accepts a 1-5 int quality or a 0.5-step star float),
+## from the WITNESSED anchor curve: exact at witnessed points, piecewise-linear between
+## them, end-slope beyond. Where several wages were witnessed at one rating the anchor is
+## a band — `rng` picks within it (per-candidate wages, as witnessed); without `rng` the
+## band midpoint is returned. Snapped to £1,000 (every witnessed wage is a round £1,000).
+static func wage_for(role: String, rating: float, rng: RandomNumberGenerator = null) -> int:
+	var anchors: Array = _WAGE_ANCHORS["TRAINER"] if is_trainer(role) \
+		else _WAGE_ANCHORS.get(role, _WAGE_ANCHORS["TRAINER"])
 	var stars := clampf(rating, STARS_LO, STARS_HI)
-	return int(d["wage_base"]) + int(round(stars * float(d["wage_step"])))
+	var lo := 0.0
+	var hi := 0.0
+	var first: Array = anchors[0]
+	var last: Array = anchors[anchors.size() - 1]
+	if stars <= float(first[0]) or anchors.size() == 1:
+		# Below the first witnessed point: scale down along the ray from the origin.
+		var t := stars / float(first[0])
+		lo = float(first[1]) * t
+		hi = float(first[2]) * t
+	elif stars >= float(last[0]):
+		# Above the last witnessed point: continue the last segment's slope.
+		var prev: Array = anchors[anchors.size() - 2]
+		var span := float(last[0]) - float(prev[0])
+		var t2 := (stars - float(last[0])) / span
+		lo = float(last[1]) + (float(last[1]) - float(prev[1])) * t2
+		hi = float(last[2]) + (float(last[2]) - float(prev[2])) * t2
+	else:
+		for i in range(anchors.size() - 1):
+			var a: Array = anchors[i]
+			var b: Array = anchors[i + 1]
+			if stars >= float(a[0]) and stars <= float(b[0]):
+				var t3 := (stars - float(a[0])) / (float(b[0]) - float(a[0]))
+				lo = lerpf(float(a[1]), float(b[1]), t3)
+				hi = lerpf(float(a[2]), float(b[2]), t3)
+				break
+	var w := (lo + hi) / 2.0 if rng == null else rng.randf_range(lo, hi)
+	return maxi(1000, int(round(w / 1000.0)) * 1000)
 
 
 # ---- rating access (members may carry `stars` float and/or `quality` int) --
@@ -265,11 +338,12 @@ static func sack_cost(member: Dictionary) -> int:
 static func members_in_role(staff: Array, role: String) -> Array:
 	return staff.filter(func(m): return str(m.get("role", "")) == role)
 
-## Candidates in the pool for `role`, most able first (the "<ROLE>s AVAILABLE" list order).
+## Candidates in the pool for `role`, in generation order — the witnessed "<ROLE>s
+## AVAILABLE" lists are NOT rating-sorted (run1 HANDLING: 1.5 / 3.0 / 1.0 stars,
+## YOUTH MANAGERS: 3.5 / 2.5 / 3.0), and after a signing the remaining rows keep
+## their order and shift up.
 static func pool_for_role(pool: Array, role: String) -> Array:
-	var out: Array = pool.filter(func(m): return str(m.get("role", "")) == role)
-	out.sort_custom(func(a, b): return _stars_of(a) > _stars_of(b))
-	return out
+	return pool.filter(func(m): return str(m.get("role", "")) == role)
 
 ## The StaffScreen `personnel` dict: role -> {name, stars, wage} for every hired slot. Vacant
 ## slots are simply absent (the screen draws them empty).
