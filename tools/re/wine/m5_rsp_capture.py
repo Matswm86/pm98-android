@@ -192,6 +192,9 @@ def main() -> None:
     print(f"XI {'OK' if not xi_bad else 'MISMATCH %d rows' % len(xi_bad)}", flush=True)
 
     def players_row() -> list:
+        # Row: [team, idx, x, y, +0x13c, +0x17c, +0x180, face+0x34, yaw+0x64, spd+0x68,
+        # curve+0x6c, +0x54, +0x58]. The first 7 keep the s44 layout (orbit_diff reads
+        # r[0..3] positionally); the s45 tail adds the mover state for the sub-LSB drill.
         rows = []
         for ti, (arr, cnt) in enumerate(teams):
             for i in range(cnt):
@@ -205,6 +208,12 @@ def main() -> None:
                         struct.unpack_from("<I", b, 0x13C)[0],
                         struct.unpack_from("<i", b, 0x17C)[0],
                         struct.unpack_from("<i", b, 0x180)[0],
+                        struct.unpack_from("<I", b, 0x34)[0] & 0xFFFF,
+                        struct.unpack_from("<I", b, 0x64)[0] & 0xFFFF,
+                        struct.unpack_from("<i", b, 0x68)[0],
+                        struct.unpack_from("<i", b, 0x6C)[0],
+                        struct.unpack_from("<i", b, 0x54)[0],
+                        struct.unpack_from("<i", b, 0x58)[0],
                     ]
                 )
         return rows
