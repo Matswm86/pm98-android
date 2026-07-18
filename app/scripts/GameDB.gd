@@ -101,11 +101,20 @@ func clubs_in_league(league_id: String) -> Array:
 	return out
 
 
+## EQUIPOS ships one squadless no-league container record ("Free players",
+## EQ961382 — the engine's out-of-contract pool, country byte 22/SPAIN,
+## stadium "Tokyo"). It is data, not a browsable club: the original never
+## lists it on any country surface, so every country query skips empty
+## no-league records here (the only such record in the 476).
+func _is_placeholder(c: Dictionary) -> bool:
+	return (c.get("players", []) as Array).is_empty()
+
+
 func countries() -> Array:
 	## Distinct countries among clubs with no league (the international set), sorted.
 	var seen: Dictionary = {}
 	for c in clubs:
-		if c.get("leagueId") == null:
+		if c.get("leagueId") == null and not _is_placeholder(c):
 			var ctry: Variant = c.get("country")
 			if ctry != null:
 				seen[ctry] = true
@@ -117,7 +126,7 @@ func countries() -> Array:
 func clubs_in_country(country: String) -> Array:
 	var out: Array = []
 	for c in clubs:
-		if c.get("leagueId") == null and c.get("country") == country:
+		if c.get("leagueId") == null and c.get("country") == country and not _is_placeholder(c):
 			out.append(c)
 	return out
 

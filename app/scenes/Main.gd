@@ -2305,9 +2305,9 @@ func _show_make_offer_card(row: Dictionary) -> void:
 		card.queue_free())
 	card.offer_made.connect(func(offer: int, yearly_wage: int, years: int, clauses: Array, bonus: int) -> void:
 		AudioManager.ui_select()
-		var rng := RandomNumberGenerator.new()
-		rng.randomize()
-		var res := _career.sign_player(pid, from_club, offer, rng,
+		# The bid is only PLACED here — the club answers on the next week roll
+		# (Career._resolve_pending_bids), as in the original's days-later response.
+		var res := _career.place_bid_roster(pid, from_club, offer,
 			maxi(1, yearly_wage / Contract.SEASON_WEEKS), years, clauses, bonus)
 		_career.save()
 		card.queue_free()
@@ -2401,14 +2401,13 @@ func _show_browse_offer_card(player: Dictionary, club: Dictionary, host: Control
 		card.queue_free())
 	card.offer_made.connect(func(offer: int, yearly_wage: int, years: int, clauses: Array, bonus: int) -> void:
 		AudioManager.ui_select()
-		var rng := RandomNumberGenerator.new()
-		rng.randomize()
+		# Placed, not completed — the answer arrives with the next week roll.
 		var res: Dictionary
 		if c.rosters.has(cid):
-			res = c.sign_player(pid, cid, offer, rng,
+			res = c.place_bid_roster(pid, cid, offer,
 				maxi(1, yearly_wage / Contract.SEASON_WEEKS), years, clauses, bonus)
 		else:
-			res = c.sign_external(player, club, offer, rng,
+			res = c.place_bid_external(player, club, offer,
 				maxi(1, yearly_wage / Contract.SEASON_WEEKS), years, clauses, bonus)
 		c.save()
 		card.queue_free()

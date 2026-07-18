@@ -142,7 +142,14 @@ func _run() -> void:
 	if moc != null:
 		moc.offer_made.emit(int(row["fee"]) * 3, 500_000, 3, [], 0)
 		await process_frame
-	ok = _assert(main._career.my_squad().size() == before + 1, "UI signing added a player") and ok
+	# The OFFER click only PLACES the bid (the original's days-later response);
+	# the club answers on the next week roll and the player joins THEN.
+	ok = _assert(main._career.my_squad().size() == before, "UI offer placed, no instant join") and ok
+	ok = _assert(main._career.pending_bids.size() == 1, "UI offer queued as a pending bid") and ok
+	var rngw := RandomNumberGenerator.new()
+	rngw.seed = 7
+	main._career.advance_week(rngw)
+	ok = _assert(main._career.my_squad().size() == before + 1, "UI signing lands with next week's answer") and ok
 	main._push(main._show_transfer_squad)
 	await process_frame
 	var p0: Dictionary = main._career.my_squad()[0]

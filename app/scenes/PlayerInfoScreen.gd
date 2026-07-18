@@ -131,6 +131,7 @@ var _club: Dictionary = {}
 var _tier: int = 1
 var _actions := false   # RENEW/TRANSFER/SACK live (manager's own squad player)
 var _press := ""
+var _down := false  # a press was seen; release without it is the emulated-mouse twin
 ## The host screen LUT-dims itself while this card is up (SquadScreen); when it
 ## can't yet, the card draws the old flat backdrop instead (documented interim).
 var host_dims := false
@@ -194,9 +195,16 @@ func _on_input(e: InputEvent) -> void:
 		return
 	var d := _to_design(e.position)
 	if e.pressed:
+		_down = true
 		_press = _hit(d)
 		queue_redraw()
 		return
+	# One release per press (emulate_mouse_from_touch double-fire guard): an orphan
+	# release landing on this freshly-mounted card tripped the unconditional
+	# back_pressed below and tore the overlay stack down to the hub.
+	if not _down:
+		return
+	_down = false
 	var was := _press
 	_press = ""
 	queue_redraw()

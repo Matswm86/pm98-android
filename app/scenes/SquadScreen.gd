@@ -100,6 +100,7 @@ var _tier: int = 1
 var _nos_ok := false
 var _youth_enabled := false
 var _press := ""
+var _down := false  # a press was seen; release without it is the emulated-mouse twin
 var _rows: Array = []
 var _header: Dictionary = {}
 var _dimmed := false
@@ -170,9 +171,17 @@ func _on_input(e: InputEvent) -> void:
 	if not tap:
 		return
 	if pressed:
+		_down = true
 		_press = _hit(_to_design(pos))
 		queue_redraw()
 	else:
+		# One release per press: with emulate_mouse_from_touch (Android default) every
+		# touch also arrives as an emulated mouse event; without this gate a row tap
+		# fired twice (second release hit the empty-space back_pressed fall-through and
+		# collapsed the overlay stack to the hub). Same pattern as DataBaseScreen._down.
+		if not _down:
+			return
+		_down = false
 		var d := _to_design(pos)
 		var a := _hit(d)
 		var was := _press

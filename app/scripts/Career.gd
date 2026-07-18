@@ -63,6 +63,10 @@ var pending_alerts: Array = []          # queued hub "PREMIER MANAGER 98" alert 
                                         # witnessed post-flow timing, scout_screen_re.md 78)
 var external_signed: Dictionary = {}    # pid -> true: players bought off static (non-roster)
                                         # squads via the OFFERS browse (hidden from re-browse)
+var pending_bids: Array = []            # outgoing transfer bids awaiting the selling club's
+                                        # answer next week (the original's days-later response;
+                                        # [{kind, pid, club_id, offer, weekly, years, clauses,
+                                        #   bonus, week}]). Resolved in advance_week.
 var staff: Array = []                   # hired backroom staff (Staff.gd)
 var staff_pool: Array = []              # staff available to hire (refreshed each season)
 var staff_seq: int = STAFF_ID_BASE      # monotonic id minter for staff candidates
@@ -546,6 +550,7 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 	cash += weekly_net
 	cash -= player_weekly_wage()        # the live squad wage bill (YEARLY WAGE / 52 per man)
 	cash -= Staff.weekly_wage(staff)   # the backroom staff wage bill (STAFF WAGES)
+	_resolve_pending_bids(rng)         # last week's outgoing bids get their answers
 	_accumulate_offers(rng)            # incoming bids on the transfer-listed (CURRENT OFFERS)
 	week += 1
 	offers_left = OFFERS_PER_WEEK   # the board's weekly signing allowance resets
@@ -1683,11 +1688,97 @@ func _find_in(id: int, pid: int) -> Dictionary:
 ## `clause_goals`, advanced weekly — the FICHA's "Matches played:" / "Goals:"
 ## sub-lines). The acceptance verdict stays fee-based — the original's clause
 ## weighting is un-RE'd (docs/re/make_offer_re.md).
-func sign_player(pid: int, from_club_id: int, offer: int, rng: RandomNumberGenerator,
+## ---- outgoing bids take days: place now, the club answers next week ----------
+## The original never completes a buy at the OFFER click — the response arrives
+## days later (news / the player joins then). place_bid_* runs the placement
+## gates (window, board allowance, cash, availability), charges the weekly
+## allowance, and queues the bid; _resolve_pending_bids (advance_week) evaluates
+## it with the SAME sign_player/sign_external logic and posts the outcome as news.
+
+func _has_pending_bid(pid: int) -> bool:
+	for b in pending_bids:
+		if int(b.get("pid", -1)) == pid:
+			return true
+	return false
+
+
+func place_bid_roster(pid: int, from_club_id: int, offer: int,
 		weekly: int = -1, years: int = -1, clauses: Array = [], bonus: int = 0) -> Dictionary:
 	if not transfers_open():
 		return {"ok": false, "msg": "The transfer deadline has passed."}
 	if offers_left <= 0:
+		return {"ok": false, "msg": "The Directors will only let you make %d offers to sign a player per week." % OFFERS_PER_WEEK}
+	if offer > cash:
+		return {"ok": false, "msg": "You do not have enough money to make this offer."}
+	var player := _find_in(from_club_id, pid)
+	if player.is_empty():
+		return {"ok": false, "msg": "That player is no longer available."}
+	if _has_pending_bid(pid):
+		return {"ok": false, "msg": "You have already made an offer for %s." % player.get("name", "?")}
+	offers_left -= 1
+	pending_bids.append({"kind": "roster", "pid": pid, "club_id": from_club_id,
+		"offer": offer, "weekly": weekly, "years": years, "clauses": clauses.duplicate(),
+		"bonus": bonus, "week": week})
+	return {"ok": true, "msg": "Your offer of £%s for %s has been sent to %s." %
+		[_money(offer), player.get("name", "?"), club_names.get(from_club_id, "?")]}
+
+
+func place_bid_external(player: Dictionary, selling_club: Dictionary, offer: int,
+		weekly: int = -1, years: int = -1, clauses: Array = [], bonus: int = 0) -> Dictionary:
+	if not transfers_open():
+		return {"ok": false, "msg": "The transfer deadline has passed."}
+	if offers_left <= 0:
+		return {"ok": false, "msg": "The Directors will only let you make %d offers to sign a player per week." % OFFERS_PER_WEEK}
+	if offer > cash:
+		return {"ok": false, "msg": "You do not have enough money to make this offer."}
+	var pid := int(player.get("id", -1))
+	if external_signed.has(pid) or not _find_in(club_id, pid).is_empty():
+		return {"ok": false, "msg": "That player is no longer available."}
+	if _has_pending_bid(pid):
+		return {"ok": false, "msg": "You have already made an offer for %s." % player.get("name", "?")}
+	offers_left -= 1
+	# The seller is static GameDB data; snapshot both so the pending bid resolves +
+	# saves self-contained (the club dict feeds is_key_player at resolution).
+	pending_bids.append({"kind": "external", "pid": pid,
+		"player": player.duplicate(true), "club": selling_club.duplicate(true),
+		"offer": offer, "weekly": weekly, "years": years, "clauses": clauses.duplicate(),
+		"bonus": bonus, "week": week})
+	return {"ok": true, "msg": "Your offer of £%s for %s has been sent to %s." %
+		[_money(offer), player.get("name", "?"), selling_club.get("name", "?")]}
+
+
+## Resolve last week's outgoing bids (called from advance_week). The evaluation
+## happens NOW, through the same sign paths (count_offer=false — the allowance
+## was charged at placement); accept and reject both land in the news log.
+func _resolve_pending_bids(rng: RandomNumberGenerator) -> void:
+	if pending_bids.is_empty():
+		return
+	var due: Array = pending_bids
+	pending_bids = []
+	for b in due:
+		var res: Dictionary
+		if str(b.get("kind", "")) == "external":
+			res = sign_external(b.get("player", {}), b.get("club", {}), int(b.get("offer", 0)),
+				rng, int(b.get("weekly", -1)), int(b.get("years", -1)),
+				b.get("clauses", []), int(b.get("bonus", 0)), false)
+		else:
+			res = sign_player(int(b.get("pid", -1)), int(b.get("club_id", -1)),
+				int(b.get("offer", 0)), rng, int(b.get("weekly", -1)), int(b.get("years", -1)),
+				b.get("clauses", []), int(b.get("bonus", 0)), false)
+		# Accepted deals already write their own "You have signed ..." news line;
+		# a rejection (or a collapsed deal — squad full / cash gone) posts here.
+		if not bool(res.get("ok", false)):
+			_log(str(res.get("msg", "")))
+
+
+func sign_player(pid: int, from_club_id: int, offer: int, rng: RandomNumberGenerator,
+		weekly: int = -1, years: int = -1, clauses: Array = [], bonus: int = 0,
+		count_offer: bool = true) -> Dictionary:
+	# count_offer=false = resolving a bid placed earlier (place_bid already charged the
+	# board allowance and the window was open at placement) — skip the placement gates.
+	if count_offer and not transfers_open():
+		return {"ok": false, "msg": "The transfer deadline has passed."}
+	if count_offer and offers_left <= 0:
 		return {"ok": false, "msg": "The Directors will only let you make %d offers to sign a player per week." % OFFERS_PER_WEEK}
 	if my_squad().size() >= TransferMarket.SQUAD_MAX:
 		return {"ok": false, "msg": "Your squad is full (%d), the maximum allowed. You can not sign more." % TransferMarket.SQUAD_MAX}
@@ -1696,7 +1787,8 @@ func sign_player(pid: int, from_club_id: int, offer: int, rng: RandomNumberGener
 	var player := _find_in(from_club_id, pid)
 	if player.is_empty():
 		return {"ok": false, "msg": "That player is no longer available."}
-	offers_left -= 1   # an offer counts whether or not it is accepted
+	if count_offer:
+		offers_left -= 1   # an offer counts whether or not it is accepted
 	var is_key := TransferMarket.is_key_player(club_view(from_club_id), pid)
 	var verdict := TransferMarket.evaluate_offer(player, offer, is_key, tier, rng)
 	var seller_name: String = club_names.get(from_club_id, "?")
@@ -1738,10 +1830,10 @@ func sign_player(pid: int, from_club_id: int, offer: int, rng: RandomNumberGener
 ## from future browses of that static squad.
 func sign_external(player: Dictionary, selling_club: Dictionary, offer: int,
 		rng: RandomNumberGenerator, weekly: int = -1, years: int = -1,
-		clauses: Array = [], bonus: int = 0) -> Dictionary:
-	if not transfers_open():
+		clauses: Array = [], bonus: int = 0, count_offer: bool = true) -> Dictionary:
+	if count_offer and not transfers_open():
 		return {"ok": false, "msg": "The transfer deadline has passed."}
-	if offers_left <= 0:
+	if count_offer and offers_left <= 0:
 		return {"ok": false, "msg": "The Directors will only let you make %d offers to sign a player per week." % OFFERS_PER_WEEK}
 	if my_squad().size() >= TransferMarket.SQUAD_MAX:
 		return {"ok": false, "msg": "Your squad is full (%d), the maximum allowed. You can not sign more." % TransferMarket.SQUAD_MAX}
@@ -1750,7 +1842,8 @@ func sign_external(player: Dictionary, selling_club: Dictionary, offer: int,
 	var pid := int(player.get("id", -1))
 	if external_signed.has(pid) or not _find_in(club_id, pid).is_empty():
 		return {"ok": false, "msg": "That player is no longer available."}
-	offers_left -= 1   # an offer counts whether or not it is accepted
+	if count_offer:
+		offers_left -= 1   # an offer counts whether or not it is accepted
 	var is_key := TransferMarket.is_key_player(selling_club, pid)
 	var verdict := TransferMarket.evaluate_offer(player, offer, is_key, tier, rng)
 	var seller_name := str(selling_club.get("name", "?"))
@@ -2615,6 +2708,7 @@ func to_dict() -> Dictionary:
 		"youth_seq": youth_seq, "youth_search": youth_search,
 		"scout_search": scout_search, "scout_results": scout_results,
 		"pending_alerts": pending_alerts, "external_signed": _str_keyed(external_signed),
+		"pending_bids": pending_bids,
 		"staff": staff, "staff_pool": staff_pool,
 		"staff_seq": staff_seq, "free_agents": free_agents, "free_seq": free_seq,
 		"talents_used": talents_used,
@@ -2695,6 +2789,7 @@ static func from_dict(d: Dictionary) -> Career:
 	c.pending_alerts = d.get("pending_alerts", [])
 	for k in d.get("external_signed", {}):
 		c.external_signed[int(k)] = true
+	c.pending_bids = d.get("pending_bids", [])   # pre-delay saves load with none pending
 	# Pre-staff saves load with no staff + an empty pool (effects default to 1.0); the
 	# first rollover refreshes a pool to hire from.
 	c.staff = d.get("staff", [])

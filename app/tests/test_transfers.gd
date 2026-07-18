@@ -32,6 +32,7 @@ func _run() -> bool:
 	ok = _valuation() and ok
 	ok = _market_and_offers(prem, league, leagues) and ok
 	ok = _sign_sell_renew(prem, league, leagues) and ok
+	ok = _pending_bid_delay(prem, league, leagues) and ok
 	ok = _ai_and_season(prem, league, leagues) and ok
 	ok = _persistence(prem, league, leagues) and ok
 	print("\n%s" % ("ALL PASS" if ok else "FAILURES ABOVE"))
@@ -95,6 +96,48 @@ func _market_and_offers(prem: Array, league: Dictionary, leagues: Array) -> bool
 	var keyp := TransferMarket._find(seller["players"], key_id)
 	ok = _assert(TransferMarket.asking_price(keyp, true, career.tier)
 		> TransferMarket.value_of(keyp, career.tier), "first-XI asking carries a premium") and ok
+	return ok
+
+
+# Outgoing bids take days: place_bid_* queues, the NEXT week roll resolves through
+# the same sign paths, and only then does the player join (the Bakayoko fix).
+func _pending_bid_delay(prem: Array, league: Dictionary, leagues: Array) -> bool:
+	var ok := true
+	var career := Career.create(prem[0], league, prem, leagues)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 23
+	career.cash = 50_000_000
+	var seller_id := int(prem[1]["id"])
+	var target := _surplus_outfielder(prem[1])
+	var tid := int(target["id"])
+	var ask := TransferMarket.asking_price(target, false, career.tier)
+	var my0 := career.my_squad().size()
+	var offers0 := career.offers_left
+	var placed := career.place_bid_roster(tid, seller_id, ask)
+	ok = _assert(placed["ok"] and placed["msg"].contains("has been sent"), "bid placed, not completed") and ok
+	ok = _assert(career.my_squad().size() == my0, "no player joins at the OFFER click") and ok
+	ok = _assert(career.cash == 50_000_000, "no cash moves at the OFFER click") and ok
+	ok = _assert(career.offers_left == offers0 - 1, "the board allowance is charged at placement") and ok
+	ok = _assert(career.pending_bids.size() == 1, "one bid pending") and ok
+	var dup := career.place_bid_roster(tid, seller_id, ask)
+	ok = _assert(not dup["ok"] and dup["msg"].contains("already"), "no double bid on the same player") and ok
+	career.advance_week(rng)
+	ok = _assert(career.pending_bids.is_empty(), "the week roll resolves the bid") and ok
+	ok = _assert(career.my_squad().size() == my0 + 1, "the player joins with the answer (non-key at asking accepts)") and ok
+	ok = _assert(not career._find_in(career.club_id, tid).is_empty(), "the target is in the squad") and ok
+	# Save round-trip with a bid still pending survives.
+	var c2 := Career.create(prem[0], league, prem, leagues)
+	c2.cash = 50_000_000
+	var t2 := _surplus_outfielder(prem[2])
+	c2.place_bid_roster(int(t2["id"]), int(prem[2]["id"]),
+		TransferMarket.asking_price(t2, false, c2.tier))
+	var snap := c2.to_dict()
+	var c3 := Career.from_dict(snap)
+	ok = _assert(c3.pending_bids.size() == 1, "pending bid survives save/load") and ok
+	var rng2 := RandomNumberGenerator.new()
+	rng2.seed = 29
+	c3.advance_week(rng2)
+	ok = _assert(not c3._find_in(c3.club_id, int(t2["id"])).is_empty(), "restored bid resolves next week") and ok
 	return ok
 
 
