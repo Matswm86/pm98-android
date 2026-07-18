@@ -1270,7 +1270,9 @@ static func _pass_handoff_aa490(p: Dictionary, target: Dictionary, b1: int, b2: 
 ## curve is PARKED to 0; otherwise it is the (P+0x70*P+0x3ac)/15000 * speed_scale/100 + P+0x3a8 formula.
 static func steer_89c0(p: Dictionary, target_pos: Array, speed_scale: int) -> void:
 	if MatchEngine.Pm98Rng._log_on:                          # diag-only steer trace (draw-free path)
-		steer_trace.append([MatchEngine.Pm98Rng._who, target_pos.duplicate(), speed_scale])
+		var _tm: Dictionary = _ref(p, 0x18c)
+		steer_trace.append([MatchEngine.Pm98Rng._who, target_pos.duplicate(), speed_scale,
+			_g(_tm, 0x448), _g(_tm, 0x461)])                 # + mid-tick phase / flag byte
 	var ctrl: Dictionary = _ref(p, 0x190)
 	var m: Dictionary = _ref(p, 0x18c)
 	var scale := speed_scale
@@ -4104,6 +4106,11 @@ static func _ps_goalbox(p: Dictionary, v: Array) -> bool:
 static func resolve_post_shot(p: Dictionary, teammates: Array, rng = null) -> void:
 	var ball := _ref(p, 0x190)
 	var m := _ref(p, 0x18c)
+	# FUN_005ab5a0 L25: FUN_0058fda0() FIRST — rebuild the predicted-trajectory buffer from the
+	# just-released kick velocity BEFORE the +0xcc reads. Same-tick off-ball b0040 interception
+	# reads the +0x114 slots; omitting this left the at-rest buffer visible for the rest of the
+	# kick tick (t1.i9 kickoff arm-step target -142564 vs silicon -194860, s44).
+	_ball_predict_traj(ball)
 	var px := _si(p, 0x4)
 	var py := _si(p, 0x8)
 	var pz := _si(p, 0xc)

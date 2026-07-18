@@ -16,7 +16,7 @@ const STRUCT_JSON := REF_DIR + "/frame0_struct_import.json"
 const FRAME0_SEED := 0xea0d2a8d
 const TICK_CAP := 700
 const CLK_LO := 0
-const CLK_HI := 218
+const CLK_HI := 306
 
 
 func _init() -> void:

@@ -10,10 +10,10 @@ extends SceneTree
 const REF_DIR := "/home/mats/MWM-AI/data/pm98-m4-oracle/capture2"
 const STRUCT_JSON := REF_DIR + "/frame0_struct_import.json"
 const FRAME0_SEED := 0xea0d2a8d
-const TICK_CAP := 620
+const TICK_CAP := 340
 # clk windows to dump per-tick call-site detail (control vs over-draw)
-const DUMP_LO := 0    # dump per-tick detail for clk in [DUMP_LO, DUMP_HI]
-const DUMP_HI := 60
+const DUMP_LO := 260  # dump per-tick detail for clk in [DUMP_LO, DUMP_HI]
+const DUMP_HI := 300
 
 
 func _init() -> void:
@@ -75,7 +75,7 @@ func _run() -> void:
 			var by := Pm98Trig._i32(_g(b, 8))
 			var ctrl_v: Variant = b.get(0x40, null)
 			var ctrl := "p%d" % (ctrl_v as Dictionary).get(0x2c8, -1) if ctrl_v is Dictionary else "-"
-			print("clk=%3d tick=%3d ndraws=%d ball=(%d,%d) carrier=%s" % [clk, t, draws.size(), bx, by, ctrl])
+			print("clk=%3d tick=%3d ndraws=%d state=%d ball=(%d,%d) carrier=%s" % [clk, t, draws.size(), rng.state, bx, by, ctrl])
 			var keys := tally.keys()
 			keys.sort()
 			for kk in keys:

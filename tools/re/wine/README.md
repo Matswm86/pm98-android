@@ -106,3 +106,21 @@ Render + synthetic clicks REQUIRE a wine virtual desktop with the FULL windows p
   draw). Filter on the store eip; `[esp]` at that stop is the drawing call-site (no frame).
   Detach after `done` may still kill the game ("stub closed") — capture first, game is
   expendable after.
+
+## RSP-only capture (ptrace_scope=1, NO sudo) — 2026-07-18 (s44)
+
+Wine double-forks every process to PPid 1, so /proc/<lpid>/mem is Yama-blocked at
+scope 1. The winedbg --gdb stub works WITHOUT sudo (wineserver holds PR_SET_PTRACER):
+its RSP `m`/`M`/`Z1`/`Z2` packets replace all /proc I/O — but ONLY after `Hg<tid>`
+(thread from the `?` T05 reply); without it the stub never answers `m`.
+
+- `m5_rsp_capture.py <port> <lpid> <ref_json> <out> [stop_clk] [win_lo] [win_hi]` —
+  base candidates/scan + frame0 poke + XI check + Z2 seed-watch, full-roster row per draw.
+- `m5_rsp_steertgt.py <port> <ref_json> <out> [team] [idx] [stop_clk]` — poke + Z1 on
+  FUN_005a89c0, per-hit steer target + player + ball dump for one player.
+- Gotchas: stub accepts ONE connection; client disconnect kills the stub (game usually
+  dies); never wrap the stub in `timeout` (SIGTERM kills the game); a Z1 on the outer
+  step 0x5983f0 held across the KICK OFF click CRASHES the stub — use the base
+  candidates 0x03dbf0d8 / 0x03dbf060 (reproduce per boot) or the mem scan;
+  the preseason injury roll can silently swap a starter — the XI check aborts,
+  re-roll the boot (~1-in-2 clean); lpid is used ONLY for /proc/<lpid>/maps (not gated).
