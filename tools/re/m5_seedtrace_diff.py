@@ -48,6 +48,8 @@ def main() -> int:
                 r = json.loads(line)
             except json.JSONDecodeError:
                 continue
+            if "seed" not in r:          # event rows (e.g. process_gone)
+                continue
             rows += 1
             seed = int(r["seed"])
             hit = port.get(seed)
