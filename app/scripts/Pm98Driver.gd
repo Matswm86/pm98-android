@@ -398,9 +398,8 @@ static func _classify_open_play(m: Dictionary, rng: MatchEngine.Pm98Rng, b: Dict
 		m[0x45c] = _i(1 - _g(b, 0x54))
 		Pm98Dispatch.dispatch(m, 3, rng)
 		return
-	var ks := Pm98Predicates.keeper_save(b, m, _defending_keeper(m))   # FUN_0058f140 -> SAVE (2)
-	if bool(ks.get("save", false)):
-		Pm98Events.keeper_event(b, 0)                # the deferred FUN_005909f0 wire
+	# FUN_0058f140 -> SAVE (2); keeper_save fires keeper_event in-function at 58f30b.
+	var ks := Pm98Predicates.keeper_save(b, m, _defending_keeper(m))
 	if int(ks.get("ret", 0)) != 0:
 		m[0x45c] = _i(1 - _g(b, 0x54))
 		Pm98Dispatch.dispatch(m, 2, rng)
@@ -482,9 +481,7 @@ static func _pen_decisive(m: Dictionary) -> bool:
 ## Penalty / extra-time special (L481-544): keeper-save short-circuit, then dispatch 1
 ## (decisive) or 3 (restart).
 static func _penalty_branch(m: Dictionary, rng: MatchEngine.Pm98Rng, b: Dictionary) -> void:
-	var ks := Pm98Predicates.keeper_save(b, m, _defending_keeper(m))
-	if bool(ks.get("save", false)):
-		Pm98Events.keeper_event(b, 0)
+	var ks := Pm98Predicates.keeper_save(b, m, _defending_keeper(m))   # fires keeper_event at 58f30b
 	Pm98Predicates.traj_copy(b, m, _traj_src(b))
 	if int(ks.get("ret", 0)) == 0 and (_g(b, 0x63) & 0xff) == 0:
 		# velocity / goal-line geometry gate: a slow ball still in front of goal -> no event.

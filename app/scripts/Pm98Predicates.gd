@@ -19,7 +19,8 @@ extends RefCounted
 ##   * keeper_save = FUN_0058f140 -- keeper-reach save: box/reach test + ball+0x61
 ##                  latch + atan_angle reach geometry + deflect-write. Returns
 ##                  {ret, save}; the save-stat bump + 0x15/0x16 event enqueue
-##                  (FUN_005909f0 -> FUN_00594470) are deferred to driver task 2.
+##                  (FUN_005909f0 -> FUN_00594470) fires in-function at the binary's
+##                  58f30b point via Pm98Events.keeper_event, BEFORE the +0x50 clear.
 ##
 ## Like Pm98Resolver, `b` (ball) and `m` (match) are offset->int Dictionaries that
 ## are MUTATED in place exactly as the binary mutates the structs. Sound/commentary
@@ -280,18 +281,29 @@ static func keeper_save(b: Dictionary, m: Dictionary, k: Dictionary) -> Dictiona
 		return {"ret": bvar12, "save": false}
 
 	var save_fired := false
-	if _g(b, 0x4c) == 0 and _g(b, 0x50) != 0:
+	# ball+0x4c (owner) / +0x50 (keeper) are POINTERS in live play (Dictionary refs) or
+	# raw ints in the oracle fixtures; null-test both via the L1109/L1218 pointer-or-int
+	# idiom (int(Dictionary) would crash). The binary derefs *(ball+0x50) as the keeper
+	# struct (58f14b..58f30b); the `k` param stands in when the fixture stores a bare
+	# int handle there.
+	var owner: Variant = b.get(0x4c, null)
+	var keep: Variant = b.get(0x50, null)
+	var owner_set: bool = owner is Dictionary or (owner is int and int(owner) != 0)
+	var keep_set: bool = keep is Dictionary or (keep is int and int(keep) != 0)
+	if not owner_set and keep_set:
 		# DAT_006d31c4 == 0 in-sim -> run the keeper-reach geometry, then clear the keeper.
-		var sgn_sel := (1 - _g(k, 0x2b8)) ^ (_g(m, 0x19a0) & 1)
+		var kk: Dictionary = keep if keep is Dictionary else k
+		var sgn_sel := (1 - _g(kk, 0x2b8)) ^ (_g(m, 0x19a0) & 1)
 		var gline := line if sgn_sel != 0 else -line      # signed goal line (kmatch+0x1820)
-		var kx := Pm98Trig._i32(_g(k, 4))
-		var ky := Pm98Trig._i32(_g(k, 8))
+		var kx := Pm98Trig._i32(_g(kk, 4))
+		var ky := Pm98Trig._i32(_g(kk, 8))
 		# angle keeper->goal-line vs keeper->ball; keeper+0x34 cancels (k34 - k34).
 		var a1 := Pm98Trig.atan_angle(gline - kx, -ky)
 		var a2 := Pm98Trig.atan_angle(x - kx, y - ky)
 		if absi(Pm98Trig._s16(a2 - a1)) < 0x3555:
-			if absi(Pm98Trig._i32(_g(k, 0x3a4) + kx)) < 0x370000:
+			if absi(Pm98Trig._i32(_g(kk, 0x3a4) + kx)) < 0x370000:
 				save_fired = true
+				Pm98Events.keeper_event(b, 0)    # 58f30b FUN_005909f0(0), BEFORE the +0x50 clear
 		b[0x50] = 0
 
 	# Deflection target: clamp the ball into the RAW goal box, zero z, nudge y outward.

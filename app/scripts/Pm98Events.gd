@@ -80,7 +80,10 @@ static func enqueue(m: Dictionary, code: int, player: Dictionary, flag: int) -> 
 ## a 0x15/0x16 commentary event for the keeper when the match+0x462 band bits warrant.
 ## No-op when ball+0x4c!=0 or ball+0x50 (the keeper) is null. ball+0x1d4 -> match.
 static func keeper_event(b: Dictionary, save_flag: int) -> void:
-	if _g(b, 0x4c) != 0:
+	# ball+0x4c is an owner POINTER in live play (Dictionary) or an int in fixtures;
+	# non-null either way -> the binary's *(this+0x4c) != 0 early-out.
+	var owner: Variant = b.get(0x4c, null)
+	if owner is Dictionary or (owner is int and int(owner) != 0):
 		return
 	var keeper := _ref(b, 0x50)
 	if keeper.is_empty():
