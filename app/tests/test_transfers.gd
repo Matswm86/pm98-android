@@ -220,14 +220,39 @@ func _ai_and_season(prem: Array, league: Dictionary, leagues: Array) -> bool:
 	for cid in career.rosters:
 		total_before += (career.rosters[cid] as Array).size()
 	var moved := 0
+	var sample := ""
 	for _i in 30:
 		var news := TransferMarket.ai_round(rng, career.rosters, career.club_names, career.club_id, career.tier)
 		moved += news.size()
+		if not news.is_empty():
+			sample = str(news[0])
 	var total_after := 0
 	for cid in career.rosters:
 		total_after += (career.rosters[cid] as Array).size()
 	ok = _assert(total_after == total_before, "AI round conserves total players (%d)" % total_after) and ok
 	ok = _assert(moved > 0, "AI round produced some transfers over 30 rounds (%d)" % moved) and ok
+	# Witnessed NEWS EXTRA MARKET format: "<buyer> has signed <player> for N seasons for £F."
+	# (2026-07-19 "Everton has signed Lilley for 5 seasons for £288,000.")
+	ok = _assert(sample.contains(" has signed ") and sample.contains(" for ")
+		and sample.contains("£") and (sample.contains(" season") or sample.contains(" seasons")),
+		"AI news line matches witnessed active+fee+years format: %s" % sample) and ok
+	# The spelled-out singular / numeral-plural rule (witnessed "one season" / "5 seasons").
+	ok = _assert(TransferMarket.seasons_phrase(1) == "one season"
+		and TransferMarket.seasons_phrase(5) == "5 seasons", "seasons_phrase singular/plural") and ok
+	ok = _assert(TransferMarket.money_str(288000) == "288,000", "money_str thousands grouping") and ok
+
+	# The manager's own signing posts a witnessed MARKET line into the newspaper feed
+	# ("<player> signs for <club> for one season."). Sign a free agent and check news_log.
+	var fa_career := Career.create(prem[2], league, prem, leagues)
+	fa_career.free_agents = TransferMarket.generate_free_agents(rng, 3, 700000)
+	var fa_id := int((fa_career.free_agents[0] as Dictionary)["id"])
+	var fa_res := fa_career.sign_free_agent(fa_id, -1, rng)
+	var has_market_news := false
+	for n in fa_career.news_log:
+		if str(n.get("kind", "")) == "transfer" and str(n.get("text", "")).contains(" signs for "):
+			has_market_news = true
+	ok = _assert(bool(fa_res.get("ok", false)) and has_market_news,
+		"manager signing posts a '<player> signs for <club> for ...' MARKET news line") and ok
 
 	# Season rollover: contracts tick, an unrenewed player leaves, the calendar resets.
 	var leaver: Dictionary = career.my_squad()[0]

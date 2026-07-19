@@ -1,0 +1,34 @@
+{
+  "binding_sources": {
+    "first": "screenshots/wine-captures-2026-07-19-lowerdiv/w5_lt_default.png",
+    "second": "screenshots/wine-captures-2026-07-19-lowerdiv/w7_lt_second.png",
+    "third": "screenshots/wine-captures-2026-07-19-lowerdiv/w7_lt_third_seed.png"
+  },
+  "note": "Lower-division chromes + movement markers, live-witnessed 2026-07-19. Rows/leader/date/plaque blanked; zone tags, subtitle and the selected tab stay baked per division.",
+  "row_grid_24": {
+    "y0": 115,
+    "pitch": 15,
+    "fill_h": 12,
+    "n": 24,
+    "x0": 71,
+    "x1": 488
+  },
+  "marker": {
+    "x": 106,
+    "w": 10,
+    "h": 9,
+    "dy_20row": 3,
+    "dy_24row": 2
+  },
+  "tabs": {
+    "x": 525,
+    "w": 100,
+    "h": 26,
+    "y": {
+      "premier": 194,
+      "first": 224,
+      "second": 254,
+      "third": 284
+    }
+  }
+}

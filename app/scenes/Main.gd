@@ -991,6 +991,13 @@ func _open_table(rows: Array, title_left: String, season: String, week_label: St
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
 	scr.setup(rows, title_left, season, week_label, tier, my_id, manager)
+	# The living pyramid behind the witnessed division tabs: each tab pulls that
+	# division's REAL simulated table + previous-revision positions (movement
+	# markers). Career overlays only — a season-sim table has no pyramid.
+	if _career != null and my_id == _career.club_id:
+		scr.set_pyramid(func(t: int) -> Dictionary:
+			return {"rows": _career.standings_for(t), "prev": _career.prev_positions_for(t)},
+			_career.prev_positions_for(_career.tier))
 	scr.back_pressed.connect(func() -> void:
 		AudioManager.ui_select()
 		scr.queue_free())
@@ -999,13 +1006,14 @@ func _open_table(rows: Array, title_left: String, season: String, week_label: St
 		var club := _club_with_roster(id) if _career != null and id == _career.club_id else GameDB.club(id)
 		_open_database_squad(club))
 	# GOAL SCORERS (witnessed 2026-07-18: LEAGUE TABLES button -> graph+list screen;
-	# RETURN goes back to LEAGUE TABLES). Career only — a simulated season table has
-	# no goal ledger, so the button stays inert there (honest gap, RE doc).
+	# RETURN goes back to LEAGUE TABLES). Division-scoped: the button opens the
+	# SELECTED division's chart (witnessed lt_goalscorers_third, 2026-07-19).
+	# Career only — a simulated season table has no goal ledger (honest gap).
 	scr.scorers_pressed.connect(func() -> void:
 		if _career == null or my_id != _career.club_id:
 			return
 		AudioManager.ui_select()
-		_show_goal_scorers_screen())
+		_show_goal_scorers_screen(scr.selected_tier()))
 
 ## Reversed FINANCES overlay for any club dict.
 func _open_finance(club: Dictionary, club_name: String, season: String) -> void:
@@ -1121,6 +1129,9 @@ func _home_select(item: Dictionary) -> void:
 func _continue_career() -> void:
 	_career = Career.load_save()
 	if _career != null:
+		# Re-attach the pyramid's static club records (never persisted); a
+		# pre-pyramid save gains its lower divisions here (fast-forwarded).
+		_career.ensure_divisions(_pyramid_context())
 		# An in-progress career in its first seasons still gets the guaranteed gem on resume.
 		var before: int = (_career.youth as Array).size()
 		_career._ensure_wonderkid()
@@ -1296,11 +1307,30 @@ func _clubs_of_country_en(name_en: String) -> Array:
 		out.append_array(GameDB.clubs_in_country(str(es2)))
 	return out
 
+## The full English-pyramid context for Career's living lower divisions:
+## all four league memberships (static GameDB club dicts) plus the WITNESSED
+## 1997-98 pre-season seed orders (data/season_seed_1997.json, live wine
+## campaign 2026-07-19 — see docs/re/league_table_screen_re.md).
+func _pyramid_context() -> Dictionary:
+	var divs: Array = []
+	for lg in GameDB.leagues:
+		divs.append({"league_id": str(lg["id"]), "name": str(lg["name"]),
+			"tier": int(lg.get("tier", 0)), "clubs": GameDB.clubs_in_league(str(lg["id"]))})
+	var seeds: Dictionary = {}
+	if FileAccess.file_exists("res://data/season_seed_1997.json"):
+		var f := FileAccess.open("res://data/season_seed_1997.json", FileAccess.READ)
+		if f != null:
+			var parsed: Variant = JSON.parse_string(f.get_as_text())
+			if typeof(parsed) == TYPE_DICTIONARY:
+				seeds = parsed.get("seeds", {})
+	return {"divisions": divs, "seeds": seeds}
+
+
 func _begin_career(manager_name: String, league: Dictionary, club: Dictionary,
 		preseason_rivals: Array = []) -> void:
 	AudioManager.ui_select()
 	var league_clubs := GameDB.clubs_in_league(league["id"])
-	_career = Career.create(club, league, league_clubs, GameDB.leagues)
+	_career = Career.create(club, league, league_clubs, GameDB.leagues, _pyramid_context())
 	_career.manager_name = manager_name
 	# Entry-flow picks (NIVEL level + Players age ? + preseason friendlies). The
 	# rivals play out via hub CONTINUE before league round 1 (Career.play_friendly).
@@ -1805,14 +1835,17 @@ func _show_league_table_screen() -> void:
 		_career.tier, _career.club_id, _career.manager_name)
 
 ## GOAL SCORERS (LEAGUE TABLES sub-screen; docs/re/goalscorers_screen_re.md): the
-## league-wide scorer chart + compare graph + per-player goal-log popup, fed by the
-## Career scorer_log ledger. Mounts OVER the league table; RETURN frees it so the
-## table beneath re-raises (the witnessed back path, frame 29 of the witness run).
-func _show_goal_scorers_screen() -> void:
+## scorer chart + compare graph + per-player goal-log popup, fed by the scorer
+## ledger of the given DIVISION (witnessed division-scoped, 2026-07-19: entering
+## from a lower division's table shows THAT division's chart). Mounts OVER the
+## league table; RETURN frees it so the table beneath re-raises.
+func _show_goal_scorers_screen(for_tier: int = -1) -> void:
+	var t: int = _career.tier if for_tier <= 0 else for_tier
 	var scr: GoalScorersScreen = load("res://scenes/GoalScorersScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
-	scr.setup(_career.league_scorers(), _career.scorer_goal_dict(), _career.club_names,
+	scr.setup(_career.league_scorers_for(t), _career.scorer_goal_dict_for(t),
+		_career.names_for(t),
 		_career.week, _career.manager_name, _career.club_name, _career.tier,
 		_career.season, "Week %d" % mini(_career.week + 1, _career.total_weeks()),
 		_career.club_id)
@@ -4174,7 +4207,7 @@ func _accept_job(offer: Dictionary) -> void:
 		return
 	var league_clubs := GameDB.clubs_in_league(lid)
 	var reason := "sacked" if _career.sacked else ("left %s" % _career.club_name)
-	_career.take_job(club, league, league_clubs, GameDB.leagues, reason)
+	_career.take_job(club, league, league_clubs, GameDB.leagues, reason, _pyramid_context())
 	# The new division was re-seeded from the 1997 GameDB: catch up any real talents
 	# whose debut has already passed (they land at their clubs here, today's ages).
 	_career.inject_due_talents(TalentDB.talents)

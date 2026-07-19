@@ -26,6 +26,28 @@ var year: int = 1                 # season number within this career
 var week: int = 0                 # index of the NEXT round to play
 var fixtures: Array = []          # Array[round]; round = Array[[home_id, away_id]]
 var table: Dictionary = {}        # club_id:int -> stat row
+# ---- the living pyramid (witnessed 2026-07-19, wine-captures-2026-07-19-lowerdiv/) ----
+# The original simulates ALL FOUR English divisions every week: real per-fixture
+# scores, per-player goal scorers, weekly table revisions with position arrows.
+# `divisions` holds the OTHER tiers (the manager's own stays in fixtures/table):
+#   tier:int -> {league_id, name, tier, ids:Array, names:{id->name}, fixtures,
+#                table:{id->row}, played:int, scorers:Array, seed:{id->pos},
+#                prev:{id->pos}}
+# Witnessed round offset: divisions BELOW the manager's have already played
+# round 1 by the manager's week-1 Saturday (w4 Premier career: Div1/2/3 all P=1
+# at 9/8 pre-match; w5 Div-1 career: Premier+Div1 P=0, Div2/3 P=1; w6 Div-2
+# career: Div3 P=1; w7 Div-3 career: Div2 P=0). Divisions at/above run in sync.
+var divisions: Dictionary = {}
+var seed_pos: Dictionary = {}     # manager division: club_id -> pre-season seed slot (witnessed
+                                  # P=0 order = prior-season finish, relegated top/promoted bottom)
+var table_prev: Dictionary = {}   # manager division: club_id -> position at the previous
+                                  # table revision (the LEAGUE TABLES up/down arrows)
+# Runtime-only (never persisted): static club dicts + rating/XI caches for the
+# other divisions' weekly sim. Flat id-keyed (memberships move across seasons).
+# Re-attached by Main after load (ensure_divisions).
+var _div_clubs: Dictionary = {}   # club_id -> static club dict (ALL English clubs)
+var _div_ratings: Dictionary = {} # club_id -> MatchEngine.team_ratings
+var _div_xis: Dictionary = {}     # club_id -> MatchSim.xi_of
 var results: Array = []           # manager's played results [{week,opp_id,home,hg,ag}]
 var scorer_log: Array = []        # every league goal, all fixtures: {week,scorer,club,minute,h,a}
                                   # (own goals excluded; feeds GOAL SCORERS, witnessed 2026-07-18)
@@ -193,10 +215,17 @@ const AI_INJ_NEWS_WEEKS := 3
 
 ## Start a fresh career managing `club` in its division. `league` is the league
 ## dict, `league_clubs` the full club dicts in that division, `leagues` all leagues.
-static func create(club: Dictionary, league: Dictionary, league_clubs: Array, leagues: Array) -> Career:
+## `pyramid` (optional): the full English-league context for the living pyramid —
+## {"divisions": [{league_id, name, tier, clubs: Array[club dict]} x4],
+##  "seeds": {league_id: Array[club_id]}}   (seeds = season_seed_1997.json,
+## the witnessed pre-season table orders). Main builds it from GameDB
+## (pyramid_context); headless tests may omit it (divisions stay empty and the
+## career behaves exactly as before).
+static func create(club: Dictionary, league: Dictionary, league_clubs: Array, leagues: Array,
+		pyramid: Dictionary = {}) -> Career:
 	var c := Career.new()
 	c.reputation = Manager.REP_START
-	c._init_club(club, league, league_clubs, leagues)
+	c._init_club(club, league, league_clubs, leagues, pyramid)
 	return c
 
 
@@ -206,7 +235,8 @@ static func create(club: Dictionary, league: Dictionary, league_clubs: Array, le
 ## mid-career) -- so the cross-career state (reputation, manager_history, the year counter)
 ## is set by the CALLER, never here. The managed club's spell is stamped as starting in the
 ## current `year`.
-func _init_club(club: Dictionary, league: Dictionary, league_clubs: Array, leagues: Array) -> void:
+func _init_club(club: Dictionary, league: Dictionary, league_clubs: Array, leagues: Array,
+		pyramid: Dictionary = {}) -> void:
 	club_id = int(club["id"])
 	club_name = club.get("name", "?")
 	league_id = str(league.get("id", ""))
@@ -294,6 +324,16 @@ func _init_club(club: Dictionary, league: Dictionary, league_clubs: Array, leagu
 	staff_seq += staff_pool.size()
 	free_agents = TransferMarket.generate_free_agents(yrng, FREE_POOL_SIZE, free_seq)
 	free_seq += FREE_POOL_SIZE
+	# The living pyramid: witnessed seed order for the manager's own table + the
+	# other three English divisions simulated alongside (see the divisions block
+	# at the top of this file for the witness trail).
+	seed_pos = {}
+	table_prev = {}
+	var seeds: Dictionary = pyramid.get("seeds", {})
+	var my_seed: Array = seeds.get(league_id, [])
+	for i in my_seed.size():
+		seed_pos[int(my_seed[i])] = i + 1
+	_build_divisions(pyramid, yrng)
 
 
 ## Deep-copy a club's squad into a live roster, stamping a contract length on each
@@ -505,9 +545,17 @@ func season_fixtures() -> Array:
 func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -> Dictionary:
 	if season_over():
 		return {}
-	# Rival clubs trade in the background while the window is open.
+	# Snapshot this revision's positions BEFORE the round lands — the LEAGUE
+	# TABLES movement arrows compare against the previous revision (witnessed
+	# lt_wk2_premier: red/white position triangles at week 2).
+	table_prev = _positions_of(standings())
+	# Rival clubs trade in the background while the window is open. Their signings
+	# surface in the NEWS EXTRA newspaper MARKET feed (witnessed: "Everton has
+	# signed Lilley for 5 seasons for £288,000.", 2026-07-19) AND the manager's
+	# transfer-activity log.
 	if transfers_open() and not rosters.is_empty():
 		for line in TransferMarket.ai_round(rng, rosters, club_names, club_id, tier):
+			_news("transfer", line)
 			_log(line)
 	# The fit XI that actually featured this week (captured before the match so its
 	# injury/card rolls land on the players who played, not this week's recoveries).
@@ -628,6 +676,10 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 	# land on the XIs that featured, and development nudges their ratings. Kept quiet bar
 	# notable rival injuries, which surface in the club news feed.
 	_roll_ai_squads(rng, ai_featured)
+	# The OTHER divisions play their round of the week (the witnessed living
+	# pyramid). Placed last so the pre-existing draw order within a week is
+	# untouched for reproducibility.
+	_advance_other_divisions(rng)
 	if season_over():
 		finished = true
 	return manager_res
@@ -717,6 +769,9 @@ func _ratings_for(id: int, clubs_override: Dictionary = {}) -> Dictionary:
 		# and suspensions actually weaken it (the living-league drift, #12). A thin XI
 		# pulls toward MatchEngine's rating floor, never below it.
 		return MatchEngine.team_ratings(_fit_view(id))
+	# An English club outside the live division: its static pyramid record.
+	if _div_clubs.has(id):
+		return _div_rating(id)
 	# Legacy save with no live roster for this club: the static override (full squad).
 	return MatchEngine.team_ratings(clubs_override.get(id, {}))
 
@@ -732,6 +787,8 @@ func _xi_for(id: int, clubs_override: Dictionary = {}) -> Array:
 		return []
 	if rosters.has(id):
 		return _ai_featured_xi(id)
+	if _div_clubs.has(id):
+		return _div_xi(id)
 	return MatchSim.xi_of(clubs_override.get(id, {}))
 
 
@@ -984,9 +1041,17 @@ func _signing_shock(newcomer: Dictionary) -> void:
 			Morale.add(pd, d)
 
 
-## Sorted standings (Pts, then GD, GF, name) as an Array of stat rows.
+## Sorted standings (Pts, then GD, GF, then the pre-season seed order) as stat rows.
+## The seed tiebreak reproduces the WITNESSED week-0 table: at P=0 every club is
+## equal, and the original lists them in last season's finishing order (relegated
+## clubs top, promoted clubs bottom) — never alphabetically (2026-07-19 frames
+## w5_lt_premier / w5_lt_default / w6_lt_second_seed / w7_lt_third_seed). Mid-season
+## equal-record ties falling to seed order is our consistent extension (un-witnessed).
 func standings() -> Array:
-	var rows: Array = table.values()
+	return _sorted_rows(table.values(), seed_pos)
+
+
+static func _sorted_rows(rows: Array, seed: Dictionary) -> Array:
 	rows.sort_custom(func(a, b):
 		if a["Pts"] != b["Pts"]:
 			return a["Pts"] > b["Pts"]
@@ -996,17 +1061,382 @@ func standings() -> Array:
 			return gda > gdb
 		if a["GF"] != b["GF"]:
 			return a["GF"] > b["GF"]
+		var sa: int = int(seed.get(int(a["id"]), 9999))
+		var sb: int = int(seed.get(int(b["id"]), 9999))
+		if sa != sb:
+			return sa < sb
 		return a["name"] < b["name"])
 	return rows
+
+
+# ---- the living pyramid --------------------------------------------------
+
+## Build the OTHER divisions' sim state from the pyramid context. Divisions
+## BELOW the manager's play their round 1 immediately (witnessed head start).
+func _build_divisions(pyramid: Dictionary, rng: RandomNumberGenerator) -> void:
+	divisions = {}
+	_div_clubs = {}
+	_div_ratings = {}
+	_div_xis = {}
+	for dv in pyramid.get("divisions", []):
+		var t := int(dv.get("tier", 0))
+		if t <= 0:
+			continue
+		# Static dicts for ALL English clubs (incl. the manager's division: a club
+		# dropping out of the live division needs its record for the pyramid sim).
+		for c in dv.get("clubs", []):
+			_div_clubs[int(c["id"])] = c
+		if t == tier:
+			continue
+		var clubs: Array = dv.get("clubs", [])
+		var ids: Array = []
+		var names: Dictionary = {}
+		var tbl: Dictionary = {}
+		for c in clubs:
+			var id := int(c["id"])
+			ids.append(id)
+			names[id] = c.get("name", "?")
+			tbl[id] = {"id": id, "name": c.get("name", "?"),
+				"P": 0, "W": 0, "D": 0, "L": 0, "GF": 0, "GA": 0, "Pts": 0}
+		var seed: Dictionary = {}
+		var order: Array = (pyramid.get("seeds", {}) as Dictionary).get(str(dv.get("league_id", "")), [])
+		for i in order.size():
+			seed[int(order[i])] = i + 1
+		divisions[t] = {"league_id": str(dv.get("league_id", "")), "name": str(dv.get("name", "")),
+			"tier": t, "ids": ids, "names": names, "fixtures": SeasonSim.fixtures(ids),
+			"table": tbl, "played": 0, "scorers": [], "seed": seed, "prev": {}}
+	for t in divisions:
+		if int(t) > tier:
+			_play_division_round(int(t), rng)
+
+
+## Re-attach the runtime club dicts after a load (they are never persisted), and
+## build any missing division state fresh. An old save gains zeroed lower-division
+## tables which are then FAST-FORWARDED to the expected round count by simulating
+## the missed rounds (same engine, not invented numbers) so the witnessed
+## "below divisions run a round ahead" offset holds mid-career.
+func ensure_divisions(pyramid: Dictionary) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	if divisions.is_empty():
+		_build_divisions(pyramid, rng)
+	else:
+		for dv in pyramid.get("divisions", []):
+			for c in dv.get("clubs", []):
+				_div_clubs[int(c["id"])] = c
+	if seed_pos.is_empty():
+		var order: Array = (pyramid.get("seeds", {}) as Dictionary).get(league_id, [])
+		for i in order.size():
+			seed_pos[int(order[i])] = i + 1
+	for t in divisions:
+		var target := week + (1 if int(t) > tier else 0)
+		while int(divisions[t]["played"]) < mini(target, (divisions[t]["fixtures"] as Array).size()):
+			var before := int(divisions[t]["played"])
+			_play_division_round(int(t), rng)
+			if int(divisions[t]["played"]) == before:
+				break   # clubs not attached; stop rather than spin
+
+
+func _div_rating(id: int) -> Dictionary:
+	if not _div_ratings.has(id):
+		var c: Dictionary = _div_clubs.get(id, {})
+		if c.is_empty():
+			return {}
+		_div_ratings[id] = MatchEngine.team_ratings(c)
+	return _div_ratings[id]
+
+
+func _div_xi(id: int) -> Array:
+	if not _div_xis.has(id):
+		var c: Dictionary = _div_clubs.get(id, {})
+		if c.is_empty():
+			return []
+		_div_xis[id] = MatchSim.xi_of(c)
+	return _div_xis[id]
+
+
+## Simulate one round of an OTHER division: real scores, table update, per-player
+## goal-scorer ledger — the witnessed living pyramid (Div-1 P=1 with a full Div-3
+## scorers chart at the manager's week 1).
+func _play_division_round(t: int, rng: RandomNumberGenerator) -> void:
+	var dv: Dictionary = divisions.get(t, {})
+	if dv.is_empty():
+		return
+	var played := int(dv["played"])
+	var fx: Array = dv["fixtures"]
+	if played >= fx.size():
+		return
+	if not _div_clubs.has(int((dv["ids"] as Array)[0])):
+		push_warning("Career: division tier %d has no attached clubs; round skipped" % t)
+		return
+	dv["prev"] = _positions_of(standings_for(t))
+	var tbl: Dictionary = dv["table"]
+	for m in fx[played]:
+		var h := int(m[0])
+		var a := int(m[1])
+		var res := MatchSim.simulate(rng, _div_rating(h), _div_rating(a),
+			_div_xi(h), _div_xi(a), h, a)
+		var hg := int(res["home_goals"])
+		var ag := int(res["away_goals"])
+		_apply(tbl[h], hg, ag)
+		_apply(tbl[a], ag, hg)
+		for g in res.get("goals", []):
+			var gd: Dictionary = g
+			if bool(gd.get("own_goal", false)):
+				continue
+			(dv["scorers"] as Array).append({"week": played + 1,
+				"scorer": str(gd.get("scorer", "?")),
+				"club": h if int(gd.get("scorer_side", 0)) == 0 else a,
+				"minute": int(gd.get("minute", 0)), "h": h, "a": a})
+	dv["played"] = played + 1
+
+
+## Advance every OTHER division by one round (called once per manager week).
+func _advance_other_divisions(rng: RandomNumberGenerator) -> void:
+	for t in divisions:
+		_play_division_round(int(t), rng)
+
+
+# Witnessed zone structure per tier (the live tables' tag columns, 2026-07-19):
+# Premier RELEGATION rows 18-20; Div 1 PROMOTION 1-2 / PLAY-OFFS 3-6 /
+# RELEGATION 22-24; Div 2 PROMOTION 1-2 / PLAY-OFFS 3-6 / RELEGATION 21-24;
+# Div 3 PROMOTION 1-3 / PLAY-OFFS 4-7, no relegation (no Conference modeled).
+# `up` = automatic promotion spots; the playoff pool's winner also goes up.
+const PYRAMID_ZONES := {
+	1: {"up": 0, "playoff": 0, "down": 3},
+	2: {"up": 2, "playoff": 4, "down": 3},
+	3: {"up": 2, "playoff": 4, "down": 4},
+	4: {"up": 3, "playoff": 4, "down": 0},
+}
+
+
+## Ratings for any English club: live view for the manager's division, static
+## record otherwise (playoff sim + cross-tier needs).
+func _any_rating(id: int) -> Dictionary:
+	if rosters.has(id):
+		return _ratings_for(id)
+	return _div_rating(id)
+
+
+## Winner of a 4-club promotion playoff: semis 1v4 / 2v3 (pool in finishing
+## order) then a final, single matches; a drawn tie re-simulates (sudden-death
+## replay, capped). The PLAY-OFFS pools are witnessed (tag columns); the
+## bracket seeding + one-leg format is the real 1997-98 English rule, FLAGGED
+## as a real-world-rule reconstruction (the in-game bracket is un-witnessed).
+func _playoff_winner(pool: Array, rng: RandomNumberGenerator) -> int:
+	if pool.size() < 4:
+		return int(pool[0]) if pool.size() > 0 else -1
+	var semi1 := _playoff_tie(int(pool[0]), int(pool[3]), rng)
+	var semi2 := _playoff_tie(int(pool[1]), int(pool[2]), rng)
+	return _playoff_tie(semi1, semi2, rng)
+
+
+func _playoff_tie(h: int, a: int, rng: RandomNumberGenerator) -> int:
+	for _i in 5:
+		var res := MatchSim.simulate(rng, _any_rating(h), _any_rating(a),
+			_div_xi(h) if not rosters.has(h) else _xi_for(h),
+			_div_xi(a) if not rosters.has(a) else _xi_for(a), h, a)
+		if int(res["home_goals"]) != int(res["away_goals"]):
+			return h if int(res["home_goals"]) > int(res["away_goals"]) else a
+	return h if rng.randf() < 0.5 else a
+
+
+## End-of-season pyramid movement (promotions / relegations / playoffs) across
+## all four English divisions, INCLUDING the manager's club. Mutates the
+## membership state (rosters/club_names/tier/league_id/league_name, divisions,
+## seed orders) and leaves fixtures/table/cup rebuilding to the advance_season
+## code that follows. New seed orders follow the WITNESSED construction:
+## relegated-from-above at top (in their finishing order), survivors by finish,
+## promoted-from-below at the bottom (champions first, playoff winner last).
+func _pyramid_rollover(rng: RandomNumberGenerator) -> void:
+	if divisions.is_empty():
+		return   # no pyramid context (headless careers) — legacy same-membership rollover
+	# Guard: membership moves need the static club records for arriving clubs.
+	if _div_clubs.is_empty():
+		push_warning("Career: pyramid rollover skipped — no static club records attached")
+		return
+	var tiers: Array = [tier]
+	for t in divisions:
+		tiers.append(int(t))
+	tiers.sort()
+	# Final standings (ids in finishing order) per tier.
+	var final: Dictionary = {}
+	for t in tiers:
+		var ids: Array = []
+		for r in standings_for(int(t)):
+			ids.append(int((r as Dictionary).get("id", -1)))
+		final[int(t)] = ids
+	# Division defs (league_id/name) per tier, for reassignment below.
+	var defs: Dictionary = {tier: {"league_id": league_id, "name": league_name}}
+	for t in divisions:
+		defs[int(t)] = {"league_id": divisions[t]["league_id"], "name": divisions[t]["name"]}
+	# Promoted (auto first, playoff winner last) and relegated per tier.
+	var promoted: Dictionary = {}
+	var relegated: Dictionary = {}
+	for t in tiers:
+		var z: Dictionary = PYRAMID_ZONES.get(int(t), {"up": 0, "playoff": 0, "down": 0})
+		var order: Array = final[int(t)]
+		var ups: Array = order.slice(0, int(z["up"]))
+		if int(z["playoff"]) > 0 and int(t) > 1 and tiers.has(int(t) - 1):
+			var pool: Array = order.slice(int(z["up"]), int(z["up"]) + int(z["playoff"]))
+			var winner := _playoff_winner(pool, rng)
+			if winner >= 0:
+				ups.append(winner)
+		promoted[int(t)] = ups if (int(t) > 1 and tiers.has(int(t) - 1)) else []
+		relegated[int(t)] = order.slice(order.size() - int(z["down"])) \
+			if (int(z["down"]) > 0 and tiers.has(int(t) + 1)) else []
+	# New membership per tier, in seed order (the witnessed construction).
+	var new_members: Dictionary = {}
+	for t in tiers:
+		var stay: Array = []
+		for id in final[int(t)]:
+			if not (promoted[int(t)] as Array).has(id) and not (relegated[int(t)] as Array).has(id):
+				stay.append(id)
+		var members: Array = []
+		if tiers.has(int(t) - 1):
+			members.append_array(relegated[int(t) - 1])
+		members.append_array(stay)
+		if tiers.has(int(t) + 1):
+			members.append_array(promoted[int(t) + 1])
+		new_members[int(t)] = members
+	# The manager's club follows its finish (promotion or relegation moves the career).
+	var new_tier := tier
+	for t in tiers:
+		if (new_members[int(t)] as Array).has(club_id):
+			new_tier = int(t)
+			break
+	var all_names := func(id: int) -> String:
+		if club_names.has(id):
+			return str(club_names[id])
+		return str((_div_clubs.get(id, {}) as Dictionary).get("name", "?"))
+	# Rebuild the LIVE division (rosters + names) for the manager's new membership:
+	# clubs already live keep their rosters; arriving clubs are seeded from their
+	# static records (their live in-season state is a fresh-squad simplification).
+	var new_rosters: Dictionary = {}
+	var new_names: Dictionary = {}
+	for id in new_members[new_tier]:
+		new_names[int(id)] = all_names.call(int(id))
+		if rosters.has(int(id)):
+			new_rosters[int(id)] = rosters[int(id)]
+		else:
+			new_rosters[int(id)] = _seed_squad(_div_clubs.get(int(id), {"players": []}))
+	rosters = new_rosters
+	club_names = new_names
+	tier = new_tier
+	league_id = str((defs[new_tier] as Dictionary)["league_id"])
+	league_name = str((defs[new_tier] as Dictionary)["name"])
+	seed_pos = {}
+	for i in (new_members[new_tier] as Array).size():
+		seed_pos[int(new_members[new_tier][i])] = i + 1
+	table_prev = {}
+	# Rebuild the OTHER divisions' sim state on the new memberships.
+	var new_divisions: Dictionary = {}
+	for t in tiers:
+		if int(t) == new_tier:
+			continue
+		var ids: Array = new_members[int(t)]
+		var names: Dictionary = {}
+		var tbl: Dictionary = {}
+		var seed: Dictionary = {}
+		for i in ids.size():
+			var id := int(ids[i])
+			names[id] = all_names.call(id)
+			seed[id] = i + 1
+			tbl[id] = {"id": id, "name": names[id],
+				"P": 0, "W": 0, "D": 0, "L": 0, "GF": 0, "GA": 0, "Pts": 0}
+		new_divisions[int(t)] = {"league_id": (defs[int(t)] as Dictionary)["league_id"],
+			"name": (defs[int(t)] as Dictionary)["name"], "tier": int(t), "ids": ids,
+			"names": names, "fixtures": SeasonSim.fixtures(ids), "table": tbl,
+			"played": 0, "scorers": [], "seed": seed, "prev": {}}
+	divisions = new_divisions
+	_div_ratings = {}
+	_div_xis = {}
+	# The witnessed round offset re-applies: divisions below the (new) manager
+	# tier open the season a round ahead (career-start rule; season 2+ is our
+	# consistent extension, un-witnessed).
+	for t in divisions:
+		if int(t) > tier:
+			_play_division_round(int(t), rng)
+
+
+func _positions_of(rows: Array) -> Dictionary:
+	var out: Dictionary = {}
+	for i in rows.size():
+		out[int((rows[i] as Dictionary).get("id", -1))] = i + 1
+	return out
+
+
+## Sorted standings for ANY English tier (the manager's own or a simulated one).
+## Returns [] for a tier the career has no data for.
+func standings_for(t: int) -> Array:
+	if t == tier:
+		return standings()
+	var dv: Dictionary = divisions.get(t, {})
+	if dv.is_empty():
+		return []
+	return _sorted_rows((dv["table"] as Dictionary).values(), dv["seed"])
+
+
+## Previous-revision positions for a tier (the LEAGUE TABLES movement arrows);
+## {} before any revision exists.
+func prev_positions_for(t: int) -> Dictionary:
+	if t == tier:
+		return table_prev
+	return (divisions.get(t, {}) as Dictionary).get("prev", {})
+
+
+func has_division(t: int) -> bool:
+	return t == tier or divisions.has(t)
+
+
+## Club id -> name for a tier (the manager's own uses the live map).
+func names_for(t: int) -> Dictionary:
+	if t == tier:
+		return club_names
+	return (divisions.get(t, {}) as Dictionary).get("names", {})
+
+
+## GOAL SCORERS chart for a tier — witnessed division-scoped (lt_goalscorers_third:
+## the button on a lower division's table opens THAT division's chart).
+func league_scorers_for(t: int) -> Array:
+	if t == tier:
+		return league_scorers()
+	var dv: Dictionary = divisions.get(t, {})
+	if dv.is_empty():
+		return []
+	return _scorer_rows(dv["scorers"], func(cid: int, nm: String) -> String:
+		return _static_legal_name(cid, nm))
+
+
+func scorer_goal_dict_for(t: int) -> Dictionary:
+	if t == tier:
+		return scorer_goal_dict()
+	var dv: Dictionary = divisions.get(t, {})
+	return _goal_dict_of(dv.get("scorers", []))
+
+
+## Full legal name for a scorer on a STATIC division roster.
+func _static_legal_name(cid: int, surname: String) -> String:
+	var c: Dictionary = _div_clubs.get(cid, {})
+	for p in c.get("players", []):
+		if p is Dictionary and str((p as Dictionary).get("name", "")) == surname:
+			return str((p as Dictionary).get("legalName", surname))
+	return surname
 
 ## GOAL SCORERS ranking off the scorer_log ledger: goals desc, ties in first-to-reach-
 ## that-count order (frames 18/87 of the 2026-07-18 witness run are consistent with
 ## this; the original's exact tiebreak is not exhaustively provable — RE doc §list).
 ## Rows: [{name, club_id, goals, legal}]; the screen shows at most its 14 witnessed bars.
 func league_scorers() -> Array:
+	return _scorer_rows(scorer_log, func(cid: int, nm: String) -> String:
+		return _legal_name(cid, nm))
+
+
+## Shared chart builder over any scorer ledger (the manager's or a division's).
+static func _scorer_rows(log: Array, legal_fn: Callable) -> Array:
 	var agg: Dictionary = {}
-	for i in scorer_log.size():
-		var e: Dictionary = scorer_log[i]
+	for i in log.size():
+		var e: Dictionary = log[i]
 		var key := "%s|%d" % [str(e.get("scorer", "?")), int(e.get("club", -1))]
 		if not agg.has(key):
 			agg[key] = {"name": str(e.get("scorer", "?")), "club_id": int(e.get("club", -1)),
@@ -1019,15 +1449,19 @@ func league_scorers() -> Array:
 			return int(x["goals"]) > int(y["goals"])
 		return int(x["last"]) < int(y["last"]))
 	for r in rows:
-		r["legal"] = _legal_name(int(r["club_id"]), str(r["name"]))
+		r["legal"] = legal_fn.call(int(r["club_id"]), str(r["name"]))
 	return rows
 
 
 ## Per-player goal entries for the goal-log popup, keyed "surname|club_id".
 ## Entry: {week, minute, h, a} (h/a = the fixture's club ids, popup MATCH columns).
 func scorer_goal_dict() -> Dictionary:
+	return _goal_dict_of(scorer_log)
+
+
+static func _goal_dict_of(log: Array) -> Dictionary:
 	var out: Dictionary = {}
-	for e in scorer_log:
+	for e in log:
 		var key := "%s|%d" % [str(e.get("scorer", "?")), int(e.get("club", -1))]
 		if not out.has(key):
 			out[key] = []
@@ -1222,12 +1656,12 @@ func record_spell(reason: String) -> void:
 ## manager carries only reputation + history + the career year counter across the move.
 ## `reason` is how the old spell ended. After this the new club's first season is ready.
 func take_job(club: Dictionary, league: Dictionary, league_clubs: Array, leagues: Array,
-		reason: String = "") -> void:
+		reason: String = "", pyramid: Dictionary = {}) -> void:
 	if reason == "":
 		reason = "sacked" if sacked else ("left for %s" % str(club.get("name", "?")))
 	record_spell(reason)
 	year += 1
-	_init_club(club, league, league_clubs, leagues)
+	_init_club(club, league, league_clubs, leagues, pyramid)
 
 ## A 1st/2nd/3rd/4th... suffix (local copy so Career stays Main-free).
 func _ord_suffix(n: int) -> String:
@@ -1854,6 +2288,9 @@ func sign_player(pid: int, from_club_id: int, offer: int, rng: RandomNumberGener
 	transfer_listed.erase(pid)
 	shortlist.erase(pid)
 	_log("You have signed %s from %s for £%s." % [player.get("name", "?"), seller_name, _money(offer)])
+	# NEWS EXTRA MARKET feed (witnessed "Wilson signs for Barnsley for one season.").
+	_news("transfer", "%s signs for %s for %s." % [
+		player.get("name", "?"), club_name, TransferMarket.seasons_phrase(term)])
 	return {"ok": true, "msg": "You have signed %s." % player.get("name", "?")}
 
 ## Bid for a player OUTSIDE the live rosters — the OFFERS map browse (any
@@ -1913,6 +2350,8 @@ func sign_external(player: Dictionary, selling_club: Dictionary, offer: int,
 	cash -= offer
 	external_signed[pid] = true
 	_log("You have signed %s from %s for £%s." % [joined.get("name", "?"), seller_name, _money(offer)])
+	_news("transfer", "%s signs for %s for %s." % [
+		joined.get("name", "?"), club_name, TransferMarket.seasons_phrase(term)])
 	return {"ok": true, "msg": "You have signed %s." % joined.get("name", "?")}
 
 ## Sign a free agent for NO fee on `offer_weekly` £/wk (default = his demand). It is a wage
@@ -1955,6 +2394,8 @@ func sign_free_agent(pid: int, offer_weekly: int = -1, rng: RandomNumberGenerato
 	_signing_shock(player)
 	rosters[club_id].append(player)
 	_log("You have signed free agent %s on £%s/wk." % [pname, _money(offer_weekly)])
+	_news("transfer", "%s signs for %s for %s." % [
+		pname, club_name, TransferMarket.seasons_phrase(TransferMarket.NEW_CONTRACT_YEARS)])
 	return {"ok": true, "msg": "You have signed %s on a free." % pname, "demanded": int(verdict["demanded"])}
 
 
@@ -2327,6 +2768,13 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	# before the roster views below so fixtures/objective/finances see the new arrivals.
 	_inject_real_talents(rng, talent_pool)
 
+	# End-of-season pyramid movement (witnessed zone structure): promotions,
+	# relegations and playoff winners reshuffle all four English divisions —
+	# including the manager's club, whose career follows its finish. Mutates
+	# rosters/club_names/tier/league_id/seed orders; the rebuild below then
+	# operates on the NEW membership. No-op without pyramid context.
+	_pyramid_rollover(rng)
+
 	var ids: Array = rosters.keys()
 	var views: Array = []
 	for id in ids:
@@ -2357,7 +2805,10 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 ## Record the just-finished season's league champion, runners-up order and F.A. Cup
 ## winner. Called at the top of advance_season, before the table is rebuilt.
 func _capture_honours() -> void:
-	var s := standings()
+	# With the living pyramid, the LEAGUE honours (Charity Shield + European
+	# berths) belong to the PREMIER table whichever division the manager is in;
+	# without it (headless careers) the manager's division stands in as before.
+	var s := standings_for(1) if has_division(1) else standings()
 	if not s.is_empty():
 		last_champion_id = int(s[0].get("id", -1))
 		last_runners_up = []
@@ -2767,8 +3218,30 @@ func to_dict() -> Dictionary:
 		"pending_offers": pending_offers, "sacked": sacked, "sack_reason": sack_reason,
 		"headhunt_pending": headhunt_pending, "spell_start_year": spell_start_year,
 		"rep_year": _rep_year,
+		"divisions": _divisions_to_dict(), "seed_pos": _str_keyed(seed_pos),
+		"table_prev": _str_keyed(table_prev),
 		"wages_live": true,   # marker: weekly_net excludes player wages (drawn live). See from_dict.
 	}
+
+
+## JSON-safe copy of the pyramid state (string keys throughout).
+func _divisions_to_dict() -> Dictionary:
+	var out: Dictionary = {}
+	for t in divisions:
+		var dv: Dictionary = divisions[t]
+		out[str(t)] = {"league_id": dv["league_id"], "name": dv["name"], "tier": dv["tier"],
+			"ids": dv["ids"], "names": _str_keyed(dv["names"]),
+			"fixtures": dv["fixtures"], "table": _str_keyed(dv["table"]),
+			"played": dv["played"], "scorers": dv["scorers"],
+			"seed": _str_keyed(dv["seed"]), "prev": _str_keyed(dv["prev"])}
+	return out
+
+
+static func _int_keyed(d: Dictionary) -> Dictionary:
+	var out: Dictionary = {}
+	for k in d:
+		out[int(k)] = d[k]
+	return out
 
 
 ## Re-key an int-keyed dict to string keys for JSON storage.
@@ -2896,6 +3369,22 @@ static func from_dict(d: Dictionary) -> Career:
 	c.sale_offers = {}
 	for k in d.get("sale_offers", {}):
 		c.sale_offers[int(k)] = d["sale_offers"][k]
+	# Pre-pyramid saves load with no divisions; Main's ensure_divisions builds and
+	# fast-forwards them (see that function). Int keys restored throughout.
+	c.divisions = {}
+	for tk in d.get("divisions", {}):
+		var dv: Dictionary = d["divisions"][tk]
+		var ids: Array = []
+		for v in dv.get("ids", []):
+			ids.append(int(v))
+		c.divisions[int(tk)] = {"league_id": str(dv.get("league_id", "")),
+			"name": str(dv.get("name", "")), "tier": int(dv.get("tier", 0)), "ids": ids,
+			"names": _int_keyed(dv.get("names", {})), "fixtures": dv.get("fixtures", []),
+			"table": _int_keyed(dv.get("table", {})), "played": int(dv.get("played", 0)),
+			"scorers": dv.get("scorers", []), "seed": _int_keyed(dv.get("seed", {})),
+			"prev": _int_keyed(dv.get("prev", {}))}
+	c.seed_pos = _int_keyed(d.get("seed_pos", {}))
+	c.table_prev = _int_keyed(d.get("table_prev", {}))
 	# Pre-contracts saves baked the player wage bill INTO weekly_net; the live loop now draws
 	# it separately, so add it back once on load to keep the old weekly burn unchanged. Legacy
 	# players have no stored `wage` -> current_weekly falls back to the (identical) market wage.

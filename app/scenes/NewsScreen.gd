@@ -94,9 +94,13 @@ func setup(news_log = [], week_now = 0, club_division = 0) -> void:
 
 
 ## The rows the current tab state shows: real Career news only. The newspaper is
-## league-wide in the original, but Career only records the manager's own club's
-## events -> items appear under the club's own division tab, others stay empty
-## (the witnessed state IS an empty page).
+## league-wide in the original (2026-07-19 witness: a Premier manager's 3rd Div
+## INJURIES/BOOKINGS pages carried real lower-division events). Our living pyramid
+## simulates the other divisions' TABLES + SCORERS but uses static rosters, so it
+## has no per-club squad events (injuries/bookings/transfers) to report there ->
+## other-division pages stay honestly EMPTY. FLAGGED GAP: full league-wide squad-
+## event news needs per-division availability sim (see docs/re/living_league_re.md).
+## The manager's own division shows his signings + rival (AI) transfers under MARKET.
 func visible_items() -> Array:
 	if _division != _club_division:
 		return []

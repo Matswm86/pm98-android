@@ -238,9 +238,33 @@ static func solicit_offer(player: Dictionary, rosters: Dictionary, names: Dictio
 
 # ---- AI-to-AI movement ---------------------------------------------------
 
+# "one season" / "N seasons" — the witnessed spelled-out singular vs numeral plural
+# ("Wilson signs for Barnsley for one season." / "... for 5 seasons ...").
+static func seasons_phrase(n: int) -> String:
+	return "one season" if n == 1 else "%d seasons" % n
+
+
+# Thousands-grouped £ amount (e.g. 288000 -> "288,000"), GameDB/Career-free so
+# TransferMarket stays a pure module.
+static func money_str(n: int) -> String:
+	var s := str(absi(n))
+	var out := ""
+	var c := 0
+	for i in range(s.length() - 1, -1, -1):
+		out = s[i] + out
+		c += 1
+		if c % 3 == 0 and i > 0:
+			out = "," + out
+	return ("-" if n < 0 else "") + out
+
+
 ## Run a round of background transfers among the AI clubs (not the manager's).
-## Moves 0-2 surplus players between clubs and returns news lines. Mutates `rosters`
-## in place (removes from seller, appends to buyer with refreshed contract).
+## Moves 0-2 surplus players between clubs and returns witnessed-format news lines
+## ("<buyer> has signed <player> for <N> seasons for £<fee>." — live-witnessed
+## 2026-07-19 NEWS EXTRA MARKET feed). Mutates `rosters` in place (removes from
+## seller, appends to buyer with a fresh deal). The deal LENGTH varies 1-5 seasons
+## (the original clearly varies it: "one season" / "5 seasons" both witnessed);
+## the exact distribution is un-RE'd (flagged model detail).
 static func ai_round(rng: RandomNumberGenerator, rosters: Dictionary, names: Dictionary, manager_id: int, tier: int) -> Array:
 	var news: Array = []
 	var ids: Array = []
@@ -270,9 +294,14 @@ static func ai_round(rng: RandomNumberGenerator, rosters: Dictionary, names: Dic
 			continue
 		seller.erase(player)
 		player["clubId"] = buyer_id
-		player["contract_years"] = NEW_CONTRACT_YEARS
+		var deal := rng.randi_range(1, 5)   # 1-5 seasons (witnessed range; distribution un-RE'd)
+		player["contract_years"] = deal
+		player["contract_term"] = deal
 		buyer.append(player)
-		news.append("%s has been signed by %s." % [player.get("name", "?"), names.get(buyer_id, "?")])
+		var fee := value_of(player, tier)
+		news.append("%s has signed %s for %s for £%s." % [
+			names.get(buyer_id, "?"), player.get("name", "?"),
+			seasons_phrase(deal), money_str(fee)])
 	return news
 
 

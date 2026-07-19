@@ -59,13 +59,13 @@ const OFFER_WEEKS := [20, 35, 50]
 #   U.E.F.A.   3,750,000 / 6,562,499 /  9,375,000   (A.Villa s24)
 #   Mid Table  3,250,000 / 5,687,500 /  8,124,999   (Wimbledon s28)
 #   Avoid Rel. 2,750,000 / 4,812,499 /  6,875,000   (Bolton parity-run orig/21)
-# "Promotion" (lower-division top tier) is UN-WITNESSED on this screen; it maps to
-# the U.E.F.A. slot (same 3rd rank) as a FLAGGED inference until a lower-division
-# ground is witnessed.
+#   Promotion  2,250,000 / 3,937,500 /  5,624,999   (Manchester C w5_improve,
+#     wine-captures-2026-07-19-lowerdiv/) — the ladder EXTENDS below Avoid
+#     Relegation; the old "maps to the U.E.F.A. slot" inference is REFUTED.
 const TIER_PRICES := {
 	"Champion": [4250000, 7437500, 10624999],
 	"U.E.F.A.": [3750000, 6562499, 9375000],
-	"Promotion": [3750000, 6562499, 9375000],   # FLAGGED inference (rank-3 slot)
+	"Promotion": [2250000, 3937500, 5624999],   # WITNESSED (Maine Road, Promotion board)
 	"Mid Table": [3250000, 5687500, 8124999],
 	"Avoid Relegation": [2750000, 4812499, 6875000],
 }

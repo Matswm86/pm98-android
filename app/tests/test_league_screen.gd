@@ -18,8 +18,15 @@ func _initialize() -> void:
 func _run() -> void:
 	var ok := true
 
-	# Baked chrome + PROMAN fonts must import + load.
+	# Baked chromes (all four divisions, live-witnessed 2026-07-19) + movement
+	# markers + PROMAN fonts must import + load.
 	for path in ["res://art/screens/leaguetable/chrome.png",
+			"res://art/screens/leaguetable/chrome_first.png",
+			"res://art/screens/leaguetable/chrome_second.png",
+			"res://art/screens/leaguetable/chrome_third.png",
+			"res://art/screens/leaguetable/marker_up.png",
+			"res://art/screens/leaguetable/marker_down.png",
+			"res://art/screens/leaguetable/marker_flat.png",
 			"res://art/fonts/proman12.fnt", "res://art/fonts/proman8.fnt"]:
 		ok = _assert(ResourceLoader.exists(path), "asset present: %s" % path) and ok
 		ok = _assert(load(path) != null, "asset loads: %s" % path) and ok
@@ -56,14 +63,21 @@ func _run() -> void:
 	screen.size = Vector2(640, 480)
 	for _i in 3:
 		await process_frame
-	ok = _assert(screen._chrome != null, "baked chrome texture loaded into screen") and ok
-	ok = _assert(screen._chrome != null and screen._chrome.get_width() == 640
-		and screen._chrome.get_height() == 480, "chrome is 640x480") and ok
+	var chromes_ok := true
+	for t in [1, 2, 3, 4]:
+		var tex: Texture2D = screen._chromes.get(t)
+		if tex == null or tex.get_width() != 640 or tex.get_height() != 480:
+			chromes_ok = false
+	ok = _assert(chromes_ok, "all four division chromes loaded, 640x480") and ok
+	ok = _assert(screen._markers.get("up") != null and screen._markers.get("down") != null
+		and screen._markers.get("flat") != null, "movement-marker sprites loaded") and ok
 	ok = _assert(screen._f12 != null and screen._f8 != null, "PROMAN fonts loaded") and ok
 	ok = _assert(PMChrome.font("12") != null, "PMChrome fonts available") and ok
 
 	# Frame-measured geometry (must not drift from the bake anchors).
 	ok = _assert(screen.ROW_Y0 == 114 and screen.ROW_PITCH == 16, "row grid y0=114 pitch=16") and ok
+	ok = _assert(screen.ROW24_Y0 == 115 and screen.ROW24_PITCH == 15,
+		"24-row grid y0=115 pitch=15 (witnessed)") and ok
 	ok = _assert(screen.RETURN_BTN == Rect2(525, 423, 99, 25), "RETURN rect = frame anchor") and ok
 
 	var my_id := int(prem[0]["id"])
@@ -87,10 +101,45 @@ func _run() -> void:
 	ok = _assert(_back == 1, "RETURN tap emits back_pressed") and ok
 	_tap(screen, Vector2(200, screen.ROW_Y0 + 4))      # inside row 0
 	ok = _assert(_club == int(rows[0]["id"]), "row-0 tap emits club_selected(row0.id)") and ok
-	# A tap on a division tab / empty margin is a no-op (never invents another table).
+	# WITHOUT pyramid data a division-tab tap stays inert (never invents a table).
 	var before := _club
-	_tap(screen, Vector2(575, 300))                    # over the (baked) division tabs
-	ok = _assert(_club == before, "division-tab tap is a no-op (no invented table)") and ok
+	_tap(screen, Vector2(575, 300))                    # over the Third tab
+	ok = _assert(_club == before and screen.selected_tier() == 1,
+		"division tab inert without pyramid data") and ok
+
+	# WITH pyramid data (the living lower divisions) the witnessed tabs go live:
+	# build a fake 24-row Div-1 table and a prev map, tap First, expect a switch.
+	var d1_rows: Array = []
+	var d1_prev: Dictionary = {}
+	for i in 24:
+		d1_rows.append({"id": 9000 + i, "name": "Club %d" % i,
+			"P": 1, "W": 0, "D": 1, "L": 0, "GF": 0, "GA": 0, "Pts": 1})
+		d1_prev[9000 + i] = 24 - i
+	screen.set_pyramid(func(t: int) -> Dictionary:
+		if t == 2:
+			return {"rows": d1_rows, "prev": d1_prev}
+		return {"rows": [], "prev": {}})
+	_tap(screen, Vector2(575, 230))                    # the First tab (y224..250)
+	ok = _assert(screen.selected_tier() == 2, "First tab switches to tier 2") and ok
+	ok = _assert(screen._rows.size() == 24, "24-row division table mounted") and ok
+	ok = _assert(not screen._prev.is_empty(), "prev-revision positions carried (markers)") and ok
+	# An empty division (no data from the provider) leaves the view unchanged.
+	_tap(screen, Vector2(575, 300))                    # the Third tab -> provider returns []
+	ok = _assert(screen.selected_tier() == 2, "empty-division tab is inert") and ok
+	# Row hit-tests follow the 24-row grid while a lower division is shown.
+	_tap(screen, Vector2(200, screen.ROW24_Y0 + 2))    # row 0 of the 24-row grid
+	ok = _assert(_club == 9000, "row-0 tap on the 24-row grid emits its club id") and ok
+	# Back to Premier via its tab (provider not consulted for the home division...
+	# it IS: give it the premier rows too).
+	screen.set_pyramid(func(t: int) -> Dictionary:
+		if t == 1:
+			return {"rows": rows, "prev": {}}
+		elif t == 2:
+			return {"rows": d1_rows, "prev": d1_prev}
+		return {"rows": [], "prev": {}})
+	_tap(screen, Vector2(575, 200))                    # the Premier tab
+	ok = _assert(screen.selected_tier() == 1 and screen._rows.size() == 20,
+		"Premier tab returns to the 20-row table") and ok
 
 	# Force a paint pass (dummy driver headless; still catches null-deref / API misuse).
 	screen.queue_redraw()

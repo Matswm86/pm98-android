@@ -5,13 +5,46 @@ FRAME-TRUE under the frame-bake precedent used by Finance / Transfer / Squad / S
 the static chrome is the ORIGINAL pixels cut 1:1, and ONLY the dynamic layer (the
 standings rows) is redrawn live over it.
 
-## Binding source — WALKTHROUGH FRAME 045 (CORRECTED 2026-07-13)
+## Binding source — WALKTHROUGH FRAME 045 (CORRECTED 2026-07-13) + LOWER DIVISIONS (2026-07-19)
 
 > **Correction:** an earlier build of this doc claimed "no walkthrough frame exists" and
 > fell back to the PC gallery capture `ma_10.png`. That was WRONG — the sub-agent's
 > contact-sheet scan missed it. The LEAGUE TABLES screen **is** in our own walkthrough.
 > Re-found by template-matching every frame's chrome against ma_10 (main session): three
 > frames scored MAD 9.16 vs 30+ for all others.
+
+> **Lower divisions now WITNESSED (2026-07-19).** The gaps below that said "lower
+> divisions not witnessed" / "cross-division tabs are a no-op" are RESOLVED. A live wine
+> campaign drove four fresh careers (Barnsley/Manchester C/Blackpool/Barnet across all
+> four tiers) and clicked every division tab. Frames in
+> `screenshots/wine-captures-2026-07-19-lowerdiv/`:
+> - `lt_first`/`lt_second`/`lt_third` (Premier career), `w5_lt_default` (First Div career),
+>   `w6_lt_second_seed`, `w7_lt_third_seed` — the FIRST/SECOND/THIRD DIVISION chromes,
+>   24-row grid, PROMOTION/PLAY-OFFS/RELEGATION pennant columns, per-division selected tab.
+> - `lt_wk2_premier` — the POSITION-MOVEMENT MARKER states (white UP triangle / red DOWN
+>   triangle / grey no-change square). **ma_10's per-row "placeholder square" IS this
+>   marker in its no-change state** — the rows carry NO crest/kit (the old kit-in-row draw
+>   was an invention, now removed).
+> - `lt_goalscorers_third` — GOAL SCORERS is DIVISION-SCOPED (the button on a lower
+>   division's table opens THAT division's chart).
+>
+> Baked by `tools/re/build_leaguetable_division_chromes.py` →
+> `chrome_first/second/third.png` + `marker_up/down/flat.png` (all cut 1:1, byte-exact
+> vs their witness frames: MAD 0.00 on every chrome region). The screen now switches
+> tables for real off `Career.standings_for(tier)` (the living pyramid, see
+> `docs/re/living_league_re.md` and `Career.gd` `divisions`).
+>
+> **Seed order (P=0):** all four divisions list clubs in the WITNESSED pre-season order —
+> last season's finish, relegated-from-above at the top, promoted-from-below at the bottom
+> — NOT alphabetically. Transcribed to `data/season_seed_1997.json` by
+> `tools/re/export_season_seed.py`.
+>
+> **Round offset:** divisions BELOW the manager's have already played round 1 by the
+> manager's week-1 Saturday; divisions at/above are in sync (witnessed on all four careers).
+>
+> **Div-3 membership fix:** the live game fields **Macclesfield T.** in Division Three,
+> NOT Hereford U. (the static EXE league table is the stale 96-97 layout). `build_db.py`
+> now applies the swap; witnessed on three careers.
 
 | source | size | state |
 |---|---|---|
@@ -126,38 +159,51 @@ pixels >60 (residual = the redrawn green date value 29 vs frozen 27).
   (real). Manager/club/season/week in the barra = live `Career` fields.
 - **SEED** — the demo render/test uses a fixed 20-club Premier table mirroring ma_10 so it
   can be overlaid; the app itself never uses that fixture.
-- **GAP / honest placeholder**:
-  1. **Lower divisions not witnessed.** Only Premier (ma_10) exists. The baked chrome
-     (PREMIER LEAGUE subtitle, Premier-selected tab, EURO/UEFA/RELEGATION tags at rows
-     1-2/3-5/18-20) is Premier-only. A non-Premier career renders Premier chrome. Not
-     fabricated — simply the one witnessed skin. Fixing needs per-division captures we
-     don't have.
-  2. **Cross-division tabs are a no-op.** The Career layer keeps only the manager's own
-     division table, so tapping First/Second/Third does nothing (never invents another
-     division's standings). Flagged for the season-loop pass.
-  3. **Date-box value semantics un-RE'd.** ma_10's stepper reads `27/11/1997` while the
-     calendar sheet reads Sat 29/11 — a 2-day offset of unknown meaning. The scene draws
-     the calendar-sheet date (`PMChrome.date_parts`), so the demo shows `29/11/1997`.
-  4. **Barra plaque is 1-line.** ma_10 shows manager ("Luis Silva") + club (2 lines); the
-     app passes only the club name to the shared `PMChrome.draw_header` (manager = ""), so
-     one centred line renders. Shared-header convention, not specific to this screen.
-  5. **Row crest** is the app's real kit sprite (thin shirt crop); ma_10's is a low-detail
-     placeholder square. Real art preferred.
+- **SEED** — the demo render/test uses a fixed 20-club Premier table mirroring ma_10 so it
+  can be overlaid; the app itself never uses that fixture.
+- **RESOLVED (2026-07-19)** — the following were flagged gaps, now witnessed + built:
+  1. ~~Lower divisions not witnessed~~ → all four division chromes baked byte-exact from
+     the live wine campaign (`chrome_first/second/third.png`); a non-Premier career now
+     renders its own division skin.
+  2. ~~Cross-division tabs are a no-op~~ → the tabs are LIVE, backed by the living pyramid
+     (`Career.standings_for(tier)` + `prev_positions_for`). Tapping First/Second/Third
+     shows that division's real simulated table + movement markers.
+  3. **Row marker** — the small box beside POS is the POSITION-MOVEMENT marker (grey
+     square / white up / red down vs the previous revision), NOT a crest. The old
+     kit-in-row draw is removed.
+  4. **Leader kit** shows only once the leader has a played game (empty card at P=0,
+     witnessed).
+- **GAP / honest placeholder (remaining)**:
+  1. **Date-box value semantics.** The box shows the LAST TABLE-REVISION date; witnessed
+     `9/8/1997` at week 1, `16/8/1997` at week 2 (w5 career), and ma_10's `27/11` vs
+     calendar Sat `29/11`. Our weekly model revises on the manager's Saturday, so the
+     scene draws the calendar-sheet date (`PMChrome.date_parts`) — a small approximation
+     of the exact revision-date offset, un-RE'd.
+  2. **Playoff bracket** (rollover) uses the real 1997-98 English one-leg semi/final
+     format; the in-game bracket UI is un-witnessed (FLAGGED in `Career._playoff_winner`).
+  3. **Season 2+ objectives/round-offset** are the app's consistent extension of the
+     witnessed season-1 rules (later boards un-witnessed).
 
 ## Wiring (Main.gd)
 
-`_show_league_table_screen()` (Main.gd:1481) → `_open_table(_career.standings(),
-_career.club_name, _career.season, "Week %d", _career.tier, _career.club_id)`. `_open_table`
-(Main.gd:921) mounts the screen FULL_RECT, calls `setup(...)`, and connects **both**
-signals: `back_pressed` → `queue_free()` (dismiss), `club_selected(id)` → opens that club's
-DATA BASE squad (`_open_database_squad`, managed club uses its live roster). So real career
-standings + both signals are wired end-to-end. Only gap: it does not pass the manager name
-to the barra (gap #4 above).
+`_show_league_table_screen()` → `_open_table(_career.standings(), _career.club_name,
+_career.season, "Week %d", _career.tier, _career.club_id, _career.manager_name)`.
+`_open_table` mounts the screen, calls `setup(...)`, and — for a career overlay — calls
+`scr.set_pyramid(...)` so the division tabs pull `Career.standings_for(tier)` /
+`prev_positions_for(tier)`. Signals: `back_pressed` → dismiss; `club_selected(id)` → that
+club's DATA BASE squad; `scorers_pressed` → the SELECTED division's GOAL SCORERS chart
+(`_show_goal_scorers_screen(scr.selected_tier())`, division-scoped per witness).
 
 ## Verification
 
-- `app/tests/test_league_screen.gd` — asserts chrome/fonts load, chrome is 640×480, real
-  20-row sorted standings with all keys, row-grid + RETURN anchors, my_id wired, all 20
-  kits load, and RETURN / row-tap / tab-no-op signals fire. **ALL PASS** headless.
-- `app/tests/shot_screens.gd` `leaguetable_demo.png` — real-renderer capture; parity
-  measured above.
+- `app/tests/test_pyramid.gd` — the living pyramid: 4-division build, witnessed seed
+  orders + head-start offset, per-division scorers, weekly movement, save/load round-trip,
+  `ensure_divisions` fast-forward for legacy saves, and a full-season rollover
+  (promotions/relegations/playoffs → 20/24/24/24 memberships, manager follows finish).
+  **43 asserts, ALL PASS** headless (~20s incl. a full 4-division season).
+- `app/tests/test_league_screen.gd` — asserts all 4 chromes + marker sprites + fonts load,
+  both row grids (20/24), RETURN anchor, my_id wired, kit load, and the live division-tab
+  switching (inert without pyramid data, switches with it). **ALL PASS** headless.
+- `app/tests/shot_league_divisions.gd` — real-render parity of the witnessed w5 First-Div
+  seed state: chrome regions **MAD 0.00 in the bake** vs `w5_lt_default.png`; render-side
+  delta is the Mesa software-GL sRGB edge shift (+1 RGB, dy=0), not positional.

@@ -3,7 +3,7 @@
   "game": "Premier Manager 98 (Dinamic Multimedia / Gremlin Interactive)",
   "season": "1997-98",
   "source": "reverse-engineered from EQUIPOS.PKF (owned game files); personal use. Squads + club headers via the EXACT engine parser (tools/extract_squads_exact.py / tools/re/equipos_parse.py == MANAGER.EXE FUN_00579c70 + FUN_005820f0, XOR-0x61 strings, engine leaver-drop rule).",
-  "note": "English divisions decoded from MANAGER.EXE's own league table (game keeps Hereford in Div3); country = PAISES.30 name via the EQUIPOS header country code (exact). Null birthYear/age/height/weight/birthDay/birthMonth = the engine randomizes or defaults these at load (FUN_005820f0) — never baked.",
+  "note": "English divisions decoded from MANAGER.EXE's own league table, with the live-witnessed Div3 fix (the static table's Hereford is the stale 96-97 layout; the running game fields Macclesfield T. — three careers witnessed 2026-07-19); country = PAISES.30 name via the EQUIPOS header country code (exact). Null birthYear/age/height/weight/birthDay/birthMonth = the engine randomizes or defaults these at load (FUN_005820f0) — never baked.",
   "counts": {
    "leagues": 4,
    "clubs": 476,
@@ -125,7 +125,7 @@
     114,
     115,
     117,
-    118,
+    1333,
     119,
     120,
     121,
@@ -65372,7 +65372,7 @@
    "kitMaker": null,
    "country": "England",
    "countryCode": 30,
-   "leagueId": "eng_div3",
+   "leagueId": null,
    "capacity": 8843,
    "foundingYear": null,
    "players": [
@@ -312187,7 +312187,7 @@
    "kitMaker": "-",
    "country": "ENGLAND",
    "countryCode": 30,
-   "leagueId": null,
+   "leagueId": "eng_div3",
    "capacity": 6112,
    "foundingYear": null,
    "players": [

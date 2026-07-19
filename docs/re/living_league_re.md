@@ -58,6 +58,28 @@ new age each season — the multi-year drift that makes a living league move.
 - **Performance**: a full Premier season with all ~19 rivals living costs ~3.1s
   headless (the `test_career` canary), well inside budget.
 
+## Living PYRAMID (2026-07-19) — all four English divisions
+
+The living league above is the manager's OWN division (full live rosters). The
+2026-07-19 wine campaign witnessed that the original also runs the OTHER three
+English divisions live: real weekly tables, per-player goal scorers, promotions/
+relegations, and per-division NEWS EXTRA pages. Built in `Career.gd` (`divisions`,
+`_play_division_round`, `_pyramid_rollover`, `standings_for`, `league_scorers_for`)
+and surfaced by the LEAGUE TABLES division tabs (`docs/re/league_table_screen_re.md`)
++ `season_seed_1997.json` (witnessed pre-season orders). Verified by
+`app/tests/test_pyramid.gd`.
+
+**Simplification (flagged):** the other three divisions use STATIC club records for
+their match ratings (not per-club live rosters). So they produce real RESULTS +
+SCORERS, but NO per-club squad EVENTS (injuries, bookings, transfers). Consequences:
+- The other divisions' clubs do not injure/develop/trade week to week (the manager's
+  own division does — the living-league section above).
+- The NEWS EXTRA newspaper's other-division INJURIES/BOOKINGS/MARKET pages stay
+  empty, whereas the original fills them (witnessed: a Premier manager's 3rd Div
+  INJURIES page listed Darlington/Scunthorpe/Cambridge/Swansea knocks). This is a
+  FLAGGED GAP — full league-wide squad-event news needs per-division availability +
+  transfer sim (every English club given a live roster), deferred.
+
 ## Open follow-on (Tier 3, flagged not built)
 Rivals age but there is no AI youth/regen intake yet, so over many (5+) seasons a
 league would slowly soften as veterans decline toward the floor with no fresh blood.

@@ -208,6 +208,25 @@ def main() -> None:
         clubs.append(emit_club(c, next_id, None, c["country"]))
         next_id += 1
 
+    # --- WITNESSED Div-3 membership fix (2026-07-19) ---------------------------
+    # The EXE's static league table (divisions_english.json) keeps Hereford U. in
+    # DIVISION THREE, but the LIVE game fields Macclesfield T. there instead:
+    # witnessed on three separate careers (w4 Barnsley lt_third / w7 Barnet
+    # w7_lt_third_seed, screenshots/wine-captures-2026-07-19-lowerdiv/) and on the
+    # START OF SEASON 3RD DIVISION page (s22 economics run + state_check frame).
+    # The static table is the stale 96-97 layout (Hereford went down to the
+    # Conference in 96-97; Macclesfield came up). Swap POST-HOC so every club id
+    # (English idx / international enumeration) stays exactly as before — only the
+    # league assignment moves. club_economy.json already keys Macclesfield's id.
+    macc = next(c for c in clubs if c["name"] == "Macclesfield T.")
+    here = next(c for c in clubs if c["name"] == "Hereford U.")
+    assert here["leagueId"] == "eng_div3" and macc["leagueId"] is None
+    macc["leagueId"] = "eng_div3"
+    here["leagueId"] = None
+    div3 = next(lg for lg in leagues if lg["id"] == "eng_div3")
+    div3["clubIds"] = [macc["id"] if i == here["id"] else i for i in div3["clubIds"]]
+    assert len(div3["clubIds"]) == 24 and here["id"] not in div3["clubIds"]
+
     intl = [c for c in clubs if c["leagueId"] is None]
     db = {
         "meta": {
@@ -218,8 +237,10 @@ def main() -> None:
             "(tools/extract_squads_exact.py / tools/re/equipos_parse.py == "
             "MANAGER.EXE FUN_00579c70 + FUN_005820f0, XOR-0x61 strings, "
             "engine leaver-drop rule).",
-            "note": "English divisions decoded from MANAGER.EXE's own league table "
-            "(game keeps Hereford in Div3); country = PAISES.30 name via the "
+            "note": "English divisions decoded from MANAGER.EXE's own league table, "
+            "with the live-witnessed Div3 fix (the static table's Hereford is the "
+            "stale 96-97 layout; the running game fields Macclesfield T. — three "
+            "careers witnessed 2026-07-19); country = PAISES.30 name via the "
             "EQUIPOS header country code (exact). Null birthYear/age/height/"
             "weight/birthDay/birthMonth = the engine randomizes or defaults "
             "these at load (FUN_005820f0) — never baked.",
