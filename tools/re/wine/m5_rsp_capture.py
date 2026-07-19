@@ -167,9 +167,7 @@ def main() -> None:
     teams = []
     for off in (0x46C, 0x78C):
         teams.append((u32(base + off), min(u32(base + off + 4), 11)))
-    fo.write(
-        json.dumps({"event": "teams", "arrays": [[hex(a), c] for a, c in teams]}) + "\n"
-    )
+    fo.write(json.dumps({"event": "teams", "arrays": [[hex(a), c] for a, c in teams]}) + "\n")
 
     # ---- 2b. XI fidelity: live frame-0 players vs the reference (injury rolls between
     # runs can swap a starter -> different match; catch it BEFORE kick off) ----
@@ -218,6 +216,26 @@ def main() -> None:
                 )
         return rows
 
+    def ball_row() -> list:
+        # s46 sub-LSB drill: the ball struct is the m+0x1610 embedding (ball+0x40 is the
+        # carrier ptr the port mirrors as m[0x1650]). Row: [x, y, z, vx, vy, vz, face34,
+        # carrier40, recv4c, own54, +0x58, N5c] — pos/vel signed, ptrs raw u32.
+        b = mread(base + 0x1610, 0x60)
+        return [
+            struct.unpack_from("<i", b, 0x4)[0],
+            struct.unpack_from("<i", b, 0x8)[0],
+            struct.unpack_from("<i", b, 0xC)[0],
+            struct.unpack_from("<i", b, 0x20)[0],
+            struct.unpack_from("<i", b, 0x24)[0],
+            struct.unpack_from("<i", b, 0x28)[0],
+            struct.unpack_from("<I", b, 0x34)[0] & 0xFFFF,
+            struct.unpack_from("<I", b, 0x40)[0],
+            struct.unpack_from("<I", b, 0x4C)[0],
+            struct.unpack_from("<i", b, 0x54)[0],
+            struct.unpack_from("<i", b, 0x58)[0],
+            struct.unpack_from("<i", b, 0x5C)[0],
+        ]
+
     # ---- 3. Z2 seed watch ----
     ok = r.cmd(f"Z2,{SEED_VA:x},4")
     fo.write(json.dumps({"event": "Z2", "reply": ok}) + "\n")
@@ -237,7 +255,10 @@ def main() -> None:
         payload = "vCont;c"
         r.s.sendall(f"${payload}#{sum(payload.encode()) % 256:02x}".encode())
 
-    print(f"ARMED @{SEED_VA:#x} win=[{win_lo},{win_hi}] stop_clk={stop_clk} — click KICK OFF", flush=True)
+    print(
+        f"ARMED @{SEED_VA:#x} win=[{win_lo},{win_hi}] stop_clk={stop_clk} — click KICK OFF",
+        flush=True,
+    )
     cont()
     stops = 0
     while True:
@@ -261,6 +282,7 @@ def main() -> None:
         row = {"stop": stops, "eip": hex(eip), "ret0": hex(ret0), "clk": clk, "seed": u32(SEED_VA)}
         if win_lo <= clk <= win_hi:
             row["pl"] = players_row()
+            row["ball"] = ball_row()
         fo.write(json.dumps(row) + "\n")
         if stops % 100 == 0:
             print(f"stop {stops} clk={clk}", flush=True)

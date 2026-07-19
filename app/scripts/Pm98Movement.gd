@@ -1286,8 +1286,26 @@ static func _pass_handoff_aa490(p: Dictionary, target: Dictionary, b1: int, b2: 
 static func steer_89c0(p: Dictionary, target_pos: Array, speed_scale: int) -> void:
 	if MatchEngine.Pm98Rng._log_on:                          # diag-only steer trace (draw-free path)
 		var _tm: Dictionary = _ref(p, 0x18c)
+		var _tc: Dictionary = _ref(p, 0x190)
+		var _tg: Dictionary = _ref(p, 0x184)
 		steer_trace.append([MatchEngine.Pm98Rng._who, target_pos.duplicate(), speed_scale,
-			_g(_tm, 0x448), _g(_tm, 0x461)])                 # + mid-tick phase / flag byte
+			_g(_tm, 0x448), _g(_tm, 0x461),                  # + mid-tick phase / flag byte
+			{"pos": [Pm98Trig._i32(_g(p, 4)), Pm98Trig._i32(_g(p, 8)), Pm98Trig._i32(_g(p, 0xc))],
+			"face": _g(p, 0x34) & 0xffff, "yaw": _g(p, 0x64) & 0xffff,
+			"spd": Pm98Trig._i32(_g(p, 0x68)), "cur": Pm98Trig._i32(_g(p, 0x6c)),
+			"p70": Pm98Trig._i32(_g(p, 0x70)), "p3ac": Pm98Trig._i32(_g(p, 0x3ac)),
+			"p3a8": Pm98Trig._i32(_g(p, 0x3a8)), "p388": Pm98Trig._i32(_g(p, 0x388)),
+			"p90": Pm98Trig._i32(_g(p, 0x90)), "p5c": _g(p, 0x5c) & 0xff,
+			"p2c": Pm98Trig._i32(_g(p, 0x2c)), "p30": Pm98Trig._i32(_g(p, 0x30)),
+			"p2d7": _g(p, 0x2d7) & 0xff, "gs2ee": _g(_tg, 0x2ee) & 0xff,
+			"ps0": play_state_eq(_tm, 0), "carrier": is_same(_tc.get(0x40, null), p),
+			"m43c_p": is_same(_tm.get(0x43c, null), p),
+			"ball": [Pm98Trig._i32(_g(_tc, 4)), Pm98Trig._i32(_g(_tc, 8)), Pm98Trig._i32(_g(_tc, 0xc))],
+			"p150": int(p.get(0x150, -1)), "anch1e0": [_si(p, 0x1e0), _si(p, 0x1e4), _si(p, 0x1e8)],
+			"roam": [_si(p, 0x210), _si(p, 0x214), _si(p, 0x218), _si(p, 0x21c), _si(p, 0x220), _si(p, 0x224)],
+			"p3a4": _si(p, 0x3a4), "gs318": _g(_tg, 0x318), "m1820": _si(_tm, 0x1820),
+			"m19a0": _g(_tm, 0x19a0), "b54": _g(_tc, 0x54), "b4c": _tc.get(0x4c, null) is Dictionary,
+			"p13c": _g(p, 0x13c), "p2c8": _g(p, 0x2c8)}])
 	var ctrl: Dictionary = _ref(p, 0x190)
 	var m: Dictionary = _ref(p, 0x18c)
 	var scale := speed_scale
@@ -1438,10 +1456,18 @@ static func steer_8f20(p: Dictionary, heading: int) -> void:
 		Pm98Trig._i32(_g(p, 0xc) + int(pv[2])),
 	]
 
+	# `applied` mirrors the binary's local_30: the FULL delta d when steps<2 (face snaps to
+	# heading), reassigned to the CLAMPED +/-0x400 step when steps>=2 — and it is this
+	# applied turn, NOT d, that FUN_005ee670 rotates the carried ball's velocity by (the s45
+	# port rotated by d in both cases: ~6x over-rotation per tick whenever the carrier
+	# demanded a big turn — the s46 sub-LSB root cause, silicon-vs-port arc capture2 clk
+	# 285-291; docs/re/M5_S46_CARRIER_DRAG_ROTATION.md).
+	var applied := d
 	if steps < 2:
 		p[0x34] = heading & 0xffff
 	else:
 		var step := 0x400 if sv > 0 else -0x400
+		applied = step
 		p[0x34] = (face16 + step) & 0xffff
 
 	# CARRIER ball-advance (FPU ftol gate): only the ball's active controller, turn nonzero,
@@ -1461,7 +1487,7 @@ static func steer_8f20(p: Dictionary, heading: int) -> void:
 			ctrl[8] = Pm98Trig._i32(_g(p, 8) + int(pv2[1]))
 			ctrl[0xc] = Pm98Trig._i32(_g(p, 0xc) + int(pv2[2]))
 			var bvel := [_g(ctrl, 0x20), _g(ctrl, 0x24), _g(ctrl, 0x28)]
-			Pm98Trig.rot_vec3(bvel, Pm98Trig._s16(d), 0)
+			Pm98Trig.rot_vec3(bvel, Pm98Trig._s16(applied), 0)
 			bvel = Pm98Trig.vec3_scale_ratio(bvel, iv13, steps)
 			ctrl[0x20] = int(bvel[0])
 			ctrl[0x24] = int(bvel[1])

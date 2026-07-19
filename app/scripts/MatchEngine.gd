@@ -47,6 +47,10 @@ class Pm98Rng extends RefCounted:
 	static var _log_on: bool = false
 	static var _draws: Array = []
 	static var _who: String = ""
+	# s46 sub-LSB drill: when set (diag-only) to the ball Dict, each logged draw also
+	# records the mid-tick ball pos — draws are in seed-lockstep with the silicon RSP
+	# stops, so draw k's ball can be diffed against capture stop k's ball row.
+	static var _ball_watch: Variant = null
 
 	func _init(seed_: int) -> void:
 		state = seed_ & 0xFFFFFFFF
@@ -64,6 +68,9 @@ class Pm98Rng extends RefCounted:
 				if str(f0.get("function", "")) == "chance_permil" and st.size() >= 3:
 					var f1: Dictionary = st[2]
 					tag = "%s:%d>chance" % [str(f1.get("source", "")).get_file(), int(f1.get("line", 0))]
+			if _ball_watch is Dictionary:
+				var _b: Dictionary = _ball_watch
+				tag += " b=(%d,%d,%d)" % [int(_b.get(4, 0)), int(_b.get(8, 0)), int(_b.get(0xc, 0))]
 			_draws.append(_who + tag if _who != "" else tag)
 		return (state >> 16) & 0x7FFF
 

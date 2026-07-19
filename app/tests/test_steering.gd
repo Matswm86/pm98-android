@@ -18,7 +18,9 @@ const C_BASE := 0x240000
 var _fail := 0
 var _pass := 0
 
-# name -> [phase, carrier, tx, ty, tz, p388, cx, cy, cz, m461]  (mirrors run_steering_oracle.sh)
+# name -> [phase, carrier, tx, ty, tz, p388, cx, cy, cz, m461, bvx, bvy, bvz]
+# (mirrors run_steering_oracle.sh; bvx/bvy/bvz optional, default 0 — the s46 ball-drag
+# rotation fixtures poke a nonzero ball vel so FUN_005ee670(applied-turn) is observable)
 var _fixtures := {
 	"park":     [2, false, 0x80000, 0x10000, 0, 0x4000, 0, 0, 0, 0],
 	"steer":    [0, false, 0x80000, 0x10000, 0, 0x4000, 0, 0, 0, 0],
@@ -26,6 +28,9 @@ var _fixtures := {
 	"arrived":  [0, false, 0, 0, 0, 0x4000, 0, 0, 0, 0],
 	"flip":     [0, false, -0x18000, 0, 0, 0x4000, 0, 0, 0, 0],
 	"retarget": [0, false, 0x500, 0x300, 0, 0x4000, 0x80000, 0x10000, 0, 0],
+	"carrier_vel":         [0, true, 0x80000, 0x10000, 0, 0x4000, 0x34ccc, 262173, 0, 0, 10000, 5000, 300],
+	"carrier_bigturn":     [0, true, 0x10000, 0x80000, 0, 0x4000, 0x34ccc, 262173, 0, 0, 10000, 5000, 300],
+	"carrier_bigturn_neg": [0, true, 0x10000, -0x80000, 0, 0x4000, 0x34ccc, 262173, 0, 0, 10000, 5000, 300],
 }
 
 
@@ -114,6 +119,10 @@ func _run_fixture(name: String, exp: Dictionary) -> void:
 	C[0x4] = cx
 	C[0x8] = cy
 	C[0xc] = cz
+	if spec.size() > 10:
+		C[0x20] = spec[10]
+		C[0x24] = spec[11]
+		C[0x28] = spec[12]
 
 	Pm98Movement.steer_89c0(P, tgt, 100)
 

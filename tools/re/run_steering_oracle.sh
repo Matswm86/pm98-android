@@ -68,9 +68,14 @@ read_mem 0x00240068 4
 read_mem 0x0024006c 4
 "
 
-# emit_spec PHASE ACTIVE TX TY TZ P388 CX CY CZ M461 SCALE
+# emit_spec PHASE ACTIVE TX TY TZ P388 CX CY CZ M461 SCALE [BVX BVY BVZ]
+# BVX/BVY/BVZ (optional, default 0): ball velocity ctrl+0x20/0x24/0x28 — nonzero in the
+# carrier_vel/bigturn fixtures so the 8f20 ball-drag ROTATION (FUN_005ee670(local_30)) is
+# observable: local_30 = the APPLIED turn (full d when steps<2, +/-0x400 when steps>=2 —
+# the s46 sub-LSB root cause; see docs/re/M5_S46_CARRIER_DRAG_ROTATION.md).
 emit_spec() {
   local phase=$1 active=$2 tx=$3 ty=$4 tz=$5 p388=$6 cx=$7 cy=$8 cz=$9 m461=${10} scale=${11}
+  local bvx=${12:-0} bvy=${13:-0} bvz=${14:-0}
   {
     echo "entry   0x5a89c0"
     echo "ret     0x00100000"
@@ -106,6 +111,9 @@ emit_spec() {
     poke 0x00240004 "$cx"          # ctrl+0x4 ball x
     poke 0x00240008 "$cy"          # ctrl+0x8 ball y
     poke 0x0024000c "$cz"          # ctrl+0xc ball z
+    poke 0x00240020 "$bvx"         # ctrl+0x20 ball vel x
+    poke 0x00240024 "$bvy"         # ctrl+0x24 ball vel y
+    poke 0x00240028 "$bvz"         # ctrl+0x28 ball vel z
     poke 0x00270000 "$tx"          # target_pos x
     poke 0x00270004 "$ty"          # target_pos y
     poke 0x00270008 "$tz"          # target_pos z
@@ -138,13 +146,23 @@ echo "# Row: FIX <name> | <abs-addr>=<u32 LE> ... . P=0x230000 ctrl=0x240000. fa
 echo "# @0x252000 + cos/atan LUT injected. Fields: P +4/8/c pos +20/24/28 vel +34 facing +40" >> "$OUT"
 echo "# action +64 yaw +68 speed +6c curve +90 counter +2c/+30; ctrl +4/8/c ballpos +20/24/28 +68 +6c." >> "$OUT"
 
-#        NAME      PHASE ACTIVE   TX        TY       TZ  P388     CX        CY       CZ  M461 SCALE
+#        NAME      PHASE ACTIVE   TX        TY       TZ  P388     CX        CY       CZ  M461 SCALE [BVX BVY BVZ]
 emit_spec  2     "$OTHER" 0x80000   0x10000  0   0x4000   0         0        0   0    100; run_emu; bank park
 emit_spec  0     "$OTHER" 0x80000   0x10000  0   0x4000   0         0        0   0    100; run_emu; bank steer
 emit_spec  0     "$P"     0x80000   0x10000  0   0x4000   0x34ccc   0x40000  0   0    100; run_emu; bank carrier
 emit_spec  0     "$OTHER" 0         0        0   0x4000   0         0        0   0    100; run_emu; bank arrived
 emit_spec  0     "$OTHER" -98304    0        0   0x4000   0         0        0   0    100; run_emu; bank flip
 emit_spec  0     "$OTHER" 0x500     0x300    0   0x4000   0x80000   0x10000  0   0    100; run_emu; bank retarget
+# s46 ball-drag ROTATION class (nonzero bvel; big-turn targets force steps>=2 -> +/-0x400).
+# CY = 262173 = 0x40000 + 29: the marker is P.pos + polar(0x4ccc, 0) = (0x4ccc, 29) (sin_a(0)
+# = COS[1023] = 100 -> y 29, NOT 0), so ball-marker = (0x30000, 0x40000) and the 8f20 ftol
+# distance is the TRUE perfect square 0x50000 — under PCode the direct CALL 0x605fb0 (real
+# CRT _ftol, NOT the IAT-repointed stub) rounds-to-nearest instead of truncating, so any
+# fractional distance banks +1 off real silicon (bit us: 0x40000 gave dist 327656.8 ->
+# emu 327657 vs silicon/port 327656, a 1-LSB ball-pos skew at iv13/steps=14/15).
+emit_spec  0     "$P"     0x80000   0x10000  0   0x4000   0x34ccc   262173   0   0    100 10000 5000 300; run_emu; bank carrier_vel
+emit_spec  0     "$P"     0x10000   0x80000  0   0x4000   0x34ccc   262173   0   0    100 10000 5000 300; run_emu; bank carrier_bigturn
+emit_spec  0     "$P"     0x10000   -0x80000 0   0x4000   0x34ccc   262173   0   0    100 10000 5000 300; run_emu; bank carrier_bigturn_neg
 
 echo "=== steering oracle -> $OUT ==="
 cat "$OUT"
