@@ -24,10 +24,17 @@ Trainer levels). Wages are shown **yearly** and **monthly** per player.
 
 ## What we built (and what is ours vs PM98's)
 
-PM98's per-player wages are **data-driven** — they live in the EQUIPOS / save data, not in
-code (like the fee + finance models, see `finance_constants.md`). So the **surface** above is
-PM98's; the wage + demand **model** is ours, in `app/scripts/Contract.gd`, calibrated to
-`FinanceModel.weekly_wage` so a signing's wage and the club's books agree.
+PM98's per-player wages are **computed at runtime, not stored** — the "they live in the
+EQUIPOS/save data" claim was **disproven 2026-07-19** (`wage_formula_re.md` §1: no EQUIPOS
+byte field sums to the three witnessed club wage bills). The real wage lives at runtime
+`player+0x74`, and its structure is now known: **`wage = f(core4) × club_factor`**, an
+≈exponential in `core4=VE+RE+AG+CA` (~2.6 %/point, validated to Bolton's whole bill + both
+witnessed Bolton players) times a per-club stature multiplier (~1.0 Bolton vs ~2.08
+Villa/Arsenal). The exact base FORM and the club_factor driver are still un-RE'd, so the app
+is **NOT yet switched to it** (shipping a form-assumed curve would be guessing). Until then
+the wage + demand **model** here is ours, in `app/scripts/Contract.gd`, calibrated to
+`FinanceModel.weekly_wage` so a signing's wage and the club's books agree — but note it reads
+~2–8× high vs the witnessed originals (`wage_formula_re.md` §4).
 
 - **Wages are stored on the player** (`wage`, weekly £), stamped when he joins (seed /
   signing / youth promotion). A player with no stored wage (a pre-contracts save, a GameDB
