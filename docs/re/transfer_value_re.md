@@ -1,10 +1,18 @@
 # Transfer VALUE (CLUB FEE) + WAGE — source-witnessed evidence (2026-07-22)
 
+> **✅ SOLVED 2026-07-22c (see §10).** The generative model is a byte-exact LOOKUP
+> TABLE in `MANAGER.EXE` (`FUN_00576cd0`), not a curve — which is why no exponent
+> ever fit. `fee = feeTable[idx]×5000`, `wage = wageTable[idx]×5000`,
+> `idx = stature*54 + abilityTier(AV)*6 + ageTier(age)`. Tables extracted to
+> `docs/re/value_tables.json`; **reproduces all 13 fee/wage witnesses exactly**
+> (`tools/re/validate_value_model.py`). §1-§9 below are the evidence trail that led
+> there; §10 is the answer. No guessing — the numbers are the game's own bytes.
+
 Owner complaint #1: "the values are nothing like the original." This session pins
 what the real numbers ARE (35 source witnesses), proves the app model is wrong, and
 proves the exact generative model is NOT a simple stored field or a core4 curve —
-it is `f(attrs, age) × selling-club stature`, whose forms + the stature table remain
-un-RE'd. **No guessed curve is shipped** (owner + `wage_formula_re.md` S5).
+it is `f(attrs, age) × selling-club stature`, now fully RE'd as a table (§10).
+**No guessed curve is shipped** (owner + `wage_formula_re.md` S5).
 
 ## 1. The "AV" column IS core4>>2 (EXE-verified, not assumed)
 
@@ -162,3 +170,47 @@ player's attrs + selling-club stature is the one remaining un-traced link.**
 2. **Wine witness sweep:** unchanged from §6.2 (club-tagged fee+wage+AV rows).
 New tool this session: `tools/re/ghidra_scripts/FindFloatWrite74.java` (backward-walk
 float-store scanner; run `-postScript FindFloatWrite74.java 0x70` / `0x74`).
+
+## 10. ✅ SOLVED — the generator is `FUN_00576cd0`, a lookup table ×5000 (2026-07-22c)
+
+EXE trace closed it. The market fee+wage are written to **player+0x70 (fee)** and
+**player+0x74 (wage)** by **`FUN_00576cd0`**, invoked per squad-player by
+**`FUN_0057a5a0`** (which first calls `FUN_0057a180` to set the club's stature).
+My earlier `+0x74` float-store scan missed the write because the store is
+`FSTP [ESI+0x8]` where `ESI = player+0x6c` (base folded across the call, disp `0x8`).
+
+**Exact model (asm-verified `FUN_00576cd0` @0x576cd0, tables dumped from the EXE):**
+```
+AV          = (VE + RE + AG + CA) >> 2            # core4>>2, the on-screen "AV"
+abilityTier = AV>=95?0 : >=90?1 : >=85?2 : >=80?3 : >=75?4 : >=70?5 : >=65?6 : >=60?7 : 8
+ageTier     = age<20?0 : <23?1 : <26?2 : <30?3 : <33?4 : 5
+idx         = stature*54 + abilityTier*6 + ageTier        # word index
+fee   (£)   = feeTable [idx] * 5000     # feeTable  @VA 0x638788
+wage  (£/yr)= wageTable[idx] * 5000     # wageTable @VA 0x638208
+```
+- **Tables**: 13 stature bands × 9 ability tiers × 6 age tiers = **702 uint16 each**,
+  extracted byte-exact to `docs/re/value_tables.json` (`tools/re/extract_value_tables.py`).
+  Stature 0 = elite (Liverpool/Man Utd), rising to 12 = lowest; higher stature → far
+  lower fees+wages at equal ability (this IS the "club stature" the witnesses showed).
+- **Multiplier**: the asm does `FILD word; FMUL double[0x638d08]` where `[0x638d08]=1e6`,
+  and the display path divides by 200 → **net ×5000** (= the £5,000 offer base step).
+  Every witness validates with a single ×5000, so use 5000 directly in the port.
+- **stature** = `club+0x58`, set by `FUN_0057a180`: the club's rank within its league
+  (`vtable+0x78`, capped at 12); special ids 0x26ae→0, 0x26de/0x26e4 (free/youth)→12/13.
+  This is the ONE input the app must reproduce for a byte-exact runtime port (a club
+  rank/reputation 0-12); the tables + tiers + ×5000 above are fully fixed.
+
+**Validation (`python3 tools/re/validate_value_model.py`): 13/13 witnesses exact.**
+Berger AV88→stature0 £11M/£1M; Scholes AV81→stature0 £8.5M/£575k; Marcelle(Barnsley)
+AV78→stature3 £650k/£175k; Wilson(Northampton) AV59→low stature £5k/£5k; Spiteri AV65
+(NB: his on-screen AV78 in §2 was a mis-read; core4 gives 65)→stature3 £150k/£25k.
+
+**Port (next step, no guess left):** replace `TransferMarket.value_of` +
+`FinanceModel._player_wage` with the `value_tables.json` lookup above, deriving each
+club's stature 0-12 the way `FUN_0057a180` does (rank within division). Re-verify vs
+the 13 witnesses + Ward £15k/Frandsen £175k before shipping.
+
+## 11. Reproduce (§10)
+`python3 tools/re/extract_value_tables.py` (writes `value_tables.json`) ·
+`python3 tools/re/validate_value_model.py` (13/13 witness check) ·
+EXE: `FUN_00576cd0`/`FUN_0057a5a0`/`FUN_0057a180`, tables @0x638788 (fee) & 0x638208 (wage).
