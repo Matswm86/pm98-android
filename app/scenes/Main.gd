@@ -399,7 +399,7 @@ func _contract_shot() -> void:
 	_save_shot(dir, "contract.png")
 	print("CONTRACT-SHOT done squad=%d wagebill/wk=%d demand/wk=%d club=%s" % [
 		_career.my_squad().size(), _career.player_weekly_wage(),
-		Contract.demanded_weekly(target, _career.tier), _career.club_name])
+		Contract.demanded_weekly(target, _career.my_band()), _career.club_name])
 	get_tree().quit()
 
 
@@ -2607,7 +2607,8 @@ func _show_browse_offer_card(player: Dictionary, club: Dictionary, host: Control
 	var cid := int(club.get("id", -1))
 	var pid := int(player.get("id", -1))
 	var is_key := TransferMarket.is_key_player(club, pid)
-	var fee := TransferMarket.asking_price(player, is_key, c.tier)
+	var band := c.band_of(cid) if c.rosters.has(cid) else TransferMarket.stature_of(club.get("players", []), FinanceModel.tier_of(club, GameDB.leagues))
+	var fee := TransferMarket.asking_price(player, is_key, band)
 	var card: MakeOfferScreen = load("res://scenes/MakeOfferScreen.gd").new()
 	card.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(card)
@@ -2683,11 +2684,11 @@ func _show_team_offer(pid: int, refresh: Callable = Callable()) -> void:
 	var scr: TeamOfferScreen = load("res://scenes/TeamOfferScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
-	var weekly := Contract.current_weekly(p, _career.tier)
+	var weekly := Contract.current_weekly(p, _career.my_band())
 	# CLUB FEE = the market value, YEARS = the full term, LEFT = years remaining
 	# (our contract model's split of the original's YEARS|LEFT pair)
 	scr.setup(p, GameDB.club(_career.club_id), offers,
-		TransferMarket.value_of(p, _career.tier), Contract.yearly(weekly),
+		TransferMarket.value_of(p, _career.my_band()), Contract.yearly(weekly),
 		int(p.get("contract_term", p.get("contract_years", 0))),
 		int(p.get("contract_years", 0)))
 	scr.answered.connect(func(decisions: Array) -> void:
@@ -3942,7 +3943,7 @@ func _show_free_agents() -> void:
 	for p in pool:
 		var gk := "GK" if p.get("isGK") else "  "
 		var ca := int(p.get("attrs", {}).get("CA", 0))
-		var demand := Contract.demanded_weekly(p, _career.tier)
+		var demand := Contract.demanded_weekly(p, _career.my_band())
 		rows.append("%-16s %s CA%2d  age %d  asks £%s/wk" % [
 			str(p.get("name", "?")).substr(0, 16), gk, ca, int(p.get("age", 0)), _fmt_int(demand)])
 		payload.append(p)
@@ -3956,7 +3957,7 @@ func _show_free_agents() -> void:
 
 func _show_free_agent_deal(player: Dictionary) -> void:
 	var pid := int(player.get("id", -1))
-	var demand := Contract.demanded_weekly(player, _career.tier)
+	var demand := Contract.demanded_weekly(player, _career.my_band())
 	var rows: Array = []
 	var payload: Array = []
 	rows.append("Offer his demand        £%s/wk" % _fmt_int(demand)); payload.append({"wage": demand})
@@ -4055,7 +4056,7 @@ func _show_transfer_squad() -> void:
 		var pos := "GK" if p.get("isGK") else "  "
 		var ca := int((p.get("attrs", {}) as Dictionary).get("CA", 0))
 		var yrs := int(p.get("contract_years", 1))
-		var wage := Contract.current_weekly(p, _career.tier)
+		var wage := Contract.current_weekly(p, _career.my_band())
 		var tag := "  EXPIRING" if Contract.is_expiring(p) else ""
 		if p.get("on_loan"):
 			tag = "  [ON LOAN]"
@@ -4070,8 +4071,8 @@ func _show_transfer_squad() -> void:
 
 func _show_player_deal(p: Dictionary) -> void:
 	var pid := int(p["id"])
-	var tier := _career.tier
-	var weekly := Contract.current_weekly(p, tier)
+	var band := _career.my_band()
+	var weekly := Contract.current_weekly(p, band)
 	var auto: bool = bool(p.get("auto_renew", false))
 	var rows: Array = []
 	var payload: Array = []
@@ -4084,7 +4085,7 @@ func _show_player_deal(p: Dictionary) -> void:
 	var expiring := "  -  EXPIRING" if Contract.is_expiring(p) else ""
 	_set_view(p.get("name", "?"),
 		"CA %d  -  CLUB FEE £%s  -  YEARLY WAGE £%s (£%s/mo)  -  contract %dy%s" % [
-			int(attrs.get("CA", 0)), _fmt_int(TransferMarket.value_of(p, tier)),
+			int(attrs.get("CA", 0)), _fmt_int(TransferMarket.value_of(p, band)),
 			_fmt_int(Contract.yearly(weekly)), _fmt_int(Contract.monthly(weekly)),
 			int(p.get("contract_years", 1)), expiring],
 		rows, payload, func(it): _player_deal_action(p, it["a"]))
@@ -4114,12 +4115,12 @@ func _player_deal_action(p: Dictionary, a: String) -> void:
 ## The RENEW negotiation: a player wants a wage to put pen to a new deal. You can hold his
 ## current terms (a lowball he may refuse), meet his demand, or better it to lock him in.
 func _show_renew(p: Dictionary) -> void:
-	var tier := _career.tier
-	var weekly := Contract.current_weekly(p, tier)
-	var demand := Contract.demanded_weekly(p, tier)
+	var band := _career.my_band()
+	var weekly := Contract.current_weekly(p, band)
+	var demand := Contract.demanded_weekly(p, band)
 	var rows: Array = []
 	var payload: Array = []
-	for opt in Contract.renewal_options(p, tier):
+	for opt in Contract.renewal_options(p, band):
 		rows.append("%-30s £%s/wk  %dy" % [opt["label"], _fmt_int(int(opt["weekly"])), int(opt["years"])])
 		payload.append(opt)
 	_set_view("Renew %s" % p.get("name", "?"),

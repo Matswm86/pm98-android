@@ -97,6 +97,7 @@ var _manager: String = ""
 var _season: String = "1997-98"
 var _week: int = 0
 var _tier: int = 1
+var _band: int = 3           # the club's PM98 stature band (RE'd wage/fee input)
 var _nos_ok := false
 var _youth_enabled := false
 var _press := ""
@@ -127,6 +128,7 @@ func setup(club: Dictionary, manager: String = "", _cash: String = "", youth_ena
 	_season = season
 	_week = week
 	_tier = tier
+	_band = TransferMarket.stature_of(club.get("players", []), tier)
 	_nos_ok = _squad_numbers_individuated()
 	# Shared silver header (LineupScreen precedent): manager plaque top, club
 	# bottom, the club crest + spiral calendar sheet from the season/week.
@@ -363,7 +365,7 @@ func _row(y: int, p: Dictionary, _key: String, row_h: int) -> void:
 	_txt(_f10, CELL_MO[1] - 5, ty, str(Morale.display(p)) if has_form else "-",
 		C_MO, 11, true)
 	_txt(_f10, CELL_LOAN[0] + 8, ty, "YES" if p.get("on_loan") else "NO", C_LOANC, 11)
-	var wage_y := Contract.yearly(Contract.current_weekly(p, _tier))
+	var wage_y := Contract.yearly(Contract.current_weekly(p, _band))
 	_txt(_f10, CELL_WAGE[1] - 6, ty, "£%s" % _money(wage_y), C_WAGE, 11, true)
 	var left := int(p.get("contract_years", 0))
 	var term: int = maxi(int(p.get("contract_term", 0)), left)

@@ -165,8 +165,11 @@ func setup(player: Dictionary, club: Dictionary, tier: int = 1, actions_enabled 
 	_club = club
 	_tier = maxi(1, tier)
 	_actions = actions_enabled
-	_fee = TransferMarket.value_of(player, _tier)
-	_yearly = Contract.yearly(Contract.current_weekly(player, _tier))
+	# The player's SELLING-club stature band drives the RE'd PM98 fee/wage (his club's
+	# squad strength, not just its division). docs/re/transfer_value_re.md sec.10.
+	var band := TransferMarket.stature_of(_club.get("players", []), _tier)
+	_fee = TransferMarket.value_of(player, band)
+	_yearly = Contract.yearly(Contract.current_weekly(player, band))
 	_left = int(player.get("contract_years", 0))
 	_years = maxi(int(player.get("contract_term", 0)), _left)
 	queue_redraw()

@@ -65,6 +65,7 @@ var board_price: int = 0          # board-set advertising-board price (0 = tier 
 # Live transfer state: the division's squads mutate as players move, and persist
 # in the save -- the career, not GameDB, is the source of truth once you're managing.
 var tier: int = 1                       # division tier (all clubs here share it)
+var _leagues: Array = []                 # league metadata (tier lookups for external clubs)
 var rosters: Dictionary = {}            # club_id:int -> Array[player dict] (live squads)
 var club_names: Dictionary = {}         # club_id:int -> String
 var transfer_listed: Dictionary = {}    # pid:int -> true (your players up for sale)
@@ -241,6 +242,7 @@ func _init_club(club: Dictionary, league: Dictionary, league_clubs: Array, leagu
 	club_name = club.get("name", "?")
 	league_id = str(league.get("id", ""))
 	league_name = league.get("name", "League")
+	_leagues = leagues                       # kept for external-club tier lookups (sign_external)
 	tier = FinanceModel.tier_of(club, leagues)
 	spell_start_year = year
 	season = _season_label(year)
@@ -344,6 +346,8 @@ func _seed_squad(club_dict: Dictionary) -> Array:
 	# the exact value frames 081/084 pin for week 1). docs/re/morale_re.md.
 	var form_rng := RandomNumberGenerator.new()
 	form_rng.randomize()
+	# The club's PM98 stature band (from its own squad strength) drives every seeded wage.
+	var band := TransferMarket.stature_of(club_dict.get("players", []), tier)
 	var out: Array = []
 	for p in club_dict.get("players", []):
 		var dup: Dictionary = (p as Dictionary).duplicate(true)
@@ -359,7 +363,7 @@ func _seed_squad(club_dict: Dictionary) -> Array:
 		dup["suspended_weeks"] = 0
 		dup["yellows"] = 0
 		dup["dev_progress"] = 0.0      # development carry-over (Training.gd)
-		Contract.stamp_wage(dup, tier)  # his contracted weekly wage (Contract.gd)
+		Contract.stamp_wage(dup, band)  # his contracted weekly wage (Contract.gd)
 		dup["auto_renew"] = false      # opt-in: auto-renew an expiring deal at rollover
 		dup["morale"] = 90 + form_rng.randi_range(0, 9)
 		dup["fitness"] = 70
@@ -943,6 +947,17 @@ func club_view(id: int) -> Dictionary:
 
 func squad_of(id: int) -> Array:
 	return rosters.get(id, [])
+
+
+## A club's PM98 STATURE band (0-12) from its live squad + the shared division tier. This
+## is the one per-club input to every fee/wage lookup (RE'd TransferMarket.stature_of):
+## a club's fees/wages depend on its OWN squad strength, not just its division.
+func band_of(id: int) -> int:
+	return TransferMarket.stature_of(rosters.get(id, []), tier)
+
+## The manager's own club stature band.
+func my_band() -> int:
+	return band_of(club_id)
 
 
 func _apply(s: Dictionary, gf: int, ga: int) -> void:
@@ -1822,8 +1837,8 @@ func _scout_row(p: Dictionary, cid: int, cname: String, club_v: Dictionary, live
 		"av": av,
 		"ca": int(a.get("CA", 0)),
 		"mo": int(p.get("morale")) if live and p.get("morale") != null else -1,
-		"fee": TransferMarket.asking_price(p, is_key, tier),
-		"wage": TransferMarket.wage_yearly(p, tier),
+		"fee": TransferMarket.asking_price(p, is_key, band_of(cid)),
+		"wage": TransferMarket.yearly_wage(p, band_of(cid)),
 		"years": int(p.get("contract_term", 0)) if live else 0,
 		"left": int(p.get("contract_years", 0)) if live else 0,
 		"key": is_key,
@@ -1968,7 +1983,7 @@ func _inject_talent(e: Dictionary, rng: RandomNumberGenerator, start_year: int) 
 		# fully contract-stamped. Full squads skip-and-retry at a later rollover.
 		if rosters[cid].size() >= TransferMarket.SQUAD_MAX:
 			return false           # NOT marked used; transfer churn usually frees room
-		rosters[cid].append(Talent.make_senior(e, rng, start_year, tier))
+		rosters[cid].append(Talent.make_senior(e, rng, start_year, band_of(cid)))
 		# Only headline arrivals reach the news feed (living-league quietness).
 		if int(e.get("tier", 4)) <= 2:
 			_news("youth", "%s, a highly rated youngster, has come through the ranks at %s." % [
@@ -2026,7 +2041,7 @@ func promote_youth(pid: int) -> Dictionary:
 	p["clubId"] = club_id
 	p["contract_years"] = TransferMarket.NEW_CONTRACT_YEARS
 	p["contract_term"] = TransferMarket.NEW_CONTRACT_YEARS
-	Contract.stamp_wage(p, tier)   # a first-team wage now he's promoted
+	Contract.stamp_wage(p, my_band())   # a first-team wage now he's promoted
 	p["auto_renew"] = false
 	var form_rng := RandomNumberGenerator.new()
 	form_rng.randomize()
@@ -2046,7 +2061,7 @@ func staff_weekly_wage() -> int:
 ## The live weekly PLAYER wage bill (sum of your squad's contracted wages). Drawn from cash
 ## each week, so a signing or a renewal raise lifts your outgoings (Contract.gd).
 func player_weekly_wage() -> int:
-	return Contract.squad_weekly_bill(my_squad(), tier)
+	return Contract.squad_weekly_bill(my_squad(), my_band())
 
 
 # ---- player insurance (INSURANCE screen) ---------------------------------
@@ -2268,7 +2283,7 @@ func sign_player(pid: int, from_club_id: int, offer: int, rng: RandomNumberGener
 	if count_offer:
 		offers_left -= 1   # an offer counts whether or not it is accepted
 	var is_key := TransferMarket.is_key_player(club_view(from_club_id), pid)
-	var verdict := TransferMarket.evaluate_offer(player, offer, is_key, tier, rng)
+	var verdict := TransferMarket.evaluate_offer(player, offer, is_key, band_of(from_club_id), rng)
 	var seller_name: String = club_names.get(from_club_id, "?")
 	if not verdict["accepted"]:
 		return {"ok": false, "msg": "%s have rejected your offer for %s." % [seller_name, player.get("name", "?")]}
@@ -2277,7 +2292,7 @@ func sign_player(pid: int, from_club_id: int, offer: int, rng: RandomNumberGener
 	var term := years if years > 0 else TransferMarket.NEW_CONTRACT_YEARS
 	player["contract_years"] = term
 	player["contract_term"] = term
-	Contract.stamp_wage(player, tier)   # his wage joins your live bill
+	Contract.stamp_wage(player, my_band())   # his wage joins your live bill
 	if weekly > 0:
 		player["wage"] = weekly          # the card's negotiated YEARLY WAGE / 52
 	if not clauses.is_empty():
@@ -2326,7 +2341,8 @@ func sign_external(player: Dictionary, selling_club: Dictionary, offer: int,
 	if count_offer:
 		offers_left -= 1   # an offer counts whether or not it is accepted
 	var is_key := TransferMarket.is_key_player(selling_club, pid)
-	var verdict := TransferMarket.evaluate_offer(player, offer, is_key, tier, rng)
+	var sell_band := TransferMarket.stature_of(selling_club.get("players", []), FinanceModel.tier_of(selling_club, _leagues))
+	var verdict := TransferMarket.evaluate_offer(player, offer, is_key, sell_band, rng)
 	var seller_name := str(selling_club.get("name", "?"))
 	if not verdict["accepted"]:
 		return {"ok": false, "msg": "%s have rejected your offer for %s." % [seller_name, player.get("name", "?")]}
@@ -2340,7 +2356,7 @@ func sign_external(player: Dictionary, selling_club: Dictionary, offer: int,
 	joined["yellows"] = 0
 	joined["dev_progress"] = 0.0
 	joined["auto_renew"] = false
-	Contract.stamp_wage(joined, tier)
+	Contract.stamp_wage(joined, my_band())
 	if weekly > 0:
 		joined["wage"] = weekly
 	if not clauses.is_empty():
@@ -2382,13 +2398,13 @@ func sign_free_agent(pid: int, offer_weekly: int = -1, rng: RandomNumberGenerato
 	if player.is_empty():
 		return {"ok": false, "msg": "That free agent is no longer available."}
 	if offer_weekly < 0:
-		offer_weekly = Contract.demanded_weekly(player, tier)
+		offer_weekly = Contract.demanded_weekly(player, my_band())
 	if rng == null:
 		rng = RandomNumberGenerator.new()
 		rng.randomize()
 	offers_left -= 1   # an offer counts whether or not it is accepted
 	var pname: String = player.get("name", "?")
-	var verdict := Contract.evaluate_renewal(player, offer_weekly, tier, rng)
+	var verdict := Contract.evaluate_renewal(player, offer_weekly, my_band(), rng)
 	if not verdict["accepted"]:
 		return {"ok": false, "msg": "%s has rejected your terms." % pname, "demanded": int(verdict["demanded"])}
 	free_agents.erase(player)
@@ -2441,7 +2457,7 @@ func sign_loan(pid: int, from_club_id: int) -> Dictionary:
 	player["on_loan"] = true
 	player["loan_from"] = from_club_id
 	player["loan_from_name"] = parent_name
-	player["wage"] = Contract.market_weekly(player, tier)   # you pick up his wages
+	player["wage"] = Contract.market_weekly(player, my_band())   # you pick up his wages
 	player["clubId"] = club_id
 	_signing_shock(player)   # a loan arrival unsettles the position just the same
 	rosters[club_id].append(player)
@@ -2510,7 +2526,7 @@ func _accumulate_offers(rng: RandomNumberGenerator) -> void:
 			"buyer_id": int(o["buyer_id"]), "buyer_name": str(o["buyer_name"]),
 			"offer": int(o["offer"]),
 			# The terms the buyer tables for the player (YEARLY WAGE / YEARS rows).
-			"weekly_wage": Contract.market_weekly(p, tier),
+			"weekly_wage": Contract.market_weekly(p, band_of(int(o["buyer_id"]))),
 			"years": 1 + rng.randi_range(0, 2), "week": week,
 		})
 		sale_offers[int(pid)] = lst
@@ -2598,7 +2614,7 @@ func release(pid: int) -> Dictionary:
 		return {"ok": false, "msg": "Your squad is too small to sack anyone (min %d)." % TransferMarket.SQUAD_MIN}
 	if player.get("isGK") and TransferMarket._count_keepers(squad) <= TransferMarket.MIN_KEEPERS:
 		return {"ok": false, "msg": "You must keep at least %d goalkeepers." % TransferMarket.MIN_KEEPERS}
-	var weekly := Contract.current_weekly(player, tier)
+	var weekly := Contract.current_weekly(player, my_band())
 	var comp := weekly * Contract.SEASON_WEEKS * maxi(1, int(player.get("contract_years", 1)))
 	var pname: String = player.get("name", "?")
 	rosters[club_id].erase(player)
@@ -2622,11 +2638,11 @@ func renew(pid: int, offer_weekly: int = -1, rng: RandomNumberGenerator = null) 
 	if player.is_empty():
 		return {"ok": false, "msg": "That player is not in your squad."}
 	if offer_weekly < 0:
-		offer_weekly = Contract.demanded_weekly(player, tier)
+		offer_weekly = Contract.demanded_weekly(player, my_band())
 	if rng == null:
 		rng = RandomNumberGenerator.new()
 		rng.randomize()
-	var verdict := Contract.evaluate_renewal(player, offer_weekly, tier, rng)
+	var verdict := Contract.evaluate_renewal(player, offer_weekly, my_band(), rng)
 	var pname: String = player.get("name", "?")
 	if not verdict["accepted"]:
 		_log("%s has rejected your offer for renewal." % pname)
@@ -2693,7 +2709,7 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 		# Contract up. An auto-renew player is re-signed at his demand if the club can fund the
 		# deal (a season's wage); otherwise -- and for everyone without auto-renew -- he leaves
 		# on a FREE TRANSFER. You tie a player down in advance via the RENEW screen.
-		var demand_wk := Contract.demanded_weekly(p, tier)
+		var demand_wk := Contract.demanded_weekly(p, my_band())
 		var affordable := Contract.yearly(demand_wk) <= cash
 		# An ASSISTANT MANAGER (T2 #10) re-signs an expiring player good enough to keep, so your
 		# stars don't walk for free while you're not looking. His quality lowers the CA bar

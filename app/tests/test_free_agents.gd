@@ -36,7 +36,7 @@ func _run() -> bool:
 	# Sign one at his demand -> accepted, joins the squad, leaves the pool, costs one offer.
 	var fa: Dictionary = career.free_agents[0]
 	var pid := int(fa["id"])
-	var demand := Contract.demanded_weekly(fa, career.tier)
+	var demand := Contract.demanded_weekly(fa, career.my_band())
 	var squad0: int = career.my_squad().size()
 	var offers0: int = career.offers_left
 	var res := career.sign_free_agent(pid, demand, rng)
@@ -50,7 +50,7 @@ func _run() -> bool:
 
 	# A lowball (below the soft floor) is rejected but still costs an offer.
 	var fb: Dictionary = career.free_agents[0]
-	var dem_b := Contract.demanded_weekly(fb, career.tier)
+	var dem_b := Contract.demanded_weekly(fb, career.my_band())
 	var off_b: int = career.offers_left
 	var low := career.sign_free_agent(int(fb["id"]), int(dem_b * 0.6), rng)
 	ok = _assert(not low["ok"], "a lowball wage is rejected") and ok

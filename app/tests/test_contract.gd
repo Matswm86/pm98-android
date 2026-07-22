@@ -58,7 +58,7 @@ func _unit_wages() -> bool:
 	p["wage"] = mkt + 5000
 	ok = _assert(Contract.current_weekly(p, 1) == mkt + 5000, "current wage honours a stored (raised) wage") and ok
 	# Tier scaling + yearly/monthly conversions.
-	ok = _assert(Contract.market_weekly(p, 1) > Contract.market_weekly(p, 4), "tier-1 wage > tier-4 wage") and ok
+	ok = _assert(Contract.market_weekly(p, 0) > Contract.market_weekly(p, 12), "band-0 (elite) wage > band-12 (lowest) wage") and ok
 	ok = _assert(Contract.yearly(2000) == 2000 * Contract.SEASON_WEEKS, "yearly = weekly x season weeks") and ok
 	ok = _assert(Contract.monthly(5200) == int(round(5200 * 52 / 12.0)), "monthly conversion") and ok
 	# Squad bill sums current wages.
@@ -78,8 +78,14 @@ func _unit_demand() -> bool:
 	var dy := Contract.demanded_weekly(young, 1)
 	var dp := Contract.demanded_weekly(prime, 1)
 	var dv := Contract.demanded_weekly(vet, 1)
-	ok = _assert(dy > Contract.market_weekly(young, 1), "a young player demands a raise over market") and ok
-	ok = _assert(dy > dp and dp > dv, "ambition falls with age (young £%d > prime £%d > vet £%d)" % [dy, dp, dv]) and ok
+	var my := Contract.market_weekly(young, 1)
+	var mp := Contract.market_weekly(prime, 1)
+	var mv := Contract.market_weekly(vet, 1)
+	ok = _assert(dy > my, "a young player demands a raise over market") and ok
+	# The RAISE asked over market (ambition) falls with age, though the RE'd PM98 table's
+	# market wage itself peaks at prime age -- so compare the demand/market ratio, not the raw £.
+	ok = _assert(float(dy) / my > float(dp) / mp and float(dp) / mp > float(dv) / mv,
+		"ambition (raise-over-market) falls with age (%.2f > %.2f > %.2f)" % [float(dy)/my, float(dp)/mp, float(dv)/mv]) and ok
 	# Never a pay cut: demand is floored at the current wage even for a veteran.
 	vet["wage"] = dv + 9000
 	ok = _assert(Contract.demanded_weekly(vet, 1) >= int(vet["wage"]), "demand never undercuts the current wage") and ok
@@ -148,7 +154,7 @@ func _career_bill(prem: Array, league: Dictionary, leagues: Array) -> bool:
 	var res := career.sign_player(int(target["id"]), seller_id, career.cash, rng)
 	ok = _assert(res["ok"], "signed a player for the bill test") and ok
 	var signed := career._find_in(career.club_id, int(target["id"]))
-	ok = _assert(career.player_weekly_wage() == bill_before + Contract.current_weekly(signed, career.tier),
+	ok = _assert(career.player_weekly_wage() == bill_before + Contract.current_weekly(signed, career.my_band()),
 		"the wage bill rises by the new signing's wage") and ok
 	return ok
 
@@ -163,20 +169,20 @@ func _career_negotiation(prem: Array, league: Dictionary, leagues: Array) -> boo
 	# Find a raise-wanting player (demand strictly above current) and make him expiring.
 	var p: Dictionary = {}
 	for cand in career.my_squad():
-		if Contract.demanded_weekly(cand, career.tier) > Contract.current_weekly(cand, career.tier):
+		if Contract.demanded_weekly(cand, career.my_band()) > Contract.current_weekly(cand, career.my_band()):
 			p = cand
 			break
 	ok = _assert(not p.is_empty(), "found a player who wants a raise") and ok
 	p["contract_years"] = 1
 	var pid := int(p["id"])
-	var cur := Contract.current_weekly(p, career.tier)
-	var dem := Contract.demanded_weekly(p, career.tier)
+	var cur := Contract.current_weekly(p, career.my_band())
+	var dem := Contract.demanded_weekly(p, career.my_band())
 	# Lowball (current terms) is rejected with the faithful message; nothing changes.
 	var low := career.renew(pid, cur, rng)
 	ok = _assert(not low["ok"] and low["msg"].contains("rejected your offer for renewal"),
 		"a lowball renewal is rejected (PM98 message)") and ok
 	ok = _assert(int(low["demanded"]) == dem, "the rejection reports his wage demand") and ok
-	ok = _assert(int(p["contract_years"]) == 1 and Contract.current_weekly(p, career.tier) == cur,
+	ok = _assert(int(p["contract_years"]) == 1 and Contract.current_weekly(p, career.my_band()) == cur,
 		"a rejected renewal leaves his deal untouched") and ok
 	# Meeting the demand re-signs him: term resets and his stored wage updates to the offer.
 	var good := career.renew(pid, dem, rng)
@@ -204,7 +210,7 @@ func _career_autorenew(prem: Array, league: Dictionary, leagues: Array) -> bool:
 	career.set_auto_renew(int(drop["id"]), false)
 	var keep_id := int(keep["id"])
 	var drop_id := int(drop["id"])
-	var keep_dem := Contract.demanded_weekly(keep, career.tier)
+	var keep_dem := Contract.demanded_weekly(keep, career.my_band())
 	career.week = 5
 	career.advance_season(leagues)
 	var kept := career._find_in(career.club_id, keep_id)

@@ -122,7 +122,7 @@ static func make_attrs(rng: RandomNumberGenerator, ca: int, pos: String, is_gk: 
 ## A full senior player dict, shaped exactly like a _seed_squad roster entry (identity
 ## from the DB schema + the live-roster stamps), ready to append to rosters[clubId].
 ## Keeps `potential` on the dict -- Training.train_week holds him there (his ceiling).
-static func make_senior(e: Dictionary, rng: RandomNumberGenerator, start_year: int, tier_div: int) -> Dictionary:
+static func make_senior(e: Dictionary, rng: RandomNumberGenerator, start_year: int, band: int) -> Dictionary:
 	var age := age_in_season(e, start_year)
 	var is_gk := bool(e.get("isGK", false))
 	var pos := str(e.get("pos", "MF"))
@@ -156,7 +156,7 @@ static func make_senior(e: Dictionary, rng: RandomNumberGenerator, start_year: i
 		"auto_renew": false,
 	}
 	p["contract_term"] = p["contract_years"]
-	Contract.stamp_wage(p, tier_div)
+	Contract.stamp_wage(p, band)
 	Morale.ensure(p, rng)
 	return p
 

@@ -54,15 +54,17 @@ func _valuation() -> bool:
 	var young := {"age": 25, "attrs": {"CA": 80}}
 	var old := {"age": 34, "attrs": {"CA": 80}}
 	var weak := {"age": 25, "attrs": {"CA": 55}}
-	var v_young := TransferMarket.value_of(young, 1)
-	var v_old := TransferMarket.value_of(old, 1)
-	var v_weak := TransferMarket.value_of(weak, 1)
-	ok = _assert(v_young > v_weak, "higher CA worth more (£%d > £%d)" % [v_young, v_weak]) and ok
+	# 2nd arg is now the selling club's STATURE BAND (0=elite ... 12=lowest). Lower band
+	# = more prestigious club = higher fee/wage at equal ability (RE'd PM98 table).
+	var v_young := TransferMarket.value_of(young, 0)
+	var v_old := TransferMarket.value_of(old, 0)
+	var v_weak := TransferMarket.value_of(weak, 0)
+	ok = _assert(v_young > v_weak, "higher AV worth more (£%d > £%d)" % [v_young, v_weak]) and ok
 	ok = _assert(v_old < v_young, "age 34 discounted vs 25 (£%d < £%d)" % [v_old, v_young]) and ok
-	ok = _assert(TransferMarket.value_of(young, 1) > TransferMarket.value_of(young, 4),
-		"tier-1 fee > tier-4 fee for same player") and ok
-	ok = _assert(TransferMarket.value_of(young, 1) >= TransferMarket._MIN_FEE, "fee respects floor") and ok
-	ok = _assert(TransferMarket.wage_yearly(young, 1) > 0, "yearly wage positive") and ok
+	ok = _assert(TransferMarket.value_of(young, 0) > TransferMarket.value_of(young, 12),
+		"elite-club (band 0) fee > lowest-club (band 12) fee for same player") and ok
+	ok = _assert(TransferMarket.value_of(young, 0) >= TransferMarket._MIN_FEE, "fee respects floor") and ok
+	ok = _assert(TransferMarket.yearly_wage(young, 0) > 0, "yearly wage positive") and ok
 	return ok
 
 
@@ -82,10 +84,11 @@ func _market_and_offers(prem: Array, league: Dictionary, leagues: Array) -> bool
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
 	var seller: Dictionary = prem[1]
+	var seller_band := career.band_of(int(seller["id"]))
 	var surplus := _surplus_outfielder(seller)
-	var ask := TransferMarket.asking_price(surplus, false, career.tier)
-	var at := TransferMarket.evaluate_offer(surplus, ask, false, career.tier, rng)
-	var below := TransferMarket.evaluate_offer(surplus, ask - 1, false, career.tier, rng)
+	var ask := TransferMarket.asking_price(surplus, false, seller_band)
+	var at := TransferMarket.evaluate_offer(surplus, ask, false, seller_band, rng)
+	var below := TransferMarket.evaluate_offer(surplus, ask - 1, false, seller_band, rng)
 	ok = _assert(at["accepted"], "surplus player accepts at asking £%d" % ask) and ok
 	ok = _assert(not below["accepted"], "offer below asking refused") and ok
 	# A first-XI man costs the premium.
@@ -94,8 +97,8 @@ func _market_and_offers(prem: Array, league: Dictionary, leagues: Array) -> bool
 		key_id = int(pid)
 		break
 	var keyp := TransferMarket._find(seller["players"], key_id)
-	ok = _assert(TransferMarket.asking_price(keyp, true, career.tier)
-		> TransferMarket.value_of(keyp, career.tier), "first-XI asking carries a premium") and ok
+	ok = _assert(TransferMarket.asking_price(keyp, true, seller_band)
+		> TransferMarket.value_of(keyp, seller_band), "first-XI asking carries a premium") and ok
 	return ok
 
 
@@ -110,7 +113,7 @@ func _pending_bid_delay(prem: Array, league: Dictionary, leagues: Array) -> bool
 	var seller_id := int(prem[1]["id"])
 	var target := _surplus_outfielder(prem[1])
 	var tid := int(target["id"])
-	var ask := TransferMarket.asking_price(target, false, career.tier)
+	var ask := TransferMarket.asking_price(target, false, career.band_of(seller_id))
 	var my0 := career.my_squad().size()
 	var offers0 := career.offers_left
 	var placed := career.place_bid_roster(tid, seller_id, ask)
@@ -138,7 +141,7 @@ func _pending_bid_delay(prem: Array, league: Dictionary, leagues: Array) -> bool
 	c2.cash = 50_000_000
 	var t2 := _surplus_outfielder(prem[2])
 	c2.place_bid_roster(int(t2["id"]), int(prem[2]["id"]),
-		TransferMarket.asking_price(t2, false, c2.tier))
+		TransferMarket.asking_price(t2, false, c2.band_of(int(prem[2]["id"]))))
 	var snap := c2.to_dict()
 	var c3 := Career.from_dict(snap)
 	ok = _assert(c3.pending_bids.size() == 1, "pending bid survives save/load") and ok
@@ -157,7 +160,7 @@ func _sign_sell_renew(prem: Array, league: Dictionary, leagues: Array) -> bool:
 	var seller_id := int(prem[1]["id"])
 	var target := _surplus_outfielder(prem[1])
 	var tid := int(target["id"])
-	var ask := TransferMarket.asking_price(target, false, career.tier)
+	var ask := TransferMarket.asking_price(target, false, career.band_of(seller_id))
 
 	# Money guard.
 	career.cash = ask - 1
@@ -283,7 +286,7 @@ func _persistence(prem: Array, league: Dictionary, leagues: Array) -> bool:
 	rng.seed = 3
 	career.cash = 50_000_000
 	var target := _surplus_outfielder(prem[1])
-	career.sign_player(int(target["id"]), int(prem[1]["id"]), TransferMarket.asking_price(target, false, career.tier), rng)
+	career.sign_player(int(target["id"]), int(prem[1]["id"]), TransferMarket.asking_price(target, false, career.band_of(int(prem[1]["id"]))), rng)
 	career.toggle_shortlist(int(_surplus_outfielder(prem[2])["id"]))
 
 	var path := "user://transfers_test.json"

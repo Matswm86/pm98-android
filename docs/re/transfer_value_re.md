@@ -214,3 +214,37 @@ the 13 witnesses + Ward £15k/Frandsen £175k before shipping.
 `python3 tools/re/extract_value_tables.py` (writes `value_tables.json`) ·
 `python3 tools/re/validate_value_model.py` (13/13 witness check) ·
 EXE: `FUN_00576cd0`/`FUN_0057a5a0`/`FUN_0057a180`, tables @0x638788 (fee) & 0x638208 (wage).
+
+## 12. ✅ STATURE fully RE'd + PORTED — band = division + squad-strength threshold (2026-07-22d)
+
+The prior "one remaining input" (each club's stature band 0-12) is now **traced byte-exact**,
+no guess left. `FUN_0057a180(club)` sets `club+0x58` = the band passed to `FUN_00576cd0`:
+
+- **clubId `0x26ae` → band 0**; free/youth `0x26de`/`0x26e4` → band **12** (asm sets +0x58=12,
+  +0x50=13; the earlier "→12/13" note conflated the two fields).
+- **Normal club:** it finds which of 10 league objects (`DAT_0066b190[0..3]` = the 4 English
+  divisions, then `[7..12]`) the club is in via `vtable+0x48(clubId)`, computes the club's
+  **average AV** `FUN_0057a340(club)` = `floor( Σ(VE+RE+AG+CA over squad) / (nPlayers*4) )`,
+  then `band = clamp( leagueVtable+0x78(avgAV), 0, 12 )`.
+- The `+0x78` method is **per-division** (that's why the 4 divisions have distinct vtables) and
+  is a pure **threshold on avgAV**, mapping each division onto a fixed band sub-range:
+
+| Division (tier) | `+0x78` fn | avgAV thresholds → band |
+|---|---|---|
+| Premier (1) | `FUN_0041c660` | ≥80→**0**, 76-79→**1**, 72-75→**2**, ≤71→**3** |
+| Division 1 (2) | `FUN_00410c10` | ≥64→**4**, 60-63→**5**, ≤59→**6** |
+| Division 2 (3) | `FUN_004255e0` | ≥54→**7**, 52-53→**8**, ≤51→**9** |
+| Division 3 (4) | `FUN_0042ed60` | ≥50→**10**, 48-49→**11**, ≤47→**12** |
+
+Verified against the shipped `game_db.json`: Man Utd avgAV81→**0**, Liverpool 80→**0**,
+Barnsley 71→**3**, Blackpool (Div2) 54→**7** — matching every pinned witness (Berger/Scholes
+stature 0, Marcelle/Barnsley 3, Taylor/Blackpool 7). Age-tier has ONE extra asm branch missed
+by §10's summary: age<20 **and** AV≥95 **and** band==0 → ageTier **1** (not 0).
+
+**PORTED (2026-07-22d):** `TransferMarket.stature_of(players, tier)` reproduces the table above;
+`TransferMarket.value_of/yearly_wage/weekly_wage(player, band)` are the RE'd `FUN_00576cd0`
+lookup (×5000). `FinanceModel`/`Contract`/`Career`/`Main`/screens now thread **band** (a club's
+squad-derived stature), not tier. The invented fee curve + `_player_wage`/`_WAGE_BASE`/`_TIER_FEE`
+are deleted. Headless suite green; Taylor £3M + 13/13 witnesses reproduce through the live GDScript.
+Decompiled sources: `docs/re/decompiled/fn_0057a180*.c`, `fn_0057a340*.c`, `fn_0057a5a0*.c`,
+`fn_00576cd0*.c`, and the four `+0x78` rank fns.

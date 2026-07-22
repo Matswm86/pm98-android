@@ -47,31 +47,32 @@ static func _round100(v: float) -> int:
 
 # ---- wages ---------------------------------------------------------------
 
-## The market weekly wage for a player at a division tier (1-4): the shared FinanceModel
-## curve, so a signing's wage matches the finance ledger's STAFF WAGES line.
-static func market_weekly(player: Dictionary, tier: int) -> int:
-	return FinanceModel.weekly_wage(_attrs(player), tier)
+## The market weekly wage for a player at his club's stature BAND (0-12): the RE'd PM98
+## wage table (weekly = yearly table wage / 52), so a signing's wage matches the finance
+## ledger's STAFF WAGES line. Band comes from TransferMarket.stature_of(club squad, tier).
+static func market_weekly(player: Dictionary, band: int) -> int:
+	return FinanceModel.weekly_wage(player, band)
 
 
 ## A player's actual weekly wage: his stored `wage` (set when he joined or last renewed),
 ## or the market wage if none is stored (legacy saves / GameDB players).
-static func current_weekly(player: Dictionary, tier: int) -> int:
+static func current_weekly(player: Dictionary, band: int) -> int:
 	var w: Variant = player.get("wage")
-	return int(w) if w != null else market_weekly(player, tier)
+	return int(w) if w != null else market_weekly(player, band)
 
 
-## Stamp a player's current wage onto his dict (his market wage at this tier). Called when a
-## player joins the club (seed / signing / youth promotion) so his wage persists and the
-## live wage bill counts him.
-static func stamp_wage(player: Dictionary, tier: int) -> void:
-	player["wage"] = market_weekly(player, tier)
+## Stamp a player's current wage onto his dict (his market wage at his club's band). Called
+## when a player joins the club (seed / signing / youth promotion) so his wage persists and
+## the live wage bill counts him.
+static func stamp_wage(player: Dictionary, band: int) -> void:
+	player["wage"] = market_weekly(player, band)
 
 
 ## Total weekly wage bill for a squad (deducted from cash each week).
-static func squad_weekly_bill(squad: Array, tier: int) -> int:
+static func squad_weekly_bill(squad: Array, band: int) -> int:
 	var w := 0
 	for p in squad:
-		w += current_weekly(p, tier)
+		w += current_weekly(p, band)
 	return w
 
 
@@ -106,18 +107,18 @@ static func _ambition(player: Dictionary) -> float:
 
 ## The weekly wage a player demands to renew. Floored at his current wage (he never re-signs
 ## for a cut), otherwise his market wage scaled by ambition. Rounded to £100.
-static func demanded_weekly(player: Dictionary, tier: int) -> int:
-	var cur := current_weekly(player, tier)
-	var asked := _round100(float(market_weekly(player, tier)) * _ambition(player))
+static func demanded_weekly(player: Dictionary, band: int) -> int:
+	var cur := current_weekly(player, band)
+	var asked := _round100(float(market_weekly(player, band)) * _ambition(player))
 	return maxi(cur, asked)
 
 
 ## The renewal offers the manager can table for a player (the RENEW screen rows). Monotonic
 ## by wage: hold his current terms (a lowball for anyone wanting a raise), meet his demand,
 ## or better it to lock him in. Each = {key, label, weekly, years}.
-static func renewal_options(player: Dictionary, tier: int) -> Array:
-	var cur := current_weekly(player, tier)
-	var dem := demanded_weekly(player, tier)
+static func renewal_options(player: Dictionary, band: int) -> Array:
+	var cur := current_weekly(player, band)
+	var dem := demanded_weekly(player, band)
 	return [
 		{"key": "hold", "label": "Offer current terms", "weekly": cur, "years": NEW_TERM_YEARS},
 		{"key": "meet", "label": "Meet his wage demand", "weekly": dem, "years": NEW_TERM_YEARS},
@@ -128,8 +129,8 @@ static func renewal_options(player: Dictionary, tier: int) -> Array:
 
 ## Decide whether a player accepts a renewal at `offer_weekly`. Accept at/above his demand,
 ## a coin-weighted maybe just below it, a flat refusal under that. Returns {accepted, demanded}.
-static func evaluate_renewal(player: Dictionary, offer_weekly: int, tier: int, rng: RandomNumberGenerator) -> Dictionary:
-	var dem := demanded_weekly(player, tier)
+static func evaluate_renewal(player: Dictionary, offer_weekly: int, band: int, rng: RandomNumberGenerator) -> Dictionary:
+	var dem := demanded_weekly(player, band)
 	var res := {"accepted": false, "demanded": dem}
 	if offer_weekly >= dem:
 		res["accepted"] = true

@@ -140,6 +140,7 @@ const C_PRESS := Color(1, 1, 1, 0.20)
 
 var _club: Dictionary = {}
 var _tier: int = 1
+var _band: int = 3           # the club's PM98 stature band (RE'd wage input)
 var _header: Dictionary = {}
 var _sections: Array = []              # {key, y0, slots, players}
 var _scroll := {}                      # key -> first visible index
@@ -195,6 +196,7 @@ func _ready() -> void:
 func setup(club: Dictionary, tier: int, header: Dictionary = {}) -> void:
 	_club = club
 	_tier = tier
+	_band = TransferMarket.stature_of(club.get("players", []), tier)
 	_header = header
 	if _header.is_empty():
 		_header = {"mode": "manager", "top": "",
@@ -578,7 +580,7 @@ func _draw_modal() -> void:
 ## wage model, not the original's decoded wages -- charter #10 parity gap).
 func _monthly_wage(p: Dictionary) -> int:
 	@warning_ignore("integer_division")
-	return Contract.current_weekly(p, _tier) * 52 / 12
+	return Contract.current_weekly(p, _band) * 52 / 12
 
 
 func _avg_of(p: Dictionary) -> int:

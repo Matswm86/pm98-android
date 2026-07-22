@@ -20,7 +20,6 @@ const _BOARDS := {1: 60, 2: 48, 3: 36, 4: 24}              # boards sold
 const _TV := {1: 8_000_000, 2: 1_200_000, 3: 450_000, 4: 220_000}  # season TV money
 const _SPONSOR := {1: 5_000_000, 2: 900_000, 3: 300_000, 4: 120_000}  # shirt/main sponsor
 const _HOME_GAMES := {1: 19, 2: 23, 3: 23, 4: 23}          # league home games
-const _WAGE_BASE := {1: 4000, 2: 1500, 3: 700, 4: 400}     # £/wk for a CA-55 player
 
 const SEASON_WEEKS := 52   # PM98 finance loops 0x34 = 52 weeks
 
@@ -46,18 +45,12 @@ static func tier_of(club: Dictionary, leagues: Array) -> int:
 	return 2
 
 
-static func _player_wage(attrs: Dictionary, base: int) -> int:
-	# Weekly wage scales with Ability (CA); stars earn disproportionately more.
-	var ca := float(attrs.get("CA", 45))
-	var mult: float = pow(maxf(0.4, ca / 55.0), 1.6)
-	return int(round(base * mult / 100.0)) * 100
-
-
-## Public weekly wage (£/wk) for one player at a division tier (1-4). Single source
-## of truth shared by the finance ledger (STAFF WAGES) and the transfer market
-## (YEARLY WAGE = this x SEASON_WEEKS), so a signing's wage and the books agree.
-static func weekly_wage(attrs: Dictionary, tier: int) -> int:
-	return _player_wage(attrs, int(_WAGE_BASE.get(tier, _WAGE_BASE[2])))
+## Public weekly wage (£/wk) for one player at his club's stature band (0-12). Single
+## source of truth shared by the finance ledger (STAFF WAGES) and the transfer market:
+## the RE'd PM98 wage table (TransferMarket.weekly_wage = yearly table wage / 52), so a
+## signing's wage and the books agree. Band comes from TransferMarket.stature_of(squad, tier).
+static func weekly_wage(player: Dictionary, band: int) -> int:
+	return TransferMarket.weekly_wage(player, band)
 
 
 ## Full finance summary for one club at a given division tier (1-4). Returns a dict
@@ -93,15 +86,16 @@ static func summary(club: Dictionary, tier: int) -> Dictionary:
 	var tv: int = int(_TV[tier])                           # TELEVISION
 	var income := gate + boards + sponsor + tv
 
-	# Expenses
-	var wbase: int = int(_WAGE_BASE[tier])
+	# Expenses. STAFF WAGES = the squad's weekly wage bill. Each unstamped player's wage is
+	# the RE'd PM98 table wage (weekly = yearly / 52) at THIS club's stature band, so the
+	# books match the market card. Band = the club's own squad strength (TransferMarket).
+	var band := TransferMarket.stature_of(club.get("players", []), tier)
 	var weekly_wages := 0
 	for p in club.get("players", []):
 		# A player's actual contracted wage (set on signing / renewal) takes precedence
-		# over the market estimate, so a renewal raise shows up in the books. Kept inline
-		# (not via Contract) so FinanceModel stays free of that dependency.
+		# over the table estimate, so a renewal raise shows up in the books.
 		var stored: Variant = p.get("wage")
-		weekly_wages += int(stored) if stored != null else _player_wage(p.get("attrs", {}), wbase)
+		weekly_wages += int(stored) if stored != null else TransferMarket.weekly_wage(p, band)
 	var wages := weekly_wages * SEASON_WEEKS               # STAFF WAGES
 	var bonus := int(round(gate * 0.02))                   # BONUS (win/appearance pool)
 	var expense := wages + bonus

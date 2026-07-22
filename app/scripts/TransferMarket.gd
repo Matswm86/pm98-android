@@ -17,11 +17,16 @@ extends RefCounted
 ##   "%s has left your club as his contract has not been renewed",
 ##   "The transfer deadline is now %u week%s away."
 ##
-## The valuation MODEL itself (fee curve, age factor, accept thresholds, AI movement)
-## is OURS, calibrated to plausible 1997-98 English fees. PM98's real per-player fees
-## are NOT code constants -- finance is a data-driven per-club float ledger loaded from
-## the club database at new-game (docs/re/finance_constants.md), so there is nothing to
-## port here; only the screen labels and message text are PM98's.
+## The fee + wage VALUES are the real PM98 model, reverse-engineered byte-exact from
+## MANAGER.EXE (docs/re/transfer_value_re.md sec.10). They are a LOOKUP TABLE, not a
+## curve: FUN_00576cd0 indexes 2x702 uint16 tables by
+##   idx = stature*54 + abilityTier(AV)*6 + ageTier(age),   AV = (VE+RE+AG+CA)>>2
+## fee = feeTable[idx]*5000, wage(yearly) = wageTable[idx]*5000. Each club's stature
+## (band 0-12) is derived from its division + squad-strength thresholds (FUN_0057a180 +
+## FUN_0057a340 + the per-division vtable+0x78), reproduced in stature_of(). Validated
+## 13/13 witnesses byte-exact (tools/re/validate_value_model.py). Only the accept
+## thresholds / key-player premium / AI-movement that LAYER on top stay ours (PM98's
+## negotiation + AI-transfer logic is un-RE'd).
 
 # Squad bounds (gameplay, ours). The only literal squad cap in the binary is the
 # non-EU "maximum allowed" rule; total-squad limits live in the database, so these
@@ -30,44 +35,36 @@ const SQUAD_MAX := 30          # can't sign beyond this
 const SQUAD_MIN := 16          # can't sell below this (must field XI + cover)
 const MIN_KEEPERS := 2         # never sell down to a single goalkeeper
 
-# Fee curve: convex in Ability (CA), shaped by age, scaled by division tier. The
-# tier scale sets the fee of an average (CA 50) prime-age player in that division.
-const _TIER_FEE := {1: 915000.0, 2: 320000.0, 3: 110000.0, 4: 45000.0}
-const _CA_PIVOT := 50.0
-const _CA_POW := 4.0
+# PM98 value table (RE'd FUN_00576cd0): fee = feeTable[idx]*MULT, wage = wageTable[idx]*MULT.
+# MULT = 5000 (asm FILD word; FMUL 1e6 then display /200 = net x5000 = the £5,000 offer step).
+const _VALUE_MULT := 5000
+const _VALUE_TABLES_PATH := "res://data/value_tables.json"
+static var _fee_table: PackedInt32Array = PackedInt32Array()
+static var _wage_table: PackedInt32Array = PackedInt32Array()
+
 const KEY_PREMIUM := 1.6       # a first-XI man isn't sold at book value...
 const STAR_FORCE := 2.2        # ...but this multiple of value always prises him loose
-const _MIN_FEE := 25000        # nobody changes hands for less than this
+const _MIN_FEE := 5000         # the table floor (£5k) is PM98's smallest fee/wage step
 
 # New signings / renewals get a fresh multi-year deal.
 const NEW_CONTRACT_YEARS := 3
 
 
-# ---- valuation -----------------------------------------------------------
+# ---- valuation (RE'd PM98 lookup table, docs/re/transfer_value_re.md sec.10) ---------
 
-## Age multiplier on fee: peak value at 24-28, a discount for the very young
-## (no decoded potential attribute, so youth isn't a premium here) and a steep
-## decline past 30.
-static func _age_factor(age: int) -> float:
-	if age <= 0:
-		return 1.0
-	if age <= 20:
-		return 0.85
-	if age <= 23:
-		return 0.95
-	if age <= 28:
-		return 1.0
-	if age <= 30:
-		return 0.80
-	if age <= 32:
-		return 0.55
-	return 0.35
-
-
-static func _round_fee(v: float, tier: int) -> int:
-	var step: int = 50000 if tier <= 2 else 5000
-	var n := int(round(v / step)) * step
-	return maxi(_MIN_FEE, n)
+static func _load_tables() -> void:
+	if not _fee_table.is_empty():
+		return
+	var f := FileAccess.open(_VALUE_TABLES_PATH, FileAccess.READ)
+	if f == null:
+		push_error("TransferMarket: %s missing" % _VALUE_TABLES_PATH)
+		return
+	var j: Variant = JSON.parse_string(f.get_as_text())
+	if j is Dictionary:
+		for v in (j as Dictionary).get("fee_table", []):
+			_fee_table.append(int(v))
+		for v in (j as Dictionary).get("wage_table", []):
+			_wage_table.append(int(v))
 
 
 ## A player's attribute row, or {} when undecoded (some fringe players store null).
@@ -76,19 +73,100 @@ static func _attrs(player: Dictionary) -> Dictionary:
 	return a if a is Dictionary else {}
 
 
-## Transfer value (CLUB FEE, £) for a player at a division tier (1-4).
-static func value_of(player: Dictionary, tier: int) -> int:
-	var attrs := _attrs(player)
-	var ca := float(attrs.get("CA", 45))
-	var age := int(player.get("age", 26))
-	var scale: float = float(_TIER_FEE.get(tier, _TIER_FEE[2]))
-	var raw := scale * pow(ca / _CA_PIVOT, _CA_POW) * _age_factor(age)
-	return _round_fee(raw, tier)
+## On-screen ability AV = (VE + RE + AG + CA) >> 2 (FUN_0057a5a0). Falls back to CA
+## alone when the other three are undecoded, so fringe rows still value.
+static func av_of(attrs: Dictionary) -> int:
+	if attrs.has("VE") and attrs.has("RE") and attrs.has("AG") and attrs.has("CA"):
+		return (int(attrs["VE"]) + int(attrs["RE"]) + int(attrs["AG"]) + int(attrs["CA"])) >> 2
+	return int(attrs.get("CA", 45))
 
 
-## Yearly wage (YEARLY WAGE, £) -- weekly wage from the shared FinanceModel curve x season.
-static func wage_yearly(player: Dictionary, tier: int) -> int:
-	return FinanceModel.weekly_wage(_attrs(player), tier) * FinanceModel.SEASON_WEEKS
+## FUN_00576cd0 ability tier from AV: AV>=95->0 ... >=60->7 else 8.
+static func _ability_tier(av: int) -> int:
+	if av >= 95: return 0
+	if av >= 90: return 1
+	if av >= 85: return 2
+	if av >= 80: return 3
+	if av >= 75: return 4
+	if av >= 70: return 5
+	if av >= 65: return 6
+	if av >= 60: return 7
+	return 8
+
+
+## FUN_00576cd0 age tier: <20->0 (special: AV>=95 & band0 -> 1) <23->1 <26->2 <30->3 <33->4 else 5.
+static func _age_tier(age: int, av: int, band: int) -> int:
+	if age < 20:
+		return 1 if (av >= 95 and band == 0) else 0
+	if age < 23: return 1
+	if age < 26: return 2
+	if age < 30: return 3
+	if age < 33: return 4
+	return 5
+
+
+## The word index into the fee/wage tables (FUN_00576cd0): stature*54 + abil*6 + age.
+static func _table_index(band: int, av: int, age: int) -> int:
+	return band * 54 + _ability_tier(av) * 6 + _age_tier(age, av, band)
+
+
+## A club's STATURE band 0-12 (FUN_0057a180 + FUN_0057a340 + per-division vtable+0x78).
+## Band = the club's division mapped through a squad-strength threshold on the club's
+## average AV = floor(sum(VE+RE+AG+CA over squad) / (nPlayers*4)):
+##   Prem(t1):  avgAV>=80->0  76-79->1  72-75->2  <=71->3
+##   Div1(t2):  avgAV>=64->4  60-63->5  <=59->6
+##   Div2(t3):  avgAV>=54->7  52-53->8  <=51->9
+##   Div3(t4):  avgAV>=50->10 48-49->11 <=47->12
+## Lower band = more prestigious club = far higher fees/wages at equal ability. This is
+## the ONE per-club input the runtime reproduces; the tables + tiers + x5000 are fixed.
+static func stature_of(players: Array, tier: int) -> int:
+	var total := 0
+	var n := 0
+	for p in players:
+		var a := _attrs(p)
+		if a.has("VE") and a.has("RE") and a.has("AG") and a.has("CA"):
+			total += int(a["VE"]) + int(a["RE"]) + int(a["AG"]) + int(a["CA"])
+			n += 1
+	var avg: int = (total / (n * 4)) if n > 0 else 0     # FUN_0057a340 integer division
+	match tier:
+		1:
+			return 0 if avg >= 80 else 1 if avg >= 76 else 2 if avg >= 72 else 3
+		2:
+			return 4 if avg >= 64 else 5 if avg >= 60 else 6
+		3:
+			return 7 if avg >= 54 else 8 if avg >= 52 else 9
+		_:
+			return 10 if avg >= 50 else 11 if avg >= 48 else 12
+
+
+## Transfer value (CLUB FEE, £) for a player, given his SELLING CLUB's stature band 0-12.
+## Byte-exact PM98 lookup: feeTable[stature*54 + abilTier(AV)*6 + ageTier(age)] * 5000.
+static func value_of(player: Dictionary, band: int) -> int:
+	_load_tables()
+	if _fee_table.is_empty():
+		return _MIN_FEE
+	var idx := _table_index(band, av_of(_attrs(player)), int(player.get("age", 26)))
+	return _fee_table[clampi(idx, 0, _fee_table.size() - 1)] * _VALUE_MULT
+
+
+## Yearly wage (YEARLY WAGE, £) for a player at his club's stature band. Byte-exact PM98
+## lookup: wageTable[idx] * 5000.
+static func yearly_wage(player: Dictionary, band: int) -> int:
+	_load_tables()
+	if _wage_table.is_empty():
+		return _MIN_FEE
+	var idx := _table_index(band, av_of(_attrs(player)), int(player.get("age", 26)))
+	return _wage_table[clampi(idx, 0, _wage_table.size() - 1)] * _VALUE_MULT
+
+
+## Weekly wage (£/wk) for the finance ledger = yearly table wage / 52, rounded.
+static func weekly_wage(player: Dictionary, band: int) -> int:
+	return int(round(yearly_wage(player, band) / float(FinanceModel.SEASON_WEEKS)))
+
+
+## Round a BID/offer amount to the £5,000 step, floored at the table minimum.
+static func _round_fee(v: float) -> int:
+	return maxi(_MIN_FEE, int(round(v / 5000.0)) * 5000)
 
 
 # ---- squad helpers -------------------------------------------------------
@@ -132,6 +210,7 @@ static func market(rosters: Dictionary, names: Dictionary, tier: int, exclude_cl
 		if int(cid) == exclude_club_id:
 			continue
 		var players: Array = rosters[cid]
+		var band := stature_of(players, tier)   # the selling club's PM98 stature
 		var view := {"id": cid, "name": names.get(cid, "?"), "players": players}
 		var key_ids := best_xi_ids(view)
 		for p in players:
@@ -143,7 +222,7 @@ static func market(rosters: Dictionary, names: Dictionary, tier: int, exclude_cl
 				"ca": int(attrs.get("CA", 0)), "mo": int(attrs.get("RM", 0)),
 				"age": int(p.get("age", 0)),
 				"club_id": int(cid), "club_name": names.get(cid, "?"),
-				"fee": value_of(p, tier), "wage": wage_yearly(p, tier),
+				"fee": value_of(p, band), "wage": yearly_wage(p, band),
 				"key": key_ids.has(pid),
 			})
 	out.sort_custom(func(a, b): return a["fee"] > b["fee"])
@@ -161,6 +240,7 @@ static func loan_market(rosters: Dictionary, names: Dictionary, tier: int, exclu
 		var players: Array = rosters[cid]
 		if players.size() <= SQUAD_MIN:
 			continue
+		var band := stature_of(players, tier)
 		var view := {"id": cid, "name": names.get(cid, "?"), "players": players}
 		var key_ids := best_xi_ids(view)
 		for p in players:
@@ -174,7 +254,7 @@ static func loan_market(rosters: Dictionary, names: Dictionary, tier: int, exclu
 				"ca": int(attrs.get("CA", 0)), "mo": int(attrs.get("RM", 0)),
 				"age": int(p.get("age", 0)),
 				"club_id": int(cid), "club_name": names.get(cid, "?"),
-				"fee": 0, "wage": wage_yearly(p, tier), "key": false,
+				"fee": 0, "wage": yearly_wage(p, band), "key": false,
 			})
 	out.sort_custom(func(a, b): return a["ca"] > b["ca"])
 	return out
@@ -182,8 +262,8 @@ static func loan_market(rosters: Dictionary, names: Dictionary, tier: int, exclu
 
 ## The asking price a club wants for a player: book value, with a premium for a
 ## first-XI man.
-static func asking_price(player: Dictionary, is_key: bool, tier: int) -> int:
-	var value := value_of(player, tier)
+static func asking_price(player: Dictionary, is_key: bool, band: int) -> int:
+	var value := value_of(player, band)
 	return int(round(value * (KEY_PREMIUM if is_key else 1.0)))
 
 
@@ -191,9 +271,9 @@ static func asking_price(player: Dictionary, is_key: bool, tier: int) -> int:
 ## Returns {accepted, asking, value}. Surplus players sell at/above book; a key
 ## player needs the premium and, even then, the board is reluctant until the offer
 ## approaches STAR_FORCE x value (where it always sells).
-static func evaluate_offer(player: Dictionary, offer: int, is_key: bool, tier: int, rng: RandomNumberGenerator) -> Dictionary:
-	var value := value_of(player, tier)
-	var asking := asking_price(player, is_key, tier)
+static func evaluate_offer(player: Dictionary, offer: int, is_key: bool, band: int, rng: RandomNumberGenerator) -> Dictionary:
+	var value := value_of(player, band)
+	var asking := asking_price(player, is_key, band)
 	var res := {"accepted": false, "asking": asking, "value": value}
 	if offer >= int(round(value * STAR_FORCE)):
 		res["accepted"] = true
@@ -214,7 +294,8 @@ static func evaluate_offer(player: Dictionary, offer: int, is_key: bool, tier: i
 ## manager's. Returns {buyer_id, buyer_name, offer, value} or {} if no club has
 ## room/interest. Buyers prefer players who'd improve or stock their squad.
 static func solicit_offer(player: Dictionary, rosters: Dictionary, names: Dictionary, tier: int, seller_id: int, rng: RandomNumberGenerator) -> Dictionary:
-	var value := value_of(player, tier)
+	var seller_band := stature_of(rosters.get(seller_id, []), tier)
+	var value := value_of(player, seller_band)
 	var best := {}
 	var best_score := -1.0
 	for cid in rosters:
@@ -231,7 +312,7 @@ static func solicit_offer(player: Dictionary, rosters: Dictionary, names: Dictio
 			var bid := int(round(value * lerpf(0.8, 1.15, rng.randf())))
 			best = {
 				"buyer_id": int(cid), "buyer_name": names.get(cid, "?"),
-				"offer": _round_fee(float(bid), tier), "value": value,
+				"offer": _round_fee(float(bid)), "value": value,
 			}
 	return best
 
@@ -298,7 +379,7 @@ static func ai_round(rng: RandomNumberGenerator, rosters: Dictionary, names: Dic
 		player["contract_years"] = deal
 		player["contract_term"] = deal
 		buyer.append(player)
-		var fee := value_of(player, tier)
+		var fee := value_of(player, stature_of(buyer, tier))
 		news.append("%s has signed %s for %s for £%s." % [
 			names.get(buyer_id, "?"), player.get("name", "?"),
 			seasons_phrase(deal), money_str(fee)])

@@ -55,7 +55,7 @@ func _release(prem: Array, league: Dictionary, leagues: Array) -> bool:
 	var free0 := c.free_agents.size()
 	var victim := _outfielder(c.my_squad())
 	var pid := int(victim["id"])
-	var weekly := Contract.current_weekly(victim, c.tier)
+	var weekly := Contract.current_weekly(victim, c.my_band())
 	var years: int = maxi(1, int(victim.get("contract_years", 1)))
 	var exp_comp := weekly * Contract.SEASON_WEEKS * years
 	var cash0 := c.cash
