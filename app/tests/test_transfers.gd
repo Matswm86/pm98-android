@@ -30,6 +30,7 @@ func _run() -> bool:
 
 	var ok := true
 	ok = _valuation() and ok
+	ok = _foreign_stature(db, leagues) and ok
 	ok = _market_and_offers(prem, league, leagues) and ok
 	ok = _sign_sell_renew(prem, league, leagues) and ok
 	ok = _pending_bid_delay(prem, league, leagues) and ok
@@ -65,6 +66,38 @@ func _valuation() -> bool:
 		"elite-club (band 0) fee > lowest-club (band 12) fee for same player") and ok
 	ok = _assert(TransferMarket.value_of(young, 0) >= TransferMarket._MIN_FEE, "fee respects floor") and ok
 	ok = _assert(TransferMarket.yearly_wage(young, 0) > 0, "yearly wage positive") and ok
+	return ok
+
+
+## Foreign (non-English) club stature — RE'd FUN_004457a0 (docs/re/transfer_value_re.md §13).
+## Guards the bug where a foreign scout/offer target (Landreau/Nantes) was valued with an
+## EMPTY squad + the MANAGER's division tier, so its fee swung with the player's division.
+func _foreign_stature(db: Dictionary, leagues: Array) -> bool:
+	var ok := true
+	# english_tier_of: 1-4 for the English divisions, 0 for a foreign/leagueless club.
+	ok = _assert(TransferMarket.english_tier_of({"leagueId": "eng_prem"}, leagues) == 1, "english_tier_of Prem=1") and ok
+	ok = _assert(TransferMarket.english_tier_of({"leagueId": "eng_div3"}, leagues) == 4, "english_tier_of Div3=4") and ok
+	ok = _assert(TransferMarket.english_tier_of({"leagueId": null}, leagues) == 0, "english_tier_of foreign=0") and ok
+	ok = _assert(TransferMarket.english_tier_of({"leagueId": "fra_div1"}, leagues) == 0, "english_tier_of unknown-league=0") and ok
+	# FUN_004457a0 boundary map (avgAV -> band 0-9).
+	var fb := func(av: int) -> int: return TransferMarket.stature_of([{"attrs": {"VE": av, "RE": av, "AG": av, "CA": av}, "age": 25}], 0)
+	ok = _assert(fb.call(80) == 0 and fb.call(79) == 1 and fb.call(71) == 3, "foreign band 80->0 79->1 71->3") and ok
+	ok = _assert(fb.call(52) == 8 and fb.call(51) == 9 and fb.call(30) == 9, "foreign band 52->8 51->9 floor 9") and ok
+	# Concrete witness: Nantes (avgAV 71) -> foreign band 3, and the value is DETERMINISTIC
+	# (independent of any manager tier). Landreau's byte-exact table fee guards the regression.
+	var nantes: Dictionary = {}
+	var landreau: Dictionary = {}
+	for c in db.get("clubs", []):
+		if int(c.get("id", -1)) == 1056:
+			nantes = c
+			for p in c.get("players", []):
+				if "andreau" in str(p.get("name", "")):
+					landreau = p
+	if not nantes.is_empty() and not landreau.is_empty():
+		var band := TransferMarket.stature_of(nantes["players"], TransferMarket.english_tier_of(nantes, leagues))
+		ok = _assert(band == 3, "Nantes stature band == 3 (avgAV 71, foreign)") and ok
+		ok = _assert(TransferMarket.value_of(landreau, band) == 3250000,
+			"Landreau fee = £3,250,000 (byte-exact table, band 3)") and ok
 	return ok
 
 

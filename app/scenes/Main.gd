@@ -1132,7 +1132,10 @@ func _open_player_info(player: Dictionary, club: Dictionary, host: Control = nul
 		scr.tree_exiting.connect(func() -> void:
 			if is_instance_valid(squad_host):
 				squad_host.set_dimmed(false))
-	var tier := FinanceModel.tier_of(club, GameDB.leagues)
+	# PlayerInfoScreen uses `tier` only for the CLUB FEE / wage stature lookup, so pass the
+	# stature classification (english_tier_of: 1-4 English, 0 foreign) not the finance tier
+	# (which would mislabel a foreign club as Division One).
+	var tier := TransferMarket.english_tier_of(club, GameDB.leagues)
 	var own: bool = _career != null and int(club.get("id", -1)) == _career.club_id
 	scr.setup(player, club, tier, own)
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
@@ -2607,7 +2610,7 @@ func _show_browse_offer_card(player: Dictionary, club: Dictionary, host: Control
 	var cid := int(club.get("id", -1))
 	var pid := int(player.get("id", -1))
 	var is_key := TransferMarket.is_key_player(club, pid)
-	var band := c.band_of(cid) if c.rosters.has(cid) else TransferMarket.stature_of(club.get("players", []), FinanceModel.tier_of(club, GameDB.leagues))
+	var band := c.band_of(cid) if c.rosters.has(cid) else TransferMarket.stature_of(club.get("players", []), TransferMarket.english_tier_of(club, GameDB.leagues))
 	var fee := TransferMarket.asking_price(player, is_key, band)
 	var card: MakeOfferScreen = load("res://scenes/MakeOfferScreen.gd").new()
 	card.set_anchors_preset(Control.PRESET_FULL_RECT)

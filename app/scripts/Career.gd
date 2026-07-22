@@ -1824,6 +1824,13 @@ func _scout_row(p: Dictionary, cid: int, cname: String, club_v: Dictionary, live
 	var a: Dictionary = p.get("attrs", {})
 	var av := int((int(a.get("VE", 0)) + int(a.get("RE", 0)) + int(a.get("AG", 0)) + int(a.get("CA", 0))) / 4.0)
 	var is_key := TransferMarket.is_key_player(club_v, int(p.get("id", -1)))
+	# The selling club's stature band. A live own-division row uses band_of (shared tier);
+	# a FROZEN foreign / other-division row must rank the club within ITS OWN league off its
+	# OWN squad (foreign clubs are not in `rosters`, so band_of would see an empty squad +
+	# the manager's tier). english_tier_of returns 1-4 for an English club, 0 for a foreign
+	# league (-> FUN_004457a0), so both cases value correctly.
+	var band := band_of(cid) if live else TransferMarket.stature_of(
+		club_v.get("players", []), TransferMarket.english_tier_of(club_v, _leagues))
 	return {
 		"pid": int(p.get("id", -1)),
 		"club_id": cid,
@@ -1837,8 +1844,8 @@ func _scout_row(p: Dictionary, cid: int, cname: String, club_v: Dictionary, live
 		"av": av,
 		"ca": int(a.get("CA", 0)),
 		"mo": int(p.get("morale")) if live and p.get("morale") != null else -1,
-		"fee": TransferMarket.asking_price(p, is_key, band_of(cid)),
-		"wage": TransferMarket.yearly_wage(p, band_of(cid)),
+		"fee": TransferMarket.asking_price(p, is_key, band),
+		"wage": TransferMarket.yearly_wage(p, band),
 		"years": int(p.get("contract_term", 0)) if live else 0,
 		"left": int(p.get("contract_years", 0)) if live else 0,
 		"key": is_key,
@@ -2341,7 +2348,7 @@ func sign_external(player: Dictionary, selling_club: Dictionary, offer: int,
 	if count_offer:
 		offers_left -= 1   # an offer counts whether or not it is accepted
 	var is_key := TransferMarket.is_key_player(selling_club, pid)
-	var sell_band := TransferMarket.stature_of(selling_club.get("players", []), FinanceModel.tier_of(selling_club, _leagues))
+	var sell_band := TransferMarket.stature_of(selling_club.get("players", []), TransferMarket.english_tier_of(selling_club, _leagues))
 	var verdict := TransferMarket.evaluate_offer(player, offer, is_key, sell_band, rng)
 	var seller_name := str(selling_club.get("name", "?"))
 	if not verdict["accepted"]:

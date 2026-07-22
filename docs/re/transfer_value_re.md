@@ -248,3 +248,50 @@ squad-derived stature), not tier. The invented fee curve + `_player_wage`/`_WAGE
 are deleted. Headless suite green; Taylor £3M + 13/13 witnesses reproduce through the live GDScript.
 Decompiled sources: `docs/re/decompiled/fn_0057a180*.c`, `fn_0057a340*.c`, `fn_0057a5a0*.c`,
 `fn_00576cd0*.c`, and the four `+0x78` rank fns.
+
+## 13. Foreign (non-English) club stature — the shared threshold `FUN_004457a0` (2026-07-22e)
+
+§12 reversed the FOUR English divisions' `+0x78` band fns. It left the *foreign* clubs
+(Nantes, Estudiantes, …; `game_db.json` `leagueId: null`) un-RE'd, so the app valued a
+foreign scout/offer target with an **empty squad + the manager's own division tier** —
+Landreau's fee swung £750k↔£3.25M by the player-manager's division. Now closed, no guessing.
+
+**How `FUN_0057a180` picks a foreign club's threshold.** The league-object array
+`DAT_0066b190[0..12]` is built by `FUN_00441ea0` (decompiled). Indices **0-3** are the
+English divisions (Prem/Div1/Div2/Div3). `FUN_0057a180` scans 0-3 first; if the club is in
+none, it scans the **second group, indices 7-12** (constructors `FUN_00457ac0(7)`,
+`FUN_0045dfb0(8)`, `FUN_00451b30(9)`, `FUN_004631a0(10)`, `FUN_00431b30(11)`, and the simple
+object at vtable `0x626e80` = idx 12). band = `(matchedVtable+0x78)(avgAV)`, clamped ≤12.
+
+Reading each of those six vtables' `+0x78` slot straight from `.rdata` (validated first
+against the four English slots, which match §12 exactly) gives:
+
+| idx | league-obj vtable | `+0x78` fn |
+|---|---|---|
+| 7 | `0x627438` | **`FUN_004457a0`** |
+| 8 | `0x627568` | **`FUN_004457a0`** |
+| 9 | `0x627300` | **`FUN_004457a0`** |
+| 10 | `0x627698` | **`FUN_004457a0`** |
+| 11 | `0x623f70` | **`FUN_004457a0`** |
+| 12 | `0x626e80` | **`FUN_004457a0`** |
+
+**All six foreign leagues share ONE threshold fn.** `FUN_004457a0` (decompiled,
+`docs/re/decompiled/fn_004457a0*.c`) maps a club's avgAV → band **0-9** (finer than Prem's
+0-3, and it never reaches the 10-12 tail — so the earlier handoff guess "foreign falls into
+bands 7-12" was wrong):
+
+| avgAV | ≥80 | 76-79 | 72-75 | 68-71 | 64-67 | 60-63 | 56-59 | 54-55 | 52-53 | ≤51 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| band | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+
+**PORTED (2026-07-22e):** `TransferMarket._foreign_band(avg)` = `FUN_004457a0`;
+`TransferMarket.stature_of(players, tier)` routes any non-1-4 tier through it;
+`TransferMarket.english_tier_of(club, leagues)` returns 1-4 for an English club and **0** for
+a foreign/leagueless one (kept distinct from `FinanceModel.tier_of`, whose foreign→2 default
+is a FINANCE default, not a stature one). The foreign-reachable valuation sites now pass the
+club's OWN squad + `english_tier_of`: `Career._scout_row` (frozen rows),
+`Career._resolve_pending_bids`, `Main._show_browse_offer_card`, `Main._show_player_info`.
+Result (byte-exact table, verified live): Nantes avgAV 71 → band **3**; Landreau fee
+**£3,250,000** — deterministic, independent of the manager's division. Guarded by
+`test_transfers._foreign_stature`. Decompiled: `fn_004457a0`, `fn_00441ea0`, and the five
+foreign-league ctors in `docs/re/decompiled/`.

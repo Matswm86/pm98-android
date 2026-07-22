@@ -110,16 +110,10 @@ static func _table_index(band: int, av: int, age: int) -> int:
 	return band * 54 + _ability_tier(av) * 6 + _age_tier(age, av, band)
 
 
-## A club's STATURE band 0-12 (FUN_0057a180 + FUN_0057a340 + per-division vtable+0x78).
-## Band = the club's division mapped through a squad-strength threshold on the club's
-## average AV = floor(sum(VE+RE+AG+CA over squad) / (nPlayers*4)):
-##   Prem(t1):  avgAV>=80->0  76-79->1  72-75->2  <=71->3
-##   Div1(t2):  avgAV>=64->4  60-63->5  <=59->6
-##   Div2(t3):  avgAV>=54->7  52-53->8  <=51->9
-##   Div3(t4):  avgAV>=50->10 48-49->11 <=47->12
-## Lower band = more prestigious club = far higher fees/wages at equal ability. This is
-## the ONE per-club input the runtime reproduces; the tables + tiers + x5000 are fixed.
-static func stature_of(players: Array, tier: int) -> int:
+## FUN_0057a340: a club's average AV = floor(Σ(VE+RE+AG+CA over squad) / (nPlayers*4)),
+## integer division; rows with undecoded attrs are skipped. The squad-strength input to
+## every league's stature threshold.
+static func _squad_avg_av(players: Array) -> int:
 	var total := 0
 	var n := 0
 	for p in players:
@@ -127,7 +121,57 @@ static func stature_of(players: Array, tier: int) -> int:
 		if a.has("VE") and a.has("RE") and a.has("AG") and a.has("CA"):
 			total += int(a["VE"]) + int(a["RE"]) + int(a["AG"]) + int(a["CA"])
 			n += 1
-	var avg: int = (total / (n * 4)) if n > 0 else 0     # FUN_0057a340 integer division
+	return (total / (n * 4)) if n > 0 else 0     # FUN_0057a340 integer division
+
+
+## FUN_004457a0: the stature threshold EVERY non-English (foreign) league shares — maps a
+## club's average AV to a band 0-9 (the English divisions use their own fns via stature_of).
+## Reversed byte-exact from MANAGER.EXE (docs/re/transfer_value_re.md §13): all six foreign
+## league vtables (DAT_0066b1ac..b1c0, the FUN_0057a180 second scan group) resolve their
+## +0x78 slot to this one function; the English four resolve to distinct per-division fns.
+static func _foreign_band(avg: int) -> int:
+	if avg >= 80: return 0
+	if avg >= 76: return 1
+	if avg >= 72: return 2
+	if avg >= 68: return 3
+	if avg >= 64: return 4
+	if avg >= 60: return 5
+	if avg >= 56: return 6
+	if avg >= 54: return 7
+	if avg >= 52: return 8
+	return 9
+
+
+## The club's ENGLISH division tier (1-4) for stature dispatch, or 0 when the club is
+## foreign / not in an English league. Only the four English leagues carry a tier in
+## game_db; a leagueless/foreign club (leagueId null, or an id absent from `leagues`)
+## returns 0, so stature_of routes it through the shared foreign threshold. Kept DISTINCT
+## from FinanceModel.tier_of (which defaults foreign clubs to mid tier 2 for the FINANCE
+## model) — the stature model must NOT treat a foreign club as English Division One.
+static func english_tier_of(club: Dictionary, leagues: Array) -> int:
+	var lid: Variant = club.get("leagueId")
+	if lid == null:
+		return 0
+	for lg in leagues:
+		if lg.get("id") == lid:
+			return int(lg.get("tier", 0))
+	return 0
+
+
+## A club's STATURE band 0-12 (FUN_0057a180 + FUN_0057a340 + per-league vtable+0x78).
+## Band = the club's league mapped through a squad-strength threshold on its average AV.
+## `tier` is the club's OWN English division 1-4 (see english_tier_of); any other value
+## (0/foreign) uses the shared foreign threshold FUN_004457a0:
+##   Prem(1):  avgAV>=80->0  76-79->1  72-75->2  <=71->3
+##   Div1(2):  avgAV>=64->4  60-63->5  <=59->6
+##   Div2(3):  avgAV>=54->7  52-53->8  <=51->9
+##   Div3(4):  avgAV>=50->10 48-49->11 <=47->12
+##   foreign:  avgAV>=80->0 76-79->1 72-75->2 68-71->3 64-67->4 60-63->5 56-59->6
+##             54-55->7 52-53->8 <=51->9   (FUN_004457a0)
+## Lower band = more prestigious club = far higher fees/wages at equal ability. This is
+## the ONE per-club input the runtime reproduces; the tables + tiers + x5000 are fixed.
+static func stature_of(players: Array, tier: int) -> int:
+	var avg := _squad_avg_av(players)
 	match tier:
 		1:
 			return 0 if avg >= 80 else 1 if avg >= 76 else 2 if avg >= 72 else 3
@@ -135,8 +179,10 @@ static func stature_of(players: Array, tier: int) -> int:
 			return 4 if avg >= 64 else 5 if avg >= 60 else 6
 		3:
 			return 7 if avg >= 54 else 8 if avg >= 52 else 9
-		_:
+		4:
 			return 10 if avg >= 50 else 11 if avg >= 48 else 12
+		_:
+			return _foreign_band(avg)
 
 
 ## Transfer value (CLUB FEE, £) for a player, given his SELLING CLUB's stature band 0-12.
