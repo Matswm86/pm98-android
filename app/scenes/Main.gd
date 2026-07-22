@@ -62,7 +62,7 @@ func _ready() -> void:
 			and not OS.has_environment("PM98_YOUTH_SHOT") and not OS.has_environment("PM98_STAFF_SHOT") \
 			and not OS.has_environment("PM98_CONTRACT_SHOT") and not OS.has_environment("PM98_SCREENS_SHOT") \
 			and not OS.has_environment("PM98_MANAGER_SHOT") and not OS.has_environment("PM98_FICHA_SHOT") \
-			and not OS.has_environment("PM98_MATCHOPTS_SHOT"):
+			and not OS.has_environment("PM98_MATCHOPTS_SHOT") and not OS.has_environment("PM98_PLAYERACT_SHOT"):
 		_devshot()
 
 
@@ -106,6 +106,9 @@ func _boot() -> void:
 		return
 	if OS.has_environment("PM98_FICHA_SHOT"):
 		_ficha_shot()
+		return
+	if OS.has_environment("PM98_PLAYERACT_SHOT"):
+		_playeract_shot()
 		return
 	if OS.has_environment("PM98_MATCHOPTS_SHOT"):
 		_matchopts_shot()
@@ -704,6 +707,186 @@ func _ficha_shot() -> void:
 		str(club.get("name")), str(player.get("photoId")), str(player.get("heightCm")),
 		str(player.get("weightKg")), str(player.get("nationality"))])
 	get_tree().quit()
+
+
+## RUNTIME REPRO of the owner's "nothing happens" report (2026-07-22 handoff): begin a
+## real career, then drive the EXACT hub->PLAYERS->player->RENEW/TRANSFER path with
+## SYNTHESIZED TOUCH INPUT pushed through the live Viewport (real hit-testing + overlay
+## ordering, not a wiring shortcut), capturing each step and printing the Career-side
+## mutation. Also drives the BUY path (transfer desk -> make offer -> place bid ->
+## week-roll resolve). Run under Xvfb+GL: PM98_PLAYERACT_SHOT=1.
+func _playeract_shot() -> void:
+	var dir := OS.get_environment("PM98_SHOT_DIR")
+	if GameDB.leagues.is_empty():
+		print("PLAYERACT-SHOT no leagues loaded")
+		get_tree().quit()
+		return
+	var lg: Dictionary = GameDB.leagues[0]
+	var clubs := GameDB.clubs_in_league(lg["id"])
+	clubs.sort_custom(func(a, b): return a["name"] < b["name"])
+	var club: Dictionary = clubs[0]
+	for c in clubs:
+		if str(c.get("name", "")).to_upper().find("MANCHESTER UTD") >= 0:
+			club = c
+			break
+	_begin_career("Manager", lg, club)      # under PM98_SHOT_DIR this mounts the hub
+	await _settle()
+	_save_shot(dir, "pa_00_hub.png")
+	print("PLAYERACT career_id=%d club=%s squad=%d" % [
+		_career.club_id, str(club.get("name", "")), (_career.my_squad() as Array).size()])
+
+	# --- OWNER STEP 1: hub PLAYERS button (action "sell") -> SQUAD MANAGEMENT ---
+	_menu_action("sell", _hub)
+	await _settle()
+	_save_shot(dir, "pa_01_squad.png")
+	var squad: SquadScreen = _first_of(SquadScreen)
+	if squad == null:
+		print("PLAYERACT FAIL: SQUAD screen did not open from hub PLAYERS")
+		get_tree().quit()
+		return
+	print("PLAYERACT squad rows=%d youth_enabled=%s" % [(squad._rows as Array).size(), squad._youth_enabled])
+	if (squad._rows as Array).is_empty():
+		print("PLAYERACT FAIL: no player rows drawn")
+		get_tree().quit()
+		return
+
+	# --- OWNER STEP 2: tap the first player row -> PLAYER INFORMATION card ---
+	var row0: Dictionary = squad._rows[0]
+	var pl: Dictionary = row0["p"]
+	var pid := int(pl.get("id", -1))
+	var r: Rect2 = row0["r"]
+	await _synth_tap(squad, r.position + r.size * 0.5)
+	await _settle()
+	_save_shot(dir, "pa_02_playerinfo.png")
+	var fi: PlayerInfoScreen = _first_of(PlayerInfoScreen)
+	if fi == null:
+		print("PLAYERACT FAIL: player row tap did NOT open PLAYER INFORMATION (pid=%d)" % pid)
+		get_tree().quit()
+		return
+	print("PLAYERACT player='%s' pid=%d actions_enabled=%s (own path expects true)" % [
+		str(pl.get("name", "?")), pid, fi._actions])
+
+	# --- OWNER STEP 3: tap TRANSFER (deterministic: pure toggle, no RNG) ---
+	var listed_before := _career.is_listed(pid)
+	var tr: Rect2 = PlayerInfoScreen.BTN["transfer"]
+	await _synth_tap(fi, tr.position + tr.size * 0.5)
+	await _settle()
+	_save_shot(dir, "pa_03_after_transfer.png")
+	var listed_after := _career.is_listed(pid)
+	print("PLAYERACT TRANSFER: listed %s -> %s  (%s)" % [
+		listed_before, listed_after,
+		"FIRED" if listed_before != listed_after else "DEAD -- tap did nothing"])
+
+	# --- OWNER STEP 4: tap RENEW (mutates contract_years on accept, logs on reject) ---
+	fi = _first_of(PlayerInfoScreen)
+	if fi != null:
+		var yrs_before := int(pl.get("contract_years", 0))
+		var news_before := (_career.news_log as Array).size()
+		var rn: Rect2 = PlayerInfoScreen.BTN["renew"]
+		await _synth_tap(fi, rn.position + rn.size * 0.5)
+		await _settle()
+		_save_shot(dir, "pa_04_after_renew.png")
+		var yrs_after := int(pl.get("contract_years", 0))
+		var news_after := (_career.news_log as Array).size()
+		print("PLAYERACT RENEW: contract_years %d -> %d, news %d -> %d  (%s)" % [
+			yrs_before, yrs_after, news_before, news_after,
+			"FIRED" if (yrs_before != yrs_after or news_before != news_after) else "DEAD"])
+
+	# --- OWNER STEP 5: BUY path -- transfer desk -> make-offer card -> OFFER -> week roll ---
+	_free_overlays()
+	await _settle()
+	_show_transfer_screen()
+	await _settle()
+	_save_shot(dir, "pa_05_transfer_desk.png")
+	var market: Array = _career.market()
+	if market.is_empty():
+		print("PLAYERACT BUY: market empty")
+	else:
+		_career.cash = 500_000_000    # isolate the SURFACING test from the cash gate
+		_show_make_offer_card(market[0])
+		await _settle()
+		_save_shot(dir, "pa_06_make_offer.png")
+		var card: MakeOfferScreen = _first_of(MakeOfferScreen)
+		if card == null:
+			print("PLAYERACT BUY: make-offer card did not open")
+		else:
+			var news_b := (_career.news_log as Array).size()
+			var alerts_b := (_career.pending_alerts as Array).size()
+			var pend_b := (_career.pending_bids as Array).size()
+			var ob: Rect2 = MakeOfferScreen.BTN["offer"]
+			await _synth_tap(card, ob.position + ob.size * 0.5)
+			await _settle()
+			print("PLAYERACT BUY placed: pending_bids %d->%d (toast only, no resolution yet)" % [
+				pend_b, (_career.pending_bids as Array).size()])
+			var rng := RandomNumberGenerator.new()
+			rng.seed = 424242
+			_career.advance_week(rng)    # the club answers -- the "days later" reply
+			var news_a := (_career.news_log as Array).size()
+			var alerts_a := (_career.pending_alerts as Array).size()
+			print("PLAYERACT BUY resolved: news %d->%d  HUB-ALERTS %d->%d  %s" % [
+				news_b, news_a, alerts_b, alerts_a,
+				"(SURFACED as hub alert)" if alerts_a > alerts_b else "(NOT surfaced -> looks dead)"])
+			for m in (_career.news_log as Array).slice(maxi(0, news_a - 2)):
+				print("   news: %s" % (str(m.get("text", "")) if m is Dictionary else str(m)))
+			# Re-render the hub: the queued bid answer must pop as the PREMIER MANAGER 98 box.
+			_free_overlays()
+			_mount_hub()
+			await _settle()
+			_save_shot(dir, "pa_06b_hub_bidreply.png")
+
+	# --- OWNER STEP 6: STAFF hire path (screen renders + hire mutates the backroom) ---
+	_free_overlays()
+	await _settle()
+	_show_staff_screen()
+	await _settle()
+	_save_shot(dir, "pa_07_staff.png")
+	var staff_before := (_career.staff as Array).size()
+	var pool := Staff.pool_for_role(_career.staff_pool, "PHYSIOTHERAPIST")
+	if pool.is_empty():
+		print("PLAYERACT STAFF: no PHYSIO candidates in pool")
+	else:
+		_open_staff_hire("PHYSIOTHERAPIST", func() -> void: pass, "PHYSIOTHERAPIST")
+		await _settle()
+		_save_shot(dir, "pa_08_staff_hire.png")
+		_career.hire_staff(int(pool[0].get("id", -1)))
+		_career.save()
+		print("PLAYERACT STAFF hire: staff %d->%d  (%s)" % [staff_before, (_career.staff as Array).size(),
+			"FIRED" if (_career.staff as Array).size() > staff_before else "DEAD"])
+	print("PLAYERACT-SHOT done")
+	get_tree().quit()
+
+
+## Push a real touch press+release through the Viewport at DESIGN-space point `d`
+## on full-rect control `ctrl` (maps design 640x480 -> the control's scaled/letterboxed
+## viewport pixels, the inverse of the screens' own _to_design). Exercises the live GUI
+## hit-test + overlay z-order exactly as a finger would.
+func _synth_tap(ctrl: Control, d: Vector2) -> void:
+	# The control lives in the 640x480 canvas; push_input wants WINDOW pixels. Map
+	# local/design -> canvas (get_global_transform_with_canvas) -> window
+	# (viewport screen transform). A real finger arrives already in window space and
+	# the viewport applies the same map, so this reproduces the true hit-test path.
+	var canvas_pt: Vector2 = ctrl.get_global_transform_with_canvas() * d
+	var pos: Vector2 = get_viewport().get_screen_transform() * canvas_pt
+	var down := InputEventScreenTouch.new()
+	down.index = 0
+	down.position = pos
+	down.pressed = true
+	get_viewport().push_input(down)
+	await get_tree().process_frame
+	var up := InputEventScreenTouch.new()
+	up.index = 0
+	up.position = pos
+	up.pressed = false
+	get_viewport().push_input(up)
+	await get_tree().process_frame
+
+
+## First mounted child of a given screen type (dev-shot introspection helper).
+func _first_of(t) -> Node:
+	for c in get_children():
+		if is_instance_of(c, t):
+			return c
+	return null
 
 
 ## Free any mounted art-overlay child (everything except the persistent hub), so the next

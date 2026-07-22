@@ -2219,7 +2219,11 @@ func place_bid_external(player: Dictionary, selling_club: Dictionary, offer: int
 
 ## Resolve last week's outgoing bids (called from advance_week). The evaluation
 ## happens NOW, through the same sign paths (count_offer=false — the allowance
-## was charged at placement); accept and reject both land in the news log.
+## was charged at placement); accept and reject both land in the news log AND pop as
+## a hub message box on the next hub view — the original's "days later" reply to a
+## bid, so a BUY is not a silent no-op. The box reuses the witnessed PREMIER MANAGER
+## 98 alert idiom (scout_screen_re.md witness 78); the exact original bid-response
+## modal wording is un-RE'd, so the app's own authored outcome line is shown.
 func _resolve_pending_bids(rng: RandomNumberGenerator) -> void:
 	if pending_bids.is_empty():
 		return
@@ -2235,10 +2239,14 @@ func _resolve_pending_bids(rng: RandomNumberGenerator) -> void:
 			res = sign_player(int(b.get("pid", -1)), int(b.get("club_id", -1)),
 				int(b.get("offer", 0)), rng, int(b.get("weekly", -1)), int(b.get("years", -1)),
 				b.get("clauses", []), int(b.get("bonus", 0)), false)
-		# Accepted deals already write their own "You have signed ..." news line;
-		# a rejection (or a collapsed deal — squad full / cash gone) posts here.
+		# The club's answer pops on the hub (the "days later" reply). Accepted deals
+		# already write their own "You have signed ..." news line; a rejection (or a
+		# collapsed deal — squad full / cash gone) also posts to the news log.
+		var msg := str(res.get("msg", ""))
+		if msg != "":
+			pending_alerts.append(msg)
 		if not bool(res.get("ok", false)):
-			_log(str(res.get("msg", "")))
+			_log(msg)
 
 
 func sign_player(pid: int, from_club_id: int, offer: int, rng: RandomNumberGenerator,

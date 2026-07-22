@@ -1,0 +1,105 @@
+# Transfer VALUE (CLUB FEE) + WAGE — source-witnessed evidence (2026-07-22)
+
+Owner complaint #1: "the values are nothing like the original." This session pins
+what the real numbers ARE (35 source witnesses), proves the app model is wrong, and
+proves the exact generative model is NOT a simple stored field or a core4 curve —
+it is `f(attrs, age) × selling-club stature`, whose forms + the stature table remain
+un-RE'd. **No guessed curve is shipped** (owner + `wage_formula_re.md` S5).
+
+## 1. The "AV" column IS core4>>2 (EXE-verified, not assumed)
+
+The TRANSFER MARKET / player-card "AV" number = the four core attributes averaged.
+`FUN_00553194` (player card) computes it as `_ultoa(FUN_00534570() >> 2, …)`, and
+`FUN_00534570` = `byte[+0x9c]+[+0x9d]+[+0x9e]+[+0x9f]` = core4 (VE+RE+AG+CA). So the
+on-screen AV lets us map any witnessed row back to its EQUIPOS player: `core4 ≈ AV*4`
+(±3 from the floor division). Verified against EQUIPOS: Leese(Barnsley) core4 273 →
+273//4 = 68 = screen AV; Fursth(Colonia) 269//4 = 67 = screen AV.
+
+## 2. 35 source witnesses — two TRANSFER MARKET screens (1997-08)
+
+`wine-captures-2026-07-15/transfer_market.png` (Man Utd, wk2) +
+`wine-captures-2026-07-19-lowerdiv/transfers_open.png` (Barnsley, wk1). Columns:
+name · AV · MO · CLUB FEE · WAGE · YEARS(left/total). Full table decoded in
+`tools/re/probe_value_witness.py`. Representative rows (name · AV · FEE · WAGE):
+
+| player | AV | CLUB FEE | WAGE | note |
+|---|---|---|---|---|
+| Wilson (Northampton) | 59 | £5,000 | £5,000 | the minimum fee |
+| Martindale | 54 | £25,000 | £10,000 | |
+| Rickers | 53 | £50,000 | £5,000 | |
+| Carragher | 57 | £75,000 | £5,000 | |
+| Van Blerk | 68 | £90,000 | £25,000 | GK |
+| Kadijevic | 73 | £150,000 | £30,000 | GK |
+| Spiteri | 78 | £150,000 | £25,000 | |
+| Gojkovic | 71 | £850,000 | £35,000 | |
+| Villarroya | 74 | £500,000 | £90,000 | |
+| Roberts | 78 | £1,500,000 | £125,000 | GK |
+| Marcelle | 78 | £650,000 | £175,000 | |
+| Scholes | 81 | £8,500,000 | £575,000 | |
+| Zé Elías | 80 | £9,500,000 | £500,000 | |
+| Berger | 88 | £11,000,000 | £1,000,000 | |
+
+## 3. Fee & wage do NOT track core4 — they scale with selling-club stature
+
+At near-equal AV the fee/wage span 100×+ : **Spiteri AV78 £150k vs Marcelle AV78
+£650k vs (higher) Scholes AV81 £8.5M**; **Wilson AV59 £5k vs Berger AV88 £11M**.
+The big numbers cluster at the big clubs (Berger=Liverpool, Scholes/Zé Elías at
+Prem giants); the £5k floor rows sit at Div-2/3 clubs. This is the SAME stature
+multiplier `wage_formula_re.md §3` found for wages (Bolton 1.0 vs Villa/Arsenal
+2.08), now seen to drive the FEE as well:
+
+> **fee = g(attrs, age) × club_stature**,  **wage = f(core4) × club_stature**
+
+The `YEARS` column (contract length left) also moves the fee (1-yr-left players are
+cheaper at equal ability). None of core4, Σ(10 attrs), age, `b1a/b16/b17`, `fine`,
+or `band` orders the witnesses by fee/wage on its own (see the probe output).
+
+## 4. What is ruled OUT (so next session doesn't re-walk it)
+
+- **Not a simple stored EQUIPOS field** — `probe_value_witness.py` dumps every
+  decoded per-player field for all 66 name-matches; no single byte/word is monotone
+  in fee or wage. (Extends `wage_formula_re.md §1`, which disproved a stored *wage*.)
+- **Not a plain float store to player+0x74** — `FindStoreDisp 0x74` finds NO
+  `FST/FSTP [reg+0x74]` anywhere; the only `+0x74` float write (`FUN_005811e0`) is
+  the finance-ledger weekly accumulator (`club+0x1e4 + week*0x20c`), re-confirmed
+  this pass. So the wage float at player+0x74 is written **indirectly / lazily**,
+  not by a direct displacement store the scanners catch.
+- **`FUN_00581e60` is a 6-attr rating** `(VE+RE+AG+CA + byte[+0xa7] + FUN_00582db0)/6`,
+  NOT the fee.
+- Player-card wage display (`FUN_0053f2dd`, `FUN_00553194`) only READS the pre-set
+  `*(float*)(player+0x74)` and formats it via the currency formatter `FUN_0058dd00`.
+
+## 5. Compute-site map (the un-traced generative pass)
+
+- Currency formatter = `FUN_0058dd00(dst, (double)value, 0)`; it has ~24 callers
+  (`FindRefsTo 0x58dd00`) — every £-render in the game. The fee/wage GENERATION is
+  the code that fills `player+0x74` (and the fee) before these read it.
+- core4 (`FUN_00534570`) callers: `FUN_00587eb0` (roster-insert — zeroes +0x24..+0x64
+  but NOT +0x74), `FUN_00588ae0` (new-signing jealousy — READS +0x74 to compare
+  wages), plus the card renderers. The writer of +0x74 is on a **new-game roster
+  pass reachable from the club loader `FUN_00579c70`**, still un-decompiled.
+
+## 6. Two bounded closure paths (either finishes the fix EXACTLY, no guess)
+
+1. **EXE**: decompile the transfer-market LIST render (a `FUN_0058dd00` caller that
+   loops a club's players and prints CLUB FEE + WAGE per row) and the +0x74 writer on
+   the new-game roster pass; read `g(attrs,age)` and the `club_stature` field.
+2. **Witness sweep (Wine)**: capture the TRANSFER MARKET screen for ~10 clubs across
+   all 4 divisions (each screen yields ~17 fee+wage+AV rows already club-tagged).
+   With the exact club per row, solve `club_stature = wage / f(core4)` per club and
+   fit `g` — validated, not assumed. `transfer_market.png` proves one screen alone
+   gives 17 rows, so ~5-8 screens pins the table.
+
+## 7. The app model is provably wrong (why the owner is right)
+
+`TransferMarket.value_of` = `_TIER_FEE[tier]·(CA/50)^4·age_factor` and
+`FinanceModel._player_wage` = `base(tier)·(CA/55)^1.6`:
+- A 19yo backup GK (Landreau, CA92) → app fee **£8.9M** (tier-1). Real GKs of far
+  higher standing: Kadijevic AV73 £150k, Friedel AV70 £750k, Mora AV75 £1.5M.
+- Wage 8× high (Ward £121,680 app vs £15,000 real, `wage_formula_re.md §4`).
+Both are wrong in a KNOWN direction; the fix is §6, not a re-tuned exponent.
+
+## 8. Reproduce
+`python3 tools/re/probe_value_witness.py` (35-witness decode + full field dump).
+EXE leads re-run with the `ghidra_scripts/` headless harness against
+`~/ghidra-projects/pm98` (program `MANAGER.EXE`).

@@ -121,10 +121,18 @@ func _pending_bid_delay(prem: Array, league: Dictionary, leagues: Array) -> bool
 	ok = _assert(career.pending_bids.size() == 1, "one bid pending") and ok
 	var dup := career.place_bid_roster(tid, seller_id, ask)
 	ok = _assert(not dup["ok"] and dup["msg"].contains("already"), "no double bid on the same player") and ok
+	var alerts0 := career.pending_alerts.size()
 	career.advance_week(rng)
 	ok = _assert(career.pending_bids.is_empty(), "the week roll resolves the bid") and ok
 	ok = _assert(career.my_squad().size() == my0 + 1, "the player joins with the answer (non-key at asking accepts)") and ok
 	ok = _assert(not career._find_in(career.club_id, tid).is_empty(), "the target is in the squad") and ok
+	# The bid answer must surface as a hub message box (the "days later" reply), not
+	# be buried in the news log -- else a BUY reads as a silent no-op (owner report).
+	var replied := false
+	for a in career.pending_alerts.slice(alerts0):
+		if str(a).contains(str(target.get("name", "?"))):
+			replied = true
+	ok = _assert(replied, "the accepted bid pops a hub reply naming the player") and ok
 	# Save round-trip with a bid still pending survives.
 	var c2 := Career.create(prem[0], league, prem, leagues)
 	c2.cash = 50_000_000
