@@ -17,6 +17,7 @@ func _run() -> bool:
 	ok = _unit_single_match() and ok
 	ok = _career_honours_and_shield() and ok
 	ok = _double_substitution() and ok
+	ok = _first_season_seed() and ok
 	print("\n%s" % ("ALL PASS" if ok else "FAILURES ABOVE"))
 	return ok
 
@@ -24,6 +25,27 @@ func _run() -> bool:
 func _assert(cond: bool, label: String) -> bool:
 	print(("  ok   " if cond else "  FAIL ") + label)
 	return cond
+
+
+# ---- first-season curtain-raiser (the scripted 97-98 opener) --------------
+# The app has no played 96-97 season, so _play_charity_shield seeds the WITNESSED opener
+# (frame 11): Man Utd (40) lift it, Chelsea (49) runners-up. Guards the bug where season 1
+# no-op'd the shield entirely (owner saw no CHARITY SHIELD CHAMPION card in a new game).
+func _first_season_seed() -> bool:
+	var ok := true
+	var car := Career.new()
+	car.season = "1997-98"
+	car.club_id = 40
+	car.last_champion_id = -1        # a fresh career: no prior honours to contest
+	car.club_names = {40: "Manchester Utd.", 49: "Chelsea"}
+	var rng := RandomNumberGenerator.new(); rng.seed = SEED
+	car.play_season_opener(rng)
+	var cs := car.charity_shield
+	ok = _assert(not cs.is_empty(), "season 1 seeds a Charity Shield (was a no-op)") and ok
+	ok = _assert(int(cs.get("winner_id", -1)) == 40, "season-1 champion = Man Utd (40)") and ok
+	ok = _assert(int(cs.get("loser_id", -1)) == 49, "season-1 runner-up = Chelsea (49)") and ok
+	ok = _assert(str(cs.get("decided", "x")) == "", "no fabricated score/pens on the witnessed card") and ok
+	return ok
 
 
 # ---- unit: single neutral match ------------------------------------------

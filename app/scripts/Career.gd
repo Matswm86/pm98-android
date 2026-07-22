@@ -156,6 +156,16 @@ const LEAGUE_CUP_OPTS := {
 # documented prize -- NOT a reversed PM98 figure (only the UEFA schedule is code-resident).
 const CHARITY_PRIZE := 250_000
 
+# The FIRST-season curtain-raiser is a fixed historical fixture: the 97-98 game opens on the
+# real 96-97 honours, which the app never played, so it is seeded from the WITNESSED original
+# CHARITY SHIELD CHAMPION card (screenshots/promanager-career-2026-07-16/11_charity_shield_
+# champion.png, captured as a 3rd-division manager -> shown to EVERY manager, not just a
+# participant): Manchester Utd. (96-97 league champions) lift it, Chelsea (96-97 F.A. Cup
+# winners) are runners-up. Ids are the game's own EQUIPOS ids (Man Utd 40 / Chelsea 49); the
+# seed no-ops if either is absent (a side-loaded non-97-98 database).
+const S1_SHIELD_CHAMPION_ID := 40
+const S1_SHIELD_RUNNERUP_ID := 49
+
 # European competitions. Three two-legged knockouts seeded from last season's domestic
 # finish; the field is filled to EURO_FIELD clubs with strong foreign sides from game_db.
 const EURO_FIELD := 16                  # 16-club field. European Cup: 4 groups of 4 ->
@@ -2859,6 +2869,7 @@ func _play_charity_shield(rng: RandomNumberGenerator) -> void:
 	var champ := last_champion_id
 	var fa := last_fa_winner_id
 	if champ == -1:
+		_seed_first_season_shield()   # no played 96-97 season -> the scripted 97-98 opener
 		return
 	if fa == -1 or fa == champ:
 		# Double winners (or no F.A. Cup last year): the league runners-up step up.
@@ -2882,6 +2893,30 @@ func _play_charity_shield(rng: RandomNumberGenerator) -> void:
 		_news("cup", "%s have won the Charity Shield, beating %s%s." % [wn, ln, pens])
 	else:
 		_news("cup", "Charity Shield: %s beat %s%s." % [wn, ln, pens])
+
+
+## First-season curtain-raiser: the fixed 97-98 CHARITY SHIELD CHAMPION card (Man Utd lift it,
+## Chelsea runners-up) witnessed in the original, since the app has no played 96-97 season to
+## derive it from. Stored like a played shield (winner/loser ids resolve to the champion card
+## in Main._show_shield_card) so the season-open chain shows the real card instead of nothing.
+## No score/pens is shown on the witnessed card, so `decided` stays blank (not fabricated).
+func _seed_first_season_shield() -> void:
+	var champ := S1_SHIELD_CHAMPION_ID
+	var ru := S1_SHIELD_RUNNERUP_ID
+	if champ == ru:
+		return
+	charity_shield = {
+		"champ_id": champ, "fa_id": ru,
+		"winner_id": champ, "loser_id": ru,
+		"season": season, "decided": "",
+	}
+	if champ == club_id:
+		cash += CHARITY_PRIZE
+	# The records/news line (club_names is the manager's own division; a lower-division
+	# manager still gets the card, whose names resolve via GameDB in Main).
+	if club_names.has(champ) and club_names.has(ru):
+		_news("cup", "Charity Shield: %s beat %s." % [
+			str(club_names[champ]), str(club_names[ru])])
 
 
 ## Build this season's European competitions from last season's honours. `euro_pool` is
