@@ -1854,7 +1854,7 @@ func _scout_row(p: Dictionary, cid: int, cname: String, club_v: Dictionary, live
 		"av": av,
 		"ca": int(a.get("CA", 0)),
 		"mo": int(p.get("morale")) if live and p.get("morale") != null else -1,
-		"fee": TransferMarket.asking_price(p, is_key, band),
+		"fee": TransferMarket.value_of(p, band),   # displayed CLUB FEE = book value (no markup)
 		"wage": TransferMarket.yearly_wage(p, band),
 		"years": int(p.get("contract_term", 0)) if live else 0,
 		"left": int(p.get("contract_years", 0)) if live else 0,
@@ -2869,7 +2869,7 @@ func _play_charity_shield(rng: RandomNumberGenerator) -> void:
 	var champ := last_champion_id
 	var fa := last_fa_winner_id
 	if champ == -1:
-		_seed_first_season_shield()   # no played 96-97 season -> the scripted 97-98 opener
+		_seed_first_season_shield(rng)   # no played 96-97 season -> the fixed-participant opener
 		return
 	if fa == -1 or fa == champ:
 		# Double winners (or no F.A. Cup last year): the league runners-up step up.
@@ -2895,28 +2895,39 @@ func _play_charity_shield(rng: RandomNumberGenerator) -> void:
 		_news("cup", "Charity Shield: %s beat %s%s." % [wn, ln, pens])
 
 
-## First-season curtain-raiser: the fixed 97-98 CHARITY SHIELD CHAMPION card (Man Utd lift it,
-## Chelsea runners-up) witnessed in the original, since the app has no played 96-97 season to
-## derive it from. Stored like a played shield (winner/loser ids resolve to the champion card
-## in Main._show_shield_card) so the season-open chain shows the real card instead of nothing.
-## No score/pens is shown on the witnessed card, so `decided` stays blank (not fabricated).
-func _seed_first_season_shield() -> void:
-	var champ := S1_SHIELD_CHAMPION_ID
-	var ru := S1_SHIELD_RUNNERUP_ID
-	if champ == ru:
+## First-season curtain-raiser. The app has no played 96-97 season, but its honours are
+## fixed history: Man Utd (96-97 champions) v Chelsea (96-97 F.A. Cup winners). PM98 plays
+## that shield as a REAL match, not a scripted result -- witnessed live in the wine original
+## 2026-07-23, where the winner AND the decider VARY between two fresh careers (career A:
+## "Manchester Utd. (on penalties)"; career B: "Chelsea", no pens). So it is NOT the old
+## hardcoded "Man Utd lift it, decided=blank" card -- it is simulated the same way as every
+## later shield (Cup.single_neutral_match), with the two fixed participants.
+func _seed_first_season_shield(rng: RandomNumberGenerator) -> void:
+	var champ := S1_SHIELD_CHAMPION_ID   # Man Utd -- 96-97 champions (home / first-named)
+	var fa := S1_SHIELD_RUNNERUP_ID      # Chelsea -- 96-97 F.A. Cup winners
+	if champ == fa:
 		return
-	charity_shield = {
-		"champ_id": champ, "fa_id": ru,
-		"winner_id": champ, "loser_id": ru,
-		"season": season, "decided": "",
-	}
-	if champ == club_id:
+	var ratings_fn := func(id: int) -> Dictionary: return _ratings_for(id)
+	var xi_fn := func(id: int) -> Array: return _xi_for(id)
+	var tie := Cup.single_neutral_match(rng, champ, fa, ratings_fn, xi_fn)
+	tie["champ_id"] = champ
+	tie["fa_id"] = fa
+	tie["season"] = season
+	charity_shield = tie
+	var w := int(tie["winner_id"])
+	var l := int(tie["loser_id"])
+	var pens := " (on penalties)" if tie.get("decided", "") == "pens" else ""
+	if w == club_id:
 		cash += CHARITY_PRIZE
-	# The records/news line (club_names is the manager's own division; a lower-division
-	# manager still gets the card, whose names resolve via GameDB in Main).
-	if club_names.has(champ) and club_names.has(ru):
-		_news("cup", "Charity Shield: %s beat %s." % [
-			str(club_names[champ]), str(club_names[ru])])
+	# club_names is the manager's own division; a lower-division manager still gets the card
+	# (names resolve via GameDB in Main). Post news only when both clubs are in this table.
+	if club_names.has(w) and club_names.has(l):
+		if w == club_id:
+			_news("cup", "%s have won the Charity Shield, beating %s%s." % [
+				str(club_names[w]), str(club_names[l]), pens])
+		else:
+			_news("cup", "Charity Shield: %s beat %s%s." % [
+				str(club_names[w]), str(club_names[l]), pens])
 
 
 ## Build this season's European competitions from last season's honours. `euro_pool` is

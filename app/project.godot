@@ -41,5 +41,11 @@ window/stretch/aspect="keep"
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 textures/vram_compression/import_etc2_astc=true
+; PM98 is pixel-exact 640x480 palette art -- NEAREST (0), never Godot's Linear
+; default (1), or every scaled kit/crest/icon blurs. 51/52 scenes set NEAREST in
+; _ready(); the hub (Main.gd) inherited the Linear default -> "home screen graphics
+; fucked up / distorted jerseys" (owner #4, 2026-07-23). Set it project-wide so no
+; CanvasItem can ever inherit Linear again.
+textures/canvas_textures/default_texture_filter=0
 ; Dark letterbox margins around the 4:3 game area.
 environment/defaults/default_clear_color=Color(0.04, 0.05, 0.08, 1)

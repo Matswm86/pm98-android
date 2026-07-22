@@ -27,10 +27,12 @@ func _assert(cond: bool, label: String) -> bool:
 	return cond
 
 
-# ---- first-season curtain-raiser (the scripted 97-98 opener) --------------
-# The app has no played 96-97 season, so _play_charity_shield seeds the WITNESSED opener
-# (frame 11): Man Utd (40) lift it, Chelsea (49) runners-up. Guards the bug where season 1
-# no-op'd the shield entirely (owner saw no CHARITY SHIELD CHAMPION card in a new game).
+# ---- first-season curtain-raiser (a REAL simulated match) -----------------
+# The app has no played 96-97 season, but its honours are fixed: Man Utd (40) v Chelsea (49).
+# PM98 PLAYS that shield -- witnessed live 2026-07-23, two fresh careers gave different
+# winners AND deciders (Man Utd on pens / Chelsea clean). So the participants are fixed but
+# the RESULT is simulated (not the old hardcoded "Man Utd win, no pens"). Also guards the
+# earlier bug where season 1 no-op'd the shield entirely (owner saw no CHAMPION card).
 func _first_season_seed() -> bool:
 	var ok := true
 	var car := Career.new()
@@ -38,13 +40,34 @@ func _first_season_seed() -> bool:
 	car.club_id = 40
 	car.last_champion_id = -1        # a fresh career: no prior honours to contest
 	car.club_names = {40: "Manchester Utd.", 49: "Chelsea"}
+	# The result must actually depend on the RNG (a real match, not a scripted card):
+	# gather winners/deciders across many seeds and require BOTH clubs to win sometimes.
+	var winners := {}
+	var pens_seen := false
+	for s in 40:
+		var c := Career.new()
+		c.season = "1997-98"; c.club_id = 40
+		c.last_champion_id = -1
+		c.club_names = {40: "Manchester Utd.", 49: "Chelsea"}
+		var r := RandomNumberGenerator.new(); r.seed = SEED + s * 101
+		c.play_season_opener(r)
+		var t := c.charity_shield
+		winners[int(t.get("winner_id", -1))] = true
+		if str(t.get("decided", "")) == "pens":
+			pens_seen = true
 	var rng := RandomNumberGenerator.new(); rng.seed = SEED
 	car.play_season_opener(rng)
 	var cs := car.charity_shield
-	ok = _assert(not cs.is_empty(), "season 1 seeds a Charity Shield (was a no-op)") and ok
-	ok = _assert(int(cs.get("winner_id", -1)) == 40, "season-1 champion = Man Utd (40)") and ok
-	ok = _assert(int(cs.get("loser_id", -1)) == 49, "season-1 runner-up = Chelsea (49)") and ok
-	ok = _assert(str(cs.get("decided", "x")) == "", "no fabricated score/pens on the witnessed card") and ok
+	ok = _assert(not cs.is_empty(), "season 1 plays a Charity Shield (was a no-op)") and ok
+	ok = _assert(int(cs.get("champ_id", -1)) == 40, "season-1 home side = Man Utd (40)") and ok
+	ok = _assert(int(cs.get("fa_id", -1)) == 49, "season-1 away side = Chelsea (49)") and ok
+	ok = _assert(int(cs.get("winner_id", -1)) in [40, 49], "winner is one of the two contestants") and ok
+	ok = _assert(int(cs.get("loser_id", -1)) in [40, 49]
+		and int(cs.get("loser_id", -1)) != int(cs.get("winner_id", -1)), "loser is the other contestant") and ok
+	ok = _assert(str(cs.get("decided", "x")) in ["", "pens"], "decider is either normal time or penalties") and ok
+	# The witnessed truth: NOT a fixed result -- both clubs can win, and pens can happen.
+	ok = _assert(winners.has(40) and winners.has(49), "the shield is simulated: both Man Utd and Chelsea win across seeds") and ok
+	ok = _assert(pens_seen, "a level shield goes to penalties across seeds (matches the wine capture)") and ok
 	return ok
 
 

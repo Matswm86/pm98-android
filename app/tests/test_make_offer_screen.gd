@@ -116,9 +116,9 @@ func _run() -> void:
 	# pick a buyable player from another club
 	var target: Dictionary = {}
 	for row in career.market():
-		# a non-key fringe player bid generously (evaluate_offer is stochastic;
-		# key players carry the KEY_PREMIUM and resist even full-price bids)
-		if not bool(row["key"]) and int(row["fee"]) * 2 <= career.cash:
+		# any affordable target: PM98 accepts an offer >= the displayed CLUB FEE
+		# (book value) deterministically — no premium, no key-player resistance.
+		if int(row["fee"]) * 2 <= career.cash:
 			target = row
 	ok = _assert(not target.is_empty(), "an affordable market target exists") and ok
 	if not target.is_empty():

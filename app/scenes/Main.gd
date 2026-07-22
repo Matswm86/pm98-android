@@ -44,6 +44,9 @@ var _country_en_es: Dictionary = {}     # PAISES English name -> [Spanish DB nam
 
 
 func _ready() -> void:
+	# Pixel-exact art: NEAREST like every other screen (the hub inherited Godot's
+	# Linear default and blurred kits/crests -- owner #4). Project default now 0 too.
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_style()
 	_back.pressed.connect(_go_back)
 	_list.item_activated.connect(_on_item)

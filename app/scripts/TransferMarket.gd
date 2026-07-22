@@ -24,9 +24,16 @@ extends RefCounted
 ## fee = feeTable[idx]*5000, wage(yearly) = wageTable[idx]*5000. Each club's stature
 ## (band 0-12) is derived from its division + squad-strength thresholds (FUN_0057a180 +
 ## FUN_0057a340 + the per-division vtable+0x78), reproduced in stature_of(). Validated
-## 13/13 witnesses byte-exact (tools/re/validate_value_model.py). Only the accept
-## thresholds / key-player premium / AI-movement that LAYER on top stay ours (PM98's
-## negotiation + AI-transfer logic is un-RE'd).
+## 13/13 witnesses byte-exact (tools/re/validate_value_model.py).
+##
+## The ASKING FEE the seller wants IS this book value (no key-player markup): the RE'd
+## accept test FUN_005889c0 reads the player's own fee float (player+0x70, filled by
+## FUN_00576cd0) and accepts iff `fee <= bid` (transfer_value_re.md §9.3). So a player
+## sells for exactly his displayed CLUB FEE — there is NO invented premium and NO random
+## board reluctance (both were removed 2026-07-23: they inflated the displayed fee AND
+## silently rejected an offer that matched it — owner "values wrong / buy does nothing").
+## The AI-to-AI movement + the AI bid spread on YOUR listed players are the only layers
+## still ours (PM98's AI-transfer logic is un-RE'd); they never drive a displayed fee.
 
 # Squad bounds (gameplay, ours). The only literal squad cap in the binary is the
 # non-EU "maximum allowed" rule; total-squad limits live in the database, so these
@@ -42,8 +49,6 @@ const _VALUE_TABLES_PATH := "res://data/value_tables.json"
 static var _fee_table: PackedInt32Array = PackedInt32Array()
 static var _wage_table: PackedInt32Array = PackedInt32Array()
 
-const KEY_PREMIUM := 1.6       # a first-XI man isn't sold at book value...
-const STAR_FORCE := 2.2        # ...but this multiple of value always prises him loose
 const _MIN_FEE := 5000         # the table floor (£5k) is PM98's smallest fee/wage step
 
 # New signings / renewals get a fresh multi-year deal.
@@ -306,34 +311,26 @@ static func loan_market(rosters: Dictionary, names: Dictionary, tier: int, exclu
 	return out
 
 
-## The asking price a club wants for a player: book value, with a premium for a
-## first-XI man.
-static func asking_price(player: Dictionary, is_key: bool, band: int) -> int:
-	var value := value_of(player, band)
-	return int(round(value * (KEY_PREMIUM if is_key else 1.0)))
+## The asking fee a club wants for a player = his book value (the RE'd PM98 model:
+## FUN_00576cd0 fills player+0x70 and the accept test compares a bid straight to it;
+## there is no first-XI markup). `_is_key` is kept for call-site stability (a first-XI
+## man is dearer only because his book value is higher, not from any premium).
+static func asking_price(player: Dictionary, _is_key: bool, band: int) -> int:
+	return value_of(player, band)
 
 
 ## Decide whether the selling club accepts `offer` for `player`.
-## Returns {accepted, asking, value}. Surplus players sell at/above book; a key
-## player needs the premium and, even then, the board is reluctant until the offer
-## approaches STAR_FORCE x value (where it always sells).
-static func evaluate_offer(player: Dictionary, offer: int, is_key: bool, band: int, rng: RandomNumberGenerator) -> Dictionary:
+## Returns {accepted, asking, value}. PM98's accept test (FUN_005889c0,
+## transfer_value_re.md §9.3) is deterministic: `fee <= bid`, where `fee` is the
+## player's book value. So an offer at or above his displayed CLUB FEE is accepted and
+## anything below is refused — no premium, no random reluctance (removed 2026-07-23).
+## (The years-left discount FUN_005889c0 applies below full price is un-extracted —
+## constants _DAT_00638fb0/fb8/fc0 — so we require full book value, a documented gap
+## that only ever asks slightly MORE than the original for a short-contract player,
+## never less; it never over-charges beyond the table value.)
+static func evaluate_offer(player: Dictionary, offer: int, _is_key: bool, band: int, _rng: RandomNumberGenerator) -> Dictionary:
 	var value := value_of(player, band)
-	var asking := asking_price(player, is_key, band)
-	var res := {"accepted": false, "asking": asking, "value": value}
-	if offer >= int(round(value * STAR_FORCE)):
-		res["accepted"] = true
-		return res
-	if offer < asking:
-		return res
-	if not is_key:
-		res["accepted"] = true
-		return res
-	# Key player at/above premium but below the forced price: reluctant board.
-	var t := inverse_lerp(float(asking), value * STAR_FORCE, float(offer))
-	var p_accept: float = lerpf(0.4, 1.0, clampf(t, 0.0, 1.0))
-	res["accepted"] = rng.randf() < p_accept
-	return res
+	return {"accepted": offer >= value, "asking": value, "value": value}
 
 
 ## The best offer an AI club will table for a transfer-listed player of the

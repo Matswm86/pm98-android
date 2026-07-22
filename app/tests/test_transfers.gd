@@ -124,14 +124,18 @@ func _market_and_offers(prem: Array, league: Dictionary, leagues: Array) -> bool
 	var below := TransferMarket.evaluate_offer(surplus, ask - 1, false, seller_band, rng)
 	ok = _assert(at["accepted"], "surplus player accepts at asking £%d" % ask) and ok
 	ok = _assert(not below["accepted"], "offer below asking refused") and ok
-	# A first-XI man costs the premium.
+	# A first-XI man sells for his book value too — PM98 has no key-player premium
+	# (the accept test is `fee <= bid`, fee = book value; transfer_value_re.md §9.3).
 	var key_id := -1
 	for pid in TransferMarket.best_xi_ids({"id": int(seller["id"]), "name": "", "players": seller["players"]}):
 		key_id = int(pid)
 		break
 	var keyp := TransferMarket._find(seller["players"], key_id)
-	ok = _assert(TransferMarket.asking_price(keyp, true, seller_band)
-		> TransferMarket.value_of(keyp, seller_band), "first-XI asking carries a premium") and ok
+	var key_val := TransferMarket.value_of(keyp, seller_band)
+	ok = _assert(TransferMarket.asking_price(keyp, true, seller_band) == key_val,
+		"first-XI asking == book value (no premium)") and ok
+	ok = _assert(TransferMarket.evaluate_offer(keyp, key_val, true, seller_band, rng)["accepted"],
+		"a first-XI man sells at his displayed CLUB FEE") and ok
 	return ok
 
 
