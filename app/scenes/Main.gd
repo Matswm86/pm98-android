@@ -2609,9 +2609,10 @@ func _show_browse_offer_card(player: Dictionary, club: Dictionary, host: Control
 	var c := _career
 	var cid := int(club.get("id", -1))
 	var pid := int(player.get("id", -1))
-	var is_key := TransferMarket.is_key_player(club, pid)
 	var band := c.band_of(cid) if c.rosters.has(cid) else TransferMarket.stature_of(club.get("players", []), TransferMarket.english_tier_of(club, GameDB.leagues))
-	var fee := TransferMarket.asking_price(player, is_key, band)
+	# CLUB FEE shown is the player's ORIGINAL book value (PM98 fee table), NOT an
+	# added key-player markup — the original shows the exact table value.
+	var fee := TransferMarket.value_of(player, band)
 	var card: MakeOfferScreen = load("res://scenes/MakeOfferScreen.gd").new()
 	card.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(card)
