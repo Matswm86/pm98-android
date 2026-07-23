@@ -1792,9 +1792,18 @@ func _tick_youth_search(rng: RandomNumberGenerator) -> void:
 ## dependence is un-witnessed — flat 2 weeks, documented.
 const SCOUT_SEARCH_WEEKS := 2
 
-## Arm a search. criteria: {pos:String(""|GK/DF/MF/FW), age:int(0=off, max),
-## role:int(0=off, posFine), quality:int(0=off, min 1-5), price:int(0=off, max
-## fee), leagues:Array[String] (league ids)}. The screen enforces the witnessed
+## AGE / QUALITY / PRICE scout criteria are BAND dropdowns (SCOUT screen), labels +
+## order lifted binary-exact from the MANAGER.EXE getter tables 0x661e08 / 0x661e20 /
+## 0x661e40 (see ScoutScreen). These are the numeric bounds behind each band index,
+## inclusive. QUALITY matches the displayed AV column (0-99); PRICE bounds are in K.
+const SCOUT_AGE_BANDS := [[17, 22], [23, 26], [27, 30], [31, 33], [34, 99]]
+const SCOUT_QUALITY_BANDS := [[50, 65], [66, 70], [71, 75], [76, 80], [81, 85], [86, 90], [91, 99]]
+const SCOUT_PRICE_BANDS_K := [[10, 75], [80, 125], [130, 250], [250, 500], [500, 1500],
+	[1500, 3000], [3000, 5000], [5000, 7500], [7500, 10000], [10000, 999999]]
+
+## Arm a search. criteria: {pos:String(""|GK/DF/MF/FW), role:int(0=off, posFine),
+## age_band/quality_band/price_band:int(-1=off, else band index into the SCOUT_*_BANDS
+## tables), leagues:Array[String] (league ids)}. The screen enforces the witnessed
 ## validation (>=1 criteria toggle ON) before calling this. `foreign_clubs` =
 ## GameDB club dicts of any checked NON-own division (Career never reads
 ## GameDB itself — Main bridges): those divisions are static, so their matches
@@ -1884,15 +1893,21 @@ func _scout_match(row: Dictionary, p: Dictionary, criteria: Dictionary) -> bool:
 	var role := int(criteria.get("role", 0))
 	if role > 0 and int(p.get("posFine", 0)) != role:
 		return false
-	var max_age := int(criteria.get("age", 0))
-	if max_age > 0 and int(row["age"]) > max_age:
-		return false
-	var min_quality := int(criteria.get("quality", 0))
-	if min_quality > 0 and int(ceil(int(row["ca"]) / 20.0)) < min_quality:
-		return false
-	var max_price := int(criteria.get("price", 0))
-	if max_price > 0 and int(row["fee"]) > max_price:
-		return false
+	var age_band := int(criteria.get("age_band", -1))
+	if age_band >= 0:
+		var ab: Array = SCOUT_AGE_BANDS[age_band]
+		if int(row["age"]) < int(ab[0]) or int(row["age"]) > int(ab[1]):
+			return false
+	var quality_band := int(criteria.get("quality_band", -1))
+	if quality_band >= 0:
+		var qb: Array = SCOUT_QUALITY_BANDS[quality_band]
+		if int(row["av"]) < int(qb[0]) or int(row["av"]) > int(qb[1]):
+			return false
+	var price_band := int(criteria.get("price_band", -1))
+	if price_band >= 0:
+		var pb: Array = SCOUT_PRICE_BANDS_K[price_band]
+		if int(row["fee"]) < int(pb[0]) * 1000 or int(row["fee"]) > int(pb[1]) * 1000:
+			return false
 	return true
 
 

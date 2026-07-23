@@ -26,8 +26,12 @@ class_name ScoutScreen
 ##    the yellow final-year cell; non-EU-1997 mini flag (insurance rule).
 ##  * a row tap opens the make-offer card (witness 82) — `player_pressed`.
 ##
-## HONEST GAPS: AGE/QUALITY/PRICE/ROLE filled-value styles are un-witnessed
-## (only POSITION "GOALKEEPER" is) — same centred-black-text grammar, values
+## CRITERIA VALUES: POSITION/ROLE/AGE/QUALITY/PRICE dropdown CONTENTS are now
+## binary-exact — lifted from the MANAGER.EXE getter tables (POSITION 0x662d10,
+## ROLE-short 0x662df8, AGE 0x661e08, QUALITY 0x661e20, PRICE 0x661e40). AGE and
+## QUALITY are the SMALL fields (band strings <=5 chars fit) and PRICE the WIDE
+## field, exactly as the game sizes them. The filled-value GLYPH STYLE is still
+## un-witnessed for all but POSITION ("GOALKEEPER") — same centred grammar,
 ## face-level. The bottom 2-segment bar is baked furniture (behaviour
 ## un-witnessed, never animated). The original's result ORDER is un-RE'd.
 
@@ -64,12 +68,19 @@ const ARROWS := {
 const BTN_SEARCH := Rect2(518, 211, 100, 26)
 const BTN_RETURN := Rect2(517, 437, 110, 28)
 
-const POSITIONS := ["GOALKEEPER", "DEFENDER", "MIDFIELDER", "FORWARD"]  # PTR_s_GOALKEEPER_00662d10 enum
+const POSITIONS := ["GOALKEEPER", "DEFENDER", "MIDFIELDER", "FORWARD"]  # getter table PTR@0x662d10 (binary-exact)
 const POS_KEYS := ["GK", "DF", "MF", "FW"]
-const AGE_MIN := 16
-const AGE_MAX := 40
-const PRICE_STEP := 250000
-const PRICE_MAX := 20000000
+# AGE / QUALITY / PRICE are BAND dropdowns in the original, NOT numeric spinners.
+# Labels + order lifted binary-exact from the MANAGER.EXE scout getter tables
+# (arrays of string pointers indexed by the dropdown position):
+#   AGE     @0x661e08 (5 bands)
+#   QUALITY @0x661e20 (7 bands, on the 0-99 ability/AV scale)
+#   PRICE   @0x661e40 (10 bands, in K)
+const AGE_BANDS := ["17-22", "23-26", "27-30", "31-33", "+33"]
+const QUALITY_BANDS := ["50-65", "66-70", "71-75", "76-80", "81-85", "86-90", "+90"]
+const PRICE_BANDS := ["10 - 75 K.", "80 - 125 K.", "130 - 250 K.", "250 - 500 K.",
+	"500 - 1,500 K.", "1,500 - 3,000 K.", "3,000 - 5,000 K.", "5,000 - 7,500 K.",
+	"7,500 - 10,000 K.", "+ 10,000 K."]
 
 # ---- PLAYERS FOUND list (scout_chrome.json row1 anchors) -------------------
 const ROW_X0 := 33
@@ -162,10 +173,10 @@ var _first := 0                  # scroll offset into _results
 var _tog := {"pos": false, "age": false, "role": false, "quality": false, "price": false}
 var _leagues := {"eng_prem": false, "eng_div1": false, "eng_div2": false, "eng_div3": false}
 var _pos_idx := 0
-var _age := 25
+var _age_idx := 0                # index into AGE_BANDS
 var _role := 1                   # posFine 1..18 (PlayerInfoScreen.FINE_ROLE)
-var _quality := 3
-var _price := 1000000
+var _quality_idx := 0            # index into QUALITY_BANDS
+var _price_idx := 0              # index into PRICE_BANDS
 var _armed_flash := false        # SEARCH ring, shown on the arming tap (witness 68)
 var _alert_img: Texture2D        # options alert (PMAlert render); null = none
 var _press := ""
@@ -231,12 +242,13 @@ func criteria() -> Dictionary:
 	for lid in _leagues:
 		if _leagues[lid]:
 			leagues.append(lid)
+	# age/quality/price are BAND indices; -1 = off (index 0 is a valid band, so 0 can't mean off)
 	return {
 		"pos": POS_KEYS[_pos_idx] if _tog["pos"] else "",
-		"age": _age if _tog["age"] else 0,
 		"role": _role if _tog["role"] else 0,
-		"quality": _quality if _tog["quality"] else 0,
-		"price": _price if _tog["price"] else 0,
+		"age_band": _age_idx if _tog["age"] else -1,
+		"quality_band": _quality_idx if _tog["quality"] else -1,
+		"price_band": _price_idx if _tog["price"] else -1,
 		"leagues": leagues,
 	}
 
@@ -364,13 +376,13 @@ func _spin(k: String) -> void:
 				_role = wrapi(_role + dirn, 1, PlayerInfoScreen.FINE_ROLE.size() + 1)
 		"age":
 			if _tog["age"]:
-				_age = clampi(_age + dirn, AGE_MIN, AGE_MAX)
+				_age_idx = wrapi(_age_idx + dirn, 0, AGE_BANDS.size())
 		"quality":
 			if _tog["quality"]:
-				_quality = clampi(_quality + dirn, 1, 5)
+				_quality_idx = wrapi(_quality_idx + dirn, 0, QUALITY_BANDS.size())
 		"price":
 			if _tog["price"]:
-				_price = clampi(_price + dirn * PRICE_STEP, PRICE_STEP, PRICE_MAX)
+				_price_idx = wrapi(_price_idx + dirn, 0, PRICE_BANDS.size())
 
 
 ## The witnessed validation (64/66): at least one LEFT-column criteria toggle
@@ -473,13 +485,13 @@ func _draw() -> void:
 			DROP_ROLE.position.y + 3, role_name, PMChrome.dim_col(C_NAME), 10)
 	if _tog["age"]:
 		_txt_center(_f10, SPIN_AGE.position.x + SPIN_AGE.size.x * 0.5,
-			SPIN_AGE.position.y + 3, str(_age), PMChrome.dim_col(C_NAME), 11)
+			SPIN_AGE.position.y + 3, AGE_BANDS[_age_idx], PMChrome.dim_col(C_NAME), 11)
 	if _tog["quality"]:
 		_txt_center(_f10, SPIN_QUALITY.position.x + SPIN_QUALITY.size.x * 0.5,
-			SPIN_QUALITY.position.y + 3, str(_quality), PMChrome.dim_col(C_NAME), 11)
+			SPIN_QUALITY.position.y + 3, QUALITY_BANDS[_quality_idx], PMChrome.dim_col(C_NAME), 11)
 	if _tog["price"]:
 		_txt_center(_f10, SPIN_PRICE.position.x + SPIN_PRICE.size.x * 0.5,
-			SPIN_PRICE.position.y + 3, TransferScreen.fmt_money(_price), PMChrome.dim_col(C_NAME), 11)
+			SPIN_PRICE.position.y + 3, PRICE_BANDS[_price_idx], PMChrome.dim_col(C_NAME), 10)
 	if _armed_flash and _armed != null:
 		draw_texture(_tex(_armed), Vector2(516, 209))
 

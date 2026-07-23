@@ -90,8 +90,8 @@ func _run() -> void:
 		59: [_mk(1, "OwnGk", "GK", 60)],
 		60: [_mk(2, "Beeney", "GK", 60), _mk(3, "Kewell", "FW", 80)],
 	}
-	c.start_scout_search({"pos": "GK", "age": 0, "role": 0, "quality": 0,
-		"price": 0, "leagues": ["eng_prem"]})
+	c.start_scout_search({"pos": "GK", "role": 0, "age_band": -1, "quality_band": -1,
+		"price_band": -1, "leagues": ["eng_prem"]})
 	ok = _assert(c.scout_searching(), "search armed") and ok
 	ok = _assert(int(c.scout_search["due_week"]) == 5, "due = armed week + 2 (witnessed)") and ok
 	c._tick_scout_search()
@@ -110,20 +110,35 @@ func _run() -> void:
 	var foreign := [{"id": 100, "name": "Blackpool", "players": [
 		_mk(9, "Preece", "GK", 48), _mk(10, "Malkin", "FW", 59)]}]
 	c.week = 3
-	c.start_scout_search({"pos": "GK", "age": 0, "role": 0, "quality": 0,
-		"price": 0, "leagues": ["eng_div2"]}, foreign)
+	c.start_scout_search({"pos": "GK", "role": 0, "age_band": -1, "quality_band": -1,
+		"price_band": -1, "leagues": ["eng_div2"]}, foreign)
 	c.week = 5
 	c._tick_scout_search()
 	ok = _assert(c.scout_results.size() == 1 and str(c.scout_results[0]["name"]) == "Preece",
 		"foreign division frozen rows return (GK only)") and ok
 
-	# price cap filter
+	# PRICE band filter: the top band (+10,000 K.) needs fee >= 10M -> no cheap player qualifies
 	c.week = 3
-	c.start_scout_search({"pos": "", "age": 0, "role": 0, "quality": 0,
-		"price": 1, "leagues": ["eng_prem"]})
+	c.start_scout_search({"pos": "", "role": 0, "age_band": -1, "quality_band": -1,
+		"price_band": 9, "leagues": ["eng_prem"]})
 	c.week = 5
 	c._tick_scout_search()
-	ok = _assert(c.scout_results.is_empty(), "price cap filters everyone") and ok
+	ok = _assert(c.scout_results.is_empty(), "top price band (+10,000 K.) filters everyone") and ok
+
+	# QUALITY band filter: Beeney av=60 -> band 0 (50-65) returns him, band 2 (71-75) does not
+	c.week = 3
+	c.start_scout_search({"pos": "GK", "role": 0, "age_band": -1, "quality_band": 0,
+		"price_band": -1, "leagues": ["eng_prem"]})
+	c.week = 5
+	c._tick_scout_search()
+	ok = _assert(c.scout_results.size() == 1 and str(c.scout_results[0]["name"]) == "Beeney",
+		"quality band 50-65 matches av=60 GK") and ok
+	c.week = 3
+	c.start_scout_search({"pos": "GK", "role": 0, "age_band": -1, "quality_band": 2,
+		"price_band": -1, "leagues": ["eng_prem"]})
+	c.week = 5
+	c._tick_scout_search()
+	ok = _assert(c.scout_results.is_empty(), "quality band 71-75 excludes av=60 GK") and ok
 
 	# save round-trip
 	c.pending_alerts = ["The scout has finished his search."]

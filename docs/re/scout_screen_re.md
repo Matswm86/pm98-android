@@ -22,6 +22,41 @@ from the live wine witness run `screenshots/wine-captures-2026-07-18-goalscorers
 | 81_scout_found2.png | results: column headers appear (NAME/AV/MO/CLUB FEE/WAGE/YEARS, y286..292) + 8 visible rows y297+16k + scroll column (down arrow enabled) |
 | 82_scout_playercard.png | row tap (Hislop) → the CONTRACT+OFFER "PLAYER INFORMATION" card (same family as 49 over TRANSFER MARKET — NOT the attrs-top MakeOffer card) |
 
+## Criteria dropdown enums — BINARY-EXACT (MANAGER.EXE getter tables, 2026-07-23)
+
+The RE previously listed AGE/QUALITY/PRICE filled-values as an "honest gap" (only
+POSITION "GOALKEEPER" was witnessed live) and the app had guessed them as numeric
+spinners (age 16-40, quality 1-5, price 250k-step money). **WRONG** — all five
+criteria are enum dropdowns whose contents are arrays of string pointers in the
+binary, indexed by the dropdown position. Lifted verbatim (via `tools/re/enum_pcf5dat.py`
+method: section map .data VA = fileoff + 0x401A00, scan pointer runs):
+
+| criterion | getter table VA | order (index 0..N) |
+|---|---|---|
+| POSITION | `0x662d10` (4) | GOALKEEPER, DEFENDER, MIDFIELDER, FORWARD |
+| ROLE     | `0x662df8` (18, short-form) | KEEPER, RIGHT BACK, LEFT BACK, SWEEPER, INS. CENT. LEFT, INS. CENT. RIGHT, RIGHT MID., INSIDE RIGHT, CENTRE FORWARD, CENTRAL MID., LEFT MID., RIGHT WINGER, CENTRAL STRIKER, LEFT WINGER, DEF. MIDFIELDER, RIGHT FORWARD, LEFT FORWARD, INSIDE LEFT |
+| AGE      | `0x661e08` (5) | 17-22, 23-26, 27-30, 31-33, +33 |
+| QUALITY  | `0x661e20` (7) | 50-65, 66-70, 71-75, 76-80, 81-85, 86-90, +90 |
+| PRICE    | `0x661e40` (10) | 10 - 75 K., 80 - 125 K., 130 - 250 K., 250 - 500 K., 500 - 1,500 K., 1,500 - 3,000 K., 3,000 - 5,000 K., 5,000 - 7,500 K., 7,500 - 10,000 K., + 10,000 K. |
+
+* POSITION == the app's existing list (was correct). ROLE == `PlayerInfoScreen.FINE_ROLE`
+  short-form, exact order — the scout value-render at `0x5753c4` reads the SHORT table
+  `0x662df8` (paired with POSITION `0x662d10` at `0x5753b4`), so the wide ROLE field uses
+  the short names, NOT the long-form parallel table `0x662db0`.
+* The five getter thunks sit together at `0x575390`/`0x5753a0`/`0x5753b0`/`0x5753c0`/`0x5753d0`.
+* QUALITY is on the 0-99 ability scale = the same metric as the results AV column
+  (witnessed AV 69-85 sits inside 66-70..81-85). NOT the training attribute list
+  (GENERAL/FITNESS/SPEED/STAMINA/AGGRESSION @0x25945x is a different screen — no pointer
+  table exists over it).
+* Geometry confirms the enums: AGE + QUALITY are the SMALL fields (x35..84) — every band
+  string is <=5 chars; POSITION/ROLE/PRICE are the WIDE fields (x131..255). The game sizes
+  the fields to exactly fit these bands.
+* App wiring: `ScoutScreen.AGE_BANDS/QUALITY_BANDS/PRICE_BANDS`; criteria carry the band
+  INDEX (`age_band`/`quality_band`/`price_band`, -1 = off since index 0 is valid);
+  `Career.SCOUT_AGE_BANDS/SCOUT_QUALITY_BANDS/SCOUT_PRICE_BANDS_K` hold the inclusive numeric
+  bounds behind each band for `_scout_match` (AGE vs player age, QUALITY vs row AV, PRICE vs
+  row fee in K). Still un-witnessed: the exact filled-value glyph style (bar POSITION).
+
 ## Witnessed rules
 
 * **Hire gate**: no scout → everything washed + gate text; SEARCH inert.

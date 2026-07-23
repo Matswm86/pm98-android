@@ -62,7 +62,24 @@ func _run() -> void:
 	scr.queue_redraw()
 	await _shot(dir, "shot_scout_position.png")
 
+	# 4b. all LEFT-column criteria ON, showing the binary-exact band dropdowns
+	# (AGE / QUALITY small fields = short band strings; ROLE / PRICE wide fields)
+	scr._tog["age"] = true
+	scr._age_idx = 2          # "27-30"
+	scr._tog["role"] = true
+	scr._role = 9             # CENTRAL MID.
+	scr._tog["quality"] = true
+	scr._quality_idx = 3      # "76-80"
+	scr._tog["price"] = true
+	scr._price_idx = 4        # "500 - 1,500 K."
+	scr.queue_redraw()
+	await _shot(dir, "shot_scout_criteria.png")
+
 	# 5. searching + armed ring (witness 68)
+	scr._tog["age"] = false
+	scr._tog["role"] = false
+	scr._tog["quality"] = false
+	scr._tog["price"] = false
 	scr._searching = true
 	scr._armed_flash = true
 	scr.queue_redraw()

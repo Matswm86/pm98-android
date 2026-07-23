@@ -470,17 +470,24 @@ had it (s4). ⇒ the button is Promanager-only, not phase-gated. The app (no but
 Manager League) is CORRECT as-is; gate any future MANAGER HISTORY entry on mode.
 
 ## C1 — Original screens with NO working app counterpart on this path (witnessed)
+> **UPDATE 2026-07-23:** rows 1/3/4/8/9 are now CLOSED — GOAL SCORERS, SCOUT, OFFERS-map,
+> START OF SEASON and CHARITY SHIELD screens are built, wired and asserted-tested this
+> season (GoalScorersScreen/ScoutScreen/OffersScreen/SeasonStartScreen/CharityShieldScreen).
+> The SCOUT criteria dropdowns are now BINARY-EXACT (POSITION/ROLE/AGE/QUALITY/PRICE lifted
+> from the MANAGER.EXE getter tables; see scout_screen_re.md). Row 6 SAVE-GAME slots + row
+> 11 MAN-TO-MAN remain open.
+
 | # | original screen (frame) | app today (verified) |
 |---|---|---|
-| 1 | GOAL SCORERS graph+list (orig/12) | button painted, dead — no screen, no code refs |
+| 1 | GOAL SCORERS graph+list (orig/12) | ~~dead~~ **CLOSED** — GoalScorersScreen built + tested |
 | 2 | INSURANCE per-player (orig/17) | documented no-op (InjuriesScreen.gd:152) |
-| 3 | SCOUT search (orig/35) | "sourced but not yet wired" (TransferScreen.gd:222) |
-| 4 | OFFERS foreign-league map (orig/36) | same — unwired (TransferScreen.gd:222) |
+| 3 | SCOUT search (orig/35) | **CLOSED** — ScoutScreen built + wired + binary-exact criteria + tested |
+| 4 | OFFERS foreign-league map (orig/36) | **CLOSED** — OffersScreen built + wired |
 | 5 | GROUND IMPROVEMENTS panel: SEATS/CAR PARK/FACILITIES/SERVICES offers (orig/21) | invented "GROUND WORKS" text browse w/ invented prices (app/56) — B5-1-class stand-in still live |
 | 6 | SAVE GAME 8-slot GAME/PLAYER dialog (orig/54) | slotless toast "Game saved" (app/59) |
 | 7 | TEAMS IN CHAMPIONSHIPS (orig/06) | never shown (preseason → hub directly) |
-| 8 | START OF SEASON objectives table (orig/71) | never shown on season entry |
-| 9 | CHARITY SHIELD trophy screen (orig/70) | never shown (no Charity Shield event at all) |
+| 8 | START OF SEASON objectives table (orig/71) | **CLOSED** — SeasonStartScreen built + tested |
+| 9 | CHARITY SHIELD trophy screen (orig/70) | **CLOSED** — CharityShieldScreen built + tested |
 | 10 | Pre-match XI-vs-XI photo roll (orig/62-63, LINE-UPS ON) | never shown |
 | 11 | In-match MAN-TO-MAN MARKINGS (orig/66) | all 4 in-match doors dead: MatchScreen.gd:219 `_:pass` (LINE-UP/TACTICS/MAN-TO-MAN/STATISTICS) |
 | 12 | MATCH OPTIONS before EVERY match (orig/60) | screen exists but only via hub OPTIONS icon; career CONTINUE jumps straight into BRIEF (Main.gd:1015-1018, persisted mode) |
