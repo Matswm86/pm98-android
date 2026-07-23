@@ -76,6 +76,12 @@ FIX=(
   "air|$(fixt 0 0 0x20000               0x4000 0x2000 0x8000)"
   "air2|$(fixt 0x5000 0 0x10000         0x2000 0x6000 0x4000)"
   "air_down|$(fixt 0 0 0x8000           0x3000 -0x2000 -0x2000)"
+  # M5 s50: the LIVE t1.i10 fork ticks. The port's +0x114 ladder at these is perfectly linear
+  # (slot[i] = pos.xy + i*4*vel.xy), which is what feeds the runaway b0040 bisection. If the real
+  # builder saturates or bends instead, that -- not b0040 -- is the clk-639 target flip's root.
+  "m5_clk638|$(fixt 757224 -1948268 154494   13633 2451 6892)"
+  "m5_clk639|$(fixt 770857 -1945817 161386   13633 2451 6714)"
+  "m5_clk640|$(fixt 784490 -1943366 168100   13633 2451 6536)"
 )
 
 : > "$OUT"

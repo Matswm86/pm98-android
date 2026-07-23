@@ -1068,6 +1068,9 @@ static var move65a0_trace: Array = []
 static var steer_trace: Array = []                          # diag-only (gated on Pm98Rng._log_on)
 static var b0040_trace: Array = []                          # diag-only: _b0040_target inputs+terms
 static var goalaim_trace: Array = []                        # diag-only: goal_aim_025 kickoff aim/target
+static var steerhdg_trace: Array = []                       # diag-only: steer_89c0 heading + turn gate
+static var steersite_trace: Array = []                      # diag-only: which steer_89c0 CALL SITE fired
+static var b0040_iter_trace: Array = []                     # diag-only: _b0040_target bisection per-iter
 
 
 static func move_dispatch(p: Dictionary, m: Dictionary, param_2: int, rng) -> bool:
@@ -1285,6 +1288,15 @@ static func _pass_handoff_aa490(p: Dictionary, target: Dictionary, b1: int, b2: 
 ## curve is PARKED to 0; otherwise it is the (P+0x70*P+0x3ac)/15000 * speed_scale/100 + P+0x3a8 formula.
 static func steer_89c0(p: Dictionary, target_pos: Array, speed_scale: int) -> void:
 	if MatchEngine.Pm98Rng._log_on:                          # diag-only steer trace (draw-free path)
+		# s50: which of the ~30 steer_89c0 call sites fired. get_stack() is debug-build only and
+		# costs a frame walk, so it stays inside the existing _log_on gate (inert when logging off).
+		var _st := get_stack()
+		var _sites: Array = []
+		for _fi in range(1, mini(_st.size(), 5)):
+			var _f: Dictionary = _st[_fi]
+			_sites.append("%s:%d" % [_f.get("function", "?"), int(_f.get("line", -1))])
+		steersite_trace.append({"who": MatchEngine.Pm98Rng._who, "target": target_pos.duplicate(),
+			"scale": speed_scale, "sites": _sites})
 		var _tm: Dictionary = _ref(p, 0x18c)
 		var _tc: Dictionary = _ref(p, 0x190)
 		var _tg: Dictionary = _ref(p, 0x184)
@@ -1407,6 +1419,11 @@ static func steer_8bc0(p: Dictionary, target_pos: Array) -> void:
 				p[0x90] = _g(p, 0x90) + 1
 			elif _g(p, 0x90) != 0:
 				p[0x90] = _g(p, 0x90) - 1
+	if MatchEngine.Pm98Rng._log_on:                          # diag-only: the s49 t1.i10 turn-direction fork
+		steerhdg_trace.append({"who": MatchEngine.Pm98Rng._who, "heading": heading,
+			"face": _g(p, 0x34) & 0xffff, "curve": Pm98Trig._i32(_g(p, 0x6c)),
+			"p90": _g(p, 0x90), "dxy": [dx, dy],
+			"ad": absi(Pm98Trig._s16(heading - (_g(p, 0x34) & 0xffff)))})
 	steer_8f20(p, heading)
 
 
@@ -1655,6 +1672,12 @@ static func _b0040_target(p: Dictionary) -> Array:
 				Pm98Trig._i32(-bz),
 			]
 			var nd := _dot3_16(tp, facedir)
+			if MatchEngine.Pm98Rng._log_on:                 # s50 diag-only: per-iteration bisection state
+				b0040_iter_trace.append({"who": MatchEngine.Pm98Rng._who, "k": k, "lead_in": lead,
+					"lp": [int(lp[0]), int(lp[1]), int(lp[2])], "dx": dx, "dy": dy,
+					"mag": Pm98Trig.planar_mag(dx, dy), "ticks": ticks, "uv9": uv9, "idx": idx,
+					"mk": mk, "mkv": [_si(ctrl, mk), _si(ctrl, mk + 4)], "tp": tp.duplicate(),
+					"nd": nd})
 			lead = Pm98Trig._tdiv(Pm98Trig._i32(nd + lead), 2)  # bisection
 			conv = absi(Pm98Trig._i32(lead - nd))
 			k += 1

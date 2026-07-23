@@ -8,7 +8,7 @@ export WINEPREFIX="$REPO/.wineprefix"
 export PM98_DIR="$WINEPREFIX/drive_c/PM98"
 export WINEDEBUG=-all
 # All capture output (shots, dumps, logs) stays out of the repo:
-export ORACLE_OUT="${ORACLE_OUT:-/tmp/claude-1000/-home-mats-MWM-AI/b1f0f3cd-1c45-40ea-bd96-4346f66b7c7c/scratchpad/m4}"
+export ORACLE_OUT="${ORACLE_OUT:-/tmp/claude-1000/-home-mats-MWM-AI/e7c3519a-b2a9-4e81-a0fd-417613d7ca18/scratchpad/m4}"
 mkdir -p "$ORACLE_OUT"
 WIN_NAME="pm98 - Wine desktop"
 
