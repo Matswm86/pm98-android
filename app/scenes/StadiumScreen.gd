@@ -100,7 +100,8 @@ const QUAD_BOX_X := [[83, 97, 111, 125], [208, 222, 236, 250], [83, 97, 111, 125
 const QUAD_BOX_Y := [202, 202, 299, 299]
 const QUAD_CELL := [Rect2(22, 196, 118, 92), Rect2(147, 196, 118, 92),
 	Rect2(22, 293, 118, 88), Rect2(147, 293, 118, 88)]
-const QUAD_TRI := [Vector2(95, 229), Vector2(220, 229), Vector2(95, 326), Vector2(220, 326)]
+const QUAD_TRI := [Vector2(91, 227), Vector2(216, 227), Vector2(91, 324), Vector2(216, 324)]
+const QUAD_TRI_SZ := Vector2(33, 30)             # works triangle size (frame 09, native)
 const BOX_SZ := 11
 const CAR_MAX := 4
 const C_BOX_OWNED := Color8(59, 85, 130)         # filled = an owned level
@@ -111,10 +112,10 @@ const CARPARK_PRICE_CELL := Rect2(136, 418, 88, 15)
 const CARPARK_PER_LEVEL_SPACES := 500
 const CARPARK_PER_LEVEL_WEEKS := 7
 
-# FACILITIES / SERVICES: item bars over a detail panel. Only the ONE item per tab witnessed
-# on the owner's Man Utd capture (CHANGING ROOMS £225k / MEDICAL EQUIPMENT £150k) is
-# purchasable; every other item + grade is un-witnessed -> HONEST GAP (listed, but inert, no
-# detail). Item lists are the game's own fixed labels (frames 03/04/10/12).
+# FACILITIES / SERVICES: item bars over a detail panel. EVERY item is now live with real data:
+# the per-club grade ladder / current level / next-upgrade cost+weeks are mined from the real
+# game and fed via set_ground_items (app/data/ground_prices.json; Man Utd captured 2026-07-23).
+# Item lists are the game's own fixed labels (frames 03/04/10/12).
 const FAC_ITEMS := ["FLOODLIGHTS", "UNDER-SOIL HEATING", "CHANGING ROOMS", "SCORE BOARD",
 	"ACCESS TO THE STADIUM"]
 const SVC_ITEMS := ["MEDICAL EQUIPMENT", "CLUB SHOP", "CAFES", "TOILETS"]
@@ -123,8 +124,10 @@ const ITEM_BAR_W := 254
 const ITEM_BAR_H := 13
 const ITEM_BAR_Y0 := 185
 const ITEM_BAR_PITCH := 18
-# Witnessed item per tab: index -> {grades, current grade, upgrade cost/weeks, ledger label,
-# icon sprite, effect-cat}. current/grade indices are 0-based within `grades`.
+# Fallback item table (index -> {grades, current grade, upgrade cost/weeks, ledger label, icon})
+# for a club not present in ground_prices.json — only the two originally-witnessed items, so an
+# un-captured club is an honest gap rather than fabricated. A captured club overrides ALL items
+# via set_ground_items. current/grade indices are 0-based within `grades`.
 const FAC_WITNESS := {
 	2: {"grades": ["BASIC", "MEDIUM", "COMPLETE"], "current": 1, "cost": 225000, "weeks": 3,
 		"ledger": "CHANG. ROOMS", "icon": "chgrooms"},
@@ -133,11 +136,14 @@ const SVC_WITNESS := {
 	0: {"grades": ["BASIC", "COMPLETE", "I.C.U."], "current": 1, "cost": 150000, "weeks": 2,
 		"ledger": "SICKROOM", "icon": "medical"},
 }
-const DETAIL_HDR := Rect2(15, 284, 258, 26)      # grey-blue header bar (frame y284..310)
-const DETAIL_ICON := Vector2(17, 284)            # 34x26 svc_<icon>.png
+# Detail card measured off original frame 10 (native): black 1px border x15..276 / y281..431,
+# header/body divider at y309. Fills sit inside the border.
+const DETAIL_CARD := Rect2(15, 281, 261, 150)    # outer black border frame (x15..276, y281..431)
+const DETAIL_HDR := Rect2(16, 282, 260, 27)      # grey-blue header bar (y282..309, inside border)
+const DETAIL_ICON := Vector2(17, 283)            # 34x26 svc_<icon>.png
 const DETAIL_NAME_CX := 162.0
 const DETAIL_NAME_Y := 290.0
-const DETAIL_BODY := Rect2(15, 310, 258, 135)    # light-grey detail body
+const DETAIL_BODY := Rect2(16, 309, 260, 122)    # light-grey detail body (y309..431)
 const DETAIL_PRICE_LBL_X := 30.0
 const DETAIL_VAL_X := 130.0
 const DETAIL_PRICE_Y := 319.0
@@ -147,7 +153,7 @@ const GRADE_Y0 := 354                            # BASIC row top (MEDIUM +18 = c
 const GRADE_PITCH := 18
 const GRADE_LABEL_X := 62.0
 const C_ITEM_BAR := Color8(0, 0, 0)
-const C_HDR_BG := Color8(96, 112, 128)           # detail header grey-blue
+const C_HDR_BG := Color8(80, 100, 120)           # detail header grey-blue (frame 10)
 const C_BODY_BG := Color8(220, 220, 220)         # detail body light grey
 const C_HILITE := Color8(56, 78, 128)            # current-grade highlight bar
 const C_PRICE_RED := Color8(164, 32, 32)
@@ -245,6 +251,12 @@ var _grades: Dictionary = {}                     # ground_grades ("cat:key" -> g
 var _total: int = 0                              # TOTAL IMPROVEMENTS
 var _fac_sel: int = 2                            # selected FACILITIES item (default CHANG. ROOMS)
 var _svc_sel: int = 0                            # selected SERVICES item (default MEDICAL)
+var _grade_sel: int = -1                         # previewed upgrade grade (-1 = idle -> PRICE £0)
+# Per-item detail (index -> {grades, current, cost, weeks, ledger, icon}). Defaults to the two
+# original witnesses; Main.set_ground_items overrides with the full per-club table mined from
+# the real game (app/data/ground_prices.json) so EVERY item is live with real data.
+var _fac_data: Dictionary = FAC_WITNESS
+var _svc_data: Dictionary = SVC_WITNESS
 
 # MATCH DAY state fed from Career (set_matchday_state). Defaults keep SEATS-only callers /
 # tests unchanged (they never open the matchday view).
@@ -274,7 +286,8 @@ func _ready() -> void:
 	_carpark = load("res://art/screens/stadium/carpark.png")
 	_matchday = load("res://art/screens/stadium/matchday.png")
 	_obras = load("res://art/screens/stadium/obras.png")
-	for k in ["chgrooms", "medical"]:
+	for k in ["chgrooms", "medical", "floodlights", "heating", "scoreboard", "access",
+			"clubshop", "cafes", "toilets"]:
 		var p := "res://art/screens/stadium/svc_%s.png" % k
 		if ResourceLoader.exists(p):
 			_svc_icons[k] = load(p)
@@ -317,6 +330,7 @@ func setup(club: String, manager: String, season: String, ground: String,
 	_view = "works"          # (re)mount always opens on the WORK IN PROGRESS ledger
 	_tab = "seats"
 	_sel = -1
+	_grade_sel = -1
 	_load_scene()
 	queue_redraw()
 
@@ -349,6 +363,25 @@ func set_matchday_state(ticket: int, board: int, home: String, away: String,
 	_mo_witness = witness
 	_mo_sold = sold
 	queue_redraw()
+
+
+## Feed the per-club FACILITIES / SERVICES item tables (real data mined from the original game,
+## app/data/ground_prices.json). Each is an ordered array of {item, grades, current, cost,
+## weeks, ledger, icon} matching FAC_ITEMS / SVC_ITEMS. Empty (a club not yet captured) leaves
+## the sparse witnessed default (CHANGING ROOMS / MEDICAL) so nothing is fabricated.
+func set_ground_items(fac: Array, svc: Array) -> void:
+	if not fac.is_empty():
+		_fac_data = _index_items(fac)
+	if not svc.is_empty():
+		_svc_data = _index_items(svc)
+	queue_redraw()
+
+
+func _index_items(items: Array) -> Dictionary:
+	var d := {}
+	for i in items.size():
+		d[i] = items[i]
+	return d
 
 
 ## In-progress work on one (cat,key), or {} if none — for the build markers + the ledger.
@@ -422,7 +455,7 @@ func _hit(d: Vector2) -> String:
 			for i in FAC_ITEMS.size():
 				if _item_rect(i).has_point(d):
 					return "fac%d" % i
-			var wf: Dictionary = FAC_WITNESS.get(_fac_sel, {})
+			var wf: Dictionary = _fac_data.get(_fac_sel, {})
 			if not wf.is_empty():
 				var nxt: int = int(_grade_of("facility", _fac_sel, wf)) + 1
 				if nxt < (wf["grades"] as Array).size() and _grade_rect(nxt).has_point(d):
@@ -431,7 +464,7 @@ func _hit(d: Vector2) -> String:
 			for i in SVC_ITEMS.size():
 				if _item_rect(i).has_point(d):
 					return "svc%d" % i
-			var ws: Dictionary = SVC_WITNESS.get(_svc_sel, {})
+			var ws: Dictionary = _svc_data.get(_svc_sel, {})
 			if not ws.is_empty():
 				var nxt2: int = int(_grade_of("service", _svc_sel, ws)) + 1
 				if nxt2 < (ws["grades"] as Array).size() and _grade_rect(nxt2).has_point(d):
@@ -461,12 +494,15 @@ func _on_input(e: InputEvent) -> void:
 			return
 		if a == "improve":
 			_view = "improve"
+			_grade_sel = -1
 			queue_redraw()
 		elif a == "works":
 			_view = "works"
+			_grade_sel = -1
 			queue_redraw()
 		elif a == "matchday":
 			_view = "matchday"
+			_grade_sel = -1
 			queue_redraw()
 		elif a == "tkt_dn":
 			matchday_ticket_step.emit(false)
@@ -483,6 +519,7 @@ func _on_input(e: InputEvent) -> void:
 		elif a.begins_with("tab:"):
 			_tab = a.substr(4)
 			_sel = -1
+			_grade_sel = -1
 			queue_redraw()
 		elif a.begins_with("card"):
 			_select_card(int(a.substr(4)))
@@ -490,14 +527,16 @@ func _on_input(e: InputEvent) -> void:
 			_buy_carpark(int(a.substr(4)))
 		elif a.begins_with("fac") and a != "facbuy":
 			_fac_sel = int(a.substr(3))
+			_grade_sel = -1
 			queue_redraw()
 		elif a.begins_with("svc") and a != "svcbuy":
 			_svc_sel = int(a.substr(3))
+			_grade_sel = -1
 			queue_redraw()
 		elif a == "facbuy":
-			_buy_grade("facility", _fac_sel, FAC_WITNESS.get(_fac_sel, {}))
+			_preview_or_buy("facility", _fac_sel, _fac_data.get(_fac_sel, {}))
 		elif a == "svcbuy":
-			_buy_grade("service", _svc_sel, SVC_WITNESS.get(_svc_sel, {}))
+			_preview_or_buy("service", _svc_sel, _svc_data.get(_svc_sel, {}))
 
 
 ## Open the in-screen IMPROVEMENTS picker (as if IMPROVE were pressed) — for tests/shots.
@@ -536,6 +575,23 @@ func _buy_carpark(q: int) -> void:
 		return
 	works_requested.emit("carpark", q, "500 spaces", _car_price, CARPARK_PER_LEVEL_WEEKS,
 		{"added": CARPARK_PER_LEVEL_SPACES})
+
+
+## First tap on the next grade PREVIEWS its price (red box, no purchase) — the original's idle
+## detail shows £0 until a grade is picked; a second tap on the same grade commits the upgrade.
+## The direct _buy_grade path is kept for tests.
+func _preview_or_buy(cat: String, item: int, data: Dictionary) -> void:
+	if data.is_empty():
+		return
+	var nxt: int = _grade_of(cat, item, data) + 1
+	if nxt >= (data["grades"] as Array).size():
+		return
+	if _grade_sel != nxt:
+		_grade_sel = nxt
+		queue_redraw()
+	else:
+		_grade_sel = -1
+		_buy_grade(cat, item, data)
 
 
 ## Tick the next grade of the witnessed FACILITIES/SERVICES item -> start its upgrade work.
@@ -609,13 +665,13 @@ func _draw() -> void:
 			draw_texture_rect(_improve, Rect2(0, 0, W, H), false)
 		match _tab:
 			"carpark": _draw_carpark()
-			"facilities": _draw_item_tab("facility", FAC_ITEMS, FAC_WITNESS, _fac_sel)
-			"services": _draw_item_tab("service", SVC_ITEMS, SVC_WITNESS, _svc_sel)
+			"facilities": _draw_item_tab("facility", FAC_ITEMS, _fac_data, _fac_sel)
+			"services": _draw_item_tab("service", SVC_ITEMS, _svc_data, _svc_sel)
 			_: _draw_seats_prices()
 		_draw_tab_outline()
 		# TOTAL IMPROVEMENTS shows the live works sum in the picker too (frames 09/10/12),
 		# overriding the £0 baked into improvements.png.
-		_cell(_f10, R_TOTAL, "£%s" % fmt_int(_total), C_TOTAL_RED, 11, "right")
+		_draw_total()
 	elif _view == "matchday":
 		_draw_matchday()
 	else:
@@ -669,7 +725,7 @@ func _draw_works_ledger() -> void:
 			"£%s" % fmt_int(int(w.get("cost", 0))), col, 11, "centre")
 		_cell(_f10, Rect2(LEDGER_WEEK_CX - 35, y - 8, 70, 16),
 			str(int(w.get("weeks_left", 0))), col, 11, "centre")
-	_cell(_f10, R_TOTAL, "£%s" % fmt_int(_total), C_TOTAL_RED, 11, "right")
+	_draw_total()
 
 
 func _ledger_row_y(cat: String, key: int) -> int:
@@ -707,6 +763,14 @@ func _draw_matchday() -> void:
 	# +0x1e0 flag), so its absence is faithful, not a stub.
 	if not _mo_witness or _mo_sold:
 		draw_rect(MD_OFFER, C_WHITE, true)
+
+
+## TOTAL IMPROVEMENTS money cell. The footer £-value cell is baked (with a "£0" in
+## improvements.png that the live text would otherwise overlap into a garble) — cover it with
+## the frame's own grey footer colour first, then draw the live sum right-aligned.
+func _draw_total() -> void:
+	draw_rect(R_TOTAL, C_BODY_BG, true)
+	_cell(_f10, R_TOTAL, "£%s" % fmt_int(_total), C_TOTAL_RED, 11, "right")
 
 
 ## SEATS offer prices + tick (unchanged behaviour, extracted for the sub-tab dispatch).
@@ -752,7 +816,7 @@ func _draw_carpark() -> void:
 			elif b == building:
 				_fill_box(bx, by, C_BOX_BUILD)
 		if building >= 0 and _obras != null:
-			draw_texture_rect(_obras, Rect2(QUAD_TRI[q], Vector2(22, 21)), false)
+			draw_texture_rect(_obras, Rect2(QUAD_TRI[q], QUAD_TRI_SZ), false)
 	# PER LEVEL price: baked £2,975,000 stays for the witnessed club; blank it (honest gap)
 	# for any club whose per-level car-park price is un-witnessed (the cost fn is un-RE'd).
 	if _car_price <= 0:
@@ -784,25 +848,31 @@ func _draw_item_detail(cat: String, item: int, items: Array, w: Dictionary) -> v
 		draw_texture(icon, DETAIL_ICON)
 	_cell(_f12, Rect2(DETAIL_NAME_CX - 130, DETAIL_NAME_Y, 260, 16), str(items[item]), C_WHITE, 12, "centre")
 	draw_rect(DETAIL_BODY, C_BODY_BG, true)
+	# Outer black border box + header/body divider (frame 10 has a bordered detail card).
+	draw_rect(DETAIL_CARD, C_BLACK, false, 1.0)
+	draw_line(Vector2(DETAIL_CARD.position.x, 309), Vector2(DETAIL_CARD.end.x, 309), C_BLACK, 1.0)
 	var grades: Array = w["grades"]
 	var cur: int = _grade_of(cat, item, w)
 	var building := not _work_for(cat, item).is_empty()
-	# PRICE / WEEKS of the next upgrade (blank once max grade is reached)
-	if cur + 1 < grades.size():
+	var has_next := cur + 1 < grades.size()
+	# The original's idle detail shows PRICE £0 / 0 weeks; the real upgrade cost appears once the
+	# next grade is previewed (tapped) or a work is under way. Labels stay put; only the value moves.
+	var show_cost := has_next and (building or _grade_sel == cur + 1)
+	if has_next:
 		_txt10(DETAIL_PRICE_LBL_X, DETAIL_PRICE_Y, "PRICE:", C_PRICE_RED)
-		_txt10(DETAIL_VAL_X, DETAIL_PRICE_Y, "£%s" % fmt_int(int(w["cost"])), C_PRICE_RED)
+		_txt10(DETAIL_VAL_X, DETAIL_PRICE_Y, "£%s" % fmt_int(int(w["cost"]) if show_cost else 0), C_PRICE_RED)
 		_txt10(DETAIL_PRICE_LBL_X, DETAIL_WEEKS_Y, "WEEKS:", C_BLACK)
-		_txt10(DETAIL_VAL_X, DETAIL_WEEKS_Y, "%d weeks" % int(w["weeks"]), C_WEEKS_GREEN)
+		_txt10(DETAIL_VAL_X, DETAIL_WEEKS_Y, "%d weeks" % (int(w["weeks"]) if show_cost else 0), C_WEEKS_GREEN)
 	for g in grades.size():
 		var y := GRADE_Y0 + GRADE_PITCH * g
 		var boxr := Rect2(GRADE_BOX_X, y + 1, 12, 12)
 		if g == cur:
 			draw_rect(Rect2(56, y - 1, 216, 15), C_HILITE, true)   # current-grade highlight bar
 			_fill_grade_box(boxr, C_BLACK)
-		elif building and g == cur + 1:
-			_fill_grade_box(boxr, C_BOX_BUILD)
-			if _obras != null:
-				draw_texture_rect(_obras, Rect2(18, y, 18, 14), false)
+		elif g == cur + 1 and (building or _grade_sel == cur + 1):
+			_fill_grade_box(boxr, C_BOX_BUILD)                     # red = previewed / building grade
+			if building and _obras != null:
+				draw_texture_rect(_obras, Rect2(18, y, 18, 14), false)  # works triangle only when building
 		else:
 			_fill_grade_box(boxr, C_GRADE_GREY)
 		_txt10(GRADE_LABEL_X, float(y), str(grades[g]), C_WHITE if g == cur else C_BLACK)

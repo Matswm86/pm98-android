@@ -119,14 +119,33 @@ FACILITIES(18,138) SERVICES(148,138), each 124x18; active tab drawn with a red o
   LEVEL = 500 spaces / £2,975,000 / 7 weeks; spaces+weeks are treated as constants, the £ is
   WITNESSED ONLY for Man Utd (the cost fn is un-RE'd; SEATS proved these prices ARE club-tiered,
   so any other club = HONEST GAP: the price cell is blanked + taps inert).
-- **FACILITIES** — 5 item bars FLOODLIGHTS / UNDER-SOIL HEATING / CHANGING ROOMS / SCORE BOARD /
-  ACCESS TO THE STADIUM over a detail panel (icon+name header, PRICE/WEEKS, 3 grade rows). Only
-  **CHANGING ROOMS** is witnessed (grades BASIC/MEDIUM/COMPLETE, current MEDIUM, MEDIUM->COMPLETE
-  = £225,000 / 3 wk). The other 4 items are listed but HONEST GAPS (grades/prices/current-levels
-  un-witnessed → no detail, inert).
-- **SERVICES (EXTRAS)** — 4 item bars MEDICAL EQUIPMENT / CLUB SHOP / CAFES / TOILETS. Only
-  **MEDICAL EQUIPMENT** witnessed (grades BASIC/COMPLETE/I.C.U., current COMPLETE, COMPLETE->
-  I.C.U. = £150,000 / 2 wk; ledger label = "SICKROOM"). Others = HONEST GAPS.
+- **FACILITIES** — 5 item bars over a detail panel (icon+name header, PRICE/WEEKS, grade rows).
+- **SERVICES (EXTRAS)** — 4 item bars over the same detail panel.
+
+## FACILITIES / SERVICES — ALL ITEMS NOW LIVE with real data (2026-07-23, wine capture)
+Every item was mined by DRIVING the original MANAGER.EXE under wine (TOTAL control, Manchester
+Utd. / Old Trafford, 97-98 wk 1: MANAGER LEAGUE → TOTAL → Man Utd → hub → GROUND → IMPROVE →
+each tab/item; scratchpad `wine/28..35`). Each item's grade ladder, starting grade, and next
+upgrade PRICE/WEEKS were read off the real detail panel. Two cross-checks reproduced the prior
+witnesses exactly (CHANGING ROOMS MEDIUM→COMPLETE £225k/3wk, MEDICAL COMPLETE→I.C.U. £150k/2wk),
+and SEATS (Champion 4.25M/7.4375M/10.625M) + CAR PARK (£2,975,000/level) also reproduced.
+Table stored in **`app/data/ground_prices.json`** (keyed by club); `Main._ground_items` feeds it
+to `StadiumScreen.set_ground_items`. Man Utd captured (grades / **current** / next £/wk):
+- FLOODLIGHTS: NONE / 500.000 K.W. / **1.000.000 K.W.** / 1.500.000 K.W. → £500,000 / 4wk
+- UNDER-SOIL HEATING: **NO** / YES → £1,200,000 / 8wk
+- CHANGING ROOMS: BASIC / **MEDIUM** / COMPLETE → £225,000 / 3wk
+- SCORE BOARD: MANUAL / ELECTRONIC / **VIDEO-WALL** (max, no upgrade)
+- ACCESS TO THE STADIUM: BASIC / **MEDIUM** / WIDE → £900,000 / 6wk
+- MEDICAL EQUIPMENT: BASIC / **COMPLETE** / I.C.U. → £150,000 / 2wk (ledger "SICKROOM")
+- CLUB SHOP: **NONE** / SMALL / MEDIUM / LARGE → £25,000 / 1wk (ledger "CLUB SHOPS")
+- CAFES: SMALL / MEDIUM / **LARGE** / VERY LARGE → £500,000 / 20wk
+- TOILETS: 10 W.C. / 20 W.C. / **40 W.C.** / 80 W.C. → £50,000 / 1wk
+
+Detail behaviour matched to the original: idle shows PRICE **£0** / 0 weeks; the real upgrade
+cost + a red box on the next grade appear when it is **previewed** (tapped once); a second tap
+commits (the works triangle then shows only while building — owner frame 10). Item icons cut
+from the captures (`svc_<key>.png`, 9 total). Per-item detail panel now has the original's outer
+**black border** (measured off frame 10: x15..276 / y281..431, divider y309).
 - **WORK IN PROGRESS ledger (frame 07)** — several works run at once. `Career.works` is now a
   LIST {cat,key,label,cost,weeks_left,effect}; `_tick_works` applies each on completion
   (capacity / car_park_levels / ground_grades). The ledger draws each live work in its section
@@ -135,12 +154,20 @@ FACILITIES(18,138) SERVICES(148,138), each 124x18; active tab drawn with a red o
 
 A ticked quadrant/grade emits `works_requested(cat,key,label,cost,weeks,effect)`;
 `Main._on_stadium_works` runs `Career.begin_work` (cash + no-duplicate guards), saves, re-mounts.
-Un-witnessed prices never emit. Render parity vs frames: CAR PARK mean-abs-diff **2.95** (baked),
-FACILITIES/SERVICES ~26-30 (procedural bars+detail, structurally frame-true), ledger matches
-frame 07 exactly. Tests: `test_ground_improvements` (concurrent works, grade/level completion,
-save/load, tab+quadrant+grade hit-tests, honest-gap no-emit); in-app `PM98_GROUNDACT_SHOT`.
-**Still un-RE'd (next):** the per-club car-park cost fn, the un-witnessed facility/service grades
-+ prices, and the GROUND MATCH DAY sub-screen (ticket price + sponsor boards, frame 06).
+Render-diffed app-vs-original (wine idle captures): FACILITIES/SERVICES panels now match the
+original's idle (£0) and preview (£cost + red box) states pixel-close; the CAR PARK works
+triangle is the clean red/yellow ⚠ cut from frame 09 (`obras.png` re-sourced 33x30 — the old
+16x15 was a garbled blob; REMEMBER to `godot --import` after replacing it or the stale .ctex
+renders); TOTAL IMPROVEMENTS no longer garbles (the baked "£0" cell is covered before the live
+sum draws). Tests: `test_ground_improvements`, `test_stadium_screen`, `test_stadium_works`,
+`test_wiring_pass` all PASS; in-app `PM98_GROUNDACT_SHOT`.
+**Render fixes shipped 2026-07-23:** garbled TOTAL (cover cell), obras blob (re-sourced ⚠),
+missing detail border (added), all items live (ground_prices.json).
+**Still un-RE'd (flagged, not fabricated):** the per-club generalisation — only Man Utd is
+captured, so the other 475 clubs fall back to the sparse witness default (CHANGING ROOMS +
+MEDICAL) until each is captured OR the cost fn is reversed; and the exact upgrade COMMIT trigger
+(preview-tap is observed; second-tap-to-buy is the app's inferred commit). The GROUND MATCH DAY
+sub-screen (frame 06) is already built.
 
 ## WIRING (Main.gd)
 `Main._show_stadium_screen()` calls `scr.setup(club, manager, season, ground, cap,

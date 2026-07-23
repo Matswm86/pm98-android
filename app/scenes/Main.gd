@@ -753,6 +753,32 @@ func _groundact_shot() -> void:
 	await _settle()
 	print("GROUNDACT after IMPROVE+CARPARK: view=%s tab=%s" % [st._view, st._tab])
 	_save_shot(dir, "ga_01_carpark.png")
+	# Render-diff baselines for every improve sub-tab (seats/facilities/services).
+	_tap_screen(st, StadiumScreen.TAB_SEATS.get_center())
+	await _settle()
+	_save_shot(dir, "ga_01a_seats.png")
+	_tap_screen(st, StadiumScreen.TAB_FACILITIES.get_center())
+	await _settle()
+	_save_shot(dir, "ga_01b_facilities.png")
+	# Previously-inert items now live with real data: select FLOODLIGHTS (0) + SCORE BOARD (3).
+	_tap_screen(st, Vector2(145, 191))
+	await _settle()
+	_save_shot(dir, "ga_01b1_floodlights.png")
+	# Two-tap: first tap on the next grade (1.500.000 K.W., row y408) previews its price (£500k).
+	_tap_screen(st, Vector2(145, 408))
+	await _settle()
+	_save_shot(dir, "ga_01b1p_floodlights_preview.png")
+	_tap_screen(st, Vector2(145, 245))
+	await _settle()
+	_save_shot(dir, "ga_01b2_scoreboard.png")
+	_tap_screen(st, StadiumScreen.TAB_SERVICES.get_center())
+	await _settle()
+	_save_shot(dir, "ga_01c_services.png")
+	_tap_screen(st, Vector2(145, 209))
+	await _settle()
+	_save_shot(dir, "ga_01c1_clubshop.png")
+	_tap_screen(st, StadiumScreen.TAB_CARPARK.get_center())
+	await _settle()
 	var before := _career.works.size()
 	_tap_screen(st, (StadiumScreen.QUAD_CELL[0] as Rect2).get_center())
 	await _settle()
@@ -761,6 +787,13 @@ func _groundact_shot() -> void:
 		"FIRED" if after > before else "DEAD -- tap did nothing"])
 	print("GROUNDACT works_total = £%d (expect 2,975,000)" % _career.works_total())
 	_save_shot(dir, "ga_02_after_buy_ledger.png")
+	# Re-open CAR PARK to render-diff the works triangle (obras) in the building quadrant.
+	st = _first_of(StadiumScreen)
+	if st != null:
+		_tap_screen(st, StadiumScreen.BTN_IMPROVE.get_center())
+		_tap_screen(st, StadiumScreen.TAB_CARPARK.get_center())
+		await _settle()
+		_save_shot(dir, "ga_02b_carpark_building.png")
 
 	# MATCH DAY (owner frame 06): the button was inert; now it opens the ticket-price / sponsor
 	# -board sub-view. Drive it end-to-end: open it, step both prices, take the board offer.
@@ -2996,6 +3029,10 @@ func _show_stadium_screen() -> void:
 	# other clubs get an honest gap (0 -> blanked, inert) until the cost fn is reversed.
 	scr.set_improve_state(_career.car_park_levels, _carpark_price(club), _career.works_ledger(),
 		_career.ground_grades, _career.works_total())
+	# The per-club FACILITIES / SERVICES item tables mined from the real game
+	# (app/data/ground_prices.json). A captured club (Man Utd) gets every item live with real
+	# grades / prices / weeks; an un-captured club falls back to the sparse witness default.
+	scr.set_ground_items(_ground_items(club, "facilities"), _ground_items(club, "services"))
 	scr.improve_selected.connect(_on_stadium_improve)
 	scr.works_requested.connect(_on_stadium_works)
 	# GROUND MATCH DAY sub-view (owner frame 06): the TICKET PRICE / PRICE OF BOARD steppers
@@ -3044,6 +3081,20 @@ func _board_sale_offer(club: Dictionary) -> int:
 ## ARE club-specific, so applying Man Utd's figure game-wide would be invention.
 func _carpark_price(club: Dictionary) -> int:
 	return 2_975_000 if str(club.get("name", "")).to_lower().contains("manchester utd") else 0
+
+## The per-club FACILITIES / SERVICES item table (real data mined from the original game,
+## app/data/ground_prices.json). Returns the club's ordered item array for `cat` in
+## ("facilities" | "services"), or [] for a club not yet captured (honest gap, no invention).
+var _ground_prices_cache: Dictionary = {}
+func _ground_items(club: Dictionary, cat: String) -> Array:
+	if _ground_prices_cache.is_empty():
+		var f := FileAccess.open("res://data/ground_prices.json", FileAccess.READ)
+		if f != null:
+			var parsed: Variant = JSON.parse_string(f.get_as_text())
+			if parsed is Dictionary:
+				_ground_prices_cache = parsed
+	var by_club: Dictionary = _ground_prices_cache.get(cat, {})
+	return by_club.get(str(club.get("name", "")), [])
 
 ## A SEATS offer card was ticked on the in-screen IMPROVEMENTS view: run the real Career
 ## expansion (start_works enforces cash + ceiling), persist, and re-mount the GROUND screen

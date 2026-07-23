@@ -1,0 +1,21 @@
+{
+  "_source": "wine-capture of the original MANAGER.EXE (TOTAL control, Manchester Utd. / Old Trafford, season 97-98 week 1), 2026-07-23. Every grade ladder, current level, and next-upgrade PRICE/WEEKS read directly off the game's IMPROVE > FACILITIES/SERVICES detail panels. Cross-checked: CHANGING ROOMS MEDIUM->COMPLETE = 225000/3wk and MEDICAL COMPLETE->I.C.U. = 150000/2wk reproduce the prior witnesses exactly; SEATS and CAR PARK also reproduce.",
+  "_note": "Per-club table. Only Manchester Utd. is captured so far (the played club). Other clubs are NOT filled (no invention) -> they fall back to the sparse witness set until captured/reversed. `current` is the club's starting grade index; `cost`/`weeks` are the next single upgrade from `current` (0 = already at max grade).",
+  "facilities": {
+    "Manchester Utd.": [
+      {"item": "FLOODLIGHTS", "grades": ["NONE", "500.000 K.W.", "1.000.000 K.W.", "1.500.000 K.W."], "current": 2, "cost": 500000, "weeks": 4, "ledger": "FLOODLIGHTS", "icon": "floodlights"},
+      {"item": "UNDER-SOIL HEATING", "grades": ["NO", "YES"], "current": 0, "cost": 1200000, "weeks": 8, "ledger": "HEATING", "icon": "heating"},
+      {"item": "CHANGING ROOMS", "grades": ["BASIC", "MEDIUM", "COMPLETE"], "current": 1, "cost": 225000, "weeks": 3, "ledger": "CHANG. ROOMS", "icon": "chgrooms"},
+      {"item": "SCORE BOARD", "grades": ["MANUAL", "ELECTRONIC", "VIDEO-WALL"], "current": 2, "cost": 0, "weeks": 0, "ledger": "SCORE BOARD", "icon": "scoreboard"},
+      {"item": "ACCESS TO THE STADIUM", "grades": ["BASIC", "MEDIUM", "WIDE"], "current": 1, "cost": 900000, "weeks": 6, "ledger": "ACCESS", "icon": "access"}
+    ]
+  },
+  "services": {
+    "Manchester Utd.": [
+      {"item": "MEDICAL EQUIPMENT", "grades": ["BASIC", "COMPLETE", "I.C.U."], "current": 1, "cost": 150000, "weeks": 2, "ledger": "SICKROOM", "icon": "medical"},
+      {"item": "CLUB SHOP", "grades": ["NONE", "SMALL", "MEDIUM", "LARGE"], "current": 0, "cost": 25000, "weeks": 1, "ledger": "CLUB SHOPS", "icon": "clubshop"},
+      {"item": "CAFES", "grades": ["SMALL", "MEDIUM", "LARGE", "VERY LARGE"], "current": 2, "cost": 500000, "weeks": 20, "ledger": "CAFES", "icon": "cafes"},
+      {"item": "TOILETS", "grades": ["10 W.C.", "20 W.C.", "40 W.C.", "80 W.C."], "current": 2, "cost": 50000, "weeks": 1, "ledger": "TOILETS", "icon": "toilets"}
+    ]
+  }
+}
