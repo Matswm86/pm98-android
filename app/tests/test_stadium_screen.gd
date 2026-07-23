@@ -87,7 +87,7 @@ func _run() -> void:
 	ok = _assert(screen._view == "improve", "IMPROVE opens the picker in-screen") and ok
 	ok = _assert(screen._hit(StadiumScreen.CARDS[0].get_center()) == "card0", "card 0 hit-tests in improve view") and ok
 	ok = _assert(screen._hit(StadiumScreen.CARDS[2].get_center()) == "card2", "card 2 hit-tests in improve view") and ok
-	ok = _assert(screen._hit(StadiumScreen.TAB_SEATS.get_center()) == "tab_seats", "SEATS tab hit-tests") and ok
+	ok = _assert(screen._hit(StadiumScreen.TAB_SEATS.get_center()) == "tab:seats", "SEATS tab hit-tests") and ok
 	ok = _assert(StadiumScreen.OFFER_SEATS == [4000, 8000, 12000], "witnessed seat increments") and ok
 	ok = _assert(StadiumScreen.OFFER_WEEKS == [20, 35, 50], "witnessed build weeks") and ok
 

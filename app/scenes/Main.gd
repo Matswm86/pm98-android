@@ -113,6 +113,9 @@ func _boot() -> void:
 	if OS.has_environment("PM98_PLAYERACT_SHOT"):
 		_playeract_shot()
 		return
+	if OS.has_environment("PM98_GROUNDACT_SHOT"):
+		_groundact_shot()
+		return
 	if OS.has_environment("PM98_MATCHOPTS_SHOT"):
 		_matchopts_shot()
 		return
@@ -718,6 +721,60 @@ func _ficha_shot() -> void:
 ## ordering, not a wiring shortcut), capturing each step and printing the Career-side
 ## mutation. Also drives the BUY path (transfer desk -> make offer -> place bid ->
 ## week-roll resolve). Run under Xvfb+GL: PM98_PLAYERACT_SHOT=1.
+## Drives the REAL GROUND flow end-to-end (owner 2026-07-23): open GROUND -> IMPROVE -> CAR
+## PARK tab -> tick a quadrant -> the work starts, the screen re-mounts on the WORK IN
+## PROGRESS ledger showing it. Proves Main._on_stadium_works wiring, not just the render.
+func _groundact_shot() -> void:
+	var dir := OS.get_environment("PM98_SHOT_DIR")
+	if GameDB.leagues.is_empty():
+		print("GROUNDACT-SHOT no leagues loaded")
+		get_tree().quit()
+		return
+	var lg: Dictionary = GameDB.leagues[0]
+	var club: Dictionary = GameDB.clubs_in_league(lg["id"])[0]
+	for c in GameDB.clubs_in_league(lg["id"]):
+		if str(c.get("name", "")).to_upper().find("MANCHESTER UTD") >= 0:
+			club = c
+			break
+	_begin_career("Manager", lg, club)
+	_career.cash = 40_000_000
+	await _settle()
+	_show_stadium_screen()
+	await _settle()
+	_save_shot(dir, "ga_00_ground.png")
+	var st: StadiumScreen = _first_of(StadiumScreen)
+	if st == null:
+		print("GROUNDACT FAIL: GROUND screen did not open")
+		get_tree().quit()
+		return
+	_tap_screen(st, StadiumScreen.BTN_IMPROVE.get_center())
+	_tap_screen(st, StadiumScreen.TAB_CARPARK.get_center())
+	await _settle()
+	print("GROUNDACT after IMPROVE+CARPARK: view=%s tab=%s" % [st._view, st._tab])
+	_save_shot(dir, "ga_01_carpark.png")
+	var before := _career.works.size()
+	_tap_screen(st, (StadiumScreen.QUAD_CELL[0] as Rect2).get_center())
+	await _settle()
+	var after := _career.works.size()
+	print("GROUNDACT carpark tick: works %d -> %d  (%s)" % [before, after,
+		"FIRED" if after > before else "DEAD -- tap did nothing"])
+	print("GROUNDACT works_total = £%d (expect 2,975,000)" % _career.works_total())
+	_save_shot(dir, "ga_02_after_buy_ledger.png")
+	print("GROUNDACT-SHOT done")
+	get_tree().quit()
+
+
+## Press+release a screen's own _on_input at a design point (the hit-test path used by
+## test_wiring_pass) -- used by _groundact_shot where viewport push_input routing is flaky.
+func _tap_screen(scr: Control, d: Vector2) -> void:
+	for pressed in [true, false]:
+		var e := InputEventScreenTouch.new()
+		e.index = 0
+		e.position = d
+		e.pressed = pressed
+		scr._on_input(e)
+
+
 func _playeract_shot() -> void:
 	var dir := OS.get_environment("PM98_SHOT_DIR")
 	if GameDB.leagues.is_empty():
@@ -1140,17 +1197,17 @@ func _open_player_info(player: Dictionary, club: Dictionary, host: Control = nul
 	# (which would mislabel a foreign club as Division One).
 	var tier := TransferMarket.english_tier_of(club, GameDB.leagues)
 	var own: bool = _career != null and int(club.get("id", -1)) == _career.club_id
-	scr.setup(player, club, tier, own)
+	var pid := int(player.get("id", -1))
+	scr.setup(player, club, tier, own, own and _career.is_listed(pid))
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
 	if not own:
 		return
-	var pid := int(player.get("id", -1))
 	# RENEW: agree a new deal at his wage demand (his term resets); refresh the card in place.
 	scr.renew_requested.connect(func(_p: Dictionary) -> void:
 		AudioManager.ui_select()
 		var res := _career.renew(pid)
 		_career.save()
-		scr.setup(player, club, tier, true)
+		scr.setup(player, club, tier, true, _career.is_listed(pid))
 		_toast(str(res.get("msg", ""))))
 	# TRANSFER: place him on (or off) the transfer market -- "PLAYER PLACED ON TRANSFER MARKET".
 	scr.transfer_requested.connect(func(_p: Dictionary) -> void:
@@ -1158,7 +1215,7 @@ func _open_player_info(player: Dictionary, club: Dictionary, host: Control = nul
 		_career.toggle_listed(pid)
 		_career.save()
 		var listed := _career.is_listed(pid)
-		scr.setup(player, club, tier, true)
+		scr.setup(player, club, tier, true, listed)
 		_toast("%s placed on the transfer market." % player.get("name", "?") if listed
 			else "%s removed from the transfer list." % player.get("name", "?")))
 	# SACK: terminate his contract (compensation paid); he leaves, so close the card + refresh.
@@ -2888,14 +2945,34 @@ func _show_stadium_screen() -> void:
 		cap, seated, cap - seated, int(round(cap / 27.0)), _career.works_status(),
 		int(sm.get("ticket_price", 0)), int(sm.get("board_price", 0)), _career.week + 1,
 		_career.league_name, str(club.get("objective", "")))
+	# The live GROUND state for the CAR PARK / FACILITIES / SERVICES tabs + the WORK IN
+	# PROGRESS ledger. CAR PARK per-level price is witnessed only for Man Utd (frame 09);
+	# other clubs get an honest gap (0 -> blanked, inert) until the cost fn is reversed.
+	scr.set_improve_state(_career.car_park_levels, _carpark_price(club), _career.works_ledger(),
+		_career.ground_grades, _career.works_total())
 	scr.improve_selected.connect(_on_stadium_improve)
+	scr.works_requested.connect(_on_stadium_works)
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
+
+## The witnessed CAR PARK per-level price. Only Man Utd was captured (frame 09, £2,975,000);
+## the cost fn is un-RE'd so every other club is an honest gap (0). SEATS proved these prices
+## ARE club-specific, so applying Man Utd's figure game-wide would be invention.
+func _carpark_price(club: Dictionary) -> int:
+	return 2_975_000 if str(club.get("name", "")).to_lower().contains("manchester utd") else 0
 
 ## A SEATS offer card was ticked on the in-screen IMPROVEMENTS view: run the real Career
 ## expansion (start_works enforces cash + ceiling), persist, and re-mount the GROUND screen
 ## so it reflects the new WORK IN PROGRESS state.
 func _on_stadium_improve(added: int, cost: int, weeks: int) -> void:
 	if _career.start_works(added, cost, weeks):
+		_career.save()
+	_show_stadium_screen()
+
+## A CAR PARK quadrant / FACILITIES / SERVICES upgrade was ticked: run the real work
+## (begin_work enforces cash + the no-duplicate guard), persist, and re-mount so the WORK IN
+## PROGRESS ledger reflects it (frame 07).
+func _on_stadium_works(cat: String, key: int, label: String, cost: int, weeks: int, effect: Dictionary) -> void:
+	if _career.begin_work(cat, key, label, cost, weeks, effect):
 		_career.save()
 	_show_stadium_screen()
 

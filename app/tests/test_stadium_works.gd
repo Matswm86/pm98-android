@@ -74,7 +74,8 @@ func _run() -> bool:
 	mid.save(path)
 	var loaded := Career.load_save(path)
 	ok = _assert(loaded != null and loaded.stadium_capacity == mid.stadium_capacity
-		and not loaded.works.is_empty() and int(loaded.works["added"]) == 2000,
+		and not loaded.works.is_empty()
+		and int((loaded.works[0]["effect"] as Dictionary)["added"]) == 2000,
 		"stadium state survived save/load") and ok
 
 	# StadiumScreen WORKS / RETURN hit-testing.

@@ -96,6 +96,16 @@ const BTN := {
 }
 const OK_PR_XY := Vector2(503, 381)             # 081's held-OK ring cut
 
+# TRANSFER-LISTED state (owner frame 14, 2026-07-23): when the player is on the
+# transfer market the card grows a "PLAYER PLACED ON TRANSFER MARKET" banner in the
+# card-white strip between the CONTRACT/CLAUSES block and the RENEW/TRANSFER/SACK/OK
+# row, and the TRANSFER button carries a persistent red outline. Both measured off the
+# native 640x480 owner capture (frame text solid olive, no AA).
+const LISTED_BANNER := "PLAYER PLACED ON TRANSFER MARKET"
+const LISTED_BANNER_CX := 345.0                 # card-centred (frame 14)
+const LISTED_BANNER_Y := 367.0                  # top of the olive glyph row (frame y368..374)
+const C_LISTED := Color8(80, 110, 5)            # frame-sampled olive banner ink
+
 const C_WHITE := Color8(255, 255, 255)
 const C_BLACK := Color8(0, 0, 0)
 const C_GOLD := Color8(255, 223, 0)
@@ -130,6 +140,7 @@ var _p: Dictionary = {}
 var _club: Dictionary = {}
 var _tier: int = 1
 var _actions := false   # RENEW/TRANSFER/SACK live (manager's own squad player)
+var _listed := false    # player is on the transfer market -> banner + red TRANSFER outline
 var _press := ""
 var _down := false  # a press was seen; release without it is the emulated-mouse twin
 ## The host screen LUT-dims itself while this card is up (SquadScreen); when it
@@ -160,11 +171,13 @@ func _ready() -> void:
 
 ## Feed the player + his club (kit/name) + league tier (fee/wage). The three
 ## action buttons show only for the manager's own squad player.
-func setup(player: Dictionary, club: Dictionary, tier: int = 1, actions_enabled := false) -> void:
+func setup(player: Dictionary, club: Dictionary, tier: int = 1, actions_enabled := false,
+		listed := false) -> void:
 	_p = player
 	_club = club
 	_tier = maxi(1, tier)
 	_actions = actions_enabled
+	_listed = listed
 	# The player's SELLING-club stature band drives the RE'd PM98 fee/wage (his club's
 	# squad strength, not just its division). docs/re/transfer_value_re.md sec.10.
 	var band := TransferMarket.stature_of(_club.get("players", []), _tier)
@@ -427,6 +440,12 @@ func _draw_buttons() -> void:
 	if not _actions:
 		for k in ["renew", "transfer", "sack"]:
 			draw_rect(BTN[k] as Rect2, C_WHITE, true)
+	# Transfer-listed: the "PLAYER PLACED ON TRANSFER MARKET" banner (frame 14) sits in the
+	# card-white strip above the button row; the TRANSFER button keeps a red outline. Only a
+	# manager's OWN squad player can be listed, so it never shows on a read-only browse card.
+	elif _listed:
+		_ctxt(_f10, LISTED_BANNER_CX, LISTED_BANNER_Y, LISTED_BANNER, C_LISTED, 10)
+		draw_rect((BTN["transfer"] as Rect2).grow(2.0), C_RING, false, 2.0)
 	if _press == "ok" and _ok_pr != null:
 		draw_texture(_ok_pr, OK_PR_XY)
 	elif _press != "" and _actions:

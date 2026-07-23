@@ -58,7 +58,15 @@ var objective_text: String = ""
 var finished: bool = false        # season complete + objective resolved
 var tactics: Dictionary = {}      # manager's Tactics.to_dict(): XI + shape + marking
 var stadium_capacity: int = 0     # managed club's current ground capacity (0 = GameDB default)
-var works: Dictionary = {}        # in-progress stadium expansion {added, weeks_left, cost}; {} = none
+# GROUND IMPROVEMENTS (frame 07): several works run at once -- a SEATS expansion, a CAR
+# PARK level, a FACILITIES grade and a SERVICES grade can all be under construction in the
+# same week. `works` is a LIST of {cat, key, label, cost, weeks_left, effect}; each ticks
+# independently and applies its effect (capacity / car-park level / facility grade) on
+# completion. car_park_levels = the 4 quadrants NE/NW/SE/SW (base level 1 each = 2,000
+# spaces); ground_grades = completed FACILITIES/SERVICES upgrades "cat:key" -> grade.
+var works: Array = []
+var car_park_levels: Array = [1, 1, 1, 1]
+var ground_grades: Dictionary = {}
 var ticket_price: int = 0         # board-set match ticket price (0 = tier default)
 var board_price: int = 0          # board-set advertising-board price (0 = tier default)
 
@@ -279,7 +287,9 @@ func _init_club(club: Dictionary, league: Dictionary, league_clubs: Array, leagu
 	# The old division's rosters (and any talents injected into them) are gone; a clean
 	# ledger lets inject_due_talents (Main, after take_job) re-deliver due talents here.
 	talents_used = {}
-	works = {}
+	works = []
+	car_park_levels = [1, 1, 1, 1]
+	ground_grades = {}
 	scout_search = {}
 	scout_results = []
 	pending_alerts = []
@@ -3202,30 +3212,112 @@ func _record_supercup_news(tie: Dictionary, comp: String, prize: int) -> void:
 
 # ---- stadium expansion (WORKS) -------------------------------------------
 
-## Begin a ground expansion: pay `cost` now, capacity rises by `added` after `weeks`.
-## Refuses if works are already running, cash is short, or it would breach the ceiling.
-func start_works(added: int, cost: int, weeks: int) -> bool:
-	if not works.is_empty() or added <= 0 or cash < cost \
-			or stadium_capacity + added > MAX_STADIUM:
+## Begin one GROUND improvement: pay `cost` now, its effect lands after `weeks`. Refuses on
+## short cash, an identical (cat,key) work already running, or a SEATS capacity-ceiling
+## breach. cat: "seats" | "carpark" | "facility" | "service"; effect carries {added:int}
+## (seats/carpark capacity delta) or {grade:int} (facilities/services target grade).
+func begin_work(cat: String, key: int, label: String, cost: int, weeks: int,
+		effect: Dictionary = {}) -> bool:
+	if cost > cash:
 		return false
+	if cat == "seats" and stadium_capacity + _pending_seats() + int(effect.get("added", 0)) > MAX_STADIUM:
+		return false
+	for w in works:
+		if str(w.get("cat")) == cat and int(w.get("key", -1)) == key:
+			return false                 # that item is already under construction
 	cash -= cost
-	works = {"added": added, "weeks_left": maxi(1, weeks), "cost": cost}
-	_news("stadium", "Ground works begun: +%s capacity, ~%d weeks (-£%s)." % [
-		_grp(added), maxi(1, weeks), _grp(cost)])
+	works.append({"cat": cat, "key": key, "label": label, "cost": cost,
+		"weeks_left": maxi(1, weeks), "effect": effect})
+	_news("stadium", "Ground works begun: %s (-£%s, ~%d wk)." % [label, _grp(cost), maxi(1, weeks)])
 	return true
 
 
-## Tick an in-progress expansion one week; on completion raise the capacity and refresh
-## the weekly finance projection so the bigger gate actually feeds the books.
+## SEATS committed but not yet built, so a second SEATS card can't overshoot the ceiling.
+func _pending_seats() -> int:
+	var s := 0
+	for w in works:
+		if str(w.get("cat")) == "seats":
+			s += int((w.get("effect", {}) as Dictionary).get("added", 0))
+	return s
+
+
+## SEATS expansion (back-compat wrapper for Main + the SEATS offer card). One seat work at
+## a time (key fixed at 0), matching the single WORK IN PROGRESS SEATS row (frame 07).
+func start_works(added: int, cost: int, weeks: int) -> bool:
+	if added <= 0:
+		return false
+	return begin_work("seats", 0, "%s seats" % _grp(added), cost, weeks, {"added": added})
+
+
+## Tick every in-progress work one week; apply the effect of any that complete and refresh
+## the weekly finance projection so a bigger gate feeds the books.
 func _tick_works() -> void:
 	if works.is_empty():
 		return
-	works["weeks_left"] = int(works["weeks_left"]) - 1
-	if int(works["weeks_left"]) <= 0:
-		stadium_capacity = mini(MAX_STADIUM, stadium_capacity + int(works["added"]))
-		_news("stadium", "Ground expansion complete: capacity now %s." % _grp(stadium_capacity))
-		works = {}
+	var done: Array = []
+	for w in works:
+		w["weeks_left"] = int(w["weeks_left"]) - 1
+		if int(w["weeks_left"]) <= 0:
+			_complete_work(w)
+			done.append(w)
+	for w in done:
+		works.erase(w)
+	if not done.is_empty():
 		_recompute_weekly_net()
+
+
+func _complete_work(w: Dictionary) -> void:
+	var eff: Dictionary = w.get("effect", {})
+	match str(w.get("cat")):
+		"seats":
+			stadium_capacity = mini(MAX_STADIUM, stadium_capacity + int(eff.get("added", 0)))
+			_news("stadium", "Ground expansion complete: capacity now %s." % _grp(stadium_capacity))
+		"carpark":
+			var q := int(w.get("key", 0))
+			if q >= 0 and q < car_park_levels.size():
+				car_park_levels[q] = mini(CAR_PARK_MAX_LEVEL, int(car_park_levels[q]) + 1)
+			_news("stadium", "Car park works complete: %s." % w.get("label", ""))
+		_:  # facility / service
+			ground_grades["%s:%d" % [str(w.get("cat")), int(w.get("key", 0))]] = int(eff.get("grade", 1))
+			_news("stadium", "%s works complete." % w.get("label", ""))
+
+
+# ---- GROUND improvement accessors (StadiumScreen + the WIP ledger) --------
+const CAR_PARK_MAX_LEVEL := 4
+const CAR_PARK_SPACES_PER_LEVEL := 500
+
+## The live work on one (cat,key), or {} if none in progress.
+func work_for(cat: String, key: int) -> Dictionary:
+	for w in works:
+		if str(w.get("cat")) == cat and int(w.get("key", -1)) == key:
+			return w
+	return {}
+
+## The current car-park level of quadrant q (0..3), base 1.
+func car_park_level(q: int) -> int:
+	return int(car_park_levels[q]) if q >= 0 and q < car_park_levels.size() else 1
+
+## Total car-park spaces = sum of the four quadrant levels x 500 (Man Utd base = 2,000).
+func car_park_spaces() -> int:
+	var t := 0
+	for lv in car_park_levels:
+		t += int(lv) * CAR_PARK_SPACES_PER_LEVEL
+	return t
+
+## The current grade of a FACILITIES/SERVICES item, or `def` if the club has not upgraded it.
+func ground_grade(cat: String, key: int, def: int) -> int:
+	return int(ground_grades.get("%s:%d" % [cat, key], def))
+
+## The WORK IN PROGRESS ledger rows (frame 07): one entry per live work.
+func works_ledger() -> Array:
+	return works
+
+## TOTAL IMPROVEMENTS = the sum of every live work's outstanding cost (frame 07).
+func works_total() -> int:
+	var t := 0
+	for w in works:
+		t += int(w.get("cost", 0))
+	return t
 
 
 ## Re-derive weekly_net from the current capacity (gate income depends on it). weekly_net
@@ -3270,11 +3362,14 @@ func finance_preview() -> Dictionary:
 		"board": int(fin["board_price"])}
 
 
-## A short human status for the WORKS in progress (or "" when none), e.g. "+5,000 in 12 wk".
+## A short human status for the SEATS work in progress (or "" when none), e.g. "+5,000 in
+## 12 wk" -- back-compat for the GROUND SEATS row / status string.
 func works_status() -> String:
-	if works.is_empty():
+	var w := work_for("seats", 0)
+	if w.is_empty():
 		return ""
-	return "+%s in %d wk" % [_grp(int(works["added"])), int(works["weeks_left"])]
+	return "+%s in %d wk" % [_grp(int((w.get("effect", {}) as Dictionary).get("added", 0))),
+		int(w["weeks_left"])]
 
 
 static func _grp(v: int) -> String:
@@ -3327,6 +3422,7 @@ func to_dict() -> Dictionary:
 		"objective_text": objective_text, "finished": finished,
 		"tactics": tactics, "tier": tier, "rosters": ros, "club_names": nms,
 		"stadium_capacity": stadium_capacity, "works": works,
+		"car_park_levels": car_park_levels, "ground_grades": ground_grades,
 		"ticket_price": ticket_price, "board_price": board_price,
 		"transfer_listed": listed, "sale_offers": offers,
 		"shortlist": shortlist, "transfer_log": transfer_log,
@@ -3418,7 +3514,28 @@ static func from_dict(d: Dictionary) -> Career:
 	c.tier = int(d.get("tier", 1))
 	# Pre-stadium-works saves load with capacity 0 (-> GameDB default via Main) + no works.
 	c.stadium_capacity = int(d.get("stadium_capacity", 0))
-	c.works = d.get("works", {})
+	# `works` was a single {added,weeks_left,cost} dict before the multi-work ledger; migrate
+	# a legacy in-progress SEATS expansion into the new list form.
+	var raw_works: Variant = d.get("works", [])
+	if raw_works is Array:
+		c.works = raw_works
+	elif raw_works is Dictionary and not (raw_works as Dictionary).is_empty():
+		c.works = [{"cat": "seats", "key": 0, "label": "%s seats" % c._grp(int(raw_works.get("added", 0))),
+			"cost": int(raw_works.get("cost", 0)), "weeks_left": int(raw_works.get("weeks_left", 1)),
+			"effect": {"added": int(raw_works.get("added", 0))}}]
+	else:
+		c.works = []
+	# JSON stores every number as a float; coerce the levels/grades back to ints so array/dict
+	# equality (and the save round-trip test) holds and the values stay clean ints.
+	c.car_park_levels = []
+	for v in d.get("car_park_levels", [1, 1, 1, 1]):
+		c.car_park_levels.append(int(v))
+	if c.car_park_levels.size() != 4:
+		c.car_park_levels = [1, 1, 1, 1]
+	c.ground_grades = {}
+	var gg: Dictionary = d.get("ground_grades", {})
+	for k in gg:
+		c.ground_grades[str(k)] = int(gg[k])
 	c.ticket_price = int(d.get("ticket_price", 0))
 	c.board_price = int(d.get("board_price", 0))
 	c.shortlist = []

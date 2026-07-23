@@ -102,9 +102,45 @@ The three SEATS offer cards carry:
 
 Ticking a witnessed card emits `improve_selected(added, cost, weeks)`; `Main._on_stadium_improve`
 runs `Career.start_works` (authoritative cash + ceiling gates), saves, and re-mounts the screen
-(now showing the WORK IN PROGRESS state). CAR PARK / FACILITIES / SERVICES tabs are **inert**
-(their offer lists are un-witnessed → not fabricated). Tests: `test_stadium_screen`
+(now showing the WORK IN PROGRESS state). Tests: `test_stadium_screen`
 (view toggle, card hit-test, witnessed vs honest-gap price), `test_stadium_works`, `test_wiring_pass`.
+
+## CAR PARK / FACILITIES / SERVICES tabs — IMPLEMENTED (2026-07-23, owner capture)
+The owner captured the three previously-un-witnessed tabs (native-640x480 frames at desktop
+offset 641,196, scale 1.0; screenshots/user-captures-2026-07-23-ground-squad-transfer/).
+Frames 02/09 = CAR PARK, 03/10 = FACILITIES, 04/12 = SERVICES(title "EXTRAS"), 05/07 = the
+concurrent WORK IN PROGRESS ledger. Tab hit rects: SEATS(18,113) CAR PARK(148,113)
+FACILITIES(18,138) SERVICES(148,138), each 124x18; active tab drawn with a red outline.
+
+- **CAR PARK** — 4 quadrant cells NE/NW/SE/SW, each level 1..4 (base 1 = 2,000 spaces, +500
+  /level). Baked chrome `carpark.png` (build_carpark_chrome_from_frames.py) keeps the quadrant
+  art + Level/1-2-3-4 labels + PER LEVEL panel; the 16 level boxes + works triangle are blanked
+  and redrawn from `Career.car_park_levels` (owned=blue, building=red + obras triangle). PER
+  LEVEL = 500 spaces / £2,975,000 / 7 weeks; spaces+weeks are treated as constants, the £ is
+  WITNESSED ONLY for Man Utd (the cost fn is un-RE'd; SEATS proved these prices ARE club-tiered,
+  so any other club = HONEST GAP: the price cell is blanked + taps inert).
+- **FACILITIES** — 5 item bars FLOODLIGHTS / UNDER-SOIL HEATING / CHANGING ROOMS / SCORE BOARD /
+  ACCESS TO THE STADIUM over a detail panel (icon+name header, PRICE/WEEKS, 3 grade rows). Only
+  **CHANGING ROOMS** is witnessed (grades BASIC/MEDIUM/COMPLETE, current MEDIUM, MEDIUM->COMPLETE
+  = £225,000 / 3 wk). The other 4 items are listed but HONEST GAPS (grades/prices/current-levels
+  un-witnessed → no detail, inert).
+- **SERVICES (EXTRAS)** — 4 item bars MEDICAL EQUIPMENT / CLUB SHOP / CAFES / TOILETS. Only
+  **MEDICAL EQUIPMENT** witnessed (grades BASIC/COMPLETE/I.C.U., current COMPLETE, COMPLETE->
+  I.C.U. = £150,000 / 2 wk; ledger label = "SICKROOM"). Others = HONEST GAPS.
+- **WORK IN PROGRESS ledger (frame 07)** — several works run at once. `Career.works` is now a
+  LIST {cat,key,label,cost,weeks_left,effect}; `_tick_works` applies each on completion
+  (capacity / car_park_levels / ground_grades). The ledger draws each live work in its section
+  row (value / TO BE PAID / WEEK + triangle); TOTAL IMPROVEMENTS = `works_total()`. Verified
+  in-app: the frame-07 mix (SEATS 8k + CAR PARK 500 + CHANG.ROOMS + SICKROOM) totals £10,787,500.
+
+A ticked quadrant/grade emits `works_requested(cat,key,label,cost,weeks,effect)`;
+`Main._on_stadium_works` runs `Career.begin_work` (cash + no-duplicate guards), saves, re-mounts.
+Un-witnessed prices never emit. Render parity vs frames: CAR PARK mean-abs-diff **2.95** (baked),
+FACILITIES/SERVICES ~26-30 (procedural bars+detail, structurally frame-true), ledger matches
+frame 07 exactly. Tests: `test_ground_improvements` (concurrent works, grade/level completion,
+save/load, tab+quadrant+grade hit-tests, honest-gap no-emit); in-app `PM98_GROUNDACT_SHOT`.
+**Still un-RE'd (next):** the per-club car-park cost fn, the un-witnessed facility/service grades
++ prices, and the GROUND MATCH DAY sub-screen (ticket price + sponsor boards, frame 06).
 
 ## WIRING (Main.gd)
 `Main._show_stadium_screen()` calls `scr.setup(club, manager, season, ground, cap,
