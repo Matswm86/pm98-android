@@ -401,7 +401,16 @@ func _contract_shot() -> void:
 		target["contract_years"] = Contract.EXPIRING_YEARS
 	_show_career()               # raise the hub
 	await _settle()
-	_show_renew(target)
+	# Drive the REAL contract path (not the retired _show_renew stand-in): mount the
+	# source FICHA (PlayerInfoScreen) for the target, then fire its RENEW signal so the
+	# real _open_renew_negotiation overlay renders -- the surface the shot must capture.
+	var club := _mgr_club()
+	_open_player_info(target, club)
+	await _settle()
+	for c in get_children():
+		if c is PlayerInfoScreen:
+			(c as PlayerInfoScreen).renew_requested.emit(target)
+			break
 	await _settle()
 	_save_shot(dir, "contract.png")
 	print("CONTRACT-SHOT done squad=%d wagebill/wk=%d demand/wk=%d club=%s" % [
@@ -1039,7 +1048,7 @@ func _free_overlays() -> void:
 		if c is LeagueTableScreen or c is LineupScreen or c is SquadScreen \
 				or c is FinanceScreen or c is TransferScreen or c is DirectivaScreen \
 				or c is StadiumScreen or c is CupScreen or c is YouthScreen \
-				or c is StaffScreen or c is BrowseScreen or c is TacticsScreen \
+				or c is StaffScreen or c is BrowseScreen \
 				or c is PlayerInfoScreen or c is RivalScreen or c is ManagerHistoryScreen \
 				or c is TrainingScreen or c is InjuriesScreen or c is StatisticsScreen \
 				or c is OffersSelectionScreen or c is ChampsScreen \
@@ -1285,8 +1294,8 @@ func _open_player_info(player: Dictionary, club: Dictionary, host: Control = nul
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
 	if not own:
 		return
-	# RENEW: the original's negotiation -- hold his terms, meet his demand, or better it; he
-	# can REJECT a lowball (contract_re.md). Opens the pick-an-offer overlay over the card.
+	# RENEW: the original's negotiation -- the OFFER form (wage/years steppers) IN the card, he
+	# can REJECT a lowball (renew_negotiation_re.md / contract_re.md). Enters the card's renew mode.
 	scr.renew_requested.connect(func(_p: Dictionary) -> void:
 		AudioManager.ui_select()
 		_open_renew_negotiation(player, pid, club, tier, scr))
@@ -1310,41 +1319,35 @@ func _open_player_info(player: Dictionary, club: Dictionary, host: Control = nul
 			_refresh_squad_overlay()
 		_toast(str(res.get("msg", ""))))
 
-## The RENEW negotiation opened from the FICHA (the original is a negotiation, not a silent
-## reset -- contract_re.md): hold his current terms (a lowball he may refuse), meet his demand,
-## or better it. A self-contained pick-an-offer overlay over the card (interim chrome, the
-## sanctioned surface for this connective flow); a pick applies Career.renew, refreshes the
-## FICHA (YEARS/WAGE update) + the SQUAD behind it, and toasts accepted/rejected.
+## The RENEW negotiation from the FICHA -- the SOURCE OFFER form witnessed live at TOTAL level
+## (renew_negotiation_re.md, 2026-07-23): the card's identity zone becomes the OFFER panel with
+## the YEARLY WAGE / YEARS steppers over the read-only CONTRACT panel. OFFER applies Career.renew
+## (he may reject a lowball, contract_re.md) and stamps the offered term; CANCEL drops back to the
+## plain card. Replaces the earlier invented full-screen browse list. Signals wired once per card.
 func _open_renew_negotiation(player: Dictionary, pid: int, club: Dictionary, tier: int,
 		scr: PlayerInfoScreen) -> void:
 	var band := _career.my_band()
 	var weekly := Contract.current_weekly(player, band)
 	var demand := Contract.demanded_weekly(player, band)
-	var opts := Contract.renewal_options(player, band)
-	var rows: Array = []
-	for opt in opts:
-		rows.append("%-22s  £%s/wk  %dy" % [
-			str(opt["label"]), _fmt_int(int(opt["weekly"])), int(opt["years"])])
-	var close_overlay := func() -> void:
-		if _browse != null and is_instance_valid(_browse):
-			_browse.queue_free()
-		_browse = null
-		if _hub != null and is_instance_valid(_hub):
-			_hub.visible = true
-	_mount_browse("RENEW %s" % PMChrome.title_case_name(str(player.get("name", "?"))),
-		"On £%s/wk  -  he wants £%s/wk  -  pick an offer" % [_fmt_int(weekly), _fmt_int(demand)],
-		rows,
-		func(i: int) -> void:
-			if i < 0 or i >= opts.size():
-				return
-			var res := _career.renew(pid, int(opts[i]["weekly"]))
+	var years := maxi(int(player.get("contract_term", 0)), int(player.get("contract_years", 0)))
+	if not scr.has_meta("renew_wired"):
+		scr.set_meta("renew_wired", true)
+		scr.offer_made.connect(func(offer_weekly: int, offer_years: int) -> void:
+			AudioManager.ui_select()
+			var res := _career.renew(pid, offer_weekly)
+			if bool(res.get("ok", false)):
+				# honour the offered contract length (Career.renew fixes term at NEW_TERM_YEARS)
+				player["contract_term"] = offer_years
+				player["contract_years"] = offer_years
 			_career.save()
-			close_overlay.call()
-			if is_instance_valid(scr):
-				scr.setup(player, club, tier, true, _career.is_listed(pid))
-			_refresh_squad_overlay()
-			_toast(str(res.get("msg", ""))),
-		close_overlay)
+			scr.end_renew()
+			scr.setup(player, club, tier, true, _career.is_listed(pid))
+			_refresh_squad_overlay()   # SQUAD YEARS/WAGE update behind the card
+			_toast(str(res.get("msg", ""))))
+		scr.renew_cancelled.connect(func() -> void:
+			AudioManager.ui_select()
+			scr.end_renew())
+	scr.begin_renew(weekly, demand, years)
 
 ## Reversed LEAGUE TABLES overlay for any standings array (career or a SeasonSim table).
 ## RETURN dismisses; tapping a club row raises that club's DATA BASE squad (the managed
@@ -4328,25 +4331,6 @@ func _loan_action(row: Dictionary, do_it: bool) -> void:
 		_push(_show_deal_result.bind(res["msg"]))
 	else:
 		_toast(res["msg"])
-
-func _show_renew(p: Dictionary) -> void:
-	var band := _career.my_band()
-	var weekly := Contract.current_weekly(p, band)
-	var demand := Contract.demanded_weekly(p, band)
-	var rows: Array = []
-	var payload: Array = []
-	for opt in Contract.renewal_options(p, band):
-		rows.append("%-30s £%s/wk  %dy" % [opt["label"], _fmt_int(int(opt["weekly"])), int(opt["years"])])
-		payload.append(opt)
-	_set_view("Renew %s" % p.get("name", "?"),
-		"On £%s/wk now  -  he wants £%s/wk  -  pick an offer" % [_fmt_int(weekly), _fmt_int(demand)],
-		rows, payload, func(opt): _renew_action(p, int(opt["weekly"])))
-
-func _renew_action(p: Dictionary, offer_weekly: int) -> void:
-	var res := _career.renew(int(p["id"]), offer_weekly)
-	_career.save()
-	_nav.pop_back()                      # drop the renew screen
-	_push(_show_deal_result.bind(res["msg"]))
 
 func _show_deal_result(msg: String) -> void:
 	_set_view("Transfer", msg, ["Back to transfers"], [{}], func(_x): _go_back())

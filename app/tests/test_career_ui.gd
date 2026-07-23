@@ -151,9 +151,9 @@ func _run() -> void:
 	rngw.seed = 7
 	main._career.advance_week(rngw)
 	ok = _assert(main._career.my_squad().size() == before + 1, "UI signing lands with next week's answer") and ok
-	# REAL RENEW: the FICHA negotiation (Main._open_renew_negotiation -> _mount_browse) applies
-	# Career.renew on a pick. Drive that same terminal call (meet his demand) and assert the fresh
-	# contract; the overlay chrome itself is covered by test_contract + shot_transfer_verify.
+	# REAL RENEW: the FICHA OFFER form (Main._open_renew_negotiation -> PlayerInfoScreen.begin_renew,
+	# OFFER -> Career.renew) applies the deal. Drive that same terminal call (meet his demand) and
+	# assert the fresh contract; the OFFER-form UI itself is covered by test_player_info_renew.
 	var p0: Dictionary = main._career.my_squad()[0]
 	var pid0 := int(p0["id"])
 	var res0: Dictionary = main._career.renew(pid0, Contract.demanded_weekly(p0, main._career.my_band()))

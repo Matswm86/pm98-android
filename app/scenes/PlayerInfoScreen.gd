@@ -37,6 +37,9 @@ signal back_pressed
 signal renew_requested(player)
 signal transfer_requested(player)
 signal sack_requested(player)
+## RENEW negotiation (TOTAL level): the OFFER form was submitted / cancelled.
+signal offer_made(weekly, years)
+signal renew_cancelled
 
 const W := 640
 const H := 480
@@ -96,6 +99,34 @@ const BTN := {
 }
 const OK_PR_XY := Vector2(503, 381)             # 081's held-OK ring cut
 
+# ---- RENEW negotiation OFFER panel (frame 25_renew, TOTAL level; renew_negotiation_re.md) ----
+# The OFFER panel replaces the identity/stat zone in renew mode. Static chrome = the frame-cut
+# renew_overlay.png (headers/bars/◄►arrows/OFFER label/CLAUSES labels+sliders/CANCEL+OFFER
+# buttons, with the fee/wage/years value cells + clause boxes cleared to resting). The dynamic
+# layer here draws the offered CLUB FEE / YEARLY WAGE / YEARS values + the CLAUSES checkboxes.
+# Every rect frame-measured off 25_renew (native 640x480, +1px window border removed).
+const RENEW_OVERLAY_XY := Vector2(92, 103)       # native draw pos (card-relative 16,45)
+const OFF_MONEY_CX := 252.0
+const OFF_FEE_Y := 125.0
+const OFF_WAGE_Y := 156.0
+const OFF_YEARS_C := Vector2(210, 187)
+const C_YEARS_INK := Color8(80, 110, 5)          # olive digit on the green YEARS bar (frame)
+# stepper hit-rects over the baked ◄/► arrows (wage row y159, years row y191)
+const OFF_WAGE_DN := Rect2(150, 152, 30, 14)
+const OFF_WAGE_UP := Rect2(323, 152, 20, 14)
+const OFF_YEARS_DN := Rect2(148, 184, 30, 14)
+const OFF_YEARS_UP := Rect2(238, 184, 26, 14)
+# CANCEL / OFFER buttons (baked visuals; these are the hit-rects)
+const OFF_CANCEL := Rect2(287, 206, 103, 32)
+const OFF_OFFER := Rect2(404, 206, 143, 32)
+# OFFER clause checkboxes: 11x11 at CB_X, panel y-tops (baked textures blitted per current clause)
+const OFF_CB_YS := [108, 124, 157, 190]
+# The wage stepper increment is un-RE'd (the engine's step granularity was not witnessed): a
+# documented functional placeholder so the offer is adjustable. Years step by 1 (integer term).
+const OFF_WAGE_STEP_WK := 100
+const OFF_YEARS_MIN := 1
+const OFF_YEARS_MAX := 5
+
 # TRANSFER-LISTED state (owner frame 14, 2026-07-23): when the player is on the
 # transfer market the card grows a "PLAYER PLACED ON TRANSFER MARKET" banner in the
 # card-white strip between the CONTRACT/CLAUSES block and the RENEW/TRANSFER/SACK/OK
@@ -153,10 +184,23 @@ var _yearly := 0
 var _years := 0
 var _left := 0
 
+# RENEW negotiation (TOTAL-level manual renewal) state.
+var _renew := false
+var _renew_overlay: Texture2D
+var _check_on: Texture2D
+var _check_off: Texture2D
+var _offer_weekly := 0      # the offered weekly wage (stepped)
+var _offer_years := 0       # the offered contract length (stepped)
+var _cur_weekly := 0        # his current weekly (offer floor)
+var _demand_weekly := 0     # the wage he wants (for the caller's accept/reject)
+
 
 func _ready() -> void:
 	_chrome = load("res://art/screens/ficha/chrome.png")
 	_ok_pr = load("res://art/screens/ficha/ok_pr.png")
+	_renew_overlay = load("res://art/screens/ficha/renew_overlay.png")
+	_check_on = load("res://art/screens/ficha/renew_check_on.png")
+	_check_off = load("res://art/screens/ficha/renew_check_off.png")
 	_star_full = load("res://art/screens/teamoffer/star_full.png")
 	_star_half = load("res://art/screens/teamoffer/star_half.png")
 	_f8 = PMChrome.font("8")
@@ -188,6 +232,24 @@ func setup(player: Dictionary, club: Dictionary, tier: int = 1, actions_enabled 
 	queue_redraw()
 
 
+## Enter the RENEW OFFER negotiation (the source form witnessed at TOTAL level,
+## renew_negotiation_re.md): the identity/stat zone becomes the OFFER panel. Seeds the offer at
+## his current terms; the ◄/► steppers move the wage/years; OFFER/CANCEL emit the signals.
+func begin_renew(cur_weekly: int, demand_weekly: int, years: int) -> void:
+	_renew = true
+	_cur_weekly = cur_weekly
+	_demand_weekly = demand_weekly
+	_offer_weekly = cur_weekly
+	_offer_years = maxi(OFF_YEARS_MIN, years)
+	_press = ""
+	queue_redraw()
+
+func end_renew() -> void:
+	_renew = false
+	_press = ""
+	queue_redraw()
+
+
 # ---- input ---------------------------------------------------------------
 
 func _scale() -> float:
@@ -198,6 +260,22 @@ func _to_design(pt: Vector2) -> Vector2:
 	return (pt - Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5)) / s
 
 func _hit(d: Vector2) -> String:
+	if _renew:
+		if OFF_OFFER.has_point(d):
+			return "offer"
+		if OFF_CANCEL.has_point(d):
+			return "cancel"
+		if OFF_WAGE_UP.has_point(d):
+			return "wage_up"
+		if OFF_WAGE_DN.has_point(d):
+			return "wage_dn"
+		if OFF_YEARS_UP.has_point(d):
+			return "years_up"
+		if OFF_YEARS_DN.has_point(d):
+			return "years_dn"
+		if (BTN["ok"] as Rect2).has_point(d):
+			return "ok"
+		return ""
 	if (BTN["ok"] as Rect2).has_point(d):
 		return "ok"
 	if _actions:
@@ -210,6 +288,9 @@ func _on_input(e: InputEvent) -> void:
 	if not (e is InputEventMouseButton or e is InputEventScreenTouch):
 		return
 	var d := _to_design(e.position)
+	if _renew:
+		_renew_input(e, d)
+		return
 	if e.pressed:
 		_down = true
 		_press = _hit(d)
@@ -232,6 +313,34 @@ func _on_input(e: InputEvent) -> void:
 			_: back_pressed.emit()
 		return
 	back_pressed.emit()
+
+
+## RENEW OFFER form input: the ◄/► steppers fire on PRESS (repeatable); OFFER/CANCEL/OK act on
+## release. A tap on empty card space is inert here (unlike the plain card) so a stray tap can't
+## silently abandon the negotiation.
+func _renew_input(e: InputEvent, d: Vector2) -> void:
+	var h := _hit(d)
+	if e.pressed:
+		_down = true
+		_press = h
+		match h:
+			"wage_up": _offer_weekly += OFF_WAGE_STEP_WK
+			"wage_dn": _offer_weekly = maxi(_cur_weekly, _offer_weekly - OFF_WAGE_STEP_WK)
+			"years_up": _offer_years = mini(OFF_YEARS_MAX, _offer_years + 1)
+			"years_dn": _offer_years = maxi(OFF_YEARS_MIN, _offer_years - 1)
+		queue_redraw()
+		return
+	if not _down:
+		return
+	_down = false
+	var was := _press
+	_press = ""
+	queue_redraw()
+	if was != "" and _hit(d) == was:
+		match was:
+			"offer": offer_made.emit(_offer_weekly, _offer_years)
+			"cancel": renew_cancelled.emit()
+			"ok": back_pressed.emit()
 
 
 # ---- derived values --------------------------------------------------------
@@ -296,8 +405,11 @@ func _draw() -> void:
 		draw_texture(_chrome, CARD_POS)
 
 	_draw_header()
-	_draw_identity()
-	_draw_stats()
+	if _renew:
+		_draw_offer()
+	else:
+		_draw_identity()
+		_draw_stats()
 	_draw_contract()
 	_draw_clauses()
 	_draw_buttons()
@@ -311,6 +423,9 @@ func _draw_header() -> void:
 		draw_texture_rect(face, PHOTO_RECT, false)
 	# single-struck PROMAN12 — the face's natural weight IS the frame's bold look
 	_txt(_f12, NAME_XY.x, NAME_XY.y, PMChrome.card_name(_p), C_WHITE, 13)
+	# The POSITION word sits in the identity zone the OFFER panel replaces -> hide it in renew mode.
+	if _renew:
+		return
 	var word := str(POS_WORD.get(str(_p.get("pos", "")), ""))
 	if word == "" and _p.get("isGK", false):
 		word = "GOALKEEPER"
@@ -387,6 +502,29 @@ func _draw_stats() -> void:
 		if halves % 2 == 1:
 			draw_texture(_star_half, Vector2(STAR_X0 + STAR_PITCH * (halves / 2), y + 1))
 		_ctxt(_f8, SKILL_VAL_CX, y, str(v), C_BLACK, 11)
+
+
+## The RENEW OFFER panel: the baked overlay chrome + the dynamic offered figures
+## (CLUB FEE / YEARLY WAGE / YEARS) and the CLAUSES checkboxes (his current clauses; the
+## clause-negotiation economics are un-RE'd, so the boxes reflect, they don't re-negotiate).
+func _draw_offer() -> void:
+	if _renew_overlay != null:
+		draw_texture(_renew_overlay, RENEW_OVERLAY_XY)
+	_ctxt(_f8, OFF_MONEY_CX, OFF_FEE_Y, "£%s" % _money(_fee), C_GOLD, 11)
+	_ctxt(_f8, OFF_MONEY_CX, OFF_WAGE_Y, "£%s" % _money(Contract.yearly(_offer_weekly)), C_WAGE, 11)
+	_ctxt(_f8, OFF_YEARS_C.x, OFF_YEARS_C.y, str(_offer_years), C_YEARS_INK, 11)
+	var on := _clauses()
+	for i in 4:
+		var tex: Texture2D = _check_on if on.has(i) else _check_off
+		if tex != null:
+			draw_texture(tex, Vector2(CB_X, OFF_CB_YS[i]))
+	# the bottom RENEW button stays ringed while the OFFER form is up (frame 25)
+	draw_rect((BTN["renew"] as Rect2).grow(2.0), C_RING, false, 2.0)
+	# press feedback on the OFFER / CANCEL buttons (red ring, card doctrine)
+	if _press == "offer":
+		draw_rect(OFF_OFFER.grow(1.0), C_RING, false, 2.0)
+	elif _press == "cancel":
+		draw_rect(OFF_CANCEL.grow(1.0), C_RING, false, 2.0)
 
 
 func _draw_contract() -> void:
