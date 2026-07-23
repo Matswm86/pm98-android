@@ -77,6 +77,11 @@ const C_EXPIRE_BG := Color8(255, 255, 170)
 const C_CELL_BG := Color8(240, 240, 240)
 const C_CELL_BRD := Color8(128, 128, 128)
 const C_PRESS := Color8(255, 0, 0)        # baked-button press ring
+# Transfer-listed tag: gold bar + white "MARKET" in the name column (frame 15 McClair,
+# gold RGB 212,159,0 measured; design x 162..218 mapped off the AV/N reference columns).
+const C_MARKET_BG := Color8(212, 159, 0)
+const MARKET_TAG_X := 162
+const MARKET_TAG_W := 56
 
 const AVG_KEYS := ["VE", "RE", "AG", "CA", "RM", "RG", "PA", "TI"]
 const SECTION_LABELS := {
@@ -103,6 +108,7 @@ var _youth_enabled := false
 var _press := ""
 var _down := false  # a press was seen; release without it is the emulated-mouse twin
 var _rows: Array = []
+var _listed: Dictionary = {}              # pid:int -> true, the manager's transfer-listed players
 var _header: Dictionary = {}
 var _dimmed := false
 
@@ -121,13 +127,14 @@ func _ready() -> void:
 
 
 func setup(club: Dictionary, manager: String = "", _cash: String = "", youth_enabled := false,
-		season: String = "1997-98", week: int = 0, tier: int = 1) -> void:
+		season: String = "1997-98", week: int = 0, tier: int = 1, listed: Dictionary = {}) -> void:
 	_club = club
 	_manager = manager
 	_youth_enabled = youth_enabled
 	_season = season
 	_week = week
 	_tier = tier
+	_listed = listed
 	_band = TransferMarket.stature_of(club.get("players", []), tier)
 	_nos_ok = _squad_numbers_individuated()
 	# Shared silver header (LineupScreen precedent): manager plaque top, club
@@ -357,6 +364,11 @@ func _row(y: int, p: Dictionary, _key: String, row_h: int) -> void:
 	_txt(_f10, NAME_X, ty, str(p.get("name", "?")).substr(0, 24), Color.BLACK, 11)
 	if st["state"] != "FIT":
 		_txt(_f8, CELL_AV[0] - 52, ty, "%s %dw" % [st["state"], int(st["weeks"])], st["colour"], 10)
+	# Transfer-listed: the original's gold "MARKET" tag in the name column (frame 15).
+	if _listed.has(int(p.get("id", -1))):
+		draw_rect(Rect2(MARKET_TAG_X, y, MARKET_TAG_W, row_h - 2), PMChrome.dim_col(C_MARKET_BG), true)
+		var mw: float = _f10.get_string_size("MARKET", HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x
+		_txt(_f10, int(MARKET_TAG_X + (MARKET_TAG_W - mw) / 2), ty, "MARKET", Color.WHITE, 10)
 
 	# AV = real rating (FUN_00581e60) with form, else _avg_of for a bare GameDB club.
 	var has_form := p.has("morale") or p.has("fitness")

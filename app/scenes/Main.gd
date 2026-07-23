@@ -900,20 +900,29 @@ func _playeract_shot() -> void:
 		listed_before, listed_after,
 		"FIRED" if listed_before != listed_after else "DEAD -- tap did nothing"])
 
-	# --- OWNER STEP 4: tap RENEW (mutates contract_years on accept, logs on reject) ---
+	# --- OWNER STEP 4: RENEW is now a negotiation -- tap RENEW opens the pick-an-offer overlay,
+	# then a row pick applies the deal (original behaviour: hold/meet/better, may be rejected). ---
 	fi = _first_of(PlayerInfoScreen)
 	if fi != null:
 		var yrs_before := int(pl.get("contract_years", 0))
-		var news_before := (_career.news_log as Array).size()
+		var wage_before := int(pl.get("wage", 0))
 		var rn: Rect2 = PlayerInfoScreen.BTN["renew"]
 		await _synth_tap(fi, rn.position + rn.size * 0.5)
 		await _settle()
+		var nego: BrowseScreen = _first_of(BrowseScreen)
+		_save_shot(dir, "pa_04a_renew_negotiation.png")
+		print("PLAYERACT RENEW negotiation opened: %s" % ("YES" if nego != null else "NO -- overlay did not mount"))
+		if nego != null:
+			# pick row index 1 ("meet his demand"): PANEL y0=50, ROW_H=26 -> y in [76,102).
+			await _synth_tap(nego, Vector2(250, 89))
+			await _settle()
+		fi = _first_of(PlayerInfoScreen)
 		_save_shot(dir, "pa_04_after_renew.png")
 		var yrs_after := int(pl.get("contract_years", 0))
-		var news_after := (_career.news_log as Array).size()
-		print("PLAYERACT RENEW: contract_years %d -> %d, news %d -> %d  (%s)" % [
-			yrs_before, yrs_after, news_before, news_after,
-			"FIRED" if (yrs_before != yrs_after or news_before != news_after) else "DEAD"])
+		var wage_after := int(pl.get("wage", 0))
+		print("PLAYERACT RENEW: contract_years %d -> %d, wage %d -> %d  (%s)" % [
+			yrs_before, yrs_after, wage_before, wage_after,
+			"FIRED" if (yrs_before != yrs_after or wage_before != wage_after) else "DEAD"])
 
 	# --- OWNER STEP 5: BUY path -- transfer desk -> make-offer card -> OFFER -> week roll ---
 	_free_overlays()
@@ -975,6 +984,15 @@ func _playeract_shot() -> void:
 		_career.save()
 		print("PLAYERACT STAFF hire: staff %d->%d  (%s)" % [staff_before, (_career.staff as Array).size(),
 			"FIRED" if (_career.staff as Array).size() > staff_before else "DEAD"])
+	# --- VERIFY: the transfer-listed MARKET tag now shows in the SQUAD list (Schmeichel listed @ pa_03) ---
+	_free_overlays()
+	await _settle()
+	_show_squad_screen()
+	await _settle()
+	var sq: SquadScreen = _first_of(SquadScreen)
+	print("PLAYERACT SQUAD listed-tag: Schmeichel listed=%s (expect true) -> MARKET tag rendered in pa_09" %
+		(_career.is_listed(45) if sq != null else "no-screen"))
+	_save_shot(dir, "pa_09_squad_listed.png")
 	print("PLAYERACT-SHOT done")
 	get_tree().quit()
 
@@ -1198,7 +1216,9 @@ func _open_squad(club: Dictionary, manager: String, cash: String, youth_enabled 
 	var scr: SquadScreen = load("res://scenes/SquadScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
-	scr.setup(club, manager, cash, youth_enabled, season, week, _career.tier if _career else 1)
+	# The transfer-listed tag ("MARKET", frame 15) only applies to the manager's OWN squad.
+	var listed: Dictionary = _career.transfer_listed if _career and int(club.get("id", -1)) == _career.club_id else {}
+	scr.setup(club, manager, cash, youth_enabled, season, week, _career.tier if _career else 1, listed)
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
 	scr.youth_pressed.connect(_show_youth_screen)
 	scr.player_pressed.connect(func(p: Dictionary) -> void: _open_player_info(p, club, scr))
@@ -1265,13 +1285,11 @@ func _open_player_info(player: Dictionary, club: Dictionary, host: Control = nul
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
 	if not own:
 		return
-	# RENEW: agree a new deal at his wage demand (his term resets); refresh the card in place.
+	# RENEW: the original's negotiation -- hold his terms, meet his demand, or better it; he
+	# can REJECT a lowball (contract_re.md). Opens the pick-an-offer overlay over the card.
 	scr.renew_requested.connect(func(_p: Dictionary) -> void:
 		AudioManager.ui_select()
-		var res := _career.renew(pid)
-		_career.save()
-		scr.setup(player, club, tier, true, _career.is_listed(pid))
-		_toast(str(res.get("msg", ""))))
+		_open_renew_negotiation(player, pid, club, tier, scr))
 	# TRANSFER: place him on (or off) the transfer market -- "PLAYER PLACED ON TRANSFER MARKET".
 	scr.transfer_requested.connect(func(_p: Dictionary) -> void:
 		AudioManager.ui_select()
@@ -1279,6 +1297,7 @@ func _open_player_info(player: Dictionary, club: Dictionary, host: Control = nul
 		_career.save()
 		var listed := _career.is_listed(pid)
 		scr.setup(player, club, tier, true, listed)
+		_refresh_squad_overlay()   # the SQUAD list behind the card now shows/hides the MARKET tag
 		_toast("%s placed on the transfer market." % player.get("name", "?") if listed
 			else "%s removed from the transfer list." % player.get("name", "?")))
 	# SACK: terminate his contract (compensation paid); he leaves, so close the card + refresh.
@@ -1290,6 +1309,42 @@ func _open_player_info(player: Dictionary, club: Dictionary, host: Control = nul
 			scr.queue_free()
 			_refresh_squad_overlay()
 		_toast(str(res.get("msg", ""))))
+
+## The RENEW negotiation opened from the FICHA (the original is a negotiation, not a silent
+## reset -- contract_re.md): hold his current terms (a lowball he may refuse), meet his demand,
+## or better it. A self-contained pick-an-offer overlay over the card (interim chrome, the
+## sanctioned surface for this connective flow); a pick applies Career.renew, refreshes the
+## FICHA (YEARS/WAGE update) + the SQUAD behind it, and toasts accepted/rejected.
+func _open_renew_negotiation(player: Dictionary, pid: int, club: Dictionary, tier: int,
+		scr: PlayerInfoScreen) -> void:
+	var band := _career.my_band()
+	var weekly := Contract.current_weekly(player, band)
+	var demand := Contract.demanded_weekly(player, band)
+	var opts := Contract.renewal_options(player, band)
+	var rows: Array = []
+	for opt in opts:
+		rows.append("%-22s  £%s/wk  %dy" % [
+			str(opt["label"]), _fmt_int(int(opt["weekly"])), int(opt["years"])])
+	var close_overlay := func() -> void:
+		if _browse != null and is_instance_valid(_browse):
+			_browse.queue_free()
+		_browse = null
+		if _hub != null and is_instance_valid(_hub):
+			_hub.visible = true
+	_mount_browse("RENEW %s" % PMChrome.title_case_name(str(player.get("name", "?"))),
+		"On £%s/wk  -  he wants £%s/wk  -  pick an offer" % [_fmt_int(weekly), _fmt_int(demand)],
+		rows,
+		func(i: int) -> void:
+			if i < 0 or i >= opts.size():
+				return
+			var res := _career.renew(pid, int(opts[i]["weekly"]))
+			_career.save()
+			close_overlay.call()
+			if is_instance_valid(scr):
+				scr.setup(player, club, tier, true, _career.is_listed(pid))
+			_refresh_squad_overlay()
+			_toast(str(res.get("msg", ""))),
+		close_overlay)
 
 ## Reversed LEAGUE TABLES overlay for any standings array (career or a SeasonSim table).
 ## RETURN dismisses; tapping a club row raises that club's DATA BASE squad (the managed
@@ -2464,7 +2519,7 @@ func _refresh_squad_overlay() -> void:
 	for c in get_children():
 		if c is SquadScreen:
 			(c as SquadScreen).setup(_mgr_club(), "", "£%s" % _fmt_int(_career.cash), true,
-				_career.season, _career.week + 1, _career.tier)
+				_career.season, _career.week + 1, _career.tier, _career.transfer_listed)
 
 ## The STAFF (EMPLE) screen on the hub's staff icon: hire/sack the backroom team (a TRAINER
 ## speeds development, a PHYSIO cuts injuries, a YOUTH COACH improves the academy -- Staff.gd),
