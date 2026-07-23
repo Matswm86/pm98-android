@@ -20,15 +20,17 @@ func _run() -> void:
 	get_root().size = Vector2i(640, 480)
 
 	var club := _synth_club()
-	# One injury per section, spanning the ordinary and serious tiers.
-	club["players"][0]["injured_weeks"] = 2       # GK
-	club["players"][0]["injury_type"] = 17        # broken leg (serious)
-	club["players"][3]["injured_weeks"] = 3       # DF
-	club["players"][3]["injury_type"] = 13        # dislocated shoulder (serious)
-	club["players"][8]["injured_weeks"] = 1       # MF
-	club["players"][8]["injury_type"] = 9         # groin strain (ordinary)
-	club["players"][12]["injured_weeks"] = 1      # FW
-	club["players"][12]["injury_type"] = 2        # pulled muscle (ordinary)
+	# One injury per section, spanning the ordinary and serious tiers. Durations
+	# are ROLLED from the binary model (Availability._injury_weeks) so the Week
+	# column shows the game's real per-type spans (broken leg = season-ending,
+	# dead-leg/groin short) instead of a hand-picked number.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 20260723
+	for pair in [[0, 17], [3, 13], [8, 9], [12, 2]]:
+		var idx: int = pair[0]
+		var ti: int = pair[1]
+		club["players"][idx]["injury_type"] = ti
+		club["players"][idx]["injured_weeks"] = Availability._injury_weeks(rng, ti)
 	var physio := {"id": 800001, "role": Staff.PHYSIO, "name": "P. Gelbier", "quality": 5,
 		"wage": Staff.wage_for(Staff.PHYSIO, 5)}
 

@@ -47,6 +47,18 @@ const INJURY_TYPES := [
 # (templates @ 0x662afc / 0x662b24).
 const SERIOUS_MIN := 11
 
+# Match-injury diagnosis distribution -- MANAGER.EXE roll_B @0x585210, the exact
+# rand(100) compare ladder (virus/cold are excluded here: those two are the
+# WEEKLY-illness roll_A @0x5850b0, a separate mechanic the app doesn't model).
+# Each row is [threshold_exclusive, type_index]: rand(0..99) picks the first row
+# whose threshold it falls under; the 98/99 tail maps to slipped disc / broken leg
+# (binary: cmp 0x63; sbb eax,eax; add eax,0x11). Verified to sum to 100%.
+const MATCH_INJURY_CDF := [
+	[0x19, 2], [0x23, 3], [0x2d, 4], [0x35, 5], [0x3d, 6], [0x45, 7],
+	[0x4a, 8], [0x4b, 9], [0x50, 10], [0x55, 11], [0x57, 12], [0x5c, 13],
+	[0x61, 14], [0x62, 15],
+]
+
 # Per featured player, per match (probabilities, not permil -- rolled with randf).
 const INJ_CHANCE := 0.018      # ~0.2 injuries / match across an XI (~1 every 5)
 const RED_CHANCE := 0.004      # ~1 sending-off a season for a side
@@ -123,8 +135,10 @@ static func roll_match(rng: RandomNumberGenerator, featured: Array, injury_mult 
 	var inj_chance := INJ_CHANCE * injury_mult
 	for p in featured:
 		if rng.randf() < inj_chance:
-			var wk := _injury_weeks(rng)
-			var ti := _pick_injury_type(rng, wk)
+			# The game rolls the diagnosis first, then its per-type duration
+			# (MANAGER.EXE apply_match_injury @0x584c00 -> roll_B -> setter).
+			var ti := _roll_match_injury_type(rng)
+			var wk := _injury_weeks(rng, ti)
 			p["injured_weeks"] = maxi(int(p.get("injured_weeks", 0)), wk)
 			p["injury_type"] = ti
 			news.append({"kind": "injury", "type": ti,
@@ -167,15 +181,15 @@ static func injury_type_name(p: Dictionary) -> String:
 	var ti := int(p["injury_type"])
 	return INJURY_TYPES[ti] if ti >= 0 and ti < INJURY_TYPES.size() else ""
 
-## Pick a diagnosis for a knock of `wk` weeks. Longer knocks draw from the game's
-## serious tier (indices SERIOUS_MIN..), short ones from the ordinary tier -- the
-## split is the binary's own is_serious classification (0x584e20); the exact
-## per-type roll table is DAT.PKF-driven and not yet decoded, so within a tier the
-## choice is uniform.
-static func _pick_injury_type(rng: RandomNumberGenerator, wk: int) -> int:
-	if wk >= 3:
-		return rng.randi_range(SERIOUS_MIN, INJURY_TYPES.size() - 1)
-	return rng.randi_range(0, SERIOUS_MIN - 1)
+## Roll a match-injury diagnosis, MANAGER.EXE roll_B @0x585210: rand(0..99) mapped
+## through the exact compare ladder (MATCH_INJURY_CDF). No invention -- this is the
+## game's own per-type probability table (virus/cold excluded from match injuries).
+static func _roll_match_injury_type(rng: RandomNumberGenerator) -> int:
+	var r := rng.randi_range(0, 99)
+	for row in MATCH_INJURY_CDF:
+		if r < int(row[0]):
+			return int(row[1])
+	return 16 if r < 0x63 else 17
 
 ## Injury news line, using MANAGER.EXE's exact wording: serious diagnoses get the
 ## "is badly injured" tier (0x662bc0 / 0x662c04), ordinary ones the "will be out"
@@ -191,18 +205,31 @@ static func _injury_news(nm: String, wk: int, ti: int) -> String:
 	return "%s will be out for the next %d weeks with a %s." % [nm, wk, t]
 
 
-## Injury length in weeks, weighted short (most knocks are a week or two).
-static func _injury_weeks(rng: RandomNumberGenerator) -> int:
-	var r := rng.randf()
-	if r < 0.45:
-		return 1
-	if r < 0.75:
-		return 2
-	if r < 0.90:
-		return 3
-	if r < 0.97:
-		return 4
-	return 5 + (1 if rng.randf() < 0.5 else 0)
+## Injury length in weeks for diagnosis `ti` -- MANAGER.EXE injury setter @0x584e70.
+## The game rolls four weighted coins (75/50/25/12%) then feeds them to a per-type
+## duration jump table (@0x585048); each `match` arm is that type's exact formula,
+## transcribed byte-for-byte (see docs/re/injury_model_re.md). All four coins are
+## rolled every time, as in the binary, so the RNG draw count matches.
+static func _injury_weeks(rng: RandomNumberGenerator, ti: int) -> int:
+	var a := 1 if rng.randi_range(0, 99) < 75 else 0
+	var b := 1 if rng.randi_range(0, 99) < 50 else 0
+	var c := 1 if rng.randi_range(0, 99) < 25 else 0
+	var d := 1 if rng.randi_range(0, 99) < 12 else 0
+	match ti:
+		3: return 1                        # dead leg
+		9: return 2                        # groin strain
+		0, 1, 2, 8: return b + 1           # virus/cold/pulled muscle/sprained wrist
+		4, 7, 10: return b + 2             # hamstring/dislocated finger/broken nose
+		5: return b + 3                    # sprained ankle
+		6: return d + c + b + 5            # dislocated wrist
+		11: return c + b + 3               # broken toe
+		12: return (c + b + 9) * 2         # broken cheekbone
+		13: return c + b + 6               # dislocated shoulder
+		14: return (c + b) * 2 + d + 5     # fractured rib
+		15: return (c + b) * 2 + d + 25    # shin splints injury
+		16: return (d + c + a + b + 10) * 2  # slipped disc
+		17: return (c + b + 20) * 2 + d    # broken leg
+	return b + 1
 
 ## Ban length for a red: mostly 1, occasionally 2-3 (violent conduct).
 static func _red_weeks(rng: RandomNumberGenerator) -> int:

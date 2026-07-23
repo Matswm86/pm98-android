@@ -51,11 +51,14 @@ injury-name pointer array at **VA 0x6622e8** (18 entries, native index order):
   one-week @0x662bc0); ordinary `%s will be out for the next %u weeks with a %s.`
   (@0x662b24, one-week @0x662afc). Feed line `%s, (%s), is out for %u week%s with a %s.`
   (@0x662990).
-- **Still data-driven (DAT.PKF), not yet decoded**: the exact per-type roll
-  distribution and duration table, and the insurance premium/payout economy
-  (`INSUR.`/`PRICE`/`COST` columns). `Availability` draws the tier from the
-  binary's own serious split and the duration from its existing weighting; within
-  a tier the diagnosis is uniform. This is the one remaining precision item.
+- **Roll distribution + duration table — CLOSED 2026-07-23** (`injury_model_re.md`):
+  the per-type probability ladder (roll_B @0x585210) and the per-type duration
+  jump-table (setter @0x584e70 / @0x585048) are now lifted binary-exact into
+  `Availability.MATCH_INJURY_CDF` + `_injury_weeks(rng, ti)`. NOT DAT.PKF-driven —
+  the tables are static code in MANAGER.EXE. The old invented short-weighting +
+  uniform-within-tier pick are gone.
+- **Still open**: the insurance premium/payout economy (`INSUR.`/`PRICE`/`COST`
+  columns) and the weekly-illness path (virus/cold, roll_A) — flagged, not faked.
 
 Injuries are rolled for the **manager's club only** (`Availability.gd` scope),
 so the list is exactly that squad. **Suspensions are not injuries** and are

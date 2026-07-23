@@ -18,6 +18,7 @@ func _run() -> bool:
 	ok = _unit_queries() and ok
 	ok = _unit_tick() and ok
 	ok = _unit_roll_and_bans() and ok
+	ok = _unit_injury_model() and ok
 	ok = _unit_reset() and ok
 	ok = _career_integration() and ok
 	print("\n%s" % ("ALL PASS" if ok else "FAILURES ABOVE"))
@@ -161,6 +162,75 @@ func _unit_roll_and_bans() -> bool:
 			q["suspended_weeks"] = 0
 			q["yellows"] = Availability.YELLOWS_FOR_BAN - 1
 	ok = _assert(banned, "accumulating %d bookings forces a ban" % Availability.YELLOWS_FOR_BAN) and ok
+	return ok
+
+
+# ---- unit: binary-exact injury model -------------------------------------
+# Locks the type distribution + per-type duration table to MANAGER.EXE
+# (roll_B @0x585210 + setter @0x584e70). If a future edit drifts from the
+# binary, these asserts fail. Bounds mirror tools/re/injury_model.py.
+
+func _unit_injury_model() -> bool:
+	var ok := true
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 424242
+
+	# 1) Match injuries never roll virus(0)/cold(1); every draw lands in the
+	#    roll_B set {2..17}; each type actually occurs over enough draws.
+	var seen := {}
+	var valid := true
+	for _i in 20000:
+		var ti := Availability._roll_match_injury_type(rng)
+		if ti < 2 or ti > 17:
+			valid = false
+		seen[ti] = int(seen.get(ti, 0)) + 1
+	ok = _assert(valid, "match injury type always in roll_B set {2..17}") and ok
+	var all_present := true
+	for t in range(2, 18):
+		if not seen.has(t):
+			all_present = false
+	ok = _assert(all_present, "every roll_B diagnosis (2..17) occurs") and ok
+	# Pulled muscle (25%) is the modal match injury per the binary ladder.
+	var modal := 2
+	for t in seen:
+		if int(seen[t]) > int(seen[modal]):
+			modal = int(t)
+	ok = _assert(modal == 2, "pulled muscle is the most common match injury") and ok
+
+	# 2) Per-type duration bounds are exactly the binary jump-table range.
+	#    {type: [min_weeks, max_weeks]} from tools/re/injury_model.py.
+	var bounds := {
+		2: [1, 2], 3: [1, 1], 4: [2, 3], 5: [3, 4], 6: [5, 8], 7: [2, 3],
+		8: [1, 2], 9: [2, 2], 10: [2, 3], 11: [3, 5], 12: [18, 22],
+		13: [6, 8], 14: [5, 10], 15: [25, 30], 16: [20, 28], 17: [40, 45],
+	}
+	var dur_ok := true
+	for ti in bounds:
+		var lo: int = bounds[ti][0]
+		var hi: int = bounds[ti][1]
+		var saw_lo := false
+		var saw_hi := false
+		for _j in 4000:
+			var w := Availability._injury_weeks(rng, int(ti))
+			if w < lo or w > hi:
+				dur_ok = false
+			if w == lo:
+				saw_lo = true
+			if w == hi:
+				saw_hi = true
+		# both extremes must be reachable (proves the coin formula, not a constant)
+		if not (saw_lo and saw_hi):
+			dur_ok = false
+	ok = _assert(dur_ok, "per-type injury duration matches the binary jump table") and ok
+	# Spot-check the two anchors a player will notice: dead leg is always 1 week,
+	# a broken leg is season-ending (40..45 weeks).
+	var dead_leg_const := true
+	for _k in 500:
+		if Availability._injury_weeks(rng, 3) != 1:
+			dead_leg_const = false
+	ok = _assert(dead_leg_const, "dead leg is exactly 1 week (binary)") and ok
+	var broken := Availability._injury_weeks(rng, 17)
+	ok = _assert(broken >= 40 and broken <= 45, "broken leg is 40..45 weeks (binary)") and ok
 	return ok
 
 
