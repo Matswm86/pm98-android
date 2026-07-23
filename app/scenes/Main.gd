@@ -65,7 +65,8 @@ func _ready() -> void:
 			and not OS.has_environment("PM98_YOUTH_SHOT") and not OS.has_environment("PM98_STAFF_SHOT") \
 			and not OS.has_environment("PM98_CONTRACT_SHOT") and not OS.has_environment("PM98_SCREENS_SHOT") \
 			and not OS.has_environment("PM98_MANAGER_SHOT") and not OS.has_environment("PM98_FICHA_SHOT") \
-			and not OS.has_environment("PM98_MATCHOPTS_SHOT") and not OS.has_environment("PM98_PLAYERACT_SHOT"):
+			and not OS.has_environment("PM98_MATCHOPTS_SHOT") and not OS.has_environment("PM98_PLAYERACT_SHOT") \
+			and not OS.has_environment("PM98_GROUNDACT_SHOT"):
 		_devshot()
 
 
@@ -760,6 +761,35 @@ func _groundact_shot() -> void:
 		"FIRED" if after > before else "DEAD -- tap did nothing"])
 	print("GROUNDACT works_total = £%d (expect 2,975,000)" % _career.works_total())
 	_save_shot(dir, "ga_02_after_buy_ledger.png")
+
+	# MATCH DAY (owner frame 06): the button was inert; now it opens the ticket-price / sponsor
+	# -board sub-view. Drive it end-to-end: open it, step both prices, take the board offer.
+	# The carpark tick re-mounted the GROUND screen, so re-acquire the live instance.
+	st = _first_of(StadiumScreen)
+	if st == null:
+		print("GROUNDACT FAIL: GROUND screen gone after carpark tick")
+		get_tree().quit()
+		return
+	_tap_screen(st, StadiumScreen.BTN_MATCHDAY.get_center())
+	await _settle()
+	print("GROUNDACT MATCH DAY: view=%s (expect matchday)" % st._view)
+	_save_shot(dir, "ga_03_matchday.png")
+	var tk0 := _career.ticket_price
+	_tap_screen(st, StadiumScreen.MD_TICKET_UP.get_center())
+	await _settle()
+	print("GROUNDACT ticket step: %d -> %d (%s)" % [tk0, _career.ticket_price,
+		"FIRED" if _career.ticket_price != tk0 else "DEAD"])
+	var bd0 := _career.board_price
+	_tap_screen(st, StadiumScreen.MD_BOARD_UP.get_center())
+	await _settle()
+	print("GROUNDACT board step: %d -> %d (%s)" % [bd0, _career.board_price,
+		"FIRED" if _career.board_price != bd0 else "DEAD"])
+	var cash0 := _career.cash
+	_tap_screen(st, StadiumScreen.MD_ACCEPT.get_center())
+	await _settle()
+	print("GROUNDACT board sale: cash +£%d, sold=%s (expect +1,120,000 / true)" % [
+		_career.cash - cash0, _career.boards_sold_season])
+	_save_shot(dir, "ga_04_matchday_sold.png")
 	print("GROUNDACT-SHOT done")
 	get_tree().quit()
 
@@ -2571,6 +2601,22 @@ func _cycle(ladder: Array, current: int) -> int:
 			return int(v)
 	return int(ladder[0])
 
+## Step a price ladder by one rung (GROUND MATCH DAY arrows: right = up, left = down). Clamps
+## at the ends (no wrap) so the two arrows read as +/- on the same ladder the PRICES screen
+## cycles. Off-ladder `current` snaps to the nearest rung in the step direction.
+func _step_price(ladder: Array, current: int, up: bool) -> int:
+	if ladder.is_empty():
+		return current
+	if up:
+		for v in ladder:
+			if int(v) > current:
+				return int(v)
+		return int(ladder[ladder.size() - 1])
+	for i in range(ladder.size() - 1, -1, -1):
+		if int(ladder[i]) < current:
+			return int(ladder[i])
+	return int(ladder[0])
+
 ## The original-art TRANSFER MARKET (FICHAR) screen as a full-screen overlay: the
 ## buyable players (dearest first) in the reversed list panel + the right-hand nav
 ## column, at the coordinates reversed from MANAGER.EXE (docs/re/transfer_screen_re.md).
@@ -2952,7 +2998,46 @@ func _show_stadium_screen() -> void:
 		_career.ground_grades, _career.works_total())
 	scr.improve_selected.connect(_on_stadium_improve)
 	scr.works_requested.connect(_on_stadium_works)
+	# GROUND MATCH DAY sub-view (owner frame 06): the TICKET PRICE / PRICE OF BOARD steppers
+	# drive the SAME board prices as FINANCE -> PRICES; the sponsor-board season offer + ACCEPT
+	# credit the witnessed lump sum. Refreshed in place (no re-mount) so stepping stays on screen.
+	_refresh_matchday(scr, club)
+	scr.matchday_ticket_step.connect(func(up: bool) -> void:
+		var pv := _career.finance_preview()
+		_career.set_ticket_price(_step_price(TICKET_LADDER, int(pv["ticket"]), up))
+		_career.save()
+		_refresh_matchday(scr, _mgr_club()))
+	scr.matchday_board_step.connect(func(up: bool) -> void:
+		var pv := _career.finance_preview()
+		_career.set_board_price(_step_price(_board_ladder(), int(pv["board"]), up))
+		_career.save()
+		_refresh_matchday(scr, _mgr_club()))
+	scr.boards_sold.connect(func() -> void:
+		if _career.sell_sponsor_boards(_board_sale_offer(_mgr_club())):
+			_career.save()
+		_refresh_matchday(scr, _mgr_club()))
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
+
+## Feed the GROUND MATCH DAY sub-view from the live Career model: the board-set ticket / board
+## prices (finance_preview, the authoritative displayed figures), the next home fixture, whether
+## this club is the baked witness (Man Utd -> ticket ground/league + the £1,120,000 offer stay
+## baked), and whether the season's boards are already sold.
+func _refresh_matchday(scr: StadiumScreen, club: Dictionary) -> void:
+	if not is_instance_valid(scr):
+		return
+	var pv := _career.finance_preview()
+	var opp := _career.next_home_opponent()
+	var away := PMChrome.title_case_name(str(GameDB.club(opp).get("name", ""))) if opp >= 0 else ""
+	scr.set_matchday_state(int(pv["ticket"]), int(pv["board"]),
+		PMChrome.title_case_name(_career.club_name), away,
+		_board_sale_offer(club) > 0, _career.boards_sold_season)
+
+## The witnessed GROUND MATCH DAY sponsor-board season-sale offer. Only Man Utd was captured
+## (frame 06, £1,120,000); the offer is conditional per club in the original (finance_constants
+## prices-screen +0x1e0 flag) and its value is data-driven, so every other club is an honest
+## gap (0 -> the offer block is hidden, ACCEPT inert). Mirrors _carpark_price's witness rule.
+func _board_sale_offer(club: Dictionary) -> int:
+	return 1_120_000 if str(club.get("name", "")).to_lower().contains("manchester utd") else 0
 
 ## The witnessed CAR PARK per-level price. Only Man Utd was captured (frame 09, £2,975,000);
 ## the cost fn is un-RE'd so every other club is an honest gap (0). SEATS proved these prices

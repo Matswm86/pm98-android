@@ -112,6 +112,50 @@ func _run() -> bool:
 	scr._buy_grade("facility", 0, StadiumScreen.FAC_WITNESS.get(0, {}))
 	ok = _assert(picks["req"] == null, "un-witnessed facility = honest gap (no emit)") and ok
 
+	# --- GROUND MATCH DAY (owner frame 06) ---
+	# The MATCH DAY action button opens the sub-view (was inert) from any view.
+	ok = _assert(scr._hit(StadiumScreen.BTN_MATCHDAY.get_center()) == "matchday",
+		"MATCH DAY button hit-tests") and ok
+	scr._view = "matchday"
+	# Witness (Man Utd, not sold): ticket/board arrows + the sponsor-board ACCEPT all live.
+	scr.set_matchday_state(7, 750, "Manchester Utd.", "Southampton", true, false)
+	ok = _assert(scr._hit(StadiumScreen.MD_TICKET_UP.get_center()) == "tkt_up"
+		and scr._hit(StadiumScreen.MD_TICKET_DN.get_center()) == "tkt_dn",
+		"ticket price arrows hit-test") and ok
+	ok = _assert(scr._hit(StadiumScreen.MD_BOARD_UP.get_center()) == "brd_up"
+		and scr._hit(StadiumScreen.MD_BOARD_DN.get_center()) == "brd_dn",
+		"board price arrows hit-test") and ok
+	ok = _assert(scr._hit(StadiumScreen.MD_ACCEPT.get_center()) == "accept",
+		"sponsor-board ACCEPT hit-tests for the witnessed offer") and ok
+	var steps := {"tk": 0, "bd": 0, "sold": false}
+	scr.matchday_ticket_step.connect(func(up: bool) -> void: steps["tk"] = 1 if up else -1)
+	scr.matchday_board_step.connect(func(up: bool) -> void: steps["bd"] = 1 if up else -1)
+	scr.boards_sold.connect(func() -> void: steps["sold"] = true)
+	scr._press = "tkt_up"; scr._on_input(_touch(StadiumScreen.MD_TICKET_UP.get_center(), false))
+	ok = _assert(steps["tk"] == 1, "ticket up arrow emits matchday_ticket_step(true)") and ok
+	scr._press = "accept"; scr._on_input(_touch(StadiumScreen.MD_ACCEPT.get_center(), false))
+	ok = _assert(steps["sold"], "ACCEPT emits boards_sold") and ok
+	# A club with no witnessed offer, or one that has sold, hides ACCEPT (honest gap / inert).
+	scr.set_matchday_state(8, 150, "Southampton", "Manchester Utd.", false, false)
+	ok = _assert(scr._hit(StadiumScreen.MD_ACCEPT.get_center()) == "",
+		"un-witnessed club: ACCEPT inert (no offer)") and ok
+	scr.set_matchday_state(7, 750, "Manchester Utd.", "Southampton", true, true)
+	ok = _assert(scr._hit(StadiumScreen.MD_ACCEPT.get_center()) == "",
+		"already-sold: ACCEPT inert") and ok
+
+	# Career: the season sponsor-board sale credits once, sets the flag, and survives save/load.
+	var md := Career.create(manu, league, prem, leagues)
+	var cash_before := md.cash
+	ok = _assert(md.sell_sponsor_boards(1_120_000)
+		and md.cash == cash_before + 1_120_000 and md.boards_sold_season,
+		"sell_sponsor_boards credits the witnessed lump sum + marks sold") and ok
+	ok = _assert(not md.sell_sponsor_boards(1_120_000),
+		"a second board sale in the same season is refused") and ok
+	ok = _assert(md.next_home_opponent() >= 0, "next home opponent resolves for a fresh career") and ok
+	md.save("user://matchday_test.json")
+	var md2 := Career.load_save("user://matchday_test.json")
+	ok = _assert(md2 != null and md2.boards_sold_season, "boards_sold_season survives save/load") and ok
+
 	if ok:
 		print("ALL PASS")
 	else:
@@ -122,3 +166,13 @@ func _run() -> bool:
 func _assert(cond: bool, msg: String) -> bool:
 	print("  [%s] %s" % ["PASS" if cond else "FAIL", msg])
 	return cond
+
+
+## A screen-touch event at design point `d` (release by default), for the release-path
+## hit that emits the MATCH DAY signals.
+func _touch(d: Vector2, pressed: bool) -> InputEventScreenTouch:
+	var e := InputEventScreenTouch.new()
+	e.index = 0
+	e.position = d
+	e.pressed = pressed
+	return e

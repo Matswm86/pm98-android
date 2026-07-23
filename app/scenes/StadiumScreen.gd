@@ -12,10 +12,11 @@ class_name StadiumScreen
 ## (PMChrome.draw_header) and marble background (PMChrome.draw_bg) render underneath, as on
 ## every other career screen.
 ##
-## The PRIOR build was rejected as invented: it showed a "MATCH DAY" ticket-price stepper and
-## a "SPONSOR BOARDS" price slider and a CAPACITY/CAR PARK/PITCH="NORMAL" readout that appear
-## on NO GROUND-overview frame (ticket price / sponsor boards live on the separate GROUND
-## MATCH DAY sub-screen, run-3 capture). All of it is gone.
+## A PRIOR build put a ticket-price stepper + sponsor slider + a "NORMAL" pitch readout on the
+## GROUND OVERVIEW, where they appear on NO frame; that invention is gone. The ticket price +
+## sponsor boards live on the separate GROUND MATCH DAY sub-screen, now built frame-true from
+## the owner's 2026-07-23 capture (frame 06) as the "matchday" view (see _draw_matchday) and
+## reached by the MATCH DAY action button -- NOT on the overview.
 ##
 ## Only club-specific values are drawn over the baked chrome, from the real Career model:
 ##   - ground name (GameDB club.stadium) in the green header
@@ -37,6 +38,13 @@ signal improve_selected(added: int, cost: int, weeks: int)
 ## Career.begin_work(cat, key, label, cost, weeks, effect). Generalises the SEATS-only
 ## improve_selected to the three unblocked tabs (owner 2026-07-23).
 signal works_requested(cat: String, key: int, label: String, cost: int, weeks: int, effect: Dictionary)
+## MATCH DAY sub-view: a ticket / advertising-board price arrow was tapped. Main cycles the
+## SAME price ladder as FINANCE -> PRICES (up = right arrow) and persists. `up` = increment.
+signal matchday_ticket_step(up: bool)
+signal matchday_board_step(up: bool)
+## MATCH DAY: ACCEPT the sponsor-board season-sale offer. Main credits the witnessed lump sum
+## once and marks the boards sold for the season (the offer then disappears).
+signal boards_sold()
 
 const W := 640
 const H := 480
@@ -177,6 +185,32 @@ const BTN_WORKS := Rect2(484, 407, 132, 25)
 const BTN_MATCHDAY := Rect2(298, 442, 152, 25)
 const BTN_RETURN := Rect2(488, 442, 124, 25)
 
+# ---- MATCH DAY sub-view (owner frame 06, native 640x480) ---------------------------------
+# Reached by the MATCH DAY action button (was inert). The TICKET PRICE + SPONSOR BOARDS
+# steppers set the SAME board prices as FINANCE -> PRICES (Career.set_ticket_price /
+# set_board_price, single price source); the sponsor-board season offer + ACCEPT credit the
+# witnessed lump sum. matchday.png bakes the whole left panel from frame 06 with the HOME/AWAY
+# names + both £ value cells blanked (redrawn here from the live board-set prices); the ticket
+# ground/league + the offer block stay baked (witnessed Man Utd = Old Trafford / Premier
+# League / £1,120,000) and are covered for a non-witnessed club / once the offer is taken.
+const MD_HOME := Rect2(22, 191, 212, 18)         # next-home-fixture home team (centred)
+const MD_AWAY := Rect2(22, 212, 212, 17)         # next-home-fixture away team (centred)
+const MD_TICKET_VAL := Rect2(119, 237, 100, 16)  # TICKET PRICE £ value (between the arrows)
+const MD_BOARD_VAL := Rect2(77, 334, 130, 15)    # PRICE OF BOARD £ value (between the arrows)
+const MD_GROUND := Rect2(22, 153, 234, 14)       # ticket ground name (cover for non-witness)
+const MD_LEAGUE := Rect2(22, 167, 234, 14)       # ticket league name (cover for non-witness)
+const MD_LEAGUE_BAND := Rect2(94, 167, 144, 12)  # the light dither band behind the league name
+const MD_OFFER := Rect2(14, 358, 265, 104)       # offer text + value + ACCEPT (cover to hide)
+const MD_TICKET_DN := Rect2(100, 237, 19, 17)    # ticket price left / decrement arrow
+const MD_TICKET_UP := Rect2(219, 237, 19, 17)    # ticket price right / increment arrow
+const MD_BOARD_DN := Rect2(56, 333, 21, 16)      # board price left / decrement arrow
+const MD_BOARD_UP := Rect2(207, 333, 21, 16)     # board price right / increment arrow
+const MD_ACCEPT := Rect2(88, 423, 104, 23)       # sponsor-board season-sale ACCEPT
+const C_TICKET_INK := Color8(20, 20, 20)         # ticket / board £ value ink (black)
+const C_GROUND_INK := Color8(96, 116, 140)       # ticket ground / league grey ink
+const C_TICKET_TOP := Color8(200, 220, 240)      # ticket top blue (ground / league cover)
+const C_TICKET_BAND := Color8(240, 240, 240)     # league light band cover
+
 # Frame-sampled text colours.
 const C_WHITE := Color8(255, 255, 255)
 const C_BLACK := Color8(0, 0, 0)
@@ -191,13 +225,14 @@ const C_XRED := Color8(210, 0, 0)                # ticked-box red X (frame 175)
 var _chrome: Texture2D
 var _improve: Texture2D
 var _carpark: Texture2D
+var _matchday: Texture2D
 var _svc_icons := {}                             # "chgrooms"/"medical" -> Texture2D
 var _obras: Texture2D                            # works triangle (shared)
 var _scene: Texture2D
 var _f12: Font
 var _f10: Font
 var _f8: Font
-var _view := "works"                             # "works" (ledger) | "improve" (picker)
+var _view := "works"                             # "works" (ledger) | "improve" (picker) | "matchday"
 var _tab := "seats"                              # improve sub-tab: seats|carpark|facilities|services
 var _sel := -1                                   # ticked SEATS offer card (-1 none)
 
@@ -210,6 +245,15 @@ var _grades: Dictionary = {}                     # ground_grades ("cat:key" -> g
 var _total: int = 0                              # TOTAL IMPROVEMENTS
 var _fac_sel: int = 2                            # selected FACILITIES item (default CHANG. ROOMS)
 var _svc_sel: int = 0                            # selected SERVICES item (default MEDICAL)
+
+# MATCH DAY state fed from Career (set_matchday_state). Defaults keep SEATS-only callers /
+# tests unchanged (they never open the matchday view).
+var _mo_ticket: int = 0                           # live board-set match ticket price (£)
+var _mo_board: int = 0                            # live board-set advertising-board price (£)
+var _mo_home: String = ""                         # next home fixture: home side (managed club)
+var _mo_away: String = ""                         # next home fixture: opponent
+var _mo_witness: bool = false                     # club matches the baked frame (Man Utd)
+var _mo_sold: bool = false                         # sponsor boards already sold this season
 
 var _club: String = ""
 var _manager: String = ""
@@ -228,6 +272,7 @@ func _ready() -> void:
 	_chrome = load("res://art/screens/stadium/chrome.png")
 	_improve = load("res://art/screens/stadium/improvements.png")
 	_carpark = load("res://art/screens/stadium/carpark.png")
+	_matchday = load("res://art/screens/stadium/matchday.png")
 	_obras = load("res://art/screens/stadium/obras.png")
 	for k in ["chgrooms", "medical"]:
 		var p := "res://art/screens/stadium/svc_%s.png" % k
@@ -290,6 +335,22 @@ func set_improve_state(car_levels: Array, car_price: int, works: Array, grades: 
 	queue_redraw()
 
 
+## Feed the MATCH DAY sub-view: the live board-set ticket / advertising-board prices, the next
+## home fixture (home = managed club, away = opponent), whether this club is the baked witness
+## (Man Utd -> the ticket ground/league + the £1,120,000 sponsor offer stay baked), and whether
+## the season's boards are already sold. Main re-feeds this after each price step / ACCEPT so
+## the panel refreshes in place (no full re-mount, which would bounce back to the ledger).
+func set_matchday_state(ticket: int, board: int, home: String, away: String,
+		witness: bool, sold: bool) -> void:
+	_mo_ticket = maxi(0, ticket)
+	_mo_board = maxi(0, board)
+	_mo_home = home
+	_mo_away = away
+	_mo_witness = witness
+	_mo_sold = sold
+	queue_redraw()
+
+
 ## In-progress work on one (cat,key), or {} if none — for the build markers + the ledger.
 func _work_for(cat: String, key: int) -> Dictionary:
 	for w in _works_list:
@@ -314,15 +375,29 @@ func _grade_rect(g: int) -> Rect2:
 
 
 func _hit(d: Vector2) -> String:
-	# The 2x2 action grid (IMPROVE / WORKS / MATCH DAY / RETURN) is baked in BOTH views:
-	# IMPROVE + WORKS toggle the left panel in-screen (frame-true); RETURN leaves; MATCH DAY
-	# is inert (disabled/washed in the frame). An empty-space tap is a no-op.
+	# The 2x2 action grid (IMPROVE / WORKS / MATCH DAY / RETURN) is baked in every view:
+	# IMPROVE + WORKS toggle the left panel in-screen (frame-true); MATCH DAY opens the
+	# ticket-price / sponsor-board sub-view (owner frame 06); RETURN leaves; empty space no-ops.
 	if BTN_IMPROVE.has_point(d):
 		return "improve"
 	if BTN_WORKS.has_point(d):
 		return "works"
+	if BTN_MATCHDAY.has_point(d):
+		return "matchday"
 	if BTN_RETURN.has_point(d):
 		return "return"
+	if _view == "matchday":
+		if MD_TICKET_DN.has_point(d):
+			return "tkt_dn"
+		if MD_TICKET_UP.has_point(d):
+			return "tkt_up"
+		if MD_BOARD_DN.has_point(d):
+			return "brd_dn"
+		if MD_BOARD_UP.has_point(d):
+			return "brd_up"
+		if _mo_witness and not _mo_sold and MD_ACCEPT.has_point(d):
+			return "accept"
+		return ""
 	if _view != "improve":
 		return ""
 	# category tabs (live in every improve sub-view)
@@ -390,6 +465,19 @@ func _on_input(e: InputEvent) -> void:
 		elif a == "works":
 			_view = "works"
 			queue_redraw()
+		elif a == "matchday":
+			_view = "matchday"
+			queue_redraw()
+		elif a == "tkt_dn":
+			matchday_ticket_step.emit(false)
+		elif a == "tkt_up":
+			matchday_ticket_step.emit(true)
+		elif a == "brd_dn":
+			matchday_board_step.emit(false)
+		elif a == "brd_up":
+			matchday_board_step.emit(true)
+		elif a == "accept":
+			boards_sold.emit()
 		elif a == "return":
 			back_pressed.emit()
 		elif a.begins_with("tab:"):
@@ -528,6 +616,8 @@ func _draw() -> void:
 		# TOTAL IMPROVEMENTS shows the live works sum in the picker too (frames 09/10/12),
 		# overriding the £0 baked into improvements.png.
 		_cell(_f10, R_TOTAL, "£%s" % fmt_int(_total), C_TOTAL_RED, 11, "right")
+	elif _view == "matchday":
+		_draw_matchday()
 	else:
 		# WORK IN PROGRESS ledger (frame 07): several works can run at once, each a row with
 		# its own TO BE PAID / WEEK, summed into TOTAL IMPROVEMENTS. Rows are drawn from the
@@ -539,8 +629,20 @@ func _draw() -> void:
 		draw_rect(BTN_IMPROVE, C_PRESS, true)
 	elif _press == "works":
 		draw_rect(BTN_WORKS, C_PRESS, true)
+	elif _press == "matchday":
+		draw_rect(BTN_MATCHDAY, C_PRESS, true)
 	elif _press == "return":
 		draw_rect(BTN_RETURN, C_PRESS, true)
+	elif _press == "accept":
+		draw_rect(MD_ACCEPT, C_PRESS, true)
+	elif _press == "tkt_dn":
+		draw_rect(MD_TICKET_DN, C_PRESS, true)
+	elif _press == "tkt_up":
+		draw_rect(MD_TICKET_UP, C_PRESS, true)
+	elif _press == "brd_dn":
+		draw_rect(MD_BOARD_DN, C_PRESS, true)
+	elif _press == "brd_up":
+		draw_rect(MD_BOARD_UP, C_PRESS, true)
 	elif _press.begins_with("card"):
 		draw_rect(CARDS[int(_press.substr(4))], C_PRESS, true)
 
@@ -577,6 +679,34 @@ func _ledger_row_y(cat: String, key: int) -> int:
 		"facility": return LEDGER_FAC_Y0 + LEDGER_ROW_PITCH * key
 		"service": return LEDGER_SVC_Y0 + LEDGER_ROW_PITCH * key
 	return -1
+
+
+## MATCH DAY sub-view (frame 06): matchday.png bakes the whole left panel; this fills the
+## blanked HOME/AWAY names + both £ value cells from the live board-set prices, and covers the
+## baked ground/league + sponsor-board offer for a non-witnessed club / a taken offer.
+func _draw_matchday() -> void:
+	if _matchday != null:
+		draw_texture_rect(_matchday, Rect2(0, 0, W, H), false)
+	# Next home fixture on the ticket (blanked in the bake).
+	_cell(_f12, MD_HOME, _mo_home, C_BLACK, 12, "centre")
+	_cell(_f12, MD_AWAY, _mo_away, C_BLACK, 12, "centre")
+	# The board-set TICKET PRICE + PRICE OF BOARD (the SAME prices as FINANCE -> PRICES).
+	_cell(_f12, MD_TICKET_VAL, "£%d" % _mo_ticket, C_TICKET_INK, 12, "centre")
+	_cell(_f10, MD_BOARD_VAL, "£%s" % fmt_int(_mo_board), C_TICKET_INK, 11, "centre")
+	# Ticket ground/league stay baked for the witnessed club (Old Trafford / Premier League);
+	# a non-witnessed club overdraws them from its own Career ground + league.
+	if not _mo_witness:
+		draw_rect(MD_GROUND, C_TICKET_TOP, true)
+		draw_rect(MD_LEAGUE, C_TICKET_TOP, true)
+		draw_rect(MD_LEAGUE_BAND, C_TICKET_BAND, true)
+		_cell(_f10, MD_GROUND, _ground if _ground != "" else _club, C_GROUND_INK, 11, "centre")
+		_cell(_f10, MD_LEAGUE, _league, C_GROUND_INK, 11, "centre")
+	# The sponsor-board season offer + ACCEPT are baked (witnessed Man Utd £1,120,000). A club
+	# with no witnessed offer, or one that has already taken it, hides the block -- honest gap:
+	# the offer is conditional in the original (docs/re/finance_constants.md, prices-screen
+	# +0x1e0 flag), so its absence is faithful, not a stub.
+	if not _mo_witness or _mo_sold:
+		draw_rect(MD_OFFER, C_WHITE, true)
 
 
 ## SEATS offer prices + tick (unchanged behaviour, extracted for the sub-tab dispatch).

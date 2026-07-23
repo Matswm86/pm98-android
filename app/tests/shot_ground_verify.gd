@@ -46,6 +46,7 @@ func _run() -> void:
 		["ground_facilities.png", "improve", "facilities"],
 		["ground_services.png", "improve", "services"],
 		["ground_ledger.png", "works", "seats"],
+		["ground_matchday.png", "matchday", "seats"],
 	]
 	for st in states:
 		var scr: StadiumScreen = load("res://scenes/StadiumScreen.gd").new()
@@ -60,6 +61,7 @@ func _run() -> void:
 			str(manu.get("objective", "")))
 		scr.set_improve_state(career.car_park_levels, 2_975_000, career.works_ledger(),
 			career.ground_grades, career.works_total())
+		scr.set_matchday_state(7, 750, "Manchester Utd.", "Southampton", true, false)
 		scr._view = str(st[1])
 		scr._tab = str(st[2])
 		scr.queue_redraw()

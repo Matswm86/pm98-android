@@ -69,6 +69,7 @@ var car_park_levels: Array = [1, 1, 1, 1]
 var ground_grades: Dictionary = {}
 var ticket_price: int = 0         # board-set match ticket price (0 = tier default)
 var board_price: int = 0          # board-set advertising-board price (0 = tier default)
+var boards_sold_season: bool = false  # GROUND MATCH DAY: sponsor-board season offer taken
 
 # Live transfer state: the division's squads mutate as players move, and persist
 # in the save -- the career, not GameDB, is the source of truth once you're managing.
@@ -2810,6 +2811,7 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	week = 0
 	finished = false
 	season_opened = false   # the week-0 chain (shield card + START OF SEASON) re-runs
+	boards_sold_season = false   # a fresh sponsor-board season offer becomes available again
 	results.clear()
 	# Preseason friendlies were a career-entry pick; season 2+ has no re-pick UI
 	# (un-walked — the walkthrough started one career), so the slate just clears.
@@ -3346,6 +3348,27 @@ func set_board_price(p: int) -> void:
 	_recompute_weekly_net()
 
 
+## The managed club's next unplayed HOME league opponent id, for the GROUND MATCH DAY ticket
+## (the ticket sets the price of a home gate). -1 once no home fixture remains this season.
+func next_home_opponent() -> int:
+	for e in season_fixtures():
+		if int(e["round"]) >= week and not bool(e["played"]) and bool(e["home"]):
+			return int(e["opp_id"])
+	return -1
+
+
+## Take the sponsor-board season-sale offer (GROUND MATCH DAY ACCEPT): credit the witnessed
+## lump sum once and mark the boards sold so the offer disappears for the rest of the season.
+## `amount` is the witnessed per-club offer (Main owns it, honest gap for un-witnessed clubs).
+func sell_sponsor_boards(amount: int) -> bool:
+	if boards_sold_season or amount <= 0:
+		return false
+	cash += amount
+	boards_sold_season = true
+	_news("finance", "The club sells its sponsor boards for the season for £%s." % _grp(amount))
+	return true
+
+
 ## Live finance preview (attendance / season gate / board income) at the current prices,
 ## for the price-control screen so the manager sees the trade-off before committing.
 func finance_preview() -> Dictionary:
@@ -3424,6 +3447,7 @@ func to_dict() -> Dictionary:
 		"stadium_capacity": stadium_capacity, "works": works,
 		"car_park_levels": car_park_levels, "ground_grades": ground_grades,
 		"ticket_price": ticket_price, "board_price": board_price,
+		"boards_sold_season": boards_sold_season,
 		"transfer_listed": listed, "sale_offers": offers,
 		"shortlist": shortlist, "transfer_log": transfer_log,
 		"offers_left": offers_left, "news_log": news_log,
@@ -3538,6 +3562,7 @@ static func from_dict(d: Dictionary) -> Career:
 		c.ground_grades[str(k)] = int(gg[k])
 	c.ticket_price = int(d.get("ticket_price", 0))
 	c.board_price = int(d.get("board_price", 0))
+	c.boards_sold_season = bool(d.get("boards_sold_season", false))
 	c.shortlist = []
 	for v in d.get("shortlist", []):
 		c.shortlist.append(int(v))
