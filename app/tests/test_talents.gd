@@ -44,8 +44,9 @@ func _entry(id: int, legal: String, by: int, club_id, tier: int, debut: int,
 func _unit_math() -> bool:
 	var ok := true
 	var e := _entry(600901, "TEST WONDER", 1982, 1, 1, 1998)
-	# Age on the DB basis: 1998-99 (start 1998) -> 1999 - 1982 = 17.
-	ok = _assert(Talent.age_in_season(e, 1998) == 17, "age basis (b.1982 is 17 in 1998-99)") and ok
+	# Age on the DB basis = season-start year - birthYear (no +1): 1998 - 1982 = 16.
+	# (Witnessed via the FICHA; see Talent.age_in_season.)
+	ok = _assert(Talent.age_in_season(e, 1998) == 16, "age basis (b.1982 is 16 in 1998-99)") and ok
 	# Tier-1 prime CA 94 walked back 4.5/season for 6 seasons short of 23 -> 67.
 	var ca := Talent.intake_ca(e, 17)
 	ok = _assert(ca == 67, "tier-1 intake CA at 17 = 67 (got %d)" % ca) and ok

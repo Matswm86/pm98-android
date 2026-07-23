@@ -447,8 +447,10 @@ def birth_year(row: dict, season_start: int) -> int | None:
         if m:
             return int(m.group(1))
     if row.get("age"):
-        # DB age basis: age = season_start + 1 - birthYear
-        return season_start + 1 - int(float(row["age"]))
+        # DB age basis: age = season_start - birthYear (plain calendar-year subtraction,
+        # witnessed via the FICHA — see Talent.age_in_season / extract_english.py). So the
+        # birthYear that reproduces an FM `age` is season_start - age.
+        return season_start - int(float(row["age"]))
     return None
 
 

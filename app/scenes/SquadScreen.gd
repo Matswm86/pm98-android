@@ -365,7 +365,7 @@ func _row(y: int, p: Dictionary, _key: String, row_h: int) -> void:
 	_txt(_f10, CELL_MO[1] - 5, ty, str(Morale.display(p)) if has_form else "-",
 		C_MO, 11, true)
 	_txt(_f10, CELL_LOAN[0] + 8, ty, "YES" if p.get("on_loan") else "NO", C_LOANC, 11)
-	var wage_y := Contract.yearly(Contract.current_weekly(p, _band))
+	var wage_y := Contract.current_yearly(p, _band)
 	_txt(_f10, CELL_WAGE[1] - 6, ty, "£%s" % _money(wage_y), C_WAGE, 11, true)
 	var left := int(p.get("contract_years", 0))
 	var term: int = maxi(int(p.get("contract_term", 0)), left)

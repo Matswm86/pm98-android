@@ -68,8 +68,10 @@ func _run() -> void:
 	st.size = Vector2(640, 480)
 	get_root().add_child(st)
 	st._ready()
-	# Bolton W is a witnessed-price club (parity/21), so a SEATS card can be ticked.
-	st.setup("Bolton W", "M", "1997-98", "Ground", 20000, 12000, 8000, 740, "", 12, 600, 2, "Premier")
+	# Bolton W is a witnessed-price club (parity/21): the board objective label "Avoid Relegation"
+	# selects the witnessed seat-price tier (2,750,000 / 4,812,499 / 6,875,000), so a SEATS card can
+	# be ticked. Main passes club["objective"] the same way (a real English club carries this label).
+	st.setup("Bolton W", "M", "1997-98", "Ground", 20000, 12000, 8000, 740, "", 12, 600, 2, "Premier", "Avoid Relegation")
 	var st_back := [false]
 	var st_pick := [[]]
 	st.back_pressed.connect(func() -> void: st_back[0] = true)

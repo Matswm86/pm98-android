@@ -470,7 +470,12 @@ def parse_club(d: bytes, off: int, end: int, archive: set[int] | None = None):
                 "name": display,
                 "legalName": legal,
                 "birthYear": year,
-                "age": 1998 - year,
+                # Age = SEASON-START year - birthYear (1997 for the 97-98 DB), NOT +1:
+                # the original displays McClair (b.1963) as 34 on the FICHA (owner frame
+                # 13, 2026-07-23) and this makes the fee/wage age-tier lookup reproduce all
+                # 19 Man Utd week-1 wage witnesses exactly. It is a plain calendar-year
+                # subtraction (no birthday adjustment): Irwin b.Oct-1965 shows 32, not 31.
+                "age": 1997 - year,
                 "pos": pos,
                 "posFine": fine,
                 "isGK": is_gk,

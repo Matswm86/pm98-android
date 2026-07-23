@@ -208,7 +208,7 @@ def parse_squad(d: bytes, off: int, end: int):
                 "name": display,
                 "legalName": legal,
                 "birthYear": year,
-                "age": 1998 - year,
+                "age": 1997 - year,  # season-start year, not +1 (see extract_english.py)
                 "media": media,
                 "pos": pos,
                 "posFine": fine,

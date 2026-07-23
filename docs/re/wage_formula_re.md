@@ -1,5 +1,12 @@
 # Player WAGES — reverse-engineering the real formula (2026-07-19)
 
+> **SUPERSEDED (2026-07-23).** The "wage = f(core4) × club_factor" fit below (and the
+> `FinanceModel._player_wage` CA^1.6 model it critiques) are BOTH dead. Wages are the
+> byte-exact PM98 lookup table `wageTable[band*54 + abilTier*6 + ageTier] * 5000`
+> (`TransferMarket.yearly_wage`, `docs/re/transfer_value_re.md §10/§14`), which reproduces
+> all **19** Man Utd week-1 wage witnesses EXACTLY once the age basis is `1997 - birthYear`
+> (§14). The club_factor mystery here was the wrong model + a +1 age bug. Kept for history.
+
 Owner ask (s22/s23 NEXT #1): the app's wage bill is "WAY too wrong". This closes
 the **question of where wages come from** and validates the **structure of the real
 formula** against source-witnessed ground truth, without inventing the parts that are

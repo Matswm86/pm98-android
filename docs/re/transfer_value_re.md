@@ -295,3 +295,32 @@ Result (byte-exact table, verified live): Nantes avgAV 71 → band **3**; Landre
 **£3,250,000** — deterministic, independent of the manager's division. Guarded by
 `test_transfers._foreign_stature`. Decompiled: `fn_004457a0`, `fn_00441ea0`, and the five
 foreign-league ctors in `docs/re/decompiled/`.
+
+## §14 Age basis correction — season-start year, NOT +1 (2026-07-23, owner frames)
+
+The fee/wage table is indexed by an AGE tier (`_age_tier`), so the stored `age` must match
+the original's. The extractors computed `age = 1998 - birthYear`; the original uses
+**`age = SEASON-START year - birthYear` = `1997 - birthYear`** for the 97-98 DB — a plain
+calendar-year subtraction with NO birthday adjustment.
+
+**Witnesses (owner captures 2026-07-23, `screenshots/user-captures-2026-07-23-ground-squad-transfer/`):**
+- FICHA frame 13: McClair (b.1963) shows **AGE 34** (= 1997−1963), not 35.
+- SQUAD frame 15: all **19** Man Utd week-1 WAGE cells reproduce byte-exact ONLY with
+  age−1 (5 age-boundary men flip to correct: Beckham/Butt/G.Neville → tier "age<23"=22;
+  Irwin/Pallister → tier "age<33"=32). At the +1 age they were each one wage-tier off.
+- The rule is calendar-year subtraction, not age-at-Aug-1997: Irwin b.Oct-1965 shows **32**
+  (= 1997−1965), though he was 31 on the season's opening day.
+
+Fixed at root: `extract_english.py` / `extract_squads.py` / `extract_squads_exact.py`
+(1998→1997); `Talent.age_in_season` + `talent_ingest._birth_year` (the same +1, e.g. Owen
+b.1979 is **18** in 97-98, not 19); and the committed `app/data/game_db.json` was transformed
+in place (8600 non-null ages −1; the 947 null/engine-randomized ages untouched). Invariant
+`age == 1998 - birthYear` held for all 8600 pre-transform, so the −1 is exact and reversible.
+
+### Wage DISPLAY exactness (same pass)
+PM98's native wage unit is the £5,000-step yearly table value. The app keeps an integer
+weekly figure for the finance ledger, but the FICHA / SQUAD / TEAM OFFER showed
+`round(yearly/52)*52`, which corrupted the exact table value (£1,000,000 → £1,000,012).
+`Contract.current_yearly()` now returns the exact table yearly for an un-renewed player
+(stored weekly still equals the table's rounded weekly) and `weekly×52` once he has
+renegotiated. All 19 Man Utd WAGE cells now render pixel-exact vs frame 15.

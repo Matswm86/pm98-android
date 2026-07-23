@@ -79,6 +79,20 @@ static func squad_weekly_bill(squad: Array, band: int) -> int:
 static func yearly(weekly: int) -> int:
 	return weekly * SEASON_WEEKS
 
+
+## The player's EXACT yearly wage for display (FICHA YEARLY WAGE / SQUAD WAGE column /
+## TEAM OFFER). PM98's native wage unit is the £5,000-step yearly table value; the app
+## keeps an integer weekly figure for the finance ledger, but round(yearly/52)*52 corrupts
+## the exact table value on screen (£1,000,000 -> £1,000,012, witnessed owner frame 15).
+## So an un-renewed player (his stored weekly still equals the table's rounded weekly)
+## shows the EXACT table yearly; once he has renegotiated his deal (stored weekly differs),
+## his agreed weekly x52 is the truth. Legacy dicts with no stored wage use the table.
+static func current_yearly(player: Dictionary, band: int) -> int:
+	var w: Variant = player.get("wage")
+	if w == null or int(w) == TransferMarket.weekly_wage(player, band):
+		return TransferMarket.yearly_wage(player, band)
+	return int(w) * SEASON_WEEKS
+
 static func monthly(weekly: int) -> int:
 	return int(round(weekly * SEASON_WEEKS / 12.0))
 

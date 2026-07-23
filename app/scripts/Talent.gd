@@ -83,9 +83,12 @@ static func key_of(e: Dictionary) -> String:
 	return str(e.get("key", "%s|%d" % [str(e.get("legalName", e.get("name", "?"))), int(e.get("birthYear", 0))]))
 
 
-## Age on the DB's basis: Owen b.1979 is 19 in the 1997-98 DB (start_year 1997).
+## Age on the DB's basis = SEASON-START year - birthYear (Owen b.1979 is 18 in the
+## 1997-98 DB, start_year 1997). Plain calendar-year subtraction, no +1 and no birthday
+## adjustment — the witnessed rule the whole DB uses (owner FICHA frame 13: McClair
+## b.1963 shows 34; makes the 19 Man Utd wage-tier witnesses exact). See extract_english.py.
 static func age_in_season(e: Dictionary, start_year: int) -> int:
-	return start_year + 1 - int(e.get("birthYear", start_year - 16))
+	return start_year - int(e.get("birthYear", start_year - 16))
 
 
 # ---- player building -------------------------------------------------------

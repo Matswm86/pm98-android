@@ -126,7 +126,7 @@ def export_player(p: dict, code2name: dict[int, str], eu_codes: set[int]) -> dic
         "birthYear": year if ok_year else None,
         "birthDay": p["day"] or None,  # engine-defaulted when 0
         "birthMonth": p["month"] or None,
-        "age": (1998 - year) if ok_year else None,
+        "age": (1997 - year) if ok_year else None,  # season-start yr, not +1 (extract_english.py)
         "pos": {0: "GK", 1: "DF", 2: "MF", 3: "FW"}.get(p["band"]),
         "posFine": p["fine"],
         "isGK": p["band"] == 0,

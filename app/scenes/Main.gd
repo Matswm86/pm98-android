@@ -2868,11 +2868,12 @@ func _show_team_offer(pid: int, refresh: Callable = Callable()) -> void:
 	var scr: TeamOfferScreen = load("res://scenes/TeamOfferScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
-	var weekly := Contract.current_weekly(p, _career.my_band())
 	# CLUB FEE = the market value, YEARS = the full term, LEFT = years remaining
-	# (our contract model's split of the original's YEARS|LEFT pair)
+	# (our contract model's split of the original's YEARS|LEFT pair). YEARLY WAGE uses the
+	# exact table yearly (Contract.current_yearly), not round(weekly/52)*52.
 	scr.setup(p, GameDB.club(_career.club_id), offers,
-		TransferMarket.value_of(p, _career.my_band()), Contract.yearly(weekly),
+		TransferMarket.value_of(p, _career.my_band()),
+		Contract.current_yearly(p, _career.my_band()),
 		int(p.get("contract_term", p.get("contract_years", 0))),
 		int(p.get("contract_years", 0)))
 	scr.answered.connect(func(decisions: Array) -> void:

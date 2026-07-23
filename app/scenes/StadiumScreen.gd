@@ -182,6 +182,11 @@ const SCENE_BOX := Rect2(299, 148, 320, 240)
 # Dynamic-text anchors, measured off frame 172 (see docs/re/stadium_screen_re.md).
 const R_GROUND := Rect2(299, 71, 320, 20)        # green header, ground name (centred)
 const R_CAP_VAL := Rect2(412, 94, 200, 15)       # CAPACITY value cell (left-aligned)
+# CAR PARK + PITCH value cells (same left edge, rows +18 each; frame 01 / ga_00). Witnessed for
+# Man Utd (CAR PARK 2,000 spaces from the live car-park model, PITCH GOOD); honest gap otherwise.
+const R_CARPARK_VAL := Rect2(412, 112, 200, 15)  # CAR PARK value cell ("<n> spaces")
+const R_PITCH_VAL := Rect2(412, 130, 200, 15)    # PITCH value cell (quality word)
+const CARPARK_SPACES_PER_LEVEL := 500            # spaces per car-park level (base 4 levels = 2,000)
 const R_TOTAL := Rect2(150, 452, 126, 13)        # TOTAL IMPROVEMENTS money cell (right)
 const R_SEATS_VAL := Rect2(150, 118, 128, 14)    # SEATS row value span (active-works line)
 
@@ -655,8 +660,19 @@ func _draw() -> void:
 	# shared by both views (not covered by the IMPROVE overlay), so it draws unconditionally.
 	_cell(_f12, R_GROUND, _ground if _ground != "" else _club, C_GROUND_TXT, 13, "centre")
 
-	# CAPACITY value (real Career). CAR PARK / PITCH stay blank — uncaptured, honest gaps.
+	# CAPACITY value (real Career), plus CAR PARK spaces + PITCH quality for the WITNESSED club
+	# (owner frame 01: Man Utd = 2,000 spaces / GOOD). CAR PARK spaces come from the live car-park
+	# model (500/level, base 4 levels = 2,000) so they stay correct after a quadrant is upgraded;
+	# PITCH GOOD is the witnessed constant. An un-witnessed club (car_price == 0) keeps both blank
+	# (honest gap — the value is not in game_db.json). The witness = the club with a witnessed
+	# car-park price, exactly the SEATS/sponsor honest-gap rule already used on this screen.
 	_cell(_f10, R_CAP_VAL, "%s seats" % fmt_int(_capacity), C_VALUE_TXT, 11)
+	if _car_price > 0:
+		var spaces := 0
+		for lvl in _car_levels:
+			spaces += CARPARK_SPACES_PER_LEVEL * int(lvl)
+		_cell(_f10, R_CARPARK_VAL, "%s spaces" % fmt_int(spaces), C_VALUE_TXT, 11)
+		_cell(_f10, R_PITCH_VAL, "GOOD", C_VALUE_TXT, 11)
 
 	if _view == "improve":
 		# Shared IMPROVEMENTS title + 4 category tabs (frame 173 bake). Each sub-tab then draws
@@ -855,14 +871,15 @@ func _draw_item_detail(cat: String, item: int, items: Array, w: Dictionary) -> v
 	var cur: int = _grade_of(cat, item, w)
 	var building := not _work_for(cat, item).is_empty()
 	var has_next := cur + 1 < grades.size()
-	# The original's idle detail shows PRICE £0 / 0 weeks; the real upgrade cost appears once the
-	# next grade is previewed (tapped) or a work is under way. Labels stay put; only the value moves.
-	var show_cost := has_next and (building or _grade_sel == cur + 1)
+	# The original's idle detail shows the NEXT-upgrade PRICE + WEEKS immediately on selecting an
+	# item (owner captures 2026-07-23: CHANGING ROOMS £225,000/3wks frame 03, MEDICAL EQUIPMENT
+	# £150,000/2wks frame 12 — both shown before any grade is tapped). A prior build assumed £0
+	# until the next grade was previewed; that was invention, refuted by the real frames.
 	if has_next:
 		_txt10(DETAIL_PRICE_LBL_X, DETAIL_PRICE_Y, "PRICE:", C_PRICE_RED)
-		_txt10(DETAIL_VAL_X, DETAIL_PRICE_Y, "£%s" % fmt_int(int(w["cost"]) if show_cost else 0), C_PRICE_RED)
+		_txt10(DETAIL_VAL_X, DETAIL_PRICE_Y, "£%s" % fmt_int(int(w["cost"])), C_PRICE_RED)
 		_txt10(DETAIL_PRICE_LBL_X, DETAIL_WEEKS_Y, "WEEKS:", C_BLACK)
-		_txt10(DETAIL_VAL_X, DETAIL_WEEKS_Y, "%d weeks" % (int(w["weeks"]) if show_cost else 0), C_WEEKS_GREEN)
+		_txt10(DETAIL_VAL_X, DETAIL_WEEKS_Y, "%d weeks" % int(w["weeks"]), C_WEEKS_GREEN)
 	for g in grades.size():
 		var y := GRADE_Y0 + GRADE_PITCH * g
 		var boxr := Rect2(GRADE_BOX_X, y + 1, 12, 12)
