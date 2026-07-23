@@ -6,6 +6,16 @@
 > (`TransferMarket.yearly_wage`, `docs/re/transfer_value_re.md §10/§14`), which reproduces
 > all **19** Man Utd week-1 wage witnesses EXACTLY once the age basis is `1997 - birthYear`
 > (§14). The club_factor mystery here was the wrong model + a +1 age bug. Kept for history.
+>
+> **LEAGUE-WIDE GAP CLOSED (2026-07-24).** The 2026-07-23 owner-bug handoff still carried this
+> doc's stale claim ("wages 2-8× too high for every club except Man Utd; club_factor un-RE'd").
+> That is now DISPROVEN empirically: the `club_factor` here IS the stature band (§12/§13,
+> ported 07-22d/e). Running the LIVE app code (`FinanceModel`/`TransferMarket`) over the three
+> different-band Premier clubs whose week-1 bills were witnessed reproduces every one to within
+> the /52 weekly-rounding error — Bolton (band 3) £39,901 vs £39,903, Aston Villa (band 1)
+> £129,330 vs £129,326, Arsenal (band 0) £232,696 vs £232,692. Permanently guarded by
+> `app/tests/test_wage_bills.gd`. There is NO remaining wage gap for the witnessed clubs; the
+> only open item is capturing MORE divisions' bills to widen the guard beyond the Premier.
 
 Owner ask (s22/s23 NEXT #1): the app's wage bill is "WAY too wrong". This closes
 the **question of where wages come from** and validates the **structure of the real

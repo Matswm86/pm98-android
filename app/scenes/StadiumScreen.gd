@@ -50,6 +50,14 @@ const W := 640
 const H := 480
 const MAX_CAPACITY := 130000
 
+# Touch-friendliness (owner 2026-07-23: "super sensitive / hard to find the exact click spot").
+# The baked art + every DRAW rect stay pixel-exact; only the _hit() test rects are grown by this
+# many design px on each side, so a finger that lands just off a 13px item bar / 19px arrow still
+# selects. For the tiled item/grade row lists (pitch 18) a grow of 4 also closes the 5px dead gap
+# between rows, so the whole list is live. Overlaps resolve by first-match order = nearest earlier
+# target, which is deterministic and matches the original's forgiving row selection.
+const HIT_PAD := 4
+
 # ---- IMPROVE view (binding frame 173_154935, "SEATS" category active) -------------------
 # Category grid — only SEATS is witnessed with offers; CAR PARK / FACILITIES / SERVICES tab
 # contents are un-RE'd (honest gap, inert). Rects measured off the frame black title bars.
@@ -412,67 +420,73 @@ func _grade_rect(g: int) -> Rect2:
 	return Rect2(ITEM_BAR_X, GRADE_Y0 + GRADE_PITCH * g, ITEM_BAR_W, ITEM_BAR_H)
 
 
+## A hit-test rect grown by HIT_PAD on every side (design space). DRAW rects never use this —
+## only _hit(), so the baked chrome stays frame-true while small targets become finger-sized.
+func _pad(r: Rect2) -> Rect2:
+	return r.grow(HIT_PAD)
+
+
 func _hit(d: Vector2) -> String:
 	# The 2x2 action grid (IMPROVE / WORKS / MATCH DAY / RETURN) is baked in every view:
 	# IMPROVE + WORKS toggle the left panel in-screen (frame-true); MATCH DAY opens the
 	# ticket-price / sponsor-board sub-view (owner frame 06); RETURN leaves; empty space no-ops.
-	if BTN_IMPROVE.has_point(d):
+	if _pad(BTN_IMPROVE).has_point(d):
 		return "improve"
-	if BTN_WORKS.has_point(d):
+	if _pad(BTN_WORKS).has_point(d):
 		return "works"
-	if BTN_MATCHDAY.has_point(d):
+	if _pad(BTN_MATCHDAY).has_point(d):
 		return "matchday"
-	if BTN_RETURN.has_point(d):
+	if _pad(BTN_RETURN).has_point(d):
 		return "return"
 	if _view == "matchday":
-		if MD_TICKET_DN.has_point(d):
+		if _pad(MD_TICKET_DN).has_point(d):
 			return "tkt_dn"
-		if MD_TICKET_UP.has_point(d):
+		if _pad(MD_TICKET_UP).has_point(d):
 			return "tkt_up"
-		if MD_BOARD_DN.has_point(d):
+		if _pad(MD_BOARD_DN).has_point(d):
 			return "brd_dn"
-		if MD_BOARD_UP.has_point(d):
+		if _pad(MD_BOARD_UP).has_point(d):
 			return "brd_up"
-		if _mo_witness and not _mo_sold and MD_ACCEPT.has_point(d):
+		if _mo_witness and not _mo_sold and _pad(MD_ACCEPT).has_point(d):
 			return "accept"
 		return ""
 	if _view != "improve":
 		return ""
 	# category tabs (live in every improve sub-view)
-	if TAB_SEATS.has_point(d):
+	if _pad(TAB_SEATS).has_point(d):
 		return "tab:seats"
-	if TAB_CARPARK.has_point(d):
+	if _pad(TAB_CARPARK).has_point(d):
 		return "tab:carpark"
-	if TAB_FACILITIES.has_point(d):
+	if _pad(TAB_FACILITIES).has_point(d):
 		return "tab:facilities"
-	if TAB_SERVICES.has_point(d):
+	if _pad(TAB_SERVICES).has_point(d):
 		return "tab:services"
 	match _tab:
 		"seats":
 			for i in CARDS.size():
-				if CARDS[i].has_point(d):
+				if _pad(CARDS[i]).has_point(d):
 					return "card%d" % i
 		"carpark":
 			for q in QUAD_CELL.size():
-				if (QUAD_CELL[q] as Rect2).has_point(d):
+				if _pad(QUAD_CELL[q]).has_point(d):
 					return "quad%d" % q
 		"facilities":
 			for i in FAC_ITEMS.size():
-				if _item_rect(i).has_point(d):
+				if _pad(_item_rect(i)).has_point(d):
 					return "fac%d" % i
 			var wf: Dictionary = _fac_data.get(_fac_sel, {})
 			if not wf.is_empty():
 				var nxt: int = int(_grade_of("facility", _fac_sel, wf)) + 1
-				if nxt < (wf["grades"] as Array).size() and _grade_rect(nxt).has_point(d):
+				if nxt < (wf["grades"] as Array).size() and _pad(_grade_rect(nxt)).has_point(d):
 					return "facbuy"
 		"services":
 			for i in SVC_ITEMS.size():
-				if _item_rect(i).has_point(d):
+				if _pad(_item_rect(i)).has_point(d):
 					return "svc%d" % i
 			var ws: Dictionary = _svc_data.get(_svc_sel, {})
 			if not ws.is_empty():
 				var nxt2: int = int(_grade_of("service", _svc_sel, ws)) + 1
-				if nxt2 < (ws["grades"] as Array).size() and _grade_rect(nxt2).has_point(d):
+				if nxt2 < (ws["grades"] as Array).size() and _pad(_grade_rect(nxt2)).has_point(d):
 					return "svcbuy"
 	return ""
 

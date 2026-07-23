@@ -4179,35 +4179,6 @@ func _save_tactics(t: Tactics) -> void:
 # Squads + cash mutate on the career and persist. PM98 screen surface; the
 # valuation model is ours-calibrated (see TransferMarket.gd).
 
-func _show_transfers() -> void:
-	var c := _career
-	var rows: Array = []
-	var payload: Array = []
-	rows.append("VIEW TRANSFER MARKET   (the screen)"); payload.append({"t": "screen"})
-	rows.append("TRANSFER MARKET"); payload.append({"t": "market"})
-	rows.append("MY SQUAD   (sell / RENEW)"); payload.append({"t": "squad"})
-	rows.append("FREE AGENTS   (%d)   -  sign for £0 + wages" % c.free_agents.size()); payload.append({"t": "free"})
-	rows.append("LOAN MARKET   -  take a player for the season"); payload.append({"t": "loan"})
-	if Staff.has_scout(c.staff):
-		rows.append("SCOUT REPORT   (%d targets)" % c.scout_targets().size()); payload.append({"t": "scout"})
-	rows.append("Shortlist   (%d)" % c.shortlist.size()); payload.append({"t": "shortlist"})
-	rows.append("Transfer news   (%d)" % c.transfer_log.size()); payload.append({"t": "news"})
-	var win := ("OPEN, deadline in %d weeks" % c.deadline_weeks_left()) if c.transfers_open() else "CLOSED"
-	_set_view("%s  -  TRANSFERS" % c.club_name,
-		"Window %s  -  £%s bank  -  %d offers left this week" % [win, _fmt_int(c.cash), c.offers_left],
-		rows, payload, func(it): _activate_transfers(it["t"]))
-
-func _activate_transfers(which: String) -> void:
-	match which:
-		"screen": _show_transfer_screen()
-		"market": _push(_show_market)
-		"squad": _push(_show_transfer_squad)
-		"free": _push(_show_free_agents)
-		"loan": _push(_show_loan_market)
-		"scout": _push(_show_scout_report)
-		"shortlist": _push(_show_shortlist)
-		"news": _push(_show_transfer_news)
-
 func _bid_round(n: int) -> int:
 	var step: int = 50000 if _career.tier <= 2 else 5000
 	return int(round(float(n) / step)) * step
@@ -4358,79 +4329,6 @@ func _loan_action(row: Dictionary, do_it: bool) -> void:
 	else:
 		_toast(res["msg"])
 
-func _show_transfer_squad() -> void:
-	var squad: Array = _career.my_squad().duplicate()
-	squad.sort_custom(func(a, b):
-		var ak := 1 if a.get("isGK") else 0
-		var bk := 1 if b.get("isGK") else 0
-		if ak != bk:
-			return ak > bk
-		return int(a.get("attrs", {}).get("CA", 0)) > int(b.get("attrs", {}).get("CA", 0)))
-	var rows: Array = []
-	var payload: Array = []
-	for p in squad:
-		var pid := int(p["id"])
-		var pos := "GK" if p.get("isGK") else "  "
-		var ca := int((p.get("attrs", {}) as Dictionary).get("CA", 0))
-		var yrs := int(p.get("contract_years", 1))
-		var wage := Contract.current_weekly(p, _career.my_band())
-		var tag := "  EXPIRING" if Contract.is_expiring(p) else ""
-		if p.get("on_loan"):
-			tag = "  [ON LOAN]"
-		elif _career.is_listed(pid):
-			tag += "  [LISTED]"
-		rows.append("%-15s %s CA%2d £%s/wk %dy%s" % [
-			p.get("name", "?"), pos, ca, _fmt_int(wage), yrs, tag])
-		payload.append(p)
-	_set_view("MY SQUAD  (%d)" % squad.size(),
-		"£%s/wk wage bill  -  tap a player to RENEW, list or sell" % _fmt_int(_career.player_weekly_wage()),
-		rows, payload, func(p): _push(_show_player_deal.bind(p)))
-
-func _show_player_deal(p: Dictionary) -> void:
-	var pid := int(p["id"])
-	var band := _career.my_band()
-	var weekly := Contract.current_weekly(p, band)
-	var auto: bool = bool(p.get("auto_renew", false))
-	var rows: Array = []
-	var payload: Array = []
-	rows.append("RENEW contract  (negotiate wage)"); payload.append({"a": "renew"})
-	rows.append("Auto-renew at expiry:  %s" % ("ON" if auto else "OFF")); payload.append({"a": "auto"})
-	rows.append("Remove from transfer list" if _career.is_listed(pid) else "Place on transfer list")
-	payload.append({"a": "list"})
-	rows.append("Get an offer / sell now"); payload.append({"a": "sell"})
-	var attrs: Dictionary = p.get("attrs", {})
-	var expiring := "  -  EXPIRING" if Contract.is_expiring(p) else ""
-	_set_view(p.get("name", "?"),
-		"CA %d  -  CLUB FEE £%s  -  YEARLY WAGE £%s (£%s/mo)  -  contract %dy%s" % [
-			int(attrs.get("CA", 0)), _fmt_int(TransferMarket.value_of(p, band)),
-			_fmt_int(Contract.yearly(weekly)), _fmt_int(Contract.monthly(weekly)),
-			int(p.get("contract_years", 1)), expiring],
-		rows, payload, func(it): _player_deal_action(p, it["a"]))
-
-func _player_deal_action(p: Dictionary, a: String) -> void:
-	var pid := int(p["id"])
-	match a:
-		"renew":
-			_push(_show_renew.bind(p))
-		"auto":
-			_career.set_auto_renew(pid, not bool(p.get("auto_renew", false)))
-			_career.save()
-			_show_player_deal(p)            # refresh the ON/OFF label in place
-		"list":
-			_career.toggle_listed(pid)
-			_career.save()
-			_show_player_deal(p)
-		"sell":
-			var rng := RandomNumberGenerator.new()
-			rng.randomize()
-			var offer := _career.solicit_sale(pid, rng)
-			if offer.is_empty():
-				_toast("No club has made an offer.")
-			else:
-				_push(_show_sale_offer.bind(pid, p.get("name", "?"), offer))
-
-## The RENEW negotiation: a player wants a wage to put pen to a new deal. You can hold his
-## current terms (a lowball he may refuse), meet his demand, or better it to lock him in.
 func _show_renew(p: Dictionary) -> void:
 	var band := _career.my_band()
 	var weekly := Contract.current_weekly(p, band)
@@ -4449,59 +4347,6 @@ func _renew_action(p: Dictionary, offer_weekly: int) -> void:
 	_career.save()
 	_nav.pop_back()                      # drop the renew screen
 	_push(_show_deal_result.bind(res["msg"]))
-
-func _show_sale_offer(pid: int, pname: String, offer: Dictionary) -> void:
-	var rows := ["ACCEPT  -  sell for £%s" % _fmt_int(int(offer["offer"])), "REFUSE"]
-	var payload := [{"a": "accept"}, {"a": "refuse"}]
-	_set_view("Offer for %s" % pname,
-		"%s bid £%s  (you value him at £%s)" % [
-			offer["buyer_name"], _fmt_int(int(offer["offer"])), _fmt_int(int(offer["value"]))],
-		rows, payload, func(it): _sale_action(pid, offer, it["a"]))
-
-func _sale_action(pid: int, offer: Dictionary, a: String) -> void:
-	if a == "refuse":
-		_go_back()
-		return
-	var res := _career.accept_sale(pid, int(offer["buyer_id"]), int(offer["offer"]))
-	_career.save()
-	_nav.pop_back()   # drop the offer screen
-	_nav.pop_back()   # drop the player screen (he may be gone)
-	_push(_show_deal_result.bind(res["msg"]))
-
-func _show_shortlist() -> void:
-	var by_pid: Dictionary = {}
-	for row in _career.market():
-		by_pid[int(row["pid"])] = row
-	var rows: Array = []
-	var payload: Array = []
-	for pid in _career.shortlist:
-		var row: Variant = by_pid.get(int(pid))
-		if row == null:
-			rows.append("(player %d no longer available -- tap to clear)" % int(pid))
-			payload.append({"gone": int(pid)})
-			continue
-		rows.append("%-15s CA%2d  £%-9s %s" % [
-			row["name"], int(row["ca"]), _fmt_int(int(row["fee"])), row["club_name"]])
-		payload.append(row)
-	if rows.is_empty():
-		rows.append("(shortlist empty -- add targets from the market)")
-		payload.append({})
-	_set_view("Shortlist", "%d targets  -  tap to bid" % _career.shortlist.size(),
-		rows, payload, _activate_shortlist)
-
-func _activate_shortlist(it: Dictionary) -> void:
-	if it.has("club_id"):
-		_push(_show_market_player.bind(it))
-	elif it.has("gone"):
-		_career.toggle_shortlist(int(it["gone"]))
-		_career.save()
-		_show_shortlist()
-
-func _show_transfer_news() -> void:
-	var rows: Array = (_career.transfer_log as Array).duplicate()
-	if rows.is_empty():
-		rows = ["(no transfer activity yet)"]
-	_set_view("Transfer news", "Latest first", rows, [], func(_x): pass)
 
 func _show_deal_result(msg: String) -> void:
 	_set_view("Transfer", msg, ["Back to transfers"], [{}], func(_x): _go_back())
