@@ -118,9 +118,10 @@ func _run() -> void:
 		tb.return_pressed.emit()                # RETURN frees the board
 		await process_frame
 
-	# Drive the transfer screens (S7): market -> bid -> squad -> RENEW -> news.
-	main._push(main._show_transfers)
-	await process_frame
+	# Drive the transfer/renew UI: market view -> make-offer card -> bid places -> signing lands
+	# next week, then the REAL FICHA RENEW. (The invented text-menu flow _show_transfers/
+	# _show_transfer_squad/_show_player_deal/_show_shortlist/_show_transfer_news was deleted
+	# 2026-07-23; its screens are covered by test_transfer_screen/_squad/_contract.)
 	main._show_market()
 	await process_frame
 	var mkt: Array = main._career.market()
@@ -150,19 +151,16 @@ func _run() -> void:
 	rngw.seed = 7
 	main._career.advance_week(rngw)
 	ok = _assert(main._career.my_squad().size() == before + 1, "UI signing lands with next week's answer") and ok
-	main._push(main._show_transfer_squad)
-	await process_frame
+	# REAL RENEW: the FICHA negotiation (Main._open_renew_negotiation -> _mount_browse) applies
+	# Career.renew on a pick. Drive that same terminal call (meet his demand) and assert the fresh
+	# contract; the overlay chrome itself is covered by test_contract + shot_transfer_verify.
 	var p0: Dictionary = main._career.my_squad()[0]
-	main._push(main._show_player_deal.bind(p0))
+	var pid0 := int(p0["id"])
+	var res0: Dictionary = main._career.renew(pid0, Contract.demanded_weekly(p0, main._career.my_band()))
 	await process_frame
-	main._player_deal_action(p0, "renew")
-	await process_frame
-	ok = _assert(int(main._career._find_in(main._career.club_id, int(p0["id"])).get("contract_years", 0))
-		== TransferMarket.NEW_CONTRACT_YEARS, "UI RENEW set a fresh contract") and ok
-	main._show_shortlist()
-	await process_frame
-	main._show_transfer_news()
-	await process_frame
+	ok = _assert(bool(res0.get("ok", false))
+		and int(main._career._find_in(main._career.club_id, pid0).get("contract_years", 0))
+		== Contract.NEW_TERM_YEARS, "UI RENEW (meet demand) set a fresh %dy contract" % Contract.NEW_TERM_YEARS) and ok
 
 	main._show_career()                         # back to the hub (re-raised)
 	await process_frame
