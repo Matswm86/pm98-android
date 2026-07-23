@@ -27,47 +27,67 @@ func _assert(cond: bool, label: String) -> bool:
 	return cond
 
 
-# ---- first-season curtain-raiser (a REAL simulated match) -----------------
-# The app has no played 96-97 season, but its honours are fixed: Man Utd (40) v Chelsea (49).
-# PM98 PLAYS that shield -- witnessed live 2026-07-23, two fresh careers gave different
-# winners AND deciders (Man Utd on pens / Chelsea clean). So the participants are fixed but
-# the RESULT is simulated (not the old hardcoded "Man Utd win, no pens"). Also guards the
-# earlier bug where season 1 no-op'd the shield entirely (owner saw no CHAMPION card).
+# ---- first-season curtain-raiser --------------------------------------------
+# Fixed honours: Man Utd (40) v Chelsea (49). Witnessed live 2026-07-23 in the wine original:
+#  - a CONTESTANT (managing Man Utd) PLAYS the shield as his first fixture (MATCH OPTIONS ->
+#    KICK OFF -> full time -> champion card), result varies (Man Utd 3-2 Chelsea observed);
+#  - a NON-participant (Barnsley) sees it auto-resolved into the card, winner AND decider
+#    varying between fresh careers (Man Utd on pens / Chelsea clean).
 func _first_season_seed() -> bool:
 	var ok := true
-	var car := Career.new()
-	car.season = "1997-98"
-	car.club_id = 40
-	car.last_champion_id = -1        # a fresh career: no prior honours to contest
-	car.club_names = {40: "Manchester Utd.", 49: "Chelsea"}
-	# The result must actually depend on the RNG (a real match, not a scripted card):
-	# gather winners/deciders across many seeds and require BOTH clubs to win sometimes.
+
+	# (A) NON-PARTICIPANT: auto-resolved into the card, result depends on the RNG.
 	var winners := {}
 	var pens_seen := false
 	for s in 40:
 		var c := Career.new()
-		c.season = "1997-98"; c.club_id = 40
+		c.season = "1997-98"; c.club_id = 44   # not a contestant
 		c.last_champion_id = -1
-		c.club_names = {40: "Manchester Utd.", 49: "Chelsea"}
+		c.club_names = {40: "Manchester Utd.", 49: "Chelsea", 44: "Newcastle Utd"}
 		var r := RandomNumberGenerator.new(); r.seed = SEED + s * 101
 		c.play_season_opener(r)
 		var t := c.charity_shield
+		ok = _assert(not c.charity_shield_pending, "non-participant does NOT play the shield") and ok
 		winners[int(t.get("winner_id", -1))] = true
 		if str(t.get("decided", "")) == "pens":
 			pens_seen = true
+	ok = _assert(int(winners.keys()[0]) in [40, 49], "auto shield winner is a contestant") and ok
+	ok = _assert(winners.has(40) and winners.has(49), "auto shield is simulated: both clubs win across seeds") and ok
+	ok = _assert(pens_seen, "a level auto shield goes to penalties across seeds") and ok
+
+	# (B) PARTICIPANT (manages Man Utd): the shield is PENDING -- he plays it himself.
+	var car := Career.new()
+	car.season = "1997-98"; car.club_id = 40
+	car.last_champion_id = -1
+	car.club_names = {40: "Manchester Utd.", 49: "Chelsea"}
 	var rng := RandomNumberGenerator.new(); rng.seed = SEED
 	car.play_season_opener(rng)
+	ok = _assert(car.charity_shield_pending, "a contestant PLAYS the shield (pending, not auto-resolved)") and ok
+	var p := car.pending_charity_shield()
+	ok = _assert(int(p.get("champ_id", -1)) == 40 and int(p.get("fa_id", -1)) == 49,
+		"pending shield is Man Utd v Chelsea") and ok
+	ok = _assert(int(p.get("opp_id", -1)) == 49 and bool(p.get("home", false)),
+		"Man Utd manager is home vs Chelsea") and ok
+	ok = _assert(int(car.charity_shield.get("winner_id", -99)) == -99, "no winner until it is played") and ok
+	# Play it: returns the match-result shape; the champion card reads the stored result.
+	var res := car.play_charity_shield_match(rng, {})
+	ok = _assert(not res.is_empty() and bool(res.get("charity", false)), "play returns a charity match result") and ok
+	ok = _assert(int(res.get("home_id", -1)) == 40 and int(res.get("away_id", -1)) == 49,
+		"played shield: Man Utd home, Chelsea away") and ok
 	var cs := car.charity_shield
-	ok = _assert(not cs.is_empty(), "season 1 plays a Charity Shield (was a no-op)") and ok
-	ok = _assert(int(cs.get("champ_id", -1)) == 40, "season-1 home side = Man Utd (40)") and ok
-	ok = _assert(int(cs.get("fa_id", -1)) == 49, "season-1 away side = Chelsea (49)") and ok
-	ok = _assert(int(cs.get("winner_id", -1)) in [40, 49], "winner is one of the two contestants") and ok
-	ok = _assert(int(cs.get("loser_id", -1)) in [40, 49]
-		and int(cs.get("loser_id", -1)) != int(cs.get("winner_id", -1)), "loser is the other contestant") and ok
-	ok = _assert(str(cs.get("decided", "x")) in ["", "pens"], "decider is either normal time or penalties") and ok
-	# The witnessed truth: NOT a fixed result -- both clubs can win, and pens can happen.
-	ok = _assert(winners.has(40) and winners.has(49), "the shield is simulated: both Man Utd and Chelsea win across seeds") and ok
-	ok = _assert(pens_seen, "a level shield goes to penalties across seeds (matches the wine capture)") and ok
+	ok = _assert(not car.charity_shield_pending, "pending cleared after playing") and ok
+	ok = _assert(int(cs.get("winner_id", -1)) in [40, 49]
+		and int(cs.get("loser_id", -1)) in [40, 49]
+		and int(cs.get("loser_id", -1)) != int(cs.get("winner_id", -1)), "played shield records a winner + loser") and ok
+	ok = _assert(str(cs.get("decided", "x")) in ["", "pens"], "played shield decider is normal time or penalties") and ok
+	# Save/load round-trips the pending flag.
+	var car2 := Career.new()
+	car2.season = "1997-98"; car2.club_id = 40
+	car2.last_champion_id = -1
+	car2.club_names = {40: "Manchester Utd.", 49: "Chelsea"}
+	car2.play_season_opener(RandomNumberGenerator.new())
+	var re := Career.from_dict(car2.to_dict())
+	ok = _assert(re.charity_shield_pending, "pending shield survives save/load") and ok
 	return ok
 
 
@@ -146,30 +166,36 @@ func _career_honours_and_shield() -> bool:
 		"F.A. Cup winner captured (%d)" % career.last_fa_winner_id) and ok
 
 	var cs := career.charity_shield
-	ok = _assert(not cs.is_empty(), "the Charity Shield was played at rollover") and ok
-	var w := int(cs.get("winner_id", -1))
+	ok = _assert(not cs.is_empty(), "the Charity Shield was staged at rollover") and ok
 	var champ := int(cs.get("champ_id", -1))
 	var fa := int(cs.get("fa_id", -1))
 	ok = _assert(champ == exp_champ, "shield home side = the champions") and ok
 	ok = _assert(fa == exp_fa or (exp_fa == exp_champ and fa == exp_runner),
 		"shield away side = F.A. Cup winners (or runners-up if a Double)") and ok
-	ok = _assert(w == champ or w == fa, "shield winner is one of the two contestants") and ok
-	# news_log is newest-first; the shield line is the most recent, scan the whole log.
-	var newcup := 0
-	for n in career.news_log:
-		if n is Dictionary and n.get("kind") == "cup" and str(n.get("text", "")).findn("charity shield") != -1:
-			newcup += 1
-	ok = _assert(newcup >= 1, "the shield result surfaces as club news") and ok
-
-	# Save/load round-trip preserves the honours + the shield result.
+	# The manager (prem[0]) may himself be a contestant -> the shield is PENDING (he plays it);
+	# otherwise it auto-resolves into a winner + a news line.
 	var path := "user://career_charity_test.json"
-	career.save(path)
-	var loaded := Career.load_save(path)
-	ok = _assert(loaded != null
-		and loaded.last_champion_id == career.last_champion_id
-		and loaded.last_fa_winner_id == career.last_fa_winner_id
-		and int(loaded.charity_shield.get("winner_id", -2)) == w,
-		"honours + shield survive save/load") and ok
+	if career.charity_shield_pending:
+		ok = _assert(career.club_id == champ or career.club_id == fa,
+			"pending only when the manager is a contestant") and ok
+		career.save(path)
+		var lp := Career.load_save(path)
+		ok = _assert(lp != null and lp.charity_shield_pending, "pending shield survives save/load") and ok
+	else:
+		var w := int(cs.get("winner_id", -1))
+		ok = _assert(w == champ or w == fa, "shield winner is one of the two contestants") and ok
+		var newcup := 0
+		for n in career.news_log:
+			if n is Dictionary and n.get("kind") == "cup" and str(n.get("text", "")).findn("charity shield") != -1:
+				newcup += 1
+		ok = _assert(newcup >= 1, "the shield result surfaces as club news") and ok
+		career.save(path)
+		var loaded := Career.load_save(path)
+		ok = _assert(loaded != null
+			and loaded.last_champion_id == career.last_champion_id
+			and loaded.last_fa_winner_id == career.last_fa_winner_id
+			and int(loaded.charity_shield.get("winner_id", -2)) == w,
+			"honours + shield survive save/load") and ok
 	return ok
 
 

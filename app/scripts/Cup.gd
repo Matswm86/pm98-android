@@ -616,6 +616,12 @@ static func _xi(xi_fn: Callable, id: int) -> Array:
 	return (xi_fn.call(id) as Array) if xi_fn.is_valid() else []
 
 
+## Public shootout: decide a level one-off tie on penalties (the Charity Shield the manager
+## PLAYS himself goes level -> pens the same way single_neutral_match resolves an auto tie).
+static func shootout(rng: RandomNumberGenerator, h: int, a: int, rh: Dictionary, ra: Dictionary) -> int:
+	return _penalties(rng, h, a, rh, ra)
+
+
 ## Penalty shootout: a rating-weighted coin flip (stronger sides edge it, never a lock).
 static func _penalties(rng: RandomNumberGenerator, h: int, a: int, rh: Dictionary, ra: Dictionary) -> int:
 	var oh := float(rh.get("att", 50)) + float(rh.get("def", 50)) + float(rh.get("gk", 50))

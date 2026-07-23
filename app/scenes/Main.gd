@@ -1630,6 +1630,13 @@ func _run_season_open_chain() -> void:
 	rng.randomize()
 	_career.play_season_opener(rng)
 	_career.save()
+	# A CONTESTANT plays his shield as the first fixture: go straight to START OF SEASON,
+	# then the hub raises it as the "Charity Final" match (played in _career_advance, the
+	# CHARITY SHIELD CHAMPION card follows the full-time whistle). A non-participant sees the
+	# already-decided card FIRST (wine-witnessed order: card -> START OF SEASON -> hub).
+	if _career.charity_shield_pending:
+		_show_season_start(func() -> void: _mount_hub())
+		return
 	var after_shield := func() -> void:
 		_show_season_start(func() -> void: _mount_hub())
 	var cs: Dictionary = _career.charity_shield
@@ -1655,9 +1662,15 @@ func _mount_hub() -> void:
 	# "Preseason"/"Preparation" and the calendar sheet shows the pending
 	# FRIENDLY's date (wine captures 2026-07-12); in season, league + Week N.
 	var pf := c.pending_friendly()
-	PMChrome.header_phase = "preseason" if not pf.is_empty() else ""
-	PMChrome.header_date = PMChrome.date_from_iso(str(pf.get("date", ""))) \
-		if not pf.is_empty() else {}
+	if not pf.is_empty():
+		PMChrome.header_phase = "preseason"
+		PMChrome.header_date = PMChrome.date_from_iso(str(pf.get("date", "")))
+	elif not c.pending_charity_shield().is_empty():
+		PMChrome.header_phase = "charity"   # the Charity Shield fixture plaque ("Charity"/"Final")
+		PMChrome.header_date = {}
+	else:
+		PMChrome.header_phase = ""
+		PMChrome.header_date = {}
 	# Next-fixture opponent for the hub's central stack (pending friendly first).
 	var fx := _next_fixture()
 	var opp_name := ""
@@ -1727,6 +1740,23 @@ func _career_advance() -> void:
 			return
 		_show_match_result(res_f)
 		return
+	# The Charity Shield the manager contests is the curtain-raiser fixture (after any
+	# friendlies, before league round 1): PLAY it through the same BRIEF/WATCH match flow,
+	# then the CHARITY SHIELD CHAMPION card follows the whistle (witnessed 2026-07-23:
+	# Man Utd v Chelsea, MATCH OPTIONS -> KICK OFF -> full time -> champion card).
+	var sh := _career.pending_charity_shield()
+	if not sh.is_empty():
+		var res_s := _career.play_charity_shield_match(rng, _club_with_roster(int(sh["opp_id"])))
+		if res_s.is_empty():
+			_career.save()
+			_show_career()
+			return
+		_show_match_result(res_s, func() -> void:
+			_career.save()
+			_show_shield_card(_career.charity_shield, func() -> void:
+				_show_career()
+				_pop_pending_team_offers()))
+		return
 	var res := _career.advance_week(rng)   # ratings come from the live roster
 	if res.is_empty():
 		_career.save()   # bye / season end: no presentation, save immediately
@@ -1738,7 +1768,7 @@ func _career_advance() -> void:
 ## The manager's match (B4): the running BRIEF + MATCH OPTIONS, whose RESULTS tap now surfaces
 ## the source-true FULL TIME read-out (MatchResultScreen; docs/re/match_flow_re.md). The BRIEF
 ## feed stays honest (kept). RETURN/CONTINUE refresh + raise the hub.
-func _show_match_result(res: Dictionary) -> void:
+func _show_match_result(res: Dictionary, on_finish: Callable = Callable()) -> void:
 	var home := GameDB.club(int(res["home_id"]))
 	var away := GameDB.club(int(res["away_id"]))
 	var rng := RandomNumberGenerator.new()
@@ -1763,7 +1793,11 @@ func _show_match_result(res: Dictionary) -> void:
 	# incremented `week` to the 1-based number of the round it just played, so the date
 	# is that Saturday (date_parts week==played round), overriding _match_header's
 	# next-week grammar for this played-match read-out.
-	if not bool(res.get("friendly", false)):
+	if bool(res.get("charity", false)):
+		# The Charity Shield read-out reads "Charity"/"Final", not the friendly default.
+		hdr["status_top"] = "Charity"
+		hdr["status_bottom"] = "Final"
+	elif not bool(res.get("friendly", false)):
 		hdr["status_top"] = PMChrome._band_league(_career.league_name)
 		hdr["status_bottom"] = "Week %d" % _career.week
 		var pd := PMChrome.date_parts(_career.season, _career.week)
@@ -1779,12 +1813,15 @@ func _show_match_result(res: Dictionary) -> void:
 	}
 	# Back at the hub, any live bids on listed players raise their TEAM OFFER
 	# cards — the original's post-match CONTINUE order (run-3 frames 085->086).
+	# CONTINUE after full time: the default returns to the hub (deferred week autosave); a
+	# caller can override it (the Charity Shield chains the CHARITY SHIELD CHAMPION card here).
+	var finish := on_finish if on_finish.is_valid() else func() -> void:
+		_career.save()   # the deferred week autosave (EXIT-Yes never gets here)
+		_show_career()
+		_pop_pending_team_offers()
 	var open_match := func() -> void:
 		_open_match(home, away, int(res["hg"]), int(res["ag"]), m["lines"],
-			"%s  -  back to the dugout" % verdict, func() -> void:
-				_career.save()   # the deferred week autosave (EXIT-Yes never gets here)
-				_show_career()
-				_pop_pending_team_offers(), result_data, res.get("possession", []))
+			"%s  -  back to the dugout" % verdict, finish, result_data, res.get("possession", []))
 	# LINE-UPS ON (charter #5, frames 61-63): the XI-vs-XI photo roll precedes
 	# the presentation in EVERY view mode — witnessed in RESULTS mode too (§4).
 	if AudioManager.lineups_on:
@@ -2150,6 +2187,10 @@ func _next_fixture() -> Array:
 	if not fr.is_empty():
 		var rid := int(fr.get("club_id", -1))
 		return [_career.club_id, rid] if bool(fr.get("home", false)) else [rid, _career.club_id]
+	# The Charity Shield the manager contests is the next fixture (champions = home side).
+	var sh := _career.pending_charity_shield()
+	if not sh.is_empty():
+		return [int(sh["champ_id"]), int(sh["fa_id"])]
 	return _career.manager_fixture()
 
 func _match_header() -> Dictionary:

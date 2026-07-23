@@ -688,10 +688,16 @@ static func draw_sheet_band_texts(ci: CanvasItem, league: String, season: String
 		_ctr_txt(ci, f8, 483, 35, str(d["day"]), C_SHEET_DAY, 11)
 		_ctr_txt(ci, f8, 483, 44, str(d["mon"]), C_SHEET_INK, 11)
 		_ctr_txt(ci, f8, 483, 55, str(d["year"]), C_SHEET_YEAR, 11)
-	var top_txt := "Preseason" if header_phase == "preseason" else _band_league(league)
+	var top_txt := _band_league(league)
+	if header_phase == "preseason":
+		top_txt = "Preseason"
+	elif header_phase == "charity":
+		top_txt = "Charity"       # the Charity Shield fixture plaque (witnessed "Charity"/"Final")
 	var bot_txt := ""
 	if header_phase == "preseason":
 		bot_txt = "Preparation"
+	elif header_phase == "charity":
+		bot_txt = "Final"
 	elif week_disp > 0:
 		bot_txt = "Week %d" % week_disp
 	_band_txt(ci, 26, top_txt, C_BAND1_INK)

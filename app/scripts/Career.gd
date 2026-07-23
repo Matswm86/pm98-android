@@ -105,7 +105,12 @@ var last_champion_id: int = -1          # last season's league champions
 var last_fa_winner_id: int = -1         # last season's F.A. Cup winners
 var last_lc_winner_id: int = -1         # last season's League Cup winners (a UEFA berth)
 var last_runners_up: Array = []         # last season's league places 2.. (EC 2nd berth + UEFA)
-var charity_shield: Dictionary = {}     # the season-opener result; {} = not played
+var charity_shield: Dictionary = {}     # the season-opener result; {} = not played.
+                                        # While `charity_shield_pending` it holds only
+                                        # {champ_id, fa_id, season} until the manager plays it.
+var charity_shield_pending: bool = false  # the manager IS a shield contestant -> he PLAYS it
+                                        # as his first fixture (Man Utd v Chelsea, witnessed
+                                        # 2026-07-23), instead of the auto-resolved card
 var season_opened: bool = false         # the week-0 curtain-raiser chain (shield card +
                                         # START OF SEASON screens) has run for this season
 var euro_seeds: Dictionary = {}         # comp_key -> domestic seed club ids (the TEAMS IN
@@ -2866,6 +2871,7 @@ func _capture_honours() -> void:
 ## first season (no prior honours to contest).
 func _play_charity_shield(rng: RandomNumberGenerator) -> void:
 	charity_shield = {}
+	charity_shield_pending = false
 	var champ := last_champion_id
 	var fa := last_fa_winner_id
 	if champ == -1:
@@ -2876,37 +2882,32 @@ func _play_charity_shield(rng: RandomNumberGenerator) -> void:
 		fa = int(last_runners_up[0]) if not last_runners_up.is_empty() else -1
 	if fa == -1 or fa == champ:
 		return
-	var ratings_fn := func(id: int) -> Dictionary: return _ratings_for(id)
-	var xi_fn := func(id: int) -> Array: return _xi_for(id)
-	var tie := Cup.single_neutral_match(rng, champ, fa, ratings_fn, xi_fn)
-	tie["champ_id"] = champ
-	tie["fa_id"] = fa
-	tie["season"] = season
-	charity_shield = tie
-	var w := int(tie["winner_id"])
-	var l := int(tie["loser_id"])
-	var wn := str(club_names.get(w, "?"))
-	var ln := str(club_names.get(l, "?"))
-	var pens := " (on penalties)" if tie.get("decided", "") == "pens" else ""
-	if w == club_id:
-		cash += CHARITY_PRIZE
-		_news("cup", "%s have won the Charity Shield, beating %s%s." % [wn, ln, pens])
-	else:
-		_news("cup", "Charity Shield: %s beat %s%s." % [wn, ln, pens])
+	_stage_charity_shield(champ, fa, rng)
 
 
 ## First-season curtain-raiser. The app has no played 96-97 season, but its honours are
-## fixed history: Man Utd (96-97 champions) v Chelsea (96-97 F.A. Cup winners). PM98 plays
-## that shield as a REAL match, not a scripted result -- witnessed live in the wine original
-## 2026-07-23, where the winner AND the decider VARY between two fresh careers (career A:
-## "Manchester Utd. (on penalties)"; career B: "Chelsea", no pens). So it is NOT the old
-## hardcoded "Man Utd lift it, decided=blank" card -- it is simulated the same way as every
-## later shield (Cup.single_neutral_match), with the two fixed participants.
+## fixed history: Man Utd (96-97 champions) v Chelsea (96-97 F.A. Cup winners). Staged the
+## same way as every later shield (fixed participants).
 func _seed_first_season_shield(rng: RandomNumberGenerator) -> void:
-	var champ := S1_SHIELD_CHAMPION_ID   # Man Utd -- 96-97 champions (home / first-named)
-	var fa := S1_SHIELD_RUNNERUP_ID      # Chelsea -- 96-97 F.A. Cup winners
-	if champ == fa:
+	_stage_charity_shield(S1_SHIELD_CHAMPION_ID, S1_SHIELD_RUNNERUP_ID, rng)
+
+
+## Stage the Charity Shield between `champ` (champions, home/first-named) and `fa` (F.A. Cup
+## winners). PM98 plays it as a REAL match -- witnessed live 2026-07-23 (winner AND decider
+## vary between fresh careers). If the MANAGER is one of the two contestants he PLAYS it as
+## his first fixture (`charity_shield_pending`; resolved by play_charity_shield_match); a
+## non-participant sees it auto-resolved into the CHARITY SHIELD CHAMPION card, exactly like
+## the wine original shows a Barnsley manager Man Utd v Chelsea already decided.
+func _stage_charity_shield(champ: int, fa: int, rng: RandomNumberGenerator) -> void:
+	if champ == -1 or fa == -1 or champ == fa:
 		return
+	if club_id == champ or club_id == fa:
+		# The manager contests it himself -> play it (Main._career_advance).
+		charity_shield = {"champ_id": champ, "fa_id": fa, "season": season}
+		charity_shield_pending = true
+		return
+	# Non-participant: auto-resolve now (Cup.single_neutral_match) into the card + news.
+	charity_shield_pending = false
 	var ratings_fn := func(id: int) -> Dictionary: return _ratings_for(id)
 	var xi_fn := func(id: int) -> Array: return _xi_for(id)
 	var tie := Cup.single_neutral_match(rng, champ, fa, ratings_fn, xi_fn)
@@ -2917,17 +2918,77 @@ func _seed_first_season_shield(rng: RandomNumberGenerator) -> void:
 	var w := int(tie["winner_id"])
 	var l := int(tie["loser_id"])
 	var pens := " (on penalties)" if tie.get("decided", "") == "pens" else ""
-	if w == club_id:
-		cash += CHARITY_PRIZE
 	# club_names is the manager's own division; a lower-division manager still gets the card
 	# (names resolve via GameDB in Main). Post news only when both clubs are in this table.
 	if club_names.has(w) and club_names.has(l):
-		if w == club_id:
+		_news("cup", "Charity Shield: %s beat %s%s." % [
+			str(club_names[w]), str(club_names[l]), pens])
+
+
+## The Charity Shield fixture the manager must PLAY (he is a contestant), or {} when there is
+## none (already played, or he isn't in it). {champ_id, fa_id, opp_id, home} -- the champions
+## are the home / first-named side (witnessed "Manchester Utd. v Chelsea").
+func pending_charity_shield() -> Dictionary:
+	if not charity_shield_pending:
+		return {}
+	var champ := int(charity_shield.get("champ_id", -1))
+	var fa := int(charity_shield.get("fa_id", -1))
+	if champ == -1 or fa == -1 or (club_id != champ and club_id != fa):
+		return {}
+	var at_home := club_id == champ
+	return {"champ_id": champ, "fa_id": fa, "opp_id": (fa if at_home else champ), "home": at_home}
+
+
+## Play the manager's Charity Shield against `opp_view` (the other contestant, roster-loaded).
+## Same engine path as play_friendly (his real repaired XI); the champions are the home side.
+## A level result is decided on penalties (Cup.shootout) like the auto path. Stores the final
+## result into `charity_shield`, awards the prize if he lifts it, clears the pending flag, and
+## returns the advance_week manager_res shape (+ friendly/charity flags) for the same
+## MatchScreen presentation. Returns {} if there is no pending shield.
+func play_charity_shield_match(rng: RandomNumberGenerator, opp_view: Dictionary) -> Dictionary:
+	var p := pending_charity_shield()
+	if p.is_empty():
+		return {}
+	var champ := int(p["champ_id"])
+	var fa := int(p["fa_id"])
+	var at_home := bool(p["home"])        # manager manages the champions -> home
+	var my_ratings := _ratings_for(club_id)
+	var my_xi := _mgr_featured_xi()
+	var opp_ratings := MatchEngine.team_ratings(opp_view)
+	var opp_xi := MatchSim.xi_of(opp_view)
+	var h := champ                        # champions are always the first-named / home side
+	var a := fa
+	var res := MatchSim.simulate(rng,
+		my_ratings if at_home else opp_ratings,
+		opp_ratings if at_home else my_ratings,
+		my_xi if at_home else opp_xi,
+		opp_xi if at_home else my_xi, h, a)
+	var hg := int(res["home_goals"])
+	var ag := int(res["away_goals"])
+	var decided := ""
+	var winner := h if hg > ag else a
+	if hg == ag:
+		var rh := my_ratings if at_home else opp_ratings
+		var ra := opp_ratings if at_home else my_ratings
+		winner = Cup.shootout(rng, h, a, rh, ra)
+		decided = "pens"
+	var loser := a if winner == h else h
+	charity_shield = {"champ_id": champ, "fa_id": fa, "season": season,
+		"home_id": h, "away_id": a, "hg": hg, "ag": ag,
+		"winner_id": winner, "loser_id": loser, "decided": decided, "bye": false}
+	charity_shield_pending = false
+	var pens := " (on penalties)" if decided == "pens" else ""
+	if winner == club_id:
+		cash += CHARITY_PRIZE
+		if club_names.has(winner) and club_names.has(loser):
 			_news("cup", "%s have won the Charity Shield, beating %s%s." % [
-				str(club_names[w]), str(club_names[l]), pens])
-		else:
-			_news("cup", "Charity Shield: %s beat %s%s." % [
-				str(club_names[w]), str(club_names[l]), pens])
+				str(club_names[winner]), str(club_names[loser]), pens])
+	elif club_names.has(winner) and club_names.has(loser):
+		_news("cup", "Charity Shield: %s beat %s%s." % [
+			str(club_names[winner]), str(club_names[loser]), pens])
+	return {"home_id": h, "away_id": a, "hg": hg, "ag": ag,
+		"manager_home": at_home, "goals": res.get("goals", []),
+		"possession": res.get("possession", []), "friendly": true, "charity": true}
 
 
 ## Build this season's European competitions from last season's honours. `euro_pool` is
@@ -3283,6 +3344,7 @@ func to_dict() -> Dictionary:
 		"last_champion_id": last_champion_id, "last_fa_winner_id": last_fa_winner_id,
 		"last_lc_winner_id": last_lc_winner_id,
 		"last_runners_up": last_runners_up, "charity_shield": charity_shield,
+		"charity_shield_pending": charity_shield_pending,
 		"season_opened": season_opened, "euro_seeds": euro_seeds,
 		"euro": euro, "euro_ratings": _str_keyed(euro_ratings),
 		"euro_names": _str_keyed(euro_names),
@@ -3399,6 +3461,7 @@ static func from_dict(d: Dictionary) -> Career:
 	for v in d.get("last_runners_up", []):
 		c.last_runners_up.append(int(v))
 	c.charity_shield = d.get("charity_shield", {})
+	c.charity_shield_pending = bool(d.get("charity_shield_pending", false))
 	# Pre-chain saves load as already-opened so the curtain-raiser screens don't
 	# fire mid-season on an in-flight career.
 	c.season_opened = bool(d.get("season_opened", true))
