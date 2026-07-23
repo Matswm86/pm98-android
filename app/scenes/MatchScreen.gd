@@ -178,7 +178,12 @@ func _row_median(img: Image, y: int, x0: int, x1: int) -> Color:
 	return Color(rs[m], gs[m], bs[m])
 
 
-## Build the honest feed from a timeline: a Kick Off line + one line per GOAL only.
+## Build the feed from a timeline: a Kick Off line then EVERY match event, minute-stamped
+## like the original BRIEF (shots, saves, ball-cleared, good-defending, headers, corners,
+## fouls, cards, offsides + the red GOAL lines) -- owner 2026-07-23: "there are many more
+## match events in the original BRIEF, not only goals". The GOALS are the stat engine's
+## real record (scorer + minute); the surrounding events are MatchCommentary's narrative
+## layer, timed around them, matching the original's dense presentation.
 ## Accepts both the MatchCommentary shape ({minute, side, text, goal}) and the raw
 ## stat-engine goal vector ({minute, side/scorer_side, scorer, own_goal}).
 func _honest_feed(lines: Array) -> Array:
@@ -188,16 +193,21 @@ func _honest_feed(lines: Array) -> Array:
 		if not (ln is Dictionary):
 			continue
 		var d: Dictionary = ln
-		var is_goal := bool(d.get("goal", false)) or d.has("scorer")
-		if not is_goal:
-			continue   # DROP shots/fouls/cards/corners (fabricated; not stat-engine truth)
-		var side := int(d.get("side", d.get("scorer_side", -1)))
-		var scorer := str(d.get("scorer", ""))
-		if scorer == "":   # MatchCommentary shape: "Goal by <name>"
-			scorer = str(d.get("text", "")).trim_prefix("Goal by ").strip_edges()
-		var club := _home if side == 0 else _away
+		# Raw stat-engine goal vector (no pre-formatted text) -> a red goal line.
+		if not d.has("text"):
+			if d.has("scorer"):
+				var gs := int(d.get("side", d.get("scorer_side", -1)))
+				out.append({"minute": int(d.get("minute", 0)), "side": gs,
+					"text": "Goal by %s (%s)" % [str(d.get("scorer", "")), (_home if gs == 0 else _away)],
+					"goal": true})
+			continue
+		# MatchCommentary shape: keep every side-tagged event; drop only the phase markers
+		# (side == -1: KICK OFF / HALF TIME / FULL TIME -- MatchScreen draws the clock itself).
+		var side := int(d.get("side", -1))
+		if side < 0:
+			continue
 		out.append({"minute": int(d.get("minute", 0)), "side": side,
-			"text": "Goal by %s (%s)" % [scorer, club], "goal": true})
+			"text": str(d.get("text", "")), "goal": bool(d.get("goal", false))})
 	return out
 
 

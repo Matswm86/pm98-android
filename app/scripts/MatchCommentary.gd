@@ -22,6 +22,9 @@ const T_SENT_OFF := "%s (%s) sent off"            # 0x65cf24
 const T_OFFSIDE := "%s (%s) offside"              # 0x65cea8
 const T_FOUL := "Foul by %s (%s)"                 # 0x65cf68
 const T_SAVED := "Shot saved by %s (%s)"          # 0x65ce54
+const T_SHOT := "Shot by %s (%s)"                 # MANAGER.EXE .rdata (BRIEF feed)
+const T_CLEARED := "Ball cleared by %s (%s)"      # MANAGER.EXE .rdata (BRIEF feed)
+const T_GOOD_DEF := "Good defending by %s (%s)"   # MANAGER.EXE .rdata (BRIEF feed)
 const T_HEADER := "Header by %s (%s)"             # 0x65cdb8
 const T_CORNER := "Corner taken by %s"            # 0x65ce84
 const T_PEN_TAKEN := "Penalty taken by %s"        # 0x65ceb8
@@ -33,12 +36,18 @@ const P_KICK_OFF := "KICK OFF"                    # 0x65cc54
 const P_HALF_TIME := "HALF TIME"                  # 0x6563b0
 const P_FULL_TIME := "FULL TIME"                  # 0x656364
 
-# Per-match ancillary event rates (ours, tuned to real-football aggregates).
-const RATE_CORNERS := 10
-const RATE_FOULS := 11
+# Per-match ancillary event rates (ours). The original BRIEF feed is DENSE -- shots,
+# saves, clearances and good-defending dominate, goals are the rare red lines (witnessed
+# 2026-07-23, Man Utd v Chelsea: ~10+ non-goal events per half). Tuned to that density.
+const RATE_SHOTS := 14        # "Shot by X (Club)" -- the commonest BRIEF line
+const RATE_CLEARANCES := 10   # "Ball cleared by X (Club)"
+const RATE_GOOD_DEF := 6      # "Good defending by X (Club)"
+const RATE_HEADERS := 4       # "Header by X (Club)"
+const RATE_CORNERS := 8
+const RATE_FOULS := 9
 const RATE_YELLOWS := 3
 const RATE_OFFSIDES := 4
-const RATE_NEAR_MISSES := 3   # post / crossbar / save flavour lines
+const RATE_NEAR_MISSES := 6   # "Shot saved by <keeper> (Club)" + post/crossbar flavour
 
 
 static func _outfield(club: Dictionary) -> Array:
@@ -147,8 +156,13 @@ static func narrate(rng: RandomNumberGenerator, home: Dictionary, away: Dictiona
 			var s := _pick(prng, ap, ["RM", "TI", "CA"])
 			events.append({"minute": _minute(prng), "side": 1, "text": T_GOAL % [s.get("name", "?"), an], "goal": true})
 
-	# Ancillary events: alternate-ish between sides via the roll.
+	# Ancillary events: alternate-ish between sides via the roll. The original BRIEF feed
+	# is built mostly of shots, clearances and good-defending, so those carry the density.
 	var both := [[0, hp, hn], [1, ap, an]]
+	_sprinkle(prng, events, both, RATE_SHOTS, func(side, p, nm): return T_SHOT % [p.get("name", "?"), nm], ["TI", "CA"])
+	_sprinkle(prng, events, both, RATE_CLEARANCES, func(side, p, nm): return T_CLEARED % [p.get("name", "?"), nm], ["AG"])
+	_sprinkle(prng, events, both, RATE_GOOD_DEF, func(side, p, nm): return T_GOOD_DEF % [p.get("name", "?"), nm], ["AG", "VE"])
+	_sprinkle(prng, events, both, RATE_HEADERS, func(side, p, nm): return T_HEADER % [p.get("name", "?"), nm], ["RM", "TI"])
 	_sprinkle(prng, events, both, RATE_YELLOWS, func(side, p, nm): return T_YELLOW % [p.get("name", "?"), nm], ["AG", "EN"])
 	_sprinkle(prng, events, both, RATE_FOULS, func(side, p, nm): return T_FOUL % [p.get("name", "?"), nm], ["AG"])
 	_sprinkle(prng, events, both, RATE_OFFSIDES, func(side, p, nm): return T_OFFSIDE % [p.get("name", "?"), nm], ["VE"])
