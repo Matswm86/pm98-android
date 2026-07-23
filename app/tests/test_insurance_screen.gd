@@ -37,8 +37,10 @@ func _run() -> void:
 	for g in InsuranceScreen.M_BTNS:
 		var r: Rect2 = InsuranceScreen.M_BTNS[g]
 		ok = _assert(r.end.x <= 640 and r.end.y <= 480, "group btn %d in canvas" % g) and ok
-	ok = _assert(InsuranceScreen.PRICES == Career.INSURANCE_PRICES,
-		"screen prices == Career constants") and ok
+	ok = _assert(InsuranceScreen.PRICES == {1: Insurance.PREMIUM_MIN[1] / Insurance.UNIT,
+			2: Insurance.PREMIUM_MIN[2] / Insurance.UNIT,
+			3: Insurance.PREMIUM_MIN[3] / Insurance.UNIT},
+		"screen minimum prices == the binary clamp constants") and ok
 
 	# ---- sections: bucket + REVERSE record order (witness rows) ------------
 	var club := {"id": 59, "name": "Bolton W", "players": [
@@ -111,9 +113,13 @@ func _run() -> void:
 		"insurance survives save round-trip") and ok
 	ok = _assert(c2.set_insurance(7, 0), "group 0 = uninsure") and ok
 	ok = _assert(not c2.rosters[59][0].has("insurance_group"), "uninsure erases key") and ok
-	ok = _assert(int(Career.INSURANCE_PRICES[1]) == 200 \
-		and int(Career.INSURANCE_PRICES[2]) == 500 \
-		and int(Career.INSURANCE_PRICES[3]) == 1000, "flat witnessed prices") and ok
+	# The two wine witnesses (Ward £1,250/mo, Frandsen £14,583/mo) both sit under
+	# FUN_0058c020's clamp, so both must price at the witnessed £200/£500/£1,000.
+	for mw in [1250, 14583]:
+		ok = _assert(Insurance.premium_monthly(1, mw) == 200 \
+			and Insurance.premium_monthly(2, mw) == 500 \
+			and Insurance.premium_monthly(3, mw) == 1000,
+			"witness monthly wage %d prices 200/500/1000" % mw) and ok
 
 	print("\n%s" % ("ALL PASS" if ok else "FAILURES ABOVE"))
 	quit(0 if ok else 1)

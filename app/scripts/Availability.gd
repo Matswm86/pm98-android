@@ -11,6 +11,7 @@ extends RefCounted
 ## State lives on the player dict (so it persists inside Career.rosters with no
 ## extra save plumbing):
 ##   * injured_weeks   : weeks still to sit out injured        (0 = fit)
+##   * injury_weeks_total : the duration the diagnosis rolled  (player+0x69)
 ##   * suspended_weeks : matchdays still to sit out banned     (0 = available)
 ##   * yellows         : bookings accrued toward the next ban
 ##   * injury_type     : index into INJURY_TYPES (the diagnosis), set when injured
@@ -113,6 +114,7 @@ static func tick_week(squad: Array) -> Array:
 			p["injured_weeks"] = inj
 			if inj == 0:
 				p.erase("injury_type")
+				p.erase("injury_weeks_total")
 				news.append({"kind": "return", "text": "%s is back to full fitness." % _nm(p)})
 		var sus := int(p.get("suspended_weeks", 0))
 		if sus > 0:
@@ -140,6 +142,10 @@ static func roll_match(rng: RandomNumberGenerator, featured: Array, injury_mult 
 			var ti := _roll_match_injury_type(rng)
 			var wk := _injury_weeks(rng, ti)
 			p["injured_weeks"] = maxi(int(p.get("injured_weeks", 0)), wk)
+			# The setter stamps BOTH injury bytes: +0x68 weeks remaining and
+			# +0x69 the total (injury_model_re.md). The total is what the
+			# INJURIES PRICE column charges against (Insurance.injury_price).
+			p["injury_weeks_total"] = int(p["injured_weeks"])
 			p["injury_type"] = ti
 			news.append({"kind": "injury", "type": ti,
 				"text": _injury_news(_nm(p), wk, ti)})
@@ -170,6 +176,7 @@ static func reset(squad: Array) -> void:
 		p["suspended_weeks"] = 0
 		p["yellows"] = 0
 		p.erase("injury_type")
+		p.erase("injury_weeks_total")
 
 
 # ---- helpers -------------------------------------------------------------

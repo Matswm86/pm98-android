@@ -96,9 +96,12 @@ Reached INJURIES -> INSURANCE; RETURN re-raises INJURIES (witnessed 39->40).
 
 - RATING view un-walked -> baked PARAM.-active state is the only view; both
   toggle buttons inert (also MONTHLY WAGE / MONTHLY COST legend = static bake).
-- Premium CHARGING cadence + injury payout flow un-RE'd -> no money moves; the
-  FinanceScreen PLAYERS' INSURANCE / INSURANCE GROUP 3 lines stay £0 gaps.
-  (INJURIES PRICE/INSUR./COST columns likewise stay resting furniture.)
+- ~~Premium CHARGING cadence + injury payout flow~~ **CLOSED 2026-07-24** ->
+  `insurance_economy_re.md`. The premium is `FUN_0058c020` (monthly/{150,120,70}
+  clamped to £200/£500/£1,000), charged weekly as `premium*12/52`; the payout is
+  `FUN_0058c000` (50 %/100 % for groups 2/3). The FinanceScreen PLAYERS'
+  INSURANCE / HOSPITALS / INSURANCE GROUP 3 lines and the INJURIES
+  PRICE/INSUR./COST columns are live.
 - Row digit inks for groups 2/3, up-enabled arrow face, scrolled slider
   positions, insured-player modal re-open border: pattern-derived, unwitnessed.
 - Wage VALUES (charter #10): original per-player wages undecoded; grammar

@@ -57,8 +57,11 @@ injury-name pointer array at **VA 0x6622e8** (18 entries, native index order):
   `Availability.MATCH_INJURY_CDF` + `_injury_weeks(rng, ti)`. NOT DAT.PKF-driven —
   the tables are static code in MANAGER.EXE. The old invented short-weighting +
   uniform-within-tier pick are gone.
-- **Still open**: the insurance premium/payout economy (`INSUR.`/`PRICE`/`COST`
-  columns) and the weekly-illness path (virus/cold, roll_A) — flagged, not faked.
+- **Insurance economy CLOSED 2026-07-24** (`insurance_economy_re.md`): `PRICE` =
+  total injury weeks x £1,500 (`FUN_00584e00`), `INSUR.` = the policy group byte,
+  `COST` = PRICE less the group payout (`FUN_0058c000`, 50 %/100 % for groups
+  2/3), and the H column = `is_serious(diagnosis)`. Row builder @0x543770.
+- **Still open**: the weekly-illness path (virus/cold, roll_A) — flagged, not faked.
 
 Injuries are rolled for the **manager's club only** (`Availability.gd` scope),
 so the list is exactly that squad. **Suspensions are not injuries** and are
@@ -80,10 +83,13 @@ x385..476 / x525..609).
 1. ~~**TYPE OF INJURY**~~ — **CLOSED 2026-07-23**: the column now renders the real
    diagnosis (binary-exact table above; `Availability.injury_type_name`).
 2. **PHYS. checkbox** (treatment toggle) — no treatment model; furniture.
-3. **PRICE / INSUR. / COST** — the app models no injury-insurance economy; those
-   columns stay furniture and INSURANCE is a documented no-op. (Payout/premium
-   amounts are DAT.PKF-driven; the real insurance strings/groups are catalogued
-   in `insurance_screen_re.md` — the economy itself is the next injuries session.)
+3. ~~**PRICE / INSUR. / COST**~~ — **CLOSED 2026-07-24** (`insurance_economy_re.md`),
+   together with the un-headered **H** column (`is_serious` -> YES/NO). The
+   populated row's furniture is now frame-cut verbatim from witness 83
+   (`tools/re/build_injuries_row_from_frame.py`) and the whole row render-diffs
+   **0 px** against it.Remaining gap: an INSURED row also draws a document icon at
+   row-x 459 (@0x543b09) that no frame witnesses on this screen, so the port
+   draws the policy digit alone.
 4. **"N PLAYERS" = physio quality** is *inferred* from frame 034's 5-stars↔"5
    PLAYERS" pairing (not reversed from the binary); flagged as an inference.
 5. **Header red-cross plaque** — the injuries-mode barra decoration (frame 034

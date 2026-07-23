@@ -18,14 +18,20 @@ class_name FinanceScreen
 ## STAFF WAGES 1,211 = 682,653).
 ##
 ## Model -> frame line mapping (docs/re/finance_screen_re.md):
-##   INCOME:  TICKETS<-gate, PUBLICITY<-boards+sponsor, TELEVISION<-tv;
-##            EUROPEAN CUP INCOME / SALE+LOAN PLAY. / INSURANCE GROUP 3 / LOANS = 0 (gap)
-##   EXPENSES: PLAYERS' WAGE<-wages, PLAYERS' BONUS<-bonus; SIGN PLAYER /
-##            CANCELLATION / PLAYERS' INCENTIVE / PLAYERS' INSURANCE / HOSPITALS /
-##            STAFF WAGES / REFORM GROUND / FINES / LOANS AND INTEREST = 0 (gap)
-## The gap lines show £0 (exactly as the frame shows them for a fresh save) — the
-## real per-line figures are a runtime float ledger the app has no save-game for
-## (docs/re/finance_constants.md), never fabricated here.
+##   INCOME:  TICKETS<-gate, PUBLICITY<-boards+sponsor, TELEVISION<-tv,
+##            INSURANCE GROUP 3<-the season's group-3 policy income;
+##            EUROPEAN CUP INCOME / SALE+LOAN PLAY. / LOANS = 0 (gap)
+##   EXPENSES: PLAYERS' WAGE<-wages less the insured-injured refund,
+##            PLAYERS' BONUS<-bonus, PLAYERS' INSURANCE<-premiums,
+##            HOSPITALS<-injury bills net of the policy payouts; SIGN PLAYER /
+##            CANCELLATION / PLAYERS' INCENTIVE / STAFF WAGES / REFORM GROUND /
+##            FINES / LOANS AND INTEREST = 0 (gap)
+## The three insurance lines and the PLAYERS' WAGE netting are the binary's own
+## ledger slots (docs/re/insurance_economy_re.md: week record +0x60 / +0x64-0x68-0x6c
+## / +0x70, and PLAYERS' WAGE = +0x50 - +0x54), fed by Career's season-to-date
+## accumulator. The remaining gap lines show £0 (exactly as the frame shows them
+## for a fresh save) — those per-line figures are a runtime float ledger the app
+## has no save-game for (docs/re/finance_constants.md), never fabricated here.
 
 signal back_pressed      # RETURN button -> Main dismisses the screen
 signal prices_pressed    # RETAINED for Main compatibility; NOT emitted (see WIRING note)
@@ -82,6 +88,7 @@ const SZ_BOT := 15     # Calend12 native size
 const SZ_TOT := 11     # Proman8 native size
 
 var _sum: Dictionary = {}
+var _ledger: Dictionary = {}  # season-to-date insurance figures (Career.insurance_ledger)
 var _club: String = ""       # not shown on this screen (kept for Main's setup call)
 var _manager: String = ""    # ditto
 var _season: String = ""
@@ -103,8 +110,9 @@ func _ready() -> void:
 
 
 func setup(summary: Dictionary, club: String, manager: String = "", season: String = "",
-		cash: int = 0, week: int = 0) -> void:
+		cash: int = 0, week: int = 0, ledger: Dictionary = {}) -> void:
 	_sum = summary
+	_ledger = ledger
 	_club = club
 	_manager = manager
 	_season = season
@@ -192,32 +200,49 @@ func _draw_season() -> void:
 	_txt(_ftot, SEASON_RIGHT, SEASON_Y, txt, C_BLACK, SZ_TOT)
 
 
-func _draw_ledger() -> void:
+## The 7 INCOME rows, in frame order. INSURANCE GROUP 3 (row 5) is the ledger's
+## +0x70 income slot; EUROPEAN CUP INCOME / SALE+LOAN PLAY. / LOANS stay gaps.
+func _income_vals() -> Array:
 	var inc: Array = _sum.get("income_lines", [])
-	var exp: Array = _sum.get("expense_lines", [])
-	# INCOME column: TICKETS, PUBLICITY, TELEVISION, then 4 honest-gap zeros.
 	var tickets := int(inc[0][1]) if inc.size() > 0 else 0
 	var publicity := (int(inc[1][1]) if inc.size() > 1 else 0) + (int(inc[2][1]) if inc.size() > 2 else 0)
 	var television := int(inc[3][1]) if inc.size() > 3 else 0
-	var income_vals := [tickets, publicity, television, 0, 0, 0, 0]
+	return [tickets, publicity, television, 0, 0, int(_ledger.get("group3_income", 0)), 0]
+
+
+## The 11 EXPENSE rows, in frame order: PLAYERS' WAGE (2, net of the
+## insured-injured refund the original subtracts at +0x54), PLAYERS' BONUS (3),
+## PLAYERS' INSURANCE (5), HOSPITALS (6); the rest stay gaps.
+func _expense_vals() -> Array:
+	var exp: Array = _sum.get("expense_lines", [])
+	var players_wage := (int(exp[0][1]) if exp.size() > 0 else 0) - int(_ledger.get("wage_refund", 0))
+	var players_bonus := int(exp[1][1]) if exp.size() > 1 else 0
+	return [0, 0, players_wage, players_bonus, 0,
+		int(_ledger.get("premiums", 0)), int(_ledger.get("hospitals", 0)), 0, 0, 0, 0]
+
+
+static func _sum_of(vals: Array) -> int:
+	var t := 0
+	for v in vals:
+		t += int(v)
+	return t
+
+
+func _draw_ledger() -> void:
+	var income_vals := _income_vals()
 	for i in income_vals.size():
 		_txt(_fval, INC_RIGHT, ROW_Y0 + i * ROW_STEP + VAL_DY, fmt_money(int(income_vals[i])), C_BLACK, SZ_VAL)
-
-	# EXPENSES column: PLAYERS' WAGE (row 2), PLAYERS' BONUS (row 3); rest gaps.
-	var players_wage := int(exp[0][1]) if exp.size() > 0 else 0
-	var players_bonus := int(exp[1][1]) if exp.size() > 1 else 0
-	var expense_vals := [0, 0, players_wage, players_bonus, 0, 0, 0, 0, 0, 0, 0]
+	var expense_vals := _expense_vals()
 	for i in expense_vals.size():
 		_txt(_fval, EXP_RIGHT, ROW_Y0 + i * ROW_STEP + VAL_DY, fmt_money(int(expense_vals[i])), C_BLACK, SZ_VAL)
-
-	# totals (equal the summed columns; verified against the frame)
-	_txt(_ftot, TOT_INC_RIGHT, TOT_Y, fmt_money(int(_sum.get("total_income", 0))), C_TOTAL_INC, SZ_TOT)
-	_txt(_ftot, TOT_EXP_RIGHT, TOT_Y, fmt_money(int(_sum.get("total_expense", 0))), C_TOTAL_EXP, SZ_TOT)
+	# totals = the summed columns (the frame's own arithmetic, verified on 013)
+	_txt(_ftot, TOT_INC_RIGHT, TOT_Y, fmt_money(_sum_of(income_vals)), C_TOTAL_INC, SZ_TOT)
+	_txt(_ftot, TOT_EXP_RIGHT, TOT_Y, fmt_money(_sum_of(expense_vals)), C_TOTAL_EXP, SZ_TOT)
 
 
 func _draw_bottom_boxes() -> void:
-	var inc := int(_sum.get("total_income", 0))
-	var exp := int(_sum.get("total_expense", 0))
+	var inc := _sum_of(_income_vals())
+	var exp := _sum_of(_expense_vals())
 	# We hold no per-week history, so LAST/CURRENT weekly income+expenses are the
 	# season figures spread evenly (a flagged approximation). CASH is the real
 	# Career figure; LAST WEEK cash backs out this week's net.

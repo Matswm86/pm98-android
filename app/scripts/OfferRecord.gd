@@ -128,6 +128,67 @@ static func seed_clauses(av: int, pos_fine: int, years: int) -> Dictionary:
 	return out
 
 
+# ---- the asking price + the accept test (FUN_005889c0 / 0x584960 / 0x5849a0) -----
+# `player+0x9a` is a PER-MILLE price modifier: init 1000 (= full book value), clamped
+# to [500, 1250] by the adder at 0x584960, and re-set each week for CENTRE FORWARDS by
+# FUN_005849a0 from a goals-per-minute ratio. `player+0x98` is the TRANSFER-LIST flag
+# (setter FUN_00588620 pushes the player into the global list at 0x66c160 — the very
+# list the TRANSFER screen's draw routine FUN_00532a50 enumerates), and it knocks a
+# further 200‰ off. The accept test compares the bid against the modified ask.
+const PRICE_MOD_FULL := 1000        # _DAT_00638fb8, the init value at 0x581d2f
+const PRICE_MOD_MIN := 500          # clamp lo (0x584960)
+const PRICE_MOD_MAX := 1250         # clamp hi (0x584960)
+const PRICE_MOD_LISTED := 200       # _DAT_00638fb0, subtracted when player+0x98 is set
+
+# FUN_005849a0's ladder, in the order the binary tests it. `thr` is the striker's
+# goals-per-minute threshold, x10000: 60 when arg2 < 4, 47 when arg2 < 7, else 36.
+const PRICE_MOD_THRESHOLDS := [[4, 60], [7, 47]]
+const PRICE_MOD_THRESHOLD_LOW := 36
+const PRICE_MOD_LADDER := [[0, 1000], [13, 900], [24, 800], [39, 700], [50, 600]]
+const PRICE_MOD_FLOOR := 500
+
+
+## The per-mille modifier a player carries. Defaults to the binary's own init value.
+static func price_modifier(p: Dictionary) -> int:
+	return clampi(int(p.get("price_modifier", PRICE_MOD_FULL)), PRICE_MOD_MIN, PRICE_MOD_MAX)
+
+
+## FUN_00584960: nudge the modifier by `delta`, clamped to [500, 1250].
+static func price_modifier_add(m: int, delta: int) -> int:
+	return clampi(m + delta, PRICE_MOD_MIN, PRICE_MOD_MAX)
+
+
+## FUN_005849a0's striker ladder. `ratio` is `goals * 10000 / minutes` over career +
+## season, `arg2` the club field the caller passes from club+0x58. Returns the per-mille
+## modifier. NOT DRIVEN YET: the app accumulates no per-player minutes or goals
+## (docs/re/statistics_screen_re.md's declared gap), so nothing calls this in anger —
+## it is ported so the moment a season-stat store lands the modifier plugs straight in.
+static func price_modifier_of(ratio: int, arg2: int) -> int:
+	var thr := PRICE_MOD_THRESHOLD_LOW
+	for row in PRICE_MOD_THRESHOLDS:
+		if arg2 < int(row[0]):
+			thr = int(row[1])
+			break
+	for row in PRICE_MOD_LADDER:
+		if ratio >= thr - int(row[0]):
+			return int(row[1])
+	return PRICE_MOD_FLOOR
+
+
+## The asking fee for a player whose book value is `fee` (FUN_005889c0): the modifier
+## only ever DISCOUNTS — at or above 1000‰ the engine asks full book value.
+static func asking_fee(fee: int, modifier: int, listed: bool) -> int:
+	var m := modifier - (PRICE_MOD_LISTED if listed else 0)
+	if m >= PRICE_MOD_FULL:
+		return fee
+	return int(float(fee) * float(m) * 0.001)
+
+
+## The accept test itself: a bid is taken iff it reaches the modified ask.
+static func offer_accepted(bid: int, fee: int, modifier: int, listed: bool) -> bool:
+	return bid >= asking_fee(fee, modifier, listed)
+
+
 # ---- the on-screen AV (FUN_00534570, transfer_value_re.md §1) ---------------------
 ## The TRANSFER MARKET / offer-card "AV" cell is core4 >> 2, NOT the CA attribute and
 ## NOT the 6-attr RATING (that one is Morale.av6 / FUN_00581e60).

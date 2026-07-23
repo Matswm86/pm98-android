@@ -1,0 +1,41 @@
+{
+  "source": "screenshots/wine-captures-2026-07-18-goalscorers/83_injuries_populated.png",
+  "strip_x": 28,
+  "strip_y_offset": -1,
+  "row_top": 105,
+  "height": 18,
+  "chrome_gap": [
+    49,
+    58
+  ],
+  "cells": {
+    "name": [
+      60,
+      158
+    ],
+    "type": [
+      180,
+      356
+    ],
+    "week": [
+      358,
+      385
+    ],
+    "h": [
+      387,
+      408
+    ],
+    "price": [
+      410,
+      482
+    ],
+    "insur": [
+      484,
+      538
+    ],
+    "cost": [
+      540,
+      609
+    ]
+  }
+}

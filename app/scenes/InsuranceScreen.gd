@@ -31,8 +31,11 @@ class_name InsuranceScreen
 ##
 ## INSURANCE POLICY modal (witness 35/36/38): whole screen palette-dims through
 ## the PMAlert alert LUT (verified 9/9 sampled colour pairs); the modal is
-## bright on top. GROUP prices are FLAT game constants (£200/£500/£1,000 --
-## Ward £1,250 vs Frandsen £14,583 monthly wage see identical prices). Tapping
+## bright on top. GROUP prices come from the binary's own FUN_0058c020
+## (Insurance.premium_monthly): monthly wage / {150,120,70}, floored UP to
+## £200/£500/£1,000. Both witnesses (Ward £1,250, Frandsen £14,583 monthly) sit
+## under that clamp, which is why they saw identical prices; a player over
+## ~£30,000 a month prices above it. Tapping
 ## a SELECT GROUP box previews it in the header card immediately (36: INSUR.
 ## GROUP 1 + £200 BEFORE OK); the 2px red pending border appears only on the
 ## tapped box (fresh-open shows NONE, 35/38). OK commits + closes; policy_
@@ -109,7 +112,10 @@ const M_BTNS := {0: Rect2(128, 361, 90, 22), 1: Rect2(230, 361, 32, 22),
 const M_OK := Rect2(458, 357, 92, 30)
 const SEL_BORDER := Color8(255, 31, 0)   # witnessed 2px pending border (36)
 
-const PRICES := {1: 200, 2: 500, 3: 1000}  # flat £/month (witness 35 vs 38)
+## Minimum £/month per group — the clamp constants in FUN_0058c020, and the
+## prices both wine witnesses saw (35 vs 38). The LIVE price is per-player:
+## see `price_of()`.
+const PRICES := {1: 200, 2: 500, 3: 1000}
 
 # EU members 1997 in game_db nationality spellings: NOT on this list -> the
 # N° cell shows the mini nationality flag (the witnessed foreigner marker;
@@ -404,7 +410,7 @@ func _draw_row(top: int, p: Dictionary, key: String, i: int) -> void:
 			draw_texture(_tex(_doc_row), Vector2(DOC_ICON_XY[0], top + DOC_ICON_XY[1]))
 		PMChrome.text(self, _f8, DIGIT_X, ty, str(g), DIGIT_INKS[g], 11, 0)
 		draw_rect(Rect2(COST_CELL[0], top + 1, COST_CELL[1], 12), PMChrome.dim_col(C_COST_FILL), true)
-		PMChrome.text(self, _f8, COST_CELL[0], ty, _money(PRICES[g]), C_COST, 11, 1,
+		PMChrome.text(self, _f8, COST_CELL[0], ty, _money(price_of(p, g)), C_COST, 11, 1,
 			float(COST_CELL[1]))
 	if _press == "row:%s:%d" % [key, i]:
 		draw_rect(Rect2(ARROW_X, top, 29, ROW_BOX_H), C_PRESS, true)
@@ -559,7 +565,7 @@ func _draw_modal() -> void:
 	PMChrome.text(self, _f8, M_NAME_BAND[0], M_VAL_Y, "£" + _money(_monthly_wage(p)),
 		C_M_VAL, 12, 1, float(M_NAME_BAND[2]))
 	PMChrome.text(self, _f8, M_RIGHT_BAND[0], M_VAL_Y,
-		"£" + _money(PRICES[g] if g >= 1 else 0), C_M_VAL, 12, 1, float(M_RIGHT_BAND[2]))
+		"£" + _money(price_of(p, g) if g >= 1 else 0), C_M_VAL, 12, 1, float(M_RIGHT_BAND[2]))
 	if _pending >= 0:
 		# 2px filled red frame OUTSIDE the box (witness 36: x228..263 y359..384
 		# around the 32x22 "1" box) — filled bars, stroke rects blur the corners
@@ -581,6 +587,12 @@ func _draw_modal() -> void:
 func _monthly_wage(p: Dictionary) -> int:
 	@warning_ignore("integer_division")
 	return Contract.current_weekly(p, _band) * 52 / 12
+
+
+## This player's monthly premium for `group` — FUN_0058c020 (Insurance.gd), not a
+## flat constant: monthly/{150,120,70} floored up to £200/£500/£1,000.
+func price_of(p: Dictionary, group: int) -> int:
+	return Insurance.premium_monthly(group, _monthly_wage(p))
 
 
 func _avg_of(p: Dictionary) -> int:

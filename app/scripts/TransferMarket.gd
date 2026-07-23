@@ -336,9 +336,17 @@ static func asking_price(player: Dictionary, _is_key: bool, band: int) -> int:
 ## constants _DAT_00638fb0/fb8/fc0 — so we require full book value, a documented gap
 ## that only ever asks slightly MORE than the original for a short-contract player,
 ## never less; it never over-charges beyond the table value.)
+## The binary's own accept test, FUN_005889c0: the ask is the book value scaled by the
+## player's per-mille price modifier (player+0x9a, init 1000) less 200‰ if he is on the
+## transfer list (player+0x98). Neither field moves off its init value yet — the modifier
+## is re-set from a goals-per-minute ratio the app has no store for, and AI clubs carry
+## no listing flag — so today every ask is full book value, as before. See
+## OfferRecord.price_modifier_of / docs/re/offer_record_re.md §6.
 static func evaluate_offer(player: Dictionary, offer: int, _is_key: bool, band: int, _rng: RandomNumberGenerator) -> Dictionary:
 	var value := value_of(player, band)
-	return {"accepted": offer >= value, "asking": value, "value": value}
+	var asking := OfferRecord.asking_fee(value, OfferRecord.price_modifier(player),
+		bool(player.get("transfer_listed", false)))
+	return {"accepted": offer >= asking, "asking": asking, "value": value}
 
 
 ## The best offer an AI club will table for a transfer-listed player of the

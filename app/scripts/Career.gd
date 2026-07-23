@@ -53,6 +53,11 @@ var scorer_log: Array = []        # every league goal, all fixtures: {week,score
                                   # (own goals excluded; feeds GOAL SCORERS, witnessed 2026-07-18)
 var cash: int = 0                 # running bank balance
 var weekly_net: int = 0           # per-week finance delta (from FinanceModel)
+# Season-to-date insurance ledger, £ (FINANCES lines, Insurance.gd / @0x57f3a6):
+var ins_premiums: int = 0         # PLAYERS' INSURANCE  (week record +0x60)
+var ins_hospitals: int = 0        # HOSPITALS, net of the group payouts (+0x64-+0x68-+0x6c)
+var ins_wage_refund: int = 0      # insured-injured wages refunded (+0x54, cut from PLAYERS' WAGE)
+var ins_group3_income: int = 0    # INSURANCE GROUP 3 income (+0x70)
 var objective_pos: int = 17       # board wants: finish at least this high (1-based)
 var objective_text: String = ""
 var finished: bool = false        # season complete + objective resolved
@@ -673,6 +678,7 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 	cash += weekly_net
 	cash -= player_weekly_wage()        # the live squad wage bill (YEARLY WAGE / 52 per man)
 	cash -= Staff.weekly_wage(staff)   # the backroom staff wage bill (STAFF WAGES)
+	_tick_insurance()                  # premiums, hospital bills and policy payouts
 	_resolve_pending_bids(rng)         # last week's outgoing bids get their answers
 	_accumulate_offers(rng)            # incoming bids on the transfer-listed (CURRENT OFFERS)
 	week += 1
@@ -2126,11 +2132,13 @@ func player_weekly_wage() -> int:
 
 # ---- player insurance (INSURANCE screen) ---------------------------------
 
-## Flat monthly policy prices, GROUP 1/2/3 — witnessed game CONSTANTS (the
-## 2026-07-18 wine run: Ward £1,250 vs Frandsen £14,583 monthly wage see the
-## SAME £200/£500/£1,000). Premium CHARGING cadence + the injury payout flow
-## are un-RE'd — no money moves yet (documented gap, insurance_screen_re.md).
-const INSURANCE_PRICES := {1: 200, 2: 500, 3: 1000}
+## The monthly policy price for one player, GROUP 1/2/3 — the binary's own
+## FUN_0058c020 (Insurance.gd): monthly wage / {150,120,70}, floored up to
+## £200/£500/£1,000. Both 2026-07-18 wine witnesses (Ward £1,250 vs Frandsen
+## £14,583 monthly) sit under the clamp, which is why they saw identical prices.
+func insurance_price(p: Dictionary, group: int) -> int:
+	return Insurance.premium_monthly(group, Contract.current_weekly(p, my_band()) * 52 / 12)
+
 
 ## Set a squad player's INSURANCE POLICY group (0 = uninsured, 1-3). Stored on
 ## his dict (`insurance_group`) like `wage`, so it persists with the roster.
@@ -2146,6 +2154,55 @@ func set_insurance(pid: int, group: int) -> bool:
 				pd["insurance_group"] = group
 			return true
 	return false
+
+
+## One week of the insurance economy (MANAGER.EXE finance loop @0x57f3a6, ported
+## in Insurance.gd). Charges every policy's weekly premium, bills the hospital
+## for every active injury, credits the group 2/3 reimbursements, refunds an
+## insured injured man's wage, and books the GROUP 3 income line. Every one of
+## those setters moves the club balance by the same signed amount in the original
+## (they all tail-call FUN_00580cd0 -> club+0x1ec), so cash follows the ledger.
+## The season-to-date totals feed the FINANCES screen's own lines.
+func _tick_insurance() -> void:
+	var band := my_band()
+	var pass_ := Insurance.weekly_pass(my_squad(),
+		func(p): return Contract.current_weekly(p, band),
+		func(p): return Contract.current_yearly(p, band))
+	var premiums := int(pass_["premiums"])
+	var hospitals := float(pass_["hospitals"])
+	var payouts := float(pass_["payout2"]) + float(pass_["payout3"])
+	var wage_back := int(pass_["wage_back"])
+	var group3 := float(pass_["group3"])
+	if premiums == 0 and hospitals == 0.0 and wage_back == 0:
+		return
+	@warning_ignore("integer_division")
+	var prem_gbp := premiums / Insurance.UNIT
+	var hosp_gbp := int(hospitals / Insurance.UNIT)
+	var pay_gbp := int(payouts / Insurance.UNIT)
+	@warning_ignore("integer_division")
+	var back_gbp := wage_back / Insurance.UNIT
+	var g3_gbp := int(group3 / Insurance.UNIT)
+	ins_premiums += prem_gbp
+	ins_hospitals += hosp_gbp - pay_gbp
+	ins_wage_refund += back_gbp
+	ins_group3_income += g3_gbp
+	cash += back_gbp + g3_gbp - prem_gbp - (hosp_gbp - pay_gbp)
+
+
+## The season-to-date insurance figures the FINANCES screen posts to its own
+## PLAYERS' INSURANCE / HOSPITALS / INSURANCE GROUP 3 lines (and the PLAYERS'
+## WAGE netting). Keys match FinanceScreen's ledger lookup.
+func insurance_ledger() -> Dictionary:
+	return {"premiums": ins_premiums, "hospitals": ins_hospitals,
+		"wage_refund": ins_wage_refund, "group3_income": ins_group3_income}
+
+
+## Clear the season-to-date insurance ledger (new season / new career).
+func _reset_insurance_ledger() -> void:
+	ins_premiums = 0
+	ins_hospitals = 0
+	ins_wage_refund = 0
+	ins_group3_income = 0
 
 ## Hire a candidate from the pool into the backroom staff. The 13 roles are SINGLE-OCCUPANCY
 ## (frames 100 + 108-121): signing into a role that already has a holder REPLACES him -- the
@@ -2839,6 +2896,7 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	finished = false
 	season_opened = false   # the week-0 chain (shield card + START OF SEASON) re-runs
 	boards_sold_season = false   # a fresh sponsor-board season offer becomes available again
+	_reset_insurance_ledger()    # the FINANCES insurance lines are season-to-date
 	results.clear()
 	# Preseason friendlies were a career-entry pick; season 2+ has no re-pick UI
 	# (un-walked — the walkthrough started one career), so the slate just clears.
@@ -3469,6 +3527,8 @@ func to_dict() -> Dictionary:
 		"fixtures": fixtures, "table": tbl, "results": results, "cash": cash,
 		"scorer_log": scorer_log,
 		"weekly_net": weekly_net, "objective_pos": objective_pos,
+		"ins_premiums": ins_premiums, "ins_hospitals": ins_hospitals,
+		"ins_wage_refund": ins_wage_refund, "ins_group3_income": ins_group3_income,
 		"objective_text": objective_text, "finished": finished,
 		"tactics": tactics, "tier": tier, "rosters": ros, "club_names": nms,
 		"stadium_capacity": stadium_capacity, "works": works,
@@ -3558,6 +3618,10 @@ static func from_dict(d: Dictionary) -> Career:
 	c.scorer_log = d.get("scorer_log", [])   # pre-goalscorers saves load with an empty chart
 	c.cash = int(d.get("cash", 0))
 	c.weekly_net = int(d.get("weekly_net", 0))
+	c.ins_premiums = int(d.get("ins_premiums", 0))
+	c.ins_hospitals = int(d.get("ins_hospitals", 0))
+	c.ins_wage_refund = int(d.get("ins_wage_refund", 0))
+	c.ins_group3_income = int(d.get("ins_group3_income", 0))
 	c.objective_pos = int(d.get("objective_pos", 17))
 	c.objective_text = d.get("objective_text", "")
 	c.finished = bool(d.get("finished", false))

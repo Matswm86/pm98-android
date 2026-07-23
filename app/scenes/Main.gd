@@ -634,6 +634,8 @@ func _screens_shot() -> void:
 		["_show_tactics_screen", "tactics.png"],   # TEAM TACTICS modal over the line-up (ma_9)
 		["_show_market", "transfer_buy.png"],      # reskinned _set_view flow (T1 #3)
 		["_show_club_news", "club_news.png"],      # T2 #12: rival injuries surface here
+		["_show_injuries_screen", "injuries.png"], # the PRICE/INSUR./COST economy live
+		["_show_insurance_screen", "insurance.png"],
 	]
 	for s in shots:
 		call(s[0])
@@ -2322,8 +2324,9 @@ func _show_injuries_screen() -> void:
 		_show_insurance_screen())
 
 ## The INSURANCE screen (InsuranceScreen.gd; docs/re/insurance_screen_re.md):
-## the squad with per-player INSURANCE POLICY groups (flat £200/£500/£1,000
-## monthly). RETURN reopens INJURIES (witnessed 39 -> 40 back path).
+## the squad with per-player INSURANCE POLICY groups, priced by the binary's own
+## FUN_0058c020 (Insurance.gd -- £200/£500/£1,000 is its floor, not a flat rate).
+## RETURN reopens INJURIES (witnessed 39 -> 40 back path).
 func _show_insurance_screen() -> void:
 	var scr: InsuranceScreen = load("res://scenes/InsuranceScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -2635,7 +2638,8 @@ func _show_finance_screen() -> void:
 	var scr: FinanceScreen = load("res://scenes/FinanceScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
-	scr.setup(sm, _career.club_name, "", _career.season, _career.cash, _career.week + 1)
+	scr.setup(sm, _career.club_name, "", _career.season, _career.cash, _career.week + 1,
+		_career.insurance_ledger())
 	scr.prices_pressed.connect(_show_finance_control)
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
 	# Secret cash cheat: 5 taps on the live-cash box deposit £100M, then re-render with it.

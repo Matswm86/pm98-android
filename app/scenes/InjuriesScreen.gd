@@ -13,11 +13,23 @@ class_name InjuriesScreen
 ##    the "N PLAYERS" figure (= his quality), from Career.staff / Staff.gd.
 ##
 ## TYPE OF INJURY renders the game's own diagnosis (Availability.INJURY_TYPES,
-## MANAGER.EXE @0x6622e8; closed 2026-07-23). Remaining gaps (injuries_screen_re.md
-## §Gaps): PHYS. (treatment checkbox) and this list's PRICE / INSUR. / COST columns
-## are the DAT.PKF-driven insurance economy, still resting furniture. The INSURANCE button
-## opens the real INSURANCE screen (InsuranceScreen.gd, ported 2026-07-18 from
-## wine witnesses 33-39). Suspensions are NOT injuries and are excluded.
+## MANAGER.EXE @0x6622e8; closed 2026-07-23). The H / PRICE / INSUR. / COST cells
+## are the row builder @0x543770-0x543d85, ported 2026-07-23:
+##   H      = is_serious(diagnosis) ? "YES" (214,60,0) : "NO" (black)   @0x54389a
+##   PRICE  = total injury weeks x £1,500                               @0x5439b4
+##   INSUR. = "NO" when uninsured, else the policy digit                @0x543a48
+##   COST   = PRICE - PRICE x payout% / 100, white; BLANK when 0        @0x543ca7
+## A populated row also REPAINTS the panel strip it sits on (PHYS. button + name
+## cell through COST). That strip is FRAME-CUT verbatim from wine witness
+## 83_injuries_populated.png by tools/re/build_injuries_row_from_frame.py, so the
+## furniture is original pixels and this scene overlays nothing but text. The
+## INSURANCE button opens the real INSURANCE screen (InsuranceScreen.gd, ported
+## 2026-07-18 from wine witnesses 33-39). Suspensions are NOT injuries, excluded.
+##
+## HONEST GAP: an INSURED injured row also draws a small document icon at row-x
+## 459 (@0x543b09). No frame witnesses that sprite on THIS screen, so the port
+## draws the policy digit alone rather than guess the art. PHYS. (the treatment
+## checkbox) stays resting furniture.
 ## Native 640x480.
 
 signal back_pressed        # RETURN -> Main reopens LINE-UP
@@ -36,10 +48,35 @@ const SECT := [
 	{"key": "fwd", "tops": [350, 370, 390], "pos": ["FW"]},
 ]
 const ROW_H := 16
-const NAME_X := 64          # under the PLAYER header
+const NAME_X := 63          # under the PLAYER header (witness 83 ink x63)
 const NAME_W := 130.0
-const TYPE_CELL := [209, 115] # TYPE OF INJURY column (header x209..324); the real diagnosis
+const TYPE_CELL := [183, 174] # TYPE OF INJURY value rect (@0x5437a7, row-x 155 + 28)
 const WEEK_CELL := [355, 40] # Week column value cell (frame: grey box x358..385)
+
+# A populated row repaints a strip of the resting panel: the PHYS. treatment
+# button and everything from the name cell to COST. That strip is FRAME-CUT from
+# witness 83 (tools/re/build_injuries_row_from_frame.py -> row_strip.png), so the
+# furniture is original pixels and this scene overlays only text.
+const STRIP_X := 28
+const STRIP_DY := -1          # the strip carries the row's own top border
+
+# Value-cell spans inside the strip, measured on witness 83. [x0, x1] inclusive.
+const CELL_NAME := [60, 158]
+const CELL_TYPE := [180, 356]
+const CELL_WEEK := [358, 385]
+const CELL_H := [387, 408]
+const CELL_PRICE := [410, 482]
+const CELL_INSUR := [484, 538]
+const CELL_COST := [540, 609]
+const TEXT_DY := 3            # value baseline inside the row (witness ink y110..118)
+
+# Row inks (frame-sampled on witness 83; the binary's own colour word in brackets,
+# quantised by the original's 8-bit palette on the way to the frame).
+const C_WEEK_INK := Color8(255, 255, 255)     # 0xffffff  @0x543815
+const C_H_SERIOUS := Color8(214, 60, 0)       # d6 3c 00  @0x5438ae
+const C_PRICE := Color8(30, 52, 98)           # 18 34 63  @0x54399b
+const C_INSUR_NO := Color8(60, 80, 100)       # 39 51 63  @0x543a67
+const C_COST_INK := Color8(255, 255, 255)     # 0xffffff  @0x543cc7
 
 # physio band (frame 034 bottom): name x61..340 white band; count on the black band
 const PHYS_NAME_X := 62
@@ -69,6 +106,7 @@ var _f10: Font
 var _chrome: Texture2D
 var _title: Texture2D
 var _phys_star: Texture2D
+var _row_strip: Texture2D
 
 
 func _ready() -> void:
@@ -77,6 +115,7 @@ func _ready() -> void:
 	_chrome = load("res://art/screens/injuries/chrome.png")
 	_title = load("res://art/screens/injuries/title.png")
 	_phys_star = load("res://art/screens/injuries/phys_star.png")
+	_row_strip = load("res://art/screens/injuries/row_strip.png")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	gui_input.connect(_on_input)
@@ -182,17 +221,43 @@ func _draw_rows() -> void:
 		var rows: Array = _injured.get(str(sect["key"]), [])
 		var tops: Array = sect["tops"]
 		for i in mini(rows.size(), tops.size()):
-			var p: Dictionary = rows[i]
-			var y: int = tops[i]
-			PMChrome.text(self, _f8, NAME_X, y + 2,
-				PMChrome.title_case_name(str(p.get("name", "?"))), C_NAME, 11, 0, NAME_W)
-			# TYPE OF INJURY: the game's own diagnosis string (Availability.INJURY_TYPES),
-			# blank only for legacy untyped injuries.
-			var diag := Availability.injury_type_name(p)
-			if diag != "":
-				PMChrome.text(self, _f8, TYPE_CELL[0], y + 2, diag, C_NAME, 11, 0, float(TYPE_CELL[1]))
-			PMChrome.text(self, _f8, WEEK_CELL[0], y + 2, str(int(p.get("injured_weeks", 0))),
-				C_WEEK, 11, 1, float(WEEK_CELL[1]))
+			_draw_row(rows[i], int(tops[i]))
+
+
+## One populated INJURIES row: the repainted cell grid (witness 83) plus every
+## value the row builder @0x543770-0x543d85 writes into it.
+func _draw_row(p: Dictionary, y: int) -> void:
+	if _row_strip != null:
+		draw_texture(_row_strip, Vector2(STRIP_X, y + STRIP_DY))
+	PMChrome.text(self, _f8, NAME_X, y + TEXT_DY,
+		PMChrome.title_case_name(str(p.get("name", "?"))), C_NAME, 11, 0, NAME_W)
+	# TYPE OF INJURY: the game's own diagnosis string (Availability.INJURY_TYPES),
+	# blank only for legacy untyped injuries.
+	var diag := Availability.injury_type_name(p)
+	if diag != "":
+		PMChrome.text(self, _f8, TYPE_CELL[0], y + TEXT_DY, diag, C_NAME, 11, 0, float(TYPE_CELL[1]))
+	# Week = the injury record's +0x68, the weeks STILL to sit out (@0x54382f).
+	_cell_text(CELL_WEEK, y, str(int(p.get("injured_weeks", 0))), C_WEEK_INK)
+	# H = is_serious(diagnosis): types 11..17 print YES in red, the rest NO in black.
+	var ti := int(p.get("injury_type", -1))
+	var serious := ti >= Availability.SERIOUS_MIN
+	_cell_text(CELL_H, y, "YES" if serious else "NO", C_H_SERIOUS if serious else C_NAME)
+	# PRICE / INSUR. / COST — the insurance economy (Insurance.gd).
+	var total := Insurance.injury_total_weeks(p)
+	var group := int(p.get("insurance_group", 0))
+	_cell_text(CELL_PRICE, y, FinanceScreen.fmt_money(Insurance.injury_price(total)), C_PRICE)
+	if group <= 0:
+		_cell_text(CELL_INSUR, y, "NO", C_INSUR_NO)
+	else:
+		_cell_text(CELL_INSUR, y, str(group), C_NAME)
+	var cost := Insurance.injury_cost(total, group)
+	if cost != 0:   # a fully-covered (GROUP 3) injury leaves the cell EMPTY (@0x543cd2)
+		_cell_text(CELL_COST, y, FinanceScreen.fmt_money(cost), C_COST_INK)
+
+
+func _cell_text(cell: Array, y: int, s: String, col: Color) -> void:
+	PMChrome.text(self, _f8, int(cell[0]), y + TEXT_DY, s, col, 11, 1,
+		float(cell[1] - cell[0] + 1))
 
 
 ## PHYSIOTHERAPIST band: name + quality stars + "N PLAYERS" (= physio quality;

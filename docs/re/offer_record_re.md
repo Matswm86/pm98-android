@@ -124,11 +124,48 @@ accept iff bid (offer+0x1c) >= ask
 Constants `_DAT_00638fb0/fb8/fc0` = **200.0 / 1000.0 / 0.001** (previously "un-extracted";
 `transfer_value_re.md §9.3` read `+0x9a` as "contract years" — it is not).
 
-`player+0x9a` is initialised to `0x3e8` (1000) at `0x581d2f`, clamped to **[500, 1250]** by
-the adder at `0x584960`, and set to one of 1000 / 900 / 800 / 700 / 500-or-600 by
-`FUN_005849a0` from an appearances/goals ratio against a position-banded threshold. The app
-still requires full book value (the conservative end of that range); wiring the modifier is
-the next step, and is now a bounded one — **not** shipped this session.
+`player+0x9a` is initialised to `0x3e8` (1000) at `0x581d2f` and clamped to **[500, 1250]**
+by the adder at `0x584960`.
+
+### 6.1 `player+0x98` = the TRANSFER LIST flag (identified 2026-07-24)
+
+`FUN_00588620(player, flag)` is the only writer outside the save-game reader
+(`@0x583d14`). It stores the byte and, when it is set, pushes the player id into the
+global list object at `0x66c160` — **the same list the TRANSFER screen's draw routine
+`FUN_00532a50` enumerates** (`@0x532e96` / `0x533094` / `0x5337b0`, filtered by position
+through `FUN_00586eb0` / `FUN_00586f10`). So the flag means "listed on the transfer
+market", and it knocks a further 200‰ (20 %) off the ask.
+
+### 6.2 The modifier ladder — `FUN_005849a0(player, seasonStats, arg2)`
+
+Called once per squad player in the weekly pass (`@0x57b2fa` / `@0x57b3bb`) with the
+player's season-stat record and `club+0x58`:
+
+```
+if byte[player+0x1d] + 1 != 9: goto drift        # CENTRE FORWARD only
+if [0x66b1d8] <= 20: goto drift                  # and only after week 20
+den   = [player+0x24] + [stats+0]                # career + season, the rate denominator
+num   = [player+0x34] + [stats+0x10]             # career + season goals
+ratio = den ? num * 10000 / den : 0
+thr   = 60 if arg2 < 4 else 47 if arg2 < 7 else 36
+ratio >= thr    -> 1000        ratio >= thr-13 -> 900
+ratio >= thr-24 ->  800        ratio >= thr-39 -> 700
+ratio >= thr-50 ->  600        else            -> 500
+drift:  add -1 / -3 (didn't play) or 0 / +2 ([stats+4] >= 80) through 0x584960
+```
+
+### 6.3 Ported, and why it is inert
+
+`OfferRecord.{price_modifier, price_modifier_add, price_modifier_of, asking_fee,
+offer_accepted}` carry all of the above, and `TransferMarket.evaluate_offer` now runs the
+real accept test instead of `offer >= value`.
+
+It changes no behaviour **today, by design**: the ladder's inputs are per-player career +
+season *rate* counters, and `statistics_screen_re.md` records that the app accumulates
+**no** per-player season statistics at all (no MP / MIN / RATING / G.) — so there is
+nothing honest to feed it, and `player+0x9a` stays at its init 1000. AI clubs likewise
+carry no listing flag, so `player+0x98` stays clear. Both plug straight in the moment a
+season-stat store lands; neither is faked in the meantime.
 
 ## 7. Ported
 

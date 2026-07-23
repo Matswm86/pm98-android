@@ -14,6 +14,7 @@ func _initialize() -> void:
 	_term_roll()
 	_clause_seeds()
 	_av()
+	_price_modifier()
 	if _fails == 0:
 		print("OFFER RECORD: ALL GREEN")
 	else:
@@ -112,3 +113,32 @@ func _av() -> void:
 	var p := {"attrs": {"VE": 87, "RE": 83, "AG": 81, "CA": 84}}
 	_ok(OfferRecord.av_of(p) == 83, "AV = (87+83+81+84)>>2 = 83")
 	_ok(OfferRecord.av_of({}) == 0, "no attrs -> 0, never a fabricated value")
+
+
+# FUN_005889c0 / 0x584960 / 0x5849a0 -- the price modifier and the accept test.
+func _price_modifier() -> void:
+	_ok(OfferRecord.price_modifier({}) == 1000, "a player with no stored modifier asks full price")
+	_ok(OfferRecord.price_modifier({"price_modifier": 90}) == 500, "the adder clamps low at 500")
+	_ok(OfferRecord.price_modifier({"price_modifier": 9999}) == 1250, "the adder clamps high at 1250")
+	_ok(OfferRecord.price_modifier_add(1000, -600) == 500, "add clamps to the 500 floor")
+	_ok(OfferRecord.price_modifier_add(1000, 600) == 1250, "add clamps to the 1250 ceiling")
+	# The ladder: threshold 60 under arg2 4, 47 under 7, else 36; then -13/-24/-39/-50.
+	_ok(OfferRecord.price_modifier_of(60, 0) == 1000, "a striker at the threshold asks full price")
+	_ok(OfferRecord.price_modifier_of(59, 0) == 900, "one under the threshold: 900")
+	_ok(OfferRecord.price_modifier_of(47, 0) == 900, "60-13 = 47 is still 900")
+	_ok(OfferRecord.price_modifier_of(46, 0) == 800, "60-24 = 36 band: 800")
+	_ok(OfferRecord.price_modifier_of(21, 0) == 700, "60-39 = 21: 700")
+	_ok(OfferRecord.price_modifier_of(10, 0) == 600, "60-50 = 10: 600")
+	_ok(OfferRecord.price_modifier_of(9, 0) == 500, "under the last rung: 500")
+	_ok(OfferRecord.price_modifier_of(47, 5) == 1000, "arg2 in [4,7) lowers the threshold to 47")
+	_ok(OfferRecord.price_modifier_of(36, 9) == 1000, "arg2 >= 7 lowers the threshold to 36")
+	# The ask itself: the modifier only ever discounts.
+	_ok(OfferRecord.asking_fee(1_000_000, 1000, false) == 1_000_000, "1000 permille = book value")
+	_ok(OfferRecord.asking_fee(1_000_000, 1250, false) == 1_000_000,
+		"above 1000 permille the engine still asks only book value")
+	_ok(OfferRecord.asking_fee(1_000_000, 800, false) == 800_000, "800 permille = 80% of book")
+	_ok(OfferRecord.asking_fee(1_000_000, 1000, true) == 800_000,
+		"the transfer-list flag knocks 200 permille off")
+	_ok(OfferRecord.asking_fee(1_000_000, 900, true) == 700_000, "flag stacks with the modifier")
+	_ok(OfferRecord.offer_accepted(800_000, 1_000_000, 1000, true), "a bid at the modified ask is taken")
+	_ok(not OfferRecord.offer_accepted(799_999, 1_000_000, 1000, true), "a bid a pound short is not")
