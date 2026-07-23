@@ -79,8 +79,17 @@ vertically OFFER / CONTRACT):
 4. Delete `Main._open_renew_negotiation`'s `_mount_browse` substitute.
 5. Render-diff the rebuilt panel vs frame 25_renew (0px target) before calling it done.
 
+## Stepper increments — CLOSED 2026-07-23 (binary, not measured off a frame)
+`docs/re/offer_record_re.md`: the ◄/► money arrows step by the CURRENT VALUE
+(£5,000 below £50,000, £10,000 below £250,000, £25,000 above; handlers
+0x529a20..0x529da0), ◄ is inert at or below £5,000, and there is **no** hold-acceleration
+ramp. YEARS runs **1..5** and mirrors onto LEFT (0x529e40 / 0x529f90); a term above one
+year zeroes the matches-to-renew target and greys its clause widget. The old
+`OFF_WAGE_STEP_WK = 100` placeholder is deleted. The **Scoring-bonus** figure the
+generator seeds is £10,000 (AV>=85) / £5,000 (AV 80..84) for a CENTRE FORWARD only, and
+the **Matches-to-renew** target is 20 — both from `FUN_00576cd0`.
+
 ## Open (do NOT fake)
-- Stepper increment size + the wage/years min-max the engine will accept.
-- Clause slider ranges (Matches-to-renew target, Scoring-bonus figure) — measure/RE, don't invent.
+- Which of the four named checkboxes `rec+0x10` / `rec+0x14` drive (no frame witnesses it).
 - The reject-message + affordability behaviour on OFFER (contract_re.md has the model; confirm
   against a live rejected offer).

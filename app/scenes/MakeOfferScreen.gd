@@ -10,9 +10,10 @@ class_name MakeOfferScreen
 ## game's own art (MINIBAND flag SAD 0.0, camrol sprite SAD 0.0, frame-cut FICHA
 ## kit patch for Blackpool / scaled NANOESC fallback).
 ##
-## Frame-truth interaction: ◄► steppers move CLUB OFFER / YEARLY WAGE in £5,000
-## steps (hold accelerates — the source repeat curve is un-RE'd, this ramp is a
-## documented approximation), YEARS in 1s; CLUB FEE is the fixed asking price.
+## Frame-truth interaction: ◄► steppers move CLUB OFFER / YEARLY WAGE by the ENGINE's
+## own value-dependent step (£5,000 below £50,000, £10,000 below £250,000, £25,000
+## above — handlers 0x529a20..0x529da0, docs/re/offer_record_re.md), floor £5,000;
+## YEARS 1..5 in 1s; CLUB FEE is the fixed asking price.
 ## Checkboxes toggle the four clauses; "Scoring bonus" is player-gated (active
 ## only for forwards — FUN_0052c66f draws it washed otherwise) and activates its
 ## stepper at £5,000 when checked (113). "Matches to renew" keeps its washed,
@@ -93,14 +94,17 @@ const BTN := {
 }
 const OFFER_PR_XY := Vector2(403, 394)          # 118's ring cut (OFFER exact)
 
-# stepper behaviour (frame-observed base step; hold ramp = documented approx)
-const STEP := 5000
-const FLOOR := 5000
-const YEARS_MIN := 1
-const YEARS_MAX := 5
+# Stepper behaviour is BINARY-EXACT (OfferRecord / docs/re/offer_record_re.md): the
+# step is chosen from the CURRENT value (£5,000 under £50,000, £10,000 under £250,000,
+# £25,000 above) by the handlers at 0x529a20..0x529da0, and ◄ refuses to go below
+# £5,000. The old "£5,000 base + accelerating hold ramp" was invented and is gone.
+# Only the auto-repeat CADENCE below is app behaviour (the widget's repeat timer is
+# not RE'd); the amount each repeat moves is the engine's.
+const FLOOR := OfferRecord.MONEY_MIN
+const YEARS_MIN := OfferRecord.YEARS_MIN
+const YEARS_MAX := OfferRecord.YEARS_MAX
 const HOLD_DELAY := 0.4
 const HOLD_RATE := 12.0                          # repeats/s while held
-const TIERS := [5000, 25000, 125000, 625000]     # step grows every 8 repeats
 
 const C_WHITE := Color8(255, 255, 255)
 const C_BLACK := Color8(0, 0, 0)
@@ -224,7 +228,7 @@ func _on_input(e: InputEvent) -> void:
 		_hold_t = 0.0
 		_repeats = 0
 		if _press.ends_with("_up") or _press.ends_with("_dn"):
-			_step(_press, 1)
+			_step(_press)
 			set_process(true)
 		queue_redraw()
 		return
@@ -256,9 +260,8 @@ func _toggle(key: String) -> void:
 	queue_redraw()
 
 
-## Hold-to-repeat with acceleration (the original's exact repeat curve is
-## un-RE'd; base step £5,000 and the accelerating ramp are frame-observed —
-## 5,000 -> 90,000 -> 1,675,000 -> 2,975,000 across ~2s captures).
+## Hold-to-repeat. Each repeat applies exactly one engine step (the amount is the
+## RE'd value-dependent ladder in OfferRecord); only the repeat cadence is ours.
 func _process(delta: float) -> void:
 	if not (_press.ends_with("_up") or _press.ends_with("_dn")):
 		set_process(false)
@@ -269,23 +272,27 @@ func _process(delta: float) -> void:
 	var due := int((_hold_t - HOLD_DELAY) * HOLD_RATE)
 	while _repeats < due:
 		_repeats += 1
-		_step(_press, TIERS[clampi(_repeats / 8, 0, TIERS.size() - 1)] / STEP)
+		_step(_press)
 	queue_redraw()
 
 
-func _step(id: String, mult: int) -> void:
-	var dv := STEP * mult * (1 if id.ends_with("_up") else -1)
+func _step(id: String) -> void:
+	var up := id.ends_with("_up")
 	match id.get_slice("_", 0):
 		"offer":
 			# ceiling = available funds (cap hypothesis, make_offer_re.md)
-			_offer = clampi(_offer + dv, FLOOR, maxi(FLOOR, _cash))
+			_offer = OfferRecord.step_up(_offer, _cash) if up else OfferRecord.step_down(_offer)
 		"wage":
-			_wage_yearly = maxi(FLOOR, _wage_yearly + dv)
+			_wage_yearly = OfferRecord.step_up(_wage_yearly) if up else OfferRecord.step_down(_wage_yearly)
 		"years":
-			_years = clampi(_years + (1 if dv > 0 else -1), YEARS_MIN, YEARS_MAX)
+			_years = OfferRecord.years_up(_years) if up else OfferRecord.years_down(_years)
+			if not OfferRecord.matches_clause_allowed(_years):
+				# binary rule (0x529e67/0x529fb7): a term over 1 year zeroes the
+				# matches-to-renew target and greys its clause box.
+				_checked["matches"] = false
 		"bonus":
 			if _checked["scoring"]:
-				_bonus = maxi(FLOOR, _bonus + dv)
+				_bonus = OfferRecord.step_up(_bonus) if up else OfferRecord.step_down(_bonus)
 	queue_redraw()
 
 

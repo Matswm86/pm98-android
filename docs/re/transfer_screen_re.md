@@ -43,26 +43,40 @@ frame-bake precedent:
 fixed. AV right-edge x250, FEE right x337, WAGE right x404 (all verified in-shot).
 
 **FRAME-TRUE:** barra region, column headers, band names+colour, `[+]` box, star column,
-scrollbar, nav chrome, FONDO, AV value (=real CA), CLUB FEE/WAGE column placement.
+scrollbar, nav chrome, FONDO, and (since 2026-07-23) the AV/MO/FEE/WAGE ink boxes
+and the star strip, pixel-matched to frame 097.
 
-**Honest gaps (rendered `-`, never fabricated):**
-- **MO** — frame shows real morale (78–99); morale is an un-RE'd dynamic save value
-  (audit B7). The market row carries a `mo` field (= the `RM` attribute) but it is **not
-  confirmed to be morale**, so the scene does NOT render it under the MO header.
-- **YEARS | LEFT** — frame shows two contract-year cells (yellow on the final year);
-  buyable-player contract years are not in `Career.market()`'s row.
-- **Nationality flag** — drawn only if the row carries `flagCode`; the market row has none,
-  so the frame's per-player flags (Pukelevicius/Giglio/Nevland) are a gap.
+**CLOSED 2026-07-23 — every value cell is now source-backed.** The three "honest gaps"
+and the two "accepted approximations" this section used to list are gone; what replaced
+each, with its evidence:
 
-**Accepted approximations (sourced-but-not-portable):**
-- **CLUB FEE / WAGE** — from `TransferMarket`'s valuation model; PM98's real fees are
-  un-portable per-club float data (`docs/re/finance_constants.md`).
-- **Star rating** — `CA/20` mapping; the exact rating curve is un-RE'd (parity-excluded,
-  like the FICHA rating).
-- **Barra text** — the manager/club/date/week plaque is **baked** from frame 097 ("asdf" /
-  "Manchester Utd."), not redrawn live (the FinanceScreen static-barra limitation: the live
-  `PMChrome.draw_header` plaque is narrower than the frame's and let the baked crest peek
-  through). `setup()` still takes club/manager/season/week for Main's call.
+| cell | was | now |
+|---|---|---|
+| **AV** | the CA attribute | **core4 >> 2** (`FUN_00534570`, `transfer_value_re.md` §1) |
+| **stars** | `CA/20` vector polygons, 5 grey slots | **halves = (AV+1) div 10** (drawer `FUN_004f79b0`) on the frame-cut STARJUGON art at the frame's own x156 / pitch-14 / 12x9 geometry, **no dim placeholders** (frame 097 draws none) |
+| **MO** | `-` ("un-RE'd dynamic save value") | **displayed morale** `FUN_00582db0` via `Morale.display` — RE'd 2026-07-03 (`morale_re.md`); the gap note was simply stale |
+| **CLUB FEE / WAGE** | "the app's valuation model; real fees un-portable float data" | the **RE'd lookup tables** `feeTable/wageTable[stature*54 + abilTier*6 + ageTier] x5000` (`FUN_00576cd0`, `transfer_value_re.md` §10/§12/§13) — also stale; the port landed 07-22d |
+| **YEARS \| LEFT** | `-` ("not in the market row") | the term `FUN_00576cd0` rolls at generation (rec+0x18/+0x19; age ladder in `offer_record_re.md` §4). The final year gets frame 097's pale-yellow chip `(255,255,170)` x446..469, 12 rows from slot_y+2, with a red `(255,31,0)` digit |
+| **nationality flag** | `-` (no flagCode on the row) | `flagCode` = player record byte **+0x1a** (`player_info_re.md`), threaded through `TransferMarket.market()` |
+
+**Value-grid faces re-measured — the old grid was mis-drawn.** The screen drew every value
+in `proman8 @8`, i.e. proman8 SCALED DOWN from its native 11, which mashed 8/9/comma
+glyphs into blobs (a "9" read as "0"). Two faces at their NATIVE sizes reproduce frame
+097's ink runs exactly (row slot_y=156): AV "79" x235..249 and MO "86" x260..274 =
+**proman8 @11**; FEE "£1,000,000" x293..336 (44px) and WAGE "£350,000" x365..403 (39px)
+and the YEARS digits = **calend8 @15** (advance 44 / 39 — exact; the FinanceScreen ledger
+precedent). After the fix the app's AV/MO/FEE/WAGE ink boxes match the frame's to the
+pixel, verified by `app/tests/shot_transfer_market_verify.gd`.
+
+**Remaining honest gap — one, and it is a term not a value:** the MO **club term**
+(`FUN_0057b710`: gate receipts + fair-wage bonus) needs the SELLING club's ledger, which
+the app only simulates for the manager's own club. An AI club's row therefore shows the
+player's stored base morale, never a fabricated number.
+
+**Known parity item, pre-existing:** the original paints each value cell as a white box
+with a grey border (a full row grid); the app draws only the horizontal row separators
+over the blanked panel fill. Not introduced here, and not faked here.
+
 
 **Parity (rendered `transfer_demo.png` vs frame 097):** columns land under the baked
 headers with no overlap — AV_right 248 (frame 249), FEE 281–335 (frame 285–340), WAGE

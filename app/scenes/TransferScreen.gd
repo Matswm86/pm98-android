@@ -22,12 +22,17 @@ class_name TransferScreen
 ## the frame's scrollbar is inert baked art (never actually scrolls).
 ##
 ## FRAME-TRUE: layout, labels, band names, colours, [+] box, nav chrome, background.
-## APPROXIMATED (accepted): CLUB FEE / WAGE come from TransferMarket's valuation model
-## (PM98's real fees are un-portable per-club float data, docs/re/finance_constants.md);
-## the star RATING mapping is un-RE'd (parity-excluded, like the FICHA rating).
-## HONEST GAPS: MO (morale is an un-RE'd dynamic save value — audit B7 renders "-",
-## never fabricated from a static attr), YEARS|LEFT (buyable-player contract years are
-## not in Career.market()'s row), and the nationality flag (no flagCode on the row).
+## EVERY VALUE CELL IS NOW SOURCE-BACKED (the four "honest gaps"/"approximations" this
+## header used to list are closed, 2026-07-23):
+##   AV       core4 >> 2                     FUN_00534570 (transfer_value_re.md §1)
+##   stars    halves = (AV+1) div 10         star drawer FUN_004f79b0 (morale_re.md)
+##   MO       displayed morale               FUN_00582db0 via Morale.display
+##   CLUB FEE / WAGE  lookup table x5000     FUN_00576cd0 (transfer_value_re.md §10/§12)
+##   YEARS|LEFT  the rolled contract term    FUN_00576cd0 rec+0x18/+0x19 (offer_record_re.md)
+##   flag     player record byte +0x1a       flagCode (player_info_re.md)
+## Remaining gap: the MO club term (FUN_0057b710) needs the SELLING club's gate receipts
+## and wage bill, which the app only simulates for the manager's own club — so an AI
+## club's row shows his stored base morale, never a fabricated number.
 ##
 ## Driven live by Career.market() (dearest first). Native 640x480; scales to fit parent.
 ##
@@ -54,6 +59,11 @@ const C_MO := Color8(75, 109, 172)         # MO value (blue) — used for the ga
 const C_FEE := Color8(210, 0, 0)           # CLUB FEE (bright red, frame dom-ink)
 const C_WAGE := Color8(150, 0, 0)          # WAGE (dark maroon, frame dom-ink C(367,95))
 const C_YEARS := Color8(42, 63, 170)       # YEARS|LEFT cell digit (navy)
+const C_YEARS_FINAL := Color8(255, 31, 0)     # LEFT digit on the final year (frame 097)
+const C_LEFT_CHIP := Color8(255, 255, 170)    # its pale-yellow cell fill (frame 097)
+const LEFT_CHIP_X := 446                      # chip x446..469, 12 rows from slot_y+2
+const LEFT_CHIP_W := 24
+const LEFT_CHIP_H := 12
 const C_NAME := Color8(0, 0, 0)            # player name (black)
 const C_ROW_SEP := Color8(176, 176, 176)   # thin row separator
 const C_GAP := Color8(150, 150, 150)       # honest-gap dash colour
@@ -68,20 +78,35 @@ const BANDS := [
 ]
 const BAND_CAPS := {"GK": 3, "DF": 5, "MF": 5, "FW": 5}   # DAT_0065c020 slot counts
 const ROW_H := 13                           # row content height (16px pitch)
-const VAL_SZ := 8                           # value-grid font size (ProMan8, frame-measured)
-const VAL_DY := 3                           # value y-top so the baseline = the name baseline
+# Value-grid faces, re-measured against frame 097 row slot_y=156 (2026-07-23). The old
+# "ProMan8 @8" was proman8 SCALED DOWN from its native 11, which mangled 8/9/comma
+# glyphs into blobs. Two faces, each at its NATIVE size, reproduce the frame's ink
+# widths exactly:
+#   AV "79" ink x235..249 = 15px  -> proman8 @11 (advance 16)
+#   MO "86" ink x260..274 = 15px  -> proman8 @11
+#   FEE "£1,000,000" ink 293..336 = 44px -> calend8 @15 (advance 44, exact)
+#   WAGE "£350,000"   ink 365..403 = 39px -> calend8 @15 (advance 39, exact)
+#   YEARS "2" ink 430..433 = 4px          -> calend8 @15
+# (calend8-as-the-money-face is the FinanceScreen ledger precedent.)
+const AV_SZ := 11                           # proman8 native
+const MONEY_SZ := 15                        # calend8 native
+const VAL_DY := 3                           # AV/MO glyph y-top vs slot_y (frame rows 161..167)
+const MONEY_DY := 1                         # calend8's taller line box, same ink rows
 
 # ---- column anchors (design coords, measured off frame 097) ----------------
 const PLUS_XY := Vector2(5, 91)             # plus.png blit origin at slot_y 92
 const FLAG_X := 34                          # nationality flag left (if flagCode)
 const NAME_X := 60
-const STARS_X := 156
-const AV_RIGHT := 250
-const MO_CENTER := 267
-const FEE_RIGHT := 337
-const WAGE_RIGHT := 404
-const YEARS1_CENTER := 432
-const YEARS2_CENTER := 457
+const STARS_X := 156                        # frame 097: runs at x156/170/184/198
+const STAR_PITCH := 14
+const STAR_DY := 3                          # glyph rows slot_y+3 .. slot_y+11
+const STAR_SLOTS := 5
+const AV_RIGHT := 251
+const MO_CENTER := 268
+const FEE_RIGHT := 338
+const WAGE_RIGHT := 405
+const YEARS1_CENTER := 433
+const YEARS2_CENTER := 458
 const ROW_LEFT := 8
 const ROW_RIGHT := 494
 
@@ -111,9 +136,12 @@ const BAND2_BASE := 44            # "Week 3" glyph rows 36..43
 
 var _chrome: Texture2D
 var _plus: Texture2D
+var _star_full: Texture2D
+var _star_half: Texture2D
 var _f12: Font
 var _f10: Font
 var _f8: Font
+var _fcal: Font
 
 var _rows: Array = []
 var _club: String = ""
@@ -131,9 +159,12 @@ var _club_id: int = -1
 func _ready() -> void:
 	_chrome = load("res://art/screens/transfer/chrome.png")
 	_plus = load("res://art/screens/transfer/plus.png")
+	_star_full = load("res://art/screens/transfer/star_full.png")
+	_star_half = load("res://art/screens/transfer/star_half.png")
 	_f12 = load("res://art/fonts/proman12.fnt")
 	_f10 = load("res://art/fonts/proman10.fnt")
 	_f8 = load("res://art/fonts/proman8.fnt")
+	_fcal = load("res://art/fonts/calend8.fnt")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2(W, H)
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -383,20 +414,47 @@ func _draw_row(r: Dictionary, y: int) -> void:
 			draw_texture(ft, Vector2(FLAG_X, y + 1))
 	# name (title-cased to the game's rendered form)
 	_txt_left(_f12, NAME_X, y + 1, PMChrome.title_case_name(str(r.get("name", "?"))), C_NAME, 12)
-	# gold star rating (mapping un-RE'd; parity-excluded like the FICHA rating)
-	var ca := int(r.get("ca", 0))
-	PMChrome.draw_stars(self, STARS_X, y + 2, ca / 20.0, 8, 5)
-	# The AV/MO/FEE/WAGE/YEARS value grid is ProMan8 (docs/re/transfer_screen_re.md:
-	# "ProMan8 grid"); frame 097 packs "£12,500,000" into ~55px (x285..340), which _f8@8
-	# reproduces (56px) and _f10@11 does NOT (98px — it overflowed left into MO/AV). The
-	# +3 y-top keeps the baseline the wider font drew at (row-top +10, = the name baseline).
-	# AV = the real ability
-	_txt_right(_f8, AV_RIGHT, y + VAL_DY, str(ca), C_AV, VAL_SZ)
-	# MO = honest gap (morale is an un-RE'd dynamic save value — audit B7)
-	_txt_center(_f8, MO_CENTER, y + VAL_DY, "-", C_GAP, VAL_SZ)
-	# CLUB FEE / WAGE from the valuation model (accepted approximation)
-	_txt_right(_f8, FEE_RIGHT, y + VAL_DY, fmt_money(int(r.get("fee", 0))), C_FEE, VAL_SZ)
-	_txt_right(_f8, WAGE_RIGHT, y + VAL_DY, fmt_money(int(r.get("wage", 0))), C_WAGE, VAL_SZ)
-	# YEARS | LEFT = honest gap (buyable-player contract years are not in the row)
-	_txt_center(_f8, YEARS1_CENTER, y + VAL_DY, "-", C_GAP, VAL_SZ)
-	_txt_center(_f8, YEARS2_CENTER, y + VAL_DY, "-", C_GAP, VAL_SZ)
+	# AV = core4>>2 (FUN_00534570, transfer_value_re.md §1) — the number in the AV cell
+	# and the value the star strip beside it grades.
+	var av := int(r.get("av", 0))
+	_draw_star_strip(y, av)
+	_txt_right(_f8, AV_RIGHT, y + VAL_DY, str(av), C_AV, AV_SZ)
+	# MO = the displayed morale (FUN_00582db0 via Morale.display)
+	var mo := int(r.get("mo", -1))
+	if mo >= 0:
+		_txt_center(_f8, MO_CENTER, y + VAL_DY, str(mo), C_MO, AV_SZ)
+	else:
+		_txt_center(_f8, MO_CENTER, y + VAL_DY, "-", C_GAP, AV_SZ)
+	# CLUB FEE / WAGE = the RE'd PM98 lookup tables keyed by the selling club's stature
+	_txt_right(_fcal, FEE_RIGHT, y + MONEY_DY, fmt_money(int(r.get("fee", 0))), C_FEE, MONEY_SZ)
+	_txt_right(_fcal, WAGE_RIGHT, y + MONEY_DY, fmt_money(int(r.get("wage", 0))), C_WAGE, MONEY_SZ)
+	# YEARS | LEFT — the deal FUN_00576cd0 rolled for him (rec+0x18 / rec+0x19)
+	_draw_term_cell(YEARS1_CENTER, y, int(r.get("years", 0)), false)
+	_draw_term_cell(YEARS2_CENTER, y, int(r.get("left", 0)), int(r.get("left", 0)) == 1)
+
+
+## The gold star strip, RE'd rule + frame-cut art: `halves = (AV+1) div 10` (star drawer
+## FUN_004f79b0, docs/re/morale_re.md), `halves/2` full stars and one half stub when a
+## half is left over. Frame 097 draws NO dim placeholder for the unlit slots — a 3-star
+## row simply stops — so neither do we (the old CA/20 + 5-slot grey strip is gone).
+func _draw_star_strip(y: int, av: int) -> void:
+	var halves := (maxi(av, 0) + 1) / 10
+	var full := mini(halves / 2, STAR_SLOTS)
+	for j in full:
+		if _star_full != null:
+			draw_texture(_star_full, Vector2(STARS_X + STAR_PITCH * j, y + STAR_DY))
+	if halves % 2 == 1 and full < STAR_SLOTS and _star_half != null:
+		draw_texture(_star_half, Vector2(STARS_X + STAR_PITCH * full, y + STAR_DY))
+
+
+## One YEARS / LEFT digit cell. On the FINAL contract year frame 097 fills the LEFT cell
+## with a pale-yellow chip (255,255,170) x446..469 y slot+2..slot+13 and switches the
+## digit to red (255,31,0) — measured off the frame, not styled.
+func _draw_term_cell(cx: int, y: int, v: int, final_year: bool) -> void:
+	if final_year:
+		draw_rect(Rect2(LEFT_CHIP_X, y + 2, LEFT_CHIP_W, LEFT_CHIP_H), C_LEFT_CHIP, true)
+	if v <= 0:
+		_txt_center(_fcal, cx, y + MONEY_DY, "-", C_GAP, MONEY_SZ)
+		return
+	_txt_center(_fcal, cx, y + MONEY_DY, str(v),
+		C_YEARS_FINAL if final_year else C_YEARS, MONEY_SZ)

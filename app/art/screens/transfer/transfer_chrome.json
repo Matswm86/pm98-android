@@ -1,6 +1,6 @@
 {
   "binding_frame": "097_164707.png",
-  "note": "TRANSFER MARKET (FICHAR); list body redrawn by TransferScreen.gd from Career.market() rows. AV=CA (real); CLUB FEE/WAGE = the valuation model (accepted approximation, TransferMarket.gd); MO + YEARS|LEFT + nationality flag = honest gaps (morale is an un-RE'd dynamic save value per audit B7; buyable-player contract years + flagCode are not in the market row).",
+  "note": "TRANSFER MARKET (FICHAR); list body redrawn by TransferScreen.gd from Career.market() rows. Every value cell is source-backed since 2026-07-23: AV = core4>>2 (FUN_00534570), stars = halves (AV+1) div 10 on the frame-cut STARJUGON art, MO = displayed morale (FUN_00582db0), CLUB FEE/WAGE = the RE'd lookup tables (FUN_00576cd0 x5000), YEARS|LEFT = the rolled contract term (rec+0x18/+0x19), flag = player byte +0x1a.",
   "size": [
     640,
     480
@@ -39,7 +39,12 @@
     "years_final_yellow": [
       255,
       255,
-      90
+      170
+    ],
+    "years_final_red": [
+      255,
+      31,
+      0
     ],
     "name_black": [
       0,

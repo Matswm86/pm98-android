@@ -121,11 +121,12 @@ const OFF_CANCEL := Rect2(287, 206, 103, 32)
 const OFF_OFFER := Rect2(404, 206, 143, 32)
 # OFFER clause checkboxes: 11x11 at CB_X, panel y-tops (baked textures blitted per current clause)
 const OFF_CB_YS := [108, 124, 157, 190]
-# The wage stepper increment is un-RE'd (the engine's step granularity was not witnessed): a
-# documented functional placeholder so the offer is adjustable. Years step by 1 (integer term).
-const OFF_WAGE_STEP_WK := 100
-const OFF_YEARS_MIN := 1
-const OFF_YEARS_MAX := 5
+# The wage/years stepper granularity is BINARY-EXACT since 2026-07-23 (OfferRecord /
+# docs/re/offer_record_re.md): the YEARLY WAGE arrows move by the engine's own
+# value-dependent step (£5,000 / £10,000 / £25,000 by band) with a £5,000 floor, and
+# YEARS runs 1..5 mirroring LEFT. The old £100/week placeholder is gone.
+const OFF_YEARS_MIN := OfferRecord.YEARS_MIN
+const OFF_YEARS_MAX := OfferRecord.YEARS_MAX
 
 # TRANSFER-LISTED state (owner frame 14, 2026-07-23): when the player is on the
 # transfer market the card grows a "PLAYER PLACED ON TRANSFER MARKET" banner in the
@@ -189,7 +190,7 @@ var _renew := false
 var _renew_overlay: Texture2D
 var _check_on: Texture2D
 var _check_off: Texture2D
-var _offer_weekly := 0      # the offered weekly wage (stepped)
+var _offer_yearly := 0      # the offered YEARLY wage (the engine's own unit; stepped)
 var _offer_years := 0       # the offered contract length (stepped)
 var _cur_weekly := 0        # his current weekly (offer floor)
 var _demand_weekly := 0     # the wage he wants (for the caller's accept/reject)
@@ -235,11 +236,14 @@ func setup(player: Dictionary, club: Dictionary, tier: int = 1, actions_enabled 
 ## Enter the RENEW OFFER negotiation (the source form witnessed at TOTAL level,
 ## renew_negotiation_re.md): the identity/stat zone becomes the OFFER panel. Seeds the offer at
 ## his current terms; the ◄/► steppers move the wage/years; OFFER/CANCEL emit the signals.
+## The offer opens on `_yearly` — his EXACT table yearly wage (Contract.current_yearly),
+## the same figure the CONTRACT panel below shows — because the engine's stepper works in
+## the yearly unit, and re-deriving it from the rounded weekly would drift off the table.
 func begin_renew(cur_weekly: int, demand_weekly: int, years: int) -> void:
 	_renew = true
 	_cur_weekly = cur_weekly
 	_demand_weekly = demand_weekly
-	_offer_weekly = cur_weekly
+	_offer_yearly = maxi(OfferRecord.MONEY_MIN, _yearly if _yearly > 0 else Contract.yearly(cur_weekly))
 	_offer_years = maxi(OFF_YEARS_MIN, years)
 	_press = ""
 	queue_redraw()
@@ -324,10 +328,13 @@ func _renew_input(e: InputEvent, d: Vector2) -> void:
 		_down = true
 		_press = h
 		match h:
-			"wage_up": _offer_weekly += OFF_WAGE_STEP_WK
-			"wage_dn": _offer_weekly = maxi(_cur_weekly, _offer_weekly - OFF_WAGE_STEP_WK)
-			"years_up": _offer_years = mini(OFF_YEARS_MAX, _offer_years + 1)
-			"years_dn": _offer_years = maxi(OFF_YEARS_MIN, _offer_years - 1)
+			# Engine steps (OfferRecord): value-dependent amount, £5,000 floor. There is
+			# no "never below his current wage" clamp in the original — you may lowball
+			# and he rejects (Contract.evaluate_renewal / "has rejected your offer").
+			"wage_up": _offer_yearly = OfferRecord.step_up(_offer_yearly)
+			"wage_dn": _offer_yearly = OfferRecord.step_down(_offer_yearly)
+			"years_up": _offer_years = OfferRecord.years_up(_offer_years)
+			"years_dn": _offer_years = OfferRecord.years_down(_offer_years)
 		queue_redraw()
 		return
 	if not _down:
@@ -338,7 +345,9 @@ func _renew_input(e: InputEvent, d: Vector2) -> void:
 	queue_redraw()
 	if was != "" and _hit(d) == was:
 		match was:
-			"offer": offer_made.emit(_offer_weekly, _offer_years)
+			# Career/Contract keep an integer weekly ledger figure; the offer itself is
+			# the engine's yearly value, converted only at the boundary.
+			"offer": offer_made.emit(int(round(float(_offer_yearly) / float(Contract.SEASON_WEEKS))), _offer_years)
 			"cancel": renew_cancelled.emit()
 			"ok": back_pressed.emit()
 
@@ -511,7 +520,7 @@ func _draw_offer() -> void:
 	if _renew_overlay != null:
 		draw_texture(_renew_overlay, RENEW_OVERLAY_XY)
 	_ctxt(_f8, OFF_MONEY_CX, OFF_FEE_Y, "£%s" % _money(_fee), C_GOLD, 11)
-	_ctxt(_f8, OFF_MONEY_CX, OFF_WAGE_Y, "£%s" % _money(Contract.yearly(_offer_weekly)), C_WAGE, 11)
+	_ctxt(_f8, OFF_MONEY_CX, OFF_WAGE_Y, "£%s" % _money(_offer_yearly), C_WAGE, 11)
 	_ctxt(_f8, OFF_YEARS_C.x, OFF_YEARS_C.y, str(_offer_years), C_YEARS_INK, 11)
 	var on := _clauses()
 	for i in 4:

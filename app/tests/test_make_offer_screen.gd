@@ -33,8 +33,13 @@ func _run() -> void:
 		"star grid x450+14j") and ok
 	ok = _assert(MakeOfferScreen.CB_YS == [290, 306, 339, 372], "checkbox rows") and ok
 	ok = _assert(MakeOfferScreen.BTN["offer"] == Rect2(405, 396, 146, 29), "OFFER button rect") and ok
-	ok = _assert(MakeOfferScreen.STEP == 5000 and MakeOfferScreen.FLOOR == 5000,
-		"£5,000 base step + floor (frame-observed)") and ok
+	# The engine's own stepper constants (FUN 0x529a20..0x529da0, internal /200 = £)
+	ok = _assert(OfferRecord.step_of(0) == 5000 and OfferRecord.step_of(49999) == 5000
+		and OfferRecord.step_of(50000) == 10000 and OfferRecord.step_of(249999) == 10000
+		and OfferRecord.step_of(250000) == 25000 and MakeOfferScreen.FLOOR == 5000,
+		"engine step ladder £5,000 / £10,000 / £25,000 + £5,000 floor") and ok
+	ok = _assert(OfferRecord.step_down(5000) == 5000 and OfferRecord.step_down(4000) == 4000,
+		"DOWN leaves a value at or below the floor alone") and ok
 
 	# ---- the corrected star rule: halves = (value+1) div 10 ---------------------
 	# frame observations — 101: 19->1 full, 79->4 full, 75->3.5, 57->2.5, 73->3.5;
@@ -55,15 +60,28 @@ func _run() -> void:
 	ok = _assert(card._offer == 5000 and card._wage_yearly == 5000 and card._years == 1,
 		"frame-constant initial values £5,000 / £5,000 / 1") and ok
 	ok = _assert(card._scoring_enabled(), "Scoring bonus active for a forward") and ok
-	card._step("offer_dn", 1)
+	card._step("offer_dn")
 	ok = _assert(card._offer == 5000, "offer floors at £5,000") and ok
-	card._step("offer_up", 1000)
+	# The engine ladder (OfferRecord): £5,000 steps to £50,000, then £10,000 to
+	# £250,000, then £25,000 — so the first four presses land exactly here.
+	card._step("offer_up")
+	ok = _assert(card._offer == 10000, "first step is the engine's £5,000") and ok
+	while card._offer < 50000:
+		card._step("offer_up")
+	card._step("offer_up")
+	ok = _assert(card._offer == 60000, "step widens to £10,000 at £50,000") and ok
+	while card._offer < 250000:
+		card._step("offer_up")
+	card._step("offer_up")
+	ok = _assert(card._offer == 275000, "step widens to £25,000 at £250,000") and ok
+	for i in 1000:
+		card._step("offer_up")
 	ok = _assert(card._offer == 3200000, "offer caps at available funds (3.2M, frame 107)") and ok
-	card._step("years_up", 1)
-	card._step("years_up", 1)
+	card._step("years_up")
+	card._step("years_up")
 	ok = _assert(card._years == 3, "years step to 3 (frame 118)") and ok
 	for i in 9:
-		card._step("years_up", 1)
+		card._step("years_up")
 	ok = _assert(card._years == MakeOfferScreen.YEARS_MAX, "years clamp") and ok
 	card._toggle("scoring")
 	ok = _assert(card._checked["scoring"] and card._bonus == 5000,

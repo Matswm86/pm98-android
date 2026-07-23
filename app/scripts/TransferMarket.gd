@@ -270,8 +270,16 @@ static func market(rosters: Dictionary, names: Dictionary, tier: int, exclude_cl
 			out.append({
 				"pid": pid, "name": p.get("name", "?"), "isGK": bool(p.get("isGK", false)),
 				"pos": str(p.get("pos", "")),
-				"ca": int(attrs.get("CA", 0)), "mo": int(attrs.get("RM", 0)),
+				"ca": int(attrs.get("CA", 0)),
+				# The screen's AV cell is core4>>2 (FUN_00534570, transfer_value_re.md §1)
+				# and MO is the displayed morale (FUN_00582db0) — both real values now,
+				# not the old `RM`-as-MO stand-in.
+				"av": OfferRecord.av_of(p), "mo": Morale.display(p),
 				"age": int(p.get("age", 0)),
+				"flagCode": p.get("flagCode", null),
+				# YEARS | LEFT: the deal the record generator rolled for him.
+				"years": int(p.get("contract_term", p.get("contract_years", 0))),
+				"left": int(p.get("contract_years", 0)),
 				"club_id": int(cid), "club_name": names.get(cid, "?"),
 				"fee": value_of(p, band), "wage": yearly_wage(p, band),
 				"key": key_ids.has(pid),

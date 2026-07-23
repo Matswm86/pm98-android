@@ -383,8 +383,17 @@ func _seed_squad(club_dict: Dictionary) -> Array:
 			# guard covers rosters seeded from raw JSON, e.g. test harnesses).
 			dup["age"] = 25 + form_rng.randi_range(0, 4)
 		var age := int(dup.get("age", 26))
-		dup["contract_years"] = 3 if age <= 29 else (2 if age <= 32 else 1)
+		# Contract term, BINARY-EXACT (FUN_00576cd0 @0x576d09/0x576e5c — the same call
+		# that fills CLUB FEE/WAGE also rolls YEARS and stamps LEFT equal to it).
+		# Replaces the app's old invented 3/2/1 age ladder. docs/re/offer_record_re.md.
+		dup["contract_years"] = OfferRecord.seed_years(age, form_rng)
 		dup["contract_term"] = dup["contract_years"]   # deal length (SQUAD MANAGEMENT YEARS col; contract_years = years LEFT)
+		var seeded := OfferRecord.seed_clauses(OfferRecord.av_of(dup),
+			int(dup.get("posFine", 0)), int(dup["contract_years"]))
+		if int(seeded["matches"]) > 0:
+			dup["clause_matches"] = int(seeded["matches"])
+		if int(seeded["bonus"]) > 0:
+			dup["clause_bonus"] = int(seeded["bonus"])
 		dup["injured_weeks"] = 0       # availability state (Availability.gd)
 		dup["suspended_weeks"] = 0
 		dup["yellows"] = 0
@@ -1855,8 +1864,9 @@ func _scout_scan_own(criteria: Dictionary) -> Array:
 	return out
 
 ## One PLAYERS FOUND row. AV = floor((VE+RE+AG+CA)/4) — the witnessed formula
-## (8/8 GK rows exact). Fee/wage = the valuation model (the real figures are
-## un-portable per-club float data — TransferScreen precedent).
+## (8/8 GK rows exact; = FUN_00534570 >> 2). Fee/wage are the RE'd PM98 lookup
+## tables (FUN_00576cd0 x5000, docs/re/transfer_value_re.md §10/§12) keyed by the
+## selling club's stature band — not an app valuation model.
 func _scout_row(p: Dictionary, cid: int, cname: String, club_v: Dictionary, live: bool) -> Dictionary:
 	var a: Dictionary = p.get("attrs", {})
 	var av := int((int(a.get("VE", 0)) + int(a.get("RE", 0)) + int(a.get("AG", 0)) + int(a.get("CA", 0))) / 4.0)

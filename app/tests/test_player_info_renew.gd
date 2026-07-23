@@ -58,7 +58,11 @@ func _run() -> bool:
 	scr.begin_renew(cur, demand, 2)
 	await process_frame
 	ok = _assert(scr._renew, "begin_renew entered renew mode") and ok
-	ok = _assert(scr._offer_weekly == cur and scr._offer_years == 2, "offer seeded at current terms") and ok
+	# The offer opens on his EXACT table yearly wage (the engine's own unit), not on a
+	# weekly figure re-multiplied by 52 (docs/re/offer_record_re.md).
+	var seed_yearly := scr._yearly
+	ok = _assert(scr._offer_yearly == seed_yearly and scr._offer_years == 2,
+		"offer seeded at his current yearly terms") and ok
 
 	# _hit resolves the OFFER-form controls at their rect centres; empty space -> "".
 	ok = _assert(scr._hit(PlayerInfoScreen.OFF_WAGE_UP.get_center()) == "wage_up", "hit wage_up") and ok
@@ -68,12 +72,17 @@ func _run() -> bool:
 	ok = _assert(scr._hit(PlayerInfoScreen.OFF_CANCEL.get_center()) == "cancel", "hit cancel") and ok
 	ok = _assert(scr._hit(Vector2(320, 60)) == "", "empty space inert") and ok
 
-	# Steppers: a press fires the step immediately (repeatable).
+	# Steppers: a press fires the step immediately (repeatable). The amount is the
+	# engine's value-dependent ladder (0x529a20..0x529da0), NOT a fixed placeholder.
 	_press(scr, PlayerInfoScreen.OFF_WAGE_UP.get_center())
-	ok = _assert(scr._offer_weekly == cur + PlayerInfoScreen.OFF_WAGE_STEP_WK, "wage_up steps up") and ok
+	ok = _assert(scr._offer_yearly == seed_yearly + OfferRecord.step_of(seed_yearly),
+		"wage_up steps by the engine ladder") and ok
 	_press(scr, PlayerInfoScreen.OFF_WAGE_DN.get_center())
-	_press(scr, PlayerInfoScreen.OFF_WAGE_DN.get_center())
-	ok = _assert(scr._offer_weekly == cur, "wage_dn floors at current wage") and ok
+	ok = _assert(scr._offer_yearly == seed_yearly, "wage_dn returns to the seed") and ok
+	for _d in 400:
+		_press(scr, PlayerInfoScreen.OFF_WAGE_DN.get_center())
+	ok = _assert(scr._offer_yearly == OfferRecord.MONEY_MIN,
+		"wage_dn floors at the engine's £5,000, never below") and ok
 	_press(scr, PlayerInfoScreen.OFF_YEARS_UP.get_center())
 	ok = _assert(scr._offer_years == 3, "years_up steps up") and ok
 	for _k in 10:
@@ -85,8 +94,8 @@ func _run() -> bool:
 	scr.offer_made.connect(func(w: int, y: int) -> void:
 		made[0] = true; made[1] = w; made[2] = y)
 	_click(scr, PlayerInfoScreen.OFF_OFFER.get_center())
-	ok = _assert(made[0] and made[1] == scr._offer_weekly and made[2] == scr._offer_years,
-		"OFFER emits offer_made(weekly, years)") and ok
+	ok = _assert(made[0] and made[1] == int(round(float(scr._offer_yearly) / float(Contract.SEASON_WEEKS)))
+		and made[2] == scr._offer_years, "OFFER emits offer_made(weekly, years)") and ok
 
 	# CANCEL: emits renew_cancelled.
 	scr.begin_renew(cur, demand, 2)

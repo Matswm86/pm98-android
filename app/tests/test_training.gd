@@ -189,10 +189,24 @@ func _career_integration() -> bool:
 	ok = _assert(inj_hard > inj_light, "Intensive injury risk > Light (%d vs %d over 300 matches)" % [inj_hard, inj_light]) and ok
 
 	# Season rollover: ages tick and intensity persists through save/load.
-	var age_before := int((career.my_squad()[0] as Dictionary).get("age", 0)) if not career.my_squad().is_empty() else 0
+	# Track ONE man by id: contract terms are now the engine's own roll (OfferRecord),
+	# so an expiring player can leave at the rollover and squad[0] need not be the same
+	# person on both sides. Pick someone on a multi-year deal and follow him.
+	var tracked := -1
+	var age_before := 0
+	for p in career.my_squad():
+		if int((p as Dictionary).get("contract_years", 0)) > 1:
+			tracked = int((p as Dictionary).get("id", -1))
+			age_before = int((p as Dictionary).get("age", 0))
+			break
 	career.advance_season(leagues)
-	var age_after := int((career.my_squad()[0] as Dictionary).get("age", 0)) if not career.my_squad().is_empty() else 0
-	ok = _assert(age_after == age_before + 1, "squad ages a year at rollover (%d->%d)" % [age_before, age_after]) and ok
+	var age_after := -1
+	for p in career.my_squad():
+		if int((p as Dictionary).get("id", -2)) == tracked:
+			age_after = int((p as Dictionary).get("age", 0))
+			break
+	ok = _assert(tracked != -1 and age_after == age_before + 1,
+		"squad ages a year at rollover (%d->%d)" % [age_before, age_after]) and ok
 
 	var path := "user://career_train_test.json"
 	career.training_intensity = "Light"

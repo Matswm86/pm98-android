@@ -48,6 +48,8 @@ FRAME = ROOT / "screenshots/original-walkthrough-2026-07-02/097_164707.png"
 OUT_DIR = ROOT / "app/art/screens/transfer"
 OUT_PNG = OUT_DIR / "chrome.png"
 OUT_PLUS = OUT_DIR / "plus.png"
+OUT_STAR_FULL = OUT_DIR / "star_full.png"
+OUT_STAR_HALF = OUT_DIR / "star_half.png"
 OUT_JSON = OUT_DIR / "transfer_chrome.json"
 
 W, H = 640, 480
@@ -67,6 +69,13 @@ BLANK_B = (8, 88, 473, 432)
 
 # ---- the [+] row expand-box sprite ----------------------------------------
 PLUS_BOX = (5, 91, 32, 105)  # x0,y0,x1,y1 -> 27x14 cut from the frame
+# Gold star strip, measured off frame 097 (2026-07-23): lit stars only, NO dim
+# placeholders -- a 3-star row simply stops after three. Runs on every walked row are
+# x156/170/184/198 (pitch 14), each 12px wide and 9px tall; an odd half-star is the
+# 5px stub at x198 on the AV-69 rows. Both cut 1:1 so the scene blits the real
+# STARJUGON art instead of drawing vector polygons.
+STAR_FULL_BOX = (156, 159, 168, 168)  # 12x9, row slot_y=156
+STAR_HALF_BOX = (198, 94, 203, 103)  # 5x9, the half stub on row slot_y=92
 
 # ---- barra live-text blanks (the stale-career fix, audit §C2) --------------
 # Frame 097's barra bakes the WALKTHROUGH career's text ("asdf" / Manchester
@@ -115,7 +124,8 @@ def main() -> int:
         "fee_red": [210, 0, 0],  # CLUB FEE bright red (dom-ink)
         "wage_darkred": [150, 0, 0],  # WAGE dark maroon (dom-ink C(367,95))
         "years_navy": [42, 63, 170],  # YEARS / LEFT cell digit
-        "years_final_yellow": [255, 255, 90],  # LEFT==1 cell highlight
+        "years_final_yellow": [255, 255, 170],  # LEFT==1 cell fill (re-sampled 07-23)
+        "years_final_red": [255, 31, 0],  # its digit ink
         "name_black": [0, 0, 0],
         "row_sep": [176, 176, 176],
         "panel_fill": list(PANEL_FILL),
@@ -124,6 +134,12 @@ def main() -> int:
     # cut the [+] expand-box sprite BEFORE blanking clears it.
     plus = im.crop(PLUS_BOX)
     plus.save(OUT_PLUS)
+
+    # cut the gold star sprites (also before blanking).
+    star_full = im.crop(STAR_FULL_BOX)
+    star_full.save(OUT_STAR_FULL)
+    star_half = im.crop(STAR_HALF_BOX)
+    star_half.save(OUT_STAR_HALF)
 
     # blank the KEEPER header text + the whole list body to the panel fill.
     fill(a, PANEL_FILL, *BLANK_A)
@@ -142,12 +158,7 @@ def main() -> int:
 
     spec = {
         "binding_frame": FRAME.name,
-        "note": "TRANSFER MARKET (FICHAR); list body redrawn by TransferScreen.gd "
-        "from Career.market() rows. AV=CA (real); CLUB FEE/WAGE = the "
-        "valuation model (accepted approximation, TransferMarket.gd); "
-        "MO + YEARS|LEFT + nationality flag = honest gaps (morale is an "
-        "un-RE'd dynamic save value per audit B7; buyable-player contract "
-        "years + flagCode are not in the market row).",
+        "note": "TRANSFER MARKET (FICHAR); list body redrawn by TransferScreen.gd from Career.market() rows. Every value cell is source-backed since 2026-07-23: AV = core4>>2 (FUN_00534570), stars = halves (AV+1) div 10 on the frame-cut STARJUGON art, MO = displayed morale (FUN_00582db0), CLUB FEE/WAGE = the RE'd lookup tables (FUN_00576cd0 x5000), YEARS|LEFT = the rolled contract term (rec+0x18/+0x19), flag = player byte +0x1a.",
         "size": [W, H],
         "samples": samples,
         "anchors": {
@@ -220,6 +231,8 @@ def main() -> int:
     OUT_JSON.write_text(json.dumps(spec, indent=2))
     print(f"wrote {OUT_PNG} ({OUT_PNG.stat().st_size} bytes)")
     print(f"wrote {OUT_PLUS} ({plus.size[0]}x{plus.size[1]})")
+    print(f"wrote {OUT_STAR_FULL} ({star_full.size[0]}x{star_full.size[1]})")
+    print(f"wrote {OUT_STAR_HALF} ({star_half.size[0]}x{star_half.size[1]})")
     print(f"wrote {OUT_JSON}")
     print("samples:", json.dumps(samples))
     return 0

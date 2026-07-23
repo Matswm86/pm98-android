@@ -118,6 +118,13 @@ the broad LUT -- corrected 2026-06-26.)
   British-only). The FICHA RATING formula stays un-RE'd (80/82 in frames vs our
   squad-AV; box parity-excluded).
 
+## RENEW stepper granularity — CLOSED 2026-07-23
+The "wage-stepper increment is un-RE'd, a documented placeholder" TODO is done: the OFFER
+panel now steps the YEARLY WAGE by the engine's own value-dependent ladder and YEARS 1..5,
+both lifted from MANAGER.EXE — `docs/re/offer_record_re.md`. The offer also opens on the
+player's EXACT table yearly wage rather than a weekly figure re-multiplied by 52, so the
+cell can no longer drift off the £5,000-step table value.
+
 ## Divergences / parity status — RE-VERIFIED 2026-07-13
 The screen is `app/scenes/PlayerInfoScreen.gd` (fonts `_f8/_f10/_f12` at native .fnt
 sizes — the old `_f18` name font is gone). Verified this pass:

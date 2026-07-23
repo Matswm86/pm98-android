@@ -431,10 +431,12 @@ Wiring done (B5-2): OPPONENT -> VIEW RIVAL (RivalScreen), PLAYERS -> SQUAD MANAG
   reverse record order per section (decoded from the frame; ability sort removed).
   AV=`_avg_of`, LOAN=`on_loan` YES/NO, WAGE=`Contract.yearly(current_weekly)`,
   YEARS=`contract_term|contract_years` (term stamped at every deal site in Career).
-  **REMAINING GAP: MO** — PM98 morale is a dynamic save-game value; the app has NO
-  morale model and no static attr matches the frame's MO (79-99). Renders `-`; do NOT
-  fabricate it. (Owner 2026-07-02: morale IS in MANAGER.EXE — RE it when convenient,
-  after the offers flow.)
+  ~~**REMAINING GAP: MO**~~ — **CLOSED**: morale was RE'd 2026-07-03 (`morale_re.md`,
+  `FUN_00582db0` displayed / `FUN_00584cc0` mutator, ported to `Morale.gd`). The stale
+  "un-RE'd dynamic save value" note survived in `TransferScreen.gd` + `transfer_screen_re.md`
+  until **2026-07-23**, when the TRANSFER MARKET row was rewired to `Morale.display`
+  along with AV (core4>>2), the star strip, YEARS|LEFT and the nationality flag —
+  see `offer_record_re.md` + the rewritten gap table in `transfer_screen_re.md`.
 - **PLAYER INFORMATION actions.** DONE 2026-07-02. The overlay's real **RENEW / TRANSFER /
   SACK / OK** row (source rects FUN_00526a60, card-local RENEW(85,325,104,25) /
   TRANSFER(196,..) / SACK(307,..) / OK(429,..,52,25)) is now live on the manager's own
@@ -451,8 +453,12 @@ Wiring done (B5-2): OPPONENT -> VIEW RIVAL (RivalScreen), PLAYERS -> SQUAD MANAG
   rebuilt frame-baked to 0px vs run-1 081/084 incl. the CLAUSES column (checked/
   washed boxes, figure labels, progress sub-lines), the YEARS|LEFT boxes, the
   FUN_00526a60 button row with the held-OK ring, and the SquadScreen palette-dim
-  (exact alert LUT, 081-vs-082). See ficha_card_re.md. Still open there: FICHA
-  RATING formula (parity-excluded), non-EU KIND evidence, matches-to-renew target.
+  (exact alert LUT, 081-vs-082). See ficha_card_re.md. Still open there: non-EU KIND
+  evidence. **CLOSED since:** the FICHA RATING formula (= `FUN_00581e60`, morale_re.md,
+  parity-INCLUDED) and the **matches-to-renew target** (= 20, seeded by `FUN_00576cd0`
+  for AV 70..79 on one-year deals only — `offer_record_re.md` §5). The RENEW/MAKE OFFER
+  stepper granularities, the last documented placeholders on this flow, are binary-exact
+  since 2026-07-23 (`offer_record_re.md` §2/§3).
 
 # §C — LIVE SIDE-BY-SIDE PARITY RUN, MANAGER LEAGUE (2026-07-16, session 6)
 
