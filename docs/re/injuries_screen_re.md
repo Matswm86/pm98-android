@@ -24,8 +24,38 @@ x353..403 · `PRICE` x428..460 · `INSUR.` x491..527 · `COST` x560..590.
 ### Section rows (grey 220, h16; baker `INJ_SECT_TOPS`)
 GOAL `[105,125,145]`, DEF `[174,194,214,234]`, MID `[262,282,302,322]`,
 FOR `[350,370,390]`. Per **injured** player (`injured_weeks>0`) in his section
-the scene draws: **PLAYER name** at x64 (black) + the **Week** value
-(`injured_weeks`) centred in cell `[355,40]` (frame row grey box x358..385).
+the scene draws: **PLAYER name** at x64 (black) + the real **diagnosis** in the
+TYPE OF INJURY cell `[209,115]` (black) + the **Week** value (`injured_weeks`)
+centred in cell `[355,40]` (frame row grey box x358..385).
+
+### TYPE OF INJURY — BINARY-EXACT (2026-07-23)
+The diagnosis is the game's own, no longer furniture. `Availability.INJURY_TYPES`
+is lifted verbatim from **MANAGER.EXE** (`extracted/Premier Manager 98/`), the
+injury-name pointer array at **VA 0x6622e8** (18 entries, native index order):
+
+| idx | type | idx | type | idx | type |
+|---|---|---|---|---|---|
+| 0 | virus | 6 | dislocated wrist | 12 | broken cheekbone |
+| 1 | cold | 7 | dislocated finger | 13 | dislocated shoulder |
+| 2 | pulled muscle | 8 | sprained wrist | 14 | fractured rib |
+| 3 | dead leg | 9 | groin strain | 15 | shin splints injury |
+| 4 | pulled hamstring | 10 | broken nose | 16 | slipped disc |
+| 5 | sprained ankle | 11 | broken toe | 17 | broken leg |
+
+- The diagnosis is a byte at the injury record's **+2** field; accessor fn
+  `injury_name()` @ **0x584e50** (`idx<18 -> table, else "XXXX"` sentinel @ 0x662448).
+- `is_serious()` @ **0x584e20** returns 1 for indices **11..17** = the "badly
+  injured" news tier (`Availability.SERIOUS_MIN=11`).
+- Injury news wording is the game's exact templates (unit **weeks**, not matches):
+  serious `%s is badly injured: he will be out for %u weeks with a %s.` (@0x662c04,
+  one-week @0x662bc0); ordinary `%s will be out for the next %u weeks with a %s.`
+  (@0x662b24, one-week @0x662afc). Feed line `%s, (%s), is out for %u week%s with a %s.`
+  (@0x662990).
+- **Still data-driven (DAT.PKF), not yet decoded**: the exact per-type roll
+  distribution and duration table, and the insurance premium/payout economy
+  (`INSUR.`/`PRICE`/`COST` columns). `Availability` draws the tier from the
+  binary's own serious split and the duration from its existing weighting; within
+  a tier the diagnosis is uniform. This is the one remaining precision item.
 
 Injuries are rolled for the **manager's club only** (`Availability.gd` scope),
 so the list is exactly that squad. **Suspensions are not injuries** and are
@@ -44,11 +74,13 @@ INSURANCE `(358,434,124,34)`, RETURN `(500,434,134,34)` (button bodies probed
 x385..476 / x525..609).
 
 ## HONEST GAPS (flagged, never filled)
-1. **TYPE OF INJURY** — `Availability.gd` stores only `injured_weeks`, no
-   injury-type string; the column stays furniture (no fabricated diagnoses).
+1. ~~**TYPE OF INJURY**~~ — **CLOSED 2026-07-23**: the column now renders the real
+   diagnosis (binary-exact table above; `Availability.injury_type_name`).
 2. **PHYS. checkbox** (treatment toggle) — no treatment model; furniture.
 3. **PRICE / INSUR. / COST** — the app models no injury-insurance economy; those
-   columns stay furniture and INSURANCE is a documented no-op.
+   columns stay furniture and INSURANCE is a documented no-op. (Payout/premium
+   amounts are DAT.PKF-driven; the real insurance strings/groups are catalogued
+   in `insurance_screen_re.md` — the economy itself is the next injuries session.)
 4. **"N PLAYERS" = physio quality** is *inferred* from frame 034's 5-stars↔"5
    PLAYERS" pairing (not reversed from the binary); flagged as an inference.
 5. **Header red-cross plaque** — the injuries-mode barra decoration (frame 034
@@ -56,6 +88,11 @@ x385..476 / x525..609).
 
 ## Verification
 `app/tests/test_injuries_screen.gd` (ALL PASS, headless): asset load,
-injured→section listing, suspension exclusion, Week=injured_weeks, physio read
-from staff, no-physio blank band, INSURANCE no-op, RETURN signal, paint pass.
-Pixel parity NOT MEASURED headless (real-display shot is the outstanding check).
+injured→section listing, **real diagnosis per row** (fractured rib / pulled
+muscle), suspension exclusion, Week=injured_weeks, physio read from staff,
+no-physio blank band, INSURANCE no-op, RETURN signal, paint pass.
+`app/tests/test_availability.gd` adds: every injury carries a valid diagnosis +
+exact news wording, serious/ordinary tiers both occur, recovery clears the type.
+Render-diff `tests/shot_injuries_verify.gd` (`out/injuries_typed.png`, display
+:1, 2026-07-23): diagnoses land in the TYPE OF INJURY column (x209..) beside
+name/week; verified by eye vs the column map above.

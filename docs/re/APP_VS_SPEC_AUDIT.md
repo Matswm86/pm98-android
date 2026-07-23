@@ -480,7 +480,7 @@ Manager League) is CORRECT as-is; gate any future MANAGER HISTORY entry on mode.
 | # | original screen (frame) | app today (verified) |
 |---|---|---|
 | 1 | GOAL SCORERS graph+list (orig/12) | ~~dead~~ **CLOSED** — GoalScorersScreen built + tested |
-| 2 | INSURANCE per-player (orig/17) | documented no-op (InjuriesScreen.gd:152) |
+| 2 | INSURANCE per-player (orig/17) | **PARTIAL** — TYPE OF INJURY column now binary-exact (18 real diagnoses, MANAGER.EXE @0x6622e8; injuries_screen_re.md). Insurance premium/payout economy still DAT.PKF-driven no-op (InjuriesScreen.gd) |
 | 3 | SCOUT search (orig/35) | **CLOSED** — ScoutScreen built + wired + binary-exact criteria + tested |
 | 4 | OFFERS foreign-league map (orig/36) | **CLOSED** — OffersScreen built + wired |
 | 5 | GROUND IMPROVEMENTS panel: SEATS/CAR PARK/FACILITIES/SERVICES offers (orig/21) | invented "GROUND WORKS" text browse w/ invented prices (app/56) — B5-1-class stand-in still live |

@@ -959,8 +959,10 @@ func _roll_ai_squads(rng: RandomNumberGenerator, ai_featured: Dictionary) -> voi
 			for p in feat:
 				var now := int(p.get("injured_weeks", 0))
 				if now >= AI_INJ_NEWS_WEEKS and now > int(before.get(int(p.get("id", -1)), 0)):
-					_news("injury", "%s's %s is out injured for %d matches." % [
-						club_names.get(int(cid), "?"), p.get("name", "?"), now])
+					var diag := Availability.injury_type_name(p)
+					var with_diag := " with a %s" % diag if diag != "" else ""
+					_news("injury", "%s's %s is out injured for %d weeks%s." % [
+						club_names.get(int(cid), "?"), p.get("name", "?"), now, with_diag])
 		Training.train_week(rng, squad, Training.DEFAULT_INTENSITY)
 
 

@@ -21,7 +21,9 @@ func _run() -> void:
 	var club := _synth_club()
 	# injure a defender (2 weeks) + a forward (1 week); suspend a midfielder (must NOT list)
 	club["players"][3]["injured_weeks"] = 2      # a DF
+	club["players"][3]["injury_type"] = 14       # "fractured rib" (serious tier)
 	club["players"][12]["injured_weeks"] = 1     # a FW
+	club["players"][12]["injury_type"] = 2       # "pulled muscle" (ordinary tier)
 	club["players"][8]["suspended_weeks"] = 1    # a MF (excluded)
 	var physio := {"id": 800001, "role": Staff.PHYSIO, "name": "R. Physio", "quality": 4,
 		"wage": Staff.wage_for(Staff.PHYSIO, 4)}
@@ -41,6 +43,11 @@ func _run() -> void:
 	ok = _assert(screen._injured["mid"].size() == 0, "the suspended midfielder is excluded") and ok
 	ok = _assert(int(screen._injured["def"][0]["injured_weeks"]) == 2,
 		"the Week value carries injured_weeks (2)") and ok
+	# TYPE OF INJURY column: the listed players carry their real binary-sourced diagnosis.
+	ok = _assert(Availability.injury_type_name(screen._injured["def"][0]) == "fractured rib",
+		"the injured defender's diagnosis is 'fractured rib'") and ok
+	ok = _assert(Availability.injury_type_name(screen._injured["fwd"][0]) == "pulled muscle",
+		"the injured forward's diagnosis is 'pulled muscle'") and ok
 	ok = _assert(not screen._physio().is_empty() and int(screen._physio()["quality"]) == 4,
 		"the hired physio is read from staff (q4)") and ok
 

@@ -100,6 +100,45 @@ func _unit_roll_and_bans() -> bool:
 	ok = _assert(bans > 0, "suspensions occur over 200 matches (got %d)" % bans) and ok
 	ok = _assert(sane, "no counter ever goes negative") and ok
 
+	# Every injury carries a real binary-sourced diagnosis, and the news wording uses
+	# the game's exact templates ("with a <type>", weeks not matches; serious ->
+	# "badly injured"). Force injuries with chance 1.0 over the 18-name table.
+	var r3 := RandomNumberGenerator.new()
+	r3.seed = 999
+	var typed_ok := true
+	var saw_serious := false
+	var saw_ordinary := false
+	for _n in 300:
+		var sq := [{"name": "Doc", "injured_weeks": 0}]
+		var items := Availability.roll_match(r3, sq, 100.0)  # inj_chance clamps well past 1
+		if items.is_empty():
+			continue
+		var it: Dictionary = items[0]
+		if it["kind"] != "injury":
+			continue
+		var ti := int(it.get("type", -1))
+		if ti < 0 or ti >= Availability.INJURY_TYPES.size():
+			typed_ok = false
+		var diag: String = Availability.injury_type_name(sq[0])
+		if diag == "" or diag != Availability.INJURY_TYPES[ti]:
+			typed_ok = false
+		var txt: String = it["text"]
+		if txt.find(diag) < 0 or txt.find("match") >= 0 or txt.find("week") < 0:
+			typed_ok = false
+		if ti >= Availability.SERIOUS_MIN:
+			saw_serious = true
+			if txt.find("badly injured") < 0:
+				typed_ok = false
+		else:
+			saw_ordinary = true
+	ok = _assert(typed_ok, "each injury has a real diagnosis + exact news wording") and ok
+	ok = _assert(saw_serious and saw_ordinary, "both serious and ordinary injuries occur") and ok
+	# Recovery clears the diagnosis, so a fit player reports no type.
+	var rec := {"name": "Rec", "injured_weeks": 1, "injury_type": 17}
+	Availability.tick_week([rec])
+	ok = _assert(Availability.injury_type_name(rec) == "" and not rec.has("injury_type"),
+		"recovery clears the injury diagnosis") and ok
+
 	# The yellow threshold bans precisely: 4 bookings -> still available, the 5th -> a
 	# 1-match ban with the tally reset. Force YELLOW (randf < YELLOW_CHANCE) via a seed
 	# that draws low is fiddly, so exercise the rule by pre-loading 4 yellows and rolling

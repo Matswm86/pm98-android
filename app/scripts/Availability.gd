@@ -10,9 +10,10 @@ extends RefCounted
 ##
 ## State lives on the player dict (so it persists inside Career.rosters with no
 ## extra save plumbing):
-##   * injured_weeks   : matchdays still to sit out injured   (0 = fit)
+##   * injured_weeks   : weeks still to sit out injured        (0 = fit)
 ##   * suspended_weeks : matchdays still to sit out banned     (0 = available)
 ##   * yellows         : bookings accrued toward the next ban
+##   * injury_type     : index into INJURY_TYPES (the diagnosis), set when injured
 ## A player is AVAILABLE only when both counters are zero.
 ##
 ## Scope (an honest simplification, flagged here): injuries/cards are rolled for
@@ -26,6 +27,25 @@ extends RefCounted
 # Five bookings earn a one-match ban (the long-standing PM-era rule), then the
 # yellow tally resets. Reds ban immediately for 1-3 matches by severity.
 const YELLOWS_FOR_BAN := 5
+
+# The game's own injury diagnoses, in its native index order. Lifted verbatim from
+# MANAGER.EXE (extracted/Premier Manager 98/MANAGER.EXE): the injury-name pointer
+# array at VA 0x6622e8. The stored diagnosis is a byte at the injury record's +2
+# field (accessor fn @ 0x584e50: index < 18 -> this table, else the "XXXX"
+# sentinel). No invention -- these are the 18 strings the original prints in the
+# INJURIES screen "TYPE OF INJURY" column and in its injury news lines.
+const INJURY_TYPES := [
+	"virus", "cold", "pulled muscle", "dead leg", "pulled hamstring",
+	"sprained ankle", "dislocated wrist", "dislocated finger", "sprained wrist",
+	"groin strain", "broken nose", "broken toe", "broken cheekbone",
+	"dislocated shoulder", "fractured rib", "shin splints injury", "slipped disc",
+	"broken leg",
+]
+# The game's is_serious(injury) predicate (MANAGER.EXE @ 0x584e20 returns 1 for
+# type indices 11..17). Serious diagnoses are the "badly injured" news tier
+# (templates @ 0x662bc0 / 0x662c04) and take the longer knocks; 0..10 are ordinary
+# (templates @ 0x662afc / 0x662b24).
+const SERIOUS_MIN := 11
 
 # Per featured player, per match (probabilities, not permil -- rolled with randf).
 const INJ_CHANCE := 0.018      # ~0.2 injuries / match across an XI (~1 every 5)
@@ -80,6 +100,7 @@ static func tick_week(squad: Array) -> Array:
 			inj -= 1
 			p["injured_weeks"] = inj
 			if inj == 0:
+				p.erase("injury_type")
 				news.append({"kind": "return", "text": "%s is back to full fitness." % _nm(p)})
 		var sus := int(p.get("suspended_weeks", 0))
 		if sus > 0:
@@ -103,9 +124,11 @@ static func roll_match(rng: RandomNumberGenerator, featured: Array, injury_mult 
 	for p in featured:
 		if rng.randf() < inj_chance:
 			var wk := _injury_weeks(rng)
+			var ti := _pick_injury_type(rng, wk)
 			p["injured_weeks"] = maxi(int(p.get("injured_weeks", 0)), wk)
-			news.append({"kind": "injury",
-				"text": "%s injured -- out for %d %s." % [_nm(p), wk, _matches(wk)]})
+			p["injury_type"] = ti
+			news.append({"kind": "injury", "type": ti,
+				"text": _injury_news(_nm(p), wk, ti)})
 			continue
 		if rng.randf() < RED_CHANCE:
 			var rwk := _red_weeks(rng)
@@ -132,11 +155,43 @@ static func reset(squad: Array) -> void:
 		p["injured_weeks"] = 0
 		p["suspended_weeks"] = 0
 		p["yellows"] = 0
+		p.erase("injury_type")
 
 
 # ---- helpers -------------------------------------------------------------
 
-## Injury length in matches, weighted short (most knocks are a week or two).
+## The diagnosis string for a player, "" when fit / untyped (legacy state).
+static func injury_type_name(p: Dictionary) -> String:
+	if int(p.get("injured_weeks", 0)) <= 0 or not p.has("injury_type"):
+		return ""
+	var ti := int(p["injury_type"])
+	return INJURY_TYPES[ti] if ti >= 0 and ti < INJURY_TYPES.size() else ""
+
+## Pick a diagnosis for a knock of `wk` weeks. Longer knocks draw from the game's
+## serious tier (indices SERIOUS_MIN..), short ones from the ordinary tier -- the
+## split is the binary's own is_serious classification (0x584e20); the exact
+## per-type roll table is DAT.PKF-driven and not yet decoded, so within a tier the
+## choice is uniform.
+static func _pick_injury_type(rng: RandomNumberGenerator, wk: int) -> int:
+	if wk >= 3:
+		return rng.randi_range(SERIOUS_MIN, INJURY_TYPES.size() - 1)
+	return rng.randi_range(0, SERIOUS_MIN - 1)
+
+## Injury news line, using MANAGER.EXE's exact wording: serious diagnoses get the
+## "is badly injured" tier (0x662bc0 / 0x662c04), ordinary ones the "will be out"
+## tier (0x662afc / 0x662b24). Unit is weeks (the game's, not "matches").
+static func _injury_news(nm: String, wk: int, ti: int) -> String:
+	var t: String = INJURY_TYPES[ti]
+	if ti >= SERIOUS_MIN:
+		if wk == 1:
+			return "%s is badly injured: he will be out for the next week with a %s." % [nm, t]
+		return "%s is badly injured: he will be out for %d weeks with a %s." % [nm, wk, t]
+	if wk == 1:
+		return "%s will be out for one week with a %s." % [nm, t]
+	return "%s will be out for the next %d weeks with a %s." % [nm, wk, t]
+
+
+## Injury length in weeks, weighted short (most knocks are a week or two).
 static func _injury_weeks(rng: RandomNumberGenerator) -> int:
 	var r := rng.randf()
 	if r < 0.45:

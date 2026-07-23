@@ -12,10 +12,10 @@ class_name InjuriesScreen
 ##  - the bottom PHYSIOTHERAPIST band: the hired physio's name + quality stars +
 ##    the "N PLAYERS" figure (= his quality), from Career.staff / Staff.gd.
 ##
-## HONEST GAPS (flagged, never invented — injuries_screen_re.md §Gaps): the app's
-## Availability model stores only injured_weeks, so TYPE OF INJURY (no injury-type
-## string), PHYS. (treatment checkbox), and this list's PRICE / INSUR. / COST
-## columns have no source and stay as resting furniture. The INSURANCE button
+## TYPE OF INJURY renders the game's own diagnosis (Availability.INJURY_TYPES,
+## MANAGER.EXE @0x6622e8; closed 2026-07-23). Remaining gaps (injuries_screen_re.md
+## §Gaps): PHYS. (treatment checkbox) and this list's PRICE / INSUR. / COST columns
+## are the DAT.PKF-driven insurance economy, still resting furniture. The INSURANCE button
 ## opens the real INSURANCE screen (InsuranceScreen.gd, ported 2026-07-18 from
 ## wine witnesses 33-39). Suspensions are NOT injuries and are excluded.
 ## Native 640x480.
@@ -38,6 +38,7 @@ const SECT := [
 const ROW_H := 16
 const NAME_X := 64          # under the PLAYER header
 const NAME_W := 130.0
+const TYPE_CELL := [209, 115] # TYPE OF INJURY column (header x209..324); the real diagnosis
 const WEEK_CELL := [355, 40] # Week column value cell (frame: grey box x358..385)
 
 # physio band (frame 034 bottom): name x61..340 white band; count on the black band
@@ -185,6 +186,11 @@ func _draw_rows() -> void:
 			var y: int = tops[i]
 			PMChrome.text(self, _f8, NAME_X, y + 2,
 				PMChrome.title_case_name(str(p.get("name", "?"))), C_NAME, 11, 0, NAME_W)
+			# TYPE OF INJURY: the game's own diagnosis string (Availability.INJURY_TYPES),
+			# blank only for legacy untyped injuries.
+			var diag := Availability.injury_type_name(p)
+			if diag != "":
+				PMChrome.text(self, _f8, TYPE_CELL[0], y + 2, diag, C_NAME, 11, 0, float(TYPE_CELL[1]))
 			PMChrome.text(self, _f8, WEEK_CELL[0], y + 2, str(int(p.get("injured_weeks", 0))),
 				C_WEEK, 11, 1, float(WEEK_CELL[1]))
 
