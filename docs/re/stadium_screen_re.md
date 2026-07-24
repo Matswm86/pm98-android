@@ -53,9 +53,36 @@ IMPROVE `(298,407,152,25)` · WORKS `(484,407,132,25)` · MATCH DAY `(298,442,15
 ## Tier picture
 `tier = clamp(capacity * 11 / 130000, 0, 11)` (reversed `FUN_0051a6e0` @0x51a728, magic
 division). 12 tiles `estadio0..11.png` (320×240, MANAGER.PAL). The frame's Old-Trafford
-render = tier 4 (real capacity 55,300). The tile matches the frame's scene (a small internal
-crop/palette offset vs the live render is an export artefact, not a placement error); it fills
-the picture box exactly and covers the baked tile so no tier bleed is possible.
+render = tier 4 (real capacity 55,300). The tile fills the picture box exactly and covers the
+baked tile so no tier bleed is possible.
+
+**The "small internal crop/palette offset … not a placement error" note was WRONG — FIXED
+2026-07-24 (s55).** It was a 256-column wrap, and it made the whole picture panel render at
+**4.1% pixel-exact**. Every tile carried a hard vertical seam at column 255→256 — the maximum
+per-column |RGB gap| in all 12 at z = 13.1…15.3σ, where the real panel's worst column is only
+z = 3.4 and not there. The same seam is in the source `RECURSOS.PKF ESTADIO<N>.BMP`, so it is a
+PCF5 DIB decode artefact, not our crop. Solved against the owner's real 1:1 GROUND capture
+(`screenshots/user-captures-2026-07-23-ground-squad-transfer/01_07-52-40.png`, client area at
+(641,196)): 12 template patches spread over the panel all located at **zero** differing pixels
+and agree on one mapping,
+
+```
+panel(bx, by)  <-  tile[(by + (2 if bx < 64 else 1)) % 240][(bx + 256) % 320]
+```
+
+— columns rotated by 256 with the row offset stepping by one across the wrap, i.e. a flat-buffer
+misregistration, not a clean column roll (a plain roll fixes columns 64…319 and leaves 0…63 at
+80% differing). **And the tile is drawn at y = 146, not the 148 read off frame 172**, so
+`SCENE_BOX` is now `Rect2(299, 146, 320, 240)`. Result on the live app render: picture panel
+**98.15% pixel-exact / 0.83% >8**, whole GROUND screen 54.5% → 78.0% exact.
+
+Tool: `tools/re/fix_estadio_wrap.py` (`--apply` rewrites the tiles, `--verify` re-measures).
+**Scope caveat:** tier 4 is the only tile with a real render to check against. The other 11 were
+corrected by the same mapping on the strength of the shared seam signature (same column, same z
+band) and are **not** independently render-verified — capture a GROUND screen for a club in
+another capacity tier to close that. The residual 0.83% is fine dither noise; whether the live
+render dithers at blit time is not reversed. The capture's frames 01-12 have pixel-identical
+panels (0.0% between them), so the picture is static — no animation is being read as an offset.
 
 ## What is frame-true vs honest gap
 - **Frame-true (baked or reversed):** the entire body chrome — both panels, all section/

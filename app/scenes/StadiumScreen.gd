@@ -184,9 +184,12 @@ const C_LED_SEATS := Color8(42, 63, 170)          # SEATS / CAR PARK ink (blue)
 const C_LED_FAC := Color8(40, 110, 40)            # FACILITIES ink (green)
 const C_LED_SVC := Color8(150, 30, 30)            # SERVICES ink (maroon)
 
-# The ESTADIO<tier> scene box, pixel-measured off frame 172 (320x240 tile, drawn 1:1 over
-# the baked Old-Trafford picture so any tier fully covers it — no bleed).
-const SCENE_BOX := Rect2(299, 148, 320, 240)
+# The ESTADIO<tier> scene box (320x240 tile, drawn 1:1 over the baked Old-Trafford picture so
+# any tier fully covers it — no bleed). y is 146, not the 148 frame 172 was read as: solved
+# against the owner's real 1:1 GROUND capture (tier 4, Old Trafford) in
+# tools/re/fix_estadio_wrap.py, which also un-wrapped the tiles' column/row misregistration.
+# At (299, 146) with the corrected tile the panel is 98.2% pixel-exact vs the real render.
+const SCENE_BOX := Rect2(299, 146, 320, 240)
 # Dynamic-text anchors, measured off frame 172 (see docs/re/stadium_screen_re.md).
 const R_GROUND := Rect2(299, 71, 320, 20)        # green header, ground name (centred)
 const R_CAP_VAL := Rect2(412, 94, 200, 15)       # CAPACITY value cell (left-aligned)

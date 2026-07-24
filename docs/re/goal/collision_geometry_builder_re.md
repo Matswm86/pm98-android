@@ -122,7 +122,14 @@ bank a ground-truth `+0x17f4`. The port strategy is therefore:
    real kickoff, or (b) a hand-derived fixture for the simple goal-line posts, since the
    goal-line geometry is a pure function of `match+0x1820/+0x1970..0x197c`.
 
-## Next-session plan (in order)
+## Next-session plan (in order) — **items 2-5 are DONE; this list was stale, verified 2026-07-24 (s55)**
+> `Pm98CollBuilder` is the exact port of phases 0-4 (`test_collbuilder` 438 checks against
+> `specs/collbuilder_oracle.txt`, `test_geomleaf` 93 on the pure leaves); `Pm98Movement` reads the
+> assembled `m[0x17f4]` post array in the ball collision loop; `Pm98Driver.tick` is the
+> `FUN_00598740` port (`test_driver` 34 checks). Only the ≥50-match kill test of item 5 is open,
+> and it is gated on the M5 capture horizon (clk 660), not on this builder — see
+> `docs/re/PLAN_byte_exact_match_engine.md` §M5 and `docs/re/M5_S55_SAMPLING_PHASE_ARTEFACT.md`.
+
 1. ~~Finish the pure leaves: FUN_005efa40, FUN_005a1730/1910/19d0, FUN_00590be0 (+oracles).~~
    DONE 2026-06-20 (all oracle-validated, test_geomleaf.gd 93 checks). NEXT real step ↓:
 2. Port FUN_005946f0 phases 1-3 (the `+0x27c8` master geometry) using the leaves; then

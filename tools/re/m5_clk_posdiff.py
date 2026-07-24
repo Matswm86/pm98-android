@@ -12,6 +12,16 @@ A Z2-stopped dartwatch capture carries several stops per clk, and the LAST stop 
 settled end-of-tick roster — the same instant the port dump records. Comparing those is exact and
 needs no skew model, so this differ reports the first clk at which any player's (x, y) differs.
 
+*** THAT PREMISE IS UNSOUND (s55) — DO NOT TRUST THIS TOOL'S FORKS ON ITS OWN. *** The Z2
+watchpoint is on the LCG seed, so it only stops on an RNG DRAW. Any player the sim moves AFTER
+the tick's last draw is read PRE-move and its row carries the PREVIOUS tick's position; the draws
+per clk vary (6-14 observed), so which players that hits changes tick to tick. The result is
+phantom forks that re-align on their own — s55 clk 587 reported three, and all three showed
+`port[clk=N] == silicon[clk=N+1]` exactly until clk 592 carried extra draws and the columns
+snapped back. Use `m5_seq_posdiff.py` (phase-tolerant) to decide whether a fork is real, then
+come back here to pin the tick once that clk's sampling instant is known.
+Details: docs/re/M5_S55_SAMPLING_PHASE_ARTEFACT.md.
+
 Port dump: `diag_m5_dart209.gd` (PM98_TICK_CAP / PM98_CLK_LO / PM98_CLK_HI).
 """
 

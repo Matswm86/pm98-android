@@ -167,6 +167,22 @@ deprioritised (last). Approved path: build an **end-to-end oracle**, kill-test t
    `MatchScreen` (BRIEF) so BRIEF narrates the engine's real event queue and RESULTS shows the
    engine's scoreline. Retire `MatchSim` from the manager-match path (keep for CPU-league bulk only
    if perf demands, flagged).
+   **STATUS 2026-07-24 (s55).** Tick-level parity, measured properly, is **clean over clk
+   270-660** — all 22 players and the ball, every silicon capture we hold, within one tick of
+   sampling phase (`tools/re/m5_seq_posdiff.py`; `docs/re/M5_S55_SAMPLING_PHASE_ARTEFACT.md`).
+   The "frontier 643/651" of s49-s54 was a false premise in `m5_clk_posdiff.py`, not physics.
+   Nothing beyond clk 660 is measured yet — a full match is 14400 clks and every capture stops
+   at 660, so parity from 661 on is unknown in both directions. The end-to-end kill-test
+   (`run_match_from_struct.gd`, byte-loaded frame-0, Villa 5-2 Bolton) still diverges early —
+   first goal 11' Aston Villa vs the reference's 21' — and then trips
+   `Pm98Outer._pause_branch`'s wait-loop guard, so it cannot yet reach FULL TIME. Extending the
+   capture window is the gate on everything downstream.
+   **Items 2-5 of the collision-builder doc's next-session plan are DONE and were stale in that
+   doc:** `FUN_005946f0` phases 0-4 are ported (`Pm98CollBuilder`, `test_collbuilder` 438 checks,
+   `test_geomleaf` 93), the post array is wired into the ball collision loop
+   (`Pm98Movement` reads `m[0x17f4]`), and the tick driver `FUN_00598740` is ported
+   (`Pm98Driver.tick`, `test_driver` 34). What remains of item 5 is the ≥50-match fixed-seed
+   kill test, which is blocked on the clk-660 measurement horizon above — not on either function.
 
 ## BRIEF-specific (mostly done — verify, don't rebuild)
 - Commentary TEMPLATES already verbatim from `MANAGER.EXE` (`MatchCommentary.gd`, VAs cited); event
