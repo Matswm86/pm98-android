@@ -150,6 +150,7 @@ var _options: Control = null     # active OptionsPanel modal
 var _alert_queue: PackedStringArray = []
 var _alert_tex: ImageTexture       # finished box (normal OK state)
 var _alert_tex_hot: ImageTexture   # finished box with the OK button held
+var _alert_msg: String = ""        # the message currently on screen ("" = none)
 var _alert_box: Rect2i             # design-space rect of the current box
 var _alert_anim: float = 1.0       # grow-in progress 0..1 (case 5/6 zoom)
 var _alert_ok_held := false
@@ -223,11 +224,13 @@ func _next_alert() -> void:
 	if _alert_queue.is_empty():
 		_alert_tex = null
 		_alert_tex_hot = null
+		_alert_msg = ""
 		set_process(false)
 		queue_redraw()
 		return
 	var msg := _alert_queue[0]
 	_alert_queue.remove_at(0)
+	_alert_msg = msg
 	_alert_box = PMAlert.box_rect(msg)
 	_alert_tex = ImageTexture.create_from_image(PMAlert.render(msg, false))
 	_alert_tex_hot = ImageTexture.create_from_image(PMAlert.render(msg, true))
