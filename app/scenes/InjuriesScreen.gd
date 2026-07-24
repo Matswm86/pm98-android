@@ -9,8 +9,13 @@ class_name InjuriesScreen
 ##    squad, placed in his GOAL/DEF/MID/FOR section: PLAYER name + the Week (matches
 ##    still to sit out) value. Injuries are rolled for the manager's club only
 ##    (Availability scope), so this lists exactly that squad;
-##  - the bottom PHYSIOTHERAPIST band: the hired physio's name + quality stars +
-##    the "N PLAYERS" figure (= his quality), from Career.staff / Staff.gd.
+##  - the bottom PHYSIOTHERAPIST band: the hired physio's name, his rating in HALF-star
+##    steps (the rating IS his quality byte / 2) and the "N PLAYERS" figure —
+##    `FUN_00578b80` case 6 on that byte, so a 4.5-star physio reads 5 (witnessed);
+##  - the per-row PHYS. treatment button (BOTONOFF grey cross / BOTONON red cross);
+##    tapping it emits `treat_pressed` -> `Career.treat_injury`, the binary's
+##    `FUN_00543080` -> `FUN_00584db0` (remaining = total x (20 - q) / 20, so a
+##    five-star physio halves the lay-off).
 ##
 ## TYPE OF INJURY renders the game's own diagnosis (Availability.INJURY_TYPES,
 ## MANAGER.EXE @0x6622e8; closed 2026-07-23). The H / PRICE / INSUR. / COST cells
@@ -28,8 +33,7 @@ class_name InjuriesScreen
 ##
 ## HONEST GAP: an INSURED injured row also draws a small document icon at row-x
 ## 459 (@0x543b09). No frame witnesses that sprite on THIS screen, so the port
-## draws the policy digit alone rather than guess the art. PHYS. (the treatment
-## checkbox) stays resting furniture.
+## draws the policy digit alone rather than guess the art.
 ## Native 640x480.
 
 signal back_pressed        # RETURN -> Main reopens LINE-UP
@@ -116,6 +120,7 @@ var _f10: Font
 var _chrome: Texture2D
 var _title: Texture2D
 var _phys_star: Texture2D
+var _phys_star_half: Texture2D
 var _row_strip: Texture2D
 var _phys_off: Texture2D
 var _phys_on: Texture2D
@@ -127,6 +132,7 @@ func _ready() -> void:
 	_chrome = load("res://art/screens/injuries/chrome.png")
 	_title = load("res://art/screens/injuries/title.png")
 	_phys_star = load("res://art/screens/injuries/phys_star.png")
+	_phys_star_half = load("res://art/screens/injuries/phys_star_half.png")
 	_row_strip = load("res://art/screens/injuries/row_strip.png")
 	_phys_off = load("res://art/screens/injuries/phys_off.png")
 	_phys_on = load("res://art/screens/injuries/phys_on.png")
@@ -297,12 +303,17 @@ func _draw_physio_band() -> void:
 	var ph := _physio()
 	if ph.is_empty():
 		return
-	var stars := clampi(int(round(float(ph.get("stars", ph.get("quality", 0))))), 0, 5)
 	PMChrome.text(self, _f10, PHYS_NAME_X, PHYS_NAME_Y,
 		PMChrome.title_case_name(str(ph.get("name", ""))), C_NAME, 12, 0, 150.0)
-	for j in stars:
+	# Half-star steps: the rating IS the quality byte / 2, so a 4.5-star physio draws
+	# four full stars and a half (witnessed, E. Wragg in 39_injuries.png).
+	var halves := clampi(Staff.quality_byte(ph), 0, 10)
+	for j in halves / 2:
 		if _phys_star != null:
 			draw_texture(_phys_star, Vector2(PHYS_STAR_X0 + PHYS_STAR_PITCH * j, PHYS_STAR_Y))
+	if halves % 2 == 1 and _phys_star_half != null:
+		draw_texture(_phys_star_half,
+			Vector2(PHYS_STAR_X0 + PHYS_STAR_PITCH * (halves / 2), PHYS_STAR_Y))
 	# "N PLAYERS" = FUN_00578b80 case 6 on his raw quality byte, NOT the star count.
 	# Witnessed 2026-07-24: a 4.5-star physio (q=9) reads "5 PLAYERS".
 	PMChrome.text(self, _f8, PHYS_COUNT_CELL[0], PHYS_COUNT_Y, str(Staff.physio_capacity(ph)),

@@ -35,6 +35,8 @@ FRAME = (
     / "screenshots/wine-captures-2026-07-24-cadence-season-store"
     / "07_injuries_row_insured_giggs.png"
 )
+HALF_FRAME = ROOT / "screenshots/wine-captures-2026-07-24-role-training-staff" / "39_injuries.png"
+HALF_AT = (220 + 14 * 4, 449)  # the 5th cell of E. Wragg's 4.5-star strip
 # The LESIONADOS folder's own entries (names repeat across folders in RECURSOS.PKF,
 # so pick by file offset band, not by name).
 BAND = (0x455000, 0x458000)
@@ -67,6 +69,18 @@ def main() -> int:
             if sad:
                 rc = 1
         print(f"  wrote {out_name} ({img.width}x{img.height}){note}")
+
+    # --- the PHYSIOTHERAPIST band's HALF star ---------------------------------
+    # The band shows the physio's rating in half-star steps (his quality byte / 2), so a
+    # 4.5-star man draws four full stars and a half. `phys_star.png` (the full glyph,
+    # 14x14, SAD 0 at x220 y449 on the band, pitch 14) was already cut; the half comes
+    # from the fifth cell of the SAME witnessed strip — E. Wragg at 4.5 stars in
+    # `wine-captures-2026-07-24-role-training-staff/39_injuries.png`.
+    band = np.asarray(Image.open(HALF_FRAME).convert("RGB"))
+    half = band[HALF_AT[1] : HALF_AT[1] + 14, HALF_AT[0] : HALF_AT[0] + 14]
+    Image.fromarray(half, "RGB").save(OUT / "phys_star_half.png")
+    print(f"  wrote phys_star_half.png (14x14) from {HALF_FRAME.name} at {HALF_AT}")
+
     print("OK" if rc == 0 else "FAIL: a sprite did not land on its witnessed position")
     return rc
 
