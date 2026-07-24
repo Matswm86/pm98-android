@@ -1,5 +1,9 @@
 # SCOUT screen + async scout search — frame RE (wine witnesses 2026-07-18)
 
+> **GAP CLOSED 2026-07-24** — the E.U. / NON E.U. / PLAYERS WITHOUT TEAM enablement
+> condition (called "un-witnessed" below) is the hired SCOUT's star rating: 3.5 / 4.0
+> / 4.5. Four careers sampled; see [`transfer_loop_live_re.md`](transfer_loop_live_re.md) §5.
+
 The TRANSFER MARKET's SCOUT screen: hire-gated search-criteria panel + the async
 "scout searches for ~2 game weeks" loop + the PLAYERS FOUND results list. Decoded
 from the live wine witness run `screenshots/wine-captures-2026-07-18-goalscorers/`

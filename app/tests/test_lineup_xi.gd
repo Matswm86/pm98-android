@@ -69,15 +69,36 @@ func _run() -> void:
 	ok = _assert(changed[0] == emits + 1, "XI<->XI swap emits") and ok
 	ok = _assert(t.validate(club) == "", "XI valid after slot swap") and ok
 
-	# --- 5. two bench players: selection moves, XI unchanged ------------------
+	# --- 5. two NON-XI players exchange places, XI untouched ------------------
+	# Live-witnessed on the real game 2026-07-24: a SUBSTITUTE selected and a RESERVE
+	# tapped swap rows (Fairclough <-> Barlow). Before this the app only moved the
+	# selection, so a substitute could never be swapped with a reserve.
 	screen._sel_pid = -1
 	var xi_snap := t.xi.duplicate()
 	var benchA := _first_bench_pid(screen)
 	var benchB := _first_bench_pid(screen, benchA)
+	var order_before := screen._subs_order().map(func(p): return int(p.get("id", -1)))
+	var ia := order_before.find(benchA)
+	var ib := order_before.find(benchB)
 	screen._tap_row(_fi(screen, benchA))
 	screen._tap_row(_fi(screen, benchB))
-	ok = _assert(screen._sel_pid == benchB, "second bench tap re-selects") and ok
-	ok = _assert(t.xi == xi_snap, "bench<->bench leaves the XI untouched") and ok
+	var order_after := screen._subs_order().map(func(p): return int(p.get("id", -1)))
+	ok = _assert(order_after[ia] == benchB and order_after[ib] == benchA,
+		"non-XI tap pair exchanges their rows") and ok
+	ok = _assert(screen._sel_pid == -1, "the swap clears the selection") and ok
+	ok = _assert(t.xi == xi_snap, "a non-XI swap leaves the XI untouched") and ok
+	# A reserve swapped onto the bench is now a SUBSTITUTE (and vice versa).
+	var last := screen._subs_order().size() - 1
+	if last >= Tactics.BENCH_SLOTS:
+		var sub0 := int(screen._subs_order()[0].get("id", -1))
+		var res_last := int(screen._subs_order()[last].get("id", -1))
+		screen._sel_pid = -1
+		screen._tap_row(_fi(screen, sub0))
+		screen._tap_row(_fi(screen, res_last))
+		var tiers := screen._tiers()
+		var bench_ids: Array = (tiers[0] as Array).map(func(p): return int(p.get("id", -1)))
+		ok = _assert(bench_ids.has(res_last) and not bench_ids.has(sub0),
+			"a reserve swapped with a substitute takes the bench slot") and ok
 
 	# --- 6. a bench keeper MAY take the GK slot -------------------------------
 	var club2 := _synth_club(16, [1, 16])     # id1 + id16 are keepers

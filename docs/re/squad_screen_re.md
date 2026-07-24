@@ -1,5 +1,10 @@
 # SQUAD MANAGEMENT (PLANTILLA) screen — reversed layout from MANAGER.EXE
 
+> **ROW-COMPRESSION DEVIATION REMOVED 2026-07-24** — the original uses FIXED per-section
+> 16px slot bands (KEEPERS 3 / DEFENDERS 6 / MIDFIELDERS 6 / FORWARDS 5) with a working
+> scrollbar each; the app's compressed pitch was clipping the WAGE glyphs. Measurements
+> in [`transfer_loop_live_re.md`](transfer_loop_live_re.md) §4.
+
 640×480 pixels, lifted from `FUN_00552110` (decompile: `docs/re/squad/fn_00552110_*.c`).
 Anchored on the string `"SQUAD MANAGEMENT"` @ `.data 0x65f098` (pushed at the screen
 draw). Geometry via `CRect::CRect(left,top,right,bottom)` and the `FUN_00436fb0/fd0`

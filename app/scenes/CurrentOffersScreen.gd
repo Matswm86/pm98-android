@@ -1,6 +1,12 @@
 extends Control
 class_name CurrentOffersScreen
-## PM98 CURRENT OFFERS (OFERTAS) screen — bids on your transfer-listed players.
+## PM98 CURRENT OFFERS (OFERTAS) screen — YOUR OUTSTANDING OUTGOING BIDS.
+## LIVE-WITNESSED 2026-07-24 against the real MANAGER.EXE (Bolton, week 1): after an
+## OFFER for Barlow the screen showed one band, "Barlow" over the attribute strip with
+## the row "Rochdale | £15,000 | £5,000 | 1" — i.e. the CLUB column is the club you bid
+## TO, not a bidder. A player of ours placed on the transfer market the same session did
+## NOT appear here. Incoming bids on your own listed players are answered on the TEAM
+## OFFER card that pops during CONTINUE processing (run-3 085->086), not on this screen.
 ## Reversed from MANAGER.EXE (docs/re/ofertas_screen_re.md): title "CURRENT OFFERS"
 ## @.data 0x65b700, white panel (31,78)-(606,438) [FUN_00523f70], 5 player bands at
 ## y=98 stepping 67 [FUN_00523ed0], each a 564x48 block [FUN_00524500]: the player's
@@ -12,15 +18,14 @@ class_name CurrentOffersScreen
 ##
 ## Faithful gaps, never invented: MO (dynamic morale, unmodelled) renders "-" like
 ## SQUAD MANAGEMENT (APP_VS_SPEC_AUDIT B7); the CLAUSES cells render empty unless an
-## offer row carries a `clauses` list (our TransferMarket doesn't model clauses — the
-## four FUN_00524500 icons are baked and drawn only when present); the band-left kit
-## figure comes from the un-RE'd band template (DAT_00666f70), so the club's extracted
-## kit art stands in at the captured spot. The original band shows ONE offer row —
-## Career keeps up to 5 bids per player, so the row shows the newest bid and a band
-## tap hands the full list to the caller (`band_pressed`) for accept/refuse.
+## offer row carries a `clauses` list (the four FUN_00524500 icons are baked and drawn
+## only when present); the band-left kit figure comes from the un-RE'd band template
+## (DAT_00666f70), so the club's extracted kit art stands in at the captured spot. The
+## original band shows ONE offer row, and one outgoing bid is exactly one row.
 ##
-## Native 640x480; scales to fit its parent. INTERACTIVE: tap a populated band ->
-## `band_pressed(player)`; RETURN or empty space -> `back_pressed`.
+## Native 640x480; scales to fit its parent. RETURN or empty space -> `back_pressed`.
+## `band_pressed(player)` still fires on a populated band, but no live caller connects
+## it: the original's band interaction on THIS screen is un-witnessed.
 
 signal back_pressed
 signal band_pressed(player)

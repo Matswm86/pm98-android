@@ -2295,13 +2295,36 @@ func _show_lineup_screen() -> void:
 		_open_player_info(p, _mgr_club(), scr))
 
 ## The LINE-UP TRAINING sub-screen (TrainingScreen.gd; docs/re/training_screen_re.md):
-## the squad's training grid + the selected player's attribute panel over the baked
-## resting chrome. RETURN reopens LINE-UP; TACTICS opens the TEAM TACTICS board.
+## the squad's training grid, the CURRENT TRAINING STAFF band (the hired skill coaches
+## with their TP) and the selected player's attribute panel with its focus boxes.
+## Ticking a box assigns him to that coach through Career.set_training_focus, which
+## enforces the original's two caps; AUTO fills every coach to his TP. RETURN reopens
+## LINE-UP; TACTICS opens the TEAM TACTICS board.
 func _show_training_screen() -> void:
 	var scr: TrainingScreen = load("res://scenes/TrainingScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
-	scr.setup(_mgr_club(), _career.staff, _match_header())
+	var feed := func() -> void:
+		scr.setup(_mgr_club(), _career.staff, _match_header(), _career.training_focus)
+	feed.call()
+	scr.focus_toggled.connect(func(pid: int, focus: String) -> void:
+		AudioManager.ui_select()
+		var sel := scr._sel_pid
+		var res := _career.set_training_focus(pid, focus)
+		if str(res.get("msg", "")) != "":
+			scr.alert(str(res["msg"]))       # "You can´t train any more players."
+		_career.save()
+		feed.call()
+		scr._sel_pid = sel                   # setup() clears the selection; keep his panel up
+		scr.queue_redraw())
+	scr.auto_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		if Training.total_trainable(_career.staff) <= 0:
+			scr.alert(Training.NO_TRAINER_MSG)
+			return
+		_career.auto_training_focus()
+		_career.save()
+		feed.call())
 	scr.back_pressed.connect(func() -> void:
 		scr.queue_free()
 		_show_lineup_screen())
@@ -2809,10 +2832,25 @@ func _show_scout_screen() -> void:
 	scr.search_started.connect(func(criteria: Dictionary) -> void:
 		AudioManager.ui_select()
 		var foreign: Array = []
+		var seen := {}
 		for lid in criteria.get("leagues", []):
 			if str(lid) != c.league_id:
-				foreign.append_array(GameDB.clubs_in_league(str(lid)))
-		c.start_scout_search(criteria, foreign)
+				for cl in GameDB.clubs_in_league(str(lid)):
+					seen[int((cl as Dictionary).get("id", -1))] = true
+					foreign.append(cl)
+		# E.U. PLAYERS / NON E.U. PLAYERS scout the WHOLE WORLD — that is how the
+		# original sends a scout abroad (there is no foreign-league checkbox). The
+		# shipped database carries 384 non-English clubs, so the pool is real data.
+		var world: Array = []
+		if bool(criteria.get("eu", false)) or bool(criteria.get("non_eu", false)):
+			for cl in GameDB.clubs:
+				var cd: Dictionary = cl
+				var cid := int(cd.get("id", -1))
+				if cid == c.club_id or seen.has(cid) or c.rosters.has(cid):
+					continue      # own club + the live division are scanned separately
+				seen[cid] = true
+				world.append(cd)
+		c.start_scout_search(criteria, foreign, world)
 		c.save())
 	scr.player_pressed.connect(func(row: Dictionary) -> void:
 		AudioManager.ui_select()
@@ -2893,33 +2931,51 @@ func _show_browse_offer_card(player: Dictionary, club: Dictionary, host: Control
 			card.queue_free()
 		_toast(str(res["msg"])))
 
-## The original-art CURRENT OFFERS (OFERTAS) screen: up to 5 transfer-listed players,
-## each band showing his attribute strip + the newest bid (CLUB | CLUB OFFER | YEARLY
-## WAGE | YEARS | CLAUSES), reversed from MANAGER.EXE + the owner's capture
-## (docs/re/ofertas_screen_re.md; CurrentOffersScreen.gd). A band tap opens the REAL
-## TEAM OFFER answer card (TeamOfferScreen, walkthrough run-3 frames 086-092);
-## RETURN dismisses back to the transfer screen.
+## The original-art CURRENT OFFERS (OFERTAS) screen. LIVE-WITNESSED 2026-07-24 on the
+## real game (Bolton career, week 1): the screen lists **the offers YOU have out** —
+## one band per outstanding outgoing bid, showing the TARGET player's name/attribute
+## strip and a single row CLUB (the club you bid to) | CLUB OFFER | YEARLY WAGE |
+## YEARS | CLAUSES. A bid for Barlow of Rochdale showed "Rochdale £15,000 £5,000 1";
+## a player of ours placed on the transfer market the same session did NOT appear.
+## (The pre-2026-07-24 app fed this screen the manager's own transfer-listed players —
+## the model was inverted. Incoming bids on your listed players are answered on the
+## TEAM OFFER card that pops during CONTINUE processing, run-3 frames 085->086.)
+## RETURN dismisses back to the transfer screen; a band tap is inert (the original's
+## band interaction on THIS screen is un-witnessed — do not invent one).
 func _show_current_offers_screen() -> void:
 	var scr: CurrentOffersScreen = load("res://scenes/CurrentOffersScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
-	var feed := func() -> void:
-		var bands: Array = []
-		for pid in _career.transfer_listed:
-			var p := _career._find_in(_career.club_id, int(pid))
-			if p.is_empty():
-				continue
-			bands.append({"player": p, "offers": _career.offers_for(int(pid))})
-			if bands.size() == 5:
-				break
-		scr.setup(bands, "", _career.club_name, _career.league_name, _career.season,
-			_career.week + 1, _career.club_id)
-	feed.call()
+	var bands: Array = []
+	for b in _career.pending_bids:
+		var bid: Dictionary = b
+		var p: Dictionary
+		var seller := ""
+		if str(bid.get("kind", "")) == "external":
+			p = bid.get("player", {})
+			seller = str((bid.get("club", {}) as Dictionary).get("name", "?"))
+		else:
+			p = _career._find_in(int(bid.get("club_id", -1)), int(bid.get("pid", -1)))
+			seller = str(_career.club_names.get(int(bid.get("club_id", -1)), "?"))
+		if p.is_empty():
+			continue
+		# The row renders OUR terms: the fee we bid, the yearly wage we offered
+		# (the card's weekly -> yearly), the contract length and any checked clauses.
+		var weekly := int(bid.get("weekly", -1))
+		bands.append({"player": p, "offers": [{
+			"buyer_name": seller,
+			"offer": int(bid.get("offer", 0)),
+			"weekly_wage": weekly if weekly > 0 else Contract.market_weekly(p, _career.my_band()),
+			"years": maxi(1, int(bid.get("years", TransferMarket.NEW_CONTRACT_YEARS))),
+			"clauses": bid.get("clauses", []),
+		}]})
+		if bands.size() == 5:
+			break
+	scr.setup(bands, "", _career.club_name, _career.league_name, _career.season,
+		_career.week + 1, _career.club_id)
 	scr.back_pressed.connect(func() -> void:
 		AudioManager.ui_select()
 		scr.queue_free())
-	scr.band_pressed.connect(func(player: Dictionary) -> void:
-		_show_team_offer(int(player.get("id", -1)), feed))
 
 ## The REAL TEAM OFFER answer card for one listed player's bids (TeamOfferScreen;
 ## walkthrough run-3 frames 086-092 + 150-153): every offer row carries a

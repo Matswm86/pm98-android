@@ -83,12 +83,34 @@ const C_MARKET_BG := Color8(212, 159, 0)
 const MARKET_TAG_X := 162
 const MARKET_TAG_W := 56
 
+# Per-section slot bands, measured off frame 077 (grey-128 row borders scanned down
+# x=20): the original does NOT compress rows to fit a deep squad — every section has a
+# FIXED number of 16px slots and its OWN scrollbar, and the surplus scrolls. KEEPERS is
+# baked into the column-header row so it has no label band of its own.
+#   KEEPERS   3 slots @ 92/108/124
+#   DEFENDERS 6 slots @ 156..236   (label band 140)
+#   MIDFIELDERS 6 slots @ 268..348 (label band 252)
+#   FORWARDS  5 slots @ 380..444   (label band 364)
+const SECT_SLOTS := {
+	"GK": {"top": 92, "rows": 3, "label": 0, "up": 92, "down": 122},
+	"DF": {"top": 156, "rows": 6, "label": 140, "up": 156, "down": 234},
+	"MF": {"top": 268, "rows": 6, "label": 252, "up": 268, "down": 346},
+	"FW": {"top": 380, "rows": 5, "label": 364, "up": 380, "down": 442},
+	"OUT": {"top": 380, "rows": 5, "label": 364, "up": 380, "down": 442},
+}
+# Scroll-arrow buttons: the yellow glyphs sit at x496..503 (frame scan); the baked
+# button cell is 16px wide from x492. Section tops above give each pair's y.
+const SB_X := 492
+const SB_W := 17
+const SB_H := 17
+
 const AVG_KEYS := ["VE", "RE", "AG", "CA", "RM", "RG", "PA", "TI"]
 const SECTION_LABELS := {
 	"GK": "KEEPERS", "DF": "DEFENDERS", "MF": "MIDFIELDERS",
 	"FW": "FORWARDS", "OUT": "OUTFIELD",
 }
 
+var _sect_scroll: Dictionary = {}   # section key -> first visible player index
 var _chrome: Texture2D
 var _chrome_dim: Texture2D
 var _title: Texture2D
@@ -163,7 +185,29 @@ func _hit(d: Vector2) -> String:
 		return "youth"
 	if RETURN_BTN.has_point(d):
 		return "return"
+	for key in SECT_SLOTS:
+		var slot: Dictionary = SECT_SLOTS[key]
+		if Rect2(SB_X, int(slot["up"]), SB_W, SB_H).has_point(d):
+			return "up:%s" % key
+		if Rect2(SB_X, int(slot["down"]), SB_W, SB_H).has_point(d):
+			return "down:%s" % key
 	return ""
+
+
+## Scroll one section by `delta` rows, clamped to its surplus. The original gives every
+## section its own scrollbar (frame 077 shows four; the DEFENDERS/MIDFIELDERS pairs are
+## live because Man Utd overflows their 6 slots, the other two washed).
+func _scroll_section(key: String, delta: int) -> void:
+	var slot: Dictionary = SECT_SLOTS.get(key, SECT_SLOTS["OUT"])
+	var n := 0
+	for sec in _sections():
+		if str(sec["key"]) == key:
+			n = (sec["players"] as Array).size()
+	var maxs: int = maxi(0, n - int(slot["rows"]))
+	var cur: int = clampi(int(_sect_scroll.get(key, 0)) + delta, 0, maxs)
+	if cur != int(_sect_scroll.get(key, 0)):
+		_sect_scroll[key] = cur
+		queue_redraw()
 
 func _on_input(e: InputEvent) -> void:
 	var pos := Vector2.ZERO
@@ -199,6 +243,10 @@ func _on_input(e: InputEvent) -> void:
 		if a != "" and a == was:
 			if a == "youth":
 				youth_pressed.emit()
+			elif a.begins_with("up:"):
+				_scroll_section(a.substr(3), -1)
+			elif a.begins_with("down:"):
+				_scroll_section(a.substr(5), 1)
 			else:
 				back_pressed.emit()
 			return
@@ -303,29 +351,21 @@ func _draw() -> void:
 
 func _draw_list() -> void:
 	_rows.clear()
-	var secs := _sections()
-	var n_players := 0
-	for sec in secs:
-		n_players += (sec["players"] as Array).size()
-	# section bands: one per group EXCEPT the first (KEEPERS is baked into the
-	# column-header row) — the original lists KEEPERS inline with the codes.
-	var n_bands := maxi(0, secs.size() - 1)
-	var n_rows := n_players + n_bands
-	var avail := (PANEL_Y1 - 2) - ROW0_Y
-	var row_h: int = ROW_PITCH if n_rows == 0 else clampi(avail / n_rows, 11, ROW_PITCH)
-
-	var y := ROW0_Y
-	var first := true
-	for sec in secs:
-		if not first:
-			_section(y, str(sec["section"]), row_h)
-			y += row_h
-		first = false
-		for p in sec["players"]:
-			if y + row_h > PANEL_Y1 - 2:
-				return
-			_row(y, p, str(sec["key"]), row_h)
-			y += row_h
+	for sec in _sections():
+		var key := str(sec["key"])
+		var slot: Dictionary = SECT_SLOTS.get(key, SECT_SLOTS["OUT"])
+		var n: int = int(slot["rows"])
+		var top: int = int(slot["top"])
+		if int(slot["label"]) > 0:
+			_section(int(slot["label"]), str(sec["section"]), ROW_PITCH)
+		var players: Array = sec["players"]
+		var sc: int = clampi(int(_sect_scroll.get(key, 0)), 0, maxi(0, players.size() - n))
+		_sect_scroll[key] = sc
+		for i in n:
+			var idx := sc + i
+			if idx >= players.size():
+				break
+			_row(top + i * ROW_PITCH, players[idx], key, ROW_PITCH)
 
 
 ## Section band: the blue group label on the white panel (frame 077).

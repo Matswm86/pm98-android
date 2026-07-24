@@ -51,6 +51,18 @@ const LED_LEAGUE := {
 	"eng_prem": Vector2(284, 140), "eng_div1": Vector2(367, 140),
 	"eng_div2": Vector2(450, 140), "eng_div3": Vector2(533, 140),
 }
+# The three NON-DIVISION search regions, one 27px row apart under the division row
+# (LED faces measured at y 171/198/225 on a live capture; cells at 167/194/221).
+# These are how the original scouts ABROAD — there is no foreign-league checkbox.
+const LED_REGION := {
+	"eu": Vector2(284, 167), "non_eu": Vector2(284, 194), "no_team": Vector2(284, 221),
+}
+# Enablement is the hired SCOUT's star rating. Measured live 2026-07-24, one scout per
+# career: 3.0 (K. Burrowes, the 2026-07-18 witness) -> all three washed; 3.5 (W. Crane)
+# -> E.U. PLAYERS only; 4.0 (M. Kelso) -> E.U. + NON E.U.; 5.0 (J. Loxley) -> all three.
+# One unlock per half-star from 3.5, so PLAYERS WITHOUT TEAM lands on 4.5 — the only
+# step not sampled directly (bracketed: off at 4.0, on at 5.0).
+const REGION_STARS := {"eu": 3.5, "non_eu": 4.0, "no_team": 4.5}
 const LED_SIZE := Vector2(22, 13)
 # toggle hit zones = LED + label row (generous tap targets, LED-anchored)
 const DROP_POS := Rect2(131, 131, 125, 16)     # POSITION value field
@@ -172,6 +184,7 @@ var _results: Array = []
 var _first := 0                  # scroll offset into _results
 var _tog := {"pos": false, "age": false, "role": false, "quality": false, "price": false}
 var _leagues := {"eng_prem": false, "eng_div1": false, "eng_div2": false, "eng_div3": false}
+var _regions := {"eu": false, "non_eu": false, "no_team": false}
 var _pos_idx := 0
 var _age_idx := 0                # index into AGE_BANDS
 var _role := 1                   # posFine 1..18 (PlayerInfoScreen.FINE_ROLE)
@@ -227,6 +240,9 @@ func setup(scout: Dictionary, searching: bool, results: Array, club: String,
 	_searching = searching
 	_results = results
 	_first = 0
+	for rk in _regions:                # a weaker scout drops the regions he can't reach
+		if _regions[rk] and not region_enabled(rk):
+			_regions[rk] = false
 	_armed_flash = false
 	_club = club
 	_manager = manager
@@ -250,7 +266,15 @@ func criteria() -> Dictionary:
 		"quality_band": _quality_idx if _tog["quality"] else -1,
 		"price_band": _price_idx if _tog["price"] else -1,
 		"leagues": leagues,
+		"eu": bool(_regions["eu"]),
+		"non_eu": bool(_regions["non_eu"]),
+		"no_team": bool(_regions["no_team"]),
 	}
+
+
+## Can the hired scout reach this region? (REGION_STARS, live-measured — see above.)
+func region_enabled(key: String) -> bool:
+	return _has_scout and _scout_stars >= float(REGION_STARS.get(key, 99.0))
 
 
 # ---- input -----------------------------------------------------------------
@@ -275,6 +299,9 @@ func _hit(d: Vector2) -> String:
 	for lid in LED_LEAGUE:
 		if Rect2(LED_LEAGUE[lid] - Vector2(2, 2), LED_SIZE + Vector2(4, 4)).has_point(d):
 			return "league:" + lid
+	for rk in LED_REGION:
+		if Rect2(LED_REGION[rk] - Vector2(2, 2), LED_SIZE + Vector2(4, 4)).has_point(d):
+			return ("region:" + rk) if region_enabled(rk) else ""
 	for k in ARROWS:
 		if ARROWS[k].has_point(d):
 			return "arrow:" + k
@@ -356,6 +383,12 @@ func _activate(a: String) -> void:
 		_leagues[lid] = not _leagues[lid]
 		_armed_flash = false
 		queue_redraw()
+	elif a.begins_with("region:"):
+		var rk := a.substr(7)
+		if region_enabled(rk):
+			_regions[rk] = not _regions[rk]
+			_armed_flash = false
+			queue_redraw()
 	elif a.begins_with("arrow:"):
 		_spin(a.substr(6))
 		queue_redraw()
@@ -392,7 +425,17 @@ func _try_search() -> void:
 	for k in _tog:
 		if _tog[k]:
 			any_tog = true
-	if not any_tog:
+	# MANAGER.EXE 0x557a84: the search needs >= 1 LEFT-column criterion AND >= 1 of the
+	# seven region boxes (four divisions + E.U. / NON E.U. / WITHOUT TEAM). Witnessed
+	# 2026-07-18 for the "leagues alone" half (frames 64/66 refused a Premier-only tap).
+	var any_region := false
+	for lid in _leagues:
+		if _leagues[lid]:
+			any_region = true
+	for rk in _regions:
+		if _regions[rk]:
+			any_region = true
+	if not any_tog or not any_region:
 		_alert_img = ImageTexture.create_from_image(
 			PMAlert.render("You have to select some options to make the search."))
 		PMChrome.set_dim(true)
@@ -472,6 +515,9 @@ func _draw() -> void:
 	for lid in LED_LEAGUE:
 		if _leagues[lid] and _led_on != null:
 			draw_texture(_tex(_led_on), LED_LEAGUE[lid])
+	for rk in LED_REGION:
+		if _regions[rk] and _led_on != null:
+			draw_texture(_tex(_led_on), LED_REGION[rk])
 	for tk in ["pos", "role", "age", "quality", "price"]:
 		if _tog[tk] and _arrow_l != null:
 			draw_texture(_arrow_l, ARROWS[tk + "_l"].position)

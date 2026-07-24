@@ -55,6 +55,28 @@ static var _dim_tex_cache := {}        # Texture2D -> ImageTexture (dimmed copy)
 static var _loaded := false
 
 
+## Load a raw BMFont atlas page. The .import files pin these PNGs to importer="keep" so
+## the file itself ships (importer="skip" DROPS it from the export — that is what left
+## every alert box blank on Android, docs/re/transfer_loop_live_re.md §7). If a rebuilt
+## import ever turns one back into an ordinary texture the raw read returns nothing, so
+## fall back to the imported Texture2D rather than silently rendering an empty box.
+static func _load_font_page(path: String) -> Image:
+	var img := Image.new()
+	var raw := FileAccess.get_file_as_bytes(path)
+	if raw.size() > 0 and img.load_png_from_buffer(raw) == OK and img.get_width() > 0:
+		return img
+	var tex: Variant = load(path)
+	if tex is Texture2D:
+		var ti := (tex as Texture2D).get_image()
+		if ti != null:
+			if ti.is_compressed():
+				ti.decompress()
+			push_warning("PMAlert: %s not shipped raw, fell back to the imported texture" % path)
+			return ti
+	push_error("PMAlert: font page %s is missing — alert text cannot render" % path)
+	return Image.create(1, 1, false, Image.FORMAT_RGBA8)
+
+
 static func _load() -> void:
 	if _loaded:
 		return
@@ -64,10 +86,7 @@ static func _load() -> void:
 	_ok_hot_img = (load("res://art/screens/alert/ok_hot.png") as Texture2D).get_image()
 	_yes_img = (load("res://art/screens/alert/yes.png") as Texture2D).get_image()
 	_no_img = (load("res://art/screens/alert/no.png") as Texture2D).get_image()
-	# The font page is importer="skip" (the BMFont reads it), so load raw bytes.
-	_font_page = Image.new()
-	_font_page.load_png_from_buffer(
-		FileAccess.get_file_as_bytes("res://art/fonts/proman10.png"))
+	_font_page = _load_font_page("res://art/fonts/proman10.png")
 	for img in [_title_img, _icon_img, _ok_img, _ok_hot_img, _yes_img, _no_img, _font_page]:
 		if img.is_compressed():
 			img.decompress()

@@ -1,5 +1,9 @@
 # TRAINING sub-screen (LINE-UP → TRAINING) — RE + build notes
 
+> **GAPS #2 AND #4 CLOSED 2026-07-24** — the per-player FOCUS tags, AUTO, the caps and
+> the CURRENT TRAINING STAFF band (name + stars + TP, TOTAL TRAINABLE = ΣTP) are now
+> witnessed live. See [`transfer_loop_live_re.md`](transfer_loop_live_re.md) §6.
+
 The LINE-UP screen's **TRAINING** button (T/I/S plate row 1) opens a dedicated
 TRAINING screen. `app/scenes/TrainingScreen.gd` renders it: the REAL game's
 resting chrome baked below the shared barra, plus a dynamic layer that traces

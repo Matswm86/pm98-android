@@ -1,5 +1,10 @@
 # CURRENT OFFERS (OFERTAS) + the FICHAR hub — reversed from MANAGER.EXE
 
+> **SUPERSEDED IN PART 2026-07-24** — the live game shows YOUR OUTGOING BIDS on this
+> screen (target player + the club you bid to), not your transfer-listed players. See
+> [`transfer_loop_live_re.md`](transfer_loop_live_re.md) §2 for the capture. The band
+> geometry below is unchanged and still correct.
+
 Decoded 2026-07-02 (strings → `pe.foff_to_va` → FindRefsTo → DecompileAt; decompiles
 in `docs/re/ofertas/`). Visual reference: the owner's capture
 `screenshots/transfer-offers-2026-07-02/current_offers.png` ("asdf / Manchester Utd.",

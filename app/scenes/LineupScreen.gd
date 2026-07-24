@@ -280,6 +280,47 @@ func setup(club: Dictionary, tactics: Tactics, manager: String = "", division: S
 
 # ---- scroll model + flat item list ----------------------------------------
 
+## The non-XI squad as ONE ordered pid list — SUBSTITUTES are its first
+## Tactics.BENCH_SLOTS entries, RESERVES the rest, exactly the partition the original's
+## squad object stores (bench/reserve COUNTS at team+0x1930 / team+0x1934). `Tactics
+## .subs_order` persists it once the line-up is edited, so a SUBSTITUTES<->RESERVES swap
+## sticks. Until then it derives: a club dict that pins "bench"/"reserves" pid arrays
+## (the parity fixture does) keeps its walked order, otherwise the rest sorts by ability
+## — both the previous behaviour bit-for-bit. Anyone signed since (or dropped from) the
+## stored order is appended in roster order, so a new signing always reaches the screen.
+func _subs_order() -> Array:
+	var xi: Array = _tactics.xi if _tactics != null else []
+	var rest: Array = []
+	for p in _club.get("players", []):
+		var pid := int(p.get("id", -1))
+		if pid >= 0 and not xi.has(pid):
+			rest.append(p)
+	var out: Array = []
+	var seen := {}
+	var stored: Array = _tactics.subs_order if _tactics != null else []
+	if stored.is_empty() and _club.has("bench") and _club.has("reserves"):
+		stored = (_club["bench"] as Array) + (_club["reserves"] as Array)
+	if stored.is_empty():
+		rest.sort_custom(func(a, b): return _av_of(a) > _av_of(b))
+		return rest
+	for pid in stored:
+		var i := int(pid)
+		if xi.has(i) or seen.has(i) or not _by_id.has(i):
+			continue
+		seen[i] = true
+		out.append(_by_id[i])
+	for p in rest:                     # new signings / players pushed out of the XI
+		if not seen.has(int(p.get("id", -1))):
+			out.append(p)
+	return out
+
+
+## [bench, reserves] as player dicts, split off _subs_order().
+func _tiers() -> Array:
+	var order := _subs_order()
+	return [order.slice(0, Tactics.BENCH_SLOTS), order.slice(Tactics.BENCH_SLOTS, order.size())]
+
+
 ## The squad list flattened to draw-items in render order: XI rows, the
 ## SUBSTITUTES band + bench rows, the RESERVES band + reserve rows. Rows are
 ## 16px units; the bands are 23px/22px strips (frame-measured).
@@ -290,31 +331,9 @@ func _flat_items() -> Array:
 	for i in xi.size():
 		var rl: String = roles[i] if i < roles.size() else ""
 		items.append({"t": "row", "pid": int(xi[i]), "slot": i, "role": rl, "h": ROW_PITCH})
-	# Bench + reserves: the original squad object stores explicit lists
-	# (team+0x1930/0x1934). The club dict may pin them ("bench"/"reserves"
-	# pid arrays — the parity shot does); the app default derives them from
-	# the not-in-XI rest by ability.
-	var rest: Array = []
-	for p in _club.get("players", []):
-		var pid := int(p.get("id", -1))
-		if pid >= 0 and not xi.has(pid):
-			rest.append(p)
-	var bench: Array = []
-	var reserves: Array = []
-	if _club.has("bench") and _club.has("reserves"):
-		for pid in _club["bench"]:
-			if not xi.has(int(pid)) and _by_id.has(int(pid)):
-				bench.append(_by_id[int(pid)])
-		for pid in _club["reserves"]:
-			if not xi.has(int(pid)) and _by_id.has(int(pid)):
-				reserves.append(_by_id[int(pid)])
-		for p in rest:
-			if not bench.has(p) and not reserves.has(p):
-				reserves.append(p)
-	else:
-		rest.sort_custom(func(a, b): return _av_of(a) > _av_of(b))
-		bench = rest.slice(0, 5)
-		reserves = rest.slice(5, rest.size())
+	var tiers := _tiers()
+	var bench: Array = tiers[0]
+	var reserves: Array = tiers[1]
 	items.append({"t": "band", "label": "sub", "h": BAND_SUB_H})
 	for p in bench:
 		items.append({"t": "row", "pid": int(p.get("id", -1)), "slot": -1,
@@ -326,17 +345,33 @@ func _flat_items() -> Array:
 	return items
 
 
-## Items that fit between the first row top and the table bottom at a scroll.
+## Index of the first RESERVES row in _flat_items(): the XI rows, the SUBSTITUTES
+## band, the bench rows and the RESERVES band all precede it and never scroll.
+func _res_start() -> int:
+	var n_xi: int = (_tactics.xi.size() if _tactics != null else 0)
+	return n_xi + 1 + (_tiers()[0] as Array).size() + 1
+
+
+## Items that fit between the first row top and the table bottom at a scroll. Only the
+## RESERVES tail scrolls — witnessed on the real game 2026-07-24: six presses of the
+## down arrow rolled the reserve list (a freshly signed player showed up at its foot)
+## while the STARTING XI and SUBSTITUTES rows never moved. The app used to scroll the
+## whole flat list, which pushed the XI off the top.
 func _layout(scroll: int) -> Array:
 	var items := _flat_items()
+	var head := mini(_res_start(), items.size())
+	var order: Array = []
+	for i in head:
+		order.append(i)
+	for i in range(head + scroll, items.size()):
+		order.append(i)
 	var out: Array = []
 	var y := XI_Y0 - 1
-	for i in range(scroll, items.size()):
+	for i in order:
 		var h := int(items[i]["h"])
 		if y + h > 465:
 			break
-		var it: Dictionary = items[i]
-		it = it.duplicate()
+		var it: Dictionary = items[i].duplicate()
 		it["y"] = y
 		it["i"] = i
 		out.append(it)
@@ -497,11 +532,36 @@ func _try_swap(sel_pid: int, tgt_pid: int) -> void:
 		slot = sel_slot
 		mover = tgt_pid
 	else:
-		_sel_pid = tgt_pid
+		# NEITHER man is in the XI: a SUBSTITUTES <-> RESERVES exchange. The real game
+		# does this (live-witnessed 2026-07-24: Fairclough selected in SUBSTITUTES,
+		# Barlow tapped in RESERVES -> Barlow took the bench slot and Fairclough took
+		# Barlow's reserve place). Before this the app just moved the selection, so a
+		# substitute could never be swapped with a reserve.
+		_swap_bench(sel_pid, tgt_pid)
 		return
 	if not _swap_legal(mover, slot):
 		return
 	_tactics.assign(slot, mover)
+	_sel_pid = -1
+	xi_changed.emit()
+
+
+## Exchange two non-XI players' PLACES in the single SUBSTITUTES+RESERVES order — the
+## positional swap the original performs (a substitute tapped against a reserve takes
+## his row and vice versa). Materialises the derived order on the first edit.
+func _swap_bench(a_pid: int, b_pid: int) -> void:
+	var order: Array = []
+	for p in _subs_order():
+		order.append(int(p.get("id", -1)))
+	var ai := order.find(a_pid)
+	var bi := order.find(b_pid)
+	if ai < 0 or bi < 0:
+		_sel_pid = b_pid
+		queue_redraw()
+		return
+	order[ai] = b_pid
+	order[bi] = a_pid
+	_tactics.subs_order = order
 	_sel_pid = -1
 	xi_changed.emit()
 

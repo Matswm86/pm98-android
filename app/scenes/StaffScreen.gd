@@ -263,7 +263,9 @@ func _blank_bar(slot: Dictionary) -> Color:
 	var b: Array = slot["bar"]
 	var bar := Rect2(b[0], b[1], b[2], b[3])
 	var bc: Array = slot.get("bar_color", [60, 60, 90])
-	var bar_col := Color8(bc[0], bc[1], bc[2])
+	# personnel_chrome.json is JSON, so every number arrives as a float — Color8 wants
+	# ints and errors out (the vacant bars then never repaint).
+	var bar_col := Color8(int(bc[0]), int(bc[1]), int(bc[2]))
 	var left_grow := 7
 	if str(slot.get("kind", "")) == "role":
 		# Mirrored role cards: the wage cell abuts the bar's LEFT edge (cell ends

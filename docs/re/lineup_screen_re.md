@@ -1,5 +1,9 @@
 # LINE-UP (ALINEACIÓN) screen — reversed layout from MANAGER.EXE
 
+> **SWAP DISPATCH WITNESSED 2026-07-24** — a SUBSTITUTE selected against a RESERVE
+> exchanges their rows, and only the RESERVES section scrolls. See
+> [`transfer_loop_live_re.md`](transfer_loop_live_re.md) §3.
+
 All coordinates are **640×480 screen pixels**, lifted from the binary (not guessed).
 The game text is English (`LINE-UP`, `RESERVES`, `SUBSTITUTES`, the `N./EN/SP/...`
 column codes are the literal strings in `.data`). Decompiled C dumps:

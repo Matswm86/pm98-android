@@ -53,6 +53,9 @@ const PRESSURISE_OPTS := ["Own", "Midfield", "Opponent"]
 
 const LINEUP_BAD := "The initial line-up is not correct."
 
+# SUBSTITUTES slots on the LINE-UP screen (frame 155's band holds five rows).
+const BENCH_SLOTS := 5
+
 # Role emphasis. Used as a WEIGHTED MEAN over the XI (weights need not sum to 1),
 # so a more attacking shape leans on its forwards and a defensive shape on its
 # back line -- the formation is an att/def trade-off rather than a free buff.
@@ -125,6 +128,15 @@ const _NEUTRAL_GK := 52.0
 
 var formation: String = DEFAULT_FORMATION
 var xi: Array = []              # 11 player ids, slot order: [GK, DEF.., MID.., FWD..]
+# The LINE-UP screen's NON-XI order: SUBSTITUTES = the first BENCH_SLOTS entries,
+# RESERVES = the rest. The original's squad object stores exactly this partition (the
+# bench and reserve COUNTS live at team+0x1930 / team+0x1934, lineup_screen_re.md),
+# which is why the real game lets you select a SUBSTITUTE and swap him with a RESERVE
+# (live-witnessed 2026-07-24: Fairclough selected on the bench, Barlow tapped in the
+# reserves -> Barlow took the bench slot and Fairclough took Barlow's reserve place).
+# Empty until the line-up is edited; the screen then derives the order by ability, so an
+# untouched line-up renders exactly as before.
+var subs_order: Array = []      # non-XI player ids, bench first
 var marking: String = "Zonal"   # defending-line marking: "Zonal" | "Man-to-man"
 # TEAM-TACTICS modal levers (defaults are the neutral/parity anchors, see factors above).
 var mentality: String = "Mixed"      # "Attacking" | "Mixed" | "Speculative"
@@ -447,7 +459,8 @@ func _players_by_id(club: Dictionary) -> Dictionary:
 
 func to_dict() -> Dictionary:
 	return {
-		"formation": formation, "xi": xi.duplicate(), "marking": marking,
+		"formation": formation, "xi": xi.duplicate(), "subs_order": subs_order.duplicate(),
+		"marking": marking,
 		"mentality": mentality, "passing_pct": passing_pct, "counter_pct": counter_pct,
 		"tackling": tackling, "clearances": clearances, "pressurise": pressurise,
 		"captain_id": captain_id, "pk_taker_id": pk_taker_id,
@@ -461,6 +474,9 @@ static func from_dict(d: Dictionary) -> Tactics:
 	t.xi = []
 	for v in raw:
 		t.xi.append(int(v))
+	t.subs_order = []
+	for v in d.get("subs_order", []):
+		t.subs_order.append(int(v))
 	t.marking = d.get("marking", "Zonal")
 	t.mentality = d.get("mentality", "Mixed")
 	t.passing_pct = int(d.get("passing_pct", 50))

@@ -191,3 +191,150 @@ static func _highest_above_floor(attrs: Dictionary) -> String:
 			best_v = v
 			best = c
 	return best
+
+
+# ---- FOCUS training (the real TRAINING screen's mechanic) ------------------
+# Live-witnessed on MANAGER.EXE 2026-07-24 (Bolton career, week 3):
+#  * With NO trainers hired the whole screen is washed, TOTAL TRAINABLE PLAYERS = 0
+#    and AUTO is inert ("For specific training\nyou have to have hired trainers.").
+#  * Hiring HANDLING F. Bush 4.0* and SHOOTING G. Slattery 2.5* put their names on the
+#    CURRENT TRAINING STAFF band with a TP column reading 4 and 2 — floor(stars) — and
+#    TOTAL TRAINABLE PLAYERS became 6 = 4 + 2.
+#  * AUTO tagged the three keepers HA and two forwards SH; the grid TOTAL read 5.
+#  * Selecting a player and ticking a right-panel skill box assigns him: the box turns
+#    gold, his grid row gains the 2-letter tag and TOTAL goes up by one.
+#  * Ticking a skill whose coach is already at his TP is refused SILENTLY (a 5th
+#    HANDLING pick did nothing); ticking with the GLOBAL total already at TOTAL
+#    TRAINABLE raises the alert "You can´t train any more players." (MANAGER.EXE
+#    0x2593f0).
+# The per-skill attribute map is the screen's own row order (SPEC_BINDING §3).
+
+# The eight focus rows of the AVER. panel, top to bottom.
+const FOCUS_GENERAL := "GENERAL"
+const FOCUS_FITNESS := "FITNESS"
+const FOCUS_SKILLS := ["HANDLING", "PASSING", "DRIBBLING", "HEADING", "TACKLING", "SHOOTING"]
+const FOCUS_ROWS := [FOCUS_GENERAL, FOCUS_FITNESS, "HANDLING", "PASSING", "DRIBBLING",
+	"HEADING", "TACKLING", "SHOOTING"]
+
+# Focus -> the decoded attribute it trains (the right panel's own rows).
+const FOCUS_ATTR := {
+	"HANDLING": "PO", "PASSING": "PA", "DRIBBLING": "RM",
+	"HEADING": "RG", "TACKLING": "EN", "SHOOTING": "TI",
+}
+# GENERAL trains the four SPEED / STAMINA / AGGRESSION / QUALITY rows together.
+const GENERAL_ATTRS := ["VE", "RE", "AG", "CA"]
+
+# The grid tag chip: 2-letter code + the skill's own CURRENT TRAINING STAFF bar colour
+# (witnessed: HANDLING tags are the orange 212,95,0 of its bar, SHOOTING the dark red
+# 85,0,0 of its own). GENERAL / FITNESS tags are un-witnessed — same chip grammar.
+const FOCUS_CODE := {
+	"GENERAL": "GE", "FITNESS": "FI", "HANDLING": "HA", "PASSING": "PA",
+	"DRIBBLING": "DR", "HEADING": "HE", "TACKLING": "TA", "SHOOTING": "SH",
+}
+const FOCUS_COLOUR := {
+	"GENERAL": Color8(59, 85, 130), "FITNESS": Color8(42, 127, 85),
+	"HANDLING": Color8(212, 95, 0), "PASSING": Color8(212, 63, 0),
+	"DRIBBLING": Color8(210, 0, 0), "HEADING": Color8(170, 0, 0),
+	"TACKLING": Color8(150, 0, 0), "SHOOTING": Color8(85, 0, 0),
+}
+# The alert the original raises when the global capacity is full (0x2593f0, verbatim
+# including its acute accent), and the no-trainer gate text (0x2593b8).
+const FULL_MSG := "You can´t train any more players."
+const NO_TRAINER_MSG := "For specific training\nyou have to have hired trainers."
+
+# A focused player's attribute moves this much faster than passive development.
+const FOCUS_RATE := 0.22
+
+
+## Training points for one skill = floor(that coach's stars); 0 with no coach hired.
+static func skill_tp(staff: Array, skill: String) -> int:
+	var m := Staff.member_in_role(staff, skill)
+	return 0 if m.is_empty() else int(floor(float(m.get("stars", 0.0))))
+
+
+## TOTAL TRAINABLE PLAYERS = the sum of every hired skill coach's TP (witnessed 4+2=6).
+static func total_trainable(staff: Array) -> int:
+	var n := 0
+	for sk in FOCUS_SKILLS:
+		n += skill_tp(staff, sk)
+	return n
+
+
+## How many players are already assigned to `skill` in the focus map.
+static func skill_load(focus: Dictionary, skill: String) -> int:
+	var n := 0
+	for pid in focus:
+		if str(focus[pid]) == skill:
+			n += 1
+	return n
+
+
+## How well `p` suits `skill` for the AUTO fill: keepers own HANDLING, outfielders are
+## ranked by the attribute the skill trains. A negative/zero score means "never AUTO him
+## onto this coach" (witnessed: AUTO put the keepers on HANDLING and forwards on
+## SHOOTING, never the reverse).
+static func focus_fit(p: Dictionary, skill: String) -> float:
+	var gk := bool(p.get("isGK", false))
+	if skill == "HANDLING":
+		return float(int((p.get("attrs", {}) as Dictionary).get("PO", 0))) if gk else 0.0
+	if gk:
+		return 0.0            # outfield skills never AUTO onto a keeper
+	var key := str(FOCUS_ATTR.get(skill, ""))
+	if key == "":
+		return 0.0
+	var v := float(int((p.get("attrs", {}) as Dictionary).get(key, 0)))
+	# SHOOTING leans on forwards, TACKLING on defenders — the witnessed AUTO shape.
+	var pos := str(p.get("pos", ""))
+	if skill == "SHOOTING" and pos == "FW":
+		v += 20.0
+	elif skill == "TACKLING" and pos == "DF":
+		v += 20.0
+	elif skill == "PASSING" and pos == "MF":
+		v += 20.0
+	return v
+
+
+## Apply one week of FOCUS training. Every assigned player pushes the attribute his
+## coach teaches, at a rate scaled by that coach's stars; GENERAL spreads across the
+## four SPEED/STAMINA/AGGRESSION/QUALITY rows and FITNESS restores condition. Returns
+## the same {kind, text} news items train_week does, for the attributes that crossed.
+static func train_focus_week(rng: RandomNumberGenerator, squad: Array,
+		focus: Dictionary, staff: Array) -> Array:
+	var news: Array = []
+	if focus.is_empty():
+		return news
+	var by_id := {}
+	for p in squad:
+		by_id[int((p as Dictionary).get("id", -1))] = p
+	for pid in focus:
+		var p: Variant = by_id.get(int(pid))
+		if not (p is Dictionary):
+			continue
+		var pd: Dictionary = p
+		var attrs: Variant = pd.get("attrs", {})
+		if not (attrs is Dictionary) or (attrs as Dictionary).is_empty():
+			continue
+		var skill := str(focus[pid])
+		if skill == FOCUS_FITNESS:
+			pd["fitness"] = mini(99, int(pd.get("fitness", 70)) + 2)
+			continue
+		var keys: Array = GENERAL_ATTRS if skill == FOCUS_GENERAL else [str(FOCUS_ATTR.get(skill, ""))]
+		# A coach's stars scale his session; GENERAL has no coach, so it runs at 1.0.
+		var stars := 1.0 if skill == FOCUS_GENERAL else maxf(0.5, float(skill_tp(staff, skill)) / 2.0)
+		var gain := FOCUS_RATE * stars * (0.75 + rng.randf() * 0.5)
+		var key := str(keys[rng.randi_range(0, keys.size() - 1)])
+		if key == "":
+			continue
+		var prog := float(pd.get("focus_progress", 0.0)) + gain
+		if prog < 1.0:
+			pd["focus_progress"] = prog
+			continue
+		pd["focus_progress"] = prog - 1.0
+		var a: Dictionary = attrs
+		var cur := int(a.get(key, 0))
+		if cur <= 0 or cur >= ATTR_CAP:
+			continue
+		a[key] = cur + 1
+		news.append({"kind": "training",
+			"text": "%s has improved his %s in training." % [pd.get("name", "?"), attr_name(key)]})
+	return news
