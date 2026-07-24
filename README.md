@@ -16,7 +16,7 @@ fan remake.</sub>
 
 ## Download
 
-📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-e5ee181.apk)** — one tap downloads `pm98-e5ee181.apk` (current build) straight to your phone.
+📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-4d4c91b.apk)** — one tap downloads `pm98-4d4c91b.apk` (current build) straight to your phone.
 
 > **This build (2026-07-24)** fixes six things you told us were wrong, each one settled against the original game rather than guessed:
 >
