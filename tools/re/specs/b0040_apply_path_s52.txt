@@ -1,0 +1,94 @@
+# M5 s52: the b0040 -> heading APPLY path, disassembled, and what silicon actually applied.
+#
+# Chain (all from MANAGER.EXE, docs/re/move/):
+#   FUN_005b0040 tail: local_c = interception point
+#     -> FUN_005b1330(local_c, M+0x1828)      per-axis clamp min(max(v,lo),hi)   <- the ONLY clamp
+#     -> FUN_005a89c0(this=P, clamped, 0x5a)  sets curve P+0x6c (75% if carrier; PARK in phase 2/3/4/5/7)
+#     -> FUN_005a8bc0(this=P, point)          delta boxes, heading = atan(delta), backpedal flip
+#     -> FUN_005a8f20(this=P, heading)        once-per-tick guard P+0x2d7, then TURN/COMMIT/INTEGRATE
+#
+# There is NO second clamp and NO second target choice after b0040. FUN_005a8f20 only turns
+# P+0x34 toward the heading it is handed. So the captured 0x34/0x64/0x68 ladder determines the
+# applied heading exactly on every snap/commit tick -- see the back-solve below.
+#
+# FUN_005a8f20 rules (decompile lines 58-115):
+#   d = (short)(heading - u16 P+0x34);  ad = |d|;  steps = trunc((ad-0x100)/0x400)+1
+#   steps<2 (ad<0x500) -> P+0x34 = heading            else P+0x34 += (d>0 ? +0x400 : -0x400)
+#   ad<0x1555          -> P+0x64 = heading, P+0x68 ramps toward P+0x6c by <=0x106
+#   else               -> P+0x68 = max(0, P+0x68-0x1ca)
+
+# ---- 1. back-solve of silicon's APPLIED heading (tools/re/m5_8f20_heading_solve.py) ----
+# t1.i10 -- heading APPLIED by the real FUN_005a8f20, back-solved per tick.
+# 'tick c-1 -> c' means the tick whose pre-state is clk c-1 and post-state is clk c.
+# clk | face_pre -> face | yaw  spd  | applied heading
+ 631 |  18046 -> 17022 slew-1024 | 28286    0 ramp  | heading in [face-0x8000, face-1280] = [50814..16766] mod 2^16
+ 632 |  17022 -> 15998 slew-1024 | 28286    0 ramp  | heading in [face-0x8000, face-1280] = [49790..15742] mod 2^16
+ 633 |  15998 -> 14974 slew-1024 | 28286    0 ramp  | heading in [face-0x8000, face-1280] = [48766..14718] mod 2^16
+ 634 |  14974 -> 13950 slew-1024 | 28286    0 ramp  | heading in [face-0x8000, face-1280] = [47742..13694] mod 2^16
+ 635 |  13950 -> 12926 slew-1024 |  9258  262 ramp  | heading = 9258  (commit)
+ 636 |  12926 -> 11902 slew-1024 |  9258  524 ramp  | heading in [face-0x8000, face-1280] = [45694..11646] mod 2^16
+ 637 |  11902 -> 10878 slew-1024 |  9258  786 ramp  | heading in [face-0x8000, face-1280] = [44670..10622] mod 2^16
+ 638 |  10878 ->  9854 slew-1024 |  9258 1048 ramp  | heading in [face-0x8000, face-1280] = [43646..9598] mod 2^16
+ 639 |   9854 ->  9258 SNAP      |  9258 1310 ramp  | heading = 9258  (snap)
+ 640 |   9258 ->  8234 slew-1024 |  9258  852 DECAY | heading in [face-0x8000, face-5461] = [42026..3797] mod 2^16
+ 641 |   8234 ->  7210 slew-1024 |  9258  394 DECAY | heading in [face-0x8000, face-5461] = [41002..2773] mod 2^16
+ 642 |   7210 ->  6186 slew-1024 |  9258    0 DECAY | heading in [face-0x8000, face-5461] = [39978..1749] mod 2^16
+ 643 |   6186 ->  5162 slew-1024 |   765  262 ramp  | heading = 765  (commit)
+ 644 |   5162 ->  4138 slew-1024 |   765  524 ramp  | heading in [face-0x8000, face-1280] = [37930..3882] mod 2^16
+ 645 |   4138 ->  3114 slew-1024 |   765  786 ramp  | heading in [face-0x8000, face-1280] = [36906..2858] mod 2^16
+ 646 |   3114 ->  2090 slew-1024 |   765 1048 ramp  | heading in [face-0x8000, face-1280] = [35882..1834] mod 2^16
+ 647 |   2090 ->  1066 slew-1024 |   765 1310 ramp  | heading in [face-0x8000, face-1280] = [34858..810] mod 2^16
+ 648 |   1066 ->   763 SNAP      |   763 1572 ramp  | heading = 763  (snap+commit)
+ 649 |    763 ->   763 SNAP      |   763 1834 ramp  | heading = 763  (snap)
+ 650 |    763 ->   763 SNAP      |   763 2096 ramp  | heading = 763  (snap)
+ 651 |    763 ->   763 SNAP      |   763 2358 ramp  | heading = 763  (snap)
+ 652 |    763 ->   763 SNAP      |   763 2620 ramp  | heading = 763  (snap)
+ 653 |    763 ->   763 SNAP      |   763 2882 ramp  | heading = 763  (snap)
+ 654 |    763 ->   763 SNAP      |   763 3144 ramp  | heading = 763  (snap)
+ 655 |    763 ->   763 SNAP      |   763 3406 ramp  | heading = 763  (snap)
+ 656 |    763 ->   762 SNAP      |   762 3668 ramp  | heading = 762  (snap+commit)
+ 657 |    762 ->   762 SNAP      |   762 3930 ramp  | heading = 762  (snap)
+ 658 |    762 ->   762 SNAP      |   762 4192 ramp  | heading = 762  (snap)
+ 659 |    762 ->   762 SNAP      |   762 4454 ramp  | heading = 762  (snap)
+ 660 |    762 ->   762 SNAP      |   762 4716 ramp  | heading = 762  (snap)
+
+# EXACT applied headings: clk 635: 9258, clk 639: 9258, clk 643: 765, clk 648: 763, clk 649: 763, clk 650: 763, clk 651: 763, clk 652: 763, clk 653: 763, clk 654: 763, clk 655: 763, clk 656: 762, clk 657: 762, clk 658: 762, clk 659: 762, clk 660: 762
+
+# forward replay of FUN_005a8f20 with heading = 9258 (<=clk 639) then 765 / 763 / 762:
+  -> EXACT MATCH (0 mismatching ticks over clk 631-660)
+
+# ---- 2. the PORT's applied heading over the same window (app/tests/diag_m5_t1i10_apply.gd) ----
+# clk | tgt(x,y) | hdg  face  ad    dec   | 0x34  0x64  0x68  0x6c  p90 | pos(x,y)
+clk 635 | tgt=3768320,2359296 |  9258 12926  3668  slew-/commit  dxy=[3420230, 4201639] p90=0 | 0x34=11902 0x64=9258 0x68=524 0x6c=6457 | pos=(348420,-1841936)
+clk 636 | tgt=3768320,2359296 |  9258 11902  2644  slew-/commit  dxy=[3419900, 4201232] p90=0 | 0x34=10878 0x64=9258 0x68=786 0x6c=6457 | pos=(348915,-1841326)
+clk 637 | tgt=3768320,2359296 |  9258 10878  1620  slew-/commit  dxy=[3419405, 4200622] p90=0 | 0x34=9854 0x64=9258 0x68=1048 0x6c=6457 | pos=(349576,-1840512)
+clk 638 | tgt=3768320,2359296 |  9258  9854   596  SNAP/commit  dxy=[3418744, 4199808] p90=0 | 0x34=9258 0x64=9258 0x68=1310 0x6c=6457 | pos=(350402,-1839495)
+clk 639 | tgt=-3768320,-2359296 | 34076  9258 24818  slew+/DECAY  dxy=[-4118722, -519801] p90=0 | 0x34=10282 0x64=9258 0x68=852 0x6c=6457 | pos=(350939,-1838834)
+clk 640 | tgt=-3768320,-2359296 | 34078 10282 23796  slew+/DECAY  dxy=[-4119259, -520462] p90=0 | 0x34=11306 0x64=9258 0x68=394 0x6c=6457 | pos=(351187,-1838528)
+clk 641 | tgt=-3768320,-2359296 | 34078 11306 22772  slew+/DECAY  dxy=[-4119507, -520768] p90=0 | 0x34=12330 0x64=9258 0x68=0 0x6c=6457 | pos=(351187,-1838528)
+clk 642 | tgt=-3768320,-2359296 | 34078 12330 21748  slew+/DECAY  dxy=[-4119507, -520768] p90=0 | 0x34=13354 0x64=9258 0x68=0 0x6c=6457 | pos=(351187,-1838528)
+clk 643 | tgt=-3768320,-2359296 | 34078 13354 20724  slew+/DECAY  dxy=[-4119507, -520768] p90=0 | 0x34=14378 0x64=9258 0x68=0 0x6c=6457 | pos=(351187,-1838528)
+clk 644 | tgt=-3768320,-2359296 | 34078 14378 19700  slew+/DECAY  dxy=[-4119507, -520768] p90=0 | 0x34=15402 0x64=9258 0x68=0 0x6c=6457 | pos=(351187,-1838528)
+clk 645 | tgt=-3768320,-2359296 | 34078 15402 18676  slew+/DECAY  dxy=[-4119507, -520768] p90=0 | 0x34=16426 0x64=9258 0x68=0 0x6c=6457 | pos=(351187,-1838528)
+
+# ---- 3. lead sweep: no plausible curve_rate reaches silicon's heading (app/tests/diag_m5_t1i10_leadsweep.gd) ----
+
+facedir=[64501, 11699, 0]  ball_planar=13855
+# crate | iters  final lead        | steer target            | heading  (silicon=765)
+   6703 | 18     -1040510322 | -3768320,-2359296        | -31460
+   6781 | 18       961997938 | 3768320,2359296          |  9258
+   8000 | 18       179901568 | 3768320,2359296          |  9258
+  10000 | 18        25815076 | 3768320,2359296          |  9258
+  12000 | 18         7233996 | 3768320,-654458          |  3480
+  13851 | 18         3283456 | 3768320,-1359679         |  1454
+  14000 | 18         3103421 | 3768320,-1391818         |  1357
+  16000 | 18         1727916 | 2471484,-1637363         |   990
+  20000 | 18          772099 | 1530762,-1807988         |   277
+  30000 | 10          274174 | 1040701,-1896874         |  -863
+  50000 |  9          108987 | 878122,-1926362          | -1701
+ 100000 |  9           52916 | 822937,-1936371          | -2108
+
+# silicon heading 765  <=>  lead ~= 1292251  -> steer target (2042699,-1715134)  [in pitch box, NO clamp]
+# port lead at the same tick = -1040510322 (i18 signed wrap) -> clamped -corner, heading 34076
+# heading 765 sits between crate 16000 (990) and 20000 (277): crate ~1.7e4 => P+0x70 ~= 69819
+# real P+0x70 at frame 0 = 13860 (frame0_struct_import.json); port at the fork tick = 13429

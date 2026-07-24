@@ -3,6 +3,11 @@
 # base 0x03dbf0d8, POKE 85/86, XI OK). 3 draws/tick, so clk 637-640 -- absent from the s48d
 # free-run poll -- are now sampled directly. Raw: capture2/oracle_dartwatch_s51_630_660.jsonl.
 #
+# CORRECTION (s52, b0040_apply_path_s52.txt): the line below about the PORT is wrong. The port
+# never writes 34078 into 0x34 -- 34078 is the HEADING (angle to b0040's clamped -corner); the
+# port's 0x34 slews UPWARD +0x400/tick (9258->10282->11306->...) because s16(34078-9258)=+24818.
+# The freeze is 0x68 decaying 0x1ca/tick to 0 while |d| >= 0x1555. Silicon's half stands.
+#
 # VERDICT: silicon's t1.i10 heading 0x34 SLEWS smoothly -0x400/tick straight through clk 639
 # (9258) with NO reversal and NO flip to the b0040 -corner (34078); it pauses ONE tick at
 # x=351187 then RESUMES. The port flips 0x34->34078 at 639 and FREEZES x=351187 for ~7 ticks.
