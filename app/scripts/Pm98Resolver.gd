@@ -124,6 +124,24 @@ static func _s16(v: int) -> int:
 	return v - 0x10000 if v >= 0x8000 else v
 
 
+## Is the actor-object POINTER at match+`off` set? `+0x43c` / `+0x440` / `+0x444` hold actor
+## objects, not scalars ("`+0x43c`/`+0x440` are actor-object pointers, `+4` is their position
+## vec3" — docs/re/jug_render_spec.md), so the binary's `!= 0` on them is a null test.
+##
+## The port writes three different nulls into +0x43c — absent, `0` (Pm98Driver L806) and `-1`
+## (Pm98Movement L902, per EXACT_PORT_PLAN L512 "null maps to index -1") — while Movement L4144
+## and the Dispatch card paths store the player Dictionary itself. Readers elsewhere already
+## cope (`Pm98Driver._ref`, `is_same(m.get(0x43c, null), p)`); resolve_tree did not, and
+## `int(<Dictionary>)` is a hard "Nonexistent 'int' constructor" crash — it killed seeds 18 and
+## 35 of the 50-seed sweep mid-match. This accepts all three nulls and a stored Dictionary.
+## The differing null sentinels are a real inconsistency in the port and are NOT resolved here.
+static func _actor_set(m: Dictionary, off: int) -> bool:
+	var v: Variant = m.get(off, 0)
+	if v is Dictionary:
+		return not (v as Dictionary).is_empty()
+	return v is int and v != 0 and v != -1
+
+
 ## FUN_0058fb50: ball at (x,y,z) inside the match goal box (bounds m+0x1828..0x183c),
 ## past the goal line (m+0x1820 - 0x108000 < |x|) and within |y| < 0x1428f5. Reads
 ## the match struct only; pure geometry, LUT-free (compares already-resolved coords).
@@ -180,7 +198,7 @@ static func resolve_tree(p: Dictionary, t: Dictionary, m: Dictionary, stats: Dic
 	# --- L172: main resolution tree --------------------------------------------
 	# Guard: no active resolver this tick, player not already mid-shot, target
 	# exists and is "live". `t` empty dict models target == null (P+0xac == 0).
-	if int(m.get(0x43c, 0)) == 0 and int(p.get(0x62, 0)) == 0 \
+	if not _actor_set(m, 0x43c) and int(p.get(0x62, 0)) == 0 \
 			and not t.is_empty() and int(t.get(0x2bc, 0)) != 0:
 		var t40 := int(t.get(0x40, 0))
 		# L174/181/188 type guards -> fall to LAB_005afabf (no resolution).
