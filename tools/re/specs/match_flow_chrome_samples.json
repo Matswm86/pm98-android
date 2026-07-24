@@ -318,18 +318,72 @@
    95,
    170
   ],
-  "stadium_rows_y": [
-   357,
-   380,
-   396,
-   412,
-   428
+  "stadium_rows": [
+   {
+    "key": "name",
+    "y0": 351,
+    "y1": 375,
+    "value_x": 84,
+    "sub_x": null
+   },
+   {
+    "key": "cap",
+    "y0": 375,
+    "y1": 390,
+    "value_x": 105,
+    "sub_x": null
+   },
+   {
+    "key": "att",
+    "y0": 392,
+    "y1": 407,
+    "value_x": 124,
+    "sub_x": 216
+   },
+   {
+    "key": "attmoney",
+    "y0": 409,
+    "y1": 424,
+    "value_x": 173,
+    "sub_x": null
+   },
+   {
+    "key": "boards",
+    "y0": 426,
+    "y1": 441,
+    "value_x": 287,
+    "sub_x": 216
+   },
+   {
+    "key": "sponsor",
+    "y0": 443,
+    "y1": 458,
+    "value_x": 173,
+    "sub_x": null
+   }
   ],
+  "stadium_right_x": 287,
   "motm_panel": [
    325,
    350,
    604,
    420
+  ],
+  "motm_photo": [
+   312,
+   370,
+   344,
+   402
+  ],
+  "motm_band_y": [
+   370,
+   402
+  ],
+  "motm_text": [
+   346,
+   378,
+   549,
+   392
   ]
  },
  "brief": {

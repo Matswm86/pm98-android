@@ -146,6 +146,16 @@ var season_opened: bool = false         # the week-0 curtain-raiser chain (shiel
 var euro_seeds: Dictionary = {}         # comp_key -> domestic seed club ids (the TEAMS IN
                                         # CHAMPIONSHIPS panels; set by mint_european_cups)
 
+# ---- MONTHLY AWARDS (MANAGERS / PLAYERS OF THE MONTH) ----------------------
+# The two sheets the original raises during the CONTINUE chain at the end of a
+# calendar month (witnessed 2026-07-18, Bolton career: week-4 CONTINUE -> the cup
+# draw -> MANAGERS OF THE MONTH (AUGUST) -> PLAYERS OF THE MONTH (AUGUST) -> hub;
+# frames 76 / 77). `month_awards` holds the built sheets until the UI has shown
+# them, then Main clears it.
+var month_awards: Dictionary = {}       # {} or {month, managers{tier->..}, players{tier->..}}
+var _month_mark: Dictionary = {}        # tier -> {club_id -> [Pts, GF, GA]} at month start
+var _month_goal_mark: Dictionary = {}   # tier -> scorer-log length at month start
+
 # European competitions (qualified into from last season's domestic finish). Each is a
 # two-legged knockout (Cup.gd) over a field of this division's qualifier(s) + strong
 # foreign clubs. euro = {comp_key -> bracket}; the foreign entrants' ratings + names are
@@ -565,7 +575,12 @@ func play_friendly(rng: RandomNumberGenerator, rival: Dictionary) -> Dictionary:
 		my_ratings if at_home else rv_ratings,
 		rv_ratings if at_home else my_ratings,
 		my_xi if at_home else rv_xi,
-		rv_xi if at_home else my_xi, h, a)
+		rv_xi if at_home else my_xi, h, a, 90, true)
+	# The MAN OF THE MATCH selector runs on the MATCH report, which every fixture has;
+	# what the live witness pins about friendlies is that they fold NOTHING into the
+	# season store (Beckham's MP 7 = 6 rounds + the Shield). So pick him, name him on
+	# the read-out, and skip fold_back.
+	var mom := Pm98StatStore.pick_mom(res["report"]) if res.get("report") != null else 0
 	friendlies_played += 1
 	# A bid placed before this CONTINUE is answered BY it — witnessed 2026-07-24 on the
 	# real game (bid placed week 1, "You have signed Barlow of Rochdale." on the very next
@@ -575,7 +590,7 @@ func play_friendly(rng: RandomNumberGenerator, rival: Dictionary) -> Dictionary:
 	friendly_results.append({"date": str(pick.get("date", "")), "home_id": h,
 		"away_id": a, "hg": int(res["home_goals"]), "ag": int(res["away_goals"])})
 	return {"home_id": h, "away_id": a, "hg": int(res["home_goals"]),
-		"ag": int(res["away_goals"]), "manager_home": at_home,
+		"ag": int(res["away_goals"]), "manager_home": at_home, "motm_pid": mom,
 		"goals": res.get("goals", []), "possession": res.get("possession", []), "friendly": true}
 
 
@@ -619,6 +634,7 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 	# TABLES movement arrows compare against the previous revision (witnessed
 	# lt_wk2_premier: red/white position triangles at week 2).
 	table_prev = _positions_of(standings())
+	_mark_month_start()   # the first round of a calendar month snapshots every table
 	# Rival clubs trade in the background while the window is open. Their signings
 	# surface in the NEWS EXTRA newspaper MARKET feed (witnessed: "Everton has
 	# signed Lilley for 5 seasons for £288,000.", 2026-07-19) AND the manager's
@@ -653,8 +669,9 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 		var mine := h == club_id or a == club_id
 		var res := MatchSim.simulate(rng, ratings[h], ratings[a], \
 				xi_of_id.call(h), xi_of_id.call(a), h, a, 90, mine)
+		var mom := 0
 		if mine:
-			fold_match_stats(res, h, a)
+			mom = fold_match_stats(res, h, a)
 		var hg := int(res["home_goals"])
 		var ag := int(res["away_goals"])
 		_apply(table[h], hg, ag)
@@ -674,6 +691,8 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 		if h == club_id or a == club_id:
 			manager_res = {"home_id": h, "away_id": a, "hg": hg, "ag": ag, "manager_home": h == club_id,
 				"goals": res.get("goals", []),
+				# FUN_0044a370's pick, named on the FULL TIME read-out's MAN OF THE MATCH band
+				"motm_pid": mom,
 					"possession": res.get("possession", [])}   # scorers + real engine possession for the feed (not persisted)
 	# Morale & fitness live through the round (docs/re/morale_re.md): the slot
 	# deltas + the result delta hit BOTH sides of every fixture, then the league
@@ -715,6 +734,7 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 	_resolve_pending_bids(rng)         # last week's outgoing bids get their answers
 	_accumulate_offers(rng)            # incoming bids on the transfer-listed (CURRENT OFFERS)
 	week += 1
+	_close_month_if_due()           # end of a calendar month -> the two award sheets
 	offers_left = OFFERS_PER_WEEK   # the board's weekly signing allowance resets
 	_tick_works()                   # stadium expansion progresses a week
 	if not manager_res.is_empty():
@@ -1571,14 +1591,18 @@ func _cup_report_sink() -> Callable:
 ## `bump_club` is false for a two-legged tie's extra time: the port simulates ET on its
 ## own Mem, so its records fold in like any other, but it is the SAME fixture as leg 2 and
 ## must not bill the club counters a second time.
+## Returns FUN_0044a370's MAN OF THE MATCH pick (0 when no record survives its gates,
+## which is also what the binary leaves in F+0xac) so the caller can name him on the
+## FULL TIME read-out.
 func fold_match_stats(res: Dictionary, home_id: int, away_id: int, league := true,
-		bump_club := true) -> void:
+		bump_club := true) -> int:
 	var rep = res.get("report")
 	if rep == null:
-		return
-	Pm98StatStore.fold_back(rep, season_stats, Pm98StatStore.pick_mom(rep))
+		return 0
+	var mom := Pm98StatStore.pick_mom(rep)
+	Pm98StatStore.fold_back(rep, season_stats, mom)
 	if not bump_club:
-		return
+		return mom
 	for cid in [home_id, away_id]:
 		# @0x449189 also has a `+= 120` branch, taken when F+0x58 != 0 AND F+0x48 != 0.
 		# Neither field has an identified producer, so that branch is deliberately NOT
@@ -1586,6 +1610,7 @@ func fold_match_stats(res: Dictionary, home_id: int, away_id: int, league := tru
 		season_club_minutes[cid] = int(season_club_minutes.get(cid, 0)) + 90
 		if league:
 			season_club_mp[cid] = int(season_club_mp.get(cid, 0)) + 1
+	return mom
 
 
 ## One STATISTICS row per squad player, in squad order: the 17 season dwords of
@@ -2767,6 +2792,121 @@ func _return_loanees() -> void:
 		_news("contract", "%s has returned to %s at the end of his loan." % [p.get("name", "?"), pname])
 
 
+# ---- MONTHLY AWARDS -------------------------------------------------------
+# The two sheets are the original's own screens (frames 76 / 77, baked verbatim by
+# tools/re/build_awards_chrome_from_frames.py). What the binary picks them BY is not
+# reversed, so the selection below is OURS and says so — the same standing as the
+# finance ledger's amounts (docs/re/finance_constants.md) and Career.sale_offers:
+#   MANAGER OF THE MONTH  = the division's best record OVER THE MONTH (points won,
+#       then goal difference, then goals for), computed from a table snapshot taken
+#       at the month's first round. Nothing is fabricated: it is this career's own
+#       played results.
+#   PLAYER OF THE MONTH   = each club's top LEAGUE scorer over the same window, from
+#       the scorer log the GOAL SCORERS chart already keeps; ties break on the
+#       earlier goal. A club that did not score in the month prints no name (the
+#       original always names one, but inventing a name would be worse).
+# The month boundary itself is not modelled — it is the real calendar the header
+# already runs on (PMChrome.date_parts, anchored at Sat 9 Aug 1997).
+
+## Calendar month number of the round `w` (1-based week), on the header's own clock.
+func _month_of_week(w: int) -> int:
+	var start_year := 1997
+	if season.length() >= 4 and season.substr(0, 4).is_valid_int():
+		start_year = int(season.substr(0, 4))
+	var t0 := Time.get_unix_time_from_datetime_dict(
+		{"year": start_year, "month": 8, "day": 9, "hour": 12, "minute": 0, "second": 0})
+	var d := Time.get_datetime_dict_from_unix_time(int(t0) + (maxi(w, 1) - 1) * 7 * 86400)
+	return int(d.get("month", 8))
+
+
+const MONTH_NAMES := ["", "JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE",
+	"JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"]
+
+
+## Snapshot every division's table + scorer log at the first round of a month.
+func _mark_month_start() -> void:
+	var m := _month_of_week(week + 1)
+	if not _month_mark.is_empty() and int(_month_mark.get("month", -1)) == m:
+		return
+	_month_mark = {"month": m, "tables": {}}
+	_month_goal_mark = {}
+	var tables: Dictionary = _month_mark["tables"]
+	tables[tier] = _snapshot_table(table)
+	_month_goal_mark[tier] = scorer_log.size()
+	for t in divisions:
+		tables[int(t)] = _snapshot_table(divisions[t]["table"])
+		_month_goal_mark[int(t)] = (divisions[t]["scorers"] as Array).size()
+
+
+static func _snapshot_table(tbl: Dictionary) -> Dictionary:
+	var out: Dictionary = {}
+	for id in tbl:
+		var r: Dictionary = tbl[id]
+		out[int(id)] = [int(r.get("Pts", 0)), int(r.get("GF", 0)), int(r.get("GA", 0))]
+	return out
+
+
+## After the round lands: if the NEXT round falls in a new calendar month, the month
+## just ended -> build both award sheets into `month_awards` for the UI to raise.
+func _close_month_if_due() -> void:
+	if _month_mark.is_empty():
+		return
+	var closing := int(_month_mark["month"])
+	if _month_of_week(week + 1) == closing and not season_over():
+		return
+	var tables: Dictionary = _month_mark["tables"]
+	var managers: Dictionary = {}
+	var players: Dictionary = {}
+	for t in tables:
+		var tt := int(t)
+		var tbl: Dictionary = table if tt == tier else (divisions[tt]["table"] as Dictionary)
+		var nms: Dictionary = club_names if tt == tier else (divisions[tt]["names"] as Dictionary)
+		var best_id := -1
+		var best: Array = [-1, -999, -999]
+		for id in tbl:
+			var was: Array = (tables[tt] as Dictionary).get(int(id), [0, 0, 0])
+			var now: Dictionary = tbl[id]
+			var d := [int(now.get("Pts", 0)) - int(was[0]),
+				(int(now.get("GF", 0)) - int(was[1])) - (int(now.get("GA", 0)) - int(was[2])),
+				int(now.get("GF", 0)) - int(was[1])]
+			if d[0] > best[0] or (d[0] == best[0] and d[1] > best[1]) \
+					or (d[0] == best[0] and d[1] == best[1] and d[2] > best[2]):
+				best = d
+				best_id = int(id)
+		if best_id != -1:
+			managers[tt] = {"club_id": best_id, "club": str(nms.get(best_id, "?"))}
+		# per-club top scorer of the month
+		var log: Array = scorer_log if tt == tier else (divisions[tt]["scorers"] as Array)
+		var from := int(_month_goal_mark.get(tt, 0))
+		var tally: Dictionary = {}        # club -> {scorer -> goals}
+		for i in range(from, log.size()):
+			var g: Dictionary = log[i]
+			var cid := int(g.get("club", -1))
+			var nm := str(g.get("scorer", ""))
+			if cid == -1 or nm == "":
+				continue
+			if not tally.has(cid):
+				tally[cid] = {}
+			(tally[cid] as Dictionary)[nm] = int((tally[cid] as Dictionary).get(nm, 0)) + 1
+		var rows: Array = []
+		var ids: Array = []
+		for id in tbl:
+			ids.append(int(id))
+		ids.sort_custom(func(x, y): return str(nms.get(x, "")) < str(nms.get(y, "")))
+		for id in ids:
+			var top := ""
+			var topn := 0
+			for nm in (tally.get(id, {}) as Dictionary):
+				if int((tally[id] as Dictionary)[nm]) > topn:
+					topn = int((tally[id] as Dictionary)[nm])
+					top = nm
+			rows.append({"club_id": id, "club": str(nms.get(id, "?")), "player": top})
+		players[tt] = rows
+	month_awards = {"month": MONTH_NAMES[closing], "managers": managers, "players": players}
+	_month_mark = {}
+	_month_goal_mark = {}
+
+
 func is_listed(pid: int) -> bool:
 	return transfer_listed.has(pid)
 
@@ -3296,7 +3436,7 @@ func play_charity_shield_match(rng: RandomNumberGenerator, opp_view: Dictionary)
 		opp_xi if at_home else my_xi, h, a, 90, true)
 	# The Shield counts in both club counters: the live witness's TEAM TOTAL MP of 7 is
 	# 6 league rounds + this fixture (see `season_club_mp`).
-	fold_match_stats(res, h, a)
+	var mom := fold_match_stats(res, h, a)
 	var hg := int(res["home_goals"])
 	var ag := int(res["away_goals"])
 	var decided := ""
@@ -3322,7 +3462,7 @@ func play_charity_shield_match(rng: RandomNumberGenerator, opp_view: Dictionary)
 		_news("cup", "Charity Shield: %s beat %s%s." % [
 			str(club_names[winner]), str(club_names[loser]), pens])
 	return {"home_id": h, "away_id": a, "hg": hg, "ag": ag,
-		"manager_home": at_home, "goals": res.get("goals", []),
+		"manager_home": at_home, "goals": res.get("goals", []), "motm_pid": mom,
 		"possession": res.get("possession", []), "friendly": true, "charity": true}
 
 
@@ -3659,6 +3799,12 @@ func _fin_summary() -> Dictionary:
 		"ticket_price": ticket_price, "board_price": board_price}, tier)
 
 
+## The managed club's full finance ledger (the FINANCES screen's own numbers) — public
+## so the FULL TIME read-out can bill this match's gate and sponsor rows off it.
+func finance_summary() -> Dictionary:
+	return _fin_summary()
+
+
 ## Set the board-controlled match ticket price and refresh the weekly finance projection.
 func set_ticket_price(p: int) -> void:
 	ticket_price = maxi(1, p)
@@ -3792,6 +3938,8 @@ func to_dict() -> Dictionary:
 		"last_runners_up": last_runners_up, "charity_shield": charity_shield,
 		"charity_shield_pending": charity_shield_pending,
 		"season_opened": season_opened, "euro_seeds": euro_seeds,
+		"month_awards": month_awards, "month_mark": _month_mark,
+		"month_goal_mark": _str_keyed(_month_goal_mark),
 		"euro": euro, "euro_ratings": _str_keyed(euro_ratings),
 		"euro_names": _str_keyed(euro_names),
 		"euro_winner_cup": euro_winner_cup, "euro_winner_cwc": euro_winner_cwc,
@@ -3966,6 +4114,23 @@ static func from_dict(d: Dictionary) -> Career:
 	# Pre-chain saves load as already-opened so the curtain-raiser screens don't
 	# fire mid-season on an in-flight career.
 	c.season_opened = bool(d.get("season_opened", true))
+	# MONTHLY AWARDS: the pending sheets + the running month's table snapshot. JSON
+	# turns every key into a String, so the tier-keyed maps are re-integered here
+	# (an old save simply starts the next month fresh).
+	c.month_awards = d.get("month_awards", {})
+	c._month_mark = {}
+	var mm: Dictionary = d.get("month_mark", {})
+	if mm.has("month") and mm.has("tables"):
+		var tabs: Dictionary = {}
+		for k in (mm["tables"] as Dictionary):
+			var one: Dictionary = {}
+			for cid in (mm["tables"][k] as Dictionary):
+				one[int(cid)] = mm["tables"][k][cid]
+			tabs[int(k)] = one
+		c._month_mark = {"month": int(mm["month"]), "tables": tabs}
+	c._month_goal_mark = {}
+	for k in d.get("month_goal_mark", {}):
+		c._month_goal_mark[int(k)] = int(d["month_goal_mark"][k])
 	c.euro_seeds = d.get("euro_seeds", {})
 	c.euro = d.get("euro", {})
 	c.euro_ratings = {}

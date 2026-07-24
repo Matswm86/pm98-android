@@ -118,6 +118,10 @@ static func summary(club: Dictionary, tier: int) -> Dictionary:
 			["STAFF WAGES", wages],
 			["BONUS", bonus],
 		],
+		# per-match derivations the FULL TIME stadium panel needs
+		"home_games": home_games,
+		"boards_sold": boards_sold,
+		"boards_pct": int(round(100.0 * boards_sold / float(_BOARDS[tier]))),
 		"total_income": income,
 		"total_expense": expense,
 		"season_balance": balance,

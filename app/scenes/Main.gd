@@ -1054,6 +1054,7 @@ func _free_overlays() -> void:
 				or c is PlayerInfoScreen or c is RivalScreen or c is ManagerHistoryScreen \
 				or c is TrainingScreen or c is InjuriesScreen or c is StatisticsScreen \
 				or c is OffersSelectionScreen or c is ChampsScreen \
+				or c is ManagersMonthScreen or c is PlayersMonthScreen \
 				or c is CharityShieldScreen or c is SeasonStartScreen:
 			c.queue_free()
 	_browse = null
@@ -1935,13 +1936,13 @@ func _career_advance() -> void:
 			_career.save()
 			_show_shield_card(_career.charity_shield, func() -> void:
 				_show_career()
-				_pop_pending_team_offers()))
+				_pop_month_awards(_pop_pending_team_offers)))
 		return
 	var res := _career.advance_week(rng)   # ratings come from the live roster
 	if res.is_empty():
 		_career.save()   # bye / season end: no presentation, save immediately
 		_show_career()   # refresh the hub in place
-		_pop_pending_team_offers()
+		_pop_month_awards(_pop_pending_team_offers)
 		return
 	_show_match_result(res)
 
@@ -1989,7 +1990,7 @@ func _show_match_result(res: Dictionary, on_finish: Callable = Callable()) -> vo
 		"home": str(home.get("name", "?")), "away": str(away.get("name", "?")),
 		"hg": int(res["hg"]), "ag": int(res["ag"]), "goals": res.get("goals", []),
 		"home_id": int(res["home_id"]), "away_id": int(res["away_id"]),
-		"header": hdr, "stadium": _result_stadium(res),
+		"header": hdr, "stadium": _result_stadium(res), "motm": _result_motm(res),
 	}
 	# Back at the hub, any live bids on listed players raise their TEAM OFFER
 	# cards — the original's post-match CONTINUE order (run-3 frames 085->086).
@@ -1998,7 +1999,7 @@ func _show_match_result(res: Dictionary, on_finish: Callable = Callable()) -> vo
 	var finish := on_finish if on_finish.is_valid() else func() -> void:
 		_career.save()   # the deferred week autosave (EXIT-Yes never gets here)
 		_show_career()
-		_pop_pending_team_offers()
+		_pop_month_awards(_pop_pending_team_offers)
 	var open_match := func() -> void:
 		_open_match(home, away, int(res["hg"]), int(res["ag"]), m["lines"],
 			"%s  -  back to the dugout" % verdict, finish, result_data, res.get("possession", []))
@@ -2089,16 +2090,50 @@ func _cpu_xi_ids(club: Dictionary) -> Array:
 ## not reproducible -- finance_constants.md -- so the money/sponsor rows stay an honest gap).
 ## Manager-home reuses the Career finance_preview (its own board-set prices + works-expanded
 ## capacity); an away fixture projects the home OPPONENT's gate from its tier + real capacity.
+## All five rows are filled (the original fills them at home and away alike). The money
+## rows come from the SAME FinanceModel ledger the FINANCES screen shows, reduced to one
+## match: ATTENDANCE MONEY = the season TICKETS line / home games, SPONSOR BOARDS SOLD =
+## boards sold as a % of the tier's board count, SPONSORSHIP MONEY = the board income for
+## this match. The model is ours and documented as such (finance_constants.md: the
+## original's per-match runtime gate lives in the save, not in code) — but the panel is no
+## longer half-blank, which is what made it read as truncated.
 func _result_stadium(res: Dictionary) -> Dictionary:
 	var home_id := int(res.get("home_id", -1))
+	var club := _mgr_club() if home_id == _career.club_id else GameDB.club(home_id)
+	var sm: Dictionary
 	if home_id == _career.club_id:
-		var fp := _career.finance_preview()
-		return {"name": str(_mgr_club().get("stadium", "")),
-			"capacity": int(fp.get("capacity", 0)), "attendance": int(fp.get("attendance", 0))}
-	var club := GameDB.club(home_id)
-	var sm := FinanceModel.summary(club, FinanceModel.tier_of(club, GameDB.leagues))
+		sm = _career.finance_summary()
+	else:
+		sm = FinanceModel.summary(club, FinanceModel.tier_of(club, GameDB.leagues))
+	var home_games: int = maxi(1, int(sm.get("home_games", 19)))
+	var gate := 0
+	var boards := 0
+	for line in sm.get("income_lines", []):
+		if line[0] == "TICKETS":
+			gate = int(line[1])
+		elif line[0] == "SPONSOR BOARDS SOLD":
+			boards = int(line[1])
+	@warning_ignore("integer_division")
 	return {"name": str(club.get("stadium", "")),
-		"capacity": int(sm.get("capacity", 0)), "attendance": int(sm.get("attendance", 0))}
+		"capacity": int(sm.get("capacity", 0)), "attendance": int(sm.get("attendance", 0)),
+		"gate": gate / home_games, "boards": boards / home_games,
+		"boards_pct": int(sm.get("boards_pct", 0))}
+
+
+## MAN OF THE MATCH for the read-out: FUN_0044a370 picked a player id; resolve his name,
+## his club and his mugshot. `{}` when the fixture produced no per-player record.
+func _result_motm(res: Dictionary) -> Dictionary:
+	var pid := int(res.get("motm_pid", 0))
+	if pid <= 0:
+		return {}
+	for cid in [int(res.get("home_id", -1)), int(res.get("away_id", -1))]:
+		var view := _club_with_roster(cid) if _career.rosters.has(cid) else GameDB.club(cid)
+		for p in view.get("players", []):
+			if int((p as Dictionary).get("id", -1)) == pid:
+				return {"name": str((p as Dictionary).get("name", "")),
+					"club": PMChrome.title_case_name(str(view.get("name", ""))),
+					"photo_id": (p as Dictionary).get("photoId")}
+	return {}
 
 ## Mount the source-true FULL TIME read-out (MatchResultScreen) over the running match, from a
 ## MATCH OPTIONS RESULTS tap. `data` carries the fixture + real goal vector + stadium; CONTINUE
@@ -2110,7 +2145,7 @@ func _open_result_readout(data: Dictionary, on_continue: Callable, half := false
 	rs.setup(str(data.get("home", "?")), str(data.get("away", "?")),
 		int(data.get("hg", 0)), int(data.get("ag", 0)), data.get("goals", []),
 		int(data.get("home_id", -1)), int(data.get("away_id", -1)),
-		data.get("header", {}), data.get("stadium", {}), half)
+		data.get("header", {}), data.get("stadium", {}), half, data.get("motm", {}))
 	var advance := func() -> void:
 		rs.queue_free()
 		if on_continue.is_valid():
@@ -3035,6 +3070,45 @@ func _apply_offer_answers(pid: int, decisions: Array) -> void:
 ## 085->086: FULL TIME -> TEAM OFFER cards -> signing messages). One card at a
 ## time; answering it (all rows default REFUSE, so OK always clears the player's
 ## bid list) chains to the next.
+## The MONTHLY AWARDS pair, raised in the CONTINUE chain when a calendar month has
+## just ended — witnessed order (2026-07-18, frames 76 -> 77 -> hub):
+## MANAGERS OF THE MONTH -> its OK -> PLAYERS OF THE MONTH -> its OK -> on.
+## `after` runs once both sheets are answered (or immediately when none is due).
+func _pop_month_awards(after: Callable) -> void:
+	if _career == null or (_career.month_awards as Dictionary).is_empty():
+		if after.is_valid():
+			after.call()
+		return
+	var aw: Dictionary = _career.month_awards
+	_career.month_awards = {}          # answered once; never re-raised
+	_career.save()
+	var month := str(aw.get("month", ""))
+	var mgr_rows: Dictionary = {}
+	for t in (aw.get("managers", {}) as Dictionary):
+		var r: Dictionary = (aw["managers"] as Dictionary)[t]
+		mgr_rows[int(t)] = {"club_id": int(r.get("club_id", -1)), "club": str(r.get("club", "")),
+			"manager": _mgr_of(int(r.get("club_id", -1)))}
+	var ply_rows: Dictionary = {}
+	for t in (aw.get("players", {}) as Dictionary):
+		ply_rows[int(t)] = (aw["players"] as Dictionary)[t]
+	var mgr: ManagersMonthScreen = load("res://scenes/ManagersMonthScreen.gd").new()
+	mgr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(mgr)
+	mgr.setup(month, mgr_rows)
+	mgr.ok_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		mgr.queue_free()
+		var ply: PlayersMonthScreen = load("res://scenes/PlayersMonthScreen.gd").new()
+		ply.set_anchors_preset(Control.PRESET_FULL_RECT)
+		add_child(ply)
+		ply.setup(month, ply_rows, _career.tier)
+		ply.ok_pressed.connect(func() -> void:
+			AudioManager.ui_select()
+			ply.queue_free()
+			if after.is_valid():
+				after.call()))
+
+
 func _pop_pending_team_offers() -> void:
 	if _career == null:
 		return

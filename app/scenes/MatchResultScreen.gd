@@ -38,10 +38,24 @@ const ROW_Y0 := 172
 const ROW_PITCH := 16
 const N_ROWS := 7
 const FOULS := [Rect2(123, 283, 34, 16), Rect2(436, 283, 34, 16)]   # value zones (overpaint)
-const STAD_NAME_Y := 357
-const STAD_ROWS := [380, 396, 412]          # CAPACITY / ATTENDANCE (money rows blank)
-const STAD_LABEL_X := 22
-const STAD_VALUE_X := 150
+# STADIUM panel value anchors, measured by diffing the two witnessed FULL TIME frames
+# (Old Trafford 55,300/19,355/35%/£145,162/31%/£6,750 vs The Dell 15,200/12,160/80%/
+# £91,200/86%/£18,750). The LABELS and the arrow chevrons are static chrome baked into
+# result_ft.png and are NOT drawn here — the old bake row-medianed them away, which is
+# the reported "stadium panel truncated and wrong".
+const STAD_NAME := Vector2i(86, 358)        # ground name, left-aligned, black on white
+const STAD_VAL_X := 109                     # CAPACITY value
+const STAD_ATT_X := 128                     # ATTENDANCE value
+const STAD_MONEY_X := 177                   # the two £ rows (the "£" belongs to the value)
+const STAD_PCT_X := 236                     # the right sub-cell "NN %" on ATT / BOARDS
+const STAD_Y := {                           # glyph tops (render-diffed to the frame)
+	"cap": 377, "att": 394, "attmoney": 411, "boards": 428, "sponsor": 445,
+}
+# MAN OF THE MATCH: 32x32 mugshot cell + the name centred on the blue band.
+const MOTM_PHOTO := Vector2i(312, 370)
+const MOTM_NAME_CX := 464
+const MOTM_NAME_Y := 381
+const C_MOTM := Color8(180, 200, 220)       # the band's pale name ink (frame-sampled)
 const CONTINUE := Rect2(479, 439, 112, 25)
 const KIT_SRC := Rect2(0, 0, 31, 64)
 
@@ -67,7 +81,8 @@ var _away_kit: Texture2D
 var _goals_home: Array = []    # [{scorer, minute}]
 var _goals_away: Array = []
 var _header: Dictionary = {}
-var _stadium: Dictionary = {}  # {name, capacity, attendance} (Career-known) or {}
+var _stadium: Dictionary = {}  # {name, capacity, attendance, gate, boards, boards_pct}
+var _motm: Dictionary = {}     # {name, club, photo_id} — FUN_0044a370's pick, or {}
 var _half := false
 var _press := ""
 
@@ -86,11 +101,14 @@ func _ready() -> void:
 ## Feed a finished fixture.
 ##   goals   = the stat engine's real vector [{minute, side(0/1), scorer, own_goal}]
 ##   header  = PMChrome.draw_match_header dict (fixture mode: top/bottom/home_id/away_id)
-##   stadium = {name, capacity, attendance} for the managed ground (Career-known), else {}
+##   stadium = {name, capacity, attendance, gate, boards, boards_pct} for the fixture's
+##             HOME ground, else {}
+##   motm    = {name, club, photo_id} for FUN_0044a370's pick, else {} (no record)
 ##   half    = true for HALF TIME (hides MAN OF THE MATCH + CONTINUE), else FULL TIME
 func setup(home_name: String, away_name: String, hg: int, ag: int, goals: Array,
 		home_id: int, away_id: int, header: Dictionary = {}, stadium: Dictionary = {},
-		half := false) -> void:
+		half := false, motm: Dictionary = {}) -> void:
+	_motm = motm
 	_home = home_name
 	_away = away_name
 	_hg = hg
@@ -170,9 +188,11 @@ func _draw() -> void:
 	for r in FOULS:
 		draw_rect(r, C_FOULS_BG, true)
 
-	# STADIUM panel: the Career-known ground name + CAPACITY + ATTENDANCE (the money
-	# / sponsor rows are a gap -> left blank in the bake).
+	# STADIUM panel: the ground name + all five row values under the baked labels.
 	_draw_stadium()
+	# MAN OF THE MATCH (full time only) — the selector's pick, with his mugshot.
+	if not _half:
+		_draw_motm()
 
 	if _press != "":
 		draw_rect(CONTINUE, C_PRESS, true)
@@ -186,23 +206,63 @@ func _draw_goals(rows: Array, col: Vector2) -> void:
 		_txt(_f8, int(col.y) - 28, y, str(r.get("minute", 0)), C_CELL_TXT, 11)
 
 
+## The five stadium rows. Only the VALUES are drawn — every label and chevron is the
+## original frame's own pixels in result_ft.png. Row grammar read straight off the two
+## witnessed boards: "15,200 spectators" / "12,160 spect." + "80 %" in the right cell /
+## "£91,200" / "86 %" in the right cell / "£18,750".
 func _draw_stadium() -> void:
 	if _stadium.is_empty():
 		return
 	var gname := str(_stadium.get("name", ""))
 	if gname != "":
 		# The ground-name row is WHITE with BLACK ink (witnessed OT/Villa/Dell/Reebok);
-		# only the CAPACITY/ATTENDANCE rows below are white-on-blue.
-		_txt(_f8, 80, STAD_NAME_Y, gname, C_STAD_NAME, 11, false, 288)
+		# the five rows below are white-on-colour.
+		_txt(_f8, STAD_NAME.x, STAD_NAME.y, gname, C_STAD_NAME, 11, false, 285)
 	var cap := int(_stadium.get("capacity", 0))
 	var att := int(_stadium.get("attendance", 0))
 	if cap > 0:
-		_txt(_f8, STAD_LABEL_X, STAD_ROWS[0], "CAPACITY:", C_STAD_TXT, 11)
-		_txt(_f8, STAD_VALUE_X, STAD_ROWS[0], "%s spectators" % _grp(cap), C_STAD_TXT, 11)
-	if att > 0 and cap > 0:
-		var pct := int(round(100.0 * att / cap))
-		_txt(_f8, STAD_LABEL_X, STAD_ROWS[1], "ATTENDANCE:", C_STAD_TXT, 11)
-		_txt(_f8, STAD_VALUE_X, STAD_ROWS[1], "%s   %d %%" % [_grp(att), pct], C_STAD_TXT, 11)
+		_txt(_f8, STAD_VAL_X, STAD_Y["cap"], "%s spectators" % _grp(cap), C_STAD_TXT, 11)
+	if att > 0:
+		_txt(_f8, STAD_ATT_X, STAD_Y["att"], "%s spect." % _grp(att), C_STAD_TXT, 11)
+		if cap > 0:
+			_txt(_f8, STAD_PCT_X, STAD_Y["att"],
+				"%d %%" % int(round(100.0 * att / cap)), C_STAD_TXT, 11)
+	if _stadium.has("gate"):
+		_txt(_f8, STAD_MONEY_X, STAD_Y["attmoney"],
+			"£%s" % _grp(int(_stadium["gate"])), C_STAD_TXT, 11)
+	if _stadium.has("boards_pct"):
+		_txt(_f8, STAD_PCT_X, STAD_Y["boards"],
+			"%d %%" % int(_stadium["boards_pct"]), C_STAD_TXT, 11)
+	if _stadium.has("boards"):
+		_txt(_f8, STAD_MONEY_X, STAD_Y["sponsor"],
+			"£%s" % _grp(int(_stadium["boards"])), C_STAD_TXT, 11)
+
+
+## MAN OF THE MATCH: the 32x32 mugshot in the panel's photo cell and
+## "Name (Club)" centred on the blue band (both frame-measured). An unpicked match
+## (no per-player record) leaves the band empty, exactly as the bake rests.
+func _draw_motm() -> void:
+	if _motm.is_empty():
+		return
+	var face := PMChrome.mini_face(_motm.get("photo_id"))
+	if face != null:
+		draw_texture_rect(face, Rect2(MOTM_PHOTO.x, MOTM_PHOTO.y, 32, 32), false)
+	var nm := str(_motm.get("name", ""))
+	if nm == "":
+		return
+	var club := str(_motm.get("club", ""))
+	var line := "%s (%s)" % [PMChrome.title_case_name(nm), club] if club != "" \
+		else PMChrome.title_case_name(nm)
+	# The band's face is ProMan10, not the panel's ProMan8: the witnessed
+	# "Holdsworth (Bolton W)" measures 159px of ink, and only proman10's advances
+	# (154) come near it — proman8 gives 129, which is what the first pass drew.
+	if _f10 == null:
+		return
+	var sz := 10                       # proman10's NATIVE size (no rescale)
+	while _f10.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x > 210.0 and sz > 8:
+		sz -= 1
+	var w := _f10.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
+	_txt(_f10, int(MOTM_NAME_CX - w * 0.5), MOTM_NAME_Y, line, C_MOTM, sz)
 
 
 static func _grp(n: int) -> String:

@@ -69,9 +69,22 @@ Below (all cleared in the bake, redrawn by the screen):
 - **GOALS columns** = the REAL vector: home col x169..289, away col x482..602; 7 rows,
   first row top y172, pitch 16, scorer left + minute right. **BOOKINGS** columns stay empty.
 - **TOTAL FOULS**, **POSSESSION %** — GAP (over-painted honest-absent).
-- **STADIUM panel** (x14..292, y348..452): car icon + ground name + CAPACITY + ATTENDANCE
-  (Career-known); the ATTENDANCE-MONEY / SPONSOR-BOARDS / SPONSORSHIP-MONEY rows stay blank.
-- **MAN OF THE MATCH** (full time, x325..604): header + generic sprite kept, name blank (GAP).
+- **STADIUM panel** (x14..292, y348..452) — REBUILT 2026-07-24. The two witnessed FT
+  boards (Old Trafford `match_result_fulltime.png` vs The Dell `15_fulltime.png`) were
+  diffed pixel-for-pixel: only the six VALUE spans differ, so the arrow chevrons, all
+  five row LABELS, the sub-cell boundaries and the stadium sprite are STATIC chrome.
+  The old bake row-medianed the whole label area away, leaving blank bars under a
+  floating sprite — the reported "stadium image truncated and wrong". Value anchors
+  (ink runs, identical in both frames): ground name x86 y358 (black on white);
+  CAPACITY x109 y377; ATTENDANCE x128 y394 + "NN %" in the right sub-cell x236;
+  ATTENDANCE MONEY x177 y411; SPONSOR BOARDS SOLD "NN %" x236 y428; SPONSORSHIP
+  MONEY x177 y445. All five now FILL (see the money-row note below).
+- **MAN OF THE MATCH** (full time) — LIVE 2026-07-24. Black header band x310..585
+  y349..369; 32x32 mugshot cell at (312,370); the name centred on the blue band
+  (x346..583 y370..401, 4-row vertical period) in **ProMan10** ink (180,200,220) —
+  "Holdsworth (Bolton W)" measures 159px of ink and only ProMan10's advances (154)
+  come near it. The pick is `Pm98StatStore.pick_mom` (FUN_0044a370, oracle-banked),
+  surfaced through `Career.fold_match_stats` → `manager_res.motm_pid`.
 - **CONTINUE** (479,439) full time only; the HALF TIME read-out dismisses on any tap.
 
 ## Event grammar — renderable TODAY vs GAP
@@ -91,8 +104,8 @@ goal events** — `{minute, side(credited 0/1), scorer, scorer_side, own_goal}` 
 | BOOKINGS (name+min) | positional engine only | **GAP** — empty chrome |
 | TOTAL FOULS | positional engine only | **GAP** — blank |
 | POSSESSION % (BRIEF bar) | `Pm98StatMatch.possession` — the engine's own `POSS` (0x64/0x804) counters, `_stats` FUN_00450510 | **REAL** — home/(home+away); the BRIEF bar eases 50/50→final over the clock (final split is engine-exact; the per-minute path is a display ease, the instant engine having no per-minute stream) |
-| ATTENDANCE MONEY / SPONSOR BOARDS / SPONSORSHIP MONEY | per-match money not modelled | **GAP** — blank |
-| MAN OF THE MATCH | not produced | **GAP** — blank panel |
+| ATTENDANCE MONEY / SPONSOR BOARDS / SPONSORSHIP MONEY | the FINANCES ledger's own TICKETS / SPONSOR BOARDS lines divided by the tier's home-game count (`FinanceModel.summary`) | **PROJECTION** — same standing as ATTENDANCE; the original's per-match runtime gate lives in the save, not in code (finance_constants.md) |
+| MAN OF THE MATCH | `Pm98StatStore.pick_mom` = FUN_0044a370, oracle-banked | **REAL** (name + club + mugshot) |
 
 Full fidelity of the GAP rows needs the positional match engine's event stream (the
 `Pm98Match`/`Pm98Driver`/`Pm98Outer` track, still test-only) — never fabricate them.
@@ -212,10 +225,13 @@ The HALF/FULL TIME read-out is repaired against the LIVE witness run
   button + the STATISTICS/TACTICS/LINE-UP chrome (baked, inert like the BRIEF doors).
 - **Honest gaps kept (never fabricated)**: POSSESSION % (the RESULT read-out's own
   counter, distinct from the now-live BRIEF POSS bar — witness §: 57/43 vs 55/45 same
-  match), TOTAL FOULS, MAN OF THE MATCH name + mug -- the instant-result stat engine
-  produces goals only (plus the BRIEF possession counters); the
-  positional match-rating stream those need is test-only (M5). The pill / header /
-  generic sprite chrome renders; the values stay absent.
+  match) and TOTAL FOULS -- the instant-result stat engine produces goals only (plus
+  the BRIEF possession counters); the positional match-rating stream those need is
+  test-only (M5). The pill / header chrome renders; those values stay absent.
+  **MAN OF THE MATCH is no longer a gap** (2026-07-24): the selector is the ported,
+  oracle-banked FUN_0044a370, so the board names him with his mugshot. A pre-season
+  friendly runs the selector too but still folds NOTHING into the season store — the
+  live witness pins only the fold-back, not the report.
 
 Verified LIVE-render (GL, `app/tests/shot_readout_verify.gd`): the away-league FT +
 HT read-outs match the Dell/Villa witness (score box, filled stadium, in-season chip).
