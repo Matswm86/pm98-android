@@ -79,8 +79,11 @@ const HOME_ID := 40                                          # Manchester Utd. (
 const AWAY_ID := 42                                          # Liverpool (eng_prem)
 
 
+## s55: PM98_SEED picks the match seed (default 1) so the fixed-seed sweep in
+## tools/re/run_match_sweep.sh can drive this harness once per seed without editing it.
 func _init() -> void:
-	_run(1)
+	var s := OS.get_environment("PM98_SEED")
+	_run(int(s) if s != "" else 1)
 	quit(0)
 
 
