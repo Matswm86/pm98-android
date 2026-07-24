@@ -18,6 +18,17 @@ Palette choice is the one judgement call (the per-screen palette is selected by 
 in MANAGER.EXE). Default: DM -> shared VGA; BM-without-palette -> --pal (MANAGER.PAL
 by default). Override per run while identifying a screen.
 
+!! WARNING -- this module's `render()` still decodes through Pillow, which honours the
+DIB's `bfOffBits` (1078). The archive STRIPS the 1024-byte palette those headers still
+declare, so Pillow starts reading the pixel rows 1024 bytes late and the image comes out
+rotated by `1024 // stride` rows + `1024 % stride` columns. It is invisible when the
+stride divides 1024 (32x32 crests wrap a whole 32 rows back onto themselves) and wrong
+otherwise -- it is the `estadio<N>.png` seam. `pkf_image.dib_indices()` decodes from
+offset 54 and is correct at every size; use `--exact` here to route through it. See the
+`pkf_image` module docstring for the ground-truth measurement (100.0000% on the real
+cup-draw frame). Anything re-exported through `--exact` must be render-diffed against a
+real frame before it ships.
+
 Usage:
   export_art.py list  <PKF>                      # names + sizes + magic
   export_art.py dump  <PKF> OUTDIR [--pal NAME] [--vga] [--transparent]
@@ -79,9 +90,17 @@ def _has_palette(im: Image.Image) -> bool:
 
 def render(pkf: str, name: str, pal_name: str = "MANAGER.PAL",
            force_vga: bool = False, transparent: bool | None = None,
-           scale: int = 1, force_pal: bool = False) -> Image.Image:
+           scale: int = 1, force_pal: bool = False, exact: bool = False) -> Image.Image:
     raw = bytearray(_entry(pkf, name))
     is_dm = raw[:2] == b"DM"
+    if exact:
+        # Correct path: rows from offset 54, no bfOffBits (see the module warning).
+        import pkf_image
+
+        idx = pkf_image.dib_indices(bytes(raw))
+        pal = vga_palette() if (is_dm or force_vga) else riff_palette(pal_name)
+        img = pkf_image.rgba(idx, pal, transparent if transparent is not None else is_dm)
+        return img.resize((img.width * scale, img.height * scale), Image.NEAREST) if scale > 1 else img
     if is_dm:
         raw[0] = ord("B")
     im = Image.open(io.BytesIO(bytes(raw)))

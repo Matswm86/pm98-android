@@ -1,0 +1,146 @@
+{
+  "source_frames": [
+    "screenshots/wine-captures-2026-07-18-goalscorers/74_after_wk4.png",
+    "screenshots/wine-captures-2026-07-18-goalscorers/75_scout_wk5.png",
+    "screenshots/promanager-career-2026-07-16/10_fa_cup_draw_round1.png"
+  ],
+  "picture": {
+    "rect": [
+      31,
+      76,
+      260,
+      144
+    ],
+    "clear": [
+      0,
+      0,
+      0
+    ],
+    "strip_at": [
+      31,
+      76
+    ],
+    "fondo_at": [
+      103,
+      76
+    ],
+    "bombo_at": [
+      136,
+      76
+    ],
+    "bombo_opaque": true,
+    "palette": "MANAGER.PAL"
+  },
+  "title": {
+    "span": [
+      44,
+      34,
+      288,
+      58
+    ],
+    "centre": 161,
+    "top": 40,
+    "font": "proman14",
+    "colour": [
+      255,
+      255,
+      255
+    ]
+  },
+  "round": {
+    "span": [
+      44,
+      232,
+      288,
+      254
+    ],
+    "centre": 158,
+    "top": 237,
+    "font": "proman14",
+    "colour": [
+      255,
+      223,
+      0
+    ]
+  },
+  "legs": {
+    "spans": [
+      [
+        26,
+        410,
+        90,
+        426
+      ],
+      [
+        26,
+        437,
+        90,
+        453
+      ]
+    ],
+    "centre": 57,
+    "tops": [
+      415,
+      442
+    ],
+    "font": "proman10",
+    "colour": [
+      255,
+      255,
+      0
+    ]
+  },
+  "list": {
+    "x": [
+      334,
+      606
+    ],
+    "y0": 51,
+    "pitch": 16,
+    "rows": 23,
+    "text_top": 3,
+    "font": "proman10",
+    "colour": [
+      80,
+      100,
+      120
+    ],
+    "bg": [
+      200,
+      220,
+      240
+    ],
+    "home_right": 465,
+    "dash_x": 466,
+    "away_left": 475
+  },
+  "scroll": {
+    "x": [
+      606,
+      624
+    ],
+    "y": [
+      70,
+      402
+    ],
+    "trough": [
+      180,
+      200,
+      220
+    ]
+  },
+  "buttons": {
+    "finish": [
+      350,
+      440,
+      462,
+      464
+    ],
+    "continue": [
+      492,
+      438,
+      610,
+      466
+    ]
+  }
+}

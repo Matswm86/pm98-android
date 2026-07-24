@@ -66,6 +66,7 @@ func _ready() -> void:
 			and not OS.has_environment("PM98_CONTRACT_SHOT") and not OS.has_environment("PM98_SCREENS_SHOT") \
 			and not OS.has_environment("PM98_MANAGER_SHOT") and not OS.has_environment("PM98_FICHA_SHOT") \
 			and not OS.has_environment("PM98_MATCHOPTS_SHOT") and not OS.has_environment("PM98_PLAYERACT_SHOT") \
+			and not OS.has_environment("PM98_CUPDRAW_SHOT") \
 			and not OS.has_environment("PM98_GROUNDACT_SHOT"):
 		_devshot()
 
@@ -116,6 +117,9 @@ func _boot() -> void:
 		return
 	if OS.has_environment("PM98_GROUNDACT_SHOT"):
 		_groundact_shot()
+		return
+	if OS.has_environment("PM98_CUPDRAW_SHOT"):
+		_cupdraw_shot()
 		return
 	if OS.has_environment("PM98_MATCHOPTS_SHOT"):
 		_matchopts_shot()
@@ -512,14 +516,14 @@ func _cup_shot() -> void:
 		_career.advance_week(rng)
 	_show_career()               # raise the hub
 	await _settle()
-	_show_cup_screen(_career.fa_cup, "F.A. CUP", "res://art/screens/cup/trophy.png")
+	_show_cup_screen(_career.fa_cup, "fa_cup", "F.A. Cup")
 	await _settle()
 	_save_shot(dir, "cup.png")
 	for c in get_children():
-		if c is CupScreen:
+		if c is CupScreen or c is CupDrawScreen:
 			c.queue_free()
 	await _settle()
-	_show_cup_screen(_career.league_cup, "COCA-COLA CUP", "res://art/screens/cup/cocacola.png")
+	_show_cup_screen(_career.league_cup, "league_cup", "Coca-Cola Cup")
 	await _settle()
 	_save_shot(dir, "league_cup.png")
 	var b: Dictionary = _career.fa_cup
@@ -527,7 +531,7 @@ func _cup_shot() -> void:
 	# Finish the season and roll over so the Charity Shield (champions v F.A. Cup winners)
 	# is contested, then capture it around the real CHARITY shield art.
 	for c in get_children():
-		if c is CupScreen:
+		if c is CupScreen or c is CupDrawScreen:
 			c.queue_free()
 	while not _career.season_over():
 		_career.advance_week(rng)
@@ -539,7 +543,7 @@ func _cup_shot() -> void:
 	# Into the new season far enough for European rounds to have been drawn + played,
 	# then capture the European Cup screen around its real trophy art.
 	for c in get_children():
-		if c is CupScreen:
+		if c is CupScreen or c is CupDrawScreen:
 			c.queue_free()
 	# First, partway in: the European Cup group stage in flight (a few matchdays played).
 	for _g in 13:
@@ -549,11 +553,11 @@ func _cup_shot() -> void:
 	_show_career()
 	await _settle()
 	var ecg: Dictionary = _career.euro.get("european_cup", {})
-	_show_cup_screen(ecg, "EUROPEAN CUP", _euro_emblem("european_cup"))
+	_show_cup_screen(ecg, "european_cup", "European Cup")
 	await _settle()
 	_save_shot(dir, "european_cup_group.png")
 	for c in get_children():
-		if c is CupScreen:
+		if c is CupScreen or c is CupDrawScreen:
 			c.queue_free()
 	# Then deeper, into the knockout rounds.
 	for _j in 18:
@@ -574,13 +578,13 @@ func _cup_shot() -> void:
 	elif _career._cwc_seed() == mid:
 		show_key = "cup_winners_cup"
 	var ec: Dictionary = _career.euro.get(show_key, {})
-	_show_cup_screen(ec, str(ec.get("name", "EUROPEAN CUP")).to_upper(), _euro_emblem(show_key))
+	_show_cup_screen(ec, show_key, str(ec.get("name", "European Cup")))
 	await _settle()
 	_save_shot(dir, "european_cup.png")
 	# Finish this European season and roll over once more so the winners-of-winners finals
 	# (European Supercup + Intercontinental Cup) are contested, then capture the Supercup.
 	for c in get_children():
-		if c is CupScreen:
+		if c is CupScreen or c is CupDrawScreen:
 			c.queue_free()
 	while not _career.season_over():
 		_career.advance_week(rng)
@@ -736,6 +740,42 @@ func _ficha_shot() -> void:
 ## Drives the REAL GROUND flow end-to-end (owner 2026-07-23): open GROUND -> IMPROVE -> CAR
 ## PARK tab -> tick a quadrant -> the work starts, the screen re-mounts on the WORK IN
 ## PROGRESS ledger showing it. Proves Main._on_stadium_works wiring, not just the render.
+## Render-diff baseline for the SORTEO (cup-draw) screen. Mounts CupDrawScreen with the
+## EXACT state of the binding frame `74_after_wk4.png` — Coca-Cola Cup, ROUND 2, the first
+## four ties of a 25-tie round with the fourth's away club still undrawn — so
+## tools/re/diff_cupdraw_parity.py can diff it against the real MANAGER.EXE frame pixel for
+## pixel. The drum frame is pinned to BOMBO08, which is the one that frame holds.
+## Run under Xvfb+GL: PM98_CUPDRAW_SHOT=1.
+func _cupdraw_shot() -> void:
+	var dir := OS.get_environment("PM98_SHOT_DIR")
+	var scr: CupDrawScreen = load("res://scenes/CupDrawScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup("league_cup", "Coca-Cola Cup", "ROUND 2", [
+		{"home": "Preston NE", "away": "Stockport C"},
+		{"home": "Tranmere Rov", "away": "Crystal Pal."},
+		{"home": "Northampton T.", "away": "Barnsley"},
+		{"home": "Coventry", "away": ""},
+	], 25, ["1ST LEG", "2ND LEG"])
+	scr.set_process(false)
+	scr.pin_drum(8)
+	await _settle()
+	_save_shot(dir, "cupdraw_74.png")
+	# ...and the F.A. Cup frame `10_fa_cup_draw_round1.png`: different competition strip,
+	# title, round, leg plates and a 40-tie scrollbar. Drum frame BOMBO07 there.
+	scr.setup("fa_cup", "F.A. Cup", "ROUND 1", [
+		{"home": "Stevenage B.", "away": "Kettering T."},
+		{"home": "Colwyn B.", "away": "Fulham"},
+		{"home": "Hayes", "away": "Stalybridge C."},
+		{"home": "Hereford U.", "away": ""},
+	], 40, ["MATCH", "REPLAY"])
+	scr.pin_drum(7)
+	await _settle()
+	_save_shot(dir, "cupdraw_10.png")
+	print("CUPDRAW-SHOT done")
+	get_tree().quit()
+
+
 func _groundact_shot() -> void:
 	var dir := OS.get_environment("PM98_SHOT_DIR")
 	if GameDB.leagues.is_empty():
@@ -1049,7 +1089,7 @@ func _free_overlays() -> void:
 			continue
 		if c is LeagueTableScreen or c is LineupScreen or c is SquadScreen \
 				or c is FinanceScreen or c is TransferScreen or c is DirectivaScreen \
-				or c is StadiumScreen or c is CupScreen or c is YouthScreen \
+				or c is StadiumScreen or c is CupScreen or c is CupDrawScreen or c is YouthScreen \
 				or c is StaffScreen or c is BrowseScreen \
 				or c is PlayerInfoScreen or c is RivalScreen or c is ManagerHistoryScreen \
 				or c is TrainingScreen or c is InjuriesScreen or c is StatisticsScreen \
@@ -3382,13 +3422,13 @@ func _open_competition(act: String) -> void:
 	elif act == "charity":
 		_show_charity_shield()
 	elif act == "facup":
-		_show_cup_screen(_career.fa_cup, "F.A. CUP", "res://art/screens/cup/facup.png")
+		_show_cup_screen(_career.fa_cup, "fa_cup", "F.A. Cup")
 	elif act == "lcup":
-		_show_cup_screen(_career.league_cup, "COCA-COLA CUP", "res://art/screens/cup/cocacola.png")
+		_show_cup_screen(_career.league_cup, "league_cup", "Coca-Cola Cup")
 	elif act.begins_with("euro:"):
 		var key := act.substr(5)
 		var b: Dictionary = _career.euro.get(key, {})
-		_show_cup_screen(b, str(b.get("name", "EUROPE")).to_upper(), _euro_emblem(key))
+		_show_cup_screen(b, key, str(b.get("name", "Europe")))
 	elif act == "supercup":
 		_show_one_off_final(_career.supercup, "EUROPEAN SUPERCUP",
 			"res://art/screens/cup/supercopa.png", "European Supercup",
@@ -3674,6 +3714,23 @@ func _show_charity_shield() -> void:
 	_show_one_off_final(_career.charity_shield, "CHARITY SHIELD",
 		"res://art/screens/cup/charity.png", "Charity Shield", "Champions v F.A. Cup winners")
 
+## The European GROUP phase, on the old placeholder chrome. The original's group screen is
+## NOT witnessed in any capture we hold, so this stays a placeholder — flagged in
+## docs/re/cupdraw_screen_re.md — rather than being drawn on the SORTEO screen, which is a
+## knockout-draw screen. Every knockout round goes through `_show_cup_screen`.
+func _show_cup_group_placeholder(b: Dictionary, title: String, emblem_path: String) -> void:
+	var v := _cup_view(b)
+	var scr: CupScreen = load("res://scenes/CupScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(_career.club_name, "", _career.season, v["status"], v["status_col"],
+		v["sub"], v["run_rows"], v["draw_label"], v["draw_rows"], v["draw_more"],
+		title, emblem_path)
+	scr.gui_input.connect(func(e: InputEvent) -> void:
+		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
+			scr.queue_free())
+
+
 ## A single-match final (Charity Shield / European Supercup / Intercontinental Cup) as a
 ## CupScreen overlay: the manager's result if his club is in it, else who lifted it, around
 ## the competition's own trophy. `res` is a Cup.single_neutral_match dict (home_id/away_id/
@@ -3730,20 +3787,63 @@ func _cup_status_word(b: Dictionary) -> String:
 		return "won by %s" % _cup_name(champ).substr(0, 14)
 	return "still in" if Cup.still_in(b, _career.club_id) else "out"
 
-## A cup screen as a full-screen overlay over the hub: the manager's run through the
-## knockout + the latest round's draw, around the competition's authentic trophy art.
-## Built from a Cup.gd bracket. Display-only; tap to dismiss.
-func _show_cup_screen(b: Dictionary, title: String, emblem_path: String) -> void:
-	var v := _cup_view(b)
-	var scr: CupScreen = load("res://scenes/CupScreen.gd").new()
+## The original's SORTEO screen as a full-screen overlay: the latest round's draw, on the
+## real chrome, around the competition's own trophy strip and the lottery drum. `key` picks
+## that strip (CupDrawScreen.STRIPS); `title` is the name as MANAGER.EXE spells it. Built
+## from a Cup.gd bracket. CONTINUE (or FINISH) dismisses it.
+func _show_cup_screen(b: Dictionary, key: String, title: String) -> void:
+	# The European GROUP phase is not a knockout draw and the original's group screen is
+	# un-witnessed, so it keeps the old placeholder rather than borrowing the SORTEO one.
+	if not Cup.group_tables(b).is_empty() and (b.get("rounds", []) as Array).is_empty():
+		_show_cup_group_placeholder(b, title.to_upper(), _euro_emblem(key))
+		return
+	var scr: CupDrawScreen = load("res://scenes/CupDrawScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
-	scr.setup(_career.club_name, "", _career.season, v["status"], v["status_col"],
-		v["sub"], v["run_rows"], v["draw_label"], v["draw_rows"], v["draw_more"],
-		title, emblem_path)
-	scr.gui_input.connect(func(e: InputEvent) -> void:
-		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
-			scr.queue_free())
+	var v := _cup_draw_view(b)
+	scr.setup(key, title, v["round"], v["ties"], int(v["total"]), v["legs"])
+	scr.continue_pressed.connect(func() -> void: scr.queue_free())
+	scr.finish_pressed.connect(func() -> void: scr.queue_free())
+
+
+## The SORTEO payload for a Cup.gd bracket: the LATEST round's ties in draw order, its
+## plate label and the bottom-left leg plates.
+##
+## The plate label is the EXE's own uppercase form (0x2523fc-0x252428: FINAL / QTR FINALS /
+## ROUND 4..1). Cup.gd's own label is uppercased and normalised into that set; a label the
+## block does not carry (Round 5, Semifinals) is uppercased as-is rather than invented into
+## one of the SEMIFINAL 1 / SEMIFINAL 2 plates, whose selection rule is not reversed. The
+## per-leg suffix Cup.gd appends ("- 1st") is dropped: the original carries the leg on the
+## bottom-left plates, not the round plate.
+##
+## Byes are left out of the MATCHES list and out of the tie count — the original's cup
+## fields are large enough that no witnessed draw has one, so their rendering is unknown.
+func _cup_draw_view(b: Dictionary) -> Dictionary:
+	var out := {"round": "", "ties": [], "total": 0, "legs": ["MATCH", "REPLAY"]}
+	var rounds: Array = b.get("rounds", [])
+	if rounds.is_empty():
+		return out
+	var last: Dictionary = rounds[-1]
+	# The plates follow THIS round, not the competition: the League Cup is two-legged
+	# throughout but its final is a single match, so that round shows MATCH / REPLAY.
+	for tie in last.get("ties", []):
+		if tie.get("two_legged", false):
+			out["legs"] = ["1ST LEG", "2ND LEG"]
+			break
+	var label := str(last.get("label", "")).to_upper()
+	for suffix in [" - 1ST", " - 2ND"]:
+		if label.ends_with(suffix):
+			label = label.substr(0, label.length() - suffix.length())
+	out["round"] = "QTR FINALS" if label == "QTR. FINALS" else label
+	var ties: Array = []
+	for tie in last.get("ties", []):
+		if tie.get("bye", false):
+			continue
+		ties.append({"home": _cup_name(int(tie["home_id"])),
+			"away": _cup_name(int(tie.get("away_id", -1)))})
+	out["ties"] = ties
+	out["total"] = ties.size()
+	return out
 
 ## A club name from the live division (falls back to GameDB / a placeholder).
 func _cup_name(id: int) -> String:

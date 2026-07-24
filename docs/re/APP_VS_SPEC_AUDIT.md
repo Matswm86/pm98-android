@@ -295,7 +295,7 @@ the original does · **PARTIAL** · **STUB**.
 |---|---|---|---|
 | results (MARCA) | results view, art in IMG.PKF (no iconos folder) | BrowseScreen W/D/L text list, Main.gd:2076-2095 | **SUBSTITUTE** |
 | table (CLASI) | CLASIFICACION (IMG.PKF) | LeagueTableScreen (ma_10 rebuild) | TRUE layout (data: A5 gap) |
-| fixtures (CALEN) | EMPAREJAMIENTOS folder | BrowseScreen "COMPETITIONS" chooser + "SEASON FIXTURES" list, Main.gd:1569-1626 | **SUBSTITUTE** |
+| fixtures (CALEN) | EMPAREJAMIENTOS folder | BrowseScreen "COMPETITIONS" chooser + "SEASON FIXTURES" list, Main.gd:1569-1626 | **SUBSTITUTE** (chooser + calendar). The cup DRAW itself is now **TRUE**: `CupDrawScreen` = the original SORTEO screen, 0 differing pixels vs `74_after_wk4.png` (2026-07-24, [cupdraw_screen_re.md](cupdraw_screen_re.md)) |
 | lineup (ALINE) | ALINEACION | LineupScreen (ma_7, FUN_004fc321) | TRUE |
 | tactics (TACTI) | TACTICAS folder | BrowseScreen menu wrapper → TacticsScreen modal (ma_9), Main.gd:2204-2242 | **PARTIAL** (wrapper invented; original TACTICAS screen not ported) |
 | opponent (RIVAL) | VERRIVAL folder (dedicated screen) | RivalScreen (VIEW RIVAL, FUN_005733d0 port; rival_screen_re.md), Main `_show_rival_screen` | **TRUE** (fixed 2026-07-02; assistant-gated report) |
@@ -312,7 +312,9 @@ the original does · **PARTIAL** · **STUB**.
 
 ## B2 — Original screens with NO app counterpart at all (flag, port or drop the icon —
 never fill with invented stand-ins)
-ENTRENAMIENTO · EMPAREJAMIENTOS · NOTICIAS · TACTICAS (screen itself) · VERRIVAL ·
+ENTRENAMIENTO · ~~EMPAREJAMIENTOS~~ (the cup DRAW half PORTED 2026-07-24 as
+`CupDrawScreen`, frame-exact — the group-phase half is still open) · NOTICIAS ·
+TACTICAS (screen itself) · VERRIVAL ·
 HISTORIAL · LESIONADOS · MULTAS · NIVELES (objectives + PREMIER FinObjetivo "goal_game") ·
 OFERTAS · OPCIONES · SECRETARIO · SEGUROS · TV · HIGHLIGHTS · CREDITOS · SELECCIONPRO ·
 PREMIER\SININFO. Also: **SquadScreen (PLANTILLA — a TRUE ported screen!) is an orphan**,
@@ -412,8 +414,9 @@ minute — since MatchSim `goals`).
    0x25aa60 directors'-report text engine needs a season-end witness).
 2. Wire the orphaned TRUE screens: SquadScreen (PLANTILLA) into the hub where the
    original puts it; fix opponent (RIVAL) to a VERRIVAL port, not the DB browser.
-3. Port the missing original screens B2 (evidence-first, one at a time: EMPAREJAMIENTOS,
-   NOTICIAS, ENTRENAMIENTO, TACTICAS, VERRIVAL first — they sit behind live hub buttons).
+3. Port the missing original screens B2 (evidence-first, one at a time: ~~EMPAREJAMIENTOS~~
+   (cup draw DONE 2026-07-24), NOTICIAS, ENTRENAMIENTO, TACTICAS, VERRIVAL first — they sit
+   behind live hub buttons).
 4. Close the MatchSim invented-fallback + replace fabricated commentary with the stat
    engine's real event vector (B3).
 5. Repair the parallel-stream breakage (B4) or revert the untracked menuicons stream.

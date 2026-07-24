@@ -91,10 +91,15 @@ chassis (`Cup.create(ids, weeks, opts)` selects the competition). The European c
 
 ## UI
 
-* On the hub, the **CALEN/fixtures** icon opens `CupScreen` (the season-calendar/competitions
-  slot — the next-match readout stays on the RIVAL/opponent icon; a full fixture calendar is
-  future work). The screen shows the trophy + the manager's status, YOUR CUP RUN (the
-  manager's tie each round), and THE DRAW (the latest round, the manager's tie in gold).
+* **2026-07-24: every knockout DRAW now uses the original's own SORTEO screen** —
+  `app/scenes/CupDrawScreen.gd`, frame-exact against two real MANAGER.EXE captures
+  (0 differing pixels on `74_after_wk4.png`). Full derivation, the EXE's own art list and
+  the un-witnessed list: [`cupdraw_screen_re.md`](cupdraw_screen_re.md). `CupScreen` (the
+  invented marble panels) survives only for the European GROUP phase and the single-match
+  Intercontinental Cup, both still un-witnessed.
+* On the hub, the **CALEN/fixtures** icon opens the COMPETITIONS chooser (the
+  season-calendar/competitions slot — the next-match readout stays on the RIVAL/opponent
+  icon; a full fixture calendar is future work); each cup routes to its draw screen.
 * Cup results also surface in the CLUB NEWS feed (gold, `_news_colour("cup")`).
 
 ## Cross-season honours + the Charity Shield (2026-06-16)
