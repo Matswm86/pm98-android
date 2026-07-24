@@ -1,0 +1,32 @@
+{
+  "popup": [
+    220,
+    87,
+    200,
+    277
+  ],
+  "title_cx": 319,
+  "title_ink_y": 96,
+  "item_y0": 112,
+  "item_pitch": 14,
+  "item_h": 12,
+  "item_text_x": 251,
+  "item_ink_dy": 2,
+  "n_items": 18,
+  "ink_natural": [
+    255,
+    223,
+    0
+  ],
+  "ink_alternate": [
+    255,
+    255,
+    255
+  ],
+  "ink_other": [
+    0,
+    0,
+    0
+  ],
+  "witness": "13_pos_arrow.png (Bergsson: RIGHT BACK gold, ICL+ICR white)"
+}

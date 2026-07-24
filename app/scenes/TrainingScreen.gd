@@ -16,12 +16,18 @@ class_name TrainingScreen
 ##    §3), each with its stars + AV value; the AVER header value;
 ##  - TOTAL TRAINABLE PLAYERS = squad size; grid TOTAL = 0 (rest).
 ##
+##  - the four PER-SECTION SCROLLBARS. The original does NOT cap a section at its
+##    visible slot count: each carries its own bar and one arrow click moves the list
+##    by one row (witnessed live 2026-07-24, Bolton W with 9 defenders in 6 slots).
+##    Both witnessed states render 0 px vs the original —
+##    `tools/re/build_training_scroll_from_frames.py` + `shot_training_scroll.gd`.
+##
 ## HONEST GAPS (flagged, never invented — training_screen_re.md §Gaps): PM98's
 ## per-player FOCUS tags (HA/TA/PA/SH) and the AUTO assignment, the per-skill
 ## right-panel FOCUS row + "last" column, the per-skill CURRENT TRAINING STAFF
-## coaches, the FI (fitness) grid column, and per-section scrolling are mechanics
-## the app's training model (Training.gd = intensity + passive development) does
-## not implement; their furniture stays at the resting look and no value is faked.
+## coaches and the FI (fitness) grid column are mechanics the app's training model
+## (Training.gd = intensity + passive development) does not implement; their
+## furniture stays at the resting look and no value is faked.
 ## AUTO is a documented no-op. Native 640x480; scales to fit its parent.
 
 signal back_pressed        # RETURN -> Main reopens LINE-UP
@@ -92,6 +98,20 @@ const C_FOCUS_BRD := Color8(0, 0, 0)
 const TAG_X := 288
 const TAG_W := 21
 
+# ---- per-section scrollbars (frame-measured, see tools/re/build_training_scroll_from_frames.py)
+# The original SCROLLS each section — it does NOT cap the squad. Witnessed live
+# 2026-07-24 on a Bolton W career with 9 defenders in 6 slots: the DEFENDERS bar is
+# enabled with the thumb parked at the top, and one DOWN click moves the list by ONE
+# row (Todd out at the top, Whitlow in at the bottom). Before this the grid drew only
+# `mini(bucket.size(), tops.size())` players, so anything past a section's slot count
+# was silently dropped — and `Career` appends a new signing to the END of the squad,
+# which is why the owner's new men "never appeared in TRAINING".
+const SCROLL_X := 313
+const SCROLL_W := 16
+const SCROLL_BTN_H := 16   # 16 + 62 + 16 == the 94-row DEFENDERS band exactly
+# section key -> [band_y, band_h]
+const SCROLL_BAND := {"gk": [87, 46], "def": [150, 94], "mid": [262, 94], "fwd": [374, 78]}
+
 const R_AUTO := Rect2(348, 444, 84, 30)
 const R_TACTICS := Rect2(448, 444, 84, 30)
 const R_RETURN := Rect2(548, 444, 84, 30)
@@ -130,6 +150,16 @@ var _star_sel_off: Texture2D
 var _rp_star_on: Texture2D
 var _rp_star_off: Texture2D
 var _rp_star_strip: Texture2D
+var _sc_up: Texture2D
+var _sc_dn: Texture2D
+var _sc_track: Texture2D
+var _sc_thumb_top: Texture2D
+var _sc_thumb_mid: Texture2D
+var _sc_thumb_bot: Texture2D
+var _sc_up_off: Texture2D
+var _sc_dn_off: Texture2D
+var _sc_off: Dictionary = {}          # band height -> the original's resting bar
+var _scroll: Dictionary = {}          # section key -> first visible index
 
 
 func _ready() -> void:
@@ -144,6 +174,18 @@ func _ready() -> void:
 	_rp_star_on = load("res://art/screens/training/rp_star_on.png")
 	_rp_star_off = load("res://art/screens/training/rp_star_off.png")
 	_rp_star_strip = load("res://art/screens/training/rp_star_on_strip.png")
+	_sc_up = load("res://art/screens/training/scroll_up_on.png")
+	_sc_dn = load("res://art/screens/training/scroll_dn_on.png")
+	_sc_track = load("res://art/screens/training/scroll_track_on.png")
+	_sc_thumb_top = load("res://art/screens/training/scroll_thumb_top.png")
+	_sc_thumb_mid = load("res://art/screens/training/scroll_thumb_mid.png")
+	_sc_thumb_bot = load("res://art/screens/training/scroll_thumb_bot.png")
+	_sc_up_off = load("res://art/screens/training/scroll_up_off.png")
+	_sc_dn_off = load("res://art/screens/training/scroll_dn_off.png")
+	for bh in [46, 94]:
+		var p := "res://art/screens/training/scroll_off_%d.png" % bh
+		if ResourceLoader.exists(p):
+			_sc_off[bh] = load(p)
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	gui_input.connect(_on_input)
@@ -218,12 +260,34 @@ func _to_design(p: Vector2) -> Vector2:
 ## The player pid under a design point in the grid, or -1.
 func _grid_pid_at(d: Vector2) -> int:
 	for sect in SECT:
-		var bucket: Array = _buckets.get(str(sect["key"]), [])
+		var key := str(sect["key"])
+		var bucket: Array = _buckets.get(key, [])
 		var tops: Array = sect["tops"]
-		for i in mini(bucket.size(), tops.size()):
+		var first := _first_of(key)
+		for i in mini(bucket.size() - first, tops.size()):
 			if Rect2(BAR_X0, float(tops[i]), BAR_W, BAR_H).has_point(d):
-				return int((bucket[i] as Dictionary).get("id", -1))
+				return int((bucket[first + i] as Dictionary).get("id", -1))
 	return -1
+
+
+## "scroll:<key>:<-1|1>" when a live section arrow is under `d`, else "".
+func _scroll_hit(d: Vector2) -> String:
+	for sect in SECT:
+		var key := str(sect["key"])
+		var bucket: Array = _buckets.get(key, [])
+		var slots := _slots_of(key)
+		if bucket.size() <= slots:
+			continue                      # disabled bar: the arrows are inert
+		var band: Array = SCROLL_BAND[key]
+		var by := int(band[0])
+		var bh := int(band[1])
+		var first := _first_of(key)
+		if first > 0 and Rect2(SCROLL_X, by, SCROLL_W, SCROLL_BTN_H).has_point(d):
+			return "scroll:%s:-1" % key
+		if first + slots < bucket.size() \
+				and Rect2(SCROLL_X, by + bh - SCROLL_BTN_H, SCROLL_W, SCROLL_BTN_H).has_point(d):
+			return "scroll:%s:1" % key
+	return ""
 
 
 func _hit(d: Vector2) -> String:
@@ -239,6 +303,9 @@ func _hit(d: Vector2) -> String:
 		return "tactics"
 	if R_RETURN.has_point(d):
 		return "return"
+	var sc := _scroll_hit(d)
+	if sc != "":
+		return sc
 	var pid := _grid_pid_at(d)
 	if pid >= 0:
 		return "grid:%d" % pid
@@ -249,6 +316,10 @@ func _hit(d: Vector2) -> String:
 
 func _on_input(e: InputEvent) -> void:
 	if not (e is InputEventMouseButton or e is InputEventScreenTouch):
+		return
+	# a finger tap arrives twice (emulated mouse + real touch) — the grid select and
+	# the focus boxes are toggles (PMChrome.is_emulated_pointer_dup)
+	if PMChrome.is_emulated_pointer_dup(e):
 		return
 	var d := _to_design(e.position)
 	if e.pressed:
@@ -276,6 +347,10 @@ func _on_input(e: InputEvent) -> void:
 				var fi := int(was.substr(6))
 				if _sel_pid >= 0 and fi < Training.FOCUS_ROWS.size():
 					focus_toggled.emit(_sel_pid, str(Training.FOCUS_ROWS[fi]))
+				return
+			if was.begins_with("scroll:"):
+				var part := was.split(":")
+				_scroll_by(str(part[1]), int(part[2]))
 				return
 			if was.begins_with("grid:"):
 				var pid := int(was.substr(5))
@@ -318,10 +393,78 @@ func _draw() -> void:
 
 func _draw_grid() -> void:
 	for sect in SECT:
-		var bucket: Array = _buckets.get(str(sect["key"]), [])
+		var key := str(sect["key"])
+		var bucket: Array = _buckets.get(key, [])
 		var tops: Array = sect["tops"]
-		for i in mini(bucket.size(), tops.size()):
-			_draw_row(int(tops[i]), bucket[i])
+		var first := _first_of(key)
+		for i in mini(bucket.size() - first, tops.size()):
+			_draw_row(int(tops[i]), bucket[first + i])
+		_draw_scrollbar(key, bucket.size(), tops.size(), first)
+
+
+# ---- per-section scrolling ------------------------------------------------
+
+## First visible index of a section, clamped to its current overflow (a sale or a
+## signing can shrink the list under the stored offset).
+func _first_of(key: String) -> int:
+	var bucket: Array = _buckets.get(key, [])
+	var slots := _slots_of(key)
+	return clampi(int(_scroll.get(key, 0)), 0, maxi(0, bucket.size() - slots))
+
+
+func _slots_of(key: String) -> int:
+	for s in SECT:
+		if str(s["key"]) == key:
+			return (s["tops"] as Array).size()
+	return 0
+
+
+## The original's own slider grammar (offers_map_re.md; verified 0 px against both
+## witnessed DEFENDERS states): thumb height = floor(track * visible / total), thumb
+## offset = floor(track * first / total). Arrows light only when they can move.
+func _draw_scrollbar(key: String, total: int, visible: int, first: int) -> void:
+	var band: Array = SCROLL_BAND[key]
+	var by := int(band[0])
+	var bh := int(band[1])
+	if total <= visible:
+		# Nothing to scroll. The baked chrome came from a career whose DEFENDERS section
+		# DID scroll, so its plate shows a thumb here — repaint the original's own
+		# RESTING bar where a frame witnesses that band height (h 46 KEEPERS, h 94
+		# DEF/MID). FORWARDS (h 78) is enabled in every frame we hold, so its resting
+		# bar is un-witnessed and the baked plate stands rather than a synthesised one.
+		var rest: Texture2D = _sc_off.get(bh)
+		if rest != null:
+			draw_texture(rest, Vector2(SCROLL_X, by))
+		return
+	var track_y := by + 16
+	var track_h := bh - 32
+	if _sc_track != null:
+		draw_texture_rect(_sc_track, Rect2(SCROLL_X, track_y, SCROLL_W, track_h), true)
+	var th := (track_h * visible) / total
+	var ty := track_y + (track_h * first) / total
+	if _sc_thumb_top != null and th >= 6:
+		draw_texture(_sc_thumb_top, Vector2(SCROLL_X, ty))
+		var body := Rect2(SCROLL_X, ty + 3, SCROLL_W, th - 6)
+		draw_texture_rect(_sc_thumb_mid, body, true)
+		draw_texture(_sc_thumb_bot, Vector2(SCROLL_X, ty + th - 3))
+	# Both buttons are always painted — lit when they can move, dim when they cannot —
+	# so the baked plate's own arrow never shows through an enabled bar.
+	var up: Texture2D = _sc_up if first > 0 else _sc_up_off
+	var dn: Texture2D = _sc_dn if first + visible < total else _sc_dn_off
+	if up != null:
+		draw_texture(up, Vector2(SCROLL_X, by))
+	if dn != null:
+		draw_texture(dn, Vector2(SCROLL_X, by + bh - SCROLL_BTN_H))
+
+
+## One arrow click scrolls by ONE row (witnessed: Todd out at the top, Whitlow in at
+## the bottom, after a single DOWN click).
+func _scroll_by(key: String, delta: int) -> void:
+	var bucket: Array = _buckets.get(key, [])
+	var slots := _slots_of(key)
+	var maxf := maxi(0, bucket.size() - slots)
+	_scroll[key] = clampi(_first_of(key) + delta, 0, maxf)
+	queue_redraw()
 
 
 func _draw_row(y: int, p: Dictionary) -> void:

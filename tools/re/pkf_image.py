@@ -112,17 +112,33 @@ def entry_bytes_at(pkf: str, index: int) -> bytes:
 def dib_indices(raw: bytes) -> np.ndarray:
     """Palette indices of a PCF5 DIB, decoded from the header (see module docstring).
 
-    Rows start at byte 54 -- NOT at the header's `bfOffBits`, which still points past
-    a 1024-byte palette that the archive does not store. Rows are bottom-up and padded
-    to a 4-byte stride. A few entries omit their last pad bytes; those are zero-filled.
+    Two header flavours occur in the archives, told apart by the DWORD at offset 14
+    (`biSize`):
+
+    * **40 = BITMAPINFOHEADER.** Rows start at byte 54 -- NOT at the header's
+      `bfOffBits`, which still points past a 1024-byte palette that the archive does
+      not store. This is the 1024-byte misregistration the module docstring documents.
+    * **12 = BITMAPCOREHEADER** (OS/2, u16 width/height). `bfOffBits` is a truthful
+      26 = 14 + 12 and no palette is declared, so the rows really do start there.
+      RECURSOS' small UI sprites (LESIONADOS\\BOTONON/BOTONOFF/HOSPITAL/SEGURO, ...)
+      are all of this kind; decoding them at 54 shears them by 28 bytes.
+
+    Rows are bottom-up and padded to a 4-byte stride. A few entries omit their last
+    pad bytes; those are zero-filled.
     """
-    w, h, _planes, bpp = struct.unpack_from("<iiHH", raw, 18)
+    (bisize,) = struct.unpack_from("<I", raw, 14)
+    if bisize == 12:
+        w, h, _planes, bpp = struct.unpack_from("<HHHH", raw, 18)
+        pixels_at = 26
+    else:
+        w, h, _planes, bpp = struct.unpack_from("<iiHH", raw, 18)
+        pixels_at = PIXELS_AT
     if bpp != 8:
         raise ValueError(f"expected 8bpp, got {bpp}")
-    flip = h > 0  # a negative height means the rows are already top-down
+    flip = h > 0 if bisize != 12 else True  # core-header heights are unsigned/bottom-up
     h = abs(h)
     stride = ((w * bpp + 31) // 32) * 4
-    px = raw[PIXELS_AT : PIXELS_AT + stride * h]
+    px = raw[pixels_at : pixels_at + stride * h]
     if len(px) < stride * h:
         px = px + bytes(stride * h - len(px))
     a = np.frombuffer(px, dtype=np.uint8).reshape(h, stride)[:, :w]

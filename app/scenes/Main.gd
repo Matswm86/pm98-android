@@ -2420,6 +2420,16 @@ func _show_injuries_screen() -> void:
 	scr.insurance_pressed.connect(func() -> void:
 		scr.queue_free()
 		_show_insurance_screen())
+	# The PHYS. "+" button: send him to the physiotherapist (FUN_00543080 ->
+	# FUN_00584db0). Refused silently when nobody is hired or the physio's slots are
+	# full — the original's own behaviour, no message.
+	scr.treat_pressed.connect(func(pid: int) -> void:
+		var res := _career.treat_injury(pid)
+		if not res:
+			return
+		AudioManager.ui_select()
+		_career.save()
+		scr.setup(_mgr_club(), _career.staff, _match_header()))
 
 ## The INSURANCE screen (InsuranceScreen.gd; docs/re/insurance_screen_re.md):
 ## the squad with per-player INSURANCE POLICY groups, priced by the binary's own
@@ -2518,6 +2528,27 @@ func _show_tactics_board_screen() -> void:
 		_career.save()
 		refresh.call()
 	scr.formation_picked.connect(apply_form)
+	# The POS-column FLECHA opens MANAGER.EXE's own ROLE picker: all 18 fine roles, the
+	# player's NATURAL role in gold and his five ALTERNATIVES in white (RolePopup — the
+	# EXE paints exactly those six, FUN_0056a1d0). Picking one writes his fine role, the
+	# same field FUN_0056a560 sets. Witnessed live 2026-07-24 (Bergsson RIGHT BACK ->
+	# INSIDE CENTRE LEFT: the ROLE cell and camrol change, POS does not).
+	scr.role_pressed.connect(func(pid: int) -> void:
+		AudioManager.ui_select()
+		var p := _career._find_in(_career.club_id, pid)
+		if p.is_empty():
+			return
+		var pop: RolePopup = load("res://scenes/RolePopup.gd").new()
+		pop.set_anchors_preset(Control.PRESET_FULL_RECT)
+		add_child(pop)
+		pop.setup(p)
+		pop.dismissed.connect(func() -> void: pop.queue_free())
+		pop.role_picked.connect(func(picked_pid: int, pos_fine: int) -> void:
+			AudioManager.ui_select()
+			pop.queue_free()
+			if _career.set_player_role(picked_pid, pos_fine):
+				_career.save()
+				refresh.call()))
 	# PREDEF opens the frame-true PredefTacticsScreen (10-formation picker, frame 140;
 	# docs/re/tactics_subscreens_re.md) OVER the board, superseding the board's inline
 	# disassembly-geometry picker: suppress that inline overlay (leave TacticsBoardScreen and
@@ -2861,8 +2892,18 @@ func _show_make_offer_card(row: Dictionary) -> void:
 	var card: MakeOfferScreen = load("res://scenes/MakeOfferScreen.gd").new()
 	card.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(card)
+	# This route IS the "PLAYER PLACED ON TRANSFER MARKET" card, so the OFFER panel
+	# opens on the seller's own asking terms — witness (wine, Bolton wk 4): Almeyda's
+	# card opens CLUB OFFER = CLUB FEE £8,500,000, YEARLY WAGE £575,000, YEARS 1, with
+	# the contract's clauses ticked. See MakeOfferScreen.setup.
+	var ask := int(row.get("fee", 0))
 	card.setup(player, {"id": from_club, "name": str(row.get("club_name", "?"))},
-		int(row.get("fee", 0)), _career.cash)
+		ask, _career.cash, {
+			"offer": ask,
+			"yearly_wage": Contract.current_yearly(player, _career.band_of(from_club)),
+			"years": int(player.get("contract_years", player.get("contract_term", 1))),
+			"clauses": player.get("clauses", []),
+		})
 	card.cancelled.connect(func() -> void:
 		AudioManager.ui_select()
 		card.queue_free())

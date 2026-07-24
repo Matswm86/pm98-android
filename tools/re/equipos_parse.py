@@ -152,6 +152,11 @@ def parse_player(s: Stream, flag: int, dbc_id: int, collect: bool = False) -> di
         "fullName": name2,
         "slot": slot,
         "fine": 0x63 if fines_raw[0] == 0 else fines_raw[0],  # == +0x1d + 1
+        # The five ALTERNATIVE roles (+0x1e..+0x22), same 1-based space as `fine`;
+        # 0 means "no role" (the TACTICS ROLE popup FUN_0056a1d0 gates on `< 0x12`
+        # against the engine's raw-1 value). Witnessed: Bergsson RIGHT BACK gold +
+        # INSIDE CENTRE LEFT / INSIDE CENTRE RIGHT white. See positions_re.md.
+        "fineAlts": [b for b in fines_raw[1:] if 1 <= b <= 18],
         "band": band,
         "year": year,
         "attrs": attrs,

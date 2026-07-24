@@ -129,6 +129,10 @@ def export_player(p: dict, code2name: dict[int, str], eu_codes: set[int]) -> dic
         "age": (1997 - year) if ok_year else None,  # season-start yr, not +1 (extract_english.py)
         "pos": {0: "GK", 1: "DF", 2: "MF", 3: "FW"}.get(p["band"]),
         "posFine": p["fine"],
+        # The five alternative roles the TACTICS ROLE popup paints WHITE beside the
+        # gold natural role (engine +0x1e..+0x22); [] = one-role player, and every
+        # keeper in the DB is one (195/195). See docs/re/positions_re.md.
+        "posAlts": p["fineAlts"],
         "isGK": p["band"] == 0,
         "photoId": p["id"] if p["id"] != 0 else None,  # 0 = engine assigns
         "squadNo": p["squadNo"],

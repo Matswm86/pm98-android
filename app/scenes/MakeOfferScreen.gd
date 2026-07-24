@@ -164,19 +164,41 @@ func _ready() -> void:
 
 ## Feed the card. `fee` = the asking price shown in the CLUB FEE bar; `cash` =
 ## the manager's funds (the offer stepper's ceiling — cap hypothesis per
-## make_offer_re.md, the frames show 3,200,000 against a 3,000,000 fee). Initial
-## offer/wage/years are the frame-constant £5,000 / £5,000 / 1.
-func setup(player: Dictionary, selling_club: Dictionary, fee: int, cash: int) -> void:
+## make_offer_re.md, the frames show 3,200,000 against a 3,000,000 fee).
+##
+## `seed` picks WHICH of the original's two opening states this card shows — both are
+## witnessed, and which one you get depends on how the player was reached:
+##
+## * **Cold approach** (the OFFERS map browse — a player nobody has listed), `seed`
+##   empty: the panel opens at the FLOOR, £5,000 / £5,000 / 1 year, no clause ticked.
+##   Witness `101_164714.png` (Scott Taylor, CLUB FEE £3,000,000, CLUB OFFER £5,000).
+## * **A player already PLACED ON TRANSFER MARKET** (the TRANSFERS list), `seed` given:
+##   the OFFER panel opens pre-filled with the seller's own asking terms — CLUB OFFER
+##   = CLUB FEE, YEARLY WAGE = his contract wage, YEARS = his contract years, and the
+##   contract's clauses already ticked. Witness (wine, Bolton career week 4,
+##   `35_make_offer.png`): Almeyda, CLUB FEE £8,500,000 and the card opens at CLUB
+##   OFFER **£8,500,000**, YEARLY WAGE £575,000, YEARS 1, "Free if relegated" ticked.
+##   The 2026-07-24 owner report ("a 14M bid takes hundreds of taps") was this state
+##   being seeded at the floor instead.
+##
+## `seed` keys: `offer`, `yearly_wage`, `years`, `clauses` (Array of clause indices).
+func setup(player: Dictionary, selling_club: Dictionary, fee: int, cash: int,
+		seed: Dictionary = {}) -> void:
 	_p = player
 	_club = selling_club
 	_fee = fee
 	_cash = cash
-	_offer = FLOOR
-	_wage_yearly = FLOOR
-	_years = YEARS_MIN
+	_offer = maxi(FLOOR, int(seed.get("offer", FLOOR)))
+	_wage_yearly = maxi(FLOOR, int(seed.get("yearly_wage", FLOOR)))
+	_years = clampi(int(seed.get("years", YEARS_MIN)), YEARS_MIN, YEARS_MAX)
 	_bonus = FLOOR
-	for k in _checked:
-		_checked[k] = false
+	var pre: Array = seed.get("clauses", [])
+	for i in CLAUSE_KEYS.size():
+		_checked[CLAUSE_KEYS[i]] = pre.has(i)
+	# the scoring-bonus stepper only exists while its clause is live (frame 113)
+	if bool(_checked.get("scoring", false)):
+		if not _scoring_enabled():
+			_checked["scoring"] = false
 	queue_redraw()
 
 
@@ -221,6 +243,10 @@ func _target_at(d: Vector2) -> String:
 
 func _on_input(e: InputEvent) -> void:
 	if not (e is InputEventMouseButton or e is InputEventScreenTouch):
+		return
+	# One finger tap arrives twice (emulated mouse + real touch): the clause boxes are
+	# toggles and the ◄► steppers move per press, so both were wrong on a device.
+	if PMChrome.is_emulated_pointer_dup(e):
 		return
 	var d := _to_design(e.position)
 	if e.pressed:

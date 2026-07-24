@@ -99,12 +99,47 @@ func _run() -> void:
 		await process_frame
 	ok = _assert((card._offers as Array).size() > 0, "the card carries offer rows") and ok
 
+	# --- per-row chip hit-testing (the OTHER half of the owner bug) ----------
+	# The chip rects used to be 17 tall against a 14 pitch, so they OVERLAPPED and
+	# `_target_at` returned the FIRST match: a tap on offer #2's chip flipped #1 and #2
+	# could never be accepted. Fill a card with the full five rows and assert each chip
+	# centre resolves to its OWN row, and that OK still wins over row 4.
+	var full: TeamOfferScreen = load("res://scenes/TeamOfferScreen.gd").new()
+	get_root().add_child(full)
+	full.size = Vector2(640, 480)
+	var rows: Array = []
+	for i in TeamOfferScreen.N_ROWS:
+		rows.append({"buyer_id": i, "buyer_name": "Club %d" % i, "offer": 1000 * (i + 1)})
+	full.setup(target, main._mgr_club(), rows, 1, 1, 1, 1)
+	for _i in 2:
+		await process_frame
+	for row in TeamOfferScreen.N_ROWS:
+		var probe := Vector2(full.CHIP_X + 40, full.CHIP_Y0 + full.ROW_PITCH * row + 7)
+		ok = _assert(full._target_at(probe) == "row%d" % row,
+			"row %d chip centre hit-tests to its own row (got '%s')"
+				% [row, full._target_at(probe)]) and ok
+	ok = _assert(full._target_at(TeamOfferScreen.OK_RECT.get_center()) == "ok",
+		"OK still hit-tests below the five rows") and ok
+	# and one device-shaped tap on row 3 must flip row 3 ONLY
+	_tap(full, Vector2(full.CHIP_X + 40, full.CHIP_Y0 + full.ROW_PITCH * 3 + 7))
+	for _i in 2:
+		await process_frame
+	var flipped: Array = []
+	for i in TeamOfferScreen.N_ROWS:
+		if bool((full._accept as Array)[i]):
+			flipped.append(i)
+	ok = _assert(flipped == [3], "a tap on row 3 flips row 3 alone (flipped %s)" % str(flipped)) and ok
+	full.queue_free()
+	for _i in 2:
+		await process_frame
+
 	# --- ACCEPT row 1, then OK ----------------------------------------------
 	var cash0: int = c.cash
 	_tap(card, Vector2(card.CHIP_X + 40, card.CHIP_Y0 + 8))
 	for _i in 3:
 		await process_frame
-	ok = _assert(bool((card._accept as Array)[0]), "the chip toggled to ACCEPT") and ok
+	ok = _assert(bool((card._accept as Array)[0]),
+		"a device-shaped tap toggles the chip to ACCEPT (and stays there)") and ok
 	_tap(card, card.OK_RECT.get_center())
 	for _i in 10:
 		await process_frame
@@ -164,8 +199,22 @@ func _fire(n: Node) -> bool:
 	return false
 
 
+## A DEVICE-SHAPED tap. Godot 4.6 with the project default
+## `input_devices/pointing/emulate_mouse_from_touch = true` delivers ONE finger press
+## to `gui_input` TWICE — an emulated `InputEventMouseButton` (device -1) AND the real
+## `InputEventScreenTouch` (device 0), in that order (measured, see
+## `tests/test_pointer_dup.gd`). The old helper sent the touch alone, which is exactly
+## why this test went green while the owner could not flip a chip on his phone: the
+## card toggles on press, so the second event flipped it straight back. Every UI test
+## that taps must send the pair.
 func _tap(n: Control, p: Vector2) -> void:
 	for pressed in [true, false]:
+		var m := InputEventMouseButton.new()
+		m.button_index = MOUSE_BUTTON_LEFT
+		m.position = p
+		m.pressed = pressed
+		m.device = InputEvent.DEVICE_ID_EMULATION
+		n._on_input(m)
 		var e := InputEventScreenTouch.new()
 		e.index = 0
 		e.position = p

@@ -86,8 +86,27 @@ RETURN → reopens LINE-UP.
    the app's staff are generic roles (Trainer/Physio/Youth, `Staff.gd`), not
    PM98's six per-skill coaches; the band stays resting furniture, `staff_star.png`
    unused. `_staff` is accepted for API parity but not rendered.
-5. **Per-section scrolling** — the scroll strips are baked furniture; sections
-   overflowing their visible slot count are truncated (not scrolled).
+5. ~~**Per-section scrolling**~~ — **CLOSED 2026-07-24.** The original SCROLLS each
+   section; it does not cap the squad. Witnessed live on a Bolton W career with 9
+   defenders in 6 slots (`screenshots/wine-captures-2026-07-24-role-training-staff/`
+   `17_training.png` -> `18_train_scrolled.png`): the DEFENDERS bar is live with its
+   thumb parked at the top, and ONE down-arrow click moves the list by exactly one row
+   (Todd off the top, Whitlow onto the bottom). The old truncation was the owner's
+   "newly signed players never appear in TRAINING" — `Career` appends a signing to the
+   END of the squad, so the new man was always the one dropped.
+
+   Geometry (design px): scroll column **x313 w16**; bands KEEPERS y87 h46,
+   DEFENDERS y150 h94, MIDFIELDERS y262 h94, FORWARDS y374 h78; buttons **16** tall at
+   each end (their last row is the bevel that turns black when the arrow goes live),
+   track = `band_y+16 .. band_y+band_h-17`. Slider grammar is the game's usual
+   `thumb_h = floor(track*visible/total)`, `thumb_y = track_y + floor(track*first/total)`
+   — 41 px and +6 px for the witnessed 9-in-6 case, both exact.
+
+   Art `tools/re/build_training_scroll_from_frames.py` (asserts the thumb 3-slice
+   rebuilds both frames at 0 px); render-diff `app/tests/shot_training_scroll.gd` —
+   **all four bars, both offsets: 0 differing px** vs the original. FORWARDS' RESTING
+   bar is the one thing still un-witnessed (it is live in every frame we hold), so that
+   band keeps the baked plate when it has nothing to scroll.
 6. **AVER / grid AV formula** — rendered via the app rating (see above); PM98's
    exact internal figure is not reversed.
 

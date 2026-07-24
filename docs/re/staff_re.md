@@ -128,9 +128,24 @@ singles):**
 **Mechanics decoded from the sequences:**
 - **Each of the six trainer SKILLS has its OWN 3-candidate pool** (HANDLING's list ≠
   PASSING's ≠ DRIBBLING's...), same as each single role.
-- **Signing REMOVES the candidate; the pool does NOT refill** — the remaining rows shift
-  up and the third row goes empty (witnessed after every one of the 15 signings). Refill
-  cadence over later weeks is un-witnessed.
+- **Signing REMOVES the candidate** — the remaining rows shift up and the third row goes
+  empty (witnessed after every one of the 15 signings) — but only until the week rolls.
+- **THE WHOLE LIST IS REGENERATED EVERY WEEK — witnessed 2026-07-24** (charter: the
+  owner's "there are plenty in the original, some vary in star ranking; now it is the
+  same the whole time"). One Bolton W career, PHYSIOTHERAPISTS list, nobody signed in
+  between (`screenshots/wine-captures-2026-07-24-role-training-staff/`):
+
+  | week | frame | candidates |
+  |---|---|---|
+  | 1 | `23_physio_wk1.png` | A. Burgess ★★½ £6,000 · R. Fields ★★ £7,000 · N. Kelso ★★ £5,000 |
+  | 3 | `29_physio_wk3.png` | F. Hallet ★★★ £18,000 · D. Todd ★★★★½ £35,000 · P. Horlicks ★★★★★ £47,000 |
+  | 4 | `32_physio_wk4.png` | G. Conner ★ £4,000 · E. Wragg ★★★★½ £42,000 · J. Preece ★★★★½ £42,000 |
+
+  Three different men each time and a fresh star spread — including the 4.5-5.0 star
+  staff the owner could never reach. Closing and reopening the screen inside the SAME
+  week returns the identical list (`30_physio_wk3_reopen.png`), so the roll happens on
+  the week tick, not on screen open. Ported as `Career._refresh_staff_pool`, called from
+  `advance_week`; test `app/tests/test_staff_weekly_pool.gd`.
 - **List order is NOT rating-sorted** (HANDLING 1.5/3.0/1.0; YOUTH MANAGER 3.5/2.5/3.0) —
   generation order.
 - **Wages are per-candidate**, not a function of stars: three 3.0-star trainers earn

@@ -72,3 +72,38 @@ Loader chain decompiles in `docs/re/pkf/`: catalog lookup `FUN_005eb4f0`, load o
 `FUN_005e6950`, directory parser `FUN_005e81c0`, name de-obfuscator `FUN_005e6500`, read/seek
 primitives `FUN_005f9a70`/`FUN_005f9ae0`. (`FUN_004f82ec` is the unrelated CD copy-protection
 check that reads a `D.G.C.` marker — not part of the archive loader.)
+
+## The two DIB header flavours + the 1024-byte misregistration sweep (2026-07-24)
+
+Entries carry one of two bitmap headers, told apart by the DWORD at offset 14:
+
+| `biSize` | header | palette declared? | rows start at |
+|---|---|---|---|
+| 40 | BITMAPINFOHEADER | yes, 1024 bytes the archive **strips** | **54** (not the header's `bfOffBits` 1078) |
+| 12 | BITMAPCOREHEADER (OS/2, u16 w/h) | no | **26** = its honest `bfOffBits` |
+
+Pillow honours `bfOffBits`, so on the first kind it read 1024 bytes late and produced an
+image rotated by `1024 // stride` rows + `1024 % stride` columns — the `estadio<N>.png`
+seam. `pkf_image.dib_indices` parses the header itself; since this session it handles
+BOTH kinds (it previously assumed 54 unconditionally, which sheared every core-header
+sprite by 28 bytes — caught while exporting `LESIONADOS\BOTONOFF.BMP`).
+
+The two paths are therefore wrong on **disjoint** sets, which is what makes the
+re-export sweep tractable. `tools/re/audit_pcf5_wrap.py [--check-app]` computes, per
+entry, the rotation the old path would have produced and cross-references the damaged
+names against the shipped PNGs under `app/art/`:
+
+* 319 entries across the five archives would have been rotated by the old Pillow path;
+  592 are core-header (which Pillow always read correctly).
+* 40 of the rotated names also exist as a shipped PNG. **29 of those verify
+  byte-identical to the fixed decode** (the cup-draw SORTEO set re-exported through
+  `--exact`, plus everything whose stride divides 1024).
+* The remaining 11 (`charity`, `cocacola`, `coparey`, `escudetto`, `facup`,
+  `hoja_calendario`, `intercont`, `league`, `ligacamp`, `recopa`, `uefa`) are **trimmed
+  derivatives** of the `… BIG.BMP` entries — no archive entry shares their shape, so a
+  byte compare cannot settle them. They were inspected instead and render clean (no
+  shear); they stay flagged for a per-screen render-diff rather than claimed done.
+
+So: **no shipped art is provably still carrying the wrap.** Anything re-exported from
+here must still be render-diffed before it ships, and `fix_estadio_wrap.py` (which
+corrects already-exported PNGs) must NOT be run on tiles exported the correct way.

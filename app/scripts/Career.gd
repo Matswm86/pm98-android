@@ -733,6 +733,7 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 	_tick_insurance()                  # premiums, hospital bills and policy payouts
 	_resolve_pending_bids(rng)         # last week's outgoing bids get their answers
 	_accumulate_offers(rng)            # incoming bids on the transfer-listed (CURRENT OFFERS)
+	_refresh_staff_pool(rng)           # a brand-new hire list every week (CLUB PERSONNEL)
 	week += 1
 	_close_month_if_due()           # end of a calendar month -> the two award sheets
 	offers_left = OFFERS_PER_WEEK   # the board's weekly signing allowance resets
@@ -2420,6 +2421,26 @@ func hire_staff(cand_id: int) -> Dictionary:
 	return {"ok": true, "msg": "%s hired as %s." % [m.get("name", "?"), Staff.label_for(role)]}
 
 
+## Throw the whole hire market away and generate a fresh one — every role gets three
+## NEW candidates with a new star spread.
+##
+## WITNESSED 2026-07-24 on the real game (Bolton W career, TOTAL level, PHYSIOTHERAPISTS
+## list, nobody signed in between):
+##   week 1  A. Burgess 2.5 £6,000 · R. Fields 2.0 £7,000 · N. Kelso 2.0 £5,000
+##   week 3  F. Hallet  3.0 £18,000 · D. Todd 4.5 £35,000 · P. Horlicks 5.0 £47,000
+##   week 4  G. Conner  1.0 £4,000  · E. Wragg 4.5 £42,000 · J. Preece 4.5 £42,000
+## — three different men every time, and the star spread moves with them (which is why
+## the owner's careers were stuck with 3-star coaches: the app generated the pool ONCE
+## and only ever removed from it). Closing and reopening the screen inside the SAME week
+## returns the identical list, so the roll happens on the week tick, not on open.
+##
+## Members already hired are untouched; a candidate the manager sacked back onto the
+## market goes with the rest (the original keeps no such carry-over).
+func _refresh_staff_pool(rng: RandomNumberGenerator) -> void:
+	staff_pool = Staff.generate_pool(rng, staff_seq, STAFF_POOL_PER_ROLE)
+	staff_seq += staff_pool.size()
+
+
 ## The StaffScreen `personnel` payload: each hired role -> {name, stars, wage}; vacant roles
 ## are absent (the screen draws them empty).
 func staff_personnel() -> Dictionary:
@@ -2905,6 +2926,46 @@ func _close_month_if_due() -> void:
 	month_awards = {"month": MONTH_NAMES[closing], "managers": managers, "players": players}
 	_month_mark = {}
 	_month_goal_mark = {}
+
+
+## Send an injured squad player to the physiotherapist (the INJURIES screen's PHYS.
+## "+" button). Mirrors FUN_00543080: refuses silently when he is already treated,
+## when no PHYSIOTHERAPIST is hired, or when the physio's "N PLAYERS" capacity is
+## already used up. Returns true when the injury was actually shortened.
+func treat_injury(pid: int) -> bool:
+	var p := _find_in(club_id, pid)
+	if p.is_empty():
+		return false
+	var members := Staff.members_in_role(staff, Staff.PHYSIO)
+	if members.is_empty():
+		return false
+	var physio: Dictionary = members[0]
+	return Availability.treat(p, my_squad(), Staff.quality_byte(physio),
+		Staff.physio_capacity(physio))
+
+
+# ---- TACTICS role assignment ---------------------------------------------
+# The TACTICS ROLE picker (FUN_0056a1d0 -> FUN_0056a560) writes the chosen role into
+# `player[+0x18]`, the fine-position byte — that is the CURRENT role, distinct from the
+# NATURAL role at `+0x1d` (`posNatural` here) and the five alternatives at `+0x1e..+0x22`
+# (`posAlts`). The original lets you pick any of the 18 and paints the ones he can
+# actually play; it does not refuse the others (see docs/re/positions_re.md).
+
+## Assign `pid` the fine role `pos_fine` (1-based, the app's posFine space). Keeps the
+## NATURAL role on first write so the picker can still paint it gold afterwards.
+## Returns true when the squad player was found and changed.
+func set_player_role(pid: int, pos_fine: int) -> bool:
+	if pos_fine < 1 or pos_fine > 18:
+		return false
+	var p := _find_in(club_id, pid)
+	if p.is_empty():
+		return false
+	if not p.has("posNatural"):
+		p["posNatural"] = int(p.get("posFine", pos_fine))
+	if int(p.get("posFine", 0)) == pos_fine:
+		return false
+	p["posFine"] = pos_fine
+	return true
 
 
 func is_listed(pid: int) -> bool:

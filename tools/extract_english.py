@@ -463,6 +463,13 @@ def parse_club(d: bytes, off: int, end: int, archive: set[int] | None = None):
         # player+0x18 the stat engine reads as the scorer-roulette POS_WEIGHT index.
         # Cross-validated to a clean role partition; see docs/re/positions_re.md.
         fine = d[Y - 12] if Y - 12 >= 0 and d[Y - 12] < 19 else None
+        # ALTERNATIVE ROLES: the five bytes right after the fine byte, Y-11..Y-7.
+        # In memory they are player+0x1e..+0x22 — the tail of the SIX-byte block
+        # +0x1d..+0x22 the TACTICS ROLE popup (FUN_0056a1d0) reads: +0x1d is painted
+        # GOLD (0x0000dfff = 255,223,0) and each of the five others WHITE, over the
+        # full 18-name list. 0 = no role (the popup's `< 0x12` gate rejects it).
+        # See docs/re/positions_re.md "Alternative roles".
+        alts = [b for b in d[Y - 11 : Y - 6] if 1 <= b <= 18] if Y - 11 >= 0 else []
         height_cm, weight_kg = physicals(d, Y)
         nat = nationality(d, Y, nxt)
         players.append(
@@ -478,6 +485,7 @@ def parse_club(d: bytes, off: int, end: int, archive: set[int] | None = None):
                 "age": 1997 - year,
                 "pos": pos,
                 "posFine": fine,
+                "posAlts": alts,
                 "isGK": is_gk,
                 "photoId": photo_id,
                 "squadNo": squad_no,

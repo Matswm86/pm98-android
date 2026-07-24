@@ -9,6 +9,29 @@ run-3 frames 101-118 (Scott Taylor, Blackpool FW) + the owner's McKinlay capture
 capture→design offset dx=+2 dy=+12) + the MANAGER.EXE label-draw helpers
 `FUN_0052c66f` / `FUN_00525893` (decompiles in `docs/re/ofertas/`).
 
+## The card has TWO opening states (2026-07-24)
+
+Which one you get depends on **how the player was reached**, and both are witnessed:
+
+* **Cold approach** — the OFFERS map browse, a player nobody has listed. The OFFER panel
+  opens at the floor: CLUB OFFER £5,000 / YEARLY WAGE £5,000 / YEARS 1, no clause
+  ticked. Frame `101_164714` (Taylor, CLUB FEE £3,000,000) is exactly this state, and it
+  is what the whole run-3 decode below was built on.
+* **A player already PLACED ON TRANSFER MARKET** — reached from the TRANSFERS list. The
+  card grows a CONTRACT panel above the OFFER panel and the OFFER panel opens
+  **pre-filled with the seller's own asking terms**: CLUB OFFER = CLUB FEE, YEARLY WAGE =
+  his contract wage, YEARS = his contract years, and the contract's clauses already
+  ticked. Witness `screenshots/wine-captures-2026-07-24-role-training-staff/
+  35_make_offer.png` (Bolton W week 4, Almeyda): CLUB FEE £8,500,000 and the panel opens
+  at CLUB OFFER **£8,500,000**, YEARLY WAGE £575,000, YEARS 1, "Free if relegated" ✔.
+
+The port seeded BOTH from the floor, which is the 2026-07-24 owner report ("a £14M bid
+takes hundreds of taps"): with the RE'd value-dependent stepper (£5,000 / £10,000 /
+£25,000 rungs) that is ~570 presses. `MakeOfferScreen.setup` now takes a `seed`
+dictionary; `Main._show_make_offer_card` (the TRANSFERS route) fills it,
+`_show_browse_offer_card` (the cold route) does not. Test
+`app/tests/test_make_offer_seed.gd`.
+
 ## Binding frames (run 3)
 
 | frame | state |

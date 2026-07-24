@@ -132,6 +132,9 @@ def main() -> None:
             "age": p.get("age"),  # null = engine randomizes (25..29 at load)
             "pos": p.get("pos"),  # GK/DF/MF/FW demarcación (band byte +0x1c)
             "posFine": p.get("posFine"),  # fine position (POS_WEIGHT scorer-roulette index)
+            # The five ALTERNATIVE roles the TACTICS ROLE popup paints white beside the
+            # gold natural role (engine bytes +0x1e..+0x22); [] = one-role player.
+            "posAlts": p.get("posAlts") or [],
             "isGK": bool(p.get("isGK")),
             "photoId": p.get("photoId"),  # the .DBC player id u16 == J96NNNNN face-bank key
             # SQUAD MANAGEMENT N. column: the byte after the player-id u16 (+0xf8,

@@ -86,6 +86,57 @@ carried through `build_db.py`, and consumed by `Pm98StatMatch._fill_participant`
 sets participant POS = `posFine` directly (per-role `POS_OF` fallback only when absent /
 out of range). Test: `app/tests/test_posfine.gd`.
 
+## Alternative roles — the TACTICS ROLE picker (BINARY-EXACT + witnessed 2026-07-24)
+
+The XI row's POS-column **flecha** button (x568..586, y row_top..+13) opens
+`FUN_0056a1d0` — a popup listing **all 18** fine roles from the LONG table, each with its
+camrol icon, over a striped title bar carrying the player's surname. It does not filter;
+it **paints** the ones he can play, and that painting is the whole "plausible roles"
+model. The disassembly (0x56a39f..0x56a412):
+
+```asm
+mov cl, [edi+0x1d]          ; his NATURAL role
+cmp ecx, 0x12 ; jae skip    ; 0x12 = 18 = "none"
+mov dword [eax], 0x0000dfff ; COLORREF -> RGB(255,223,0) GOLD
+call 0x468c70               ; item[cl].ink = colour   (item stride 0x418)
+mov esi, 1
+.loop:
+mov al, [esi+edi+0x1d]      ; the five ALTERNATIVES, +0x1e..+0x22
+cmp eax, 0x12 ; jae next
+mov dword [ecx], 0x00ffffff ; WHITE
+call 0x468c70
+inc esi ; cmp esi, 6 ; jb .loop
+```
+
+Picking a row runs `FUN_0056a560`, which is simply
+`player[+0x18] = item_id - 0x58` — the CURRENT fine role. So `+0x18` is what the row
+displays and the engine reads; `+0x1d` is the natural role and never moves.
+
+**The six bytes are a contiguous block in the record.** The player loader
+`FUN_00583bd0` reads them straight off the stream into `+0x1d..+0x22`, and
+`tools/re/equipos_parse.py` already walked that stream (`fines_raw = [s.u8() for _ in
+range(6)]`, "0 -> 0x62, else raw-1"). In the file they are **1-based** (1..18, matching
+our `posFine`), with **0 = no role**. `equipos_parse` now emits them as `fineAlts`,
+`extract_squads_exact.py` as `posAlts`, and `build_db.py` carries them into
+`game_db.json`. The approximate extractors read the same bytes at `d[Y-11 .. Y-7]`
+(the five right after the fine byte at `d[Y-12]`).
+
+Distribution over the 9,547-player database: 4,532 one-role players, 2,982 with one
+alternative, 1,366 with two, 508 with three, 120 with four, 39 with all five. **195 of
+195 English keepers have none.**
+
+Live proof (`screenshots/wine-captures-2026-07-24-role-training-staff/13_pos_arrow.png`,
+Bolton W week 1, Bergsson): RIGHT BACK in gold, INSIDE CENTRE LEFT and INSIDE CENTRE
+RIGHT in white, the other 15 black — and EQUIPOS.PKF stores him `posFine` 2 with
+`posAlts` [5, 6]. `15_role_applied.png` shows the pick landing: the row's ROLE name and
+camrol change to INSIDE CENTRE LEFT, the broad POS stays DEF.
+
+Port: `app/scenes/RolePopup.gd` (chrome baked by
+`tools/re/build_role_popup_from_frame.py`), opened from `TacticsBoardScreen.role_pressed`,
+applied by `Career.set_player_role`. Render-diff `tools/re/diff_role_popup_parity.py`:
+**chrome 0 px** vs the original's frame; the glyph bands differ by the app's own font
+raster (the standing app-wide substitution).
+
 ## Fine-position NAME tables (the FICHA ROLE band) — located 2026-06-26
 
 MANAGER.EXE carries two parallel 18-entry string-pointer tables for the fine demarcación:

@@ -83,6 +83,29 @@ const _CAMROL_FALLBACK := {"GK": 1, "DF": 4, "DEF": 4, "MF": 10, "MID": 10,
 	"FW": 9, "FOR": 9}
 
 
+# ---- pointer input -------------------------------------------------------
+
+## True when `e` is the EMULATED mouse event Godot synthesises from a real finger tap,
+## and the screen already handles `InputEventScreenTouch` itself.
+##
+## Measured on Godot 4.6.2 (`tests/test_pointer_dup.gd`): with the project default
+## `input_devices/pointing/emulate_mouse_from_touch = true`, ONE finger press delivers
+## TWO events to the same `gui_input`:
+##     InputEventMouseButton pressed=true device=-1   (DEVICE_ID_EMULATION)
+##     InputEventScreenTouch pressed=true device=0
+## Handlers that only navigate are idempotent under that, so it stayed invisible; a
+## handler that TOGGLES flips twice and lands back where it started. That is the
+## 2026-07-24 owner bug "cannot change REFUSE to ACCEPT" — `TeamOfferScreen` flips the
+## chip on press, so on a device it flipped to ACCEPT and straight back to REFUSE. The
+## mouse-only headless `test_sell_loop` could never reproduce it (it sends one event).
+##
+## Every screen that handles BOTH event kinds must drop one of the pair. We drop the
+## emulated mouse event (device == DEVICE_ID_EMULATION), keeping the real touch on a
+## device and the real mouse on desktop.
+static func is_emulated_pointer_dup(e: InputEvent) -> bool:
+	return e is InputEventMouseButton and e.device == InputEvent.DEVICE_ID_EMULATION
+
+
 # ---- shared assets -------------------------------------------------------
 
 static func font(name: String) -> Font:

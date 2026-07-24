@@ -79,10 +79,60 @@ black band, cell `[239,16]` y429. Blank when no physio is hired.
 INSURANCE `(358,434,124,34)`, RETURN `(500,434,134,34)` (button bodies probed
 x385..476 / x525..609).
 
+### PHYS. — the treatment button, BINARY-EXACT (2026-07-24)
+
+The PHYS. column of a populated row carries a **21x18 button**, `RECURSOS\ICONOS\
+LESIONADOS\BOTONOFF.BMP` (grey cross) / `BOTONON.BMP` (red cross), drawn at **x28,
+y = row_top - 1** — SAD **0** against witness `wine-captures-2026-07-24-cadence-season-
+store/07_injuries_row_insured_giggs.png` (`tools/re/export_injuries_phys_button.py`).
+This is the owner's "+ sign". The row renderer `FUN_00543307` picks between the two on
+`player[+0x6b]`.
+
+Tapping it runs `FUN_00543080`:
+
+```
+if player[+0x6b] != 0:               return   # already treated — ONE-WAY
+physio = staff[6]           (FUN_0057cd70(6))
+if physio == 0:                      return   # nobody hired -> the button is inert
+if treated_count >= FUN_00578b80(physio): return   # his "N PLAYERS" capacity
+treated_count += 1
+FUN_00584db0(&player[+0x68], physio[+1])
+```
+
+and the treatment itself, `FUN_00584db0(injury, q)`:
+
+```
+if q > 9: q = 10
+injury[+3] = q                                 # = player+0x6b, the ON flag
+injury[+0] = injury[+1] * (20 - q) * 5 / 100   # remaining = total * (20-q) / 20
+```
+
+So a **maxed (5-star, q=10) physio HALVES the injury**, a weaker one takes a
+proportional bite, and it always recomputes from the **original total**, not from what
+is left — exactly the owner's description. Nothing is fitted.
+
+`FUN_00578b80` case 6 is the capacity ladder: `q<3 -> 1, <5 -> 2, <7 -> 3, <9 -> 4,
+else 5`. Since the displayed stars are `q / 2`, that is `ceil(q/2)` — and it closes gap
+4 below: a **4.5-star** physio (q = 9) reads "**5 PLAYERS**" on the band, witnessed in
+`wine-captures-2026-07-24-role-training-staff/39_injuries.png` (E. Wragg).
+
+The header's blue **H** badge is `LESIONADOS\HOSPITAL.BMP` 14x12 at **(390, 88)** and the
+clock over "Week" is `SEMANAS.BMP` 12x11 at **(364, 78)** — both SAD 0 on the same
+witness, which is what identified them.
+
+Port: `Availability.treat/treated_weeks/is_treated`, `Staff.quality_byte/physio_capacity`,
+`Career.treat_injury`, `InjuriesScreen.treat_pressed`. Test
+`app/tests/test_physio_treatment.gd`.
+
+**Difficulty note (not ported, flagged):** at the **TRAINER** level the game answers a
+PHYS. tap with `"This is an automatic option in the Trainer level."` (@0x65d824,
+handler 0x543040 gated on the global at 0x66b1f8) — the app models the TOTAL-control
+level, so it has no such branch.
+
 ## HONEST GAPS (flagged, never filled)
 1. ~~**TYPE OF INJURY**~~ — **CLOSED 2026-07-23**: the column now renders the real
    diagnosis (binary-exact table above; `Availability.injury_type_name`).
-2. **PHYS. checkbox** (treatment toggle) — no treatment model; furniture.
+2. ~~**PHYS. checkbox**~~ — **CLOSED 2026-07-24**, see above.
 3. ~~**PRICE / INSUR. / COST**~~ — **CLOSED 2026-07-24** (`insurance_economy_re.md`),
    together with the un-headered **H** column (`is_serious` -> YES/NO). The
    populated row's furniture is now frame-cut verbatim from witness 83
@@ -98,8 +148,9 @@ x385..476 / x525..609).
    that 640x480 frame: a document with a folded top-right corner and two darker text rules.
    Remaining: cut it into the row strip (a baker pass); the port still draws the policy
    digit alone.
-4. **"N PLAYERS" = physio quality** is *inferred* from frame 034's 5-stars↔"5
-   PLAYERS" pairing (not reversed from the binary); flagged as an inference.
+4. ~~**"N PLAYERS" = physio quality**~~ — **CLOSED 2026-07-24**: it is
+   `FUN_00578b80` case 6 on the raw quality byte (see PHYS. above), not the star count;
+   the old inference happened to agree because stars = q/2.
 5. **Header red-cross plaque** — the injuries-mode barra decoration (frame 034
    top-left) is not reproduced; the scene uses the standard shared header.
 

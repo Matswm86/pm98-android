@@ -107,6 +107,24 @@ minus 2).
   YEARS = `contract_term`, LEFT = `contract_years` (our model's split of the
   original pair).
 
+## The chip could not be flipped on a device (root cause, 2026-07-24)
+
+Reported twice as "still cannot change REFUSE to ACCEPT" while `test_sell_loop` was
+green. Two independent defects, both now fixed and both regression-tested:
+
+1. **One finger tap arrived TWICE.** With Godot's project-default
+   `input_devices/pointing/emulate_mouse_from_touch`, a press is delivered to `gui_input`
+   as an emulated `InputEventMouseButton` (device `-1`) *and* the real
+   `InputEventScreenTouch` — measured, `app/tests/test_pointer_dup.gd`. This card flips
+   the chip **on press**, so on a phone it went ACCEPT then straight back to REFUSE
+   inside a single tap. Navigation-only screens were immune, which is why nothing else
+   looked broken. Guard: `PMChrome.is_emulated_pointer_dup`. The headless test could
+   never see it because it sent the touch alone; `_tap` now sends the real pair.
+2. **The chip hit rects overlapped.** They were 17 px tall against the frame's 14 px row
+   pitch, and `_target_at` returns the FIRST match — so a tap on offer #2's chip flipped
+   offer #1 and #2 could never be accepted at all. The rect is now exactly `ROW_PITCH`,
+   which is what the frames show (rows at y370+14i, solid chip y370..382 + its shadow).
+
 ## Honest gaps
 
 - **FICHA RATING formula RE'd 2026-07-03, parity-INCLUDED**: it is not a mean

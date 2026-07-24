@@ -23,16 +23,18 @@ extends RefCounted
 ## CANDIDATE POOLS (real, 2026-07-18 — docs/re/staff_re.md "The real candidate pools"):
 ## the original's hire lists were witnessed across TWO careers (Man Utd run1 frames 095-120,
 ## Bolton wine 56-59): every role — each of the six trainer SKILLS included — has its OWN
-## 3-candidate pool, a signed candidate is REMOVED and the pool does NOT refill (the row
-## goes empty), list order is generation order (NOT rating-sorted), and wages are
+## 3-candidate pool, a signed candidate is REMOVED and the rows shift up WITHIN the week,
+## list order is generation order (NOT rating-sorted), and wages are
 ## PER-CANDIDATE (three 3.0-star trainers at £16k/£17k/£19k; 5.0-star trainers £47k one
 ## career, £52k the other). Names come from the game's OWN tables — all 43 witnessed
 ## candidate surnames are rows of DBDAT/APELLIDO.30 (incl. the escape-byte "O'brian"),
 ## exported with the forename table to res://data/name_pools.json. Candidate wages here
 ## are drawn from _WAGE_ANCHORS: the exact witnessed (stars -> wage) points per role,
 ## interpolated between anchors — the original's generator itself is un-RE'd, so anything
-## BETWEEN witnessed points is fitted, never asserted. Whether pools ever refill across
-## weeks is un-witnessed; new careers/seasons regenerate (the two careers differ).
+## BETWEEN witnessed points is fitted, never asserted. **The refill cadence is no longer
+## un-witnessed: the whole list is REGENERATED EVERY WEEK** (witnessed live 2026-07-24
+## across weeks 1/3/4 of one Bolton career — three new names and a new star spread each
+## time, and identical on a same-week reopen). Career._refresh_staff_pool does it.
 ##
 ## PM98's staff EFFECTS are data-driven (loaded from the save, un-RE'd), so the effect
 ## numerics below are OURS -- only the surface + pool mechanics above are PM98's. Roles
@@ -165,6 +167,39 @@ static func category_of(role: String) -> String:
 static func label_for(role: String) -> String:
 	return str(_LABEL.get(role, role))
 
+
+# ---- the engine's raw quality byte ---------------------------------------
+# A staff record's `+1` byte is a 1..10 quality the game shows as `q / 2` half-stars,
+# and every per-role capability the engine derives (FUN_00578b80) is keyed off it, NOT
+# off the displayed star count. Verified live 2026-07-24: a 4.5-star physio (q = 9)
+# reports "5 PLAYERS" on the INJURIES band, which is exactly FUN_00578b80's case 6
+# ladder (q<3 -> 1, <5 -> 2, <7 -> 3, <9 -> 4, else 5).
+
+const QUALITY_BYTE_HI := 10
+
+## The engine's raw 1..10 quality byte for a hired member (stars x 2).
+static func quality_byte(member: Dictionary) -> int:
+	if member.is_empty():
+		return 0
+	return clampi(int(round(float(member.get("stars", 0.0)) * 2.0)), 0, QUALITY_BYTE_HI)
+
+
+## FUN_00578b80 case 6 — how many injured players a PHYSIOTHERAPIST can treat at once
+## ("N PLAYERS" on the INJURIES band).
+static func physio_capacity(member: Dictionary) -> int:
+	var q := quality_byte(member)
+	if q <= 0:
+		return 0
+	if q < 3:
+		return 1
+	if q < 5:
+		return 2
+	if q < 7:
+		return 3
+	if q < 9:
+		return 4
+	return 5
+
 ## An "A. Padmore" style forename-initial + surname — the witnessed hire-list format —
 ## drawn from the game's OWN name tables (name_pools.json). Surnames keep their table
 ## bytes exactly ("O'brian", "Mcgrath" — the original's own casing).
@@ -179,9 +214,12 @@ static func _short_name(rng: RandomNumberGenerator) -> String:
 
 # ---- candidate generation ------------------------------------------------
 
-## Half-star rating (1.0 .. 5.0 in 0.5 steps), the witnessed display granularity. The
-## distribution is FITTED (uniform is consistent with the 48 witnessed candidates,
-## range 1.0-5.0, mid-heavy); the original's generator is un-RE'd.
+## Half-star rating (1.0 .. 5.0 in 0.5 steps), the witnessed display granularity — the
+## engine's raw 1..10 quality byte read as `q / 2` (Staff.quality_byte). The
+## DISTRIBUTION is FITTED (uniform is consistent with the 57 witnessed candidates,
+## range 1.0-5.0); the original's generator is un-RE'd. What IS witnessed is the range
+## and that a fresh weekly pool routinely offers 4.5-5.0 star staff — see
+## Career._refresh_staff_pool.
 static func _rand_stars(rng: RandomNumberGenerator) -> float:
 	return rng.randi_range(2, 10) * 0.5   # 1.0 .. 5.0 in half steps
 

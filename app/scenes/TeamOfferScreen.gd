@@ -165,13 +165,23 @@ func _target_at(d: Vector2) -> String:
 	if OK_RECT.has_point(d):
 		return "ok"
 	for i in _offers.size():
-		if Rect2(CHIP_X, CHIP_Y0 + ROW_PITCH * i, 91, 17).has_point(d):
+		# The hit rect is EXACTLY the row pitch (14). It used to be 17 tall, which made
+		# rows overlap: `_target_at` returns the FIRST match, so a tap on offer #2's chip
+		# flipped offer #1 and #2 could never be accepted (team_offer_re.md: rows are at
+		# y370+14i, the solid chip paints y370..382 and its shadow y383..385, so the
+		# clickable band is one 14-row period).
+		if Rect2(CHIP_X, CHIP_Y0 + ROW_PITCH * i, 91, ROW_PITCH).has_point(d):
 			return "row%d" % i
 	return ""
 
 
 func _on_input(e: InputEvent) -> void:
 	if not (e is InputEventMouseButton or e is InputEventScreenTouch):
+		return
+	# A finger tap arrives TWICE (emulated mouse + real touch); the chip flips on press,
+	# so without this it flipped to ACCEPT and back to REFUSE in the same tap and the
+	# card looked dead on a device. See PMChrome.is_emulated_pointer_dup.
+	if PMChrome.is_emulated_pointer_dup(e):
 		return
 	var d := _to_design(e.position)
 	if e.pressed:

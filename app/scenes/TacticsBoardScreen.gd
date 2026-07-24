@@ -38,6 +38,7 @@ signal team_tactics_pressed  # -> the TEAM TACTICS modal
 signal view_rival_pressed    # -> VIEW RIVAL
 signal lineup_pressed        # -> back to LINE-UP
 signal return_pressed        # -> hub
+signal role_pressed(pid: int)  # the row's POS-column arrow -> the ROLE picker (RolePopup)
 
 const W := 640
 const H := 480
@@ -67,6 +68,13 @@ const AV_RIGHT := 370              # right-aligned advance edge (painted ends 36
 const CAMROL_X := 375
 const ROLE_CX := 484               # fine-role text centre on the band (EURO8 face)
 const POS_CX := 605                # broad POS word centre in the white box
+# The FLECHA button left of the POS word — the control that opens the ROLE picker
+# (witnessed live 2026-07-24: a click here raises MANAGER.EXE's 18-role popup, and the
+# row's ROLE name + camrol change when one is chosen; the broad POS does NOT). Bevel
+# measured off `11_tactics.png` row 1: x568..586, y row_top..row_top+13.
+const ROLE_BTN_X := 568
+const ROLE_BTN_W := 19
+const ROLE_BTN_H := 14
 const MARK_ORIGIN := Vector2i(187, 310)
 const BAND_DEF_MAX_MK1X := 52      # FUN_004fe2d0 thresholds, pre-scaled space
 const BAND_FWD_MIN_MK2X := 211
@@ -372,6 +380,9 @@ func _draw_rows() -> void:
 		var pos_s := _pos_word(pl)
 		PMChrome.text(self, _f8, _cell_centre(_f8, pos_s, 590, 30), y + 2, pos_s, C_POS, 11)
 
+		# the FLECHA button that opens the ROLE picker (chrome-baked; hit only)
+		_hit(Rect2(ROLE_BTN_X, y, ROLE_BTN_W, ROLE_BTN_H), "role:%d" % int(pl.get("id", -1)))
+
 
 const BAKED_FORM := "3-5-2"   # the formation whose bar background the chrome bakes
 
@@ -538,6 +549,8 @@ func _to_design(p: Vector2) -> Vector2:
 
 
 func _on_input(e: InputEvent) -> void:
+	if PMChrome.is_emulated_pointer_dup(e):
+		return   # one finger tap arrives twice; see PMChrome.is_emulated_pointer_dup
 	var pressed := (e is InputEventMouseButton and (e as InputEventMouseButton).pressed) \
 		or (e is InputEventScreenTouch and (e as InputEventScreenTouch).pressed)
 	if not pressed:
@@ -550,6 +563,9 @@ func _on_input(e: InputEvent) -> void:
 
 
 func _activate(kind: String) -> void:
+	if kind.begins_with("role:"):
+		role_pressed.emit(int(kind.substr(5)))
+		return
 	if kind.begins_with("pick:"):
 		_picker_open = false
 		formation_picked.emit(kind.substr(5))

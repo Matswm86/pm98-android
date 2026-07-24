@@ -34,6 +34,7 @@ class_name InjuriesScreen
 
 signal back_pressed        # RETURN -> Main reopens LINE-UP
 signal insurance_pressed   # INSURANCE -> Main mounts the INSURANCE screen
+signal treat_pressed(pid: int)   # the row's PHYS. "+" button -> send him to the physio
 
 const W := 640
 const H := 480
@@ -87,6 +88,15 @@ const PHYS_STAR_Y := 449
 const PHYS_COUNT_CELL := [239, 16]  # white digit on the black band (x239..255)
 const PHYS_COUNT_Y := 429
 
+# PHYS. treatment button — `LESIONADOS\BOTONOFF.BMP` / `BOTONON.BMP`, 21x18, drawn at
+# x28, y = row_top - 1 (SAD 0 against wine witness 07_injuries_row_insured_giggs.png;
+# tools/re/export_injuries_phys_button.py). This is the owner's "+ sign": a grey cross
+# while untreated, a RED cross once the physio has him (`FUN_00543307` switches on
+# player+0x6b). Tapping it runs FUN_00543080 -> FUN_00584db0, which recomputes the
+# remaining weeks from the ORIGINAL total as total x (20 - q) / 20.
+const PHYS_BTN_XY := Vector2(28, -1)     # y is relative to the row top
+const PHYS_BTN_SIZE := Vector2(21, 18)
+
 const R_INSURANCE := Rect2(358, 434, 124, 34)
 const R_RETURN := Rect2(500, 434, 134, 34)
 
@@ -107,6 +117,8 @@ var _chrome: Texture2D
 var _title: Texture2D
 var _phys_star: Texture2D
 var _row_strip: Texture2D
+var _phys_off: Texture2D
+var _phys_on: Texture2D
 
 
 func _ready() -> void:
@@ -116,6 +128,8 @@ func _ready() -> void:
 	_title = load("res://art/screens/injuries/title.png")
 	_phys_star = load("res://art/screens/injuries/phys_star.png")
 	_row_strip = load("res://art/screens/injuries/row_strip.png")
+	_phys_off = load("res://art/screens/injuries/phys_off.png")
+	_phys_on = load("res://art/screens/injuries/phys_on.png")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	gui_input.connect(_on_input)
@@ -170,6 +184,14 @@ func _hit(d: Vector2) -> String:
 		return "insurance"
 	if R_RETURN.has_point(d):
 		return "return"
+	for sect in SECT:
+		var rows: Array = _injured.get(str(sect["key"]), [])
+		var tops: Array = sect["tops"]
+		for i in mini(rows.size(), tops.size()):
+			var r := Rect2(PHYS_BTN_XY.x, int(tops[i]) + PHYS_BTN_XY.y,
+				PHYS_BTN_SIZE.x, PHYS_BTN_SIZE.y)
+			if r.has_point(d):
+				return "treat:%d" % int((rows[i] as Dictionary).get("id", -1))
 	return ""
 
 
@@ -178,6 +200,8 @@ func _hit(d: Vector2) -> String:
 func _on_input(e: InputEvent) -> void:
 	if not (e is InputEventMouseButton or e is InputEventScreenTouch):
 		return
+	if PMChrome.is_emulated_pointer_dup(e):
+		return   # one finger tap arrives twice; see PMChrome.is_emulated_pointer_dup
 	var d := _to_design(e.position)
 	if e.pressed:
 		_press = _hit(d)
@@ -187,6 +211,9 @@ func _on_input(e: InputEvent) -> void:
 	_press = ""
 	queue_redraw()
 	if was == "" or was != _hit(d):
+		return
+	if was.begins_with("treat:"):
+		treat_pressed.emit(int(was.substr(6)))
 		return
 	match was:
 		"return":
@@ -229,6 +256,10 @@ func _draw_rows() -> void:
 func _draw_row(p: Dictionary, y: int) -> void:
 	if _row_strip != null:
 		draw_texture(_row_strip, Vector2(STRIP_X, y + STRIP_DY))
+	# PHYS. button: BOTONON (red cross) once the physio has him, BOTONOFF otherwise.
+	var btn := _phys_on if Availability.is_treated(p) else _phys_off
+	if btn != null:
+		draw_texture(btn, Vector2(PHYS_BTN_XY.x, y + PHYS_BTN_XY.y))
 	PMChrome.text(self, _f8, NAME_X, y + TEXT_DY,
 		PMChrome.title_case_name(str(p.get("name", "?"))), C_NAME, 11, 0, NAME_W)
 	# TYPE OF INJURY: the game's own diagnosis string (Availability.INJURY_TYPES),
@@ -266,11 +297,13 @@ func _draw_physio_band() -> void:
 	var ph := _physio()
 	if ph.is_empty():
 		return
-	var q := clampi(int(ph.get("quality", 0)), 0, 5)
+	var stars := clampi(int(round(float(ph.get("stars", ph.get("quality", 0))))), 0, 5)
 	PMChrome.text(self, _f10, PHYS_NAME_X, PHYS_NAME_Y,
 		PMChrome.title_case_name(str(ph.get("name", ""))), C_NAME, 12, 0, 150.0)
-	for j in q:
+	for j in stars:
 		if _phys_star != null:
 			draw_texture(_phys_star, Vector2(PHYS_STAR_X0 + PHYS_STAR_PITCH * j, PHYS_STAR_Y))
-	PMChrome.text(self, _f8, PHYS_COUNT_CELL[0], PHYS_COUNT_Y, str(q),
+	# "N PLAYERS" = FUN_00578b80 case 6 on his raw quality byte, NOT the star count.
+	# Witnessed 2026-07-24: a 4.5-star physio (q=9) reads "5 PLAYERS".
+	PMChrome.text(self, _f8, PHYS_COUNT_CELL[0], PHYS_COUNT_Y, str(Staff.physio_capacity(ph)),
 		C_COUNT, 11, 1, float(PHYS_COUNT_CELL[1]))

@@ -203,6 +203,10 @@ def parse_squad(d: bytes, off: int, end: int):
         # the scorer-roulette POS_WEIGHT index, loader FUN_00583bd0). Cross-validated to
         # a clean role partition (GK->1/w0, central striker->9/w35) in docs/re/positions_re.md.
         fine = d[Y - 12] if Y - 12 >= 0 and d[Y - 12] < 19 else None
+        # Alternative roles = the next five bytes (in memory player+0x1e..+0x22, the
+        # tail of the ROLE popup's six-byte block); 0 = none. See extract_english.py
+        # and docs/re/positions_re.md "Alternative roles".
+        alts = [b for b in d[Y - 11 : Y - 6] if 1 <= b <= 18] if Y - 11 >= 0 else []
         players.append(
             {
                 "name": display,
@@ -212,6 +216,7 @@ def parse_squad(d: bytes, off: int, end: int):
                 "media": media,
                 "pos": pos,
                 "posFine": fine,
+                "posAlts": alts,
                 "attrs": dict(zip(ATTR_NAMES, attrs)),
                 "isGK": pos == "GK" if pos else attrs[9] > 50,
             }

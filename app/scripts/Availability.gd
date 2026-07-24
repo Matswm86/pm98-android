@@ -115,6 +115,7 @@ static func tick_week(squad: Array) -> Array:
 			if inj == 0:
 				p.erase("injury_type")
 				p.erase("injury_weeks_total")
+				p.erase("physio_treated")
 				news.append({"kind": "return", "text": "%s is back to full fitness." % _nm(p)})
 		var sus := int(p.get("suspended_weeks", 0))
 		if sus > 0:
@@ -177,6 +178,72 @@ static func reset(squad: Array) -> void:
 		p["yellows"] = 0
 		p.erase("injury_type")
 		p.erase("injury_weeks_total")
+
+
+# ---- physiotherapy (the INJURIES screen's PHYS. button) -------------------
+# BINARY-EXACT (MANAGER.EXE, 2026-07-24). The PHYS. column of an injured row carries a
+# 21x18 button — `RECURSOS\ICONOS\LESIONADOS\BOTONOFF.BMP` (grey cross) / `BOTONON.BMP`
+# (red cross), the "+ sign" of the 2026-07-24 owner report. Its handler is
+# `FUN_00543080`:
+#
+#     if player[+0x6b] != 0:            return          # already treated, one-way
+#     physio = staff[6]                                 # FUN_0057cd70(6)
+#     if physio == 0:                   return          # nobody hired -> inert
+#     if treated_count >= FUN_00578b80(physio): return  # his "N PLAYERS" capacity
+#     treated_count += 1
+#     FUN_00584db0(&player[+0x68], physio[+1])          # <- the treatment
+#
+# and `FUN_00584db0(injury, q)` is:
+#
+#     if q > 9: q = 10
+#     injury[+3] = q                                    # player+0x6b, the ON flag
+#     injury[+0]  = injury[+1] * (20 - q) * 5 / 100     # remaining = total*(20-q)/20
+#
+# so a maxed (10 = five-star) physio HALVES the injury and every lesser one takes a
+# proportional bite — and it recomputes from the ORIGINAL total, not from what is left,
+# exactly as the owner described. Nothing here is fitted.
+
+const PHYSIO_Q_MAX := 10
+
+## Weeks left after a physio of raw quality byte `q` treats an injury of `total` weeks.
+static func treated_weeks(total: int, q: int) -> int:
+	var qq := mini(maxi(q, 0), PHYSIO_Q_MAX)
+	return (total * (20 - qq) * 5) / 100
+
+
+## Has this player already been through the physio for his current injury?
+static func is_treated(p: Dictionary) -> bool:
+	return int(p.get("physio_treated", 0)) > 0
+
+
+## How many of `squad` are currently under treatment (the engine's screen counter
+## at +0x1928, which is what the capacity check compares).
+static func treated_count(squad: Array) -> int:
+	var n := 0
+	for p in squad:
+		if int(p.get("injured_weeks", 0)) > 0 and is_treated(p):
+			n += 1
+	return n
+
+
+## Send `p` to the physiotherapist. `q` is the physio's raw quality byte
+## (Staff.quality_byte); `capacity` his "N PLAYERS"; `squad` the club's players.
+## Returns true when the treatment was applied — false is the engine's own silent
+## refusal (already treated / no physio / his slots are full).
+static func treat(p: Dictionary, squad: Array, q: int, capacity: int) -> bool:
+	if int(p.get("injured_weeks", 0)) <= 0 or is_treated(p) or q <= 0:
+		return false
+	if treated_count(squad) >= capacity:
+		return false
+	var total := int(p.get("injury_weeks_total", p.get("injured_weeks", 0)))
+	p["physio_treated"] = mini(q, PHYSIO_Q_MAX)
+	p["injured_weeks"] = treated_weeks(total, q)
+	if int(p["injured_weeks"]) <= 0:
+		p["injured_weeks"] = 0
+		p.erase("injury_type")
+		p.erase("injury_weeks_total")
+		p.erase("physio_treated")
+	return true
 
 
 # ---- helpers -------------------------------------------------------------
