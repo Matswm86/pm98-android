@@ -1071,6 +1071,7 @@ static var goalaim_trace: Array = []                        # diag-only: goal_ai
 static var steerhdg_trace: Array = []                       # diag-only: steer_89c0 heading + turn gate
 static var steersite_trace: Array = []                      # diag-only: which steer_89c0 CALL SITE fired
 static var b0040_iter_trace: Array = []                     # diag-only: _b0040_target bisection per-iter
+static var steer8f20_trace: Array = []                      # diag-only: EVERY steer_8f20 entry + its 0x2d7 guard
 
 
 static func move_dispatch(p: Dictionary, m: Dictionary, param_2: int, rng) -> bool:
@@ -1440,6 +1441,14 @@ static func steer_8f20(p: Dictionary, heading: int) -> void:
 
 	var guard := _g(p, 0x2d7) & 0xff                       # once-per-tick char guard
 	p[0x2d7] = 1
+	if MatchEngine.Pm98Rng._log_on:                        # diag-only (s53): who steers first wins the tick
+		var _sites: Array = []
+		var _st: Array = get_stack()
+		for _fi in range(1, mini(_st.size(), 5)):
+			var _f: Dictionary = _st[_fi]
+			_sites.append("%s:%d" % [_f.get("function", "?"), int(_f.get("line", -1))])
+		steer8f20_trace.append({"who": MatchEngine.Pm98Rng._who, "heading": heading & 0xffff,
+			"guard": guard, "applied": guard == 0, "face": _g(p, 0x34) & 0xffff, "sites": _sites})
 	if guard != 0:
 		return
 

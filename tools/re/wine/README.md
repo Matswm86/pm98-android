@@ -114,8 +114,11 @@ scope 1. The winedbg --gdb stub works WITHOUT sudo (wineserver holds PR_SET_PTRA
 its RSP `m`/`M`/`Z1`/`Z2` packets replace all /proc I/O — but ONLY after `Hg<tid>`
 (thread from the `?` T05 reply); without it the stub never answers `m`.
 
-- `m5_rsp_capture.py <port> <lpid> <ref_json> <out> [stop_clk] [win_lo] [win_hi]` —
+- `m5_rsp_capture.py <port> <lpid> <ref_json> <out> [stop_clk] [win_lo] [win_hi] [base_hex]` —
   base candidates/scan + frame0 poke + XI check + Z2 seed-watch, full-roster row per draw.
+  s53 rows carry the FUN_005b1420 gate: player tail `[+0x184, +0x5c, +0x2b8, +0x2bc, +0x2d7,
+  +0x2d8]`, a per-team `gs` row (`+0x1fc/+0x200/+0x204` resolved to `[team, idx]`, `+0x2ee`)
+  and `sub_fa0`. Read it with `tools/re/m5_b1420_arm_solve.py`.
 - `m5_rsp_steertgt.py <port> <ref_json> <out> [team] [idx] [stop_clk]` — poke + Z1 on
   FUN_005a89c0, per-hit steer target + player + ball dump for one player.
 - Gotchas: stub accepts ONE connection; client disconnect kills the stub (game usually
@@ -124,3 +127,18 @@ its RSP `m`/`M`/`Z1`/`Z2` packets replace all /proc I/O — but ONLY after `Hg<t
   candidates 0x03dbf0d8 / 0x03dbf060 (reproduce per boot) or the mem scan;
   the preseason injury roll can silently swap a starter — the XI check aborts,
   re-roll the boot (~1-in-2 clean); lpid is used ONLY for /proc/<lpid>/maps (not gated).
+- **The base MOVES with the WINEPREFIX path length** (s53): the same boot+nav under a copied
+  prefix landed at `0x03dcf1d0`, not `0x03dbf0d8`, so the stored candidates missed and the
+  fallback mem scan ran. That scan costs ~20 min per 2 MB (RSP `m` moves ~500 B/round trip),
+  so it now probes `0x03d00000-0x03e00000` first — every observed base is in that band. If a
+  boot lands outside it, add the new value to the candidate list and note it here.
+- **Concurrent sessions collide.** One wineprefix = one wineserver, and `explorer /desktop=<name>`
+  reuses an existing desktop of that name: a second boot on another DISPLAY dies with
+  `X Error … BadWindow … X_CreateWindow`. Isolate with `cp -a` of the prefix plus
+  `PM98_WINEPREFIX=<copy> PM98_DESKTOP=<other-name>` (env.sh honours both, and `wdbg_pid.sh`
+  picks the LPID whose `/proc/<pid>/environ` carries that prefix).
+- **The XI check is necessary but not sufficient.** It compares `+0x4/+0x8/+0x2c8/+0x37c/+0x380`.
+  Two runs can share an identical XI yet differ in the derived pace/stamina fields
+  (`+0x37c/+0x380`, `docs/re/session_lineup_re.md`) because the preseason condition roll differs
+  — s53 hit exactly that on t0.i9. Cross-check the captured `0x34/0x64/0x68` ladder against the
+  banked one (`tools/re/specs/b0040_m5_live_heading.txt`) before trusting a run.

@@ -14,14 +14,22 @@ the fallback vtable scan. Run at the KICK OFF screen (phase 2, clock frozen):
   3. arm Z2 on the seed, then per STORE stop (eip != the 0x5ec255 entry-load twin)
      log clk/seed/ret0 and, while win_lo <= clk <= win_hi, all 22 players'
      [team, idx, x, y, +0x13c, +0x17c, +0x180, 0x34, 0x64, 0x68, 0x6c, 0x54, 0x58]
-     plus the ball row (base+0x1610) with the s51 tail: the FUN_0058fda0 predicted
-     trajectory buffer ball+0x114..0x1d4 (48 i32) + segments +0x74/78/7c. Exit once
-     clk > stop_clk.
+     plus the s53 gate tail [+0x184, +0x5c, +0x2b8, +0x2bc, +0x2d7, +0x2d8], the
+     per-team header row "gs" (+0x1fc/+0x200/+0x204 designations resolved to
+     [team, idx], + the +0x2ee freeze flag) and "sub_fa0" (FUN_005943b0's
+     *(match+0x468)+0xfa0), plus the ball row (base+0x1610) with the s51 tail: the
+     FUN_0058fda0 predicted trajectory buffer ball+0x114..0x1d4 (48 i32) + segments
+     +0x74/78/7c. Exit once clk > stop_clk.
+     The s53 fields are the FUN_005b1420 arm decision, byte for byte: the B0040 arm
+     needs `p == *(gs+0x204) && *(ball+0x40) == 0`, and FUN_005a8f20 no-ops when
+     +0x2d7 is already 1 — so they separate "b1420 picked a different arm" from
+     "an earlier steer call consumed the once-per-tick guard".
 Same stub gotchas as the seedwatch (see README.md): ONE connection, game dies if the
 stub is killed — capture first, the game is expendable after.
 """
 
 import json
+import os
 import struct
 import sys
 from pathlib import Path
@@ -32,7 +40,14 @@ VTABLE = 0x6390E0
 SCALE_OFF, SCALE_VAL = 0x19AC, 14400
 SKIP = {0x0, 0x468, 0x46C, 0x470, 0x78C, 0x790, 0x1A5C}
 PLAYER_STRIDE = 0x3BC
-PBLOB = 0x184  # covers x/y (+4/+8) and +0x13c/+0x17c/+0x180
+PBLOB = 0x188  # covers x/y (+4/+8), +0x13c/+0x17c/+0x180 and the team-header ptr +0x184
+# s53 tail: the FUN_005b1420 gate inputs that are NOT in the head blob —
+# +0x2b8 (team id, vs ball+0x54), +0x2bc (on-pitch), +0x2d7 (FUN_005a8f20 once-per-tick
+# steer guard, cleared by the per-tick prologue FUN_005a4600), +0x2d8 (its sibling flag).
+PTAIL_OFF, PTAIL_LEN = 0x2B8, 0x24
+# s53: team-header (player+0x184) span covering the role slots +0x1fc/+0x200/+0x204
+# (FUN_005b8a60 designations, player POINTERS) and the set-piece freeze flag +0x2ee.
+GS_OFF, GS_LEN = 0x1FC, 0xF4
 STORE_EIP_SKIP = 0x5EC255  # rand() entry LOAD twin stop — not the draw
 MAX_STOPS = 40000
 
@@ -108,11 +123,20 @@ def main() -> None:
             start, end = (int(x, 16) for x in addr.split("-"))
             if perms.startswith("rw") and start < (1 << 32) and end - start <= 0x4000000:
                 spans.append((start, end))
-        # the match struct has landed in the 0x03-0x04 heap window every observed boot —
-        # scan that neighbourhood first, then the rest
+        # RSP `m` runs ~500 B per round trip, so a blind forward sweep of the heap costs ~20 min
+        # per 2 MB (measured 2026-07-24, s53). Every observed base — 0x03dbf060 (s34),
+        # 0x03dbf0d8 (s51), 0x03dcf1d0 (s53) — sits in [HOT_LO, HOT_HI), so probe that band
+        # first inside each span, then fall back to the rest of the span.
+        HOT_LO, HOT_HI = 0x03D00000, 0x03E00000
         spans.sort(key=lambda s: (not (0x03000000 <= s[0] < 0x05000000), s[0]))
+        ranges = []
         for start, end in spans:
-            print(f"scan {start:#010x}-{end:#010x}", flush=True)
+            hs, he = max(start, HOT_LO), min(end, HOT_HI)
+            if hs < he:
+                ranges.append((hs, he, True))
+        ranges += [(s, e, False) for s, e in spans]
+        for start, end, hot in ranges:
+            print(f"scan {start:#010x}-{end:#010x}{' HOT' if hot else ''}", flush=True)
             a = start
             while a < end and not base:
                 try:
@@ -122,9 +146,12 @@ def main() -> None:
                 i = data.find(needle)
                 while i != -1:
                     b0 = a + i
-                    if u32(b0 + SCALE_OFF) == SCALE_VAL:
-                        base = b0
-                        break
+                    try:
+                        if u32(b0 + SCALE_OFF) == SCALE_VAL:
+                            base = b0
+                            break
+                    except OSError:
+                        pass  # candidate straddles the span end — not the match struct
                     i = data.find(needle, i + 1)
                 a += 0x200 - 4  # overlap so a straddling needle is still found
             if base:
@@ -170,7 +197,57 @@ def main() -> None:
     teams = []
     for off in (0x46C, 0x78C):
         teams.append((u32(base + off), min(u32(base + off + 4), 11)))
-    fo.write(json.dumps({"event": "teams", "arrays": [[hex(a), c] for a, c in teams]}) + "\n")
+    # s53: the team-header object each player points at via +0x184 (FUN_005b1420 reads
+    # its +0x204 designation and its +0x2ee freeze flag). Taken from player 0 of each
+    # side and cross-checked against the whole XI — a split would mean the header model
+    # is wrong and the designate rows below would be meaningless.
+    hdrs, hdr_split = [], []
+    for ti, (arr, cnt) in enumerate(teams):
+        h0 = u32(arr + 0x184)
+        hdrs.append(h0)
+        for i in range(1, cnt):
+            hi = u32(arr + i * PLAYER_STRIDE + 0x184)
+            if hi != h0:
+                hdr_split.append([ti, i, hex(hi), hex(h0)])
+    fo.write(
+        json.dumps(
+            {
+                "event": "teams",
+                "arrays": [[hex(a), c] for a, c in teams],
+                "headers": [hex(h) for h in hdrs],
+                "header_split": hdr_split,
+            }
+        )
+        + "\n"
+    )
+    print(f"HDRS {[hex(h) for h in hdrs]} split={len(hdr_split)}", flush=True)
+
+    def resolve_p(ptr: int):
+        """A raw player pointer -> [team, idx], or None when it is null/off-roster."""
+        if not ptr:
+            return None
+        for ti, (arr, cnt) in enumerate(teams):
+            d = ptr - arr
+            if 0 <= d < cnt * PLAYER_STRIDE and d % PLAYER_STRIDE == 0:
+                return [ti, d // PLAYER_STRIDE]
+        return None
+
+    def gs_rows() -> list:
+        # Per team header: [hdr, +0x1fc, +0x200, +0x204 raw, resolved(+0x1fc/0x200/0x204),
+        # +0x2ee]. +0x204 is the B0040 arm's designate (FUN_005b8a60's in-possession pick).
+        rows = []
+        for h in hdrs:
+            b = mread(h + GS_OFF, GS_LEN)
+            slots = [struct.unpack_from("<I", b, off - GS_OFF)[0] for off in (0x1FC, 0x200, 0x204)]
+            rows.append(
+                [
+                    hex(h),
+                    [hex(s) for s in slots],
+                    [resolve_p(s) for s in slots],
+                    b[0x2EE - GS_OFF],
+                ]
+            )
+        return rows
 
     # ---- 2b. XI fidelity: live frame-0 players vs the reference (injury rolls between
     # runs can swap a starter -> different match; catch it BEFORE kick off) ----
@@ -191,15 +268,28 @@ def main() -> None:
                     xi_bad.append([ti, i, hex(off), hex(live_v), hex(ref_pf(refs[i], off))])
     fo.write(json.dumps({"event": "xi_check", "mismatches": xi_bad}) + "\n")
     print(f"XI {'OK' if not xi_bad else 'MISMATCH %d rows' % len(xi_bad)}", flush=True)
+    # A mismatch means a DIFFERENT match: even when the XI is the same eleven, the preseason
+    # condition roll can move the derived pace/stamina (+0x37c/+0x380) and the sim forks from
+    # tick 1 — s53 burned a full 20-min capture proving that (t1.i10's 0x34 ladder came out
+    # 63979/58859 at clk 630 against the banked 18046/28286). Abort and re-roll the boot;
+    # PM98_XI_FORCE=1 keeps the old behaviour when a run is deliberately off-reference.
+    if xi_bad and os.environ.get("PM98_XI_FORCE") != "1":
+        print("ABORT: re-roll the boot (or set PM98_XI_FORCE=1 to capture anyway)", flush=True)
+        fo.write(json.dumps({"event": "abort", "why": "xi_mismatch"}) + "\n")
+        sys.exit(2)
 
     def players_row() -> list:
         # Row: [team, idx, x, y, +0x13c, +0x17c, +0x180, face+0x34, yaw+0x64, spd+0x68,
         # curve+0x6c, +0x54, +0x58]. The first 7 keep the s44 layout (orbit_diff reads
-        # r[0..3] positionally); the s45 tail adds the mover state for the sub-LSB drill.
+        # r[0..3] positionally); the s45 tail adds the mover state for the sub-LSB drill;
+        # the s53 tail (13..18) adds the FUN_005b1420 / FUN_005a8f20 gate inputs
+        # [hdr+0x184, lock+0x5c, team+0x2b8, onpitch+0x2bc, guard+0x2d7, +0x2d8].
         rows = []
         for ti, (arr, cnt) in enumerate(teams):
             for i in range(cnt):
-                b = mread(arr + i * PLAYER_STRIDE, PBLOB)
+                p = arr + i * PLAYER_STRIDE
+                b = mread(p, PBLOB)
+                t = mread(p + PTAIL_OFF, PTAIL_LEN)
                 rows.append(
                     [
                         ti,
@@ -215,6 +305,12 @@ def main() -> None:
                         struct.unpack_from("<i", b, 0x6C)[0],
                         struct.unpack_from("<i", b, 0x54)[0],
                         struct.unpack_from("<i", b, 0x58)[0],
+                        struct.unpack_from("<I", b, 0x184)[0],
+                        b[0x5C],
+                        struct.unpack_from("<i", t, 0x2B8 - PTAIL_OFF)[0],
+                        struct.unpack_from("<i", t, 0x2BC - PTAIL_OFF)[0],
+                        t[0x2D7 - PTAIL_OFF],
+                        t[0x2D8 - PTAIL_OFF],
                     ]
                 )
         return rows
@@ -293,6 +389,12 @@ def main() -> None:
         if win_lo <= clk <= win_hi:
             row["pl"] = players_row()
             row["ball"] = ball_row()
+            row["gs"] = gs_rows()
+            # FUN_005943b0(m) == (*(match+0x468) + 0xfa0) == 0 — the b1420 freeze predicate.
+            try:
+                row["sub_fa0"] = u32(u32(base + 0x468) + 0xFA0)
+            except OSError:
+                row["sub_fa0"] = None
         fo.write(json.dumps(row) + "\n")
         if stops % 100 == 0:
             print(f"stop {stops} clk={clk}", flush=True)
