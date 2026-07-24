@@ -104,11 +104,35 @@ This replaces the app's invented `3 if age<=29 else 2 if age<=32 else 1` ladder 
 then `if YEARS > 1: rec+0x1a = 0`. `posFine 9` = table idx 8 = **CENTRE FORWARD**
 (`positions_re.md`) — i.e. the goal-bonus money is striker-only.
 
-**Not claimed:** which of the four named checkboxes (`Free if relegated` / `Matches to
-renew` / `Scoring bonus` / `House and car`) `rec+0x10` and `rec+0x14` map to. No frame
-witnesses it, so the port carries them as numbered flags and renders no guessed label.
-`rec+0x1a` is read as the matches-to-renew target on the evidence that the years handler
-clears it exactly when a term stops being 1 year.
+### 5.1 The clause → checkbox map — WITNESSED 2026-07-24 (no longer a gap)
+
+Live wine capture, fresh TOTAL-level Manager League career at **Manchester Utd**, week 1
+(`screenshots/wine-captures-2026-07-24-clause-labels/`, frames 01-05). The CONTRACT panel
+on the PLAYER INFORMATION card shows each player's *generated* clause state, so the four
+rows can be read straight off cards whose AV band is known from the squad list:
+
+| card (AV, term) | Free if relegated | Matches to renew | Scoring bonus | House and car |
+|---|---|---|---|---|
+| Southgate 81, 2y (07-23 Villa frame `24_ficha`) | ✔ | – | – | – |
+| Cole 83 **CF**, 1y | ✔ | – | ✔ **(£5,000)** | – |
+| Keane 89 MID, 2y | ✔ | – | – | ✔ |
+| Sheringham 75 CF, 1y | ✔ | ✔ **(20)**, "Matches played: 0" | – | – |
+| Nevland (3y) | – | – | – | – |
+
+Reading that against the generation table above (AV ≥85 sets `+0x10` **and** `+0x14`;
+80..84 sets `+0x10` alone; 75..79 sets `+0x10` and `+0x1a = 20`; `+0xc` is the striker-only
+money; `YEARS > 1` clears `+0x1a`) fixes every row:
+
+```
+rec+0x10 -> "Free if relegated"     (the only box on the 80..84 card)
+rec+0x14 -> "House and car"         (the only box AV>=85 adds over AV 80..84)
+rec+0x1a -> "Matches to renew (N)"  (renders the literal 20 on the 1-year 75..79 card)
+rec+0xc  -> "Scoring bonus (£N)"    (renders the literal £5,000 on the AV-83 centre forward)
+```
+
+All five cards match the generation table exactly, including the two negative controls
+(Nevland on a 3-year deal: `+0x1a` cleared, nothing ticked; Keane, a midfielder: no
+scoring bonus). The port may now render the real labels.
 
 ## 6. The accept test — `FUN_005889c0(player, offer)`
 
@@ -161,11 +185,29 @@ offer_accepted}` carry all of the above, and `TransferMarket.evaluate_offer` now
 real accept test instead of `offer >= value`.
 
 It changes no behaviour **today, by design**: the ladder's inputs are per-player career +
-season *rate* counters, and `statistics_screen_re.md` records that the app accumulates
-**no** per-player season statistics at all (no MP / MIN / RATING / G.) — so there is
-nothing honest to feed it, and `player+0x9a` stays at its init 1000. AI clubs likewise
-carry no listing flag, so `player+0x98` stays clear. Both plug straight in the moment a
-season-stat store lands; neither is faked in the meantime.
+season *rate* counters, and the *port* accumulates **no** per-player season statistics at all
+(no MP / MIN / RATING / G.) — so there is nothing honest to feed it, and `player+0x9a` stays
+at its init 1000. AI clubs likewise carry no listing flag, so `player+0x98` stays clear. Both
+plug straight in the moment a season-stat store lands; neither is faked in the meantime.
+
+The store exists in MANAGER.EXE and is now **oracle-verified**: the `seasonStats` record
+read here as `[stats+0]` / `[stats+4]` / `[stats+0x10]` is the 0x48-byte record at
+`DAT_0066afd0+0x9c` (home) / `+0xa4` (away), pid @ `+0x44`, fetched by `FUN_00449b50`,
+written by `FUN_0044e440` as a straight copy of participant `+0xec..+0x12f`
+(`tools/re/run_statcommit_oracle.sh`, 5 fixtures).
+
+That also resolves the "career counter provenance" that was open here: **`player+0x24`
+is not a bare counter, it is the persistent copy of this very record** — the player-object
+ctor `FUN_00581c80` runs `FUN_004484d0` (the 0x44-byte record ctor) on `player+0x24`. So
+this ladder reads the *same two fields* from both copies:
+
+```
+den = persistent[+0x00] + match[+0x00]     # player+0x24  = record +0x00 (MP/appeared)
+num = persistent[+0x10] + match[+0x10]     # player+0x34  = record +0x10 (goals)
+```
+
+Still unresolved: the writer that folds a finished match record back into
+`player+0x24`. See **`season_stats_re.md`**.
 
 ## 7. Ported
 

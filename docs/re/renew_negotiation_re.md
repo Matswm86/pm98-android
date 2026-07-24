@@ -90,6 +90,10 @@ generator seeds is £10,000 (AV>=85) / £5,000 (AV 80..84) for a CENTRE FORWARD 
 the **Matches-to-renew** target is 20 — both from `FUN_00576cd0`.
 
 ## Open (do NOT fake)
-- Which of the four named checkboxes `rec+0x10` / `rec+0x14` drive (no frame witnesses it).
+- ~~Which of the four named checkboxes `rec+0x10` / `rec+0x14` drive~~ — **CLOSED
+  2026-07-24** by a live Man Utd TOTAL-level capture: `+0x10` = *Free if relegated*,
+  `+0x14` = *House and car*, `+0x1a` = *Matches to renew (N)*, `+0xc` = *Scoring bonus
+  (£N)*. Five witness cards + the derivation in `offer_record_re.md §5.1`, frames in
+  `screenshots/wine-captures-2026-07-24-clause-labels/`.
 - The reject-message + affordability behaviour on OFFER (contract_re.md has the model; confirm
   against a live rejected offer).
