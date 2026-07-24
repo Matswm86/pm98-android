@@ -1,0 +1,33 @@
+# FUN_0044a370 MAN OF THE MATCH ground truth (PCode emu; PcodeEmu.java).
+# report F=0x220000(DAT_0066afd0) home recs=0x230000 away recs=0x231000
+# Every record carries ratios A=B=C=D=50, so score == 50 + 10*min(goals,10).
+# FUN_00448a00 (result code) + FUN_00449660 (event list) stubbed; F+0x64 = 0 so
+# the event-count tie-break loop never iterates.
+# 'mom' is the u16 at F+0xac -- the winning record's rec+0x44.
+
+=== FIX A_max  RET  stubhits={resultcode=1}
+  home=0x3 away=0x1 resultcode=0  mom=21
+
+=== FIX B_gate38  RET  stubhits={resultcode=1}
+  home=0x1 away=0x1 resultcode=0  mom=13
+
+=== FIX C_yellow  RET  stubhits={resultcode=1}
+  home=0x1 away=0x1 resultcode=0  mom=13
+
+=== FIX D_red  RET  stubhits={resultcode=1}
+  home=0x1 away=0x1 resultcode=0  mom=13
+
+=== FIX E_tie_home  RET  stubhits={resultcode=1}
+  home=0x2 away=0x0 resultcode=0  mom=11
+
+=== FIX F_tie_cross_r0  RET  stubhits={resultcode=1}
+  home=0x1 away=0x1 resultcode=0  mom=11
+
+=== FIX G_tie_cross_r1  RET  stubhits={resultcode=1}
+  home=0x1 away=0x1 resultcode=1  mom=11
+
+=== FIX H_empty  RET  stubhits={resultcode=1}
+  home=0x0 away=0x0 resultcode=0  mom=0
+
+=== FIX I_goalcap  RET  stubhits={resultcode=1}
+  home=0x2 away=0x0 resultcode=0  mom=11

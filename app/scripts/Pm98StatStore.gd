@@ -260,6 +260,55 @@ static func commit(mem: Pm98StatMatch.Mem, rep: Report, pids := {}) -> void:
 			rep.condition[pid] = mini(mem.u8(pb + 0xb8), 0x63)
 
 
+# --- FUN_0044a370: the MAN OF THE MATCH selector ----------------------------
+## The selector's score, recomputed per record from the same four success ratios the row
+## widget's RATING uses (`@0x44a463..0x44a617`). It is RATING's inner term before the
+## `4 + 6*x/100` wrapper, so the two are the same measure on different scales.
+static func mom_score(f: PackedInt32Array) -> int:
+	var a := _ratio(f[R_INVOLVE / 4], f[R_MIN / 4])
+	var b := _ratio(f[R_SHOTS_ON / 4], f[R_SHOTS_OFF / 4])
+	var c := _ratio(f[R_PASS_OK / 4], f[R_PASS_FAIL / 4])
+	var d := _ratio(f[R_TACK_OK / 4], f[R_TACK_FAIL / 4])
+	return ((a + b + c + d) >> 2) + 10 * mini(f[R_GOALS / 4], 10)
+
+
+## Pick the Man of the Match: the highest-scoring record across the home array then the
+## away array, writing its pid into the report header (`F+0xac`) and returning it.
+## Returns 0 when no record survives the gates -- the binary zeroes `F+0xac` first
+## (`@0x44a382`) and simply leaves it at 0, so nobody is stamped.
+##
+## Banked against the real function: `tools/re/run_moms_oracle.sh` ->
+## `tools/re/specs/moms_oracle.txt`, asserted by `app/tests/test_mom_oracle.gd`.
+## The oracle pins all four behaviours below, including that the FIRST record wins a tie
+## both inside one array (E_tie_home) and across the two (F/G_tie_cross).
+##
+## GAP, deliberately not modelled: on an exact score tie the binary runs a second
+## tie-break that walks the display event list (`F+0x64` entries via FUN_00449660,
+## `@0x44a7f6..0x44a832`) and counts the entries naming each record, with the stubbed
+## FUN_00448a00 result code steering the final choice (`@0x44a871..0x44a8b9`). Every
+## oracle fixture runs with `F+0x64 == 0`, where that loop cannot iterate and the result
+## code provably does not change the outcome (F and G differ only in it and both return
+## pid 11). With a populated event list the outcome is UNKNOWN, so it is not guessed.
+static func pick_mom(rep: Report) -> int:
+	var best := -1
+	var best_pid := 0
+	for side in range(2):
+		for i in range(rep.count(side)):
+			var f := rep.fields(side, i)
+			if f[R_F38 / 4] != 0:              # @0x44a40c
+				continue
+			if f[R_YELLOW / 4] >= 2:           # two yellows, @0x44a448
+				continue
+			if f[R_RED / 4] != 0:              # a red, @0x44a455
+				continue
+			var s := mom_score(f)
+			if s > best:                       # `jbe` @0x44a617 -> the FIRST wins a tie
+				best = s
+				best_pid = rep.pid(side, i)
+	rep.hdr.encode_u16(F_MOM_PID, best_pid)
+	return best_pid
+
+
 # --- FUN_00448b60 @0x448f6b / @0x44907a: the season fold-back ---------------
 ## Adds every report record into the persistent per-player store, field by field. The
 ## binary writes playerobj+0x24 + 4k; here `store` is a Dictionary pid ->

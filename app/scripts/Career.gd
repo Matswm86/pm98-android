@@ -51,6 +51,21 @@ var _div_xis: Dictionary = {}     # club_id -> MatchSim.xi_of
 var results: Array = []           # manager's played results [{week,opp_id,home,hg,ag}]
 var scorer_log: Array = []        # every league goal, all fixtures: {week,scorer,club,minute,h,a}
                                   # (own goals excluded; feeds GOAL SCORERS, witnessed 2026-07-18)
+# ---- per-player SEASON statistics: the STATISTICS screen's persistent store ---------
+# MANAGER.EXE keeps these at playerobj+0x24..+0x64 -- 17 dwords in the same field order
+# as one 0x48-byte match record -- and the career-match runner ADDS each finished
+# match's record into them (FUN_00448b60 @0x448f6b / @0x44907a). Ported as
+# Pm98StatStore.fold_back(); the STATISTICS screen reads them back at @0x4b2233.
+# Key = the GLOBAL game_db player id (NOT the participant slot -- see MatchSim.pid_map).
+var season_stats: Dictionary = {}          # pid:int -> PackedInt32Array(17)
+# club+0x274, the club's season MINUTES -- the TEAM TOTAL MIN cell (@0x4b221a). The
+# runner bumps it per finished match (@0x449189). Live witness 2026-07-24: 630 -> 720
+# across one Euro Cup tie, i.e. +90 and cup ties DO count.
+var season_club_minutes: Dictionary = {}   # club_id:int -> int
+# The TEAM TOTAL MP cell (the club-squad path's own count, @0x4b21ed). Same witness:
+# it stayed 7 across that Euro tie while every player's MP went 7 -> 8, and 7 is exactly
+# the 6 league rounds played plus the Charity Shield. So cup ties do NOT bump it.
+var season_club_mp: Dictionary = {}        # club_id:int -> int
 var cash: int = 0                 # running bank balance
 var weekly_net: int = 0           # per-week finance delta (from FinanceModel)
 # Season-to-date insurance ledger, £ (FINANCES lines, Insurance.gd / @0x57f3a6):
@@ -624,8 +639,15 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 			ratings[h] = _ratings_for(h, clubs_override)
 		if not ratings.has(a):
 			ratings[a] = _ratings_for(a, clubs_override)
+		# Per-player STATISTICS records are only accumulated for the manager's own
+		# fixture: his club's squad is the only one the STATISTICS screen ever renders
+		# (@0x4b2233 walks the managed club's squad), and running the store for all four
+		# divisions' 380 rounds would cost a season sim for nothing on screen.
+		var mine := h == club_id or a == club_id
 		var res := MatchSim.simulate(rng, ratings[h], ratings[a], \
-				xi_of_id.call(h), xi_of_id.call(a), h, a)
+				xi_of_id.call(h), xi_of_id.call(a), h, a, 90, mine)
+		if mine:
+			fold_match_stats(res, h, a)
 		var hg := int(res["home_goals"])
 		var ag := int(res["away_goals"])
 		_apply(table[h], hg, ag)
@@ -747,7 +769,8 @@ func _play_due_cup_rounds(rng: RandomNumberGenerator, clubs_override: Dictionary
 		if cup.is_empty():
 			continue
 		while Cup.round_due(cup, week):
-			var cr := Cup.play_round(cup, rng, ratings_fn, club_id, names_fn, xi_fn)
+			var cr := Cup.play_round(cup, rng, ratings_fn, club_id, names_fn, xi_fn,
+				_cup_report_sink())
 			for n in cr["news"]:
 				_news(n["kind"], n["text"])
 			if int(cr["prize"]) > 0:
@@ -760,7 +783,8 @@ func _play_due_cup_rounds(rng: RandomNumberGenerator, clubs_override: Dictionary
 			continue
 		while Cup.round_due(eb, week):
 			var in_before := Cup.still_in(eb, club_id)
-			var er := Cup.play_next(eb, rng, ratings_fn, club_id, names_fn, xi_fn)
+			var er := Cup.play_next(eb, rng, ratings_fn, club_id, names_fn, xi_fn,
+				_cup_report_sink())
 			for n in er["news"]:
 				_news(n["kind"], n["text"])
 			if str(er.get("phase", "")) == "group":
@@ -1513,6 +1537,67 @@ static func _scorer_rows(log: Array, legal_fn: Callable) -> Array:
 	for r in rows:
 		r["legal"] = legal_fn.call(int(r["club_id"]), str(r["name"]))
 	return rows
+
+
+## Fold one finished fixture's per-player record into the season stores -- the port of
+## the career-match runner's fold-back loops (FUN_00448b60 @0x448f6b / @0x44907a).
+## `res` is a MatchSim.simulate() result; it carries a Pm98StatStore.Report under
+## "report" whenever the caller asked for stats (and null on the legacy fallback, where
+## no per-player records exist at all). `league` gates the TEAM TOTAL MP counter -- see
+## `season_club_mp`.
+##
+## NOT called for pre-season friendlies: the same live witness that pins the two club
+## counters also pins this. Beckham read MP 7 with 6 league rounds played plus the
+## Charity Shield, so the career's friendlies had folded back nothing.
+## The sink Cup calls for every match the manager's club plays in a cup tie. Cup fixtures
+## bump the club MINUTES counter but NOT the TEAM TOTAL MP counter (`league = false`).
+func _cup_report_sink() -> Callable:
+	return func(res: Dictionary, h: int, a: int, bump_club := true) -> void:
+		fold_match_stats(res, h, a, false, bump_club)
+
+
+## `bump_club` is false for a two-legged tie's extra time: the port simulates ET on its
+## own Mem, so its records fold in like any other, but it is the SAME fixture as leg 2 and
+## must not bill the club counters a second time.
+func fold_match_stats(res: Dictionary, home_id: int, away_id: int, league := true,
+		bump_club := true) -> void:
+	var rep = res.get("report")
+	if rep == null:
+		return
+	Pm98StatStore.fold_back(rep, season_stats, Pm98StatStore.pick_mom(rep))
+	if not bump_club:
+		return
+	for cid in [home_id, away_id]:
+		# @0x449189 also has a `+= 120` branch, taken when F+0x58 != 0 AND F+0x48 != 0.
+		# Neither field has an identified producer, so that branch is deliberately NOT
+		# modelled rather than guessed; every fixture here takes the witnessed +90.
+		season_club_minutes[cid] = int(season_club_minutes.get(cid, 0)) + 90
+		if league:
+			season_club_mp[cid] = int(season_club_mp.get(cid, 0)) + 1
+
+
+## One STATISTICS row per squad player, in squad order: the 17 season dwords of
+## `playerobj+0x24`, exactly the record the screen rebuilds at @0x4b2233. A player who
+## has never featured yields an all-zero row, which the widget prints as the dashes the
+## real game shows for an unused squad member.
+func season_stat_rows(players: Array) -> Array:
+	var out: Array = []
+	for p in players:
+		var pid := int((p as Dictionary).get("id", -1))
+		var f: PackedInt32Array = season_stats.get(pid, PackedInt32Array())
+		if f.size() != Pm98StatStore.REC_DWORDS:
+			f = PackedInt32Array()
+			f.resize(Pm98StatStore.REC_DWORDS)
+		out.append(f)
+	return out
+
+
+## The TEAM TOTAL row for `cid`. The club-squad path does NOT column-sum the first two
+## cells: MP comes from the club's own matches-played count and MIN from club+0x274
+## (@0x4b21ed / @0x4b221a). Everything from +0x08 rightwards is a per-column sum.
+func season_stat_totals(rows: Array, cid: int) -> PackedInt32Array:
+	return Pm98StatStore.totals(rows, int(season_club_mp.get(cid, 0)),
+		int(season_club_minutes.get(cid, 0)))
 
 
 ## Per-player goal entries for the goal-log popup, keyed "surname|club_id".
@@ -2901,6 +2986,11 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	season_opened = false   # the week-0 chain (shield card + START OF SEASON) re-runs
 	boards_sold_season = false   # a fresh sponsor-board season offer becomes available again
 	_reset_insurance_ledger()    # the FINANCES insurance lines are season-to-date
+	# The STATISTICS store is per SEASON (its header reads "STATISTICS FOR <club>." with
+	# no year, and a fresh career's table is all dashes), so it clears with the results.
+	season_stats.clear()
+	season_club_minutes.clear()
+	season_club_mp.clear()
 	results.clear()
 	# Preseason friendlies were a career-entry pick; season 2+ has no re-pick UI
 	# (un-walked — the walkthrough started one career), so the slate just clears.
@@ -3063,7 +3153,10 @@ func play_charity_shield_match(rng: RandomNumberGenerator, opp_view: Dictionary)
 		my_ratings if at_home else opp_ratings,
 		opp_ratings if at_home else my_ratings,
 		my_xi if at_home else opp_xi,
-		opp_xi if at_home else my_xi, h, a)
+		opp_xi if at_home else my_xi, h, a, 90, true)
+	# The Shield counts in both club counters: the live witness's TEAM TOTAL MP of 7 is
+	# 6 league rounds + this fixture (see `season_club_mp`).
+	fold_match_stats(res, h, a)
 	var hg := int(res["home_goals"])
 	var ag := int(res["away_goals"])
 	var decided := ""
@@ -3570,6 +3663,11 @@ func to_dict() -> Dictionary:
 		"rep_year": _rep_year,
 		"divisions": _divisions_to_dict(), "seed_pos": _str_keyed(seed_pos),
 		"table_prev": _str_keyed(table_prev),
+		# The season stat store. PackedInt32Array is not a JSON type, so each record goes
+		# out as a plain 17-int Array; from_dict packs it back.
+		"season_stats": _season_stats_to_dict(),
+		"season_club_minutes": _str_keyed(season_club_minutes),
+		"season_club_mp": _str_keyed(season_club_mp),
 		"wages_live": true,   # marker: weekly_net excludes player wages (drawn live). See from_dict.
 	}
 
@@ -3591,6 +3689,27 @@ static func _int_keyed(d: Dictionary) -> Dictionary:
 	var out: Dictionary = {}
 	for k in d:
 		out[int(k)] = d[k]
+	return out
+
+
+func _season_stats_to_dict() -> Dictionary:
+	var out: Dictionary = {}
+	for pid in season_stats:
+		out[str(pid)] = Array(season_stats[pid] as PackedInt32Array)
+	return out
+
+
+## Pack the JSON form back. A pre-STATISTICS save simply has no key and loads with an
+## empty store, which renders as the all-dashes zero state.
+static func _season_stats_from_dict(d: Dictionary) -> Dictionary:
+	var out: Dictionary = {}
+	for pid in d:
+		var f := PackedInt32Array()
+		f.resize(Pm98StatStore.REC_DWORDS)
+		var src: Array = d[pid]
+		for k in mini(src.size(), Pm98StatStore.REC_DWORDS):
+			f[k] = int(src[k])
+		out[int(pid)] = f
 	return out
 
 
@@ -3762,6 +3881,9 @@ static func from_dict(d: Dictionary) -> Career:
 			"prev": _int_keyed(dv.get("prev", {}))}
 	c.seed_pos = _int_keyed(d.get("seed_pos", {}))
 	c.table_prev = _int_keyed(d.get("table_prev", {}))
+	c.season_stats = _season_stats_from_dict(d.get("season_stats", {}))
+	c.season_club_minutes = _int_keyed(d.get("season_club_minutes", {}))
+	c.season_club_mp = _int_keyed(d.get("season_club_mp", {}))
 	# Pre-contracts saves baked the player wage bill INTO weekly_net; the live loop now draws
 	# it separately, so add it back once on load to keep the old weekly burn unchanged. Legacy
 	# players have no stored `wage` -> current_weekly falls back to the (identical) market wage.

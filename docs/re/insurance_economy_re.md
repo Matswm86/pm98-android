@@ -167,9 +167,15 @@ addresses above.
 
 - **`player+0x98` on the INJURIES screen**: nothing here uses it. See
   `offer_record_re.md` §6 for the transfer-list flag.
-- **The insured-row document icon** (`@0x543b09`, row-x 459): no frame witnesses
-  that sprite on the INJURIES screen, so the port draws the policy digit alone.
-  A wine witness of an insured player picking up an injury closes it.
+- ~~**The insured-row document icon**~~ (`@0x543b09`): **CLOSED 2026-07-24.** `screenshots/wine-captures-2026-07-24-cadence-season-store/
+  07_injuries_row_insured_giggs.png` finally witnesses it: Giggs (Group 1) picked up a
+  7-week dislocated wrist in a live career, and his INSUR. cell reads
+  `[document icon] 1        0%` with COST equal to the full PRICE (£10,500) — i.e. **group
+  1 pays 0%**, so the icon marks "a policy exists", not "a payout happened". The sprite
+  occupies **x487..494 (8 px) x y266..275 (10 px)** inside the cell (cell border x483) on
+  that 640x480 frame: a document with a folded top-right corner and two darker text rules.
+  Remaining: cut it into the row strip (a baker pass); the port still draws the policy
+  digit alone.
 - **PHYS.** (the treatment checkbox) is still resting furniture — the row strip
   carries its unticked face verbatim; the ticked state is unwitnessed.
 - **The weekly-illness path** (`roll_A` @0x5850b0) still isn't modelled, so only

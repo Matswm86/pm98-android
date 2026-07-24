@@ -86,9 +86,12 @@ func _run() -> void:
 			matched = true
 	ok = _assert(matched, "watch -> 2D MATCH VIEW overlay with a timeline") and ok
 
-	# Enter a career -> the front-of-house browse is dropped and the hub is raised.
+	# Enter a career. Since the 2026-07 season-chain work (orig/06) _begin_career opens
+	# the TEAMS IN CHAMPIONSHIPS sheet FIRST and only raises the hub once it is dismissed,
+	# so the test drives that CONTINUE rather than asserting behind it.
 	main._begin_career("Test Mgr", lg, cl[0])
 	await process_frame
+	await _clear_season_open_chain(main)
 	ok = _assert(main._browse == null, "entering a career clears the browse overlay") and ok
 	ok = _assert(main._hub != null and is_instance_valid(main._hub),
 		"entering a career raises the MENUPRINCIPAL hub") and ok
@@ -100,3 +103,21 @@ func _run() -> void:
 func _assert(cond: bool, label: String) -> bool:
 	print("  [%s] %s" % ["PASS" if cond else "FAIL", label])
 	return cond
+
+## Drive the witnessed career-entry curtain-raiser chain (orig/06 + orig/70-73):
+## TEAMS IN CHAMPIONSHIPS -> [CHARITY SHIELD card] -> START OF SEASON -> hub. Each is a
+## real screen with a real button signal, so the test presses them rather than asserting
+## behind them. Returns once no curtain-raiser is left mounted.
+func _clear_season_open_chain(main: Node) -> void:
+	for _step in 6:
+		var pressed := false
+		for ch in main.get_children():
+			if ch is ChampsScreen:
+				ch.continue_pressed.emit(); pressed = true
+			elif ch is SeasonStartScreen:
+				ch.continue_pressed.emit(); pressed = true
+			elif ch is CharityShieldScreen:
+				ch.ok_pressed.emit(); pressed = true
+		await main.get_tree().process_frame
+		if not pressed:
+			return

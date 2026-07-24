@@ -111,8 +111,22 @@ The pairs it uses — `(+0x08 over +0x04+0x08)`, `(+0x14 over +0x14+0x18)`,
 `(+0x1c over +0x1c+0x20)`, `(+0x24 over +0x24+0x28)` — match the draw method exactly.
 It compares with `jbe` (`@0x44a617`), so the **first** record wins a tie. Records are
 skipped when `rec+0x38 != 0` (`@0x44a40c`), `rec+0x30 >= 2` (two yellows, `@0x44a448`)
-or `rec+0x34 != 0` (red, `@0x44a455`). *The selector itself is not ported yet — no oracle
-banked — so `rec+0x38`'s meaning stays unnamed.*
+or `rec+0x34 != 0` (red, `@0x44a455`).
+
+**PORTED + ORACLE-BANKED 2026-07-24.** `tools/re/run_moms_oracle.sh` ->
+`tools/re/specs/moms_oracle.txt` drives the real function through the PCode emulator over
+nine crafted record sets; `Pm98StatStore.pick_mom()` reproduces all nine
+(`app/tests/test_mom_oracle.gd`, 18 checks). The oracle pins: the argmax spans BOTH
+arrays (A_max -> the away record), each of the three gates drops a higher-scoring record
+(B/C/D), `min(goals, 10)` really caps (I_goalcap), the FIRST record wins a tie inside one
+array (E) and across the two (F/G), and an empty report leaves `F+0xac` at 0 (H).
+
+`rec+0x38`'s meaning still stays unnamed — the port only knows it disqualifies.
+One path is **not** covered and is not guessed: on an exact tie the binary runs a second
+tie-break over the display event list (`F+0x64` entries via FUN_00449660,
+`@0x44a7f6..0x44a832`) with the FUN_00448a00 result code steering the final pick
+(`@0x44a871..0x44a8b9`). Every fixture runs `F+0x64 == 0`, where that loop cannot iterate
+and the result code provably does not matter (F and G differ only in it, both -> pid 11).
 
 ## TEAM TOTAL row (`@0x4b2322..0x4b246c`)
 

@@ -87,9 +87,17 @@ x385..476 / x525..609).
    together with the un-headered **H** column (`is_serious` -> YES/NO). The
    populated row's furniture is now frame-cut verbatim from witness 83
    (`tools/re/build_injuries_row_from_frame.py`) and the whole row render-diffs
-   **0 px** against it.Remaining gap: an INSURED row also draws a document icon at
-   row-x 459 (@0x543b09) that no frame witnesses on this screen, so the port
-   draws the policy digit alone.
+   **0 px** against it. The INSURED row's document icon (@0x543b09) is now
+   witnessed — see gap 6.
+6. **Insured-row document icon** — **CLOSED 2026-07-24.** `screenshots/wine-captures-2026-07-24-cadence-season-store/
+   07_injuries_row_insured_giggs.png` finally witnesses it: Giggs (Group 1) picked up a
+   7-week dislocated wrist in a live career, and his INSUR. cell reads
+   `[document icon] 1        0%` with COST equal to the full PRICE (£10,500) — i.e. **group
+   1 pays 0%**, so the icon marks "a policy exists", not "a payout happened". The sprite
+   occupies **x487..494 (8 px) x y266..275 (10 px)** inside the cell (cell border x483) on
+   that 640x480 frame: a document with a folded top-right corner and two darker text rules.
+   Remaining: cut it into the row strip (a baker pass); the port still draws the policy
+   digit alone.
 4. **"N PLAYERS" = physio quality** is *inferred* from frame 034's 5-stars↔"5
    PLAYERS" pairing (not reversed from the binary); flagged as an inference.
 5. **Header red-cross plaque** — the injuries-mode barra decoration (frame 034

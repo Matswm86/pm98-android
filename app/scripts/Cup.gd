@@ -242,8 +242,13 @@ static func round_due(b: Dictionary, week: int) -> bool:
 ## penalties on a level tie), advance the winners. Mutates `b`. `ratings_fn` is a
 ## Callable(id:int)->team_ratings dict; `names_fn` a Callable(id:int)->String.
 ## Returns {label, manager_tie, manager_out, champion, news:[{kind,text}], prize}.
+## `on_report` is the season-stat sink: when valid it is called as
+## `on_report.call(res, home_id, away_id)` for every match the MANAGER's club plays here,
+## so Career can fold the per-player records in. The live witness (a Euro tie moving every
+## Man Utd player's MP 7 -> 8 and club minutes 630 -> 720) is why cup ties feed it too.
 static func play_round(b: Dictionary, rng: RandomNumberGenerator,
-		ratings_fn: Callable, club_id: int, names_fn: Callable, xi_fn := Callable()) -> Dictionary:
+		ratings_fn: Callable, club_id: int, names_fn: Callable, xi_fn := Callable(),
+		on_report := Callable()) -> Dictionary:
 	var survivors: Array = (_survivors(b) as Array).duplicate()
 	var start_count := survivors.size()
 	var label := _label_for(b, start_count, (b.get("rounds", []) as Array).size() + 1)
@@ -285,7 +290,8 @@ static func play_round(b: Dictionary, rng: RandomNumberGenerator,
 	while i + 1 < players.size():
 		var h := int(players[i])
 		var a := int(players[i + 1])
-		var tie := _play_tie(rng, h, a, ratings_fn, round_legs, xi_fn)
+		var tie := _play_tie(rng, h, a, ratings_fn, round_legs, xi_fn,
+			(on_report if (h == club_id or a == club_id) else Callable()))
 		ties.append(tie)
 		next_survivors.append(int(tie["winner_id"]))
 		i += 2
@@ -325,10 +331,11 @@ static func play_round(b: Dictionary, rng: RandomNumberGenerator,
 ## Play the next due step: a group matchday while the group phase is live, else a
 ## knockout round. The single entry the season loop calls for any competition.
 static func play_next(b: Dictionary, rng: RandomNumberGenerator,
-		ratings_fn: Callable, club_id: int, names_fn: Callable, xi_fn := Callable()) -> Dictionary:
+		ratings_fn: Callable, club_id: int, names_fn: Callable, xi_fn := Callable(),
+		on_report := Callable()) -> Dictionary:
 	if _in_group_phase(b):
-		return play_group_matchday(b, rng, ratings_fn, club_id, names_fn, xi_fn)
-	return play_round(b, rng, ratings_fn, club_id, names_fn, xi_fn)
+		return play_group_matchday(b, rng, ratings_fn, club_id, names_fn, xi_fn, on_report)
+	return play_round(b, rng, ratings_fn, club_id, names_fn, xi_fn, on_report)
 
 
 ## Play one matchday across every group: simulate each fixture, update the standings, and
@@ -337,7 +344,8 @@ static func play_next(b: Dictionary, rng: RandomNumberGenerator,
 ## knockout draw. Returns {phase:"group", label, news, manager_result, manager_group,
 ## qualified, manager_qualified}.
 static func play_group_matchday(b: Dictionary, rng: RandomNumberGenerator,
-		ratings_fn: Callable, club_id: int, names_fn: Callable, xi_fn := Callable()) -> Dictionary:
+		ratings_fn: Callable, club_id: int, names_fn: Callable, xi_fn := Callable(),
+		on_report := Callable()) -> Dictionary:
 	var gs: Dictionary = b["group_stage"]
 	if (gs.get("groups", []) as Array).is_empty():
 		_draw_groups(gs, rng)
@@ -355,8 +363,11 @@ static func play_group_matchday(b: Dictionary, rng: RandomNumberGenerator,
 		for pr in pairs:
 			var h := int(clubs[int(pr[0])])
 			var a := int(clubs[int(pr[1])])
+			var mine_g := h == club_id or a == club_id
 			var res := MatchSim.simulate(rng, ratings_fn.call(h), ratings_fn.call(a), \
-					_xi(xi_fn, h), _xi(xi_fn, a), h, a)
+					_xi(xi_fn, h), _xi(xi_fn, a), h, a, 90, mine_g and on_report.is_valid())
+			if mine_g and on_report.is_valid():
+				on_report.call(res, h, a)
 			var hg := int(res["home_goals"])
 			var ag := int(res["away_goals"])
 			_apply_result(table, h, a, hg, ag)
@@ -499,14 +510,17 @@ static func group_tables(b: Dictionary) -> Array:
 ## rounds): home-and-away, advance on aggregate, a level aggregate goes to penalties.
 ## Returns the tie dict; scores are from the FIRST-named (home-first-leg) side's view.
 static func _play_tie(rng: RandomNumberGenerator, h: int, a: int, ratings_fn: Callable, \
-		legs := 1, xi_fn := Callable()) -> Dictionary:
+		legs := 1, xi_fn := Callable(), on_report := Callable()) -> Dictionary:
 	var rh: Dictionary = ratings_fn.call(h)
 	var ra: Dictionary = ratings_fn.call(a)
 	var xih := _xi(xi_fn, h)
 	var xia := _xi(xi_fn, a)
 	if legs >= 2:
-		return _play_two_leg_tie(rng, h, a, rh, ra, xih, xia)
-	var res := MatchSim.simulate(rng, rh, ra, xih, xia, h, a)
+		return _play_two_leg_tie(rng, h, a, rh, ra, xih, xia, on_report)
+	var st := on_report.is_valid()
+	var res := MatchSim.simulate(rng, rh, ra, xih, xia, h, a, 90, st)
+	if st:
+		on_report.call(res, h, a)
 	var hg := int(res["home_goals"])
 	var ag := int(res["away_goals"])
 	if hg != ag:
@@ -514,7 +528,9 @@ static func _play_tie(rng: RandomNumberGenerator, h: int, a: int, ratings_fn: Ca
 		return {"home_id": h, "away_id": a, "hg": hg, "ag": ag,
 			"winner_id": w, "loser_id": (a if w == h else h), "decided": "", "bye": false}
 	# Replay at the reversed venue (a at home).
-	var r2 := MatchSim.simulate(rng, ra, rh, xia, xih, a, h)
+	var r2 := MatchSim.simulate(rng, ra, rh, xia, xih, a, h, 90, st)
+	if st:
+		on_report.call(r2, a, h)
 	var ag2 := int(r2["home_goals"])
 	var hg2 := int(r2["away_goals"])
 	if ag2 != hg2:
@@ -534,9 +550,13 @@ static func _play_tie(rng: RandomNumberGenerator, h: int, a: int, ratings_fn: Ca
 ## aggregate and ET away goals still count), then penalties. Stores both leg scores
 ## (home-first-leg side's view), the aggregate, and any ET goals.
 static func _play_two_leg_tie(rng: RandomNumberGenerator, h: int, a: int, rh: Dictionary, \
-		ra: Dictionary, xih := [], xia := []) -> Dictionary:
-	var l1 := MatchSim.simulate(rng, rh, ra, xih, xia, h, a)        # leg 1: h at home
-	var l2 := MatchSim.simulate(rng, ra, rh, xia, xih, a, h)        # leg 2: a at home
+		ra: Dictionary, xih := [], xia := [], on_report := Callable()) -> Dictionary:
+	var st := on_report.is_valid()
+	var l1 := MatchSim.simulate(rng, rh, ra, xih, xia, h, a, 90, st)   # leg 1: h at home
+	var l2 := MatchSim.simulate(rng, ra, rh, xia, xih, a, h, 90, st)   # leg 2: a at home
+	if st:
+		on_report.call(l1, h, a)
+		on_report.call(l2, a, h)
 	var h_goals1 := int(l1["home_goals"])
 	var a_goals1 := int(l1["away_goals"])
 	var a_goals2 := int(l2["home_goals"])              # a is home in leg 2
@@ -555,7 +575,9 @@ static func _play_two_leg_tie(rng: RandomNumberGenerator, h: int, a: int, rh: Di
 	if w == -1:
 		# 2) extra time in leg 2 (a at home); its goals join the aggregate, ET away goals
 		# (h's) still count. A 30-minute period off the same engine.
-		var et := MatchSim.simulate(rng, ra, rh, xia, xih, a, h, 30)
+		var et := MatchSim.simulate(rng, ra, rh, xia, xih, a, h, 30, st)
+		if st:
+			on_report.call(et, a, h, false)   # same fixture as leg 2 -- stats only
 		var et_a := int(et["home_goals"])              # a home in ET
 		var et_h := int(et["away_goals"])              # h away in ET (an away goal)
 		h_agg += et_h
@@ -594,10 +616,13 @@ static func _two_leg_winner(h: int, a: int, h_agg: int, a_agg: int, h_away: int,
 ## to penalties. `h` is nominally the home/first-named side (e.g. the league champions).
 ## Returns a tie-shaped dict so the cup UI can render it like any other tie.
 static func single_neutral_match(rng: RandomNumberGenerator, h: int, a: int, \
-		ratings_fn: Callable, xi_fn := Callable()) -> Dictionary:
+		ratings_fn: Callable, xi_fn := Callable(), on_report := Callable()) -> Dictionary:
 	var rh: Dictionary = ratings_fn.call(h)
 	var ra: Dictionary = ratings_fn.call(a)
-	var res := MatchSim.simulate(rng, rh, ra, _xi(xi_fn, h), _xi(xi_fn, a), h, a)
+	var st := on_report.is_valid()
+	var res := MatchSim.simulate(rng, rh, ra, _xi(xi_fn, h), _xi(xi_fn, a), h, a, 90, st)
+	if st:
+		on_report.call(res, h, a)
 	var hg := int(res["home_goals"])
 	var ag := int(res["away_goals"])
 	if hg != ag:

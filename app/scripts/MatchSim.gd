@@ -72,14 +72,21 @@ static func _usable(xi) -> bool:
 ## the stat engine's own resolved scorers (empty on the legacy fallback) so the commentary
 ## feed can name the players who actually scored instead of re-rolling its own.
 static func simulate(rng: RandomNumberGenerator, rh: Dictionary, ra: Dictionary, \
-		xi_h: Array, xi_a: Array, tid_h: int, tid_a: int, minutes := 90) -> Dictionary:
+		xi_h: Array, xi_a: Array, tid_h: int, tid_a: int, minutes := 90, \
+		stats := false) -> Dictionary:
 	if _stat_on() and _usable(xi_h) and _usable(xi_a):
 		var mem := Pm98StatMatch.build_mem(xi_h, xi_a, tid_h, tid_a)
 		var prng := Pm98StatMatch.Rng.new(rng.randi())
+		var rep = null
+		var pids := {}
+		if stats:
+			rep = Pm98StatStore.Report.new(tid_h, tid_a)
+			pids = pid_map(xi_h, xi_a)
 		if minutes >= 90:
-			Pm98StatMatch.simulate(mem, prng)
+			Pm98StatMatch.simulate(mem, prng, false, false, rep, pids,
+				Pm98StatMatch.CADENCE_MATCH)
 		else:
-			Pm98StatMatch.simulate_extra_time(mem, prng)
+			Pm98StatMatch.simulate_extra_time(mem, prng, rep, pids)
 		var sc := Pm98StatMatch.score(mem)
 		return {
 			"home_goals": int(sc.get(tid_h & 0xFFFF, 0)),
@@ -88,6 +95,8 @@ static func simulate(rng: RandomNumberGenerator, rh: Dictionary, ra: Dictionary,
 			"goals": _resolve_goals(mem, xi_h, xi_a, tid_h, tid_a),
 			# real engine POSSESSION counters ([home,away]); the BRIEF bar reads the split.
 			"possession": Pm98StatMatch.possession(mem),
+			# Pm98StatStore.Report when `stats` was asked for, else null.
+			"report": rep,
 		}
 	# LOUD fallback (never silent): a non-empty XI that fails _usable means the caller
 	# expected the faithful engine and is getting the legacy abstraction instead.
@@ -98,7 +107,26 @@ static func simulate(rng: RandomNumberGenerator, rh: Dictionary, ra: Dictionary,
 	var res := MatchEngine.simulate(rng, rh, ra, minutes)
 	res["goals"] = []
 	res["possession"] = []   # legacy path produces no possession -> BRIEF bar stays 50/50
+	res["report"] = null      # no per-player records exist on the abstracted model
 	return res
+
+
+## The MANDATORY `pids` bridge for Pm98StatStore.commit(). `build_mem` writes slot+1
+## into participant +0x88 on BOTH sides, so records keyed on the raw value would merge
+## the two teams on ids 1..11; the binary keys them on the GLOBAL player id. Maps
+## `side * 11 + slot` -> the game_db player id. A slot with no id (a sparse decoded
+## record) is left out, so commit() falls back to slot+1 for it rather than inventing one.
+static func pid_map(xi_h: Array, xi_a: Array) -> Dictionary:
+	var out: Dictionary = {}
+	for side in 2:
+		var xi: Array = xi_h if side == 0 else xi_a
+		for slot in mini(xi.size(), 11):
+			if not (xi[slot] is Dictionary):
+				continue
+			var pid := int((xi[slot] as Dictionary).get("id", -1))
+			if pid > 0:
+				out[side * 11 + slot] = pid
+	return out
 
 
 ## Map the stat engine's raw goal events to named scorers for the commentary feed:

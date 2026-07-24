@@ -505,6 +505,38 @@ static func _buildup(mem: Mem, rng: Rng, span: int, base: int) -> void:
 	_buildup_assist(mem, rng, span, base)
 
 
+# --- stat-commit cadence ----------------------------------------------------
+## FUN_0044ee70 forks at @0x44eed9 on `DAT_00652a10 != 0` and, when that holds, on the
+## per-team flags `M+0x7f0` / `M+0xf90` (@0x44eee6..@0x44eef4). Both zero -> the
+## STATISTICAL branch at @0x44f5ce, which is what this file ports (all four
+## FUN_00450510 call sites -- @0x44f90a / @0x44fc21 / @0x44ff46 / @0x450235 -- live in
+## it). Otherwise the PRESENTED branch at @0x44eefa runs instead.
+##
+## A live read of the running career (2026-07-24, winedbg gdb proxy, RSP `m652a10,4`)
+## returns **1**, so the manager's own fixture takes the PRESENTED branch. That settles
+## the cadence contradiction logged in the 07-24 s4 handoff: nothing about the
+## FUN_0044e440 oracle is wrong, it simply is not the branch the live sheets came from.
+##
+## CADENCE_PERIOD -- the statistical branch, traced instruction by instruction: commit
+##   at every period transition. FUN_0044e440 zeroes participant +0xec..+0x12f
+##   (@0x44e7ad..@0x44e7e0, unconditional) and FUN_00449990 overwrites the record with a
+##   `rep movsd` of 0x12 dwords (@0x449a50), so a full-time record holds the SECOND HALF
+##   only and MIN reads 45.
+## CADENCE_MATCH -- the presented branch's MEASURED contract. Two live captures
+##   (`screenshots/wine-captures-2026-07-24-statistics-live` and
+##   `.../wine-captures-2026-07-24-cadence-season-store`) show the full-time sheet is
+##   whole-match cumulative: MIN 45 -> 90 on every player who ran the 90, every column
+##   monotone, and a player whose minutes were frozen by an event (Cole, red card at
+##   20') frozen in every column too. The season store then gains exactly that sheet
+##   (Beckham PASSES 61/70 -> 69/81 = +8/+11, his full-time row; MIN 630 -> 720). So the
+##   report record must hold whole-match totals: commit ONCE, after the last period,
+##   with no intermediate zeroing. The presented branch's internal commit sites
+##   (@0x44f2b0, FUN_0044d3d0 @0x44d4d5, FUN_0044d520 @0x44d526) are NOT traced -- its
+##   stat source is the positional engine, which is the separate M5 workstream -- so
+##   this cadence is banked from the frames, not from the disassembly.
+enum { CADENCE_PERIOD, CADENCE_MATCH }
+
+
 # --- FUN_0044ee70 (PS==5): simulate a full instant-result fixture -----------
 ## Drives the validated resolver + stats accumulator through the binary's segment
 ## ordering. H1 + H2 always run. For a cup tie still level at full time the binary
@@ -525,14 +557,18 @@ static func _buildup(mem: Mem, rng: Rng, span: int, base: int) -> void:
 ## the oracle tests that omit it stay bit-identical.
 ## `pids` bridges the port's slot+1 participant ids to real global ids -- see
 ## Pm98StatStore.commit(). Ignored when `rep` is null.
+## `cadence` picks WHEN the commit runs -- see the CADENCE_* block above. The default
+## reproduces the statistical branch this file ports; CADENCE_MATCH reproduces the
+## presented branch's measured whole-match record.
 static func simulate(mem: Mem, rng: Rng, run_et := false, run_pen := false,
-		rep = null, pids := {}) -> void:
+		rep = null, pids := {}, cadence := CADENCE_PERIOD) -> void:
+	var per_period: bool = rep != null and cadence == CADENCE_PERIOD
 	# first half (segment 0): buildup minutes rand%45 + 1
 	_buildup(mem, rng, 0x2d, 1)
 	_half_chances(mem, rng, 0, 0x2d)
 	_stats(mem, rng, 0x2d, 0, 0)
 	# FUN_0044d0d0 half transition -- no rand, no event; commits the H1 stats
-	if rep != null:
+	if per_period:
 		Pm98StatStore.commit(mem, rep, pids)
 	# second half (segment 1): buildup minutes rand%45 + 46
 	_buildup(mem, rng, 0x2d, 0x2e)
@@ -540,25 +576,29 @@ static func simulate(mem: Mem, rng: Rng, run_et := false, run_pen := false,
 	_stats(mem, rng, 0x2d, 0, 0)
 	# (FUN_00450e60 full-time gate -- no rand; its result is `run_et` / `run_pen`.)
 	# FUN_0044d190 full-time transition -- commits the H2 stats
-	if rep != null:
+	if per_period:
 		Pm98StatStore.commit(mem, rep, pids)
 	if run_et:
 		# ET1 (segment 2): buildup minutes rand%15 + 91
 		_et_half(mem, rng, 2, 0x5b)
 		# FUN_0044d250 ET1->ET2 transition -- no rand; commits the ET1 stats
-		if rep != null:
+		if per_period:
 			Pm98StatStore.commit(mem, rep, pids)
 		# ET2 (segment 3): buildup minutes rand%15 + 106
 		_et_half(mem, rng, 3, 0x6a)
 		# (FUN_00450e60 ET gate) + FUN_0044d310 transition -- no rand
-		if rep != null:
+		if per_period:
 			Pm98StatStore.commit(mem, rep, pids)
 	if run_pen:
 		# penalty shootout (FUN_00606220 finalize -- no rand)
 		_penalties(mem, rng)
 		# FUN_0044d520 -- the full-time handler; commits, then stamps the MoM flag
-		if rep != null:
+		if per_period:
 			Pm98StatStore.commit(mem, rep, pids)
+	# CADENCE_MATCH: the single end-of-match commit, on a participant block that was
+	# never zeroed -- so every record holds the whole match, as the live sheets show.
+	if rep != null and cadence == CADENCE_MATCH:
+		Pm98StatStore.commit(mem, rep, pids)
 
 
 # --- FUN_0044d5f0: the Mem-from-clubs bridge --------------------------------
@@ -669,9 +709,12 @@ static func simulate_fixture(seed: int, xi0: Array, xi1: Array, team_id0: int, \
 ## Standalone extra time (two 15-min segments) on a fresh Mem -- for a two-legged cup
 ## tie whose 90-min legs were simulated separately and whose aggregate is level. Mirrors
 ## FUN_0044ee70's ET tail without the preceding H1/H2. Read the ET goals via score(mem).
-static func simulate_extra_time(mem: Mem, rng: Rng) -> void:
+static func simulate_extra_time(mem: Mem, rng: Rng, rep = null, pids := {}) -> void:
 	_et_half(mem, rng, 2, 0x5b)
 	_et_half(mem, rng, 3, 0x6a)
+	# Standalone ET is always the whole "match" here, so it commits once (CADENCE_MATCH).
+	if rep != null:
+		Pm98StatStore.commit(mem, rep, pids)
 
 
 ## Final score as { teamId: goals } from the event queue (goals = non-penalty events).

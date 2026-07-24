@@ -1,5 +1,16 @@
 # Per-player stat store (MP/MIN/RATING/G./SHOTS/PASSES/TAC.) — RE map
 
+> **UPDATED 2026-07-24.** Two corrections from later sessions live in sibling docs and
+> supersede anything here that disagrees:
+> * the row widget's stride is **`0x444`** (not `0x41c`) and RATING is **computed, never
+>   stored** — [`statistics_row_widget_re.md`](statistics_row_widget_re.md);
+> * `FUN_0044e440`'s commit-and-zero cadence is the **statistical** branch of
+>   `FUN_0044ee70` only. The manager's own fixture takes the **presented** branch, whose
+>   full-time record holds the WHOLE match — measured, see
+>   [`stat_commit_cadence_re.md`](stat_commit_cadence_re.md).
+> The MoM selector `FUN_0044a370` is now ported and oracle-banked
+> (`tools/re/run_moms_oracle.sh`).
+
 Status: **CLOSED 2026-07-24 (second pass).** Store, getter, write path and accumulator
 were oracle-verified earlier the same day. The two gaps that remained — the record
 dword → display-column map and the fold-back writer — are now both closed:

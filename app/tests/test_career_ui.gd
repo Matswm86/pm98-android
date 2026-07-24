@@ -33,6 +33,8 @@ func _run() -> void:
 
 	main._begin_career("Test Mgr", league, club)   # build career + enter hub
 	await process_frame
+	# The hub is raised only at the END of the witnessed curtain-raiser chain.
+	await _clear_season_open_chain(main)
 	ok = _assert(main._career != null and main._career.club_id == int(club["id"]),
 		"career created for %s" % club.get("name", "?")) and ok
 	ok = _assert(main._career.week == 0, "starts at week 0") and ok
@@ -204,9 +206,38 @@ func _run() -> void:
 		ok = _assert(rival_up, "hub OPPONENT opens VIEW RIVAL (RivalScreen)") and ok
 	await process_frame
 
-	# CONTINUE plays the week through the hub router (no green hub left).
+	# CONTINUE plays the week through the hub router (no green hub left). On the career's
+	# FIRST match it raises MATCH OPTIONS first and the week does NOT advance until that
+	# is confirmed (witnessed, matchday_flow_witness_re §1), so drive the modal.
 	var wk: int = main._career.week
 	main._menu_action("continue", main._hub)
+	await process_frame
+	# By week 4 the saved XI has usually picked up an injury/ban, and the witnessed gate
+	# (matchday_flow_witness_re §3) fires BEFORE the modal: the alert raises and the week
+	# does NOT advance. Assert that, clear it, then repair the XI the way LINE-UP would.
+	if main._xi_has_unavailable():
+		ok = _assert(main._hub.alert_active(),
+			"CONTINUE with an unavailable player raises the line-up alert") and ok
+		ok = _assert(main._career.week == wk, "and the week does NOT advance") and ok
+		main._hub._next_alert()
+		# Repair the XI the way the player would in LINE-UP: pick from the AVAILABLE
+		# squad only (auto_pick over the whole squad can re-select the injured man).
+		var fit: Dictionary = main._mgr_club().duplicate()
+		var avail: Array = []
+		for pl in fit.get("players", []):
+			if Availability.is_available(pl):
+				avail.append(pl)
+		fit["players"] = avail
+		main._save_tactics(Tactics.auto_pick(fit))
+		main._menu_action("continue", main._hub)
+		await process_frame
+	var opts_up := false
+	for ch in main.get_children():
+		if ch is MatchOptions:
+			opts_up = true
+			var am: Node = main.get_node_or_null(^"/root/AudioManager")
+			ch.confirmed.emit(am.match_view_mode, am.match_settings())
+	ok = _assert(opts_up, "first CONTINUE raises MATCH OPTIONS before the match") and ok
 	await process_frame
 	ok = _assert(main._career.week == wk + 1, "hub CONTINUE advanced a week (%d->%d)" % [
 		wk, main._career.week]) and ok
@@ -218,3 +249,21 @@ func _run() -> void:
 func _assert(cond: bool, label: String) -> bool:
 	print("  [%s] %s" % ["PASS" if cond else "FAIL", label])
 	return cond
+
+## Drive the witnessed career-entry curtain-raiser chain (orig/06 + orig/70-73):
+## TEAMS IN CHAMPIONSHIPS -> [CHARITY SHIELD card] -> START OF SEASON -> hub. Each is a
+## real screen with a real button signal, so the test presses them rather than asserting
+## behind them. Returns once no curtain-raiser is left mounted.
+func _clear_season_open_chain(main: Node) -> void:
+	for _step in 6:
+		var pressed := false
+		for ch in main.get_children():
+			if ch is ChampsScreen:
+				ch.continue_pressed.emit(); pressed = true
+			elif ch is SeasonStartScreen:
+				ch.continue_pressed.emit(); pressed = true
+			elif ch is CharityShieldScreen:
+				ch.ok_pressed.emit(); pressed = true
+		await main.get_tree().process_frame
+		if not pressed:
+			return

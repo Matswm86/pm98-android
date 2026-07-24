@@ -101,6 +101,9 @@ var _away_kit: Texture2D
 var _feed: Array = []          # honest feed: [{minute, side, text, goal, kickoff}]
 var _minute := 0.0
 var _playing := true
+var _am: Node             # /root/AudioManager (absent in some headless harnesses)
+var _prev_minute := 0.0   # last frame's clock, so a goal fires its roar exactly once
+var _final_done := false  # the full-time whistle is a one-shot
 var _started := false   # KICK OFF pressed (running/paused chrome vs the idle board)
 var _press := ""
 var _poss_final := 0.5     # home possession fraction (real engine split; 0.5 = neutral gap)
@@ -121,6 +124,7 @@ func _ready() -> void:
 	custom_minimum_size = Vector2(W, H)
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	gui_input.connect(_on_input)
+	_am = get_node_or_null(^"/root/AudioManager")
 	set_process(true)
 	queue_redraw()
 
@@ -277,7 +281,39 @@ func _kit_tex(club_id: int) -> Texture2D:
 func _process(delta: float) -> void:
 	if _playing and _minute < 90.0:
 		_minute = minf(90.0, _minute + delta * MIN_PER_SEC)
+		# Every feed line the clock has just passed fires its SFX once.
+		for ln in _feed:
+			var m := float(ln.get("minute", 0))
+			if _prev_minute < m and m <= _minute:
+				var key := _line_sfx(ln)
+				if key != "" and _am:
+					_am.sfx(key)
+		_prev_minute = _minute
+		if _minute >= 90.0 and not _final_done:
+			_final_done = true
+			if _am:
+				_am.sfx("whistle_final")
 		queue_redraw()
+
+
+## SFX key for a commentary line, or "" if it has none. Goals roar; a card draws the
+## crowd. The feed itself only ever carries goal + kick-off lines today (the fabricated
+## RATE_* chatter is dropped in setup()), so the card branches are dormant but kept:
+## they are the original mapping and cost nothing.
+func _line_sfx(ln: Dictionary) -> String:
+	if ln.get("goal") == true:
+		return "goal"
+	var t := str(ln.get("text", ""))
+	if t.begins_with("Yellow card:"):
+		return "card_yellow"
+	if t.ends_with("sent off"):
+		return "card_red"
+	return ""
+
+
+func _exit_tree() -> void:
+	if _am:
+		_am.stop_crowd()
 
 
 # ---- input ---------------------------------------------------------------
@@ -315,6 +351,13 @@ func _activate(target: String) -> void:
 			if not _playing:
 				_playing = true
 				_started = true
+				# The menu theme yields to the crowd bed and the whistle blows.
+				if _am == null:
+					_am = get_node_or_null(^"/root/AudioManager")
+				if _am:
+					_am.stop_music()
+					_am.play_crowd()
+					_am.sfx("whistle")
 		"exit":
 			# At FULL TIME the EXIT slot holds CONTINUE (orig/68) -> the RESULT
 			# read-out. Before full time EXIT leaves the running view (the career

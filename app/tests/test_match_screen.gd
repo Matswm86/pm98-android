@@ -40,15 +40,33 @@ func _run() -> void:
 	scr.setup("ARSENAL", "CHELSEA", 2, 1, lines, 38, 39)
 	await process_frame
 
-	# HONEST FEED: kick-off + 3 goals only (all fabricated lines dropped).
-	ok = _assert(scr._feed.size() == 4, "feed = kick-off + 3 goals only (%d)" % scr._feed.size()) and ok
+	# FEED: kick-off + every SIDE-TAGGED event. Since 2026-07-23 the BRIEF keeps the
+	# surrounding narrative (shots, corners, cards) as well as the goals -- owner: "there
+	# are many more match events in the original BRIEF, not only goals". Only the phase
+	# markers (side == -1: HALF TIME / FULL TIME) are dropped, because MatchScreen draws
+	# the clock itself.
+	ok = _assert(scr._feed.size() == 7, "feed = kick-off + 6 side-tagged events (%d)" % scr._feed.size()) and ok
 	ok = _assert(bool(scr._feed[0].get("kickoff", false)), "row 0 is the KICK OFF line") and ok
-	var only_goals := true
+	var phase_markers := 0
 	for i in range(1, scr._feed.size()):
-		if not bool(scr._feed[i].get("goal", false)):
-			only_goals = false
-	ok = _assert(only_goals, "every non-kickoff feed line is a real goal (no RATE_* fabrications)") and ok
-	ok = _assert(str(scr._feed[1]["text"]).begins_with("Goal by A (ARSENAL)"), "goal line names scorer + club") and ok
+		if int(scr._feed[i].get("side", -1)) < 0:
+			phase_markers += 1
+	ok = _assert(phase_markers == 0, "no phase-marker line survives into the feed") and ok
+	var goal_minutes: Array = []
+	for i in range(1, scr._feed.size()):
+		if bool(scr._feed[i].get("goal", false)):
+			goal_minutes.append(int(scr._feed[i]["minute"]))
+	ok = _assert(goal_minutes == [23, 58, 71], "the 3 real goals keep their flag + minutes (%s)" % str(goal_minutes)) and ok
+	ok = _assert(str(scr._feed[1]["text"]) == "Corner taken by A", "a MatchCommentary line passes through verbatim") and ok
+
+	# The RAW stat-engine goal vector (no pre-formatted text) is the shape that gets the
+	# club appended.
+	var raw: MatchScreen = load("res://scenes/MatchScreen.gd").new()
+	get_root().add_child(raw)
+	raw.setup("ARSENAL", "CHELSEA", 1, 0, [{"minute": 23, "side": 0, "scorer": "A"}], 38, 39)
+	await process_frame
+	ok = _assert(str(raw._feed[1]["text"]) == "Goal by A (ARSENAL)", "raw goal vector names scorer + club") and ok
+	raw.queue_free()
 
 	# Score counts goals as the clock passes them.
 	ok = _assert(scr._score_at(5.0) == Vector2i(0, 0), "0:0 before any goal") and ok
@@ -58,7 +76,8 @@ func _run() -> void:
 
 	# Feed grows with the clock.
 	ok = _assert(scr._events_upto(10.0).size() == 1, "only kick-off before 23'") and ok
-	ok = _assert(scr._events_upto(30.0).size() == 2, "kick-off + first goal by 30'") and ok
+	# By 30' the clock has passed the 12' corner and the 23' goal.
+	ok = _assert(scr._events_upto(30.0).size() == 3, "kick-off + 12' + 23' by 30' (%d)" % scr._events_upto(30.0).size()) and ok
 
 	# Half/state label flips with the clock.
 	ok = _assert(scr._half_label(0.0) == "KICK OFF", "kick off at 0'") and ok

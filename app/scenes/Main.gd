@@ -2340,12 +2340,16 @@ func _show_insurance_screen() -> void:
 		_show_injuries_screen())
 
 ## The LINE-UP STATISTICS sub-screen (StatisticsScreen.gd; docs/re/statistics_screen_re.md):
-## the squad roster over the baked table; per-player season stats are an honest gap (untracked).
+## the squad roster over the baked table, with the REAL per-player season records out of
+## the career's Pm98StatStore (the port of playerobj+0x24) and the club-counter TEAM TOTAL.
 func _show_statistics_screen() -> void:
 	var scr: StatisticsScreen = load("res://scenes/StatisticsScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
-	scr.setup(_mgr_club(), _match_header())
+	var club := _mgr_club()
+	var rows := _career.season_stat_rows(club.get("players", []) as Array)
+	scr.setup(club, _match_header(), rows,
+		_career.season_stat_totals(rows, int(club.get("id", -1))))
 	scr.back_pressed.connect(func() -> void:
 		scr.queue_free()
 		_show_lineup_screen())
