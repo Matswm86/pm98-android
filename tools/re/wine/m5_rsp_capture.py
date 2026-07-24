@@ -13,7 +13,10 @@ the fallback vtable scan. Run at the KICK OFF screen (phase 2, clock frozen):
      structural offsets, skip ptr-looking pairs) and re-verify.
   3. arm Z2 on the seed, then per STORE stop (eip != the 0x5ec255 entry-load twin)
      log clk/seed/ret0 and, while win_lo <= clk <= win_hi, all 22 players'
-     [team, idx, x, y, +0x13c, +0x17c, +0x180]. Exit once clk > stop_clk.
+     [team, idx, x, y, +0x13c, +0x17c, +0x180, 0x34, 0x64, 0x68, 0x6c, 0x54, 0x58]
+     plus the ball row (base+0x1610) with the s51 tail: the FUN_0058fda0 predicted
+     trajectory buffer ball+0x114..0x1d4 (48 i32) + segments +0x74/78/7c. Exit once
+     clk > stop_clk.
 Same stub gotchas as the seedwatch (see README.md): ONE connection, game dies if the
 stub is killed — capture first, the game is expendable after.
 """
@@ -220,8 +223,12 @@ def main() -> None:
         # s46 sub-LSB drill: the ball struct is the m+0x1610 embedding (ball+0x40 is the
         # carrier ptr the port mirrors as m[0x1650]). Row: [x, y, z, vx, vy, vz, face34,
         # carrier40, recv4c, own54, +0x58, N5c] — pos/vel signed, ptrs raw u32.
-        b = mread(base + 0x1610, 0x60)
-        return [
+        # s51 tail (indices 12..62): the FUN_0058fda0 predicted-trajectory buffer that
+        # feeds the b0040 interception bisection — ball+0x114..0x1d4 (16 vec3, stride 12
+        # = 48 i32) then the 3 bounce-segment lengths ball+0x74/0x78/0x7c. Read WHOLE so
+        # the capture decides whether silicon's marker ladder differs at the clk-639 fork.
+        b = mread(base + 0x1610, 0x1E0)  # 0x1610..0x17f0 covers 0x0..0x1d4 + segments
+        row = [
             struct.unpack_from("<i", b, 0x4)[0],
             struct.unpack_from("<i", b, 0x8)[0],
             struct.unpack_from("<i", b, 0xC)[0],
@@ -235,6 +242,9 @@ def main() -> None:
             struct.unpack_from("<i", b, 0x58)[0],
             struct.unpack_from("<i", b, 0x5C)[0],
         ]
+        row += [struct.unpack_from("<i", b, 0x114 + 4 * k)[0] for k in range(48)]
+        row += [struct.unpack_from("<i", b, off)[0] for off in (0x74, 0x78, 0x7C)]
+        return row
 
     # ---- 3. Z2 seed watch ----
     ok = r.cmd(f"Z2,{SEED_VA:x},4")
