@@ -55,33 +55,6 @@ static var _dim_tex_cache := {}        # Texture2D -> ImageTexture (dimmed copy)
 static var _loaded := false
 
 
-## Load a BMFont atlas page as an Image.
-##
-## These PNGs used to carry importer="skip" so only the BMFont importer touched them,
-## and the page was read back with FileAccess. That does not survive an export: Godot
-## drops a "skip" file entirely, and a shipped APK's assets/art/fonts/ held nothing but
-## .import stubs — the page loaded empty, every glyph measured 0 ink, and EVERY PM98
-## alert box rendered as a small blank white rectangle on Android (signings, rejections,
-## "The scout has finished his search.", ...). importer="keep" did not ship it either
-## (verified against a CI-built APK). So the pages now import as ordinary lossless
-## textures, which the exporter definitely carries, and we read the image off that.
-## The raw-file read stays as a fallback, and a total failure is loud, never silent.
-static func _load_font_page(path: String) -> Image:
-	var tex: Variant = load(path) if ResourceLoader.exists(path) else null
-	if tex is Texture2D:
-		var ti := (tex as Texture2D).get_image()
-		if ti != null and ti.get_width() > 0:
-			if ti.is_compressed():
-				ti.decompress()
-			return ti
-	var img := Image.new()
-	var raw := FileAccess.get_file_as_bytes(path)
-	if raw.size() > 0 and img.load_png_from_buffer(raw) == OK and img.get_width() > 0:
-		return img
-	push_error("PMAlert: font page %s is missing — alert text cannot render" % path)
-	return Image.create(1, 1, false, Image.FORMAT_RGBA8)
-
-
 static func _load() -> void:
 	if _loaded:
 		return
@@ -91,32 +64,17 @@ static func _load() -> void:
 	_ok_hot_img = (load("res://art/screens/alert/ok_hot.png") as Texture2D).get_image()
 	_yes_img = (load("res://art/screens/alert/yes.png") as Texture2D).get_image()
 	_no_img = (load("res://art/screens/alert/no.png") as Texture2D).get_image()
-	_font_page = _load_font_page("res://art/fonts/proman10.png")
+	# Atlas page + char table both come from PMFont: NEITHER art/fonts/proman10.png
+	# NOR .fnt exists in an exported build (Godot ships only the .import stub and
+	# the imported .ctex/.fontdata), so reading them raw gave an empty glyph table
+	# on device and every alert box drew as a blank white rectangle.
+	_font_page = PMFont.page("proman10")
 	for img in [_title_img, _icon_img, _ok_img, _ok_hot_img, _yes_img, _no_img, _font_page]:
 		if img.is_compressed():
 			img.decompress()
-	var fnt := FileAccess.get_file_as_string("res://art/fonts/proman10.fnt")
-	var re := RegEx.create_from_string(
-		"char id=(\\d+) +x=(\\d+) +y=(\\d+) +width=(\\d+) +height=(\\d+) " +
-		"+xoffset=(-?\\d+) +yoffset=(-?\\d+) +xadvance=(-?\\d+)")
-	for m in re.search_all(fnt):
-		var rect := Rect2i(int(m.get_string(2)), int(m.get_string(3)),
-			int(m.get_string(4)), int(m.get_string(5)))
-		# ink width = rightmost non-empty bitmap column + 1 (cells carry padding)
-		var ink_w := 0
-		for gx in range(rect.size.x - 1, -1, -1):
-			for gy in rect.size.y:
-				if _font_page.get_pixel(rect.position.x + gx, rect.position.y + gy).a >= 0.5:
-					ink_w = gx + 1
-					break
-			if ink_w > 0:
-				break
-		_glyphs[int(m.get_string(1))] = {
-			"rect": rect,
-			"off": Vector2i(int(m.get_string(6)), int(m.get_string(7))),
-			"adv": int(m.get_string(8)),
-			"ink_w": ink_w,
-		}
+	_glyphs = PMFont.chars("proman10")
+	if _glyphs.is_empty():
+		push_error("PMAlert: proman10 char table is empty — alert text cannot render")
 	var lut: Dictionary = JSON.parse_string(
 		FileAccess.get_file_as_string("res://art/screens/alert/dim_lut.json"))
 	for k in lut:

@@ -739,30 +739,16 @@ static var _atlas: Dictionary = {}   # font key -> {tex, metrics: {code: [x,y,w,
 func _font_atlas(key: String) -> Dictionary:
 	if not _atlas.has(key):
 		var info := {}
-		# The BMFont atlas png. It imports as an ordinary lossless texture (a raw
-		# FileAccess read does NOT survive the export — that is what blanked every
-		# alert box on Android, see PMAlert._load_font_page), with the raw read kept
-		# as a fallback.
-		var path := "res://art/fonts/%s.png" % key
-		var tex: Texture2D = load(path) if ResourceLoader.exists(path) else null
-		if tex == null:
-			var img := Image.new()
-			if img.load_png_from_buffer(FileAccess.get_file_as_bytes(path)) == OK:
-				tex = ImageTexture.create_from_image(img)
+		# Page + char table both via PMFont: neither art/fonts/<key>.png nor .fnt
+		# is present in an exported build (only the .import stub and the imported
+		# .ctex/.fontdata are), so a raw FileAccess read gave an empty table on
+		# device — the same bug that blanked every alert box.
 		var metrics := {}
-		var f := FileAccess.open("res://art/fonts/%s.fnt" % key, FileAccess.READ)
-		while f != null and not f.eof_reached():
-			var line := f.get_line()
-			if not line.begins_with("char id="):
-				continue
-			var kv := {}
-			for part in line.split(" ", false):
-				var eq := part.split("=")
-				if eq.size() == 2:
-					kv[eq[0]] = eq[1]
-			metrics[int(kv.get("id", -1))] = [int(kv.get("x", 0)), int(kv.get("y", 0)),
-				int(kv.get("width", 0)), int(kv.get("height", 0)), int(kv.get("xadvance", 0))]
-		info["tex"] = tex
+		for code in PMFont.chars(key):
+			var g: Dictionary = PMFont.chars(key)[code]
+			var r: Rect2i = g["rect"]
+			metrics[int(code)] = [r.position.x, r.position.y, r.size.x, r.size.y, int(g["adv"])]
+		info["tex"] = PMFont.page_texture(key)
 		info["metrics"] = metrics
 		_atlas[key] = info
 	return _atlas[key]

@@ -233,27 +233,18 @@ func _load_club_tactics() -> void:
 
 
 ## ProMan8 digit glyph cells (BMFont) for the marker-number composites.
+## Via PMFont — neither the raw .fnt nor the source png is in an exported build.
 func _load_digit_cells() -> void:
-	var f := FileAccess.open("res://art/fonts/proman8.fnt", FileAccess.READ)
-	if f == null:
-		return
-	while not f.eof_reached():
-		var line := f.get_line()
-		if not line.begins_with("char id="):
+	var tbl := PMFont.chars("proman8")
+	for cid in range(48, 58):
+		if not tbl.has(cid):
 			continue
-		var kv := {}
-		for part in line.split(" ", false):
-			var eq := part.split("=")
-			if eq.size() == 2:
-				kv[eq[0]] = eq[1]
-		var cid := int(kv.get("id", "0"))
-		if cid >= 48 and cid <= 57:
-			_digit_cells[char(cid)] = {"x": int(kv["x"]), "y": int(kv["y"]),
-				"w": int(kv["width"]), "h": int(kv["height"]), "adv": int(kv["xadvance"])}
-	# the BMFont atlas png is importer="skip" (the .fnt loader reads it raw)
-	_pm8_atlas = Image.load_from_file("res://art/fonts/proman8.png")
-	if _pm8_atlas != null:
-		_pm8_atlas.convert(Image.FORMAT_RGBA8)
+		var g: Dictionary = tbl[cid]
+		var r: Rect2i = g["rect"]
+		_digit_cells[char(cid)] = {"x": r.position.x, "y": r.position.y,
+			"w": r.size.x, "h": r.size.y, "adv": int(g["adv"])}
+	_pm8_atlas = PMFont.page("proman8").duplicate()
+	_pm8_atlas.convert(Image.FORMAT_RGBA8)
 
 
 ## Feed the RIVAL club, the manager's OWN club + tactics (the ghost overlay is YOUR
