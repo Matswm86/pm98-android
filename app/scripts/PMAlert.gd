@@ -55,24 +55,29 @@ static var _dim_tex_cache := {}        # Texture2D -> ImageTexture (dimmed copy)
 static var _loaded := false
 
 
-## Load a raw BMFont atlas page. The .import files pin these PNGs to importer="keep" so
-## the file itself ships (importer="skip" DROPS it from the export — that is what left
-## every alert box blank on Android, docs/re/transfer_loop_live_re.md §7). If a rebuilt
-## import ever turns one back into an ordinary texture the raw read returns nothing, so
-## fall back to the imported Texture2D rather than silently rendering an empty box.
+## Load a BMFont atlas page as an Image.
+##
+## These PNGs used to carry importer="skip" so only the BMFont importer touched them,
+## and the page was read back with FileAccess. That does not survive an export: Godot
+## drops a "skip" file entirely, and a shipped APK's assets/art/fonts/ held nothing but
+## .import stubs — the page loaded empty, every glyph measured 0 ink, and EVERY PM98
+## alert box rendered as a small blank white rectangle on Android (signings, rejections,
+## "The scout has finished his search.", ...). importer="keep" did not ship it either
+## (verified against a CI-built APK). So the pages now import as ordinary lossless
+## textures, which the exporter definitely carries, and we read the image off that.
+## The raw-file read stays as a fallback, and a total failure is loud, never silent.
 static func _load_font_page(path: String) -> Image:
+	var tex: Variant = load(path) if ResourceLoader.exists(path) else null
+	if tex is Texture2D:
+		var ti := (tex as Texture2D).get_image()
+		if ti != null and ti.get_width() > 0:
+			if ti.is_compressed():
+				ti.decompress()
+			return ti
 	var img := Image.new()
 	var raw := FileAccess.get_file_as_bytes(path)
 	if raw.size() > 0 and img.load_png_from_buffer(raw) == OK and img.get_width() > 0:
 		return img
-	var tex: Variant = load(path)
-	if tex is Texture2D:
-		var ti := (tex as Texture2D).get_image()
-		if ti != null:
-			if ti.is_compressed():
-				ti.decompress()
-			push_warning("PMAlert: %s not shipped raw, fell back to the imported texture" % path)
-			return ti
 	push_error("PMAlert: font page %s is missing — alert text cannot render" % path)
 	return Image.create(1, 1, false, Image.FORMAT_RGBA8)
 

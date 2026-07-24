@@ -193,13 +193,24 @@ This replaces `training_screen_re.md`'s honest gaps #2 (focus tags + AUTO) and #
 
 ## 7. Not a decode: why the alert box was blank on Android
 
-Every PM98 alert renders through `PMAlert`, which reads the raw font page with
+Every PM98 alert renders through `PMAlert`, which read the raw font page with
 `FileAccess.get_file_as_bytes("res://art/fonts/proman10.png")`. All twelve
-`art/fonts/*.png` carried `importer="skip"` in their `.import` files. Godot's exporter
-treats `skip` as *do not ship this file* (only `keep` copies it verbatim) — confirmed by
-unzipping a shipped APK, whose `assets/art/fonts/` holds nothing but `.import` stubs.
+`art/fonts/*.png` carried `importer="skip"` in their `.import` files so that only the
+BMFont importer touched them — and **a skipped file is not exported**: unzipping a
+shipped APK, `assets/art/fonts/` holds nothing but `.import` stubs and neither the loose
+assets nor `assets.sparsepck` contains `proman10.png`.
 
-On device the font page loaded empty, every glyph measured 0 ink, `line_ink()` returned
-0, and `box_rect()` collapsed to the 160-px minimum: **a small white box with no text**,
-for signings, rejections, "The scout has finished his search." and every other alert.
-All twelve are now `importer="keep"`.
+On device the page therefore loaded empty, every glyph measured 0 ink, `line_ink()`
+returned 0, and `box_rect()` collapsed to the 160-px minimum: **a small white box with
+no text**, for signings, rejections, "The scout has finished his search." and every
+other alert.
+
+`importer="keep"` was tried first and **did not fix it** — the CI-built APK
+`pm98-34c917e.apk` still shipped no page (checked loose and inside the sparse pack). The
+working fix is to let the pages import as ORDINARY lossless textures (`compress/mode=0`,
+`vram_texture: false`) and read the image off the imported `Texture2D`; the exporter
+carries those the same way it carries every other sprite in the app. `PMAlert
+._load_font_page` prefers that path, keeps the raw read as a fallback, and `push_error`s
+if both fail so the failure can never be silent again. `DataBaseCardScreen`'s own atlas
+read was on the same footing and is fixed with it. Verified by re-rendering the hub
+alert: glyphs, the 3-layer drop shadow and the box metrics are unchanged.

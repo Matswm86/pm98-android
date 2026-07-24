@@ -739,13 +739,16 @@ static var _atlas: Dictionary = {}   # font key -> {tex, metrics: {code: [x,y,w,
 func _font_atlas(key: String) -> Dictionary:
 	if not _atlas.has(key):
 		var info := {}
-		# the BMFont atlas png is not an imported resource (the .fnt owns it) —
-		# read it as an Image and wrap it
-		var tex: Texture2D = null
-		var img := Image.new()
-		if img.load_png_from_buffer(
-				FileAccess.get_file_as_bytes("res://art/fonts/%s.png" % key)) == OK:
-			tex = ImageTexture.create_from_image(img)
+		# The BMFont atlas png. It imports as an ordinary lossless texture (a raw
+		# FileAccess read does NOT survive the export — that is what blanked every
+		# alert box on Android, see PMAlert._load_font_page), with the raw read kept
+		# as a fallback.
+		var path := "res://art/fonts/%s.png" % key
+		var tex: Texture2D = load(path) if ResourceLoader.exists(path) else null
+		if tex == null:
+			var img := Image.new()
+			if img.load_png_from_buffer(FileAccess.get_file_as_bytes(path)) == OK:
+				tex = ImageTexture.create_from_image(img)
 		var metrics := {}
 		var f := FileAccess.open("res://art/fonts/%s.fnt" % key, FileAccess.READ)
 		while f != null and not f.eof_reached():
