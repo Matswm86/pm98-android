@@ -167,6 +167,10 @@ deprioritised (last). Approved path: build an **end-to-end oracle**, kill-test t
    `MatchScreen` (BRIEF) so BRIEF narrates the engine's real event queue and RESULTS shows the
    engine's scoreline. Retire `MatchSim` from the manager-match path (keep for CPU-league bulk only
    if perf demands, flagged).
+   **SWEEP 2026-07-24 (s55):** `tools/re/run_match_sweep.sh 50 5` — after the `+0x43c` resolver
+   crash fix (`23307d1`), **50/50 seeds reach FULL TIME on dispatch code 10, 0 failures, 5
+   deterministic across two runs.** Scores spread realistically (2-1 the mode, 8/50; range 0-2 to
+   3-1). This is robustness + reproducibility only — NOT parity vs MANAGER.EXE.
    **STATUS 2026-07-24 (s55).** Tick-level parity, measured properly, is **clean over clk
    270-660** — all 22 players and the ball, every silicon capture we hold, within one tick of
    sampling phase (`tools/re/m5_seq_posdiff.py`; `docs/re/M5_S55_SAMPLING_PHASE_ARTEFACT.md`).
