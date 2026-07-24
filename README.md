@@ -16,7 +16,9 @@ fan remake.</sub>
 
 ## Download
 
-📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-31e31b1.apk)** — one tap downloads `pm98-31e31b1.apk` (current build) straight to your phone.
+📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-6f2e598.apk)** — one tap downloads `pm98-6f2e598.apk` (current build) straight to your phone.
+
+> **This build (2026-07-24)** fixes the transfer loop end to end — a bid is answered on the very next CONTINUE, with the original's own wording ("You have signed Barlow of Rochdale."), and the **alert box now shows its text** instead of a blank white rectangle. CURRENT OFFERS lists your outstanding *outgoing* bids (as the real game does); SQUAD MANAGEMENT no longer truncates VALUE/WAGE; a substitute can be swapped with a reserve on the LINE-UP; the SCOUT can be sent worldwide via **E.U. PLAYERS / NON E.U. PLAYERS / PLAYERS WITHOUT TEAM** (unlocked by the scout's star rating); and **TRAINING works** — hired skill coaches show up with their TP, and you assign players to them. See [`docs/re/transfer_loop_live_re.md`](docs/re/transfer_loop_live_re.md) for the source captures behind each of those.
 
 > Filenames change every build (`pm98-<commit>.apk`) on purpose, so your phone/browser can never serve a stale cached APK. If a newer build has landed and the direct link above 404s, grab the newest `pm98-*.apk` asset from the **[latest release page](https://github.com/Matswm86/pm98-android/releases/tag/latest)**.
 
