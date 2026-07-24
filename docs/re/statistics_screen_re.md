@@ -44,15 +44,23 @@ invented per-section scrolling). RETURN `(505,446,128,30)`.
 `LineupScreen.statistics_pressed` (`TIS_BTNS[2]`) → `Main._show_statistics_screen`
 → `setup(_mgr_club(), _match_header())`. RETURN reopens LINE-UP.
 
-## HONEST GAP (the whole stat table)
-The *app/port* `Career` / match engine **accumulates no per-player season statistics**:
-there is no store for MP, MIN, RATING, MoM, G., SHOTS, PASSES, TAC., S., cards or
-injuries per player across a season. (`Career` tracks only `clause_matches` /
-`clause_goals` for players on a contract clause — a different, partial counter,
-deliberately not surfaced here to avoid a misleading mixed table.) Every stat
-column and the TEAM TOTAL row therefore stay at PM98's own pre-match zero state
-(the baked empty-slot furniture), exactly matching the real game's fresh-season
-look (frame 147_154839). No number is fabricated.
+## HONEST GAP (the whole stat table) — the store now EXISTS, the screen is not wired yet
+The *app/port* still renders every stat column at PM98's own pre-match zero state (the
+baked empty-slot furniture, matching the real fresh-season look in frame 147_154839).
+No number is fabricated. What changed on 2026-07-24: the **port now has a real store**,
+so this is a wiring gap, not a knowledge gap.
+
+`app/scripts/Pm98StatStore.gd` ports the commit (`FUN_0044e440`), the season fold-back
+(`FUN_00448b60 @0x448f6b`), the RATING formula and the cell/TEAM-TOTAL formatting;
+`Pm98StatMatch.simulate(..., rep, pids)` runs the commit at the traced transition points.
+`app/tests/test_statcommit_oracle.gd` asserts all of it against the banked emulator
+oracle (**323 checks green**). What is NOT done: `Career` does not yet keep a
+`Pm98StatStore` per club-season, and `StatisticsScreen` does not read one. Until it does,
+the columns stay at zero rather than showing a partial table.
+
+(`Career` also tracks `clause_matches` / `clause_goals` for players on a contract clause
+— a different, partial counter, deliberately not surfaced here to avoid a misleading
+mixed table.)
 
 **MANAGER.EXE itself DOES have the store**, and it is now oracle-verified in
 **`season_stats_re.md`** (2026-07-24, `tools/re/run_statcommit_oracle.sh` →
@@ -96,16 +104,24 @@ What the frames establish (read off the frames, nothing inferred):
   across the same match, so it is neither a sum nor a constant — **its source is
   unidentified**.
 
-### Column → record offset: what is NOT claimed
-`+0x00` (MP), `+0x0c` (MoM) and `+0x10` (G.) are anchored above. A purely positional
-reading of the remaining cells (`MIN=+0x04`, `RATING=+0x08`, `SHOTS=+0x14/+0x18`,
-`PASSES=+0x1c/+0x20`, `TAC.=+0x24/+0x28`, `S.=+0x2c`, cards `+0x30/+0x34`, injury `+0x38`)
-fits all three anchors and the 15-cell count exactly — but it **contradicts** the
-provisional `FUN_00450510` field labels in `stat_match_engine_re.md` (which call
-participant `+0x114`, i.e. record `+0x28`, the *rating*). Both cannot be right, so neither
-is adopted: the port fills only the three anchored columns when a store lands, and the rest
-stay honest-zero until the row-widget draw method is located (record sits at widget
-`+0x3f4`, widget stride `0x41c`).
+### Column → record offset: CLOSED 2026-07-24
+The row widget's draw method is `FUN_004afce0` and the full map is in
+**[`statistics_row_widget_re.md`](statistics_row_widget_re.md)**. The positional reading
+wins; the provisional `FUN_00450510` labels in `stat_match_engine_re.md` were the wrong
+half of the conflict and are corrected there.
+
+Two things the earlier note got wrong and this closes:
+
+* the widget stride is **`0x444`**, not `0x41c` (the TEAM TOTAL is simply slot 19 of the
+  same array: `screen+0xa7cc + 19*0x444 = screen+0xf8d8`);
+* **RATING is not a stored field.** It is recomputed every paint as
+  `4 + 6*((A+B+C+D)/4 + 10*min(G,10))/100` over four success ratios. That is why the
+  TEAM TOTAL rating is "neither a sum nor a constant" — it is the same formula applied to
+  the totals record. `tools/re/verify_statrow_rating.py` inverts it against all 24 rating
+  cells in frames 02/06 and reports SURVIVES.
+
+Injury is `+0x3c` (the draw skips `+0x42c`), matching this screen's own persistent-store
+path which writes `rec+0x3c = byte playerobj+0x23`. `+0x38` and `+0x40` stay unnamed.
 
 ## Verification
 `app/tests/test_statistics_screen.gd` (ALL PASS, headless): asset load, row list

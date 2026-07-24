@@ -102,29 +102,55 @@ static func seed_years(age: int, rng: RandomNumberGenerator) -> int:
 	return c
 
 
-## The clause fields the same call seeds, keyed by the row's AV (core4 >> 2) and his
-## fine position. `flag_a`/`flag_b` are rec+0x10 / rec+0x14: two clause booleans whose
-## mapping onto the four named checkboxes is NOT witnessed, so they are carried as
-## numbered flags and never rendered under a guessed label.
+# ---- clause -> CONTRACT-panel checkbox map (WITNESSED 2026-07-24) ----------------
+# The four PLAYER INFORMATION checkboxes, in the row order the card draws them
+# (PlayerInfoScreen.CB_YS). The record field behind each was read straight off five live
+# cards whose AV band and term were known -- Southgate 81 (one box), Keane 89 MID (two),
+# Sheringham 75 1y (renders the literal "(20)"), Cole 83 CF (renders "£5,000") and
+# Nevland 3y (none): screenshots/wine-captures-2026-07-24-clause-labels/,
+# docs/re/offer_record_re.md §5.1. Before that capture these were carried as unnamed
+# numbered flags; they are no longer a guess.
+const CLAUSE_FREE_IF_RELEGATED := 0    # rec+0x10
+const CLAUSE_MATCHES_TO_RENEW := 1     # rec+0x1a
+const CLAUSE_SCORING_BONUS := 2        # rec+0x0c
+const CLAUSE_HOUSE_AND_CAR := 3        # rec+0x14
+const CLAUSE_LABELS := ["Free if relegated", "Matches to renew", "Scoring bonus",
+	"House and car"]
+
+
+## The clause fields the same call seeds, keyed by the row's AV (core4 >> 2) and his fine
+## position. Returns the record fields under their witnessed names plus `indices`, the
+## sorted checkbox rows the CONTRACT panel ticks (`player["clauses"]`).
 static func seed_clauses(av: int, pos_fine: int, years: int) -> Dictionary:
-	var out := {"flag_a": false, "flag_b": false, "matches": 0, "bonus": 0}
+	var out := {"free_if_relegated": false, "house_and_car": false, "matches": 0,
+		"bonus": 0, "indices": []}
 	var striker := pos_fine == POSFINE_CENTRE_FORWARD
 	if av >= AV_CLAUSE_BOTH:
-		out["flag_a"] = true
-		out["flag_b"] = true
+		out["free_if_relegated"] = true
+		out["house_and_car"] = true
 		if striker:
 			out["bonus"] = BONUS_HI
 	elif av >= AV_CLAUSE_ONE:
-		out["flag_a"] = true
+		out["free_if_relegated"] = true
 		if striker:
 			out["bonus"] = BONUS_LO
 	elif av >= AV_CLAUSE_MATCH_HI:
-		out["flag_a"] = true
+		out["free_if_relegated"] = true
 		out["matches"] = MATCHES_TO_RENEW
 	elif av >= AV_CLAUSE_MATCH_LO:
 		out["matches"] = MATCHES_TO_RENEW
 	if not matches_clause_allowed(years):
 		out["matches"] = 0
+	var idx: Array = []
+	if out["free_if_relegated"]:
+		idx.append(CLAUSE_FREE_IF_RELEGATED)
+	if int(out["matches"]) > 0:
+		idx.append(CLAUSE_MATCHES_TO_RENEW)
+	if int(out["bonus"]) > 0:
+		idx.append(CLAUSE_SCORING_BONUS)
+	if out["house_and_car"]:
+		idx.append(CLAUSE_HOUSE_AND_CAR)
+	out["indices"] = idx
 	return out
 
 

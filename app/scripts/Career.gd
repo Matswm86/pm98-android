@@ -395,6 +395,10 @@ func _seed_squad(club_dict: Dictionary) -> Array:
 		dup["contract_term"] = dup["contract_years"]   # deal length (SQUAD MANAGEMENT YEARS col; contract_years = years LEFT)
 		var seeded := OfferRecord.seed_clauses(OfferRecord.av_of(dup),
 			int(dup.get("posFine", 0)), int(dup["contract_years"]))
+		# The clause -> checkbox map was witnessed 2026-07-24 (offer_record_re.md §5.1),
+		# so the seeded clauses now reach the CONTRACT panel under their real labels
+		# instead of being generated and dropped.
+		dup["clauses"] = (seeded["indices"] as Array).duplicate()
 		if int(seeded["matches"]) > 0:
 			dup["clause_matches"] = int(seeded["matches"])
 		if int(seeded["bonus"]) > 0:

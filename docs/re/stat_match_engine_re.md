@@ -147,9 +147,27 @@ Draw budget per call:
    and bumps that player's counter on a hit. Stops once the running counter total
    reaches `dur`. **Strength bytes must be nonzero or this never terminates.**
 3. **Per-player stat draws** (4 per selected player, +2 for a non-GK role-2/3 player):
-   key-pass `+0x104` (2 draws, role 2/3 non-GK only), passes `+0x108` + tackles `+0x10c`
-   (2), dribble `+0x110` (1), rating `+0x114` (1). The GK (player 0) uses `*2` scalings
-   and its own pass seed; outfielders use `*5`.
+   `+0x104` (2 draws, role 2/3 non-GK only), `+0x108` + `+0x10c` (2), `+0x110` (1),
+   `+0x114` (1). The GK (player 0) uses `*2` scalings and its own pass seed; outfielders
+   use `*5`.
+
+   **Field names CORRECTED 2026-07-24** (`statistics_row_widget_re.md`). These are three
+   *(succeeded, failed)* pairs, not five separate stats, and none of them is a rating:
+
+   | participant | record | STATISTICS column |
+   |-------------|--------|-------------------|
+   | `+0xf0` | `+0x04` | **MIN** (minutes played) |
+   | `+0xf4` | `+0x08` | involvement counter, never displayed (feeds RATING only) |
+   | `+0x100` / `+0x104` | `+0x14` / `+0x18` | **SHOTS** on / off target |
+   | `+0x108` / `+0x10c` | `+0x1c` / `+0x20` | **PASSES** completed / failed |
+   | `+0x110` / `+0x114` | `+0x24` / `+0x28` | **TAC.** won / lost |
+   | `+0x118` | `+0x2c` | **S.** (saves) |
+   | `+0x11c` / `+0x120` | `+0x30` / `+0x34` | yellow / red cards |
+   | `+0x128` | `+0x3c` | injury |
+
+   The old labels "key-pass `+0x104`", "tackles `+0x10c`", "dribble `+0x110`" and
+   "rating `+0x114`" were provisional guesses and are **withdrawn**. Only
+   "passes `+0x108`" survived. The rating is computed at draw time and stored nowhere.
 4. **Event re-roll** (block C): for each player, while a local counter `< +0xfc`
    (= `FUN_00450d20` count of that shirt's goal events) roll `+= rand()%3`. So this
    couples to the H1 goals already in the queue — a scorer drives extra draws here.

@@ -132,7 +132,18 @@ rec+0xc  -> "Scoring bonus (£N)"    (renders the literal £5,000 on the AV-83 c
 
 All five cards match the generation table exactly, including the two negative controls
 (Nevland on a 3-year deal: `+0x1a` cleared, nothing ticked; Keane, a midfielder: no
-scoring bonus). The port may now render the real labels.
+scoring bonus).
+
+**SHIPPED 2026-07-24.** `OfferRecord.seed_clauses` now returns the fields under their
+witnessed names plus `indices` (the checkbox rows), `Career` stores them on the player as
+`clauses`, and `PlayerInfoScreen._draw_clauses` ticks them. Before this the seeded clauses
+were generated and dropped, so every card drew four resting boxes.
+`app/tests/test_offer_record.gd::_clause_checkbox_map` reproduces all five witness cards.
+
+**Render-diff (real app under Xwayland, `PM98_PLAYERACT_SHOT=1`):** the CLAUSES column of
+`pa_02_playerinfo.png` (Schmeichel, AV ≥ 85 non-striker → Free if relegated + House and
+car) against the same region of `02_keane_av89_relegated+housecar.png` — **0 differing
+pixels of 22,660**.
 
 ## 6. The accept test — `FUN_005889c0(player, offer)`
 

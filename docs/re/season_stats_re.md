@@ -1,13 +1,20 @@
 # Per-player stat store (MP/MIN/RATING/G./SHOTS/PASSES/TAC.) — RE map
 
-Status: **STORE + GETTER + WRITE PATH + ACCUMULATOR now ORACLE-VERIFIED (2026-07-24).**
+Status: **CLOSED 2026-07-24 (second pass).** Store, getter, write path and accumulator
+were oracle-verified earlier the same day. The two gaps that remained — the record
+dword → display-column map and the fold-back writer — are now both closed:
+
+* **Display map + RATING formula** → the row widget's draw method `FUN_004afce0`.
+  Full column table, geometry and the pixel-exact live verification are in
+  **[`statistics_row_widget_re.md`](statistics_row_widget_re.md)**.
+* **Fold-back writer** → it is **inline in the career-match runner `FUN_00448b60`**
+  (`@0x448f6b` home, `@0x44907a` away). See §"The fold-back writer" below.
+
 `tools/re/run_statcommit_oracle.sh` drives the real `FUN_0044e440` through the Ghidra
 PCode emulator across 5 fixtures (all RET) and banks every byte it writes to
-`tools/re/specs/statcommit_oracle.txt`. The **persistent** store is also located and
-ctor-verified. What is still NOT reversed: the record dword → display-column map, and
-the writer that folds a match record back into the persistent store. Nothing is ported
-yet; per `pm98_stay_true_to_original` / `ship_real_content_no_assumptions` no field
-meaning below is inferred where the oracle did not show it.
+`tools/re/specs/statcommit_oracle.txt`. Per `pm98_stay_true_to_original` /
+`ship_real_content_no_assumptions` nothing below is inferred where the disassembly or
+the live frames did not show it — `+0x38` and `+0x40` deliberately stay unnamed.
 
 ## Two stores, one 0x48-byte record layout
 
@@ -56,21 +63,35 @@ object. Confirmed by the oracle (records land keyed by exactly the ids poked at 
 
 ### Field meanings that are VERIFIED
 
+Column names below are the STATISTICS header labels, established by the row widget's
+draw method `FUN_004afce0` (see `statistics_row_widget_re.md` for the geometry proof).
+`x/y` columns consume **two** record fields: the screen prints `first` and
+`first + second`, so the pair is *(succeeded, failed)*.
+
 | off | meaning | evidence |
 |-----|---------|----------|
-| `+0x00` | **appeared / MP flag** | accumulator forces `1` (`@0x44e770`); every consumer greys the row on `[rec]==0` (`@0x4fcf55`, `@0x4fd814`, `@0x578822`); oracle shows `+0x00=0x1` while the sentinel says `0x10100` |
-| `+0x04` | stat with a **≥80** price-drift threshold | price ladder `FUN_005849a0` (`offer_record_re.md §6.2`) |
-| `+0x0c` | **Man of the Match** | `FUN_0044d520` sets `rec+0xc = 1` for the record whose pid equals `DAT_0066afd0+0xac` (`@0x44d563` home, `@0x44d59c` away); **live-confirmed 2026-07-24** — the full-time board names Wise (Chelsea) MoM and only his STATISTICS row reads `MoM = 1` (`screenshots/wine-captures-2026-07-24-statistics-live/` 04+05) |
-| `+0x10` | **goals** | price ladder `num = [player+0x34] + [stats+0x10]`; source field participant `+0xfc` is the per-shirt goal-event count (`FUN_00450d20`, `stat_match_engine_re.md`) |
-| `+0x18` | key passes | source participant `+0x104` (`FUN_00450510`) |
-| `+0x1c` | passes | source participant `+0x108` |
-| `+0x20` | tackles | source participant `+0x10c` |
-| `+0x24` | dribbles | source participant `+0x110` |
-| `+0x28` | rating | source participant `+0x114` |
+| `+0x00` | **MP** (appeared flag) | accumulator forces `1` (`@0x44e770`); every consumer greys the row on `[rec]==0` (`@0x4fcf55`, `@0x4fd814`, `@0x578822`); oracle shows `+0x00=0x1` while the sentinel says `0x10100`; drawn in cell 1 (`widget+0x3f4`) |
+| `+0x04` | **MIN** (minutes played) | `FUN_00450510` sets participant `+0xf0` to the substitution/booking minute or `+= dur` (`@0x450766..0x450795`); drawn in cell 2; the TEAM TOTAL cell is the **max**, and the live full-time sheet reads `90` with Solskjaer on `45`. Also the price ladder's **≥80** threshold field (`FUN_005849a0`, `offer_record_re.md §6.2`) |
+| `+0x08` | involvement counter (`FUN_00450510`'s per-visit tally, total `= dur` across all 22) | folded in at participant `+0xf4` (`@0x4506a3..0x4506ef`). **Never displayed** — it only feeds the RATING ratio |
+| `+0x0c` | **MoM** | `FUN_0044d520` sets `rec+0xc = 1` for the record whose pid equals `DAT_0066afd0+0xac` (`@0x44d563` home, `@0x44d59c` away), and `FUN_00448b60` does the same in the fold-back loop (`@0x448fb1` / `@0x4490c0`); **live-confirmed** — the full-time board names Wise (Chelsea) MoM and only his row reads `MoM = 1` (`wine-captures-2026-07-24-statistics-live/` 04+05); drawn in cell 4 |
+| `+0x10` | **G.** (goals) | price ladder `num = [player+0x34] + [stats+0x10]`; source participant `+0xfc` = the per-id goal-event count (`FUN_00450d20`); drawn in cell 5 **and** capped at 10 as the RATING's goal term |
+| `+0x14` / `+0x18` | **SHOTS** on / off target | drawn as `x/y` in cell 6 (`widget+0x408`/`+0x40c`); source participants `+0x100`/`+0x104` |
+| `+0x1c` / `+0x20` | **PASSES** completed / failed | cell 7; source participants `+0x108`/`+0x10c` |
+| `+0x24` / `+0x28` | **TAC.** won / lost | cell 8; source participants `+0x110`/`+0x114` |
+| `+0x2c` | **S.** (saves) | cell 9; source participant `+0x118`; the live GK row reads 6 at half-time / 13 at full time and is the only nonzero one |
+| `+0x30` | **yellow cards** | cell 10; source participant `+0x11c`; `>= 2` also disqualifies from MoM (`@0x44a448`) |
+| `+0x34` | **red card** | cell 11; source participant `+0x120`; nonzero disqualifies from MoM (`@0x44a455`) |
+| `+0x3c` | **injury** | cell 12 (`widget+0x430`, note it **skips** `+0x42c`); the screen's persistent-store path writes `rec+0x3c = byte playerobj+0x23` (`@0x4b2233`) |
 | `+0x44` | player id (u16) | search key everywhere |
 
-`+0x08`, `+0x14`, `+0x2c..+0x40` have no identified producer or consumer yet. **Do not
-guess them.**
+`+0x38` and `+0x40` are still **unnamed**. Neither is drawn; both are summed into the
+TEAM TOTAL, both are folded into the persistent store, and `+0x38 != 0` disqualifies a
+record from Man of the Match (`@0x44a40c`). **Do not guess them.**
+
+**There is no stored rating.** The RATING column is recomputed on every paint from
+`+0x04`, `+0x08`, `+0x10` and the three `x/y` pairs — formula and its independent
+confirmation in the MoM selector `FUN_0044a370` are in `statistics_row_widget_re.md`.
+The old `+0x28 = rating` label was wrong.
 
 ## `FUN_0044e440` is a COPY, not an arithmetic accumulator
 
@@ -165,23 +186,77 @@ for the RNG, but they are where the stats get committed.
 inside the driver `FUN_0044ee70`): accumulator → `FUN_0044a370(F)` → MoM stamp
 (`rec+0xc = 1` where `rec+0x44 == F+0xac`) → post-match screen `FUN_0044d5f0`.
 
+## The fold-back writer (CLOSED — inline in `FUN_00448b60`)
+
+There is no separate function: the career-match runner does it itself, immediately after
+`FUN_0044ee70` returns and `FUN_0044a370` has picked the Man of the Match.
+
+```
+@0x448f13  call FUN_0044ee70            ; play the match
+@0x448f21  call FUN_0044a370            ; -> F+0xac = MoM pid
+@0x448f5d  if ([ebp+8] == 0) skip the whole fold-back  (jumps to @0x4491b9)
+@0x448f6b  home loop: idx 0 .. F+0xa0-1 over the F+0x9c array, stride 0x48
+@0x44907a  away loop: idx 0 .. F+0xa8-1 over the F+0xa4 array, stride 0x48
+```
+
+Both loops are byte-identical apart from the array/count pair. Per record:
+
+```
+pid       = u16 [rec + 0x44]
+playerobj = (pid < DAT_0066c150) ? DAT_0066c158[pid] : 0
+if (pid == u16 [F + 0xac])  rec+0x0c = 1              ; MoM stamp (@0x448fb1 / @0x4490c0)
+for k in 0 .. 16:                                      ; 17 dwords = the whole 0x44 block
+    playerobj[0x24 + 4k] += rec[4k]
+```
+
+So the persistent store at `playerobj+0x24` is a **per-field running SEASON total**, and
+the fold-back is a plain add — not a copy. That is why `FUN_0044e440` may overwrite the
+report record and zero the participant block: the season figures live elsewhere.
+
+The persistent layout therefore mirrors the record exactly:
+
+| playerobj | record | column |
+|-----------|--------|--------|
+| `+0x24` | `+0x00` | season appearances (**MP**) |
+| `+0x28` | `+0x04` | season minutes |
+| `+0x30` | `+0x0c` | season Man-of-the-Match count |
+| `+0x34` | `+0x10` | **season goals** — the field the transfer price ladder reads (`offer_record_re.md §6`) |
+| `+0x38` … `+0x64` | `+0x14` … `+0x40` | the rest, same order |
+
+After both loops the runner also credits each club's season minutes:
+`club+0x274 += 0x78` (120) when `F+0x58 != 0` **and** `F+0x48 != 0`, else `+= 0x5a` (90)
+(`@0x449189..0x4491b3`). That is the same `club+0x274` the STATISTICS screen puts in the
+TEAM TOTAL `MIN` cell when it renders from the persistent store (`@0x4b221a`).
+
+`FUN_0044d5f0` (checked earlier) really does only *read* — it was the wrong candidate.
+
 ## STILL OPEN (bounded, none may be invented)
 
-1. **Record dword → display column.** `+0x00` (MP), `+0x0c` (MoM) and `+0x10` (G.) are
-   anchored by the live capture (see `statistics_screen_re.md` §"LIVE POPULATED WITNESS");
-   `SHOTS`/`PASSES`/`TAC.` are `x/y` pairs consuming two fields each. The screen hands
-   each 0x48 record to a row widget (stride `0x41c`, record at widget `+0x3f4`, e.g.
-   `@0x4b2438..0x4b2455` for the totals row); that widget's draw method is not yet located,
-   and the obvious positional reading of the remaining cells contradicts the provisional
-   `FUN_00450510` labels, so `+0x04`, `+0x08`, `+0x14..+0x28` and `+0x2c..+0x40` stay
-   unnamed.
-2. **The fold-back writer.** The persistent store is `playerobj+0x24`; the code that
-   folds a finished match's report record into it has not been found. `FUN_0044d5f0`
-   (checked) only *reads*.
-3. **Port.** Once (1) is closed: un-stub the transitions in `Pm98StatMatch`, run the
-   ported `FUN_0044e440` per segment into a Godot store keyed by pid, wire it into
-   `StatisticsScreen` and `OfferRecord`, and assert against
-   `tools/re/specs/statcommit_oracle.txt`.
+1. **The commit cadence does not yet explain the live full-time sheet.** Two pieces of
+   hard evidence collide and neither may be bent:
+   * The emulator shows `FUN_0044e440` **overwrites** the record and then
+     **unconditionally zeroes** participant `+0xec..+0x12f` (`@0x44e7ad..0x44e7e0`), and
+     `FUN_0044d0d0`'s very first instruction is that commit (`@0x44d0d3`), reached from
+     the statistical driver right after H1's `FUN_00450510` (`@0x44f90a` → `@0x44f911`).
+     On that cadence a full-time record holds **second-half stats only**, so `MIN` would
+     read 45.
+   * The live full-time sheet
+     (`screenshots/wine-captures-2026-07-24-statistics-live/06`) reads `MIN = 90` for
+     ten players and `45` for the substituted Solskjaer, and every other column is
+     `>=` its half-time value. That is cumulative over both halves.
+
+   So either the captured Charity Shield ran the **positional** engine (`PS != 5`, whose
+   stat path is not traced) rather than the statistical one, or a half-time commit did
+   not fire in that flow. **Not resolved, not guessed.** The port therefore wires the
+   commit only at the transition points traced inside `FUN_0044ee70`'s `PS == 5` branch,
+   and `app/tests/test_statcommit_oracle.gd` asserts the emulator's semantics
+   (`sim.rep.min_is_h2`), not the frame's. Next capture should play a match in each mode
+   and diff the two STATISTICS sheets.
+2. **`rec+0x38` and `rec+0x40`.** Never drawn, no named producer. `+0x38 != 0`
+   disqualifies a record from Man of the Match (`@0x44a40c`). Leave unnamed.
+3. **The Man-of-the-Match selector `FUN_0044a370`** is mapped (same rating score,
+   three eligibility gates, first-wins-ties) but **not oracle-banked and not ported**.
+4. **The display event-list rebuild `FUN_004497f0`** is still stubbed in the oracle.
 
 ## Reproduce
 

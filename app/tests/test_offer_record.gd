@@ -92,20 +92,48 @@ func _term_roll() -> void:
 func _clause_seeds() -> void:
 	var cf := OfferRecord.POSFINE_CENTRE_FORWARD
 	var elite := OfferRecord.seed_clauses(88, cf, 3)
-	_ok(elite["flag_a"] and elite["flag_b"] and int(elite["bonus"]) == 10_000,
+	_ok(elite["free_if_relegated"] and elite["house_and_car"] and int(elite["bonus"]) == 10_000,
 		"AV>=85 striker: both flags + £10,000 bonus")
 	var good := OfferRecord.seed_clauses(82, cf, 3)
-	_ok(good["flag_a"] and not good["flag_b"] and int(good["bonus"]) == 5000,
+	_ok(good["free_if_relegated"] and not good["house_and_car"] and int(good["bonus"]) == 5000,
 		"AV 80..84 striker: one flag + £5,000 bonus")
 	_ok(int(OfferRecord.seed_clauses(88, 4, 3)["bonus"]) == 0,
 		"a defender never carries the goal bonus")
 	var mid := OfferRecord.seed_clauses(77, 10, 1)
-	_ok(mid["flag_a"] and int(mid["matches"]) == 20, "AV 75..79: flag + 20-match target")
+	_ok(mid["free_if_relegated"] and int(mid["matches"]) == 20,
+		"AV 75..79: flag + 20-match target")
 	_ok(int(OfferRecord.seed_clauses(72, 10, 1)["matches"]) == 20, "AV 70..74: target only")
 	_ok(int(OfferRecord.seed_clauses(72, 10, 2)["matches"]) == 0,
 		"a multi-year term clears the match target (the years-handler rule)")
 	var low := OfferRecord.seed_clauses(60, 10, 1)
-	_ok(not low["flag_a"] and int(low["matches"]) == 0, "AV < 70: no clauses")
+	_ok(not low["free_if_relegated"] and int(low["matches"]) == 0, "AV < 70: no clauses")
+	_clause_checkbox_map()
+
+
+# The clause -> CONTRACT-panel checkbox map, WITNESSED on the five live cards in
+# screenshots/wine-captures-2026-07-24-clause-labels/ (offer_record_re.md §5.1).
+# Each assertion below reproduces one of those cards.
+func _clause_checkbox_map() -> void:
+	var cf := OfferRecord.POSFINE_CENTRE_FORWARD
+	var mid := 10
+	# Southgate, AV 81, 2y: "Free if relegated" only.
+	_ok(str(OfferRecord.seed_clauses(81, 4, 2)["indices"]) == str([0]),
+		"Southgate 81 2y -> Free if relegated only")
+	# Cole, AV 83 CENTRE FORWARD, 1y: free-if-relegated + the £5,000 scoring bonus.
+	var cole: Array = OfferRecord.seed_clauses(83, cf, 1)["indices"]
+	_ok(str(cole) == str([0, 2]), "Cole 83 CF 1y -> Free if relegated + Scoring bonus")
+	# Keane, AV 89 MIDFIELDER, 2y: free-if-relegated + house-and-car, no bonus.
+	_ok(str(OfferRecord.seed_clauses(89, mid, 2)["indices"]) == str([0, 3]),
+		"Keane 89 MID 2y -> Free if relegated + House and car")
+	# Sheringham, AV 75 CF, 1y: free-if-relegated + the 20-match renew target.
+	_ok(str(OfferRecord.seed_clauses(75, cf, 1)["indices"]) == str([0, 1]),
+		"Sheringham 75 CF 1y -> Free if relegated + Matches to renew")
+	# Nevland, 3-year deal, sub-70 band: nothing ticked (the negative control).
+	_ok(str(OfferRecord.seed_clauses(65, mid, 3)["indices"]) == str([]),
+		"Nevland 3y low AV -> no clauses (negative control)")
+	# the labels the panel prints, in checkbox-row order
+	_ok(str(OfferRecord.CLAUSE_LABELS) == str(["Free if relegated", "Matches to renew",
+		"Scoring bonus", "House and car"]), "clause labels in card row order")
 
 
 # FUN_00534570: the on-screen AV is core4 >> 2, not CA and not the 6-attr rating.
