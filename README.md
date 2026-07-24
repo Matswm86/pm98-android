@@ -16,9 +16,18 @@ fan remake.</sub>
 
 ## Download
 
-📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-e6728bb.apk)** — one tap downloads `pm98-e6728bb.apk` (current build) straight to your phone.
+📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-e5ee181.apk)** — one tap downloads `pm98-e5ee181.apk` (current build) straight to your phone.
 
-> **This build (2026-07-24)** ports the **cup DRAW screen** — the one the original raises when a round is drawn, for the F.A. Cup, the Coca-Cola Cup and all three European competitions. It is the real screen, not a stand-in: the competition's own trophy beside the lottery drum, the yellow ROUND plate, the green **MATCHES** list filling one club at a time (a tie shows its home club and the dash while its opponent is still being pulled), the 1ST LEG / 2ND LEG plates on a two-legged tie and MATCH / REPLAY on a single one, and a scrollbar sized to the round's tie count. Rendered side by side with a capture of the real MS-DOS game it is **pixel-for-pixel identical — 0 differing pixels out of 307,200** ([`docs/re/cupdraw_screen_re.md`](docs/re/cupdraw_screen_re.md)). Getting there uncovered a bug in how this project reads the game's own art: every image in the `.PKF` archives was being decoded 1024 bytes out of step, which is what put the visible seam in the GROUND stadium pictures. That is fixed at the source now.
+> **This build (2026-07-24)** fixes six things you told us were wrong, each one settled against the original game rather than guessed:
+>
+> - **New signings now show up in TRAINING.** The original scrolls each section of the training grid; we were cutting it off at the visible rows, and since a new man joins the end of the squad he was always the one that vanished. Every section has its working scrollbar now.
+> - **TACTICS → ROLE is a real picker.** Tap the arrow beside a player's POS and you get the game's own list of all eighteen roles, with **his natural role in gold and the other roles he can genuinely play in white** — a left back who can also fill in at right back, a centre half who can drop into midfield. Those alternatives are not our invention: they are stored per player in the original database, and the popup is the original's own screen down to the pixel.
+> - **The staff market refreshes every week.** Three new candidates for every job each week, with a fresh spread of star ratings — so five-star coaches and physios actually turn up instead of the same three names for ever.
+> - **You can heal an injured player.** The **+** button on the INJURIES row sends him to the physiotherapist: a five-star physio halves his time out, a weaker one takes a smaller bite, and how many men he can treat at once is his own "N PLAYERS" figure.
+> - **Selling works.** Tapping an offer really does flip REFUSE to ACCEPT now — on a phone the tap was being counted twice and cancelling itself, and offers below the first row could not be hit at all.
+> - **Bidding is not a marathon.** A player already on the transfer market opens with the asking price, his wage and his contract already filled in, exactly as the original does, instead of starting from £5,000.
+
+
 
 > Filenames change every build (`pm98-<commit>.apk`) on purpose, so your phone/browser can never serve a stale cached APK. If a newer build has landed and the direct link above 404s, grab the newest `pm98-*.apk` asset from the **[latest release page](https://github.com/Matswm86/pm98-android/releases/tag/latest)**.
 
