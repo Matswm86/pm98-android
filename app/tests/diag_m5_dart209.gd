@@ -13,6 +13,9 @@ extends SceneTree
 
 const REF_DIR := "/home/mats/MWM-AI/data/pm98-m4-oracle/capture2"
 const STRUCT_JSON := REF_DIR + "/frame0_struct_import.json"
+## s55: PM98_SEED overrides the frame-0 LCG seed so the port can mirror a cross-seed silicon
+## capture (m5_rsp_capture.py honours the same variable). Everything else stays the reference
+## frame-0 state, so only the RNG stream differs.
 const FRAME0_SEED := 0xea0d2a8d
 ## s54: window + cap are env-overridable (PM98_TICK_CAP / PM98_CLK_LO / PM98_CLK_HI) so the same
 ## dump feeds the parity differs over any range without editing the s34 defaults.
@@ -52,7 +55,9 @@ func _run() -> void:
 			built[ti] as Array, ti, m)
 
 	var rng := MatchEngine.Pm98Rng.new(0)
-	rng.state = FRAME0_SEED
+	var seed_env := OS.get_environment("PM98_SEED")
+	rng.state = (seed_env.hex_to_int() if seed_env.begins_with("0x") else int(seed_env)) \
+		if seed_env != "" else FRAME0_SEED
 	var t := 0
 	while t < TICK_CAP:
 		var in_win := _g(m, 0x450) >= CLK_LO and _g(m, 0x450) <= CLK_HI

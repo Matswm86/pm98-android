@@ -163,7 +163,11 @@ def main() -> None:
     print(f"BASE {base:#010x}", flush=True)
 
     # ---- 2. poke frame0 + seed ----
-    ref_seed = ref["meta"]["seed_0x6d3184"]
+    # PM98_SEED overrides the reference frame-0 LCG seed. The rest of frame 0 (match scalars,
+    # the 22 players, the session) is still the reference state, so the run stays the SAME
+    # fixture and XI and only the RNG stream changes -- which is exactly the cross-seed sweep
+    # the port can mirror (diag_m5_dart209.gd honours the same PM98_SEED).
+    ref_seed = int(os.environ.get("PM98_SEED", "0"), 0) or ref["meta"]["seed_0x6d3184"]
     poked, skipped = [], []
     for off_s, ref_v in ref["match"].items():
         off = int(off_s, 16)
