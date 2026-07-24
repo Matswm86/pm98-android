@@ -19,8 +19,10 @@ const REF_DIR := "/home/mats/MWM-AI/data/pm98-m4-oracle/capture2"
 const STRUCT_JSON := REF_DIR + "/frame0_struct_import.json"
 const FRAME0_SEED := 0xea0d2a8d
 const TICK_CAP := 1400
-const CLK_LO := 637
-const CLK_HI := 640
+## s54: the window is env-overridable (PM98_CLK_LO / PM98_CLK_HI) so the same drill can dump the
+## whole 636-646 fork window without editing the s50 defaults.
+var CLK_LO := int(OS.get_environment("PM98_CLK_LO")) if OS.get_environment("PM98_CLK_LO") != "" else 637
+var CLK_HI := int(OS.get_environment("PM98_CLK_HI")) if OS.get_environment("PM98_CLK_HI") != "" else 640
 const TEAM := 1
 const IDX := 10
 

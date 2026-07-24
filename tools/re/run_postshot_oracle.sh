@@ -5,8 +5,13 @@
 # the SIM RESIDUE + enqueue order the GDScript port (Pm98Movement.resolve_post_shot) must reproduce.
 #
 # STUBBED (logged, no sim residue we model):
-#   FUN_0058fda0 (0x58fda0) render trail (__fastcall ECX=ball, 0 args) -> noop.
 #   FUN_00594470 (0x594470) enqueue (__thiscall match; code, player, flag -> RET 0xC). arg0 = code.
+# RUN REAL since s54 (was stubbed as "render trail, no sim residue" -- WRONG):
+#   FUN_0058fda0 (0x58fda0). Its Loop 1 BANKS the 3 predicted flight segments into the ball --
+#   +0x74+4s length, +0xa8+0xc*s midpoint/apex, +0xcc+0xc*s END pos, +0xf0+0xc*s END vel -- and this
+#   very function reads +0xcc back as the ball's predicted-rest spot (the 0x10 enqueue gate), while
+#   FUN_005b0040's marker-adjust arm reads +0xb0/+0xcc. Stubbing it let the poked +0xcc survive a
+#   rebuild the real code performs. See docs/re/M5_S54_BALL_TRAJ_FIELDS.md.
 # RUN REAL (in-image, verified leaves): predicates FUN_005ac120/005ac0e0/0058fb50; geometry
 #   FUN_005ee080(atan)/00436fb0(store)/005edfb0(muladd16)/005b1260(planar_mag)/00590ae0/00590aa0(vec);
 #   FUN_005b0bb0 (pass-target test, + its leaves & the ftol thunk); engage FUN_0058eca0 + FUN_0058ed70;
@@ -39,7 +44,6 @@ FTOL="membts 0x00252000 83EC08D93C248B042480CC0C6689442404D96C2404DB542404D92C24
 $(poke 0x6233a4 0x252000)"
 
 STUBS=(
-  "0x58fda0 0 0 TRAIL"     # render trail (no sim residue)
   "0x594470 0 12 ENQ"      # enqueue (arg0 = event code)
 )
 

@@ -10,7 +10,7 @@
 # UN-STUBBED vs run_engine_oracle.sh: 0x5acc40 (acc40 = goal_aim_025) and 0x5ac1a0 (setup_shot) run REAL.
 # resolve_post_shot (0x5ab5a0) is reached transitively from setup_shot and runs REAL (never stubbed). The
 # OTHER 6 handlers + the resolver + teammate-count + 3 movement fns stay STUBBED; 7260+8f20 run REAL (not on the acc40 path).
-# resolve_post_shot's own two display/queue leaves are stubbed (TRAIL FUN_0058fda0, ENQ FUN_00594470) --
+# resolve_post_shot's queue leaf is stubbed (ENQ FUN_00594470); FUN_0058fda0 runs REAL since s54 --
 # exactly as in run_postshot_oracle.sh -- since the GD port models them as no-ops.
 #
 # FTOL: the FISTTP truncating thunk (run_shotsetup_oracle.sh) -- setup_shot ftols a near-boundary sqrt, so
@@ -61,7 +61,6 @@ STUBS=(
   "0x5a9490 0 0 M9490"     # lean (post-switch)
   "0x605ff0 0 0 atexit"    # FUN_005a7260 (ball-touch) now runs REAL (un-stubbed); atexit guards its steer
                            # box-init. These fixtures never reach 7260's body, so the output is unchanged.
-  "0x58fda0 0 0 TRAIL"     # resolve_post_shot render trail (no sim residue)
   "0x594470 0 12 ENQ"      # resolve_post_shot enqueue (arg0 = event code)
 )
 

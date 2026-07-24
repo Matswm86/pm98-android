@@ -131,12 +131,23 @@ its RSP `m`/`M`/`Z1`/`Z2` packets replace all /proc I/O — but ONLY after `Hg<t
   prefix landed at `0x03dcf1d0`, not `0x03dbf0d8`, so the stored candidates missed and the
   fallback mem scan ran. That scan costs ~20 min per 2 MB (RSP `m` moves ~500 B/round trip),
   so it now probes `0x03d00000-0x03e00000` first — every observed base is in that band. If a
-  boot lands outside it, add the new value to the candidate list and note it here.
+  boot lands outside it, add the new value to the candidate list and note it here. Observed so far:
+  `0x03dbf060` (s34), `0x03dbf0d8`, `0x03dbf228` (s53), `0x03dbf240` (s54, prefix copied under
+  `/tmp/...`), `0x03dcf1d0`.
 - **Concurrent sessions collide.** One wineprefix = one wineserver, and `explorer /desktop=<name>`
   reuses an existing desktop of that name: a second boot on another DISPLAY dies with
   `X Error … BadWindow … X_CreateWindow`. Isolate with `cp -a` of the prefix plus
   `PM98_WINEPREFIX=<copy> PM98_DESKTOP=<other-name>` (env.sh honours both, and `wdbg_pid.sh`
-  picks the LPID whose `/proc/<pid>/environ` carries that prefix).
+  picks the LPID whose `/proc/<pid>/environ` carries that prefix). s54: the reference CAREER session
+  runs on `DISPLAY=:2` with the repo prefix — do not disturb it; start a second Xwayland
+  (`Xwayland :3 -geometry 800x600 -retro &` with `XDG_RUNTIME_DIR=/run/user/1000
+  WAYLAND_DISPLAY=wayland-1`) and drive the copy there.
+- `m5_rsp_b0040trace.py <port> <lpid> <ref_json> <out> [team] [idx] [arm_clk] [stop_clk]` (s54) —
+  poke + seed free-run + `Z1` inside the real `FUN_005b0040`: per-iteration `lead_in`/`nd`/`lead_out`
+  from the bisection, the pre-clamp accumulator, and the live `P+0x70/0x3a8/0x3ac`, clamp box and
+  `ball+0x74/0xb0/0xbc/0xcc/0xd8`. Read with `tools/re/m5_b0040_trace_solve.py`. NOTE: winedbg
+  accepted a 4th `Z1` at `0x5b04c1` but never reported a hit for it — key any exit condition off the
+  `0x5b04a6` stop instead, or the capture never ends.
 - **The XI check is necessary but not sufficient.** It compares `+0x4/+0x8/+0x2c8/+0x37c/+0x380`.
   Two runs can share an identical XI yet differ in the derived pace/stamina fields
   (`+0x37c/+0x380`, `docs/re/session_lineup_re.md`) because the preseason condition roll differs

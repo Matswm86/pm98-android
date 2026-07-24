@@ -14,9 +14,11 @@ extends SceneTree
 const REF_DIR := "/home/mats/MWM-AI/data/pm98-m4-oracle/capture2"
 const STRUCT_JSON := REF_DIR + "/frame0_struct_import.json"
 const FRAME0_SEED := 0xea0d2a8d
-const TICK_CAP := 700
-const CLK_LO := 0
-const CLK_HI := 306
+## s54: window + cap are env-overridable (PM98_TICK_CAP / PM98_CLK_LO / PM98_CLK_HI) so the same
+## dump feeds the parity differs over any range without editing the s34 defaults.
+var TICK_CAP := int(OS.get_environment("PM98_TICK_CAP")) if OS.get_environment("PM98_TICK_CAP") != "" else 700
+var CLK_LO := int(OS.get_environment("PM98_CLK_LO")) if OS.get_environment("PM98_CLK_LO") != "" else 0
+var CLK_HI := int(OS.get_environment("PM98_CLK_HI")) if OS.get_environment("PM98_CLK_HI") != "" else 306
 
 
 func _init() -> void:

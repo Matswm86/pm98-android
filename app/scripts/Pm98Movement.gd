@@ -3387,7 +3387,14 @@ static func _traj_ftol(f: float) -> int:
 
 
 ## Loop-1 half: build one flight segment from running (px,py,pz,vx,vy,vz). Returns
-## [seg_len, epx,epy,epz, evx,evy,evz] (segment length + END pos + END vel). `grounded` = vz==0 && pz==0.
+## [seg_len, epx,epy,epz, evx,evy,evz, mx,my,mz] (segment length + END pos + END vel + the MIDPOINT
+## the binary banks at ball+0xa8+0xc*s). `grounded` = vz==0 && pz==0.
+##
+## s54: the midpoint is NOT render-only. For an airborne segment it is the arc APEX -- sampled at
+## `t = vz / 178` (the decompile's `iVar6 = (int)local_10 / 0xb2`, NOT half the segment) -- and its
+## Z component lands in `ball+0xb0`, which FUN_005b0040's marker-adjust arm tests against 0x2cccc.
+## Skipping these writes is what left `ball+0xb0 = 0` in the port and killed that arm; see
+## docs/re/M5_S54_BALL_TRAJ_FIELDS.md.
 static func _traj_segment(px: int, py: int, pz: int, vx: int, vy: int, vz: int) -> Array:
 	if vz == 0 and pz == 0:                                          # GROUNDED roll (L37 branch)
 		var pol: Array = Pm98Trig.polar_vec(BALL_FRICT, Pm98Trig.atan_angle(vx, vy))   # FUN_005ee0f0
@@ -3406,9 +3413,14 @@ static func _traj_segment(px: int, py: int, pz: int, vx: int, vy: int, vz: int) 
 		var evx := Pm98Trig._i32(vx - Pm98Trig._i32(seg_len * cx))
 		var epy := Pm98Trig._i32(Pm98Trig._i32(vy - Pm98Trig._tdiv(Pm98Trig._i32(seg_len * cy), 2)) * seg_len + py)
 		var evy := Pm98Trig._i32(vy - Pm98Trig._i32(seg_len * cy))
-		return [seg_len, epx, epy, 0, evx, evy, 0]
-	# AIRBORNE (L79 else). The vz<1 test (L80) only changes the render MIDPOINT (+0xa8, not read by the
-	# +0x114 buffer), so it is dropped here: the segment length + END are ALWAYS computed. Segment length
+		# MIDPOINT (L60-62): the same roll sample at HALF the segment length, z pinned to 0.
+		var half := Pm98Trig._tdiv(seg_len, 2)
+		var mx := Pm98Trig._i32(Pm98Trig._i32(vx - Pm98Trig._tdiv(Pm98Trig._i32(half * cx), 2)) * half + px)
+		var my := Pm98Trig._i32(Pm98Trig._i32(vy - Pm98Trig._tdiv(Pm98Trig._i32(half * cy), 2)) * half + py)
+		return [seg_len, epx, epy, 0, evx, evy, 0, mx, my, 0]
+	# AIRBORNE (L79 else). The vz<1 test (L80) selects the MIDPOINT form only; the segment length + END
+	# are ALWAYS computed. (It was dropped here until s54 on the belief that +0xa8 was render-only —
+	# it is not: +0xb0 is the b0040 marker-adjust gate. See the header note.) Segment length
 	# = FP time-to-ground trunc((vz + sqrt(vz*vz + 356*z0)) / 178), constants decoded from ds:0x639090
 	# (-356.0) / 0x639098 (1/178); _ftol (0x605fb0) forces round-toward-zero (RC=11) so this truncates.
 	var t := _traj_ftol((float(vz) + sqrt(float(vz) * float(vz) + 2.0 * float(BALL_GRAV_G) * float(pz))) / float(BALL_GRAV_G))
@@ -3420,7 +3432,17 @@ static func _traj_segment(px: int, py: int, pz: int, vx: int, vy: int, vz: int) 
 	var evz2 := Pm98Trig._i32(-Pm98Trig.mul16(vz_ground, BALL_REST_V))
 	if absi(evz2) < BALL_VZ_SETTLE:
 		evz2 = 0
-	return [t, epx2, epy2, 0, evx2, evy2, evz2]
+	# MIDPOINT (L79-90): vz<1 -> the CURRENT position verbatim; else the APEX, sampled at
+	# ta = vz/178 (integer divide), z = (vz - (ta*178)/2)*ta + pz.
+	var mx2 := px
+	var my2 := py
+	var mz2 := pz
+	if vz >= 1:
+		var ta := Pm98Trig._tdiv(vz, BALL_GRAV_G)
+		mx2 = Pm98Trig._i32(Pm98Trig._i32(vx * ta) + px)
+		my2 = Pm98Trig._i32(Pm98Trig._i32(vy * ta) + py)
+		mz2 = Pm98Trig._i32(Pm98Trig._i32(vz - Pm98Trig._tdiv(Pm98Trig._i32(ta * BALL_GRAV_G), 2)) * ta + pz)
+	return [t, epx2, epy2, 0, evx2, evy2, evz2, mx2, my2, mz2]
 
 
 ## Loop-1: build up to 3 segments; Loop-2: sample them (every 4 frames) into the 16-slot +0x114 buffer.
@@ -3437,6 +3459,16 @@ static func _ball_predict_traj(ball: Dictionary) -> void:
 	for _s in range(3):
 		var seg: Array = _traj_segment(rpx, rpy, rpz, rvx, rvy, rvz)
 		segs.append(seg)
+		# s54: Loop 1 BANKS each segment into the ball, and FUN_005b0040 reads it back --
+		# +0x74+4s = length, +0xa8+0xc*s = midpoint/apex, +0xcc+0xc*s = END pos, +0xf0+0xc*s = END vel.
+		# The b0040 marker-adjust arm is `ball+0xb0 > 0x2cccc` (segment-0 apex HEIGHT) -> replace the
+		# interception lead with dot16(ball+0xcc - ball.pos, facedir), i.e. aim at the first-bounce
+		# landing spot. Leaving these unwritten pinned +0xb0 to 0, so the port kept the runaway
+		# (int32-wrapping) bisection lead on every lofted ball. docs/re/M5_S54_BALL_TRAJ_FIELDS.md.
+		ball[0x74 + 4 * _s] = int(seg[0])
+		ball[0xA8 + 0xC * _s] = int(seg[7]); ball[0xAC + 0xC * _s] = int(seg[8]); ball[0xB0 + 0xC * _s] = int(seg[9])
+		ball[0xCC + 0xC * _s] = int(seg[1]); ball[0xD0 + 0xC * _s] = int(seg[2]); ball[0xD4 + 0xC * _s] = int(seg[3])
+		ball[0xF0 + 0xC * _s] = int(seg[4]); ball[0xF4 + 0xC * _s] = int(seg[5]); ball[0xF8 + 0xC * _s] = int(seg[6])
 		rpx = int(seg[1]); rpy = int(seg[2]); rpz = int(seg[3])
 		rvx = int(seg[4]); rvy = int(seg[5]); rvz = int(seg[6])
 	# --- Loop 2: sample every 4 frames across the segments into the 16 slots ---

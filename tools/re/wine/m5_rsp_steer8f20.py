@@ -94,7 +94,7 @@ def main() -> None:  # noqa: C901 — one linear capture script, split would hid
 
     # ---- 1. base ----
     base = 0
-    for cand in (0x03DBF228, 0x03DBF0D8, 0x03DBF060):
+    for cand in (0x03DBF240, 0x03DBF228, 0x03DBF0D8, 0x03DBF060, 0x03DCF1D0):
         try:
             if u32(cand) == VTABLE and u32(cand + SCALE_OFF) == SCALE_VAL:
                 base = cand
