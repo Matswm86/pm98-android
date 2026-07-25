@@ -28,7 +28,9 @@ func _run() -> void:
 	for f in DirAccess.get_files_at(FONT_DIR):
 		if f.ends_with(".fnt"):
 			keys.append(f.get_basename())
-	ok = _assert(keys.size() == 12, "12 .fnt sources, got %d" % keys.size()) and ok
+	# 13 since MICRO8 shipped 2026-07-25 for PLAYERS OF THE YEAR's rows -- the face the
+	# original really draws that panel in (docs/re/season_end_sequence_re.md).
+	ok = _assert(keys.size() == 13, "13 .fnt sources, got %d" % keys.size()) and ok
 
 	for key in keys:
 		var b: Dictionary = (baked as Dictionary).get(key, {})
