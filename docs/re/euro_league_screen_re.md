@@ -1,6 +1,10 @@
 # RESULTS → EURO. LEAGUE — the European competition screen (group phase + knockout)
 
-**Status: CAPTURED AND SPECIFIED. The MODEL is built, the SCREEN is not.**
+**Status: the GROUP view is BUILT and render-diffed (2026-07-26). The KNOCKOUT view is
+not.** `app/scenes/EuroGroupScreen.gd` + `app/art/screens/euroleague/` (baked by
+`tools/re/build_euroleague_chrome_from_frames.py`); `Main._show_euro_group_screen` raises
+it and the invented `CupScreen` placeholder is deleted. Parity vs all six witnessed group
+frames: **0 px outside two named residuals** — see "What actually shipped" at the end.
 
 Built 2026-07-25: the six-group / 24-club field, the six-winners-plus-two-best-runners-up
 advancement rule, and the phase label. `Cup.next_label` now emits the original's own
@@ -9,10 +13,9 @@ advancement rule, and the phase label. `Cup.next_label` now emits the original's
 26 Nov 1997 (`docs/re/REFRUN_manutd_1997-98.md` R3), so it is a fixed competition-phase
 string and wrong-but-canonical. Asserted in `app/tests/test_refrun_findings.gd`.
 
-Still the invented `CupScreen` placeholder: The app still shows the European GROUP
-phase on the invented `CupScreen` placeholder (`Main._show_cup_group_placeholder`). This
-doc records the original's real screen, from the binary and from live captures taken this
-session, so the build has no guessing left in it.
+The app used to show the European GROUP phase on an invented `CupScreen` placeholder
+(`Main._show_cup_group_placeholder`, removed 2026-07-26). This doc records the original's
+real screen, from the binary and from live captures, so the build had no guessing in it.
 
 ## Where it lives
 
@@ -79,7 +82,8 @@ with the real 1997-98 entrants** — no qualification needed to browse them.
   four rows, each a position plate (navy, white digit), the club name on a light-blue bar
   with its **MINIBAND** country flag right-aligned in the name cell, then the seven number
   cells. Under the table, that matchday's results — kit, right-aligned home club, two score
-  boxes (**the winner's goals inked yellow**), away club, kit. To the right, the six
+  boxes (one goal digit inked yellow — **NOT the winner's**, see the retraction below), away
+  club, kit. To the right, the six
   `GROUP A`..`GROUP F` buttons, the selected one lit red on white.
 * **Six groups of four = 24 clubs** — the real 1997-98 Champions League field, and the label
   the original gives that phase is `1/8 FINALS`.
@@ -209,8 +213,9 @@ Only the LIGHT band's inks are pinned so far: club `(60,60,100)`, numbers
 
 * the dark band's club and number inks;
 * the MINIBAND flag rect inside the name cell (`DBDAT\MINIBAND\ba96%04u.bmp`);
-* the results rows under the table (kit, right-aligned home club, two score boxes with
-  the winner's goals inked yellow, away club, kit) — their row tops and cell spans;
+* the results rows under the table (kit, right-aligned home club, two score boxes with one
+  goal digit inked yellow — **the "winner's goals" reading is RETRACTED**, see below — away
+  club, kit) — their row tops and cell spans;
 * the six GROUP A..F buttons' lit/unlit faces: all six lit states ARE witnessed, one per
   frame, so they can be cut verbatim rather than synthesised — buttons pitched 24px at
   centres y194 / 218 / 242 / 266 / 290 / 314, x approx 403, panel borders x360-361 and
@@ -296,17 +301,84 @@ best fit at **(80,274)** with 32 of 221 opaque pixels differing — the residual
 engine's soft-shadow pass, the same one already documented for the NANOESC blits
 (`build_match_header_from_frames.py`), not different art.
 
-### What still blocks a 0-px build
+### What used to block a 0-px build — both settled 2026-07-26
 
-1. **The desktop under the two results rows.** The rows are drawn straight onto the
-   wallpaper — there is no plate behind them — and all six frames have both rows filled,
-   so the background is only recoverable where a pixel is uncovered in at least five of
-   the six (466 of 792 px in the two kit rects; 310 are covered in every frame). The fix
-   is one capture, not a guess: page the ROUND paginator to an UNPLAYED round (a week-8
-   career has only Round 1 played, per `07_euroleague_group_a.png`) and the results zone
-   should come back empty. Do that before baking.
-2. **The kit shadow pass**, as above — 32 px per kit until it is reproduced or the patches
-   are cut per club from frames.
+1. **The desktop under the two results rows.** The old plan was to page the ROUND
+   paginator to an UNPLAYED round and expect the zone to come back empty. **It does not**
+   — captured live and witnessed in
+   `tools/re/refs/euroleague-group-2026-07-26/03_group_A_round5_unplayed.png`:
+   an unplayed round still draws both kits, both white club bars and both black score
+   boxes, and drops **only the goal digits**. So the rows' own chrome is static and stays
+   baked; the desktop is needed only where the kit sprites are transparent.
+   The desktop itself came from a different capture:
+   `01_results_premier_empty_body.png`, the SAME RESULTS screen with an empty body. Proven
+   the right source, not assumed — the wallpaper band `y330..430 / x75..450` is **0 px**
+   identical between that frame and every group frame, **across two different careers**,
+   and the 206 px of the four kit rects that the blit leaves uncovered match it exactly.
+2. **The kit shadow pass** — still open, and now measured on the live build rather than
+   estimated: see the residual table below.
 
-Nothing else is missing: table geometry, all inks, the flag rect, the row spans, the
-button faces and the model (6 groups of 4, 6 winners + 2 best runners-up) are all in hand.
+## What actually shipped (2026-07-26)
+
+`tools/re/build_euroleague_chrome_from_frames.py` bakes:
+
+* `chrome.png` — the whole 640x480 screen from frame 10, with every dynamic cell blanked
+  to its frame-sampled flat colour (the club cells, the seven number cells, the two white
+  club bars, the two black score boxes, the ROUND plate) and the five kit rects replaced
+  by the empty-body desktop;
+* `hdr_group_A..F.png` — the `GROUP <letter>` plate cut verbatim per letter. Necessary,
+  not lazy: the string is **CENTRED**, so `GROUP D` sits one pixel left of `GROUP A`
+  (measured; frames 10 vs 13 differ across x105..168 for that reason alone);
+* `btn_lit_A..F.png` — each GROUP button's lit face, one per witnessed frame. The unlit
+  faces are baked into the chrome, each cut from a frame whose selected group is a
+  *different* letter.
+
+Text anchors, all solved with `tools/re/probe_text_anchor.py` at zero differing pixels:
+
+| cell | font | ink | anchor |
+|---|---|---|---|
+| table club name | calend12 | `(60,60,100)` | LEFT, pen x **100**, pen top = row top |
+| table numbers | calend12 | `(180,200,220)` | centred on `x0 + x1 + 1` |
+| results home club | calend12 | `(80,100,120)` | RIGHT, pen END **177** |
+| results away club | calend12 | `(80,100,120)` | LEFT, pen x **219** |
+| goal digits | calend12 | `(180,200,220)` / `(255,255,0)` | centred on the box, pen top = bar top − 1 |
+| `Round %u` | proman10 | `(0,0,0)` | centred on **829** (plate x372..456), pen top **124** |
+
+**The yellow goal digit is ported as the checkerboard it measures as.** Row 1 marks the
+SECOND box, row 2 the FIRST — now witnessed on **20 rows**: the six wk22 group frames
+(12 rows) plus a second career's GROUP A paged through all six matchdays (8 played rows,
+`04..09_group_A_round1..6.png`). Those six rounds also prove the display order: matchday 4
+is matchday 1 with the venues swapped and the club order swaps with it, so the LEFT club
+is the HOME club — and the yellow still does not follow it. It is `(row + box) % 2 == 1`,
+and **what it means is still unresolved**. It is NOT a winner marker.
+
+### Parity — `tools/re/diff_euroleague_parity.py` on all six groups
+
+```
+group A: 1268px differ (1246 kit blits, 22 MINIBAND flags, 0 outside)
+group B: 1269px differ (1255 kit blits, 14 MINIBAND flags, 0 outside)
+group C: 1290px differ (1278 kit blits, 12 MINIBAND flags, 0 outside)
+group D: 1286px differ (1258 kit blits, 28 MINIBAND flags, 0 outside)
+group E: 1259px differ (1257 kit blits,  2 MINIBAND flags, 0 outside)
+group F: 1284px differ (1263 kit blits, 21 MINIBAND flags, 0 outside)
+```
+
+Every table cell, name, number, score digit, yellow marker, button face, header plate,
+ROUND label and barra value is **exact**. The two residuals, both pre-existing and both
+named rather than hidden:
+
+* **kit blits** — the barra manager kit (only Man Utd's 35x44 header patch has ever been
+  cut, so a Bolton W barra falls back to the 24x32 NANOESC kit and differs by the whole
+  blit: ~640 px), the group leader's NANOESC kit (79 of 419 opaque px) and the four
+  RIDIESC results kits (32 of 221 each). The RIDIESC/NANOESC residual is *only* the
+  sprite's 1-px outline ring, and it is **not** a plain blend of the outline with the
+  background (tested: left-edge pixels darken, right-edge pixels lighten to 128/144 grey),
+  so the pass is still un-reversed. Not invented, not faked.
+* **MINIBAND flags** — 99 px over all six frames, every one a single dithered pixel on a
+  neighbouring palette entry. The right flag is at the right rect in every row.
+
+### Still not built
+
+The **knockout view** (`MATCHES` with `1ST LEG` / `2ND LEG` / `AGGR.`), which
+`16_euroleague_qtr_finals.png` holds, and the bracket art (`flecha cuartos`,
+`gana derecha`, `gana izquierda`) the screen loads.

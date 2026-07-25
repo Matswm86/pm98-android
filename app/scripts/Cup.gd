@@ -634,6 +634,31 @@ static func group_tables(b: Dictionary) -> Array:
 	return gs.get("groups", [])
 
 
+## One group's table on the points / goal-difference / goals-for ladder. The stored table
+## is already ranked once the group phase has resolved; ranking again is idempotent, so
+## the EURO. LEAGUE screen can ask for it at any matchday.
+static func ranked_table(grp: Dictionary) -> Array:
+	return _sorted_table(grp.get("table", []))
+
+
+## The fixtures matchday `rnd` (1-based) puts on in group `gi`, home side first, as the
+## shared round-robin schedule pairs them -- whether or not they have been played.
+static func group_fixtures(b: Dictionary, gi: int, rnd: int) -> Array:
+	var gs: Dictionary = b.get("group_stage", {})
+	var groups: Array = gs.get("groups", [])
+	var sched: Array = gs.get("schedule", [])
+	if gi < 0 or gi >= groups.size() or rnd < 1 or rnd > sched.size():
+		return []
+	var clubs: Array = (groups[gi] as Dictionary).get("clubs", [])
+	var out: Array = []
+	for pr in (sched[rnd - 1] as Array):
+		var hi := int(pr[0])
+		var ai := int(pr[1])
+		if hi < clubs.size() and ai < clubs.size():
+			out.append({"h": int(clubs[hi]), "a": int(clubs[ai])})
+	return out
+
+
 ## Resolve one tie over `legs` legs. Single-leg (FA Cup, League Cup final): a draw is
 ## replayed at the reversed venue, a level replay goes to penalties. Two-leg (League Cup
 ## rounds): home-and-away, advance on aggregate, a level aggregate goes to penalties.

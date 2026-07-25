@@ -4008,17 +4008,66 @@ func _comp_side(club_id: int) -> Dictionary:
 ## NOT witnessed in any capture we hold, so this stays a placeholder — flagged in
 ## docs/re/cupdraw_screen_re.md — rather than being drawn on the SORTEO screen, which is a
 ## knockout-draw screen. Every knockout round goes through `_show_cup_screen`.
-func _show_cup_group_placeholder(b: Dictionary, title: String, emblem_path: String) -> void:
-	var v := _cup_view(b)
-	var scr: CupScreen = load("res://scenes/CupScreen.gd").new()
+## RESULTS -> EURO. LEAGUE, the group phase, on the original's own screen
+## (docs/re/euro_league_screen_re.md). `gi` is the group index and `rnd` the 1-based
+## matchday the ROUND paginator sits on; both are re-entered on every tap so the screen
+## stays a pure view over Cup.gd's bracket.
+func _show_euro_group_screen(b: Dictionary, gi := 0, rnd := 0) -> void:
+	var groups: Array = Cup.group_tables(b)
+	if groups.is_empty():
+		return
+	gi = clampi(gi, 0, groups.size() - 1)
+	var grp: Dictionary = groups[gi]
+	var played := int((b.get("group_stage", {}) as Dictionary).get("matchdays_played", 0))
+	var n_md := int((b.get("group_stage", {}) as Dictionary).get("n_matchdays", 6))
+	if rnd <= 0:
+		rnd = maxi(1, played)
+	rnd = clampi(rnd, 1, n_md)
+
+	var rows: Array = []
+	for row in Cup.ranked_table(grp):
+		var cid := int(row.get("id", -1))
+		rows.append({"name": _cup_name(cid), "club_id": cid,
+			"flag": int(GameDB.club(cid).get("countryCode", -1)),
+			"pts": row.get("pts", 0), "p": row.get("p", 0), "w": row.get("w", 0),
+			"d": row.get("d", 0), "l": row.get("l", 0),
+			"gf": row.get("gf", 0), "ga": row.get("ga", 0)})
+
+	# The original draws the matchday's fixtures whether or not they are played: an
+	# unplayed round keeps the kits, the bars and the empty score boxes (witnessed
+	# 2026-07-26, 03_group_A_round5_unplayed.png).
+	var results: Array = []
+	var md_results: Array = grp.get("results", [])
+	var fixtures: Array = Cup.group_fixtures(b, gi, rnd)
+	for i in fixtures.size():
+		var f: Dictionary = fixtures[i]
+		var r := {"home_id": int(f["h"]), "home": _cup_name(int(f["h"])),
+			"away_id": int(f["a"]), "away": _cup_name(int(f["a"])), "played": false,
+			"hg": 0, "ag": 0}
+		if rnd - 1 < md_results.size():
+			var played_md: Array = md_results[rnd - 1]
+			if i < played_md.size():
+				var pr: Dictionary = played_md[i]
+				r["home_id"] = int(pr["h"])
+				r["home"] = _cup_name(int(pr["h"]))
+				r["away_id"] = int(pr["a"])
+				r["away"] = _cup_name(int(pr["a"]))
+				r["hg"] = int(pr["hg"])
+				r["ag"] = int(pr["ag"])
+				r["played"] = true
+		results.append(r)
+
+	var scr: EuroGroupScreen = load("res://scenes/EuroGroupScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
-	scr.setup(_career.club_name, "", _career.season, v["status"], v["status_col"],
-		v["sub"], v["run_rows"], v["draw_label"], v["draw_rows"], v["draw_more"],
-		title, emblem_path)
-	scr.gui_input.connect(func(e: InputEvent) -> void:
-		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
-			scr.queue_free())
+	scr.setup(_match_header(), EuroGroupScreen.LETTERS[gi], rnd, n_md, rows, results)
+	scr.back_pressed.connect(func() -> void: scr.queue_free())
+	scr.group_selected.connect(func(idx: int) -> void:
+		scr.queue_free()
+		_show_euro_group_screen(b, idx, rnd))
+	scr.round_changed.connect(func(delta: int) -> void:
+		scr.queue_free()
+		_show_euro_group_screen(b, gi, rnd + delta))
 
 
 ## A single-match final (Charity Shield / European Supercup / Intercontinental Cup) as a
@@ -4082,10 +4131,10 @@ func _cup_status_word(b: Dictionary) -> String:
 ## that strip (CupDrawScreen.STRIPS); `title` is the name as MANAGER.EXE spells it. Built
 ## from a Cup.gd bracket. CONTINUE (or FINISH) dismisses it.
 func _show_cup_screen(b: Dictionary, key: String, title: String) -> void:
-	# The European GROUP phase is not a knockout draw and the original's group screen is
-	# un-witnessed, so it keeps the old placeholder rather than borrowing the SORTEO one.
+	# The European GROUP phase is not a knockout draw: it has its own screen now, rebuilt
+	# from the original's frames (docs/re/euro_league_screen_re.md).
 	if not Cup.group_tables(b).is_empty() and (b.get("rounds", []) as Array).is_empty():
-		_show_cup_group_placeholder(b, title.to_upper(), _euro_emblem(key))
+		_show_euro_group_screen(b)
 		return
 	var scr: CupDrawScreen = load("res://scenes/CupDrawScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)

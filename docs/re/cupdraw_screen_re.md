@@ -328,10 +328,11 @@ from the bracket's LATEST round:
   differs again; the trigger is unknown, so the chrome bakes frame 74's phase and the
   differ excludes that rect. This is the only exclusion.
 * **The drum's frame rate** (12 fps is ours) and **which BOMBO frame a draw starts on**.
-* **The European GROUP phase.** It is not a knockout draw. It has its own screen — RESULTS
-  → **EURO. LEAGUE** — now captured and fully specified in
-  [`euro_league_screen_re.md`](euro_league_screen_re.md); until it is built,
-  `Main._show_cup_group_placeholder` keeps the old placeholder.
+* ~~**The European GROUP phase.**~~ — **CLOSED 2026-07-26.** It is not a knockout draw; it
+  has its own screen — RESULTS → **EURO. LEAGUE** — now BUILT as `EuroGroupScreen` and
+  render-diffed against all six witnessed group frames
+  ([`euro_league_screen_re.md`](euro_league_screen_re.md)). The old
+  `Main._show_cup_group_placeholder` is deleted.
 * ~~**The Intercontinental Cup**~~ — **CLOSED 2026-07-25.** It has no `SORTEO` strip
   because it is not a draw: it is a single match on the CHARITY SHIELD screen, which
   MANAGER.EXE proves byte-for-byte (`FUN_0048daf0` == `FUN_004717a0` bar the title string

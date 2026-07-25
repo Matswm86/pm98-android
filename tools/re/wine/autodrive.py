@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
@@ -94,8 +95,10 @@ def grab(e: dict, path: Path) -> Image.Image:
 def click(e: dict, x: int, y: int, n: int = 1, gap: float = 0.4) -> None:
     wid = window_id(e)
     ev = {"DISPLAY": e["display"], "PATH": "/usr/bin:/bin"}
-    subprocess.run(["xdotool", "windowactivate", "--sync", wid], env=ev, check=False)
-    subprocess.run(["xdotool", "windowraise", wid], env=ev, check=False)
+    # PM98_NO_RAISE=1: drive without yanking the game window to the front on every click.
+    if os.environ.get("PM98_NO_RAISE") != "1":
+        subprocess.run(["xdotool", "windowactivate", "--sync", wid], env=ev, check=False)
+        subprocess.run(["xdotool", "windowraise", wid], env=ev, check=False)
     time.sleep(0.2)
     for _ in range(n):
         subprocess.run(

@@ -87,6 +87,35 @@ and is saved — every stop is a screen never witnessed, which is the point.
 - **The 2026-07 archived captures are 641 px wide** — the same 640 px window plus one
   black column at x=640 (99.92 % of pixels identical at offset 0). `as_frame` crops.
 
+## Drive without stealing the owner's screen (2026-07-26)
+
+`click.sh` and `autodrive.py` used to `windowactivate` + `windowraise` the game window on
+**every** click, which yanks it to the front of the live desktop each time. Two changes:
+
+* **`PM98_NO_RAISE=1`** skips the raise in both. Clicks are XTEST pointer warps, so they
+  still land — *provided the game window is the top window at that point*. It is not a
+  general fix: X delivers the button press to whatever window is under the pointer, so a
+  covered game window means the click goes into whatever covers it.
+* **Therefore: run a capture on its OWN display.** The only clean answer when the owner is
+  using the machine, and it also removes the pointer fight (the owner's real mouse and the
+  harness's XTEST warps share one pointer per display):
+  ```
+  XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-1 Xwayland :5 -geometry 800x600 -retro &
+  DISPLAY=:5 PM98_DESKTOP=pm98cap bash boot.sh          # a FRESH desktop name, see env.sh
+  ```
+  There is no window manager on that display, so `xdotool windowactivate` fails — use
+  `xdotool windowfocus` before typing (verified: the name field takes `MATS`).
+* Two MANAGER.EXE instances on one wineprefix are fine as long as the desktop names differ
+  (`pm98play` for the owner's game, `pm98cap` for the harness). Note that
+  `explorer /desktop=<name>` also spawns a plain `explorer /desktop` whose full-screen
+  "Default - Wine desktop" window can sit ON TOP of the game window.
+
+`screens.json` gained two signatures this session: `cup_draw` (taught over the
+FINISH+CONTINUE strip from four real draws, so it survives any competition) and a
+re-taught `match_options` (1200 probes over both the MATCH and SOUND tabs — the old
+448-probe signature lost to `hub`'s 497 under most-specific-wins and stalled the drive).
+Setting **LINE-UPS: OFF** in MATCH OPTIONS before starting `run` is worth ~35 s a match.
+
 ## Reproduce the capture
 
 1. `bash boot.sh` — game to the title screen.
