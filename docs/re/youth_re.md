@@ -32,10 +32,28 @@ ready the youth manager reports "%s is ready to be promoted to the first team sq
 
 ## What we built (and what is ours vs PM98's)
 
-PM98's youth ratings + scout/manager quality are **data-driven** (loaded from the club
-database at new-game), not code constants — there is nothing numeric to port, the same as
-the transfer-fee and finance models (see `finance_constants.md`). So the **surface** above
-is PM98's; the **development model** is ours, in `app/scripts/Youth.gd`:
+> **CORRECTED 2026-07-25 — the claim below is WRONG and the owner has asked for the whole
+> youth part to be exact.** The youth generator is IN CODE, and it was located:
+>
+> * **`FUN_0058a360`** — the intake. The only function referencing BOTH
+>   `%s has joined your Youth Team.` (0x663398) and
+>   `The youth player %s has rejected your offer.` (0x6635e8), so it owns the
+>   offer/accept/reject decision, the squad-cap gate, and the `operator_new(0x1c)` youth
+>   record it appends via `FUN_0058a7b0`.
+> * **`FUN_00589e20`** — called first (`FUN_0058a360` bails when it returns NULL) and also
+>   references the rejection string: the **candidate generator**, i.e. where the youngster's
+>   rolled attributes and his ceiling live.
+> * `FUN_0057b400` (the weekly club turn) raises `The youth team scout has finished his
+>   search.` (0x66317c) — the search-duration side.
+>
+> Next step is a PORT, not a data hunt: oracle those two the way `FUN_00582760` was
+> oracled and replace every invented constant listed below. Youth TRAINING is already
+> exact — it is `FUN_00582760`'s `0x20` YOUTH branch.
+
+PM98's youth ratings + scout/manager quality were believed to be **data-driven** (loaded
+from the club database at new-game) with nothing numeric to port. So the **surface** above
+is PM98's; the **development model** below is ours, in `app/scripts/Youth.gd`, and is the
+part that must be replaced:
 
 - **Intake** (`Youth.intake`): a youngster aged 15–17 with a modest current ability (CA
   30–46) and a hidden **potential** (CA + 8..42, capped 88) — his ceiling. ~1 in 6 is a
