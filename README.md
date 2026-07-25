@@ -16,7 +16,7 @@ fan remake.</sub>
 
 ## Download
 
-📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-d634dff.apk)** — one tap downloads `pm98-d634dff.apk` (current build) straight to your phone.
+📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-d3f8298.apk)** — one tap downloads `pm98-d3f8298.apk` (current build) straight to your phone.
 
 > **This build (2026-07-25)** makes the whole youth team the original's, which is what you asked for. It turned out the academy was never a generator at all — the game **ships** its youth players, fifty-one of them, with real names, birthplaces and ratings, in a hidden club inside its own database. Everything the youth part does is a rule over that table, and all four rules are now taken straight from the game's code:
 >
