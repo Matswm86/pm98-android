@@ -16,16 +16,21 @@ fan remake.</sub>
 
 ## Download
 
-📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-d3f8298.apk)** — one tap downloads `pm98-d3f8298.apk` (current build) straight to your phone.
+📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-c162980.apk)** — one tap downloads `pm98-c162980.apk` (current build) straight to your phone.
 
-> **This build (2026-07-25)** makes the whole youth team the original's, which is what you asked for. It turned out the academy was never a generator at all — the game **ships** its youth players, fifty-one of them, with real names, birthplaces and ratings, in a hidden club inside its own database. Everything the youth part does is a rule over that table, and all four rules are now taken straight from the game's code:
+> **This build (2026-07-25)** is the season the game plays back at you. I played a whole 1997-98 campaign in the real Premier Manager 98 by hand, recording every screen, and then fixed what the recording caught us getting wrong. Most of it is money.
 >
-> - **Your youngsters are real people from the game's own database now**, not names we made up. The game hands each one to you thirty-five to forty-five points below himself, so **his ceiling is his own shipped rating** — the "hidden potential" we used to roll for him was never needed.
-> - **The youth scout brings back exactly one player**, picked at random from those who clear eighty in any capability you lit. That is what the routine does; our shortlist of up to three was ours.
-> - **How long he takes now depends on how good he is.** Fifty to fifty-five weeks at half a star, thirty to thirty-five at five — the game's own formula. We still halve it so a season carries two intakes, as you asked; that is the one number in the whole youth part that is not the game's.
-> - **A youngster grows back up to his shipped rating and stops dead there**, a point roughly every other week, and the youth manager tells you he is ready the moment his core four arrive. No more youngsters who never budge, and no more youngsters who grow past themselves.
-> - **The academy no longer empties itself every summer.** We used to age players out at nineteen and scout a free crop in — neither thing happens in the original, and the shipped youngsters are seventeen to nineteen, so they were being thrown away almost immediately.
->
+> - **You can go broke now, and that is the point.** The original charges your wage bill every single week and only pays you when you play at home — so an away Saturday is a straight loss and Manchester United's bank falls from £9.6m to £3.3m across a season. Ours added the same tidy profit every week, home or away, and finished sixteen million up. The club's books are now the game's own: seven income lines, eleven expense lines, week by week, and if you run at a loss the board starts counting the weeks out loud.
+> - **A ticket costs £7.50.** The game prints capacity, attendance and gate money together on the full-time board, and both grounds I checked came out at exactly seven pounds fifty a head. We were charging fifteen.
+> - **A TV station buys the rights to your home matches** and tells you so on its own card before kick-off — £90,000 for a league game, £187,500 for the Charity Shield, £375,000 in the European Cup. That fee is your TELEVISION line for the week. We were paying television money on away weeks and on weeks with no match at all.
+> - **The FINANCES screen is real.** Actual weekly figures, an actual last week / this week, and the balance chart is now your own season instead of one number drawn flat.
+> - **The cups are the whole country again.** All ninety-two clubs, with the Premier entering at Round 3 — which is how a Division One side can knock you out, or win the thing. Ties are one match with a replay, as the draw card says. There is no prize purse any more: a cup run pays you through the turnstiles, like everything else.
+> - **The lower divisions play all forty-six of their matches** and run ahead of you on midweeks, instead of stopping short at thirty-eight and handing out promotions off an unfinished table.
+> - **The end of the season is the game's own.** Final tables, then the trophy cards, then the year's top scorers and managers, then next pre-season. The board-verdict screen we used to show you does not exist in the original and is gone.
+> - **The Intercontinental Cup is played in December and the European Supercup in March**, each on its own trophy card, instead of both being bolted onto the start of the season.
+> - **Two transfer-deadline warnings**, two weeks and one week out, in the game's own words.
+> - **Youth training is twice as fast**, to match the scouting — you asked for both halved.
+
 > **Earlier build (2026-07-25)** — nine things you reported, each settled against the original:
 >
 > - **Training actually trains now.** We had an invented development model whose prime-age rate needed sixty-seven weeks to move a single point, so your best players never budged. The real routine is now ported straight from the game: put a man on a coach and **that skill climbs a full point every week** until he is eighteen to twenty-four clear of his shipped rating. GENERAL lifts all six trainable skills but only by five; SPEED, STAMINA, AGGRESSION and QUALITY are not trainable at all, exactly as in the original; and take a man off training and his gains bleed away a point a week.
@@ -71,6 +76,16 @@ prompted. Reinstalling over an older build? Uninstall the old one first.
   Five bookings earn a one-match ban; reds sit a player down on the spot.
 - **Club news:** a live feed of injuries, suspensions, returns to fitness and the
   weekly result, newest first and colour-coded, on the original Main Menu's NEWS.
+- **The club's books, week by week:** the original's own FINANCES ledger — seven income
+  lines and eleven expense lines, accrued as the season is played. Your wage bill is
+  charged **every** week; the turnstiles and the TV money only come in when you play at
+  **home**, so an away Saturday costs you. A TV station buys the rights to each home match
+  and says so on its own card. Run at a loss and the board starts counting the weeks.
+- **Both domestic cups over the whole country:** all 92 clubs, with the Premier entering at
+  **Round 3**, one match per tie and a replay if it's level — so a Division Two side can
+  knock you out, and can win it.
+- **The season ends the way the original ends it:** the final table of every division, then
+  the trophy cards, then the year's top scorers and managers, then next pre-season.
 - **Training & player development:** the original's own weekly routine, ported from the
   game. Hire the six skill coaches, put a player on one, and that skill climbs a point a
   week until he is well clear of the rating he shipped with; GENERAL lifts all six a
