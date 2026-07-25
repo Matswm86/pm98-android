@@ -16,9 +16,19 @@ fan remake.</sub>
 
 ## Download
 
-📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-c162980.apk)** — one tap downloads `pm98-c162980.apk` (current build) straight to your phone.
+📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-5e40c23.apk)** — one tap downloads `pm98-5e40c23.apk` (current build) straight to your phone.
 
-> **This build (2026-07-25)** is the season the game plays back at you. I played a whole 1997-98 campaign in the real Premier Manager 98 by hand, recording every screen, and then fixed what the recording caught us getting wrong. Most of it is money.
+> **This build (2026-07-25)** finishes the season the game plays back at you. Four screens the real Premier Manager 98 shows and this remake did not, each rebuilt from the game's own frames and checked back against them pixel by pixel.
+>
+> - **The cup draw actually happens now.** The draw screen — the trophy, the lottery drum, the round plate, the list of ties — has been in the app for a while with no way to reach it. It now comes up on its own, the way the original does, the moment a round is drawn, for both English cups and all three European ones. And it has the second layout the original has: a short round (sixteen ties or fewer) lays the draw out in a grid with both clubs' kits instead of one line per tie, and **your own tie is picked out on a dark plate with your club in yellow**, so you can find yourself at a glance. Tap a tie and the panel bottom-left fills in with both clubs, both managers and both grounds.
+> - **FINANCES has its week-by-week view.** The tab was there; the page behind it was not. You get the real weekly books — seven income lines, eleven expense lines — with a stepper to walk back through the season and the game's own date stamp for each week. While you are on the live week it reads `CURRENT 31`, exactly as the original does, and drops the word once you step back.
+> - **THE CHAMPIONSHIPS.** After the trophy cards, the season's eight finals on one sheet with their scorelines, the winner's name in black and the loser's in grey. Nothing is ever shared: a level final went to penalties.
+> - **END OF SEASON.** The four-division overview — champion, runner-up, the U.E.F.A. places, who went up and who went down. This is the screen whose *name* our invented board-verdict sheet used to borrow.
+> - **PLAYERS OF THE YEAR.** One player of the season per club, ninety-two of them, across four division tabs.
+>
+> Getting these right also caught three things we had wrong on screens that already shipped: the finance figures were in the wrong typeface throughout, the finance chrome was rubbing out two panel borders, and the U.E.F.A. Cup draw was showing the F.A. Cup's trophy.
+
+> **Earlier this day (2026-07-25)** the season the game plays back at you. I played a whole 1997-98 campaign in the real Premier Manager 98 by hand, recording every screen, and then fixed what the recording caught us getting wrong. Most of it is money.
 >
 > - **You can go broke now, and that is the point.** The original charges your wage bill every single week and only pays you when you play at home — so an away Saturday is a straight loss and Manchester United's bank falls from £9.6m to £3.3m across a season. Ours added the same tidy profit every week, home or away, and finished sixteen million up. The club's books are now the game's own: seven income lines, eleven expense lines, week by week, and if you run at a loss the board starts counting the weeks out loud.
 > - **A ticket costs £7.50.** The game prints capacity, attendance and gate money together on the full-time board, and both grounds I checked came out at exactly seven pounds fifty a head. We were charging fifteen.
