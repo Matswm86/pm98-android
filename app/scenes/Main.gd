@@ -5360,6 +5360,21 @@ func _show_manager_career() -> void:
 		AudioManager.ui_select()
 		scr.queue_free()
 		_mgr_history = null)
+	scr.honours_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		_show_honours())
+
+## HONOURS + CAREER RESUME — OURS (docs/SPEC_ours_additions.md item 1). Raised off the
+## MANAGER HISTORY plaque, which the original leaves inert, so that screen keeps its 0-px
+## parity. Reads only Career.honours, the ledger written at each season rollover.
+func _show_honours() -> void:
+	var scr: HonoursScreen = load("res://scenes/HonoursScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(_career.manager_name, _career.honours_board(), _career.career_resume())
+	scr.back_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		scr.queue_free())
 
 ## The witnessed division short-forms ("3rd Div." in OFFERS SELECTION / MANAGER
 ## HISTORY; "Premier" on the news side-tabs). Foreign league names pass through.

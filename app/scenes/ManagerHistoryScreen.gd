@@ -24,6 +24,12 @@ class_name ManagerHistoryScreen
 ## baked, inert). Native 640x480; scales to fit its parent.
 
 signal back_pressed    # RETURN -> dismiss
+## OURS, not the game's: a tap on the manager-name PLAQUE opens the HONOURS + CAREER
+## RESUME screen (docs/SPEC_ours_additions.md item 1). The plaque is inert in every
+## captured frame and nothing is drawn to advertise the tap, so this screen still
+## renders at 0 differing pixels — the same rule the SCOUT screen's extra-filters
+## panel follows. If the plaque's own behaviour is ever witnessed, this moves.
+signal honours_pressed
 
 const W := 640
 const H := 480
@@ -121,6 +127,8 @@ func _on_input(e: InputEvent) -> void:
 	var p := _to_design(e.position)
 	if BTN_RETURN.has_point(p):
 		back_pressed.emit()
+	elif PLAQUE.has_point(p):
+		honours_pressed.emit()      # OURS (see the signal's note)
 	elif BTN_TOTAL.has_point(p):
 		_total_on = not _total_on
 		queue_redraw()

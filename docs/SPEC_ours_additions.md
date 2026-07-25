@@ -127,3 +127,65 @@ stops looking like 1998.
 The same shape extends to the other three if wanted: HEADING weights who gets the header on
 set pieces (header events are already distinguished in commentary), TACKLING feeds how many
 chances a defence concedes, DRIBBLING weights the assist roll.
+
+---
+
+## BUILD LOG — 2026-07-25 (late). Items 1-4 shipped; two of them were wrong as specified.
+
+### 1. Honours board + career resume — BUILT
+
+The R14 blocker was already closed (`Career._capture_euro_honours` captures
+`euro_winner_uefa`), so the board ships with no hole. Added:
+
+* `Career.honours` — one record per COMPLETED season, written by
+  `_capture_season_honours()` at the rollover while the brackets still stand. Idempotent
+  per (season, club). Persisted; a pre-ledger save loads with an empty ledger.
+* `Career.honours_board()` — the fold: per competition, the seasons won and the seasons
+  lost in the final, each carrying its own `(on penalties)` qualifier from the tie itself.
+* `Career.career_resume()` — one row per season: club, division, final position, the
+  board's objective and whether it was met, the trophies lifted, how the season ended.
+* `app/scenes/HonoursScreen.gd` — two pages, HONOURS and CAREER.
+
+**Presentation note, deliberately not followed to the letter.** The spec said to reuse the
+champion-card chrome. The champion card is a single-trophy card; an honours board is a
+list of nine competitions across N seasons, and forcing the card's layout onto it would
+have meant inventing a card that the original never draws. The screen instead borrows the
+SCOUT extra-panel plate — an OURS surface that already exists — and says on its own face
+that it is this port's, not the 1998 game's.
+
+**Entry point:** a tap on the manager-name plaque of the witnessed MANAGER HISTORY screen,
+a zone that screen leaves inert. MANAGER HISTORY still renders **0 px** against both its
+witnesses (`diff_managerhistory_parity`, re-run). Nothing advertises the tap, because
+drawing a button there would cost a witnessed pixel.
+
+### 2. The scout result cap — BUILT, and the spec's numbers were WRONG
+
+`FUN_00575750` was disassembled (see `docs/re/scout_screen_re.md`). Two corrections:
+
+* **The ladder is 20 / 25 / 30 / 35 / 40 / 45 / 50 / 55 / 60**, not 15/20/25/30/35. The
+  quality byte in `(quality + 2) * 5` is the raw **1..10 half-star** value, not the 1..5
+  star count. A ★★★ scout caps at **40** — which is exactly the result count the 2026-07-18
+  witness frame 81 encodes in its 18px slider. Had the spec's ladder been implemented, it
+  would have contradicted a live frame.
+* **"Which 35 of the 112?" is not ours to choose.** The resolver keeps its N by a uniform
+  random draw without replacement. Not highest-AV. A weak scout brings back fewer names,
+  not worse ones.
+
+The shortfall line ships as asked, in the extra-filters panel:
+*"40 of 112 shown - your scout could only bring back 40."*
+
+### 3. AV in PLAYERS FOUND — ALREADY THERE, nothing to do
+
+The spec says the senior list does not show AV. It does, and always has:
+`ScoutScreen._draw_row` draws it at `CELL_AV_CX` in `C_AV`, and the RE doc's own
+verification line pins the digit-centring of "69" to witness ink x238. AV is a witnessed
+column of the original's own header strip, not an addition. No change made.
+
+### 4. Sortable result columns — BUILT
+
+`ScoutScreen.view_rows()` sorts on NAME / AV / MO / CLUB FEE / WAGE / AGE, either
+direction. The control lives in the extra-filters panel rather than on the header strip,
+because a sort marker drawn on the witnessed headers would cost parity. Default is the
+Career scan order, i.e. exactly what the screen showed before.
+
+### The appendix (making SHOOTING matter) — still NOT APPROVED, still not built.

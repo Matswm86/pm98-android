@@ -240,6 +240,13 @@ var spell_start_year: int = 1           # the career `year` you joined the curre
 var comp_total: Dictionary = {}         # career-total per-competition record (MANAGER HISTORY
                                         # TOTAL view); past seasons/spells fold in at rollover
 var _rep_year: int = 0                  # guard: the season `year` the board review was applied
+# OURS (docs/SPEC_ours_additions.md item 1, approved 2026-07-25). The original tracks
+# eight trophies and shows each one only in the moment it is won, then forgets: a
+# ten-season save leaves no record of itself, and the game raises no board-verdict screen
+# at all (REFRUN R15). This is one record per COMPLETED season, oldest first, written by
+# _capture_season_honours at the rollover. It is a LEDGER, not a rule change: nothing in
+# the model reads it, so a save without it plays identically.
+var honours: Array = []
 
 # THE DOMESTIC CUPS, on the original's own shape (REFRUN R1/R2/R8, witnessed 2026-07-25).
 #
@@ -4052,6 +4059,7 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	# Supercup/Intercontinental (which need this season's European winners + ratings).
 	_capture_honours()
 	_capture_euro_honours()
+	_capture_season_honours()    # OURS: the ledger, written while the brackets still stand
 	if rng == null:
 		rng = RandomNumberGenerator.new()
 		rng.randomize()
@@ -4212,6 +4220,159 @@ func _capture_honours() -> void:
 			last_runners_up.append(int(s[i].get("id", -1)))
 	last_fa_winner_id = Cup.champion_id(fa_cup)
 	last_lc_winner_id = Cup.champion_id(league_cup)
+
+
+# ---- OURS: the honours ledger (SPEC_ours_additions item 1) -----------------
+
+## The eight trophies the original's own season-end backdrop shows, plus the
+## Intercontinental Cup, which is not on the backdrop but does raise its own champion
+## card (REFRUN R7) and so earns a line. Order = the backdrop's.
+const HONOUR_COMPS := ["league", "fa_cup", "league_cup", "charity",
+	"european_cup", "uefa_cup", "cup_winners_cup", "supercup", "intercont"]
+const HONOUR_NAMES := {
+	"league": "League", "fa_cup": "F.A. Cup", "league_cup": "Coca-Cola Cup",
+	"charity": "Charity Shield", "european_cup": "European Cup",
+	"uefa_cup": "U.E.F.A. Cup", "cup_winners_cup": "Cup Winner's Cup",
+	"supercup": "European Supercup", "intercont": "Intercontinental Cup",
+}
+
+## Append the season that has just finished to `honours`. Called from advance_season
+## AFTER _capture_honours / _capture_euro_honours (which is where the brackets are still
+## intact) and BEFORE anything is rebuilt. Idempotent per season: re-running it for a
+## season already on the ledger overwrites that entry rather than duplicating it.
+func _capture_season_honours() -> void:
+	var rec := {
+		"season": season, "year": year,
+		"club_id": club_id, "club_name": club_name, "league_name": league_name,
+		"tier": tier, "pos": position(), "squad_size": rosters.get(club_id, []).size(),
+		"objective": objective_text, "objective_pos": objective_pos,
+		"objective_met": objective_met(),
+		"sacked": sacked, "sack_reason": sack_reason,
+		"comps": {},
+	}
+	var comps: Dictionary = rec["comps"]
+	# The LEAGUE is the manager's own division, not necessarily the Premier League.
+	var table := standings()
+	if not table.is_empty():
+		comps["league"] = {
+			"winner_id": int(table[0].get("id", -1)),
+			"winner_name": str(table[0].get("name", club_names.get(int(table[0].get("id", -1)), "?"))),
+			"loser_id": int(table[1].get("id", -1)) if table.size() > 1 else -1,
+			"loser_name": str(table[1].get("name", "")) if table.size() > 1 else "",
+			"detail": "",
+		}
+	for pair in [["fa_cup", fa_cup], ["league_cup", league_cup],
+			["european_cup", euro.get("european_cup", {})],
+			["uefa_cup", euro.get("uefa_cup", {})],
+			["cup_winners_cup", euro.get("cup_winners_cup", {})]]:
+		var f := _final_of(pair[1])
+		if not f.is_empty():
+			comps[str(pair[0])] = f
+	for pair2 in [["charity", charity_shield], ["supercup", supercup],
+			["intercont", intercontinental]]:
+		var t: Dictionary = pair2[1]
+		if not t.is_empty() and int(t.get("winner_id", -1)) != -1:
+			comps[str(pair2[0])] = {
+				"winner_id": int(t.get("winner_id", -1)),
+				"winner_name": _club_label(int(t.get("winner_id", -1))),
+				"loser_id": int(t.get("loser_id", -1)),
+				"loser_name": _club_label(int(t.get("loser_id", -1))),
+				"detail": "on penalties" if str(t.get("decided", "")) == "pens" else "",
+			}
+	for i in honours.size():
+		if str((honours[i] as Dictionary).get("season", "")) == season \
+				and int((honours[i] as Dictionary).get("club_id", -2)) == club_id:
+			honours[i] = rec
+			return
+	honours.append(rec)
+
+
+## The winner and runner-up of a finished bracket, with the "(on penalties)" qualifier the
+## champion cards carry (REFRUN R14). {} while the cup is still running.
+func _final_of(b: Dictionary) -> Dictionary:
+	var champ := Cup.champion_id(b)
+	if champ == -1:
+		return {}
+	var rounds: Array = b.get("rounds", [])
+	for i in range(rounds.size() - 1, -1, -1):
+		for tie in (rounds[i] as Dictionary).get("ties", []):
+			var t: Dictionary = tie
+			if int(t.get("winner_id", -1)) != champ:
+				continue
+			return {
+				"winner_id": champ, "winner_name": _club_label(champ),
+				"loser_id": int(t.get("loser_id", -1)),
+				"loser_name": _club_label(int(t.get("loser_id", -1))),
+				"detail": "on penalties" if str(t.get("decided", "")) == "pens" else "",
+			}
+	return {"winner_id": champ, "winner_name": _club_label(champ),
+		"loser_id": -1, "loser_name": "", "detail": ""}
+
+
+## A club's display name from whichever store holds it (own division, then the European
+## name cache). "?" rather than a guess when neither does.
+func _club_label(cid: int) -> String:
+	if cid < 0:
+		return ""
+	if int(cid) == club_id:
+		return club_name
+	if club_names.has(cid):
+		return str(club_names[cid])
+	if euro_names.has(cid):
+		return str(euro_names[cid])
+	return "?"
+
+
+## The manager's own honours, folded across every season on the ledger:
+## {comp_key: {"won": [season, ...], "runner_up": [season, ...]}}. Screens read this.
+func honours_board() -> Dictionary:
+	var out := {}
+	for e in honours:
+		var rec: Dictionary = e
+		var cid := int(rec.get("club_id", -1))
+		var comps: Dictionary = rec.get("comps", {})
+		for key in HONOUR_COMPS:
+			var c: Dictionary = comps.get(key, {})
+			if c.is_empty():
+				continue
+			var slot: Dictionary = out.get(key, {"won": [], "runner_up": []})
+			if int(c.get("winner_id", -1)) == cid:
+				(slot["won"] as Array).append({"season": str(rec.get("season", "")),
+					"club": str(rec.get("club_name", "")), "detail": str(c.get("detail", ""))})
+			elif int(c.get("loser_id", -1)) == cid:
+				(slot["runner_up"] as Array).append({"season": str(rec.get("season", "")),
+					"club": str(rec.get("club_name", "")), "detail": str(c.get("detail", ""))})
+			out[key] = slot
+	return out
+
+
+## One row per season for the career resume: club, division, final position, the board's
+## objective and whether it was met, the trophies lifted, and how the season ended.
+func career_resume() -> Array:
+	var rows: Array = []
+	for e in honours:
+		var rec: Dictionary = e
+		var cid := int(rec.get("club_id", -1))
+		var won: Array = []
+		var comps: Dictionary = rec.get("comps", {})
+		for key in HONOUR_COMPS:
+			var c: Dictionary = comps.get(key, {})
+			if not c.is_empty() and int(c.get("winner_id", -1)) == cid:
+				won.append(str(HONOUR_NAMES.get(key, key)))
+		var ended := ""
+		if bool(rec.get("sacked", false)):
+			ended = "sacked (%s)" % str(rec.get("sack_reason", ""))
+		rows.append({
+			"season": str(rec.get("season", "")),
+			"club": str(rec.get("club_name", "")),
+			"league": str(rec.get("league_name", "")),
+			"pos": int(rec.get("pos", 0)),
+			"objective": str(rec.get("objective", "")),
+			"objective_met": bool(rec.get("objective_met", false)),
+			"won": won,
+			"ended": ended,
+		})
+	return rows
 
 
 ## Play the Charity Shield (champions v F.A. Cup winners) as the season's curtain-raiser.
@@ -4969,6 +5130,7 @@ func to_dict() -> Dictionary:
 		"euro_winner_names": _str_keyed(euro_winner_names),
 		"supercup": supercup, "intercontinental": intercontinental,
 		"reputation": reputation, "manager_history": manager_history,
+		"honours": honours,
 		"comp_total": comp_total,
 		"pending_offers": pending_offers, "sacked": sacked, "sack_reason": sack_reason,
 		"headhunt_pending": headhunt_pending, "spell_start_year": spell_start_year,
@@ -5183,6 +5345,7 @@ static func from_dict(d: Dictionary) -> Career:
 	# spell starting in the save's own year, so an in-flight career carries on seamlessly.
 	c.reputation = float(d.get("reputation", Manager.REP_START))
 	c.manager_history = d.get("manager_history", [])
+	c.honours = d.get("honours", [])
 	c.comp_total = d.get("comp_total", {})
 	c.pending_offers = d.get("pending_offers", [])
 	c.sacked = bool(d.get("sacked", false))
