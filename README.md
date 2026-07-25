@@ -16,7 +16,7 @@ fan remake.</sub>
 
 ## Download
 
-📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-d16669f.apk)** — one tap downloads `pm98-d16669f.apk` (current build) straight to your phone.
+📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-d0bc4ee.apk)** — one tap downloads `pm98-d0bc4ee.apk` (current build) straight to your phone.
 
 > **This build (2026-07-25)** fixes nine more things you told us were wrong. Each one was settled against the original game — either by disassembling the routine that does it, or by driving the real game and watching:
 >
@@ -101,7 +101,10 @@ prompted. Reinstalling over an older build? Uninstall the old one first.
 - **The winners-of-winners finals:** each new season also opens the **European Supercup**
   (last season's European Cup winners v Cup Winners' Cup winners) and the **Intercontinental
   Cup** (European Cup winners v the South American champions), one-off matches around their
-  own original trophies.
+  own original trophies. The **Charity Shield** and the **Intercontinental Cup** now open on
+  the original game's own competition screen — the same screen for both, because
+  MANAGER.EXE builds them with the same 1107-byte function and swaps only the title and the
+  trophy.
 - **Watch a match:** the original's in-match **MATCH OPTIONS** view picker
   (WATCH / HIGHLIGHTS / BRIEF / RESULTS, at the exact button coordinates reversed
   from the executable). **BRIEF** is a minute-by-minute commentary feed (goals,
