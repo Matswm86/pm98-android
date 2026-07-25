@@ -21,6 +21,14 @@ the binary this session; nothing inferred from memory.
   is the annual career-setup screen **0x3c1 = OFFERS SELECTION** itself:
   `FUN_004f8a00` re-runs `FUN_004f9520(0x3c1)` at the top of every season
   loop once `DAT_0066b1e4 != 0 && DAT_0066b18c > 0x7cd` (year > 1997).
+> **CORRECTION 2026-07-25.** The line below is right about THESE TWO screens and wrong
+> as a general statement. A Manager League career does run an eight-step season-end
+> sequence — final league tables, champion cards, THE CHAMPIONSHIPS, END OF SEASON, and
+> the GOAL SCORERS / PLAYERS / MANAGERS OF THE YEAR sheets — captured live and
+> independently in a hand-played reference season. See
+> [`season_end_sequence_re.md`](season_end_sequence_re.md). What 0x3b8 / 0x3ba add on top
+> is the PROMANAGER report and the career-complete screen, and those really are gated.
+
 - **Manager League (b1e4=0) has NO season-end screens at all**: no report, no
   END OF THE GAME, no offers re-mount. Seasons roll straight over. (App
   implication below.)

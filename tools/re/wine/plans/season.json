@@ -126,6 +126,27 @@
     437
    ],
    "settle": 1.5
+  },
+  "the_championships": {
+   "click": [
+    573,
+    451
+   ],
+   "settle": 1.5
+  },
+  "end_of_season": {
+   "click": [
+    573,
+    437
+   ],
+   "settle": 1.5
+  },
+  "players_of_the_year": {
+   "click": [
+    557,
+    438
+   ],
+   "settle": 1.5
   }
  },
  "film_secs": 20,
