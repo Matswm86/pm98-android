@@ -16,9 +16,15 @@ fan remake.</sub>
 
 ## Download
 
-📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-eea349c.apk)** — one tap downloads `pm98-eea349c.apk` (current build) straight to your phone.
+📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-64a95eb.apk)** — one tap downloads `pm98-64a95eb.apk` (current build) straight to your phone.
 
-> **This build (2026-07-25, later)** is about your scout, and about remembering what you have won.
+> **This build (2026-07-26)** gives the European group stage its real screen.
+>
+> - **RESULTS → Euro. League no longer shows a made-up card.** Where the app used to put an invented summary panel, it now draws the original's own screen: the black `GROUP A` header with the leaders' kit beside it, the four-club table with its country flags and its `PTS P W D L GF GA` columns, that matchday's two results underneath with both clubs' kits, and the six `GROUP A`–`GROUP F` buttons down the right. Tap a group to switch, or step the `Round` arrows through the six matchdays — including the ones that have not been played yet, which the original draws as empty score boxes rather than hiding.
+> - **Every pixel of it was checked back against the real game.** Six screenshots of six different groups, taken from a career played through to week 22 in the actual 1998 game, and the remake now matches all six exactly — every name, every number, every score, every button. The only differences left are the shirt graphics themselves, where the original does something to the outline we have not worked out yet, and a handful of stray dots in the little country flags.
+> - **One thing we had been told about this screen was simply wrong.** A goal number in each result is printed in yellow, and the obvious reading — that it marks the winner — is not true. Paged through all six matchdays of a group, in two different careers, the yellow always sits in the same two places whoever won. It is copied exactly as the game prints it, and we say plainly in the notes that we do not yet know what it means. It is not a winner marker, and it is not invented into one.
+
+> **The build before (2026-07-25, later)** is about your scout, and about remembering what you have won.
 >
 > - **Your scout has a limit, and it is the one the game gave him.** We read the search out of the original's own code this time instead of watching it from outside. It scans every player, then keeps only so many: a three-star scout brings back forty names, a five-star one sixty — and which ones he keeps is a straight lottery, not the best of them. A better scout finds you *more*, not better. That number matched a screenshot from a week ago exactly, right down to the size of the scrollbar, which is how we know it is right.
 > - **Searching by ROLE now finds everyone who can play there.** A player carries six positions, not one, and the original checks all six. We were only checking his first, so a search for a sweeper missed every defender who *also* plays sweeper.
@@ -28,7 +34,7 @@ fan remake.</sub>
 >
 > Also fixed: the game's own player card calls RM *dribbling* and RG *heading*; we had those two the wrong way round in the training code, and called speed "pace" and quality "ability", which are not words this game uses.
 
-> **The build before (2026-07-25)** finishes the season the game plays back at you. Four screens the real Premier Manager 98 shows and this remake did not, each rebuilt from the game's own frames and checked back against them pixel by pixel.
+> **Before that (2026-07-25)** finishes the season the game plays back at you. Four screens the real Premier Manager 98 shows and this remake did not, each rebuilt from the game's own frames and checked back against them pixel by pixel.
 >
 > - **The cup draw actually happens now.** The draw screen — the trophy, the lottery drum, the round plate, the list of ties — has been in the app for a while with no way to reach it. It now comes up on its own, the way the original does, the moment a round is drawn, for both English cups and all three European ones. And it has the second layout the original has: a short round (sixteen ties or fewer) lays the draw out in a grid with both clubs' kits instead of one line per tie, and **your own tie is picked out on a dark plate with your club in yellow**, so you can find yourself at a glance. Tap a tie and the panel bottom-left fills in with both clubs, both managers and both grounds.
 > - **FINANCES has its week-by-week view.** The tab was there; the page behind it was not. You get the real weekly books — seven income lines, eleven expense lines — with a stepper to walk back through the season and the game's own date stamp for each week. While you are on the live week it reads `CURRENT 31`, exactly as the original does, and drops the word once you step back.
