@@ -1,8 +1,20 @@
 extends Control
 class_name CharityShieldScreen
-## PM98 CHARITY SHIELD CHAMPION card (charter #4, audit C1 #9): the season
-## curtain-raiser result, frame-baked from the witnessed original
+## PM98 CAMPEON card -- the shared champion-card layout every trophy is presented on
+## (charter #4, audit C1 #9). Frame-baked from the witnessed originals
 ## (parity-run-2026-07-16/orig/70_after_ft.png == promanager 11, CAMPEON family).
+##
+## ONE LAYOUT, SIX WITNESSED TROPHIES. The reference run caught five competitions on
+## this exact card at a 0.99-1.00 pixel-signature match, and a sixth came off the
+## European drive (docs/re/REFRUN_manutd_1997-98.md R7/R11/R14/R15). The title plate,
+## the trophy render and the backdrop are per-competition art, so each has its own
+## baked chrome (tools/re/build_champion_cards_from_frames.py); everything else --
+## panel, RUNNER-UP label, OK button, every text baseline -- is shared and verified
+## byte-identical across all six before the bake transfers its blanking zones.
+##
+## NOT witnessed and therefore NOT drawn: PREMIER LEAGUE, EUROPEAN CUP and CUP
+## WINNER'S CUP. `has_card()` returns false for those, and the caller skips the card
+## rather than showing an invented one.
 ## Chrome = the real frame with ONLY the winner/runner-up kits + name lines
 ## restored to the card's own texture (build_seasonflow_chrome_from_frames.py).
 ## Live draw: winner club "(on penalties)" (light grey 220s), winner manager
@@ -27,16 +39,32 @@ const WINNER_MGR_BASE := 178
 const RUNNER_BASE := 286
 const RUNNER_MGR_BASE := 303
 
+## Competition key -> baked chrome. Keys match Career's own competition keys.
+const CHROME := {
+	"charity_shield": "res://art/screens/seasonflow/shield.png",
+	"intercontinental": "res://art/screens/seasonflow/card_intercontinental.png",
+	"coca_cola": "res://art/screens/seasonflow/card_coca_cola.png",
+	"uefa_cup": "res://art/screens/seasonflow/card_uefa_cup.png",
+	"fa_cup": "res://art/screens/seasonflow/card_fa_cup.png",
+	"supercup": "res://art/screens/seasonflow/card_supercup.png",
+}
+
+## Is this competition's card art witnessed? False -> the caller must NOT raise a card.
+static func has_card(comp: String) -> bool:
+	return CHROME.has(comp)
+
+
 var _chrome: Texture2D
 var _f12: Font
 var _f8: Font
+var _comp := "charity_shield"
 var _winner: Dictionary = {}   # {club, manager, club_id, pens: bool}
 var _runner: Dictionary = {}
 var _press := false
 
 
 func _ready() -> void:
-	_chrome = load("res://art/screens/seasonflow/shield.png")
+	_load_chrome()
 	_f12 = PMChrome.font("12")
 	_f8 = PMChrome.font("8")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -46,10 +74,21 @@ func _ready() -> void:
 	queue_redraw()
 
 
-func setup(winner: Dictionary, runner: Dictionary) -> void:
+## winner/runner: {club, manager, club_id} plus, on the winner, either `pens: true`
+## or the original's own result `qualifier` string (witnessed: " (on penalties)").
+## `comp` picks the trophy; an unwitnessed key keeps the Charity Shield chrome, so
+## callers must gate on has_card() first.
+func setup(winner: Dictionary, runner: Dictionary, comp := "charity_shield") -> void:
 	_winner = winner
 	_runner = runner
+	_comp = comp
+	_load_chrome()
 	queue_redraw()
+
+
+func _load_chrome() -> void:
+	var path := str(CHROME.get(_comp, CHROME["charity_shield"]))
+	_chrome = load(path)
 
 
 func _to_design(p: Vector2) -> Vector2:
@@ -80,9 +119,13 @@ func _draw() -> void:
 		draw_texture(_chrome, Vector2.ZERO)
 	if not _winner.is_empty():
 		PMChrome.draw_crest(self, int(_winner.get("club_id", -1)), KIT_WINNER)
+		# The card's name field is "%s%s" % [club, qualifier] -- witnessed as
+		# `Lyon (on penalties)` on the U.E.F.A. CUP CHAMPION card (REFRUN R14).
 		var line := PMChrome.title_case_name(str(_winner.get("club", "?")))
-		if bool(_winner.get("pens", false)):
-			line += " (on penalties)"
+		var qual := str(_winner.get("qualifier", ""))
+		if qual == "" and bool(_winner.get("pens", false)):
+			qual = " (on penalties)"
+		line += qual
 		_txt(_f12, TXT_X, WINNER_BASE, line, C_WINNER, 13)
 		_txt(_f8, TXT_X, WINNER_MGR_BASE, PMChrome.title_case_name(str(_winner.get("manager", ""))),
 			C_WINNER_MGR, 11)

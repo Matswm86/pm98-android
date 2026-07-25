@@ -64,6 +64,7 @@ var _chrome: Texture2D
 var _f14: Font
 var _f10: Font
 var _month := ""
+var _title := ""          # "" -> the MANAGERS OF THE MONTH caption
 var _rows: Dictionary = {}     # tier(1..4) -> {club_id, club, manager}
 var _press := false
 
@@ -82,6 +83,20 @@ func _ready() -> void:
 ## month: "AUGUST"; rows: {tier -> {club_id, club, manager}} for tiers 1..4.
 func setup(month: String, rows: Dictionary) -> void:
 	_month = month
+	_title = ""
+	_rows = rows
+	queue_redraw()
+
+
+## The same sheet under a CAPTION OF ITS OWN. The season-end GOAL SCORERS OF THE YEAR and
+## MANAGERS OF THE YEAR sheets are this exact panel: diffed against the shipped month
+## chrome, tools/re/refs/season-end-2026-07-25/24_managers_of_the_year.png is identical
+## everywhere but the caption text and the four card cells (REFRUN R15, and
+## docs/re/season_end_sequence_re.md -- one pixel signature matches both families, so the
+## title plate is what tells them apart). GOAL SCORERS puts "Fowler (19)" in the cell the
+## month sheet puts a manager's surname in, and the club beside it, unchanged.
+func setup_titled(title: String, rows: Dictionary) -> void:
+	_title = title
 	_rows = rows
 	queue_redraw()
 
@@ -114,8 +129,8 @@ func _draw() -> void:
 	draw_set_transform(_origin(s), 0.0, Vector2(s, s))
 	if _chrome != null:
 		draw_texture(_chrome, Vector2(PANEL))
-	draw_caption(self, "MANAGERS OF THE MONTH (%s)" % _month,
-		CAPTION_Y.x, CAPTION_Y.y, PANEL.x + 2, 624, _f14)
+	var caption := _title if _title != "" else "MANAGERS OF THE MONTH (%s)" % _month
+	draw_caption(self, caption, CAPTION_Y.x, CAPTION_Y.y, PANEL.x + 2, 624, _f14)
 	for i in CARDS.size():
 		var c: Dictionary = CARDS[i]
 		var row: Dictionary = _rows.get(int(c["key"]), {})

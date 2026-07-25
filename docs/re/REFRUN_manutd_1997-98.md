@@ -101,23 +101,70 @@ the rule is unknown.
 
 ## Work list
 
+> **STATUS 2026-07-25 (evening).** Items 1, 3, 5, 6, 7, 8, 9 and the owner deviation are
+> SHIPPED; item 4 is shipped in part; item 2 is not started. Every shipped item is asserted
+> in [`app/tests/test_refrun_findings.gd`](../../app/tests/test_refrun_findings.gd), which
+> checks the numbers and strings against this document rather than against the port.
+> Detail per item below.
+
 **Blocked on nothing, evidence in hand:**
 
-1. `FinanceModel` / `Career.gd:752` — per-week ledger with a real matchday gate (R5, R6, R9)
-   and the running-at-a-loss counter + sacking path (R16). This is the largest and the most
-   load-bearing: three findings and the only measured *sign* error in the port.
-2. Route the cups and Europe (R4), and present the draw with both panel forms and
-   competition-dependent buttons (R8).
-3. Widen the cup fields to the pyramid, Premier entering at Round 3 (R1); add replays (R2).
-4. Build the season-end sequence (R13, R15) and retire `_show_end_of_season`'s invented board
-   verdict, freeing the name for the original's overview screen.
-5. Capture the U.E.F.A. Cup winner (R14, trivial) and render the `(on penalties)` qualifier.
-6. Move Intercontinental to December and Supercup to March (R7, R11).
-7. `DEADLINE_TAIL` 6 -> 4 plus two warning alerts (R10).
-8. Run lower divisions to 46 rounds, ahead of the Premier (R12).
-9. Emit the original's `"1/8 Final"` badge string verbatim (R3).
+1. **SHIPPED.** `FinanceModel` gains the original's own per-week ledger (7 income + 11
+   expense lines, the screen's own labels and order) and `Career` posts every cash movement
+   through it, so the bank and the books can never disagree. PLAYERS' WAGE + STAFF WAGES are
+   charged EVERY week; TICKETS + TELEVISION + PLAYERS' BONUS only on a HOME matchday; an
+   away week is a pure loss. Measured on the same club the run measured: **+£189,214 home /
+   -£237,981 away** against the witnessed +£216,038 / -£233,942, and 16-17
+   running-at-a-loss alerts in a season. Three things fell out of the frames along the way:
+   * the **TICKET PRICE is £7.50 a head, witnessed** — the FULL TIME stadium panel prints
+     capacity, attendance and ATTENDANCE MONEY together, and 21,014 x 7.50 = £157,605 (Old
+     Trafford) and 41,000 x 7.50 = £307,500 (Anfield) are both exact. The app's own
+     £15/12/10/8 tier ladder was roughly double it. Man Utd's per-home-match gate now lands
+     within 3.4% of the ledger's £364,980.
+   * the **finance year runs Sunday..Saturday from 20 July 1997**, so finance week = league
+     week + 2. `FinanceModel.finance_week_span` reproduces all three captured stamps
+     verbatim.
+   * the **channelTV fee IS that week's TELEVISION line**, on a per-competition constant.
+     The two domestic cups and the two other European competitions were never measured and
+     pay £0 rather than a guess.
+   The running-at-a-loss counter and its verbatim alert are in; the SACKING THRESHOLD is
+   not witnessed, so `LOSS_SACK_WEEKS` is ours and flagged, and it feeds the board review
+   the app already has rather than an invented mid-season dismissal.
+2. **NOT STARTED.** Route the cups and Europe (R4), and present the draw with both panel
+   forms and competition-dependent buttons (R8). `CupDrawScreen` is still 0-px art with no
+   live caller.
+3. **SHIPPED.** Both cups are contested by all 92 league clubs with the Premier entering at
+   Round 3. `Cup` gained `late_entry`, and byes now normalise ANY off-power-of-two field
+   (the old code only did round one's). The field walks 72 -> 64 -> (+20) 52 -> 32 -> 16 ->
+   8 -> 4 -> 2, labelled Round 1..Round 5, Qtr Finals, Semifinals, Final — PM98's own
+   ladder. Ties are single-leg with a REPLAY per the Round 3 draw card (R2); the League
+   Cup's invented two-legged rounds are gone.
+4. **PART SHIPPED.** The invented board-verdict sheet is DELETED, and the witnessed
+   sequence runs in its place: final division tables (lower divisions first, blank manager
+   plate) -> champion cards -> GOAL SCORERS OF THE YEAR -> MANAGERS OF THE YEAR -> the new
+   preseason. Champion cards are baked for the **six competitions whose card art was
+   witnessed** (Charity Shield, Intercontinental, Coca-Cola, U.E.F.A., F.A. Cup, European
+   Supercup); the Premier League, European Cup and Cup Winners' Cup frames were never
+   captured, so those raise no card rather than borrow another trophy's.
+   **Still missing: THE CHAMPIONSHIPS, END OF SEASON and PLAYERS OF THE YEAR** — steps 3, 4
+   and 6. Their binding frames are committed at `tools/re/refs/season-end-2026-07-25/`;
+   each needs its own chrome bake.
+5. **SHIPPED.** `_capture_euro_honours` keeps the U.E.F.A. Cup winner, and a champion's club
+   name takes the original's result qualifier — `Lyon (on penalties)`.
+6. **SHIPPED.** The Intercontinental Cup fires in the first DECEMBER week and the European
+   Supercup in MARCH, both read off the app's own calendar, and both raise a champion card.
+   Neither is a curtain-raiser any more.
+7. **SHIPPED.** `DEADLINE_TAIL` 6 -> 4, plus the two warning alerts and no deadline-day
+   event. The two-week wording is the witnessed string; the one-week form is that string
+   pluralised the way PM98 pluralises its own `"%u offer%s"` alert, and is flagged as such.
+8. **SHIPPED.** Lower divisions play all 46 rounds and run ahead of the Premier. The
+   catch-up rule spreads the surplus evenly and reproduces the witnessed First Division
+   **P = 44 at manager week 37** exactly. The per-division midweek allocation (which put
+   the Third Division two weeks further on) is NOT witnessed and is not invented.
+9. **SHIPPED.** `Cup.next_label` emits `1/8 Final` verbatim for every matchday of the group
+   phase.
 
-**Owner deviation to implement (R17):** halve youth training to match the already-halved
+**Owner deviation, SHIPPED (R17):** halve youth training to match the already-halved
 scouting. The lever is **not** `YOUTH_GAIN_GATE` — dropping it to 0 only takes 60% to 100%,
 a 1.67x speedup. The exact 2x is a `YOUTH_GROWTH_SPEEDUP := 2` multiplier on `gain` in
 `Training.develop_youth_week`, labelled ours the same way `SEARCH_SPEEDUP` is. **Trap:** the

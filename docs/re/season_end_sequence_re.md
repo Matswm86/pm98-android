@@ -1,6 +1,33 @@
 # The MANAGER LEAGUE season-end sequence — witnessed end to end (2026-07-25)
 
-**Status: CAPTURED, NOT YET BUILT.** Eight steps run between the last league match and
+**Status: CAPTURED; FIVE OF THE EIGHT STEPS BUILT (2026-07-25 evening).**
+
+| step | screen | state |
+|---|---|---|
+| 1 | LEAGUE TABLES, one per division, blank manager plate | **BUILT** — `Main._season_end_final_tables`, lower divisions first |
+| 2 | champion cards | **BUILT for six trophies** — Charity Shield, Intercontinental, Coca-Cola, U.E.F.A., F.A. Cup, European Supercup. PREMIER LEAGUE, EUROPEAN CUP and CUP WINNER'S CUP card art was never captured, so `CharityShieldScreen.has_card()` returns false and the card is SKIPPED, never borrowed |
+| 3 | THE CHAMPIONSHIPS | **NOT BUILT** — binding frame `20_the_championships.png`, needs its own chrome bake |
+| 4 | END OF SEASON | **NOT BUILT** — binding frame `21_end_of_season.png` |
+| 5 | GOAL SCORERS OF THE YEAR | **BUILT** — the awards panel is byte-identical to the shipped MANAGERS OF THE MONTH chrome (diffed), so `ManagersMonthScreen.setup_titled()` serves it with no new art |
+| 6 | PLAYERS OF THE YEAR | **NOT BUILT** — binding frame `23_players_of_the_year.png`. NOT the same screen as PLAYERS OF THE MONTH: the title sits in the top barra band, the panel geometry differs and the four division tabs are a 2x2 grid with a CONTINUE button |
+| 7 | MANAGERS OF THE YEAR | **BUILT**, same layout as step 5. The PICK is ours and flagged (see below) |
+| 8 | Preseason | already the app's own |
+
+**The invented board-verdict screen is GONE.** `Main._show_end_of_season` used to present an
+unconditional "Final position / Board objective / Reputation / Verdict" sheet under the
+original's own screen name. The original raises nothing of the kind. The board still
+decides (`Career.board_review`), but it surfaces only when it has consequences — a sacking
+or a job offer — and then through the original's own modal alert box.
+
+**MANAGERS OF THE YEAR's pick is ours.** The run settled what the rule is NOT (see below);
+the binary's rule is un-reversed. `Career._manager_of_year` gives it to a domestic-cup
+FINALIST from the division (the one thing the witness positively shows counts — Wycombe W.)
+and otherwise to the club that finished furthest above its pre-season seed. Flagged exactly
+the way MANAGERS OF THE MONTH's month-form pick is. The SCREEN is the original's.
+
+---
+
+**Original capture status: CAPTURED, NOT YET BUILT.** Eight steps run between the last league match and
 the new season's preseason. The app has none of them; `Main._show_end_of_season` is an
 invented board-verdict screen that also takes the original's screen name.
 

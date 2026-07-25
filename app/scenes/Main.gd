@@ -4794,63 +4794,186 @@ func _show_deal_result(msg: String) -> void:
 	_set_view("Transfer", msg, ["Back to transfers"], [{}], func(_x): _go_back())
 
 
-## The end-of-season board review (#14): the board passes its verdict, your reputation is
-## updated, and the season either rolls on, ends in a sacking with job offers, or invites a
-## move to a bigger club. The career history is always one tap away.
+## THE SEASON-END SEQUENCE (REFRUN R13/R15, witnessed end to end 2026-07-25).
+##
+## The original runs EIGHT steps between the last league match and the new preseason,
+## every one of them raised UNPROMPTED:
+##   1. the final table of each division, as it finishes  <- built (LeagueTableScreen)
+##   2. a champion card per trophy, on the shared CAMPEON layout  <- built, for the six
+##      competitions whose card art is witnessed
+##   3. THE CHAMPIONSHIPS -- all eight finals with scorelines   <- NOT BUILT
+##   4. END OF SEASON -- champion / U.E.F.A. places / promoted / relegated  <- NOT BUILT
+##   5. GOAL SCORERS OF THE YEAR                                <- built (awards layout)
+##   6. PLAYERS OF THE YEAR -- one per club, four tabs          <- NOT BUILT
+##   7. MANAGERS OF THE YEAR                                    <- built (awards layout)
+##   8. Preseason for the new season
+## Steps 3, 4 and 6 need their own chrome bakes; their binding frames are committed at
+## tools/re/refs/season-end-2026-07-25/ and the gap is recorded in
+## docs/re/season_end_sequence_re.md. They are SKIPPED, not faked.
+##
+## AND THERE IS NO BOARD-VERDICT SCREEN IN IT. What used to live here -- an unconditional
+## "Final position: Nth of 20 / Board objective / Reputation / Verdict" sheet -- was an
+## invention, and it also took the name of the original's own END OF SEASON screen, which
+## is the four-division promoted/relegated overview (step 4). It is gone. The board's
+## decision still happens (Career.board_review), but it surfaces only when it has
+## consequences -- a sacking or a job offer -- and then through the original's own modal
+## alert box, not a screen of its own.
 func _show_end_of_season() -> void:
-	var rv := _career.board_review()
-	var rows: Array = []
-	var payload: Array = []
-	rows.append("Final position: %d%s of %d" % [
-		int(rv["finished_pos"]), _ord_suffix(int(rv["finished_pos"])), _career.standings().size()])
-	payload.append({})
-	rows.append("Board objective: %s" % _career.objective_text)
-	payload.append({})
-	rows.append("Reputation: %d  -  %s" % [int(rv["reputation"]), rv["rep_label"]])
-	payload.append({})
-	rows.append("")
-	payload.append({})
-	if bool(rv["sacked"]):
-		var why := "relegation" if str(rv["reason"]) == "relegated" else "falling short of the board's target"
-		rows.append("The board has SACKED you after %s." % why)
-		payload.append({})
-		_generate_offers(false)
-		rows.append("▶  See which clubs want you (%d)" % _career.pending_offers.size())
-		payload.append({"act": "offers"})
-	elif bool(rv["headhunted"]):
-		rows.append("Verdict: ACHIEVED  -  and bigger clubs have noticed.")
-		payload.append({})
-		_generate_offers(true)
-		rows.append("▶  Stay at %s next season" % _career.club_name)
-		payload.append({"act": "stay"})
-		rows.append("▶  Hear out %d job offer%s" % [
-			_career.pending_offers.size(), "" if _career.pending_offers.size() == 1 else "s"])
-		payload.append({"act": "offers"})
-	else:
-		var verdict := "ACHIEVED - you keep your job" if bool(rv["objective_met"]) \
-			else "MISSED - the board expects better"
-		rows.append("Verdict: %s" % verdict)
-		payload.append({})
-		rows.append("▶  Start next season")
-		payload.append({"act": "next"})
-	rows.append("▶  Your managerial record")
-	payload.append({"act": "record"})
-	_set_view("End of %s" % _career.season, "%s" % _career.club_name, rows, payload,
-		_activate_end_of_season)
+	_career.queue_season_end_champion_cards()
+	_season_end_step(0)
 
-func _activate_end_of_season(item: Dictionary) -> void:
-	match str(item.get("act", "")):
-		"next":
-			_next_season()
-		"stay":
-			# Decline the suitors and sign up for another season at the current club.
-			_career.pending_offers = []
-			_career.headhunt_pending = false
-			_next_season()
-		"offers":
-			_show_job_offers()
-		"record":
-			_show_manager_career()
+
+## Walk the witnessed sequence one step at a time; each screen's own dismiss control
+## advances it. Steps the app cannot yet draw faithfully are skipped in place.
+func _season_end_step(step: int) -> void:
+	var next := func() -> void: _season_end_step(step + 1)
+	match step:
+		0:
+			_season_end_final_tables(next)
+		1:
+			_season_end_champion_cards(next)
+		2:
+			_season_end_goal_scorers(next)
+		3:
+			_season_end_managers(next)
+		_:
+			_season_end_board()
+
+
+## Step 1: the final table of every division, raised unprompted with a BLANK manager
+## plate and the division in the badge (REFRUN R13). Lower divisions finish first (R12),
+## so they are presented first, the manager's own division last.
+func _season_end_final_tables(after: Callable) -> void:
+	var tiers: Array = []
+	for t in [4, 3, 2, 1]:
+		if t == _career.tier or _career.has_division(t):
+			tiers.append(t)
+	_season_end_next_table(tiers, 0, after)
+
+
+func _season_end_next_table(tiers: Array, i: int, after: Callable) -> void:
+	if i >= tiers.size():
+		after.call()
+		return
+	var t := int(tiers[i])
+	var scr: LeagueTableScreen = load("res://scenes/LeagueTableScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	# Blank manager plate: in this mode the original shows no manager (R13).
+	scr.setup(_career.standings_for(t) if t != _career.tier else _career.standings(),
+		_career.club_name, _career.season, "Week %d" % _career.total_weeks(),
+		t, _career.club_id, "")
+	scr.back_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		scr.queue_free()
+		_season_end_next_table(tiers, i + 1, after))
+
+
+## Step 2: the champion cards, in the original's own order, one OK each.
+func _season_end_champion_cards(after: Callable) -> void:
+	if _career.pending_champion_cards.is_empty():
+		after.call()
+		return
+	var card: Dictionary = (_career.pending_champion_cards as Array).pop_front()
+	var comp := str(card.get("comp", ""))
+	if not CharityShieldScreen.has_card(comp):
+		# Card art never captured for this trophy -- skip it rather than borrow another's.
+		_season_end_champion_cards(after)
+		return
+	_show_champion_card(card, func() -> void: _season_end_champion_cards(after))
+
+
+## One CAMPEON card over whatever is on screen. `card` is a Career pending_champion_cards
+## entry; manager names are resolved here (Career has no manager database).
+func _show_champion_card(card: Dictionary, after: Callable) -> void:
+	var scr: CharityShieldScreen = load("res://scenes/CharityShieldScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	var w: Dictionary = (card.get("winner", {}) as Dictionary).duplicate()
+	var r: Dictionary = (card.get("runner", {}) as Dictionary).duplicate()
+	w["manager"] = _mgr_of(int(w.get("club_id", -1)))
+	r["manager"] = _mgr_of(int(r.get("club_id", -1)))
+	scr.setup(w, r, str(card.get("comp", "charity_shield")))
+	scr.ok_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		scr.queue_free()
+		if after.is_valid():
+			after.call())
+
+
+## Step 5: GOAL SCORERS OF THE YEAR, on the award sheets' shared four-panel layout
+## (the year and month sheets are byte-identical chrome -- verified against
+## tools/re/refs/season-end-2026-07-25/24_managers_of_the_year.png).
+func _season_end_goal_scorers(after: Callable) -> void:
+	var aw := _career.season_end_awards()
+	var rows: Dictionary = {}
+	for t in (aw.get("scorers", {}) as Dictionary):
+		var r: Dictionary = (aw["scorers"] as Dictionary)[t]
+		# The original prints "Fowler (19)" in the name cell and the club beside it.
+		rows[int(t)] = {"club_id": int(r.get("club_id", -1)), "club": str(r.get("club", "")),
+			"manager": "%s (%d)" % [str(r.get("player", "")), int(r.get("goals", 0))]}
+	_show_year_award("GOAL SCORERS OF THE YEAR", rows, after)
+
+
+## Step 7: MANAGERS OF THE YEAR, same layout, one per division.
+func _season_end_managers(after: Callable) -> void:
+	var aw := _career.season_end_awards()
+	var rows: Dictionary = {}
+	for t in (aw.get("managers", {}) as Dictionary):
+		var r: Dictionary = (aw["managers"] as Dictionary)[t]
+		rows[int(t)] = {"club_id": int(r.get("club_id", -1)), "club": str(r.get("club", "")),
+			"manager": _mgr_of(int(r.get("club_id", -1)))}
+	_show_year_award("MANAGERS OF THE YEAR", rows, after)
+
+
+func _show_year_award(title: String, rows: Dictionary, after: Callable) -> void:
+	if rows.is_empty():
+		after.call()
+		return
+	var scr: ManagersMonthScreen = load("res://scenes/ManagersMonthScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup_titled(title, rows)
+	scr.ok_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		scr.queue_free()
+		after.call())
+
+
+## The board's decision, AFTER the sequence. The original has no verdict screen, so this
+## raises nothing at all in the ordinary case -- it goes straight to the new preseason.
+## A sacking or a job offer still has to reach the manager somehow; both go through the
+## original's own modal alert box on the hub, and the offer list is the app's own screen.
+func _season_end_board() -> void:
+	var rv := _career.board_review()
+	if bool(rv["sacked"]):
+		var why := "relegation"
+		match str(rv["reason"]):
+			"missed":
+				why = "falling short of the board's target"
+			"insolvent":
+				why = "running the club at a loss"
+		_generate_offers(false)
+		_show_alert_then("The board has terminated your contract after %s." % why,
+			_show_job_offers)
+		return
+	if bool(rv["headhunted"]):
+		_generate_offers(true)
+		_show_job_offers()
+		return
+	_next_season()
+
+
+## Raise one modal "PREMIER MANAGER 98" alert box over whatever is on screen, then run
+## `after` when it is answered. The hub owns the box, so it is queued there.
+func _show_alert_then(msg: String, after: Callable) -> void:
+	_show_career()
+	if _hub != null and is_instance_valid(_hub):
+		_hub.alerts_cleared.connect(func() -> void: after.call(), CONNECT_ONE_SHOT)
+		_hub.alert(msg)
+	else:
+		after.call()
+
 
 func _next_season() -> void:
 	# Carry the live squads, cash and tactics into the new season; contracts tick

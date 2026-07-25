@@ -130,3 +130,45 @@ load inert (`charity_shield == {}`).
 * Tests: `app/tests/test_charity.gd` (single-match unit, honours capture, the shield,
   the Double->runners-up substitution, news, save/load). Verified by a real in-engine
   render: `screenshots/charity_shield.png` (Newcastle Utd v Manchester Utd, 0-0 pens).
+
+## THE FIELD AND THE ENTRY ROUND — corrected 2026-07-25
+
+The reference run (`docs/re/REFRUN_manutd_1997-98.md` R1/R2/R8) killed the old "each cup is
+contested among the manager's own division" simplification. Witnessed:
+
+* **Both cups span the whole 92-club league pyramid.** The Coca-Cola Cup ROUND 3 drew
+  Manchester Utd. away at **Bradford City** (Division One, manager *Jewell*, ground
+  *The Pulse Stadium*), and the F.A. Cup ROUND 3 panel is a scrollable list of ties between
+  clubs from outside the Premier. In the same season Bradford City **won the F.A. Cup** and
+  Wycombe W. (Division Two) reached the Coca-Cola final.
+* **Premier clubs enter at ROUND 3.** Both cups, both draws.
+* **Ties are single-leg with a REPLAY**, not two legs: the Round 3 draw card carries
+  MATCH / REPLAY buttons per tie. Only Round 3 was witnessed; the binary also ships the
+  `<round> - 1st` / `- 2nd` two-legged label set, so whether the real Round 1 and the
+  semifinals are two-legged (as they were in real 1997-98) is UNRESOLVED and is not guessed.
+
+### How the app builds it
+
+`Career._mint_domestic_cups` puts the 72 non-Premier clubs in from Round 1 and holds the 20
+Premier clubs back via `Cup.create`'s new `late_entry` opt. `Cup` also had to learn to give
+byes in ANY round, not just the first, because a 92-club field with a late entry is
+off-power-of-two twice. The field walks:
+
+```
+Round 1   72 -> 64   (56 byes, 8 ties)
+Round 2   64 -> 32
+Round 3   52 -> 32   (+20 Premier, 12 byes, 20 ties)
+Round 4   32 -> 16
+Round 5   16 -> 8
+Qtr / Semi / Final
+```
+
+which is PM98's own label ladder (Round 1..Round 5, Qtr Finals, Semifinals, Final) with the
+real round numbers. **Unmeasured:** the F.A. Cup's actual Round 3 tie count — the original's
+panel scrolls and was not counted — so 52-at-Round-3 is what the 92-club field yields, not a
+witnessed number.
+
+**Domestic cup prize money is retired to £0.** It was ours, and the per-week ledger settles
+it: the original has no domestic-cup income line at all, and an away week was measured at
+income exactly £0. A cup run pays the club through the TURNSTILES, so `Career` now books a
+HOME cup tie as a matchday (TICKETS + TELEVISION + bonus) and pays no purse.

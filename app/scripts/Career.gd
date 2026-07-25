@@ -3296,6 +3296,148 @@ func _close_month_if_due() -> void:
 	_month_goal_mark = {}
 
 
+# ---- the season-end award sheets (REFRUN R15 steps 5 and 7) ---------------
+#
+# GOAL SCORERS OF THE YEAR is EXACT: the original prints one name per division with his
+# goal count in brackets ("Fowler (19)"), and the app already keeps the per-division
+# league scorer ledger the GOAL SCORERS chart is drawn from, so this is the real number.
+#
+# MANAGERS OF THE YEAR is NOT. The reference run settled what the rule is NOT -- it is
+# not "award the division's champion": the Second Division went to Wycombe W., who were
+# Coca-Cola Cup FINALISTS rather than champions, and the Third to Peterborough, 3rd and
+# promoted; a concurrent Bolton career gave the Premier to Wenger (Arsenal) while
+# Blackburn R. were champions. The binary's own rule is un-reversed. So the PICK below is
+# OURS, flagged exactly as MANAGERS OF THE MONTH's month-form pick is: a domestic-cup
+# FINALIST from the division takes it (the one thing the witness positively shows counts),
+# otherwise the club that finished furthest ABOVE its pre-season seed, ties on points.
+# The SCREEN is the original's.
+
+## Top league scorer of the season for tier `t`: {player, goals, club_id, club}, or {}.
+func _top_scorer_of_year(t: int) -> Dictionary:
+	var log: Array = scorer_log if t == tier else ((divisions.get(t, {}) as Dictionary).get("scorers", []) as Array)
+	var nms: Dictionary = club_names if t == tier else names_for(t)
+	var tally: Dictionary = {}       # "name@club" -> {n, club}
+	for g in log:
+		var gd: Dictionary = g
+		var nm := str(gd.get("scorer", ""))
+		var cid := int(gd.get("club", -1))
+		if nm == "" or cid == -1:
+			continue
+		var k := "%s@%d" % [nm, cid]
+		if not tally.has(k):
+			tally[k] = {"n": 0, "club": cid, "name": nm}
+		tally[k]["n"] = int(tally[k]["n"]) + 1
+	var best: Dictionary = {}
+	for k in tally:
+		var row: Dictionary = tally[k]
+		if best.is_empty() or int(row["n"]) > int(best["n"]):
+			best = row
+	if best.is_empty():
+		return {}
+	return {"player": str(best["name"]), "goals": int(best["n"]),
+		"club_id": int(best["club"]), "club": str(nms.get(int(best["club"]), "?"))}
+
+
+## Clubs from tier `t` that reached a domestic cup FINAL this season (winner + runner-up).
+func _cup_finalists_in(t: int) -> Array:
+	var out: Array = []
+	var ids: Array = _pyramid_ids_by_tier(table.keys()).get(t, [])
+	for b in [fa_cup, league_cup]:
+		var rounds: Array = b.get("rounds", [])
+		if rounds.is_empty():
+			continue
+		for tie in (rounds[-1] as Dictionary).get("ties", []):
+			for k in ["home_id", "away_id"]:
+				var cid := int((tie as Dictionary).get(k, -1))
+				if cid != -1 and ids.has(cid) and not out.has(cid):
+					out.append(cid)
+	return out
+
+
+## MANAGER OF THE YEAR pick for tier `t`: {club_id, club}, or {}. See the block comment --
+## the rule is ours, the screen is the original's.
+func _manager_of_year(t: int) -> Dictionary:
+	var rows: Array = standings() if t == tier else standings_for(t)
+	if rows.is_empty():
+		return {}
+	var nms: Dictionary = club_names if t == tier else names_for(t)
+	var finalists := _cup_finalists_in(t)
+	for i in rows.size():
+		if finalists.has(int(rows[i].get("id", -1))):
+			var fid := int(rows[i]["id"])
+			return {"club_id": fid, "club": str(nms.get(fid, "?"))}
+	var seeds: Dictionary = seed_pos if t == tier else ((divisions.get(t, {}) as Dictionary).get("seed", {}) as Dictionary)
+	var best_id := -1
+	var best_gain := -9999
+	var best_pts := -1
+	for i in rows.size():
+		var cid := int(rows[i].get("id", -1))
+		var gain := int(seeds.get(cid, i + 1)) - (i + 1)
+		var pts := int(rows[i].get("Pts", 0))
+		if gain > best_gain or (gain == best_gain and pts > best_pts):
+			best_gain = gain
+			best_pts = pts
+			best_id = cid
+	if best_id == -1:
+		return {}
+	return {"club_id": best_id, "club": str(nms.get(best_id, "?"))}
+
+
+## The two season-end award sheets' data, keyed by tier 1..4:
+##   {"scorers": {t: {player, goals, club_id, club}}, "managers": {t: {club_id, club}}}
+func season_end_awards() -> Dictionary:
+	var scorers: Dictionary = {}
+	var managers: Dictionary = {}
+	for t in [1, 2, 3, 4]:
+		if t != tier and not divisions.has(t):
+			continue
+		var sc := _top_scorer_of_year(t)
+		if not sc.is_empty():
+			scorers[t] = sc
+		var mg := _manager_of_year(t)
+		if not mg.is_empty():
+			managers[t] = mg
+	return {"scorers": scorers, "managers": managers}
+
+
+## Queue the season's champion cards, in the ORIGINAL's own order (REFRUN R15 step 2):
+## U.E.F.A. Cup -> Premier League -> Cup Winner's Cup -> F.A. Cup -> European Cup. Only
+## competitions whose CARD ART is witnessed get a card -- the Premier League, European Cup
+## and Cup Winners' Cup frames were never captured, so those are skipped rather than drawn
+## on a borrowed trophy (CharityShieldScreen.has_card is the gate, on the UI side).
+func queue_season_end_champion_cards() -> void:
+	for entry in [["uefa_cup", euro.get("uefa_cup", {})],
+			["cup_winners_cup", euro.get("cup_winners_cup", {})],
+			["fa_cup", fa_cup], ["european_cup", euro.get("european_cup", {})],
+			["coca_cola", league_cup]]:
+		var comp := str(entry[0])
+		var b: Dictionary = entry[1]
+		if b.is_empty():
+			continue
+		var w := Cup.champion_id(b)
+		if w == -1:
+			continue
+		var final_tie := _final_tie_of(b)
+		var l := -1
+		if int(final_tie.get("winner_id", -2)) == w:
+			l = int(final_tie.get("loser_id", -1))
+		pending_champion_cards.append({
+			"comp": comp,
+			"winner": {"club": _any_club_name(w), "club_id": w,
+				"qualifier": champion_qualifier(final_tie)},
+			"runner": {"club": _any_club_name(l), "club_id": l},
+		})
+
+
+## The deciding tie of a finished bracket ({} if it never got that far).
+func _final_tie_of(b: Dictionary) -> Dictionary:
+	var rounds: Array = b.get("rounds", [])
+	if rounds.is_empty():
+		return {}
+	var ties: Array = (rounds[-1] as Dictionary).get("ties", [])
+	return ties[0] if not ties.is_empty() else {}
+
+
 ## Send an injured squad player to the physiotherapist (the INJURIES screen's PHYS.
 ## "+" button). Mirrors FUN_00543080: refuses silently when he is already treated,
 ## when no PHYSIOTHERAPIST is hired, or when the physio's "N PLAYERS" capacity is

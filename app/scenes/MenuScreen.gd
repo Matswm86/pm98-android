@@ -18,6 +18,8 @@ class_name MenuScreen
 ## `action_selected(action)` (Main routes it). Native 640x480; scales to fit (NEAREST).
 
 signal action_selected(action: String)
+## Every queued alert box has been answered and the hub is live again.
+signal alerts_cleared
 
 const W := 640
 const H := 480
@@ -230,11 +232,14 @@ func alert_active() -> bool:
 
 func _next_alert() -> void:
 	if _alert_queue.is_empty():
+		var was_up := _alert_tex != null
 		_alert_tex = null
 		_alert_tex_hot = null
 		_alert_msg = ""
 		set_process(false)
 		queue_redraw()
+		if was_up:
+			alerts_cleared.emit()
 		return
 	var msg := _alert_queue[0]
 	_alert_queue.remove_at(0)

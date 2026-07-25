@@ -105,3 +105,68 @@ never emitted (only RETURN → `back_pressed`). Main can therefore drop its
 lines (harmless if left). The board TICKET PRICE / SPONSOR BOARDS controls belong on
 the **GROUND / improvements** flow (walkthrough frames 066-069), not FINANCES —
 that is where PM98 actually sets them.
+
+## PER WEEK — CAPTURED AND BUILT (2026-07-25)
+
+The reference run caught the **INC. + EXP. / PER WEEK** view twice, and it settles the whole
+economy (`docs/re/REFRUN_manutd_1997-98.md` R5/R6/R9/R16):
+
+| frame | week | stamp |
+|---|---|---|
+| `screenshots/refrun-manutd-1997-98/novel/p0045_finance_perweek_wk4.png` | `CURRENT 4` | From 10-8-1997 to 16-8-1997 |
+| `screenshots/refrun-manutd-1997-98/novel/p0509_finance_perweek_wk29.png` | 29, stepped back | From 1-2-1998 to 7-2-1998 |
+| `screenshots/refrun-manutd-1997-98/novel/p0495_UNKNOWN.png` | `CURRENT 31` | From 15-2-1998 to 21-2-1998 |
+
+Week 29 is a played HOME week and reads, exactly:
+
+```
+INCOME    TICKETS £364,980 · TELEVISION £90,000 · everything else £0   -> £454,980
+EXPENSES  PLAYERS' WAGE £226,923 · PLAYERS' BONUS £5,000 ·
+          STAFF WAGES £7,019 · everything else £0                      -> £238,942
+```
+
+and the following AWAY week reads income £0, expenses £233,942 = 226,923 + 7,019. So:
+
+* **flat, every week:** PLAYERS' WAGE + STAFF WAGES
+* **home matchday only:** TICKETS + TELEVISION + PLAYERS' BONUS
+* **away week:** a pure loss
+
+### What is now real in the app
+
+`Career` keeps the books (`week_ledgers`, one record per completed week, capped at the
+finance year's 52) and every cash movement posts through `_post_income` / `_post_expense`
+against these same lines, so the bank and the ledger cannot drift. The screen draws:
+
+* the **ledger rows** as season-to-date accruals off the real lines (was a projection);
+* the **LAST WEEK / CURRENT WEEK** tiles off the real records — and matching the frames,
+  CURRENT WEEK reads £0/£0 while the week is still running, with only CASH live;
+* the **BALANCE chart** as one bar per banked week at its own finance-week slot, blue above
+  the axis and red below (was one constant drawn flat across the elapsed weeks).
+
+### The calendar
+
+Finance week 1 opens **Sunday 20 July 1997** and the week runs Sunday..Saturday, so
+`finance week = league week + 2`. Derived from the three stamps above, cross-checked against
+the channelTV card (hub "Week 27", Saturday 7 February 1998, ledger week 29).
+`FinanceModel.finance_week_span` reproduces all three verbatim.
+
+### TICKET PRICE = £7.50, witnessed
+
+The FULL TIME stadium panel prints CAPACITY, ATTENDANCE and ATTENDANCE MONEY together:
+Old Trafford 21,014 in -> £157,605, Anfield 41,000 in -> £307,500. Both are exactly
+attendance x 7.50, on two different clubs, so the opening price is a game default rather
+than a per-club figure. Only the PREMIER is witnessed; the same default carries down the
+pyramid because nothing witnessed says otherwise.
+
+### TELEVISION = the channelTV fee, per competition
+
+Premier **£90,000** · Charity Shield **£187,500** · European Cup **£375,000**. The card's
+fee IS that week's TELEVISION line (proved on week 29). The Coca-Cola Cup, F.A. Cup,
+U.E.F.A. Cup and Cup Winners' Cup fees were **not measured** and pay £0 — a visible gap,
+not a guess.
+
+### Still not built
+
+The PER WEEK view itself — the tab, the `WEEK  < CURRENT n >` stepper and the date stamp —
+needs its own chrome bake off `p0495`, whose value cells are all £0 and therefore trivially
+blankable. The DATA behind it now exists; only the view is missing.

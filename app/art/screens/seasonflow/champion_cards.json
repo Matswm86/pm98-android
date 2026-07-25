@@ -1,0 +1,51 @@
+{
+  "_source": "build_champion_cards_from_frames.py",
+  "binding_frames": {
+    "charity_shield": "screenshots/parity-run-2026-07-16/orig/70_after_ft.png",
+    "intercontinental": "screenshots/refrun-manutd-1997-98/named/p0273_champion_card.png",
+    "coca_cola": "screenshots/refrun-manutd-1997-98/named/p0581_champion_card.png",
+    "uefa_cup": "screenshots/refrun-manutd-1997-98/named/p0643_champion_card.png",
+    "fa_cup": "screenshots/refrun-manutd-1997-98/named/p0651_champion_card.png",
+    "supercup": "screenshots/wine-captures-2026-07-25-euro-competitions/11_european_supercup_champion_card.png"
+  },
+  "zones": [
+    [
+      60,
+      108,
+      140,
+      146
+    ],
+    [
+      60,
+      146,
+      140,
+      232
+    ],
+    [
+      140,
+      146,
+      332,
+      188
+    ],
+    [
+      60,
+      240,
+      140,
+      340
+    ],
+    [
+      140,
+      267,
+      340,
+      320
+    ]
+  ],
+  "cards": {
+    "charity_shield": "shield.png",
+    "intercontinental": "card_intercontinental.png",
+    "coca_cola": "card_coca_cola.png",
+    "uefa_cup": "card_uefa_cup.png",
+    "fa_cup": "card_fa_cup.png",
+    "supercup": "card_supercup.png"
+  }
+}

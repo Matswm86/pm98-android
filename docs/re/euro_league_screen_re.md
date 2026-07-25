@@ -1,6 +1,15 @@
 # RESULTS → EURO. LEAGUE — the European competition screen (group phase + knockout)
 
-**Status: CAPTURED AND SPECIFIED, NOT YET BUILT.** The app still shows the European GROUP
+**Status: CAPTURED AND SPECIFIED. The MODEL is built, the SCREEN is not.**
+
+Built 2026-07-25: the six-group / 24-club field, the six-winners-plus-two-best-runners-up
+advancement rule, and the phase label. `Cup.next_label` now emits the original's own
+`1/8 Final` verbatim for every matchday of the group phase, instead of a
+`Group Matchday %d` counter — the badge was witnessed unchanged on 1 Oct, 5 Nov and
+26 Nov 1997 (`docs/re/REFRUN_manutd_1997-98.md` R3), so it is a fixed competition-phase
+string and wrong-but-canonical. Asserted in `app/tests/test_refrun_findings.gd`.
+
+Still the invented `CupScreen` placeholder: The app still shows the European GROUP
 phase on the invented `CupScreen` placeholder (`Main._show_cup_group_placeholder`). This
 doc records the original's real screen, from the binary and from live captures taken this
 session, so the build has no guessing left in it.
