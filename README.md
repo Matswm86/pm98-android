@@ -16,7 +16,7 @@ fan remake.</sub>
 
 ## Download
 
-📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-55fa5df.apk)** — one tap downloads `pm98-55fa5df.apk` (current build) straight to your phone.
+📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-d634dff.apk)** — one tap downloads `pm98-d634dff.apk` (current build) straight to your phone.
 
 > **This build (2026-07-25)** makes the whole youth team the original's, which is what you asked for. It turned out the academy was never a generator at all — the game **ships** its youth players, fifty-one of them, with real names, birthplaces and ratings, in a hidden club inside its own database. Everything the youth part does is a rule over that table, and all four rules are now taken straight from the game's code:
 >
@@ -62,7 +62,10 @@ prompted. Reinstalling over an older build? Uninstall the old one first.
   marking and set-piece takers, all fed into the match engine.
 - **Transfer market:** buy and sell players (valued from their real ratings),
   with AI clubs bidding back.
-- **Injuries & suspensions:** your players pick up knocks and bookings as they
+- **Injuries & suspensions, marked the way the original marks them:** a man who cannot
+  play is drawn on the gold plate with the game's own three boxes — a **red cross and
+  WEEKS** if he is hurt, **two yellow cards and MATCHES** if he is banned. Your players
+  pick up knocks and bookings as they
   play, sit out while they recover, and come back. An injured or suspended player
   can't be selected, so the XI reshuffles and the side is weaker until he returns.
   Five bookings earn a one-match ban; reds sit a player down on the spot.
@@ -98,21 +101,25 @@ prompted. Reinstalling over an older build? Uninstall the old one first.
   season's **league champions** and **F.A. Cup winners** (the league runners-up step up if
   one club did the Double), a single neutral-venue match settled on penalties if level,
   around the game's own Charity Shield art.
-- **European competitions:** finish high and you qualify for Europe the next season,
-  the same way the original does: the **European Cup** (champions), the **U.E.F.A. Cup**
-  (runners-up) and the **Cup Winners' Cup** (F.A. Cup winners). Each is a two-legged
-  knockout (home and away, settled on aggregate then penalties) against a field of strong
-  foreign clubs from the game's own database, with prize money on the reversed **UEFA
-  schedule** (1M to compete, 510k a win, bonuses for reaching the last 8 and last 4), and
-  its own original trophy. Watch every competition through to its final even when you're
-  not in it.
+- **European competitions, at the original's own size:** finish high and you qualify for
+  Europe the next season, the same way the original does: the **European Cup** (champions),
+  the **U.E.F.A. Cup** (runners-up) and the **Cup Winners' Cup** (F.A. Cup winners). The
+  field sizes are the game's own, counted off its own RESULTS screens — European Cup **24
+  clubs in six groups of four**, U.E.F.A. Cup **32** (`1/16 FINALS`), Cup Winners' **16**
+  (`1/8 FINALS`). Out of the groups go the **six winners plus the two best runners-up**,
+  which is not a guess: a career was driven to the quarter finals and the eight clubs drawn
+  there are exactly those eight. Two-legged throughout (aggregate, away goals, extra time,
+  penalties), against strong foreign clubs from the game's own database, with prize money on
+  the reversed **UEFA schedule** (1M to compete, 510k a win, bonuses for the last 8 and last
+  4). Watch every competition through to its final even when you're not in it.
 - **The winners-of-winners finals:** each new season also opens the **European Supercup**
-  (last season's European Cup winners v Cup Winners' Cup winners) and the **Intercontinental
-  Cup** (European Cup winners v the South American champions), one-off matches around their
-  own original trophies. The **Charity Shield** and the **Intercontinental Cup** now open on
-  the original game's own competition screen — the same screen for both, because
-  MANAGER.EXE builds them with the same 1107-byte function and swaps only the title and the
-  trophy.
+  and the **Intercontinental Cup**. The Supercup is **two-legged**, the Cup Winners' Cup
+  holder at home first, on the original's own screen with a `1ST LEG MATCH` / `2ND LEG
+  MATCH` block and a real ground each — Camp Nou then Westfalen in 1997-98, straight out of
+  the game's own club data. The **Charity Shield** and the **Intercontinental Cup** open on
+  the original game's own single-match competition screen — the same screen for both,
+  because MANAGER.EXE builds them with the same 1107-byte function and swaps only the title
+  and the trophy.
 - **Watch a match:** the original's in-match **MATCH OPTIONS** view picker
   (WATCH / HIGHLIGHTS / BRIEF / RESULTS, at the exact button coordinates reversed
   from the executable). **BRIEF** is a minute-by-minute commentary feed (goals,
