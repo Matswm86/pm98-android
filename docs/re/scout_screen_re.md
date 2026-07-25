@@ -246,6 +246,16 @@ The panel also prints the cap shortfall — *"40 of 112 shown - your scout could
 back 40"*. The cap is the binary's; saying it out loud is ours, because a silent trim
 reads as "that is all there was".
 
+The NAME box matches on a **folded key**, not on the raw string: lower-cased, the 20
+accented letters the squads actually use folded to ASCII, and every non-alphanumeric
+character dropped. The game's own name data forces it — 635 of the 9,547 shipped names
+carry an accent, and the database ships **two different apostrophes**, ASCII in `O'Neill`
+(40 names) and an ACUTE ACCENT in `O´Connor` (15), so no typed apostrophe could ever hit
+both. Dropping spaces too makes `o neill` / `oneill` / `O´Neill` one key, and lets
+`pancho guerrero` find `"Pancho" Guerrero` (68 names carry a quoted nickname). It stays a
+SUBSTRING test: `guerro` still misses `Guerrero`, because near-matching is not something
+the original does and not something to invent. `Career.fold_name`.
+
 **The honest note that travels with the six filters:** only `STR`, `PASS` (=PA) and
 `GKSAVE` (=PO+10) are read by the match engine, so DRIBBLING / HEADING / TACKLING /
 SHOOTING filter on numbers that do not move a scoreline. That was known when they were

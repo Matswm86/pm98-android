@@ -2506,8 +2506,8 @@ func _scout_match(row: Dictionary, p: Dictionary, criteria: Dictionary) -> bool:
 	# The original has no name box and no per-attribute criterion. Both are additions,
 	# approved 2026-07-25, and both are pure narrowing: with `name` empty and every
 	# threshold off, this block cannot change a single result.
-	var want := str(criteria.get("name", "")).strip_edges()
-	if want != "" and not str(row.get("name", "")).to_lower().contains(want.to_lower()):
+	var want := fold_name(str(criteria.get("name", "")))
+	if want != "" and not fold_name(str(row.get("name", ""))).contains(want):
 		return false
 	var attr_min: Dictionary = criteria.get("attr_min", {})
 	if not attr_min.is_empty():
@@ -2516,6 +2516,34 @@ func _scout_match(row: Dictionary, p: Dictionary, criteria: Dictionary) -> bool:
 			if int(a.get(code, 0)) < int(attr_min[code]):
 				return false
 	return true
+
+
+## The 20 accented letters the shipped squads actually use, folded to ASCII. Counted over
+## all 9,547 names in `game_db.json`: 635 carry one (a-acute 150, e-acute 134, i-acute 119,
+## o-acute 64, o-umlaut 37, n-tilde 34 ...). Typing "cafu" has to find "Cafú".
+const _FOLD := {
+	"á": "a", "ä": "a", "è": "e", "é": "e", "ë": "e", "í": "i", "ï": "i", "ñ": "n",
+	"ò": "o", "ó": "o", "ö": "o", "ú": "u", "ü": "u", "ç": "c", "ý": "y",
+}
+
+## Search key for a player name: lower-cased, accents folded, and every character that is
+## not a letter or a digit dropped. OURS — the search box is ours, so its matching rule is
+## too, and it is deliberately forgiving because the game's own name data is not tidy:
+##   * TWO different apostrophes ship in the same database — "O'Neill" with an ASCII quote
+##     (40 names) and "O´Connor" with an acute accent (15). Nobody can be expected to know
+##     which a given Irishman got, so neither counts.
+##   * 68 names carry double quotes around a nickname ('"Pancho" Guerrero'), 243 carry a
+##     dot, 16 a hyphen.
+## Dropping spaces too means "o neill", "oneill" and "O´Neill" are one key, and
+## "pancho guerrero" finds '"Pancho" Guerrero'. It is a SUBSTRING test, not a fuzzy one:
+## a misspelling ("guerro") still misses, by design — no invented near-matching.
+static func fold_name(s: String) -> String:
+	var out := ""
+	for ch in s.to_lower():
+		var c: String = _FOLD.get(ch, ch)
+		if (c >= "a" and c <= "z") or (c >= "0" and c <= "9"):
+			out += c
+	return out
 
 
 ## Does the player hold `role` (a 1..18 posFine) in ANY of his six role slots?

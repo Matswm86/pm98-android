@@ -196,6 +196,29 @@ func _run() -> void:
 	c._tick_scout_search()
 	ok = _assert(c.scout_results.size() == 1 and str(c.scout_results[0]["name"]) == "Cole",
 		"OURS name search is substring + case-insensitive") and ok
+	# The shipped squads carry 635 accented names, 40 ASCII apostrophes, 15 ACUTE-accent
+	# apostrophes and 68 quoted nicknames — the search key folds all of it away.
+	ok = _assert(Career.fold_name("Cafú") == "cafu"
+		and Career.fold_name("cafu") == "cafu",
+		"accents fold: cafu finds Cafu-acute") and ok
+	ok = _assert(Career.fold_name("O'Neill") == "oneill"
+		and Career.fold_name("O´Neill") == "oneill"
+		and Career.fold_name("o neill") == "oneill",
+		"both shipped apostrophes and a typed space collapse to one key") and ok
+	ok = _assert(Career.fold_name("\"Pancho\" Guerrero").contains("pancho")
+		and Career.fold_name("\"Pancho\" Guerrero") == "panchoguerrero",
+		"a quoted nickname is searchable by either part") and ok
+	ok = _assert(not Career.fold_name("Guerrero").contains(Career.fold_name("guerro")),
+		"a misspelling still misses — substring, not fuzzy") and ok
+	var accented := _mk(14, "Cafú", "DF", 70)
+	c.rosters[60] = [accented]
+	c.week = 3
+	c.start_scout_search({"pos": "", "role": 0, "age_band": -1, "quality_band": -1,
+		"price_band": -1, "leagues": ["eng_prem"], "name": "cafu"})
+	c.week = 5
+	c._tick_scout_search()
+	ok = _assert(c.scout_results.size() == 1, "an accented player is found by plain ASCII") and ok
+	c.rosters[60] = [cole, _mk(13, "Poole", "FW", 40)]     # the attribute tests below need these back
 	c.week = 3
 	c.start_scout_search({"pos": "", "role": 0, "age_band": -1, "quality_band": -1,
 		"price_band": -1, "leagues": ["eng_prem"], "attr_min": {"TI": 85}})
