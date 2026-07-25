@@ -161,17 +161,42 @@ _career.staff, _match_header())`. TACTICS → `_show_tactics_board_screen`;
 RETURN → reopens LINE-UP.
 
 ## HONEST GAPS (flagged, never filled)
-1. **FI (fitness) grid column** — the app tracks no per-player fitness byte; the
-   FI cell stays empty (resting furniture).
-2. **Per-player FOCUS tags (HA/TA/PA/SH) + AUTO assignment** — no focus model in
-   `Training.gd` (it is intensity + passive weekly development). AUTO is a
-   documented no-op; grid TOTAL stays 0; tag chips (`tag_*.png`) unused.
-3. **Right-panel per-skill FOCUS row + "last" column** (`focus_row.png`) — same
-   reason; the app has no per-skill focus or previous-value history.
-4. **CURRENT TRAINING STAFF band** (per-skill coaches HANDLING…SHOOTING + TP) —
-   the app's staff are generic roles (Trainer/Physio/Youth, `Staff.gd`), not
-   PM98's six per-skill coaches; the band stays resting furniture, `staff_star.png`
-   unused. `_staff` is accepted for API parity but not rendered.
+1. ~~**FI (fitness) grid column**~~ — **CLOSED 2026-07-25.** FI is the player's condition
+   byte (struct `+0xa7`, `Morale`'s `fitness` 40..99) — the same number the LINE-UP grid's
+   own FI column prints. Cell measured on `wine-captures-2026-07-24-transfer-training-scout/
+   tn4.png` row y88 (Ward, FI 70): the digits ink x240..254, so the GDI-centred cell is
+   `[236, 22]` (centre 247), sitting left of AV's `[261, 22]` (centre 272). Ink
+   `(42,95,170)` on a resting row, `(92,126,174)` on the selected black bar. The witnessed
+   fresh-career value is **70** down the whole grid (`17_training.png`), which is exactly
+   `Morale.ensure`'s own seed.
+2. ~~**Per-player FOCUS tags + AUTO assignment**~~ — **CLOSED** (model 2026-07-24, chip art
+   2026-07-25). The chips are a **flat plate + the white 2-letter code**, and the plate
+   colour is its **own** table, NOT the CURRENT TRAINING STAFF bar's. Measured in
+   `005_162348.png` at the chip cell x288..308:
+
+   | focus | chip plate | that skill's staff bar |
+   |---|---|---|
+   | HANDLING | (212,95,0) | (212,95,0) — same |
+   | PASSING | **(150,0,0)** | (212,63,0) — different |
+   | TACKLING | **(42,0,170)** | (150,0,0) — different |
+   | SHOOTING | (85,0,0) | (85,0,0) — same |
+
+   The screen drew all eight from `Training.FOCUS_COLOUR` and so had PASSING and TACKLING
+   wrong; it now draws the four witnessed chips as the frame's own art
+   (`app/art/screens/training/tag_{ha,pa,ta,sh}.png`, 21x12).
+   **Still un-witnessed:** the DRIBBLING / HEADING / GENERAL / FITNESS chips — no capture
+   we hold has those coaches hired with a man assigned, and the four witnessed plate
+   colours follow no derivable rule. They fall back to the chip grammar with that skill's
+   staff-bar colour and are flagged at the fallback. Hiring a DRIBBLING or HEADING coach in
+   a live career and assigning a player is the capture that would settle it.
+3. **Right-panel per-skill "last" column** (`focus_row.png`) — the app keeps no previous-
+   value history, so the column stays empty. (The FOCUS box itself is live: witnessed gold
+   on the HANDLING row of `tn4.png`.)
+4. ~~**CURRENT TRAINING STAFF band**~~ — **CLOSED 2026-07-24**: the six per-skill coaches
+   with name, stars and TP, and TOTAL TRAINABLE PLAYERS = ΣTP (witnessed 3+5+5+3+4+5 = 25
+   in `005_162348.png`, 4+2 = 6 in `tn4.png`). Bar fills sampled off both frames:
+   HANDLING (212,95,0), PASSING (212,63,0), DRIBBLING (210,0,0), HEADING (170,0,0),
+   TACKLING (150,0,0), SHOOTING (85,0,0).
 5. ~~**Per-section scrolling**~~ — **CLOSED 2026-07-24.** The original SCROLLS each
    section; it does not cap the squad. Witnessed live on a Bolton W career with 9
    defenders in 6 slots (`screenshots/wine-captures-2026-07-24-role-training-staff/`

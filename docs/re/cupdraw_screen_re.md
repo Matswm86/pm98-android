@@ -177,11 +177,15 @@ from the bracket's LATEST round:
   differs again; the trigger is unknown, so the chrome bakes frame 74's phase and the
   differ excludes that rect. This is the only exclusion.
 * **The drum's frame rate** (12 fps is ours) and **which BOMBO frame a draw starts on**.
-* **The European GROUP phase.** It is not a knockout draw and the original's group screen
-  is in no capture we hold, so `Main._show_cup_group_placeholder` keeps the old
-  placeholder rather than borrowing the SORTEO screen. Still open.
-* **The Intercontinental Cup** has no `SORTEO` strip in IMG.PKF (CHARITY and
-  SUPERCOPA_EUROPA do), so it keeps the old one-off-final overlay. Still open.
+* **The European GROUP phase.** It is not a knockout draw. It has its own screen — RESULTS
+  → **EURO. LEAGUE** — now captured and fully specified in
+  [`euro_league_screen_re.md`](euro_league_screen_re.md); until it is built,
+  `Main._show_cup_group_placeholder` keeps the old placeholder.
+* ~~**The Intercontinental Cup**~~ — **CLOSED 2026-07-25.** It has no `SORTEO` strip
+  because it is not a draw: it is a single match on the CHARITY SHIELD screen, which
+  MANAGER.EXE proves byte-for-byte (`FUN_0048daf0` == `FUN_004717a0` bar the title string
+  and the trophy bitmap). Built as `CompResultScreen` —
+  [`comp_result_screen_re.md`](comp_result_screen_re.md).
 
 ## Residuals
 

@@ -3572,9 +3572,7 @@ func _open_competition(act: String) -> void:
 			"res://art/screens/cup/supercopa.png", "European Supercup",
 			"European Cup winners v Cup Winners' Cup winners")
 	elif act == "intercont":
-		_show_one_off_final(_career.intercontinental, "INTERCONTINENTAL CUP",
-			"res://art/screens/cup/intercont.png", "Intercontinental Cup",
-			"European Cup winners v the South American champions")
+		_show_comp_result("intercont", _career.intercontinental, "Tokyo")
 
 ## The trophy art path for a European competition.
 func _euro_emblem(key: String) -> String:
@@ -3846,11 +3844,44 @@ func _oneoff_status_word(res: Dictionary) -> String:
 		return "WINNERS"
 	return "won by %s" % _cup_name(w).substr(0, 14)
 
-## The Charity Shield as a CupScreen overlay: the season's curtain-raiser (champions v
-## F.A. Cup winners), a single neutral-venue match around the real CHARITY shield art.
+## The Charity Shield on the ORIGINAL's own screen (champions v F.A. Cup winners, a single
+## match at Wembley — the ground the real frame prints).
 func _show_charity_shield() -> void:
-	_show_one_off_final(_career.charity_shield, "CHARITY SHIELD",
-		"res://art/screens/cup/charity.png", "Charity Shield", "Champions v F.A. Cup winners")
+	_show_comp_result("charity", _career.charity_shield, "Wembley")
+
+
+## RESULTS -> CHARITY SHIELD / INTERCONTINENTAL CUP on the original's own screen
+## (CompResultScreen; MANAGER.EXE FUN_004717a0 == FUN_0048daf0 bar the title and the
+## trophy). `ground` is the fixed venue the real frame prints for that competition —
+## Wembley for the shield, Tokyo for the Intercontinental Cup.
+func _show_comp_result(kind: String, res: Dictionary, ground: String) -> void:
+	var scr: CompResultScreen = load("res://scenes/CompResultScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	var m := {"stadium": ground}
+	if not res.is_empty():
+		var home := int(res.get("home_id", -1))
+		var away := int(res.get("away_id", -1))
+		var win := int(res.get("winner_id", -1))
+		m["home"] = _comp_side(home)
+		m["away"] = _comp_side(away)
+		if res.has("hg") and res.has("ag"):
+			m["hg"] = int(res["hg"])
+			m["ag"] = int(res["ag"])
+		if win != -1:
+			m["winner"] = _comp_side(win)
+	scr.setup(kind, m, _match_header())
+	scr.back_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		scr.queue_free())
+
+
+## One club as CompResultScreen wants it: the display name, the id its kit is drawn from
+## and the PAISES index its country flag is drawn from.
+func _comp_side(club_id: int) -> Dictionary:
+	var rec: Dictionary = GameDB.club(club_id)
+	var code: int = int(rec.get("countryCode", -1)) if not rec.is_empty() else -1
+	return {"name": _cup_name(club_id), "club_id": club_id, "flag": code}
 
 ## The European GROUP phase, on the old placeholder chrome. The original's group screen is
 ## NOT witnessed in any capture we hold, so this stays a placeholder — flagged in

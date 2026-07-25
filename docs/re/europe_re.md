@@ -81,6 +81,12 @@ group phase; the U.E.F.A. Cup and Cup Winners' Cup were straight knockouts that 
   winners + 2 best runners-up -> the last 8). We keep the existing 16-club field and run 4
   groups of 4 -> top 2 -> the same last-8 knockout. Same honest "smaller field" scope as
   the single-division domestic cups.
+  **2026-07-25: this simplification is no longer necessary.** The original's own European
+  Cup was driven live and captured — **two qualifying rounds (`Round 1`, `Round 2`) then 24
+  clubs in SIX groups of four**, the phase the original labels `1/8 FINALS`, with real
+  1997-98 entrants from season one. Field, structure, screen and every measured colour are
+  in [`euro_league_screen_re.md`](euro_league_screen_re.md); the model should be rebuilt to
+  that shape when the EURO. LEAGUE screen is built.
 * **Foreign field from `game_db`.** The opponents are real clubs from the game's own
   international database, rated from their squads, frozen for the season (they don't
   develop -- same scope as "AI clubs don't develop").

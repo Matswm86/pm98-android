@@ -22,13 +22,14 @@ class_name TrainingScreen
 ##    Both witnessed states render 0 px vs the original —
 ##    `tools/re/build_training_scroll_from_frames.py` + `shot_training_scroll.gd`.
 ##
-## HONEST GAPS (flagged, never invented — training_screen_re.md §Gaps): PM98's
-## per-player FOCUS tags (HA/TA/PA/SH) and the AUTO assignment, the per-skill
-## right-panel FOCUS row + "last" column, the per-skill CURRENT TRAINING STAFF
-## coaches and the FI (fitness) grid column are mechanics the app's training model
-## (Training.gd = intensity + passive development) does not implement; their
-## furniture stays at the resting look and no value is faked.
-## AUTO is a documented no-op. Native 640x480; scales to fit its parent.
+## CLOSED 2026-07-25: the FI (fitness) grid column now shows the player's condition
+## byte, and the four witnessed focus chips (HA/PA/TA/SH) are drawn as the frame's own
+## art instead of a synthesised plate — their plate colours are an independent table and
+## PASSING/TACKLING were being drawn in the wrong colour.
+##
+## HONEST GAPS (flagged, never invented — training_screen_re.md §Gaps): the DRIBBLING /
+## HEADING / GENERAL / FITNESS chips (no capture has those coaches hired with a man
+## assigned) and the right-panel "last" column. Native 640x480; scales to fit its parent.
 
 signal back_pressed        # RETURN -> Main reopens LINE-UP
 signal tactics_pressed     # TACTICS -> Main opens the TEAM TACTICS board
@@ -56,6 +57,9 @@ const NAME_X := 53            # names align under the KEEPERS/DEFENDERS headers
 const NAME_W := 108.0
 const STAR_X0 := 163          # STARJUGON grid strip
 const STAR_PITCH := 14
+# FI (fitness) and AV cells, both GDI-centred. Measured on tn4 row y88 (Ward, FI 70 AV 64):
+# the FI digits ink x240..254, the AV digits x265..279 — centres 247 and 272.
+const FI_CELL := [236, 22]
 const AV_CELL := [261, 22]    # frame: AV digits x265..279
 
 # right panel (selected player) — sub-rows (design y) + the decoded attr they map to
@@ -97,6 +101,7 @@ const C_FOCUS_BRD := Color8(0, 0, 0)
 # Grid tag chip: right of the row bar (bar ends x286), 21x12 as the frame's tag cuts.
 const TAG_X := 288
 const TAG_W := 21
+const TAG_H := 12
 
 # ---- per-section scrollbars (frame-measured, see tools/re/build_training_scroll_from_frames.py)
 # The original SCROLLS each section — it does NOT cap the squad. Witnessed live
@@ -121,6 +126,8 @@ const C_NUM := Color8(0, 0, 128)      # grid_n
 const C_NAME := Color8(0, 0, 0)
 const C_AV := Color8(210, 0, 0)       # grid_av
 const C_AV_SEL := Color8(255, 0, 0)   # grid_av_sel
+const C_FI := Color8(42, 95, 170)     # tn4 FI digits on a resting row
+const C_FI_SEL := Color8(92, 126, 174) # tn4 FI digits on the selected (black) row
 const C_RP_VAL := Color8(59, 85, 130) # rp_av / AVER value
 const C_TOTAL := Color8(0, 0, 0)
 const C_TTP := Color8(255, 255, 255)
@@ -160,6 +167,7 @@ var _sc_up_off: Texture2D
 var _sc_dn_off: Texture2D
 var _sc_off: Dictionary = {}          # band height -> the original's resting bar
 var _scroll: Dictionary = {}          # section key -> first visible index
+var _tags: Dictionary = {}            # focus name -> the frame-cut chip (witnessed four)
 
 
 func _ready() -> void:
@@ -186,6 +194,10 @@ func _ready() -> void:
 		var p := "res://art/screens/training/scroll_off_%d.png" % bh
 		if ResourceLoader.exists(p):
 			_sc_off[bh] = load(p)
+	for focus in Training.TAG_ART:
+		var tp := "res://art/screens/training/tag_%s.png" % str(Training.TAG_ART[focus])
+		if ResourceLoader.exists(tp):
+			_tags[focus] = load(tp)
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	gui_input.connect(_on_input)
@@ -482,6 +494,12 @@ func _draw_row(y: int, p: Dictionary) -> void:
 	PMChrome.text(self, _f8, NAME_X, y + 1, nm, C_WHITE if sel else C_NAME, 11, 0, NAME_W)
 	_draw_stars(STAR_X0, y, av,
 		_star_sel_on if sel else _star_on, _star_sel_off if sel else _star_off, STAR_PITCH)
+	# FI = the player's condition byte (struct +0xa7, Morale's `fitness` 40..99) — the
+	# same value the LINE-UP grid's FI column shows. Was an empty cell until 2026-07-25.
+	# 70 is Morale.ensure's own seed, and the value the original prints for every man of a
+	# freshly created career (17_training.png, Bolton W week 1: FI 70 down the whole grid).
+	PMChrome.text(self, _f8, FI_CELL[0], y + 1, str(int(p.get("fitness", 70))),
+		C_FI_SEL if sel else C_FI, 11, 1, float(FI_CELL[1]))
 	PMChrome.text(self, _f8, AV_CELL[0], y + 1, str(av),
 		C_AV_SEL if sel else C_AV, 11, 1, float(AV_CELL[1]))
 	_draw_tag(y, pid)
@@ -567,11 +585,21 @@ func _draw_focus_boxes() -> void:
 
 
 ## The 2-letter focus tag at the right end of an assigned player's grid row.
+##
+## The four chips the original shows us (HA/PA/TA/SH, frame 005_162348) ship as frame
+## cuts and are drawn as ART — their plate colours are their own table, not the staff
+## band's, so the old FOCUS_COLOUR fill had PASSING and TACKLING wrong. DRIBBLING /
+## HEADING / GENERAL / FITNESS are un-witnessed and fall back to the chip grammar with
+## the skill's staff-bar colour (Training.TAG_ART comment).
 func _draw_tag(y: int, pid: int) -> void:
 	var f := str(_focus.get(pid, ""))
 	if f == "":
 		return
-	draw_rect(Rect2(TAG_X, y, TAG_W, BAR_H), Color(Training.FOCUS_COLOUR[f]), true)
+	var art: Texture2D = _tags.get(f)
+	if art != null:
+		draw_texture(art, Vector2(TAG_X, y))
+		return
+	draw_rect(Rect2(TAG_X, y, TAG_W, TAG_H), Color(Training.FOCUS_COLOUR[f]), true)
 	PMChrome.text(self, _f8, TAG_X, y + 1, str(Training.FOCUS_CODE[f]), C_WHITE, 11, 1, float(TAG_W))
 
 

@@ -109,19 +109,31 @@ const FOCUS_ATTR := {
 # (FUN_00582760 case 1). It does NOT touch SPEED/STAMINA/AGGRESSION/QUALITY —
 # those four are the untrainable core (see develop_week).
 
-# The grid tag chip: 2-letter code + the skill's own CURRENT TRAINING STAFF bar colour
-# (witnessed: HANDLING tags are the orange 212,95,0 of its bar, SHOOTING the dark red
-# 85,0,0 of its own). GENERAL / FITNESS tags are un-witnessed — same chip grammar.
 const FOCUS_CODE := {
 	"GENERAL": "GE", "FITNESS": "FI", "HANDLING": "HA", "PASSING": "PA",
 	"DRIBBLING": "DR", "HEADING": "HE", "TACKLING": "TA", "SHOOTING": "SH",
 }
+# CURRENT TRAINING STAFF bar fills, sampled off the real frames (the modal colour of
+# x439..605 on each row): identical in 005_162348 (six coaches hired) and tn4 (two).
 const FOCUS_COLOUR := {
 	"GENERAL": Color8(59, 85, 130), "FITNESS": Color8(42, 127, 85),
 	"HANDLING": Color8(212, 95, 0), "PASSING": Color8(212, 63, 0),
 	"DRIBBLING": Color8(210, 0, 0), "HEADING": Color8(170, 0, 0),
 	"TACKLING": Color8(150, 0, 0), "SHOOTING": Color8(85, 0, 0),
 }
+# The grid tag chip is a FLAT plate + the white 2-letter code, and its plate colour is
+# its OWN table — NOT the staff bar's. Measured in 005_162348 at the chip cell x288..308:
+#   HANDLING (212,95,0)   TACKLING (42,0,170)   PASSING (150,0,0)   SHOOTING (85,0,0)
+# HANDLING and SHOOTING happen to match their bar; PASSING and TACKLING do not (the old
+# code drew both from FOCUS_COLOUR and got them wrong). The four witnessed chips ship as
+# frame cuts (app/art/screens/training/tag_*.png) and are drawn as art.
+const TAG_ART := {"HANDLING": "ha", "PASSING": "pa", "TACKLING": "ta", "SHOOTING": "sh"}
+# DRIBBLING / HEADING / GENERAL / FITNESS chips are UN-WITNESSED: no capture we hold has
+# those coaches hired with a man assigned. They fall back to the witnessed chip grammar
+# with the skill's own staff-bar colour — the least-invented choice available, since that
+# IS the plate colour for two of the four witnessed chips. Flagged in
+# docs/re/training_screen_re.md; hiring a DRIBBLING or HEADING coach in a live career and
+# assigning a player is the capture that would settle it.
 # The alert the original raises when the global capacity is full (0x2593f0, verbatim
 # including its acute accent), and the no-trainer gate text (0x2593b8).
 const FULL_MSG := "You can´t train any more players."

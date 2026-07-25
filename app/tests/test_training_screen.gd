@@ -68,7 +68,39 @@ func _run() -> void:
 	_tap(screen, Vector2(590, 459))          # R_RETURN centre
 	ok = _assert(back[0], "RETURN emits back_pressed") and ok
 
-	# select a player and force a paint pass (panel + grid, catches null-deref)
+	# ---- the grid FOCUS chips are the frame's own art (2026-07-25) -------------------
+	# Their plate colours are an INDEPENDENT table, not the CURRENT TRAINING STAFF bar's:
+	# measured in original-walkthrough-2026-07-02/005_162348.png at the chip cell
+	# x288..308. HANDLING and SHOOTING happen to match their bar; PASSING and TACKLING do
+	# not, and drawing them from Training.FOCUS_COLOUR (as the code did) got both wrong.
+	var chip_ink := {"HANDLING": Color8(212, 95, 0), "PASSING": Color8(150, 0, 0),
+		"TACKLING": Color8(42, 0, 170), "SHOOTING": Color8(85, 0, 0)}
+	ok = _assert(screen._tags.size() == chip_ink.size(),
+		"the four witnessed chips loaded as art (%d)" % screen._tags.size()) and ok
+	for skill in chip_ink:
+		var tex: Texture2D = screen._tags.get(skill)
+		if tex == null:
+			ok = _assert(false, "chip art present: %s" % skill)
+			continue
+		ok = _assert(tex.get_size() == Vector2(TrainingScreen.TAG_W, TrainingScreen.TAG_H),
+			"%s chip is %dx%d" % [skill, TrainingScreen.TAG_W, TrainingScreen.TAG_H]) and ok
+		ok = _assert(_modal_colour(tex) == chip_ink[skill],
+			"%s chip plate is the frame's own colour" % skill) and ok
+	ok = _assert(screen._tags.get("DRIBBLING") == null and screen._tags.get("HEADING") == null,
+		"DRIBBLING/HEADING stay un-witnessed (no invented chip art)") and ok
+
+	# ---- the FI column ---------------------------------------------------------------
+	# tn4 row y88 (Ward, FI 70): the digits ink x240..254, so the centred cell's midpoint
+	# is 247. AV's own cell (x265..279 -> 272) is the already-accepted neighbour.
+	ok = _assert(TrainingScreen.FI_CELL[0] + TrainingScreen.FI_CELL[1] / 2 == 247,
+		"FI cell centres on the frame's digit span") and ok
+	ok = _assert(TrainingScreen.AV_CELL[0] + TrainingScreen.AV_CELL[1] / 2 == 272,
+		"AV cell unchanged") and ok
+
+	# select a player and force a paint pass (panel + grid + chips + FI, catches null-deref)
+	screen._focus = {int(screen._buckets["gk"][0]["id"]): "HANDLING",
+		int(screen._buckets["fwd"][0]["id"]): "SHOOTING",
+		int(screen._buckets["mid"][0]["id"]): "DRIBBLING"}
 	screen._sel_pid = int(screen._buckets["fwd"][0]["id"])
 	screen.queue_redraw()
 	for _i in 3:
@@ -106,6 +138,26 @@ func _tap(screen: TrainingScreen, p: Vector2) -> void:
 	up.position = p
 	up.pressed = false
 	screen._on_input(up)
+
+
+## The most common opaque colour of a texture — a chip is a flat plate + white letters,
+## so this is the plate.
+func _modal_colour(tex: Texture2D) -> Color:
+	var img := tex.get_image()
+	var tally: Dictionary = {}
+	for y in img.get_height():
+		for x in img.get_width():
+			var c := img.get_pixel(x, y)
+			if c.a < 0.5:
+				continue
+			tally[c] = int(tally.get(c, 0)) + 1
+	var best := Color(0, 0, 0)
+	var best_n := -1
+	for c in tally:
+		if int(tally[c]) > best_n:
+			best_n = int(tally[c])
+			best = c
+	return best
 
 
 func _assert(cond: bool, label: String) -> bool:
