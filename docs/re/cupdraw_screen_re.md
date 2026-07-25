@@ -173,6 +173,26 @@ from the bracket's LATEST round:
   the EXE loads are presumably theirs; exported, unused.
 * **MANO0..7 and BOLA0..3** — the hand and ball the EXE loads for this screen appear in
   no captured frame. Exported, unused.
+
+  **2026-07-25 hunt, negative result — recorded so it is not repeated.** A live Coca-Cola
+  Cup ROUND 2 draw was reached twice on a driven career and filmed at 25 fps
+  (`tools/re/wine/film.sh`). What was ruled out:
+
+  * **The screen does not animate on open.** 20 s of film from ~1 s after the screen
+    appeared: the ONLY changing pixels in the whole 640x480 frame are x503..528 y442..462
+    — the CONTINUE button's spinning football. The drum is a still.
+  * **CONTINUE does not run the draw.** Clicking it (551, 451) cross-fades straight out to
+    the hub. In 350 filmed frames the only non-spinner change is that 5-frame wipe.
+  * The tie panel bottom-left has TWO states: **empty** (this draw, ties already listed in
+    MATCHES) and **populated** with kits, club names and 1ST/2ND LEG stadiums (a week-1
+    draw). So the panel is a per-tie detail view, not the drum's output.
+
+  Still untried, in order of likelihood: the red **FINISH** button (405, 451), a click on
+  the drum art itself, and selecting a MATCHES row. Also possible the animation runs only
+  the first time a competition's draw is raised in a career, i.e. it must be caught on the
+  very first CONTINUE that opens it. The harness is ready either way — `cup_draw` is
+  parked out of `screens.json` into `screens_parked.json`, so a draw reads as UNKNOWN and
+  `autodrive.py` films it at 25 fps automatically.
 * **The CONTINUE ball's lit/unlit rule.** Frame 74 is dark, frame 75 is green, frame 10
   differs again; the trigger is unknown, so the chrome bakes frame 74's phase and the
   differ excludes that rect. This is the only exclusion.
