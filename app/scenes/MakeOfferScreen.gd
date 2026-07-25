@@ -181,6 +181,14 @@ func _ready() -> void:
 ##   The 2026-07-24 owner report ("a 14M bid takes hundreds of taps") was this state
 ##   being seeded at the floor instead.
 ##
+## ANDROID DEVIATION (owner decision, 2026-07-24): the COLD-APPROACH opening CLUB OFFER
+## is seeded at the CLUB FEE too, not at the £5,000 floor the original opens on. The
+## original's floor is still what frame `101_164714.png` shows and it is not in dispute —
+## but the stepper moves in £5,000/£10,000/£25,000 notches (value-dependent), so bidding
+## the fee for a £16,000,000 player costs ~640 taps on a touch screen. Every route now
+## opens at the asking price and the steppers walk DOWN from there. Pass an explicit
+## `offer` in `seed` to override; the floor is still the stepper's hard minimum.
+##
 ## `seed` keys: `offer`, `yearly_wage`, `years`, `clauses` (Array of clause indices).
 func setup(player: Dictionary, selling_club: Dictionary, fee: int, cash: int,
 		seed: Dictionary = {}) -> void:
@@ -188,7 +196,7 @@ func setup(player: Dictionary, selling_club: Dictionary, fee: int, cash: int,
 	_club = selling_club
 	_fee = fee
 	_cash = cash
-	_offer = maxi(FLOOR, int(seed.get("offer", FLOOR)))
+	_offer = maxi(FLOOR, int(seed.get("offer", maxi(FLOOR, fee))))
 	_wage_yearly = maxi(FLOOR, int(seed.get("yearly_wage", FLOOR)))
 	_years = clampi(int(seed.get("years", YEARS_MIN)), YEARS_MIN, YEARS_MAX)
 	_bonus = FLOOR

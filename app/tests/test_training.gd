@@ -1,10 +1,11 @@
 extends SceneTree
-## Headless test for player development through training (Track A engine depth).
+## Headless test for the TRAINING lever + its Career integration.
 ##   ~/godot462 --headless --path app --script res://tests/test_training.gd
-## Covers the Training unit model (intensity lookups, age-driven dev direction, the
-## ±1 attribute crossing + news, caps/floors, trend) and the Career integration
-## (a season develops a youngster and declines a veteran, intensity changes the
-## injury count, intensity persists, ages tick at rollover).
+## The DEVELOPMENT MODEL itself is `test_training_exact.gd` — a clause-by-clause check
+## against FUN_00582760. What is left here is the surrounding machinery: the intensity
+## lookups (which now only feed the injury roll), `trend()`'s screen arrows, and the
+## Career loop (a season of FOCUSED training moves the squad, intensity changes the
+## injury count and persists, ages tick at rollover).
 
 const SEED := 33445566
 
@@ -25,9 +26,10 @@ func _run() -> bool:
 
 
 func _player(name_: String, age: int, ca: int) -> Dictionary:
-	return {"name": name_, "age": age, "dev_progress": 0.0,
-		"attrs": {"VE": ca, "RE": ca, "AG": ca, "CA": ca, "RM": ca,
-			"RG": ca, "PA": ca, "TI": ca, "EN": ca, "PO": ca}}
+	var a := {"VE": ca, "RE": ca, "AG": ca, "CA": ca, "RM": ca,
+		"RG": ca, "PA": ca, "TI": ca, "EN": ca, "PO": ca}
+	return {"id": 0, "name": name_, "age": age, "fitness": 70,
+		"attrs": a, "attrs_base": a.duplicate()}
 
 
 # ---- unit: lookups -------------------------------------------------------
@@ -44,41 +46,24 @@ func _unit_lookups() -> bool:
 	return ok
 
 
-# ---- unit: development direction by age ----------------------------------
+# ---- unit: the lever only changes injury risk -----------------------------
 
 func _unit_direction() -> bool:
 	var ok := true
 	var rng := RandomNumberGenerator.new()
 	rng.seed = SEED
-	# A 19yo trained Intensive for a season climbs; a 34yo declines; a 27yo barely moves.
+	# The engine's pass has NO age term and NO intensity term. Two players 15 years
+	# apart, both focused on the same skill, move IDENTICALLY.
 	var young := _player("Kid", 19, 60)
-	var vet := _player("Veteran", 34, 70)
-	var prime := _player("Prime", 27, 75)
-	var young_news := 0
-	var vet_news := 0
-	for _w in 38:
-		for it in Training.train_week(rng, [young], "Intensive"):
-			if it["kind"] == "develop":
-				young_news += 1
-		for it in Training.train_week(rng, [vet], "Intensive"):
-			if it["kind"] == "decline":
-				vet_news += 1
-		Training.train_week(rng, [prime], "Normal")
-	ok = _assert(int(young["attrs"]["CA"]) > 60, "a 19yo improves over a season (CA %d->%d)" % [60, int(young["attrs"]["CA"])]) and ok
-	ok = _assert(young_news > 0, "improvement fires develop news (%d items)" % young_news) and ok
-	ok = _assert(int(vet["attrs"]["CA"]) < 70, "a 34yo declines over a season (CA %d->%d)" % [70, int(vet["attrs"]["CA"])]) and ok
-	ok = _assert(vet_news > 0, "decline fires decline news (%d items)" % vet_news) and ok
-	ok = _assert(absi(int(prime["attrs"]["CA"]) - 75) <= 2, "a 27yo holds roughly steady (CA %d)" % int(prime["attrs"]["CA"])) and ok
-	# Intensive develops faster than Light for the same youngster/seed.
-	var r1 := RandomNumberGenerator.new(); r1.seed = 99
-	var r2 := RandomNumberGenerator.new(); r2.seed = 99
-	var a := _player("A", 18, 55)
-	var b := _player("B", 18, 55)
-	for _w in 20:
-		Training.train_week(r1, [a], "Intensive")
-		Training.train_week(r2, [b], "Light")
-	ok = _assert(int(a["attrs"]["CA"]) >= int(b["attrs"]["CA"]),
-		"Intensive develops >= Light (%d vs %d)" % [int(a["attrs"]["CA"]), int(b["attrs"]["CA"])]) and ok
+	var vet := _player("Veteran", 34, 60)
+	for _w in 10:
+		Training.develop_week(rng, [young], {0: "SHOOTING"})
+		Training.develop_week(rng, [vet], {0: "SHOOTING"})
+	ok = _assert(int(young["attrs"]["TI"]) == 70 and int(vet["attrs"]["TI"]) == 70,
+		"age does not change development (%d vs %d)" % [
+			int(young["attrs"]["TI"]), int(vet["attrs"]["TI"])]) and ok
+	ok = _assert(int(young["attrs"]["CA"]) == 60 and int(vet["attrs"]["CA"]) == 60,
+		"and neither ages nor trains the untrainable core") and ok
 	return ok
 
 
@@ -88,26 +73,27 @@ func _unit_caps() -> bool:
 	var ok := true
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
-	var star := _player("Star", 18, Training.ATTR_CAP)   # already maxed
+	var star := _player("Star", 18, 99)      # already at the engine ceiling
 	for _w in 60:
-		Training.train_week(rng, [star], "Intensive")
+		Training.develop_week(rng, [star], {0: "SHOOTING"})
 	var over := false
 	for c in star["attrs"]:
-		if int(star["attrs"][c]) > Training.ATTR_CAP:
+		if int(star["attrs"][c]) > 99:
 			over = true
-	ok = _assert(not over, "no attribute climbs past the cap") and ok
+	ok = _assert(not over, "no attribute climbs past 99") and ok
 
-	var done := _player("Done", 39, Training.ATTR_FLOOR)  # already floored
+	# Decay never takes a man below his shipped base.
+	var done := _player("Done", 39, 30)
 	for _w in 60:
-		Training.train_week(rng, [done], "Intensive")
+		Training.develop_week(rng, [done])
 	var under := false
 	for c in done["attrs"]:
-		if int(done["attrs"][c]) < Training.ATTR_FLOOR:
+		if int(done["attrs"][c]) < 30:
 			under = true
-	ok = _assert(not under, "no attribute drops below the floor") and ok
+	ok = _assert(not under, "decay stops at the shipped base") and ok
 	# unrated player (no attrs) is skipped without error
-	var fringe := {"name": "Fringe", "age": 20, "dev_progress": 0.0, "attrs": {}}
-	Training.train_week(rng, [fringe], "Normal")
+	var fringe := {"id": 1, "name": "Fringe", "age": 20, "attrs": {}}
+	Training.develop_week(rng, [fringe], {1: "SHOOTING"})
 	ok = _assert(true, "unrated player trains without error") and ok
 	return ok
 
@@ -147,12 +133,12 @@ func _career_integration() -> bool:
 	var ok := true
 	ok = _assert(career.training_intensity == Training.DEFAULT_INTENSITY, "career defaults to Normal training") and ok
 
-	# dev_progress seeded on the squad.
+	# the engine's BASE attribute block is seeded on the squad.
 	var seeded := true
 	for p in career.my_squad():
-		if not p.has("dev_progress"):
+		if not p.has("attrs_base"):
 			seeded = false
-	ok = _assert(seeded, "squad seeded with dev_progress") and ok
+	ok = _assert(seeded, "squad seeded with the base attribute block") and ok
 
 	# Cycle intensity wraps.
 	career.cycle_training()
@@ -163,9 +149,24 @@ func _career_integration() -> bool:
 	# Play a season on Intensive: development news accrues and at least one player's
 	# ability moves from where it started.
 	career.training_intensity = "Intensive"
+	# Hire the six skill coaches and let AUTO assign the focus — without a coach the
+	# original trains NOBODY (TOTAL TRAINABLE PLAYERS = 0), so neither do we.
+	var sid := 700
+	for skill in Staff.TRAINER_SKILLS:
+		career.staff.append({"id": sid, "name": "COACH", "role": skill,
+			"stars": 5.0, "quality": 5, "wage": 1000})
+		sid += 1
+	career.auto_training_focus()
+	ok = _assert(not career.training_focus.is_empty(),
+		"AUTO assigned %d players to the coaches" % career.training_focus.size()) and ok
 	var before: Dictionary = {}
 	for p in career.my_squad():
-		before[int(p.get("id", -1))] = int((p.get("attrs", {}) as Dictionary).get("CA", 0))
+		before[int(p.get("id", -1))] = int((p.get("attrs", {}) as Dictionary).get("TI", 0)) \
+			+ int((p.get("attrs", {}) as Dictionary).get("EN", 0)) \
+			+ int((p.get("attrs", {}) as Dictionary).get("PO", 0)) \
+			+ int((p.get("attrs", {}) as Dictionary).get("PA", 0)) \
+			+ int((p.get("attrs", {}) as Dictionary).get("RM", 0)) \
+			+ int((p.get("attrs", {}) as Dictionary).get("RG", 0))
 	var rng := RandomNumberGenerator.new()
 	rng.seed = SEED
 	while not career.season_over():
@@ -173,10 +174,13 @@ func _career_integration() -> bool:
 	var moved := 0
 	var dev_news := 0
 	for p in career.my_squad():
-		if int((p.get("attrs", {}) as Dictionary).get("CA", 0)) != before.get(int(p.get("id", -1)), -999):
+		var a: Dictionary = p.get("attrs", {})
+		var now := int(a.get("TI", 0)) + int(a.get("EN", 0)) + int(a.get("PO", 0)) \
+			+ int(a.get("PA", 0)) + int(a.get("RM", 0)) + int(a.get("RG", 0))
+		if now != before.get(int(p.get("id", -1)), -999):
 			moved += 1
 	for n in career.news_log:
-		if n is Dictionary and (n.get("kind") == "develop" or n.get("kind") == "decline"):
+		if n is Dictionary and n.get("kind") == "training":
 			dev_news += 1
 	ok = _assert(moved > 0, "a season of training moves squad ability (%d players changed)" % moved) and ok
 	ok = _assert(dev_news > 0, "development surfaces as club news (%d items)" % dev_news) and ok

@@ -180,6 +180,32 @@ static func _bump(hdr: PackedByteArray, off: int) -> void:
 ## 1..11 and a season store keyed on them would merge both teams. Callers that want real
 ## season stats must pass `pids[side * 11 + idx] = <global player id>`; selection is still
 ## gated on `+0x88 != 0` exactly as the binary gates it.
+## A HALF-TIME snapshot of the running per-player totals into `rep`, WITHOUT the
+## participant zeroing `commit` does. This is what the PRESENTED branch's half-time
+## board reads: the live sheets show a half-time table whose every column is a PREFIX of
+## the full-time one (Man Utd SHOTS 7/9 -> 10/13, MIN 45 -> 90, frames 02 and 06 of
+## screenshots/wine-captures-2026-07-24-statistics-live/), which running totals produce
+## and per-period records do not. Zeroing here would break `CADENCE_MATCH`'s single
+## whole-match commit, so this deliberately leaves `+0xec..+0x12f` alone.
+##
+## The header/event half is skipped: the half-time board's own goal + booking columns are
+## drawn from the match's event vector by the caller, not from these records.
+static func snapshot(mem: Pm98StatMatch.Mem, rep: Report, pids := {}) -> void:
+	for side in range(2):
+		for idx in range(11):
+			var pb := Pm98StatMatch._player(side, idx)
+			var pid := mem.u16(pb + Pm98StatMatch.SEL)
+			if pid == 0:
+				continue
+			pid = int(pids.get(side * 11 + idx, pid))
+			mem.set_s32(pb + PART_BLOCK, 1)                # rec+0x00 forced to 1, as commit does
+			var rec := PackedByteArray(); rec.resize(REC_SIZE)
+			for k in range(REC_BLOCK):
+				rec[k] = mem.u8(pb + PART_BLOCK + k)
+			rec.encode_u16(R_PID, pid)
+			_add_or_replace(rep, side, rec)
+
+
 static func commit(mem: Pm98StatMatch.Mem, rep: Report, pids := {}) -> void:
 	# 1. header copy (@0x44e470..0x44e52d)
 	rep.hdr.encode_u16(F_POSS0, mem.u16(Pm98StatMatch.POSS))
@@ -392,6 +418,32 @@ static func _cell(v: int) -> String:
 
 static func _pair(n: int, d: int) -> String:
 	return "-/-" if n + d == 0 else "%d/%d" % [n, n + d]
+
+
+## One side's MATCH records, ordered to match `xi` — what the HALF TIME / FULL TIME
+## board's per-team STATISTICS button shows. `@0x4b1fd3` / `@0x4b20f5` is the binary's
+## own path: it `rep movsd`-copies the records straight out of the report array
+## (`DAT_0066afd0+0xa4` / `+0x9c`) rather than rebuilding them from the persistent store,
+## so these are the stats SINCE THE LAST COMMIT — this match, not the season.
+##
+## Records are keyed on the global player id (`rec+0x44`), which `MatchSim.pid_map`
+## supplies to `commit`. A player with no record yields an all-zero row, which the widget
+## prints as the original's dashes.
+static func match_rows(rep, side: int, xi: Array) -> Array:
+	var by_pid: Dictionary = {}
+	if rep != null:
+		for i in rep.count(side):
+			by_pid[rep.pid(side, i)] = rep.fields(side, i)
+	var out: Array = []
+	for p in xi:
+		var f := PackedInt32Array()
+		f.resize(REC_DWORDS)
+		if p is Dictionary:
+			var pid := int((p as Dictionary).get("id", -1))
+			if by_pid.has(pid):
+				f = by_pid[pid]
+		out.append(f)
+	return out
 
 
 ## The TEAM TOTAL row (`@0x4b2322..0x4b246c`). `+0x00` and `+0x04` are NOT column sums:

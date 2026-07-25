@@ -52,6 +52,7 @@ class_name YouthScreen
 
 signal search_pressed(skills: Array)   # SEARCH armed + tapped (skill keys, cap_order ids)
 signal promote_requested(pid: int)     # tap a READY roster row (un-walked interaction)
+signal prospect_pressed(pid: int)      # tap a PLAYERS FOUND row -> offer him a contract
 signal back_pressed                    # RETURN
 
 const W := 640
@@ -92,6 +93,19 @@ var _club_id := -1
 var _count_override := -1          # parity oracle only (frame 047's "3 PLAYERS")
 var _press := ""
 var _row_rects: Array = []
+var _found: Array = []             # Career.youth_found — the PLAYERS FOUND shortlist
+var _found_rects: Array = []
+
+# PLAYERS FOUND filled list. The panel interior is frame-measured (`pf_interior`); the
+# ROW grammar inside it is the app's, because the original's filled panel is not in any
+# frame we hold. Kept deliberately plain — name + ability + a potential star count — and
+# on the same 16px pitch as every other list in the game.
+const PF_ROW_PITCH := 16
+const PF_ROW_H := 13
+const C_PF_ROW := Color8(222, 228, 240)
+const C_PF_ROW_SEL := Color8(255, 226, 128)
+const C_PF_INK := Color8(0, 0, 0)
+const C_PF_STAR := Color8(196, 138, 0)
 
 
 func _ready() -> void:
@@ -126,7 +140,9 @@ func _ready() -> void:
 ## Feed the live youth team + staff + header chrome, then repaint. Backwards
 ## tolerant with the pre-rebuild Main call shape (youth, manager, club, cash).
 func setup(youth: Array, staff = null, manager = "", club = "", season = "",
-		week = 0, club_id = -1, searching = false, selected = null) -> void:
+		week = 0, club_id = -1, searching = false, selected = null, found = null) -> void:
+	if found is Array:
+		_found = (found as Array).duplicate()
 	_youth = youth.duplicate()
 	_youth.sort_custom(func(a, b):
 		var ra := Youth.is_ready(a)
@@ -197,6 +213,9 @@ func _hit(d: Vector2) -> String:
 	for skill in _spec.get("cap_order", []):
 		if _led_card(str(skill)).has_point(d):
 			return "led:" + str(skill)
+	for fr in _found_rects:
+		if (fr["rect"] as Rect2).has_point(d):
+			return "found:%d" % int(fr["pid"])
 	for rr in _row_rects:
 		if (rr["rect"] as Rect2).has_point(d):
 			return "row:%d" % int(rr["pid"])
@@ -241,6 +260,8 @@ func _on_input(e: InputEvent) -> void:
 			var k := was.substr(4)
 			_selected[k] = not bool(_selected.get(k, false))
 			queue_redraw()
+	elif was.begins_with("found:"):
+		prospect_pressed.emit(int(was.substr(6)))
 	elif was.begins_with("row:"):
 		var pid := int(was.substr(4))
 		for p in _youth:
@@ -351,7 +372,11 @@ func _draw() -> void:
 		if _search_on != null:
 			draw_texture(_search_on, _btn_rect("search").position)
 
-	# --- PLAYERS FOUND: the two witnessed messages verbatim ---
+	# --- PLAYERS FOUND: the shortlist if the scout brought one back, else the
+	#     two witnessed messages verbatim ---
+	_found_rects.clear()
+	if has_scout and not _searching and not _found.is_empty():
+		_draw_found()
 	var msg: Array = []
 	if not has_scout:
 		msg = _spec.get("pf_msg_no_scout", [])
@@ -447,6 +472,36 @@ func _draw_rows() -> void:
 		_row_rects.append({"pid": int(p.get("id", -1)), "rect": r})
 		if _press == "row:%d" % int(p.get("id", -1)):
 			draw_rect(r, Color(1, 1, 1, 0.25), true)
+
+
+## The PLAYERS FOUND shortlist. Each row is a prospect the scout came back with; a tap
+## offers him a contract (Career.sign_youth_prospect), which he can refuse — the loop
+## the MANAGER.EXE strings describe ("The youth team scout has finished his search." ->
+## "%s has joined your Youth Team." / "The youth player %s has rejected your offer.").
+## The panel's FILLED look is un-witnessed, so this is plain app grammar inside the
+## frame-measured interior, flagged as reconstruction in docs/re/youth_re.md.
+func _draw_found() -> void:
+	var iv: Array = _spec.get("pf_interior", [326, 102, 302, 117])
+	var x := float(iv[0]) + 4.0
+	var w := float(iv[2]) - 8.0
+	var y := float(iv[1]) + 6.0
+	var limit := int((float(iv[3]) - 10.0) / PF_ROW_PITCH)
+	for i in mini(_found.size(), limit):
+		var p: Dictionary = _found[i]
+		var pid := int(p.get("id", -1))
+		var r := Rect2(x, y, w, PF_ROW_H)
+		var held := _press == "found:%d" % pid
+		draw_rect(r, C_PF_ROW_SEL if held else C_PF_ROW, true)
+		_txt_left(_f8, x + 4.0, y + 1.0, str(p.get("name", "")).to_upper(), C_PF_INK, 11)
+		_txt_center(_f8, x + w - 74.0, y + 1.0, str(p.get("age", 0)), C_PF_INK, 11)
+		_txt_center(_f8, x + w - 54.0, y + 1.0, str(Youth.ability(p)), C_PF_INK, 11)
+		# potential as 1-5 pips (the YOUTH screen's own star language, drawn plain
+		# because the panel has no witnessed star art of its own)
+		var pips := clampi(int(round(Youth.potential_of(p) / 20.0)), 1, 5)
+		for s in pips:
+			draw_rect(Rect2(x + w - 38.0 + s * 6.0, y + 4.0, 4.0, 5.0), C_PF_STAR, true)
+		_found_rects.append({"pid": pid, "rect": r})
+		y += PF_ROW_PITCH
 
 
 func _col(v: Variant) -> Color:

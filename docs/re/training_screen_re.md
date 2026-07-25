@@ -1,5 +1,91 @@
 # TRAINING sub-screen (LINE-UP → TRAINING) — RE + build notes
 
+> **THE DEVELOPMENT MODEL IS NOW EXACT (2026-07-25).** Owner report: *"training doesn't
+> actually do anything. The players' stats don't go up. They do in the original, so fix
+> it so it's exact."* He was right, and the cause was ours: the app carried an invented
+> age-based drift whose PRIME rate (`0.015`/week) needed **67 weeks per attribute point**,
+> so a manager's core squad never moved in a season. See
+> [The weekly development pass](#the-weekly-development-pass-fun_00582760) below.
+
+## The weekly development pass (`FUN_00582760`)
+
+Located and ported this session. `FUN_0057b400` is the **weekly club turn** — it is the
+same function that runs `FUN_0057f080` (the four "The works to … has finished." messages)
+and fires the two scout "…has finished his search" lines — and it walks the club's squad
+list (`club+0x24`) calling `FUN_00582760` once per player, **for every club**.
+
+**Every attribute is stored twice.** Decoded from the DBC loader `FUN_005820f0`
+@0x582185-0x582250, which writes each of the ten EQUIPOS bytes into two blocks:
+
+| | VE | RE | AG | CA | PO | EN | PA | RM | RG | TI |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **LIVE** | +0x9c | +0x9d | +0x9e | +0x9f | +0xa0 | +0xa1 | +0xa2 | +0xa3 | +0xa4 | +0xa5 |
+| **BASE** | +0xaa | +0xab | +0xac | +0xad | +0xae | +0xaf | +0xb0 | +0xb1 | +0xb2 | +0xb3 |
+
+`+0x9c..+0x9f = VE/RE/AG/CA` is independently confirmed: `FUN_00534570` averages exactly
+those four as `core4`, the known wage/AV input (`wage_formula_re.md` §2). BASE is the
+shipped rating and is never rewritten after load; `FUN_0058b030` restores VE/RE/AG/RG
+**from** BASE when the engine regenerates a player, which pins the direction of the pair.
+
+The pass, verbatim:
+
+```
+mode = player[+0xa9]                      ; 0 = not in training
+if mode == 0:                             ; DECAY
+    for a in [PO, EN, PA, RM, RG, TI]:
+        if base[a] < live[a]: live[a] -= 1
+else:
+    roll = rand(7) + 0x12                  ; 18..24 headroom for the focused attribute
+    gain, cap[6] = 0, [0,0,0,0,0,0]
+    switch mode:
+      1 GENERAL   -> gain 1, cap[*] = 5
+      2 FITNESS   -> gain 0                            (condition only)
+      3 HANDLING  -> gain 1, cap[PO] = roll
+      4 PASSING   -> gain 1, cap[PA] = roll
+      5 DRIBBLING -> gain 1, cap[RM] = roll
+      6 HEADING   -> gain 1, cap[RG] = roll
+      7 TACKLING  -> gain 1, cap[EN] = roll
+      8 SHOOTING  -> gain 1, cap[TI] = roll
+      0x20 YOUTH  -> gain = 1 if rand(100) > 0x27 (60%); core4 climbs to BASE, then
+                     mode = 0 + "Your youth manager has informed you that %s is ready
+                     to be promoted to the first team squad."
+    if gain:
+        for a in the six:
+            n = live[a] + gain
+            if n <= base[a] + cap[a]: live[a] = 99 if n > 98 else n
+    condition(+0xa7) += 3 if mode == 2 else 1          (FUN_00584c60, clamps [0x28, 99])
+```
+
+**The mode codes land exactly on this screen's eight focus rows**, and the skill →
+attribute map is the one the app already had from SPEC_BINDING §3 (HANDLING→PO,
+PASSING→PA, DRIBBLING→RM, HEADING→RG, TACKLING→EN, SHOOTING→TI). That is a strong
+independent check on both.
+
+Consequences that are the ORIGINAL's, not ours:
+
+* a focused attribute climbs **a full point every week** until it is 18-24 clear of the
+  shipped rating — so a season of focus is worth ~20 points, not the old ~8;
+* **GENERAL** lifts all six, but only to base+5;
+* **SPEED / STAMINA / AGGRESSION / QUALITY are not trainable at all**. Only the youth
+  mode moves them, and only back up to the player's own shipped adult rating;
+* taking a man off training **bleeds his gains away at a point a week**, down to base
+  and no further;
+* an AI club carries no focus, so its squad holds at its shipped ratings.
+
+Ported in `app/scripts/Training.gd` (`develop_week`, with the disassembly in-file);
+`Career.advance_week` and `_roll_ai_squads` both call it. Player records now carry
+`attrs_base` (the BASE block), seeded at roster creation and lazily for legacy saves.
+Regression: **`app/tests/test_training_exact.gd`** — one assertion per clause above,
+including the `0x62` snap and the decay floor.
+
+**Stated, not invented:** whether a separate SEASON-ROLLOVER pass ages attributes is
+un-located. `FUN_005825c0` (season init) touches only morale `+0xa6`, condition
+`+0xa7/+0xa8` and the counters — no attribute drift. The app's own age-based drift is
+therefore gone from the weekly pass; `Training.trend()` survives only as the screen's
+arrow readout, and the LIGHT/NORMAL/INTENSIVE lever now only feeds the injury roll
+(the engine's pass has no intensity term).
+
+
 > **GAPS #2 AND #4 CLOSED 2026-07-24** — the per-player FOCUS tags, AUTO, the caps and
 > the CURRENT TRAINING STAFF band (name + stars + TP, TOTAL TRAINABLE = ΣTP) are now
 > witnessed live. See [`transfer_loop_live_re.md`](transfer_loop_live_re.md) §6.

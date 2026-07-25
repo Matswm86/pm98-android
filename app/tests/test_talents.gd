@@ -240,22 +240,30 @@ func _training_ceiling() -> bool:
 	var ok := true
 	var rng := RandomNumberGenerator.new()
 	rng.seed = SEED
+	# The old invented `potential` ceiling lived inside a development model that no
+	# longer exists: FUN_00582760 never touches CA on a senior at all (only the youth
+	# mode 0x20 does, and only up to his own shipped rating). So the ceiling is now
+	# enforced by the ENGINE's own rule — CA is untrainable — and that is what is
+	# asserted here.
 	var e := _entry(600921, "CAPPED KID", 1980, 7, 5, 1998)   # tier 5: peak 66, ceiling 70
 	var p := Talent.make_senior(e, rng, 1998, 1)
-	p["age"] = 18   # deep in the growth window
-	p["attrs"]["CA"] = 70   # already at his ceiling
+	p["age"] = 18
+	p["id"] = 600921
+	p["attrs"]["CA"] = 70
 	var squad := [p]
 	for _w in 200:
-		Training.train_week(rng, squad, "Intensive", 2.0)
+		Training.develop_week(rng, squad, {600921: "SHOOTING"})
 	ok = _assert(int(p["attrs"]["CA"]) == 70,
-		"ceiling holds under 200 intensive weeks (CA %d, potential 70)" % int(p["attrs"]["CA"])) and ok
-	# And a vanilla dict (no potential) still grows -- the guard is opt-in by key.
+		"CA is untrainable: 200 focused weeks leave it at 70 (got %d)" % int(p["attrs"]["CA"])) and ok
+	ok = _assert(int(p["attrs"]["TI"]) > 0, "but the focused attribute did move") and ok
+	# A vanilla dict trains the same way -- no per-player exception exists any more.
 	var v := {"id": 1, "name": "VANILLA", "age": 18, "isGK": false,
 		"attrs": {"VE": 50, "RE": 50, "AG": 50, "CA": 50, "RM": 50,
-			"RG": 50, "PA": 50, "TI": 50, "EN": 50, "PO": 25}, "dev_progress": 0.0}
+			"RG": 50, "PA": 50, "TI": 50, "EN": 50, "PO": 25}}
 	for _w in 100:
-		Training.train_week(rng, [v], "Normal")
-	ok = _assert(int(v["attrs"]["CA"]) > 50, "vanilla young player still develops") and ok
+		Training.develop_week(rng, [v], {1: "SHOOTING"})
+	ok = _assert(int(v["attrs"]["TI"]) > 50, "a vanilla record trains identically") and ok
+	ok = _assert(int(v["attrs"]["CA"]) == 50, "and its CA is equally untouched") and ok
 	return ok
 
 

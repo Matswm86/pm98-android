@@ -50,13 +50,22 @@ const RATE_OFFSIDES := 4
 const RATE_NEAR_MISSES := 6   # "Shot saved by <keeper> (Club)" + post/crossbar flavour
 
 
-static func _outfield(club: Dictionary) -> Array:
+## The outfielders a commentary line may name. `xi` (the 11 that actually took the
+## field, slot 0 = GK) is authoritative when the caller has it: the statistical engine
+## is built from the two XIs and nothing else, so nobody off the teamsheet can shoot,
+## clear, foul or be booked. Falling back to the whole squad is the legacy path for
+## callers with no XI (the watched non-career fixture); a STALE squad there is what
+## put a sold player on the feed (owner report 2026-07-24).
+static func _outfield(club: Dictionary, xi: Array = []) -> Array:
+	var src: Array = xi if not xi.is_empty() else (club.get("players", []) as Array)
 	var out: Array = []
-	for p in club.get("players", []):
-		if not p.get("isGK"):
+	for p in src:
+		if p is Dictionary and not p.get("isGK"):
 			out.append(p)
 	if out.is_empty():
-		out = club.get("players", [])
+		for p in src:
+			if p is Dictionary:
+				out.append(p)
 	return out
 
 
@@ -83,7 +92,11 @@ static func _pick(prng: MatchEngine.Pm98Rng, players: Array, codes: Array) -> Di
 	return players[players.size() - 1]
 
 
-static func _keeper(club: Dictionary) -> String:
+## The keeper a save is credited to. With an XI it is slot 0 — the man the engine put
+## in goal — never "the best PO in the squad", who may be sitting on the bench.
+static func _keeper(club: Dictionary, xi: Array = []) -> String:
+	if not xi.is_empty() and xi[0] is Dictionary:
+		return str((xi[0] as Dictionary).get("name", "the keeper"))
 	var best := ""
 	var best_po := -1
 	for p in club.get("players", []):
@@ -108,9 +121,12 @@ static func _minute(prng: MatchEngine.Pm98Rng) -> int:
 static func timeline(rng: RandomNumberGenerator, home: Dictionary, away: Dictionary) -> Dictionary:
 	var hr := MatchEngine.team_ratings(home)
 	var ar := MatchEngine.team_ratings(away)
-	var res := MatchSim.simulate(rng, hr, ar, MatchSim.xi_of(home), MatchSim.xi_of(away), \
+	var xh := MatchSim.xi_of(home)
+	var xa := MatchSim.xi_of(away)
+	var res := MatchSim.simulate(rng, hr, ar, xh, xa, \
 			int(home.get("id", 0)), int(away.get("id", 0)))
-	var out := narrate(rng, home, away, int(res["home_goals"]), int(res["away_goals"]), res.get("goals", []))
+	var out := narrate(rng, home, away, int(res["home_goals"]), int(res["away_goals"]),
+		res.get("goals", []), xh, xa)
 	out["possession"] = res.get("possession", [])   # carry the real engine split to the BRIEF bar
 	return out
 
@@ -122,10 +138,12 @@ static func timeline(rng: RandomNumberGenerator, home: Dictionary, away: Diction
 ## actually picked + the minutes it scored at; when present the GOAL lines come straight
 ## from it instead of re-rolling here, so the feed and the scoreline agree on WHO scored.
 ## Empty (legacy fallback / no XI) -> the goals are re-rolled by finishing weight as before.
-static func narrate(rng: RandomNumberGenerator, home: Dictionary, away: Dictionary, home_goals: int, away_goals: int, engine_goals: Array = []) -> Dictionary:
+## `xi_home` / `xi_away` are the ordered 11s that took the field (slot 0 = GK). Pass
+## them whenever the caller has them — they are the ONLY players the feed may name.
+static func narrate(rng: RandomNumberGenerator, home: Dictionary, away: Dictionary, home_goals: int, away_goals: int, engine_goals: Array = [], xi_home: Array = [], xi_away: Array = []) -> Dictionary:
 	var prng := MatchEngine.Pm98Rng.new(rng.randi())
-	var hp := _outfield(home)
-	var ap := _outfield(away)
+	var hp := _outfield(home, xi_home)
+	var ap := _outfield(away, xi_away)
 	var hn: String = home.get("name", "Home")
 	var an: String = away.get("name", "Away")
 	var events: Array = []   # {minute, side, text}
@@ -169,7 +187,7 @@ static func narrate(rng: RandomNumberGenerator, home: Dictionary, away: Dictiona
 	_sprinkle(prng, events, both, RATE_CORNERS, func(side, p, nm): return T_CORNER % p.get("name", "?"), ["PA"])
 
 	# Saves name the DEFENDING keeper (side flips to the goalkeeper's team).
-	var keepers := [[0, _keeper(home), hn], [1, _keeper(away), an]]
+	var keepers := [[0, _keeper(home, xi_home), hn], [1, _keeper(away, xi_away), an]]
 	for _i in RATE_NEAR_MISSES:
 		var k: Array = keepers[prng.next() % 2]
 		events.append({"minute": _minute(prng), "side": k[0], "text": T_SAVED % [k[1], k[2]]})

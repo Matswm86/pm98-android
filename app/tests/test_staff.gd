@@ -279,17 +279,22 @@ func _trainer_develops_more(prem: Array, league: Dictionary, leagues: Array) -> 
 	b.rosters[b.club_id] = a.rosters[a.club_id].duplicate(true)
 	a.training_intensity = "Normal"
 	b.training_intensity = "Normal"
+	# A coach's real effect is CAPACITY: TOTAL TRAINABLE PLAYERS = the sum of every
+	# hired skill coach's TP (witnessed live), and the engine only develops a player
+	# who is ON a coach. So the club with no trainers can focus nobody and develops
+	# nobody; the club with six 5-star coaches develops everyone AUTO puts on them.
+	a.auto_training_focus()
+	b.auto_training_focus()
 	var dev_a := 0
 	var dev_b := 0
 	var ra := RandomNumberGenerator.new(); ra.seed = SEED
 	var rb := RandomNumberGenerator.new(); rb.seed = SEED
 	for _w in 30:
-		for n in Training.train_week(ra, a.my_squad(), "Normal", Staff.training_factor(a.staff)):
-			if n["kind"] == "develop": dev_a += 1
-		for n in Training.train_week(rb, b.my_squad(), "Normal", Staff.training_factor(b.staff)):
-			if n["kind"] == "develop": dev_b += 1
-	print("    trainer dev: none=%d trainer=%d" % [dev_a, dev_b])
-	return dev_b > dev_a
+		dev_a += Training.develop_week(ra, a.my_squad(), a.training_focus).size()
+		dev_b += Training.develop_week(rb, b.my_squad(), b.training_focus).size()
+	print("    trainable: none=%d trainer=%d ; dev items none=%d trainer=%d" % [
+		Training.total_trainable(a.staff), Training.total_trainable(b.staff), dev_a, dev_b])
+	return Training.total_trainable(a.staff) == 0 and dev_a == 0 and dev_b > 0
 
 
 ## Single occupancy (frames 108-121): each of the 13 roles holds exactly ONE member; signing

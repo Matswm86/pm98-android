@@ -132,6 +132,45 @@ the searching state renders frame 047's message. Duration (`YOUTH_SEARCH_WEEKS` 
 and the find-chance (0.25 + 0.11·stars) are OUR reconstruction — the strings-decoded
 loop is the game's, the numbers are not RE'd.
 
+---
+
+## PLAYERS FOUND is now a real shortlist (2026-07-25)
+
+Owner report: *"the youth scout is the same [as the senior scout]. The players they find
+are supposed to be possible to click on to offer contract. But that youth scout result
+only appears once per season towards the end on original (or rather a set of weeks); in
+our android game it's ok to lower the amount of weeks it takes so we have 2 intakes per
+season."*
+
+He is right that there is an offer step, and MANAGER.EXE proves it: **"The youth player
+%s has rejected your offer."** (0x663be8) can only exist because the original ASKS. The
+app used to skip straight from "finished his search" to "%s has joined your Youth Team.",
+so there was nothing to click and no way to be turned down.
+
+The loop now matches the strings:
+
+1. `Career.start_youth_search(skills)` arms it and clears the last shortlist.
+2. `_tick_youth_search` resolves it into **`Career.youth_found`** — up to
+   `YOUTH_FOUND_MAX` (3) prospects, or none, with the game's own two messages (both also
+   queued as hub alerts). Nobody joins on his own any more.
+3. `YouthScreen` draws `youth_found` in the frame-measured `pf_interior`
+   `[326, 102, 302, 117]` and a row tap emits `prospect_pressed(pid)`.
+4. `Career.sign_youth_prospect(pid, rng)` signs him — *"%s has joined your Youth Team."* —
+   or he refuses — *"The youth player %s has rejected your offer."* Either way he leaves
+   the shortlist. Refusal odds rise with his hidden potential and fall with the YOUTH
+   MANAGER's pull (OURS; the original's are database-driven).
+
+**Cadence.** `YOUTH_SEARCH_WEEKS` 2 → **19**. The original delivers its intake once a
+season, late on; 38 league rounds ÷ 19 gives the owner's requested TWO intakes per season
+and no more (`test_youth_prospects` asserts both bounds).
+
+**Still a reconstruction:** the panel's FILLED look. No frame we hold shows it, so the row
+grammar (name · age · ability · 1-5 potential pips, 16px pitch) is the app's own, kept
+plain and inside the measured interior. Render check `app/tests/shot_youth_found.gd`
+(also asserts every row hit-tests back to itself); regression `test_youth_prospects.gd`.
+
+---
+
 **Honest gaps (do NOT invent)**: filled roster-row rendering (rows witnessed EMPTY —
 values render in the game faces under the baked headers; WAGE/YEARS stay blank, youth
 contracts un-modelled); the filled PLAYERS FOUND list; frame 047's "3 PLAYERS" over an

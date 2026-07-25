@@ -27,6 +27,41 @@ Wine `screenshots/wine-captures-2026-07-18-goalscorers/` (Bolton, week 3):
 | 46_offers_club.png | first kit tapped: gold OVER cell at (12,366); strip CLEARS + enlarged flag reverts; "F.C. Barcelona" title + 14 rows; club name label under the kit grid (ink y450..457, the preseason last-pick ink 120,120,160) |
 | 47_offers_player.png | Rivaldo row → the MakeOfferScreen card (attrs top + OFFER panel) over the LUT-dimmed screen |
 
+## The ">= 16 clubs" rule was a hover artefact — CORRECTED 2026-07-25
+
+The owner reported that "a LOT of nations do nothing when I click them" on the OFFERS
+map. He was right, and the cause was ours.
+
+Two frames were read as click-negatives: walkthrough **015_154401** (strip "HUNGARY",
+panel still ENGLAND) and **119_164747** (strip "MACEDONIA", panel still England /
+Blackpool). Both are the **country strip's HOVER readout**, not a click — frame
+**016_154403**, two seconds later with no further input, shows the strip already
+cleared and the panel still on ENGLAND. Nothing was ever clicked in either frame.
+
+A live sweep settles it. Real MANAGER.EXE under wine, fresh TOTAL Manager-League
+career (Bolton W), preseason map: **all 47 European flags and all 10 S.American
+flags clicked, with the ENGLAND flag re-tapped between each**. The kit panel
+switched every time. Frames in
+`screenshots/wine-captures-2026-07-25-offers-map-countries/`, each verified by the
+country name the panel itself prints:
+
+| frame | country | clubs in EQUIPOS | panel |
+|---|---|---|---|
+| 01 | MACEDONIA | 1 (Sileks) | switches, one kit |
+| 02 | HUNGARY | 5 | switches, five kits |
+| 03 | FINLAND | 3 | switches, three kits |
+| 04 | LITHUANIA | 3 | switches, three kits |
+| 05 | SWEDEN | 5 | switches, five kits |
+| 06 | BOLIVIA (S.AM) | 3 | switches, three kits |
+| 07 | BRAZIL (S.AM) | 10 | switches, ten kits |
+
+MACEDONIA — the single-club country the old rule was built to exclude — loads exactly
+like SPAIN's twenty. Any minimum-club threshold is therefore dead, not merely
+mis-tuned. `OffersScreen` now opens a country iff GameDB holds any club for it (56 of
+the 57 flagged countries; the 57th is ENGLAND, which routes through the division
+buttons). Regression: `test_offers_screen` drives `_route_target("flag:<NAME>")` for
+every marker and fails on any that does not load its full club list.
+
 ## The left column is the PRESEASON chrome
 
 Map (27,80 300x220), EUROPE/S.AMERICA side tabs, country strip, kit panel
@@ -36,13 +71,10 @@ fallback, own-club checker wash: ALL identical pixels (match ratio 1.000 on
 map/tabs/strip vs app/art/screens/pretemp/chrome.png). PreseasonScreen's
 machinery is the reference implementation.
 
-* Flag tap: strip name + enlarged flag ALWAYS; the kit panel switches ONLY for
-  a BROWSABLE country. Witness set: Spain (21 db clubs) switches (45);
-  Macedonia (1 club — Sileks) does NOT (119); preseason frame 015 shows
-  Hungary (5 clubs) not switching either. Adopted rule: browsable iff the
-  country's club list holds a full league (>= 16 clubs: Spain/Argentina/
-  France/Italy/Germany/Portugal/Holland) — fitted to all three witnesses, the
-  original's exact list un-RE'd.
+* Flag tap: strip name + enlarged flag, AND the kit panel switches to that
+  country's clubs. **EVERY country is browsable — there is no minimum-club
+  gate.** (Corrected 2026-07-25; see "The ">= 16 clubs" rule was a hover
+  artefact" below.)
 * The enlarged flag plaque: witness-cut sprite per seen code
   (`flag_big/22.png`, Spain 45 — the BANDERAS bank art differs by a few
   interior pixels from the wine render); border+flag(code) fallback otherwise.

@@ -95,13 +95,30 @@ func _run() -> void:
 		+ int(a.get("CA", 0))) / 4.0)
 	ok = _assert(av == 48, "Preece AV 48 = floor(sum4/4) (witnessed)") and ok
 
-	# ---- browsable-country rule (Spain 21 yes / Macedonia 1 no / Hungary 5 no)
-	ok = _assert(gamedb.clubs_in_country("SPAIN").size() >= OffersScreen.BROWSABLE_MIN,
-		"SPAIN browsable (witness 45)") and ok
-	ok = _assert(gamedb.clubs_in_country("MACEDONIA").size() < OffersScreen.BROWSABLE_MIN,
-		"MACEDONIA not browsable (witness 119)") and ok
-	ok = _assert(gamedb.clubs_in_country("HUNGARY").size() < OffersScreen.BROWSABLE_MIN,
-		"HUNGARY not browsable (preseason 015 witness)") and ok
+	# ---- every country is browsable ---------------------------------------
+	# Corrected 2026-07-25 against the live game: the old ">= 16 clubs" gate was
+	# fitted to two HOVER frames and is gone. A flag tap must load that country's
+	# clubs however few it has — MACEDONIA ships exactly one (Sileks) and the real
+	# game shows it (wine-captures-2026-07-25-offers-map-countries/01).
+	scr.setup(gamedb.leagues, gamedb.clubs_in_league,
+		func(nm: String) -> Array: return gamedb.clubs_in_country(nm),
+		0, 82, {}, "Bolton W")
+	var dead: Array = []
+	for m in scr._markers + scr._markers_sa:
+		var nm := str(m["name"])
+		var have: int = (gamedb.clubs_in_country(nm) as Array).size()
+		if have == 0 or nm == "ENGLAND":
+			continue
+		scr._tab = 0 if scr._markers.has(m) else 1
+		scr._country = "ENGLAND"
+		scr._press = "flag:%s" % nm
+		scr._route_target("flag:%s" % nm)
+		if scr._country != nm or scr._country_clubs.size() != have:
+			dead.append("%s(%d)" % [nm, have])
+	ok = _assert(dead.is_empty(), "every flagged country with clubs opens (dead: %s)"
+		% ", ".join(dead)) and ok
+	scr._country = "ENGLAND"
+	scr._country_clubs = []
 
 	# ---- kit grid maths ----------------------------------------------------
 	scr._country_clubs = []

@@ -133,11 +133,19 @@ var _press: String = ""        # action currently held down (for the highlight)
 # (witnessed in the options capture). Slide duration is an approximation (the
 # capture poll can't time it); TRANSITIONS OFF makes it instant.
 const DROP_H := 41.0
-const R_DROP_MON := Rect2(534, 6, 33, 32)   # monitor icon (frame-measured)
-const R_DROP_HP := Rect2(592, 6, 30, 30)    # headphones icon
-# Tapping the top edge reveals the bar (the original slides it down on top-edge hover;
-# the top band carries no active hub controls, verified — all ICON/BAR hits are y>=70).
-const R_DROP_TRIGGER := Rect2(0, 0, W, 20)
+const R_DROP_MON := Rect2(534, 6, 33, 32)   # monitor icon (bar-local, frame-measured)
+const R_DROP_HP := Rect2(592, 6, 30, 30)    # headphones icon (bar-local)
+# ANDROID TOUCH ADAPTATION (owner-reported, 2026-07-24): on a phone the very top edge of
+# the screen belongs to the system notification shade, so both the reveal tap AND the
+# bar's own icons were being swallowed by it. The bar therefore RESTS this far below the
+# top edge instead of flush against it, and the reveal band sits below the shade zone.
+# At the worst-case 4:3 pillarbox on a 1080-tall phone the scale is 2.25, so design y36
+# is ~81 real px and y48+6 (the monitor icon top) is ~121 px — clear of the 24dp inset.
+# Nothing about the bar's own art or its icon geometry changes; only where it is parked.
+const TOUCH_DROP_Y := 48.0
+# Tapping this band reveals the bar (the original slides it down on top-edge hover; the
+# top band carries no active hub controls, verified — all ICON/BAR hits are y>=70).
+const R_DROP_TRIGGER := Rect2(0, 36, W, 32)
 var _drop_tex: Texture2D
 var _drop_open := false
 var _drop_anim := 0.0            # 0 = hidden, 1 = fully down
@@ -278,11 +286,12 @@ func _close_drop() -> void:
 ## Which dropdown target a design-space point hits when the bar is open:
 ## "mon" (MATCH OPTIONS) / "hp" (audio OPTIONS) / "bar" (dead bar area) / "" (outside).
 func _drop_hit(d: Vector2) -> String:
-	if R_DROP_MON.has_point(d):
+	var b := d - Vector2(0, TOUCH_DROP_Y)   # bar-local (the bar parks at TOUCH_DROP_Y)
+	if R_DROP_MON.has_point(b):
 		return "mon"
-	if R_DROP_HP.has_point(d):
+	if R_DROP_HP.has_point(b):
 		return "hp"
-	if d.y <= DROP_H:
+	if b.y >= 0.0 and b.y <= DROP_H:
 		return "bar"
 	return ""
 
@@ -515,10 +524,14 @@ func _draw() -> void:
 ## faint edge hint marks the pull zone (the original reveals on top-edge hover).
 func _draw_dropdown() -> void:
 	if _drop_anim <= 0.001:
-		draw_rect(Rect2(0, 0, W, 3), Color(0.45, 0.55, 0.85, 0.30), true)
+		# Closed: the pull hint marks the REVEAL BAND, not the screen edge, so the
+		# thumb lands where the tap is actually read (see TOUCH_DROP_Y).
+		draw_rect(Rect2(R_DROP_TRIGGER.position.x, R_DROP_TRIGGER.end.y - 3,
+			R_DROP_TRIGGER.size.x, 3), Color(0.45, 0.55, 0.85, 0.30), true)
 		return
 	draw_rect(Rect2(0, 0, W, H), Color(0.02, 0.03, 0.07, 0.45 * _drop_anim), true)
-	var y := -DROP_H * (1.0 - _drop_anim)
+	# The bar slides from behind the top edge down to its parked TOUCH_DROP_Y.
+	var y := TOUCH_DROP_Y - (TOUCH_DROP_Y + DROP_H) * (1.0 - _drop_anim)
 	if _drop_tex != null:
 		draw_texture(_drop_tex, Vector2(0, y))
 	else:

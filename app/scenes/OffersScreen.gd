@@ -24,13 +24,20 @@ class_name OffersScreen
 ## make-offer card (witness 47 = MakeOfferScreen; Main routes the buy through
 ## sign_player for own-division clubs, sign_external otherwise).
 ##
-## MODEL RULES (documented, fitted to witness): a country is BROWSABLE iff its
-## club list holds a full league (>= 16 clubs — Spain 21 switches, Macedonia 1
-## and preseason-Hungary 5 do not); the browse shows the static GameDB squads
-## (the app's living league covers only the manager's division; buys route
-## through the live roster where one exists). Star rating mapping un-RE'd
-## (parity-excluded, FICHA precedent). First/Third Division SELECTED faces are
-## synthesized (un-witnessed).
+## EVERY COUNTRY IS BROWSABLE — corrected 2026-07-25 against the real game. The old
+## ">= 16 clubs" rule came from two frames (walkthrough 015 HUNGARY, 119 MACEDONIA)
+## where the strip named a country but the kit panel stayed on England. Those frames
+## are a HOVER readout, not a click: 016 (2 s later, no further input) shows the strip
+## already cleared and the panel still England. A live sweep of the real MANAGER.EXE
+## preseason map — all 47 European flags plus all 10 S.American ones, ENGLAND re-tapped
+## between each — switched the panel EVERY time, MACEDONIA's one club included
+## (screenshots/wine-captures-2026-07-25-offers-map-countries/). The gate is deleted;
+## a country is browsable iff GameDB holds any club for it.
+##
+## MODEL RULES: the browse shows the static GameDB squads (the app's living league
+## covers only the manager's division; buys route through the live roster where one
+## exists). Star rating mapping un-RE'd (parity-excluded, FICHA precedent).
+## First/Third Division SELECTED faces are synthesized (un-witnessed).
 
 signal back_pressed
 signal player_pressed(player: Dictionary, club: Dictionary)
@@ -50,7 +57,6 @@ const KIT_Y := [368, 405]
 const C_TITLE_BLUE := Color8(0, 0, 160)
 const C_PRESS := Color(1, 1, 1, 0.2)
 const C_LAST_PICK := Color8(120, 120, 160)
-const BROWSABLE_MIN := 16      # full-league threshold (offers_map_re.md)
 
 # ---- right panel -----------------------------------------------------------
 const LIST_TITLE_CX := 485.0
@@ -355,6 +361,12 @@ func _on_input(e: InputEvent) -> void:
 	queue_redraw()
 	if was == "" or was != _target_at(d):
 		return
+	_route_target(was)
+
+
+## Act on a confirmed tap target ("flag:NAME" / "kit:N" / "row:N" / "div:N" / ...).
+## Split out of _on_input so the headless tests can drive the same routing.
+func _route_target(was: String) -> void:
 	match was:
 		"return":
 			back_pressed.emit()
@@ -381,8 +393,11 @@ func _on_input(e: InputEvent) -> void:
 		queue_redraw()
 	elif was.begins_with("flag:"):
 		var nm := was.substr(5)
-		# strip name + enlarged flag ALWAYS (119); the kit panel switches only
-		# for a browsable country (45 Spain yes / 119 Macedonia no)
+		# Strip name + enlarged flag, and the kit panel switches to that country's
+		# clubs. EVERY country switches — there is NO minimum-club gate (live sweep
+		# 2026-07-25, all 47 European + 10 S.American flags clicked on a real
+		# MANAGER.EXE preseason map; MACEDONIA's single club loads exactly like
+		# SPAIN's twenty). See the class doc for how the old ">= 16" rule arose.
 		_strip_country = nm
 		for m in (_markers if _tab == 0 else _markers_sa):
 			if str(m["name"]) == nm:
@@ -392,7 +407,7 @@ func _on_input(e: InputEvent) -> void:
 			_select_england()
 		else:
 			var cc: Array = _clubs_of_country.call(nm) if _clubs_of_country.is_valid() else []
-			if cc.size() >= BROWSABLE_MIN:
+			if not cc.is_empty():
 				_country = nm
 				cc.sort_custom(func(a, b): return str(a.get("name", "")) < str(b.get("name", "")))
 				_country_clubs = cc

@@ -560,8 +560,12 @@ enum { CADENCE_PERIOD, CADENCE_MATCH }
 ## `cadence` picks WHEN the commit runs -- see the CADENCE_* block above. The default
 ## reproduces the statistical branch this file ports; CADENCE_MATCH reproduces the
 ## presented branch's measured whole-match record.
+## `rep_ht`, when given under CADENCE_MATCH, receives a NON-ZEROING snapshot of the
+## running per-player totals at the half transition — the half-time board's own
+## STATISTICS table (Pm98StatStore.snapshot; the live sheets show it as a strict prefix
+## of the full-time one). It never touches the accumulation the end-of-match commit reads.
 static func simulate(mem: Mem, rng: Rng, run_et := false, run_pen := false,
-		rep = null, pids := {}, cadence := CADENCE_PERIOD) -> void:
+		rep = null, pids := {}, cadence := CADENCE_PERIOD, rep_ht = null) -> void:
 	var per_period: bool = rep != null and cadence == CADENCE_PERIOD
 	# first half (segment 0): buildup minutes rand%45 + 1
 	_buildup(mem, rng, 0x2d, 1)
@@ -570,6 +574,8 @@ static func simulate(mem: Mem, rng: Rng, run_et := false, run_pen := false,
 	# FUN_0044d0d0 half transition -- no rand, no event; commits the H1 stats
 	if per_period:
 		Pm98StatStore.commit(mem, rep, pids)
+	elif rep_ht != null:
+		Pm98StatStore.snapshot(mem, rep_ht, pids)
 	# second half (segment 1): buildup minutes rand%45 + 46
 	_buildup(mem, rng, 0x2d, 0x2e)
 	_half_chances(mem, rng, 1, 0x2d)

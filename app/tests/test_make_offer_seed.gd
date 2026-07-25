@@ -7,6 +7,10 @@ extends SceneTree
 ##   * COLD APPROACH (OFFERS map browse, nobody has listed him) — frame
 ##     `101_164714.png`: Scott Taylor, CLUB FEE £3,000,000 and the panel opens at the
 ##     FLOOR, CLUB OFFER £5,000 / YEARLY WAGE £5,000 / YEARS 1, no clause ticked.
+##     ANDROID DEVIATION (owner decision 2026-07-24): the CLUB OFFER of this state is
+##     seeded at the CLUB FEE instead, because the £5,000/£10,000/£25,000 stepper costs
+##     ~640 taps to reach a £16M asking price. Everything else about the state is the
+##     original's — wage at the floor, YEARS 1, no clause.
 ##   * PLACED ON TRANSFER MARKET (the TRANSFERS list) — wine `35_make_offer.png`:
 ##     Almeyda, CLUB FEE £8,500,000 and the panel opens pre-filled at CLUB OFFER
 ##     **£8,500,000**, YEARLY WAGE £575,000, YEARS 1, "Free if relegated" ticked.
@@ -27,13 +31,21 @@ func _run() -> void:
 	var taylor := {"id": 1, "name": "TAYLOR", "pos": "FW", "attrs": {}}
 	var club := {"id": 2, "name": "Blackpool"}
 
-	# --- cold approach: the frame-101 floor ----------------------------------
+	# --- cold approach: fee-seeded offer, everything else the frame-101 rest ---
 	card.setup(taylor, club, 3_000_000, 50_000_000)
-	ok = _assert(card._offer == MakeOfferScreen.FLOOR,
-		"cold approach opens at the £5,000 floor (frame 101)") and ok
-	ok = _assert(card._wage_yearly == MakeOfferScreen.FLOOR, "wage at the floor too") and ok
+	ok = _assert(card._offer == 3_000_000,
+		"cold approach opens AT the club fee (got £%d)" % card._offer) and ok
+	ok = _assert(card._wage_yearly == MakeOfferScreen.FLOOR, "wage still at the floor") and ok
 	ok = _assert(card._years == MakeOfferScreen.YEARS_MIN, "YEARS 1") and ok
 	ok = _assert(card.checked_clauses().is_empty(), "no clause ticked") and ok
+	# A £16M cold approach — the owner's own example — must not open at £5,000.
+	var ronaldo := {"id": 9, "name": "RONALDO", "pos": "FW", "attrs": {}}
+	card.setup(ronaldo, club, 16_000_000, 50_000_000)
+	ok = _assert(card._offer == 16_000_000,
+		"a £16,000,000 cold approach opens at £16,000,000 (got £%d)" % card._offer) and ok
+	# A fee UNDER the floor still clamps up to the floor.
+	card.setup(taylor, club, 1_000, 50_000_000)
+	ok = _assert(card._offer == MakeOfferScreen.FLOOR, "a sub-floor fee clamps up") and ok
 
 	# --- a listed player: the seller's own asking terms ----------------------
 	var almeyda := {"id": 3, "name": "ALMEYDA", "pos": "MF", "attrs": {}}

@@ -107,6 +107,8 @@ var training_intensity: String = Training.DEFAULT_INTENSITY   # Light/Normal/Int
 var youth: Array = []                   # the youth team: scouted youngsters (Youth.gd)
 var youth_seq: int = YOUTH_ID_BASE      # monotonic id minter for youth (above senior ids)
 var youth_search: Dictionary = {}       # running scout search {skills:Array, weeks:int}; {} = idle
+var youth_found: Array = []             # finished search's prospects, awaiting a contract offer
+                                        # (the PLAYERS FOUND panel; they are NOT in `youth` yet)
 var scout_search: Dictionary = {}       # SENIOR scout search {criteria:Dictionary, due_week:int};
                                         # {} = idle (SCOUT screen, docs/re/scout_screen_re.md)
 var scout_results: Array = []           # last finished search's rows (persist until a new search)
@@ -244,7 +246,11 @@ const YOUTH_SEED_COUNT := 0             # a career starts with an EMPTY youth li
                                         # scouts the first crop in
 const YOUTH_INTAKE_LO := 1             # a season's fresh intake (scout's haul) ...
 const YOUTH_INTAKE_HI := 3             # ... is this many youngsters
-const YOUTH_SEARCH_WEEKS := 2          # a scout search reports back after this many weeks
+# A youth search reports back after this many weeks. The ORIGINAL delivers its youth
+# intake once a season, late on (a set of weeks). The owner's Android call (2026-07-24)
+# is to halve that so a season carries TWO intakes: 38 league rounds / 2 = 19.
+const YOUTH_SEARCH_WEEKS := 19
+const YOUTH_FOUND_MAX := 3             # most prospects one search can shortlist
 const WONDERKID_MAX_YEAR := 3          # the guaranteed gem is scouted within a career's first 3 seasons
 
 # Backroom staff: candidates are minted from their own id base; a new career starts with no
@@ -324,6 +330,8 @@ func _init_club(club: Dictionary, league: Dictionary, league_clubs: Array, leagu
 	ground_grades = {}
 	scout_search = {}
 	scout_results = []
+	youth_search = {}
+	youth_found = []
 	pending_alerts = []
 	training_focus = {}
 	external_signed = {}
@@ -434,6 +442,12 @@ func _seed_squad(club_dict: Dictionary) -> Array:
 		dup["suspended_weeks"] = 0
 		dup["yellows"] = 0
 		dup["dev_progress"] = 0.0      # development carry-over (Training.gd)
+		# The engine's BASE attribute block (+0xaa..+0xb3): the shipped EQUIPOS rating,
+		# written once at load and never again. Training moves the LIVE block relative
+		# to it, and taking a man off training bleeds him back down to it.
+		var seed_attrs: Variant = dup.get("attrs", {})
+		if seed_attrs is Dictionary:
+			dup["attrs_base"] = (seed_attrs as Dictionary).duplicate()
 		Contract.stamp_wage(dup, band)  # his contracted weekly wage (Contract.gd)
 		dup["auto_renew"] = false      # opt-in: auto-renew an expiring deal at rollover
 		dup["morale"] = 90 + form_rng.randi_range(0, 9)
@@ -591,6 +605,8 @@ func play_friendly(rng: RandomNumberGenerator, rival: Dictionary) -> Dictionary:
 		"away_id": a, "hg": int(res["home_goals"]), "ag": int(res["away_goals"])})
 	return {"home_id": h, "away_id": a, "hg": int(res["home_goals"]),
 		"ag": int(res["away_goals"]), "manager_home": at_home, "motm_pid": mom,
+		"xi_home": my_xi if at_home else rv_xi, "xi_away": rv_xi if at_home else my_xi,
+		"report": res.get("report"), "report_ht": res.get("report_ht"),
 		"goals": res.get("goals", []), "possession": res.get("possession", []), "friendly": true}
 
 
@@ -693,6 +709,12 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 				"goals": res.get("goals", []),
 				# FUN_0044a370's pick, named on the FULL TIME read-out's MAN OF THE MATCH band
 				"motm_pid": mom,
+				# The 22 players that actually took the field. The stat engine only ever
+				# knew these (build_mem takes the two XIs), so the BRIEF feed must name
+				# them and nobody else — the owner's "I sold Pallister and he still picks
+				# up yellow cards" was the feed reading the frozen 1997 GameDB squad.
+				"xi_home": xi_of_id.call(h), "xi_away": xi_of_id.call(a),
+				"report": res.get("report"), "report_ht": res.get("report_ht"),
 					"possession": res.get("possession", [])}   # scorers + real engine possession for the feed (not persisted)
 	# Morale & fitness live through the round (docs/re/morale_re.md): the slot
 	# deltas + the result delta hit BOTH sides of every fixture, then the league
@@ -754,14 +776,12 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 		var inj_mult := Training.injury_multiplier(training_intensity) * Staff.physio_factor(staff)
 		for n in Availability.roll_match(rng, featured, inj_mult):
 			_news(n["kind"], n["text"])
-	# Player development for the training week just completed -- a TRAINER on the staff
-	# speeds it up (training_factor >= 1.0).
-	for n in Training.train_week(rng, my_squad(), training_intensity, Staff.training_factor(staff)):
-		_news(n["kind"], n["text"])
-	# The TRAINING screen's per-player FOCUS: everyone assigned to a skill this week
-	# trains it under his coach (the tagged rows on the grid). Un-assigned players get
-	# the passive development above and nothing more.
-	for n in Training.train_focus_week(rng, my_squad(), training_focus, staff):
+	# The weekly development pass, byte-exact from FUN_00582760 (see Training.gd):
+	# a player carrying a TRAINING-screen focus climbs that attribute a POINT A WEEK
+	# until he is 18-24 clear of his shipped rating (GENERAL: all six, +5); a player
+	# with no focus bleeds any gains back at a point a week. The original walks every
+	# club's squad here, so the rivals get the same pass below (_roll_ai_squads).
+	for n in Training.develop_week(rng, my_squad(), training_focus):
 		_news(n["kind"], n["text"])
 	# The youth team develops on its own track (a YOUTH COACH speeds it); a youngster
 	# crossing the readiness line is reported so you know to look at the YOUTH TEAM screen.
@@ -1039,7 +1059,11 @@ func _roll_ai_squads(rng: RandomNumberGenerator, ai_featured: Dictionary) -> voi
 					var with_diag := " with a %s" % diag if diag != "" else ""
 					_news("injury", "%s's %s is out injured for %d weeks%s." % [
 						club_names.get(int(cid), "?"), p.get("name", "?"), now, with_diag])
-		Training.train_week(rng, squad, Training.DEFAULT_INTENSITY)
+		# The original runs the SAME weekly pass over every club's squad (FUN_0057b400
+		# walks club+0x24 and calls FUN_00582760 per player). An AI side carries no
+		# TRAINING-screen focus, so the pass is pure decay for them — they hold at their
+		# shipped ratings. That is the engine's behaviour, not a simplification.
+		Training.develop_week(rng, squad)
 
 
 # ---- live squad access ---------------------------------------------------
@@ -1904,11 +1928,14 @@ func cycle_training() -> void:
 func start_youth_search(skills: Array) -> void:
 	if youth_search.is_empty() and not Staff.member_in_role(staff, Staff.YOUTH_TEAM_SCOUT).is_empty():
 		youth_search = {"skills": skills.duplicate(), "weeks": YOUTH_SEARCH_WEEKS}
+		youth_found = []      # arming a new search clears the last one's shortlist
 		_news("youth", "The scout is now searching for players with selected capabilities.")
 
-## Weekly tick of a running scout search. On completion the scout either brings a
-## youngster into the youth setup (room permitting; better scouts find more often)
-## or reports back empty-handed — both with the original's news strings.
+## Weekly tick of a running scout search. On completion the scout comes back with a
+## SHORTLIST — the PLAYERS FOUND panel — or empty-handed. A found youngster does NOT
+## join by himself: you offer him a contract from the panel, and he can turn it down
+## ("The youth player %s has rejected your offer.", MANAGER.EXE 0x663be8 — the string
+## only makes sense if there is an offer step, which the app used to skip).
 func _tick_youth_search(rng: RandomNumberGenerator) -> void:
 	if youth_search.is_empty():
 		return
@@ -1918,15 +1945,54 @@ func _tick_youth_search(rng: RandomNumberGenerator) -> void:
 	youth_search = {}
 	var scout := Staff.member_in_role(staff, Staff.YOUTH_TEAM_SCOUT)
 	var stars := float(scout.get("stars", 0.0))
-	var room := Youth.SQUAD_CAP - youth.size()
-	if room > 0 and rng.randf() < 0.25 + 0.11 * stars:
-		for p in Youth.intake(rng, 1, youth_seq, Staff.youth_factor(staff)):
-			youth.append(p)
-			_news("youth", "The youth team scout has finished his search.")
-			_news("youth", "%s has joined your Youth Team." % p.get("name", "?"))
-		youth_seq += 1
+	# A better scout comes back with a longer shortlist. Yield is OURS (the original's
+	# numbers are database-driven, docs/re/youth_re.md); the loop and every string are
+	# the game's.
+	var n := 0
+	for _i in YOUTH_FOUND_MAX:
+		if rng.randf() < 0.25 + 0.11 * stars:
+			n += 1
+	if n > 0:
+		youth_found = Youth.intake(rng, n, youth_seq, Staff.youth_factor(staff))
+		youth_seq += n
+		_news("youth", "The youth team scout has finished his search.")
+		pending_alerts.append("The youth team scout has finished his search.")
 	else:
-		_news("youth", "The youth team scout has finished his search and hasn't found any players.")
+		_news("youth", "The youth team scout has finished his search and hasn't found\na player with the required qualities.")
+		pending_alerts.append("The youth team scout has finished his search and hasn't found\na player with the required qualities.")
+
+
+## Offer a contract to one of the scout's finds (a PLAYERS FOUND row tap). He joins the
+## youth setup, or refuses — the two outcomes the MANAGER.EXE strings describe. A raw
+## prospect with a big ceiling is the likeliest to say no. {ok, msg}.
+func sign_youth_prospect(pid: int, rng: RandomNumberGenerator = null) -> Dictionary:
+	var idx := -1
+	for i in youth_found.size():
+		if int((youth_found[i] as Dictionary).get("id", -2)) == pid:
+			idx = i
+			break
+	if idx == -1:
+		return {"ok": false, "msg": "That youngster is no longer available."}
+	var p: Dictionary = youth_found[idx]
+	var nm := str(p.get("name", "?"))
+	if youth.size() >= Youth.SQUAD_CAP:
+		return {"ok": false, "msg": "Your Youth Team is full (%d)." % Youth.SQUAD_CAP}
+	if rng == null:
+		rng = RandomNumberGenerator.new()
+		rng.randomize()
+	# Refusal chance rises with his potential and falls with the YOUTH MANAGER's pull.
+	var pot := float(Youth.potential_of(p))
+	var pull := Staff.youth_factor(staff)
+	var refuse := clampf((pot - 55.0) / 120.0 / maxf(0.5, pull), 0.0, 0.45)
+	if rng.randf() < refuse:
+		youth_found.remove_at(idx)
+		_news("youth", "The youth player %s has rejected your offer." % nm)
+		return {"ok": false, "msg": "The youth player %s has rejected your offer." % nm}
+	youth_found.remove_at(idx)
+	youth.append(p)
+	_news("youth", "%s has joined your Youth Team." % nm)
+	_log("%s has joined your Youth Team." % nm)
+	return {"ok": true, "msg": "%s has joined your Youth Team." % nm}
 
 
 # ---- the SENIOR scout search (SCOUT screen, docs/re/scout_screen_re.md) ----
@@ -3524,6 +3590,8 @@ func play_charity_shield_match(rng: RandomNumberGenerator, opp_view: Dictionary)
 			str(club_names[winner]), str(club_names[loser]), pens])
 	return {"home_id": h, "away_id": a, "hg": hg, "ag": ag,
 		"manager_home": at_home, "goals": res.get("goals", []), "motm_pid": mom,
+		"xi_home": my_xi if at_home else opp_xi, "xi_away": opp_xi if at_home else my_xi,
+		"report": res.get("report"), "report_ht": res.get("report_ht"),
 		"possession": res.get("possession", []), "friendly": true, "charity": true}
 
 
@@ -3792,9 +3860,23 @@ func _tick_works() -> void:
 		_recompute_weekly_net()
 
 
+# The original's own completion messages, verbatim from MANAGER.EXE's message-pointer
+# table at 0x662cec..0x662cf8 (one entry per GROUND category, in this order). They are
+# raised as the modal "PREMIER MANAGER 98" box on the hub, like every other queued
+# career alert — the owner-reported "no text box when ground works are complete".
+# Note the capacity line reads "OF your stadium", the other three "AT your stadium".
+const WORKS_DONE_MSG := {
+	"seats": "The works to increase the capacity\nof your stadium has finished.",     # 0x6639d8
+	"carpark": "The works to improve the parking\nat your stadium has finished.",      # 0x663998
+	"facility": "The works to improve the facilities\nat your stadium has finished.",  # 0x663954
+	"service": "The works to extend the services\nat your stadium has finished.",      # 0x663914
+}
+
+
 func _complete_work(w: Dictionary) -> void:
 	var eff: Dictionary = w.get("effect", {})
-	match str(w.get("cat")):
+	var cat := str(w.get("cat"))
+	match cat:
 		"seats":
 			stadium_capacity = mini(MAX_STADIUM, stadium_capacity + int(eff.get("added", 0)))
 			_news("stadium", "Ground expansion complete: capacity now %s." % _grp(stadium_capacity))
@@ -3804,8 +3886,10 @@ func _complete_work(w: Dictionary) -> void:
 				car_park_levels[q] = mini(CAR_PARK_MAX_LEVEL, int(car_park_levels[q]) + 1)
 			_news("stadium", "Car park works complete: %s." % w.get("label", ""))
 		_:  # facility / service
-			ground_grades["%s:%d" % [str(w.get("cat")), int(w.get("key", 0))]] = int(eff.get("grade", 1))
+			ground_grades["%s:%d" % [cat, int(w.get("key", 0))]] = int(eff.get("grade", 1))
 			_news("stadium", "%s works complete." % w.get("label", ""))
+	if WORKS_DONE_MSG.has(cat):
+		pending_alerts.append(str(WORKS_DONE_MSG[cat]))
 
 
 # ---- GROUND improvement accessors (StadiumScreen + the WIP ledger) --------
@@ -3985,7 +4069,7 @@ func to_dict() -> Dictionary:
 		"offers_left": offers_left, "news_log": news_log,
 		"training_intensity": training_intensity, "training_focus": _str_keyed(training_focus),
 		"youth": youth,
-		"youth_seq": youth_seq, "youth_search": youth_search,
+		"youth_seq": youth_seq, "youth_search": youth_search, "youth_found": youth_found,
 		"scout_search": scout_search, "scout_results": scout_results,
 		"pending_alerts": pending_alerts, "external_signed": _str_keyed(external_signed),
 		"pending_bids": pending_bids,
@@ -4143,6 +4227,7 @@ static func from_dict(d: Dictionary) -> Career:
 	c.youth = d.get("youth", [])
 	c.youth_seq = int(d.get("youth_seq", YOUTH_ID_BASE))
 	c.youth_search = d.get("youth_search", {})
+	c.youth_found = d.get("youth_found", [])
 	# Pre-SCOUT-screen saves load idle with no results (inert until a search).
 	c.scout_search = d.get("scout_search", {})
 	c.scout_results = d.get("scout_results", [])

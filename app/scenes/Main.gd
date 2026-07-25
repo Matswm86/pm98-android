@@ -1990,13 +1990,19 @@ func _career_advance() -> void:
 ## the source-true FULL TIME read-out (MatchResultScreen; docs/re/match_flow_re.md). The BRIEF
 ## feed stays honest (kept). RETURN/CONTINUE refresh + raise the hub.
 func _show_match_result(res: Dictionary, on_finish: Callable = Callable()) -> void:
-	var home := GameDB.club(int(res["home_id"]))
-	var away := GameDB.club(int(res["away_id"]))
+	# LIVE rosters, not the frozen GameDB squads: a player sold in week 3 must not turn
+	# up on the week-4 BRIEF feed (owner report 2026-07-24). `_club_with_roster` is the
+	# same view the pre-match LINE-UPS roll and every squad screen already use.
+	var home := _club_with_roster(int(res["home_id"]))
+	var away := _club_with_roster(int(res["away_id"]))
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
 	# Narrate the EXACT stored scoreline so feed and table agree; the stat engine's own
-	# scorers ride along in res["goals"] (empty -> narrate re-rolls by finishing weight).
-	var m := MatchCommentary.narrate(rng, home, away, int(res["hg"]), int(res["ag"]), res.get("goals", []))
+	# scorers ride along in res["goals"] (empty -> narrate re-rolls by finishing weight),
+	# and res["xi_home"/"xi_away"] are the 22 that actually played — the only players the
+	# feed may name.
+	var m := MatchCommentary.narrate(rng, home, away, int(res["hg"]), int(res["ag"]),
+		res.get("goals", []), res.get("xi_home", []), res.get("xi_away", []))
 	var verdict := _result_word(int(res["hg"]), int(res["ag"]), bool(res["manager_home"]))
 	# The RESULT read-out data: fixture-mode barra (the two clubs that JUST played — note the
 	# date + phase chip are corrected for the played match below) + the real goal vector +
@@ -2031,6 +2037,11 @@ func _show_match_result(res: Dictionary, on_finish: Callable = Callable()) -> vo
 		"hg": int(res["hg"]), "ag": int(res["ag"]), "goals": res.get("goals", []),
 		"home_id": int(res["home_id"]), "away_id": int(res["away_id"]),
 		"header": hdr, "stadium": _result_stadium(res), "motm": _result_motm(res),
+		# For the board's per-team STATISTICS buttons: the two XIs that played and the
+		# fixture's own stat report (the records the binary copies out of
+		# DAT_0066afd0+0x9c/+0xa4 rather than the season store).
+		"xi_home": res.get("xi_home", []), "xi_away": res.get("xi_away", []),
+		"report": res.get("report"), "report_ht": res.get("report_ht"),
 	}
 	# Back at the hub, any live bids on listed players raise their TEAM OFFER
 	# cards — the original's post-match CONTINUE order (run-3 frames 085->086).
@@ -2193,6 +2204,11 @@ func _open_result_readout(data: Dictionary, on_continue: Callable, half := false
 	# Both HALF TIME and FULL TIME advance on CONTINUE (witnessed §5: the HT read-out
 	# carries a real CONTINUE button, not a tap-anywhere dismiss).
 	rs.continue_pressed.connect(advance)
+	# Either team's STATISTICS button opens that side's MATCH table over the board
+	# (witness frames 02/03 half time, 05/06 full time); RETURN drops back to it.
+	rs.statistics_pressed.connect(func(side: int) -> void:
+		AudioManager.ui_select()
+		_show_match_statistics(data, side))
 
 ## The HALF TIME view of a result: the same fixture with only first-half goals
 ## and the score they produce (witnessed RESULTS-mode chain, §7).
@@ -2211,6 +2227,9 @@ func _halftime_data(data: Dictionary) -> Dictionary:
 	ht["goals"] = goals
 	ht["hg"] = hg
 	ht["ag"] = ag
+	# The HALF TIME board's STATISTICS buttons read the half-time snapshot, not the
+	# finished match (MIN 45, and every column a prefix of the full-time sheet).
+	ht["report"] = data.get("report_ht")
 	return ht
 
 ## EXIT during a career match: the witnessed leave-championship confirm (§6).
@@ -2462,6 +2481,30 @@ func _show_statistics_screen() -> void:
 		scr.queue_free()
 		_show_lineup_screen())
 
+## The MATCH statistics table for one side of a finished (or half-finished) fixture —
+## the HALF TIME / FULL TIME board's per-team STATISTICS button (witness frames 02/03
+## and 05/06, screenshots/wine-captures-2026-07-24-statistics-live/). Same screen the
+## LINE-UP route uses, but fed the MATCH report instead of the season store: eleven rows,
+## the XI that played, and the totals the report path computes (MP 1, MIN = the max, then
+## a per-column sum). RETURN drops back to the board, which is still mounted underneath.
+func _show_match_statistics(data: Dictionary, side: int) -> void:
+	var xi: Array = data.get("xi_home" if side == 0 else "xi_away", [])
+	var cid := int(data.get("home_id" if side == 0 else "away_id", -1))
+	if xi.is_empty():
+		# A legacy save or the ratings-fallback path carries no XI to render.
+		_toast("No line-up was recorded for this match.")
+		return
+	var scr: StatisticsScreen = load("res://scenes/StatisticsScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	var club := {"id": cid, "name": str(data.get("home" if side == 0 else "away", "?")),
+		"players": xi}
+	var rows := Pm98StatStore.match_rows(data.get("report"), side, xi)
+	# The board's own barra (both clubs + the fixture date), not the manager plaques —
+	# the witnessed STATISTICS frames keep the match header they were opened from.
+	scr.setup(club, data.get("header", {}), rows, Pm98StatStore.totals(rows))
+	scr.back_pressed.connect(func() -> void: scr.queue_free())
+
 ## The original-art TACTICS board (TACTICAS) over the hub: the XI with fine-ROLE / POS
 ## columns, the skill grid, PREDEF / LOAD / SAVE TACTICS, and the CAMPO pitch carrying the
 ## formation's two-phase markers (docs/re/tacticas_screen_re.md; TacticsBoardScreen.gd).
@@ -2637,12 +2680,21 @@ func _show_youth_screen() -> void:
 	var refresh := func() -> void:
 		scr.setup(_career.youth, _career.staff, _career.manager_name, _career.club_name,
 			_career.season, _career.week + 1, _career.club_id,
-			not _career.youth_search.is_empty())
+			not _career.youth_search.is_empty(), null, _career.youth_found)
 	refresh.call()
 	scr.search_pressed.connect(func(skills: Array) -> void:
 		_career.start_youth_search(skills)
 		_career.save()
 		refresh.call())
+	# PLAYERS FOUND row tap: offer the prospect a contract. He joins, or turns you down
+	# ("The youth player %s has rejected your offer.") — the owner's "the players they
+	# find are supposed to be clickable to offer a contract".
+	scr.prospect_pressed.connect(func(pid: int) -> void:
+		AudioManager.ui_select()
+		var res := _career.sign_youth_prospect(int(pid))
+		_career.save()
+		refresh.call()
+		_toast(str(res.get("msg", ""))))
 	scr.promote_requested.connect(func(pid: int) -> void:
 		_career.promote_youth(int(pid))
 		_career.save()
@@ -2886,6 +2938,27 @@ func _show_make_offer_card(row: Dictionary) -> void:
 	var pid := int(row.get("pid", -1))
 	var from_club := int(row.get("club_id", -1))
 	var player := _career._find_in(from_club, pid)
+	# A SCOUT result can name a player at a club with no live roster — the scout
+	# searches the whole world (E.U. / NON E.U.), and only the manager's own division
+	# is simulated live. `_find_in` returns {} for those, which used to answer the tap
+	# with "That player is no longer available" and nothing else: the owner's "scout
+	# results are supposed to be clickable". Fall back to the static GameDB record and
+	# route the bid the external way, exactly as the OFFERS browse already does.
+	var live := not player.is_empty()
+	if not live:
+		for p in GameDB.club(from_club).get("players", []):
+			if int((p as Dictionary).get("id", -1)) == pid:
+				player = p
+				break
+	# PLAYERS WITHOUT TEAM rows carry club_id -1: they are the free-agent pool, signed
+	# on wage terms alone (no club to bid to), so the card routes to sign_free_agent.
+	var free := false
+	if player.is_empty() and from_club == -1:
+		for p in _career.free_agents:
+			if int((p as Dictionary).get("id", -1)) == pid:
+				player = p
+				free = true
+				break
 	if player.is_empty():
 		_toast("That player is no longer available.")
 		return
@@ -2896,11 +2969,19 @@ func _show_make_offer_card(row: Dictionary) -> void:
 	# opens on the seller's own asking terms — witness (wine, Bolton wk 4): Almeyda's
 	# card opens CLUB OFFER = CLUB FEE £8,500,000, YEARLY WAGE £575,000, YEARS 1, with
 	# the contract's clauses ticked. See MakeOfferScreen.setup.
+	var seller := GameDB.club(from_club)
+	var band := _career.band_of(from_club) if live \
+		else TransferMarket.stature_of(seller.get("players", []),
+			TransferMarket.english_tier_of(seller, GameDB.leagues))
 	var ask := int(row.get("fee", 0))
+	if ask <= 0 and not free:
+		ask = TransferMarket.value_of(player, band)   # a scout row with no stamped fee
+	if free:
+		band = _career.my_band()                      # no seller: value his terms off us
 	card.setup(player, {"id": from_club, "name": str(row.get("club_name", "?"))},
 		ask, _career.cash, {
 			"offer": ask,
-			"yearly_wage": Contract.current_yearly(player, _career.band_of(from_club)),
+			"yearly_wage": Contract.current_yearly(player, band),
 			"years": int(player.get("contract_years", player.get("contract_term", 1))),
 			"clauses": player.get("clauses", []),
 		})
@@ -2911,13 +2992,29 @@ func _show_make_offer_card(row: Dictionary) -> void:
 		AudioManager.ui_select()
 		# The bid is only PLACED here — the club answers on the next week roll
 		# (Career._resolve_pending_bids), as in the original's days-later response.
-		var res := _career.place_bid_roster(pid, from_club, offer,
-			maxi(1, yearly_wage / Contract.SEASON_WEEKS), years, clauses, bonus)
+		var weekly := maxi(1, yearly_wage / Contract.SEASON_WEEKS)
+		var res: Dictionary
+		if free:
+			res = _career.sign_free_agent(pid, weekly)   # no club to bid to: wage terms only
+		elif live:
+			res = _career.place_bid_roster(pid, from_club, offer, weekly, years, clauses, bonus)
+		else:
+			res = _career.place_bid_external(player,
+				{"id": from_club, "name": str(row.get("club_name", "?")),
+					"players": GameDB.club(from_club).get("players", [])},
+				offer, weekly, years, clauses, bonus)
 		_career.save()
 		card.queue_free()
 		_toast(str(res["msg"])))
 	card.loan_requested.connect(func() -> void:
 		AudioManager.ui_select()
+		if free:
+			_toast("%s has no club to loan him from." % str(player.get("name", "He")))
+			return
+		if not live:
+			# loans out of static (foreign / other-division) clubs are un-modeled
+			_toast("%s will not loan out their players." % str(row.get("club_name", "They")))
+			return
 		if bool(row.get("key", false)):
 			_toast("%s will not loan out a first-team player." % str(row.get("club_name", "They")))
 			return

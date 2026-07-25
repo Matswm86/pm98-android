@@ -19,6 +19,8 @@ class_name MatchResultScreen
 ## empty/absent state, never fabricated (match_flow_re.md "renderable-today vs gap").
 
 signal continue_pressed
+## A per-team STATISTICS button: 0 = the LEFT (home) team, 1 = the RIGHT (away) team.
+signal statistics_pressed(side: int)
 
 const W := 640
 const H := 480
@@ -57,6 +59,12 @@ const MOTM_NAME_CX := 464
 const MOTM_NAME_Y := 381
 const C_MOTM := Color8(180, 200, 220)       # the band's pale name ink (frame-sampled)
 const CONTINUE := Rect2(479, 439, 112, 25)
+# The per-team STATISTICS buttons on the board's button row. Measured off the two live
+# frames (screenshots/wine-captures-2026-07-24-statistics-live/ 01 half time and 04 full
+# time): the dark plates run x205..310 and x329..434, y308..332 in BOTH states. Half time
+# additionally carries LINE-UP (x15..106) and TACTICS (x116..195) on the left — those are
+# the manager's own mid-match doors and stay baked chrome (un-ported, see _on_input).
+const STATS_BTN := [Rect2(205, 308, 106, 25), Rect2(329, 308, 106, 25)]
 const KIT_SRC := Rect2(0, 0, 31, 64)
 
 const C_NAME := Color(0.98, 0.99, 1.0)
@@ -145,16 +153,45 @@ func _on_input(e: InputEvent) -> void:
 	var d := _to_design(e.position)
 	# Both HALF TIME and FULL TIME advance on the CONTINUE button (witnessed §5: the
 	# RESULTS-mode HT read-out carries a real CONTINUE + STATISTICS/TACTICS/LINE-UP
-	# chrome -- it is NOT a tap-anywhere dismiss). The manager-side buttons are baked
-	# chrome, inert for now (their sub-screens mid-match are an un-ported gap, like the
-	# BRIEF doors); CONTINUE is the only live control.
+	# chrome -- it is NOT a tap-anywhere dismiss).
+	#
+	# EACH TEAM's STATISTICS button is live (owner report 2026-07-24: "in match results
+	# screen the statistics button doesn't work on either team"). Witness frames 02/03
+	# (half time) and 05/06 (full time) in wine-captures-2026-07-24-statistics-live/:
+	# the button opens the STATISTICS table for THAT side's XI, showing the match record
+	# (MP 1, MIN 45 or 90, RATING, MoM, G., SHOTS/PASSES/TAC. as x/y pairs, S., cards),
+	# with RETURN back to this board. LINE-UP / TACTICS (half time, left) stay baked
+	# chrome -- the manager's mid-match doors are still an un-ported gap.
 	if e.pressed:
-		_press = "continue" if CONTINUE.has_point(d) else ""
+		_press = _hit(d)
 	else:
-		if _press == "continue" and CONTINUE.has_point(d):
-			continue_pressed.emit()
+		var rel := _hit(d)
+		if rel != "" and rel == _press:
+			if rel == "continue":
+				continue_pressed.emit()
+			elif rel.begins_with("stats:"):
+				statistics_pressed.emit(int(rel.substr(6)))
 		_press = ""
 	queue_redraw()
+
+
+## The live target at a design-space point ("" if none).
+func _hit(d: Vector2) -> String:
+	if CONTINUE.has_point(d):
+		return "continue"          # live in BOTH states (witnessed 01 + 04)
+	for i in STATS_BTN.size():
+		if (STATS_BTN[i] as Rect2).has_point(d):
+			return "stats:%d" % i
+	return ""
+
+
+## Design-space rect of a held target, for the press flash.
+func _press_rect(name: String) -> Rect2:
+	if name == "continue":
+		return CONTINUE
+	if name.begins_with("stats:"):
+		return STATS_BTN[int(name.substr(6))]
+	return Rect2()
 
 
 # ---- drawing -------------------------------------------------------------
@@ -195,7 +232,9 @@ func _draw() -> void:
 		_draw_motm()
 
 	if _press != "":
-		draw_rect(CONTINUE, C_PRESS, true)
+		var pr := _press_rect(_press)
+		if pr.size.x > 0:
+			draw_rect(pr, C_PRESS, true)
 
 
 func _draw_goals(rows: Array, col: Vector2) -> void:

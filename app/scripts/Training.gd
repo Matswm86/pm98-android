@@ -1,45 +1,34 @@
 class_name Training
 extends RefCounted
-## Player development through training (Track A engine depth).
+## Player development through training.
 ##
-## Gives the week-to-week career a long arc: your players get better or worse over
-## a season depending on their age and how hard you train them. Young players
-## improve, players in their prime hold, veterans decline -- and training INTENSITY
-## is the lever, trading faster development against a higher injury risk (the link
-## back into Availability.gd from last session).
+## `develop_week` is a byte-exact port of the engine's own weekly pass
+## `FUN_00582760`, decoded 2026-07-24 — see the long comment above it for the
+## disassembly, the two attribute blocks it reads and every constant. It replaced an
+## invented age-based drift model whose prime-age rate needed 67 weeks per point,
+## which is why the owner reported "training doesn't actually do anything".
 ##
-## Kept light on the save: a single float `dev_progress` accumulates on each player
-## dict; when it crosses +/-1.0 one attribute changes by a point and a news line
-## fires, then the fractional remainder carries over. So changes are occasional,
-## visible and explained, not a noisy per-attribute drift. Attributes are the
-## decoded 10 (VE RE AG CA RM RG PA TI EN PO), so a bump flows straight through to
-## ratings, the squad AV column and transfer value with no extra plumbing.
+## What survives from the old model, and why:
+##   * `INTENSITIES` / `injury_multiplier` — the LIGHT/NORMAL/INTENSIVE lever still
+##     feeds Availability's injury roll. It has no development effect (the engine's
+##     pass has no intensity term).
+##   * `trend()` — a TRAINING-screen readout only, not a prediction.
 ##
 ## GameDB-free, mutates only the dicts passed in -> headless-testable
-## (tests/test_training.gd). Manager's club only, like injuries.
+## (tests/test_training.gd + tests/test_training_exact.gd). The engine runs this over
+## EVERY club's squad each week; Career does the same.
 
 const INTENSITIES := ["Light", "Normal", "Intensive"]
 const DEFAULT_INTENSITY := "Normal"
 
-# Per-intensity development-rate factor and injury-risk multiplier.
+# Per-intensity injury-risk multiplier (the lever's only surviving effect).
 const _FACTOR := {"Light": 0.60, "Normal": 1.00, "Intensive": 1.55}
 const _INJURY_MULT := {"Light": 0.75, "Normal": 1.00, "Intensive": 1.45}
 
-# Base weekly progress by career stage (Normal intensity). Young players climb,
-# the prime holds with a touch of rounding-out, veterans slide.
-const _RATE_YOUNG := 0.11    # age <= PRIME_LO
-const _RATE_PRIME := 0.015   # PRIME_LO < age <= PRIME_HI
-const _RATE_VET := -0.085    # age > PRIME_HI
+# Age bands, kept for `trend()`'s TRAINING-screen arrows only. The engine's weekly
+# pass has NO age term (see develop_week); these do not move a single attribute.
 const PRIME_LO := 23
 const PRIME_HI := 30
-
-const ATTR_CAP := 96   # a developed attribute won't climb past this
-const ATTR_FLOOR := 22 # a declining attribute won't drop below this
-
-# The trainable attribute codes (no PO -- keeper rating develops on its own track).
-const _OUTFIELD_CODES := ["VE", "RE", "AG", "CA", "RM", "RG", "PA", "TI", "EN"]
-# Veterans lose their legs first: physical attributes decline ahead of the rest.
-const _DECLINE_FIRST := ["VE", "RE", "AG"]
 
 const _NAMES := {
 	"VE": "Pace", "RE": "Stamina", "AG": "Aggression", "CA": "Ability",
@@ -61,59 +50,12 @@ static func attr_name(code: String) -> String:
 	return str(_NAMES.get(code, code))
 
 
-# ---- weekly development --------------------------------------------------
-
-## Develop every player in `squad` for one training week at `intensity`. `dev_factor` is an
-## external multiplier on the IMPROVEMENT rate (the backroom TRAINER staff -- Staff.gd --
-## defaults to 1.0); it never speeds a veteran's decline. Mutates attrs + dev_progress in
-## place and returns {kind:"develop"|"decline", text} for the players who crossed this week.
-static func train_week(rng: RandomNumberGenerator, squad: Array, intensity: String, dev_factor := 1.0) -> Array:
-	var news: Array = []
-	var factor := intensity_factor(intensity)
-	var dev := maxf(0.1, dev_factor)
-	for p in squad:
-		var attrs: Variant = p.get("attrs", {})
-		if not (attrs is Dictionary) or (attrs as Dictionary).is_empty():
-			continue   # unrated fringe player: nothing to develop
-		var age := int(p.get("age", 26))
-		var base := _base_rate(age)
-		# A dict carrying a hidden `potential` (injected real talents keep theirs; ordinary
-		# seniors never have one -- Youth.graduate erases it) HOLDS at that ceiling while
-		# he'd otherwise improve; veteran decline (negative base) still applies. Vanilla
-		# players never carry the key, so their path is bit-identical.
-		if base > 0.0 and p.has("potential") \
-				and int((attrs as Dictionary).get("CA", 0)) >= int(p["potential"]):
-			continue
-		# Trainers speed development but don't hasten decline: dev_factor applies to a
-		# positive (improving) rate only.
-		var rate := base * factor * (dev if base > 0.0 else 1.0)
-		# A little noise so identically-aged players don't move in lockstep.
-		rate += (rng.randf() - 0.5) * 0.04 * factor
-		var prog := float(p.get("dev_progress", 0.0)) + rate
-		if prog >= 1.0:
-			prog -= 1.0
-			var item := _improve(p, attrs)
-			if not item.is_empty():
-				news.append(item)
-		elif prog <= -1.0:
-			prog += 1.0
-			var item := _decline(p, attrs)
-			if not item.is_empty():
-				news.append(item)
-		p["dev_progress"] = prog
-	return news
-
-
-## Reset development carry-over (e.g. at season rollover, after ages tick).
-static func reset_progress(squad: Array) -> void:
-	for p in squad:
-		p["dev_progress"] = 0.0
-
-
 # ---- trend (for the training screen) -------------------------------------
 
 ## {dir:"up"|"down"|"hold", arrow:String, colour:Color, ability:int, name:String}
-## for one player -- how training is moving him, by age.
+## for one player -- how the TRAINING screen shows him moving. Kept as a SCREEN
+## affordance only: the engine's weekly pass (develop_week, below) has no age term,
+## so this is a readout of who the manager would normally push, not a prediction.
 static func trend(p: Dictionary) -> Dictionary:
 	var age := int(p.get("age", 26))
 	var attrs: Dictionary = p.get("attrs", {}) if p.get("attrs") is Dictionary else {}
@@ -128,69 +70,11 @@ static func trend(p: Dictionary) -> Dictionary:
 		"ability": ca, "name": str(p.get("name", "?"))}
 
 
-# ---- internals -----------------------------------------------------------
-
-static func _base_rate(age: int) -> float:
-	if age <= PRIME_LO:
-		return _RATE_YOUNG
-	if age <= PRIME_HI:
-		return _RATE_PRIME
-	return _RATE_VET
-
-
-## Raise one attribute: the lowest outfield code still below the cap (so the player
-## rounds out his game), nudging CA up alongside it so ability tracks development.
-static func _improve(p: Dictionary, attrs: Dictionary) -> Dictionary:
-	var code := _lowest_below_cap(attrs)
-	if code == "":
-		return {}
-	attrs[code] = mini(ATTR_CAP, int(attrs.get(code, 0)) + 1)
-	# ability (CA) is the headline rating -> let it creep up with real development
-	if code != "CA" and int(attrs.get("CA", 0)) < ATTR_CAP:
-		attrs["CA"] = mini(ATTR_CAP, int(attrs.get("CA", 0)) + 1)
-	return {"kind": "develop",
-		"text": "%s has improved his %s." % [p.get("name", "?"), attr_name(code)]}
-
-
-## Lower one attribute: a physical first (pace/stamina/aggression), else the
-## highest outfield code, pulling CA down a touch so the decline shows in ability.
-static func _decline(p: Dictionary, attrs: Dictionary) -> Dictionary:
-	var code := ""
-	for c in _DECLINE_FIRST:
-		if int(attrs.get(c, 0)) > ATTR_FLOOR:
-			code = c
-			break
-	if code == "":
-		code = _highest_above_floor(attrs)
-	if code == "":
-		return {}
-	attrs[code] = maxi(ATTR_FLOOR, int(attrs.get(code, 0)) - 1)
-	if code != "CA" and int(attrs.get("CA", 0)) > ATTR_FLOOR:
-		attrs["CA"] = maxi(ATTR_FLOOR, int(attrs.get("CA", 0)) - 1)
-	return {"kind": "decline",
-		"text": "%s is past his best -- %s is slipping." % [p.get("name", "?"), attr_name(code)]}
-
-
-static func _lowest_below_cap(attrs: Dictionary) -> String:
-	var best := ""
-	var best_v := ATTR_CAP + 1
-	for c in _OUTFIELD_CODES:
-		var v := int(attrs.get(c, 0))
-		if v < ATTR_CAP and v < best_v:
-			best_v = v
-			best = c
-	return best
-
-
-static func _highest_above_floor(attrs: Dictionary) -> String:
-	var best := ""
-	var best_v := ATTR_FLOOR - 1
-	for c in _OUTFIELD_CODES:
-		var v := int(attrs.get(c, 0))
-		if v > ATTR_FLOOR and v > best_v:
-			best_v = v
-			best = c
-	return best
+## Reset development carry-over (season rollover). The exact pass keeps no
+## fractional carry, so this only clears the superseded field off old saves.
+static func reset_progress(squad: Array) -> void:
+	for p in squad:
+		p["dev_progress"] = 0.0
 
 
 # ---- FOCUS training (the real TRAINING screen's mechanic) ------------------
@@ -221,8 +105,9 @@ const FOCUS_ATTR := {
 	"HANDLING": "PO", "PASSING": "PA", "DRIBBLING": "RM",
 	"HEADING": "RG", "TACKLING": "EN", "SHOOTING": "TI",
 }
-# GENERAL trains the four SPEED / STAMINA / AGGRESSION / QUALITY rows together.
-const GENERAL_ATTRS := ["VE", "RE", "AG", "CA"]
+# GENERAL is mode 1: it lifts all SIX trainable attributes, but only to base+5
+# (FUN_00582760 case 1). It does NOT touch SPEED/STAMINA/AGGRESSION/QUALITY —
+# those four are the untrainable core (see develop_week).
 
 # The grid tag chip: 2-letter code + the skill's own CURRENT TRAINING STAFF bar colour
 # (witnessed: HANDLING tags are the orange 212,95,0 of its bar, SHOOTING the dark red
@@ -242,8 +127,155 @@ const FOCUS_COLOUR := {
 const FULL_MSG := "You can´t train any more players."
 const NO_TRAINER_MSG := "For specific training\nyou have to have hired trainers."
 
-# A focused player's attribute moves this much faster than passive development.
-const FOCUS_RATE := 0.22
+
+# ==========================================================================
+# THE REAL WEEKLY DEVELOPMENT PASS — a byte-exact port of FUN_00582760
+# ==========================================================================
+# Owner report 2026-07-24: "training doesn't actually do anything. The players'
+# stats don't go up. They do in the original, so fix it so it's exact."
+#
+# It is now exact. `FUN_00582760` (MANAGER.EXE, 1240 bytes @0x582760) is the
+# PER-PLAYER weekly pass; the weekly club turn `FUN_0057b400` — the same function
+# that runs `FUN_0057f080`'s ground-works messages and the two scout "finished his
+# search" lines — walks the club's squad list (club+0x24) and calls it once per
+# player, for EVERY club. So an untrained player is not "developing slowly": the
+# original does not move him at all.
+#
+# EVERY attribute is stored TWICE in the player record, decoded this session from
+# the DBC loader `FUN_005820f0` @0x582185-0x582250, which writes each of the ten
+# EQUIPOS bytes into both blocks:
+#
+#   LIVE   +0x9c VE  +0x9d RE  +0x9e AG  +0x9f CA  +0xa0 PO  +0xa1 EN
+#          +0xa2 PA  +0xa3 RM  +0xa4 RG  +0xa5 TI
+#   BASE   +0xaa VE  +0xab RE  +0xac AG  +0xad CA  +0xae PO  +0xaf EN
+#          +0xb0 PA  +0xb1 RM  +0xb2 RG  +0xb3 TI
+#
+# (+0x9c..+0x9f being VE/RE/AG/CA is independently confirmed: `FUN_00534570`
+# averages exactly those four bytes as `core4`, the known wage/AV input.)
+# BASE is the shipped EQUIPOS rating and is never rewritten after load; LIVE is what
+# training moves. `FUN_0058b030` restores VE/RE/AG/RG from BASE when the engine
+# regenerates a player, which is what pins the direction of the pair.
+#
+# The pass, verbatim:
+#
+#   mode = player[+0xa9]                      ; 0 = not in training
+#   if mode == 0:                             ; DECAY — gains bleed back to base
+#       for a in [PO, EN, PA, RM, RG, TI]:
+#           if base[a] < live[a]: live[a] -= 1
+#   else:
+#       roll = rand(7) + 0x12                 ; 18..24, the focused attribute's headroom
+#       gain, cap[6] = 0, [0,0,0,0,0,0]
+#       switch mode:
+#         1 GENERAL   -> gain 1, cap[*] = 5
+#         2 FITNESS   -> gain 0                       (condition only)
+#         3 HANDLING  -> gain 1, cap[PO] = roll
+#         4 PASSING   -> gain 1, cap[PA] = roll
+#         5 DRIBBLING -> gain 1, cap[RM] = roll
+#         6 HEADING   -> gain 1, cap[RG] = roll
+#         7 TACKLING  -> gain 1, cap[EN] = roll
+#         8 SHOOTING  -> gain 1, cap[TI] = roll
+#         0x20 YOUTH  -> gain = 1 if rand(100) > 0x27 else 0     (60%)
+#                        core4: live = min(live+gain, base); when all four reach
+#                        base -> mode = 0 + "Your youth manager has informed you
+#                        that %s is ready to be promoted to the first team squad."
+#       if gain:
+#           for a in the six:
+#               n = live[a] + gain
+#               if n <= base[a] + cap[a]: live[a] = 99 if n > 98 else n
+#       condition(+0xa7) += 3 if mode == 2 else 1     (FUN_00584c60)
+#
+# Consequences that are the ORIGINAL's, not ours: a focused attribute climbs a
+# FULL POINT EVERY WEEK until it is 18-24 clear of the shipped rating; GENERAL
+# lifts all six but only by 5; the core four (SPEED/STAMINA/AGGRESSION/QUALITY)
+# are NOT trainable at all — only the youth-growth mode moves them, and only back
+# up to the player's own shipped adult rating; and taking a man off training bleeds
+# his gains away at a point a week.
+#
+# NOT located yet, stated rather than invented: whether a separate season-rollover
+# pass ages attributes. `FUN_005825c0` (season init) touches only morale +0xa6,
+# condition +0xa8/+0xa7 and the counters — no attribute drift. The app's own
+# age-based drift is therefore gone from the weekly pass.
+
+# `player+0xa9` mode codes, keyed by the TRAINING screen's own row names.
+const FOCUS_MODE := {
+	FOCUS_GENERAL: 1, FOCUS_FITNESS: 2, "HANDLING": 3, "PASSING": 4,
+	"DRIBBLING": 5, "HEADING": 6, "TACKLING": 7, "SHOOTING": 8,
+}
+const MODE_YOUTH := 0x20
+# The six trainable attributes in the engine's own +0xa0..+0xa5 order.
+const TRAINABLE := ["PO", "EN", "PA", "RM", "RG", "TI"]
+# The four that only youth growth can move (+0x9c..+0x9f).
+const CORE4 := ["VE", "RE", "AG", "CA"]
+const GENERAL_CAP := 5           # case 1's flat headroom over base
+const ROLL_BASE := 0x12          # rand(7) + 0x12 -> 18..24
+const ROLL_SPAN := 7
+const ATTR_MAX := 99             # `if (0x62 < n) n = 99`
+const ATTR_SNAP := 0x62
+const COND_FLOOR := 40           # FUN_00584c60's clamps (Morale.gd agrees: +0xa7 40..99)
+const COND_CAP := 99
+
+
+## The player's BASE (shipped EQUIPOS) attribute block — the engine's +0xaa..+0xb3.
+## Seeded on first use for any player dict that predates it (a legacy save, a test
+## fixture, a GameDB record used directly): his current values ARE his base until
+## something trains him, which is exactly what the loader writes.
+static func base_attrs(p: Dictionary) -> Dictionary:
+	var b: Variant = p.get("attrs_base")
+	if b is Dictionary and not (b as Dictionary).is_empty():
+		return b
+	var attrs: Variant = p.get("attrs", {})
+	var seed_b: Dictionary = (attrs as Dictionary).duplicate() if attrs is Dictionary else {}
+	p["attrs_base"] = seed_b
+	return seed_b
+
+
+## One WEEK of `FUN_00582760` over a squad. `focus` maps pid -> a FOCUS_ROWS name
+## (absent = not in training). Returns the same {kind, text} news items as before,
+## for the attributes that actually moved. Mutates `attrs` and `fitness` in place.
+static func develop_week(rng: RandomNumberGenerator, squad: Array, focus: Dictionary = {}) -> Array:
+	var news: Array = []
+	for p in squad:
+		var pd: Dictionary = p
+		var av: Variant = pd.get("attrs", {})
+		if not (av is Dictionary) or (av as Dictionary).is_empty():
+			continue                       # unrated fringe record: the engine skips it too
+		var attrs: Dictionary = av
+		var base := base_attrs(pd)
+		var mode := int(FOCUS_MODE.get(str(focus.get(int(pd.get("id", -1)), "")), 0))
+		if mode == 0:
+			# DECAY: anything above the shipped rating bleeds back a point a week.
+			for a in TRAINABLE:
+				if int(base.get(a, 0)) < int(attrs.get(a, 0)):
+					attrs[a] = int(attrs[a]) - 1
+			continue
+		var roll := ROLL_BASE + rng.randi_range(0, ROLL_SPAN - 1)
+		var gain := 1
+		var cap := {}
+		for a in TRAINABLE:
+			cap[a] = 0
+		match mode:
+			1:
+				for a in TRAINABLE:
+					cap[a] = GENERAL_CAP
+			2:
+				gain = 0                   # FITNESS is condition only
+			_:
+				var key := str(FOCUS_ATTR.get(str(focus.get(int(pd.get("id", -1)), "")), ""))
+				if key != "":
+					cap[key] = roll
+		if gain > 0:
+			for a in TRAINABLE:
+				var n := int(attrs.get(a, 0)) + gain
+				if n <= int(base.get(a, 0)) + int(cap[a]):
+					attrs[a] = ATTR_MAX if n > ATTR_SNAP else n
+					if int(cap[a]) > 0:
+						news.append({"kind": "training",
+							"text": "%s has improved his %s in training." % [
+								pd.get("name", "?"), attr_name(a)]})
+		# FUN_00584c60: +3 condition on FITNESS, +1 otherwise.
+		pd["fitness"] = clampi(int(pd.get("fitness", COND_CAP)) + (3 if mode == 2 else 1),
+			COND_FLOOR, COND_CAP)
+	return news
 
 
 ## Training points for one skill = floor(that coach's stars); 0 with no coach hired.
@@ -292,49 +324,3 @@ static func focus_fit(p: Dictionary, skill: String) -> float:
 	elif skill == "PASSING" and pos == "MF":
 		v += 20.0
 	return v
-
-
-## Apply one week of FOCUS training. Every assigned player pushes the attribute his
-## coach teaches, at a rate scaled by that coach's stars; GENERAL spreads across the
-## four SPEED/STAMINA/AGGRESSION/QUALITY rows and FITNESS restores condition. Returns
-## the same {kind, text} news items train_week does, for the attributes that crossed.
-static func train_focus_week(rng: RandomNumberGenerator, squad: Array,
-		focus: Dictionary, staff: Array) -> Array:
-	var news: Array = []
-	if focus.is_empty():
-		return news
-	var by_id := {}
-	for p in squad:
-		by_id[int((p as Dictionary).get("id", -1))] = p
-	for pid in focus:
-		var p: Variant = by_id.get(int(pid))
-		if not (p is Dictionary):
-			continue
-		var pd: Dictionary = p
-		var attrs: Variant = pd.get("attrs", {})
-		if not (attrs is Dictionary) or (attrs as Dictionary).is_empty():
-			continue
-		var skill := str(focus[pid])
-		if skill == FOCUS_FITNESS:
-			pd["fitness"] = mini(99, int(pd.get("fitness", 70)) + 2)
-			continue
-		var keys: Array = GENERAL_ATTRS if skill == FOCUS_GENERAL else [str(FOCUS_ATTR.get(skill, ""))]
-		# A coach's stars scale his session; GENERAL has no coach, so it runs at 1.0.
-		var stars := 1.0 if skill == FOCUS_GENERAL else maxf(0.5, float(skill_tp(staff, skill)) / 2.0)
-		var gain := FOCUS_RATE * stars * (0.75 + rng.randf() * 0.5)
-		var key := str(keys[rng.randi_range(0, keys.size() - 1)])
-		if key == "":
-			continue
-		var prog := float(pd.get("focus_progress", 0.0)) + gain
-		if prog < 1.0:
-			pd["focus_progress"] = prog
-			continue
-		pd["focus_progress"] = prog - 1.0
-		var a: Dictionary = attrs
-		var cur := int(a.get(key, 0))
-		if cur <= 0 or cur >= ATTR_CAP:
-			continue
-		a[key] = cur + 1
-		news.append({"kind": "training",
-			"text": "%s has improved his %s in training." % [pd.get("name", "?"), attr_name(key)]})
-	return news

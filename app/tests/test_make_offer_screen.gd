@@ -57,9 +57,13 @@ func _run() -> void:
 			"PA": 79, "TI": 73, "EN": 57, "PO": 19}}
 	var card: MakeOfferScreen = MakeOfferScreen.new()
 	card.setup(taylor, {"id": 82, "name": "BLACKPOOL"}, 3000000, 3200000)
-	ok = _assert(card._offer == 5000 and card._wage_yearly == 5000 and card._years == 1,
-		"frame-constant initial values £5,000 / £5,000 / 1") and ok
+	# CLUB OFFER now opens at the CLUB FEE on every route (owner deviation, see
+	# MakeOfferScreen.setup); YEARLY WAGE / YEARS keep the frame-101 constants.
+	ok = _assert(card._offer == 3000000 and card._wage_yearly == 5000 and card._years == 1,
+		"opens at the fee, £5,000 wage, 1 year") and ok
 	ok = _assert(card._scoring_enabled(), "Scoring bonus active for a forward") and ok
+	# The stepper ladder itself is unchanged — walk it from the floor.
+	card.setup(taylor, {"id": 82, "name": "BLACKPOOL"}, 3000000, 3200000, {"offer": 5000})
 	card._step("offer_dn")
 	ok = _assert(card._offer == 5000, "offer floors at £5,000") and ok
 	# The engine ladder (OfferRecord): £5,000 steps to £50,000, then £10,000 to

@@ -78,13 +78,15 @@ static func simulate(rng: RandomNumberGenerator, rh: Dictionary, ra: Dictionary,
 		var mem := Pm98StatMatch.build_mem(xi_h, xi_a, tid_h, tid_a)
 		var prng := Pm98StatMatch.Rng.new(rng.randi())
 		var rep = null
+		var rep_ht = null
 		var pids := {}
 		if stats:
 			rep = Pm98StatStore.Report.new(tid_h, tid_a)
+			rep_ht = Pm98StatStore.Report.new(tid_h, tid_a)
 			pids = pid_map(xi_h, xi_a)
 		if minutes >= 90:
 			Pm98StatMatch.simulate(mem, prng, false, false, rep, pids,
-				Pm98StatMatch.CADENCE_MATCH)
+				Pm98StatMatch.CADENCE_MATCH, rep_ht)
 		else:
 			Pm98StatMatch.simulate_extra_time(mem, prng, rep, pids)
 		var sc := Pm98StatMatch.score(mem)
@@ -95,8 +97,10 @@ static func simulate(rng: RandomNumberGenerator, rh: Dictionary, ra: Dictionary,
 			"goals": _resolve_goals(mem, xi_h, xi_a, tid_h, tid_a),
 			# real engine POSSESSION counters ([home,away]); the BRIEF bar reads the split.
 			"possession": Pm98StatMatch.possession(mem),
-			# Pm98StatStore.Report when `stats` was asked for, else null.
+			# Pm98StatStore.Report when `stats` was asked for, else null. `report_ht`
+			# is the half-time snapshot the HALF TIME board's STATISTICS button reads.
 			"report": rep,
+			"report_ht": rep_ht,
 		}
 	# LOUD fallback (never silent): a non-empty XI that fails _usable means the caller
 	# expected the faithful engine and is getting the legacy abstraction instead.
@@ -108,6 +112,7 @@ static func simulate(rng: RandomNumberGenerator, rh: Dictionary, ra: Dictionary,
 	res["goals"] = []
 	res["possession"] = []   # legacy path produces no possession -> BRIEF bar stays 50/50
 	res["report"] = null      # no per-player records exist on the abstracted model
+	res["report_ht"] = null
 	return res
 
 
