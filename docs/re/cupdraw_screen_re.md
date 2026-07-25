@@ -151,9 +151,108 @@ values. (25 and 40 are the real 1997-98 field sizes for those rounds.) The body 
 two-row alternating band keyed on absolute y; both frames start their thumb at y 70, so
 that parity choice is not independently distinguished.
 
+## The SECOND panel form, and the tie-detail card — BUILT 2026-07-25 (REFRUN R8)
+
+The MATCHES panel has **two forms**, and the switch is **list length**:
+
+| ties in the round | form |
+|---|---|
+| **> 16** | one centred `Home - Away` line per tie, 23 rows, scrollbar (the form above) |
+| **<= 16** | a **16-row GRID** of four columns — home kit, home club, away club, away kit — and **no scrollbar at all** |
+
+Witnessed on four frames of the reference run: the Coca-Cola Cup ROUND 3 and the F.A. Cup
+ROUND 4 (16 ties -> grid) against the F.A. Cup ROUND 3 and the Coca-Cola ROUND 2 (32 and
+25 -> list). The grid's sixteen bands are painted **before any club lands in them**
+(`p0125`, `p0445` are empty grids), so the switch is the FULL round's tie count, not how
+many have been drawn.
+
+Grid geometry, off the frames' own black borders: column borders at x332-333 / 355 /
+477-478 / 600 / 622-623; row separators every 23px from y49-50 to y418-419, so 16 rows of
+22 starting at y51.
+
+| cell | span | content |
+|---|---|---|
+| home kit | x334..354 | the club's kit |
+| home club | x356..476 | centred on `356 + 476`, proman10, pen top +6 |
+| away club | x479..599 | centred on `479 + 599`, same |
+| away kit | x601..621 | the club's kit |
+
+Row states, all four witnessed:
+
+| state | name-cell ground | kit-cell ground | ink |
+|---|---|---|---|
+| even band | `(200,220,240)` | `(180,200,220)` | `(100,120,140)` |
+| odd band | `(160,180,200)` | `(140,160,180)` | `(60,80,100)` |
+| **the manager's own tie** | `(60,60,100)` | `(40,40,80)` | `(100,120,140)`, and **his club** in `(255,255,85)` |
+| highlighted | `(255,255,255)` | `(255,255,255)` | `(60,80,100)` |
+
+The highlighted row is a **mouse-hover** state (the same one the list form's row 17
+shows). A touch app has no hover, so it is bound to the TAPPED row instead — the state is
+the original's own even though the trigger cannot be.
+
+### The tie-detail card
+
+The bottom-left panel's "two long value cells" are a **per-tie detail card**, populated
+when a row is taken: each club's name over its manager's, and the two legs' GROUNDS
+beside the MATCH / REPLAY (or 1ST LEG / 2ND LEG) plates. Every line was solved with
+`tools/re/probe_text_anchor.py` at ZERO differing pixels against BOTH populated frames
+(`p0131` Bradford City / Jewell v Manchester Utd. / MWM, `p0747` F.C. Barcelona /
+Van Gaal v Karlsruher):
+
+| line | font | centre (field sum) | pen tops | ink |
+|---|---|---|---|---|
+| club | proman10 | 325 | 323 / 361 | `(255,223,0)` |
+| manager | calend12 | 325 | 335 / 373 | `(166,202,240)` |
+| ground | proman10 | 398 | 411 / 438 | `(42,191,255)` |
+
+**The MANAGER'S OWN name renders GREEN `(42,191,85)`** where another manager's is pale
+blue — witnessed on `MWM`.
+
+The two kit panels (x33..109 y325..380 and x236..286 y329..384) use the app's own kit art
+scaled in, the same documented approximation `CompResultScreen` and `CharityShieldScreen`
+carry, because the original's hi-res panel kit bank is un-extracted.
+
+### Render-diff
+
+`tools/re/diff_cupdraw_parity.py` now covers **both forms, four frames**:
+
+| shot | frame | differing px after exclusions |
+|---|---|---|
+| `cupdraw_74` | Coca-Cola ROUND 2 (list) | **0** |
+| `cupdraw_10` | F.A. Cup ROUND 1 (list) | **1** |
+| `cupdraw_133` | Coca-Cola ROUND 3 (grid, own tie marked) | **0** |
+| `cupdraw_747` | U.E.F.A. 1/16 (grid, card filled) | **2** |
+
+The grid shots exclude the kit cells and the card's two kit panels (the harness feeds
+club NAMES only, so no kit is drawn) and the drum — see below.
+
+### A NEW drum finding, for the parked hunt
+
+`p0133` and `p0747` hold a drum image that is **byte-identical to each other** and
+matches **none of the twelve exported BOMBO frames** (nearest is BOMBO00 at 2709 px),
+while `p0125` is BOMBO03 and `p0445` is BOMBO06 at **zero**. So the drum has at least one
+state beyond the twelve stills — the first positive evidence in that direction, and a
+lead worth taking when the drum hunt resumes. Candidates: BOLA or MANO composited over a
+BOMBO frame, or a lit variant.
+
 ## Wiring
 
-`Main._show_cup_screen(bracket, key, title)` mounts it for **every knockout round** of the
+**The live route exists (REFRUN R4, 2026-07-25).** `Career._queue_cup_draw` banks one
+entry per knockout round it resolves — both domestic cups and all three European
+competitions — into `Career.pending_cup_draws`, and `Main._pop_cup_draw` raises it at the
+head of the post-week card chain, over the hub, unprompted, exactly as the original does.
+FINISH and CONTINUE both dismiss; more than one competition in a week raises one card
+each. The plate label, the leg plates and the trophy strip all come from
+`Cup.draw_round_plate` / `draw_leg_plates` / `draw_art_key`, so the hub route and the
+live route cannot drift apart.
+
+**DIVERGENCE, flagged:** the original draws a round and plays it later, so its SORTEO
+shows the ties before they are played. `Cup.play_round` pairs AND plays in one step, so
+the card is raised immediately AFTER. Nothing on the screen differs — the SORTEO carries
+no scores — but the ordering against the week's result news is ours until the model
+separates the two steps.
+
+`Main._show_cup_screen(bracket, key, title)` also mounts it for **every knockout round** of the
 F.A. Cup, Coca-Cola Cup, European Cup, U.E.F.A. Cup and Cup Winners' Cup, from the hub
 COMPETITIONS chooser and from the devshot walk. `Main._cup_draw_view` builds the payload
 from the bracket's LATEST round:
@@ -168,9 +267,9 @@ from the bracket's LATEST round:
 
 ## Un-witnessed, and therefore NOT built
 
-* **The two long value cells** in the bottom-left panel are empty in all three frames.
-  Their populated state is unknown, so they stay empty. The `flecha azul/verde` arrows
-  the EXE loads are presumably theirs; exported, unused.
+* ~~**The two long value cells** in the bottom-left panel~~ — **CLOSED 2026-07-25.** They
+  are the tie-detail card, populated and specified above (REFRUN R8). The `flecha
+  azul/verde` arrows the EXE loads are still exported and unused.
 * **MANO0..7 and BOLA0..3** — the hand and ball the EXE loads for this screen appear in
   no captured frame. Exported, unused.
 

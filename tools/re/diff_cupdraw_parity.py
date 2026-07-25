@@ -3,11 +3,21 @@
 
 Usage:  python3 tools/re/diff_cupdraw_parity.py <shot_dir> [--heatmap out_prefix]
 
-Two shots, two real MANAGER.EXE frames:
-  cupdraw_74.png  vs  wine-captures-2026-07-18-goalscorers/74_after_wk4.png
-                      Coca-Cola Cup ROUND 2, 4 of 25 ties, the 4th mid-draw
-  cupdraw_10.png  vs  promanager-career-2026-07-16/10_fa_cup_draw_round1.png
-                      F.A. Cup ROUND 1, 4 of 40 ties, MATCH / REPLAY plates
+Four shots, four real MANAGER.EXE frames -- BOTH panel forms (REFRUN R8):
+
+  the >16-tie LIST form
+    cupdraw_74.png  vs  wine-captures-2026-07-18-goalscorers/74_after_wk4.png
+                        Coca-Cola Cup ROUND 2, 4 of 25 ties, the 4th mid-draw
+    cupdraw_10.png  vs  promanager-career-2026-07-16/10_fa_cup_draw_round1.png
+                        F.A. Cup ROUND 1, 4 of 40 ties, MATCH / REPLAY plates
+
+  the <=16-tie GRID form
+    cupdraw_133.png vs  refs/refrun-manutd-1997-98/p0133_cup_draw.png
+                        Coca-Cola Cup ROUND 3, all 16 ties, the manager's own tie on
+                        row 1 (dark plate, his club in bright yellow)
+    cupdraw_747.png vs  refs/refrun-manutd-1997-98/p0747_cup_draw.png
+                        U.E.F.A. Cup 1/16 FINAL, row 5 selected and the tie-detail card
+                        filled in (F.C. Barcelona / Van Gaal v Karlsruher)
 
 The whole screen is engine-composited (baked chrome + the redrawn dynamic layer), so the
 diff is against the FULL 640x480 frame. Excluded rects are listed with a reason each and
@@ -32,6 +42,14 @@ CASES = [
         "cupdraw_10.png",
         ROOT / "screenshots" / "promanager-career-2026-07-16" / "10_fa_cup_draw_round1.png",
     ),
+    (
+        "cupdraw_133.png",
+        ROOT / "tools" / "re" / "refs" / "refrun-manutd-1997-98" / "p0133_cup_draw.png",
+    ),
+    (
+        "cupdraw_747.png",
+        ROOT / "tools" / "re" / "refs" / "refrun-manutd-1997-98" / "p0747_cup_draw.png",
+    ),
 ]
 THRESH = 0.004  # <0.4% of the 640x480 frame after the documented exclusions
 
@@ -40,6 +58,24 @@ THRESH = 0.004  # <0.4% of the 640x480 frame after the documented exclusions
 #    so the chrome bakes frame 74's phase and frame 10's own phase differs.
 EXCLUDE = [
     (489, 436, 614, 470),  # CONTINUE button: animated ball + un-witnessed lit state
+]
+
+# The two GRID shots carry two extra exclusions, each a DATA gap rather than a geometry
+# one, so they are named per-case instead of globally:
+#  - the kit cells and the tie card's two kit panels: the shot feeds club names only, so
+#    no kit is drawn at all, and the original's hi-res panel kit bank is un-extracted
+#    anyway (the same gap CompResultScreen and CharityShieldScreen already carry);
+#  - the DRUM. p0133 and p0747 hold a drum image that is byte-identical to each other and
+#    matches NONE of the twelve exported BOMBO frames (nearest is BOMBO00 at 2709 px),
+#    while p0125 is BOMBO03 and p0445 is BOMBO06 at ZERO. So the drum has at least one
+#    state beyond the twelve stills -- a lead for the parked drum hunt, recorded in
+#    docs/re/cupdraw_screen_re.md, not something this change can resolve.
+GRID_EXCLUDE = [
+    (136, 76, 228, 168),   # the drum: a state none of the twelve BOMBO frames holds
+    (334, 51, 355, 419),   # home kit cells   -- no kit art fed to the shot
+    (601, 51, 622, 419),   # away kit cells
+    (33, 320, 110, 386),   # tie card, home kit panel
+    (236, 320, 287, 386),  # tie card, away kit panel
 ]
 
 
@@ -52,7 +88,10 @@ def report(shot: Path, frame: Path, heat: str | None) -> float:
     d = (a != b).any(axis=2)
     raw = float(d.mean())
     m = d.copy()
-    for x0, y0, x1, y1 in EXCLUDE:
+    rects = list(EXCLUDE)
+    if shot.name in ("cupdraw_133.png", "cupdraw_747.png"):
+        rects += GRID_EXCLUDE
+    for x0, y0, x1, y1 in rects:
         m[y0:y1, x0:x1] = False
     net = float(m.mean())
     print(f"{shot.name} vs {frame.name}")

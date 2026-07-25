@@ -35,6 +35,8 @@ func _run() -> bool:
 	ok = _euro_group_badge() and ok
 	ok = _deadline_warnings() and ok
 	ok = _youth_training_speedup() and ok
+	ok = _cup_draw_forms_and_route() and ok
+	ok = _season_end_sequence() and ok
 	print("")
 	print("ALL PASS" if _fails == 0 else "FAILURES ABOVE (%d)" % _fails)
 	return _fails == 0
@@ -307,6 +309,108 @@ func _youth_training_speedup() -> bool:
 		if int(attrs[a]) > int(base[a]):
 			capped = false
 	ok = _assert(capped, "no attribute overshoots the youth's own shipped BASE") and ok
+	return ok
+
+
+## R4 + R8 -- the cup draw's live route and its two panel forms.
+##
+## R8's switch is the FULL round's tie count, and R4 is the route that was missing: the
+## original raises the SORTEO unprompted when a knockout round is drawn, and the port's
+## 0-px screen had no live caller at all.
+func _cup_draw_forms_and_route() -> bool:
+	print("R4/R8  the cup draw: two panel forms, and a live route")
+	var ok := true
+	var scr: CupDrawScreen = load("res://scenes/CupDrawScreen.gd").new()
+	# > 16 ties -> the scrollable single-line list; <= 16 -> the grid. Both witnessed:
+	# the F.A. Cup ROUND 3 (32) and Coca-Cola ROUND 2 (25) list, ROUND 3 (16) and the
+	# F.A. Cup ROUND 4 (16) grid.
+	scr.setup("league_cup", "Coca-Cola Cup", "ROUND 3", [], 16, ["MATCH", "REPLAY"])
+	ok = _assert(scr.is_grid(), "16 ties -> the GRID form") and ok
+	scr.setup("fa_cup", "F.A. Cup", "ROUND 3", [], 32, ["MATCH", "REPLAY"])
+	ok = _assert(not scr.is_grid(), "32 ties -> the scrollable LIST form") and ok
+	scr.setup("league_cup", "Coca-Cola Cup", "ROUND 2", [], 25, ["1ST LEG", "2ND LEG"])
+	ok = _assert(not scr.is_grid(), "25 ties -> the LIST form") and ok
+	scr.setup("fa_cup", "F.A. Cup", "ROUND 4", [], 16, ["MATCH", "REPLAY"])
+	ok = _assert(scr.is_grid(), "the F.A. Cup ROUND 4's 16 ties -> the GRID form") and ok
+	scr.free()
+	# The plate label is the EXE's own uppercase form, and the leg plates follow the ROUND.
+	var single := {"rounds": [{"label": "Qtr. Finals", "ties": [{"home_id": 1, "away_id": 2}]}]}
+	ok = _assert(Cup.draw_round_plate(single) == "QTR FINALS",
+		"the QTR FINALS plate is the EXE's own spelling") and ok
+	ok = _assert(Cup.draw_leg_plates(single) == ["MATCH", "REPLAY"],
+		"a single-match round shows MATCH / REPLAY") and ok
+	var twoleg := {"rounds": [{"label": "Round 2 - 1st",
+		"ties": [{"home_id": 1, "away_id": 2, "two_legged": true}]}]}
+	ok = _assert(Cup.draw_round_plate(twoleg) == "ROUND 2",
+		"the per-leg suffix is dropped from the ROUND plate") and ok
+	ok = _assert(Cup.draw_leg_plates(twoleg) == ["1ST LEG", "2ND LEG"],
+		"a two-legged round shows 1ST LEG / 2ND LEG") and ok
+	ok = _assert(Cup.draw_art_key({"name": "F.A. Cup"}) == "fa_cup"
+		and Cup.draw_art_key({"name": "Coca-Cola Cup"}) == "league_cup"
+		and Cup.draw_art_key({"name": "U.E.F.A. Cup"}) == "uefa_cup"
+		and Cup.draw_art_key({"name": "Cup Winners' Cup"}) == "cup_winners_cup"
+		and Cup.draw_art_key({"name": "European Cup"}) == "european_cup",
+		"each competition picks its own SORTEO strip") and ok
+	# The route: a played week must leave the draw queued for the hub to raise.
+	var c := _new_career()
+	if c == null:
+		return _assert(false, "career fixture loaded") and ok
+	var rng := RandomNumberGenerator.new()
+	rng.seed = SEED
+	var drew := false
+	for _i in 24:
+		c.advance_week(rng)
+		if not (c.pending_cup_draws as Array).is_empty():
+			drew = true
+			break
+	ok = _assert(drew, "a resolved knockout round queues its SORTEO for the hub") and ok
+	if drew:
+		var d: Dictionary = (c.pending_cup_draws as Array)[0]
+		ok = _assert(not (d.get("ties", []) as Array).is_empty(),
+			"the queued draw carries the round's ties") and ok
+		ok = _assert(str(d.get("round", "")) == str(d.get("round", "")).to_upper(),
+			"the queued round plate is uppercase, as the EXE's block is") and ok
+	return ok
+
+
+## R15 -- the season-end sequence's three new screens carry the frame's own shape.
+func _season_end_sequence() -> bool:
+	print("R15  THE CHAMPIONSHIPS / END OF SEASON / PLAYERS OF THE YEAR")
+	var ok := true
+	# Eight slots, in the sheet's own order, and Career answers with eight entries.
+	ok = _assert(ChampionshipsScreen.SLOTS.size() == 8, "the sheet has eight fixed slots") and ok
+	var comps: Array = []
+	for slot in ChampionshipsScreen.SLOTS:
+		comps.append(str((slot as Dictionary)["comp"]))
+	ok = _assert(comps == Career.CHAMPIONSHIP_SLOTS,
+		"Career returns its eight finals in the sheet's own slot order") and ok
+	# The U.E.F.A. Cup's card is the narrow one: ONE score cell, not two.
+	var uefa: Dictionary = ChampionshipsScreen.SLOTS[5]
+	ok = _assert(str(uefa["comp"]) == "uefa_cup"
+		and (uefa["scores"] as Array).size() == 1,
+		"the U.E.F.A. Cup card carries ONE score cell") and ok
+	for i in [4, 6, 7]:
+		var slot2: Dictionary = ChampionshipsScreen.SLOTS[i]
+		ok = _assert((slot2["scores"] as Array).size() == 2,
+			"the %s card carries TWO score cells" % str(slot2["comp"])) and ok
+	# END OF SEASON's plate counts are the chrome's own and match PYRAMID_ZONES.
+	ok = _assert((EndOfSeasonScreen.MID_ROWS[1] as Array).size() == 4
+		and (EndOfSeasonScreen.REL_ROWS[1] as Array).size() == 3,
+		"the Premier shows 4 U.E.F.A. places and 3 relegated") and ok
+	ok = _assert((EndOfSeasonScreen.REL_ROWS[4] as Array).is_empty(),
+		"the Third Division has no relegation column") and ok
+	for t in [2, 3, 4]:
+		var z: Dictionary = Career.PYRAMID_ZONES[t]
+		var ups: int = int(z["up"]) + (1 if int(z["playoff"]) > 0 else 0)
+		ok = _assert((EndOfSeasonScreen.MID_ROWS[t] as Array).size() == ups,
+			"tier %d's promoted plates match PYRAMID_ZONES" % t) and ok
+		ok = _assert((EndOfSeasonScreen.REL_ROWS[t] as Array).size() == int(z["down"]),
+			"tier %d's relegated plates match PYRAMID_ZONES" % t) and ok
+	# PLAYERS OF THE YEAR is one award per club: ten rows x two columns x four tabs = 80
+	# on screen, and 92 across a full pyramid.
+	ok = _assert(PlayersYearScreen.ROWS == 10 and PlayersYearScreen.COLS.size() == 2,
+		"PLAYERS OF THE YEAR shows twenty clubs a page") and ok
+	ok = _assert(PlayersYearScreen.TABS.size() == 4, "four division tabs, in a 2x2 grid") and ok
 	return ok
 
 

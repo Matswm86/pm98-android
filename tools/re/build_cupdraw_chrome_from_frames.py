@@ -64,6 +64,25 @@ F_MAIN = WCAP / "74_after_wk4.png"
 F_LATE = WCAP / "75_scout_wk5.png"
 F_FACUP = PCAP / "10_fa_cup_draw_round1.png"
 
+# ---- the SECOND panel form (REFRUN R8) -------------------------------------
+# The MATCHES panel has TWO forms and the switch is LIST LENGTH: a round of MORE than 16
+# ties draws one centred `Home - Away` line per tie over 23 scrollable rows (the form
+# above); a round of 16 or fewer draws a 16-row GRID of four columns -- home kit, home
+# club, away club, away kit -- with no scrollbar at all.
+#
+# Binding frames, both EMPTY grids, so the bake has no list ink to clear:
+#   p0125  Coca-Cola Cup ROUND 3, grid drawn, no tie yet -- PRIMARY, the bake is this
+#   p0747  U.E.F.A. Cup 1/16 FINAL -- the plate-recovery partner. p0445 (F.A. Cup ROUND
+#          4) is the other empty grid, but "ROUND 4" inks almost exactly where "ROUND 3"
+#          does, so it recovers nothing; "1/16 FINAL" and "U.E.F.A. CUP" do.
+# and two POPULATED frames the geometry and the text anchors were solved against:
+#   p0133  the same Coca-Cola round with all 16 ties, the manager's own tie marked
+#   p0747  the tie-detail card filled in (F.C. Barcelona / Van Gaal v Karlsruher)
+REFS = ROOT / "tools" / "re" / "refs" / "refrun-manutd-1997-98"
+G_MAIN = REFS / "p0125_cup_draw.png"
+G_ALT = REFS / "p0747_cup_draw.png"
+G_ALT2 = REFS / "p0445_cup_draw.png"
+
 # ---- geometry, all measured off the frames ---------------------------------
 PICTURE = (31, 76, 260, 144)  # x, y, w, h -- cleared to black
 STRIP_AT = (31, 76)  # the competition's 72x144 SORTEO strip
@@ -100,6 +119,38 @@ C_TROUGH = (180, 200, 220)
 
 BTN_FINISH = (350, 440, 462, 464)
 BTN_CONTINUE = (492, 438, 610, 466)
+
+# ---- grid form geometry, off the frames' own black borders ------------------
+# Column borders at x332-333 / 355 / 477-478 / 600 / 622-623; row separators every 23px
+# from y49-50 to y418-419, so 16 rows of 22.
+GRID_Y0, GRID_PITCH, GRID_ROWS = 51, 23, 16
+GRID_ROW_H = 22
+GRID_KIT_L = (334, 355)      # home kit cell (x0, x1 exclusive)
+GRID_HOME = (356, 477)       # home club cell
+GRID_AWAY = (479, 600)       # away club cell
+GRID_KIT_R = (601, 622)      # away kit cell
+# Row bands alternate, and the INK follows the band. The manager's own tie takes a dark
+# plate with his club's name in bright yellow; a highlighted row goes white. All four
+# states are witnessed across p0125 / p0133 / p0747.
+C_GRID_BG = [(200, 220, 240), (160, 180, 200)]
+C_GRID_KIT_BG = [(180, 200, 220), (140, 160, 180)]
+C_GRID_INK = [(100, 120, 140), (60, 80, 100)]
+C_GRID_OWN_BG = (60, 60, 100)
+C_GRID_OWN_INK = (255, 255, 85)
+C_GRID_SEL_BG = (255, 255, 255)
+
+# ---- the tie-detail card (bottom-left panel), solved with probe_text_anchor.py ------
+# Every line centres on its own field sum and every font came out at ZERO differing
+# pixels against BOTH populated frames.
+CARD_CLUB_SUM, CARD_CLUB_TOPS, CARD_CLUB_FONT = 325, (323, 361), "proman10"
+CARD_MGR_SUM, CARD_MGR_TOPS, CARD_MGR_FONT = 325, (335, 373), "calend12"
+CARD_STADIUM_SUM, CARD_STADIUM_TOPS, CARD_STADIUM_FONT = 398, (411, 438), "proman10"
+C_CARD_CLUB = (255, 223, 0)
+C_CARD_MGR = (166, 202, 240)
+C_CARD_MGR_OWN = (42, 191, 85)      # the MANAGER'S OWN name, witnessed on "MWM"
+C_CARD_STADIUM = (42, 191, 255)
+CARD_KIT_L = (33, 325, 110, 381)    # x0, y0, x1, y1 -- the home club's kit panel
+CARD_KIT_R = (236, 329, 287, 385)   # the away club's
 
 
 def load(p: Path) -> np.ndarray:
@@ -146,6 +197,71 @@ def clear_by_union(
     return both
 
 
+def bake_grid() -> dict:
+    """The <=16-tie GRID form (REFRUN R8). Both binding frames are EMPTY grids, so the
+    only spans this has to clear are the picture window and the three dithered plates --
+    the sixteen rows and the tie-detail card are already the original's own blank state."""
+    if not G_MAIN.exists() or not G_ALT.exists() or not G_ALT2.exists():
+        raise SystemExit(f"ASSERT FAILED: grid binding frames missing under {REFS}")
+    f = load(G_MAIN)
+    alt = load(G_ALT)
+    alt2 = load(G_ALT2)
+    # p0445 is a second EMPTY grid on a different competition: it proves the grid
+    # furniture itself is static before any of it is trusted as chrome.
+    grid_static = (f[GRID_Y0:419, 334:622] == alt2[GRID_Y0:419, 334:622]).all()
+    expect(bool(grid_static), "the two empty grids are pixel-identical in the panel")
+    expect(tuple(f[60, 400]) == C_GRID_BG[0], "grid row 0 is the light band")
+    expect(tuple(f[83, 400]) == C_GRID_BG[1], "grid row 1 is the darker band")
+    expect(tuple(f[60, 345]) == C_GRID_KIT_BG[0], "grid row 0's kit cell is a shade darker")
+    for k in range(GRID_ROWS - 1):
+        sep = GRID_Y0 + GRID_PITCH * k + 22
+        expect(tuple(f[sep, 400]) == (0, 0, 0), f"grid row separator at y={sep}")
+    a = f.copy()
+    px, py, pw, ph = PICTURE
+    a[py : py + ph, px : px + pw] = (0, 0, 0)
+    both = clear_by_union(a, f, alt, TITLE_SPAN, C_TITLE)
+    both += clear_by_union(a, f, alt, ROUND_SPAN, C_ROUND)
+    both += sum(clear_by_union(a, f, alt, s, C_LEG) for s in LEG_SPANS)
+    print(f"  grid plates cleared — both-ink fallback px: {both}")
+    # The LEG plates are the same two words on both frames (MATCH / REPLAY v 1ST LEG /
+    # 2ND LEG share strokes), so their overlap is inherently higher than the list form's.
+    expect(both < 1000, "the two grid titles overlap only partially")
+    Image.fromarray(a).save(OUT / "chrome_grid.png")
+    print(f"  {(OUT / 'chrome_grid.png').relative_to(ROOT)}  {a.shape[1]}x{a.shape[0]}")
+    return {
+        "source_frames": [str(p.relative_to(ROOT)) for p in (G_MAIN, G_ALT, G_ALT2)],
+        "rows": GRID_ROWS,
+        "y0": GRID_Y0,
+        "pitch": GRID_PITCH,
+        "row_h": GRID_ROW_H,
+        "kit_left": list(GRID_KIT_L),
+        "home": list(GRID_HOME),
+        "away": list(GRID_AWAY),
+        "kit_right": list(GRID_KIT_R),
+        "band_bg": [list(c) for c in C_GRID_BG],
+        "band_kit_bg": [list(c) for c in C_GRID_KIT_BG],
+        "band_ink": [list(c) for c in C_GRID_INK],
+        "own_bg": list(C_GRID_OWN_BG),
+        "own_ink": list(C_GRID_OWN_INK),
+        "selected_bg": list(C_GRID_SEL_BG),
+        "switch": "grid when the round has <= 16 ties, the scrollable list otherwise",
+    }
+
+
+def card_spec() -> dict:
+    return {
+        "club": {"field_sum": CARD_CLUB_SUM, "tops": list(CARD_CLUB_TOPS),
+                 "font": CARD_CLUB_FONT, "colour": list(C_CARD_CLUB)},
+        "manager": {"field_sum": CARD_MGR_SUM, "tops": list(CARD_MGR_TOPS),
+                    "font": CARD_MGR_FONT, "colour": list(C_CARD_MGR),
+                    "own_colour": list(C_CARD_MGR_OWN)},
+        "stadium": {"field_sum": CARD_STADIUM_SUM, "tops": list(CARD_STADIUM_TOPS),
+                    "font": CARD_STADIUM_FONT, "colour": list(C_CARD_STADIUM)},
+        "kit_left": list(CARD_KIT_L),
+        "kit_right": list(CARD_KIT_R),
+    }
+
+
 def main() -> None:
     f = load(F_MAIN)
     late = load(F_LATE)
@@ -188,8 +304,11 @@ def main() -> None:
     Image.fromarray(a).save(OUT / "chrome.png")
     print(f"  {(OUT / 'chrome.png').relative_to(ROOT)}  {a.shape[1]}x{a.shape[0]}")
 
+    grid = bake_grid()
     spec = {
         "source_frames": [str(p.relative_to(ROOT)) for p in (F_MAIN, F_LATE, F_FACUP)],
+        "grid": grid,
+        "tie_card": card_spec(),
         "picture": {
             "rect": list(PICTURE),
             "clear": [0, 0, 0],

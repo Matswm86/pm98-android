@@ -103,9 +103,13 @@ the rule is unknown.
 
 ## Work list
 
-> **STATUS 2026-07-25 (evening).** Items 1, 3, 5, 6, 7, 8, 9 and the owner deviation are
-> SHIPPED; item 4 is shipped in part; item 2 is not started. Every shipped item is asserted
-> in [`app/tests/test_refrun_findings.gd`](../../app/tests/test_refrun_findings.gd), which
+> **STATUS 2026-07-25 (late).** **The whole list is SHIPPED.** Items 1, 3, 5, 6, 7, 8, 9
+> and the owner deviation landed earlier in the evening; item 2 (the cup-draw route and
+> the second panel form) and the rest of item 4 (THE CHAMPIONSHIPS, END OF SEASON,
+> PLAYERS OF THE YEAR) landed after them, every screen render-diffed at 0 differing
+> pixels against its own binding frame. Item 5's FINANCE PER WEEK view is built too.
+> Every shipped item is asserted in
+> [`app/tests/test_refrun_findings.gd`](../../app/tests/test_refrun_findings.gd), which
 > checks the numbers and strings against this document rather than against the port.
 > Detail per item below.
 
@@ -132,9 +136,20 @@ the rule is unknown.
    The running-at-a-loss counter and its verbatim alert are in; the SACKING THRESHOLD is
    not witnessed, so `LOSS_SACK_WEEKS` is ours and flagged, and it feeds the board review
    the app already has rather than an invented mid-season dismissal.
-2. **NOT STARTED.** Route the cups and Europe (R4), and present the draw with both panel
-   forms and competition-dependent buttons (R8). `CupDrawScreen` is still 0-px art with no
-   live caller.
+2. **SHIPPED.** The 0-px `CupDrawScreen` has a LIVE ROUTE: `Career._queue_cup_draw` banks
+   one entry per knockout round it resolves -- both domestic cups and all three European
+   competitions -- and `Main._pop_cup_draw` raises it at the head of the post-week card
+   chain, over the hub, unprompted, exactly as the original does (R4). And it has BOTH
+   panel forms (R8): a round of more than 16 ties keeps the scrollable single-line list,
+   16 or fewer gets the original's 16-row GRID of home kit | home club | away club | away
+   kit, with the manager's own tie on its dark plate and his club in bright yellow. The
+   bottom-left panel's two "long value cells" turned out to be a TIE-DETAIL CARD -- each
+   club's name over its manager's, the two legs' grounds beside the MATCH / REPLAY plates,
+   and the manager's OWN name in green. All four cup-draw parity shots pass: 0 / 1 / 0 / 2
+   differing pixels. **Flagged divergence:** the original draws a round and plays it
+   later; `Cup.play_round` pairs and plays in one step, so the card is raised immediately
+   after rather than before. Nothing on the screen differs -- the SORTEO carries no
+   scores -- but the ordering against the week's result news is ours.
 3. **SHIPPED.** Both cups are contested by all 92 league clubs with the Premier entering at
    Round 3. `Cup` gained `late_entry`, and byes now normalise ANY off-power-of-two field
    (the old code only did round one's). The field walks 72 -> 64 -> (+20) 52 -> 32 -> 16 ->

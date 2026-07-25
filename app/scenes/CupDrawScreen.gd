@@ -21,14 +21,32 @@ class_name CupDrawScreen
 ## OPAQUE — its index-0 pixels land as black in the original, which is why a transparent
 ## blit left 168 stray pixels.
 ##
-## NOT witnessed, and therefore NOT drawn: the two long value cells in the bottom-left
-## panel are empty in every frame we hold, so they stay empty; the hand (MANO0..7) and
-## ball (BOLA0..3) sprites the EXE loads for this screen appear in no captured frame, so
-## they are exported but unused; and the CONTINUE ball's lit/unlit rule is unknown, so
-## the chrome keeps frame 74's phase.
+## THE MATCHES PANEL HAS TWO FORMS, and the switch is LIST LENGTH (REFRUN R8): a round
+## of MORE than 16 ties draws one centred `Home - Away` line per tie over 23 scrollable
+## rows; a round of 16 or fewer draws a 16-row GRID of four columns -- home kit, home
+## club, away club, away kit -- with no scrollbar at all. Both forms are the original's,
+## each with its own baked chrome. Witnessed on four frames of the reference run: the
+## Coca-Cola Cup ROUND 3 and the F.A. Cup ROUND 4 (16 ties -> grid) against the F.A. Cup
+## ROUND 3 and the Coca-Cola ROUND 2 (32 and 25 ties -> list).
+##
+## THE BOTTOM-LEFT PANEL IS A TIE-DETAIL CARD, and it is populated (R8): the two clubs'
+## kits, each club's name over its manager's, and the two legs' grounds beside the
+## MATCH / REPLAY (or 1ST LEG / 2ND LEG) plates. Every line's font and pen was solved
+## against p0131 and p0747 at ZERO differing pixels, and the MANAGER'S OWN name comes out
+## green (42,191,85) where another manager's is pale blue.
+##
+## NOT witnessed, and therefore NOT drawn: the hand (MANO0..7) and ball (BOLA0..3)
+## sprites the EXE loads for this screen appear in no captured frame, so they are
+## exported but unused; and the CONTINUE ball's lit/unlit rule is unknown, so the chrome
+## keeps frame 74's phase. The white row the frames show is a MOUSE-HOVER highlight,
+## which a touch app has no equivalent of -- it is bound to the tapped row instead, so
+## the state is the original's own even though the trigger cannot be.
 
 signal continue_pressed
 signal finish_pressed
+## A MATCHES row was tapped (grid form): its index in `ties`. The caller answers with
+## `show_tie()` because only it knows the managers and the grounds.
+signal tie_selected(row: int)
 
 const W := 640
 const H := 480
@@ -86,6 +104,47 @@ const C_THUMB_B := [Color8(120, 140, 160), Color8(120, 140, 160), Color8(100, 12
 const BTN_FINISH := Rect2(350, 440, 112, 24)
 const BTN_CONTINUE := Rect2(492, 438, 118, 28)
 
+# ---- the GRID form, <= 16 ties (REFRUN R8) ---------------------------------
+const GRID_MAX := 16          # the switch: <= 16 ties -> grid, more -> the list above
+const GRID_ROWS_N := 16       # the grid always paints sixteen bands, drawn or not
+const GRID_Y0 := 51
+const GRID_PITCH := 23
+const GRID_ROW_H := 22
+const GRID_KIT_L := [334, 355]
+const GRID_HOME := [356, 476]
+const GRID_AWAY := [479, 599]
+const GRID_KIT_R := [601, 622]
+const GRID_PEN_TOP := 6       # pen top inside the row band
+## Bands alternate and the INK follows the band; the manager's own tie takes a dark plate
+## with his club in bright yellow, and the tapped row goes white. All four states are the
+## frames' own.
+const C_GRID_BG := [Color8(200, 220, 240), Color8(160, 180, 200)]
+const C_GRID_KIT_BG := [Color8(180, 200, 220), Color8(140, 160, 180)]
+const C_GRID_INK := [Color8(100, 120, 140), Color8(60, 80, 100)]
+const C_GRID_OWN_BG := Color8(60, 60, 100)
+const C_GRID_OWN_KIT_BG := Color8(40, 40, 80)
+const C_GRID_OWN_INK := Color8(100, 120, 140)   # the side that is NOT the manager's club
+const C_GRID_OWN_INK_MINE := Color8(255, 255, 85)
+const C_GRID_SEL_BG := Color8(255, 255, 255)
+const C_GRID_SEL_INK := Color8(60, 80, 100)
+
+# ---- the tie-detail card (the bottom-left panel) ---------------------------
+const CARD_CLUB_SUM := 325
+const CARD_CLUB_TOPS := [323, 361]
+const CARD_MGR_SUM := 325
+const CARD_MGR_TOPS := [335, 373]
+const CARD_STADIUM_SUM := 398
+const CARD_STADIUM_TOPS := [411, 438]
+const C_CARD_CLUB := Color8(255, 223, 0)
+const C_CARD_MGR := Color8(166, 202, 240)
+const C_CARD_MGR_OWN := Color8(42, 191, 85)
+const C_CARD_STADIUM := Color8(42, 191, 255)
+## The original's own hi-res panel kit art is un-extracted, so the app's kit texture is
+## scaled into the measured rect -- the same documented approximation CompResultScreen
+## and CharityShieldScreen already carry.
+const CARD_KIT_L := Rect2(33, 325, 77, 56)
+const CARD_KIT_R := Rect2(236, 329, 51, 56)
+
 ## The five competitions MANAGER.EXE loads a SORTEO strip for on THIS screen, plus the
 ## two more that ship one in IMG.PKF (charity / supercup) for the single-tie finals.
 const STRIPS := {
@@ -99,13 +158,16 @@ const STRIPS := {
 }
 
 var _chrome: Texture2D
+var _chrome_grid: Texture2D
 var _fondo: Texture2D
 var _bombo: Array[Texture2D] = []
 var _strip: Texture2D
 var _page10: Texture2D
 var _page14: Texture2D
+var _page12c: Texture2D       # calend12 — the card's two manager lines
 var _g10: Dictionary = {}
 var _g14: Dictionary = {}
+var _g12c: Dictionary = {}
 
 var _title := ""                  # "Coca-Cola Cup" — the EXE's own spelling
 var _round := ""                  # "ROUND 2" — the EXE's own uppercase label
@@ -115,10 +177,15 @@ var _total := 0                   # ties in the round; drives the scrollbar
 var _first := 0                   # first visible row
 var _spin := 0.0                  # drum animation phase (seconds)
 var _press := ""
+var _own_club_id := -1            # the manager's club — its tie takes the dark plate
+var _own_manager := ""            # his name — it renders green on the card
+var _sel := -1                    # the tapped row, whose tie fills the detail card
+var _card: Dictionary = {}        # {home:{club,manager,stadium}, away:{...}} or {}
 
 
 func _ready() -> void:
 	_chrome = load("res://art/screens/cupdraw/chrome.png")
+	_chrome_grid = load("res://art/screens/cupdraw/chrome_grid.png")
 	_fondo = load("res://art/screens/cupdraw/fondo.png")
 	for i in 12:
 		var t: Texture2D = load("res://art/screens/cupdraw/bombo%02d_opaque.png" % i)
@@ -126,8 +193,10 @@ func _ready() -> void:
 			_bombo.append(t)
 	_page10 = PMFont.page_texture("proman10")
 	_page14 = PMFont.page_texture("proman14")
+	_page12c = PMFont.page_texture("calend12")
 	_g10 = PMFont.chars("proman10")
 	_g14 = PMFont.chars("proman14")
+	_g12c = PMFont.chars("calend12")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2(W, H)
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -145,15 +214,34 @@ func _ready() -> void:
 ##   legs   — the two bottom-left plates: ["1ST LEG","2ND LEG"] two-legged, else
 ##            ["MATCH","REPLAY"]
 func setup(key: String, title: String, rnd: String, ties: Array, total: int,
-		legs: Array) -> void:
+		legs: Array, own_club_id := -1, own_manager := "") -> void:
 	_title = title
 	_round = rnd
 	_ties = ties
 	_total = maxi(total, ties.size())
 	_legs = legs
 	_first = 0
+	_own_club_id = own_club_id
+	_own_manager = own_manager
+	_sel = -1
+	_card = {}
 	var stem: String = str(STRIPS.get(key, "sorteo_facup"))
 	_strip = load("res://art/screens/cupdraw/%s.png" % stem)
+	queue_redraw()
+
+
+## True when the round is short enough for the original's GRID form. The switch is the
+## FULL round's tie count, not how many have been drawn so far, because the grid's
+## sixteen row bands are painted before any club lands in them (frames p0125 / p0445).
+func is_grid() -> bool:
+	return _total <= GRID_MAX
+
+
+## Fill the bottom-left tie-detail card. Each side is {club, manager, stadium}; the leg
+## plates name the two grounds, so `stadium` is that side's own ground. Pass {} to clear.
+func show_tie(card: Dictionary, row := -1) -> void:
+	_card = card
+	_sel = row
 	queue_redraw()
 
 
@@ -202,8 +290,24 @@ func _on_input(e: InputEvent) -> void:
 			finish_pressed.emit()
 		elif _press == "continue" and BTN_CONTINUE.has_point(d):
 			continue_pressed.emit()
+		elif _press == "":
+			var r := _row_at(d)
+			if r >= 0:
+				tie_selected.emit(r)
 		_press = ""
 	queue_redraw()
+
+
+## The MATCHES row under a design-space point, or -1. Grid form only: the list form's
+## rows have no witnessed selected state beyond the same hover highlight, and no card
+## content was ever captured for one.
+func _row_at(d: Vector2) -> int:
+	if not is_grid() or d.x < GRID_KIT_L[0] or d.x >= GRID_KIT_R[1]:
+		return -1
+	var r := int(floor((d.y - GRID_Y0) / float(GRID_PITCH)))
+	if r < 0 or r >= GRID_ROWS_N or d.y < GRID_Y0:
+		return -1
+	return r if r < _ties.size() else -1
 
 
 # ---- text ----------------------------------------------------------------
@@ -250,19 +354,103 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0), true)
 	var s := _scale()
 	draw_set_transform(_origin(s), 0.0, Vector2(s, s))
-	if _chrome != null:
-		draw_texture(_chrome, Vector2.ZERO)
+	var grid := is_grid()
+	var chrome: Texture2D = _chrome_grid if grid else _chrome
+	if chrome != null:
+		draw_texture(chrome, Vector2.ZERO)
 
 	_draw_picture()
 	_txt_field(_page14, _g14, TITLE_SUM, TITLE_TOP, _title, C_TITLE)
 	_txt_field(_page14, _g14, ROUND_SUM, ROUND_TOP, _round, C_ROUND)
 	for i in mini(_legs.size(), LEG_TOPS.size()):
 		_txt_field(_page10, _g10, LEG_SUM, int(LEG_TOPS[i]), str(_legs[i]), C_LEG)
-	_draw_rows()
-	_draw_scrollbar()
+	if grid:
+		_draw_grid()
+	else:
+		_draw_rows()
+		_draw_scrollbar()
+	_draw_card()
 	if _press != "":
 		draw_rect(BTN_FINISH if _press == "finish" else BTN_CONTINUE,
 			Color(1, 1, 1, 0.18), true)
+
+
+## The GRID form: sixteen four-column bands, home kit | home club | away club | away kit.
+## A band whose tie is the MANAGER'S takes the dark plate and prints his club in bright
+## yellow; the tapped band goes white. Both are the frames' own states.
+func _draw_grid() -> void:
+	for k in GRID_ROWS_N:
+		if k >= _ties.size():
+			break
+		var tie: Dictionary = _ties[k]
+		var home := str(tie.get("home", ""))
+		if home == "":
+			continue
+		var away := str(tie.get("away", ""))
+		var y := GRID_Y0 + GRID_PITCH * k
+		var band := k & 1
+		var hid := int(tie.get("home_id", -1))
+		var aid := int(tie.get("away_id", -1))
+		var mine: bool = _own_club_id >= 0 and (hid == _own_club_id or aid == _own_club_id)
+		var ink: Color = C_GRID_INK[band]
+		if mine:
+			_fill_row(y, C_GRID_OWN_BG, C_GRID_OWN_KIT_BG)
+			ink = C_GRID_OWN_INK
+		elif k == _sel:
+			_fill_row(y, C_GRID_SEL_BG, C_GRID_SEL_BG)
+			ink = C_GRID_SEL_INK
+		var pen := y + GRID_PEN_TOP
+		_txt_field(_page10, _g10, GRID_HOME[0] + GRID_HOME[1], pen, home,
+			C_GRID_OWN_INK_MINE if (mine and hid == _own_club_id) else ink)
+		if away != "":
+			_txt_field(_page10, _g10, GRID_AWAY[0] + GRID_AWAY[1], pen, away,
+				C_GRID_OWN_INK_MINE if (mine and aid == _own_club_id) else ink)
+		_kit_cell(GRID_KIT_L, y, hid)
+		if away != "":
+			_kit_cell(GRID_KIT_R, y, aid)
+
+
+## Repaint one grid band, cell by cell: the two name cells take `bg` and the two kit
+## cells `kit_bg`. The black column separators between them are the chrome's and must
+## survive, so nothing paints across x477-478 or the two cell borders.
+func _fill_row(y: int, bg: Color, kit_bg: Color) -> void:
+	draw_rect(Rect2(GRID_KIT_L[0], y, GRID_KIT_L[1] - GRID_KIT_L[0], GRID_ROW_H), kit_bg, true)
+	draw_rect(Rect2(GRID_HOME[0], y, GRID_HOME[1] - GRID_HOME[0] + 1, GRID_ROW_H), bg, true)
+	draw_rect(Rect2(GRID_AWAY[0], y, GRID_AWAY[1] - GRID_AWAY[0] + 1, GRID_ROW_H), bg, true)
+	draw_rect(Rect2(GRID_KIT_R[0], y, GRID_KIT_R[1] - GRID_KIT_R[0], GRID_ROW_H), kit_bg, true)
+
+
+func _kit_cell(cell: Array, y: int, club_id: int) -> void:
+	var kit := PMChrome.kit(club_id)
+	if kit == null:
+		return
+	draw_texture_rect_region(kit,
+		Rect2(int(cell[0]) + 2, y + 1, int(cell[1]) - int(cell[0]) - 4, GRID_ROW_H - 2),
+		Rect2(0, 0, 31, 64))
+
+
+## The bottom-left tie-detail card. Empty until a row is tapped, which is the original's
+## own resting state (every captured frame with no tie selected shows it blank).
+func _draw_card() -> void:
+	if _card.is_empty():
+		return
+	var sides: Array = [_card.get("home", {}), _card.get("away", {})]
+	for i in sides.size():
+		var side: Dictionary = sides[i]
+		if side.is_empty():
+			continue
+		_txt_field(_page10, _g10, CARD_CLUB_SUM, int(CARD_CLUB_TOPS[i]),
+			str(side.get("club", "")), C_CARD_CLUB)
+		var mgr := str(side.get("manager", ""))
+		if mgr != "":
+			_txt_field(_page12c, _g12c, CARD_MGR_SUM, int(CARD_MGR_TOPS[i]), mgr,
+				C_CARD_MGR_OWN if (_own_manager != "" and mgr == _own_manager) else C_CARD_MGR)
+		_txt_field(_page10, _g10, CARD_STADIUM_SUM, int(CARD_STADIUM_TOPS[i]),
+			str(side.get("stadium", "")), C_CARD_STADIUM)
+		var kit := PMChrome.kit(int(side.get("club_id", -1)))
+		if kit != null:
+			draw_texture_rect_region(kit, CARD_KIT_L if i == 0 else CARD_KIT_R,
+				Rect2(0, 0, 31, 64))
 
 
 ## Black window, competition strip, drum backdrop, drum frame (opaque). Exactly the

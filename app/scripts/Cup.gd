@@ -210,6 +210,57 @@ static func is_finished(b: Dictionary) -> bool:
 static func _survivors(b: Dictionary) -> Array:
 	return b.get("survivors", [])
 
+## ---- the SORTEO payload (docs/re/cupdraw_screen_re.md) ---------------------
+##
+## The three things CupDrawScreen needs off a bracket, kept here so the hub route and the
+## live post-week route cannot drift apart.
+
+## The ROUND plate, in the EXE's own uppercase form (0x2523fc-0x252428: FINAL / QTR
+## FINALS / ROUND 4..1). The bracket's own label is uppercased and `QTR. FINALS`
+## normalised; a label that block does not carry (ROUND 5, SEMIFINALS) is uppercased
+## as-is rather than invented into one of the SEMIFINAL 1 / SEMIFINAL 2 plates, whose
+## selection rule is not reversed. The per-leg suffix is dropped -- the original carries
+## the leg on the bottom-left plates, not on this one.
+static func draw_round_plate(b: Dictionary) -> String:
+	var rounds: Array = b.get("rounds", [])
+	if rounds.is_empty():
+		return ""
+	var label := str((rounds[-1] as Dictionary).get("label", "")).to_upper()
+	for suffix in [" - 1ST", " - 2ND"]:
+		if label.ends_with(suffix):
+			label = label.substr(0, label.length() - suffix.length())
+	return "QTR FINALS" if label == "QTR. FINALS" else label
+
+
+## The two bottom-left plates. They follow THIS round, not the competition: the League
+## Cup is two-legged throughout but its final is a single match, so that round shows
+## MATCH / REPLAY.
+static func draw_leg_plates(b: Dictionary) -> Array:
+	var rounds: Array = b.get("rounds", [])
+	if not rounds.is_empty():
+		for tie in ((rounds[-1] as Dictionary).get("ties", []) as Array):
+			if bool((tie as Dictionary).get("two_legged", false)):
+				return ["1ST LEG", "2ND LEG"]
+	return ["MATCH", "REPLAY"]
+
+
+## The competition's own SORTEO strip key (CupDrawScreen.STRIPS), from the bracket's own
+## name -- the five MANAGER.EXE loads a strip for on this screen.
+static func draw_art_key(b: Dictionary) -> String:
+	# ORDER MATTERS: "u.e.f.a. cup" CONTAINS "f.a.", so the European names are tested
+	# first. Getting that backwards put the U.E.F.A. Cup on the F.A. Cup's trophy.
+	var n := str(b.get("name", "")).to_lower()
+	if n.find("u.e.f.a") >= 0 or n.find("uefa") >= 0:
+		return "uefa_cup"
+	if n.find("winner") >= 0 or n.find("recopa") >= 0:
+		return "cup_winners_cup"
+	if n.find("f.a.") >= 0 or n.find("fa cup") >= 0:
+		return "fa_cup"
+	if n.find("coca") >= 0 or n.find("league cup") >= 0:
+		return "league_cup"
+	return "european_cup"
+
+
 static func champion_id(b: Dictionary) -> int:
 	return int(b.get("champion_id", -1))
 

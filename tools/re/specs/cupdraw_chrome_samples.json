@@ -4,6 +4,143 @@
     "screenshots/wine-captures-2026-07-18-goalscorers/75_scout_wk5.png",
     "screenshots/promanager-career-2026-07-16/10_fa_cup_draw_round1.png"
   ],
+  "grid": {
+    "source_frames": [
+      "tools/re/refs/refrun-manutd-1997-98/p0125_cup_draw.png",
+      "tools/re/refs/refrun-manutd-1997-98/p0747_cup_draw.png",
+      "tools/re/refs/refrun-manutd-1997-98/p0445_cup_draw.png"
+    ],
+    "rows": 16,
+    "y0": 51,
+    "pitch": 23,
+    "row_h": 22,
+    "kit_left": [
+      334,
+      355
+    ],
+    "home": [
+      356,
+      477
+    ],
+    "away": [
+      479,
+      600
+    ],
+    "kit_right": [
+      601,
+      622
+    ],
+    "band_bg": [
+      [
+        200,
+        220,
+        240
+      ],
+      [
+        160,
+        180,
+        200
+      ]
+    ],
+    "band_kit_bg": [
+      [
+        180,
+        200,
+        220
+      ],
+      [
+        140,
+        160,
+        180
+      ]
+    ],
+    "band_ink": [
+      [
+        100,
+        120,
+        140
+      ],
+      [
+        60,
+        80,
+        100
+      ]
+    ],
+    "own_bg": [
+      60,
+      60,
+      100
+    ],
+    "own_ink": [
+      255,
+      255,
+      85
+    ],
+    "selected_bg": [
+      255,
+      255,
+      255
+    ],
+    "switch": "grid when the round has <= 16 ties, the scrollable list otherwise"
+  },
+  "tie_card": {
+    "club": {
+      "field_sum": 325,
+      "tops": [
+        323,
+        361
+      ],
+      "font": "proman10",
+      "colour": [
+        255,
+        223,
+        0
+      ]
+    },
+    "manager": {
+      "field_sum": 325,
+      "tops": [
+        335,
+        373
+      ],
+      "font": "calend12",
+      "colour": [
+        166,
+        202,
+        240
+      ],
+      "own_colour": [
+        42,
+        191,
+        85
+      ]
+    },
+    "stadium": {
+      "field_sum": 398,
+      "tops": [
+        411,
+        438
+      ],
+      "font": "proman10",
+      "colour": [
+        42,
+        191,
+        255
+      ]
+    },
+    "kit_left": [
+      33,
+      325,
+      110,
+      381
+    ],
+    "kit_right": [
+      236,
+      329,
+      287,
+      385
+    ]
+  },
   "picture": {
     "rect": [
       31,

@@ -198,6 +198,17 @@ var loss_weeks: int = 0
 # The channelTV card queued for the coming HOME match: {"fee": int, "comp": String}.
 # {} when the next fixture is away, or the competition's fee is not witnessed.
 var pending_channel_tv: Dictionary = {}
+## Knockout rounds whose draw the hub still has to raise, oldest first (REFRUN R4). The
+## original raises the pixel-exact SORTEO screen UNPROMPTED when a round is drawn; the
+## port had the screen at 0 differing pixels and NO live caller at all. Each entry is
+## {key, title, round, ties, total, legs} -- exactly CupDrawScreen.setup's arguments.
+##
+## DIVERGENCE, flagged: the original draws a round and plays it later, so its SORTEO
+## shows the ties before they are played. This app's `Cup.play_round` pairs AND plays in
+## one step, so the card is raised immediately AFTER. Nothing on the screen differs --
+## the SORTEO carries no scores -- but the ordering against the week's result news is
+## ours until the model separates the two steps.
+var pending_cup_draws: Array = []
 
 var supercup: Dictionary = {}           # European Supercup result; {} = not played
 var sa_champion_id: int = -1            # Libertadores holder, for the December Intercontinental
@@ -421,6 +432,7 @@ func _init_club(club: Dictionary, league: Dictionary, league_clubs: Array, leagu
 	_wk = {}
 	loss_weeks = 0
 	pending_channel_tv = {}
+	pending_cup_draws = []
 	pending_champion_cards = []
 	sa_champion_id = -1
 	training_focus = {}
@@ -915,6 +927,36 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 	return manager_res
 
 
+## Queue one knockout round's SORTEO for the hub (REFRUN R4). Reads the bracket's LATEST
+## round -- the one just resolved -- and hands CupDrawScreen exactly the payload it takes.
+## A group-phase step is not a draw and raises nothing; nor is a round of byes only.
+func _queue_cup_draw(b: Dictionary) -> void:
+	var rounds: Array = b.get("rounds", [])
+	if rounds.is_empty():
+		return
+	var last: Dictionary = rounds[-1]
+	var ties: Array = []
+	for t in (last.get("ties", []) as Array):
+		var tie: Dictionary = t
+		if bool(tie.get("bye", false)):
+			continue        # a bye has no opponent and the original lists no line for it
+		var h := int(tie.get("home_id", -1))
+		var a := int(tie.get("away_id", -1))
+		ties.append({"home": _any_club_name(h), "away": _any_club_name(a),
+			"home_id": h, "away_id": a})
+	if ties.is_empty():
+		return
+	var name := str(b.get("name", ""))
+	pending_cup_draws.append({
+		"key": Cup.draw_art_key(b),
+		"title": name,
+		"round": Cup.draw_round_plate(b),
+		"ties": ties,
+		"total": ties.size(),
+		"legs": Cup.draw_leg_plates(b),
+	})
+
+
 ## Play every due round of both cups (F.A. Cup + League Cup) whose scheduled week has
 ## been reached. The bracket dicts mutate in place, so this writes straight to the save.
 func _play_due_cup_rounds(rng: RandomNumberGenerator, clubs_override: Dictionary) -> void:
@@ -928,6 +970,7 @@ func _play_due_cup_rounds(rng: RandomNumberGenerator, clubs_override: Dictionary
 		while Cup.round_due(cup, week):
 			var cr := Cup.play_round(cup, rng, ratings_fn, club_id, names_fn, xi_fn,
 				_cup_report_sink())
+			_queue_cup_draw(cup)
 			for n in cr["news"]:
 				_news(n["kind"], n["text"])
 			# NOTE: cr["prize"] is Cup's own documented-invention purse and is now ZERO
@@ -949,6 +992,7 @@ func _play_due_cup_rounds(rng: RandomNumberGenerator, clubs_override: Dictionary
 			continue
 		while Cup.round_due(eb, week):
 			var in_before := Cup.still_in(eb, club_id)
+			_queue_cup_draw(eb)
 			var er := Cup.play_next(eb, rng, ratings_fn, club_id, names_fn, xi_fn,
 				_cup_report_sink())
 			for n in er["news"]:
@@ -4003,6 +4047,7 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	_wk = {}
 	loss_weeks = 0
 	pending_channel_tv = {}
+	pending_cup_draws = []
 	pending_champion_cards = []
 	sa_champion_id = -1
 	# The STATISTICS store is per SEASON (its header reads "STATISTICS FOR <club>." with

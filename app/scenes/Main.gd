@@ -770,8 +770,69 @@ func _cupdraw_shot() -> void:
 	scr.pin_drum(7)
 	await _settle()
 	_save_shot(dir, "cupdraw_10.png")
+	# ...and the GRID form (REFRUN R8), against the reference run's own two frames.
+	# p0133: Coca-Cola Cup ROUND 3, all sixteen ties, the manager's own tie on row 1.
+	scr.setup("league_cup", "Coca-Cola Cup", "ROUND 3", _CUPDRAW_R3_TIES, 16,
+		["MATCH", "REPLAY"], _CUPDRAW_OWN_ID, "MWM")
+	scr.pin_drum(0)
+	await _settle()
+	_save_shot(dir, "cupdraw_133.png")
+	# p0747: a U.E.F.A. Cup 1/16 FINAL with the tie-detail card filled in.
+	scr.setup("uefa_cup", "U.E.F.A. CUP", "1/16 FINAL", _CUPDRAW_UEFA_TIES, 16,
+		["1ST LEG", "2ND LEG"], _CUPDRAW_OWN_ID, "MWM")
+	scr.show_tie({
+		"home": {"club": "F.C. Barcelona", "club_id": -1, "manager": "Van Gaal",
+			"stadium": "Camp Nou"},
+		"away": {"club": "Karlsruher", "club_id": -1, "manager": "Winfried Schafer",
+			"stadium": "Wildpark"},
+	}, 5)
+	scr.pin_drum(0)
+	await _settle()
+	_save_shot(dir, "cupdraw_747.png")
 	print("CUPDRAW-SHOT done")
 	get_tree().quit()
+
+
+## The reference run's own two grid draws, verbatim off p0133 and p0747. `home_id` /
+## `away_id` only have to identify the MANAGER's club for the own-tie plate, so the
+## sentinel below is used for it and every other club is left unidentified.
+const _CUPDRAW_OWN_ID := 424242
+const _CUPDRAW_R3_TIES := [
+	{"home": "Aston Villa", "away": "Carlisle U."},
+	{"home": "Bradford City", "away": "Manchester Utd.", "away_id": _CUPDRAW_OWN_ID},
+	{"home": "Bolton W", "away": "Arsenal"},
+	{"home": "Sheffield W.", "away": "Chelsea"},
+	{"home": "Newcastle Utd", "away": "Bury"},
+	{"home": "Wimbledon", "away": "Tranmere Rov"},
+	{"home": "Liverpool", "away": "Peterborough"},
+	{"home": "Manchester C", "away": "WBA"},
+	{"home": "Stockport C", "away": "Sheffield Utd"},
+	{"home": "Leicester", "away": "Ipswich"},
+	{"home": "Charlton Ath", "away": "Blackburn R."},
+	{"home": "Middlesbrough", "away": "Nottingham F."},
+	{"home": "Grimsby T", "away": "Coventry"},
+	{"home": "Wycombe W.", "away": "Sunderland"},
+	{"home": "Tottenham H", "away": "Barnsley"},
+	{"home": "West Ham Utd", "away": "Plymouth Arg."},
+]
+const _CUPDRAW_UEFA_TIES := [
+	{"home": "Spartak Moscú", "away": "Croatia Zag."},
+	{"home": "Helsingborgs", "away": "Panathinaikos"},
+	{"home": "Olympiakos", "away": "B. Leverkusen"},
+	{"home": "Schalke 04", "away": "Chelsea"},
+	{"home": "Sampdoria", "away": "Vejle BK"},
+	{"home": "F.C. Barcelona", "away": "Karlsruher"},
+	{"home": "G. Ekeren", "away": "Manchester Utd.", "away_id": _CUPDRAW_OWN_ID},
+	{"home": "Varzim", "away": "Borussia M."},
+	{"home": "Tottenham H", "away": "D.Bucarest"},
+	{"home": "C. At. Madrid", "away": "Sturm Graz"},
+	{"home": "Lyon", "away": "R. Valladolid"},
+	{"home": "Sl.Bratislava", "away": "Valletta"},
+	{"home": "Blackburn R.", "away": "PAOK"},
+	{"home": "De Graafschap", "away": "Ferencvaros"},
+	{"home": "Viking", "away": "C.Salzburgo"},
+	{"home": "Marítimo", "away": "Primorje"},
+]
 
 
 func _groundact_shot() -> void:
@@ -1977,13 +2038,13 @@ func _career_advance() -> void:
 			_career.save()
 			_show_shield_card(_career.charity_shield, func() -> void:
 				_show_career()
-				_pop_month_awards(func() -> void: _pop_channel_tv(_pop_pending_team_offers))))
+				_pop_cup_draw(func() -> void: _pop_month_awards(func() -> void: _pop_channel_tv(_pop_pending_team_offers)))))
 		return
 	var res := _career.advance_week(rng)   # ratings come from the live roster
 	if res.is_empty():
 		_career.save()   # bye / season end: no presentation, save immediately
 		_show_career()   # refresh the hub in place
-		_pop_month_awards(func() -> void: _pop_channel_tv(_pop_pending_team_offers))
+		_pop_cup_draw(func() -> void: _pop_month_awards(func() -> void: _pop_channel_tv(_pop_pending_team_offers)))
 		return
 	_show_match_result(res)
 
@@ -2051,7 +2112,7 @@ func _show_match_result(res: Dictionary, on_finish: Callable = Callable()) -> vo
 	var finish := on_finish if on_finish.is_valid() else func() -> void:
 		_career.save()   # the deferred week autosave (EXIT-Yes never gets here)
 		_show_career()
-		_pop_month_awards(func() -> void: _pop_channel_tv(_pop_pending_team_offers))
+		_pop_cup_draw(func() -> void: _pop_month_awards(func() -> void: _pop_channel_tv(_pop_pending_team_offers)))
 	var open_match := func() -> void:
 		_open_match(home, away, int(res["hg"]), int(res["ag"]), m["lines"],
 			"%s  -  back to the dugout" % verdict, finish, result_data, res.get("possession", []))
@@ -4021,9 +4082,65 @@ func _show_cup_screen(b: Dictionary, key: String, title: String) -> void:
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
 	var v := _cup_draw_view(b)
-	scr.setup(key, title, v["round"], v["ties"], int(v["total"]), v["legs"])
+	scr.setup(key, title, v["round"], v["ties"], int(v["total"]), v["legs"],
+		_career.club_id, _career.manager_name)
+	_wire_cup_draw_rows(scr, v["ties"], v["legs"])
 	scr.continue_pressed.connect(func() -> void: scr.queue_free())
 	scr.finish_pressed.connect(func() -> void: scr.queue_free())
+
+
+## Answer the SORTEO's row taps with the original's own tie-detail card: each club's
+## name over its manager's, and the two legs' GROUNDS beside the MATCH / REPLAY (or
+## 1ST LEG / 2ND LEG) plates. The first plate names the FIRST-named club's ground and the
+## second the other's, which is what both witnessed cards show (The Pulse Stadium then
+## Old Trafford for Bradford City v Manchester Utd.; Camp Nou then Wildpark for
+## F.C. Barcelona v Karlsruher).
+func _wire_cup_draw_rows(scr: CupDrawScreen, ties: Array, _legs: Array) -> void:
+	scr.tie_selected.connect(func(row: int) -> void:
+		if row < 0 or row >= ties.size():
+			return
+		var tie: Dictionary = ties[row]
+		scr.show_tie({
+			"home": _cup_draw_side(int(tie.get("home_id", -1)), str(tie.get("home", ""))),
+			"away": _cup_draw_side(int(tie.get("away_id", -1)), str(tie.get("away", ""))),
+		}, row))
+
+
+func _cup_draw_side(club_id: int, fallback: String) -> Dictionary:
+	var club := GameDB.club(club_id)
+	return {
+		"club": _cup_name(club_id) if club_id >= 0 else fallback,
+		"club_id": club_id,
+		"manager": _mgr_of(club_id),
+		"stadium": str(club.get("stadium", "")),
+	}
+
+
+## The unprompted SORTEO the original raises when a knockout round is drawn (REFRUN R4).
+## Rides the same post-week card chain the channelTV card and the monthly awards do,
+## because that is how the original raises it: over the hub, with no menu step. FINISH
+## and CONTINUE both dismiss it -- the live drive proved CONTINUE cross-fades straight
+## out to the hub and does not run a draw animation.
+func _pop_cup_draw(after: Callable) -> void:
+	if _career == null or (_career.pending_cup_draws as Array).is_empty():
+		if after.is_valid():
+			after.call()
+		return
+	var d: Dictionary = (_career.pending_cup_draws as Array).pop_front()
+	var scr: CupDrawScreen = load("res://scenes/CupDrawScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	var ties: Array = d.get("ties", [])
+	scr.setup(str(d.get("key", "fa_cup")), str(d.get("title", "")), str(d.get("round", "")),
+		ties, int(d.get("total", ties.size())), d.get("legs", ["MATCH", "REPLAY"]),
+		_career.club_id, _career.manager_name)
+	_wire_cup_draw_rows(scr, ties, d.get("legs", []))
+	var dismiss := func() -> void:
+		AudioManager.ui_select()
+		scr.queue_free()
+		_pop_cup_draw(after)        # the week can draw more than one competition
+	scr.continue_pressed.connect(dismiss)
+	scr.finish_pressed.connect(dismiss)
 
 
 ## The SORTEO payload for a Cup.gd bracket: the LATEST round's ties in draw order, its
@@ -4044,23 +4161,15 @@ func _cup_draw_view(b: Dictionary) -> Dictionary:
 	if rounds.is_empty():
 		return out
 	var last: Dictionary = rounds[-1]
-	# The plates follow THIS round, not the competition: the League Cup is two-legged
-	# throughout but its final is a single match, so that round shows MATCH / REPLAY.
-	for tie in last.get("ties", []):
-		if tie.get("two_legged", false):
-			out["legs"] = ["1ST LEG", "2ND LEG"]
-			break
-	var label := str(last.get("label", "")).to_upper()
-	for suffix in [" - 1ST", " - 2ND"]:
-		if label.ends_with(suffix):
-			label = label.substr(0, label.length() - suffix.length())
-	out["round"] = "QTR FINALS" if label == "QTR. FINALS" else label
+	out["legs"] = Cup.draw_leg_plates(b)
+	out["round"] = Cup.draw_round_plate(b)
 	var ties: Array = []
 	for tie in last.get("ties", []):
 		if tie.get("bye", false):
 			continue
 		ties.append({"home": _cup_name(int(tie["home_id"])),
-			"away": _cup_name(int(tie.get("away_id", -1)))})
+			"away": _cup_name(int(tie.get("away_id", -1))),
+			"home_id": int(tie["home_id"]), "away_id": int(tie.get("away_id", -1))})
 	out["ties"] = ties
 	out["total"] = ties.size()
 	return out

@@ -76,6 +76,61 @@ the title plate does.
   The F.A. Cup and Coca-Cola Cup rows carry the same second column.
 * **There is no board-verdict screen anywhere in the sequence.**
 
+## BUILT 2026-07-25 — steps 3, 4 and 6, all at 0 differing pixels
+
+The three screens the sequence was missing are baked and wired.
+Chrome: `tools/re/build_seasonend_year_chrome_from_frames.py`.
+Render-diff: `tools/re/diff_seasonend_year_parity.py` (shot
+`app/tests/shot_seasonend_year.gd`). Scenes: `ChampionshipsScreen.gd`,
+`EndOfSeasonScreen.gd`, `PlayersYearScreen.gd`; `Main._season_end_step` now walks all
+eight steps.
+
+| screen | region | differing px |
+|---|---|---|
+| THE CHAMPIONSHIPS | barra, trophies + titles, all club names, all scores, CONTINUE | **0** |
+| END OF SEASON | barra, division bands, champion names, both columns, CONTINUE | **0** |
+| PLAYERS OF THE YEAR | barra, panel + headers, all 20 rows, tabs, CONTINUE | **0** |
+
+Only the KIT blocks differ, and only because the parity shot is fed club NAMES with no
+ids, so no kit is drawn at all.
+
+### Three things the frames forced, that the earlier reading had wrong
+
+* **THE CHAMPIONSHIPS lists each tie's HOME then AWAY side, not winner-then-loser.** The
+  U.E.F.A. CUP card puts `Inter 0` above `Arsenal 1` and the COCA-COLA CUP puts
+  Southampton above Arsenal — the WINNER is the second row in both. The winner is marked
+  only by its INK: solid black `(0,0,0)` against the loser's grey `(80,100,120)`.
+* **The second score cell belongs to the CARD, not the column.** The U.E.F.A. Cup's card
+  is narrower than its three right-column neighbours and carries ONE score cell, with the
+  desktop showing to the right of it; the F.A. Cup, European Supercup and Coca-Cola Cup
+  carry two. So it is not "the right column has two".
+* **PLAYERS OF THE YEAR's rows are MICRO8** — a WINFONTS face the app had not shipped.
+  It is also the face the already-shipped PLAYERS OF THE MONTH rows are really drawn in
+  (its "Arsenal" bitmap is identical on both frames), so that sheet's scaled-proman10
+  rows are wrong by the same measurement.
+
+### Geometry, for the record
+
+THE CHAMPIONSHIPS — eight fixed slots, cards at y113 / 204 / 295 / 388, row 2 at +22, row
+height 20. Left column: kit x56, name pen 82, score cell 245..273. Right: kit x334, name
+pen 360, score cells 523..551 and 554..582. Names proman10 left-aligned at the column's
+pen, scores proman10 centred on `x0 + x1 + 1`, both with pen top +5 into the band.
+
+END OF SEASON — five navy plates at y100 / 137 / 219 / 314 / 418 (x17..172, kit at x18,
+17x19), everything proman8. The middle column's plates span x186..331 and the relegated
+column's x346..491, both centred on `x0 + x1 + 1`. The champion names are LEFT-aligned at
+pen x 50 / 50 / 49 / 49 / 48 down the five plates — a 1px ladder the single captured
+frame does not explain, carried verbatim rather than smoothed into an invented rule.
+
+PLAYERS OF THE YEAR — ten rows from y127 at pitch 16; TEAM right-aligned to pen end 180 /
+476, PLAYER left at pen 186 / 482, both micro8 at pen top row+1. The division sub-header
+is proman12 centred on the full 640 width, pen top 95. Tabs are a 2x2 grid at
+(380,345) / (502,345) / (380,379) / (502,379), 112x25, over CONTINUE at (502,426).
+
+PREMIER is the only SELECTED tab face the frame witnesses, so another tab borrows its
+glow and keeps its own resting label — the documented approximation PlayersMonthScreen
+already carries.
+
 ## Not witnessed
 
 * whether step 1 raises a table for the manager's OWN division before or after the
