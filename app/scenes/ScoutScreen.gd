@@ -35,6 +35,18 @@ class_name ScoutScreen
 ## face-level. The bottom 2-segment bar is baked furniture (behaviour
 ## un-witnessed, never animated). The original's result ORDER is un-RE'd.
 
+##
+## ---- ONE PANEL ON THIS SCREEN IS OURS, NOT THE GAME'S -----------------------
+## `docs/SPEC_scout_attribute_search.md`, owner-approved 2026-07-25: a NAME box, six
+## per-attribute "at least" thresholds, and a sort selector — none of which the original
+## has. They live in an OVERLAY that is CLOSED by default and is opened by tapping the
+## inert 2-segment bar along the bottom (x11..500, y438..463), so with the panel shut
+## every witnessed state of this screen still renders at 0 differing pixels. That bar's
+## real behaviour is un-witnessed and it is never animated in any captured frame; binding
+## our toggle to it is OURS and moves the moment the original's own use for it is seen.
+## The panel also carries the shortfall line for the engine's shortlist cap
+## (Career.scout_cap) — the cap itself is the binary's, the line is ours.
+
 signal back_pressed
 signal search_started(criteria: Dictionary)
 signal player_pressed(row: Dictionary)
@@ -79,6 +91,31 @@ const ARROWS := {
 }
 const BTN_SEARCH := Rect2(518, 211, 100, 26)
 const BTN_RETURN := Rect2(517, 437, 110, 28)
+
+# ---- the OURS overlay (see the header note) --------------------------------
+## The inert bottom bar, measured off the live frame p0023: body x11..500, y438..463.
+const BTN_EXTRA := Rect2(11, 438, 490, 26)
+const OURS_PANEL := Rect2(40, 92, 560, 330)
+const OURS_NAME_FIELD := Rect2(150, 136, 300, 18)
+const OURS_ROW_Y0 := 168          # first attribute row top
+const OURS_ROW_PITCH := 22
+const OURS_LABEL_X := 60
+const OURS_ARROW_L_X := 200
+const OURS_VALUE_CX := 276.0
+const OURS_ARROW_R_X := 336
+const OURS_ARROW := Vector2(16, 16)
+const OURS_SORT_Y := 306
+const OURS_CLEAR := Rect2(348, 380, 96, 24)
+const OURS_CLOSE := Rect2(456, 380, 96, 24)
+const OURS_SORTS := [["name", "NAME"], ["av", "AV"], ["mo", "MO"], ["fee", "CLUB FEE"],
+	["wage", "WAGE"], ["age", "AGE"]]
+# Panel inks: the PM98 desktop family (navy plate, white plate text, red heading).
+const C_OURS_BG := Color8(20, 24, 60)
+const C_OURS_EDGE := Color8(160, 180, 200)
+const C_OURS_HEAD := Color8(255, 210, 0)
+const C_OURS_TXT := Color8(230, 235, 245)
+const C_OURS_DIM := Color8(140, 150, 175)
+const C_OURS_FIELD := Color8(0, 0, 0)
 
 const POSITIONS := ["GOALKEEPER", "DEFENDER", "MIDFIELDER", "FORWARD"]  # getter table PTR@0x662d10 (binary-exact)
 const POS_KEYS := ["GK", "DF", "MF", "FW"]
@@ -191,6 +228,13 @@ var _role := 1                   # posFine 1..18 (PlayerInfoScreen.FINE_ROLE)
 var _quality_idx := 0            # index into QUALITY_BANDS
 var _price_idx := 0              # index into PRICE_BANDS
 var _armed_flash := false        # SEARCH ring, shown on the arming tap (witness 68)
+# ---- OURS panel state ------------------------------------------------------
+var _ours_open := false
+var _name_edit: LineEdit
+var _attr_idx := {}              # attr code -> index into Career.SCOUT_ATTR_STOPS, -1 = off
+var _sort_i := -1                # index into OURS_SORTS, -1 = the scan order (the default)
+var _sort_desc := true
+var _found_total := 0            # pre-cap match count (Career.scout_found_total)
 var _alert_img: Texture2D        # options alert (PMAlert render); null = none
 var _press := ""
 var _row_flag_cache := {}
@@ -225,14 +269,56 @@ func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2(W, H)
 	set_anchors_preset(Control.PRESET_FULL_RECT)
+	for e in Career.SCOUT_ATTR_FILTERS:
+		_attr_idx[str(e[0])] = -1
+	_build_name_edit()
+	resized.connect(_reposition_name)
 	gui_input.connect(_on_input)
 	queue_redraw()
+
+
+## The OURS name box. A real LineEdit so Android raises its own keyboard (the
+## SeleccionScreen / SaveGameDialog precedent); hidden unless the panel is open.
+func _build_name_edit() -> void:
+	_name_edit = LineEdit.new()
+	_name_edit.max_length = 24
+	_name_edit.placeholder_text = "part of a surname"
+	_name_edit.visible = false
+	_name_edit.add_theme_font_override("font", _f10)
+	_name_edit.add_theme_font_size_override("font_size", 11)
+	_name_edit.add_theme_color_override("font_color", Color.WHITE)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = C_OURS_FIELD
+	for st in ["normal", "focus", "read_only"]:
+		_name_edit.add_theme_stylebox_override(st, sb)
+	_name_edit.text_changed.connect(func(_t: String) -> void: queue_redraw())
+	add_child(_name_edit)
+	_reposition_name()
+
+
+func _scale() -> float:
+	return minf(size.x / W, size.y / H) if size.x > 0 and size.y > 0 else 1.0
+
+
+func _origin(s: float) -> Vector2:
+	return Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5)
+
+
+func _reposition_name() -> void:
+	if _name_edit == null:
+		return
+	var s := _scale()
+	_name_edit.position = _origin(s) + OURS_NAME_FIELD.position * s
+	_name_edit.size = OURS_NAME_FIELD.size * s
+	_name_edit.add_theme_font_size_override("font_size", maxi(8, int(11 * s)))
 
 
 ## scout = the hired Staff SCOUT member ({} = none); searching/results = the
 ## Career async state. Barra args follow the TransferScreen setup shape.
 func setup(scout: Dictionary, searching: bool, results: Array, club: String,
-		manager := "", season := "", week := 0, league := "", club_id := -1) -> void:
+		manager := "", season := "", week := 0, league := "", club_id := -1,
+		found_total := -1) -> void:
+	_found_total = found_total if found_total >= 0 else results.size()
 	_has_scout = not scout.is_empty()
 	_scout_name = str(scout.get("name", ""))
 	_scout_stars = float(scout.get("stars", 0.0))
@@ -259,6 +345,12 @@ func criteria() -> Dictionary:
 		if _leagues[lid]:
 			leagues.append(lid)
 	# age/quality/price are BAND indices; -1 = off (index 0 is a valid band, so 0 can't mean off)
+	# `name` + `attr_min` are OURS (empty / {} = the original's behaviour exactly).
+	var attr_min := {}
+	for code in _attr_idx:
+		var i := int(_attr_idx[code])
+		if i >= 0:
+			attr_min[code] = int(Career.SCOUT_ATTR_STOPS[i])
 	return {
 		"pos": POS_KEYS[_pos_idx] if _tog["pos"] else "",
 		"role": _role if _tog["role"] else 0,
@@ -269,7 +361,27 @@ func criteria() -> Dictionary:
 		"eu": bool(_regions["eu"]),
 		"non_eu": bool(_regions["non_eu"]),
 		"no_team": bool(_regions["no_team"]),
+		"name": _name_edit.text.strip_edges() if _name_edit != null else "",
+		"attr_min": attr_min,
 	}
+
+
+## The rows in display order. OURS: with no sort picked this is the Career scan order,
+## i.e. exactly what the screen showed before the sort selector existed.
+func view_rows() -> Array:
+	if _sort_i < 0 or _results.is_empty():
+		return _results
+	var key := str(OURS_SORTS[_sort_i][0])
+	var rows: Array = _results.duplicate()
+	var desc := _sort_desc
+	rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var av: Variant = a.get(key, 0)
+		var bv: Variant = b.get(key, 0)
+		if av is String or bv is String:
+			var c := str(av).naturalcasecmp_to(str(bv))
+			return c > 0 if desc else c < 0
+		return float(av) > float(bv) if desc else float(av) < float(bv))
+	return rows
 
 
 ## Can the hired scout reach this region? (REGION_STARS, live-measured — see above.)
@@ -287,8 +399,12 @@ func _to_design(p: Vector2) -> Vector2:
 func _hit(d: Vector2) -> String:
 	if _alert_img != null:
 		return "alert_ok"     # any tap answers the alert's OK (single-button box)
+	if _ours_open:
+		return _hit_ours(d)
 	if BTN_RETURN.has_point(d):
 		return "return"
+	if BTN_EXTRA.has_point(d) and _has_scout:
+		return "ours_open"
 	if not _has_scout:
 		return ""
 	if BTN_SEARCH.has_point(d) and not _searching:
@@ -315,6 +431,31 @@ func _hit(d: Vector2) -> String:
 			if d.y >= SB_DN_Y and d.y <= SB_DN_Y + 16:
 				return "scroll_dn"
 	return ""
+
+
+## OURS panel hit map. A tap outside the panel closes it, so it can never trap the user.
+func _hit_ours(d: Vector2) -> String:
+	if not OURS_PANEL.has_point(d):
+		return "ours_close"
+	if OURS_CLOSE.has_point(d):
+		return "ours_close"
+	if OURS_CLEAR.has_point(d):
+		return "ours_clear"
+	for i in Career.SCOUT_ATTR_FILTERS.size():
+		var y := OURS_ROW_Y0 + i * OURS_ROW_PITCH
+		if d.y >= y and d.y < y + 18:
+			if Rect2(OURS_ARROW_L_X, y, OURS_ARROW.x, OURS_ARROW.y).has_point(d):
+				return "ours_attr_l:%d" % i
+			if Rect2(OURS_ARROW_R_X, y, OURS_ARROW.x, OURS_ARROW.y).has_point(d):
+				return "ours_attr_r:%d" % i
+	if d.y >= OURS_SORT_Y and d.y < OURS_SORT_Y + 18:
+		if Rect2(OURS_ARROW_L_X, OURS_SORT_Y, OURS_ARROW.x, OURS_ARROW.y).has_point(d):
+			return "ours_sort_l"
+		if Rect2(OURS_ARROW_R_X, OURS_SORT_Y, OURS_ARROW.x, OURS_ARROW.y).has_point(d):
+			return "ours_sort_r"
+		if d.x > OURS_ARROW_R_X + OURS_ARROW.x:
+			return "ours_sort_dir"
+	return "ours_none"
 
 
 func _row_at(d: Vector2) -> int:
@@ -365,6 +506,36 @@ func _activate(a: String) -> void:
 		"search":
 			_try_search()
 			return
+		"ours_open", "ours_close":
+			_ours_open = a == "ours_open"
+			if _name_edit != null:
+				_name_edit.visible = _ours_open
+				if _ours_open:
+					_reposition_name()
+					_name_edit.grab_focus()
+				else:
+					_name_edit.release_focus()
+			queue_redraw()
+			return
+		"ours_none":
+			return
+		"ours_clear":
+			for code in _attr_idx:
+				_attr_idx[code] = -1
+			if _name_edit != null:
+				_name_edit.text = ""
+			_sort_i = -1
+			queue_redraw()
+			return
+		"ours_sort_l", "ours_sort_r":
+			var dr := -1 if a.ends_with("_l") else 1
+			_sort_i = wrapi(_sort_i + dr, -1, OURS_SORTS.size())
+			queue_redraw()
+			return
+		"ours_sort_dir":
+			_sort_desc = not _sort_desc
+			queue_redraw()
+			return
 		"scroll_up":
 			_first = maxi(0, _first - 1)
 			queue_redraw()
@@ -373,7 +544,14 @@ func _activate(a: String) -> void:
 			_first = clampi(_first + 1, 0, maxi(0, _results.size() - N_ROWS))
 			queue_redraw()
 			return
-	if a.begins_with("tog:"):
+	if a.begins_with("ours_attr_"):
+		var dirn := -1 if a.begins_with("ours_attr_l") else 1
+		var ai := int(a.split(":")[1])
+		var code := str(Career.SCOUT_ATTR_FILTERS[ai][0])
+		# -1 (off) sits below stop 0, so one step left off the bottom turns the filter off.
+		_attr_idx[code] = wrapi(int(_attr_idx[code]) + dirn, -1, Career.SCOUT_ATTR_STOPS.size())
+		queue_redraw()
+	elif a.begins_with("tog:"):
 		var k := a.substr(4)
 		_tog[k] = not _tog[k]
 		_armed_flash = false
@@ -394,8 +572,9 @@ func _activate(a: String) -> void:
 		queue_redraw()
 	elif a.begins_with("row:"):
 		var i := int(a.substr(4))
-		if i < _results.size():
-			player_pressed.emit(_results[i])
+		var rows := view_rows()          # the tap indexes what is DRAWN, not the scan order
+		if i < rows.size():
+			player_pressed.emit(rows[i])
 
 
 func _spin(k: String) -> void:
@@ -545,6 +724,8 @@ func _draw() -> void:
 		draw_texture(_tex(_searching_tex), SEARCHING_XY)
 	elif not _results.is_empty():
 		_draw_results()
+	if _ours_open:
+		_draw_ours()
 	_draw_alert()
 
 
@@ -588,11 +769,74 @@ func _draw_strip() -> void:
 func _draw_results() -> void:
 	if _headers != null:
 		draw_texture(_tex(_headers), HEADERS_XY)
-	var shown := mini(N_ROWS, _results.size() - _first)
+	var rows := view_rows()
+	var shown := mini(N_ROWS, rows.size() - _first)
 	for i in shown:
-		_draw_row(_results[_first + i], ROW_Y0 + i * ROW_PITCH)
-	if _results.size() > N_ROWS:
+		_draw_row(rows[_first + i], ROW_Y0 + i * ROW_PITCH)
+	if rows.size() > N_ROWS:
 		_draw_scrollbar()
+
+
+# ---- the OURS panel --------------------------------------------------------
+
+func _draw_ours() -> void:
+	draw_rect(OURS_PANEL, C_OURS_BG, true)
+	draw_rect(OURS_PANEL, C_OURS_EDGE, false, 1.0)
+	var x0 := OURS_PANEL.position.x
+	PMChrome.text(self, _f12, x0 + 20, OURS_PANEL.position.y + 8,
+		"EXTRA SEARCH FILTERS", C_OURS_HEAD, 13)
+	PMChrome.text(self, _f8, x0 + 20, OURS_PANEL.position.y + 26,
+		"Not in the original game - added on request.", C_OURS_DIM, 9)
+	PMChrome.text(self, _f10, OURS_LABEL_X, OURS_NAME_FIELD.position.y + 2,
+		"NAME", C_OURS_TXT, 11)
+	draw_rect(Rect2(OURS_NAME_FIELD.position - Vector2(1, 1),
+		OURS_NAME_FIELD.size + Vector2(2, 2)), C_OURS_EDGE, false, 1.0)
+	for i in Career.SCOUT_ATTR_FILTERS.size():
+		var e: Array = Career.SCOUT_ATTR_FILTERS[i]
+		var y := OURS_ROW_Y0 + i * OURS_ROW_PITCH
+		var idx := int(_attr_idx[str(e[0])])
+		PMChrome.text(self, _f10, OURS_LABEL_X, y + 2, str(e[1]), C_OURS_TXT, 11)
+		_ours_spin(y, "AT LEAST %d" % int(Career.SCOUT_ATTR_STOPS[idx]) if idx >= 0 else "ANY",
+			idx >= 0)
+	var sort_txt := "SCOUT'S ORDER" if _sort_i < 0 else str(OURS_SORTS[_sort_i][1])
+	PMChrome.text(self, _f10, OURS_LABEL_X, OURS_SORT_Y + 2, "SORT BY", C_OURS_TXT, 11)
+	_ours_spin(OURS_SORT_Y, sort_txt, _sort_i >= 0)
+	if _sort_i >= 0:
+		PMChrome.text(self, _f8, OURS_ARROW_R_X + 26, OURS_SORT_Y + 4,
+			"HIGH-LOW" if _sort_desc else "LOW-HIGH", C_OURS_HEAD, 9)
+	_ours_button(OURS_CLEAR, "CLEAR")
+	_ours_button(OURS_CLOSE, "CLOSE")
+	# The shortlist shortfall. The CAP is the engine's ((quality+2)*5, FUN_00575750) and it
+	# discards at random; saying so out loud is ours, because a silent trim would read as
+	# "that is all there was" ([[feedback_no_silent_failures]]).
+	var msg := ""
+	if _searching:
+		msg = "The scout is still out."
+	elif _results.is_empty():
+		msg = "No search has come back yet."
+	elif _found_total > _results.size():
+		msg = "%d of %d shown - your scout could only bring back %d." % [
+			_results.size(), _found_total, _results.size()]
+	else:
+		msg = "%d found, all shown." % _results.size()
+	PMChrome.text(self, _f8, OURS_LABEL_X, OURS_SORT_Y + 34, msg, C_OURS_TXT, 9)
+	PMChrome.text(self, _f8, OURS_LABEL_X, OURS_SORT_Y + 48,
+		"A better SCOUT brings back more names: (stars x 2 + 2) x 5.", C_OURS_DIM, 9)
+
+
+func _ours_spin(y: int, value: String, lit: bool) -> void:
+	if _arrow_l != null:
+		draw_texture(_arrow_l, Vector2(OURS_ARROW_L_X, y))
+	if _arrow_r != null:
+		draw_texture(_arrow_r, Vector2(OURS_ARROW_R_X, y))
+	_txt_center(_f10, OURS_VALUE_CX, y + 2, value,
+		C_OURS_HEAD if lit else C_OURS_DIM, 11)
+
+
+func _ours_button(r: Rect2, label: String) -> void:
+	draw_rect(r, Color8(40, 48, 96), true)
+	draw_rect(r, C_OURS_EDGE, false, 1.0)
+	_txt_center(_f10, r.position.x + r.size.x * 0.5, r.position.y + 5, label, C_OURS_TXT, 11)
 
 
 func _draw_row(r: Dictionary, top: int) -> void:

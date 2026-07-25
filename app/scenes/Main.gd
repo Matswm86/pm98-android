@@ -11,11 +11,13 @@ const ACCENT := Color(0.224, 1.0, 0.533)   # #39ff88 phosphor green
 const TEXT := Color(0.812, 0.910, 0.847)   # #cfe8d8
 const DIM := Color(0.498, 0.682, 0.576)    # #7fae93
 
-# Spanish attribute codes -> readable English labels (same semantics as the file).
+# Spanish attribute codes -> the labels the original's own PLAYER INFORMATION card
+# prints (Cole, frame p0056; see Training._NAMES for the full ten-code proof). RM and RG
+# were swapped here too, and "Pace" / "Ability" / "Goalkeeping" are not the game's words.
 const ATTR_LABELS := {
-	"VE": "Pace", "RE": "Stamina", "AG": "Aggression", "CA": "Ability",
-	"RM": "Heading/Finishing", "RG": "Dribbling", "PA": "Passing",
-	"TI": "Shooting", "EN": "Tackling", "PO": "Goalkeeping",
+	"VE": "Speed", "RE": "Stamina", "AG": "Aggression", "CA": "Quality",
+	"RM": "Dribbling", "RG": "Heading", "PA": "Passing",
+	"TI": "Shooting", "EN": "Tackling", "PO": "Handling",
 }
 const ATTR_ORDER := ["CA", "VE", "RE", "AG", "RM", "RG", "PA", "TI", "EN", "PO"]
 
@@ -3102,7 +3104,7 @@ func _show_scout_screen() -> void:
 	add_child(scr)
 	scr.setup(Staff.member_in_role(c.staff, Staff.SCOUT_ROLE), c.scout_searching(),
 		c.scout_results, c.club_name, c.manager_name, c.season, c.week + 1,
-		c.league_name, c.club_id)
+		c.league_name, c.club_id, c.scout_found_total)
 	scr.back_pressed.connect(func() -> void:
 		AudioManager.ui_select()
 		scr.queue_free())
@@ -3115,8 +3117,12 @@ func _show_scout_screen() -> void:
 				for cl in GameDB.clubs_in_league(str(lid)):
 					seen[int((cl as Dictionary).get("id", -1))] = true
 					foreign.append(cl)
-		# E.U. PLAYERS / NON E.U. PLAYERS scout the WHOLE WORLD — that is how the
-		# original sends a scout abroad (there is no foreign-league checkbox). The
+		# E.U. PLAYERS / NON E.U. PLAYERS scout ABROAD — that is how the original sends a
+		# scout out of England (there is no foreign-league checkbox). Binary-exact since
+		# 2026-07-25: `FUN_005753e0` @0x575675 routes a player to the nationality gate ONLY
+		# when his club's division index (club+0x50) is >= 4, so these two boxes never
+		# reach an English club's players — those are the four division checkboxes' job
+		# alone. Hence the FOREIGN filter below (a club with no English `leagueId`). The
 		# shipped database carries 384 non-English clubs, so the pool is real data.
 		var world: Array = []
 		if bool(criteria.get("eu", false)) or bool(criteria.get("non_eu", false)):
@@ -3125,6 +3131,9 @@ func _show_scout_screen() -> void:
 				var cid := int(cd.get("id", -1))
 				if cid == c.club_id or seen.has(cid) or c.rosters.has(cid):
 					continue      # own club + the live division are scanned separately
+				var lid_v: Variant = cd.get("leagueId")   # null on all 384 foreign clubs
+				if lid_v is String and str(lid_v) != "":
+					continue      # an ENGLISH-league club: only its division box reaches it
 				seen[cid] = true
 				world.append(cd)
 		c.start_scout_search(criteria, foreign, world)

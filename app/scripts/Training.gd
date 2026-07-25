@@ -30,10 +30,17 @@ const _INJURY_MULT := {"Light": 0.75, "Normal": 1.00, "Intensive": 1.45}
 const PRIME_LO := 23
 const PRIME_HI := 30
 
+# The attribute labels the original's own PLAYER INFORMATION card prints, verified
+# 2026-07-25 against Andrew Alexander COLE's live card (frame p0056) beside his
+# game_db row: SPEED 87 / STAMINA 86 / AGGRESSION 84 / QUALITY 75 and HANDLING 13 /
+# PASSING 70 / DRIBBLING 86 / HEADING 73 / TACKLING 65 / SHOOTING 88 against
+# VE 87 RE 86 AG 84 CA 75 · PO 13 PA 70 RM 86 RG 73 EN 65 TI 88. Every value matches,
+# so the card pins all ten codes. This dict previously had RM and RG SWAPPED and called
+# VE "Pace" / CA "Ability" / PO "Goalkeeping" — none of which is a word the game uses.
 const _NAMES := {
-	"VE": "Pace", "RE": "Stamina", "AG": "Aggression", "CA": "Ability",
-	"RM": "Heading", "RG": "Dribbling", "PA": "Passing", "TI": "Shooting",
-	"EN": "Tackling", "PO": "Goalkeeping",
+	"VE": "Speed", "RE": "Stamina", "AG": "Aggression", "CA": "Quality",
+	"RM": "Dribbling", "RG": "Heading", "PA": "Passing", "TI": "Shooting",
+	"EN": "Tackling", "PO": "Handling",
 }
 
 

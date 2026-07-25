@@ -217,3 +217,96 @@ Only the LIGHT band's inks are pinned so far: club `(60,60,100)`, numbers
   x443-444;
 * the knockout view (`MATCHES` with `1ST LEG` / `2ND LEG` / `AGGR.`), which
   `16_euroleague_qtr_finals.png` holds.
+
+## Measurements taken 2026-07-25 (late) — the four open items are CLOSED
+
+All off the six committed frames `tools/re/refs/euro-competitions-2026-07-25/
+10..15_euroleague_group_A..F.png`. The screen is still NOT built; what follows is
+everything the previous entry listed as "still to measure", plus the kit bank, which was
+the real blocker.
+
+### The dark band's inks — the same as the light band's
+
+Sampled per cell on all four rows of GROUP F:
+
+| cell | light row (y209 / y239) | dark row (y224 / y254) |
+|---|---|---|
+| club-name cell background | `(200,220,240)` | `(160,180,200)` |
+| club-name ink | `(60,60,100)` | **`(60,60,100)` — identical** |
+| P/W/D/L/GF/GA cell background | `(100,120,140)` | `(80,100,120)` |
+| number ink | `(180,200,220)` | **`(180,200,220)` — identical** |
+| PTS cell background | `(20,0,90)` | `(20,0,90)` |
+| PTS ink | `(180,200,220)` | `(180,200,220)` |
+| position plate | `(0,0,128)` navy | `(0,0,128)` navy |
+| position digit | white | white |
+
+Only the two BACKGROUNDS alternate. Every ink is band-independent, so there is no second
+ink table to carry.
+
+### The MINIBAND flag rect
+
+**x183..196, y = row top + 2, 14 x 10** — right-aligned inside the name cell, measured on
+all four rows (the rows whose club name is short show the cell clean up to x182). That is
+exactly the size `PMChrome.mini_flag` already ships (`art/flags/mini_%03d.png`, the
+14x10 MINIBAND bank), so no new art is needed.
+
+### The results rows under the table
+
+Two rows in every captured frame (a group of four plays two matches a matchday).
+
+| element | span |
+|---|---|
+| row 1 | y278..290 · row 2 y300..312 — **pitch 22, bar height 13** |
+| left kit | x80..96, y274..293 (the RIDIESC blit, see below) |
+| home-club bar | x97..179, white `(255,255,255)`, club name RIGHT-aligned |
+| score box 1 | x181..196, black |
+| score box 2 | x199..214, black |
+| away-club bar | x216..300, white, club name LEFT-aligned |
+| right kit | x301..317 |
+
+**One goal digit per row is inked yellow `(255,255,0)`, the other `(180,200,220)` — and it
+is NOT the winner.** Counted on all six frames: the yellow is in the SECOND box on row 1
+and in the FIRST box on row 2, every single time, whoever won. GROUP F is the plain
+counter-example — row 1 Feyenoord 1-3 Bayern M. puts the yellow on the winner's 3, row 2
+MTK 0-2 Real Madrid puts it on the LOSER's 0. So the earlier "winner inked yellow" reading
+from the low-res session was wrong; the marker tracks the ROW, not the result, and its
+actual rule is **unresolved**. Do not port it as a winner highlight. Whatever it is, it
+needs either a frame where a group plays a different number of matches or the draw code
+(`FUN_00496fd0`) read.
+
+### The six GROUP buttons
+
+Differ A-vs-B at **y183..205 and y207..229**, columns **x358..446**. So six buttons of
+**89 x 23 pitched 24 px**: tops y183 / 207 / 231 / 255 / 279 / 303. All six lit faces are
+witnessed one per frame, so every face can be cut verbatim rather than synthesised.
+
+### The header band is NOT static — it carries the leader's kit
+
+`y180..207`: a **kit blit at x75..97** (the group's top club) plus `GROUP <letter>` in the
+bold outlined face on the black band. Varying columns are x75..97 (kit), x105..168 and
+x172..185 (the text). So the "everything but y180..325 x75..446 is chrome" note stands,
+but inside it the header is dynamic too.
+
+### The kit bank is RIDIESC — already shipped
+
+The results-row kit is the game's **RIDIESC** 17x20 kit (`DBDAT/RIDIESC.PKF`), which the
+port already exports to `app/art/kits/ridi/<id>.png` and reads through
+`PMChrome.ridi_kit`. Proven by matching Feyenoord's own `ridi/1104.png` against frame 15:
+best fit at **(80,274)** with 32 of 221 opaque pixels differing — the residual is the
+engine's soft-shadow pass, the same one already documented for the NANOESC blits
+(`build_match_header_from_frames.py`), not different art.
+
+### What still blocks a 0-px build
+
+1. **The desktop under the two results rows.** The rows are drawn straight onto the
+   wallpaper — there is no plate behind them — and all six frames have both rows filled,
+   so the background is only recoverable where a pixel is uncovered in at least five of
+   the six (466 of 792 px in the two kit rects; 310 are covered in every frame). The fix
+   is one capture, not a guess: page the ROUND paginator to an UNPLAYED round (a week-8
+   career has only Round 1 played, per `07_euroleague_group_a.png`) and the results zone
+   should come back empty. Do that before baking.
+2. **The kit shadow pass**, as above — 32 px per kit until it is reproduced or the patches
+   are cut per club from frames.
+
+Nothing else is missing: table geometry, all inks, the flag rect, the row spans, the
+button faces and the model (6 groups of 4, 6 winners + 2 best runners-up) are all in hand.

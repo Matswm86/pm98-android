@@ -146,3 +146,107 @@ ScoutScreen (fresh GameDB-live). Career:
 queues the hub alert text via `pending_alerts` (raised by Main at the next hub
 show — the witnessed post-flow timing), and news-logs it. Results survive
 save/load. Row tap → the make-offer card family (82).
+
+## The resolver itself, disassembled 2026-07-25 — the search is no longer inferred
+
+Everything above was witnessed at the SCREEN. This section is the code behind it. The
+senior scout is a two-slot vtable at **0x6354f8** (constructed at 0x554975 / 0x557588 /
+0x57c765), the exact shape of the youth scout's 0x632fc8:
+
+| slot | function | what it is |
+|---|---|---|
+| 0 | `FUN_005753e0` | the per-player FILTER predicate |
+| 1 | `FUN_00575750` | the SEARCH: scan, then trim to the scout's cap |
+
+The criteria object is one struct: `+4` own club id (word), `+6` the scout's raw
+quality byte, `+7` a busy flag, `+8` the result vector, `+0x10` AGE, `+0x11` QUALITY,
+`+0x12` POSITION, `+0x13` PRICE, `+0x14` ROLE (each `0xff` = that filter OFF), `+0x1c..
++0x28` the four division checkboxes, `+0x2c` E.U., `+0x30` NON E.U., `+0x34` WITHOUT TEAM.
+
+### `FUN_00575750` — the scan and the CAP
+
+```
+for id in 1 .. 0x9c40:                  # the whole 40000-slot player table
+    if slot is live and vtable[0](player):   # the filter below
+        result[n++] = player_id
+cap = (quality_byte + 2) * 5                  # @0x5757e7
+if n > cap:                                   # @0x575800
+    keep `cap` of them by drawing UNIFORMLY AT RANDOM WITHOUT REPLACEMENT
+    (rand()*n >> 15 into the array, retry any slot already zeroed)  @0x575826-0x5758b9
+```
+
+Two things follow, and both were open questions before today:
+
+* **The cap is by HALF-STAR, not by star.** The quality byte is the staff record's raw
+  1..10 (`Staff.quality_byte` = stars x 2, already proven live by the physiotherapist's
+  "N PLAYERS" ladder). A ★★★ scout is quality 6 and caps at **40** — which is exactly the
+  result count witness 81 shows through its 18px slider, `floor(94 x 8 / 40)`. The frame
+  and the disassembly agree to the player. The ladder is
+  20 / 25 / 30 / 35 / **40** / 45 / 50 / 55 / 60 for 1.0★ .. 5.0★.
+* **The trim is RANDOM, not "the best N."** `docs/SPEC_ours_additions.md` left "which 35
+  of the 112?" open and suggested highest-AV as an honest default. The binary answers it:
+  a uniform draw without replacement. A weak scout brings back FEWER names, not worse
+  ones, and re-running the same criteria gives a different shortlist. Ported in
+  `Career._scout_apply_cap`.
+
+### `FUN_005753e0` — the filter, criterion by criterion
+
+Rejects outright: the manager's own club, and any club id >= 0x26e4.
+
+| criterion | offset | rule |
+|---|---|---|
+| AGE | `+0x10` | 17-22 / 23-26 / 27-30 / 31-33 / >33 (@0x57544b) |
+| POSITION | `+0x12` | the coarse byte `player+0x1c` must equal it |
+| ROLE | `+0x14` | **any one of the player's SIX role bytes** `+0x1d..+0x22` (@0x5754bc) |
+| QUALITY | `+0x11` | `(p[0x9c]+p[0x9d]+p[0x9e]+p[0x9f]) >> 2` (= AV) against the 7 bands |
+| PRICE | `+0x13` | `value x 1e-06` (the double at 0x638200 = units of 5K) against 10 bands |
+
+**ROLE is a six-slot test, and that is new.** The port matched `posFine` only; the engine
+loops `+0x1d` (posFine) plus the five alternates `+0x1e..+0x22` — the same bytes the
+extractor already exports as `posAlts` — and accepts on the first hit. So searching for
+SWEEPER finds every player who can play there, not only those listed there first.
+
+### The region gate is a three-way, not an OR
+
+The tail (@0x575675) picks exactly one toggle for each player:
+
+```
+club id == 0x26de              -> the PLAYERS WITHOUT TEAM box   (+0x34)
+club division (club+0x50) < 4  -> that ENGLISH division's box    (+0x1c + div*4)
+otherwise (a foreign club)     -> FUN_0058d2f0(player+0x1a) ? E.U. (+0x2c) : NON E.U. (+0x30)
+```
+
+So **E.U. / NON E.U. never reach an English club's players** and the division boxes never
+reach a foreign one. The port used to let E.U./NON E.U. rescan the manager's own division;
+fixed in `Career._scout_scan_own` and in `Main._show_scout_screen`'s world pool.
+
+### The E.U. list IS in MANAGER.EXE after all
+
+`FUN_0058d2f0` is a flat compare chain over the PAISES country code returning 1 for
+eighteen: 2 GERMANY · 5 AUSTRIA · 0x0c BELGIUM · 0x12 DENMARK · 0x13 SCOTLAND ·
+0x16 SPAIN · 0x17 FINLAND · 0x18 FRANCE · 0x1a GREECE · 0x1b HOLLAND · 0x1e ENGLAND ·
+0x1f REP. OF IRELAND · 0x20 NORTH. IRELAND · 0x24 ITALY · 0x26 LUXEMBOURG · 0x2d WALES ·
+0x2f PORTUGAL · 0x35 SWEDEN. This doc previously recorded the list as "not located in
+MANAGER.EXE — historical membership". It is located, it is those eighteen, and the
+historical list the port shipped happens to be exactly the same set, so nothing changed
+except the provenance (`Career.EU_CODES`).
+
+## The OURS panel (2026-07-25) — flagged, not hidden
+
+`docs/SPEC_scout_attribute_search.md` + `docs/SPEC_ours_additions.md`, owner-approved:
+a NAME substring box, six per-attribute "at least" thresholds (30..95 by 5, exactly
+`Training.TRAINABLE`), and a sort selector. The original has none of them.
+
+They live in an overlay that is **closed by default**, opened by tapping the inert
+2-segment bar at x11..500 y438..463, so all six witnessed states still verify at 0 px
+(re-run 2026-07-25 after the change: noscout/idle/premier/position/searching/results all
+0 px). Binding the toggle to that bar is ours; the bar's own behaviour is un-witnessed.
+
+The panel also prints the cap shortfall — *"40 of 112 shown - your scout could only bring
+back 40"*. The cap is the binary's; saying it out loud is ours, because a silent trim
+reads as "that is all there was".
+
+**The honest note that travels with the six filters:** only `STR`, `PASS` (=PA) and
+`GKSAVE` (=PO+10) are read by the match engine, so DRIBBLING / HEADING / TACKLING /
+SHOOTING filter on numbers that do not move a scoreline. That was known when they were
+asked for; do not "fix" it by hiding them.

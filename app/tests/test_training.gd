@@ -41,8 +41,14 @@ func _unit_lookups() -> bool:
 		"intensity factor ordered Light<Normal<Intensive") and ok
 	ok = _assert(Training.injury_multiplier("Intensive") > 1.0 and Training.injury_multiplier("Light") < 1.0,
 		"intensity injury multiplier: Intensive>1, Light<1") and ok
-	ok = _assert(Training.attr_name("PA") == "Passing" and Training.attr_name("VE") == "Pace",
+	# The ten labels are the PLAYER INFORMATION card's own (Cole, frame p0056) — RM is
+	# DRIBBLING and RG is HEADING, which this dict had backwards until 2026-07-25.
+	ok = _assert(Training.attr_name("PA") == "Passing" and Training.attr_name("VE") == "Speed",
 		"attribute code names resolve") and ok
+	ok = _assert(Training.attr_name("RM") == "Dribbling" and Training.attr_name("RG") == "Heading",
+		"RM is DRIBBLING and RG is HEADING (Cole's card)") and ok
+	ok = _assert(Training.attr_name("CA") == "Quality" and Training.attr_name("PO") == "Handling",
+		"CA is QUALITY and PO is HANDLING (Cole's card)") and ok
 	return ok
 
 

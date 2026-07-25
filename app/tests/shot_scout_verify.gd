@@ -106,6 +106,19 @@ func _run() -> void:
 	scr.queue_redraw()
 	await _shot(dir, "shot_scout_results.png")
 
+	# 7. the OURS panel (docs/SPEC_scout_attribute_search.md) — NOT a witness state:
+	# the original has no such panel. It exists so the addition is eyeballed like every
+	# other screen; the six shots above are the parity ones, and they are taken with it
+	# CLOSED, which is how the screen ships.
+	scr.setup(scout, false, results, barra[0], barra[1], barra[2], barra[3], barra[4],
+		barra[5], 112)
+	scr._activate("ours_open")
+	scr._attr_idx["TI"] = 11        # SHOOTING >= 85
+	scr._attr_idx["PA"] = 8         # PASSING >= 70
+	scr._sort_i = 1                 # sort by AV
+	scr.queue_redraw()
+	await _shot(dir, "shot_scout_ours_panel.png")
+
 	print("SCOUT verify shots -> %s" % dir)
 	quit(0)
 

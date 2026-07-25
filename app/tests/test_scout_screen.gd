@@ -140,6 +140,101 @@ func _run() -> void:
 	c._tick_scout_search()
 	ok = _assert(c.scout_results.is_empty(), "quality band 71-75 excludes av=60 GK") and ok
 
+	# ---- ROLE matches ANY of the six role slots (FUN_005753e0 @0x5754bc) -----
+	# posFine + the five `posAlts`. Bergsson-shaped: primary RIGHT BACK (2) with
+	# INS. CENT. LEFT (5) alternate -> a search for role 5 must find him.
+	var alt := _mk(11, "Bergsson", "DF", 70)
+	alt["posFine"] = 2
+	alt["posAlts"] = [5, 6]
+	c.rosters[60] = [alt]
+	c.week = 3
+	c.start_scout_search({"pos": "", "role": 5, "age_band": -1, "quality_band": -1,
+		"price_band": -1, "leagues": ["eng_prem"]})
+	c.week = 5
+	c._tick_scout_search()
+	ok = _assert(c.scout_results.size() == 1 and str(c.scout_results[0]["name"]) == "Bergsson",
+		"ROLE matches an ALTERNATE role slot, not just posFine") and ok
+	c.week = 3
+	c.start_scout_search({"pos": "", "role": 9, "age_band": -1, "quality_band": -1,
+		"price_band": -1, "leagues": ["eng_prem"]})
+	c.week = 5
+	c._tick_scout_search()
+	ok = _assert(c.scout_results.is_empty(), "a role he does not hold still excludes him") and ok
+
+	# ---- the shortlist cap: (quality_byte + 2) * 5, drawn at random ----------
+	ok = _assert(Career.scout_cap(6) == 40, "a 3.0-star scout (q=6) caps at 40 = witness 81") and ok
+	ok = _assert(Career.scout_cap(10) == 60 and Career.scout_cap(2) == 20,
+		"the cap ladder runs 20 (1.0*) .. 60 (5.0*)") and ok
+	var many: Array = []
+	for i in 60:
+		many.append(_mk(200 + i, "Reserve%d" % i, "GK", 60))
+	c.rosters[60] = many
+	c.staff = [{"role": Staff.SCOUT_ROLE, "name": "K. BURROWES", "stars": 3.0, "wage": 20000}]
+	c.week = 3
+	c.start_scout_search({"pos": "GK", "role": 0, "age_band": -1, "quality_band": -1,
+		"price_band": -1, "leagues": ["eng_prem"]})
+	c.week = 5
+	c._tick_scout_search()
+	ok = _assert(c.scout_results.size() == 40, "60 matches trimmed to the 3-star cap of 40") and ok
+	ok = _assert(c.scout_found_total == 60, "the pre-cap match count is kept for the panel") and ok
+	var names := {}
+	for r2 in c.scout_results:
+		names[str((r2 as Dictionary)["name"])] = true
+	ok = _assert(names.size() == 40, "the trim never repeats a player (draw without replacement)") and ok
+	c.staff = []
+	c.rosters[60] = [_mk(2, "Beeney", "GK", 60), _mk(3, "Kewell", "FW", 80)]
+
+	# ---- OURS: the name box and the six attribute thresholds ----------------
+	var cole := _mk(12, "Cole", "FW", 75)
+	cole["attrs"] = {"VE": 87, "RE": 86, "AG": 84, "CA": 75,
+		"PO": 13, "PA": 70, "RM": 86, "RG": 73, "EN": 65, "TI": 88}
+	c.rosters[60] = [cole, _mk(13, "Poole", "FW", 40)]
+	c.week = 3
+	c.start_scout_search({"pos": "", "role": 0, "age_band": -1, "quality_band": -1,
+		"price_band": -1, "leagues": ["eng_prem"], "name": "col"})
+	c.week = 5
+	c._tick_scout_search()
+	ok = _assert(c.scout_results.size() == 1 and str(c.scout_results[0]["name"]) == "Cole",
+		"OURS name search is substring + case-insensitive") and ok
+	c.week = 3
+	c.start_scout_search({"pos": "", "role": 0, "age_band": -1, "quality_band": -1,
+		"price_band": -1, "leagues": ["eng_prem"], "attr_min": {"TI": 85}})
+	c.week = 5
+	c._tick_scout_search()
+	ok = _assert(c.scout_results.size() == 1 and str(c.scout_results[0]["name"]) == "Cole",
+		"OURS SHOOTING >= 85 keeps Cole (TI 88) and drops the rest") and ok
+	c.week = 3
+	c.start_scout_search({"pos": "", "role": 0, "age_band": -1, "quality_band": -1,
+		"price_band": -1, "leagues": ["eng_prem"], "attr_min": {"TI": 85, "PO": 50}})
+	c.week = 5
+	c._tick_scout_search()
+	ok = _assert(c.scout_results.is_empty(),
+		"OURS thresholds AND together (Cole's HANDLING is 13)") and ok
+	ok = _assert(Career.SCOUT_ATTR_STOPS.size() == 14
+		and int(Career.SCOUT_ATTR_STOPS[0]) == 30
+		and int(Career.SCOUT_ATTR_STOPS[13]) == 95,
+		"14 threshold stops, 30..95 by 5") and ok
+	var codes: Array = []
+	for e in Career.SCOUT_ATTR_FILTERS:
+		codes.append(str(e[0]))
+	codes.sort()
+	var trainable: Array = Training.TRAINABLE.duplicate()
+	trainable.sort()
+	ok = _assert(codes == trainable,
+		"the six filters are exactly Training.TRAINABLE") and ok
+	c.rosters[60] = [_mk(2, "Beeney", "GK", 60), _mk(3, "Kewell", "FW", 80)]
+
+	# ---- the E.U. list is the binary's own (FUN_0058d2f0, 18 codes) ---------
+	ok = _assert(Career.EU_CODES.size() == 18 and Career.EU_NATIONS.size() == 18,
+		"18 E.U. country codes, 18 names") and ok
+	var cc: Dictionary = JSON.parse_string(
+		FileAccess.get_file_as_string("res://data/country_codes.json"))["byCode"]
+	var eu_ok := true
+	for code in Career.EU_CODES:
+		if not Career.EU_NATIONS.has(str(cc.get(str(code), "?"))):
+			eu_ok = false
+	ok = _assert(eu_ok, "every FUN_0058d2f0 code resolves to a listed E.U. nation") and ok
+
 	# save round-trip
 	c.pending_alerts = ["The scout has finished his search."]
 	c.external_signed = {77: true}

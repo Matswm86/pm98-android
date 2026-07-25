@@ -119,6 +119,10 @@ var youth_pool: Array = []              # the shipped 0x26e4 pool the YOUTH SCOU
 var scout_search: Dictionary = {}       # SENIOR scout search {criteria:Dictionary, due_week:int};
                                         # {} = idle (SCOUT screen, docs/re/scout_screen_re.md)
 var scout_results: Array = []           # last finished search's rows (persist until a new search)
+var scout_found_total: int = 0          # how many the scan MATCHED before the engine's
+                                        # (quality+2)*5 shortlist cap trimmed it (see
+                                        # _scout_apply_cap); == scout_results.size() when
+                                        # nothing was cut. Drives the OURS shortfall line.
 var training_focus: Dictionary = {}      # pid:int -> focus row (Training.FOCUS_ROWS)
 var pending_alerts: Array = []          # queued hub "PREMIER MANAGER 98" alert texts; Main
                                         # raises + clears them when the hub next shows (the
@@ -2249,10 +2253,39 @@ const SCOUT_SEARCH_WEEKS := 2
 ## order lifted binary-exact from the MANAGER.EXE getter tables 0x661e08 / 0x661e20 /
 ## 0x661e40 (see ScoutScreen). These are the numeric bounds behind each band index,
 ## inclusive. QUALITY matches the displayed AV column (0-99); PRICE bounds are in K.
+## All five band tables are now confirmed against the resolver itself, `FUN_005753e0`
+## (the senior scout vtable 0x6354f8 slot 0), disassembled 2026-07-25:
+##   AGE     @0x57544b — 17-22 / 23-26 / 27-30 / 31-33 / >33
+##   QUALITY @0x57552e — the >>2 mean of the player's +0x9c..+0x9f bytes (= AV) against
+##                       0x32-0x41 / 0x42-0x46 / 0x47-0x4b / 0x4c-0x50 / 0x51-0x55 /
+##                       0x56-0x5a / >0x5a
+##   PRICE   @0x5755c8 — value x 1e-06 (the double at 0x638200), i.e. units of 5 K,
+##                       against 2-15 / 16-25 / 26-50 / 51-100 / 101-300 / 301-600 /
+##                       601-1000 / 1001-1500 / 1501-2000 / >2000 = exactly the K bounds
+##                       below. 0xff in any criterion byte = that filter is OFF.
 const SCOUT_AGE_BANDS := [[17, 22], [23, 26], [27, 30], [31, 33], [34, 99]]
 const SCOUT_QUALITY_BANDS := [[50, 65], [66, 70], [71, 75], [76, 80], [81, 85], [86, 90], [91, 99]]
 const SCOUT_PRICE_BANDS_K := [[10, 75], [80, 125], [130, 250], [250, 500], [500, 1500],
 	[1500, 3000], [3000, 5000], [5000, 7500], [7500, 10000], [10000, 999999]]
+
+## The shortlist cap, `FUN_00575750` @0x5757e7: `(quality_byte + 2) * 5`, where the
+## quality byte is the staff record's raw 1..10 half-star value (Staff.quality_byte =
+## stars x 2), NOT the 1..5 displayed star count. A ★★★ scout is quality 6 and therefore
+## caps at 40 — which is exactly the result count the 2026-07-18 witness frame 81 shows
+## (its 18px slider is floor(94 x 8 / 40)), so the cap is confirmed by a live frame and
+## not only by the disassembly.
+##   1.0★ 20 · 1.5★ 25 · 2.0★ 30 · 2.5★ 35 · 3.0★ 40 · 3.5★ 45 · 4.0★ 50 · 4.5★ 55 · 5.0★ 60
+static func scout_cap(quality_byte: int) -> int:
+	return (maxi(0, quality_byte) + 2) * 5
+
+## OURS, not the binary's — the six per-attribute "at least" filters the SCOUT screen's
+## extra panel adds (docs/SPEC_scout_attribute_search.md, owner-approved 2026-07-25).
+## They are exactly Training.TRAINABLE, so the searchable set equals the improvable set.
+## The original has NO per-attribute criterion; labels are the PLAYER INFORMATION card's.
+const SCOUT_ATTR_FILTERS := [["PO", "HANDLING"], ["PA", "PASSING"], ["RM", "DRIBBLING"],
+	["RG", "HEADING"], ["EN", "TACKLING"], ["TI", "SHOOTING"]]
+## 30..95 in steps of 5 (14 stops); index -1 = off. OURS.
+const SCOUT_ATTR_STOPS := [30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95]
 
 ## Arm a search. criteria: {pos:String(""|GK/DF/MF/FW), role:int(0=off, posFine),
 ## age_band/quality_band/price_band:int(-1=off, else band index into the SCOUT_*_BANDS
@@ -2301,12 +2334,40 @@ func _tick_scout_search() -> void:
 		return
 	if week < int(scout_search.get("due_week", 0)):
 		return
-	scout_results = _scout_scan_own(scout_search.get("criteria", {}))
-	scout_results.append_array(scout_search.get("frozen", []))
+	var found: Array = _scout_scan_own(scout_search.get("criteria", {}))
+	found.append_array(scout_search.get("frozen", []))
+	scout_found_total = found.size()
+	scout_results = _scout_apply_cap(found)
 	scout_search = {}
 	# The witnessed hub alert (78) — raised by Main when the hub next shows.
 	pending_alerts.append("The scout has finished his search.")
 	_news("transfer", "The scout has finished his search.")
+
+## The engine's own shortlist trim, `FUN_00575750` @0x5757e7-0x5758d4: if the match count
+## exceeds `(quality_byte + 2) * 5` the resolver keeps that many by drawing UNIFORMLY AT
+## RANDOM WITHOUT REPLACEMENT (`rand() * n >> 15` into the match array, retrying any slot
+## it has already zeroed) and discards the rest. It is NOT "the best N" — a weak scout
+## brings back fewer names, not worse ones, and the same criteria re-run give a different
+## shortlist. That answers the "which 35?" question `docs/SPEC_ours_additions.md` left
+## open: the binary picks at random, so nothing here is ours to choose.
+## `scout_found_total` keeps the pre-trim count so the screen can say how many were cut.
+func _scout_apply_cap(found: Array) -> Array:
+	var scout := Staff.member_in_role(staff, Staff.SCOUT_ROLE)
+	if scout.is_empty():
+		return found      # no hired scout = no cap: the original's screen cannot arm a
+		                  # search at all without one (witness 43), so a quality byte of 0
+		                  # is a state the resolver never sees. Capping it at (0+2)*5 = 10
+		                  # would be us inventing a rule for a case the game does not have.
+	var cap := scout_cap(Staff.quality_byte(scout))
+	if found.size() <= cap:
+		return found
+	var pool: Array = found.duplicate()
+	var kept: Array = []
+	var r := RandomNumberGenerator.new()
+	r.randomize()
+	while kept.size() < cap and not pool.is_empty():
+		kept.append(pool.pop_at(r.randi() % pool.size()))
+	return kept
 
 ## Scan the manager's own division (live rosters, own club excluded) when it is
 ## among the checked leagues. The original's result order is un-RE'd
@@ -2314,9 +2375,10 @@ func _tick_scout_search() -> void:
 func _scout_scan_own(criteria: Dictionary) -> Array:
 	var out: Array = []
 	var in_div: bool = criteria.get("leagues", []).has(league_id)
-	# The own division still scans when only E.U. / NON E.U. is checked — those regions
-	# are nationality filters over the WHOLE world, not a league selection.
-	if not in_div and not bool(criteria.get("eu", false)) and not bool(criteria.get("non_eu", false)):
+	# The four ENGLISH divisions are reached ONLY by their own checkboxes. E.U. / NON E.U.
+	# do NOT open them: `FUN_005753e0` @0x575675 sends a player to the nationality gate only
+	# when his club's division index (club+0x50) is >= 4, i.e. when the club is foreign.
+	if not in_div:
 		return out
 	for cid in rosters:
 		if int(cid) == club_id:
@@ -2331,13 +2393,17 @@ func _scout_scan_own(criteria: Dictionary) -> Array:
 	return out
 
 
-# The E.U. member states of the 1997-98 season the game ships (EU-15), spelled with
-# PM98's own country names (DBDAT/PAISES.30 -> game_db `nationality`): the UK's four
-# home nations, IRELAND as "REP. OF IRELAND", the Netherlands as "HOLLAND". The game's
-# own per-country E.U. flag is NOT located in MANAGER.EXE — this list is the historical
-# membership for the game's season, and is the one part of the E.U./NON E.U. filter not
-# lifted from the binary. Everything else about these checkboxes (their existence, their
-# geometry and the scout-rating unlock ladder) is live-witnessed.
+# The game's OWN E.U. list, no longer a historical reconstruction. `FUN_0058d2f0` is a
+# flat compare chain over the PAISES country code and returns 1 for exactly eighteen:
+#   2 GERMANY · 5 AUSTRIA · 0x0c BELGIUM · 0x12 DENMARK · 0x13 SCOTLAND · 0x16 SPAIN ·
+#   0x17 FINLAND · 0x18 FRANCE · 0x1a GREECE · 0x1b HOLLAND · 0x1e ENGLAND ·
+#   0x1f REP. OF IRELAND · 0x20 NORTH. IRELAND · 0x24 ITALY · 0x26 LUXEMBOURG ·
+#   0x2d WALES · 0x2f PORTUGAL · 0x35 SWEDEN
+# (codes resolved through app/data/country_codes.json = DBDAT/PAISES.30). Disassembled
+# 2026-07-25; the historical EU-15 + home-nations list this file used to carry turns out
+# to be exactly that set, so the behaviour is unchanged and the provenance is now the
+# binary. `EU_CODES` is the binary's own key — names are the PAISES spellings of it.
+const EU_CODES := [2, 5, 12, 18, 19, 22, 23, 24, 26, 27, 30, 31, 32, 36, 38, 45, 47, 53]
 const EU_NATIONS := {
 	"ENGLAND": true, "SCOTLAND": true, "WALES": true, "NORTH. IRELAND": true,
 	"REP. OF IRELAND": true, "FRANCE": true, "GERMANY": true, "ITALY": true,
@@ -2350,11 +2416,14 @@ static func nationality_is_eu(nat: String) -> bool:
 	return EU_NATIONS.has(nat.strip_edges().to_upper())
 
 
-## Does this player fall inside ANY of the search's checked REGIONS? The regions are
-## the four division checkboxes plus E.U. PLAYERS / NON E.U. PLAYERS / PLAYERS WITHOUT
-## TEAM, and the original ORs them (MANAGER.EXE 0x557a84: a search needs >=1 left-column
-## criterion AND >=1 of the seven region boxes). `in_div` is whether the player's club
-## sits in one of the checked divisions.
+## Does this player fall inside ANY of the search's checked REGIONS? Binary-exact since
+## 2026-07-25 — the tail of `FUN_005753e0` (@0x575675) is a three-way, not an OR:
+##   club id 0x26de (the no-club pseudo-club)  -> the PLAYERS WITHOUT TEAM toggle;
+##   club division index (club+0x50) < 4       -> that ENGLISH division's own checkbox;
+##   otherwise (a foreign club)                -> nationality: FUN_0058d2f0 picks the
+##                                                E.U. PLAYERS or NON E.U. PLAYERS box.
+## So E.U. / NON E.U. never reach an English club's players, and the division boxes never
+## reach a foreign one. `in_div` is whether the player's club sits in a checked division.
 func _region_ok(p: Dictionary, in_div: bool, criteria: Dictionary) -> bool:
 	if in_div:
 		return true
@@ -2404,8 +2473,12 @@ func _scout_match(row: Dictionary, p: Dictionary, criteria: Dictionary) -> bool:
 	var pos := str(criteria.get("pos", ""))
 	if pos != "" and str(p.get("pos", "")) != pos:
 		return false
+	# ROLE matches ANY of the player's SIX role slots, not just his primary one. The
+	# resolver loops the six bytes at player +0x1d..+0x22 and accepts on the first hit
+	# (`FUN_005753e0` @0x5754bc); +0x1d is `posFine` and +0x1e..+0x22 are the five
+	# alternates the extractor exports as `posAlts` (tools/re/equipos_parse.py:159).
 	var role := int(criteria.get("role", 0))
-	if role > 0 and int(p.get("posFine", 0)) != role:
+	if role > 0 and not _has_role(p, role):
 		return false
 	var age_band := int(criteria.get("age_band", -1))
 	if age_band >= 0:
@@ -2422,7 +2495,30 @@ func _scout_match(row: Dictionary, p: Dictionary, criteria: Dictionary) -> bool:
 		var pb: Array = SCOUT_PRICE_BANDS_K[price_band]
 		if int(row["fee"]) < int(pb[0]) * 1000 or int(row["fee"]) > int(pb[1]) * 1000:
 			return false
+	# ---- OURS from here down (docs/SPEC_scout_attribute_search.md) ----------------
+	# The original has no name box and no per-attribute criterion. Both are additions,
+	# approved 2026-07-25, and both are pure narrowing: with `name` empty and every
+	# threshold off, this block cannot change a single result.
+	var want := str(criteria.get("name", "")).strip_edges()
+	if want != "" and not str(row.get("name", "")).to_lower().contains(want.to_lower()):
+		return false
+	var attr_min: Dictionary = criteria.get("attr_min", {})
+	if not attr_min.is_empty():
+		var a: Dictionary = p.get("attrs", {}) if p.get("attrs") is Dictionary else {}
+		for code in attr_min:
+			if int(a.get(code, 0)) < int(attr_min[code]):
+				return false
 	return true
+
+
+## Does the player hold `role` (a 1..18 posFine) in ANY of his six role slots?
+func _has_role(p: Dictionary, role: int) -> bool:
+	if int(p.get("posFine", 0)) == role:
+		return true
+	for alt in p.get("posAlts", []):
+		if int(alt) == role:
+			return true
+	return false
 
 
 ## A season's youth turnover. The ONLY route into the academy is the YOUTH TEAM SCOUT
@@ -4847,6 +4943,7 @@ func to_dict() -> Dictionary:
 		"youth": youth,
 		"youth_seq": youth_seq, "youth_search": youth_search, "youth_found": youth_found,
 		"scout_search": scout_search, "scout_results": scout_results,
+		"scout_found_total": scout_found_total,
 		"pending_alerts": pending_alerts, "external_signed": _str_keyed(external_signed),
 		"pending_bids": pending_bids,
 		"staff": staff, "staff_pool": staff_pool,
@@ -5011,6 +5108,7 @@ static func from_dict(d: Dictionary) -> Career:
 	# Pre-SCOUT-screen saves load idle with no results (inert until a search).
 	c.scout_search = d.get("scout_search", {})
 	c.scout_results = d.get("scout_results", [])
+	c.scout_found_total = int(d.get("scout_found_total", c.scout_results.size()))
 	c.pending_alerts = d.get("pending_alerts", [])
 	for k in d.get("external_signed", {}):
 		c.external_signed[int(k)] = true
