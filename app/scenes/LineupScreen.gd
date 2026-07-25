@@ -10,7 +10,8 @@ class_name LineupScreen
 ##    gk/def/mid/fwd for the XI; uniform sub/res skins) + ProMan8 number/name,
 ##    STARJUGON star strip (halves=(AV+1) div 10, odd half = the dimmed star),
 ##    EURO8 fine-role SHORT name, red AV, CAMROL sprite, POS word;
-##  - the INJURED row (gold tint template: cross + count + WEEKS/DAYS boxes);
+##  - the UNAVAILABLE row (gold tint template: icon + count + unit boxes) in its two
+##    forms -- INJURED (red cross, WEEKS) and SUSPENDED (two yellow cards, MATCHES);
 ##  - the SELECTED row's 2px black frame + the right-panel name band + attr
 ##    values (attrs PO/PA/RM/RG/EN/TI — frame-verified: Solskjaer 11/72/84/81/
 ##    66/79) with STARPARON stars;
@@ -184,7 +185,7 @@ func _ready() -> void:
 	_f12 = PMChrome.font("12")
 	_feuro = load("res://art/fonts/euro8.fnt")
 	_chrome = load("res://art/screens/lineup/chrome.png")
-	for cls in ["gk", "def", "mid", "fwd", "inj", "sub", "res"]:
+	for cls in ["gk", "def", "mid", "fwd", "inj", "ban", "sub", "res"]:
 		_rows[cls] = load("res://art/screens/lineup/row_%s.png" % cls)
 	_bands["sub"] = load("res://art/screens/lineup/band_subs.png")
 	_bands["res"] = load("res://art/screens/lineup/band_res.png")
@@ -699,6 +700,11 @@ func _injury_weeks(p: Dictionary) -> int:
 	return int(p.get("injured_weeks", 0))
 
 
+## Matches still to sit out banned (Availability.gd's `suspended_weeks`).
+func _ban_matches(p: Dictionary) -> int:
+	return int(p.get("suspended_weeks", 0))
+
+
 # ---- drawing ---------------------------------------------------------------
 
 func _draw() -> void:
@@ -735,11 +741,17 @@ func _draw_row(y: int, it: Dictionary) -> void:
 	var slot := int(it["slot"])
 	var tier: String = str(it.get("tier", "xi"))
 	var injured := _injury_weeks(pl) > 0
+	var banned := not injured and _ban_matches(pl) > 0
+	# The original draws an injury and a suspension on the SAME gold plate and the same
+	# three cells; only the icon (red cross / two yellow cards) and the unit word
+	# (WEEKS / MATCHES) differ — docs/re/lineup_screen_re.md, witnessed on the reference
+	# season's `2 Gary Neville ... 2 MATCHES` row.
+	var unavailable := injured or banned
 	var cls: String
 	if tier == "xi":
-		cls = "inj" if injured else ("gk" if slot == 0 else _band_of_slot(slot - 1))
+		cls = ("inj" if injured else "ban") if unavailable else ("gk" if slot == 0 else _band_of_slot(slot - 1))
 	else:
-		cls = "inj" if injured else tier
+		cls = ("inj" if injured else "ban") if unavailable else tier
 	if _rows.get(cls) != null:
 		draw_texture(_rows[cls], Vector2(ROW_X, y))
 	var tint := _tint_of(cls)
@@ -751,8 +763,8 @@ func _draw_row(y: int, it: Dictionary) -> void:
 		PMChrome.title_case_name(str(pl.get("name", "?"))), C_NAME, 11, 0, 103.0)
 
 	var av := _av_of(pl)
-	if injured:
-		_draw_injury_cells(y, pl)
+	if unavailable:
+		_draw_unavailable_cells(y, pl, injured)
 	elif _rating_view:
 		# STARJUGON strip: halves=(AV+1) div 10; odd half = the DIMMED star.
 		var halves := (av + 1) / 10
@@ -811,18 +823,19 @@ func _tint_of(cls: String) -> Color:
 		"def": return Color8(220, 250, 210)
 		"mid": return Color8(204, 204, 255)
 		"fwd": return Color8(255, 191, 170)
-		"inj": return Color8(212, 191, 85)
+		"inj", "ban": return Color8(212, 191, 85)
 		"sub": return Color8(212, 223, 255)
 	return Color8(180, 200, 220)
 
 
-## The injured row's dynamic digits (cross + boxes + WEEKS text are template
-## furniture; the label cell redraws for the DAYS variant).
-func _draw_injury_cells(y: int, pl: Dictionary) -> void:
-	var wks := _injury_weeks(pl)
+## The unavailable row's dynamic digits. The icon + boxes are template furniture
+## (row_inj / row_ban); the count and the unit label are drawn here — WEEKS for an
+## injury, MATCHES for a suspension, singular when the count is 1.
+func _draw_unavailable_cells(y: int, pl: Dictionary, injured: bool) -> void:
+	var wks := _injury_weeks(pl) if injured else _ban_matches(pl)
 	PMChrome.text(self, _f8, _cell_centre(_f8, str(wks), INJ_COUNT[0], INJ_COUNT[1]), y + 2,
 		str(wks), C_INJ_COUNT, 11)
-	var label := "WEEKS" if wks != 1 else "WEEK"
+	var label := ("WEEKS" if wks != 1 else "WEEK") if injured else ("MATCHES" if wks != 1 else "MATCH")
 	PMChrome.text(self, _f8, _cell_centre(_f8, label, INJ_WEEKS[0], INJ_WEEKS[1]), y + 2,
 		label, C_INJ_LABEL, 11)
 	var fi := str(clampi(int(pl.get("fitness", 99)), 0, 99))

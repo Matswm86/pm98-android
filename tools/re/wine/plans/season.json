@@ -119,6 +119,13 @@
     455
    ],
    "settle": 1.5
+  },
+  "league_tables_final": {
+   "click": [
+    573,
+    437
+   ],
+   "settle": 1.5
   }
  },
  "film_secs": 20,
@@ -136,5 +143,6 @@
    ],
    "settle": 3.0
   }
- }
+ },
+ "keep_all": true
 }

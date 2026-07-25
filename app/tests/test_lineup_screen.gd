@@ -53,7 +53,10 @@ func _run() -> void:
 		"PROMAN fonts loaded into screen") and ok
 	ok = _assert(screen._chrome != null and screen._campo_img != null,
 		"baked chrome + CAMPO image loaded") and ok
-	ok = _assert(screen._rows.size() == 7, "all 7 row templates loaded") and ok
+	# 8 since the SUSPENDED row (row_ban: two yellow cards + MATCHES) joined the
+	# INJURED one -- docs/re/lineup_screen_re.md.
+	ok = _assert(screen._rows.size() == 8, "all 8 row templates loaded") and ok
+	ok = _assert(screen._rows.get("ban") != null, "the suspended-row template loaded") and ok
 	screen.setup(club, t, "", "Premier")
 	await process_frame
 	ok = _assert(screen._by_id.size() == (club["players"] as Array).size(),

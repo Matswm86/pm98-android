@@ -373,8 +373,8 @@ def run_plan(plan_path: Path, max_steps: int, settle: float) -> int:
                   + ", ".join(f"{n}={s:.2f}" for n, s in ranked), file=sys.stderr)
             return 2
 
-        if name in keep:
-            shot.replace(outdir / f"keep_{name}_{step:04d}.png")
+        if plan.get("keep_all") or name in keep:
+            shot.replace(outdir / f"keep_{step:04d}_{name}.png")
         elif shot.exists():
             shot.unlink()
 

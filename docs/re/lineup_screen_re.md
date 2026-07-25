@@ -176,3 +176,37 @@ is superseded by `app/scenes/LineupScreen.gd`'s baked pipeline.
 - **Bench/reserve order** is save-stored (team+0x1930/0x1934) — the club dict
   may pin `bench`/`reserves` pid arrays (the parity shot does); the app
   default derives them by ability.
+
+## The UNAVAILABLE row — injured AND suspended (witnessed 2026-07-25)
+
+A player who cannot play is drawn on a **gold plate `(212,191,85)`** with his five
+leftmost attribute cells replaced by three boxes. Cell x-extents are IDENTICAL for both
+causes (measured on two frames, borders included):
+
+| box | x | fill | contents |
+|---|---|---|---|
+| icon | 174..197 | white `(255,255,255)` | the CAUSE glyph |
+| count | 199..222 | dark gold `(85,63,0)` | the number, bright yellow `(255,255,0)` |
+| unit | 224..297 | gold `(170,127,0)` | the unit word, black |
+
+Only two things change with the cause:
+
+* **INJURED** — a red medical cross `(255,31,0)` at x181..189, unit `WEEKS` (`WEEK` at 1).
+  Witnessed: `36 Holdsworth [+] 5 WEEKS`, Bolton W career, 25 September 1997.
+* **SUSPENDED** — **two yellow cards side by side** (`(255,223,0)` with a
+  `(212,191,0)` shadow, at x178..185 and x187..194), unit `MATCHES` (`MATCH` at 1).
+  Witnessed: `2 Gary Neville [::] 2 MATCHES`, the reference Manchester Utd. 1997-98
+  season, `out/refrun-manutd-9798/play/p0349_UNKNOWN.png` (RESERVES) and
+  `p0346_UNKNOWN.png` (still in the **XI**, which is what makes the original refuse the
+  week with "The initial line-up is not correct").
+
+The three surviving cells to the right (FI, MO, AV) keep their normal values, and the
+row's shirt number, name, ROLE swatch and POS are unchanged. The app bakes one template
+per cause — `row_inj.png` and `row_ban.png` — the latter cut from the real frame by
+`tools/re/build_lineup_ban_row_from_frame.py`, which replaces ONLY the icon cell so every
+other pixel is still the original's.
+
+The engine field behind it is `player + 0xb6 + DAT_0066b1dc` (a per-competition byte
+array read by `FUN_0057a4c0`, the "Players banned will not be available for the next
+match." gate; 0 and 6 mean available). The app's own counter is
+`Availability.gd`'s `suspended_weeks`.
