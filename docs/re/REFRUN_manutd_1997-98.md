@@ -28,7 +28,7 @@ witnesses the European screens the audit was missing.
 | of which never witnessed before | **179** (`novel/`) |
 | already-taught screens | **59** (`named/`) |
 | pointer samples | ~15,000, window-relative, recovers the click target per transition |
-| raw frames + manifest | `out/refrun-manutd-9798/` (gitignored, durable) |
+| raw frames + manifest | `out/refrun-manutd-9798/` (gitignored, local only, 60 MB+) |
 
 Harness: [`tools/re/wine/record_play.py`](../../tools/re/wine/record_play.py) — passive, never
 clicks, names every frame with `autodrive.identify()` and prints **NEW SCREEN** when a frame
@@ -37,7 +37,9 @@ matches nothing taught. Ran on an isolated wineprefix
 banked frame is a settled screen rather than a mid-fade blit.
 
 Full finding detail, with frame numbers and evidence, is in
-`out/refrun-manutd-9798/FINDINGS.md`. This file is the summary and the work list.
+[`REFRUN_manutd_1997-98_FINDINGS.md`](REFRUN_manutd_1997-98_FINDINGS.md) (committed beside
+this file; it was written to the gitignored `out/refrun-manutd-9798/FINDINGS.md`). This
+file is the summary and the work list.
 
 ---
 
