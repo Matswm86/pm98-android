@@ -79,13 +79,18 @@ static func create(club_ids: Array, total_weeks: int, opts: Dictionary = {}) -> 
 	if has_groups:
 		var n_groups := int(gs.get("groups", 4))
 		var advance := int(gs.get("advance", 2))
+		# The European Cup takes the six group winners PLUS the two best runners-up --
+		# witnessed, not inferred: the QTR FINALS view holds exactly those eight clubs
+		# (docs/re/euro_league_screen_re.md).
+		var best_ru := int(gs.get("best_runners_up", 0))
 		var group_size := ids.size() / n_groups
 		var n_md := 2 * (group_size - 1)               # double round-robin
-		var ko_field := n_groups * advance
+		var ko_field := n_groups * advance + best_ru
 		num_rounds = n_md + _num_rounds(ko_field)       # group matchdays then the knockout
 		survivors = []
 		group_stage = {
 			"field": ids.duplicate(), "n_groups": n_groups, "advance": advance,
+			"best_runners_up": best_ru,
 			"group_size": group_size, "n_matchdays": n_md, "matchdays_played": 0,
 			"groups": [], "qualified": false,
 		}
@@ -388,14 +393,22 @@ static func play_group_matchday(b: Dictionary, rng: RandomNumberGenerator,
 	if int(gs["matchdays_played"]) >= int(gs["n_matchdays"]):
 		var qualifiers: Array = []
 		var advance := int(gs["advance"])
+		var runners_up: Array = []
 		for grp in groups:
 			var ranked := _sorted_table(grp["table"])
 			grp["table"] = ranked                      # store ranked for the UI
 			for i in mini(advance, ranked.size()):
-				var qid := int(ranked[i]["id"])
-				qualifiers.append(qid)
-				if qid == club_id:
-					out["manager_qualified"] = true
+				qualifiers.append(int(ranked[i]["id"]))
+			if advance < ranked.size():
+				runners_up.append(ranked[advance])     # the best club that did NOT go through
+		# Best runners-up across the groups, on the same points / GD / GF ladder.
+		var best_ru := int(gs.get("best_runners_up", 0))
+		if best_ru > 0 and not runners_up.is_empty():
+			for row in _sorted_table(runners_up).slice(0, best_ru):
+				qualifiers.append(int(row["id"]))
+		for qid in qualifiers:
+			if int(qid) == club_id:
+				out["manager_qualified"] = true
 		b["survivors"] = qualifiers
 		gs["qualified"] = true
 		out["qualified"] = true
@@ -611,9 +624,25 @@ static func _two_leg_winner(h: int, a: int, h_agg: int, a_agg: int, h_away: int,
 	return -1
 
 
-## A one-off neutral-venue match (the Charity Shield curtain-raiser; later the European
-## Supercup / Intercontinental Cup). One match, no replay -- a level result goes straight
-## to penalties. `h` is nominally the home/first-named side (e.g. the league champions).
+## A standalone HOME-AND-AWAY final (the European Supercup). `leg1_home` hosts the first
+## leg, `leg2_home` the second; settled by the same 1997-98 UEFA ladder as any two-legged
+## round. Returns the tie dict, whose scores are from `leg1_home`'s view.
+##
+## The original plays the Supercup over two legs, not on neutral ground: its RESULTS ->
+## Euro. Superc. screen carries `1ST LEG MATCH` / `2ND LEG MATCH` blocks, each with its own
+## STADIUM caption (witnessed 1997-98: leg 1 Camp Nou, leg 2 Westfalen, for Borussia D. v
+## F.C. Barcelona) -- `docs/re/euro_supercup_screen_re.md`.
+static func two_leg_tie(rng: RandomNumberGenerator, leg1_home: int, leg2_home: int, \
+		ratings_fn: Callable, xi_fn := Callable(), on_report := Callable()) -> Dictionary:
+	var rh: Dictionary = ratings_fn.call(leg1_home)
+	var ra: Dictionary = ratings_fn.call(leg2_home)
+	return _play_two_leg_tie(rng, leg1_home, leg2_home, rh, ra,
+		_xi(xi_fn, leg1_home), _xi(xi_fn, leg2_home), on_report)
+
+
+## A one-off neutral-venue match (the Charity Shield curtain-raiser; the Intercontinental
+## Cup). One match, no replay -- a level result goes straight to penalties. `h` is nominally
+## the home/first-named side (e.g. the league champions).
 ## Returns a tie-shaped dict so the cup UI can render it like any other tie.
 static func single_neutral_match(rng: RandomNumberGenerator, h: int, a: int, \
 		ratings_fn: Callable, xi_fn := Callable(), on_report := Callable()) -> Dictionary:

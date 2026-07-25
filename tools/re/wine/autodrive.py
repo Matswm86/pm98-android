@@ -168,6 +168,16 @@ def learn(name: str, roi: tuple[int, int, int, int], frames: list[Path], step: i
 
 
 TEMPLATES = HERE / "templates"
+_PROBE_CACHE: dict = {}
+_TMPL_CACHE: dict = {}
+
+
+def _template(name: str) -> np.ndarray:
+    if name not in _TMPL_CACHE:
+        _TMPL_CACHE[name] = np.asarray(
+            Image.open(TEMPLATES / name).convert("RGB"), dtype=np.int16
+        )
+    return _TMPL_CACHE[name]
 
 
 def locate(img: Image.Image, tmpl_name: str, tol: int = CHANNEL_TOL) -> tuple[int, int] | None:
@@ -178,22 +188,26 @@ def locate(img: Image.Image, tmpl_name: str, tol: int = CHANNEL_TOL) -> tuple[in
     positions whose pixel equals the template's own rarest colour are verified.
     """
     a = as_frame(img)
-    t = as_frame_tmpl(Image.open(TEMPLATES / tmpl_name))
+    t = _template(tmpl_name)
     th, tw = t.shape[:2]
-    # pick the template pixel whose colour is rarest in the frame
-    flat = a.reshape(-1, 3)
-    best_px, best_n = (0, 0), None
-    for ty in range(0, th, 2):
-        for tx in range(0, tw, 2):
-            c = t[ty, tx]
-            n = int((np.abs(flat - c).max(axis=1) <= tol).sum())
-            if best_n is None or n < best_n:
-                best_px, best_n = (ty, tx), n
-                if n <= 4:
+    # Pick (once per template) the pixel whose colour is rarest in the frame, then reuse
+    # it: re-deriving it on every frame made identify() cost tens of seconds a step.
+    if tmpl_name in _PROBE_CACHE:
+        ty, tx = _PROBE_CACHE[tmpl_name]
+    else:
+        flat = a.reshape(-1, 3)
+        best_px, best_n = (0, 0), None
+        for ty in range(0, th, 2):
+            for tx in range(0, tw, 2):
+                n = int((np.abs(flat - t[ty, tx]).max(axis=1) <= tol).sum())
+                if best_n is None or n < best_n:
+                    best_px, best_n = (ty, tx), n
+                if best_n <= 200:
                     break
-        if best_n is not None and best_n <= 4:
-            break
-    ty, tx = best_px
+            if best_n <= 200:
+                break
+        _PROBE_CACHE[tmpl_name] = best_px
+        ty, tx = best_px
     ys, xs = np.nonzero(np.abs(a - t[ty, tx]).max(axis=2) <= tol)
     for y, x in zip(ys - ty, xs - tx):
         if y < 0 or x < 0 or y + th > a.shape[0] or x + tw > a.shape[1]:
@@ -201,10 +215,6 @@ def locate(img: Image.Image, tmpl_name: str, tol: int = CHANNEL_TOL) -> tuple[in
         if np.abs(a[y:y + th, x:x + tw] - t).max() <= tol:
             return int(x), int(y)
     return None
-
-
-def as_frame_tmpl(img: Image.Image) -> np.ndarray:
-    return np.asarray(img.convert("RGB"), dtype=np.int16)
 
 
 def score(img: Image.Image, entry: dict) -> float:
@@ -261,7 +271,7 @@ LINEUP_GOLD = (212, 191, 85)
 
 
 def _is_unavailable(a: np.ndarray, y: int) -> bool:
-    return bool((np.abs(a[y, LINEUP_PLATE_X] - np.array(LINEUP_GOLD)).max() <= 8))
+    return bool(np.abs(a[y, LINEUP_PLATE_X] - np.array(LINEUP_GOLD)).max() <= 8)
 
 
 def unavailable_rows(img: Image.Image) -> dict:

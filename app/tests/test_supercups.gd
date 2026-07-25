@@ -81,7 +81,7 @@ func _two_season_flow() -> bool:
 	# Season 1 -> rollover mints Europe for season 2.
 	while not career.season_over():
 		career.advance_week(rng)
-	career.advance_season(leagues, rng, _fake_pool(60), _fake_sa())
+	career.advance_season(leagues, rng, _fake_pool(90), _fake_sa())
 	ok = _assert(career.euro.size() == 3, "season 2 has European competitions") and ok
 	ok = _assert(career.supercup.is_empty() and career.intercontinental.is_empty(),
 		"no Supercup yet (no prior European winners)") and ok
@@ -91,7 +91,7 @@ func _two_season_flow() -> bool:
 		career.advance_week(rng)
 	var exp_cup := Cup.champion_id(career.euro["european_cup"])
 	var exp_cwc := Cup.champion_id(career.euro["cup_winners_cup"])
-	career.advance_season(leagues, rng, _fake_pool(60), _fake_sa())
+	career.advance_season(leagues, rng, _fake_pool(90), _fake_sa())
 
 	ok = _assert(career.euro_winner_cup == exp_cup,
 		"European Cup winner captured across the rollover (%d)" % career.euro_winner_cup) and ok
@@ -100,12 +100,23 @@ func _two_season_flow() -> bool:
 	ok = _assert(career.euro_winner_ratings.has(exp_cup),
 		"the European Cup winner's rating was frozen for the finals") and ok
 
-	# Supercup: European Cup winner v Cup Winners' Cup winner (unless the same club).
+	# Supercup: European Cup winner v Cup Winners' Cup winner (unless the same club),
+	# HOME AND AWAY with the Cup Winners' Cup holder hosting the first leg -- the
+	# original's own screen carries 1ST LEG / 2ND LEG blocks with a ground each
+	# (docs/re/euro_supercup_screen_re.md).
 	if exp_cup != exp_cwc and exp_cwc != -1:
 		var sc := career.supercup
 		ok = _assert(not sc.is_empty(), "the European Supercup was contested") and ok
-		ok = _assert(int(sc.get("home_id", -1)) == exp_cup and int(sc.get("away_id", -1)) == exp_cwc,
-			"Supercup is Euro Cup winner v Cup Winners' Cup winner") and ok
+		ok = _assert(bool(sc.get("two_legged", false)), "the Supercup is a two-legged tie") and ok
+		ok = _assert(int(sc.get("home_id", -1)) == exp_cwc and int(sc.get("away_id", -1)) == exp_cup,
+			"leg 1 is hosted by the Cup Winners' Cup holder") and ok
+		ok = _assert(int(sc.get("euro_cup_id", -1)) == exp_cup and int(sc.get("cwc_id", -1)) == exp_cwc,
+			"both holders are tagged for the TEAMS IN CHAMPIONSHIPS naming order") and ok
+		ok = _assert(sc.has("leg1_hg") and sc.has("leg1_ag") and sc.has("leg2_hg")
+			and sc.has("leg2_ag"), "both legs were played") and ok
+		ok = _assert(int(sc.get("h_agg", -1)) == int(sc.get("leg1_hg", 0)) + int(sc.get("leg2_hg", 0))
+			+ int(sc.get("et_hg", 0)),
+			"the aggregate is the two legs (plus any extra time)") and ok
 		ok = _assert(int(sc.get("winner_id", -1)) in [exp_cup, exp_cwc],
 			"Supercup has a valid winner") and ok
 

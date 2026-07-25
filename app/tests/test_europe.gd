@@ -86,14 +86,16 @@ func _mint_and_fields() -> bool:
 	career.last_fa_winner_id = int(div[4])
 	career.last_lc_winner_id = int(div[5])
 	var rng := RandomNumberGenerator.new(); rng.seed = SEED
-	career.mint_european_cups(_fake_pool(60), rng)
+	career.mint_european_cups(_fake_pool(90), rng)
 
 	ok = _assert(career.euro.size() == 3, "three European competitions minted") and ok
+	# The original's own field sizes, counted off its RESULTS screens: European Cup 24
+	# (six groups of four), U.E.F.A. Cup 32 (1/16 FINALS), Cup Winners' 16 (1/8 FINALS).
 	for key in ["european_cup", "uefa_cup", "cup_winners_cup"]:
 		ok = _assert(career.euro.has(key), "minted %s" % key) and ok
 		var b: Dictionary = career.euro.get(key, {})
-		ok = _assert(_field(b).size() == Career.EURO_FIELD,
-			"%s field = %d clubs" % [key, Career.EURO_FIELD]) and ok
+		ok = _assert(_field(b).size() == int(Career.EURO_FIELD[key]),
+			"%s field = %d clubs" % [key, int(Career.EURO_FIELD[key])]) and ok
 	# The witnessed 1997-98 entry rule (TEAMS IN CHAMPIONSHIPS, orig/06):
 	# European Cup = champions + first runners-up; U.E.F.A. Cup = the next
 	# runners-up + the League Cup winners.
@@ -141,7 +143,7 @@ func _manager_entry_prize_and_resolve() -> bool:
 	career.last_fa_winner_id = int(div[4])
 	var cash0 := career.cash
 	var rng := RandomNumberGenerator.new(); rng.seed = SEED
-	career.mint_european_cups(_fake_pool(60), rng)
+	career.mint_european_cups(_fake_pool(90), rng)
 	ok = _assert(_field(career.euro["european_cup"]).has(career.club_id),
 		"manager (champions) is in the European Cup") and ok
 	ok = _assert(career.cash >= cash0 + Career.EURO_ENTRY,
@@ -187,7 +189,7 @@ func _rollover_integration() -> bool:
 	while not career.season_over():
 		career.advance_week(rng)
 	# Roll over WITH a foreign pool -> Europe is minted for the new season.
-	career.advance_season(leagues, rng, _fake_pool(60))
+	career.advance_season(leagues, rng, _fake_pool(90))
 	ok = _assert(career.euro.size() == 3, "rollover with a pool mints Europe") and ok
 	ok = _assert(_field(career.euro["european_cup"]).has(career.last_champion_id),
 		"the new European Cup is seeded with last season's champions") and ok
@@ -213,12 +215,14 @@ func _group_stage() -> bool:
 	career.last_runners_up = [int(div[1]), int(div[2]), int(div[3])]
 	career.last_fa_winner_id = int(div[4])
 	var rng := RandomNumberGenerator.new(); rng.seed = SEED
-	career.mint_european_cups(_fake_pool(60), rng)
+	career.mint_european_cups(_fake_pool(90), rng)
 	var b: Dictionary = career.euro["european_cup"]
 	var gs: Dictionary = b.get("group_stage", {})
 	ok = _assert(not gs.is_empty(), "European Cup has a group stage") and ok
-	ok = _assert(int(gs.get("n_groups", 0)) == 4 and int(gs.get("group_size", 0)) == 4,
-		"4 groups of 4") and ok
+	ok = _assert(int(gs.get("n_groups", 0)) == 6 and int(gs.get("group_size", 0)) == 4,
+		"six groups of four") and ok
+	ok = _assert(int(gs.get("advance", 0)) == 1 and int(gs.get("best_runners_up", 0)) == 2,
+		"six winners + the two best runners-up go through") and ok
 	# Only the European Cup has groups; the other two are straight knockouts.
 	ok = _assert((career.euro["uefa_cup"].get("group_stage", {}) as Dictionary).is_empty()
 		and (career.euro["cup_winners_cup"].get("group_stage", {}) as Dictionary).is_empty(),

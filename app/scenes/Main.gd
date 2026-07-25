@@ -589,9 +589,7 @@ func _cup_shot() -> void:
 	while not _career.season_over():
 		_career.advance_week(rng)
 	_career.advance_season(GameDB.leagues, rng, _euro_pool(), _sa_champion())
-	_show_one_off_final(_career.supercup, "EUROPEAN SUPERCUP",
-		"res://art/screens/cup/supercopa.png", "European Supercup",
-		"European Cup winners v Cup Winners' Cup winners")
+	_show_euro_supercup()
 	await _settle()
 	_save_shot(dir, "european_supercup.png")
 	print("CUP-SHOT done facup_rounds=%d champ=%d | lcup_rounds=%d champ=%d | charity winner=%d | euro_comps=%d show=%s ec_rounds=%d | supercup=%d intercont=%d club=%s" % [
@@ -3571,9 +3569,7 @@ func _open_competition(act: String) -> void:
 		var b: Dictionary = _career.euro.get(key, {})
 		_show_cup_screen(b, key, str(b.get("name", "Europe")))
 	elif act == "supercup":
-		_show_one_off_final(_career.supercup, "EUROPEAN SUPERCUP",
-			"res://art/screens/cup/supercopa.png", "European Supercup",
-			"European Cup winners v Cup Winners' Cup winners")
+		_show_euro_supercup()
 	elif act == "intercont":
 		_show_comp_result("intercont", _career.intercontinental, "Tokyo")
 
@@ -3602,8 +3598,10 @@ func _euro_pool() -> Array:
 		var r := MatchEngine.team_ratings(c)
 		scored.append({"c": c, "s": float(r["att"]) + float(r["def"]) + float(r["gk"])})
 	scored.sort_custom(func(a, b): return a["s"] > b["s"])
+	# Enough to fill all three of the original's fields: 24 + 32 + 16 = 72 places, less
+	# the domestic seeds, plus headroom for clubs the career has already used.
 	var out: Array = []
-	for e in scored.slice(0, 48):
+	for e in scored.slice(0, 96):
 		out.append(e["c"])
 	return out
 
@@ -3877,6 +3875,54 @@ func _show_comp_result(kind: String, res: Dictionary, ground: String) -> void:
 	scr.back_pressed.connect(func() -> void:
 		AudioManager.ui_select()
 		scr.queue_free())
+
+
+## RESULTS -> Euro. Superc. on the original's own screen. The Supercup is a TWO-LEGGED
+## tie (FUN_004a1820 mounts the 1ST LEG / 2ND LEG panel widget FUN_0046a110, two match
+## records 0xbc apart), so it does NOT go through _show_comp_result -- that screen is the
+## single-match CHARITY / INTERCONT builder. docs/re/euro_supercup_screen_re.md.
+func _show_euro_supercup() -> void:
+	var res: Dictionary = _career.supercup
+	var scr: EuroSupercupScreen = load("res://scenes/EuroSupercupScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(_supercup_view(res), _match_header())
+	scr.back_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		scr.queue_free())
+
+
+## The Supercup tie as EuroSupercupScreen wants it. `home_id` is the Cup Winners' Cup
+## holder, who hosts the FIRST leg (witnessed 1997-98: leg 1 Camp Nou, leg 2 Westfalen);
+## the second leg is the same pair reversed, and each leg's ground is the home club's own
+## `stadium` string out of game_db.
+func _supercup_view(res: Dictionary) -> Dictionary:
+	if res.is_empty():
+		return {"legs": []}
+	var h := int(res.get("home_id", -1))
+	var a := int(res.get("away_id", -1))
+	var side_h := _comp_side(h)
+	var side_a := _comp_side(a)
+	var leg1 := {"stadium": _club_ground(h), "home": side_h, "away": side_a}
+	var leg2 := {"stadium": _club_ground(a), "home": side_a, "away": side_h}
+	if res.has("leg1_hg") and res.has("leg1_ag"):
+		leg1["hg"] = int(res["leg1_hg"])
+		leg1["ag"] = int(res["leg1_ag"])
+		# The stored leg-2 pair is still home-first-leg-side first; on the screen the
+		# second leg is drawn with the away club on top, so the two swap.
+		leg2["hg"] = int(res.get("leg2_ag", 0))
+		leg2["ag"] = int(res.get("leg2_hg", 0))
+	var out := {"legs": [leg1, leg2]}
+	var win := int(res.get("winner_id", -1))
+	if win != -1 and res.has("leg1_hg"):
+		out["winner"] = _comp_side(win)
+	return out
+
+
+## A club's own ground name out of game_db (the EQUIPOS string), "" if unknown.
+func _club_ground(club_id: int) -> String:
+	var rec: Dictionary = GameDB.club(club_id)
+	return str(rec.get("stadium", "")) if not rec.is_empty() else ""
 
 
 ## One club as CompResultScreen wants it: the display name, the id its kit is drawn from

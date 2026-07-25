@@ -219,8 +219,17 @@ const S1_SHIELD_RUNNERUP_ID := 49
 
 # European competitions. Three two-legged knockouts seeded from last season's domestic
 # finish; the field is filled to EURO_FIELD clubs with strong foreign sides from game_db.
-const EURO_FIELD := 16                  # 16-club field. European Cup: 4 groups of 4 ->
-                                        # top 2 -> QF/SF/Final. UEFA/CWC: R16 -> QF -> SF -> Final.
+# The original's own field sizes, counted off its RESULTS screens
+# (docs/re/euro_league_screen_re.md):
+#   European Cup   24 clubs -> six groups of four -> six winners + the two best
+#                  runners-up -> QTR FINALS / SEMIFINALS / FINAL
+#   U.E.F.A. Cup   32 clubs -> straight knockout from `1/16 FINALS`
+#   Cup Winners'   16 clubs -> straight knockout from `1/8 FINALS`
+# (The two qualifying rounds the original plays AHEAD of the European Cup groups -- 15
+# ties then 16 -- are not modelled: the app's field is derived from the domestic
+# qualifiers plus rated foreign clubs and enters at the group phase.)
+const EURO_FIELD := {"european_cup": 24, "uefa_cup": 32, "cup_winners_cup": 16}
+const EURO_GROUPS := {"groups": 6, "advance": 1, "best_runners_up": 2}
 const UEFA_SPOTS := 2                   # league places below the champions that enter the UEFA Cup
 const EURO_OPTS := {
 	"european_cup": {"name": "European Cup", "emblem": "ligacamp"},
@@ -3623,7 +3632,7 @@ func mint_european_cups(euro_pool: Array, rng: RandomNumberGenerator,
 		euro_ratings[id] = MatchEngine.team_ratings(club)
 		euro_names[id] = str(club.get("name", "?"))
 		bag.append(id)
-	if bag.size() < EURO_FIELD - UEFA_SPOTS:
+	if bag.size() < int(EURO_FIELD["cup_winners_cup"]) - UEFA_SPOTS:
 		return                             # not enough foreign clubs to fill even one field
 	# Shuffle the foreign pool once, then deal distinct clubs to each competition.
 	for i in range(bag.size() - 1, 0, -1):
@@ -3653,7 +3662,7 @@ func mint_european_cups(euro_pool: Array, rng: RandomNumberGenerator,
 			if int(s) != -1 and not field.has(int(s)):
 				field.append(int(s))
 		euro_seeds[key] = field.duplicate()   # the domestic entrants (champs screen)
-		var need := EURO_FIELD - field.size()
+		var need := int(EURO_FIELD[key]) - field.size()
 		if cursor + need > bag.size():
 			break                          # foreign pool exhausted; remaining comps skipped
 		field += bag.slice(cursor, cursor + need)
@@ -3661,11 +3670,12 @@ func mint_european_cups(euro_pool: Array, rng: RandomNumberGenerator,
 		var opts := {"name": str(EURO_OPTS[key]["name"]), "legs": 2,
 			"two_legged_final": false, "label_scheme": "sequential",
 			"qtr_label": "Quarter Finals", "prize_round": 0, "prize_winner": 0}
-		# Only the European Cup runs a group phase (the real 1997-98 format): the 16-club
-		# field is drawn into 4 groups of 4, double round-robin, top 2 into the knockout.
-		# The U.E.F.A. Cup and Cup Winners' Cup were straight knockouts that season.
+		# Only the European Cup runs a group phase: 24 clubs into six groups of four,
+		# double round-robin (`Round 1`..`Round 6` under the original's `1/8 FINALS`
+		# header), then the six winners plus the two best runners-up into the quarter
+		# finals. The U.E.F.A. Cup and Cup Winners' Cup are straight knockouts.
 		if key == "european_cup":
-			opts["group_stage"] = {"groups": 4, "advance": 2}
+			opts["group_stage"] = EURO_GROUPS.duplicate()
 		euro[key] = Cup.create(field, fixtures.size(), opts)
 		if field.has(club_id):
 			cash += EURO_ENTRY
@@ -3756,9 +3766,15 @@ func _freeze_winner(id: int) -> void:
 ## Play the winners-of-winners finals as the new season opens: the European Supercup
 ## (last season's European Cup winner v Cup Winners' Cup winner) and the Intercontinental
 ## Cup (European Cup winner v the South American champion -- `sa_champion`, a club dict the
-## caller supplies from game_db; approximated by the strongest South American club). Both
-## are single neutral matches (level -> penalties). No-op until a first European season has
-## produced winners. Pays the manager a documented prize + a news line if his club is in.
+## caller supplies from game_db; approximated by the strongest South American club).
+##
+## The Supercup is a TWO-LEGGED tie, the Cup Winners' Cup holder at home first -- the
+## original's own screen shows `1ST LEG MATCH` at the CWC winner's ground and `2ND LEG
+## MATCH` at the European Cup winner's (1997-98: Camp Nou then Westfalen, for Borussia D.
+## v F.C. Barcelona), `docs/re/euro_supercup_screen_re.md`. The Intercontinental stays a
+## single neutral match in Tokyo (level -> penalties), which is what its screen shows.
+## No-op until a first European season has produced winners. Pays the manager a documented
+## prize + a news line if his club is in.
 func _play_euro_supercups(sa_champion: Dictionary, rng: RandomNumberGenerator) -> void:
 	supercup = {}
 	intercontinental = {}
@@ -3770,10 +3786,13 @@ func _play_euro_supercups(sa_champion: Dictionary, rng: RandomNumberGenerator) -
 			r["name"] = str(euro_winner_names.get(int(id), "?"))
 			return r
 		return _ratings_for(int(id))
-	# European Supercup: needs both winners, and distinct (else no fixture).
+	# European Supercup: needs both winners, and distinct (else no fixture). Two legs, the
+	# Cup Winners' Cup holder hosting the first.
 	if euro_winner_cwc != -1 and euro_winner_cwc != euro_winner_cup:
-		var tie := Cup.single_neutral_match(rng, euro_winner_cup, euro_winner_cwc, r_fn)
+		var tie := Cup.two_leg_tie(rng, euro_winner_cwc, euro_winner_cup, r_fn)
 		tie["season"] = season
+		tie["euro_cup_id"] = euro_winner_cup     # first-named on TEAMS IN CHAMPIONSHIPS
+		tie["cwc_id"] = euro_winner_cwc
 		supercup = tie
 		_record_supercup_news(tie, "European Supercup", SUPERCUP_PRIZE)
 	# Intercontinental Cup: European Cup winner v the South American champion.

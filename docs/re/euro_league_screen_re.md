@@ -82,31 +82,76 @@ with the real 1997-98 entrants** — no qualification needed to browse them.
 qualifying rounds (`Round 1`, `Round 2`) ahead of it. That simplification is no longer
 necessary and should be replaced by the real shape when this screen is built.
 
-## Group F is NOT captured — the filenames mislead
+## The full field, witnessed 2026-07-25 (session 4)
 
-Checked frame by frame 2026-07-25 (session 3). `08_group_D.png` is a **duplicate of
-GROUP C** (the click did not land), so the set runs one behind from D onwards:
+The previous session could not capture GROUP F: `08_group_D.png` was a duplicate of
+GROUP C because the click did not land, and the file names then ran one behind. The
+cause is now known — the six GROUP buttons are pitched **24 px** apart with centres at
+**y194 / 218 / 242 / 266 / 290 / 314** (x≈403), not the 20 px that was clicked.
 
-| file | the group actually on screen |
+A fresh Bolton W career was driven to **week 22** (`tools/re/wine/autodrive.py`) and all
+six groups were captured after the final matchday, plus the phase after them:
+
+`screenshots/wine-captures-2026-07-25-season-drive/10..15_euroleague_group_A..F.png`
+and `16_euroleague_qtr_finals.png`.
+
+| group | table after Round 6 (PTS P W D L GF GA) |
 |---|---|
-| `07_euroleague_group_a.png`, `08_group_A.png` | GROUP A — B. Leverkusen, Sporting Port., Besiktas, Real Madrid C.F. |
-| `08_group_B.png` | GROUP B — Olympiakos, Spartak Moscú, Galatasaray, Juventus |
-| `08_group_C.png`, `08_group_D.png` | GROUP C — Rosenborg, Parma, Mónaco, Oporto |
-| `08_group_E.png` | GROUP D — Newcastle Utd, F.C. Barcelona, Feyenoord, Sion |
-| `08_group_F.png` | GROUP E — Brondby, Sparta Praga, Manchester Utd., Borussia D. |
+| A | Göteborg 15 · Manchester Utd. 13 · Borussia D. 5 · Anorthosis 1 |
+| B | Lierse 11 · PSV 10 · C.Salzburgo 7 · B. Leverkusen 4 |
+| C | Parma 12 · Brondby 9 · Oporto 9 · Valletta 6 |
+| D | Juventus 13 · Mónaco 11 · Olympiakos 6 · Barry Town 4 |
+| E | Newcastle Utd 15 · Gotu 8 · Croatia Zag. 8 · Rosenborg 3 |
+| F | Real Madrid C.F. 12 · Bayern M. 9 · Feyenoord 7 · MTK 7 |
 
-So **20 of the 24 entrants are witnessed and GROUP F's four are not**. Do not fill them
-in from the real 1997-98 competition — capture GROUP F before anyone writes a field list.
-(The app does not need the list to be rebuilt to six groups: `Career.mint_european_cups`
-DERIVES its field from the domestic qualifiers plus rated foreign clubs, so only the
-SHAPE — 24 clubs, six groups of four, six winners + two best runners-up — is the change.
-The two qualifying rounds ahead of the groups would need the pre-group entrant count,
-which is un-witnessed.)
+**The group entrants are drawn per career, not fixed data.** This career's six groups
+share almost nothing with the previous session's, because the qualifying rounds ahead of
+them are played from the career's own RNG. That settles the old worry about "filling in
+the last four from the real 1997-98 competition": there is no canonical field to fill in.
+
+## The advancement rule — CONFIRMED, not inferred
+
+`16_euroleague_qtr_finals.png` (the QTR FINALS view, never witnessed before) holds
+**Mónaco v Juventus, Lierse v Real Madrid C.F., Manchester Utd. v Göteborg, Parma v
+Newcastle Utd** — eight clubs, four two-legged ties, each row a kit + flag pair with
+`1ST LEG` / `2ND LEG` / `AGGR.` bars.
+
+Against the six tables above that is exactly:
+
+* the **six group winners** — Göteborg, Lierse, Parma, Juventus, Newcastle Utd,
+  Real Madrid C.F.; plus
+* the **two best runners-up on points** — Manchester Utd. (13) and Mónaco (11), ahead of
+  PSV 10, Brondby 9, Bayern M. 9, Gotu 8.
+
+So the group phase is 6 x 4 with **6 winners + 2 best runners-up** into the quarter
+finals. The phase label the original prints over the groups is `1/8 FINALS`, and the
+group matchday paginator runs `Round 1` .. `Round 6` (a double round-robin of four).
+
+## The qualifying rounds — the entrant counts, witnessed
+
+Browsed at week 1 of a fresh career (`02_euroleague_round2_week1.png`,
+`03_euroleague_round1_played.png`), counted off the row bands:
+
+| phase | ties | clubs |
+|---|---|---|
+| `Round 1` (already played at career start) | 15 | 30 |
+| `Round 2` | 16 | 32 = the 15 Round-1 winners + 17 clubs entering here |
+| `1/8 FINALS` (the groups) | — | 24 = the 16 Round-2 winners + 8 entering here |
+| `QTR FINALS` | 4 | 8 |
+
+All fifteen Round-1 winners reappear in the Round-2 list, which is what fixes the 15/17
+split. At week 1 the phase paginator's right arrow is **dim** past `Round 2`: the group
+draw does not exist until Round 2 has been played, which is why a week-1 career cannot
+be paged into the groups at all.
+
+The sister competitions are straight knockouts of a different size, from the same rail:
+**U.E.F.A. Cup** opens at `1/16 FINALS` with **16 ties (32 clubs)**, **Cup Winners' Cup**
+at `1/8 FINALS` with **8 ties (16 clubs)** — and the Cup Winners' rows are the taller
+kit-flanked variant, 22 px instead of 15 px.
 
 ## Not yet witnessed
 
-* the QTR FINALS / SEMIFINALS / FINAL phases of the European Cup (the career is mid-season);
-* which two clubs advance out of each group in the original's own rule (the real 1997-98
-  competition took the six winners plus the two best runners-up);
-* the `flecha cuartos` / `gana derecha` / `gana izquierda` bracket art — loaded by the
-  screen, absent from every frame we hold.
+* the SEMIFINALS and FINAL of the European Cup, and the `flecha cuartos` /
+  `gana derecha` / `gana izquierda` bracket art the screen loads;
+* the tie-break the original uses between runners-up level on points (this career's two
+  qualifiers were clear on points, so goal difference was never exercised).

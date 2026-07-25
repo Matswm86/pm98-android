@@ -105,6 +105,20 @@
     38
    ],
    "settle": 1.5
+  },
+  "finance_screen": {
+   "click": [
+    568,
+    451
+   ],
+   "settle": 1.5
+  },
+  "team_offer": {
+   "click": [
+    492,
+    455
+   ],
+   "settle": 1.5
   }
  },
  "film_secs": 20,
