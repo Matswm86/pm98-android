@@ -25,7 +25,12 @@ import numpy as np
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[2]
-REF = ROOT / "out" / "refrun-manutd-9798" / "play" / "p0349_UNKNOWN.png"
+# The full reference-run capture set is local-only (screenshots/ and out/ are
+# gitignored); the parity-binding frame is committed under tools/re/refs/, the same
+# convention diff_news_parity.py uses for the walkthrough.
+REF = ROOT / "tools" / "re" / "refs" / "refrun-manutd-1997-98" / "p0349_lineup_ban_reserve.png"
+if not REF.exists():
+    REF = ROOT / "out" / "refrun-manutd-9798" / "play" / "p0349_UNKNOWN.png"
 
 GOLD = np.array([212, 191, 85])
 PLATE_PROBE_X = 60

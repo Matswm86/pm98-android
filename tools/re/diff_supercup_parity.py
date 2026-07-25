@@ -31,7 +31,11 @@ import numpy as np
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[2]
-REF = ROOT / "screenshots" / "wine-captures-2026-07-25-euro-competitions" / "09_comp_supercup.png"
+# screenshots/ is local-only; the binding frame is committed under tools/re/refs/.
+REF = ROOT / "tools" / "re" / "refs" / "euro-competitions-2026-07-25" / "09_comp_supercup.png"
+if not REF.exists():
+    REF = (ROOT / "screenshots" / "wine-captures-2026-07-25-euro-competitions"
+           / "09_comp_supercup.png")
 
 # region -> (x0, y0, x1, y1, must_be_zero)
 REGIONS = {

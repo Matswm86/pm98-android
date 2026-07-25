@@ -32,7 +32,9 @@ from pathlib import Path
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[2]
-FRAME = ROOT / "out" / "refrun-manutd-9798" / "play" / "p0349_UNKNOWN.png"
+FRAME = ROOT / "tools" / "re" / "refs" / "refrun-manutd-1997-98" / "p0349_lineup_ban_reserve.png"
+if not FRAME.exists():
+    FRAME = ROOT / "out" / "refrun-manutd-9798" / "play" / "p0349_UNKNOWN.png"
 SRC = ROOT / "app" / "art" / "screens" / "lineup" / "row_inj.png"
 OUT = ROOT / "app" / "art" / "screens" / "lineup" / "row_ban.png"
 

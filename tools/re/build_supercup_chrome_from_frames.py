@@ -37,7 +37,9 @@ from pathlib import Path
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[2]
-FRAMES = ROOT / "screenshots" / "wine-captures-2026-07-25-euro-competitions"
+FRAMES = ROOT / "tools" / "re" / "refs" / "euro-competitions-2026-07-25"
+if not (FRAMES / "09_comp_supercup.png").exists():
+    FRAMES = ROOT / "screenshots" / "wine-captures-2026-07-25-euro-competitions"
 FRAME = "09_comp_supercup.png"
 OUT = ROOT / "app" / "art" / "screens" / "compresult" / "supercup.png"
 
