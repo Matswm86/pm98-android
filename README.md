@@ -16,9 +16,17 @@ fan remake.</sub>
 
 ## Download
 
-📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-eb009ae.apk)** — one tap downloads `pm98-eb009ae.apk` (current build) straight to your phone.
+📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-55fa5df.apk)** — one tap downloads `pm98-55fa5df.apk` (current build) straight to your phone.
 
-> **This build (2026-07-25)** fixes nine more things you told us were wrong. Each one was settled against the original game — either by disassembling the routine that does it, or by driving the real game and watching:
+> **This build (2026-07-25)** makes the whole youth team the original's, which is what you asked for. It turned out the academy was never a generator at all — the game **ships** its youth players, fifty-one of them, with real names, birthplaces and ratings, in a hidden club inside its own database. Everything the youth part does is a rule over that table, and all four rules are now taken straight from the game's code:
+>
+> - **Your youngsters are real people from the game's own database now**, not names we made up. The game hands each one to you thirty-five to forty-five points below himself, so **his ceiling is his own shipped rating** — the "hidden potential" we used to roll for him was never needed.
+> - **The youth scout brings back exactly one player**, picked at random from those who clear eighty in any capability you lit. That is what the routine does; our shortlist of up to three was ours.
+> - **How long he takes now depends on how good he is.** Fifty to fifty-five weeks at half a star, thirty to thirty-five at five — the game's own formula. We still halve it so a season carries two intakes, as you asked; that is the one number in the whole youth part that is not the game's.
+> - **A youngster grows back up to his shipped rating and stops dead there**, a point roughly every other week, and the youth manager tells you he is ready the moment his core four arrive. No more youngsters who never budge, and no more youngsters who grow past themselves.
+> - **The academy no longer empties itself every summer.** We used to age players out at nineteen and scout a free crop in — neither thing happens in the original, and the shipped youngsters are seventeen to nineteen, so they were being thrown away almost immediately.
+>
+> **Earlier build (2026-07-25)** — nine things you reported, each settled against the original:
 >
 > - **Training actually trains now.** We had an invented development model whose prime-age rate needed sixty-seven weeks to move a single point, so your best players never budged. The real routine is now ported straight from the game: put a man on a coach and **that skill climbs a full point every week** until he is eighteen to twenty-four clear of his shipped rating. GENERAL lifts all six trainable skills but only by five; SPEED, STAMINA, AGGRESSION and QUALITY are not trainable at all, exactly as in the original; and take a man off training and his gains bleed away a point a week.
 > - **The BRIEF commentary follows your team sheet.** Sell Pallister and buy Nesta and it is Nesta on the pitch — the feed was reading the frozen 1997 squad, so sold players kept turning up. Only the twenty-two who actually played can be named now, and a save is credited to the keeper you picked.

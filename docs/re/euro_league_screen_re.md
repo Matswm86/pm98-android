@@ -82,6 +82,27 @@ with the real 1997-98 entrants** — no qualification needed to browse them.
 qualifying rounds (`Round 1`, `Round 2`) ahead of it. That simplification is no longer
 necessary and should be replaced by the real shape when this screen is built.
 
+## Group F is NOT captured — the filenames mislead
+
+Checked frame by frame 2026-07-25 (session 3). `08_group_D.png` is a **duplicate of
+GROUP C** (the click did not land), so the set runs one behind from D onwards:
+
+| file | the group actually on screen |
+|---|---|
+| `07_euroleague_group_a.png`, `08_group_A.png` | GROUP A — B. Leverkusen, Sporting Port., Besiktas, Real Madrid C.F. |
+| `08_group_B.png` | GROUP B — Olympiakos, Spartak Moscú, Galatasaray, Juventus |
+| `08_group_C.png`, `08_group_D.png` | GROUP C — Rosenborg, Parma, Mónaco, Oporto |
+| `08_group_E.png` | GROUP D — Newcastle Utd, F.C. Barcelona, Feyenoord, Sion |
+| `08_group_F.png` | GROUP E — Brondby, Sparta Praga, Manchester Utd., Borussia D. |
+
+So **20 of the 24 entrants are witnessed and GROUP F's four are not**. Do not fill them
+in from the real 1997-98 competition — capture GROUP F before anyone writes a field list.
+(The app does not need the list to be rebuilt to six groups: `Career.mint_european_cups`
+DERIVES its field from the domestic qualifiers plus rated foreign clubs, so only the
+SHAPE — 24 clubs, six groups of four, six winners + two best runners-up — is the change.
+The two qualifying rounds ahead of the groups would need the pre-group entrant count,
+which is un-witnessed.)
+
 ## Not yet witnessed
 
 * the QTR FINALS / SEMIFINALS / FINAL phases of the European Cup (the career is mid-season);

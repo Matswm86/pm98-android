@@ -87,6 +87,13 @@ group phase; the U.E.F.A. Cup and Cup Winners' Cup were straight knockouts that 
   1997-98 entrants from season one. Field, structure, screen and every measured colour are
   in [`euro_league_screen_re.md`](euro_league_screen_re.md); the model should be rebuilt to
   that shape when the EURO. LEAGUE screen is built.
+  **2026-07-25 (session 3), scoping the rebuild:** only the SHAPE has to change —
+  `mint_european_cups` DERIVES the field (domestic qualifiers + rated foreign clubs), so
+  going to 24 clubs in six groups of four with six winners + two best runners-up needs no
+  entrant list. What it CANNOT have yet: the two qualifying rounds (`Round 1`/`Round 2`)
+  ahead of the groups, because the pre-group entrant count is un-witnessed, and GROUP F's
+  four clubs, which were never actually captured (`08_group_D.png` is a duplicate of
+  GROUP C — see the frame table in `euro_league_screen_re.md`).
 * **Foreign field from `game_db`.** The opponents are real clubs from the game's own
   international database, rated from their squads, frozen for the season (they don't
   develop -- same scope as "AI clubs don't develop").
