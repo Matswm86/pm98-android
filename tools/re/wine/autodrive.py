@@ -450,6 +450,11 @@ def run_plan(plan_path: Path, max_steps: int, settle: float) -> int:
         if "click" in rule:
             cx, cy = rule["click"]
             click(e, cx, cy, rule.get("count", 1))
+        for pt in rule.get("clicks", []):
+            # A screen that needs a SEQUENCE (preseason: four SKIPs then CONTINUE) —
+            # one point per entry, in order.
+            click(e, int(pt[0]), int(pt[1]), int(pt[2]) if len(pt) > 2 else 1)
+            time.sleep(0.5)
         time.sleep(rule.get("settle", settle))
 
     (outdir / "drive.json").write_text(json.dumps(log, indent=1) + "\n")
