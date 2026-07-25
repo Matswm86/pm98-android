@@ -16,16 +16,19 @@ fan remake.</sub>
 
 ## Download
 
-📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-4d4c91b.apk)** — one tap downloads `pm98-4d4c91b.apk` (current build) straight to your phone.
+📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-9269ca9.apk)** — one tap downloads `pm98-9269ca9.apk` (current build) straight to your phone.
 
-> **This build (2026-07-24)** fixes six things you told us were wrong, each one settled against the original game rather than guessed:
+> **This build (2026-07-25)** fixes nine more things you told us were wrong. Each one was settled against the original game — either by disassembling the routine that does it, or by driving the real game and watching:
 >
-> - **New signings now show up in TRAINING.** The original scrolls each section of the training grid; we were cutting it off at the visible rows, and since a new man joins the end of the squad he was always the one that vanished. Every section has its working scrollbar now.
-> - **TACTICS → ROLE is a real picker.** Tap the arrow beside a player's POS and you get the game's own list of all eighteen roles, with **his natural role in gold and the other roles he can genuinely play in white** — a left back who can also fill in at right back, a centre half who can drop into midfield. Those alternatives are not our invention: they are stored per player in the original database, and the popup is the original's own screen down to the pixel.
-> - **The staff market refreshes every week.** Three new candidates for every job each week, with a fresh spread of star ratings — so five-star coaches and physios actually turn up instead of the same three names for ever.
-> - **You can heal an injured player.** The **+** button on the INJURIES row sends him to the physiotherapist: a five-star physio halves his time out, a weaker one takes a smaller bite, and how many men he can treat at once is his own "N PLAYERS" figure.
-> - **Selling works.** Tapping an offer really does flip REFUSE to ACCEPT now — on a phone the tap was being counted twice and cancelling itself, and offers below the first row could not be hit at all.
-> - **Bidding is not a marathon.** A player already on the transfer market opens with the asking price, his wage and his contract already filled in, exactly as the original does, instead of starting from £5,000.
+> - **Training actually trains now.** We had an invented development model whose prime-age rate needed sixty-seven weeks to move a single point, so your best players never budged. The real routine is now ported straight from the game: put a man on a coach and **that skill climbs a full point every week** until he is eighteen to twenty-four clear of his shipped rating. GENERAL lifts all six trainable skills but only by five; SPEED, STAMINA, AGGRESSION and QUALITY are not trainable at all, exactly as in the original; and take a man off training and his gains bleed away a point a week.
+> - **The BRIEF commentary follows your team sheet.** Sell Pallister and buy Nesta and it is Nesta on the pitch — the feed was reading the frozen 1997 squad, so sold players kept turning up. Only the twenty-two who actually played can be named now, and a save is credited to the keeper you picked.
+> - **STATISTICS works on the results board — for both teams.** The button beside each side at half time and full time opens that team's eleven with the match record: minutes, rating, man of the match, goals, shots, passes, tackles, saves and cards. Half time shows the half-time figures, not the finished match.
+> - **Most of the world is reachable in the transfer market again.** Fifty-six flagged countries on the OFFERS map did nothing when you tapped them; the rule that blocked them was ours, fitted to two frames that turned out to be a mouse hover. We clicked every flag on the real game — all fifty-seven switch, Macedonia's single club included — so the block is gone.
+> - **Scout results are clickable.** Tapping a scouted player opens the offer card, including players abroad and free agents, instead of answering "no longer available".
+> - **The youth scout brings you a shortlist.** His finds now appear in PLAYERS FOUND and you offer each one a contract — which he can turn down, as the original's own message says. The search is shortened so a season carries **two** intakes.
+> - **Bidding starts at the asking price on every player**, not only the transfer-listed ones. Ronaldo opens at £16,000,000 instead of £5,000. (The original opens a cold approach at the floor; on a touch screen that is six hundred taps, so this one is a deliberate change.)
+> - **The ground works tell you when they are done** — the original's own message box, one per job: capacity, car park, facilities, services.
+> - **The match-options bar is reachable on a phone.** It used to sit under the notification shade; it now parks lower down, clear of the system gesture area.
 
 
 
@@ -57,20 +60,25 @@ prompted. Reinstalling over an older build? Uninstall the old one first.
   Five bookings earn a one-match ban; reds sit a player down on the spot.
 - **Club news:** a live feed of injuries, suspensions, returns to fitness and the
   weekly result, newest first and colour-coded, on the original Main Menu's NEWS.
-- **Training & player development:** your players improve or decline over a season
-  by age (youngsters climb, veterans fade), and training **intensity** is the lever:
-  harder training develops them faster but risks more injuries. Squads age a year
-  each season, so a career has a real arc.
-- **The youth team:** an academy of young prospects develops on its own track, each with
-  a projected **potential** (the ceiling he can reach). When the youth manager judges one
-  ready, he's flagged on the YOUTH TEAM screen and you **promote** him into the first-team
-  squad. A fresh crop is scouted in every season; youngsters who never make the grade move
-  on. Reached from the SQUAD screen's YOUTH TEAM button.
-- **The backroom staff:** hire and sack a **TRAINER** (speeds player development), a
-  **PHYSIOTHERAPIST** (cuts injury risk) and a **YOUTH COACH** (improves the academy) from
-  a pool of available staff, each with a quality rating and a wage. The wage bill comes out
-  of the bank every week, and the STAFF screen shows the live effect of your team on all
-  three systems. On the Main Menu's EMPLE (staff) icon.
+- **Training & player development:** the original's own weekly routine, ported from the
+  game. Hire the six skill coaches, put a player on one, and that skill climbs a point a
+  week until he is well clear of the rating he shipped with; GENERAL lifts all six a
+  little; FITNESS restores condition three times as fast. SPEED, STAMINA, AGGRESSION and
+  QUALITY are not trainable — that is the original, not a shortcut — and a man taken off
+  training loses his gains again a point a week. Training **intensity** is still the
+  injury lever. Squads age a year each season, so a career has a real arc.
+- **The youth team:** hire a youth scout and he goes looking. What he brings back is a
+  **shortlist** on the YOUTH TEAM screen — tap a name to offer him a contract, which he
+  can turn down. Signed youngsters develop toward a projected **potential**, and when the
+  youth manager judges one ready you **promote** him into the first-team squad. Two
+  intakes a season. Reached from the SQUAD screen's YOUTH TEAM button.
+- **The backroom staff:** hire and sack all thirteen of the original's jobs — the six skill
+  coaches (**HANDLING, PASSING, DRIBBLING, HEADING, TACKLING, SHOOTING**, who decide how
+  many players you can put into training and on what), a **PHYSIOTHERAPIST** (cuts injury
+  risk and treats the injured), a **SCOUT**, a **YOUTH TEAM SCOUT** and **MANAGER**, and
+  the rest — each with a star rating and a wage. A fresh set of candidates turns up every
+  week. The wage bill comes out of the bank every week, and the STAFF screen shows the live
+  effect of your team. On the Main Menu's EMPLE (staff) icon.
 - **The domestic cups:** the **F.A. Cup** and the **Coca-Cola (League) Cup** both run
   alongside the league, with a fresh open draw each round (as the real cups do) and
   prize money for every round you survive plus a bonus for lifting one. The F.A. Cup is
