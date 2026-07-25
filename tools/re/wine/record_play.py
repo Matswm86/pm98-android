@@ -141,6 +141,8 @@ def ahash(a: np.ndarray) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--poll", type=float, default=1.0, help="seconds between grabs")
+    ap.add_argument("--min-px", type=int, default=20, dest="min_px",
+                    help="bank a frame when at least this many pixels differ from the last kept one")
     a = ap.parse_args()
 
     e = autodrive.env()
@@ -160,7 +162,7 @@ def main() -> int:
     ptr.start()
 
     n = len(list(out.glob("*.png")))           # resume-safe: keep counting up
-    last_hash = ""
+    last_arr = None
     probe = out / ".probe.png"
     print(f"recording -> {out} (poll {a.poll}s, {len(sigs['screens'])} taught screens)")
     print("play the game; Ctrl-C to stop", flush=True)
@@ -178,9 +180,17 @@ def main() -> int:
             continue
 
         h = ahash(arr)
-        if h == last_hash:
-            _stop.wait(a.poll)
-            continue
+        # Change detection is a PIXEL COUNT, not the average hash. An 8x8 ahash cannot see a
+        # small text field change — stepping the SCOUT screen's QUALITY spinner through all
+        # seven bands produced ONE banked frame on 2026-07-25, because a two-word field in a
+        # 640x480 frame does not move the downsampled average. The hash is still recorded in
+        # the manifest (it groups identical screens cheaply); it just no longer gates.
+        if last_arr is not None:
+            changed = int(np.count_nonzero(np.any(arr != last_arr, axis=2)))
+            if changed < a.min_px:
+                _stop.wait(a.poll)
+                continue
+        last_arr = arr
 
         px, py = ptr.last                      # sampled up to 0.2 s before the change
         foc = focused(e)
@@ -209,7 +219,6 @@ def main() -> int:
             with newlog.open("a") as fh:
                 fh.write(f"{n}\t{f.name}\tptr={px},{py}\tclosest={close}\n")
         print(line, flush=True)
-        last_hash = h
         _stop.wait(a.poll)
 
     _stop.set()

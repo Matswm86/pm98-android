@@ -4801,15 +4801,15 @@ func _show_deal_result(msg: String) -> void:
 ##   1. the final table of each division, as it finishes  <- built (LeagueTableScreen)
 ##   2. a champion card per trophy, on the shared CAMPEON layout  <- built, for the six
 ##      competitions whose card art is witnessed
-##   3. THE CHAMPIONSHIPS -- all eight finals with scorelines   <- NOT BUILT
-##   4. END OF SEASON -- champion / U.E.F.A. places / promoted / relegated  <- NOT BUILT
+##   3. THE CHAMPIONSHIPS -- all eight finals with scorelines   <- built (0-px bake)
+##   4. END OF SEASON -- champion / U.E.F.A. places / promoted / relegated  <- built (0-px)
 ##   5. GOAL SCORERS OF THE YEAR                                <- built (awards layout)
-##   6. PLAYERS OF THE YEAR -- one per club, four tabs          <- NOT BUILT
+##   6. PLAYERS OF THE YEAR -- one per club, four tabs          <- built (0-px bake)
 ##   7. MANAGERS OF THE YEAR                                    <- built (awards layout)
 ##   8. Preseason for the new season
-## Steps 3, 4 and 6 need their own chrome bakes; their binding frames are committed at
-## tools/re/refs/season-end-2026-07-25/ and the gap is recorded in
-## docs/re/season_end_sequence_re.md. They are SKIPPED, not faked.
+## All eight now run. Steps 3, 4 and 6 were baked 2026-07-25 off the reference run's own
+## frames at tools/re/refs/season-end-2026-07-25/ and render-diff at ZERO differing
+## pixels (tools/re/diff_seasonend_year_parity.py); see docs/re/season_end_sequence_re.md.
 ##
 ## AND THERE IS NO BOARD-VERDICT SCREEN IN IT. What used to live here -- an unconditional
 ## "Final position: Nth of 20 / Board objective / Reputation / Verdict" sheet -- was an
@@ -4833,8 +4833,14 @@ func _season_end_step(step: int) -> void:
 		1:
 			_season_end_champion_cards(next)
 		2:
-			_season_end_goal_scorers(next)
+			_season_end_championships(next)
 		3:
+			_season_end_overview(next)
+		4:
+			_season_end_goal_scorers(next)
+		5:
+			_season_end_players(next)
+		6:
 			_season_end_managers(next)
 		_:
 			_season_end_board()
@@ -4923,6 +4929,62 @@ func _show_champion_card(card: Dictionary, after: Callable) -> void:
 		scr.queue_free()
 		if after.is_valid():
 			after.call())
+
+
+## Step 3: THE CHAMPIONSHIPS -- the season's eight finals on one sheet, each card's
+## trophy and title baked from the original's own frame. A competition that was never
+## played leaves its card as the original leaves it rather than borrowing another's.
+func _season_end_championships(after: Callable) -> void:
+	var rows := _career.season_end_championships()
+	var any := false
+	for r in rows:
+		if not (r as Dictionary).is_empty():
+			any = true
+			break
+	if not any:
+		after.call()
+		return
+	var scr: ChampionshipsScreen = load("res://scenes/ChampionshipsScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(rows)
+	scr.continue_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		scr.queue_free()
+		after.call())
+
+
+## Step 4: END OF SEASON -- the four-division promoted / relegated overview. This is the
+## screen whose NAME the deleted board-verdict invention used to take.
+func _season_end_overview(after: Callable) -> void:
+	var by_tier := _career.season_end_overview()
+	if by_tier.is_empty():
+		after.call()
+		return
+	var scr: EndOfSeasonScreen = load("res://scenes/EndOfSeasonScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(by_tier)
+	scr.continue_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		scr.queue_free()
+		after.call())
+
+
+## Step 6: PLAYERS OF THE YEAR -- one award per club, four division tabs (92 awards).
+func _season_end_players(after: Callable) -> void:
+	var by_tier := _career.players_of_year()
+	if by_tier.is_empty():
+		after.call()
+		return
+	var scr: PlayersYearScreen = load("res://scenes/PlayersYearScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(by_tier, _career.tier)
+	scr.continue_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		scr.queue_free()
+		after.call())
 
 
 ## Step 5: GOAL SCORERS OF THE YEAR, on the award sheets' shared four-panel layout

@@ -1,0 +1,334 @@
+{
+  "championships": {
+    "binding_frame": "20_the_championships.png",
+    "card_tops": [
+      113,
+      204,
+      295,
+      388
+    ],
+    "row2_dy": 22,
+    "row_h": 20,
+    "kit_wh": [
+      17,
+      19
+    ],
+    "name_pen_dy": 5,
+    "columns": {
+      "left": {
+        "kit_x": 56,
+        "name_pen": 82,
+        "name_x1": 242
+      },
+      "right": {
+        "kit_x": 334,
+        "name_pen": 360,
+        "name_x1": 520
+      }
+    },
+    "slots": [
+      {
+        "side": "left",
+        "card": 0,
+        "comp": "charity_shield",
+        "scores": [
+          [
+            245,
+            273
+          ]
+        ]
+      },
+      {
+        "side": "left",
+        "card": 1,
+        "comp": "european_cup",
+        "scores": [
+          [
+            245,
+            273
+          ]
+        ]
+      },
+      {
+        "side": "left",
+        "card": 2,
+        "comp": "cup_winners_cup",
+        "scores": [
+          [
+            245,
+            273
+          ]
+        ]
+      },
+      {
+        "side": "left",
+        "card": 3,
+        "comp": "intercontinental",
+        "scores": [
+          [
+            245,
+            273
+          ]
+        ]
+      },
+      {
+        "side": "right",
+        "card": 0,
+        "comp": "fa_cup",
+        "scores": [
+          [
+            523,
+            551
+          ],
+          [
+            554,
+            582
+          ]
+        ]
+      },
+      {
+        "side": "right",
+        "card": 1,
+        "comp": "uefa_cup",
+        "scores": [
+          [
+            523,
+            551
+          ]
+        ]
+      },
+      {
+        "side": "right",
+        "card": 2,
+        "comp": "supercup",
+        "scores": [
+          [
+            523,
+            551
+          ],
+          [
+            554,
+            582
+          ]
+        ]
+      },
+      {
+        "side": "right",
+        "card": 3,
+        "comp": "coca_cola",
+        "scores": [
+          [
+            523,
+            551
+          ],
+          [
+            554,
+            582
+          ]
+        ]
+      }
+    ],
+    "winner_ink": [
+      0,
+      0,
+      0
+    ],
+    "loser_ink": [
+      80,
+      100,
+      120
+    ],
+    "score_ink": [
+      255,
+      255,
+      255
+    ],
+    "name_font": "proman10",
+    "score_font": "proman10",
+    "score_field_bias": 1
+  },
+  "end_of_season": {
+    "binding_frame": "21_end_of_season.png",
+    "plates": [
+      {
+        "y": 100,
+        "pen_x": 50
+      },
+      {
+        "y": 137,
+        "pen_x": 50
+      },
+      {
+        "y": 219,
+        "pen_x": 49
+      },
+      {
+        "y": 314,
+        "pen_x": 49
+      },
+      {
+        "y": 418,
+        "pen_x": 48
+      }
+    ],
+    "plate_h": 21,
+    "plate_x": [
+      17,
+      172
+    ],
+    "kit": {
+      "x": 18,
+      "w": 17,
+      "h": 19
+    },
+    "name_pen_dy": 5,
+    "mid_x": [
+      186,
+      331
+    ],
+    "rel_x": [
+      346,
+      491
+    ],
+    "mid_rows": {
+      "1": [
+        99,
+        116,
+        133,
+        150
+      ],
+      "2": [
+        204,
+        221,
+        238
+      ],
+      "3": [
+        294,
+        311,
+        328
+      ],
+      "4": [
+        398,
+        415,
+        432,
+        449
+      ]
+    },
+    "rel_rows": {
+      "1": [
+        99,
+        116,
+        133
+      ],
+      "2": [
+        204,
+        221,
+        238
+      ],
+      "3": [
+        294,
+        311,
+        328,
+        345
+      ],
+      "4": []
+    },
+    "row_h": 12,
+    "pen_dy": 1,
+    "ink": [
+      0,
+      0,
+      0
+    ],
+    "plate_ink": [
+      255,
+      255,
+      255
+    ],
+    "font": "proman8",
+    "field_bias": 1
+  },
+  "players_year": {
+    "binding_frame": "23_players_of_the_year.png",
+    "subhdr_y": [
+      96,
+      105
+    ],
+    "panel_x": [
+      26,
+      614
+    ],
+    "row_y0": 127,
+    "row_pitch": 16,
+    "row_h": 12,
+    "rows": 10,
+    "cols": [
+      [
+        34,
+        178,
+        182,
+        309
+      ],
+      [
+        330,
+        474,
+        478,
+        605
+      ]
+    ],
+    "team_ink": [
+      0,
+      0,
+      0
+    ],
+    "player_ink": [
+      255,
+      255,
+      255
+    ],
+    "tabs": [
+      {
+        "tier": 1,
+        "rect": [
+          380,
+          345,
+          112,
+          25
+        ]
+      },
+      {
+        "tier": 2,
+        "rect": [
+          502,
+          345,
+          112,
+          25
+        ]
+      },
+      {
+        "tier": 3,
+        "rect": [
+          380,
+          379,
+          112,
+          25
+        ]
+      },
+      {
+        "tier": 4,
+        "rect": [
+          502,
+          379,
+          112,
+          25
+        ]
+      }
+    ],
+    "continue": [
+      502,
+      426,
+      112,
+      25
+    ]
+  }
+}

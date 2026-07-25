@@ -177,8 +177,71 @@ monthly awards and the TEAM OFFER cards use), because the original raises it unp
 whether it comes before or after the XI-validity gate is NOT witnessed, so it does not gate
 CONTINUE.
 
-### Still not built
+### The PER WEEK view — BUILT 2026-07-25, render-diffed at 0 px
 
-The PER WEEK view itself — the tab, the `WEEK  < CURRENT n >` stepper and the date stamp —
-needs its own chrome bake off `p0495`, whose value cells are all £0 and therefore trivially
-blankable. The DATA behind it now exists; only the view is missing.
+`chrome_perweek.png` is a second bake off `p0495_finance_perweek_wk31.png` (the reference
+run's LIVE week, whose every value cell already reads £0, so the only spans the bake has
+to clear beyond the shared body are the week label and the date). `FinanceScreen` gained
+a view switch on the original's own two tabs and the stepper's own arrows.
+
+**Two frames, 0 differing pixels each**, everywhere except the balance chart:
+
+| region | `finance_perweek_31` vs `p0495` | `finance_perweek_29` vs `p0509` |
+|---|---|---|
+| tab strip · week label · date span | 0 | 0 |
+| income column · expense column · totals | 0 | 0 |
+| LAST WEEK / CURRENT WEEK tiles | 0 | 0 |
+| balance chart | 3912 (excluded) | 3912 (excluded) |
+
+The chart is the ONLY exclusion: the frame carries the reference season's own 52 weeks of
+bars and the shot is fed the two weeks the run actually measured, so the rest cannot be
+drawn without inventing figures.
+
+Reproduce:
+
+```bash
+python3 tools/re/build_finance_chrome_from_frames.py
+~/godot462 --headless --path app --import
+DISPLAY=:5 PM98_SHOT_DIR=<dir> ~/godot462 --rendering-driver opengl3 \
+    --resolution 640x480 --path app --script res://tests/shot_finance_perweek.gd
+python3 tools/re/diff_finance_perweek_parity.py <dir>
+```
+
+#### Three things the render-diff corrected, on BOTH views
+
+The PER SEASON view had never been render-diffed — only its chrome was baked — and the
+overlay it drew was wrong in three ways that the PER WEEK diff exposed. Each replacement
+was pinned by rendering EVERY BMFont atlas the game ships against the frame's own pixels
+and keeping only the zero-differing-pixel answer:
+
+| element | was | IS (0 px) |
+|---|---|---|
+| ledger value cells | calend8, right edge 305 / 601 | **euro8**, pen END 306 / 602, pen top 99 + 16i |
+| TOTAL INCOME / EXPENSES | proman8 @11 | **proman10**, pen END 307 / 605, pen top 284 |
+| LAST / CURRENT WEEK tiles | calend12 @15 | **proman8**, pen END 226 / 459, tops 429 / 441 / 453 |
+| SEASON header | proman8, `SEASON 1997 · 98` | **proman10**, `SEASON 1997 - 98`, pen END 601 |
+
+And the chrome bake itself over-cleared: the LAST WEEK value cell was blanked to x=248
+and the CURRENT WEEK cell to x=498, which wiped the LAST WEEK box's right border, the
+CURRENT WEEK box's left border and 30 px of the desktop behind it. The real cells stop
+inside their own black box frames at x=228 and x=461.
+
+#### The header, solved
+
+| span | content | font / ink | anchor |
+|---|---|---|---|
+| gold box `300..391` | `CURRENT 31` / `29` | proman10, `(255,223,0)` | centred, `floor((693 - advance) / 2)`, pen top 60 |
+| white panel | `From 1-2-1998 to 7-2-1998` | proman8, `(128,128,128)` | pen x 416, pen top 60 |
+
+`CURRENT ` is prefixed only while the stepper is parked on the live week — witnessed on
+all three captured frames (`CURRENT 31`, `CURRENT 4`, and a bare `29` when stepped back).
+
+#### Witnessed, and therefore copied
+
+The LAST WEEK / CURRENT WEEK tiles and the BALANCE chart do **not** follow the stepper:
+`p0495` and `p0509` are two different selected weeks with byte-identical tiles and chart.
+
+#### Still not built
+
+The INCOME and EXPENSES detail tabs. No frame of either was ever captured, so their tabs
+are inert rather than invented.

@@ -3400,6 +3400,166 @@ func season_end_awards() -> Dictionary:
 	return {"scorers": scorers, "managers": managers}
 
 
+# ---- THE CHAMPIONSHIPS (REFRUN R15 step 3) --------------------------------
+#
+# The original's sheet carries EIGHT finals in eight fixed slots, and the slot -> trophy
+# binding is baked into the chrome (each card's title and trophy bitmap are the frame's
+# own pixels). So this returns the eight in the frame's own order, and a competition
+# that was never played returns {} and leaves its card's cells empty -- which is what
+# the original itself shows for a first season with no European history.
+#
+# The four RIGHT-hand slots are the ones the chrome gives a second score cell to, and
+# they are exactly the four PM98 can decide over two legs or a replay.
+const CHAMPIONSHIP_SLOTS := ["charity_shield", "european_cup", "cup_winners_cup",
+	"intercontinental", "fa_cup", "uefa_cup", "supercup", "coca_cola"]
+
+## The eight finals for THE CHAMPIONSHIPS, in the sheet's own slot order. Each entry is
+## {} (not played) or {home: {club, club_id, scores, won}, away: {...}} -- the tie's own
+## two sides in the sheet's own row order, with `scores` holding one figure per score
+## cell the slot has and `won` driving the winner's black ink.
+func season_end_championships() -> Array:
+	var out: Array = []
+	for comp in CHAMPIONSHIP_SLOTS:
+		out.append(_championship_row(comp))
+	return out
+
+
+func _championship_row(comp: String) -> Dictionary:
+	var tie: Dictionary = {}
+	match comp:
+		"charity_shield":
+			tie = charity_shield
+		"intercontinental":
+			tie = intercontinental
+		"supercup":
+			tie = supercup
+		"fa_cup":
+			tie = _final_tie_of(fa_cup)
+		"coca_cola":
+			tie = _final_tie_of(league_cup)
+		_:
+			tie = _final_tie_of(euro.get(comp, {}) as Dictionary)
+	if tie.is_empty() or int(tie.get("winner_id", -1)) == -1:
+		return {}
+	var w := int(tie["winner_id"])
+	var home := int(tie.get("home_id", -1))
+	var away := int(tie.get("away_id", -1))
+	var scores := _tie_scores(tie)
+	# HOME first, AWAY second -- the sheet lists the tie's own two sides in that order,
+	# NOT winner-then-loser. Witnessed on the frame's U.E.F.A. CUP (Inter 0 above
+	# Arsenal 1) and COCA-COLA CUP (Southampton above Arsenal), where the winner is the
+	# SECOND row and is marked only by its ink.
+	return {
+		"home": {"club": _any_club_name(home), "club_id": home,
+			"scores": scores["home"], "won": w == home},
+		"away": {"club": _any_club_name(away), "club_id": away,
+			"scores": scores["away"], "won": w == away},
+	}
+
+
+## A tie's goals per score cell, home side and away side. A two-legged tie fills BOTH
+## cells (leg 1 then leg 2, always home-club-first as the tie records them); a single
+## match fills only the first, and its second cell stays empty -- which is exactly what
+## the frame's F.A. CUP and U.E.F.A. CUP cards show.
+func _tie_scores(tie: Dictionary) -> Dictionary:
+	if bool(tie.get("two_legged", false)):
+		return {"home": [int(tie.get("leg1_hg", 0)), int(tie.get("leg2_hg", 0))],
+			"away": [int(tie.get("leg1_ag", 0)), int(tie.get("leg2_ag", 0))]}
+	return {"home": [int(tie.get("hg", 0))], "away": [int(tie.get("ag", 0))]}
+
+
+# ---- END OF SEASON (REFRUN R15 step 4) ------------------------------------
+#
+# The four-division promoted / relegated overview. The PLATE COUNTS are the chrome's own
+# (Premier 4 middle + 3 relegated, First 3 + 3, Second 3 + 4, Third 4 + none) and they
+# agree line for line with the app's existing PYRAMID_ZONES, so nothing here is a new
+# rule: the middle column is that division's promotion zone (its automatic places plus
+# the play-off berth) and the right column its relegation zone.
+#
+# The PREMIER's middle column is headed U.E.F.A. CUP rather than PROMOTED and carries
+# four clubs. The frame shows them as the four finishing BELOW the champion and the
+# runner-up -- which is the only reading its own data supports -- so that is what this
+# returns, and the mapping of those four onto actual berths stays with `UEFA_SPOTS`,
+# which is a separate, already-shipped rule.
+func season_end_overview() -> Dictionary:
+	var out: Dictionary = {}
+	for t in [1, 2, 3, 4]:
+		if t != tier and not divisions.has(t):
+			continue
+		var rows: Array = standings() if t == tier else standings_for(t)
+		if rows.is_empty():
+			continue
+		var nms: Dictionary = club_names if t == tier else names_for(t)
+		var name_of := func(i: int) -> Dictionary:
+			if i < 0 or i >= rows.size():
+				return {}
+			var cid := int((rows[i] as Dictionary).get("id", -1))
+			return {"club_id": cid, "club": str(nms.get(cid, "?"))}
+		var z: Dictionary = PYRAMID_ZONES.get(t, {"up": 0, "playoff": 0, "down": 0})
+		var mid: Array = []
+		if t == 1:
+			# the four below the champion and the runner-up
+			for i in range(2, 6):
+				var r: Dictionary = name_of.call(i)
+				if not r.is_empty():
+					mid.append(r)
+		else:
+			var ups := int(z["up"]) + (1 if int(z["playoff"]) > 0 else 0)
+			for i in ups:
+				var r2: Dictionary = name_of.call(i)
+				if not r2.is_empty():
+					mid.append(r2)
+		var rel: Array = []
+		for i in range(rows.size() - int(z["down"]), rows.size()):
+			var r3: Dictionary = name_of.call(i)
+			if not r3.is_empty():
+				rel.append(r3)
+		out[t] = {"champion": name_of.call(0), "runner_up": name_of.call(1),
+			"mid": mid, "relegated": rel}
+	return out
+
+
+# ---- PLAYERS OF THE YEAR (REFRUN R15 step 6) ------------------------------
+
+## One award per CLUB, per division, in the sheet's own alphabetical club order --
+## the same shape PLAYERS OF THE MONTH uses, over the WHOLE season's scorer ledger
+## instead of one month's. A club that never scored shows an empty PLAYER cell rather
+## than a borrowed name.
+func players_of_year() -> Dictionary:
+	var out: Dictionary = {}
+	for t in [1, 2, 3, 4]:
+		if t != tier and not divisions.has(t):
+			continue
+		var tbl: Dictionary = table if t == tier else ((divisions[t] as Dictionary)["table"] as Dictionary)
+		var nms: Dictionary = club_names if t == tier else names_for(t)
+		var log: Array = scorer_log if t == tier else ((divisions[t] as Dictionary)["scorers"] as Array)
+		var tally: Dictionary = {}        # club -> {scorer -> goals}
+		for g in log:
+			var gd: Dictionary = g
+			var cid := int(gd.get("club", -1))
+			var nm := str(gd.get("scorer", ""))
+			if cid == -1 or nm == "":
+				continue
+			if not tally.has(cid):
+				tally[cid] = {}
+			(tally[cid] as Dictionary)[nm] = int((tally[cid] as Dictionary).get(nm, 0)) + 1
+		var ids: Array = []
+		for id in tbl:
+			ids.append(int(id))
+		ids.sort_custom(func(x, y): return str(nms.get(x, "")) < str(nms.get(y, "")))
+		var rows: Array = []
+		for id in ids:
+			var top := ""
+			var topn := 0
+			for nm2 in (tally.get(id, {}) as Dictionary):
+				if int((tally[id] as Dictionary)[nm2]) > topn:
+					topn = int((tally[id] as Dictionary)[nm2])
+					top = nm2
+			rows.append({"club_id": id, "club": str(nms.get(id, "?")), "player": top})
+		out[t] = rows
+	return out
+
+
 ## Queue the season's champion cards, in the ORIGINAL's own order (REFRUN R15 step 2):
 ## U.E.F.A. Cup -> Premier League -> Cup Winner's Cup -> F.A. Cup -> European Cup. Only
 ## competitions whose CARD ART is witnessed get a card -- the Premier League, European Cup

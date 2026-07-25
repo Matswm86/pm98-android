@@ -56,14 +56,14 @@
     "row_y0": 98,
     "row_step": 16,
     "income_right": 305,
-    "expense_right": 602,
+    "expense_right": 601,
     "total_y": 284,
     "total_income_right": 305,
     "total_expense_right": 603,
     "season_right": 600,
     "season_y": 60,
-    "last_week_right": 246,
-    "current_week_right": 496,
+    "last_week_right": 226,
+    "current_week_right": 459,
     "bottom_rows_y": [
       [
         428,
@@ -79,5 +79,48 @@
       ]
     ],
     "chart_zero_y": 353
+  },
+  "per_week": {
+    "binding_frame": "p0495_finance_perweek_wk31.png",
+    "week_box_font": "proman10",
+    "week_box_ink": [
+      255,
+      223,
+      0
+    ],
+    "week_box_field_sum": 693,
+    "week_box_pen_top": 62,
+    "date_font": "proman8",
+    "date_ink": [
+      128,
+      128,
+      128
+    ],
+    "date_pen_x": 416,
+    "date_pen_top": 62,
+    "prev_btn": [
+      278,
+      57,
+      22,
+      21
+    ],
+    "next_btn": [
+      392,
+      57,
+      22,
+      21
+    ],
+    "tab_per_week": [
+      365,
+      7,
+      125,
+      25
+    ],
+    "tab_per_season": [
+      499,
+      7,
+      125,
+      25
+    ]
   }
 }
