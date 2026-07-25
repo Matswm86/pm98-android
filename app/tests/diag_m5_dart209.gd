@@ -80,13 +80,27 @@ func _run() -> void:
 			cdesc = "t%d.id%d" % [_g(cd, 0x2b8), _g(cd, 0x2c8)]
 		print("clk=%3d tick=%3d ball=(%d,%d) ctrl=%s draws=%s" % [
 			clk, t, Pm98Trig._i32(_g(ball, 4)), Pm98Trig._i32(_g(ball, 8)), cdesc, str(draws)])
+		# s56: the BALL row carries what m5_rsp_capture.py's ball_row() carries in the same
+		# order (x y z vx vy vz face34 own54 +0x58 N5c), so the widened differ can check the
+		# ball's velocity and facing, not just its x/y.
+		print("   BALL %d %d %d %d %d %d %d %d %d %d" % [
+			_si(ball, 4), _si(ball, 8), _si(ball, 0xc),
+			_si(ball, 0x20), _si(ball, 0x24), _si(ball, 0x28),
+			_g(ball, 0x34) & 0xffff, _si(ball, 0x54), _si(ball, 0x58), _si(ball, 0x5c)])
 		for ti in range(2):
 			var arr: Array = built[ti]
 			for i in range(arr.size()):
 				var p: Dictionary = arr[i]
-				print("   PL %d %d %d %d %d %x %x %d" % [
+				# The first eight columns are the s34 layout every existing differ parses
+				# positionally; s56 APPENDS the rest of m5_rsp_capture.py's players_row so
+				# the widened differ can check orientation, speed and the gate inputs too.
+				print("   PL %d %d %d %d %d %x %x %d %d %d %d %d %d %d %d %d %d %d %d" % [
 					ti, i, _si(p, 4), _si(p, 8), _g(p, 0x13c),
-					_si(p, 0x17c) & 0xffffffff, _si(p, 0x180) & 0xffffffff, _g(p, 0x2c8)])
+					_si(p, 0x17c) & 0xffffffff, _si(p, 0x180) & 0xffffffff, _g(p, 0x2c8),
+					_g(p, 0x34) & 0xffff, _g(p, 0x64) & 0xffff,
+					_si(p, 0x68), _si(p, 0x6c), _si(p, 0x54), _si(p, 0x58),
+					_g(p, 0x5c) & 0xff, _si(p, 0x2b8), _si(p, 0x2bc),
+					_g(p, 0x2d7) & 0xff, _g(p, 0x2d8) & 0xff])
 		if clk >= CLK_HI:
 			break
 
