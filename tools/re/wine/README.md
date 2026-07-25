@@ -49,6 +49,44 @@ Render + synthetic clicks REQUIRE a wine virtual desktop with the FULL windows p
 | `m5_gdbrsp_watch.py`| HW write-watchpoint via `winedbg --gdb` + raw RSP (Z2/vCont;c); names position writers (s32) |
 | `m5_gdbrsp_seedwatch.py`| Z2 on the LCG seed 0x006d3184: one stop per RNG draw, `ret0`=[esp] names the drawing call-site (s33) |
 
+## The pixel-signature auto-driver (`autodrive.py`) — 2026-07-25
+
+A blind click list desynchronises within a few weeks: the original raises news boards,
+alert boxes, cup draws and award sheets in an order the sim decides. `autodrive.py`
+looks at the frame before every click.
+
+| verb | does |
+|---|---|
+| `learn NAME X,Y,W,H frame.png [more.png] [--step N]` | teach a screen — keeps only the lattice probes whose RGB is identical in EVERY teaching frame, so club names/scores/dates drop out and the chrome stays |
+| `id [--frame f.png]` | name the screen on the wire (or in a file) and print the five closest |
+| `shots DIR` | re-identify a whole capture directory |
+| `run plans/season.json` | drive by the rule table |
+| `snap NAME` / `click X Y` / `probe X Y` | one-shot helpers |
+
+`run` loops: grab -> identify -> look the screen up in the plan's rules -> click. Rules
+are `{"click": [x, y]}`, `{"click_alert_ok": true}`, `{"click_template": "ok_button.png"}`,
+`{"swap_unavailable": true}` or `{"type": "text"}`. **An unknown screen stops the drive**
+and is saved — every stop is a screen never witnessed, which is the point.
+
+- Signatures live in `screens.json`; teach with `teach.sh PLAN NAME ROI FRAME X Y` to add
+  the rule in the same step.
+- **Most-specific-wins**: a modal leaves the screen under it intact, so both signatures
+  pass; the one with more probes (teach overlays over the panel they draw) wins.
+- **Animations**: the pre-match LINE-UPS reveal takes ~35 s and the cup-draw drum plays
+  once. An unknown frame is re-grabbed for `retries` rounds AND filmed at 25 fps
+  (`film.sh`) so sprite order survives. `film.sh NAME SECS [FPS]` also stands alone.
+- **The XI-validity gate IS scriptable** (contrary to `record_play.py`'s premise): the
+  original refuses to advance the week while an injured or banned player is in the XI, and
+  two synthetic clicks in the name column — the unavailable row, then a fit substitute —
+  clear it. Verified live 2026-07-25: Holdsworth (injured 5 weeks) out, Fairclough in,
+  TEAM RATING 72 -> 79. `swap_unavailable` does exactly that; an unavailable row is the
+  gold plate `(212,191,85)` at x=60 with the dark-gold `(170,127,0)` status band.
+- **`loop_breaker`** names the way out of a screen pair the drive cannot leave
+  (hub -> alert -> hub is the XI gate); it fires only on the `when` screen so the click
+  lands on the hub and not on the modal.
+- **The 2026-07 archived captures are 641 px wide** — the same 640 px window plus one
+  black column at x=640 (99.92 % of pixels identical at offset 0). `as_frame` crops.
+
 ## Reproduce the capture
 
 1. `bash boot.sh` — game to the title screen.
