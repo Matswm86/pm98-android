@@ -217,18 +217,19 @@ func _career_integration() -> bool:
 		"hire moves the member pool -> staff") and ok
 	ok = _assert(Staff.training_factor(career.staff) > 1.0, "the hired trainer raises the live factor") and ok
 
-	# Wages are drawn from cash each week (week 0 has no cup prize, so the delta is exact).
-	# The week's draw is weekly_net minus BOTH the live player wage bill and the staff bill.
+	# Wages are drawn from cash each week. STAFF WAGES is one of the two flat costs the
+	# original charges EVERY week (REFRUN R9), and it is booked to its own ledger line.
 	var cash_before := career.cash
 	var wage := career.staff_weekly_wage()
-	var players := career.player_weekly_wage()
-	var net := career.weekly_net
 	var rng := RandomNumberGenerator.new()
 	rng.seed = SEED
 	career.advance_week(rng)
+	var rec: Dictionary = career.week_ledgers[-1]
 	ok = _assert(wage > 0, "the hired staff has a weekly wage (£%d/wk)" % wage) and ok
-	ok = _assert(career.cash == cash_before + net - players - wage,
-		"the staff wage bill is drawn from cash (%d + %d - %d - %d)" % [cash_before, net, players, wage]) and ok
+	ok = _assert(int(rec["expense"]["STAFF WAGES"]) == wage,
+		"STAFF WAGES booked every week (£%d)" % wage) and ok
+	ok = _assert(career.cash == cash_before + FinanceModel.ledger_balance(rec),
+		"the week's cash delta == the week's ledger balance") and ok
 
 	# Sack the trainer: back to the pool, compensation paid, factor back to 1.0.
 	var mid := int(career.staff[0]["id"])

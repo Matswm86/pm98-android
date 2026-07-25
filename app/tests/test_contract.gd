@@ -140,11 +140,18 @@ func _career_bill(prem: Array, league: Dictionary, leagues: Array) -> bool:
 	ok = _assert(all_stamped, "create stamps a wage on every seed player") and ok
 	var bill := career.player_weekly_wage()
 	ok = _assert(bill > 0, "live player wage bill positive (£%d/wk)" % bill) and ok
-	# A week's cash delta is exactly weekly_net minus the player + staff wage bills.
+	# A week's cash delta is exactly that week's BOOKS (REFRUN R5/R9): PLAYERS' WAGE +
+	# STAFF WAGES are charged every week, income only on a home matchday, and the ledger
+	# and the bank can never disagree because every movement posts through both.
 	var cash_b := career.cash
 	career.advance_week(rng)
-	var expect := cash_b + career.weekly_net - bill - career.staff_weekly_wage()
-	ok = _assert(career.cash == expect, "a week draws the player wage bill from cash") and ok
+	var rec: Dictionary = career.week_ledgers[-1]
+	ok = _assert(career.cash == cash_b + FinanceModel.ledger_balance(rec),
+		"the week's cash delta == the week's ledger balance") and ok
+	ok = _assert(int(rec["expense"]["PLAYERS' WAGE"]) == bill,
+		"PLAYERS' WAGE booked at the live squad bill (£%d)" % bill) and ok
+	ok = _assert(int(rec["expense"]["STAFF WAGES"]) == career.staff_weekly_wage(),
+		"STAFF WAGES booked at the live staff bill") and ok
 	# Signing a player lifts the bill by his wage.
 	var seller_id := int(prem[1]["id"])
 	var target := _surplus_outfielder(_club_view(career, seller_id))

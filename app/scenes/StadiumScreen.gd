@@ -276,7 +276,7 @@ var _svc_data: Dictionary = SVC_WITNESS
 
 # MATCH DAY state fed from Career (set_matchday_state). Defaults keep SEATS-only callers /
 # tests unchanged (they never open the matchday view).
-var _mo_ticket: int = 0                           # live board-set match ticket price (£)
+var _mo_ticket: float = 0.0                       # live board-set match ticket price (£)
 var _mo_board: int = 0                            # live board-set advertising-board price (£)
 var _mo_home: String = ""                         # next home fixture: home side (managed club)
 var _mo_away: String = ""                         # next home fixture: opponent
@@ -333,7 +333,7 @@ func _load_scene() -> void:
 ## / board are ignored — they fed the removed invented ticket-price + sponsor + split readouts.
 func setup(club: String, manager: String, season: String, ground: String,
 		capacity: int, _seated: int, _standing: int, _parking: int, works := "",
-		_ticket := 0, _board := 0, week := 0, league := "", objective := "") -> void:
+		_ticket := 0.0, _board := 0, week := 0, league := "", objective := "") -> void:
 	_club = club
 	_manager = manager
 	_season = season
@@ -370,9 +370,17 @@ func set_improve_state(car_levels: Array, car_price: int, works: Array, grades: 
 ## (Man Utd -> the ticket ground/league + the £1,120,000 sponsor offer stay baked), and whether
 ## the season's boards are already sold. Main re-feeds this after each price step / ACCEPT so
 ## the panel refreshes in place (no full re-mount, which would bounce back to the ledger).
-func set_matchday_state(ticket: int, board: int, home: String, away: String,
+## "£7.50" for a price with pence, "£15" for a round one -- the original prints the
+## default £7.50 ticket, so the cell cannot be integer-only.
+static func money_price(v: float) -> String:
+	if absf(v - round(v)) < 0.005:
+		return "£%d" % int(round(v))
+	return "£%.2f" % v
+
+
+func set_matchday_state(ticket: float, board: int, home: String, away: String,
 		witness: bool, sold: bool) -> void:
-	_mo_ticket = maxi(0, ticket)
+	_mo_ticket = maxf(0.0, ticket)
 	_mo_board = maxi(0, board)
 	_mo_home = home
 	_mo_away = away
@@ -780,7 +788,7 @@ func _draw_matchday() -> void:
 	_cell(_f12, MD_HOME, _mo_home, C_BLACK, 12, "centre")
 	_cell(_f12, MD_AWAY, _mo_away, C_BLACK, 12, "centre")
 	# The board-set TICKET PRICE + PRICE OF BOARD (the SAME prices as FINANCE -> PRICES).
-	_cell(_f12, MD_TICKET_VAL, "£%d" % _mo_ticket, C_TICKET_INK, 12, "centre")
+	_cell(_f12, MD_TICKET_VAL, money_price(_mo_ticket), C_TICKET_INK, 12, "centre")
 	_cell(_f10, MD_BOARD_VAL, "£%s" % fmt_int(_mo_board), C_TICKET_INK, 11, "centre")
 	# Ticket ground/league stay baked for the witnessed club (Old Trafford / Premier League);
 	# a non-witnessed club overdraws them from its own Career ground + league.

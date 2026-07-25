@@ -172,7 +172,12 @@ func _run() -> void:
 	# ... and the save raises the modal "PREMIER MANAGER 98" alert box (the
 	# original's hub message box, frames 093/149 — docs/re/alert_box_re.md).
 	ok = _assert(main._hub.alert_active(), "save raises the hub alert box") and ok
-	main._hub._next_alert()                     # answer OK so the hub is live again
+	# Answer OK until the queue drains -- the hub can hold more than one card now (the
+	# transfer-deadline warnings and the running-at-a-loss counter both queue here).
+	for _i in range(16):
+		if not main._hub.alert_active():
+			break
+		main._hub._next_alert()
 	ok = _assert(not main._hub.alert_active(), "alert dismissed") and ok
 	main._menu_action("news", main._hub)        # info action (no crash, no nav)
 	await process_frame

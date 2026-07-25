@@ -87,7 +87,10 @@ var stadium_capacity: int = 0     # managed club's current ground capacity (0 = 
 var works: Array = []
 var car_park_levels: Array = [1, 1, 1, 1]
 var ground_grades: Dictionary = {}
-var ticket_price: int = 0         # board-set match ticket price (0 = tier default)
+# Board-set match ticket price, in POUNDS AND PENCE -- the original's own default is
+# £7.50 a head (FinanceModel.TICKET_DEFAULT, measured exactly off two FULL TIME stadium
+# panels), so this cannot be a whole-pound integer without losing the witness.
+var ticket_price: float = 0.0     # board-set match ticket price (0 = tier default)
 var board_price: int = 0          # board-set advertising-board price (0 = tier default)
 var boards_sold_season: bool = false  # GROUND MATCH DAY: sponsor-board season offer taken
 
@@ -175,9 +178,38 @@ var euro_names: Dictionary = {}         # foreign club id:int -> String
 # frozen so the finals resolve after euro_ratings is rebuilt.
 var euro_winner_cup: int = -1           # last season's European Cup winner
 var euro_winner_cwc: int = -1           # last season's Cup Winners' Cup winner
+# REFRUN R14: the U.E.F.A. Cup winner was thrown away by _capture_euro_honours, yet the
+# original both raises a U.E.F.A. CUP CHAMPION card for it and lists it among the eight
+# trophies on THE CHAMPIONSHIPS. Captured now like the other two.
+var euro_winner_uefa: int = -1          # last season's U.E.F.A. Cup winner
 var euro_winner_ratings: Dictionary = {}  # winner/SA-champ id:int -> {att,def,gk}
 var euro_winner_names: Dictionary = {}    # winner/SA-champ id:int -> String
+# The original's own per-week finance books (FINANCE -> INC. + EXP. -> PER WEEK), the
+# structure REFRUN R5/R9 witnessed. `week_ledgers` holds one record per COMPLETED week,
+# oldest first, capped at the finance year's 52; `_wk` is the week being accumulated.
+# Every cash movement goes through _post_income / _post_expense so the books and the
+# bank can never disagree.
+var week_ledgers: Array = []
+var _wk: Dictionary = {}
+# Consecutive weeks the club closed in the red (REFRUN R16). The original raises one hub
+# alert a week while this is non-zero, incrementing, and CLEARS it the moment the club is
+# back in profit -- witnessed at 1, 2 and 3 weeks, then cleared by a sale.
+var loss_weeks: int = 0
+# The channelTV card queued for the coming HOME match: {"fee": int, "comp": String}.
+# {} when the next fixture is away, or the competition's fee is not witnessed.
+var pending_channel_tv: Dictionary = {}
+
 var supercup: Dictionary = {}           # European Supercup result; {} = not played
+var sa_champion_id: int = -1            # Libertadores holder, for the December Intercontinental
+# Champion cards the hub has to raise UNPROMPTED, oldest first (REFRUN R7/R11/R14/R15).
+# The original presents every trophy on the one shared CAMPEON layout -- five competitions
+# matched the taught `champion_card` signature at 0.99-1.00 -- and raises the card itself
+# without the manager asking for it: the Charity Shield at season start, the
+# Intercontinental in December, the Supercup in March, and the rest in the season-end
+# sequence. Each entry is
+#   {"comp": key, "winner": {club, club_id, qualifier}, "runner": {club, club_id}}
+# with the manager names resolved by the UI (Career has no manager database).
+var pending_champion_cards: Array = []
 var intercontinental: Dictionary = {}   # Intercontinental Cup result; {} = not played
 
 # The manager's career ACROSS clubs (#14). Reputation tracks how you've done; the board can
@@ -194,18 +226,41 @@ var comp_total: Dictionary = {}         # career-total per-competition record (M
                                         # TOTAL view); past seasons/spells fold in at rollover
 var _rep_year: int = 0                  # guard: the season `year` the board review was applied
 
-# Coca-Cola Cup options: two-legged rounds, a single-leg final, sequential round labels
-# (Round 1 -> Round 2 -> Qtr Finals -> Semifinals -> Final), a smaller purse than the F.A.
-# Cup, and a schedule that finishes earlier in the season (so the two finals don't clash).
+# THE DOMESTIC CUPS, on the original's own shape (REFRUN R1/R2/R8, witnessed 2026-07-25).
+#
+# Both cups are contested by the WHOLE 92-club league pyramid, and PREMIER clubs enter at
+# ROUND 3. Witnessed on two separate draws: the Coca-Cola Cup ROUND 3 drew Man Utd away at
+# Bradford City (Division One, manager Jewell, The Pulse Stadium), and the F.A. Cup ROUND 3
+# panel is a scrollable list of ties between clubs from outside the Premier. Two lower-
+# division clubs went deep in the same season -- Bradford City WON the F.A. Cup and
+# Wycombe W. (Division Two) reached the Coca-Cola final. The app used to contest each cup
+# among the manager's own 20-club division, so a lower-division club could not be drawn at
+# all, and its "sequential" labels called the manager's first tie Round 1 when the original
+# calls it Round 3.
+#
+# Ties are SINGLE-LEG WITH A REPLAY, not two legs: the Round 3 draw card carries MATCH /
+# REPLAY buttons per tie (R2). Only Round 3 was witnessed; the binary also ships the
+# "<round> - 1st" / "- 2nd" two-legged label set, so whether the real Round 1 and the
+# semifinals are two-legged (as they were in real 1997-98) is UNRESOLVED and is not
+# guessed at here -- every round replays.
+const PREMIER_ENTRY_ROUND := 3
+
+const FA_CUP_OPTS := {
+	"name": "F.A. Cup", "legs": 1, "two_legged_final": false,
+	"label_scheme": "sequential", "qtr_label": "Qtr. Finals",
+	"prize_round": 0, "prize_winner": 0, "span_lo": 0.0, "span_hi": 1.0,
+}
 const LEAGUE_CUP_OPTS := {
-	"name": "Coca-Cola Cup", "legs": 2, "two_legged_final": false,
+	"name": "Coca-Cola Cup", "legs": 1, "two_legged_final": false,
 	"label_scheme": "sequential", "qtr_label": "Qtr Finals",
-	"prize_round": 120_000, "prize_winner": 900_000, "span_lo": 0.0, "span_hi": 0.7,
+	"prize_round": 0, "prize_winner": 0, "span_lo": 0.0, "span_hi": 0.7,
 }
 
-# Charity Shield (champions v F.A. Cup winners, the season's curtain-raiser). A modest,
-# documented prize -- NOT a reversed PM98 figure (only the UEFA schedule is code-resident).
-const CHARITY_PRIZE := 250_000
+# Charity Shield (champions v F.A. Cup winners, the season's curtain-raiser). RETIRED to
+# 0 on 2026-07-25 for the same reason as the domestic cup purses: it was ours, and the
+# original's per-week ledger has no line it could post to. What the original DOES pay for
+# the Shield is the £187,500 channelTV fee, which is now booked instead (REFRUN R6).
+const CHARITY_PRIZE := 0
 
 # The FIRST-season curtain-raiser is a fixed historical fixture: the 97-98 game opens on the
 # real 96-97 honours, which the app never played, so it is seeded from the WITNESSED original
@@ -229,7 +284,11 @@ const S1_SHIELD_RUNNERUP_ID := 49
 # ties then 16 -- are not modelled: the app's field is derived from the domestic
 # qualifiers plus rated foreign clubs and enters at the group phase.)
 const EURO_FIELD := {"european_cup": 24, "uefa_cup": 32, "cup_winners_cup": 16}
-const EURO_GROUPS := {"groups": 6, "advance": 1, "best_runners_up": 2}
+# `label` is the original's own phase string for the whole group phase, copied
+# verbatim (REFRUN R3): the hub badge read `Euro. Cup / 1/8 Final` on 1 Oct, 5 Nov and
+# 26 Nov 1997 alike, and the EURO. LEAGUE screen heads the groups `1/8 FINALS`.
+const EURO_GROUPS := {"groups": 6, "advance": 1, "best_runners_up": 2,
+	"label": "1/8 Final"}
 const UEFA_SPOTS := 2                   # league places below the champions that enter the UEFA Cup
 const EURO_OPTS := {
 	"european_cup": {"name": "European Cup", "emblem": "ligacamp"},
@@ -272,8 +331,25 @@ const STAFF_MAX := 13                   # the 13 single-occupancy role slots (on
 
 # "The Directors will only let you make %u offer%s to sign a player per week."
 const OFFERS_PER_WEEK := 3
-# Transfer window shuts this many rounds before the season ends (deadline day).
-const DEADLINE_TAIL := 6
+# Transfer window shuts this many rounds before the season ends. WITNESSED (REFRUN R10):
+# on Sunday 8 March 1998, Premier Week 32, the original raised "The transfer deadline is
+# now 2 weeks away." -- so the deadline falls on week 34 of a 38-round Premier season,
+# i.e. total_weeks() - 4. Was 6 (which put it at week 32, two weeks early).
+const DEADLINE_TAIL := 4
+# The original raises exactly TWO warnings, at two weeks and one week out, and the window
+# then shuts silently -- there is no deadline-day event (owner, 2026-07-25: not a concept
+# in 1998). The two-week wording is the witnessed string; the one-week form is the same
+# string pluralised the way PM98 pluralises OFFERS_PER_WEEK's own alert ("%u offer%s").
+# REFRUN R16, verbatim off p0685_alert_box.png / p0716_alert_box.png:
+#   "You have been running the club at a loss for 1 week now."
+#   "You have been running the club at a loss for 2 weeks now."
+# The counter reached 3 and was cleared by a sale, so the SACKING threshold is > 3 and
+# remains unmeasured -- LOSS_SACK_WEEKS is therefore OURS, set to the first value the
+# witness does not contradict, and flagged as such on the board review.
+const LOSS_ALERT_MSG := "You have been running the club at a loss for %d week%s now."
+const LOSS_SACK_WEEKS := 4
+const DEADLINE_WARN_WEEKS := [2, 1]
+const DEADLINE_WARN_MSG := "The transfer deadline is now %d week%s away."
 
 # Living league (#12): rival clubs' squads injure/develop week to week like the manager's.
 # Only a notable rival injury (this many matches or longer) is surfaced to the club news
@@ -341,6 +417,12 @@ func _init_club(club: Dictionary, league: Dictionary, league_clubs: Array, leagu
 	youth_search = {}
 	youth_found = []
 	pending_alerts = []
+	week_ledgers = []
+	_wk = {}
+	loss_weeks = 0
+	pending_channel_tv = {}
+	pending_champion_cards = []
+	sa_champion_id = -1
 	training_focus = {}
 	external_signed = {}
 	offers_left = OFFERS_PER_WEEK
@@ -357,6 +439,7 @@ func _init_club(club: Dictionary, league: Dictionary, league_clubs: Array, leagu
 	euro_seeds = {}
 	euro_winner_cup = -1
 	euro_winner_cwc = -1
+	euro_winner_uefa = -1
 	euro_winner_ratings = {}
 	euro_winner_names = {}
 	supercup = {}
@@ -367,8 +450,6 @@ func _init_club(club: Dictionary, league: Dictionary, league_clubs: Array, leagu
 		club_names[int(lc["id"])] = lc.get("name", "?")
 		rosters[int(lc["id"])] = _seed_squad(lc)
 	fixtures = SeasonSim.fixtures(ids)
-	fa_cup = Cup.create(ids, fixtures.size())
-	league_cup = Cup.create(ids, fixtures.size(), LEAGUE_CUP_OPTS)
 	_init_table(league_clubs)
 	_set_objective(club, league, league_clubs, leagues)
 	var fin := FinanceModel.summary(club, tier)
@@ -387,7 +468,7 @@ func _init_club(club: Dictionary, league: Dictionary, league_clubs: Array, leagu
 	else:
 		cash = int(fin.get("total_income", 0)) / 4   # un-decoded fallback
 	stadium_capacity = int(fin.get("capacity", 0))   # ground starts at the club's known size
-	ticket_price = int(fin.get("ticket_price", 0))   # prices start at the division defaults
+	ticket_price = float(fin.get("ticket_price", 0.0))   # prices start at the division defaults
 	board_price = int(fin.get("board_price", 0))
 	tactics = Tactics.auto_pick(club, Tactics.DEFAULT_FORMATION).to_dict()
 	# A fresh academy + staff pool + free-agent pool for the new club (none carry across).
@@ -409,6 +490,8 @@ func _init_club(club: Dictionary, league: Dictionary, league_clubs: Array, leagu
 	for i in my_seed.size():
 		seed_pos[int(my_seed[i])] = i + 1
 	_build_divisions(pyramid, yrng)
+	# The cups span the whole pyramid, so they are minted AFTER the other divisions exist.
+	_mint_domestic_cups(ids)
 
 
 ## Deep-copy a club's squad into a live roster, stamping a contract length on each
@@ -756,9 +839,15 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 			var nm2 := str(pd.get("name", ""))
 			if pd.has("clause_goals") and scored.has(nm2):
 				pd["clause_goals"] = int(pd["clause_goals"]) + int(scored[nm2])
-	cash += weekly_net
-	cash -= player_weekly_wage()        # the live squad wage bill (YEARLY WAGE / 52 per man)
-	cash -= Staff.weekly_wage(staff)   # the backroom staff wage bill (STAFF WAGES)
+	# THE WEEK'S BOOKS (REFRUN R5/R9). The original charges PLAYERS' WAGE + STAFF WAGES
+	# EVERY week and adds income only on a HOME matchday, so an away week is a pure loss
+	# (witnessed: -£233,942 flat, and Man Utd's cash FELL £9.6M -> £3.3M across 1997-98).
+	# The old model added one constant season-average `weekly_net` every week regardless,
+	# which is the sign error R9 measured; weekly_net now survives only as the FINANCES
+	# screen's season projection and as save-file compatibility.
+	_post_expense("PLAYERS' WAGE", player_weekly_wage())
+	_post_expense("STAFF WAGES", Staff.weekly_wage(staff))
+	_post_matchday_income(manager_res)
 	_tick_insurance()                  # premiums, hospital bills and policy payouts
 	_resolve_pending_bids(rng)         # last week's outgoing bids get their answers
 	_accumulate_offers(rng)            # incoming bids on the transfer-listed (CURRENT OFFERS)
@@ -767,6 +856,8 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 	_close_month_if_due()           # end of a calendar month -> the two award sheets
 	offers_left = OFFERS_PER_WEEK   # the board's weekly signing allowance resets
 	_tick_works()                   # stadium expansion progresses a week
+	_tick_transfer_deadline()       # the two-week / one-week deadline warnings (R10)
+	_tick_one_off_finals(rng)       # Intercontinental in December, Supercup in March (R7/R11)
 	if not manager_res.is_empty():
 		results.append({
 			"week": week, "opp_id": manager_res["away_id"] if manager_res["manager_home"] else manager_res["home_id"],
@@ -812,6 +903,13 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 	# pyramid). Placed last so the pre-existing draw order within a week is
 	# untouched for reproducibility.
 	_advance_other_divisions(rng)
+	# Close the week's books LAST, so every posting this week made -- wages, the matchday
+	# take, insurance, cup ties, transfers -- is inside the record before the
+	# running-at-a-loss counter reads it (REFRUN R5/R9/R16).
+	_close_week_books()
+	# ...then queue the channelTV card for the fixture the manager is about to play, which
+	# is how the original raises it: unprompted, on the hub, BEFORE the match (R6).
+	_queue_channel_tv()
 	if season_over():
 		finished = true
 	return manager_res
@@ -823,9 +921,7 @@ func _play_due_cup_rounds(rng: RandomNumberGenerator, clubs_override: Dictionary
 	var ratings_fn := func(id: int) -> Dictionary: return _ratings_for(id, clubs_override)
 	var xi_fn := func(id: int) -> Array: return _xi_for(id, clubs_override)
 	var names_fn := func(id: int) -> String:
-		if club_names.has(int(id)):
-			return str(club_names[int(id)])
-		return str(euro_names.get(int(id), "?"))
+		return _any_club_name(int(id))
 	for cup in [fa_cup, league_cup]:
 		if cup.is_empty():
 			continue
@@ -834,8 +930,17 @@ func _play_due_cup_rounds(rng: RandomNumberGenerator, clubs_override: Dictionary
 				_cup_report_sink())
 			for n in cr["news"]:
 				_news(n["kind"], n["text"])
-			if int(cr["prize"]) > 0:
-				cash += int(cr["prize"])
+			# NOTE: cr["prize"] is Cup's own documented-invention purse and is now ZERO
+			# (Cup.ROUND_PRIZE / WINNER_BONUS, and LEAGUE_CUP_OPTS). The original's
+			# per-week ledger has NO domestic-cup income line (REFRUN R5), and an away
+			# week's income was measured at exactly £0 -- a cup run pays the club through
+			# the turnstiles, not through a purse. Booked below, as a matchday.
+			# A cup tie AT HOME is a matchday: turnstiles, channelTV and the players' bonus,
+			# exactly as a league Saturday (REFRUN R6/R9). The TV fee for the two domestic
+			# cups is NOT witnessed, so _post_home_match pays 0 for them.
+			var ct: Dictionary = cr.get("manager_tie", {})
+			if _tie_is_home(ct):
+				_post_home_match(_tv_key_for_cup(str(cup.get("name", ""))))
 	# European competitions: same chassis, but prizes follow the reversed UEFA schedule
 	# (per-tie, with QF/SF milestones) rather than the domestic per-round model.
 	for key in euro:
@@ -854,13 +959,35 @@ func _play_due_cup_rounds(rng: RandomNumberGenerator, clubs_override: Dictionary
 				# qualifying through the group.
 				match str(er.get("manager_result", "")):
 					"win":
-						cash += EURO_WIN
+						_post_income("EUROPEAN CUP INCOME", EURO_WIN)
 					"draw":
-						cash += EURO_DRAW
+						_post_income("EUROPEAN CUP INCOME", EURO_DRAW)
 				if bool(er.get("manager_qualified", false)):
-					cash += EURO_QF
+					_post_income("EUROPEAN CUP INCOME", EURO_QF)
 			elif in_before:
-				cash += _euro_prize(eb, er)
+				# EUROPEAN CUP INCOME is one of the screen's own income lines (REFRUN R5),
+				# and the UEFA schedule behind these figures IS reversed from MANAGER.EXE.
+				_post_income("EUROPEAN CUP INCOME", _euro_prize(eb, er))
+			var et: Dictionary = er.get("manager_tie", {})
+			if _tie_is_home(et):
+				_post_home_match(str(key))
+
+
+## Was the manager's club the HOME side of this tie? A two-legged tie hosts one leg each
+## way, so it counts as a home matchday either way; a bye and an empty tie do not.
+func _tie_is_home(tie: Dictionary) -> bool:
+	if tie.is_empty() or bool(tie.get("bye", false)):
+		return false
+	if bool(tie.get("two_legged", false)):
+		return int(tie.get("home_id", -1)) == club_id or int(tie.get("away_id", -1)) == club_id
+	return int(tie.get("home_id", -1)) == club_id
+
+
+## FinanceModel.TV_FEE key for a domestic cup by display name. Neither the F.A. Cup nor
+## the Coca-Cola Cup home TV fee was captured, so both fall through to a key with no
+## entry and pay £0 rather than a guess (REFRUN R6, "not measured").
+func _tv_key_for_cup(cup_name: String) -> String:
+	return "cup:%s" % cup_name
 
 
 ## The manager's UEFA prize for a European round just played (he was in it beforehand):
@@ -1280,8 +1407,10 @@ func ensure_divisions(pyramid: Dictionary) -> void:
 		for i in order.size():
 			seed_pos[int(order[i])] = i + 1
 	for t in divisions:
-		var target := week + (1 if int(t) > tier else 0)
-		while int(divisions[t]["played"]) < mini(target, (divisions[t]["fixtures"] as Array).size()):
+		var head2 := 1 if int(t) > tier else 0
+		var n_fx := int((divisions[t]["fixtures"] as Array).size())
+		var target := head2 + _division_rounds_due(n_fx - head2)
+		while int(divisions[t]["played"]) < mini(target, n_fx):
 			var before := int(divisions[t]["played"])
 			_play_division_round(int(t), rng)
 			if int(divisions[t]["played"]) == before:
@@ -1342,10 +1471,49 @@ func _play_division_round(t: int, rng: RandomNumberGenerator) -> void:
 	dv["played"] = played + 1
 
 
-## Advance every OTHER division by one round (called once per manager week).
+## Advance every OTHER division to where it should be by this manager week.
+##
+## WITNESSED (REFRUN R12): the lower divisions play ALL 46 of their rounds and run AHEAD
+## of the Premier -- the First Division table dated 18/4/1998 (the manager's week 37) reads
+## P = 44 for every club, and the Third Division reached P = 46 before the Premier's last
+## match. The extra rounds are midweek fixtures. Playing exactly one lower round per manager
+## week (what this did before) stalls a 46-round division at 38 and hands `_pyramid_rollover`
+## a short table, so promotion and relegation were computed off an unfinished season.
+##
+## The catch-up rule spreads the surplus rounds evenly across the manager's season:
+##     rounds_due(w) = w + floor((division_rounds - manager_weeks) * w / manager_weeks)
+## At w = 37 of 38, a 46-round division is due 37 + floor(8*37/38) = 44 -- the First
+## Division witness, exactly -- and the last manager week clears the remaining two. The
+## PER-DIVISION midweek allocation (which is what puts the Third Division two weeks further
+## on) is not witnessed, so every lower division shares the one schedule rather than getting
+## an invented one of its own.
 func _advance_other_divisions(rng: RandomNumberGenerator) -> void:
 	for t in divisions:
-		_play_division_round(int(t), rng)
+		var dv: Dictionary = divisions.get(int(t), {})
+		if dv.is_empty():
+			continue
+		# The witnessed one-round HEAD START of every division BELOW the manager's
+		# (Career._build_divisions) rides on top of the catch-up schedule.
+		var head := 1 if int(t) > tier else 0
+		var due := head + _division_rounds_due(int((dv.get("fixtures", []) as Array).size()) - head)
+		while int(dv.get("played", 0)) < due:
+			var before := int(dv.get("played", 0))
+			_play_division_round(int(t), rng)
+			if int(dv.get("played", 0)) == before:
+				break            # nothing left to play (or the division is detached)
+
+
+## How many rounds a division of `n_rounds` should have played by the manager's current
+## week. See _advance_other_divisions for the witness this reproduces.
+func _division_rounds_due(n_rounds: int) -> int:
+	var mw := total_weeks()
+	if mw <= 0 or n_rounds <= 0:
+		return 0
+	if n_rounds <= mw:
+		return mini(week, n_rounds)
+	@warning_ignore("integer_division")
+	var extra := ((n_rounds - mw) * week) / mw
+	return mini(week + extra, n_rounds)
 
 
 # Witnessed zone structure per tier (the live tables' tag columns, 2026-07-19):
@@ -1738,6 +1906,15 @@ func board_review() -> Dictionary:
 			_releg_count(), survival, seasons_at_club())
 		sacked = bool(sd["sacked"])
 		sack_reason = str(sd["reason"])
+		# REFRUN R16: the running-at-a-loss counter "feeds the sacking path". The counter
+		# and its weekly alert are witnessed (1, 2, 3 weeks, then cleared); the THRESHOLD
+		# is not -- Mats cleared it at 3, so all that is known is > 3. LOSS_SACK_WEEKS is
+		# therefore ours. The original's sacking SCREEN was never reached either, so the
+		# board acts here, at the review the app already has, rather than through an
+		# invented mid-season dismissal.
+		if not sacked and loss_weeks >= LOSS_SACK_WEEKS:
+			sacked = true
+			sack_reason = "insolvent"
 		var rng := RandomNumberGenerator.new()
 		rng.randomize()
 		headhunt_pending = not sacked and Manager.headhunted(finished_pos, objective_pos, reputation, rng)
@@ -1749,6 +1926,7 @@ func board_review() -> Dictionary:
 		"finished_pos": finished_pos, "objective_pos": objective_pos,
 		"objective_met": finished_pos <= objective_pos,
 		"reputation": int(round(reputation)), "rep_label": Manager.reputation_label(reputation),
+		"loss_weeks": loss_weeks,
 	}
 
 ## The strength-percentile band + count of clubs that will offer you their job, given your
@@ -2446,7 +2624,14 @@ func _tick_insurance() -> void:
 	ins_hospitals += hosp_gbp - pay_gbp
 	ins_wage_refund += back_gbp
 	ins_group3_income += g3_gbp
-	cash += back_gbp + g3_gbp - prem_gbp - (hosp_gbp - pay_gbp)
+	# Booked against the screen's own insurance lines rather than as one lump, so the
+	# PER WEEK view reads the way the original's does.
+	_post_income("INSURANCE GROUP 3", g3_gbp)
+	_post_expense("PLAYERS' INSURANCE", prem_gbp)
+	_post_expense("HOSPITALS", hosp_gbp - pay_gbp)
+	# The insured-injured wage refund nets off PLAYERS' WAGE (+0x50 - +0x54 in the
+	# binary's week record, docs/re/insurance_economy_re.md).
+	_post_expense("PLAYERS' WAGE", -back_gbp)
 
 
 ## The season-to-date insurance figures the FINANCES screen posts to its own
@@ -2455,6 +2640,106 @@ func _tick_insurance() -> void:
 func insurance_ledger() -> Dictionary:
 	return {"premiums": ins_premiums, "hospitals": ins_hospitals,
 		"wage_refund": ins_wage_refund, "group3_income": ins_group3_income}
+
+
+# ---- the weekly books (REFRUN R5/R9/R16) ---------------------------------
+
+## The week record currently accumulating (minted lazily so a loaded save is fine).
+func _week_rec() -> Dictionary:
+	if _wk.is_empty():
+		_wk = FinanceModel.new_week_ledger(FinanceModel.finance_week(week + 1))
+	return _wk
+
+## Bank `amount` and book it against one of the screen's INCOME lines. Negative amounts
+## are legal (a reversal) and simply reduce the line.
+func _post_income(line: String, amount: int) -> void:
+	if amount == 0:
+		return
+	var rec := _week_rec()
+	rec["income"][line] = int(rec["income"].get(line, 0)) + amount
+	cash += amount
+
+## Pay `amount` and book it against one of the screen's EXPENSE lines. `amount` is the
+## POSITIVE cost; cash falls by it.
+func _post_expense(line: String, amount: int) -> void:
+	if amount == 0:
+		return
+	var rec := _week_rec()
+	rec["expense"][line] = int(rec["expense"].get(line, 0)) + amount
+	cash -= amount
+
+## Close the accumulating week: file it, run the running-at-a-loss counter, and start a
+## fresh record. Called once per advance_week, after every posting for the week is in.
+func _close_week_books() -> void:
+	var rec := _week_rec()
+	week_ledgers.append(rec)
+	while week_ledgers.size() > FinanceModel.SEASON_WEEKS:
+		week_ledgers.pop_front()
+	_wk = {}
+	# REFRUN R16, witnessed over three consecutive weeks of the 1998-99 season and then
+	# cleared: one alert per week, the count incrementing, reset on a week back in profit.
+	# The wording is the original's own (p0685/p0716_alert_box.png).
+	if FinanceModel.ledger_balance(rec) < 0:
+		loss_weeks += 1
+		pending_alerts.append(LOSS_ALERT_MSG % [loss_weeks, "" if loss_weeks == 1 else "s"])
+	else:
+		loss_weeks = 0
+
+## PLAYERS' BONUS on a home matchday. WITNESSED ONCE: £5,000 in Man Utd's week-29 ledger,
+## the only home week captured line by line (REFRUN R9). The original's `Win bonus` string
+## is a PER-PLAYER contract term (docs/re/finance_constants.md), so whether the £5,000 is a
+## club-flat figure or that squad's bonuses summed is NOT settled -- and neither is whether
+## it is conditional on the result. Flat per home matchday is the minimal reading of the
+## one measurement; it is not a reversed constant.
+const HOME_MATCH_BONUS := 5_000
+
+## Book one HOME match: the turnstile take, the channelTV fee for that competition, and
+## the players' bonus. This is the ONLY route by which money enters the club in a normal
+## week -- an away week or a blank week books nothing (REFRUN R9).
+##   comp_key indexes FinanceModel.TV_FEE; an unwitnessed competition pays 0 TV rather
+##   than a guessed figure.
+func _post_home_match(comp_key: String) -> void:
+	var fin := _fin_summary()
+	_post_income("TICKETS", int(fin.get("match_gate", 0)))
+	_post_income("TELEVISION", int(FinanceModel.TV_FEE.get(comp_key, 0)))
+	_post_expense("PLAYERS' BONUS", HOME_MATCH_BONUS)
+
+
+## The league round's matchday income, if the manager's club was at home this week.
+func _post_matchday_income(res: Dictionary) -> void:
+	if res.is_empty() or not bool(res.get("manager_home", false)):
+		return
+	_post_home_match("league")
+
+
+## Queue the channelTV card for the coming week's fixture, so the hub can raise it BEFORE
+## the match the way the original does (an unprompted card over MANAGER MENU, witnessed
+## Sat 7 Feb 1998 / Premier Week 27). Home fixtures only, and only for a competition whose
+## fee is witnessed -- an unmeasured competition raises no card rather than a made-up one.
+func _queue_channel_tv() -> void:
+	pending_channel_tv = {}
+	if week >= fixtures.size():
+		return
+	for m in fixtures[week]:
+		if int(m[0]) == club_id:
+			var fee := int(FinanceModel.TV_FEE.get("league", 0))
+			if fee > 0:
+				pending_channel_tv = {"fee": fee, "comp": "league"}
+			return
+		elif int(m[1]) == club_id:
+			return
+
+
+## The finished week records, oldest first (the PER WEEK stepper + the BALANCE chart).
+func week_books() -> Array:
+	return week_ledgers
+
+## One finished week record by its FINANCE week number, or {} if that week is not banked.
+func week_book(fin_week: int) -> Dictionary:
+	for rec in week_ledgers:
+		if int((rec as Dictionary).get("week", -1)) == fin_week:
+			return rec
+	return {}
 
 
 ## Clear the season-to-date insurance ledger (new season / new career).
@@ -2532,7 +2817,7 @@ func sack_staff(member_id: int) -> Dictionary:
 	var m: Dictionary = staff[idx]
 	var comp := Staff.sack_cost(m)
 	staff.remove_at(idx)
-	cash -= comp
+	_post_expense("CANCELLATION", comp)
 	staff_pool.append(m)
 	_news("staff", "%s has been sacked (£%s compensation)." % [m.get("name", "?"), _money(comp)])
 	_log("Sacked %s (%s); paid £%s compensation." % [m.get("name", "?"), Staff.label_for(str(m.get("role", ""))), _money(comp)])
@@ -2545,6 +2830,16 @@ func transfers_open() -> bool:
 ## Rounds until the deadline (0 once it has passed).
 func deadline_weeks_left() -> int:
 	return maxi(0, (total_weeks() - DEADLINE_TAIL) - week)
+
+## The transfer-deadline countdown alerts. WITNESSED (REFRUN R10, frame p0524): the
+## original raises a hub alert box two weeks out, and (owner) one week out, then shuts
+## the window silently. Called once per week from advance_week, AFTER `week` has been
+## incremented, so `deadline_weeks_left()` is the count the manager still has.
+func _tick_transfer_deadline() -> void:
+	var left := deadline_weeks_left()
+	if not DEADLINE_WARN_WEEKS.has(left):
+		return
+	pending_alerts.append(DEADLINE_WARN_MSG % [left, "" if left == 1 else "s"])
 
 func my_squad() -> Array:
 	return rosters.get(club_id, [])
@@ -2705,7 +3000,7 @@ func sign_player(pid: int, from_club_id: int, offer: int, rng: RandomNumberGener
 	Morale.ensure(player, rng)
 	_signing_shock(player)   # the incumbents in his position take it badly (FUN_00588ae0)
 	rosters[club_id].append(player)
-	cash -= offer
+	_post_expense("SIGN PLAYER", offer)
 	transfer_listed.erase(pid)
 	shortlist.erase(pid)
 	_log("You have signed %s from %s for £%s." % [player.get("name", "?"), seller_name, _money(offer)])
@@ -2772,7 +3067,7 @@ func sign_external(player: Dictionary, selling_club: Dictionary, offer: int,
 	joined["fitness"] = 70
 	_signing_shock(joined)
 	rosters[club_id].append(joined)
-	cash -= offer
+	_post_expense("SIGN PLAYER", offer)
 	external_signed[pid] = true
 	_log("You have signed %s from %s for £%s." % [joined.get("name", "?"), seller_name, _money(offer)])
 	_news("transfer", "%s signs for %s for %s." % [
@@ -3209,7 +3504,7 @@ func accept_sale(pid: int, buyer_id: int, offer: int) -> Dictionary:
 	player["contract_term"] = TransferMarket.NEW_CONTRACT_YEARS
 	if rosters.has(buyer_id):
 		rosters[buyer_id].append(player)
-	cash += offer
+	_post_income("SALE + LOAN PLAY.", offer)
 	transfer_listed.erase(pid)
 	var buyer_name: String = club_names.get(buyer_id, "?")
 	_log("%s has been signed by %s for £%s." % [player.get("name", "?"), buyer_name, _money(offer)])
@@ -3243,7 +3538,7 @@ func release(pid: int) -> Dictionary:
 	player["clubId"] = -1                 # now a free agent (no club)
 	player["auto_renew"] = false
 	free_agents.append(player)
-	cash -= comp
+	_post_expense("CANCELLATION", comp)
 	_log("You have sacked %s; paid £%s compensation of contract." % [pname, _money(comp)])
 	return {"ok": true, "msg": "Sacked %s. Paid £%s compensation." % [pname, _money(comp)],
 		"compensation": comp}
@@ -3400,6 +3695,14 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	season_opened = false   # the week-0 chain (shield card + START OF SEASON) re-runs
 	boards_sold_season = false   # a fresh sponsor-board season offer becomes available again
 	_reset_insurance_ledger()    # the FINANCES insurance lines are season-to-date
+	# The finance year is 52 weeks (FinanceModel.SEASON_WEEKS): a new season opens fresh
+	# books and a cleared running-at-a-loss counter.
+	week_ledgers = []
+	_wk = {}
+	loss_weeks = 0
+	pending_channel_tv = {}
+	pending_champion_cards = []
+	sa_champion_id = -1
 	# The STATISTICS store is per SEASON (its header reads "STATISTICS FOR <club>." with
 	# no year, and a fresh career's table is all dashes), so it clears with the results.
 	season_stats.clear()
@@ -3431,8 +3734,7 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	for id in ids:
 		views.append(club_view(id))
 	fixtures = SeasonSim.fixtures(ids)
-	fa_cup = Cup.create(ids, fixtures.size())   # a fresh F.A. Cup each season
-	league_cup = Cup.create(ids, fixtures.size(), LEAGUE_CUP_OPTS)
+	_mint_domestic_cups(ids)                    # fresh 92-club cups each season
 	_init_table(views)
 	var league := {"id": league_id, "name": league_name, "tier": tier}
 	# Season 2+: the witnessed labels are the 1997-98 board table; later seasons'
@@ -3450,7 +3752,7 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	# European competitions for the new season, seeded from last season's honours.
 	mint_european_cups(euro_pool, rng)
 	# Winners-of-winners curtain-raisers from last season's European champions.
-	_play_euro_supercups(sa_champion, rng)
+	_arm_one_off_finals(sa_champion)
 
 
 ## Record the just-finished season's league champion, runners-up order and F.A. Cup
@@ -3586,9 +3888,15 @@ func play_charity_shield_match(rng: RandomNumberGenerator, opp_view: Dictionary)
 		"winner_id": winner, "loser_id": loser, "decided": decided, "bye": false}
 	charity_shield_pending = false
 	_resolve_pending_bids(rng)   # the Shield is a CONTINUE too (see play_friendly)
+	# The channelTV card fires for the Shield too, at £187,500 -- witnessed Sun 3 Aug 1997
+	# (REFRUN R6, p0032_channel_tv.png) -- and the fee IS that week's TELEVISION line. It
+	# is paid for BROADCASTING the match, so it lands whoever wins. No TICKETS: the Shield
+	# is played at a neutral ground, and the original's gate for it was not captured.
+	if h == club_id or a == club_id:
+		_post_income("TELEVISION", int(FinanceModel.TV_FEE.get("charity_shield", 0)))
 	var pens := " (on penalties)" if decided == "pens" else ""
 	if winner == club_id:
-		cash += CHARITY_PRIZE
+		_post_income("EUROPEAN CUP INCOME", CHARITY_PRIZE)
 		if club_names.has(winner) and club_names.has(loser):
 			_news("cup", "%s have won the Charity Shield, beating %s%s." % [
 				str(club_names[winner]), str(club_names[loser]), pens])
@@ -3678,7 +3986,7 @@ func mint_european_cups(euro_pool: Array, rng: RandomNumberGenerator,
 			opts["group_stage"] = EURO_GROUPS.duplicate()
 		euro[key] = Cup.create(field, fixtures.size(), opts)
 		if field.has(club_id):
-			cash += EURO_ENTRY
+			_post_income("EUROPEAN CUP INCOME", EURO_ENTRY)
 			_news("cup", "Your club has entered the %s (1 million from UEFA for competing)."
 				% str(EURO_OPTS[key]["name"]))
 
@@ -3726,7 +4034,7 @@ func open_first_season(honours: Dictionary, euro_pool: Array,
 		euro_winner_cwc = int(cwcw.get("id", -1))
 		euro_winner_ratings[euro_winner_cwc] = MatchEngine.team_ratings(cwcw)
 		euro_winner_names[euro_winner_cwc] = str(cwcw.get("name", "?"))
-	_play_euro_supercups(sa_champion, rng)
+	_arm_one_off_finals(sa_champion)
 
 
 ## Play the Charity Shield on the week-0 curtain-raiser chain if it hasn't been
@@ -3744,13 +4052,15 @@ func play_season_opener(rng: RandomNumberGenerator) -> void:
 func _capture_euro_honours() -> void:
 	euro_winner_cup = -1
 	euro_winner_cwc = -1
+	euro_winner_uefa = -1
 	euro_winner_ratings = {}
 	euro_winner_names = {}
 	if euro.is_empty():
 		return
 	euro_winner_cup = Cup.champion_id(euro.get("european_cup", {}))
 	euro_winner_cwc = Cup.champion_id(euro.get("cup_winners_cup", {}))
-	for id in [euro_winner_cup, euro_winner_cwc]:
+	euro_winner_uefa = Cup.champion_id(euro.get("uefa_cup", {}))
+	for id in [euro_winner_cup, euro_winner_cwc, euro_winner_uefa]:
 		if int(id) != -1:
 			_freeze_winner(int(id))
 
@@ -3775,36 +4085,136 @@ func _freeze_winner(id: int) -> void:
 ## single neutral match in Tokyo (level -> penalties), which is what its screen shows.
 ## No-op until a first European season has produced winners. Pays the manager a documented
 ## prize + a news line if his club is in.
-func _play_euro_supercups(sa_champion: Dictionary, rng: RandomNumberGenerator) -> void:
+func _arm_one_off_finals(sa_champion: Dictionary) -> void:
 	supercup = {}
 	intercontinental = {}
-	if euro_winner_cup == -1:
+	sa_champion_id = -1
+	if euro_winner_cup == -1 or sa_champion.is_empty():
 		return
-	var r_fn := func(id: int) -> Dictionary:
+	var sid := int(sa_champion.get("id", -1))
+	if sid == -1 or sid == euro_winner_cup:
+		return
+	# Freeze the Libertadores holder's rating + name the same way the European winners are
+	# frozen, so the December fixture is playable long after the caller's club dict is gone.
+	euro_winner_ratings[sid] = MatchEngine.team_ratings(sa_champion)
+	euro_winner_names[sid] = str(sa_champion.get("name", "?"))
+	sa_champion_id = sid
+
+
+## Ratings resolver for the frozen winners-of-winners field.
+func _winner_ratings_fn() -> Callable:
+	return func(id: int) -> Dictionary:
 		if euro_winner_ratings.has(int(id)):
 			var r: Dictionary = (euro_winner_ratings[int(id)] as Dictionary).duplicate()
 			r["name"] = str(euro_winner_names.get(int(id), "?"))
 			return r
 		return _ratings_for(int(id))
-	# European Supercup: needs both winners, and distinct (else no fixture). Two legs, the
-	# Cup Winners' Cup holder hosting the first.
-	if euro_winner_cwc != -1 and euro_winner_cwc != euro_winner_cup:
+
+
+## The two winners-of-winners finals, each on the date the ORIGINAL plays it. Neither is a
+## curtain-raiser -- REFRUN R7 and R11 both caught the port red-handed there:
+##   * INTERCONTINENTAL CUP -- raised in the FIRST DECEMBER WEEK of 1997 (the real fixture
+##     was 2 December 1997), as a champion card: Borussia D. (Scala) over Cruzeiro (Weber).
+##   * EUROPEAN SUPERCUP -- raised in MARCH, the week of Sunday 8 March 1998, also as a
+##     champion card, and over two legs: F.C. Barcelona 2|1 Borussia D. 0|3.
+## Month is read off the app's own calendar (_month_of_week), so both land in the right
+## month whatever the season's week count is. Called once per week from advance_week.
+func _tick_one_off_finals(rng: RandomNumberGenerator) -> void:
+	if euro_winner_cup == -1:
+		return
+	var mon := _month_of_week(week)
+	var r_fn := _winner_ratings_fn()
+	# December: the Intercontinental Cup, one neutral match in Tokyo (level -> penalties).
+	if intercontinental.is_empty() and mon == 12 and sa_champion_id != -1:
+		var t2 := Cup.single_neutral_match(rng, euro_winner_cup, sa_champion_id, r_fn)
+		t2["season"] = season
+		intercontinental = t2
+		_record_supercup_news(t2, "Intercontinental Cup", INTERCONTINENTAL_PRIZE)
+		_queue_champion_card("intercontinental", "INTERCONTINENTAL CUP", t2)
+	# March: the European Supercup, two legs, the Cup Winners' Cup holder hosting the first.
+	if supercup.is_empty() and mon == 3 and euro_winner_cwc != -1 and euro_winner_cwc != euro_winner_cup:
 		var tie := Cup.two_leg_tie(rng, euro_winner_cwc, euro_winner_cup, r_fn)
 		tie["season"] = season
 		tie["euro_cup_id"] = euro_winner_cup     # first-named on TEAMS IN CHAMPIONSHIPS
 		tie["cwc_id"] = euro_winner_cwc
 		supercup = tie
 		_record_supercup_news(tie, "European Supercup", SUPERCUP_PRIZE)
-	# Intercontinental Cup: European Cup winner v the South American champion.
-	if not sa_champion.is_empty():
-		var sid := int(sa_champion.get("id", -1))
-		if sid != -1 and sid != euro_winner_cup:
-			euro_winner_ratings[sid] = MatchEngine.team_ratings(sa_champion)
-			euro_winner_names[sid] = str(sa_champion.get("name", "?"))
-			var t2 := Cup.single_neutral_match(rng, euro_winner_cup, sid, r_fn)
-			t2["season"] = season
-			intercontinental = t2
-			_record_supercup_news(t2, "Intercontinental Cup", INTERCONTINENTAL_PRIZE)
+		_queue_champion_card("supercup", "EUROPEAN SUPERCUP", tie)
+
+
+## Queue one CAMPEON card for the hub. `comp` keys the card art; the winner's club name
+## takes the original's own result QUALIFIER when the tie was not settled in normal time --
+## witnessed as `Lyon (on penalties)` on the U.E.F.A. CUP CHAMPION card (REFRUN R14), so
+## the card's name field is "%s%s" % [club, qualifier], not just the club.
+func _queue_champion_card(comp: String, _title: String, tie: Dictionary) -> void:
+	var w := int(tie.get("winner_id", -1))
+	var l := int(tie.get("loser_id", -1))
+	if w == -1:
+		return
+	pending_champion_cards.append({
+		"comp": comp,
+		"winner": {"club": _any_club_name(w), "club_id": w,
+			"qualifier": champion_qualifier(tie)},
+		"runner": {"club": _any_club_name(l), "club_id": l},
+	})
+
+
+## The original's result qualifier appended to a champion's club name. Penalties is the
+## only one witnessed (`Lyon (on penalties)`); every other decider prints nothing.
+static func champion_qualifier(tie: Dictionary) -> String:
+	return " (on penalties)" if str(tie.get("decided", "")) == "pens" else ""
+
+
+## All English club ids the domestic cups are contested over, keyed by tier: the manager's
+## own live division plus every other division the pyramid holds.
+func _pyramid_ids_by_tier(div_ids: Array) -> Dictionary:
+	var by_tier: Dictionary = {tier: div_ids.duplicate()}
+	for t in divisions:
+		by_tier[int(t)] = ((divisions[int(t)] as Dictionary).get("ids", []) as Array).duplicate()
+	return by_tier
+
+
+## Mint this season's F.A. Cup + Coca-Cola Cup over the whole pyramid, with the Premier
+## clubs held back to Round 3 (see PREMIER_ENTRY_ROUND). A career with no pyramid context
+## (a legacy save, or a side-loaded single-division database) falls back to the manager's
+## own division, which is what the app did everywhere before.
+func _mint_domestic_cups(div_ids: Array) -> void:
+	var by_tier := _pyramid_ids_by_tier(div_ids)
+	var top: Array = by_tier.get(1, [])
+	var rest: Array = []
+	for t in by_tier:
+		if int(t) == 1:
+			continue
+		for v in by_tier[t]:
+			if not rest.has(int(v)):
+				rest.append(int(v))
+	if rest.is_empty() or top.is_empty():
+		fa_cup = Cup.create(div_ids, fixtures.size(), FA_CUP_OPTS)
+		league_cup = Cup.create(div_ids, fixtures.size(), LEAGUE_CUP_OPTS)
+		return
+	var entry := {"round": PREMIER_ENTRY_ROUND, "ids": top}
+	var fa: Dictionary = FA_CUP_OPTS.duplicate(true)
+	fa["late_entry"] = entry
+	var lc: Dictionary = LEAGUE_CUP_OPTS.duplicate(true)
+	lc["late_entry"] = entry
+	fa_cup = Cup.create(rest, fixtures.size(), fa)
+	league_cup = Cup.create(rest, fixtures.size(), lc)
+
+
+## A club's display name from any of the stores this career keeps.
+func _any_club_name(id: int) -> String:
+	if club_names.has(int(id)):
+		return str(club_names[int(id)])
+	if euro_winner_names.has(int(id)):
+		return str(euro_winner_names[int(id)])
+	# A pyramid club from another division: the cups now span all 92 (REFRUN R1).
+	for t in divisions:
+		var nm: Dictionary = (divisions[int(t)] as Dictionary).get("names", {})
+		if nm.has(int(id)):
+			return str(nm[int(id)])
+	if _div_clubs.has(int(id)):
+		return str((_div_clubs[int(id)] as Dictionary).get("name", "?"))
+	return str(euro_names.get(int(id), "?"))
 
 
 ## Bank the manager's prize (if his club lifted it) + a news line for a one-off final.
@@ -3815,7 +4225,9 @@ func _record_supercup_news(tie: Dictionary, comp: String, prize: int) -> void:
 	var ln := str(euro_winner_names.get(l, club_names.get(l, "?")))
 	var pens := " (on penalties)" if tie.get("decided", "") == "pens" else ""
 	if w == club_id:
-		cash += prize
+		# Ours, not the binary's -- but a winners-of-winners final is UEFA/FIFA money, so
+		# it posts to the ledger's own EUROPEAN CUP INCOME line rather than out of thin air.
+		_post_income("EUROPEAN CUP INCOME", prize)
 		_news("cup", "%s have won the %s, beating %s%s." % [wn, comp, ln, pens])
 	else:
 		_news("cup", "%s: %s beat %s%s." % [comp, wn, ln, pens])
@@ -3836,7 +4248,7 @@ func begin_work(cat: String, key: int, label: String, cost: int, weeks: int,
 	for w in works:
 		if str(w.get("cat")) == cat and int(w.get("key", -1)) == key:
 			return false                 # that item is already under construction
-	cash -= cost
+	_post_expense("REFORM GROUND", cost)
 	works.append({"cat": cat, "key": key, "label": label, "cost": cost,
 		"weeks_left": maxi(1, weeks), "effect": effect})
 	_news("stadium", "Ground works begun: %s (-£%s, ~%d wk)." % [label, _grp(cost), maxi(1, weeks)])
@@ -3968,8 +4380,8 @@ func finance_summary() -> Dictionary:
 
 
 ## Set the board-controlled match ticket price and refresh the weekly finance projection.
-func set_ticket_price(p: int) -> void:
-	ticket_price = maxi(1, p)
+func set_ticket_price(p: float) -> void:
+	ticket_price = maxf(0.5, p)
 	_recompute_weekly_net()
 
 
@@ -3994,7 +4406,7 @@ func next_home_opponent() -> int:
 func sell_sponsor_boards(amount: int) -> bool:
 	if boards_sold_season or amount <= 0:
 		return false
-	cash += amount
+	_post_income("PUBLICITY", amount)
 	boards_sold_season = true
 	_news("finance", "The club sells its sponsor boards for the season for £%s." % _grp(amount))
 	return true
@@ -4012,7 +4424,7 @@ func finance_preview() -> Dictionary:
 		elif line[0] == "SPONSOR BOARDS SOLD":
 			boards = int(line[1])
 	return {"attendance": int(fin["attendance"]), "capacity": int(fin["capacity"]),
-		"gate": gate, "boards": boards, "ticket": int(fin["ticket_price"]),
+		"gate": gate, "boards": boards, "ticket": float(fin["ticket_price"]),
 		"board": int(fin["board_price"])}
 
 
@@ -4104,7 +4516,11 @@ func to_dict() -> Dictionary:
 		"month_goal_mark": _str_keyed(_month_goal_mark),
 		"euro": euro, "euro_ratings": _str_keyed(euro_ratings),
 		"euro_names": _str_keyed(euro_names),
+		"week_ledgers": week_ledgers, "loss_weeks": loss_weeks,
+		"pending_champion_cards": pending_champion_cards, "sa_champion_id": sa_champion_id,
+		"pending_channel_tv": pending_channel_tv,
 		"euro_winner_cup": euro_winner_cup, "euro_winner_cwc": euro_winner_cwc,
+		"euro_winner_uefa": euro_winner_uefa,
 		"euro_winner_ratings": _str_keyed(euro_winner_ratings),
 		"euro_winner_names": _str_keyed(euro_winner_names),
 		"supercup": supercup, "intercontinental": intercontinental,
@@ -4226,7 +4642,7 @@ static func from_dict(d: Dictionary) -> Career:
 	var gg: Dictionary = d.get("ground_grades", {})
 	for k in gg:
 		c.ground_grades[str(k)] = int(gg[k])
-	c.ticket_price = int(d.get("ticket_price", 0))
+	c.ticket_price = float(d.get("ticket_price", 0.0))
 	c.board_price = int(d.get("board_price", 0))
 	c.boards_sold_season = bool(d.get("boards_sold_season", false))
 	c.shortlist = []
@@ -4302,7 +4718,13 @@ static func from_dict(d: Dictionary) -> Career:
 	c.euro_names = {}
 	for k in d.get("euro_names", {}):
 		c.euro_names[int(k)] = d["euro_names"][k]
+	c.week_ledgers = d.get("week_ledgers", [])
+	c.pending_champion_cards = d.get("pending_champion_cards", [])
+	c.sa_champion_id = int(d.get("sa_champion_id", -1))
+	c.loss_weeks = int(d.get("loss_weeks", 0))
+	c.pending_channel_tv = d.get("pending_channel_tv", {})
 	c.euro_winner_cup = int(d.get("euro_winner_cup", -1))
+	c.euro_winner_uefa = int(d.get("euro_winner_uefa", -1))
 	c.euro_winner_cwc = int(d.get("euro_winner_cwc", -1))
 	c.euro_winner_ratings = {}
 	for k in d.get("euro_winner_ratings", {}):

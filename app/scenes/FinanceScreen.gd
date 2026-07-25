@@ -89,6 +89,11 @@ const SZ_TOT := 11     # Proman8 native size
 
 var _sum: Dictionary = {}
 var _ledger: Dictionary = {}  # season-to-date insurance figures (Career.insurance_ledger)
+# The REAL per-week books (Career.week_ledgers), oldest first. Each entry is
+# {"week": finance week, "income": {line: £}, "expense": {line: £}} -- the original's own
+# lines, accrued as the season is played (REFRUN R5/R9). Empty for a legacy save, in which
+# case the LAST/CURRENT WEEK tiles and the BALANCE chart fall back to the season average.
+var _books: Array = []
 var _club: String = ""       # not shown on this screen (kept for Main's setup call)
 var _manager: String = ""    # ditto
 var _season: String = ""
@@ -110,9 +115,10 @@ func _ready() -> void:
 
 
 func setup(summary: Dictionary, club: String, manager: String = "", season: String = "",
-		cash: int = 0, week: int = 0, ledger: Dictionary = {}) -> void:
+		cash: int = 0, week: int = 0, ledger: Dictionary = {}, books: Array = []) -> void:
 	_sum = summary
 	_ledger = ledger
+	_books = books
 	_club = club
 	_manager = manager
 	_season = season
@@ -200,9 +206,26 @@ func _draw_season() -> void:
 	_txt(_ftot, SEASON_RIGHT, SEASON_Y, txt, C_BLACK, SZ_TOT)
 
 
-## The 7 INCOME rows, in frame order. INSURANCE GROUP 3 (row 5) is the ledger's
-## +0x70 income slot; EUROPEAN CUP INCOME / SALE+LOAN PLAY. / LOANS stay gaps.
+## Season-to-date total of one ledger line across the banked books.
+func _book_total(side: String, line: String) -> int:
+	var t := 0
+	for rec in _books:
+		t += int(((rec as Dictionary).get(side, {}) as Dictionary).get(line, 0))
+	return t
+
+
+## The 7 INCOME rows, in frame order.
+##
+## With real books (Career.week_ledgers) these are the SEASON-TO-DATE accruals off the
+## original's own lines -- which is precisely what the binding PER SEASON view shows.
+## Without them (a legacy save) it falls back to the old FinanceModel projection, where
+## INSURANCE GROUP 3 came from the insurance ledger and three lines stayed £0 gaps.
 func _income_vals() -> Array:
+	if not _books.is_empty():
+		var out: Array = []
+		for line in FinanceModel.INCOME_LINES:
+			out.append(_book_total("income", line))
+		return out
 	var inc: Array = _sum.get("income_lines", [])
 	var tickets := int(inc[0][1]) if inc.size() > 0 else 0
 	var publicity := (int(inc[1][1]) if inc.size() > 1 else 0) + (int(inc[2][1]) if inc.size() > 2 else 0)
@@ -210,10 +233,16 @@ func _income_vals() -> Array:
 	return [tickets, publicity, television, 0, 0, int(_ledger.get("group3_income", 0)), 0]
 
 
-## The 11 EXPENSE rows, in frame order: PLAYERS' WAGE (2, net of the
-## insured-injured refund the original subtracts at +0x54), PLAYERS' BONUS (3),
-## PLAYERS' INSURANCE (5), HOSPITALS (6); the rest stay gaps.
+## The 11 EXPENSE rows, in frame order. Same rule as _income_vals: real accruals when the
+## books exist, the projection (PLAYERS' WAGE net of the insured-injured refund the
+## original subtracts at week-record +0x54, PLAYERS' BONUS, PLAYERS' INSURANCE, HOSPITALS)
+## otherwise.
 func _expense_vals() -> Array:
+	if not _books.is_empty():
+		var out: Array = []
+		for line in FinanceModel.EXPENSE_LINES:
+			out.append(_book_total("expense", line))
+		return out
 	var exp: Array = _sum.get("expense_lines", [])
 	var players_wage := (int(exp[0][1]) if exp.size() > 0 else 0) - int(_ledger.get("wage_refund", 0))
 	var players_bonus := int(exp[1][1]) if exp.size() > 1 else 0
@@ -240,41 +269,69 @@ func _draw_ledger() -> void:
 	_txt(_ftot, TOT_EXP_RIGHT, TOT_Y, fmt_money(_sum_of(expense_vals)), C_TOTAL_EXP, SZ_TOT)
 
 
+## LAST WEEK / CURRENT WEEK, from the real books.
+##
+## WITNESSED (REFRUN R5/R9, the two PER WEEK frames): the CURRENT WEEK tile reads £0 /
+## £0 while the week is still running and only the CASH figure is live, and the LAST WEEK
+## tile carries the completed week's totals -- Man Utd's away week 30 shows income £0,
+## expenses £233,942, cash £3,283,406, and the SAME cash appears in both tiles because
+## nothing has been posted yet this week. That is exactly what this now draws.
 func _draw_bottom_boxes() -> void:
-	var inc := _sum_of(_income_vals())
-	var exp := _sum_of(_expense_vals())
-	# We hold no per-week history, so LAST/CURRENT weekly income+expenses are the
-	# season figures spread evenly (a flagged approximation). CASH is the real
-	# Career figure; LAST WEEK cash backs out this week's net.
-	var w_inc := int(round(inc / float(SEASON_WEEKS)))
-	var w_exp := int(round(exp / float(SEASON_WEEKS)))
-	# LAST WEEK
-	_txt(_fbot, LW_RIGHT, BOT_ROW_Y[0], fmt_money(w_inc), C_BLACK, SZ_BOT)
-	_txt(_fbot, LW_RIGHT, BOT_ROW_Y[1], fmt_money(w_exp), C_BLACK, SZ_BOT)
-	_txt(_fbot, LW_RIGHT, BOT_ROW_Y[2], fmt_money(_cash - (w_inc - w_exp)), C_GOLD, SZ_BOT)
+	var last_inc := 0
+	var last_exp := 0
+	var cur_inc := 0
+	var cur_exp := 0
+	if _books.is_empty():
+		# Legacy save with no per-week history: the season figures spread evenly, flagged.
+		last_inc = int(round(_sum_of(_income_vals()) / float(SEASON_WEEKS)))
+		last_exp = int(round(_sum_of(_expense_vals()) / float(SEASON_WEEKS)))
+		cur_inc = last_inc
+		cur_exp = last_exp
+	else:
+		var last: Dictionary = _books[-1]
+		last_inc = FinanceModel.ledger_total(last, "income")
+		last_exp = FinanceModel.ledger_total(last, "expense")
+	# LAST WEEK -- cash as it stood at the close of that week is the live figure less
+	# anything posted since, which for a settled hub view is nothing.
+	_txt(_fbot, LW_RIGHT, BOT_ROW_Y[0], fmt_money(last_inc), C_BLACK, SZ_BOT)
+	_txt(_fbot, LW_RIGHT, BOT_ROW_Y[1], fmt_money(last_exp), C_BLACK, SZ_BOT)
+	_txt(_fbot, LW_RIGHT, BOT_ROW_Y[2], fmt_money(_cash - (cur_inc - cur_exp)), C_GOLD, SZ_BOT)
 	# CURRENT WEEK
-	_txt(_fbot, CW_RIGHT, BOT_ROW_Y[0], fmt_money(w_inc), C_BLACK, SZ_BOT)
-	_txt(_fbot, CW_RIGHT, BOT_ROW_Y[1], fmt_money(w_exp), C_BLACK, SZ_BOT)
+	_txt(_fbot, CW_RIGHT, BOT_ROW_Y[0], fmt_money(cur_inc), C_BLACK, SZ_BOT)
+	_txt(_fbot, CW_RIGHT, BOT_ROW_Y[1], fmt_money(cur_exp), C_BLACK, SZ_BOT)
 	_txt(_fbot, CW_RIGHT, BOT_ROW_Y[2], fmt_money(_cash), C_GOLD, SZ_BOT)
 
 
-## The WEEKLY BALANCE chart. HONEST GAP: PM98's chart is a per-week float ledger
-## (finance_constants.md); the app has no save-game, so FinanceModel yields only a
-## single constant `weekly_balance`. We plot that one real figure flat across the
-## elapsed weeks on the frame's fixed +/-2,500K axis — deliberately NO invented
-## week-to-week variation. When a save-game ledger exists this becomes real.
+## The WEEKLY BALANCE chart -- now the REAL per-week books, one bar per banked week at
+## its own finance-week slot on the frame's fixed +/-2,500K axis. This is what the
+## original's chart is (REFRUN R9's frame: blue bars of differing heights above the axis,
+## red bars below it, and weeks with no bar at all). It used to be a single constant
+## drawn flat across the elapsed weeks, because there were no per-week books to plot.
 func _draw_chart() -> void:
-	var wk := int(_sum.get("weekly_balance", 0))
-	if wk == 0:
-		return
-	var weeks := clampi(_week if _week > 0 else 1, 1, SEASON_WEEKS)
 	var wpp := float(CHART_R - CHART_L) / float(SEASON_WEEKS)
-	var up: bool = wk >= 0
+	if _books.is_empty():
+		# Legacy save: the one constant the projection yields, flat, as before.
+		var wk := int(_sum.get("weekly_balance", 0))
+		if wk == 0:
+			return
+		var weeks := clampi(_week if _week > 0 else 1, 1, SEASON_WEEKS)
+		for i in weeks:
+			_bar(CHART_L + i * wpp, wpp, wk)
+		return
+	for rec in _books:
+		var slot := clampi(int((rec as Dictionary).get("week", 1)) - 1, 0, SEASON_WEEKS - 1)
+		_bar(CHART_L + slot * wpp, wpp, FinanceModel.ledger_balance(rec))
+
+
+## One balance bar: up from the axis in blue for a week in profit, down in red for a week
+## in the red, clipped to the frame's baked +/-2,500K scale.
+func _bar(bx: float, wpp: float, value: int) -> void:
+	if value == 0:
+		return
+	var up: bool = value > 0
 	var span: int = (CHART_ZERO_Y - CHART_TOP_Y) if up else (CHART_BOT_Y - CHART_ZERO_Y)
-	var hh: float = clampf(absf(float(wk)) / float(CHART_SCALE), 0.0, 1.0) * span
-	for i in weeks:
-		var bx := CHART_L + i * wpp
-		if up:
-			draw_rect(Rect2(bx, CHART_ZERO_Y - hh, maxf(1.0, wpp - 1.0), hh), C_BAR_POS, true)
-		else:
-			draw_rect(Rect2(bx, CHART_ZERO_Y + 1, maxf(1.0, wpp - 1.0), hh), C_BAR_NEG, true)
+	var hh: float = clampf(absf(float(value)) / float(CHART_SCALE), 0.0, 1.0) * span
+	if up:
+		draw_rect(Rect2(bx, CHART_ZERO_Y - hh, maxf(1.0, wpp - 1.0), hh), C_BAR_POS, true)
+	else:
+		draw_rect(Rect2(bx, CHART_ZERO_Y + 1, maxf(1.0, wpp - 1.0), hh), C_BAR_NEG, true)

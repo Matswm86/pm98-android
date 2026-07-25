@@ -14,7 +14,21 @@ extends RefCounted
 # Defaults by division tier (1=Premier ... 4=Division Three).
 const _CAP := {1: 35000, 2: 20000, 3: 10000, 4: 5000}     # fallback stadium size
 const _FILL := {1: 0.85, 2: 0.65, 3: 0.55, 4: 0.45}        # attendance fraction
-const _TICKET := {1: 15, 2: 12, 3: 10, 4: 8}               # £ default ticket price
+
+## TICKET PRICE -- WITNESSED, not ours. The original's FULL TIME stadium panel prints
+## CAPACITY / ATTENDANCE / ATTENDANCE MONEY together, so the price falls straight out of
+## the division:
+##   Old Trafford 55,300 cap, 21,014 in (38%) -> ATTENDANCE MONEY £157,605 = 21,014 x 7.50
+##   Anfield      41,000 cap, 41,000 in (100%) -> ATTENDANCE MONEY £307,500 = 41,000 x 7.50
+## (screenshots/refrun-manutd-1997-98/named/p0031_full_time.png and p0342_full_time.png,
+## 1997-98 reference run). Two different clubs, both exactly £7.50 a head, so the opening
+## TICKET PRICE is a game default rather than a per-club figure -- and the app's old
+## £15/12/10/8 tier ladder was ours and roughly double it.
+## Only the PREMIER is witnessed; the same default is carried down the pyramid because
+## nothing witnessed says it changes, and inventing a lower-division ladder would be a
+## guess. Revisit the moment a Division One+ FULL TIME panel is captured.
+const TICKET_DEFAULT := 7.5
+const _TICKET := {1: TICKET_DEFAULT, 2: TICKET_DEFAULT, 3: TICKET_DEFAULT, 4: TICKET_DEFAULT}
 const _BOARD := {1: 1200, 2: 600, 3: 300, 4: 150}          # £ per advertising board
 const _BOARDS := {1: 60, 2: 48, 3: 36, 4: 24}              # boards sold
 const _TV := {1: 8_000_000, 2: 1_200_000, 3: 450_000, 4: 220_000}  # season TV money
@@ -31,6 +45,115 @@ const SEASON_WEEKS := 52   # PM98 finance loops 0x34 = 52 weeks
 #   boards_mult     = 1.5 - 0.5 * (board/default)    -> board income peaks at ~1.5x the default
 const _TICKET_SLOPE := 0.6
 const _BOARD_SLOPE := 0.5
+
+
+# ---- the per-week ledger (FINANCE -> INC. + EXP. -> PER WEEK) -------------
+#
+# WITNESSED end to end in the 1997-98 reference run (docs/re/REFRUN_manutd_1997-98.md
+# R5/R6/R9), two frames of the very screen:
+#   out/refrun-manutd-9798/play/p0045_UNKNOWN.png  week "CURRENT 4", 10-8-1997..16-8-1997
+#   out/refrun-manutd-9798/play/p0509_UNKNOWN.png  week 29, 1-2-1998..7-2-1998, a HOME week
+# Week 29 reads, exactly:
+#   INCOME    TICKETS £364,980 · TELEVISION £90,000 · everything else £0  -> £454,980
+#   EXPENSES  PLAYERS' WAGE £226,923 · PLAYERS' BONUS £5,000 ·
+#             STAFF WAGES £7,019 · everything else £0                     -> £238,942
+# and the following AWAY week (p0495's LAST WEEK tiles) reads income £0, expenses
+# £233,942 = 226,923 + 7,019. So the original's week splits cleanly into
+#   * a FLAT cost charged every week: PLAYERS' WAGE + STAFF WAGES
+#   * income and bonus that exist ONLY on a HOME matchday
+# and an away week is a pure loss. That is the structure this app now runs; the old
+# model spread one whole-season balance flat across 52 weeks, which produced a
+# constant POSITIVE weekly delta and made the original's running-at-a-loss failure
+# mode unreachable.
+#
+# The LINE LABELS are the screen's own, in the screen's own top-to-bottom order.
+
+const INCOME_LINES := ["TICKETS", "PUBLICITY", "TELEVISION", "EUROPEAN CUP INCOME",
+	"SALE + LOAN PLAY.", "INSURANCE GROUP 3", "LOANS"]
+const EXPENSE_LINES := ["SIGN PLAYER", "CANCELLATION", "PLAYERS' WAGE", "PLAYERS' BONUS",
+	"PLAYERS' INCENTIVE", "PLAYERS' INSURANCE", "HOSPITALS", "STAFF WAGES",
+	"REFORM GROUND", "FINES", "LOANS AND INTEREST"]
+
+## The finance year runs SUNDAY..SATURDAY and week 1 opens 20 July 1997 -- derived, not
+## guessed, from the two captured frames: week 4 is stamped "From 10-8-1997 to 16-8-1997"
+## and week 29 "From 1-2-1998 to 7-2-1998", which are exactly 25 weeks apart. The league
+## calendar's week 1 is Saturday 9 August 1997 (PMChrome.date_parts), the last day of
+## finance week 3 -- so finance week = league week + LEAGUE_WEEK_OFFSET. Cross-checked on
+## the channelTV card: hub "Week 27", Saturday 7 February 1998, ledger week 29.
+## TELEVISION, per competition -- the channelTV card's fee IS that week's TELEVISION
+## line (proved on week 29: the card says £90,000 on Sat 7 Feb 1998, the ledger's
+## TELEVISION line for that week is £90,000). The original sells the rights to each
+## HOME match, unprompted, on a per-competition constant. Three measured, all Man Utd
+## home fixtures (REFRUN R6):
+##   Charity Shield  Sun  3 Aug 1997  £187,500   p0032_channel_tv.png
+##   European Cup    Wed  1 Oct 1997  £375,000   p0138_channel_tv.png
+##   Premier League  Sat 25 Oct 1997  £90,000    p0210_channel_tv.png
+##   Premier League  Sat  7 Feb 1998  £90,000    p0474_channel_tv.png  (confirms constant)
+## NOT measured: the Coca-Cola Cup, the F.A. Cup, the U.E.F.A. Cup and the Cup Winners'
+## Cup. Those pay 0 here rather than a guessed figure -- the gap is visible in the ledger
+## and in docs/re/finance_screen_re.md, and closes the moment one is captured.
+const TV_FEE := {
+	"league": 90_000,
+	"charity_shield": 187_500,
+	"european_cup": 375_000,
+}
+
+## The channelTV card's own wording, verbatim off the frame (two lines, then the fee).
+const CHANNEL_TV_TEXT := "A TV station has bought the rights\nto broadcast the current match."
+const CHANNEL_TV_FEE_TEXT := "For £%s"
+
+const LEAGUE_WEEK_OFFSET := 2
+const FINANCE_WEEK1_YMD := [1997, 7, 20]
+
+## A zeroed week record: every line the screen prints, at £0. Income and expenses are
+## kept apart because the screen does, and because the sign convention differs.
+static func new_week_ledger(week: int = 0) -> Dictionary:
+	var inc: Dictionary = {}
+	for k in INCOME_LINES:
+		inc[k] = 0
+	var exp: Dictionary = {}
+	for k in EXPENSE_LINES:
+		exp[k] = 0
+	return {"week": week, "income": inc, "expense": exp}
+
+
+static func ledger_total(rec: Dictionary, side: String) -> int:
+	var t := 0
+	for k in (rec.get(side, {}) as Dictionary):
+		t += int(rec[side][k])
+	return t
+
+
+## Income minus expenses for one week record (the BALANCE chart's bar).
+static func ledger_balance(rec: Dictionary) -> int:
+	return ledger_total(rec, "income") - ledger_total(rec, "expense")
+
+
+## ATTENDANCE MONEY for one match: heads through the turnstile x TICKET PRICE, which is
+## the original's exact rule (see TICKET_DEFAULT above). Rounded down, as a till is.
+static func attendance_money(attendance: int, ticket: float) -> int:
+	return int(floor(float(attendance) * ticket))
+
+
+## The finance-year week number for a league week (1-based both sides).
+static func finance_week(league_week: int) -> int:
+	return maxi(1, league_week) + LEAGUE_WEEK_OFFSET
+
+
+## "From D-M-YYYY to D-M-YYYY" for a finance week, the screen's own stamp format.
+static func finance_week_span(fin_week: int, start_year: int = 1997) -> String:
+	var y0: int = FINANCE_WEEK1_YMD[0]
+	var t0 := Time.get_unix_time_from_datetime_dict({
+		"year": start_year + (int(FINANCE_WEEK1_YMD[0]) - y0), "month": int(FINANCE_WEEK1_YMD[1]),
+		"day": int(FINANCE_WEEK1_YMD[2]), "hour": 12, "minute": 0, "second": 0})
+	var a := int(t0) + (maxi(fin_week, 1) - 1) * 7 * 86400
+	var b := a + 6 * 86400
+	return "From %s to %s" % [_ymd(a), _ymd(b)]
+
+
+static func _ymd(t: int) -> String:
+	var d := Time.get_datetime_dict_from_unix_time(t)
+	return "%d-%d-%d" % [int(d["day"]), int(d["month"]), int(d["year"])]
 
 
 ## Tier (1-4) for a club, resolved against a leagues array (e.g. GameDB.leagues).
@@ -64,23 +187,25 @@ static func summary(club: Dictionary, tier: int) -> Dictionary:
 	# Board-set prices (T2 #6): a manager-chosen ticket / advertising-board price overrides
 	# the tier default, and demand responds. With no override (every non-managed club, and
 	# legacy callers) the defaults reproduce the previous figures exactly.
-	var def_ticket: int = int(_TICKET[tier])
+	var def_ticket: float = float(_TICKET[tier])
 	var def_board: int = int(_BOARD[tier])
 	var ticket_raw: Variant = club.get("ticket_price")
-	var ticket: int = int(ticket_raw) if (ticket_raw != null and int(ticket_raw) > 0) else def_ticket
+	var ticket: float = float(ticket_raw) if (ticket_raw != null and float(ticket_raw) > 0.0) else def_ticket
 	var board_raw: Variant = club.get("board_price")
 	var board_price: int = int(board_raw) if (board_raw != null and int(board_raw) > 0) else def_board
 
 	# Attendance thins as the ticket price rises above the default (and fills toward capacity
 	# as it drops), bounded so it never exceeds the ground or collapses to nothing.
-	var att_mult := clampf(1.6 - _TICKET_SLOPE * float(ticket) / float(def_ticket), 0.25, 1.6)
+	var att_mult := clampf(1.6 - _TICKET_SLOPE * ticket / def_ticket, 0.25, 1.6)
 	var attendance := mini(cap, int(round(cap * float(_FILL[tier]) * att_mult)))
 	# Fewer boards sell as their price rises above the default.
 	var boards_mult := clampf(1.5 - _BOARD_SLOPE * float(board_price) / float(def_board), 0.2, 1.5)
 	var boards_sold := int(round(_BOARDS[tier] * boards_mult))
 
 	# Income
-	var gate := attendance * ticket * home_games          # TICKETS
+	# ATTENDANCE MONEY, the original's own rule: attendance x TICKET PRICE, exact
+	# (witnessed twice, above). The season line is that per-match figure x home games.
+	var gate := attendance_money(attendance, ticket) * home_games   # TICKETS
 	var boards := board_price * boards_sold                # SPONSOR BOARDS SOLD
 	var sponsor: int = int(_SPONSOR[tier])                 # SPONSORSHIP MONEY
 	var tv: int = int(_TV[tier])                           # TELEVISION
@@ -107,6 +232,7 @@ static func summary(club: Dictionary, tier: int) -> Dictionary:
 		"capacity_known": cap_raw != null and int(cap_raw) > 0,
 		"attendance": attendance,
 		"ticket_price": ticket,
+		"match_gate": attendance_money(attendance, ticket),
 		"board_price": board_price,
 		"income_lines": [
 			["TICKETS", gate],

@@ -859,7 +859,7 @@ func _groundact_shot() -> void:
 	var tk0 := _career.ticket_price
 	_tap_screen(st, StadiumScreen.MD_TICKET_UP.get_center())
 	await _settle()
-	print("GROUNDACT ticket step: %d -> %d (%s)" % [tk0, _career.ticket_price,
+	print("GROUNDACT ticket step: %s -> %s (%s)" % [tk0, _career.ticket_price,
 		"FIRED" if _career.ticket_price != tk0 else "DEAD"])
 	var bd0 := _career.board_price
 	_tap_screen(st, StadiumScreen.MD_BOARD_UP.get_center())
@@ -2810,7 +2810,9 @@ func _close_staff_hire() -> void:
 ## The original-art FINANCES ("INCOME + EXPENSES") screen for the managed club. Tap to
 ## dismiss. (docs/re/finance_screen_re.md, driven by FinanceModel.)
 ## Selectable match ticket prices (£); the board advertising-board ladder is tier-scaled.
-const TICKET_LADDER := [8, 10, 12, 15, 18, 22, 28, 35]
+# OURS: the original's own TICKET PRICE ladder is not reversed. Only the DEFAULT is
+# witnessed -- £7.50 a head (FinanceModel.TICKET_DEFAULT) -- and it opens the ladder.
+const TICKET_LADDER := [7.5, 10.0, 12.0, 15.0, 18.0, 22.0, 28.0, 35.0]
 
 func _show_finance_screen() -> void:
 	for c in get_children():
@@ -2825,7 +2827,7 @@ func _show_finance_screen() -> void:
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
 	scr.setup(sm, _career.club_name, "", _career.season, _career.cash, _career.week + 1,
-		_career.insurance_ledger())
+		_career.insurance_ledger(), _career.week_books())
 	scr.prices_pressed.connect(_show_finance_control)
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
 	# Secret cash cheat: 5 taps on the live-cash box deposit £100M, then re-render with it.
@@ -2857,9 +2859,9 @@ func _show_finance_control() -> void:
 			if p == null:
 				return
 			if p["a"] == "ticket":
-				_career.set_ticket_price(_cycle(TICKET_LADDER, int(pv["ticket"])))
+				_career.set_ticket_price(_cycle(TICKET_LADDER, float(pv["ticket"])))
 			else:
-				_career.set_board_price(_cycle(_board_ladder(), int(pv["board"])))
+				_career.set_board_price(int(_cycle(_board_ladder(), float(pv["board"]))))
 			_career.save()
 			_show_finance_control(),
 		func() -> void: _show_finance_screen())
@@ -2873,30 +2875,30 @@ func _board_ladder() -> Array:
 	return out
 
 ## Next rung up a price ladder (wraps); if `current` is off-ladder, the first rung above it.
-func _cycle(ladder: Array, current: int) -> int:
+func _cycle(ladder: Array, current: float) -> float:
 	for i in ladder.size():
-		if int(ladder[i]) == current:
-			return int(ladder[(i + 1) % ladder.size()])
+		if absf(float(ladder[i]) - current) < 0.005:
+			return float(ladder[(i + 1) % ladder.size()])
 	for v in ladder:
-		if int(v) > current:
-			return int(v)
-	return int(ladder[0])
+		if float(v) > current:
+			return float(v)
+	return float(ladder[0])
 
 ## Step a price ladder by one rung (GROUND MATCH DAY arrows: right = up, left = down). Clamps
 ## at the ends (no wrap) so the two arrows read as +/- on the same ladder the PRICES screen
 ## cycles. Off-ladder `current` snaps to the nearest rung in the step direction.
-func _step_price(ladder: Array, current: int, up: bool) -> int:
+func _step_price(ladder: Array, current: float, up: bool) -> float:
 	if ladder.is_empty():
 		return current
 	if up:
 		for v in ladder:
-			if int(v) > current:
-				return int(v)
-		return int(ladder[ladder.size() - 1])
+			if float(v) > current:
+				return float(v)
+		return float(ladder[ladder.size() - 1])
 	for i in range(ladder.size() - 1, -1, -1):
-		if int(ladder[i]) < current:
-			return int(ladder[i])
-	return int(ladder[0])
+		if float(ladder[i]) < current:
+			return float(ladder[i])
+	return float(ladder[0])
 
 ## The original-art TRANSFER MARKET (FICHAR) screen as a full-screen overlay: the
 ## buyable players (dearest first) in the reversed list panel + the right-hand nav
@@ -3398,7 +3400,7 @@ func _show_stadium_screen() -> void:
 	add_child(scr)
 	scr.setup(_career.club_name, _career.manager_name, _career.season, ground,
 		cap, seated, cap - seated, int(round(cap / 27.0)), _career.works_status(),
-		int(sm.get("ticket_price", 0)), int(sm.get("board_price", 0)), _career.week + 1,
+		float(sm.get("ticket_price", 0.0)), int(sm.get("board_price", 0)), _career.week + 1,
 		_career.league_name, str(club.get("objective", "")))
 	# The live GROUND state for the CAR PARK / FACILITIES / SERVICES tabs + the WORK IN
 	# PROGRESS ledger. CAR PARK per-level price is witnessed only for Man Utd (frame 09);
@@ -3417,12 +3419,12 @@ func _show_stadium_screen() -> void:
 	_refresh_matchday(scr, club)
 	scr.matchday_ticket_step.connect(func(up: bool) -> void:
 		var pv := _career.finance_preview()
-		_career.set_ticket_price(_step_price(TICKET_LADDER, int(pv["ticket"]), up))
+		_career.set_ticket_price(_step_price(TICKET_LADDER, float(pv["ticket"]), up))
 		_career.save()
 		_refresh_matchday(scr, _mgr_club()))
 	scr.matchday_board_step.connect(func(up: bool) -> void:
 		var pv := _career.finance_preview()
-		_career.set_board_price(_step_price(_board_ladder(), int(pv["board"]), up))
+		_career.set_board_price(int(_step_price(_board_ladder(), float(pv["board"]), up)))
 		_career.save()
 		_refresh_matchday(scr, _mgr_club()))
 	scr.boards_sold.connect(func() -> void:
@@ -3441,7 +3443,7 @@ func _refresh_matchday(scr: StadiumScreen, club: Dictionary) -> void:
 	var pv := _career.finance_preview()
 	var opp := _career.next_home_opponent()
 	var away := PMChrome.title_case_name(str(GameDB.club(opp).get("name", ""))) if opp >= 0 else ""
-	scr.set_matchday_state(int(pv["ticket"]), int(pv["board"]),
+	scr.set_matchday_state(float(pv["ticket"]), int(pv["board"]),
 		PMChrome.title_case_name(_career.club_name), away,
 		_board_sale_offer(club) > 0, _career.boards_sold_season)
 

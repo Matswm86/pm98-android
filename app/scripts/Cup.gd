@@ -35,11 +35,14 @@ extends RefCounted
 
 const NAME := "F.A. Cup"
 
-# Prize money credited to the manager's bank for progressing (gate receipts + prize
-# fund). NOT a reversed PM98 prize table -- a modest, documented reward so a cup run
-# matters financially. Per round survived, plus a trophy bonus for lifting the cup.
-const ROUND_PRIZE := 200_000
-const WINNER_BONUS := 1_500_000
+# Domestic cup prize money. RETIRED to 0 on 2026-07-25: these were ours, never a
+# reversed PM98 table, and the reference run's per-week ledger settles it -- the original
+# has no domestic-cup income line at all (7 income lines, REFRUN R5) and an away week was
+# measured at income exactly £0 (R9). A cup run pays the club through the TURNSTILES, so
+# Career now books a HOME cup tie as a matchday (TICKETS + TELEVISION + bonus) and pays no
+# purse. Kept as named constants so the shape of `play_round`'s result is unchanged.
+const ROUND_PRIZE := 0
+const WINNER_BONUS := 0
 
 # Round-label thresholds: the label for a round is chosen by how many clubs START it.
 # Matches PM98 (a 16-club field => Round 5; 8 => Qtr. Finals; 4 => Semifinals; 2 => Final).
@@ -75,7 +78,17 @@ static func create(club_ids: Array, total_weeks: int, opts: Dictionary = {}) -> 
 	var has_groups := not gs.is_empty() and ids.size() >= 4
 	var group_stage: Dictionary = {}
 	var survivors: Array = ids
-	var num_rounds := _num_rounds(ids.size())
+	# LATE ENTRY -- the domestic cups' own shape, witnessed 2026-07-25 (REFRUN R1/R8): the
+	# whole 92-club league pyramid contests both cups and the PREMIER clubs enter at
+	# ROUND 3. `late_entry` = {"round": 3, "ids": [...]}; those clubs are held out of the
+	# field until that round starts and are then folded into the draw.
+	var late: Dictionary = opts.get("late_entry", {})
+	var late_ids: Array = []
+	for v in late.get("ids", []):
+		if not ids.has(int(v)) and not late_ids.has(int(v)):
+			late_ids.append(int(v))
+	var late_round := int(late.get("round", 0)) if not late_ids.is_empty() else 0
+	var num_rounds := _num_rounds_with_entry(ids.size(), late_round, late_ids.size())
 	if has_groups:
 		var n_groups := int(gs.get("groups", 4))
 		var advance := int(gs.get("advance", 2))
@@ -83,6 +96,14 @@ static func create(club_ids: Array, total_weeks: int, opts: Dictionary = {}) -> 
 		# witnessed, not inferred: the QTR FINALS view holds exactly those eight clubs
 		# (docs/re/euro_league_screen_re.md).
 		var best_ru := int(gs.get("best_runners_up", 0))
+		# The phase label the ORIGINAL prints across the WHOLE group phase, verbatim.
+		# Witnessed three times on the hub badge -- 1 Oct, 5 Nov and 26 Nov 1997, all
+		# reading `Euro. Cup / 1/8 Final` -- so it is a fixed competition-phase string,
+		# not a matchday counter (REFRUN R3). The EURO. LEAGUE screen carries the same
+		# string in caps at .data 0x6545e4, `1/8 FINALS`
+		# (docs/re/euro_league_screen_re.md). Wrong-but-canonical -- the phase IS the
+		# group stage, not a last-16 -- and copied as-is rather than corrected.
+		var glabel := str(gs.get("label", ""))
 		var group_size := ids.size() / n_groups
 		var n_md := 2 * (group_size - 1)               # double round-robin
 		var ko_field := n_groups * advance + best_ru
@@ -90,7 +111,7 @@ static func create(club_ids: Array, total_weeks: int, opts: Dictionary = {}) -> 
 		survivors = []
 		group_stage = {
 			"field": ids.duplicate(), "n_groups": n_groups, "advance": advance,
-			"best_runners_up": best_ru,
+			"best_runners_up": best_ru, "label": glabel,
 			"group_size": group_size, "n_matchdays": n_md, "matchdays_played": 0,
 			"groups": [], "qualified": false,
 		}
@@ -108,6 +129,8 @@ static func create(club_ids: Array, total_weeks: int, opts: Dictionary = {}) -> 
 		"prize_round": int(opts.get("prize_round", ROUND_PRIZE)),
 		"prize_winner": int(opts.get("prize_winner", WINNER_BONUS)),
 		"group_stage": group_stage,        # {} unless this comp has a group phase
+		"late_ids": late_ids,              # clubs that join at `late_round` (R1: the Premier)
+		"late_round": late_round,          # 0 = every club is in from round one
 	}
 
 
@@ -119,18 +142,43 @@ static func _floor_pow2(n: int) -> int:
 	return p if n >= 1 else 0
 
 
-## How many rounds the whole cup runs: one preliminary round to bring the field to a
-## power of two (when it isn't already), then a clean halving down to one champion.
+## How many rounds the whole cup runs. A round whose field is not a power of two gives
+## byes to the surplus and reduces to the next power of two below; a power-of-two field
+## halves. Both are one round.
 static func _num_rounds(n: int) -> int:
-	if n <= 1:
+	return _num_rounds_with_entry(n, 0, 0)
+
+
+## Survivors of one round played by `c` clubs: a clean halving when `c` is a power of two,
+## else byes bring it to the largest power of two below (byes = 2p - c, ties = c - p,
+## survivors = byes + ties = p).
+static func _survivors_after(c: int) -> int:
+	if c <= 1:
+		return c
+	var p := _floor_pow2(c)
+	@warning_ignore("integer_division")
+	return (c / 2) if c == p else p
+
+
+## Rounds a cup runs when `n_late` clubs join at 1-based round `late_round` (0 = none).
+## Walks the field down round by round rather than assuming a clean bracket: a 92-club
+## field with the Premier entering at Round 3 is neither a power of two nor a fixed
+## halving (REFRUN R1).
+static func _num_rounds_with_entry(n: int, late_round: int, n_late: int) -> int:
+	var c := n
+	if c + n_late <= 1:
 		return 0
-	var p := _floor_pow2(n)
-	var halvings := 0
-	var k := p
-	while k > 1:
-		k /= 2
-		halvings += 1
-	return halvings if n == p else halvings + 1
+	var r := 0
+	while r <= 64:
+		r += 1
+		if late_round > 0 and r == late_round:
+			c += n_late
+		if c <= 1:
+			return maxi(r - 1, 0)
+		c = _survivors_after(c)
+		if c <= 1:
+			return r
+	return r
 
 
 ## League-week boundaries after which each cup round is played (midweek ties), spread
@@ -169,6 +217,12 @@ static func champion_id(b: Dictionary) -> int:
 static func next_label(b: Dictionary) -> String:
 	if _in_group_phase(b):
 		var gs: Dictionary = b.get("group_stage", {})
+		# The original's own phase string, unchanged for every matchday of the group
+		# phase (REFRUN R3). Falls back to the matchday counter only for a group comp
+		# minted without one (a legacy save).
+		var gl := str(gs.get("label", ""))
+		if gl != "":
+			return gl
 		return "Group Matchday %d" % (int(gs.get("matchdays_played", 0)) + 1)
 	var surv := _survivors(b).size()
 	if surv <= 1:
@@ -255,8 +309,16 @@ static func play_round(b: Dictionary, rng: RandomNumberGenerator,
 		ratings_fn: Callable, club_id: int, names_fn: Callable, xi_fn := Callable(),
 		on_report := Callable()) -> Dictionary:
 	var survivors: Array = (_survivors(b) as Array).duplicate()
+	# Fold in this round's late entrants BEFORE the count and the label are taken -- the
+	# Premier clubs joining at Round 3 are part of that round's draw (REFRUN R1).
+	var this_round := (b.get("rounds", []) as Array).size() + 1
+	if int(b.get("late_round", 0)) == this_round:
+		for v in b.get("late_ids", []):
+			if not survivors.has(int(v)):
+				survivors.append(int(v))
+		b["late_ids"] = []
 	var start_count := survivors.size()
-	var label := _label_for(b, start_count, (b.get("rounds", []) as Array).size() + 1)
+	var label := _label_for(b, start_count, this_round)
 	var out := {"label": label, "manager_tie": {}, "manager_out": false,
 		"champion": false, "news": [], "prize": 0}
 	if start_count <= 1:
@@ -274,11 +336,14 @@ static func play_round(b: Dictionary, rng: RandomNumberGenerator,
 	# Round one may need byes to bring an off-power-of-two field down to a power of
 	# two; later rounds are a clean halving (survivors is always even by then). A field
 	# already a power of two needs no byes -- it just halves.
+	# Byes bring ANY off-power-of-two field down to the next power of two below, not just
+	# round one's: with the Premier entering a 92-club cup at Round 3 the field is
+	# off-power-of-two twice (72 -> 64 at Round 1, 52 -> 32 at Round 3), so restricting byes
+	# to the first round left a ragged bracket downstream (REFRUN R1).
 	var byes := 0
-	if (b.get("rounds", []) as Array).is_empty():
-		var p := _floor_pow2(start_count)
-		if p != start_count:
-			byes = 2 * p - start_count        # clubs that sit the preliminary round out
+	var p := _floor_pow2(start_count)
+	if p != start_count:
+		byes = 2 * p - start_count        # clubs that sit this round out
 	# Guard: an odd field with no planned byes (shouldn't happen) gives one bye.
 	if (start_count - byes) % 2 == 1:
 		byes += 1

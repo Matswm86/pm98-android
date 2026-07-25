@@ -310,6 +310,15 @@ static func develop_week(rng: RandomNumberGenerator, squad: Array, focus: Dictio
 # EQUIPOS rating, which the DBC loader already knocked 35..45 off (see Youth.gd).
 const YOUTH_GAIN_GATE := 0x27    # rand(100) > 0x27 -> gain 1
 
+## OURS, and the only youth-TRAINING number that is (the twin of Youth.SEARCH_SPEEDUP,
+## which is likewise ours). Owner decision 2026-07-25, recorded in
+## docs/re/REFRUN_manutd_1997-98.md R17: "half the length of both scouting and training
+## of youth players. Assume they take the same time." Scouting was already halved; this
+## is training's half. The lever CANNOT be YOUTH_GAIN_GATE -- dropping it to 0 only takes
+## the 60% firing rate to 100%, a 1.67x speedup, not 2x. The exact 2x is +2 per firing.
+## Set to 1 for the binary's own cadence.
+const YOUTH_GROWTH_SPEEDUP := 2
+
 ## One WEEK of the 0x20 YOUTH branch over a youth list. Returns {kind, text} news for
 ## each youngster the youth manager reports ready. Mutates attrs/fitness/`ready`.
 static func develop_youth_week(rng: RandomNumberGenerator, youth: Array) -> Array:
@@ -322,11 +331,17 @@ static func develop_youth_week(rng: RandomNumberGenerator, youth: Array) -> Arra
 		var attrs: Dictionary = av
 		var base := base_attrs(pd)
 		if not bool(pd.get("ready", false)):
-			var gain := 1 if rng.randi_range(0, 99) > YOUTH_GAIN_GATE else 0
+			# YOUTH_GROWTH_SPEEDUP is ours; at 1 this is the binary's own +1.
+			var gain := YOUTH_GROWTH_SPEEDUP if rng.randi_range(0, 99) > YOUTH_GAIN_GATE else 0
 			if gain > 0:
 				for a in CORE4:
-					var n := int(attrs.get(a, 0)) + gain
-					if n <= int(base.get(a, 0)):
+					# The binary's clamp is `skip the step if it would overshoot BASE`,
+					# which is identical to mini() at gain 1 but STALLS one point short
+					# on an odd remaining gap at gain 2 -- and the CORE4 equality test
+					# below would then never fire, so the youth never reports ready.
+					# mini() is the faithful generalisation: never exceed BASE.
+					var n := mini(int(attrs.get(a, 0)) + gain, int(base.get(a, 0)))
+					if n > int(attrs.get(a, 0)):
 						attrs[a] = ATTR_MAX if n > ATTR_MAX else n
 				var done := true
 				for a in CORE4:
@@ -338,10 +353,10 @@ static func develop_youth_week(rng: RandomNumberGenerator, youth: Array) -> Arra
 					news.append({"kind": "youth",
 						"text": "Your youth manager has informed you that %s is ready to be promoted to the first team squad."
 							% pd.get("name", "?")})
-				# The shared block, cap[*] = 0.
+				# The shared block, cap[*] = 0. Same mini() clamp as CORE4 above.
 				for a in TRAINABLE:
-					var m := int(attrs.get(a, 0)) + gain
-					if m <= int(base.get(a, 0)):
+					var m := mini(int(attrs.get(a, 0)) + gain, int(base.get(a, 0)))
+					if m > int(attrs.get(a, 0)):
 						attrs[a] = ATTR_MAX if m > ATTR_SNAP else m
 		pd["fitness"] = clampi(int(pd.get("fitness", COND_CAP)) + 1, COND_FLOOR, COND_CAP)
 	return news

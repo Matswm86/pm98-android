@@ -99,6 +99,25 @@ func _two_season_flow() -> bool:
 		"Cup Winners' Cup winner captured (%d)" % career.euro_winner_cwc) and ok
 	ok = _assert(career.euro_winner_ratings.has(exp_cup),
 		"the European Cup winner's rating was frozen for the finals") and ok
+	# REFRUN R7/R11: neither final is a curtain-raiser. The Intercontinental fires in the
+	# FIRST DECEMBER week and the Supercup in MARCH, so at the season's OPEN both are still
+	# empty, and they land as the new season's calendar reaches those months.
+	ok = _assert(career.supercup.is_empty() and career.intercontinental.is_empty(),
+		"neither winners-of-winners final is played at season open (R7/R11)") and ok
+	var ic_week := -1
+	var sc_week := -1
+	while not career.season_over():
+		career.advance_week(rng)
+		if ic_week == -1 and not career.intercontinental.is_empty():
+			ic_week = career.week
+		if sc_week == -1 and not career.supercup.is_empty():
+			sc_week = career.week
+	ok = _assert(ic_week > 0 and career._month_of_week(ic_week) == 12,
+		"the Intercontinental Cup fires in December (week %d)" % ic_week) and ok
+	if exp_cup != exp_cwc and exp_cwc != -1:
+		ok = _assert(sc_week > 0 and career._month_of_week(sc_week) == 3,
+			"the European Supercup fires in March (week %d)" % sc_week) and ok
+		ok = _assert(sc_week > ic_week, "the Supercup follows the Intercontinental") and ok
 
 	# Supercup: European Cup winner v Cup Winners' Cup winner (unless the same club),
 	# HOME AND AWAY with the Cup Winners' Cup holder hosting the first leg -- the

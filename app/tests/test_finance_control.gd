@@ -26,8 +26,10 @@ func _run() -> bool:
 		"default attendance unchanged (%d)" % int(base["attendance"])) and ok
 
 	# Ticket price <-> attendance (dearer thins the crowd; cheaper fills it, capped at cap).
+	# The tier default is now the WITNESSED £7.50 a head (FinanceModel.TICKET_DEFAULT,
+	# measured off two FULL TIME stadium panels), so "cheap" has to be below that.
 	var dear := FinanceModel.summary({"capacity": 40000, "ticket_price": 30}, 1)
-	var cheap := FinanceModel.summary({"capacity": 40000, "ticket_price": 8}, 1)
+	var cheap := FinanceModel.summary({"capacity": 40000, "ticket_price": 4}, 1)
 	ok = _assert(int(dear["attendance"]) < int(base["attendance"]),
 		"dearer ticket thins the crowd (%d < %d)" % [int(dear["attendance"]), int(base["attendance"])]) and ok
 	ok = _assert(int(cheap["attendance"]) > int(base["attendance"])
@@ -54,12 +56,15 @@ func _run() -> bool:
 		if c.get("leagueId") == "eng_prem":
 			prem.append(c)
 	var career := Career.create(prem[0], league, prem, db.get("leagues", []))
-	ok = _assert(career.ticket_price > 0 and career.board_price > 0,
-		"career seeded default prices (£%d / £%d)" % [career.ticket_price, career.board_price]) and ok
+	# The seeded ticket price is the WITNESSED default, £7.50 a head (REFRUN, FULL TIME
+	# stadium panels: 21,014 x 7.50 = £157,605 and 41,000 x 7.50 = £307,500).
+	ok = _assert(absf(career.ticket_price - FinanceModel.TICKET_DEFAULT) < 0.005
+		and career.board_price > 0,
+		"career seeded default prices (£%.2f / £%d)" % [career.ticket_price, career.board_price]) and ok
 
 	var net0: int = career.weekly_net
-	career.set_ticket_price(35)   # well above the £15 default -> thinner crowd, different net
-	ok = _assert(career.ticket_price == 35 and career.weekly_net != net0,
+	career.set_ticket_price(35.0)  # well above the £7.50 default -> thinner crowd, different net
+	ok = _assert(absf(career.ticket_price - 35.0) < 0.005 and career.weekly_net != net0,
 		"set_ticket_price applied + refreshed weekly_net") and ok
 	var pv := career.finance_preview()
 	ok = _assert(int(pv["ticket"]) == 35 and int(pv["attendance"]) <= int(pv["capacity"]),
@@ -69,7 +74,7 @@ func _run() -> bool:
 	var path := "user://finance_control_test.json"
 	career.save(path)
 	var loaded := Career.load_save(path)
-	ok = _assert(loaded != null and loaded.ticket_price == 35 and loaded.board_price == 2400,
+	ok = _assert(loaded != null and absf(loaded.ticket_price - 35.0) < 0.005 and loaded.board_price == 2400,
 		"prices survived save/load") and ok
 
 	# FinanceScreen signal surface (Main compatibility after the frame-true rebuild):
