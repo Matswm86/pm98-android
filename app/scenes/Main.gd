@@ -1977,13 +1977,13 @@ func _career_advance() -> void:
 			_career.save()
 			_show_shield_card(_career.charity_shield, func() -> void:
 				_show_career()
-				_pop_month_awards(_pop_pending_team_offers)))
+				_pop_month_awards(func() -> void: _pop_channel_tv(_pop_pending_team_offers))))
 		return
 	var res := _career.advance_week(rng)   # ratings come from the live roster
 	if res.is_empty():
 		_career.save()   # bye / season end: no presentation, save immediately
 		_show_career()   # refresh the hub in place
-		_pop_month_awards(_pop_pending_team_offers)
+		_pop_month_awards(func() -> void: _pop_channel_tv(_pop_pending_team_offers))
 		return
 	_show_match_result(res)
 
@@ -2051,7 +2051,7 @@ func _show_match_result(res: Dictionary, on_finish: Callable = Callable()) -> vo
 	var finish := on_finish if on_finish.is_valid() else func() -> void:
 		_career.save()   # the deferred week autosave (EXIT-Yes never gets here)
 		_show_career()
-		_pop_month_awards(_pop_pending_team_offers)
+		_pop_month_awards(func() -> void: _pop_channel_tv(_pop_pending_team_offers))
 	var open_match := func() -> void:
 		_open_match(home, away, int(res["hg"]), int(res["ag"]), m["lines"],
 			"%s  -  back to the dugout" % verdict, finish, result_data, res.get("possession", []))
@@ -4881,6 +4881,30 @@ func _season_end_champion_cards(after: Callable) -> void:
 		_season_end_champion_cards(after)
 		return
 	_show_champion_card(card, func() -> void: _season_end_champion_cards(after))
+
+
+## The channelTV broadcast-rights card over the hub (REFRUN R6). The original raises it
+## UNPROMPTED, so it rides the same post-week card chain the monthly awards and the TEAM
+## OFFER cards do rather than gating CONTINUE. Career queues it when the COMING fixture is
+## at home and that competition's fee is witnessed. The fee is booked to the week's
+## TELEVISION line when the match is actually played -- the card announces it, it does not
+## pay it -- so answering OK just clears the queue and runs `after`.
+func _pop_channel_tv(after: Callable) -> void:
+	if _career == null or (_career.pending_channel_tv as Dictionary).is_empty():
+		if after.is_valid():
+			after.call()
+		return
+	var card: Dictionary = _career.pending_channel_tv
+	_career.pending_channel_tv = {}
+	var scr: ChannelTvScreen = load("res://scenes/ChannelTvScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(int(card.get("fee", 0)))
+	scr.ok_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		scr.queue_free()
+		if after.is_valid():
+			after.call())
 
 
 ## One CAMPEON card over whatever is on screen. `card` is a Career pending_champion_cards

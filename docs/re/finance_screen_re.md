@@ -165,6 +165,18 @@ fee IS that week's TELEVISION line (proved on week 29). The Coca-Cola Cup, F.A. 
 U.E.F.A. Cup and Cup Winners' Cup fees were **not measured** and pay £0 — a visible gap,
 not a guess.
 
+### The channelTV card — BUILT
+
+`app/scenes/ChannelTvScreen.gd`, chrome from
+`tools/re/build_channeltv_card_from_frames.py`. The bake diffs the two captured cards
+(`p0474_channel_tv.png` £90,000 and `p0032_channel_tv.png` £187,500) and REFUSES to run
+unless they are byte-identical everywhere except the fee line and the OK button, so the
+logo, the camera art and both body lines are the original's own pixels and the fee is the
+only thing the scene draws. It rides the post-week unprompted-card chain (the same one the
+monthly awards and the TEAM OFFER cards use), because the original raises it unprompted;
+whether it comes before or after the XI-validity gate is NOT witnessed, so it does not gate
+CONTINUE.
+
 ### Still not built
 
 The PER WEEK view itself — the tab, the `WEEK  < CURRENT n >` stepper and the date stamp —

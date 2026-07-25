@@ -1,0 +1,30 @@
+{
+  "_source": "build_channeltv_card_from_frames.py",
+  "binding_frames": [
+    "screenshots/refrun-manutd-1997-98/named/p0474_channel_tv.png",
+    "screenshots/refrun-manutd-1997-98/named/p0032_channel_tv.png"
+  ],
+  "panel": [
+    96,
+    102,
+    544,
+    375
+  ],
+  "fee_zone": [
+    255,
+    326,
+    390,
+    342
+  ],
+  "ok_rect": [
+    463,
+    345,
+    541,
+    374
+  ],
+  "witnessed_fees": {
+    "premier_league": 90000,
+    "charity_shield": 187500,
+    "european_cup": 375000
+  }
+}
