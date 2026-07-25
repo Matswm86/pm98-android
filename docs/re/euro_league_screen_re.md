@@ -164,3 +164,56 @@ kit-flanked variant, 22 px instead of 15 px.
   `gana derecha` / `gana izquierda` bracket art the screen loads;
 * the tie-break the original uses between runners-up level on points (this career's two
   qualifiers were clear on points, so goal difference was never exercised).
+
+## Geometry banked 2026-07-25 (late) — the screen is STILL NOT BUILT
+
+Measured off `tools/re/refs/euro-competitions-2026-07-25/15_euroleague_group_F.png` (all
+six group frames are now committed beside it, `10..15_euroleague_group_A..F.png`) so the
+next session starts from numbers rather than from a frame. **No scene was written and
+nothing was baked** — `Main._show_cup_group_placeholder` still raises the invented
+`CupScreen`.
+
+**What varies across the six group frames** — and therefore what the chrome must clear —
+is exactly one region: `y180..325, x75..446`. Everything else (barra, the EURO. LEAGUE
+title band and its two paginators, the competition rail, the division chips, RETURN) is
+identical on all six and is static chrome.
+
+### The GROUP table
+
+Black frame rows at y186-187 / 207-208 / 223 / 238 / 253 / 268-269; columns at x79-80 /
+94 / 199 / 221 / 237 / 253 / 269 / 285 / 301 / 317-318. So:
+
+| cell | span |
+|---|---|
+| position plate | x81..93, navy `(20,0,90)`, digit white |
+| club name + MINIBAND flag | x95..198 |
+| PTS · P · W · D · L · GF · GA | x200..220, 222..236, 238..252, 254..268, 270..284, 286..300, 302..316 |
+
+Four rows at y209 / 224 / 239 / 254, pitch 15, and the bands alternate
+`(200,220,240)` / `(160,180,200)`.
+
+### Text, solved with `tools/re/probe_text_anchor.py` at ZERO differing pixels
+
+Everything on the table is **calend12**, pen top = the row's own top:
+
+| cell | anchor |
+|---|---|
+| position | centred on `81 + 93` |
+| club | LEFT-aligned, pen x **100** |
+| each number | centred on `x0 + x1 + 1` — verified on PTS (205 for `12`), P (226) and GA (306) |
+
+Only the LIGHT band's inks are pinned so far: club `(60,60,100)`, numbers
+`(180,200,220)`. The dark band's club ink is not yet measured.
+
+### Still to measure before building
+
+* the dark band's club and number inks;
+* the MINIBAND flag rect inside the name cell (`DBDAT\MINIBAND\ba96%04u.bmp`);
+* the results rows under the table (kit, right-aligned home club, two score boxes with
+  the winner's goals inked yellow, away club, kit) — their row tops and cell spans;
+* the six GROUP A..F buttons' lit/unlit faces: all six lit states ARE witnessed, one per
+  frame, so they can be cut verbatim rather than synthesised — buttons pitched 24px at
+  centres y194 / 218 / 242 / 266 / 290 / 314, x approx 403, panel borders x360-361 and
+  x443-444;
+* the knockout view (`MATCHES` with `1ST LEG` / `2ND LEG` / `AGGR.`), which
+  `16_euroleague_qtr_finals.png` holds.
