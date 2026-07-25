@@ -53,6 +53,9 @@ with the real 1997-98 entrants** — no qualification needed to browse them.
 | `06_euroleague_round1_played.png` | EURO. LEAGUE **ROUND 1** played: 1ST LEG / 2ND LEG / AGGR. columns, the winner of each tie inked yellow |
 | `07_euroleague_group_a.png`, `08_group_A..F.png` | the **GROUP phase**: header `1/8 FINALS` + `Round 1`, GROUP A table, the group's results below it, and the six GROUP A..F buttons |
 | `09_comp_uefa.png` | U.E.F.A. CUP — the same MATCHES list with a single `1/16 FINALS` paginator and **no** group buttons |
+| `11_european_supercup_champion_card.png` | the **EUROPEAN SUPERCUP CHAMPION** card (CAMPEON family, the screen `CharityShieldScreen` already implements): Borussia D. / Scala over F.C. Barcelona / Van Gaal |
+| `12_uefa_cup_champion_card.png` | the **U.E.F.A. CUP CHAMPION** card, same family: Arsenal / Wenger over Liverpool / Evans, raised in the season-end sequence |
+| `13_league_tables_final_markers.png` | the season-end **LEAGUE TABLES** walk (8 May 1998, one screen per division, `CONTINUE` at (610,437)) with the original's own `PROMOTION` / `PLAY-OFFS` / `RELEGATION` chips down the left edge |
 
 ### Screen structure, as captured
 
