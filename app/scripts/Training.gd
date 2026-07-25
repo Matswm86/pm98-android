@@ -290,6 +290,63 @@ static func develop_week(rng: RandomNumberGenerator, squad: Array, focus: Dictio
 	return news
 
 
+# The 0x20 YOUTH branch of the same switch, disassembled at 0x582813-0x5828c2:
+#
+#   case 0x20:
+#     gain = (rand(100) > 0x27)                    ; 60%
+#     if gain:
+#       for a in CORE4 (live +0x9c..+0x9f / base +0xaa..+0xad):
+#           n = live[a] + gain
+#           if n <= base[a]: live[a] = 99 if n > 99 else n     ; i.e. min(live+gain, base)
+#       if live[VE]==base[VE] and live[RE]==base[RE]
+#          and live[AG]==base[AG] and live[CA]==base[CA]:
+#           mode = 0
+#           "Your youth manager has informed you that %s is ready to be
+#            promoted to the first team squad."       (0x6634e1, via 0x662d58)
+#   ; then the SHARED six-attribute block runs with cap[*] = 0, so the other six
+#   ; also climb one a week and stop dead at BASE; condition +1 (FUN_00584c60).
+#
+# So a youth's ceiling is not a hidden number we roll: it is his own shipped
+# EQUIPOS rating, which the DBC loader already knocked 35..45 off (see Youth.gd).
+const YOUTH_GAIN_GATE := 0x27    # rand(100) > 0x27 -> gain 1
+
+## One WEEK of the 0x20 YOUTH branch over a youth list. Returns {kind, text} news for
+## each youngster the youth manager reports ready. Mutates attrs/fitness/`ready`.
+static func develop_youth_week(rng: RandomNumberGenerator, youth: Array) -> Array:
+	var news: Array = []
+	for p in youth:
+		var pd: Dictionary = p
+		var av: Variant = pd.get("attrs", {})
+		if not (av is Dictionary) or (av as Dictionary).is_empty():
+			continue
+		var attrs: Dictionary = av
+		var base := base_attrs(pd)
+		if not bool(pd.get("ready", false)):
+			var gain := 1 if rng.randi_range(0, 99) > YOUTH_GAIN_GATE else 0
+			if gain > 0:
+				for a in CORE4:
+					var n := int(attrs.get(a, 0)) + gain
+					if n <= int(base.get(a, 0)):
+						attrs[a] = ATTR_MAX if n > ATTR_MAX else n
+				var done := true
+				for a in CORE4:
+					if int(attrs.get(a, 0)) != int(base.get(a, 0)):
+						done = false
+						break
+				if done:
+					pd["ready"] = true
+					news.append({"kind": "youth",
+						"text": "Your youth manager has informed you that %s is ready to be promoted to the first team squad."
+							% pd.get("name", "?")})
+				# The shared block, cap[*] = 0.
+				for a in TRAINABLE:
+					var m := int(attrs.get(a, 0)) + gain
+					if m <= int(base.get(a, 0)):
+						attrs[a] = ATTR_MAX if m > ATTR_SNAP else m
+		pd["fitness"] = clampi(int(pd.get("fitness", COND_CAP)) + 1, COND_FLOOR, COND_CAP)
+	return news
+
+
 ## Training points for one skill = floor(that coach's stars); 0 with no coach hired.
 static func skill_tp(staff: Array, skill: String) -> int:
 	var m := Staff.member_in_role(staff, skill)

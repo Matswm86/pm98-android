@@ -1542,6 +1542,8 @@ func _continue_career() -> void:
 		# Re-attach the pyramid's static club records (never persisted); a
 		# pre-pyramid save gains its lower divisions here (fast-forwarded).
 		_career.ensure_divisions(_pyramid_context())
+		# ...and the shipped 0x26e4 youth pool, which is game data, not save data.
+		_career.youth_pool = Youth.pool_of(GameDB.clubs_by_id)
 		# An in-progress career in its first seasons still gets the guaranteed gem on resume.
 		var before: int = (_career.youth as Array).size()
 		_career._ensure_wonderkid()
@@ -1741,6 +1743,7 @@ func _begin_career(manager_name: String, league: Dictionary, club: Dictionary,
 	AudioManager.ui_select()
 	var league_clubs := GameDB.clubs_in_league(league["id"])
 	_career = Career.create(club, league, league_clubs, GameDB.leagues, _pyramid_context())
+	_career.youth_pool = Youth.pool_of(GameDB.clubs_by_id)   # the shipped 0x26e4 pool
 	_career.manager_name = manager_name
 	# Entry-flow picks (NIVEL level + Players age ? + preseason friendlies). The
 	# rivals play out via hub CONTINUE before league round 1 (Career.play_friendly).

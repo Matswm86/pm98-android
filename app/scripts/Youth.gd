@@ -1,46 +1,80 @@
 class_name Youth
 extends RefCounted
-## The Youth Team (Track A engine depth): a scouted intake of young players who
-## develop on their own track until the youth manager judges one ready to step up,
-## at which point you PROMOTE him into the first-team squad.
+## The Youth Team, ported from MANAGER.EXE rather than invented (2026-07-25).
 ##
-## Faithful surface (strings scanned from MANAGER.EXE this session): YOUTH TEAM /
-## YOUTH PLAYER / YOUTH SCOUT / YOUTH MANAGER / PROMOTE / PROMOTED, and the message
-## templates "%s has joined your Youth Team.",
-## "Your youth manager has informed you that %s is ready to be promoted to the first
-## team squad.", "The youth player %s has rejected your offer.",
-## "The youth team scout has finished his search." / "...hasn't found".
-## The original gates intake behind a hired YOUTH SCOUT and faster growth behind a
-## YOUTH MANAGER -- staff (EMPLE) is a separate deferred screen, so for now the club
-## runs a baseline youth setup; the intake/develop rates are factor-scaled so a future
-## staff system can raise them with no rework here.
+## The academy is DATA, not a generator. EQUIPOS.PKF ships `EQ969956.DBC` — engine club
+## id **0x26e4**, the pool the game calls "Young players" (51 real records with names,
+## birthplaces and ratings; app club id 1383). Everything the youth part does is one of
+## four binary rules:
 ##
-## A youth player carries the SAME dict shape as a senior (id/name/age/isGK/attrs) plus
-## a hidden `potential` (his CA ceiling), a `dev_progress` carry-over and a `ready` flag,
-## so promotion is a straight move into rosters[club_id] with no attribute remapping and
-## every existing screen (squad, line-up, training, transfer value) reads him unchanged.
+##  1. **The knock-down** — `FUN_005820f0` @0x582434: any record loaded under club 0x26e4
+##     has ONE `rand(11)+0x23` (35..45) subtracted from all ten LIVE attribute bytes,
+##     floored at 0. BASE is untouched. So a youngster's ceiling is his own shipped adult
+##     rating, and the "hidden potential" this file used to roll was never needed.
+##     (Applied at load in `GameDB._apply_loader_defaults`.)
+##  2. **The scout's filter** — `FUN_00575d90` (youth-scout vtable 0x632fc8, slot 0):
+##     the record must be in club 0x26e4, and **any one** selected capability's BASE byte
+##     must be **> 0x4f**. The six criteria slots (+0x10..+0x24) are, in order,
+##     BASE +0xae/+0xb1/+0xaf/+0xb2/+0xb0/+0xb3 = PO / RM / EN / RG / PA / TI =
+##     HANDLING / DRIBBLING / TACKLING / HEADING / PASSING / SHOOTING.
+##  3. **The search** — `FUN_00575e80` (vtable slot 1) walks club 0x26e4's player list,
+##     keeps every match, and then throws all but **ONE, picked uniformly at random**
+##     (`FUN_0058df90(n)`). The senior scout's `(quality+2)*5` shortlist cap is the OTHER
+##     resolver (`FUN_00575750`) and does not apply here. Duration in weeks is set when
+##     SEARCH is pressed, `FUN_0053e860` @0x53e967:
+##         weeks = rand(6) + 0x37 - 5 * ((scout_quality_byte + 1) >> 1)
+##  4. **The growth** — `FUN_00582760` case 0x20, ported in `Training.develop_youth_week`:
+##     60% chance of +1 a week on every attribute, hard-stopped at BASE; when the core
+##     four (VE/RE/AG/CA) all reach BASE the mode clears and the youth manager reports
+##     "…is ready to be promoted to the first team squad."
 ##
-## GameDB-free, mutates only the dicts passed in -> headless-testable
-## (tests/test_youth.gd). Manager's club only, like injuries and training.
+## Signing is the shared offer path (`FUN_0058a360`), which is why the youth pseudo-club
+## has its own two strings there: "%s has joined your Youth Team." on accept and
+## "The youth player %s has rejected your offer." on refusal.
+##
+## The `_make_attrs` / `_gen_name` / `random_pos` block at the bottom is NOT the academy
+## any more — it is the shared REGEN helper that `TransferMarket` (free agents) and
+## `Talent` (the easter-egg lane) call, kept here so those callers keep working.
 
-# Intake age band, the age a youngster ages out of the setup if never promoted, and the
-# soft cap on how many can sit in the youth team at once.
+## The EQUIPOS club the youth pool ships under: `EQ969956.DBC`, engine id 0x26e4,
+## remapped to 1383 by tools/extract_squads_exact.py. Mirrors GameDB.YOUTH_POOL_CLUB
+## (an autoload cannot be read from a const initialiser).
+const POOL_CLUB_ID := 1383
+
+## `FUN_00575d90`: capability -> the BASE attribute byte it gates, and the threshold
+## (`0x4f < byte`, so 80 and up). The labels are the YOUTH screen's own `cap_order`
+## names; the attribute map is the one the TRAINING modes independently pin
+## (docs/re/training_screen_re.md: HANDLING->PO, PASSING->PA, DRIBBLING->RM,
+## HEADING->RG, TACKLING->EN, SHOOTING->TI).
+const CAP_ATTR := {
+	"HANDLING": "PO", "DRIBBLING": "RM", "TACKLING": "EN",
+	"HEADING": "RG", "PASSING": "PA", "SHOOTING": "TI",
+}
+const CAP_THRESHOLD := 0x50       # `0x4f < base[attr]`
+
+## `FUN_0053e860` @0x53e967: weeks = rand(6) + 0x37 - 5 * ((quality + 1) >> 1).
+const SEARCH_BASE_WEEKS := 0x37
+const SEARCH_SPAN := 6
+const SEARCH_PER_STAR := 5
+## OURS, and the only youth number that is: the owner's standing Android call
+## (2026-07-24 owner report) is "it's ok to lower the amount of weeks it takes so we
+## have 2 intakes per season". The original's own 30..60 weeks is one intake a season
+## at best. Halving it is the whole deviation; set to 1 for the binary's own cadence.
+const SEARCH_SPEEDUP := 2
+
+# The age a youngster is released at if never promoted, and the soft cap on the setup.
 const INTAKE_AGE_LO := 15
 const INTAKE_AGE_HI := 17
 const GRADUATE_AGE := 19          # over this and not promoted -> released from the setup
 const SQUAD_CAP := 12             # the youth team won't grow past this
 
-# A youth player's CA must reach this for the youth manager to flag him ready to step up.
-# Low-potential intakes never get here and age out instead -- youth is a gamble.
+# Regen-lane constants (free agents + the talent easter egg), NOT the academy.
 const READY_CA := 58
-
-# Current-ability band at intake, and the spread of hidden potential above it. A gem
-# (high roll) tops out near first-team class; most settle as squad players or wash out.
 const INTAKE_CA_LO := 30
 const INTAKE_CA_HI := 46
-const POTENTIAL_LO := 8           # potential = intake CA + [POTENTIAL_LO..POTENTIAL_HI]
+const POTENTIAL_LO := 8
 const POTENTIAL_HI := 42
-const POTENTIAL_CAP := 88         # no youth projects past this
+const POTENTIAL_CAP := 88
 
 # The hidden gem (easter egg): a guaranteed generational FW the academy scouts in within a
 # career's first few seasons. Potential sits ABOVE the regen cap -- a one-in-a-generation
@@ -54,10 +88,6 @@ const GK_CHANCE := 0.16           # roughly one in six intakes is a goalkeeper
 const _DF_SHARE := 0.38
 const _MF_SHARE := 0.33           # remainder (0.29) is FW
 
-# Weekly development toward potential (youth climb fast -- roughly a point of ability every
-# ~3 weeks, so a promising prospect reaches first-team grade in one to two seasons). Scaled
-# by a staff factor that defaults to 1.0 until a YOUTH MANAGER exists to raise it.
-const _DEV_RATE := 0.34
 const ATTR_FLOOR := 20
 
 # The trainable attribute codes (PO tracks separately for keepers, like Training).
@@ -74,12 +104,15 @@ static func _gen_name(rng: RandomNumberGenerator) -> String:
 	return "%s %s" % [fores[rng.randi() % fores.size()], surs[rng.randi() % surs.size()]]
 
 
-# ---- intake --------------------------------------------------------------
+# ---- REGEN LANE (free agents + the talent easter egg) --------------------
+#
+# NOT the academy. `TransferMarket.generate_free_agents` and `Talent` call these to mint
+# a player who has no EQUIPOS record; the numbers below are OURS and always were. The
+# real youth pool is `pool()` above and is entirely shipped data.
 
-## Generate `count` fresh youth players with ids starting at `first_id` (the caller's
-## monotonic youth-id minter -- kept well above the senior id space so a promoted youth
-## never collides). `factor` (>= 1.0, a future YOUTH SCOUT lever) nudges the quality of
-## the crop. Returns the Array of player dicts; never touches GameDB.
+## Generate `count` fresh players with ids starting at `first_id` (the caller's monotonic
+## id minter -- kept well above the senior id space so a mint never collides).
+## `factor` (>= 1.0) nudges the quality of the crop. Never touches GameDB.
 static func intake(rng: RandomNumberGenerator, count: int, first_id: int, factor := 1.0) -> Array:
 	var out: Array = []
 	for i in maxi(0, count):
@@ -159,63 +192,99 @@ static func _make_attrs(rng: RandomNumberGenerator, ca: int, is_gk: bool) -> Dic
 	return a
 
 
+# ---- the shipped pool + the scout (FUN_00575d90 / FUN_00575e80 / FUN_0053e860) ----
+
+## The live youth pool out of a `clubs_by_id` map (GameDB's, or a test's): every player
+## loaded under club 0x26e4, already knocked down by the loader. Returns the SAME dicts
+## the map holds, so signing one and mutating him is what the engine does with its own
+## record. Passed in rather than reached for, so this file stays headless-testable.
+static func pool_of(clubs_by_id: Dictionary) -> Array:
+	var c: Dictionary = clubs_by_id.get(POOL_CLUB_ID, {})
+	var ps: Variant = c.get("players", [])
+	return ps if ps is Array else []
+
+
+## `FUN_005820f0` @0x582434 — the club-0x26e4 branch of the DBC player loader, which
+## rolls ONE `rand(11) + 0x23` (35..45) and subtracts it from all TEN live attribute
+## bytes (+0x9c..+0xa5), flooring at 0, leaving BASE (+0xaa..+0xb3) alone. `attrs_base`
+## keeps the shipped block; `attrs` becomes the knocked-down live one. Idempotent — a
+## record that already carries `attrs_base` has been through this.
+const DEGRADE_LO := 0x23
+const DEGRADE_SPAN := 0xb
+
+static func degrade(p: Dictionary, rng: RandomNumberGenerator) -> void:
+	var av: Variant = p.get("attrs")
+	if not (av is Dictionary) or p.has("attrs_base"):
+		return
+	var d := DEGRADE_LO + rng.randi_range(0, DEGRADE_SPAN - 1)
+	var live: Dictionary = av
+	p["attrs_base"] = live.duplicate()
+	for k in live:
+		var v := int(live[k])
+		live[k] = (v - d) if d < v else 0
+
+
+## `FUN_00575d90`. `caps` is the set of capability names the six LEDs have lit. A record
+## matches when ANY lit capability's BASE byte is > 0x4f — the predicate short-circuits
+## on the first hit, so it is a plain OR, not a score.
+static func scout_matches(p: Dictionary, caps: Array) -> bool:
+	var base: Dictionary = Training.base_attrs(p)
+	for cap in caps:
+		var code := str(CAP_ATTR.get(str(cap), ""))
+		if code != "" and int(base.get(code, 0)) >= CAP_THRESHOLD:
+			return true
+	return false
+
+
+## `FUN_00575e80`. Filter `pool`, then keep exactly ONE at random. `exclude` is the ids
+## already signed (the engine drops a signed youngster out of club 0x26e4, so he can
+## never be found twice). Returns [] or a one-element Array — the PLAYERS FOUND panel.
+static func scout_search(rng: RandomNumberGenerator, caps: Array, pool: Array,
+		exclude: Array = []) -> Array:
+	var hits: Array = []
+	for p in pool:
+		if int(p.get("id", -1)) in exclude:
+			continue
+		if scout_matches(p, caps):
+			hits.append(p)
+	if hits.is_empty():
+		return []
+	# A DEEP COPY, not the GameDB record itself: the engine re-parents its own record
+	# because it reloads the database for every new game, but GameDB here is loaded once
+	# per app launch and shared by every career. Handing out the live dict would leave a
+	# signed youngster's clubId / ready / part-grown attrs stuck on the pool for the next
+	# career. The copy is what `enrol` then stamps.
+	return [(hits[rng.randi_range(0, hits.size() - 1)] as Dictionary).duplicate(true)]
+
+
+## `FUN_0053e860` @0x53e967, divided by the owner's SEARCH_SPEEDUP.
+## `quality` is the YOUTH TEAM SCOUT's raw 1..10 quality byte (Staff.quality_byte).
+static func search_weeks(rng: RandomNumberGenerator, quality: int) -> int:
+	var w := rng.randi_range(0, SEARCH_SPAN - 1) \
+		+ SEARCH_BASE_WEEKS - SEARCH_PER_STAR * ((quality + 1) >> 1)
+	return maxi(1, int(ceil(float(w) / float(SEARCH_SPEEDUP))))
+
+
+## Stamp a pool record as a member of YOUR youth setup: the engine moves him out of club
+## 0x26e4 and turns his training mode to 0x20, which is all "being in the academy" is.
+static func enrol(p: Dictionary, club_id: int) -> Dictionary:
+	p["clubId"] = club_id
+	p["is_youth"] = true
+	p["ready"] = false
+	p["_from_youth_pool"] = 1   # so the scout never re-finds him after a promotion
+	Training.base_attrs(p)      # make sure BASE exists before he starts climbing
+	return p
+
+
 # ---- weekly development --------------------------------------------------
 
-## Develop every youth in `youth` for one week. Each climbs toward his hidden potential;
-## when his CA first reaches READY_CA the youth manager flags him (a "youth" news item),
-## a fully-developed youngster holds. `factor` is the staff/development lever (>= 1.0).
-## Mutates attrs/dev_progress/ready in place; returns news {kind:"develop"|"youth", text}.
-static func develop_week(rng: RandomNumberGenerator, youth: Array, factor := 1.0) -> Array:
-	var news: Array = []
-	for p in youth:
-		var attrs: Variant = p.get("attrs", {})
-		if not (attrs is Dictionary) or (attrs as Dictionary).is_empty():
-			continue
-		var ca := int((attrs as Dictionary).get("CA", 0))
-		var potential := int(p.get("potential", ca))
-		if ca >= potential:
-			continue   # reached his ceiling -- holds until promoted or aged out
-		var rate := _DEV_RATE * maxf(0.5, factor)
-		rate += (rng.randf() - 0.5) * 0.05 * factor
-		var prog := float(p.get("dev_progress", 0.0)) + maxf(0.0, rate)
-		if prog >= 1.0:
-			prog -= 1.0
-			var item := _improve(p, attrs, potential)
-			if not item.is_empty():
-				news.append(item)
-			# Crossing the readiness line is the headline the youth manager reports.
-			if not bool(p.get("ready", false)) and int(attrs.get("CA", 0)) >= READY_CA:
-				p["ready"] = true
-				news.append({"kind": "youth",
-					"text": "Your youth manager reports that %s is ready to be promoted to the first team squad."
-						% p.get("name", "?")})
-		p["dev_progress"] = prog
-	return news
-
-
-## Raise one attribute (the lowest outfield code still below the ceiling) and nudge CA up
-## with it, so development flows to ability without overshooting potential.
-static func _improve(p: Dictionary, attrs: Dictionary, potential: int) -> Dictionary:
-	var ceil_attr := mini(POTENTIAL_CAP, potential + 6)   # individual attrs may sit a little above CA
-	var code := _lowest_below(attrs, ceil_attr)
-	if code == "":
-		return {}
-	attrs[code] = mini(ceil_attr, int(attrs.get(code, 0)) + 1)
-	if code != "CA" and int(attrs.get("CA", 0)) < potential:
-		attrs["CA"] = mini(potential, int(attrs.get("CA", 0)) + 1)
-	return {"kind": "develop",
-		"text": "Youth team: %s is coming along nicely." % p.get("name", "?")}
-
-
-static func _lowest_below(attrs: Dictionary, ceiling: int) -> String:
-	var best := ""
-	var best_v := ceiling + 1
-	for c in _OUTFIELD_CODES:
-		var v := int(attrs.get(c, 0))
-		if v < ceiling and v < best_v:
-			best_v = v
-			best = c
-	return best
+## One week of `FUN_00582760`'s 0x20 YOUTH branch (ported in Training.develop_youth_week):
+## 60% chance of +1 on every attribute, stopped dead at the player's own shipped BASE;
+## when the core four reach BASE the youth manager reports him ready. `factor` is
+## accepted for call-site compatibility and deliberately unused — the original's youth
+## growth has no staff term.
+static func develop_week(rng: RandomNumberGenerator, youth: Array, _factor := 1.0) -> Array:
+	return Training.develop_youth_week(rng, youth)
 
 
 # ---- queries (for the screen + Career) -----------------------------------
@@ -230,8 +299,12 @@ static func ability(p: Dictionary) -> int:
 	return int((attrs as Dictionary).get("CA", 0)) if attrs is Dictionary else 0
 
 
+## His ceiling: the shipped BASE CA the loader knocked him down from. The regen lane
+## (free agents, talents) still carries an explicit `potential`, so honour that first.
 static func potential_of(p: Dictionary) -> int:
-	return int(p.get("potential", ability(p)))
+	if p.has("potential"):
+		return int(p["potential"])
+	return int(Training.base_attrs(p).get("CA", ability(p)))
 
 
 ## A 1-5 star projection of a youth's ceiling, for the screen.

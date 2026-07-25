@@ -155,6 +155,13 @@ func _career_integration() -> bool:
 	rng.seed = SEED
 	while not career.season_over():
 		career.advance_week(rng, clubs_by_id)
+	# Contracts are randomised at club init, so the number of players who leave on a
+	# free at the rollover is not fixed. With enough leavers the free-agent pool hits
+	# FREE_POOL_CAP and the MARKET PRODIGY assertion below flips (it defers, which is
+	# correct engine behaviour and is covered separately). Give everyone a running
+	# contract so this sub-test measures routing, not pool headroom.
+	for p in career.rosters[my_id]:
+		p["contract_years"] = 3
 	career.advance_season(leagues, rng, [], {}, pool)
 	ok = _assert(career.season == "1998-99", "rolled into 1998-99") and ok
 

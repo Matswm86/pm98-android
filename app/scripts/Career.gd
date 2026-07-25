@@ -109,6 +109,10 @@ var youth_seq: int = YOUTH_ID_BASE      # monotonic id minter for youth (above s
 var youth_search: Dictionary = {}       # running scout search {skills:Array, weeks:int}; {} = idle
 var youth_found: Array = []             # finished search's prospects, awaiting a contract offer
                                         # (the PLAYERS FOUND panel; they are NOT in `youth` yet)
+var youth_pool: Array = []              # the shipped 0x26e4 pool the YOUTH SCOUT searches
+                                        # (Youth.pool_of(GameDB.clubs_by_id); set by the
+                                        # caller so this file never reaches for an autoload).
+                                        # NOT persisted — it is game data, not save data.
 var scout_search: Dictionary = {}       # SENIOR scout search {criteria:Dictionary, due_week:int};
                                         # {} = idle (SCOUT screen, docs/re/scout_screen_re.md)
 var scout_results: Array = []           # last finished search's rows (persist until a new search)
@@ -241,16 +245,11 @@ const INTERCONTINENTAL_PRIZE := 750_000 # Intercontinental Cup (Euro Cup winner 
 # so a promoted youngster never collides with a real player. Each career starts with a
 # small academy intake; a fresh crop is scouted in at every season rollover.
 const YOUTH_ID_BASE := 900000
-const YOUTH_SEED_COUNT := 0             # a career starts with an EMPTY youth list (witnessed
-                                        # orig/39, parity run 2026-07-16); the first rollover
-                                        # scouts the first crop in
-const YOUTH_INTAKE_LO := 1             # a season's fresh intake (scout's haul) ...
-const YOUTH_INTAKE_HI := 3             # ... is this many youngsters
-# A youth search reports back after this many weeks. The ORIGINAL delivers its youth
-# intake once a season, late on (a set of weeks). The owner's Android call (2026-07-24)
-# is to halve that so a season carries TWO intakes: 38 league rounds / 2 = 19.
-const YOUTH_SEARCH_WEEKS := 19
-const YOUTH_FOUND_MAX := 3             # most prospects one search can shortlist
+# A career starts with an EMPTY youth list (witnessed orig/39, parity run 2026-07-16);
+# the YOUTH TEAM SCOUT is the only way anyone joins it. The search DURATION and the
+# one-prospect result are MANAGER.EXE's own (Youth.search_weeks / Youth.scout_search);
+# the only youth number that is ours is Youth.SEARCH_SPEEDUP, the owner's 2026-07-24
+# call to halve the wait so a season carries two intakes rather than one.
 const WONDERKID_MAX_YEAR := 3          # the guaranteed gem is scouted within a career's first 3 seasons
 
 # Backroom staff: candidates are minted from their own id base; a new career starts with no
@@ -385,8 +384,7 @@ func _init_club(club: Dictionary, league: Dictionary, league_clubs: Array, leagu
 	# A fresh academy + staff pool + free-agent pool for the new club (none carry across).
 	var yrng := RandomNumberGenerator.new()
 	yrng.randomize()
-	youth = Youth.intake(yrng, YOUTH_SEED_COUNT, youth_seq)
-	youth_seq += YOUTH_SEED_COUNT
+	youth = []                    # witnessed empty (orig/39, parity run 2026-07-16)
 	staff = []
 	staff_pool = Staff.generate_pool(yrng, staff_seq, STAFF_POOL_PER_ROLE)
 	staff_seq += staff_pool.size()
@@ -783,9 +781,10 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 	# club's squad here, so the rivals get the same pass below (_roll_ai_squads).
 	for n in Training.develop_week(rng, my_squad(), training_focus):
 		_news(n["kind"], n["text"])
-	# The youth team develops on its own track (a YOUTH COACH speeds it); a youngster
-	# crossing the readiness line is reported so you know to look at the YOUTH TEAM screen.
-	for n in Youth.develop_week(rng, youth, Staff.youth_factor(staff)):
+	# The youth team runs the same weekly pass on its 0x20 YOUTH mode: 60% of a point on
+	# every attribute, hard-stopped at his own shipped rating, and the youth manager's
+	# "ready to be promoted" line the moment the core four get there.
+	for n in Youth.develop_week(rng, youth):
 		_news(n["kind"], n["text"])
 	# A running YOUTH TEAM SCOUT search ticks down and reports back (YOUTH TEAM screen).
 	_tick_youth_search(rng)
@@ -1926,8 +1925,14 @@ func cycle_training() -> void:
 ## decoded from MANAGER.EXE strings (docs/re/youth_re.md): search -> "finished his
 ## search" / "...hasn't found"; the duration/yield numbers are our reconstruction.
 func start_youth_search(skills: Array) -> void:
-	if youth_search.is_empty() and not Staff.member_in_role(staff, Staff.YOUTH_TEAM_SCOUT).is_empty():
-		youth_search = {"skills": skills.duplicate(), "weeks": YOUTH_SEARCH_WEEKS}
+	var scout := Staff.member_in_role(staff, Staff.YOUTH_TEAM_SCOUT)
+	if youth_search.is_empty() and not scout.is_empty():
+		var rng := RandomNumberGenerator.new()
+		rng.randomize()
+		# FUN_0053e860 @0x53e967: rand(6) + 0x37 - 5*((quality+1)>>1), over the owner's
+		# SEARCH_SPEEDUP. A 5-star scout is fast, a half-star one takes most of a season.
+		youth_search = {"skills": skills.duplicate(),
+			"weeks": Youth.search_weeks(rng, Staff.quality_byte(scout))}
 		youth_found = []      # arming a new search clears the last one's shortlist
 		_news("youth", "The scout is now searching for players with selected capabilities.")
 
@@ -1942,24 +1947,31 @@ func _tick_youth_search(rng: RandomNumberGenerator) -> void:
 	youth_search["weeks"] = int(youth_search.get("weeks", 1)) - 1
 	if int(youth_search["weeks"]) > 0:
 		return
+	var skills: Array = youth_search.get("skills", [])
 	youth_search = {}
-	var scout := Staff.member_in_role(staff, Staff.YOUTH_TEAM_SCOUT)
-	var stars := float(scout.get("stars", 0.0))
-	# A better scout comes back with a longer shortlist. Yield is OURS (the original's
-	# numbers are database-driven, docs/re/youth_re.md); the loop and every string are
-	# the game's.
-	var n := 0
-	for _i in YOUTH_FOUND_MAX:
-		if rng.randf() < 0.25 + 0.11 * stars:
-			n += 1
-	if n > 0:
-		youth_found = Youth.intake(rng, n, youth_seq, Staff.youth_factor(staff))
-		youth_seq += n
+	# FUN_00575e80: walk the shipped 0x26e4 pool, keep every record whose BASE clears
+	# 0x4f on ANY lit capability, then throw all but ONE at random. `_youth_taken` is
+	# the engine dropping a signed youngster out of the pool for good.
+	youth_found = Youth.scout_search(rng, skills, youth_pool, _youth_taken())
+	if not youth_found.is_empty():
 		_news("youth", "The youth team scout has finished his search.")
 		pending_alerts.append("The youth team scout has finished his search.")
 	else:
 		_news("youth", "The youth team scout has finished his search and hasn't found\na player with the required qualities.")
 		pending_alerts.append("The youth team scout has finished his search and hasn't found\na player with the required qualities.")
+
+
+## Ids already out of the shipped 0x26e4 pool — in your academy, or promoted into your
+## squad. The engine re-parents a signed youngster, so the scout can never re-find him.
+func _youth_taken() -> Array:
+	var out: Array = []
+	for p in youth:
+		out.append(int(p.get("id", -1)))
+	for p in rosters.get(club_id, []):
+		var pid := int(p.get("id", -1))
+		if pid >= 0 and int(p.get("_from_youth_pool", 0)) == 1:
+			out.append(pid)
+	return out
 
 
 ## Offer a contract to one of the scout's finds (a PLAYERS FOUND row tap). He joins the
@@ -1989,7 +2001,7 @@ func sign_youth_prospect(pid: int, rng: RandomNumberGenerator = null) -> Diction
 		_news("youth", "The youth player %s has rejected your offer." % nm)
 		return {"ok": false, "msg": "The youth player %s has rejected your offer." % nm}
 	youth_found.remove_at(idx)
-	youth.append(p)
+	youth.append(Youth.enrol(p, club_id))
 	_news("youth", "%s has joined your Youth Team." % nm)
 	_log("%s has joined your Youth Team." % nm)
 	return {"ok": true, "msg": "%s has joined your Youth Team." % nm}
@@ -2182,29 +2194,15 @@ func _scout_match(row: Dictionary, p: Dictionary, criteria: Dictionary) -> bool:
 	return true
 
 
-## A season's youth turnover: every youngster ages a year; anyone over the graduation
-## age who was never promoted is released to free a place; then the scout brings in a
-## fresh crop (capped at the youth squad size). News lines either way.
-func _roll_youth(rng: RandomNumberGenerator) -> void:
-	var stayers: Array = []
+## A season's youth turnover. The ONLY route into the academy is the YOUTH TEAM SCOUT
+## and the only route out is PROMOTE — nothing in MANAGER.EXE adds or releases youth at
+## the rollover, so neither does this (the old age-out + free crop were both ours, and
+## the shipped 0x26e4 pool is 17-19 year olds who would have aged straight out of it).
+## Everyone just gets a year older.
+func _roll_youth(_rng: RandomNumberGenerator) -> void:
 	for p in youth:
 		p["age"] = int(p.get("age", Youth.INTAKE_AGE_LO)) + 1
-		p["dev_progress"] = 0.0
-		if int(p.get("age", 0)) > Youth.GRADUATE_AGE:
-			_news("youth", "%s has left the youth team without making the grade." % p.get("name", "?"))
-		else:
-			stayers.append(p)
-	youth = stayers
 	_ensure_wonderkid()           # season-rollover delivery of the gem (first 3 seasons; no-op after)
-	var room := Youth.SQUAD_CAP - youth.size()
-	if room <= 0:
-		return
-	var want := mini(room, rng.randi_range(YOUTH_INTAKE_LO, YOUTH_INTAKE_HI))
-	# A youth coach raises the quality of the intake (Youth.intake's scout factor).
-	for p in Youth.intake(rng, want, youth_seq, Staff.youth_factor(staff)):
-		youth.append(p)
-		_news("youth", "%s has joined your Youth Team." % p.get("name", "?"))
-	youth_seq += want
 
 
 ## Plant the guaranteed generational FW (easter egg) if a career is still in its first

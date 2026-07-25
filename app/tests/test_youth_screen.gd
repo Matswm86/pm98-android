@@ -86,13 +86,16 @@ func _run() -> void:
 	career.staff = staff
 	career.start_youth_search(["DRIBBLING"])
 	ok = _assert(not career.youth_search.is_empty(), "start_youth_search arms the search") and ok
-	ok = _assert(int(career.youth_search.get("weeks", 0)) == Career.YOUTH_SEARCH_WEEKS,
-		"search runs YOUTH_SEARCH_WEEKS") and ok
+	# FUN_0053e860 @0x53e967, over Youth.SEARCH_SPEEDUP: a 5-star scout (quality byte
+	# 10) is armed for 30..35 / 2 weeks.
+	var armed := int(career.youth_search.get("weeks", 0))
+	ok = _assert(armed >= 15 and armed <= 18,
+		"search runs the binary's own duration (%d weeks)" % armed) and ok
 	ok = _assert(str((career.news_log[0] as Dictionary).get("text", "")).begins_with(
 		"The scout is now searching"), "searching news = witnessed string") and ok
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 4242
-	for _i in Career.YOUTH_SEARCH_WEEKS:
+	for _i in armed:
 		career._tick_youth_search(rng)
 	ok = _assert(career.youth_search.is_empty(), "search resolves after its weeks") and ok
 	var news_text := ""

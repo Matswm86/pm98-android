@@ -36,14 +36,27 @@ func _run() -> bool:
 			prem.append(c)
 	var ok := true
 
-	# ---- cadence: two intakes per 38-round season ---------------------------
-	ok = _assert(Career.YOUTH_SEARCH_WEEKS * 2 <= 38,
-		"two searches fit in a season (%d weeks each)" % Career.YOUTH_SEARCH_WEEKS) and ok
-	ok = _assert(Career.YOUTH_SEARCH_WEEKS * 3 > 38,
-		"but three do not — it is TWO intakes, not a trickle") and ok
+	# ---- cadence: the binary's own duration, over the owner's SEARCH_SPEEDUP ----
+	# FUN_0053e860 @0x53e967: weeks = rand(6) + 0x37 - 5*((quality+1)>>1). At five
+	# stars (quality byte 10) that is 30..35 weeks — one intake a season at best,
+	# which is what the owner reported seeing. SEARCH_SPEEDUP 2 gives him two.
+	var wrng := RandomNumberGenerator.new()
+	wrng.seed = 9911
+	var top_lo := 99999
+	var top_hi := -1
+	for _i in 300:
+		var w := Youth.search_weeks(wrng, 10)
+		top_lo = mini(top_lo, w)
+		top_hi = maxi(top_hi, w)
+	ok = _assert(top_lo >= 15 and top_hi <= 18,
+		"a 5-star scout takes 30..35 weeks / SPEEDUP (%d..%d)" % [top_lo, top_hi]) and ok
+	ok = _assert(top_hi * 2 <= 38, "two searches fit in a 38-round season") and ok
+	ok = _assert(Youth.search_weeks(wrng, 10) < Youth.search_weeks(wrng, 1) + Youth.SEARCH_SPAN,
+		"a 5-star scout beats a half-star one") and ok
 
 	# ---- a search returns a SHORTLIST, it does not sign anyone --------------
 	var career := Career.create(prem[0], league, prem, leagues)
+	career.youth_pool = Youth.pool_of(_pool_map(db))
 	career.staff = [{"id": 1, "name": "P. MITCHELL", "role": Staff.YOUTH_TEAM_SCOUT,
 		"stars": 5.0, "wage": 1000}]
 	var rng := RandomNumberGenerator.new()
@@ -54,7 +67,7 @@ func _run() -> bool:
 		career.youth_found = []
 		career.start_youth_search(["DRIBBLING"])
 		ok = _assert(not career.youth_search.is_empty(), "SEARCH armed") and ok
-		for _w in Career.YOUTH_SEARCH_WEEKS:
+		for _w in int(career.youth_search.get("weeks", 1)):
 			career._tick_youth_search(rng)
 		ok = _assert(career.youth_search.is_empty(), "the search resolved") and ok
 		ok = _assert(career.youth.is_empty(),
@@ -66,8 +79,8 @@ func _run() -> bool:
 	if not got_shortlist:
 		print("test_youth_prospects: FAIL")
 		return false
-	ok = _assert(career.youth_found.size() <= Career.YOUTH_FOUND_MAX,
-		"the shortlist respects its cap (%d)" % career.youth_found.size()) and ok
+	ok = _assert(career.youth_found.size() == 1,
+		"FUN_00575e80 keeps exactly ONE (%d)" % career.youth_found.size()) and ok
 	ok = _assert(not career.pending_alerts.is_empty(),
 		"the finish raises a hub alert") and ok
 
@@ -120,6 +133,20 @@ func _run() -> bool:
 
 	print("test_youth_prospects: ", "PASS" if ok else "FAIL")
 	return ok
+
+
+## The shipped 0x26e4 youth pool out of a raw game_db dict, with the loader's own
+## knock-down applied (GameDB does this at load; the headless runner has no autoloads).
+func _pool_map(db: Dictionary) -> Dictionary:
+	var by_id: Dictionary = {}
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5150
+	for c in db.get("clubs", []):
+		by_id[int(c["id"])] = c
+		if int(c["id"]) == Youth.POOL_CLUB_ID:
+			for p in c.get("players", []):
+				Youth.degrade(p, rng)
+	return by_id
 
 
 func _pids(rows: Array) -> Array:

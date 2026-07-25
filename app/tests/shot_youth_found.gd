@@ -25,13 +25,19 @@ func _run() -> void:
 	node.position = Vector2.ZERO
 	node.size = Vector2(640, 480)
 
-	var found: Array = []
-	var names := ["Chris Stump", "Danny Ferrell", "Wayne Oldroyd"]
-	for i in 3:
-		found.append({"id": 900100 + i, "name": names[i], "age": 15 + i, "pos": "MF",
-			"isGK": false, "potential": 62 + i * 13,
-			"attrs": {"VE": 40 + i, "RE": 41, "AG": 38, "CA": 34 + i * 4, "RM": 39,
-				"RG": 37, "PA": 44, "TI": 36, "EN": 40, "PO": 12}})
+	# FUN_00575e80 keeps exactly ONE match, out of the shipped 0x26e4 pool — so the
+	# panel this renders is the real one, with a real shipped youngster in it.
+	var by_id: Dictionary = {}
+	var db: Dictionary = JSON.parse_string(
+		FileAccess.open("res://data/game_db.json", FileAccess.READ).get_as_text())
+	var drng := RandomNumberGenerator.new()
+	drng.seed = 20260725
+	for c in db.get("clubs", []):
+		by_id[int(c["id"])] = c
+		if int(c["id"]) == Youth.POOL_CLUB_ID:
+			for pl in c.get("players", []):
+				Youth.degrade(pl, drng)
+	var found := Youth.scout_search(drng, ["DRIBBLING"], Youth.pool_of(by_id))
 	PMChrome.header_phase = "season"
 	node.setup([], [{"id": 1, "name": "P. MITCHELL", "role": Staff.YOUTH_TEAM_SCOUT,
 			"stars": 5.0, "wage": 1000},
@@ -53,4 +59,4 @@ func _run() -> void:
 			ok = false
 			print("  FAIL row %d hit-tests to '%s'" % [int(fr["pid"]), hit])
 	print("found rows: %d, hit-test %s" % [node._found_rects.size(), "OK" if ok else "BROKEN"])
-	quit(0 if ok and node._found_rects.size() == 3 else 1)
+	quit(0 if ok and node._found_rects.size() == 1 else 1)

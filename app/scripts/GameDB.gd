@@ -87,6 +87,9 @@ func _apply_loader_defaults() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
 	for c in clubs:
+		# FUN_005820f0 @0x582434 also knocks every club-0x26e4 (youth pool) record down
+		# at load — same function, same pass. Youth.degrade carries the disassembly.
+		var is_youth_pool := int(c.get("id", -1)) == Youth.POOL_CLUB_ID
 		for p in c.get("players", []):
 			if p.get("age") == null:
 				p["age"] = 25 + rng.randi_range(0, 4)
@@ -94,6 +97,8 @@ func _apply_loader_defaults() -> void:
 				p["heightCm"] = 170 + rng.randi_range(0, 9)
 			if p.get("weightKg") == null:
 				p["weightKg"] = 75 + rng.randi_range(0, 9)
+			if is_youth_pool:
+				Youth.degrade(p, rng)
 
 
 ## Fill the empty `manager` field from the source-true transcription table
