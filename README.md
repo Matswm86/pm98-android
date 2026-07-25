@@ -16,9 +16,19 @@ fan remake.</sub>
 
 ## Download
 
-📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-5e40c23.apk)** — one tap downloads `pm98-5e40c23.apk` (current build) straight to your phone.
+📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-eea349c.apk)** — one tap downloads `pm98-eea349c.apk` (current build) straight to your phone.
 
-> **This build (2026-07-25)** finishes the season the game plays back at you. Four screens the real Premier Manager 98 shows and this remake did not, each rebuilt from the game's own frames and checked back against them pixel by pixel.
+> **This build (2026-07-25, later)** is about your scout, and about remembering what you have won.
+>
+> - **Your scout has a limit, and it is the one the game gave him.** We read the search out of the original's own code this time instead of watching it from outside. It scans every player, then keeps only so many: a three-star scout brings back forty names, a five-star one sixty — and which ones he keeps is a straight lottery, not the best of them. A better scout finds you *more*, not better. That number matched a screenshot from a week ago exactly, right down to the size of the scrollbar, which is how we know it is right.
+> - **Searching by ROLE now finds everyone who can play there.** A player carries six positions, not one, and the original checks all six. We were only checking his first, so a search for a sweeper missed every defender who *also* plays sweeper.
+> - **E.U. PLAYERS and NON E.U. PLAYERS only reach abroad**, as they do in the original — the four division boxes are what reach English clubs. And the game's own list of E.U. countries turned out to be in the executable after all: eighteen of them, exactly the list we had guessed.
+> - **New: search by name, and by any of the six skills.** Tap the grey bar along the bottom of the SCOUT screen. Type part of a surname, or ask for HANDLING 80+, SHOOTING 85+, any combination, and sort what comes back. This is ours, not the 1998 game's, and it says so on its own face — and when your scout has had to leave names behind, it tells you how many. *(Honestly: only passing, handling and overall quality actually change match results, so filtering on shooting finds you a better-looking player, not more goals.)*
+> - **New: an honours board and a career résumé.** The original shows you a trophy the day you win it and then forgets it forever. Now every season you finish is written down — what you won, what you lost the final of, where you finished, what the board asked for and whether you did it — across every club you manage. Tap your own name on the MANAGER HISTORY screen.
+>
+> Also fixed: the game's own player card calls RM *dribbling* and RG *heading*; we had those two the wrong way round in the training code, and called speed "pace" and quality "ability", which are not words this game uses.
+
+> **The build before (2026-07-25)** finishes the season the game plays back at you. Four screens the real Premier Manager 98 shows and this remake did not, each rebuilt from the game's own frames and checked back against them pixel by pixel.
 >
 > - **The cup draw actually happens now.** The draw screen — the trophy, the lottery drum, the round plate, the list of ties — has been in the app for a while with no way to reach it. It now comes up on its own, the way the original does, the moment a round is drawn, for both English cups and all three European ones. And it has the second layout the original has: a short round (sixteen ties or fewer) lays the draw out in a grid with both clubs' kits instead of one line per tie, and **your own tie is picked out on a dark plate with your club in yellow**, so you can find yourself at a glance. Tap a tie and the panel bottom-left fills in with both clubs, both managers and both grounds.
 > - **FINANCES has its week-by-week view.** The tab was there; the page behind it was not. You get the real weekly books — seven income lines, eleven expense lines — with a stepper to walk back through the season and the game's own date stamp for each week. While you are on the live week it reads `CURRENT 31`, exactly as the original does, and drops the word once you step back.

@@ -235,6 +235,38 @@ state beyond the twelve stills — the first positive evidence in that direction
 lead worth taking when the drum hunt resumes. Candidates: BOLA or MANO composited over a
 BOMBO frame, or a lit variant.
 
+#### RESOLVED 2026-07-25 — there is no thirteenth drum. It is the SHADOW.
+
+Every candidate above was tested and killed, and the answer turned out to be a lighting
+pass, not missing art:
+
+* **There is no thirteenth bitmap to find.** `IMG.PKF`'s directory holds exactly
+  `BOMBO00.BMP` .. `BOMBO11.BMP`, four `BOLA?.BMP`, eight `MANO?.BMP` and the per-cup
+  `* SORTEO.BMP` plates. `SORTEO.BMP` itself is a **31x31 icon**, not a scene.
+* **Not a palette variant** — rendering the twelve under the VGA table and all three RIFF
+  palettes (MANAGER / MENU / DBASE) gives pixel-identical results, so the same two
+  nearest neighbours and the same 2551-px residual.
+* **Not an offset** — a +-8 px search around the (136,76) anchor makes every frame worse.
+* **Not a mid-blit tear** — a row-by-row best-match walk picks BOMBO00 for 88 of the 92
+  rows with a residual on every one of them, so there is no clean split between two
+  frames.
+* **Not a per-colour LUT dim** — 8115 of 8203 pixels sit on source colours that map to
+  more than one destination colour, so whatever changes them is SPATIAL, not palettal.
+
+What it is: **the drum's cast shadow, colour `(10,15,0)`.** That exact colour is present
+in every cup-draw frame — 1206 px in `p0445`, 1243 px in `p0125`, where it draws the
+shadow the drum throws down-left onto the table — and in `p0133` / `p0747` it covers
+**2761 px**, because there it also lies across the cage's own interior. Mask the frame to
+that one colour and the picture is unmistakable: the drum's silhouette plus its shadow.
+Correspondingly the whole 2551-px residual sits on the three DARK BLUES of the drum art
+(`(0,0,50)` idx 22, `(20,0,90)` idx 167, `(0,0,128)` idx 4) and on the metal edges beside
+them; the white/grey cage and the gold balls are untouched.
+
+So `p0133` / `p0747` are **BOMBO00 under the shadow pass**, and the twelve stills are the
+complete set. The open question is no longer "where is the thirteenth frame" but "what
+drives the shadow" — it is the same class of engine pass as the NANOESC kit shadow and
+the PMAlert LUT dim, both already documented in this port.
+
 ## Wiring
 
 **The live route exists (REFRUN R4, 2026-07-25).** `Career._queue_cup_draw` banks one
