@@ -154,7 +154,7 @@ func _draw() -> void:
 		var kit := PMChrome.kit(int(club.get("club_id", -1)))
 		if kit != null:
 			draw_texture_rect_region(kit, Rect2(KIT_X, int(p[0]), KIT_W, KIT_H),
-				Rect2(0, 0, 31, 64))
+				Rect2(1, 3, 45, 57))
 		_blit(int(p[1]), int(p[0]) + NAME_PEN_DY, str(club.get("club", "")), C_PLATE_INK)
 	for t in [1, 2, 3, 4]:
 		var blk2: Dictionary = _by_tier.get(t, {})

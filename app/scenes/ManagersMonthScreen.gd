@@ -140,7 +140,7 @@ func _draw() -> void:
 		if kit != null:
 			var k: Vector2i = c["kit"]
 			draw_texture_rect_region(kit, Rect2(k.x, k.y, KIT_WH.x, KIT_WH.y),
-				Rect2(0, 0, 31, 64))
+				Rect2(1, 3, 45, 57))
 		var v: Vector2i = c["val"]
 		var nx: Vector2i = c["name"]
 		var bx: Vector2i = c["club"]

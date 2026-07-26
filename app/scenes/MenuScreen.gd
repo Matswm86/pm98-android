@@ -93,11 +93,11 @@ const CLUB_BASE_BOT := 286
 # Witnessed kit boxes: top x195-244 y200-264, bottom x395-444 y255-318. The
 # original's free-floating 50x65 hub kit render is un-extracted (the panel
 # bank bakes a white panel behind it, unusable over the circle); the kits
-# sheet's front view draws 1:1 centred on the witnessed box (flagged
-# approximation, shield-card precedent).
-const KIT_VIEW := Rect2(0, 0, 31, 64)      # front-kit view of the 48x64 sheet
-const KIT_TOP_POS := Vector2(204, 200)     # top side kit, left of the top band
-const KIT_BOT_POS := Vector2(404, 254)     # bottom side kit, right of the bottom band
+# sheet's figure content (bbox x1..45 y3..59 on the exact decode) draws 1:1
+# centred on the witnessed box (flagged approximation, shield-card precedent).
+const KIT_VIEW := Rect2(1, 3, 45, 57)      # the figure's content bbox
+const KIT_TOP_POS := Vector2(197, 204)     # 45x57 centred in x195..244 y200..264
+const KIT_BOT_POS := Vector2(397, 259)     # 45x57 centred in x395..444 y255..318
 const C_INK_CPU := Color8(0, 0, 0)         # CPU half: black on the pale boxes
 const C_INK_PLAYER := Color8(255, 255, 255)  # player half: white on the dark boxes
 

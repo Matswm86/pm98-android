@@ -426,7 +426,7 @@ func _kit_cell(cell: Array, y: int, club_id: int) -> void:
 		return
 	draw_texture_rect_region(kit,
 		Rect2(int(cell[0]) + 2, y + 1, int(cell[1]) - int(cell[0]) - 4, GRID_ROW_H - 2),
-		Rect2(0, 0, 31, 64))
+		Rect2(1, 3, 45, 57))
 
 
 ## The bottom-left tie-detail card. Empty until a row is tapped, which is the original's
@@ -450,7 +450,7 @@ func _draw_card() -> void:
 		var kit := PMChrome.kit(int(side.get("club_id", -1)))
 		if kit != null:
 			draw_texture_rect_region(kit, CARD_KIT_L if i == 0 else CARD_KIT_R,
-				Rect2(0, 0, 31, 64))
+				Rect2(1, 3, 45, 57))
 
 
 ## Black window, competition strip, drum backdrop, drum frame (opaque). Exactly the

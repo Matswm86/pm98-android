@@ -33,12 +33,14 @@ const NAME_H := Vector2(76, 256)           # home name zone (x span)
 const NAME_A := Vector2(382, 586)          # away name zone (x span)
 const BOX_L := Rect2(258, 100, 62, 32)     # left score box
 const BOX_R := Rect2(322, 100, 58, 32)     # right score box
-# kit = the club escudo drawn to the frame-64 bounds. The escudo's opaque kit (y24..63,
-# 40px) maps to the original's y89..142 (53px) at uniform scale ~1.32; the anchor lands
-# the opaque top at y89 (the transparent y0..23 sits above the band). x0..31 -> x14..55.
-const KIT_H := Vector2(14, 57)             # home kit anchor (escudo top-left)
-const KIT_A := Vector2(585, 57)            # away kit anchor
-const KIT_SCALE := 1.32                    # escudo-opaque(40h) -> frame-64 kit(53h)
+# kit = the club escudo drawn to the frame-64 bounds. The witnessed kit band is
+# x14..55 (42 wide) / y89..142 (53 tall). The old anchors ("opaque y24..63, scale
+# 1.32") were solved on the WRAPPED bank; on the exact decode the figure's bbox is
+# x1..45 y3..59 (45x57), so the content now draws at its own top-left with the
+# fit scale min(42/45, 53/57).
+const KIT_H := Vector2(14, 89)             # home kit content top-left
+const KIT_A := Vector2(585, 89)            # away kit content top-left
+const KIT_SCALE := 0.9298                  # 45x57 figure -> the witnessed 42x53 band
 # feed body = the REAL EVENTS panel (frame 67): light-grey MIN column x153..198 +
 # white COMMENT column x199..467 (scrollbar x470..476). The old x312..470 rect drew
 # only the right third, so the goal line's club clipped ("Goal by Salako" -> "Goal by
@@ -59,7 +61,7 @@ const BTN := {
 	"exit": Rect2(508, 442, 120, 30),
 }
 
-const KIT_SRC := Rect2(0, 0, 31, 64)   # shirt half of the 48x64 MINIESC escudo
+const KIT_SRC := Rect2(1, 3, 45, 57)   # the MINIESC figure's content bbox (exact decode)
 const C_LCD := Color(0.78, 0.86, 0.78)
 const C_NAME := Color(1.0, 1.0, 1.0)
 const C_GOAL := Color(1, 0, 0)   # goal lines pure red (frame 67 "Goal by Blake" = 255,0,0)

@@ -183,7 +183,7 @@ func _draw_side(col: Dictionary, cells: Array, row_top: int, side: Dictionary) -
 	var kit := PMChrome.kit(int(side.get("club_id", -1)))
 	if kit != null:
 		draw_texture_rect_region(kit, Rect2(int(col["kit_x"]), row_top + 1, KIT_W, KIT_H),
-			Rect2(0, 0, 31, 64))
+			Rect2(1, 3, 45, 57))
 	_blit(int(col["name_pen"]), row_top + NAME_PEN_DY, str(side.get("club", "")), ink)
 	var scores: Array = side.get("scores", [])
 	for k in mini(scores.size(), cells.size()):

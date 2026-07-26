@@ -65,7 +65,9 @@ const CONTINUE := Rect2(479, 439, 112, 25)
 # additionally carries LINE-UP (x15..106) and TACTICS (x116..195) on the left — those are
 # the manager's own mid-match doors and stay baked chrome (un-ported, see _on_input).
 const STATS_BTN := [Rect2(205, 308, 106, 25), Rect2(329, 308, 106, 25)]
-const KIT_SRC := Rect2(0, 0, 31, 64)
+# The kit figure's true content bbox on the exact-decoded MINIESC sheet (was the
+# wrapped-bank 0,0,31,64 crop — see PMChrome.KIT_SRC's note).
+const KIT_SRC := Rect2(1, 3, 45, 57)
 
 const C_NAME := Color(0.98, 0.99, 1.0)
 const C_SCORE := Color(1, 1, 1)

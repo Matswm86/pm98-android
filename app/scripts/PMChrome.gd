@@ -59,8 +59,13 @@ const _WD := ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", 
 const _MON := ["", "January", "February", "March", "April", "May", "June", "July",
 	"August", "September", "October", "November", "December"]
 
-# Home-kit crop (left 31px of the 48x64 MINIESC kit), as the other screens use.
-const KIT_SRC := Rect2(0, 0, 31, 64)
+# MINIESC kit content crop. The sprite sheet is 48x64; the FIGURE's opaque bbox
+# is x1..45, y3..59 (427/476 sprites exactly, union x1..45 y3..60 — measured on
+# the exact-decoded bank, 2026-07-26). The old Rect2(0,0,31,64) was tuned while
+# the bank shipped WRAPPED (rotated 21 rows + 16 cols) and its "left 31px =
+# shirt half" story was an artifact of that wrap: on the true decode it sliced
+# 21% of the figure's opaque pixels off mid-body. [Mats QA 2026-07-26]
+const KIT_SRC := Rect2(1, 3, 45, 57)
 
 static var _fonts: Dictionary = {}
 static var _kits: Dictionary = {}
@@ -436,7 +441,8 @@ static func draw_bg(ci: CanvasItem) -> void:
 		ci.draw_rect(Rect2(0, 0, W, H), _dc(Color(0.10, 0.18, 0.40)), true)
 
 
-## The managed club's home kit (left crop) fitted into a box, aspect-preserved.
+## The managed club's kit figure (KIT_SRC content bbox) fitted into a box,
+## aspect-preserved.
 static func draw_crest(ci: CanvasItem, club_id: int, r: Rect2) -> void:
 	var tex := kit(club_id)
 	if tex == null:

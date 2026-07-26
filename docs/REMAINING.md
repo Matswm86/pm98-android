@@ -26,12 +26,19 @@ final build:
   HANDLING..SHOOTING button plates + the scout screen's own fields/arrows); the scene
   draws only live text in sampled inks. All six scout witnesses still 0 px.
   See `scout_screen_re.md` §"The OURS panel".
-* **Kit blits truncated / outside frames.** Seven screens crop FIXED sub-regions of the
-  top-level kit bank that were tuned while that bank shipped WRAPPED (see §5):
-  `ChampionshipsScreen`, `ManagersMonthScreen`, `MatchResultScreen`, `EndOfSeasonScreen`,
-  `CupDrawScreen`, `MenuScreen`, `RivalScreen`. The 2026-07-26 un-wrap moved every
-  sprite's content, so those crops now cut the kit. Re-tune each against its witness
-  frames (correct sprite bbox is x1..45, y3..59).
+* ~~**Kit blits truncated / outside frames.**~~ — **RE-TUNED 2026-07-26 evening.** The
+  wrapped-bank `Rect2(0,0,31,64)` crop is gone everywhere: the shared
+  `PMChrome.KIT_SRC` (and its aspect-fit `draw_crest`, feeding EuroSupercup /
+  CompResult / CharityShield / LeagueTable) plus the per-screen crops in
+  `ChampionshipsScreen`, `ManagersMonthScreen`, `MatchResultScreen`,
+  `EndOfSeasonScreen`, `CupDrawScreen` (grid + card), `MenuScreen` (45x57 1:1,
+  re-centred in the witnessed 50x65 boxes) and `MatchScreen` (content top-left at the
+  witnessed y89 band, fit 42x53) all use the exact-decode figure bbox
+  `Rect2(1,3,45,57)`; `MatchSimulador._club_colour` samples the same bbox.
+  **`RivalScreen` was a false positive** — it consumes the nano/ bank (never wrapped)
+  and is pinned by `diff_entry_parity`'s full-frame 0 px case; untouched. Gates re-run
+  green: seasonend-year, cupdraw, supercup (+ scout/knockout unaffected).
+  `LineupRollScreen`/`FixturesScreen` draw the whole sheet (no truncation) — left as-is.
 * **Preseason is gone in season two** — no friendly setup reachable at the second
   season's start.
 * **No contract-renewal message toward season end**, which the original raises.

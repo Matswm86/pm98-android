@@ -247,14 +247,15 @@ func _club_colour(club_id: int, fallback: Color) -> Color:
 	var img := tex.get_image()
 	if img == null:
 		return fallback
-	# Sample the shirt half (left 0..23 of the 48-wide escudo); pick the most saturated,
-	# reasonably-bright pixel as the team colour.
+	# Sample the figure's content bbox (x1..45, y3..59 on the exact-decoded sheet —
+	# the old "shirt half x0..23" window was a wrapped-bank artifact); pick the most
+	# saturated, reasonably-bright pixel as the team colour.
 	var best := fallback
 	var best_sat := -1.0
-	var w: int = mini(24, img.get_width())
-	var h: int = img.get_height()
-	for y in range(0, h, 2):
-		for x in range(0, w, 2):
+	var w: int = mini(46, img.get_width())
+	var h: int = mini(60, img.get_height())
+	for y in range(3, h, 2):
+		for x in range(1, w, 2):
 			var c := img.get_pixel(x, y)
 			if c.a < 0.5:
 				continue
