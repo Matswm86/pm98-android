@@ -93,8 +93,29 @@ baked verbatim. The domestic form of the same bracket is
 `REPLAY` plates instead of the three European ones.
 
 **Still unwitnessed here:** a bracket tie with BOTH legs played, so the `AGGR.` cell's ink
-and the advancing-club highlight in this layout are still open. The phase paginator can be
-walked back to a finished phase, which is how to get it.
+and the advancing-club highlight *in this layout* are still open. Note the aggregate itself
+IS witnessed, in the COMPACT layout — `06_euroleague_round1_played.png` carries
+`1ST LEG 2-1 · 2ND LEG 1-0 · AGGR. 2-2`, i.e. the aggregate is the two legs summed with the
+home/away sides swapped. Only the bracket form's own cell is missing.
+
+**Two full seasons were driven and both missed it, for a structural reason — read this
+before driving a third.** The screen auto-advances to the next phase the moment that phase
+is DRAWN, and the next round is drawn as soon as the previous one resolves (the
+draw-then-play rule above). So a completed bracket is on screen only for the days between
+its last 2nd leg and the next draw, which a two-week probe cadence walks straight over:
+
+| season | bracket seen | next probe |
+|---|---|---|
+| 1997-98 | QTR FINALS, 1st legs in, Sat 14 Mar 1998 (`03_...`) | already Semifinals |
+| 1998-99 | QTR FINALS, 1st legs in, Sat 13 Mar 1999 | already Semifinals, Sat 27 Mar |
+
+**The method that will work** is not another season, it is the **phase paginator's LEFT
+arrow**: pause the drive with the euro at Semifinals and page back one phase to the
+finished quarter-finals. Same trick gets the played `WINNER` band — the Final was still
+undecided at week 38 in both seasons and is played inside the season-end sequence, when the
+hub never comes back. The arrow moves with the label width (measured `(197,96)` / `(303,96)`
+for `QTR FINALS`, `(243,97)` / `(350,97)` for `ROUND 1`), so measure it on the live frame.
+Reaching the euro semifinals from a fresh career is ~34 weeks, about an hour of drive.
 
 ### 4 — the semifinal cards
 

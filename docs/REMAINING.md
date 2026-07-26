@@ -75,6 +75,9 @@ is real and shipped, and PM98 ships two match presentations, so this is the seco
   in **`docs/re/knockout_views_re.md`**. Two cells remain unwitnessed (a bracket `AGGR.`
   with a decided tie, and a played `WINNER` band) — both reachable by walking the phase
   paginator back into a finished phase.
+  Two seasons were driven and both missed those two cells for a structural reason (the view
+  auto-advances the moment the next phase is drawn), so a third season is the wrong move —
+  page the phase paginator BACK from Semifinals instead. See `knockout_views_re.md`.
   **THE BUILD IS THE OUTSTANDING WORK** (Mats, 2026-07-26): `app/scenes/` holds
   `EuroGroupScreen.gd` and nothing for a knockout round in ANY competition, so RESULTS →
   any cup at a knockout phase still has no faithful screen. Suggested order: the compact
