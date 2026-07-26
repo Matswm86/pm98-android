@@ -46,6 +46,7 @@ var snd_ambient := true
 var snd_comments := true
 var camera_mode := "static"     # static/auto/free
 var lineups_on := true          # LINE-UPS: pre-match XI-vs-XI photo roll (live consumer)
+var cheat_three_up_front := false   # port-only cheat, NOT a PM98 option — see set_three_up_front
 
 const _SETTINGS := "user://settings.cfg"
 const _MUSIC_DB := -8.0   # the module theme sits under the UI
@@ -92,6 +93,7 @@ func _load_settings() -> void:
 	snd_comments = bool(cf.get_value("match", "snd_comments", snd_comments))
 	camera_mode = str(cf.get_value("match", "camera_mode", camera_mode))
 	lineups_on = bool(cf.get_value("match", "lineups", lineups_on))
+	set_three_up_front(bool(cf.get_value("cheats", "three_up_front", cheat_three_up_front)))
 
 
 func save_settings() -> void:
@@ -112,7 +114,19 @@ func save_settings() -> void:
 	cf.set_value("match", "snd_comments", snd_comments)
 	cf.set_value("match", "camera_mode", camera_mode)
 	cf.set_value("match", "lineups", lineups_on)
+	cf.set_value("cheats", "three_up_front", cheat_three_up_front)
 	cf.save(_SETTINGS)
+
+
+## THREE UP FRONT — the port of MANAGER_HACK.EXE (docs/re/hack_three_forwards.md).
+## Not a PM98 setting: the original has no such option, so it lives in its own `cheats`
+## block and never appears on a screen the render-diff covers. Default OFF, and OFF is
+## bit-identical to stock (proven in the PCode emulator against the real bytes).
+func set_three_up_front(on: bool, persist := false) -> void:
+	cheat_three_up_front = on
+	Pm98StatMatch.cheat_three_up_front = on
+	if persist:
+		save_settings()
 
 
 ## Persist the chosen MATCH OPTIONS view mode (WATCH/HIGHLIGHTS/BRIEF/RESULTS).

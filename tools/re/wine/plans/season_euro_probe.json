@@ -1,0 +1,250 @@
+{
+ "out": "season_euro",
+ "note": "Drive a MANAGER LEAGUE career week by week AND photograph the RESULTS competition rail every second hub visit. The European knockout view, the two domestic cup tabs and the U.E.F.A./Cup Winners' tabs are never raised by the sim itself, so a whole season of them only exists if the drive walks in and back out on a schedule. Hub tile coords measured on keep_0037_hub.png: RESULTS (155,97); rail chips x=565 at y=132 F.A. Cup, 159 Coca-Cola, 186 Charity Shield, 223 Euro. League, 250 Cup Winner's, 277 U.E.F.A., 304 Euro. Superc., 331 Intercont.; RETURN (562,447).",
+ "keep": [
+  "hub",
+  "cup_draw",
+  "champion_card",
+  "the_championships",
+  "end_of_season"
+ ],
+ "rules": {
+  "hub": {
+   "click": [
+    594,
+    268
+   ],
+   "settle": 1.2
+  },
+  "champion_card": {
+   "click": [
+    115,
+    352
+   ],
+   "settle": 1.2
+  },
+  "start_of_season": {
+   "click": [
+    573,
+    428
+   ],
+   "settle": 1.2
+  },
+  "teams_in_championships": {
+   "click": [
+    573,
+    451
+   ],
+   "settle": 1.2
+  },
+  "match_options": {
+   "click": [
+    478,
+    351
+   ],
+   "settle": 3.0
+  },
+  "prematch_lineups": {
+   "click": [
+    320,
+    240
+   ],
+   "settle": 3.0
+  },
+  "half_time": {
+   "click": [
+    536,
+    451
+   ],
+   "settle": 2.0
+  },
+  "full_time": {
+   "click": [
+    536,
+    451
+   ],
+   "settle": 2.0
+  },
+  "cup_draw": {
+   "click": [
+    551,
+    451
+   ],
+   "settle": 2.0
+  },
+  "manager_of_month": {
+   "click": [
+    573,
+    255
+   ],
+   "settle": 1.5
+  },
+  "player_of_month": {
+   "click": [
+    571,
+    359
+   ],
+   "settle": 1.5
+  },
+  "channel_tv": {
+   "click": [
+    505,
+    357
+   ],
+   "settle": 1.5
+  },
+  "lineup_screen": {
+   "swap_unavailable": true,
+   "click": [
+    592,
+    454
+   ],
+   "settle": 1.5
+  },
+  "alert_box": {
+   "click_alert_ok": true,
+   "settle": 1.2
+  },
+  "news_extra": {
+   "click": [
+    486,
+    38
+   ],
+   "settle": 1.5
+  },
+  "finance_screen": {
+   "click": [
+    568,
+    451
+   ],
+   "settle": 1.5
+  },
+  "team_offer": {
+   "click": [
+    492,
+    455
+   ],
+   "settle": 1.5
+  },
+  "league_tables_final": {
+   "click": [
+    573,
+    437
+   ],
+   "settle": 1.5
+  },
+  "the_championships": {
+   "click": [
+    573,
+    451
+   ],
+   "settle": 1.5
+  },
+  "end_of_season": {
+   "click": [
+    573,
+    437
+   ],
+   "settle": 1.5
+  },
+  "players_of_the_year": {
+   "click": [
+    557,
+    438
+   ],
+   "settle": 1.5
+  },
+  "preseason": {
+   "clicks": [
+    [
+     557,
+     346,
+     4
+    ],
+    [
+     570,
+     455
+    ]
+   ],
+   "settle": 3.0
+  }
+ },
+ "film_secs": 20,
+ "retries": 45,
+ "loop_breaker": {
+  "cycle": [
+   "hub",
+   "alert_box"
+  ],
+  "when": "hub",
+  "action": {
+   "click": [
+    480,
+    97
+   ],
+   "settle": 3.0
+  }
+ },
+ "keep_all": false,
+ "probe": {
+  "on": "hub",
+  "every": 2,
+  "steps": [
+   {
+    "click": [
+     155,
+     97
+    ],
+    "settle": 2.2,
+    "snap": "results"
+   },
+   {
+    "click": [
+     565,
+     223
+    ],
+    "settle": 1.8,
+    "snap": "euro"
+   },
+   {
+    "click": [
+     565,
+     132
+    ],
+    "settle": 1.5,
+    "snap": "facup"
+   },
+   {
+    "click": [
+     565,
+     159
+    ],
+    "settle": 1.5,
+    "snap": "cocacola"
+   },
+   {
+    "click": [
+     565,
+     250
+    ],
+    "settle": 1.5,
+    "snap": "cwc"
+   },
+   {
+    "click": [
+     565,
+     277
+    ],
+    "settle": 1.5,
+    "snap": "uefa"
+   },
+   {
+    "click": [
+     562,
+     447
+    ],
+    "settle": 2.2
+   }
+  ]
+ }
+}

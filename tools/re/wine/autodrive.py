@@ -257,24 +257,38 @@ def alert_ok_point(img: Image.Image) -> tuple[int, int] | None:
     return right - 1 - 23, bottom - 12
 
 
-# LINE-UP screen geometry, measured on real frames 2026-07-25 (30_lineup / 34_swap) and
-# agreeing with the previous session's independent measurement in lineup_offender.py:
+# LINE-UP screen geometry. XI rows measured 2026-07-25 (30_lineup / 34_swap), pool rows
+# re-measured 2026-07-26 on a live Bolton W LINE-UP with a suspension (the old
+# `SUB = 294,310,326` / `RESERVE = 363..443` was wrong: the block holds FIVE substitutes,
+# 294..358, and the RESERVES rows start at 395 — 363/379 are the block's own header band,
+# so a swap could aim at a row that is not a player at all).
 #   XI rows          y = 95 + 16*i, i = 0..10
-#   SUBSTITUTES rows y = 294 + 16*i, i = 0..2
-#   RESERVES rows    y = 363 + 16*i
-# An unavailable player's row is repainted on a GOLD plate (212,191,85) with a dark-gold
-# status band (170,127,0) where the EN..QU attribute cells normally are — an injury draws
-# a medical cross at x181..189 plus "<n> WEEKS" in that band. Available rows are never gold.
+#   SUBSTITUTES rows y = 294 + 16*i, i = 0..4
+#   RESERVES rows    y = 395 + 16*i, i = 0..3   (the block scrolls; 4 are on screen)
+# An unavailable player's row is repainted on a GOLD plate (212,191,85) at x=60 with a
+# dark-gold status band where the EN..QU attribute cells normally are: an INJURY draws a
+# medical cross at x181..189 plus "<n> WEEKS", a SUSPENSION a red card plus "MATCH".
+# The plate alone is NOT sufficient — a row the user has just tapped is repainted with the
+# selection blue over the plate, and that is exactly the row a swap has to find. The band
+# survives the selection, so it is the discriminator: dark gold is the only ink in that
+# column with B < 40 (every available row's band is a pastel or (100,100,140)).
+# Witnessed values: (85,63,0) plain, (170,127,0) and (170,159,0) under a modal's dim.
 LINEUP_XI_Y = tuple(95 + 16 * i for i in range(11))
-LINEUP_SUB_Y = (294, 310, 326)
-LINEUP_RESERVE_Y = (363, 379, 395, 411, 427, 443)
+LINEUP_SUB_Y = tuple(294 + 16 * i for i in range(5))
+LINEUP_RESERVE_Y = tuple(395 + 16 * i for i in range(4))
 LINEUP_PLATE_X = 60
 LINEUP_NAME_X = 100
 LINEUP_GOLD = (212, 191, 85)
+LINEUP_BAND_X = (196, 233)   # the status-band column span
 
 
 def _is_unavailable(a: np.ndarray, y: int) -> bool:
-    return bool(np.abs(a[y, LINEUP_PLATE_X] - np.array(LINEUP_GOLD)).max() <= 8)
+    if bool(np.abs(a[y, LINEUP_PLATE_X] - np.array(LINEUP_GOLD)).max() <= 8):
+        return True
+    band = a[max(0, y - 2):y + 7, LINEUP_BAND_X[0]:LINEUP_BAND_X[1]]
+    gold = (band[..., 2] < 40) & (band[..., 0] >= 60) & (band[..., 0] > band[..., 1]) \
+        & (band[..., 1] > band[..., 2])
+    return bool(gold.any())
 
 
 def unavailable_rows(img: Image.Image) -> dict:
@@ -287,15 +301,38 @@ def unavailable_rows(img: Image.Image) -> dict:
     }
 
 
+LINEUP_ROL_X = (400, 434)   # the ROL text cell ("GOAL"/"DEF"/"MID"/"FOR"), ink only
+LINEUP_ROL_DY = (-2, 3)     # the five glyph rows; the cell's own borders move per row
+
+
+def _rol_mask(a: np.ndarray, y: int) -> bytes:
+    """The ROL cell's ink as a bitmask, so two rows of the same role compare equal.
+
+    The cell BACKGROUND alternates with the row band, so a raw pixel compare is useless;
+    the glyphs are the same face at the same x on every row, so their ink mask is not.
+    Cropped to the glyph rows: the cell's left border and its bottom edge are drawn
+    differently on a selected / block-boundary row and would defeat the compare.
+    """
+    cell = a[max(0, y + LINEUP_ROL_DY[0]):y + LINEUP_ROL_DY[1], LINEUP_ROL_X[0]:LINEUP_ROL_X[1]]
+    return (cell.max(axis=2) < 120).tobytes()
+
+
 def lineup_swap_plan(img: Image.Image) -> tuple[tuple[int, int], tuple[int, int]] | None:
-    """Pick (unavailable XI row, replacement row) as two name-column click points."""
+    """Pick (unavailable XI row, replacement row) as two name-column click points.
+
+    Never offers a second goalkeeper: XI slot 0 is always the GK, so a pool row whose ROL
+    ink matches slot 0's is one too. (Learned the hard way — the first ban this driver hit
+    would have swapped a suspended defender for the backup keeper.)
+    """
+    a = as_frame(img)
     bad = unavailable_rows(img)
     if not bad["xi"]:
         return None
+    gk = _rol_mask(a, LINEUP_XI_Y[0])
     for block in ("subs", "reserves"):
         pool = LINEUP_SUB_Y if block == "subs" else LINEUP_RESERVE_Y
         for y in pool:
-            if y not in bad[block]:
+            if y not in bad[block] and _rol_mask(a, y) != gk:
                 return (LINEUP_NAME_X, bad["xi"][0]), (LINEUP_NAME_X, y)
     return None
 
@@ -326,6 +363,23 @@ def identify(img: Image.Image, sigs: dict) -> tuple[str | None, float, list[tupl
 # ------------------------------------------------------------------------- the drive
 
 
+def run_probe(e: dict, probe: dict, outdir: Path, tag: str) -> None:
+    """Detour off the drive to photograph a screen the career itself never raises.
+
+    The European knockout view, the domestic cup tabs and the league tables are only
+    reachable by walking into RESULTS and back; the sim never shows them unprompted. A
+    probe is that walk, expressed as a click/snap list, fired every `every` visits of the
+    `on` screen. Frames land in the drive's own output directory named for the probe step,
+    so a whole season's worth of one screen is a `ls` away.
+    """
+    for i, act in enumerate(probe.get("steps", [])):
+        if "click" in act:
+            click(e, *act["click"], act.get("count", 1))
+        time.sleep(act.get("settle", 1.2))
+        if "snap" in act:
+            grab(e, outdir / f"probe_{tag}_{i:02d}_{act['snap']}.png")
+
+
 def run_plan(plan_path: Path, max_steps: int, settle: float) -> int:
     plan = json.loads(plan_path.read_text())
     sigs = load_sigs()
@@ -335,6 +389,8 @@ def run_plan(plan_path: Path, max_steps: int, settle: float) -> int:
     rules = plan["rules"]
     goal = plan.get("goal")
     keep = set(plan.get("keep", []))
+    probe = plan.get("probe")
+    probe_seen = 0
     log = []
     recent: list[str] = []
     unknown = 0
@@ -404,6 +460,12 @@ def run_plan(plan_path: Path, max_steps: int, settle: float) -> int:
             click(e, *act["click"], act.get("count", 1))
             time.sleep(act.get("settle", 2.0))
             continue
+
+        if probe and name == probe.get("on", "hub"):
+            probe_seen += 1
+            if probe_seen % max(1, int(probe.get("every", 10))) == 0:
+                print(f"   probe #{probe_seen // int(probe.get('every', 10))} at step {step}", flush=True)
+                run_probe(e, probe, outdir, f"{step:04d}")
 
         rule = rules.get(name)
         if rule is None:

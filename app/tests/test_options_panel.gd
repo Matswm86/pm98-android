@@ -30,11 +30,30 @@ func _run() -> void:
 		["R_TRANS_ON", OptionsPanel.R_TRANS_ON],
 		["R_TRANS_OFF", OptionsPanel.R_TRANS_OFF],
 		["R_OK", OptionsPanel.R_OK],
+		["R_CHEAT_ON", OptionsPanel.R_CHEAT_ON],
+		["R_CHEAT_OFF", OptionsPanel.R_CHEAT_OFF],
+		["R_CHEAT_BAND", OptionsPanel.R_CHEAT_BAND],
 	]
 	for entry in controls:
 		var r: Rect2 = entry[1]
 		ok = _assert(canvas.encloses(r), "%s in canvas" % entry[0]) and ok
 		ok = _assert(OptionsPanel.BOX.encloses(r), "%s inside BOX" % entry[0]) and ok
+
+	# THREE UP FRONT is the ONE declared deviation from the original modal
+	# (docs/re/hack_three_forwards.md). Its two X-boxes must live inside the band the
+	# parity gate tools/re/diff_options_parity.py excludes, and the band must not touch
+	# any control the original actually draws -- else the deviation stops being bounded.
+	ok = _assert(OptionsPanel.R_CHEAT_BAND.encloses(OptionsPanel.R_CHEAT_ON),
+		"R_CHEAT_ON inside the declared band") and ok
+	ok = _assert(OptionsPanel.R_CHEAT_BAND.encloses(OptionsPanel.R_CHEAT_OFF),
+		"R_CHEAT_OFF inside the declared band") and ok
+	for entry in [["R_MUSIC_SLIDER", OptionsPanel.R_MUSIC_SLIDER],
+			["R_SFX_SLIDER", OptionsPanel.R_SFX_SLIDER],
+			["R_MUSIC_BOX", OptionsPanel.R_MUSIC_BOX], ["R_SFX_BOX", OptionsPanel.R_SFX_BOX],
+			["R_TRANS_ON", OptionsPanel.R_TRANS_ON], ["R_TRANS_OFF", OptionsPanel.R_TRANS_OFF],
+			["R_OK", OptionsPanel.R_OK]]:
+		ok = _assert(not OptionsPanel.R_CHEAT_BAND.intersects(entry[1] as Rect2),
+			"declared band clear of %s" % entry[0]) and ok
 
 	# Baked chrome referenced by _ready() is present and loadable.
 	for path in ["res://art/screens/dropdown/options_box.png",
@@ -77,6 +96,16 @@ func _run() -> void:
 		ok = _assert(am.sfx_volume == 64, "AudioManager.set_sfx_volume applies value") and ok
 		am.set_transitions(not orig_trans)
 		ok = _assert(am.transitions_enabled == (not orig_trans), "AudioManager.set_transitions applies value") and ok
+		# THREE UP FRONT: the panel's R_CHEAT_ON/OFF hits forward to set_three_up_front,
+		# which must move BOTH the stored flag and the engine's own static.
+		var orig_cheat: bool = am.cheat_three_up_front
+		am.set_three_up_front(true)
+		ok = _assert(am.cheat_three_up_front and Pm98StatMatch.cheat_three_up_front,
+			"AudioManager.set_three_up_front arms the engine") and ok
+		am.set_three_up_front(false)
+		ok = _assert(not am.cheat_three_up_front and not Pm98StatMatch.cheat_three_up_front,
+			"AudioManager.set_three_up_front disarms the engine") and ok
+		am.set_three_up_front(orig_cheat)
 		# Restore so this headless run doesn't leak state into user://settings.cfg for
 		# other test scripts (test_audio.gd follows the same restore convention).
 		am.set_music_volume(orig_mv)

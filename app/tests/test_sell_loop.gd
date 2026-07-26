@@ -148,12 +148,25 @@ func _run() -> void:
 	ok = _assert(not c.is_listed(pid), "the listing cleared") and ok
 
 	# --- the hub message must carry INK, not be a blank box ------------------
+	# MenuScreen.alert() QUEUES: `_alert_msg` is only the box currently on screen and the
+	# rest wait in `_alert_queue`. The same CONTINUE can raise a finance warning ("You have
+	# been running the club at a loss...") before the sale confirmation, and then reading
+	# `_alert_msg` alone fails on a message the hub *did* raise — which is exactly why this
+	# test was intermittently red. Search the whole pending set, on-screen box included.
 	var hub = main._hub
-	var msg := ""
+	var pending: Array = []
 	if hub != null and "_alert_msg" in hub:
-		msg = str(hub._alert_msg)
-	ok = _assert(msg.find("signed by") >= 0,
-		"hub raised the signing message ('%s')" % msg) and ok
+		if str(hub._alert_msg) != "":
+			pending.append(str(hub._alert_msg))
+	if hub != null and "_alert_queue" in hub:
+		for q in (hub._alert_queue as Array):
+			pending.append(str(q))
+	var msg := ""
+	for m in pending:
+		if str(m).find("signed by") >= 0:
+			msg = str(m)
+	ok = _assert(msg != "",
+		"hub raised the signing message (pending %s)" % str(pending)) and ok
 	if msg != "":
 		# the exact blank-box regression: an empty glyph table collapses the box to
 		# its 160px minimum and draws nothing.

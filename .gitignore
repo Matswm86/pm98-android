@@ -119,3 +119,6 @@ screenshots/
 tools/re/_*.py
 out/
 scratchpad/
+
+# ── PM98 hack tooling transients
+tools/hack/_*

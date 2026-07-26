@@ -110,8 +110,27 @@ const POS_WEIGHT := [0, 0, 3, 3, 3, 7, 7, 12, 10, 35, 10, 12, 15, 18, 15, 3, 18,
 const MINUTE_OFFSET := [0, 0x2d, 0x5a, 0x69]
 
 
+## THREE UP FRONT — the port of MANAGER_HACK.EXE (docs/re/hack_three_forwards.md).
+## OFF by default and OFF is bit-identical to stock: the EXE patch was proven in the
+## Ghidra PCode emulator to leave draws, event count, final LCG state and score untouched
+## for any XI with fewer than three forwards, and this port keeps that property by
+## computing the stock `3 - rand()%3` cap (and consuming its draws) before flooring.
+static var cheat_three_up_front := false
+
+
 static func _player(side: int, idx: int) -> int:
 	return side * SIDE_STRIDE + idx * PLAYER_STRIDE
+
+
+## Selected players with ROLE == 3 (ATT/FOR) in `side`'s XI — the cave's `att3` routine.
+## Evaluated per side, so an AI team fielding three forwards gets the same buff.
+static func _att_count(mem: Mem, side: int) -> int:
+	var n := 0
+	for i in range(11):
+		var pb := _player(side, i)
+		if mem.u16(pb + SEL) != 0 and mem.s32(pb + ROLE) == 3:
+			n += 1
+	return n
 
 
 # --- FUN_004510b0: append an event ------------------------------------------
@@ -176,10 +195,14 @@ static func _assist_marker(mem: Mem, side: int, idx: int, val: int) -> void:
 ## Appends a goal event, or does nothing on a keeper save / no eligible scorer.
 static func _resolve(mem: Mem, rng: Rng, side: int, seg: int, minute: int) -> void:
 	# keeper-save gate: defending side's player[0].
+	# THREE UP FRONT (MANAGER_HACK.EXE hook 0x44ed04, docs/re/hack_three_forwards.md):
+	# when the ATTACKING side triggers, the gate is skipped entirely -- draws included,
+	# exactly as the cave does, so cheat-ON is not a re-roll of cheat-OFF.
 	var kbase := _player(1 - side, 0)
-	if mem.u16(kbase + SEL) != 0:
-		if rng.mod(130) < mem.u8(kbase + GKSAVE):
-			return
+	if not (cheat_three_up_front and _att_count(mem, side) >= 3):
+		if mem.u16(kbase + SEL) != 0:
+			if rng.mod(130) < mem.u8(kbase + GKSAVE):
+				return
 
 	var abase := side * SIDE_STRIDE
 	var total := 0
@@ -404,9 +427,16 @@ static func _half_chances(mem: Mem, rng: Rng, seg: int, span: int) -> void:
 	var avg0 := _avg_strength(mem, 0)
 	var avg1 := _avg_strength(mem, 1)
 	var c0 := _chance_count(rng, avg0, avg1)
+	# THREE UP FRONT (hooks 0x44f802 / 0x44f899 / 0x44fb16 / 0x44fbb7): the stock cap
+	# above has already run and consumed its draws; the cave only raises the result.
+	# H1/H2 only — the extra-time loops (`_et_half`) are NOT patched, as in the EXE.
+	if cheat_three_up_front and _att_count(mem, 0) >= 3:
+		c0 = maxi(c0, 3)
 	for _i in range(c0):
 		_resolve(mem, rng, 0, seg, ((rng.next() * span) >> 15) + 1)
 	var c1 := _chance_count(rng, avg1, avg0)
+	if cheat_three_up_front and _att_count(mem, 1) >= 3:
+		c1 = maxi(c1, 3)
 	for _i in range(c1):
 		_resolve(mem, rng, 1, seg, ((rng.next() * span) >> 15) + 1)
 

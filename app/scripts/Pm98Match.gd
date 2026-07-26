@@ -587,6 +587,15 @@ static func _pitch_box(xscale: int, yscale: int) -> Array:
 ## at team[0x9c]. RNG-INVARIANT: the whole FUN_005b6ba0 -> FUN_005a2830 closure (462/455 fns)
 ## never calls the draw FUN_005ec250 -- so kickoff's 4-draw seed inventory holds either way.
 static func _team_kickoff_reset(m: Dictionary, ti: int, rng: MatchEngine.Pm98Rng) -> void:
+	# SHELL/FIXTURE PATH: a hand-built match skeleton (the driver tests, which exercise the
+	# restart rungs without a roster) carries no team headers at all. `m["sim"]` then threw
+	# `Invalid access to property or key 'sim'`, which Godot logs and swallows -- the reset
+	# was already a no-op, just a noisy one that made every test run look broken. There is
+	# nothing to zero without the headers, and this call is RNG-invariant either way, so
+	# the skip is the same behaviour, stated. Same convention as the +0x19a0 == 4 ball-spot
+	# branch below in Pm98Driver: write the Dict when populated, the match keys otherwise.
+	if not (m.get("sim") is Array) or (m["sim"] as Array).size() <= ti:
+		return
 	var team: Dictionary = m["sim"][ti]
 	team[0x168] = 0                                       # param_1[0x5a] = active-player idx
 	team[0xc] = 0                                         # puVar5[-2]

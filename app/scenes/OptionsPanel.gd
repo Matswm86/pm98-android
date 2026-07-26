@@ -13,6 +13,15 @@ class_name OptionsPanel
 ## the four X-boxes (box_checked/box_empty frame patches) and the volume
 ## truncation. Honest gap: a sub-100 volume render is unwitnessed — the
 ## gradient is truncated from the right with the trough navy (inferred).
+##
+## DECLARED DEVIATION (2026-07-26): this modal now carries ONE row the original does
+## not — THREE UP FRONT, the port-side switch for the MANAGER_HACK.EXE cheat
+## (docs/re/hack_three_forwards.md). It is drawn in the box's empty bottom-left band
+## (R_CHEAT_BAND), left of the OK plate, in the game's own proman font and the modal's
+## own frame-sampled label ink. `tools/re/diff_options_parity.py` is the gate: it proves
+## the rest of the modal is still 0 px against the MANAGER.EXE capture, that the band
+## overlaps none of the original's controls, and that the original draws nothing there.
+## No other screen in this port carries invented pixels.
 
 signal closed
 
@@ -27,6 +36,17 @@ const R_SFX_BOX := Rect2(393, 248, 13, 13)
 const R_TRANS_ON := Rect2(310, 287, 13, 13)
 const R_TRANS_OFF := Rect2(360, 287, 13, 13)
 const R_OK := Rect2(432, 320, 46, 22)      # plate around the red OK glyphs (446,328)
+# THREE UP FRONT — the ONLY row on this modal that is NOT in the original. The port-side
+# switch for the MANAGER_HACK.EXE cheat (docs/re/hack_three_forwards.md), placed in the
+# box's empty bottom-left band (design y318..344, left of the OK plate at x432) so it
+# overdraws nothing the frame cut carries. Same ON/OFF X-box idiom as TRANSITIONS.
+# Its pixels are declared, not hidden: `tools/re/diff_options_parity.py` excludes exactly
+# this band and asserts the REST of the modal is still 0 px vs the MANAGER.EXE capture.
+const R_CHEAT_ON := Rect2(310, 322, 13, 13)
+const R_CHEAT_OFF := Rect2(360, 322, 13, 13)
+const R_CHEAT_BAND := Rect2(146, 318, 280, 22)   # what the parity diff excludes
+const LABEL_END_X := 266.0                  # every baked label's ink ends here (measured)
+const C_LABEL := Color8(255, 223, 0)        # the modal's own label ink (frame-sampled)
 const C_TROUGH := Color8(0, 0, 50)          # box interior navy (frame-sampled)
 const C_PRESS := Color(1, 1, 1, 0.2)
 
@@ -117,6 +137,10 @@ func _on_input(e: InputEvent) -> void:
 			am.call("set_transitions", true)
 		elif R_TRANS_OFF.has_point(d):
 			am.call("set_transitions", false)
+		elif R_CHEAT_ON.has_point(d):
+			am.call("set_three_up_front", true, true)
+		elif R_CHEAT_OFF.has_point(d):
+			am.call("set_three_up_front", false, true)
 	if R_OK.has_point(d) and _ok_held:
 		if am != null:
 			am.call("ui_select")
@@ -145,10 +169,23 @@ func _draw() -> void:
 			var lx := r.position.x + r.size.x * v / 100.0
 			draw_rect(Rect2(lx, r.position.y, r.end.x - lx, r.size.y), C_TROUGH, true)
 	# X-boxes: baked = channels OFF (checked) + transitions ON (checked)
+	var cheat_on: bool = am != null and bool(am.get("cheat_three_up_front"))
 	for trio in [[R_MUSIC_BOX, not music_on], [R_SFX_BOX, not sfx_on],
-			[R_TRANS_ON, trans_on], [R_TRANS_OFF, not trans_on]]:
+			[R_TRANS_ON, trans_on], [R_TRANS_OFF, not trans_on],
+			[R_CHEAT_ON, cheat_on], [R_CHEAT_OFF, not cheat_on]]:
 		var tex := _checked if bool(trio[1]) else _empty
 		if tex != null:
 			draw_texture(tex, (trio[0] as Rect2).position)
+	# THREE UP FRONT caption row — port-only, drawn in the game's own proman font and the
+	# modal's own frame-sampled label ink, inside R_CHEAT_BAND.
+	# Geometry copied from the modal's own three rows rather than invented: all three
+	# baked labels are RIGHT-aligned with their ink ending at design x=266 (measured on
+	# options_box.png), and the ON/OFF captions are white, not label-gold. The captions sit
+	# LEFT of the boxes here because the original's place for them — under the boxes —
+	# falls outside the box on this row.
+	var f := PMChrome.font("10")
+	PMChrome.text(self, f, LABEL_END_X, 327, "THREE UP FRONT", C_LABEL, 10, 2)
+	PMChrome.text(self, f, R_CHEAT_ON.position.x - 3, 327, "ON", Color.WHITE, 10, 2)
+	PMChrome.text(self, f, R_CHEAT_OFF.position.x - 3, 327, "OFF", Color.WHITE, 10, 2)
 	if _ok_held:
 		draw_rect(R_OK, C_PRESS, true)

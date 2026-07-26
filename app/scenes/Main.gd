@@ -126,6 +126,9 @@ func _boot() -> void:
 	if OS.has_environment("PM98_MATCHOPTS_SHOT"):
 		_matchopts_shot()
 		return
+	if OS.has_environment("PM98_OPTIONS_SHOT"):
+		_options_shot()
+		return
 	var boot_shot := OS.has_environment("PM98_BOOT_SHOT")
 	if boot_shot or not OS.has_environment("PM98_SHOT_DIR"):
 		_show_title_screen()
@@ -226,6 +229,52 @@ func _matchopts_shot() -> void:
 		await _settle()
 		_save_shot(dir, "matchopts_%s.png" % t[1])
 	print("MATCHOPTS-SHOT done tab=%d controls=%s" % [opt._tab, str(opt._s)])
+	get_tree().quit()
+
+
+## Faithful real-render of the audio OPTIONS panel through the REAL route (the hub
+## dropdown's headphones icon -> _menu_action "options_audio" -> _show_audio_options),
+## captured in BOTH states of the one row this port adds to it: THREE UP FRONT off, then
+## on after a real tap on its ON box. The row is the port's single declared deviation
+## from a 0-px modal (docs/re/hack_three_forwards.md), so it gets looked at, not assumed.
+## Run as the NORMAL app under Xvfb+GL: PM98_OPTIONS_SHOT=1.
+func _options_shot() -> void:
+	var dir := OS.get_environment("PM98_SHOT_DIR")
+	if GameDB.leagues.is_empty():
+		print("OPTIONS-SHOT no leagues loaded")
+		get_tree().quit()
+		return
+	var lg: Dictionary = GameDB.leagues[0]
+	var clubs := GameDB.clubs_in_league(lg["id"])
+	clubs.sort_custom(func(a, b): return a["name"] < b["name"])
+	_begin_career("Manager", lg, clubs[0])
+	await _settle()
+	_menu_action("options_audio", _hub)
+	await _settle()
+	var op: OptionsPanel = null
+	for c in get_children():
+		if c is OptionsPanel:
+			op = c
+	if op == null:
+		print("OPTIONS-SHOT panel did not mount")
+		get_tree().quit()
+		return
+	var was: bool = AudioManager.cheat_three_up_front
+	AudioManager.set_three_up_front(false)
+	op.queue_redraw()
+	await _settle()
+	_save_shot(dir, "options_cheat_off.png")
+	# tap the ON box through the panel's own gui handler, not by setting the flag
+	for pressed in [true, false]:
+		var e := InputEventScreenTouch.new()
+		e.position = OptionsPanel.R_CHEAT_ON.get_center()
+		e.pressed = pressed
+		op._on_input(e)
+	await _settle()
+	_save_shot(dir, "options_cheat_on.png")
+	print("OPTIONS-SHOT done cheat=%s engine=%s" % [
+		str(AudioManager.cheat_three_up_front), str(Pm98StatMatch.cheat_three_up_front)])
+	AudioManager.set_three_up_front(was, true)
 	get_tree().quit()
 
 
