@@ -1,7 +1,10 @@
 # RESULTS → EURO. LEAGUE — the European competition screen (group phase + knockout)
 
 **Status: the GROUP view is BUILT and render-diffed (2026-07-26). The KNOCKOUT view is
-not.** `app/scenes/EuroGroupScreen.gd` + `app/art/screens/euroleague/` (baked by
+not — but it is no longer short of evidence: see
+[`knockout_views_re.md`](knockout_views_re.md), which measures all FIVE layouts the
+original switches between (compact list, kit list, the four-panel bracket, the two-card
+semifinal view, the trophy+WINNER final) off a scheduled-probe capture run.** `app/scenes/EuroGroupScreen.gd` + `app/art/screens/euroleague/` (baked by
 `tools/re/build_euroleague_chrome_from_frames.py`); `Main._show_euro_group_screen` raises
 it and the invented `CupScreen` placeholder is deleted. Parity vs all six witnessed group
 frames: **0 px outside two named residuals** — see "What actually shipped" at the end.

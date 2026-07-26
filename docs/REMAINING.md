@@ -65,11 +65,22 @@ is real and shipped, and PM98 ships two match presentations, so this is the seco
 
 ## 3. The screen / model tail
 
-* **EURO. LEAGUE knockout view** — `MATCHES` with `1ST LEG` / `2ND LEG` / `AGGR.`; the frame
-  is in hand (`16_euroleague_qtr_finals.png`), the bracket art is un-decoded. The GROUP view
-  shipped 2026-07-26 at 0 px outside the two named residuals.
-* **Draw-then-play** — `Cup.play_round` still pairs AND plays in one step; the original
-  draws, shows the draw, and plays later. Wants its own session.
+* **The knockout views** — NO LONGER BLOCKED ON EVIDENCE, still NOT BUILT. The old entry
+  said "the frame is in hand"; one frame was, and every tie in it was unplayed, so leg
+  scores, aggregates and the winner ink were unwitnessed. A scheduled-probe drive
+  (`plans/season_euro_probe.json`) photographed the whole competition rail every second hub
+  visit through 1997-98 and caught **five layouts, four never seen before**: compact list,
+  kit list, the four-panel bracket, the two-card semifinal view with `FINALIST` plates, and
+  the trophy+`WINNER` final. Geometry, column sets and the chrome/content split are measured
+  in **`docs/re/knockout_views_re.md`**. Two cells remain unwitnessed (a bracket `AGGR.`
+  with a decided tie, and a played `WINNER` band) — both reachable by walking the phase
+  paginator back into a finished phase.
+* ~~**Draw-then-play**~~ — **CLOSED 2026-07-26.** The separation is witnessed twice in two
+  competitions (F.A. Cup R2 played 14 Dec → R3 drawn unplayed 20 Dec → played 10 Jan;
+  Coca-Cola R4 played 1 Dec → Qtr Finals drawn unplayed 7 Dec), so the rule needed no
+  inventing: the next round is drawn as soon as the previous one resolves and is played at
+  its own scheduled week. `Cup.draw_next_round` + `b["pending_draw"]`,
+  `app/tests/test_cup_draw_then_play.gd`.
 * ~~**Per-club ground prices**~~ — **CLOSED 2026-07-26.** The cost function `FUN_0057ddd0` is
   reversed and every one of the 476 clubs is priced from the binary's own jump tables, keyed
   by the club's stature band (`GroundCost.gd`, 24/24 witnessed prices exact including the
@@ -83,6 +94,16 @@ is real and shipped, and PM98 ships two match presentations, so this is the seco
   Not dither: the flags were decoded with the shared VGA palette instead of `MANAGER.PAL`
   plus the 20 Windows static system colours. Re-exported, **0 px** over all 24 flag cells
   (`euro_league_screen_re.md` §Parity).
+
+## 3b. THREE UP FRONT — the one place this port draws a pixel the original does not
+
+SHIPPED 2026-07-26 and listed here so it is never a surprise: the MANAGER_HACK.EXE cheat
+(`docs/re/hack_three_forwards.md`) is ported into `Pm98StatMatch` and switched by a row on
+the OPTIONS modal. Default OFF, and OFF is bit-identical to stock — the eight banked
+oracle fixtures reproduce draw-for-draw with the flag on and no forwards in the XI.
+`tools/re/diff_options_parity.py` bounds it: the rest of that modal is still 0 px against
+the MANAGER.EXE capture, the row's band overlaps none of the original's controls, and the
+original draws nothing underneath it. **No other screen carries invented pixels.**
 
 ## 4. The SHOOTING appendix
 
