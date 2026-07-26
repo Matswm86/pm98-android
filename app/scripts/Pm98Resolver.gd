@@ -128,13 +128,13 @@ static func _s16(v: int) -> int:
 ## objects, not scalars ("`+0x43c`/`+0x440` are actor-object pointers, `+4` is their position
 ## vec3" — docs/re/jug_render_spec.md), so the binary's `!= 0` on them is a null test.
 ##
-## The port writes three different nulls into +0x43c — absent, `0` (Pm98Driver L806) and `-1`
-## (Pm98Movement L902, per EXACT_PORT_PLAN L512 "null maps to index -1") — while Movement L4144
-## and the Dispatch card paths store the player Dictionary itself. Readers elsewhere already
-## cope (`Pm98Driver._ref`, `is_same(m.get(0x43c, null), p)`); resolve_tree did not, and
-## `int(<Dictionary>)` is a hard "Nonexistent 'int' constructor" crash — it killed seeds 18 and
-## 35 of the 50-seed sweep mid-match. This accepts all three nulls and a stored Dictionary.
-## The differing null sentinels are a real inconsistency in the port and are NOT resolved here.
+## UNIFIED 2026-07-26 to the binary's model: the only null is int `0` (fn_0058eca0 L25 and the
+## driver reset both write 0; every binary read is a `!= 0` / pointer compare) and every non-null
+## write stores the player object (fn_005aeda0 L396 and fn_005b0bb0 L81 both write param_1).
+## The port's former `-1` (set_engagement) and `1` (resolve_tree commit) sentinels were
+## inventions and are gone. This helper still tolerates them (plus a raw int pointer from a
+## mid-match struct import) defensively — `int(<Dictionary>)` was a hard crash that killed
+## seeds 18 and 35 of the 50-seed sweep before it learned to.
 static func _actor_set(m: Dictionary, off: int) -> bool:
 	var v: Variant = m.get(off, 0)
 	if v is Dictionary:
@@ -307,7 +307,7 @@ static func _resolve_outcome(p: Dictionary, t: Dictionary, m: Dictionary, stats:
 			bvar7 = false
 			if bvar8 and int(p.get(0x2da, 0)) != 0:
 				bvar8 = false
-		m[0x43c] = 1
+		m[0x43c] = p    # fn_005aeda0 L396: *(match+0x43c) = param_1 -- the SHOOTER pointer, not a flag
 		# L397-424: bit0 = "ball ends in the goal box" (FUN_0058fb50 + sign-bucket gate).
 		# Oracle-validated by hi_face/hi_angle in test_resolver_tree.gd (origin coords ->
 		# bvar17=1). Real ball coordinates arrive with the Stage-3 movement block + LUT.

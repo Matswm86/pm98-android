@@ -879,7 +879,8 @@ static func set_position_code(p: Dictionary, pos_code: int) -> void:
 ##     changes, copy the target's team (+0x2b8) into +0x54, latch +0x44/+0x48 to the target,
 ##     zero the target's +0x54/+0x58, bump the engagement counter +0x80, and -- only in open
 ##     play (match+0x448 == 0) with a live set-piece taker (match+0x460 != 0) that is NOT this
-##     target -- clear that stale taker (match+0x460 = 0, match+0x43c = none).
+##     target -- clear that stale taker (match+0x460 = 0, match+0x43c = 0; the binary's only
+##     null for +0x43c, fn_0058eca0 L25 -- the guard is a pointer compare vs the target).
 static func set_engagement(p: Dictionary, target_idx: int, players: Array) -> void:
 	if int(p.get(0x40, -1)) == target_idx:
 		return
@@ -897,9 +898,9 @@ static func set_engagement(p: Dictionary, target_idx: int, players: Array) -> vo
 	target[0x58] = 0
 	target[0x54] = 0
 	p[0x80] = _g(p, 0x80) + 1
-	if _g(m, 0x448) == 0 and _g(m, 0x460) != 0 and int(m.get(0x43c, -1)) != target_idx:
+	if _g(m, 0x448) == 0 and _g(m, 0x460) != 0 and not is_same(m.get(0x43c, 0), target):
 		m[0x460] = 0
-		m[0x43c] = -1
+		m[0x43c] = 0
 
 
 # =============================================================================
@@ -4350,7 +4351,7 @@ static func _ball_engage_player(ball: Dictionary, target: Dictionary) -> void:
 	target[0x58] = 0
 	target[0x54] = 0
 	ball[0x80] = _g(ball, 0x80) + 1
-	if _g(m, 0x448) == 0 and _g(m, 0x460) != 0 and m.get(0x43c, null) != target:
+	if _g(m, 0x448) == 0 and _g(m, 0x460) != 0 and not is_same(m.get(0x43c, 0), target):
 		m[0x460] = 0
 		m[0x43c] = 0
 

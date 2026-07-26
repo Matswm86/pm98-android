@@ -9,8 +9,9 @@ extends SceneTree
 ## (tools/re/run_decideset_oracle.sh -> tools/re/specs/decideset_oracle.txt). The runner
 ## EMBEDS each fixture's initial state; the EXPECTED outputs are read from the banked file
 ## (so there is no transcription). Pointer-valued fields (p40/p44/p48/m43c for 58eca0) come
-## out of the oracle as ABSOLUTE addresses; this test maps them to the index model
-## Pm98Movement uses (0 -> null(-1), else (addr - P_BASE) / P_STRIDE) before comparing.
+## out of the oracle as ABSOLUTE addresses; p40/p44/p48 map to the index model Pm98Movement
+## uses (0 -> null(-1), else (addr - P_BASE) / P_STRIDE), while m43c uses the unified
+## match+0x43c model (2026-07-26): the player Dictionary itself, int 0 for null.
 
 const U32 := 0xffffffff
 const P_BASE := 0x230000
@@ -24,14 +25,16 @@ const POS_FIX := {
 
 # FUN_0058eca0 fixtures: name -> {tgt = target index (-1 null), + initial-state overrides}.
 # Defaults (matching run_decideset_oracle.sh ENG_BASE): p54=99, p4c=0x3333, p80=5,
-# target+0x2b8(team)=7, target+0x54=0xAAAA, target+0x58=0xBBBB, m458=10, m460=1, m448=0, m43c=0.
+# target+0x2b8(team)=7, target+0x54=0xAAAA, target+0x58=0xBBBB, m458=10, m460=1, m448=0.
+# m43c mirrors the oracle runner's per-fixture initial: P0 (idx 0) everywhere except
+# takereq, where it is the target (idx 1) so the stale-taker clear must NOT fire.
 const ENG_FIX := {
-	"engage_new":      {"tgt": 1, "p40": -1},
-	"engage_sameteam": {"tgt": 1, "p40": -1, "p54": 7},
+	"engage_new":      {"tgt": 1, "p40": -1, "m43c": 0},
+	"engage_sameteam": {"tgt": 1, "p40": -1, "p54": 7, "m43c": 0},
 	"engage_takereq":  {"tgt": 1, "p40": -1, "m43c": 1},
-	"engage_phase":    {"tgt": 1, "p40": -1, "m448": 2},
-	"engage_same":     {"tgt": 1, "p40": 1, "p44": 1, "p48": 1},
-	"engage_null":     {"tgt": -1, "p40": 1, "p44": 1, "p48": 1},
+	"engage_phase":    {"tgt": 1, "p40": -1, "m448": 2, "m43c": 0},
+	"engage_same":     {"tgt": 1, "p40": 1, "p44": 1, "p48": 1, "m43c": 0},
+	"engage_null":     {"tgt": -1, "p40": 1, "p44": 1, "p48": 1, "m43c": 0},
 }
 
 var _fail := 0
@@ -77,6 +80,15 @@ func _addr_to_idx(addr: int) -> int:
 	return (addr - P_BASE) / P_STRIDE
 
 
+## Unified match+0x43c value (player Dictionary or 0) -> roster index, -1 for null.
+func _val_to_idx(v: Variant, players: Array) -> int:
+	if v is Dictionary:
+		for i in players.size():
+			if is_same(players[i], v):
+				return i
+	return -1
+
+
 # Parse "FIX <name> fn=<f> k=v k=v ..." rows into {name: {"fn":..., k:int,...}}.
 func _load_oracle() -> Dictionary:
 	var out := {}
@@ -120,7 +132,7 @@ func _run_eng(name: String, exp: Dictionary) -> void:
 	var fx: Dictionary = ENG_FIX[name]
 	var m := {
 		0x458: 10, 0x460: 1,
-		0x448: int(fx.get("m448", 0)), 0x43c: int(fx.get("m43c", 0)),
+		0x448: int(fx.get("m448", 0)), 0x43c: 0,
 	}
 	var p := {
 		0x40: int(fx.get("p40", -1)), 0x54: int(fx.get("p54", 99)),
@@ -132,6 +144,10 @@ func _run_eng(name: String, exp: Dictionary) -> void:
 		p[0x48] = int(fx["p48"])
 	var target := {0x2b8: 7, 0x54: 0xAAAA, 0x58: 0xBBBB}
 	var players: Array = [p, target]                       # p = idx 0, target = idx 1
+	# match+0x43c holds the player OBJECT (unified model); map the fixture index to it.
+	var m43c_i := int(fx.get("m43c", -1))
+	if m43c_i >= 0:
+		m[0x43c] = players[m43c_i]
 
 	Pm98Movement.set_engagement(p, int(fx["tgt"]), players)
 
@@ -139,7 +155,7 @@ func _run_eng(name: String, exp: Dictionary) -> void:
 	_eq(name, "p40", int(p.get(0x40, -1)), _addr_to_idx(int(exp["p40"])))
 	_eq(name, "p44", int(p.get(0x44, -1)), _addr_to_idx(int(exp["p44"])))
 	_eq(name, "p48", int(p.get(0x48, -1)), _addr_to_idx(int(exp["p48"])))
-	_eq(name, "m43c", int(m.get(0x43c, -1)), _addr_to_idx(int(exp["m43c"])))
+	_eq(name, "m43c", _val_to_idx(m.get(0x43c, 0), players), _addr_to_idx(int(exp["m43c"])))
 	# Scalar fields.
 	_eq(name, "p4c", int(p.get(0x4c, 0)), int(exp["p4c"]))
 	_eq(name, "p54", int(p.get(0x54, 0)), int(exp["p54"]))

@@ -62,7 +62,9 @@ def main() -> None:
     win_lo = int(sys.argv[6]) if len(sys.argv) > 6 else 0
     win_hi = int(sys.argv[7]) if len(sys.argv) > 7 else 306
     cand = [int(sys.argv[8], 16)] if len(sys.argv) > 8 else []
-    cand.append(0x03DBF060)  # s34: same boot+nav reproduced this base 3/3 runs
+    # Every base observed so far (README §RSP-only capture; s58 handoff: add each new
+    # one here so the ~4-min HOT-band scan stays the safety net, not the path).
+    cand += [0x03DBF060, 0x03DBF0D8, 0x03DBF228, 0x03DBF240, 0x03DCF1D0, 0x03DCF0D8]
 
     ref = json.load(open(ref_path))
     fo = open(out, "a", buffering=1)  # noqa: SIM115 — streamed jsonl
