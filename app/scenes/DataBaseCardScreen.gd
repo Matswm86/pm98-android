@@ -502,7 +502,7 @@ func _draw_pdata() -> void:
 
 
 func _draw_photo_or_pitch() -> void:
-	var photo := _bank("res://art/faces/dbcard/%d.png" % int(_p.get("photoId", -1)))
+	var photo := _bank("res://art/faces/dbcard/%d.png" % PMChrome.iget(_p, "photoId", -1))
 	if photo != null:
 		draw_texture(photo, PHOTO_XY)
 		# the SOMBRA drop shadows (baked frame cuts; identical 034/055)
@@ -520,7 +520,7 @@ func _draw_campo_markers() -> void:
 		draw_texture(campo, Vector2(37, 133))
 	var balon := _t("balon")
 	if balon != null:
-		var fine := clampi(int(_p.get("posFine", 0)), 1, 18)
+		var fine := clampi(PMChrome.iget(_p, "posFine"), 1, 18)
 		@warning_ignore("integer_division")
 		var fy := 300.0 - 15.0 * ((fine - 1) / 3)  # GK bottom rows, FW top
 		var fx := 37.0 + 20.0 + 30.0 * ((fine - 1) % 3)

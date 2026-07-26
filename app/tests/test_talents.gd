@@ -75,6 +75,15 @@ func _unit_dicts() -> bool:
 	ok = _assert(int(p["contract_years"]) == 3, "age-19 arrival gets a 3-year deal") and ok
 	ok = _assert(int(p["potential"]) == 92, "senior keeps his hidden ceiling (tier-2 92)") and ok
 	ok = _assert(p["photoId"] == null, "no face-bank photo (screens draw none)") and ok
+	# Shape parity with a decoded record: every field an int() consumer reads must
+	# be a real int, NEVER a stored null (int(null) aborts the enclosing draw call —
+	# the season-2 "stars but no position or roles" rows, Mats QA 2026-07-26).
+	for k2 in ["posFine", "squadNo", "heightCm", "weightKg"]:
+		ok = _assert(p.get(k2) != null and typeof(p[k2]) != TYPE_NIL,
+			"senior '%s' is never a stored null" % k2) and ok
+	ok = _assert(int(p["posFine"]) >= 1 and int(p["posFine"]) <= 18,
+		"senior posFine is a real fine code") and ok
+	ok = _assert(p.get("posAlts") is Array, "senior carries posAlts") and ok
 	var gk := Talent.make_senior(_entry(600904, "TEST KEEPER", 1980, 7, 3, 1998, "GK"), rng, 1998, 1)
 	ok = _assert(int(gk["attrs"]["PO"]) > int(gk["attrs"]["TI"]), "keeper's PO is his headline") and ok
 	var fw := Talent.make_youth(_entry(600905, "TEST STRIKER", 1982, 7, 1, 1998), rng, 1998)

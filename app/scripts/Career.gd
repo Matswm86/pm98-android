@@ -2665,6 +2665,31 @@ func inject_due_talents(pool: Array, rng: RandomNumberGenerator = null) -> int:
 	return n
 
 
+## A new arrival's dorsal. squad_number_re.md's per-club rule is witnessed: N°
+## renders only when the club's WHOLE set is individuated (unique, all present),
+## else the column is "-". A joiner arriving with no number (talent intake, youth
+## promotion, any signing) would therefore flip an individuated club to dashes —
+## so he takes the lowest free dorsal instead. On a pad club (no real, unique
+## numbering) this changes nothing: the set stays non-individuated and renders
+## "-" exactly as before. [Mats QA 2026-07-26: talents must look like the squad]
+static func _assign_free_no(roster: Array, p: Dictionary) -> void:
+	var v: Variant = p.get("squadNo")
+	if v != null and int(v) > 0:
+		return
+	var used := {}
+	for q in roster:
+		var qv: Variant = q.get("squadNo")
+		if qv != null and int(qv) > 0:
+			used[int(qv)] = true
+	p["squadNo"] = 0
+	if used.is_empty():
+		return                       # pad club: he pads too
+	var n := 1
+	while used.has(n):
+		n += 1
+	p["squadNo"] = n
+
+
 ## Best prospects first, so when a season delivers more talents than there is room
 ## for (free-agent pool cap, full squads) the headroom goes to the biggest names.
 static func _by_tier(due: Array) -> Array:
@@ -2708,7 +2733,9 @@ func _inject_talent(e: Dictionary, rng: RandomNumberGenerator, start_year: int) 
 		# fully contract-stamped. Full squads skip-and-retry at a later rollover.
 		if rosters[cid].size() >= TransferMarket.SQUAD_MAX:
 			return false           # NOT marked used; transfer churn usually frees room
-		rosters[cid].append(Talent.make_senior(e, rng, start_year, band_of(cid)))
+		var senior := Talent.make_senior(e, rng, start_year, band_of(cid))
+		_assign_free_no(rosters[cid], senior)
+		rosters[cid].append(senior)
 		# Only headline arrivals reach the news feed (living-league quietness).
 		if int(e.get("tier", 4)) <= 2:
 			_news("youth", "%s, a highly rated youngster, has come through the ranks at %s." % [
@@ -2771,6 +2798,7 @@ func promote_youth(pid: int) -> Dictionary:
 	var form_rng := RandomNumberGenerator.new()
 	form_rng.randomize()
 	Morale.ensure(p, form_rng)   # fresh dynamic form, like the season kickoff roll
+	_assign_free_no(rosters[club_id], p)
 	rosters[club_id].append(p)
 	_news("youth", "%s has been promoted to the first team squad." % p.get("name", "?"))
 	_log("%s has been promoted from the youth team." % p.get("name", "?"))
@@ -3248,6 +3276,7 @@ func sign_player(pid: int, from_club_id: int, offer: int, rng: RandomNumberGener
 	player["auto_renew"] = false
 	Morale.ensure(player, rng)
 	_signing_shock(player)   # the incumbents in his position take it badly (FUN_00588ae0)
+	_assign_free_no(rosters[club_id], player)
 	rosters[club_id].append(player)
 	_post_expense("SIGN PLAYER", offer)
 	transfer_listed.erase(pid)
@@ -3315,6 +3344,7 @@ func sign_external(player: Dictionary, selling_club: Dictionary, offer: int,
 	Morale.ensure(joined, rng)
 	joined["fitness"] = 70
 	_signing_shock(joined)
+	_assign_free_no(rosters[club_id], joined)
 	rosters[club_id].append(joined)
 	_post_expense("SIGN PLAYER", offer)
 	external_signed[pid] = true
@@ -3362,6 +3392,7 @@ func sign_free_agent(pid: int, offer_weekly: int = -1, rng: RandomNumberGenerato
 	player["auto_renew"] = false
 	Morale.ensure(player, rng)
 	_signing_shock(player)
+	_assign_free_no(rosters[club_id], player)
 	rosters[club_id].append(player)
 	_log("You have signed free agent %s on £%s/wk." % [pname, _money(offer_weekly)])
 	_news("transfer", "%s signs for %s for %s." % [
@@ -5305,6 +5336,24 @@ func _str_keyed(d: Dictionary) -> Dictionary:
 		out[str(k)] = d[k]
 	return out
 
+## In-place repair of a player dict carrying STORED nulls: a JSON null survives
+## get(k, fallback), so `int(p.get("posFine", 0))` aborts the whole enclosing draw
+## call in a debug build. Talent.gd wrote such nulls until 2026-07-26; this heals
+## every roster/free-agent/youth dict on load so an in-flight career recovers
+## without a restart. Missing keys (regen youth / free-pool dicts) heal the same way.
+static func _heal_nulls(p: Dictionary) -> void:
+	if p.get("posFine") == null or int(p.get("posFine", 0)) <= 0:
+		p["posFine"] = int({"GK": 1, "DF": 4, "MF": 10, "FW": 9}.get(str(p.get("pos", "MF")), 10))
+	if p.get("squadNo") == null:
+		p["squadNo"] = 0
+	if p.get("posAlts") == null:
+		p["posAlts"] = []
+	if p.get("heightCm") == null:
+		p["heightCm"] = 175
+	if p.get("weightKg") == null:
+		p["weightKg"] = 78
+
+
 static func from_dict(d: Dictionary) -> Career:
 	var c := Career.new()
 	c.club_id = int(d.get("club_id", -1))
@@ -5471,6 +5520,16 @@ static func from_dict(d: Dictionary) -> Career:
 	c.rosters = {}
 	for k in d.get("rosters", {}):
 		c.rosters[int(k)] = d["rosters"][k]
+	# Heal a save written while Talent.gd emitted stored nulls (posFine/squadNo —
+	# a stored null survives get(k, fallback) and aborts int(null) in every draw
+	# path: the season-2 "stars but no position or roles" rows, Mats QA 2026-07-26).
+	for k in c.rosters:
+		for p in c.rosters[k]:
+			_heal_nulls(p)
+	for p in c.free_agents:
+		_heal_nulls(p)
+	for p in c.youth:
+		_heal_nulls(p)
 	c.club_names = {}
 	for k in d.get("club_names", {}):
 		c.club_names[int(k)] = d["club_names"][k]

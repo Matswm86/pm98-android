@@ -635,7 +635,7 @@ func _av_of(p: Dictionary) -> int:
 
 
 func _role_short(p: Dictionary) -> String:
-	var pf := int(p.get("posFine", 0))
+	var pf := PMChrome.iget(p, "posFine")
 	if pf >= 1 and pf <= FINE_ROLE_SHORT.size():
 		return FINE_ROLE_SHORT[pf - 1]
 	return str(POS_WORD.get(str(p.get("pos", "")), "OUT"))
@@ -648,7 +648,7 @@ func _pos_word(p: Dictionary) -> String:
 
 
 func _shirt(p: Dictionary, slot: int) -> int:
-	var no := int(p.get("squadNo", 0))
+	var no := PMChrome.iget(p, "squadNo")
 	return no if no > 0 else slot + 1
 
 
@@ -804,7 +804,7 @@ func _draw_row(y: int, it: Dictionary) -> void:
 	PMChrome.text(self, _f8, _cell_centre(_f8, str(av), AV_CELL[0], AV_CELL[1]), y + 2,
 		str(av), C_AV, 11)
 	PMChrome.draw_role_icon(self, Rect2(CAMROL_X, y, 25, 14),
-		int(pl.get("posFine", 0)), str(pl.get("pos", "")))
+		PMChrome.iget(pl, "posFine"), str(pl.get("pos", "")))
 	var pos_s := _pos_word(pl)
 	PMChrome.text(self, _f8, _cell_centre(_f8, pos_s, POS_CELL[0], POS_CELL[1]), y + 2,
 		pos_s, C_POS, 11)

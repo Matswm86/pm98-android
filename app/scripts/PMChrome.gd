@@ -441,6 +441,15 @@ static func draw_bg(ci: CanvasItem) -> void:
 		ci.draw_rect(Rect2(0, 0, W, H), _dc(Color(0.10, 0.18, 0.40)), true)
 
 
+## Null-safe int read of a player field. A STORED JSON null (old Talent.gd saves)
+## survives `get(k, fallback)`, and `int(null)` aborts the whole enclosing call in
+## a debug build — which is how season-2 talents drew stars but no role/position
+## (Mats QA 2026-07-26). Use this for posFine / squadNo / photoId style reads.
+static func iget(p: Dictionary, key: String, fallback: int = 0) -> int:
+	var v: Variant = p.get(key)
+	return int(v) if v != null else fallback
+
+
 ## The managed club's kit figure (KIT_SRC content bbox) fitted into a box,
 ## aspect-preserved.
 static func draw_crest(ci: CanvasItem, club_id: int, r: Rect2) -> void:

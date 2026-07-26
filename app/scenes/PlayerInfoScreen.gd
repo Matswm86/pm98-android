@@ -465,9 +465,9 @@ func _draw_identity() -> void:
 	_ctxt(_f8, KIND_CX, IDENT_Y, _decoded_or_dash(_p.get("kind")), C_WHITE, 11)
 	# ROLE: camrol sprite (SAD 0.0; alpha-0 ring restored by the black backing)
 	draw_rect(Rect2(CAMROL_XY, Vector2(25, 14)), C_BLACK, true)
+	var pf := PMChrome.iget(_p, "posFine")
 	PMChrome.draw_role_icon(self, Rect2(CAMROL_XY, Vector2(25, 14)),
-		int(_p.get("posFine", 0)), str(_p.get("pos", "")))
-	var pf := int(_p.get("posFine", 0)) if _p.get("posFine") != null else 0
+		pf, str(_p.get("pos", "")))
 	var role: String
 	if pf >= 1 and pf <= FINE_ROLE.size():
 		role = FINE_ROLE[pf - 1]

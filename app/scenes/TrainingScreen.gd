@@ -541,7 +541,7 @@ func _draw_panel(p: Dictionary) -> void:
 
 
 func _shirt(p: Dictionary) -> int:
-	return int(p.get("squadNo", 0))
+	return PMChrome.iget(p, "squadNo")
 
 
 ## CURRENT TRAINING STAFF: the six skill coaches with name, star strip and the TP

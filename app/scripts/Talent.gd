@@ -122,6 +122,20 @@ static func make_attrs(rng: RandomNumberGenerator, ca: int, pos: String, is_gk: 
 	return a
 
 
+## The intake's fine-position code. data/talent_pool.json ships posFine null on
+## EVERY entry, and a stored null aborts every downstream `int(p.get("posFine", 0))`
+## draw call (GDScript: get() returns the stored null, int(null) errors) — the
+## "stars but no position or roles" rows Mats saw on season-2 talents. A talent
+## therefore gets the representative central slot for his broad position — the
+## same codes PMChrome._CAMROL_FALLBACK uses (positions_re.md): GK 1 / DF 4 /
+## MF 10 / FW 9. [Mats QA 2026-07-26]
+static func _fine_of(e: Dictionary, pos: String) -> int:
+	var pf: Variant = e.get("posFine")
+	if pf != null and int(pf) > 0:
+		return int(pf)
+	return int({"GK": 1, "DF": 4, "MF": 10, "FW": 9}.get(pos, 10))
+
+
 ## A full senior player dict, shaped exactly like a _seed_squad roster entry (identity
 ## from the DB schema + the live-roster stamps), ready to append to rosters[clubId].
 ## Keeps `potential` on the dict -- Training.train_week holds him there (his ceiling).
@@ -138,16 +152,19 @@ static func make_senior(e: Dictionary, rng: RandomNumberGenerator, start_year: i
 		"birthYear": int(e.get("birthYear", start_year - age + 1)),
 		"age": age,
 		"pos": pos,
-		"posFine": e.get("posFine"),
+		"posFine": _fine_of(e, pos),
+		"posAlts": [],
 		"isGK": is_gk,
 		"media": null,
 		"photoId": null,          # no J96 face-bank entry; screens draw no photo (frame truth)
-		"squadNo": null,
+		"squadNo": 0,             # 0 = no individuated number (never null — int(null) aborts)
 		"nationality": str(e.get("nationality", "ENGLAND")),
 		"flagCode": int(e.get("flagCode", 30)),
 		"kind": str(e.get("kind", "NATIONAL")),
-		"heightCm": e.get("heightCm"),
-		"weightKg": e.get("weightKg"),
+		# The pool carries no measurements; the loader's own defaults (GameDB
+		# _apply_loader_defaults) so the FICHA card never prints blanks.
+		"heightCm": int(e.get("heightCm") if e.get("heightCm") != null else 170 + rng.randi_range(0, 9)),
+		"weightKg": int(e.get("weightKg") if e.get("weightKg") != null else 75 + rng.randi_range(0, 9)),
 		"attrs": make_attrs(rng, ca, pos, is_gk),
 		"potential": potential_of(e),
 		# The _seed_squad live-roster stamps (Career.gd), so he is contract-complete.
@@ -181,7 +198,8 @@ static func make_free_agent(e: Dictionary, rng: RandomNumberGenerator, start_yea
 		"birthYear": int(e.get("birthYear", start_year - age + 1)),
 		"age": age,
 		"pos": pos,
-		"posFine": e.get("posFine"),
+		"posFine": _fine_of(e, pos),
+		"posAlts": [],
 		"isGK": is_gk,
 		"nationality": str(e.get("nationality", "ENGLAND")),
 		"flagCode": int(e.get("flagCode", 30)),
@@ -212,6 +230,8 @@ static func make_youth(e: Dictionary, rng: RandomNumberGenerator, start_year: in
 		"age": maxi(Youth.INTAKE_AGE_LO, age),
 		"isGK": is_gk,
 		"pos": pos,
+		"posFine": _fine_of(e, pos),
+		"posAlts": [],
 		"nationality": str(e.get("nationality", "ENGLAND")),
 		"flagCode": int(e.get("flagCode", 30)),
 		"kind": str(e.get("kind", "NATIONAL")),

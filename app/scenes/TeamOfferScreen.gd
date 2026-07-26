@@ -308,9 +308,9 @@ func _draw_identity() -> void:
 	# pixels are alpha-0 in the export, and the frame shows them black — the
 	# backing rect restores them)
 	draw_rect(Rect2(CAMROL_XY, Vector2(25, 14)), C_BLACK, true)
+	var pf := PMChrome.iget(_p, "posFine")
 	PMChrome.draw_role_icon(self, Rect2(CAMROL_XY, Vector2(25, 14)),
-		int(_p.get("posFine", 0)), str(_p.get("pos", "")))
-	var pf := int(_p.get("posFine", 0)) if _p.get("posFine") != null else 0
+		pf, str(_p.get("pos", "")))
 	var role: String
 	if pf >= 1 and pf <= PlayerInfoScreen.FINE_ROLE.size():
 		role = PlayerInfoScreen.FINE_ROLE[pf - 1]
