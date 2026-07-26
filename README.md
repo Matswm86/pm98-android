@@ -16,7 +16,7 @@ fan remake.</sub>
 
 ## Download
 
-📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-64a95eb.apk)** — one tap downloads `pm98-64a95eb.apk` (current build) straight to your phone.
+📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-d807eb8.apk)** — one tap downloads `pm98-d807eb8.apk` (current build) straight to your phone.
 
 > **This build (2026-07-26, later)** changes nothing you can see. It is about the match engine, and it is good news.
 >
