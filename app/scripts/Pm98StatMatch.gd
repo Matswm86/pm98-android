@@ -320,7 +320,8 @@ static func _stats(mem: Mem, rng: Rng, dur: int, p3: int, p4: int) -> void:
 			else:
 				mem.add_s32(pb + 0x108, (((rng.next() * 8) >> 15) * pseed) / 100)
 				mem.add_s32(pb + 0x10c, (((rng.next() * 0xf) >> 15) * (99 - pseed)) / 100)
-			# dribble (+0x110): GK uses its own pass seed (param_1+0xc2+side base)
+			# TAC. won (+0x110; the old "dribble" label is withdrawn, see stat_match_engine_re.md
+			# §STATISTICS): GK uses its own pass seed (param_1+0xc2+side base)
 			var dseed := mem.u8(s * SIDE_STRIDE + PASS) if idx == 0 else pseed
 			var i5b := (rng.next() * 2) if idx == 0 else (rng.next() * 5)
 			mem.add_s32(pb + 0x110, ((i5b >> 15) * dseed) / 100)
