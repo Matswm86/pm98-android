@@ -167,6 +167,14 @@ explicit go/no-go before a line of it is written.
 * `DAT.PKF` / `DATSIM.PKF` match-sim rating tables are still LZ-packed. Only needed to tune
   the *abstracted* engine toward the original — the byte-exact engine gets these from the
   code path itself, so this is track-A work only.
+* **The top-level MINIESC kit bank looks mismapped** (noticed 2026-07-26, not chased).
+  `app/art/kits/40.png` renders as two half-shirts and `app/art/kits/1381.png` is a **star**,
+  not a kit. `map_crests.py --export` wrote that bank from `DBDAT/MINIESC.PKF`, whose entries
+  do decode correctly when rendered directly through `tools/re/pkf_image.py` — so it is the
+  export's id mapping or its crop that is wrong, not the archive. Nothing visible is broken
+  today: every screen that shows a kit uses the `nano` (24x32) or `ridi` (17x20) banks, which
+  are right. It matters the moment the BRACKET lands, because that layout's 47x59 blit is
+  MINIESC (§3).
 
 ## 6. Android packaging / device polish
 
