@@ -195,9 +195,10 @@ var euro_winner_names: Dictionary = {}    # winner/SA-champ id:int -> String
 # bank can never disagree.
 var week_ledgers: Array = []
 var _wk: Dictionary = {}
-# Consecutive weeks the club closed in the red (REFRUN R16). The original raises one hub
-# alert a week while this is non-zero, incrementing, and CLEARS it the moment the club is
-# back in profit -- witnessed at 1, 2 and 3 weeks, then cleared by a sale.
+# Consecutive weeks the club's BANK BALANCE has been below zero (REFRUN R16, trigger
+# corrected 2026-07-26 -- see _close_week_books). The original raises one hub alert a week
+# while this is non-zero, incrementing, and CLEARS it the moment the balance is positive
+# again -- witnessed at 1, 2 and 3 weeks, then cleared by a sale.
 var loss_weeks: int = 0
 # The channelTV card queued for the coming HOME match: {"fee": int, "comp": String}.
 # {} when the next fixture is away, or the competition's fee is not witnessed.
@@ -2867,10 +2868,14 @@ func _close_week_books() -> void:
 	while week_ledgers.size() > FinanceModel.SEASON_WEEKS:
 		week_ledgers.pop_front()
 	_wk = {}
-	# REFRUN R16, witnessed over three consecutive weeks of the 1998-99 season and then
-	# cleared: one alert per week, the count incrementing, reset on a week back in profit.
-	# The wording is the original's own (p0685/p0716_alert_box.png).
-	if FinanceModel.ledger_balance(rec) < 0:
+	# REFRUN R16, corrected 2026-07-26: the trigger is the BANK BALANCE below zero, not a
+	# P&L-negative week. Three discriminating witnesses: (1) the whole 1997-98 refrun
+	# season raised NO alert although every quiet away week closes wages-only negative;
+	# (2) the alerts began W4 of 1998-99 after the summer spend and cleared on the Butt
+	# sale (p0685/p0716_alert_box.png, wording the original's own); (3) the ledger-based
+	# reading fired at week 1 of a career holding millions -- Mats, live report,
+	# 2026-07-26 -- which the original does not do.
+	if cash < 0:
 		loss_weeks += 1
 		pending_alerts.append(LOSS_ALERT_MSG % [loss_weeks, "" if loss_weeks == 1 else "s"])
 	else:

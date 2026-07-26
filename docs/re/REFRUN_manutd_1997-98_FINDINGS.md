@@ -317,6 +317,15 @@ So a cup run counts. The rule is unknown and cannot be "award the title winner".
 So it counts **consecutive** weeks in the red and resets the moment the club is back in
 profit. The sacking threshold is therefore **> 3 weeks** and remains unmeasured.
 
+**Trigger corrected 2026-07-26: "in the red" is the BANK BALANCE below zero, not a
+P&L-negative week.** Three discriminating witnesses: the whole 1997-98 refrun season
+raised NO alert although every quiet away week closes wages-only P&L-negative; the alerts
+began only at W4 of 1998-99, after the summer spend drove the balance under, and cleared
+when the Butt sale brought it back; and the P&L reading fired at week 1 of a career
+holding millions (Mats, live report, 2026-07-26), which the original does not do. Port:
+`Career._close_week_books` now tests `cash < 0`; probed both ways in
+`test_refrun_findings`.
+
 Grep for `at a loss|loss_weeks|running the club|bankrupt|insolven` across `app/` returns
 **zero hits**. The mechanic does not exist in the port at all.
 

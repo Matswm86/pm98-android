@@ -101,6 +101,25 @@ func _weekly_books() -> bool:
 	var away_weeks := 0
 	var away_exact := 0
 	var loss_alerts := 0
+	# Trigger corrected 2026-07-26: the at-a-loss counter follows the BANK BALANCE, not
+	# the week's P&L. Probe it while the season is live: a negative balance raises the
+	# alert, a positive one clears the counter.
+	var probe_cash: int = career.cash
+	career.cash = -20_000_000
+	career.advance_week(rng)
+	var neg_alert := false
+	for a in career.pending_alerts:
+		if str(a).begins_with("You have been running the club at a loss"):
+			neg_alert = true
+	career.pending_alerts.clear()
+	ok = _assert(neg_alert and career.loss_weeks == 1,
+		"a week closing with the bank below zero raises the alert (count %d)"
+		% career.loss_weeks) and ok
+	career.cash = probe_cash + 1_000_000
+	career.advance_week(rng)
+	ok = _assert(career.loss_weeks == 0,
+		"a positive balance clears the counter (%d)" % career.loss_weeks) and ok
+	career.pending_alerts.clear()
 	while not career.season_over():
 		var cash_before: int = career.cash
 		var res := career.advance_week(rng)
@@ -127,8 +146,10 @@ func _weekly_books() -> bool:
 	ok = _assert(away_exact > 0,
 		"an away week is a pure PLAYERS' WAGE + STAFF WAGES loss (%d of %d such weeks)"
 		% [away_exact, away_weeks]) and ok
-	ok = _assert(loss_alerts > 0,
-		"the running-at-a-loss counter is reachable (%d alerts)" % loss_alerts) and ok
+	# A solvent season raises NO at-a-loss alert -- the whole 1997-98 refrun did not,
+	# although its quiet away weeks all closed wages-only P&L-negative.
+	ok = _assert(loss_alerts == 0,
+		"a solvent season raises no at-a-loss alert (%d raised)" % loss_alerts) and ok
 	ok = _assert(career.week_ledgers.size() > 0
 		and int(career.week_ledgers[0]["week"]) == FinanceModel.finance_week(1),
 		"the first banked week is finance week %d" % FinanceModel.finance_week(1)) and ok
