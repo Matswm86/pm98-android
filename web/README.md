@@ -23,10 +23,20 @@ img/*.png         640x480 captures of the REAL 1998 PC GAME, copied from
 ```
 
 CI uploads one `pm98-<commit>.apk` per build to the `latest` release, so a
-hardcoded filename goes stale on every push. `deploy.sh` resolves the newest
-asset from the GitHub API and rewrites the link, size, build id and date before
-rsyncing. **Run it after the commit that triggers the build you want to ship**,
-otherwise the site points at the previous build.
+hardcoded filename goes stale on every push. Two layers handle that:
+
+* **At page load**, `app.js` asks the GitHub API for the newest `pm98-*.apk` on
+  the `latest` release and repoints the button and the file line. This is what
+  keeps the link correct between deploys — including for the build produced by
+  the very commit that deployed the page. Needs `connect-src https://api.github.com`
+  in the vhost CSP.
+* **At deploy time**, `deploy.sh` bakes the then-newest filename into
+  `index.html`, so the page is still right if the API call fails (unauthenticated,
+  60 requests/hour per IP) or JavaScript is off.
+
+Regression test for the first layer: bake a bogus filename into a copy of
+`index.html`, serve it, and confirm the DOM's `#dlbtn` href comes back pointing
+at the real newest APK.
 
 Served by Caddy from `/var/www/pm98` under a `pm98.mwmai.no` vhost. The CSP is
 strict — `script-src 'self'; style-src 'self'`, no `unsafe-inline` — so **do not

@@ -163,3 +163,38 @@
         'The rest of the page does not need it.</p>';
     });
 })();
+
+/* ------------------------------------------------------------------ APK link
+   CI uploads one pm98-<commit>.apk per build to the `latest` release, so any
+   filename baked into this page is stale the moment the next commit lands.
+   Resolve the newest asset at load and repoint the button. The baked-in link
+   stays as the fallback: if the API is unreachable or rate-limited (it is
+   unauthenticated, 60/hr per IP), the page is exactly as it shipped. */
+(function () {
+  'use strict';
+  var btn = document.getElementById('dlbtn');
+  var meta = document.getElementById('dlmeta');
+  if (!btn || !window.fetch) return;
+
+  fetch('https://api.github.com/repos/Matswm86/pm98-android/releases/tags/latest', {
+    headers: { Accept: 'application/vnd.github+json' }
+  })
+    .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+    .then(function (rel) {
+      var apks = (rel.assets || []).filter(function (a) {
+        return /^pm98-[0-9a-f]{7,40}\.apk$/.test(a.name);
+      });
+      if (!apks.length) return;
+      apks.sort(function (a, b) { return a.updated_at < b.updated_at ? 1 : -1; });
+      var a = apks[0];
+      if (a.browser_download_url) btn.href = a.browser_download_url;
+      if (!meta) return;
+      var mb = (a.size / 1e6).toFixed(1);
+      var commit = a.name.replace(/^pm98-|\.apk$/g, '');
+      var when = new Date(a.updated_at).toLocaleDateString('en-GB',
+        { day: 'numeric', month: 'short', year: 'numeric' });
+      meta.textContent = 'file  ' + a.name + ' · ' + mb + ' MB · build ' + commit +
+        ' · uploaded ' + when;
+    })
+    .catch(function () { /* keep the baked-in link */ });
+})();

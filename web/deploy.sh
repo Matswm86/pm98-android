@@ -36,9 +36,9 @@ html, name, mb, date, commit = sys.argv[1:6]
 s = open(html, encoding='utf-8').read()
 before = s
 s = re.sub(r'pm98-[0-9a-f]{7,40}\.apk', name, s)
-s = re.sub(r'&middot; [\d.]+&nbsp;MB &middot; build <code>[0-9a-f]{7,40}</code>',
-           '&middot; %s&nbsp;MB &middot; build <code>%s</code>' % (mb, commit), s)
-s = re.sub(r'<div>uploaded [^&]*&middot;', '<div>uploaded %s &middot;' % date, s)
+s = re.sub(r'<div id="dlmeta">.*?</div>',
+           '<div id="dlmeta">file &nbsp;%s &middot; %s MB &middot; build %s &middot; uploaded %s</div>'
+           % (name, mb, commit, date), s, flags=re.S)
 s = re.sub(r'<span class="sub">latest build &middot;[^<]*</span>',
            '<span class="sub">latest build &middot; %s</span>' % date, s)
 open(html, 'w', encoding='utf-8').write(s)
