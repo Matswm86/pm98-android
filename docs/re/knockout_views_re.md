@@ -257,6 +257,11 @@ needs no guessing either. Four panels, `T = 113, 193, 273, 353` (pitch **80**), 
 | domestic | slot 1 is EMPTY white; slot 2 `RES.`, slot 3 `REPLAY` — plates `(140,160,180)`/`(120,140,160)`, boxes `(80,100,120)`/`(60,80,100)` |
 | a leg score | white `(255,255,255)`, ink rows `y T+52 .. T+58`, `0 - 0` at x115..122 / dash x127..129 / x134..141, i.e. centred on its value box |
 
+**The art the bracket needs already exists**, which the build should not re-derive: the kit
+blit measures **47x59** at `(27, T+11)` / `(424, T+12)` — exactly the `app/art/kits/offers/`
+set — and the flag **30x20** at `(83, T+6)` / `(385, T+6)`, exactly `app/art/flags/dbcard/`.
+No new export is needed for this layout.
+
 The chrome/content split is proven twice over: the same layout in two careers and two
 competitions differs ONLY inside `y T+7 .. T+67` of each panel, and the SAME career's
 unplayed and leg-1-played frames differ in **490 px total, all of them the leg-1 score
