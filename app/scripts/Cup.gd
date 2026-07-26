@@ -119,6 +119,9 @@ static func create(club_ids: Array, total_weeks: int, opts: Dictionary = {}) -> 
 		"name": str(opts.get("name", NAME)),
 		"survivors": survivors,            # clubs still in the knockout (empty during groups)
 		"rounds": [],                      # played knockout rounds, oldest first: {label, ties}
+		# The round DRAWN but not yet played (see draw_next_round): {label, round,
+		# round_legs, byes, players}. {} when the next round has not been drawn yet.
+		"pending_draw": {},
 		"round_weeks": _schedule(total_weeks, num_rounds, span_lo, span_hi),
 		"champion_id": -1,
 		"n0": ids.size(),                  # starting field size (for labels)
@@ -223,9 +226,17 @@ static func _survivors(b: Dictionary) -> Array:
 ## the leg on the bottom-left plates, not on this one.
 static func draw_round_plate(b: Dictionary) -> String:
 	var rounds: Array = b.get("rounds", [])
-	if rounds.is_empty():
+	var pd: Dictionary = b.get("pending_draw", {})
+	# The SORTEO names the round it is DRAWING. Since 2026-07-26 that round is drawn a week
+	# or more before it is played, so the plate comes from `pending_draw` when one is up and
+	# only falls back to the last played round for a caller that never drew separately.
+	var label := ""
+	if not pd.is_empty():
+		label = str(pd.get("label", "")).to_upper()
+	elif not rounds.is_empty():
+		label = str((rounds[-1] as Dictionary).get("label", "")).to_upper()
+	else:
 		return ""
-	var label := str((rounds[-1] as Dictionary).get("label", "")).to_upper()
 	for suffix in [" - 1ST", " - 2ND"]:
 		if label.ends_with(suffix):
 			label = label.substr(0, label.length() - suffix.length())
@@ -236,6 +247,9 @@ static func draw_round_plate(b: Dictionary) -> String:
 ## Cup is two-legged throughout but its final is a single match, so that round shows
 ## MATCH / REPLAY.
 static func draw_leg_plates(b: Dictionary) -> Array:
+	var pd: Dictionary = b.get("pending_draw", {})
+	if not pd.is_empty():
+		return ["1ST LEG", "2ND LEG"] if int(pd.get("round_legs", 1)) > 1 else ["MATCH", "REPLAY"]
 	var rounds: Array = b.get("rounds", [])
 	if not rounds.is_empty():
 		for tie in ((rounds[-1] as Dictionary).get("ties", []) as Array):
@@ -275,6 +289,12 @@ static func next_label(b: Dictionary) -> String:
 		if gl != "":
 			return gl
 		return "Group Matchday %d" % (int(gs.get("matchdays_played", 0)) + 1)
+	# A drawn-but-unplayed round already HAS its label, taken before its late entrants were
+	# folded in and `late_ids` emptied — recomputing it from the survivor count afterwards
+	# would name the round short by exactly those entrants.
+	var pd: Dictionary = b.get("pending_draw", {})
+	if not pd.is_empty():
+		return str(pd.get("label", ""))
 	var surv := _survivors(b).size()
 	if surv <= 1:
 		return ""
@@ -356,9 +376,36 @@ static func round_due(b: Dictionary, week: int) -> bool:
 ## `on_report.call(res, home_id, away_id)` for every match the MANAGER's club plays here,
 ## so Career can fold the per-player records in. The live witness (a Euro tie moving every
 ## Man Utd player's MP 7 -> 8 and club minutes 630 -> 720) is why cup ties feed it too.
-static func play_round(b: Dictionary, rng: RandomNumberGenerator,
-		ratings_fn: Callable, club_id: int, names_fn: Callable, xi_fn := Callable(),
-		on_report := Callable()) -> Dictionary:
+## Pair the next knockout round WITHOUT playing it: fold in the late entrants, take the
+## label, shuffle, and split off the byes. Returns
+## `{label, round, round_legs, byes:[id], players:[id]}` — everything `play_round` needs to
+## resolve the round later. `{}` when there is nothing to draw (finished, or <= 1 left).
+##
+## This is the half of a knockout round the ORIGINAL does in its own week. Witnessed
+## 2026-07-26 on a live Bolton W career, twice and in two competitions:
+##   F.A. Cup   Round 2 played Sun 14 Dec 1997 -> Round 3 drawn and shown unplayed by
+##              Sat 20 Dec -> still unplayed Sun 28 Dec -> played Sat 10 Jan 1998
+##   Coca-Cola  Round 4 played Mon 1 Dec 1997 -> Qtr Finals drawn and shown unplayed
+##              (RES./REPLAY plates empty) Sun 7 Dec
+## Frames: screenshots/wine-captures-2026-07-26-cup-draw-then-play/. So the rule is not an
+## interval to invent: **the next round is drawn as soon as the previous one is played**,
+## and it is played at its own scheduled week.
+static func draw_next_round(b: Dictionary, rng: RandomNumberGenerator) -> Dictionary:
+	if int(b.get("champion_id", -1)) != -1 or _in_group_phase(b):
+		return {}
+	if not (b.get("pending_draw", {}) as Dictionary).is_empty():
+		return b["pending_draw"]
+	var d := _pair_round(b, rng)
+	if d.is_empty():
+		return {}
+	b["pending_draw"] = d
+	return d
+
+
+## The pairing half of a round. Mutates `b["late_ids"]` (the entrants are consumed once)
+## and consumes the shuffle draws, so it must run exactly once per round — which is why
+## `draw_next_round` returns an existing `pending_draw` untouched instead of re-pairing.
+static func _pair_round(b: Dictionary, rng: RandomNumberGenerator) -> Dictionary:
 	var survivors: Array = (_survivors(b) as Array).duplicate()
 	# Fold in this round's late entrants BEFORE the count and the label are taken -- the
 	# Premier clubs joining at Round 3 are part of that round's draw (REFRUN R1).
@@ -369,11 +416,9 @@ static func play_round(b: Dictionary, rng: RandomNumberGenerator,
 				survivors.append(int(v))
 		b["late_ids"] = []
 	var start_count := survivors.size()
-	var label := _label_for(b, start_count, this_round)
-	var out := {"label": label, "manager_tie": {}, "manager_out": false,
-		"champion": false, "news": [], "prize": 0}
 	if start_count <= 1:
-		return out
+		return {}
+	var label := _label_for(b, start_count, this_round)
 
 	# How many legs this round's ties are played over: 1 (FA Cup, or a single-leg final),
 	# else the competition's leg count (the League Cup's two-legged rounds).
@@ -398,11 +443,32 @@ static func play_round(b: Dictionary, rng: RandomNumberGenerator,
 	# Guard: an odd field with no planned byes (shouldn't happen) gives one bye.
 	if (start_count - byes) % 2 == 1:
 		byes += 1
+	return {
+		"label": label, "round": this_round, "round_legs": round_legs,
+		"byes": survivors.slice(0, byes), "players": survivors.slice(byes),
+	}
+
+
+static func play_round(b: Dictionary, rng: RandomNumberGenerator,
+		ratings_fn: Callable, club_id: int, names_fn: Callable, xi_fn := Callable(),
+		on_report := Callable()) -> Dictionary:
+	# Consume the draw made in an earlier week when there is one; pair now when there is
+	# not (a competition's FIRST round, and every caller that plays without drawing first).
+	var d: Dictionary = b.get("pending_draw", {})
+	if d.is_empty():
+		d = _pair_round(b, rng)
+	b["pending_draw"] = {}
+	var label := str(d.get("label", _label_for(b, 0, (b.get("rounds", []) as Array).size() + 1)))
+	var out := {"label": label, "manager_tie": {}, "manager_out": false,
+		"champion": false, "news": [], "prize": 0}
+	if d.is_empty():
+		return out
+	var round_legs := int(d["round_legs"])
 
 	var ties: Array = []
 	var next_survivors: Array = []
-	var bye_clubs: Array = survivors.slice(0, byes)
-	var players: Array = survivors.slice(byes)
+	var bye_clubs: Array = d["byes"]
+	var players: Array = d["players"]
 	for cid in bye_clubs:
 		ties.append({"home_id": int(cid), "away_id": -1, "hg": 0, "ag": 0,
 			"winner_id": int(cid), "loser_id": -1, "decided": "bye", "bye": true})

@@ -207,11 +207,12 @@ var pending_channel_tv: Dictionary = {}
 ## port had the screen at 0 differing pixels and NO live caller at all. Each entry is
 ## {key, title, round, ties, total, legs} -- exactly CupDrawScreen.setup's arguments.
 ##
-## DIVERGENCE, flagged: the original draws a round and plays it later, so its SORTEO
-## shows the ties before they are played. This app's `Cup.play_round` pairs AND plays in
-## one step, so the card is raised immediately AFTER. Nothing on the screen differs --
-## the SORTEO carries no scores -- but the ordering against the week's result news is
-## ours until the model separates the two steps.
+## CLOSED 2026-07-26. The two steps are separate now: `Cup.draw_next_round` pairs the next
+## round the moment the previous one resolves, and the round is played at its own scheduled
+## week, so this card shows ties that have NOT been played -- as the original's does. The
+## split is witnessed, not assumed: F.A. Cup R2 played 14 Dec 1997, R3 drawn and shown
+## unplayed by 20 Dec, still unplayed 28 Dec, played 10 Jan 1998; Coca-Cola R4 played
+## 1 Dec, Qtr Finals drawn and shown unplayed 7 Dec. See `Cup.draw_next_round`.
 var pending_cup_draws: Array = []
 
 var supercup: Dictionary = {}           # European Supercup result; {} = not played
@@ -942,19 +943,23 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 ## round -- the one just resolved -- and hands CupDrawScreen exactly the payload it takes.
 ## A group-phase step is not a draw and raises nothing; nor is a round of byes only.
 func _queue_cup_draw(b: Dictionary) -> void:
-	var rounds: Array = b.get("rounds", [])
-	if rounds.is_empty():
+	# The SORTEO is by definition the draw of a round about to be PLAYED, so it reads
+	# `pending_draw` and nothing else. Reading the last PLAYED round instead (what this did
+	# until 2026-07-26) meant the final's own card was raised after the final had been
+	# decided. No pending draw -> the competition has nothing left to draw -> no card.
+	var pd: Dictionary = b.get("pending_draw", {})
+	if pd.is_empty():
 		return
-	var last: Dictionary = rounds[-1]
 	var ties: Array = []
-	for t in (last.get("ties", []) as Array):
-		var tie: Dictionary = t
-		if bool(tie.get("bye", false)):
-			continue        # a bye has no opponent and the original lists no line for it
-		var h := int(tie.get("home_id", -1))
-		var a := int(tie.get("away_id", -1))
+	# The byes are skipped: a bye has no opponent and the original lists no line for it.
+	var players: Array = pd.get("players", [])
+	var i := 0
+	while i + 1 < players.size():
+		var h := int(players[i])
+		var a := int(players[i + 1])
 		ties.append({"home": _any_club_name(h), "away": _any_club_name(a),
 			"home_id": h, "away_id": a})
+		i += 2
 	if ties.is_empty():
 		return
 	var name := str(b.get("name", ""))
@@ -979,8 +984,14 @@ func _play_due_cup_rounds(rng: RandomNumberGenerator, clubs_override: Dictionary
 		if cup.is_empty():
 			continue
 		while Cup.round_due(cup, week):
+			# DRAW-THEN-PLAY (witnessed 2026-07-26, see Cup.draw_next_round): a round the
+			# original drew in an earlier week is already sitting in `pending_draw` and is
+			# consumed here; a competition's FIRST round has none, and pairs on the spot.
 			var cr := Cup.play_round(cup, rng, ratings_fn, club_id, names_fn, xi_fn,
 				_cup_report_sink())
+			# ...and the NEXT round is drawn the moment this one resolves, which is what
+			# puts the SORTEO a week or more ahead of the ties it shows.
+			Cup.draw_next_round(cup, rng)
 			_queue_cup_draw(cup)
 			for n in cr["news"]:
 				_news(n["kind"], n["text"])
@@ -1003,9 +1014,12 @@ func _play_due_cup_rounds(rng: RandomNumberGenerator, clubs_override: Dictionary
 			continue
 		while Cup.round_due(eb, week):
 			var in_before := Cup.still_in(eb, club_id)
-			_queue_cup_draw(eb)
 			var er := Cup.play_next(eb, rng, ratings_fn, club_id, names_fn, xi_fn,
 				_cup_report_sink())
+			# Same draw-then-play order as the domestic cups. `draw_next_round` is a no-op
+			# while the group phase is live, so the group matchdays raise no SORTEO.
+			Cup.draw_next_round(eb, rng)
+			_queue_cup_draw(eb)
 			for n in er["news"]:
 				_news(n["kind"], n["text"])
 			if str(er.get("phase", "")) == "group":
