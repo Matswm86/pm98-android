@@ -192,6 +192,40 @@ jobs:
           files: app/${{ env.APK_FILE }}
           fail_on_unmatched_files: true
 
+      # The APK filename carries the commit SHA (cache-busting, above), so any link
+      # written into README.md by hand is stale the moment the next build lands. This
+      # rewrites it to the APK this run just uploaded and pushes with [skip ci], so the
+      # README download link is always the newest build and the commit does not rebuild.
+      # The website (web/) resolves the newest asset from the API at page load instead;
+      # a GitHub README cannot run JavaScript, so it needs this.
+      - name: Point README at the APK this build produced (main pushes)
+        if: github.ref == 'refs/heads/main'
+        env:
+          APK_FILE: ${{ env.APK_FILE }}
+        run: |
+          set -euo pipefail
+          # Work off the current tip of main, not this run's (possibly older) checkout,
+          # so a concurrent push is a failed push rather than a silent revert.
+          git fetch --depth=1 origin main
+          git checkout -B _readme_bump FETCH_HEAD
+          python3 - "$APK_FILE" <<'EOF'
+          import re, sys
+          apk = sys.argv[1]
+          s = open('README.md', encoding='utf-8').read()
+          out = re.sub(r'pm98-[0-9a-f]{7,40}\.apk', apk, s)
+          open('README.md', 'w', encoding='utf-8').write(out)
+          print('README unchanged' if out == s else 'README -> ' + apk)
+          EOF
+          if git diff --quiet -- README.md; then
+            echo "README already points at ${APK_FILE}"; exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -qam "README: download link -> ${APK_FILE} [skip ci]"
+          # A losing race just means the next build corrects it; never fail the build.
+          git push origin _readme_bump:main \
+            || echo "push rejected (main moved) - the next build will correct the README"
+
       - name: Create tagged release (vX.Y.Z tags)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
