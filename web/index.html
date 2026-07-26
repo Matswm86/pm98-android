@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PM98 — Premier Manager 98, rebuilt for Android</title>
-<meta name="description" content="A personal, non-commercial fan port of Premier Manager 98 to Android, rebuilt from my own copy of the PC game. Download, plus what the match engine actually reads and how to beat it.">
+<meta name="description" content="A personal, non-commercial fan port of Premier Manager 98 to Android, rebuilt from my own copy of the PC game. Download, plus tips, tactics and hacks read straight out of the 1998 executable.">
 <meta name="robots" content="index,follow">
 <link rel="stylesheet" href="style.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23cc1122'/><text x='16' y='24' font-size='20' font-family='Arial' font-weight='bold' font-style='italic' fill='white' text-anchor='middle'>98</text></svg>">
@@ -17,7 +17,6 @@
     <nav>
       <a href="#start">Start</a>
       <a href="#build">The build</a>
-      <a href="#engine">The engine</a>
       <a href="#beat">Beat it</a>
       <a href="#money">Money</a>
       <a href="#book">Squad book</a>
@@ -63,8 +62,8 @@
       </div>
 
       <figure class="shot">
-        <img src="img/title.png" width="640" height="480" alt="The Premier Manager 98 front-door menu: DATA BASE, MANAGER LEAGUE, PRO-MANAGER LEAGUE">
-        <figcaption>The front door, running in the Android build &mdash; the original's own art and fonts, rebuilt from the game's own resources.</figcaption>
+        <img src="img/title.png" width="641" height="480" alt="The Premier Manager 98 front-door menu: DATA BASE, MANAGER LEAGUE, PRO-MANAGER LEAGUE">
+        <figcaption>The real thing &mdash; Premier Manager 98 running on the PC. Every screenshot on this page is the original game, not the port.</figcaption>
       </figure>
     </div>
   </div>
@@ -73,7 +72,7 @@
 <!-- ================================================================= DOWNLOAD -->
 <div class="band b-fin" id="download">
   <div class="wrap"><h2 class="band-title">Download <em>&mdash;</em> the Android build</h2>
-    <span class="sub">latest build &middot; 26 July 2026</span></div>
+    <span class="sub">latest build &middot; 26 Jul 2026</span></div>
 </div>
 <section>
   <div class="wrap">
@@ -82,9 +81,9 @@
         <h3>Get the APK</h3>
         <p>One tap downloads the current build straight to your phone. Android only.
            You will need to allow "install from this source" when your phone asks.</p>
-        <a class="btn" id="dlbtn" href="https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-46655c7.apk">Download PM98 &nbsp;&darr;</a>
+        <a class="btn" id="dlbtn" href="https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-2c8a179.apk">Download PM98 &nbsp;&darr;</a>
         <div class="dl-meta">
-          <div>file &nbsp;<code>pm98-46655c7.apk</code> &middot; 60.3&nbsp;MB &middot; build <code>46655c7</code></div>
+          <div>file &nbsp;<code>pm98-2c8a179.apk</code> &middot; 60.3&nbsp;MB &middot; build <code>2c8a179</code></div>
           <div>uploaded 26 Jul 2026 &middot; <a href="https://github.com/Matswm86/pm98-android/releases/tag/latest">all builds</a> &middot; <a href="https://github.com/Matswm86/pm98-android">source</a></div>
         </div>
       </div>
@@ -123,123 +122,33 @@
       <div class="plaque p-fin"><b>Finances</b><span>The weekly ledger, the board room, loans, insurance, ticket and sponsor pricing, ground improvements.</span></div>
     </div>
 
+    <p class="note">Every screenshot below is <b>the original 1998 PC game</b>, captured running.
+    They are what the port is measured against, screen by screen and pixel by pixel.</p>
+
     <div class="gallery">
-      <figure class="shot"><img src="img/hub.png" width="640" height="480" alt="The MANAGER MENU career hub">
-        <figcaption>The career hub, mid-season.</figcaption></figure>
-      <figure class="shot"><img src="img/lineup.png" width="640" height="480" alt="The LINE-UP screen with the squad, the chosen XI and the mini-pitch">
-        <figcaption>LINE-UP &mdash; squad, chosen XI, formation.</figcaption></figure>
-      <figure class="shot"><img src="img/match.png" width="640" height="480" alt="The BRIEF match read-out">
-        <figcaption>BRIEF &mdash; the running match read-out.</figcaption></figure>
-      <figure class="shot"><img src="img/finance.png" width="640" height="480" alt="The FINANCES weekly ledger">
+      <figure class="shot"><img src="img/hub.png" width="640" height="480" alt="The MANAGER MENU career hub of Premier Manager 98">
+        <figcaption>MANAGER MENU &mdash; the career hub.</figcaption></figure>
+      <figure class="shot"><img src="img/lineup.png" width="641" height="480" alt="The LINE-UP screen with the squad, ratings, the chosen XI and the mini-pitch">
+        <figcaption>LINE-UP &mdash; squad, ratings, XI, formation.</figcaption></figure>
+      <figure class="shot"><img src="img/squad.png" width="640" height="480" alt="The SQUAD MANAGEMENT screen listing the squad with wages and contract years">
+        <figcaption>SQUAD MANAGEMENT &mdash; wages and contracts.</figcaption></figure>
+      <figure class="shot"><img src="img/transfer.png" width="640" height="480" alt="The TRANSFER MARKET screen listing players with club fee and wage">
+        <figcaption>TRANSFER MARKET &mdash; the fee and wage columns.</figcaption></figure>
+      <figure class="shot"><img src="img/scout.png" width="640" height="480" alt="The SCOUT screen with search criteria and the players-found panel">
+        <figcaption>SCOUT &mdash; criteria, and the search running.</figcaption></figure>
+      <figure class="shot"><img src="img/finance.png" width="641" height="480" alt="The FINANCES ledger with the income and expenses columns and the weekly balance table">
         <figcaption>FINANCES &mdash; the weekly ledger.</figcaption></figure>
-      <figure class="shot"><img src="img/stadium.png" width="640" height="480" alt="The GROUND screen with works in progress and the stadium picture">
-        <figcaption>GROUND &mdash; works, capacity, improvements.</figcaption></figure>
-      <figure class="shot"><img src="img/match_sim.png" width="640" height="480" alt="The 2D simulador pitch view">
-        <figcaption>WATCH &mdash; the 2D simulador pitch.</figcaption></figure>
+      <figure class="shot"><img src="img/ground.png" width="641" height="480" alt="The GROUND screen with ticket price, sponsor boards and the stadium picture">
+        <figcaption>GROUND &mdash; ticket price, boards, the stadium.</figcaption></figure>
+      <figure class="shot"><img src="img/brief.png" width="641" height="480" alt="The BRIEF match read-out at kick off, Barcelona versus Manchester United">
+        <figcaption>BRIEF &mdash; the running match read-out.</figcaption></figure>
+      <figure class="shot"><img src="img/result.png" width="641" height="480" alt="The FULL TIME result read-out with goals, possession and man of the match">
+        <figcaption>FULL TIME &mdash; goals, possession, man of the match.</figcaption></figure>
+      <figure class="shot"><img src="img/table.png" width="640" height="480" alt="The LEAGUE TABLES screen showing the First Division">
+        <figcaption>LEAGUE TABLES.</figcaption></figure>
+      <figure class="shot"><img src="img/euro_group.png" width="641" height="480" alt="The Euro League group stage screen with the group table and that round's results">
+        <figcaption>EURO. LEAGUE &mdash; the group stage.</figcaption></figure>
     </div>
-  </div>
-</section>
-
-<!-- =================================================================== ENGINE -->
-<div class="band b-info" id="engine">
-  <div class="wrap"><h2 class="band-title">How a match is <em>actually</em> decided</h2>
-    <span class="sub">two engines &middot; four view modes</span></div>
-</div>
-<section>
-  <div class="wrap">
-
-    <div class="panel">
-      <h3>There are two match engines, and the picker chooses which one you watch</h3>
-      <p>The career-match runner holds both. It switches on a play-state byte:</p>
-      <ul>
-        <li><b>The positional engine</b> &mdash; twenty-two players, ball physics, a tick driver
-            running to 14,400 ticks a half. This is what <b>WATCH</b> shows you.</li>
-        <li><b>The statistical engine</b> &mdash; pure random draws and integer arithmetic, no
-            pitch, no ball. This produces <b>BRIEF</b>, <b>RESULTS</b>, <b>and every single
-            AI-versus-AI fixture in every division.</b></li>
-      </ul>
-      <div class="callout red">
-        <b>That second sentence is the whole game.</b> The league table forming around you is not
-        being simulated on a pitch. It is being produced by six numbers per player and a handful of
-        random draws. Learn those six numbers and you have learned the game.
-      </div>
-    </div>
-
-    <div class="cols">
-      <div class="panel">
-        <h3>The six fields it reads</h3>
-        <p>Per player, the instant engine reads exactly this and nothing else:</p>
-        <dl class="facts">
-          <dt>SEL</dt><dd>Is he in the XI? Zero means no, and a player with SEL&nbsp;0 does not exist to the engine.</dd>
-          <dt>STR</dt><dd><code>(VE + RE + AG + CA) &gt;&gt; 2</code> &mdash; the four general attributes, averaged. This is the "AV" number on his card.</dd>
-          <dt>GKSAVE</dt><dd>His HANDLING (PO), <b>plus 10 if he is in line-up slot 0</b>, clamped to 99.</dd>
-          <dt>PASS</dt><dd>His PASSING (PA), straight through.</dd>
-          <dt>POS</dt><dd>His fine position 0&ndash;18, used only to pick <em>who</em> scores.</dd>
-          <dt>ROLE</dt><dd>0/1/2/3 = keeper / defender / midfielder / attacker.</dd>
-        </dl>
-        <h4>Unread, entirely</h4>
-        <p>TACKLING (EN), DRIBBLING (RM), HEADING (RG) and <b>SHOOTING (TI)</b> are never read by
-        the instant engine. Neither is MORALE, and neither is FITNESS &mdash; those two move the
-        <em>displayed</em> rating and the computer's auto-pick, but they do not enter this
-        arithmetic. A striker with SHOOTING 99 and one with SHOOTING 20 are the same striker to
-        the engine that decides your league.</p>
-      </div>
-
-      <div class="panel">
-        <h3>The scoreline, in four lines</h3>
-        <p>Per side, per half:</p>
-<pre class="slab"><b>chances</b> = rand()%8 + own_avgSTR - opp_avgSTR - 1
-<i>if</i> chances &lt; 0:   chances += rand()%own_avgSTR
-<i>if</i> chances &gt; (3 - rand()%3):
-        chances = 3 - rand()%3        <b>&lt;-- HARD CAP, 1..3</b>
-
-<b>goal</b> per chance <i>unless</i> rand()%130 &lt; GKSAVE   <i>(the keeper)</i></pre>
-        <p>That is it. A half is capped at <b>three chances a side</b>, and every one of them is
-        stopped or not stopped by one comparison against your goalkeeper's number.</p>
-        <div class="callout">
-          <b>The scorer</b> is picked separately, by a weighted roulette over the fine positions:
-          centre-forward carries weight&nbsp;35, a defender carries&nbsp;3. That decides
-          <em>who</em> is on the scoresheet. It never changes <em>how many</em>.
-        </div>
-      </div>
-    </div>
-
-    <h3 class="cond sect">The four view modes</h3>
-    <div class="tablewrap">
-      <table>
-        <caption>MATCH OPTIONS &mdash; what each button actually runs</caption>
-        <thead><tr><th>Mode</th><th>Engine</th><th>What you get</th><th>Can you influence it?</th></tr></thead>
-        <tbody>
-          <tr>
-            <td class="nm">WATCH</td>
-            <td>Positional</td>
-            <td>The 2D pitch: players, ball, arrow marker, the real crowd and hoarding art.</td>
-            <td>Where your men stand genuinely matters here in a way it does not in BRIEF.</td>
-          </tr>
-          <tr>
-            <td class="nm">HIGHLIGHTS</td>
-            <td>3D engine</td>
-            <td><b>Nothing.</b> The 3D model files are absent from both my disc and the CD image &mdash; zero <code>.p3d</code> entries, no models folder. The app says so plainly instead of faking it.</td>
-            <td>No. There is nothing there to influence.</td>
-          </tr>
-          <tr>
-            <td class="nm">BRIEF</td>
-            <td>Statistical</td>
-            <td>The minute-by-minute feed with the engine's real goals, real scorers, real minutes and the engine's own possession counters.</td>
-            <td>Only through the six fields above. The in-match LINE-UP / TACTICS / MAN-TO-MAN buttons are chrome on this path.</td>
-          </tr>
-          <tr>
-            <td class="nm">RESULTS</td>
-            <td>Statistical</td>
-            <td>The same match as BRIEF, same draws, same score &mdash; jumped straight to full time.</td>
-            <td>Identical to BRIEF. Use it to burn through a season fast.</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <p class="note">BRIEF omits the shot / save / run / cross / header / injury lines rather than
-    inventing them: those come from the positional engine's event stream, and the instant engine
-    does not produce one. Same for TOTAL FOULS and BOOKINGS &mdash; blank chrome, never fabricated.</p>
   </div>
 </section>
 

@@ -9,14 +9,24 @@ app.js            the squad-book table browser
 data/players.json 9,547 rated players, ranked on the three fields the instant
                   engine reads, priced from the executable's own fee/wage tables
 data/value_tables.json   a copy of docs/re/value_tables.json, for reference
-img/*.png         640x480 captures copied from ../screens/
+img/*.png         640x480 captures of the REAL 1998 PC GAME, copied from
+                  ../screenshots/ (original-walkthrough + wine-captures).
+                  ONLY original-game frames go here — never a capture of the
+                  Android port, and never a mock-up.
 ```
 
 ## Deploy
 
 ```bash
-rsync -a --delete web/ mats@204.168.244.173:/var/www/pm98/
+./web/deploy.sh            # resolve newest APK -> rewrite index.html -> rsync
+./web/deploy.sh --local    # rewrite only, no rsync
 ```
+
+CI uploads one `pm98-<commit>.apk` per build to the `latest` release, so a
+hardcoded filename goes stale on every push. `deploy.sh` resolves the newest
+asset from the GitHub API and rewrites the link, size, build id and date before
+rsyncing. **Run it after the commit that triggers the build you want to ship**,
+otherwise the site points at the previous build.
 
 Served by Caddy from `/var/www/pm98` under a `pm98.mwmai.no` vhost. The CSP is
 strict — `script-src 'self'; style-src 'self'`, no `unsafe-inline` — so **do not
