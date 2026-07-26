@@ -19,7 +19,7 @@ fan remake.</sub>
 
 ## Download
 
-📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-9d943a6.apk)** — one tap downloads `pm98-9d943a6.apk` (current build) straight to your phone.
+📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-a74dcf7.apk)** — one tap downloads `pm98-a74dcf7.apk` (current build) straight to your phone.
 
 🌐 **[pm98.mwmai.no](https://pm98.mwmai.no)** — the project page: the same download (it resolves the newest build automatically), a gallery of the original 1998 screens, and a long write-up of what the game's own executable actually rewards, drawn straight out of `docs/re/`. Source for the page is in [`web/`](web/).
 
