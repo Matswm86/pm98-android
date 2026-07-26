@@ -293,7 +293,7 @@ the original does · **PARTIAL** · **STUB**.
 
 | action (icon) | original target (evidence) | app today (cite) | verdict |
 |---|---|---|---|
-| results (MARCA) | results view, art in IMG.PKF (no iconos folder) | BrowseScreen W/D/L text list, Main.gd:2076-2095 | **SUBSTITUTE** |
+| results (MARCA) | results view, art in IMG.PKF (no iconos folder) | `ResultsScreen` — the real frame baked verbatim (`app/art/screens/results/`) + a dynamic layer; raised by `Main.gd` `"results": _show_results_screen()`. The invented BrowseScreen W/D/L text list is gone. | **TRUE** (fixed; [results_screen_re.md](results_screen_re.md)) |
 | table (CLASI) | CLASIFICACION (IMG.PKF) | LeagueTableScreen (ma_10 rebuild) | TRUE layout (data: A5 gap) |
 | fixtures (CALEN) | EMPAREJAMIENTOS folder | BrowseScreen "COMPETITIONS" chooser + "SEASON FIXTURES" list, Main.gd:1569-1626 | **SUBSTITUTE** (chooser + calendar). The cup DRAW itself is now **TRUE**: `CupDrawScreen` = the original SORTEO screen, 0 differing pixels vs `74_after_wk4.png` (2026-07-24, [cupdraw_screen_re.md](cupdraw_screen_re.md)) |
 | lineup (ALINE) | ALINEACION | LineupScreen (ma_7, FUN_004fc321) | TRUE |

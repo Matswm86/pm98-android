@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""Sampling-phase-TOLERANT per-player position differ: port tick dump vs a Z2 capture.
+"""SUPERSEDED BY s57 -- use tools/re/m5_anchor_posdiff.py. Kept for history.
+
+This differ indexes the silicon by clk alone, so the row it keeps is whichever pl-bearing
+stop happened to be LAST in that tick, and the stop count varies with what the tick did
+(1-9 per tick in s55b_partial.jsonl). The sampling instant therefore moves around INSIDE
+the tick -- which is exactly what the PM98_CLK_TOL tolerance below compensates for. Sampled
+at ONE fixed stop per tick (`ret0 0x5910fd`) the port is byte-exact to the silicon over
+clk 1-823 at ZERO tolerance. See docs/re/M5_S57_SAMPLING_ANCHOR.md.
+
+Sampling-phase-TOLERANT per-player position differ: port tick dump vs a Z2 capture.
 
 Usage: m5_seq_posdiff.py <port_posdump.txt> <capture.jsonl> [clk_lo] [clk_hi]
 Env:   PM98_CLK_TOL (default 2) — how many ticks of sampling phase to allow.

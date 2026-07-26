@@ -1,5 +1,17 @@
 #!/usr/bin/env python3
-"""WIDE per-field differ: port tick dump vs a Z2 silicon capture, phase-tolerant.
+"""SUPERSEDED BY s57 -- use tools/re/m5_anchor_posdiff.py. Kept for history.
+
+Every fork this differ reports is an artefact. It indexes the silicon by clk alone, so the
+row it keeps is whichever pl-bearing stop happened to be LAST in that tick, and the stop
+count varies with what the tick did (1-9 per tick in s55b_partial.jsonl). At a mid-tick
+stop part of the roster has been advanced and part has not, and `orient17c`/`orient180`
+are a min-projection over the WHOLE roster -- hence the phantom "forks" at 657/721/777/801,
+every one of them a matrix-refresh clk (== 1 mod 8). The clk-721 ball row is the same thing:
+PORT N == SILICON N+1 exactly, possession event included. Sampled at ONE fixed stop per tick
+the port is byte-exact over clk 1-823 at ZERO tolerance.
+See docs/re/M5_S57_SAMPLING_ANCHOR.md.
+
+WIDE per-field differ: port tick dump vs a Z2 silicon capture, phase-tolerant.
 
 Usage: m5_field_posdiff.py <port_posdump.txt> <capture.jsonl> [clk_lo] [clk_hi]
 Env:   PM98_CLK_TOL (default 2) — ticks of sampling phase to allow (see s55).

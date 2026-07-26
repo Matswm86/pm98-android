@@ -55,9 +55,17 @@ func _run() -> void:
 	get_root().add_child(screen)
 	for _i in 3:
 		await process_frame
-	ok = _assert(screen._fval != null and screen._fbot != null and screen._ftot != null,
-		"value fonts loaded (calend8 / calend12 / proman8)") and ok
+	# 2026-07-25 (`93db901`, the FINANCE PER WEEK view) moved this screen off Godot FontFiles
+	# and onto the game's own BMFont atlases, the way CupDrawScreen does: `_fval`/`_fbot`/
+	# `_ftot` became `_pageV`/`_page8`/`_page10` plus their glyph tables. This assertion was
+	# left on the old names, so it raised "Invalid access to property '_fval'" and the tree
+	# never reached `quit()` -- the suite HUNG rather than failed.
+	ok = _assert(screen._pageV != null and screen._page8 != null and screen._page10 != null,
+		"atlas pages loaded (euro8 / proman8 / proman10)") and ok
+	ok = _assert(not screen._gV.is_empty() and not screen._g8.is_empty()
+		and not screen._g10.is_empty(), "glyph tables loaded for all three atlases") and ok
 	ok = _assert(screen._chrome != null, "baked finance chrome.png loads") and ok
+	ok = _assert(screen._chrome_week != null, "baked chrome_perweek.png loads") and ok
 	screen.setup(sm, club["name"], "A. FERGUSON", "1997-98", 12_345_678, 5)
 	await process_frame
 	ok = _assert((screen._sum["income_lines"] as Array).size() == 4, "screen received the summary") and ok

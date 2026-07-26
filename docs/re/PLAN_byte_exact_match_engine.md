@@ -187,6 +187,22 @@ deprioritised (last). Approved path: build an **end-to-end oracle**, kill-test t
    (`Pm98Movement` reads `m[0x17f4]`), and the tick driver `FUN_00598740` is ported
    (`Pm98Driver.tick`, `test_driver` 34). What remains of item 5 is the ≥50-match fixed-seed
    kill test, which is blocked on the clk-660 measurement horizon above — not on either function.
+   **STATUS 2026-07-26 (s57) — supersedes the s55/s56 wording above.**
+   `docs/re/M5_S57_SAMPLING_ANCHOR.md`. Sampled at ONE fixed silicon stop per tick
+   (`ret0 0x5910fd`, the `FUN_005910c0` replay-record read) instead of "the last pl-bearing stop
+   of that clk", the port is **byte-exact over clk 1-823 at ZERO tolerance**: 22 players × 16
+   fields, the ball × 10 fields, its 51-word `FUN_0058fda0` trajectory tail, and the LCG state at
+   all 823 tick boundaries — 72,685 words, 0 mismatches (`tools/re/m5_anchor_posdiff.py`).
+   The ±TOL phase machinery is retired with it, and s56's `orient17c`/`orient180`/`curve6c`/
+   `lock5c`/`guard2d7` forks and its clk-721 ball-possession divergence are all artefacts of the
+   moving sample point — **do not chase them**. The one per-tick draw-count difference in the
+   window (clk 620, silicon 8 vs port 7) is the net-neutral save/draw/restore triple around the
+   headless-gated `FUN_004e7e10` commentary leaf, confirmed live from the restored LCG word.
+   **The frontier is now purely a CAPTURE problem.** `+0x450 * 0x2d / +0x19ac` with
+   `+0x19ac = 14400` puts clk 823 at match minute 2, so the verified window is 5.7 % of one half.
+   The 11'-vs-21' kill-test divergence sits at clk ~3500 vs ~6700 — four times beyond any capture
+   we hold — so it cannot be attributed to the engine yet. Extending
+   `tools/re/wine/m5_rsp_capture.py` past clk 823 remains the gate on everything downstream.
 
 ## BRIEF-specific (mostly done — verify, don't rebuild)
 - Commentary TEMPLATES already verbatim from `MANAGER.EXE` (`MatchCommentary.gd`, VAs cited); event

@@ -78,8 +78,14 @@ func _run() -> void:
 		if ctrl_v is Dictionary:
 			var cd: Dictionary = ctrl_v
 			cdesc = "t%d.id%d" % [_g(cd, 0x2b8), _g(cd, 0x2c8)]
-		print("clk=%3d tick=%3d ball=(%d,%d) ctrl=%s draws=%s" % [
-			clk, t, Pm98Trig._i32(_g(ball, 4)), Pm98Trig._i32(_g(ball, 8)), cdesc, str(draws)])
+		# s57: `rng=` is the LCG state at the END of this tick. The Z2 capture records the
+		# same word at every RSP stop, so the once-per-tick anchor stop (ret0 0x5910fd, the
+		# FUN_005910c0 replay-record read that runs after the +0x450 bump and before the
+		# movement core) carries the state at the START of silicon tick clk+1 -- i.e. the
+		# same instant as this line. m5_anchor_posdiff.py diffs the two directly.
+		print("clk=%3d tick=%3d ball=(%d,%d) ctrl=%s rng=%d draws=%s" % [
+			clk, t, Pm98Trig._i32(_g(ball, 4)), Pm98Trig._i32(_g(ball, 8)), cdesc,
+			rng.state, str(draws)])
 		# s56: the BALL row carries what m5_rsp_capture.py's ball_row() carries in the same
 		# order (x y z vx vy vz face34 own54 +0x58 N5c), so the widened differ can check the
 		# ball's velocity and facing, not just its x/y.
@@ -87,6 +93,16 @@ func _run() -> void:
 			_si(ball, 4), _si(ball, 8), _si(ball, 0xc),
 			_si(ball, 0x20), _si(ball, 0x24), _si(ball, 0x28),
 			_g(ball, 0x34) & 0xffff, _si(ball, 0x54), _si(ball, 0x58), _si(ball, 0x5c)])
+		# s57: the rest of m5_rsp_capture.py's ball_row() -- the FUN_0058fda0 predicted-
+		# trajectory buffer ball+0x114..0x1d4 (16 vec3, stride 12 = 48 i32) then the three
+		# bounce-segment lengths ball+0x74/0x78/0x7c. s56 named these as "in the capture but
+		# not in the port dump"; without them the ball parity claim covered 10 of 63 words.
+		var traj: Array = []
+		for k in range(48):
+			traj.append(_si(ball, 0x114 + 4 * k))
+		for off in [0x74, 0x78, 0x7c]:
+			traj.append(_si(ball, off))
+		print("   BTRAJ %s" % " ".join(traj.map(func(v): return str(v))))
 		for ti in range(2):
 			var arr: Array = built[ti]
 			for i in range(arr.size()):

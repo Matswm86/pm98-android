@@ -1,3 +1,16 @@
+> **CORRECTED BY s57 — every fork below is an artefact, not a divergence.**
+> `docs/re/M5_S57_SAMPLING_ANCHOR.md`. This differ indexes the silicon by clk alone, so it
+> samples whichever stop happened to be LAST in that tick, and the stop count varies with
+> what the tick did (1-9 per tick in this capture). At a mid-tick stop part of the roster
+> has been advanced and part has not. `orient17c`/`orient180` are the per-refresh
+> min-projection over the WHOLE roster, so a half-updated snapshot changes them — every
+> "fork" clk below is a matrix-refresh clk (657/721/777/801 are all `== 1 mod 8`). The
+> clk-721 ball row is the same thing: `PORT N == SILICON N+1` exactly, possession event
+> included. Sampled at one fixed stop per tick, the port is byte-exact over clk 1-823 on
+> all 22 players, the ball, its trajectory tail and the RNG state, at ZERO tolerance.
+> The findings kept from this session: the widened dump columns, and the note that x/y
+> alone was a weaker claim than it read. Use `tools/re/m5_anchor_posdiff.py`.
+
 # M5 s56: the differ was only ever checking x/y — widened, and it finds real forks
 
 `m5_seq_posdiff.py` (s55) fixed the sampling-phase artefact and reported **22/22 players +
