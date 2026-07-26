@@ -87,8 +87,17 @@ is real and shipped, and PM98 ships two match presentations, so this is the seco
   Panel geometry is asserted by `app/tests/test_knockout_layout.gd`.
   **Still to build: the bracket (4 ties), the semifinal cards (2) and the final (1)** —
   all measured in `knockout_views_re.md`; a round that small still falls through to the
-  SORTEO card. The bracket also still wants a decided `AGGR.` cell, which the
-  phase-paginator page-back drive is capturing; the `WINNER` band is witnessed.
+  SORTEO card. The `WINNER` band is witnessed.
+  **The bracket is now fully specified and unblocked (2026-07-26).** Re-measured off FIVE
+  competitions instead of two — the pageback drive left 14 more bracket frames nobody had
+  opened — which corrected three things the doc had wrong (the score ink is `(180,200,220)`,
+  not white; the domestic slots sit at their own x positions, they are not the European ones
+  minus slot 1; the kit art does NOT already exist). `tools/re/verify_bracket_split.py`
+  re-proves what the build needs: **20 panels over 6 frames are byte-identical outside six
+  content rects**, the flags blit at **0 px**, and `desktop.png` already covers every
+  inter-panel gap. What stays open: a decided `AGGR.` cell (all 17 bracket frames in the repo
+  checked, plus the 139-frame pageback drive — none has one), and the eight kit blits, which
+  are MINIESC plus the un-reversed outline pass and must be a declared bucket.
 * ~~**Draw-then-play**~~ — **CLOSED 2026-07-26.** The separation is witnessed twice in two
   competitions (F.A. Cup R2 played 14 Dec → R3 drawn unplayed 20 Dec → played 10 Jan;
   Coca-Cola R4 played 1 Dec → Qtr Finals drawn unplayed 7 Dec), so the rule needed no
@@ -104,6 +113,12 @@ is real and shipped, and PM98 ships two match presentations, so this is the seco
 * **The kit-outline blit pass** — the engine's un-reversed outline/bevel pass. Tested and
   REJECTED: a 50 % blend with the background (left-edge pixels darken, right-edge lighten to
   128/144 grey, so it is a bevel or shadow sprite, not a blend).
+  **Attack it on the BRACKET, not the group screen (2026-07-26).** The bracket's 47x59 kit is
+  MINIESC — 1373 of 1661 opaque pixels match at `(27, T+11)` — and its residual is **173
+  silhouette-edge pixels carrying five known greys** `(144,144,144)` `(128,128,128)`
+  `(80,80,80)` `(44,44,44)` `(160,160,164)`, against the group screen's 32. It also settles
+  the shape question: the sprite's opaque bbox is **45x57 while the blit is 47x59**, so the
+  pass draws a ring one pixel OUTSIDE the silhouette. 115 interior pixels remain unexplained.
 * ~~**MINIBAND dither** — 99 px across the six euro group frames.~~ **CLOSED 2026-07-26.**
   Not dither: the flags were decoded with the shared VGA palette instead of `MANAGER.PAL`
   plus the 20 Windows static system colours. Re-exported, **0 px** over all 24 flag cells

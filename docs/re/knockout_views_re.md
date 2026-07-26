@@ -257,15 +257,106 @@ needs no guessing either. Four panels, `T = 113, 193, 273, 353` (pitch **80**), 
 | domestic | slot 1 is EMPTY white; slot 2 `RES.`, slot 3 `REPLAY` — plates `(140,160,180)`/`(120,140,160)`, boxes `(80,100,120)`/`(60,80,100)` |
 | a leg score | white `(255,255,255)`, ink rows `y T+52 .. T+58`, `0 - 0` at x115..122 / dash x127..129 / x134..141, i.e. centred on its value box |
 
-**The art the bracket needs already exists**, which the build should not re-derive: the kit
-blit measures **47x59** at `(27, T+11)` / `(424, T+12)` — exactly the `app/art/kits/offers/`
-set — and the flag **30x20** at `(83, T+6)` / `(385, T+6)`, exactly `app/art/flags/dbcard/`.
-No new export is needed for this layout.
-
 The chrome/content split is proven twice over: the same layout in two careers and two
 competitions differs ONLY inside `y T+7 .. T+67` of each panel, and the SAME career's
 unplayed and leg-1-played frames differ in **490 px total, all of them the leg-1 score
 ink**. Everything else is static and can be baked verbatim.
+
+## The bracket, re-measured 2026-07-26 — and three things above are WRONG
+
+Read this section, not the one above, before building. The table above was measured off two
+frames; this was measured off **five bracket frames across five competitions** — the
+pageback drive left 14 more in `screenshots/wine-captures-2026-07-26-knockout-pageback/`
+(euro, Cup Winner's, U.E.F.A., Coca-Cola at weeks 83/92/106/116/127) that nobody had opened.
+The three corrections:
+
+1. **The score ink is NOT white.** It is `(180,200,220)` — the same colour as the name bars —
+   with an 80 % blend `(160,180,200)` on the glyph edges, which is what the `.fnt` bitmap's
+   two alpha levels produce over the `(80,100,120)` box. A white ink would be visible from
+   across the room as wrong.
+2. **The domestic form does not "leave slot 1 empty".** Its two slots are at *different x
+   positions* from the European three, not a subset of them: `RES.` at `x135..227` and
+   `REPLAY` at `x271..361`, with the arrow gap `x229..269` between them and plain white
+   panel either side (`x82..133`, `x363..415`). The European slots are `x83..175`,
+   `x193..283`, `x310..414`.
+3. **The kit art does NOT already exist.** `app/art/kits/offers/` holds exactly **one**
+   witness-cut patch (Brighton, 107) — the claim that the bracket's 47x59 blit "is exactly
+   that set" was checked and is false. See §"The kit" below; the flags claim IS true.
+
+### Verified geometry (five competitions, 20 panels)
+
+Panels at `T = 113, 193, 273, 353`, each `x20..477`. Relative to T:
+
+| dy | what |
+|---|---|
+| 0-1, 70-71 | the panel's black frame rows (full width x20..477) |
+| 2-5 | white interior |
+| 6 | black rule, `x82..415` (the top of the name block) |
+| 7-26 | name bars: home `x114..247`, away `x250..383`, ground `(180,200,220)`; flags `x83..112` and `x385..414` |
+| 27 | black rule, `x82..415` |
+| 28-31 | white |
+| 32 | black, over each slot's span |
+| 33-46 | the plates. EURO `(140,160,180)` / `(140,160,180)` / `(42,95,170)`; DOM `(140,160,180)` / `(120,140,160)` |
+| 47 | black, over each slot's span |
+| 48-61 | the value boxes. EURO `(80,100,120)` / `(80,100,120)` / `(20,0,90)`; DOM `(80,100,120)` / `(60,80,100)` |
+| 62 | black, over each slot's span |
+| 63-69 | white |
+
+**The chrome/content split, proven over 20 panels.** With only these six rects declared as
+content — the two kits `x22..81` / `x416..475` (dy 2..69), the two flags `x83..112` /
+`x385..414` (dy 7..26), the two name bars (dy 7..26) — plus each column set's value boxes,
+**12 European panels across 3 competitions and 8 domestic panels across 2 are byte-identical
+outside them.** So one 458x72 panel strip per column set can be baked verbatim and repeated
+four times, and `desktop.png` already covers every gap: it is 0 px against both bracket
+frames at `y185..192`, `y265..272`, `y345..352` and `y425+`.
+
+**The band.** `BAND_Y = (64, 112)` for this family (the panel starts at 113, not 125). The
+phase plate sits **one row higher for EURO. LEAGUE than for everyone else**: euro's plate
+interior is `x213..297, y79..99` with arrows at `(189,79)` / `(299,79)`; F.A. Cup,
+Coca-Cola, U.E.F.A. and Cup Winner's all use `x315..399, y78..98` with arrows at
+`(291,78)` / `(401,78)`.
+
+**Text placement.** Names are CENTRED, not edge-anchored as in the list layout: home ink
+centres on x≈177, away on x≈318 (their bars' centres are 180.5 and 316.5, so this is not
+"centre of the bar" — solve the exact cx off the eight witnessed names with the
+`floor(cx - advance/2)` rule that the SCOUT bar needed, `docs/re/scout_screen_re.md`). Ink
+rows are dy 12..21, colour `(60,80,100)`. The leg-1 score centres on its box (x129 for the
+European slot 1; ink rows dy 52..58).
+
+### The kit — MINIESC, and it hands the outline pass a 5x bigger sample
+
+The 47x59 blit is **`DBDAT/MINIESC.PKF`**, whose sprites render 48x64 with a 45x57 opaque
+bbox. Placed at `(27, T+11)` it matches in **1373 of 1661 opaque pixels**; every offset in
+±4 is worse. The identification is not in doubt (`EQ960401.BMP` = Borussia Dortmund, panel 1
+of the euro QTR frame).
+
+The 288-pixel residual is the **un-reversed kit outline/bevel pass**, and it is the same
+thing as the EURO. LEAGUE group screen's 32-px residual (§Aside above) — this is just a much
+larger sample of it:
+
+* **173 of the 288 sit on the 1 px silhouette edge**, and the frame carries greys there
+  — `(144,144,144)`, `(128,128,128)`, `(80,80,80)`, `(44,44,44)`, `(160,160,164)` — where the
+  sprite has its near-black `(22,22,22)` outline index. That is exactly the "left edge dark,
+  right edge light, drawn after the kit" directional plane the group-screen note describes.
+* The blit is **47x59 while the sprite's opaque bbox is 45x57** — one pixel larger on every
+  side. So the pass draws a ring OUTSIDE the silhouette, which is why the on-screen rect has
+  never matched any sprite dimension.
+* 115 residual pixels are interior and still unexplained.
+
+**So the bracket can be built now**, with the eight kit rects as a declared bucket exactly
+as `diff_knockout_parity.py` already declares the barra manager kit and `OffersScreen`
+declares its kit panel. And work-list item 6 (the kit-outline bevel) should be attacked here
+rather than on the group screen: 173 edge samples with five known greys beats 32.
+
+**The flags DO blit exactly.** `app/art/flags/dbcard/<code>.png`, 30x20, at `(83, T+7)` and
+`(385, T+7)` — **0 px** on four tested cells (Germany 2, Greece 26, Spain 22, England 30).
+Note `T+7`, not the `T+6` claimed above: dy 6 is the black rule.
+
+**Still unwitnessed after all 17 bracket frames in the repo were checked:** a decided
+`AGGR.` cell, and any ink at all in the domestic `RES.` / `REPLAY` boxes. The 139-frame
+pageback drive did not catch it either (`knockoutwatch.py scan` → 0). Build the ink rule from
+the leg-1 cell's own grammar and say in the code that the other boxes' placement is inferred
+from it.
 
 **Still missing for the bracket:** a tie with BOTH legs played, so the `AGGR.` cell's ink
 and the advancing-club highlight in this layout stay unwitnessed. The aggregate RULE is not
