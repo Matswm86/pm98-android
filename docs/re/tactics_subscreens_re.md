@@ -74,7 +74,32 @@ lists the captured tactics screens as "TACTICS + PREDEFINED (10 formations) +
 VIEW RIVAL" and, separately, "MAN-TO-MAN MARKINGS" — **never** a team-tactics /
 attack-defence modal. `FUN_0056ea15` is not disassembled and no `lift_widgets.py`
 exists. So the modal **cannot be frame-baked** and its assembled window geometry
-is **NOT MEASURED** for parity.
+was **NOT MEASURED** for parity.
+
+**MEASURED 2026-07-26.** It is witnessed now:
+`screenshots/wine-captures-2026-07-26-team-tactics/01_team_tactics_modal_live.png`, a live
+640x480 capture of the modal open over TACTICS in a running MANAGER.EXE (Man Utd v
+Newcastle, 23 December 1999). It is a capture of the real screen, so the modal CAN now be
+frame-baked; what follows is what a bake needs, measured off it:
+
+| element | span |
+|---|---|
+| modal outer frame | `x57..582`, `y95..397` (black rows y95-96 / y396-397, columns x57-58 / x581-582) |
+| `TEAM TACTICS` title band | `y95..118` (band closes on the black row y118-119) |
+| ATTACK panel | the left half; DEFENCE the right |
+| X-boxes | 12x9 white plates, X drawn in red |
+| ATTACKING / SPECULATIVE / MIXED PLAY | `(103,177)`, `(103,203)`, `(103,229)` |
+| TACKLING SOFT / MEDIUM / AGGRESSIVE | `(374,190)`, `(442,190)`, `(523,190)` |
+| MARKING ZONAL / MAN TO MAN | `(374,236)`, `(484,236)` |
+| CLEARANCES SHORT / LONG | `(373,282)`, `(483,282)` |
+| PRESSURISE OWN / MIDFIELD / OPPONENT | `(372,330)`, `(444,330)`, `(516,330)` |
+| PASSING ↔ LONG BALL slider handle | around `(184..200, 268..270)`; the frame reads 70 % / 30 % |
+| COUNTER ATTACK | YES 80 % / NO 20 % on the same slider idiom |
+| OK | centred under both panels, `y≈365..385` |
+
+Worth remembering WHY the levers on this modal do not change an instant result: the
+statistical engine reads only `SEL`, `STR`, `GKSAVE`, `PASS`, `POS`, `ROLE`, and none of
+these settings is among them (`docs/re/hack_three_forwards.md` §1).
 
 ### What IS source-true (and used verbatim)
 1. **Every control + label.** The modal's complete label set is a contiguous
