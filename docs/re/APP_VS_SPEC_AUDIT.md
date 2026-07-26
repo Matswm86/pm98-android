@@ -306,12 +306,21 @@ the original does · **PARTIAL** · **STUB**.
 | board (DECIS) | DIRECTIVA | DirectivaScreen (ma_14; meters derived) | TRUE |
 | stadium (ESTAD) | ESTADIO | StadiumScreen (ma_15, FUN_0051a6e0) | TRUE |
 | NEWS (control) | NOTICIAS "News extra" overlay (walkthrough 155-158) | NewsScreen overlay (frame-baked pages, 0px parity x3; news_screen_re.md), Main `_show_club_news` | **TRUE** (fixed 2026-07-16) |
-| SAVE GAME (control) | original save flow | `_career.save()` + toast only, Main.gd:2030-2032 | **STUB** |
+| SAVE GAME (control) | original save flow | ~~`_career.save()` + toast only~~ **CLOSED 2026-07-18**: ten-slot `SaveGameDialog`, 0 px vs witnesses 51/52/53 (`savegame_dialog_re.md`) — this row had gone stale against §C1 row 6 of this same file | ~~STUB~~ **TRUE** |
 | CONTINUE (control) | advance + match | real stat-engine result BUT invented watch/commentary (§B3) | **PARTIAL** |
 | EXIT (control) | leave to front door | flow OK, Main.gd:2029 | TRUE-ish (flow) |
 
 ## B2 — Original screens with NO app counterpart at all (flag, port or drop the icon —
 never fill with invented stand-ins)
+
+> ⚠️ **STALE LIST (flagged 2026-07-26).** Written 07-02; at least these now EXIST as scenes:
+> ENTRENAMIENTO → `TrainingScreen`, NOTICIAS → `NewsScreen`, TACTICAS → `TacticsBoardScreen`,
+> VERRIVAL → `RivalScreen`, HISTORIAL → `ManagerHistoryScreen`, LESIONADOS →
+> `InjuriesScreen`, NIVELES → `NivelScreen`, OFERTAS → `OffersScreen`/`CurrentOffersScreen`,
+> OPCIONES → `OptionsPanel`/`MatchOptions`, SEGUROS → `InsuranceScreen`, and the SquadScreen
+> orphan is fixed. Still genuinely without a counterpart: **MULTAS, SECRETARIO, TV,
+> HIGHLIGHTS (hard gap), CREDITOS, SELECCIONPRO, SININFO**, the European entry alert, and
+> the group-phase half of EMPAREJAMIENTOS. See `AUDIT_COMPLETE_2026-07-26.md` §4.
 ENTRENAMIENTO · ~~EMPAREJAMIENTOS~~ (the cup DRAW half PORTED 2026-07-24 as
 `CupDrawScreen`, frame-exact — the group-phase half is still open) · NOTICIAS ·
 TACTICAS (screen itself) · VERRIVAL ·

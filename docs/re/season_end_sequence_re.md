@@ -1,15 +1,19 @@
 # The MANAGER LEAGUE season-end sequence — witnessed end to end (2026-07-25)
 
-**Status: CAPTURED; FIVE OF THE EIGHT STEPS BUILT (2026-07-25 evening).**
+**Status: ALL EIGHT STEPS BUILT (corrected 2026-07-26 — the "five of eight" line below went
+stale the same evening it was written; steps 3, 4 and 6 shipped later on 07-25 at 0 px:
+`ChampionshipsScreen.gd`, `EndOfSeasonScreen.gd`, `PlayersYearScreen.gd`, wired via
+`Main._season_end_championships` / `_overview` / `_players`. See
+`handoff-pm98-cupdraw-route-seasonend-finance-2026-07-25` and `AUDIT_COMPLETE_2026-07-26.md`.)**
 
 | step | screen | state |
 |---|---|---|
 | 1 | LEAGUE TABLES, one per division, blank manager plate | **BUILT** — `Main._season_end_final_tables`, lower divisions first |
 | 2 | champion cards | **BUILT for six trophies** — Charity Shield, Intercontinental, Coca-Cola, U.E.F.A., F.A. Cup, European Supercup. PREMIER LEAGUE, EUROPEAN CUP and CUP WINNER'S CUP card art was never captured, so `CharityShieldScreen.has_card()` returns false and the card is SKIPPED, never borrowed |
-| 3 | THE CHAMPIONSHIPS | **NOT BUILT** — binding frame `20_the_championships.png`, needs its own chrome bake |
-| 4 | END OF SEASON | **NOT BUILT** — binding frame `21_end_of_season.png` |
+| 3 | THE CHAMPIONSHIPS | **BUILT 07-25, 0 px** (`ChampionshipsScreen.gd`; was: needs its own chrome bake) |
+| 4 | END OF SEASON | **BUILT 07-25, 0 px** (`EndOfSeasonScreen.gd`) |
 | 5 | GOAL SCORERS OF THE YEAR | **BUILT** — the awards panel is byte-identical to the shipped MANAGERS OF THE MONTH chrome (diffed), so `ManagersMonthScreen.setup_titled()` serves it with no new art |
-| 6 | PLAYERS OF THE YEAR | **NOT BUILT** — binding frame `23_players_of_the_year.png`. NOT the same screen as PLAYERS OF THE MONTH: the title sits in the top barra band, the panel geometry differs and the four division tabs are a 2x2 grid with a CONTINUE button |
+| 6 | PLAYERS OF THE YEAR | **BUILT 07-25, 0 px** (`PlayersYearScreen.gd` — own layout, NOT the month sheet: title in the top barra band, different panel geometry, 2x2 division tabs with CONTINUE) |
 | 7 | MANAGERS OF THE YEAR | **BUILT**, same layout as step 5. The PICK is ours and flagged (see below) |
 | 8 | Preseason | already the app's own |
 

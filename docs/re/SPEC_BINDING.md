@@ -54,7 +54,15 @@ reference card*, `docs/re/player_info_re.md:55`):
 outfield attrs; `FITNESS`/`MORAL` are dynamic form, NOT static attrs (defaulted on load).
 
 ## 4. Screens (each app scene → its RE doc + source)
-All 20 game screens are reversed from `MANAGER.EXE`; the app scene must match the documented
+
+> ⚠️ **STALE TABLE (flagged 2026-07-26).** This table dates from the ~20-screen era; the app
+> now ships **63 screens** across 64 scenes, each bound to its own `docs/re/<screen>_re.md`.
+> The binding rule is unchanged — the table below is a historical subset, NOT the registry.
+> For the full inventory and the invented-screen register see
+> [`AUDIT_COMPLETE_2026-07-26.md`](AUDIT_COMPLETE_2026-07-26.md) §2. Note `CupScreen` (row
+> below) is dead code, superseded by `CompResultScreen`.
+
+All game screens are reversed from `MANAGER.EXE`; the app scene must match the documented
 layout/rects, not an invented one.
 
 | App scene | RE doc |
@@ -85,10 +93,15 @@ Match engine: `docs/re/EXACT_PORT_PLAN.md`, `match_engine_re.md`, `stat_match_en
    (Top-down `CAMPO.BMP` lines ARE source-true.)
 3. `GFX.DAT` (81 KB) unknown format.
 4. `SFX/*.PKF` inner-WAV packing undocumented.
-5. DBC per-team record schema ~281/476 complete.
+5. ~~DBC per-team record schema ~281/476 complete~~ — **CLOSED 2026-07-06**: 476/476
+   byte-exact (`tools/re/equipos_parse.py` == `FUN_00579c70`/`FUN_005820f0`; §2/§3 above
+   already said so — this line had gone stale against its own file).
 6. Player `kind` exact source byte — confirm before relying.
-7. International club country tags are best-effort inference (rate 0.914).
-8. League table not yet computed from a season loop (`LeagueTableScreen.gd:20`).
+7. ~~International club country tags are best-effort inference (rate 0.914)~~ — **CLOSED
+   2026-07-06**: country is EXACT (EQUIPOS header byte = PAISES.30 code, all 476 resolve;
+   §2 above, audit finding A3).
+8. ~~League table not yet computed from a season loop~~ — **CLOSED 2026-07-25**: the season
+   audit drove a full season loop; standings are computed from played fixtures.
 
 ## 6. Active de-invention record (already removed by prior passes — keep removed)
 The DataBase/Directiva/Finance/Stadium screens previously shipped invented content that has

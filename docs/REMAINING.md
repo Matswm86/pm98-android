@@ -25,12 +25,17 @@ plays with, and the animated 2D match view does not exist.
 
 ## 1. The byte-exact match engine (M5) — THE critical path
 
-The app plays every match on `MatchSim.simulate` (`Career.gd`, `Cup.gd`), an abstracted
-engine self-documented as app-tuned and validated against real-football aggregates, NOT
-against PM98 output. The instruction-exact engine (`Pm98Driver` / `Pm98Outer` /
-`Pm98Movement` / `Pm98Action` / `Pm98Resolver` / `Pm98CollBuilder`) exists, is oracle-locked
-leaf by leaf against a Ghidra PCode emulator, and is **not wired into gameplay**. Swapping
-it in is the whole game's fidelity ceiling.
+The app plays every match on `MatchSim.simulate` (`Career.gd`, `Cup.gd`), which — corrected
+2026-07-26, the old wording here understated what has shipped — routes to **`Pm98StatMatch`**,
+the byte-exact port of the original's instant-result runner (`FUN_0044ee70` family,
+oracle-anchored), whenever both XIs pass `_usable`. Only when an XI is unusable does it fall
+back to the abstracted legacy `MatchEngine` (app-tuned constants, validated against
+real-football aggregates, NOT against PM98 output) — and that fallback fires ~37 times a
+season on European ties because foreign clubs carry no usable XI (S5 below). The
+instruction-exact POSITIONAL engine (`Pm98Driver` / `Pm98Outer` / `Pm98Movement` /
+`Pm98Action` / `Pm98Resolver` / `Pm98CollBuilder`) exists, is oracle-locked leaf by leaf
+against a Ghidra PCode emulator, and is **not wired into gameplay**. Swapping it in is the
+whole game's fidelity ceiling.
 
 Where it actually stands, measured 2026-07-26 (`docs/re/M5_S58_FRONTIER_1032.md`):
 
@@ -124,6 +129,20 @@ is real and shipped, and PM98 ships two match presentations, so this is the seco
   plus the 20 Windows static system colours. Re-exported, **0 px** over all 24 flag cells
   (`euro_league_screen_re.md` §Parity).
 
+## 3a. Reachability — the knockout/Europe views ship unreachable (FOUND 2026-07-26)
+
+The complete-audit pass (`docs/re/AUDIT_COMPLETE_2026-07-26.md` §1) traced the call graph:
+`Main._show_competitions()` (Main.gd:3631) has **zero callers**, and `_show_cup_screen`'s
+only other callers live inside the `PM98_CUP_SHOT` dev harness. The RESULTS competition
+rail is baked, inert chrome (`ResultsScreen.gd` declares only `back_pressed`). So
+**`KnockoutScreen` (LIST, 0 px), `EuroGroupScreen`, `EuroSupercupScreen` and
+`CompResultScreen` cannot be reached by a player in a real career.** `CupDrawScreen`
+(post-week `_pop_cup_draw` chain) and `CharityShieldScreen` (season chains) ARE reachable.
+Fix belongs with the BRACKET build: wire the RESULTS rail chips (the `KNOCKOUT_RAIL` map at
+Main.gd:4223 already exists) or restore the hub entry. Also found fully dead:
+`CupScreen.gd` + its sole caller `_show_one_off_final()` (superseded by `CompResultScreen`)
+and the interim `_show_training()` browse — safe to delete in a cleanup pass.
+
 ## 3b. THREE UP FRONT — the one place this port draws a pixel the original does not
 
 SHIPPED 2026-07-26 and listed here so it is never a surprise: the MANAGER_HACK.EXE cheat
@@ -152,6 +171,32 @@ Plan: memory-diff that byte in a **clone** of the play prefix (`/tmp/pm98-play/
 sandbox-prefix`, display `:8`, never the live career) while toggling ATTACKING ↔ MIXED with
 synthetic clicks, then re-target the `att3` cave at it. The modal's geometry is measured
 now (`tactics_subscreens_re.md`), so the click target is known: MIXED PLAY's X-box (103,229).
+
+## 3c. Model-level divergences from the season audit — OPEN (rescued 2026-07-26)
+
+From `docs/re/AUDIT_season_playthrough_2026-07-25.md` (previously /tmp-only, now in-repo);
+verified still open at HEAD `4076800`:
+
+* **S3 — a career is not reproducible at a fixed seed.** 12 `randomize()` sites in
+  `Career.gd` (500, 528, 1467, 1988, 2187, 2250, 2388, 2629, 2742, 3292, 4052, 4109).
+  Not player-facing (the original also reseeds from `time()`), but the port's own
+  acceptance machinery — save/load equivalence, the M5 kill-test, seeded parity claims —
+  assumes a seed pins a career, and it does not.
+* **S5 — European ties run on the invented legacy engine.** Foreign XIs fail `_usable`
+  (`MatchSim.gd:105-110`), ~37 loud `[MATCHSIM_FALLBACK]` warnings per season.
+  `test_career.gd` asserts zero fallbacks and passes because it only checks the manager's
+  own league. Fix = usable foreign XIs (feed from `game_db` directory records) or a
+  stat-engine path that does not need a full XI.
+* **S8 — no player ever retires.** No retirement/ageing-intake mechanic exists in
+  `app/scripts`; squads age without bound and a multi-season career ages into a dead end.
+  Blocked on reversing `FUN_005865b0` / `FUN_005c1df0` / `FUN_00443180`.
+* Smaller opens from the same audit + refrun: the running-at-a-loss **sacking threshold**
+  (>3 weeks, unmeasured) and the sacking screen; the Coca-Cola Cup home TV fee (pays £0,
+  flagged); the weekly-illness (virus/cold) insurance path; the insured-row document icon;
+  **O1** board objective is a category (Champion / U.E.F.A. / Mid Table / Avoid Relegation),
+  the port shows a position; **O3** the original names every club's manager on START OF
+  SEASON; **S7 remainder** — the European field shape (24 clubs / 6 groups / 2 qualifying
+  rounds) is not confirmed shipped.
 
 ## 4. The SHOOTING appendix
 
@@ -196,7 +241,10 @@ pass (touch targets, screen sizes), app icon/splash, and a signed release build.
   driver (`Pm98Driver`), the full per-player DECIDE/ADVANCE, relationship matrix, marker
   and role selection, ball advance, the trig LUTs, the event queue and dispatcher — all
   ported and oracle-locked. They are done; they are simply not the engine the app calls.
-* **219 GDScript test suites** under `app/tests/`.
+* **321 GDScript test scripts** under `app/tests/` (224 `test_*`, 42 `diag_*`, 55 `shot_*`;
+  the old "219" count here was stale). Caveats: a full sweep has never run to completion,
+  CI runs no test gate (`build-android.yml` only exports the APK; `screenshot.yml` steps
+  are `|| true`), and all 20 `diff_*_parity.py` gates are manual-only.
 * **Render-diff discipline**: screen after screen is baked from the real captured frames and
   proven at 0 differing pixels by a `tools/re/diff_*_parity.py`. That is the standard every
   new screen has to clear.
@@ -208,5 +256,6 @@ pass (touch targets, screen sizes), app icon/splash, and a signed release build.
 | is screen X faithful? | `docs/re/<screen>_re.md` `Status:` line |
 | what does the app do that the original does not (and vice versa)? | `docs/re/APP_VS_SPEC_AUDIT.md` |
 | what is decoded already? | `docs/re/EXACT_PORT_PLAN.md` §"Already decoded — cite, don't redo" |
-| where is the byte-exact engine? | `docs/re/PLAN_byte_exact_match_engine.md` + `docs/re/M5_S57_SAMPLING_ANCHOR.md` |
+| where is the byte-exact engine? | `docs/re/PLAN_byte_exact_match_engine.md` + `docs/re/M5_S58_FRONTIER_1032.md` (supersedes s57) |
+| what did the complete audit find? | `docs/re/AUDIT_COMPLETE_2026-07-26.md` + `docs/re/AUDIT_season_playthrough_2026-07-25.md` |
 | which source file proves a claim? | `docs/re/SOURCE_INVENTORY.md`, `docs/re/SPEC_BINDING.md` |

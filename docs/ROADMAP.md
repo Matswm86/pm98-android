@@ -1,5 +1,11 @@
 # PM98 Android — Native Clone Roadmap
 
+> ⚠️ **HISTORICAL DOCUMENT — DO NOT USE FOR STATUS (flagged 2026-07-26).** This is the
+> June-era plan. Everything in Phase 0 is long done (PKF cracked, art/audio extracted),
+> the engine choice was made (Godot 4), the DB is 476/476 clubs / 9,547 players, and 63
+> screens have shipped. For live status read `docs/REMAINING.md`; for the audit,
+> `docs/re/AUDIT_COMPLETE_2026-07-26.md`. Kept only for the original phase rationale.
+
 Goal: a native English Android game that reads the **original PM98 assets**
 (database, names, badges, photos, kits, stadiums) and reproduces the original
 look + gameplay. For personal use on Mats's phone. Source files in `extracted/`.
