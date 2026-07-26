@@ -1,9 +1,15 @@
 # The knockout views — RESULTS → any cup, every layout the original switches between
 
-**Status: WITNESSED and measured 2026-07-26, NOT BUILT.** The app has no knockout screen at
-all: `Main._show_euro_group_screen` raises `EuroGroupScreen` for the European group phase
-(0 px, `euro_league_screen_re.md`) and there is nothing for a knockout round in any
-competition. This doc is the evidence and the geometry, so the build has no guessing in it.
+**Status: the LIST layout is BUILT and 0 px (2026-07-26); layouts 3-5 measured, not built.**
+`KnockoutScreen.gd` draws the compact list in both column sets and
+`tools/re/diff_knockout_parity.py` proves it at **0 differing pixels** against
+`06_euroleague_round1_played.png` (European, 15 ties, every aggregate filled) and
+`03_facup_r3_drawn_UNPLAYED_1997-12-20.png` (domestic, 16 ties, every cell empty), outside
+two declared buckets — the barra manager kit, a hole this screen shares with `ResultsScreen`
+and `EuroGroupScreen`, and the scrollbar's thumb (see "What is inferred" below).
+`Main._show_cup_screen` raises it for any knockout phase of nine ties or more; a smaller
+round still falls through to the SORTEO card, because the bracket / semifinal-card / final
+layouts are measured here but not yet built.
 
 Frames: `screenshots/wine-captures-2026-07-26-knockout-views/` and
 `screenshots/wine-captures-2026-07-26-cup-draw-then-play/` (a live Bolton W 1997-98 career
@@ -178,6 +184,73 @@ narrowed it without closing it. Measured on `ridi/1104.png` against
 What survives: the left-edge pixels take dark entries and the right-edge pixels light ones,
 which is a directional pass. So it is a **second sprite plane or an emboss table keyed on
 the silhouette**, drawn after the kit — not anything the kit decode can fix.
+
+## Geometry banked 2026-07-26 — the LIST layout, as built
+
+Measured on `06_euroleague_round1_played.png` (European) and
+`01_facup_r2_PLAYED_1997-12-14.png` / `03_facup_r3_drawn_UNPLAYED_1997-12-20.png`
+(domestic). All spans inclusive, design space 640x480.
+
+| element | span |
+|---|---|
+| panel | `x6..477`; top border y125-126, the title band y127..151, its underline y152-153 |
+| body top | y154 |
+| column cells, European | home `8..158` · away `161..309` · 1ST LEG `312..365` · 2ND LEG `367..420` · AGGR. `422..475` |
+| column cells, domestic | home `8..185` · away `188..363` · RES. `365..418` · REPLAY `420..473` |
+| row grounds, light/dark | names `(120,140,160)`/`(100,120,140)` · score cells `(160,160,200)`/`(120,120,160)` · the LAST score cell `(140,140,180)`/`(100,100,140)` |
+| the manager's own tie | replaces the alternation outright: names `(60,80,100)`, score `(59,85,130)`, last `(30,52,98)`, ink `(140,160,180)` |
+| home name | proman10, RIGHT-aligned, pen END at `cell_x1 - 4`, pen top `row_top + 2` |
+| away name | proman10, LEFT-aligned, pen at `cell_x0 + 4`, same pen top |
+| a score cell | first number RIGHT-aligned pen end `cell_x0 + 21`, the dash at `cell_x0 + 24`, second number pen `cell_x0 + 31`, pen top `row_top + 2` |
+| inks | the club going through `(255,223,0)`, the other `(42,63,85)` |
+
+**The panel is sized to the round.** Two sizes are witnessed and they are *not* the same
+pitch, which is why `app/tests/test_knockout_layout.gd` asserts both:
+
+| ties | body height | black rules at | foot |
+|---|---|---|---|
+| 15 | 225 | y168, 183, 198 … 363 (pitch 15) | y378..380 |
+| 16 | 255 | y168, 184, 200 … 392 | y408..410 |
+
+Both fall out of `rule_i = 154 + floor((i+1) * body_h / n) - 1` with
+`body_h = 15 * n` up to 15 ties and the panel's full **255** at 16 or more. Above 16 the
+list scrolls at the full height (`01_facup_r2` is the witness, 16 rows plus a scrollbar).
+
+**The marked digit.** The club going through has ITS OWN goals inked yellow in every cell,
+and the SECOND LEG is printed with the sides swapped — its host first — so the marked
+position flips there. Witnessed on all 15 rows of `06_euroleague_round1_played.png`; the
+aggregate confirms it arithmetically (leg 1 `2-1` + leg 2 `1-0` → `AGGR. 2-2`).
+
+**The phase paginator.** Plate interior `x254..338 y88..108` for EURO. LEAGUE,
+`x315..399 y88..108` for the domestic and U.E.F.A./Cup Winner's bands; the label is
+proman10 `(100,100,140)`, centred, pen top `plate_y0 + 5`. The arrow buttons are 23x21 at
+the plate's two sides. **A DISABLED arrow's triangle is a two-colour checkerboard keyed on
+ABSOLUTE screen parity** — the same disabled right arrow differs in 76 px between (299,79)
+and (401,88), every one a symmetric swap of one of five colour pairs — so both phases are
+cut from real frames. The ENABLED faces are not dithered: the enabled left arrow is 0 px
+different across those same two parities.
+
+**The competition band is not placed by any rule this port can state.** Over eight frames
+its outer box is `x69..365` for EURO. LEAGUE in the list layouts, `x28..324` for the same
+competition in the bracket layouts, and `x71..428` for F.A. Cup / Coca-Cola / U.E.F.A. /
+Cup Winner's in BOTH — three placements that no width of the name, the label or the panel
+accounts for. So each witnessed (competition, layout) pair is cut verbatim as a strip and
+`bands.json` records where its label and arrows sit.
+
+## What is inferred, and therefore declared
+
+Three things in the built screen are not pixel-witnessed, and the parity gate buckets or
+documents each rather than hiding it:
+
+1. **the scrollbar thumb.** Its arrows and trough are the original's own; the two frames in
+   hand differ only in the thumb's LENGTH, which fixes neither the rounding nor a minimum,
+   so length and tracking are computed proportionally. `diff_knockout_parity.py` reports the
+   column `x478..493` as its own bucket.
+2. **the REPLAY column with ink in it.** Every witnessed domestic frame leaves it empty —
+   the original raises a replay in a later week. The port prints the replay in the same
+   grammar as `RES.`; the ink rule there is unwitnessed.
+3. **the enabled RIGHT arrow at odd screen parity.** No frame has one. It is taken to be
+   dither-free like its witnessed twin, the enabled LEFT arrow.
 
 ## What the port needs before this can be built
 

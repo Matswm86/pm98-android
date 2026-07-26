@@ -561,7 +561,22 @@ func _cup_shot() -> void:
 	_begin_career("Manager", lg, clubs[0])
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 717171            # fixed seed -> reproducible capture
-	for _i in 22:                # past several scheduled rounds of both cups
+	# First stop early, while the F.A. Cup is still a big round: that is the KNOCKOUT LIST
+	# view (docs/re/knockout_views_re.md), the one the SORTEO card used to stand in for.
+	for _e in 10:
+		if _career.season_over():
+			break
+		_career.advance_week(rng)
+	_show_career()
+	await _settle()
+	_show_cup_screen(_career.fa_cup, "fa_cup", "F.A. Cup")
+	await _settle()
+	_save_shot(dir, "cup_knockout_list.png")
+	for c in get_children():
+		if c is KnockoutScreen or c is CupScreen or c is CupDrawScreen:
+			c.queue_free()
+	await _settle()
+	for _i in 12:                # past several scheduled rounds of both cups
 		if _career.season_over():
 			break
 		_career.advance_week(rng)
@@ -4186,6 +4201,14 @@ func _show_cup_screen(b: Dictionary, key: String, title: String) -> void:
 	if not Cup.group_tables(b).is_empty() and (b.get("rounds", []) as Array).is_empty():
 		_show_euro_group_screen(b)
 		return
+	# A knockout phase big enough for the original's LIST layout has its own screen too
+	# (docs/re/knockout_views_re.md). The bracket / semifinal-card / final layouts are
+	# measured but not built yet, so those phases still fall through to the SORTEO card.
+	if _knockout_phases(b).size() > 0 and KNOCKOUT_RAIL.has(key):
+		var last: int = _knockout_phases(b).size() - 1
+		if (_knockout_ties(b, last) as Array).size() >= KnockoutScreen.MIN_LIST_TIES:
+			_show_knockout_screen(b, key, last)
+			return
 	var scr: CupDrawScreen = load("res://scenes/CupDrawScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
@@ -4195,6 +4218,97 @@ func _show_cup_screen(b: Dictionary, key: String, title: String) -> void:
 	_wire_cup_draw_rows(scr, v["ties"], v["legs"])
 	scr.continue_pressed.connect(func() -> void: scr.queue_free())
 	scr.finish_pressed.connect(func() -> void: scr.queue_free())
+
+
+## Cup.gd bracket key -> the competition rail chip the original lights for it.
+const KNOCKOUT_RAIL := {
+	"fa_cup": "facup", "league_cup": "cocacola", "european_cup": "euro",
+	"cup_winners_cup": "cwc", "uefa_cup": "uefa",
+}
+
+
+## The phases the paginator walks: every round PLAYED, then the round that has been DRAWN
+## but not yet played, if there is one. That is the original's own order -- the next round
+## is drawn the moment the previous resolves (docs/re/knockout_views_re.md).
+func _knockout_phases(b: Dictionary) -> Array:
+	var out: Array = []
+	for r in b.get("rounds", []):
+		out.append(r)
+	var pd: Dictionary = b.get("pending_draw", {})
+	if not pd.is_empty():
+		out.append({"label": str(pd.get("label", "")), "pending": pd})
+	return out
+
+
+## One phase's ties as KnockoutScreen rows. Byes are left out, as they are on the SORTEO:
+## the original's cup fields are large enough that no witnessed draw has one, so their
+## rendering is unknown and is not invented.
+func _knockout_ties(b: Dictionary, phase: int) -> Array:
+	var phases := _knockout_phases(b)
+	if phase < 0 or phase >= phases.size():
+		return []
+	var ph: Dictionary = phases[phase]
+	var mine: int = _career.club_id
+	var out: Array = []
+	if ph.has("pending"):
+		var pd: Dictionary = ph["pending"]
+		var players: Array = pd.get("players", [])
+		var two := int(pd.get("round_legs", 1)) >= 2
+		var i := 0
+		while i + 1 < players.size():
+			var h := int(players[i])
+			var a := int(players[i + 1])
+			out.append({"home": _cup_name(h), "away": _cup_name(a), "winner": -1,
+				"mine": h == mine or a == mine,
+				"cells": [["", ""], ["", ""], ["", ""]] if two else [["", ""], ["", ""]]})
+			i += 2
+		return out
+	for tie in ph.get("ties", []):
+		if tie.get("bye", false):
+			continue
+		var h := int(tie["home_id"])
+		var a := int(tie.get("away_id", -1))
+		var w := int(tie.get("winner_id", -1))
+		var cells: Array = []
+		if tie.get("two_legged", false):
+			# The second leg is printed with the sides swapped -- its host first.
+			cells = [[str(int(tie["leg1_hg"])), str(int(tie["leg1_ag"]))],
+				[str(int(tie["leg2_ag"])), str(int(tie["leg2_hg"]))],
+				[str(int(tie["h_agg"])), str(int(tie["a_agg"]))]]
+		else:
+			var replay: Array = ["", ""]
+			if tie.has("replay_hg"):
+				# The REPLAY column with ink in it is not witnessed -- the one played
+				# frame in hand leaves it empty on every level tie. Printed here in the
+				# same grammar as RES., and flagged as unwitnessed in the RE doc.
+				replay = [str(int(tie["replay_ag"])), str(int(tie["replay_hg"]))]
+			cells = [[str(int(tie["hg"])), str(int(tie["ag"]))], replay]
+		out.append({"home": _cup_name(h), "away": _cup_name(a),
+			"winner": (0 if w == h else (1 if w == a else -1)),
+			"mine": h == mine or a == mine, "cells": cells})
+	return out
+
+
+## RESULTS -> a cup at a knockout phase, on the original's own list layout. Re-entered on
+## every tap, so the screen stays a pure view over Cup.gd's bracket.
+func _show_knockout_screen(b: Dictionary, key: String, phase: int) -> void:
+	var phases := _knockout_phases(b)
+	if phases.is_empty():
+		return
+	phase = clampi(phase, 0, phases.size() - 1)
+	var ties := _knockout_ties(b, phase)
+	var two_legged := (ties.size() > 0
+		and ((ties[0] as Dictionary).get("cells", []) as Array).size() >= 3)
+	var scr: KnockoutScreen = load("res://scenes/KnockoutScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(_match_header(), str(KNOCKOUT_RAIL.get(key, "euro")),
+		str((phases[phase] as Dictionary).get("label", "")).to_upper(), two_legged, ties,
+		phase > 0, phase < phases.size() - 1)
+	scr.back_pressed.connect(func() -> void: scr.queue_free())
+	scr.phase_changed.connect(func(delta: int) -> void:
+		scr.queue_free()
+		_show_knockout_screen(b, key, phase + delta))
 
 
 ## Answer the SORTEO's row taps with the original's own tie-detail card: each club's

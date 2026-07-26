@@ -375,6 +375,16 @@ def run_probe(e: dict, probe: dict, outdir: Path, tag: str) -> None:
     for i, act in enumerate(probe.get("steps", [])):
         if "click" in act:
             click(e, *act["click"], act.get("count", 1))
+        if "click_template" in act:
+            # The competition phase paginator moves with the width of its own label
+            # ("ROUND 1" sits ~54 px right of "QTR FINALS"), and its LEFT button is drawn
+            # grey when there is no earlier phase to page back to — so the button has to
+            # be FOUND, and its absence is a normal outcome, not a failure.
+            hit = locate(grab(e, outdir / "_find.png"), act["click_template"])
+            if hit is None:
+                continue
+            tw, th = Image.open(TEMPLATES / act["click_template"]).size
+            click(e, hit[0] + tw // 2, hit[1] + th // 2, act.get("count", 1))
         time.sleep(act.get("settle", 1.2))
         if "snap" in act:
             grab(e, outdir / f"probe_{tag}_{i:02d}_{act['snap']}.png")
