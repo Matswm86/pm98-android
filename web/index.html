@@ -1,0 +1,842 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PM98 — Premier Manager 98, rebuilt for Android</title>
+<meta name="description" content="A personal, non-commercial fan port of Premier Manager 98 to Android, rebuilt from my own copy of the PC game. Download, plus what the match engine actually reads and how to beat it.">
+<meta name="robots" content="index,follow">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23cc1122'/><text x='16' y='24' font-size='20' font-family='Arial' font-weight='bold' font-style='italic' fill='white' text-anchor='middle'>98</text></svg>">
+</head>
+<body>
+
+<header class="barra">
+  <div class="wrap">
+    <span class="crest"><span class="a">MWM</span><span class="b">PM98</span></span>
+    <nav>
+      <a href="#start">Start</a>
+      <a href="#build">The build</a>
+      <a href="#engine">The engine</a>
+      <a href="#beat">Beat it</a>
+      <a href="#money">Money</a>
+      <a href="#book">Squad book</a>
+      <a href="#sources">Sources</a>
+      <a class="dl" href="#download">Download</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ==================================================================== START -->
+<section class="hero" id="start">
+  <div class="wrap">
+    <p class="kicker">A personal fan project &middot; not for sale &middot; not affiliated with anyone</p>
+    <div class="logo" aria-label="Premier Manager 98">
+      <span class="l"><b>Premier</b><b>Manager</b></span>
+      <span class="r"><b>98</b></span>
+    </div>
+    <h1>The 1998 game, rebuilt for a phone</h1>
+
+    <div class="hero-grid">
+      <div>
+        <p class="lede">
+          I own a copy of <strong>Premier Manager 98</strong> on PC. This project takes that copy
+          apart &mdash; the executable, the art archives, the club and player database &mdash; and
+          rebuilds the game as an Android app, screen by screen, against the original's own bytes.
+        </p>
+        <p class="lede">
+          It is <strong>a hobby, for my own use</strong>. Nothing is sold, nothing is monetised, and
+          no original game data ships inside the app that did not come off my own disc. If you do not
+          own the game, this is a read about how a 1998 football manager works under the bonnet,
+          not a way to get it for free.
+        </p>
+
+        <div class="callout gold">
+          <b>What "faithful" means here.</b> Screens are measured against photographs of the real
+          game running and diffed pixel-for-pixel &mdash; most of them land at <b>0 differing pixels</b>.
+          Rules are read out of the 1998 executable, not guessed: the transfer prices, the wage
+          table, the insurance economy, the injury model, the ground-improvement costs and the
+          instant-result match engine are all the original's own arithmetic, reproduced.
+          Where something is genuinely unknown, the app leaves it blank and says so rather than
+          inventing a number.
+        </div>
+      </div>
+
+      <figure class="shot">
+        <img src="img/title.png" width="640" height="480" alt="The Premier Manager 98 front-door menu: DATA BASE, MANAGER LEAGUE, PRO-MANAGER LEAGUE">
+        <figcaption>The front door, running in the Android build &mdash; the original's own art and fonts, rebuilt from the game's own resources.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================= DOWNLOAD -->
+<div class="band b-fin" id="download">
+  <div class="wrap"><h2 class="band-title">Download <em>&mdash;</em> the Android build</h2>
+    <span class="sub">latest build &middot; 26 July 2026</span></div>
+</div>
+<section>
+  <div class="wrap">
+    <div class="cols">
+      <div class="dl-box">
+        <h3>Get the APK</h3>
+        <p>One tap downloads the current build straight to your phone. Android only.
+           You will need to allow "install from this source" when your phone asks.</p>
+        <a class="btn" id="dlbtn" href="https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-46655c7.apk">Download PM98 &nbsp;&darr;</a>
+        <div class="dl-meta">
+          <div>file &nbsp;<code>pm98-46655c7.apk</code> &middot; 60.3&nbsp;MB &middot; build <code>46655c7</code></div>
+          <div>uploaded 26 Jul 2026 &middot; <a href="https://github.com/Matswm86/pm98-android/releases/tag/latest">all builds</a> &middot; <a href="https://github.com/Matswm86/pm98-android">source</a></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>In this build</h3>
+        <ul>
+          <li><b>The cup draw happens before the ties are played</b>, the way the real game does it.
+              Pinned by playing a whole 1997&ndash;98 season under emulation and photographing the
+              results screen every couple of weeks.</li>
+          <li><b>The European knockout screens are measured.</b> Five layouts, four of which had
+              never been seen before: plain list, list with shirts, the four-panel quarter-final
+              bracket, a two-card semi-final that names the stadiums, and the final with the trophy.</li>
+          <li><b>Three up front</b> &mdash; an optional cheat, off by default. See
+              <a href="#hack">below</a>.</li>
+        </ul>
+        <p class="muted">Filenames change every build on purpose, so your phone can never serve you
+        a stale cached APK. If the link 404s, a newer build has landed &mdash; grab the newest
+        <code>pm98-*.apk</code> from the releases page.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================================================================== BUILD -->
+<div class="band b-mgr" id="build">
+  <div class="wrap"><h2 class="band-title">The build <em>&mdash;</em> what is in it</h2>
+    <span class="sub">career, squad, transfers, finances, Europe</span></div>
+</div>
+<section>
+  <div class="wrap">
+    <div class="plaques mb18">
+      <div class="plaque p-info"><b>Information</b><span>Results, league tables, fixtures, goalscorers, statistics, news, the season-end sequence.</span></div>
+      <div class="plaque p-mgr"><b>Manager</b><span>Line-up and the XI editor, team tactics, training, view rival, the pre-match photo roll.</span></div>
+      <div class="plaque p-tm"><b>Transfer market</b><span>Transfers, the scout, offers and counter-offers, contracts and renewals, staff, the youth academy.</span></div>
+      <div class="plaque p-fin"><b>Finances</b><span>The weekly ledger, the board room, loans, insurance, ticket and sponsor pricing, ground improvements.</span></div>
+    </div>
+
+    <div class="gallery">
+      <figure class="shot"><img src="img/hub.png" width="640" height="480" alt="The MANAGER MENU career hub">
+        <figcaption>The career hub, mid-season.</figcaption></figure>
+      <figure class="shot"><img src="img/lineup.png" width="640" height="480" alt="The LINE-UP screen with the squad, the chosen XI and the mini-pitch">
+        <figcaption>LINE-UP &mdash; squad, chosen XI, formation.</figcaption></figure>
+      <figure class="shot"><img src="img/match.png" width="640" height="480" alt="The BRIEF match read-out">
+        <figcaption>BRIEF &mdash; the running match read-out.</figcaption></figure>
+      <figure class="shot"><img src="img/finance.png" width="640" height="480" alt="The FINANCES weekly ledger">
+        <figcaption>FINANCES &mdash; the weekly ledger.</figcaption></figure>
+      <figure class="shot"><img src="img/stadium.png" width="640" height="480" alt="The GROUND screen with works in progress and the stadium picture">
+        <figcaption>GROUND &mdash; works, capacity, improvements.</figcaption></figure>
+      <figure class="shot"><img src="img/match_sim.png" width="640" height="480" alt="The 2D simulador pitch view">
+        <figcaption>WATCH &mdash; the 2D simulador pitch.</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<!-- =================================================================== ENGINE -->
+<div class="band b-info" id="engine">
+  <div class="wrap"><h2 class="band-title">How a match is <em>actually</em> decided</h2>
+    <span class="sub">two engines &middot; four view modes</span></div>
+</div>
+<section>
+  <div class="wrap">
+
+    <div class="panel">
+      <h3>There are two match engines, and the picker chooses which one you watch</h3>
+      <p>The career-match runner holds both. It switches on a play-state byte:</p>
+      <ul>
+        <li><b>The positional engine</b> &mdash; twenty-two players, ball physics, a tick driver
+            running to 14,400 ticks a half. This is what <b>WATCH</b> shows you.</li>
+        <li><b>The statistical engine</b> &mdash; pure random draws and integer arithmetic, no
+            pitch, no ball. This produces <b>BRIEF</b>, <b>RESULTS</b>, <b>and every single
+            AI-versus-AI fixture in every division.</b></li>
+      </ul>
+      <div class="callout red">
+        <b>That second sentence is the whole game.</b> The league table forming around you is not
+        being simulated on a pitch. It is being produced by six numbers per player and a handful of
+        random draws. Learn those six numbers and you have learned the game.
+      </div>
+    </div>
+
+    <div class="cols">
+      <div class="panel">
+        <h3>The six fields it reads</h3>
+        <p>Per player, the instant engine reads exactly this and nothing else:</p>
+        <dl class="facts">
+          <dt>SEL</dt><dd>Is he in the XI? Zero means no, and a player with SEL&nbsp;0 does not exist to the engine.</dd>
+          <dt>STR</dt><dd><code>(VE + RE + AG + CA) &gt;&gt; 2</code> &mdash; the four general attributes, averaged. This is the "AV" number on his card.</dd>
+          <dt>GKSAVE</dt><dd>His HANDLING (PO), <b>plus 10 if he is in line-up slot 0</b>, clamped to 99.</dd>
+          <dt>PASS</dt><dd>His PASSING (PA), straight through.</dd>
+          <dt>POS</dt><dd>His fine position 0&ndash;18, used only to pick <em>who</em> scores.</dd>
+          <dt>ROLE</dt><dd>0/1/2/3 = keeper / defender / midfielder / attacker.</dd>
+        </dl>
+        <h4>Unread, entirely</h4>
+        <p>TACKLING (EN), DRIBBLING (RM), HEADING (RG) and <b>SHOOTING (TI)</b> are never read by
+        the instant engine. Neither is MORALE, and neither is FITNESS &mdash; those two move the
+        <em>displayed</em> rating and the computer's auto-pick, but they do not enter this
+        arithmetic. A striker with SHOOTING 99 and one with SHOOTING 20 are the same striker to
+        the engine that decides your league.</p>
+      </div>
+
+      <div class="panel">
+        <h3>The scoreline, in four lines</h3>
+        <p>Per side, per half:</p>
+<pre class="slab"><b>chances</b> = rand()%8 + own_avgSTR - opp_avgSTR - 1
+<i>if</i> chances &lt; 0:   chances += rand()%own_avgSTR
+<i>if</i> chances &gt; (3 - rand()%3):
+        chances = 3 - rand()%3        <b>&lt;-- HARD CAP, 1..3</b>
+
+<b>goal</b> per chance <i>unless</i> rand()%130 &lt; GKSAVE   <i>(the keeper)</i></pre>
+        <p>That is it. A half is capped at <b>three chances a side</b>, and every one of them is
+        stopped or not stopped by one comparison against your goalkeeper's number.</p>
+        <div class="callout">
+          <b>The scorer</b> is picked separately, by a weighted roulette over the fine positions:
+          centre-forward carries weight&nbsp;35, a defender carries&nbsp;3. That decides
+          <em>who</em> is on the scoresheet. It never changes <em>how many</em>.
+        </div>
+      </div>
+    </div>
+
+    <h3 class="cond sect">The four view modes</h3>
+    <div class="tablewrap">
+      <table>
+        <caption>MATCH OPTIONS &mdash; what each button actually runs</caption>
+        <thead><tr><th>Mode</th><th>Engine</th><th>What you get</th><th>Can you influence it?</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="nm">WATCH</td>
+            <td>Positional</td>
+            <td>The 2D pitch: players, ball, arrow marker, the real crowd and hoarding art.</td>
+            <td>Where your men stand genuinely matters here in a way it does not in BRIEF.</td>
+          </tr>
+          <tr>
+            <td class="nm">HIGHLIGHTS</td>
+            <td>3D engine</td>
+            <td><b>Nothing.</b> The 3D model files are absent from both my disc and the CD image &mdash; zero <code>.p3d</code> entries, no models folder. The app says so plainly instead of faking it.</td>
+            <td>No. There is nothing there to influence.</td>
+          </tr>
+          <tr>
+            <td class="nm">BRIEF</td>
+            <td>Statistical</td>
+            <td>The minute-by-minute feed with the engine's real goals, real scorers, real minutes and the engine's own possession counters.</td>
+            <td>Only through the six fields above. The in-match LINE-UP / TACTICS / MAN-TO-MAN buttons are chrome on this path.</td>
+          </tr>
+          <tr>
+            <td class="nm">RESULTS</td>
+            <td>Statistical</td>
+            <td>The same match as BRIEF, same draws, same score &mdash; jumped straight to full time.</td>
+            <td>Identical to BRIEF. Use it to burn through a season fast.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">BRIEF omits the shot / save / run / cross / header / injury lines rather than
+    inventing them: those come from the positional engine's event stream, and the instant engine
+    does not produce one. Same for TOTAL FOULS and BOOKINGS &mdash; blank chrome, never fabricated.</p>
+  </div>
+</section>
+
+<!-- ===================================================================== BEAT -->
+<div class="band b-red" id="beat">
+  <div class="wrap"><h2 class="band-title">Beating the engine <em>&mdash;</em> tips, tactics, hacks</h2>
+    <span class="sub">every one of these is read out of the 1998 executable</span></div>
+</div>
+<section>
+  <div class="wrap">
+
+    <div class="callout red">
+      <b>Read this first: your TEAM TACTICS screen does nothing to a scoreline.</b>
+      ATTACKING / SPECULATIVE / MIXED PLAY, PASSING&harr;LONG BALL, COUNTER ATTACK, TACKLING,
+      MARKING, CLEARANCES, PRESSURISE FROM &mdash; none of those settings is in the instant
+      engine's input set. Not one. They cannot change a BRIEF or RESULTS score, and they cannot
+      change any other club's result either. Two decades of people carefully setting their marking
+      before a big game were setting a control that is not wired to anything.
+    </div>
+
+    <div class="tips">
+
+      <div class="tip">
+        <div>
+          <h4>Your goalkeeper is the whole game <span class="chip eng">engine</span></h4>
+          <p>Every chance is resolved by one comparison: <code>rand()%130 &lt; GKSAVE</code>. A
+          keeper on GKSAVE 99 stops 99 chances in 130 &mdash; <b>76%</b>. A keeper on 60 stops
+          <b>46%</b>. Across the six chances a match the engine allows, that is the difference
+          between conceding about one and a half goals and conceding about three.</p>
+          <p class="why"><b>Why:</b> it is the only per-player number that touches the goal
+          decision itself. STR only sets how many chances happen; the keeper decides what happens
+          to each one.</p>
+        </div>
+      </div>
+
+      <div class="tip">
+        <div>
+          <h4>Never pay for a keeper above HANDLING 89 <span class="chip money">money</span></h4>
+          <p>GKSAVE is HANDLING <b>+10 in slot 0</b>, clamped to 99. So <b>every keeper from
+          HANDLING 89 upward is literally the same keeper</b> to the engine.</p>
+          <p>Schmeichel (HANDLING 91) costs <b>&pound;8,500,000</b> and <b>&pound;1,000,000</b> a
+          year. K&ouml;pke (HANDLING 95, Olympique&nbsp;M.) costs <b>&pound;450,000</b> and
+          &pound;125,000. Eriksson (HANDLING 90, Oporto) costs <b>&pound;625,000</b> and
+          &pound;200,000. All three are GKSAVE 99. You can save eight million pounds and half your
+          wage bill on the single most important position in the game, and lose nothing at all.</p>
+          <p class="why"><b>Why:</b> the +10 pushes anyone at 89 or above past the clamp. Above the
+          clamp the engine cannot tell them apart.</p>
+        </div>
+      </div>
+
+      <div class="tip">
+        <div>
+          <h4>The keeper must be in slot 0, and he must be in the XI <span class="chip eng">engine</span></h4>
+          <p>The +10 is a <b>slot-0 bonus</b>, not a position bonus. And the save gate is skipped
+          entirely if the defending keeper's SEL is zero &mdash; <b>an empty keeper slot means every
+          single chance scores.</b> If your keeper is injured or suspended, put someone in that
+          slot. Anyone. An outfielder on HANDLING 15 still saves 11% of chances; an empty slot
+          saves none.</p>
+          <p class="why"><b>Why:</b> the engine checks the defending side's participant&nbsp;0 and
+          returns early on SEL&nbsp;== 0 without rolling the save at all.</p>
+        </div>
+      </div>
+
+      <div class="tip">
+        <div>
+          <h4>Squad strength stops paying almost immediately <span class="chip eng">engine</span></h4>
+          <p>Chances are <code>rand()%8 + own_avgSTR - opp_avgSTR - 1</code>, then hard-capped at
+          <code>3 - rand()%3</code>. That cap is 1, 2 or 3 &mdash; and it is applied <em>after</em>
+          your strength advantage.</p>
+          <p>So an eight-point average-STR edge over the opposition already puts you over the cap in
+          most halves. Beyond that, <b>more strength buys you literally nothing</b>. A squad
+          averaging STR 90 and a squad averaging STR 82 generate the same capped three chances
+          against a mid-table side.</p>
+          <p class="why"><b>Why:</b> the cap is unconditional. The only thing a huge STR edge still
+          does is stop you falling into the negative branch, where you get a smaller rescue draw.</p>
+        </div>
+      </div>
+
+      <div class="tip">
+        <div>
+          <h4>Playing a man out of position costs a quarter of his strength <span class="chip eng">engine</span></h4>
+          <p>Before STR reaches the engine it passes a position-fit gate. A defender whose slot sits
+          too far forward, a midfielder outside the middle band, an attacker not far enough up
+          &mdash; each takes <b>STR &times; 3/4</b>. A keeper in an outfield slot, or an outfielder
+          in the keeper slot, takes <b>STR &divide; 2</b>.</p>
+          <p>Since chances are driven by the <em>average</em> STR of the eleven, three men out of
+          position drags your whole team's chance count down.</p>
+          <p class="why"><b>Why:</b> the gate compares each man's role byte against his own
+          formation slot's pitch coordinates. It is not fatigue and not form &mdash; it is geometry,
+          and it is entirely under your control on the LINE-UP screen.</p>
+        </div>
+      </div>
+
+      <div class="tip">
+        <div>
+          <h4>If you want a particular man on the scoresheet, move him, do not train him <span class="chip eng">engine</span></h4>
+          <p>The scorer roulette weights the fine positions:
+          <code>[0, 0, 3, 3, 3, 7, 7, 12, 10, <b>35</b>, 10, 12, 15, 18, 15, 3, 18, 18, 10]</code>.
+          Centre-forward (index&nbsp;9) carries <b>35</b>. A full-back carries <b>3</b>. Keepers
+          carry zero and are skipped.</p>
+          <p>Nothing about shooting, finishing or form enters. If you want your man to win the
+          golden boot, put him at index 9 &mdash; he becomes roughly twelve times likelier to be
+          credited than a defender, purely by standing there.</p>
+          <p class="why"><b>Why:</b> the roulette is over position weights only. A player is also
+          skipped if he already carries two build-up markers or a pending shot, which is why your
+          35-weight striker occasionally goes missing.</p>
+        </div>
+      </div>
+
+      <div class="tip">
+        <div>
+          <h4>Extra time is the only place a strong squad is properly rewarded <span class="chip eng">engine</span></h4>
+          <p>The extra-time chance loop is a different formula and <b>it has no cap</b>:
+          <code>(own_avg - opp_avg)/6 - 1 + rand()%3</code>, and then the loop keeps going while
+          <code>rand()%4 == 0</code>. A big strength edge that was being thrown away by the cap for
+          ninety minutes finally converts.</p>
+          <p><b>The read:</b> in cup competition, a genuinely superior squad is more likely to win
+          the longer the tie runs. In the league, where there is no extra time, it is not.</p>
+          <p class="why"><b>Why:</b> the <code>3 - rand()%3</code> clamp exists only in the two
+          normal halves. The extra-time tail loop was written without it.</p>
+        </div>
+      </div>
+
+      <div class="tip">
+        <div>
+          <h4>Do not build a squad for penalties <span class="chip eng">engine</span></h4>
+          <p>The shootout is <code>s0 = rand()%6; s1 = rand()%6;</code> and then both are nudged
+          until they differ. <b>Not one player attribute is consulted.</b> Not the keeper's, not
+          the takers'. The engine then picks names at random to hang the converted penalties on,
+          purely for the read-out.</p>
+          <p class="why"><b>Why:</b> the shootout records an outcome, not a contest. Penalty events
+          are also excluded from the scoreline entirely.</p>
+        </div>
+      </div>
+
+      <div class="tip" id="hack">
+        <div>
+          <h4>Three up front &mdash; the cheat, and exactly what it does <span class="chip cheat">cheat</span></h4>
+          <p>Field <b>three or more selected players with an attacker role</b> and switch
+          <b>THREE UP FRONT</b> on in OPTIONS. Two things happen for that side: the chance count is
+          <b>floored at 3</b> per half, and the opposing keeper's save gate is <b>skipped
+          entirely</b>. Net effect: <b>six goals a match</b>, unless the ordinary rolls give you
+          more.</p>
+          <p>Measured against the real 1998 program, patched and run in an emulator on the same
+          four seeds: stock gives 3&ndash;2, 3&ndash;3, 2&ndash;1, 4&ndash;2. Hacked gives
+          <b>6&ndash;2, 6&ndash;2, 6&ndash;0, 6&ndash;3.</b></p>
+          <p>Three honest caveats. It is <b>off by default</b>, and with it off the engine is
+          bit-for-bit what it always was. It touches <b>instantly-played matches only</b> &mdash; a
+          watched match is unaffected. And <b>the computer gets it too:</b> the trigger is evaluated
+          per side, so an AI team that happens to field three forwards gets the same buff against
+          you. Extra-time loops are not patched.</p>
+          <p class="why"><b>Why it exists:</b> it came out of finding that no tactic on the TEAM
+          TACTICS screen can move a scoreline, and that a match is capped at three chances a side.
+          The cap was patched out of the real program first, and then the patch was ported.</p>
+        </div>
+      </div>
+
+      <div class="tip">
+        <div>
+          <h4>Morale and fitness do not change results &mdash; but they do change your job <span class="chip gap">indirect</span></h4>
+          <p>Neither is in the engine's six fields. What they do drive is the displayed
+          <b>RATING = (VE + RE + AG + CA + FITNESS + MORALE) / 6</b>, which drives the computer's
+          own team selection, and which is what the board looks at when it looks at you.</p>
+          <p>The post-match deltas are worth knowing: <b>played</b> +3 fitness / +3 morale,
+          <b>bench</b> &minus;1 / &minus;2, <b>out of the sixteen</b> &minus;2 / &minus;4. And your
+          <em>best</em> players suffer more for being left out &mdash; anyone with quality 81 or
+          above takes an extra point of morale damage on every one of those rows.</p>
+          <p>The result delta lands on <em>every</em> player at once: a home win over a same-sized
+          club is +8, a home draw is &minus;2, a home defeat is &minus;10. Away: win +10, draw +5,
+          defeat &minus;4. A small club winning away at a giant takes <b>+20</b>; the giant losing
+          that game at home takes <b>&minus;24</b>.</p>
+          <p class="why"><b>Why it matters anyway:</b> at season start morale is 90&nbsp;+ a random
+          0&ndash;9 and fitness is knocked halfway toward 40 &mdash; a fresh squad starts on 70
+          fitness, which is exactly what the real game shows in week one.</p>
+        </div>
+      </div>
+
+      <div class="tip">
+        <div>
+          <h4>One superstar wage costs that player eight morale <span class="chip money">money</span></h4>
+          <p>Displayed morale carries a club term. Compare a player's wage against the squad
+          average: <b>up to 4&times; the average &rarr; +8 morale. Up to 8&times; &rarr; +4. Above
+          8&times; &rarr; nothing.</b> There is also a gate-receipts term worth up to +8, which only
+          switches on when your latest home gate cleared roughly a million.</p>
+          <p class="why"><b>Why:</b> it is computed at render time from the club's wage bill and
+          squad count, so it moves the moment you sign someone on a silly contract.</p>
+        </div>
+      </div>
+
+      <div class="tip">
+        <div>
+          <h4>Know your sack dates &mdash; there are only four of them <span class="chip brief">career</span></h4>
+          <p>The board does not review you continuously. It reviews you on a <b>fixed schedule</b>,
+          and it only fires if you were below expectation at the previous checkpoint <em>and</em>
+          have not recovered by this one:</p>
+          <ul>
+            <li><b>Week 10</b> warning, <b>week 14</b> sack &mdash; big clubs only (expectation bands 0 and 1).</li>
+            <li><b>Week 18</b> warning, <b>week 22</b> sack &mdash; everyone.</li>
+            <li><b>Week 26</b> sack &mdash; everyone, if you were below at 18 and still are.</li>
+            <li><b>Week 30</b> warning, <b>week 34</b> sack &mdash; the very biggest clubs only.</li>
+          </ul>
+          <p>"Below expectation" is league position against your club's own band. In the Premier
+          League: band 1 must stay above 8th, band 2 above 15th, band 3 above 17th. The elite band 0
+          is judged on <b>points</b> instead &mdash; you are in trouble when the leader is
+          <b>7 or more points</b> clear of you. In the lower divisions it is 6th / 13th / 15th
+          depending on your band.</p>
+          <p class="why"><b>The practical read:</b> one good month timed before week 14, 22, 26 or
+          34 saves your job outright. A terrible run between checkpoints costs you nothing at all,
+          as long as you have climbed back by the gate.</p>
+        </div>
+      </div>
+
+      <div class="tip">
+        <div>
+          <h4>Two sacks that have nothing to do with results <span class="chip bad chip">watch out</span></h4>
+          <p><b>Four consecutive weeks with a negative bank balance</b> and you are gone,
+          regardless of where you sit in the table. And <b>if your squad falls to fifteen players
+          or fewer</b> you are gone as well &mdash; that check is always armed, in both career
+          modes, and no flag in the retail build waives it.</p>
+          <p class="why"><b>Why:</b> the financial sack is a counter that increments on a negative
+          balance and fires at 4. The squad-minimum sack reads the squad count directly.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ==================================================================== MONEY -->
+<div class="band b-fin" id="money">
+  <div class="wrap"><h2 class="band-title">The money <em>&mdash;</em> securing your club</h2>
+    <span class="sub">the transfer table, the insurance loophole, the ground, Europe</span></div>
+</div>
+<section>
+  <div class="wrap">
+
+    <div class="panel">
+      <h3>Every price in the game comes out of one lookup table</h3>
+      <p>There is no valuation curve and no stored price on a player. Fee and wage are read from two
+      702-entry tables inside the executable:</p>
+<pre class="slab"><b>AV</b>          = (VE + RE + AG + CA) &gt;&gt; 2
+<b>abilityTier</b> = AV&ge;95:0  &ge;90:1  &ge;85:2  &ge;80:3  &ge;75:4  &ge;70:5  &ge;65:6  &ge;60:7  else:8
+<b>ageTier</b>     = age&lt;20:0  &lt;23:1  &lt;26:2  &lt;30:3  &lt;33:4  else:5
+<b>idx</b>         = stature*54 + abilityTier*6 + ageTier
+
+<b>fee </b> = feeTable [idx] * 5000
+<b>wage</b> = wageTable[idx] * 5000     <i>per year</i></pre>
+      <p><b>stature</b> is the <em>selling</em> club's standing, 0 (elite) to 12 (bottom). Age is a
+      plain calendar subtraction &mdash; season-start year minus birth year, no birthday adjustment
+      &mdash; which is exactly the age the player's card prints. Checked against the real TRANSFER
+      MARKET screen: <b>every witnessed row exact.</b></p>
+    </div>
+
+    <div class="tips">
+
+      <div class="tip">
+        <div>
+          <h4>The same player is twenty times cheaper at a small club <span class="chip money">money</span></h4>
+          <p>Take a 24-year-old on AV 80&ndash;84. At a stature-0 club he costs
+          <b>&pound;8,500,000</b>. At stature 3 &mdash; a weaker Premier League side &mdash;
+          <b>&pound;2,000,000</b>. At stature 7, a Division Two club, <b>&pound;375,000</b>. Same
+          player, same attributes, same age.</p>
+          <p><b>So: shop downwards, and shop abroad.</b> Shevchenko at Dinamo Kiev is
+          <b>&pound;850,000</b>. Kluivert at Milan, comparable numbers, is
+          <b>&pound;12,500,000</b>.</p>
+          <p class="why"><b>Why:</b> stature is the leading term of the index, and it dominates
+          everything else in the table.</p>
+        </div>
+      </div>
+
+      <div class="tip">
+        <div>
+          <h4>AV 80 is a price cliff. Buy AV 79. <span class="chip money">money</span></h4>
+          <p>The ability tiers are steps, not a slope, and the step from tier 4 to tier 3
+          &mdash; that is, from AV 79 to AV 80 &mdash; is the biggest in the table. At a top club, a
+          young player at AV 79 costs <b>&pound;3,250,000</b>. The same age at AV 80 costs
+          <b>&pound;10,000,000</b>. <b>Three times the money for one point of average.</b></p>
+          <p>The other cliffs, if you need them: AV 84&rarr;85 is &pound;10M&rarr;&pound;14M, and
+          AV 89&rarr;90 is &pound;14M&rarr;&pound;15M. Those are mild. 79&rarr;80 is the one that
+          matters.</p>
+          <p class="why"><b>Why:</b> one point of AV is worth almost nothing to the match engine
+          &mdash; chances are capped anyway &mdash; and three times the fee to your bank. This is
+          the single best value trade in the game.</p>
+        </div>
+      </div>
+
+      <div class="tip">
+        <div>
+          <h4>Older is cheaper to buy <em>and</em> cheaper to pay <span class="chip money">money</span></h4>
+          <p>Fee falls with every age tier: at a top club, tier 3 ability runs
+          &pound;10M &rarr; &pound;9.5M &rarr; &pound;8.5M &rarr; &pound;7.5M &rarr; &pound;6.5M
+          &rarr; &pound;5M across the six age bands.</p>
+          <p>Wage does <b>not</b> fall the same way &mdash; it <em>peaks</em> in the 26&ndash;29
+          band (&pound;650,000) and drops after 30 (&pound;550,000) and after 33
+          (&pound;475,000). So the 30&ndash;32 bracket is a genuine sweet spot: cheaper to buy than
+          a 27-year-old <em>and</em> cheaper to keep.</p>
+          <p class="why"><b>Why:</b> the engine has no ageing decline in the fields it reads. A
+          34-year-old with AV 85 plays exactly like a 24-year-old with AV 85.</p>
+        </div>
+      </div>
+
+      <div class="tip">
+        <div>
+          <h4>Improving your squad makes everything you buy next more expensive <span class="chip money">trap</span></h4>
+          <p>Your own stature band is computed from <b>your squad's average AV</b>. In the Premier
+          League: average AV 80 or more &rarr; band 0; 76&ndash;79 &rarr; band 1; 72&ndash;75
+          &rarr; band 2; 71 or below &rarr; band 3. Division One: 64+/60-63/&le;59 &rarr; 4/5/6.
+          Division Two: 54+/52-53/&le;51 &rarr; 7/8/9. Division Three: 50+/48-49/&le;47 &rarr;
+          10/11/12.</p>
+          <p>Your band sets what your players are worth, what wages they expect at renewal, and what
+          your ground improvements cost. <b>Crossing a threshold steps all of that up at once.</b>
+          A club at average AV 79 that buys its way to 80 has just made itself considerably more
+          expensive to run.</p>
+          <p class="why"><b>Why:</b> band is the leading term of both money tables and of the
+          ground-cost function. It is a squad-strength readout, not a reputation you earn.</p>
+        </div>
+      </div>
+
+      <div class="tip">
+        <div>
+          <h4>Insurance Group 3 is the best line in the game &mdash; and it is not close <span class="chip money">money</span></h4>
+          <p>The premium is <code>monthly wage / 70</code> for Group 3, floored to a minimum of
+          <b>&pound;1,000</b> &mdash; and the ledger charges it as
+          <code>premium &times; 12 &divide; 52</code> every week. So for <b>anyone earning under
+          &pound;840,000 a year</b> &mdash; nearly your whole squad &mdash; the policy is a flat
+          <b>&pound;230.77 a week, &pound;12,000 a year</b>, whatever he earns. Above that it becomes
+          one seventieth of his wage. (Group 1 floors at &pound;200, Group 2 at &pound;500, on the
+          same &times;12&divide;52 footing.)</p>
+          <p>When an insured Group 3 player is injured, three things happen in the ledger, all in
+          your favour:</p>
+          <ul>
+            <li>His <b>hospital bill is covered 100%</b>.</li>
+            <li>His <b>wage is refunded</b> &mdash; netted straight out of PLAYERS' WAGE.</li>
+            <li>His wage <b>plus &pound;333 a week</b> is <em>also</em> booked as income on the
+                INSURANCE GROUP 3 line.</li>
+          </ul>
+          <p><b>An injured, insured, well-paid player is cash-positive.</b> That is the 1998 game's
+          own model, reproduced exactly, not an interpretation of it.</p>
+          <p>Work one through. A man on &pound;175,000 a year picks up a three-week injury. Uninsured
+          he costs you &pound;8,250 in hospital bills and you pay his &pound;10,100 of wages anyway.
+          On Group 3 the bills vanish, the &pound;10,100 comes back, another &pound;10,100 lands as
+          income, and &pound;1,000 of bonus on top &mdash; roughly a <b>&pound;29,000 swing</b>
+          against a &pound;12,000 annual premium. <b>One injury pays for the policy twice over.</b></p>
+          <p>For contrast: <b>Group 1 reimburses nothing at all</b> &mdash; zero percent, by the
+          binary, not by a missing case. Group 2 pays 50%. Insuring anyone in Group 1 is money
+          thrown away.</p>
+          <p class="why"><b>Do this:</b> put every player you would actually miss on Group 3, and
+          nobody on Group 1. Do not blanket-insure the whole squad &mdash; at &pound;12,000 a head
+          a twenty-man sweep is &pound;240,000 a year, which only pays back if they keep getting
+          hurt.</p>
+        </div>
+      </div>
+
+      <div class="tip">
+        <div>
+          <h4>Uninsured injuries cost far more than the PRICE column says <span class="chip money">money</span></h4>
+          <p>An injury's price is <b>&pound;1,500 per week</b> of its total rolled duration. But the
+          weekly bill divides that total by the weeks <b>remaining</b>, not the total &mdash; so the
+          bill <em>climbs</em> as the man heals.</p>
+          <p>A three-week injury reads &pound;4,500 on the INJURIES screen. You actually pay
+          &pound;1,500, then &pound;2,250, then &pound;4,500 &mdash; <b>&pound;8,250</b>, nearly
+          double the displayed price.</p>
+          <p class="why"><b>Why:</b> the original divides by remaining weeks. It is reproduced
+          verbatim, because it is what the real game charges.</p>
+        </div>
+      </div>
+
+      <div class="tip">
+        <div>
+          <h4>Build your ground while you are still small <span class="chip money">money</span></h4>
+          <p>Improvement cost is <code>weeks &times; 5000 &times; P</code>, where <b>P falls as your
+          stature band rises</b> &mdash; that is, as your club gets <em>weaker</em>. New seating runs
+          P&nbsp;42.5 at a stature-0 giant down to P&nbsp;10 at the bottom. Car parking runs 85 down
+          to 20.</p>
+          <p>That is why the biggest seating card costs Manchester United <b>&pound;10,624,999</b>
+          and a Division Two club a fraction of it. (Yes, that price is a pound short of round. The
+          1998 program's own arithmetic is a pound out there, and the port keeps the missing pound,
+          because the real game charges it.)</p>
+          <p><b>Cheap wins:</b> TOILETS is a flat P&nbsp;10 over one week &mdash;
+          <b>&pound;50,000 at any club in the game</b>. CHANGING ROOMS is three weeks at
+          P&nbsp;3&ndash;15. FLOODLIGHTS four weeks at P&nbsp;5&ndash;25.</p>
+          <p class="why"><b>Why:</b> the cost function reads the same stature band as the transfer
+          table. Promotion makes your ground more expensive to extend, so extend it first.</p>
+        </div>
+      </div>
+
+      <div class="tip">
+        <div>
+          <h4>Europe is the only income you can plan against a number <span class="chip money">money</span></h4>
+          <p>There is <b>no static domestic prize table</b> anywhere in the executable &mdash;
+          domestic income is a dynamic weekly float ledger, 524 bytes a week, 52 weeks a season.
+          The one fixed, code-resident prize schedule is UEFA's:</p>
+          <div class="tablewrap mt10">
+            <table class="narrow">
+              <thead><tr><th>Event</th><th class="num">Payment</th></tr></thead>
+              <tbody>
+                <tr><td>Entry &mdash; competing in the championship</td><td class="num fee">&pound;1,000,000</td></tr>
+                <tr><td>Every drawn match</td><td class="num fee">&pound;255,000</td></tr>
+                <tr><td>Every match won</td><td class="num fee">&pound;510,000</td></tr>
+                <tr><td>Qualifying for the quarter-finals</td><td class="num fee">&pound;1,500,000</td></tr>
+                <tr><td>Qualifying for the semi-finals</td><td class="num fee">&pound;1,625,000</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="mt10">A six-win group stage is <b>&pound;4,060,000</b> with the entry
+          fee. Reaching the semi-finals adds another <b>&pound;3,125,000</b> on top of the win money.
+          A win is worth exactly twice a draw, so in Europe there is never a reason to play for one.</p>
+          <p class="why"><b>Why:</b> these amounts are embedded in the message text itself &mdash;
+          the string the game shows you <em>is</em> the constant.</p>
+        </div>
+      </div>
+
+      <div class="tip">
+        <div>
+          <h4>Only home weeks pay <span class="chip money">money</span></h4>
+          <p>A matchday's income is <b>TICKETS + TELEVISION + PLAYERS' BONUS</b>, and only at home.
+          A witnessed away week reads income <b>&pound;0</b> against expenses of &pound;233,942.
+          Ticket price starts at &pound;7.50.</p>
+          <p class="why"><b>Why it matters:</b> the financial sack fires on four consecutive weeks
+          in the red. A run of away fixtures is exactly when that counter climbs, so time a big
+          outgoing &mdash; a signing, a ground project &mdash; to land on a home week.</p>
+        </div>
+      </div>
+
+      <div class="tip">
+        <div>
+          <h4>Most of your backroom staff do nothing <span class="chip gap">honest</span></h4>
+          <p>Thirteen roles are hireable, from &pound;1,000 to &pound;52,000 a year. In this port,
+          the six skill trainers, the psychologist, the assistant manager and the groundsman
+          <b>have no engine effect</b> &mdash; there is no decoded source data behind them, so
+          rather than invent one they are no-ops, and that is stated rather than hidden.</p>
+          <p>The ones that genuinely do something are the <b>scout</b>, the <b>youth team
+          scout</b> (who gates the academy entirely &mdash; no youth scout, no youth players) and
+          the <b>physiotherapist</b>.</p>
+          <p class="why"><b>Do this:</b> hire a scout, a youth scout and a physio. Leave the other
+          ten unfilled and keep the wages.</p>
+        </div>
+      </div>
+
+      <div class="tip">
+        <div>
+          <h4>A better scout finds you more names, not better ones <span class="chip eng">engine</span></h4>
+          <p>The scout's shortlist cap is <code>(quality + 2) &times; 5</code>, where quality is
+          counted in <b>half-stars</b>. A three-star scout is quality 6 and brings back <b>40</b>
+          names; a five-star scout brings back <b>60</b>; a one-star scout, <b>20</b>.</p>
+          <p>And the trim is <b>uniformly at random</b> &mdash; not "the best N". If 112 players
+          match your criteria, a three-star scout throws 72 of them away at random, and re-running
+          the same search gives you a different list.</p>
+          <p><b>So:</b> a &pound;45,000-a-year five-star scout buys you 50% more names off the same
+          search, and nothing else. Whether that is worth &pound;41,000 more than a one-star scout
+          is a real decision, not an obvious one. And <b>re-run the same search</b> &mdash; the
+          player you want may simply have been binned by the lottery last time.</p>
+          <p class="why"><b>Also:</b> searching by ROLE checks all six of a player's positions, not
+          just his first. The E.U. / NON-E.U. boxes only reach foreign clubs; the four division
+          boxes are what reach English ones.</p>
+        </div>
+      </div>
+
+      <div class="tip">
+        <div>
+          <h4>The youth academy gives you one player at a time <span class="chip eng">engine</span></h4>
+          <p>The youth scout scans the pool, filters it, and then returns <b>at most one player,
+          chosen uniformly at random from the matches</b>. Not the best match &mdash; a random one.
+          Youth players sit in the game's youth pseudo-club, which is the lowest stature band there
+          is, which is why their listed fees look absurdly low.</p>
+          <p>They are not buyable at that price. They arrive only through the scout, and they leave
+          the pool only by being promoted &mdash; the same scout can never find the same boy twice.</p>
+          <p class="why"><b>Do this:</b> hire the youth scout in week one. It is the only route into
+          the academy and the searches are the only intake there is.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ===================================================================== BOOK -->
+<div class="band b-mgr" id="book">
+  <div class="wrap"><h2 class="band-title">The squad book <em>&mdash;</em> top 20 by position and role</h2>
+    <span class="sub">9,547 rated players &middot; ranked on what the engine reads &middot; priced from the game's own table</span></div>
+</div>
+<section>
+  <div class="wrap">
+
+    <div class="cols mb18">
+      <div class="panel">
+        <h3>How these are ranked</h3>
+        <dl class="facts">
+          <dt>STR</dt><dd><code>(VE + RE + AG + CA) &gt;&gt; 2</code> &mdash; the four general bytes, averaged.</dd>
+          <dt>PASS</dt><dd>PA, straight through.</dd>
+          <dt>GKSAVE</dt><dd>PO + 10 in the keeper slot, clamped to 99.</dd>
+        </dl>
+        <p class="muted mt10">Outfielders rank on <b>(STR + PASS) / 2</b>. Keepers
+        rank on GKSAVE, which is why so many of them tie on 99 &mdash; from HANDLING 89 upward they
+        are the same keeper to the engine. TACKLING, DRIBBLING, HEADING and SHOOTING are not read at
+        all, so they are not ranked on.</p>
+      </div>
+      <div class="panel">
+        <h3>How these are priced</h3>
+        <dl class="facts">
+          <dt>FEE</dt><dd><code>feeTable[idx] &times; 5,000</code> &mdash; the asking price, and what the seller accepts.</dd>
+          <dt>WAGE</dt><dd><code>wageTable[idx] &times; 5,000</code>, per year.</dd>
+          <dt>idx</dt><dd><code>stature &times; 54 + abilityTier(STR) &times; 6 + ageTier(age)</code>.</dd>
+        </dl>
+        <p class="muted mt10">Both tables are lifted byte-exact out of the
+        original executable. <b>Stature</b> is the selling club's standing 0&ndash;12, set from its
+        division and its squad's average strength &mdash; which is why the same player is worth ten
+        times more at Liverpool than at Blackpool. Checked against the real TRANSFER MARKET screen:
+        <b>17 of 17 rows exact.</b></p>
+      </div>
+    </div>
+
+    <div class="bar">
+      <div class="seg" role="group" aria-label="Age band">
+        <button id="bAll" aria-pressed="true">Overall</button>
+        <button id="bU24" aria-pressed="false">Under 24</button>
+      </div>
+      <div class="seg" role="group" aria-label="Grouping">
+        <button data-kind="position" aria-pressed="true">By position</button>
+        <button data-kind="role" aria-pressed="false">By fine role</button>
+        <button data-kind="value" aria-pressed="false">Value</button>
+      </div>
+      <input type="search" id="q" placeholder="Filter by player, club or league" aria-label="Filter players">
+    </div>
+
+    <div class="roles" id="roles"></div>
+    <p class="note" id="note"></p>
+    <div id="out"><p class="note">Loading the database&hellip;</p></div>
+
+    <p class="note mt18">
+      Fine roles are the game's own position index &mdash; the ROL column, drawn as a pitch glyph
+      &mdash; named from the SCOUT screen's own ROLE dropdown. Roles with fewer than 50 players are
+      omitted. The youth pool is included and marked <span class="gem">youth</span>; those players
+      are <em>not</em> buyable. They arrive only through the youth scout, and their listed fee is
+      what the table says the youth band is worth, not an asking price you can pay.
+    </p>
+  </div>
+</section>
+
+<!-- ================================================================== SOURCES -->
+<div class="band b-tm" id="sources">
+  <div class="wrap"><h2 class="band-title">Where all of this comes from</h2>
+    <span class="sub">and what is still unknown</span></div>
+</div>
+<section>
+  <div class="wrap">
+    <div class="cols">
+      <div class="panel">
+        <h3>The method</h3>
+        <p>Three sources, in order of authority:</p>
+        <ol>
+          <li><b>The 1998 executable.</b> Disassembled and decompiled. Every formula on this page
+              &mdash; the chance count, the keeper gate, the fee and wage tables, the insurance
+              premiums, the injury bill, the ground costs, the sack schedule, the morale deltas
+              &mdash; is read out of it, and most are re-run against the real bytes in an emulator
+              to prove the port matches.</li>
+          <li><b>Photographs of the real game running.</b> Hundreds of them, including a full
+              1997&ndash;98 season played from August to the season-end sequence, captured to
+              settle questions the code alone could not answer.</li>
+          <li><b>The art and data archives</b> off the disc, decoded to their original palettes.</li>
+        </ol>
+      </div>
+      <div class="panel">
+        <h3>What is still open, stated plainly</h3>
+        <ul>
+          <li>The <b>positional engine</b> is verified tick-for-tick against the original for the
+              first 1,032 ticks &mdash; a little over three minutes of a 14,400-tick half. It is
+              exact everywhere it has been checked and <b>unchecked after that</b>. The match you
+              actually play is still the simpler engine until the exact one clears a full ninety.</li>
+          <li><b>HIGHLIGHTS</b> cannot be built: the 3D model files are not on the disc or the CD
+              image. That is the only part genuinely out of reach.</li>
+          <li>The <b>MIXED PLAY</b> variant of the three-forwards cheat is not built &mdash; the
+              club tactic byte has not been located yet.</li>
+          <li>Several finance rows, backroom-staff effects and a handful of screen fonts are
+              honest gaps. They are rendered blank rather than filled with plausible numbers.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <h4>PM98</h4>
+    <p>A personal Android remake of Premier Manager 98, rebuilt from my own copy of the PC game.
+       <a href="https://github.com/Matswm86/pm98-android">Source and full reverse-engineering notes on GitHub</a>.</p>
+    <p class="legal">
+      This is a <b>non-commercial fan project for personal use</b>. It is not affiliated with,
+      endorsed by, or connected to Gremlin Interactive, Dinamic Multimedia, or any present rights
+      holder in Premier Manager. Premier Manager 98 and all original game art, data and trademarks
+      remain the property of their respective owners; screenshots are shown here for identification
+      and commentary. No original game data is distributed by this site or this app that did not
+      come from a copy of the game I own. Nothing here is for sale.
+    </p>
+  </div>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
