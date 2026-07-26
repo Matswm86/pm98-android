@@ -374,6 +374,17 @@ static func card_name(p: Dictionary) -> String:
 	var legal := str(p.get("legalName", "")).strip_edges()
 	if legal == "":
 		return str(p.get("name", "?"))
+	# A MIXED-CASE legalName is already the string the original renders — the exact-cipher
+	# rebuild stores the game's own casing, surname uppercased in place. Print it verbatim.
+	# Witnessed five times: "Alessandro DEL PIERO" and "Iván DE LA PEÑA López" on the ficha
+	# (refrun p0242 / p0282), "Patrick KLUIVERT", "Joseba ETXEBERRIA Lizardi" and
+	# "Alessandro NESTA" in the SCOUT rollover bar (p0241 / p0279 / p0283). The
+	# reconstruction below cannot produce the middle-surname forms at all — it uppercases the
+	# LAST word, so it printed "Iván De La Peña LÓPEZ" — and 1,272 of the 9,547 shipped names
+	# have a surname that is not the trailing run. 9,446 names are mixed-case and take this
+	# path; the 97 all-uppercase ones (talent pool, youth, sample_db) still need the rebuild.
+	if legal != legal.to_upper() and legal != legal.to_lower():
+		return legal
 	var surname := str(p.get("name", "")).strip_edges().to_upper()
 	var given := ""
 	if surname != "" and legal.to_upper().ends_with(surname):

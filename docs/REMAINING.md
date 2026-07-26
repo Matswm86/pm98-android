@@ -117,7 +117,17 @@ the OPTIONS modal. Default OFF, and OFF is bit-identical to stock — the eight 
 oracle fixtures reproduce draw-for-draw with the flag on and no forwards in the XI.
 `tools/re/diff_options_parity.py` bounds it: the rest of that modal is still 0 px against
 the MANAGER.EXE capture, the row's band overlaps none of the original's controls, and the
-original draws nothing underneath it. **No other screen carries invented pixels.**
+original draws nothing underneath it.
+
+**The SECOND and last such site, 2026-07-26: the SCOUT door.** The EXTRA SEARCH FILTERS panel
+(§`docs/SPEC_scout_attribute_search.md`) had been shipped and working since 07-25 behind a
+bottom bar with no label of any kind — Mats: *"I don't see the new search objects."* The bar
+now carries `EXTRA SEARCH FILTERS` / `TAP HERE`. While fixing it the bar turned out to be the
+**original's own rollover readout** (three witnesses, now built at 0 px — see
+`docs/re/scout_screen_re.md`), so the two uses are split by state: a row held → the original's
+readout, nothing held → the label. `tools/re/diff_scout_bar_parity.py` bounds it from the
+frames: all ten committed frames of that screen are either a readout or blank, and the two
+segments overlap none of the 21 original controls. **No other screen carries invented pixels.**
 
 **Still to do here — the MIXED PLAY variant.** The other half of
 `docs/re/hack_three_forwards.md`: make toggling MIXED PLAY the trigger instead of three

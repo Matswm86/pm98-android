@@ -106,12 +106,42 @@ func _run() -> void:
 	scr.queue_redraw()
 	await _shot(dir, "shot_scout_results.png")
 
+	# 6b. THE ROLLOVER (witness p0279 in screenshots/refrun-manutd-1997-98/novel/): a finger
+	# held on list row 2 -> that row grows the 2 px black frame and the bottom bar reads out
+	# [Athletic Club's ridi kit] [Joseba ETXEBERRIA Lizardi] [Athletic Club]. Only the bar and
+	# the frame are compared (diff_scout_bar_parity.py) — the witness list is a different
+	# search, so its row CONTENTS cannot be reproduced and are not claimed.
+	# All three readout witnesses are reproduced, because the pen-x rule is a FLOOR of a
+	# half-pixel and the three club strings land on different parities ("Milan" 29 px advance,
+	# "Athletic Club" 75, "Lazio" 30) — one of them would pass under a rounding rule too.
+	for cell in [["shot_scout_rollover.png", 1004, "Athletic Club", "Etxeberria",
+			"Joseba ETXEBERRIA Lizardi", 8, 1],
+			["shot_scout_rollover_milan.png", 1020, "Milan", "Kluivert",
+			"Patrick KLUIVERT", 5, 1],
+			["shot_scout_rollover_lazio.png", 1023, "Lazio", "Nesta",
+			"Alessandro NESTA", 8, 3]]:
+		var roll: Array = []
+		for i in int(cell[5]):
+			roll.append({"pid": 0, "club_id": int(cell[1]), "club_name": str(cell[2]),
+				"name": str(cell[3]), "legalName": str(cell[4]),
+				"flagCode": null, "nationality": "SPAIN", "pos": "FW", "posFine": 13,
+				"age": 20, "av": 81, "ca": 80, "mo": 88, "fee": 10000000, "wage": 300000,
+				"years": 3, "left": 3, "key": false})
+		scr.setup(scout, false, roll, barra[0], barra[1], barra[2], barra[3], barra[4], barra[5])
+		scr._leagues["eng_prem"] = true
+		scr._hover_row = int(cell[6])
+		scr.queue_redraw()
+		await _shot(dir, str(cell[0]))
+
 	# 7. the OURS panel (docs/SPEC_scout_attribute_search.md) — NOT a witness state:
 	# the original has no such panel. It exists so the addition is eyeballed like every
 	# other screen; the six shots above are the parity ones, and they are taken with it
 	# CLOSED, which is how the screen ships.
 	scr.setup(scout, false, results, barra[0], barra[1], barra[2], barra[3], barra[4],
 		barra[5], 112)
+	scr._hover_row = -1
+	scr._leagues["eng_prem"] = true
+	scr._tog["pos"] = true
 	scr._activate("ours_open")
 	scr._attr_idx["TI"] = 11        # SHOOTING >= 85
 	scr._attr_idx["PA"] = 8         # PASSING >= 70

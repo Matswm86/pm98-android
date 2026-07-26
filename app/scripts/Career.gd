@@ -2475,6 +2475,8 @@ func _scout_row(p: Dictionary, cid: int, cname: String, club_v: Dictionary, live
 		"club_id": cid,
 		"club_name": cname,
 		"name": str(p.get("name", "?")),
+		# the SCOUT rollover bar prints the full rendered name (p0241/p0279/p0283)
+		"legalName": str(p.get("legalName", "")),
 		"flagCode": p.get("flagCode"),
 		"nationality": str(p.get("nationality", "")),
 		"pos": str(p.get("pos", "")),

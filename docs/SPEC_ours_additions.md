@@ -188,4 +188,25 @@ direction. The control lives in the extra-filters panel rather than on the heade
 because a sort marker drawn on the witnessed headers would cost parity. Default is the
 Career scan order, i.e. exactly what the screen showed before.
 
+### 5. The DOOR — added 2026-07-26, because items 1-4 were invisible
+
+Approved by Mats on 2026-07-26 after he reported the additions missing from the build:
+*"I don't see the new search objects. Scout screen looks like it always has still."* They were
+all there. What was missing was any way to know: the panel opened by tapping the bottom bar,
+which was a blank grey two-segment field with **no label of any kind**. Nothing on screen
+suggested it did anything.
+
+The bar now carries `EXTRA SEARCH FILTERS` in its left segment and `TAP HERE` (or `N ACTIVE`,
+or `CLOSE` while open) in its right, in the screen's own proman8-at-11 black.
+
+**And the bar turned out not to be ours to take.** Checking it against every committed frame
+of the screen — instead of only the six parity witnesses — found three in which the ORIGINAL
+uses it: a per-row rollover readout printing the held row's club kit, full name and club. That
+is now built and render-diffed at 0 px (`docs/re/scout_screen_re.md` §"The bottom bar"). So the
+label is drawn **only while the original's readout is empty**, and yields on the first press.
+`tools/re/diff_scout_bar_parity.py` proves both halves from the frames.
+
+This is the second and last site in the port that draws a pixel the original does not; the
+other is THREE UP FRONT on the OPTIONS modal. `docs/REMAINING.md` §3b keeps the count visible.
+
 ### The appendix (making SHOOTING matter) — still NOT APPROVED, still not built.

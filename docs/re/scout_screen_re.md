@@ -3,6 +3,13 @@
 > **GAP CLOSED 2026-07-24** — the E.U. / NON E.U. / PLAYERS WITHOUT TEAM enablement
 > condition (called "un-witnessed" below) is the hired SCOUT's star rating: 3.5 / 4.0
 > / 4.5. Four careers sampled; see [`transfer_loop_live_re.md`](transfer_loop_live_re.md) §5.
+>
+> **GAP CLOSED 2026-07-26** — the bottom two-segment bar, recorded below as "baked furniture,
+> behaviour un-witnessed, never animated". It is the original's **per-row ROLLOVER READOUT**
+> and it is witnessed three times. Built and render-diffed at **0 px** on all three, bar body
+> and row frame. See §"The bottom bar" — and note the habit that found it: the frames had been
+> in the repo since 2026-07-25, and a 4-line scan over every committed capture found them in
+> seconds. Scan what you already have before calling something un-witnessed.
 
 The TRANSFER MARKET's SCOUT screen: hire-gated search-criteria panel + the async
 "scout searches for ~2 game weeks" loop + the PLAYERS FOUND results list. Decoded
@@ -116,8 +123,9 @@ method: section map .data VA = fileoff + 0x401A00, scan pointer runs):
 * Gate text sprite (43): ink x90..418 y348..357 (centred on panel cx256).
   Searching text sprite (68): ink x123..387 y338..347 + x123..326 y358..367
   (LEFT-anchored x123, line tops 20 apart). Both cut as sprites → 0px.
-* Bottom strip (white panel + 2-segment grey bar) = baked furniture; its
-  behaviour (progress?) is un-witnessed — never animated by the app.
+* Bottom strip (white panel + 2-segment grey bar) = the ROLLOVER READOUT, closed
+  2026-07-26 — see the dedicated section below. (This line used to read "baked
+  furniture; its behaviour (progress?) is un-witnessed".)
 * The options alert = PMAlert.render(msg) centred (317,237) + PMChrome dim
   bracket (LUT-verified above; InsuranceScreen precedent).
 
@@ -231,16 +239,75 @@ MANAGER.EXE — historical membership". It is located, it is those eighteen, and
 historical list the port shipped happens to be exactly the same set, so nothing changed
 except the provenance (`Career.EU_CODES`).
 
+## The bottom bar — the original's ROLLOVER READOUT (2026-07-26, 0 px)
+
+Two sessions recorded this bar as inert furniture. It is not. Three frames in
+`screenshots/refrun-manutd-1997-98/novel/` show it in use, and a fourth from the same list
+shows it empty, which is what settles what drives it:
+
+| frame | list | bar |
+|---|---|---|
+| `p0241` | Kluivert (row 2) framed | Milan kit · `Patrick KLUIVERT` · `Milan` |
+| `p0279` | Etxeberria (row 2) framed | Athletic Club kit · `Joseba ETXEBERRIA Lizardi` · `Athletic Club` |
+| `p0283` | Nesta (row 4) framed | Lazio kit · `Alessandro NESTA` · `Lazio` |
+| `p0245` | same results, NO row framed | empty |
+
+**It is a rollover, not a selection.** In `p0245` the pointer has moved to SEARCH (its armed
+ring is up) and the readout has cleared; in `p0242` / `p0281` a modal is up and it has cleared
+too. A click-selection would have survived both. There is no other state in which it appears.
+
+Measured, all three frames agreeing to the pixel:
+
+| element | value |
+|---|---|
+| club kit | `app/art/kits/ridi/<club_id>.png` at **(17, 442)** — 0 px on ridi/1020 Milan, 1004 Athletic Club, 1023 Lazio (found by matching the 17x18 ink against all 476 ridi kits at every offset in ±3) |
+| segment A | the player's FULL rendered name, centred; segment `x40..285`, ink rows **y448..454** |
+| segment B | the club name, centred; segment `x287..449`, same rows |
+| face | **proman8 at 11 px**, ink pure black — the six witness strings size within 1 px of the measured ink widths and nothing else in the bank is close |
+| pen x | `floor(cx - advance/2)`, **cx = 163.0 in A, 368.0 in B**. Solved, not assumed: the six measured ink starts (112/83/109 and 353/330/353) bracket cx to exactly those two values. Rounding instead of flooring puts `Athletic Club` 1 px right — that was the whole residual. |
+| the held row | grows a **2 px BLACK frame**, `x32..474`, `y (top-1)..(top+14)`: it replaces the grey 1 px border and eats one row of the white gap above and below. Isolated by diffing `p0279` against `p0283` — the same list with a different row held, 1820 px, all of it two rings. |
+
+The full name is **`legalName` verbatim**. game_db already stores the string the original
+renders, surname uppercased in place: `Iván DE LA PEÑA López`, `Joseba ETXEBERRIA Lizardi`.
+`PMChrome.card_name` used to rebuild it by uppercasing the LAST word, which cannot produce a
+middle surname at all (it printed `Iván De La Peña LÓPEZ`), and **1,272 of the 9,547 shipped
+names** have a surname that is not the trailing run. Fixed 2026-07-26: a mixed-case
+`legalName` is printed verbatim; the 97 all-uppercase ones (talent pool / youth / sample_db)
+still take the rebuild, which is what `test_make_offer_screen`'s four cases assert. Five
+witnesses back the rule — three here plus the two fichas `p0242` / `p0282`.
+
+**Android has no pointer**, so the rollover is bound to the PRESS: while a finger is held on a
+row that row frames and the bar reads out, and the release still opens the card. That is a
+port decision about an input the original does not have, not an invented pixel.
+
+Gate: `tools/re/diff_scout_bar_parity.py` — bar body and row frame, 0 px on all three.
+
 ## The OURS panel (2026-07-25) — flagged, not hidden
 
 `docs/SPEC_scout_attribute_search.md` + `docs/SPEC_ours_additions.md`, owner-approved:
 a NAME substring box, six per-attribute "at least" thresholds (30..95 by 5, exactly
 `Training.TRAINABLE`), and a sort selector. The original has none of them.
 
-They live in an overlay that is **closed by default**, opened by tapping the inert
-2-segment bar at x11..500 y438..463, so all six witnessed states still verify at 0 px
-(re-run 2026-07-25 after the change: noscout/idle/premier/position/searching/results all
-0 px). Binding the toggle to that bar is ours; the bar's own behaviour is un-witnessed.
+They live in an overlay that is **closed by default**, opened by tapping the 2-segment bar at
+x11..500 y438..463, so all six witnessed states still verify at 0 px (re-run 2026-07-26 after
+the readout landed: noscout/idle/premier/position/searching/results all 0 px).
+
+**2026-07-26 — the bar got a visible label, and the bar turned out to be the original's.**
+Mats: *"I don't see the new search objects. Scout screen looks like it always has still."* The
+panel had been shipped and working since 07-25 behind a bar with no label of any kind, which
+is why it read as missing. The same session found the bar's real behaviour (above), so the two
+uses are now split by STATE, not by pixels:
+
+* a row held → the original's readout owns the bar, and the label is not drawn;
+* nothing held → the label `EXTRA SEARCH FILTERS` / `TAP HERE` (or `N ACTIVE`, or `CLOSE`), in
+  the readout's own proman8-at-11 black on the bar's own grey.
+
+So the port never covers a pixel the original draws — the label only occupies a state the
+original leaves blank, and it yields on the first press. `diff_scout_bar_parity.py` §B proves
+that from the frames rather than asserting it: it checks all ten committed frames of this
+screen and requires each one to be either a readout or blank, and it checks the two segments
+against the 21 original controls for overlap. This is the SECOND and last site in the port
+that draws a pixel the original does not (the first is THREE UP FRONT on OPTIONS).
 
 The panel also prints the cap shortfall — *"40 of 112 shown - your scout could only bring
 back 40"*. The cap is the binary's; saying it out loud is ours, because a silent trim

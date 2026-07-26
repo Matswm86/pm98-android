@@ -108,8 +108,8 @@ TI 88`. Every value matches, so the card labels pin all ten codes.
 `RATING = (VE+RE+AG+CA+FITNESS+MORAL) / 6` = `(87+86+84+75+70+99)//6 = 83`, matching the
 card exactly (`Morale.av6`, `FUN_00581e60`).
 
-**Latent trap found while confirming this:** `Training.gd:35` `_NAMES` maps
-`"RM": "Heading", "RG": "Dribbling"` — swapped — and calls VE "Pace" and CA "Ability" where
-the card says SPEED and QUALITY. It is not a live bug: the dict's only consumer is
-`Training.attr_name`, whose only caller is `test_training.gd`, which asserts PA and VE only.
-Fix it anyway before something starts using it.
+**Latent trap found while confirming this — FIXED, verify before repeating it.** `Training.gd`
+`_NAMES` used to map `"RM": "Heading", "RG": "Dribbling"` — swapped — and to call VE "Pace",
+CA "Ability" and PO "Goalkeeping", none of which is a word the game prints. It now carries the
+card's own ten labels (`RM: Dribbling`, `RG: Heading`, `VE: Speed`, `CA: Quality`,
+`PO: Handling`). The 2026-07-26 work list still listed this as open; it was not.

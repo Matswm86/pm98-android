@@ -95,6 +95,48 @@ const BTN_RETURN := Rect2(517, 437, 110, 28)
 # ---- the OURS overlay (see the header note) --------------------------------
 ## The inert bottom bar, measured off the live frame p0023: body x11..500, y438..463.
 const BTN_EXTRA := Rect2(11, 438, 490, 26)
+## ---- the bottom bar is the ORIGINAL'S ROLLOVER READOUT (found 2026-07-26) -------------
+## Two sessions recorded this bar as "inert furniture, behaviour un-witnessed". It is not:
+## three frames in `screenshots/refrun-manutd-1997-98/novel/` show it in use, and they close
+## it. `p0241` (Kluivert), `p0279` (Etxeberria) and `p0283` (Nesta) each carry
+##   [the club's ridi kit] [the player's FULL name] [his club]
+## for the ONE list row that is highlighted, and `p0245` — same results, no row highlighted —
+## has all three empty. So it is a per-row rollover, not a persistent selection: in `p0245`
+## the pointer has moved to SEARCH (the armed ring is up) and the readout has cleared, and in
+## `p0242` / `p0281` a modal is up and it has cleared too. A click-selection would have
+## survived both. Measured, all three frames agreeing to the pixel:
+##   * kit      = `app/art/kits/ridi/<club_id>.png`, blitted at (17, 442) — matched 0 px on
+##                all three (ridi/1020 Milan, ridi/1004 Athletic Club, ridi/1023 Lazio);
+##   * name     = the full rendered name, CENTRED on segment A, ink pure black;
+##   * club     = the club name, CENTRED on segment B, same ink;
+##   * face     = proman8 at 11 px — the six witness strings size to within 1 px of the
+##                measured ink widths, and no other font/size in the bank comes close;
+##   * the highlighted row grows a **2 px BLACK frame**, x32..474, y (top-1)..(top+14),
+##     replacing the grey 1 px border and eating one row of the white gap each side.
+## Android has no pointer, so the rollover is bound to the PRESS: while a finger is held on a
+## row that row frames and the bar reads out, and the release still opens the card. That is a
+## port decision about an input the original did not have, not an invented pixel.
+##
+## The bar's two recessed segments, measured off the baked chrome: the grey (128,128,128)
+## border runs x39..450 / y444..457, the interior is (220,220,220), and a single grey column
+## at x286 splits it in two. So segment A is x40..285 and segment B x287..449, both y445..456.
+const EXTRA_SEG_A := Rect2(40, 445, 246, 12)
+const EXTRA_SEG_B := Rect2(287, 445, 163, 12)
+const BAR_KIT_XY := Vector2(17, 442)
+const BAR_TEXT_TY := 446           # pen top; puts the ink on the witnessed rows y448..454
+## The two centres, SOLVED off the three witnesses rather than assumed from the segment
+## widths: with the pen at `floor(cx - advance/2)` the six measured ink starts (112 / 83 / 109
+## in A, 353 / 330 / 353 in B) bracket cx to exactly these two values. Rounding the half-pixel
+## instead of flooring it puts "Athletic Club" 1 px right of the frame — the whole residual
+## this pair closes.
+const BAR_CX_A := 163.0
+const BAR_CX_B := 368.0
+## The door's own label. It is drawn ONLY while the original's readout is empty — the instant
+## a row is pressed the readout takes the bar back — so the port never covers a pixel the
+## original draws. That is the second and last site in this port that draws a pixel the
+## original does not; `tools/re/diff_scout_door_parity.py` bounds it exactly as
+## `diff_options_parity.py` bounds the THREE UP FRONT row.
+const EXTRA_LABEL := "EXTRA SEARCH FILTERS"
 const OURS_PANEL := Rect2(40, 92, 560, 330)
 const OURS_NAME_FIELD := Rect2(150, 136, 300, 18)
 const OURS_ROW_Y0 := 168          # first attribute row top
@@ -236,6 +278,7 @@ var _sort_i := -1                # index into OURS_SORTS, -1 = the scan order (t
 var _sort_desc := true
 var _found_total := 0            # pre-cap match count (Career.scout_found_total)
 var _alert_img: Texture2D        # options alert (PMAlert render); null = none
+var _hover_row := -1             # the row under the finger (the original's rollover), -1 none
 var _press := ""
 var _row_flag_cache := {}
 
@@ -485,9 +528,16 @@ func _on_input(e: InputEvent) -> void:
 	var a := _hit(_to_design(pos))
 	if pressed:
 		_press = a
+		# the rollover: held on a row = the original's pointer over that row
+		_hover_row = int(a.substr(4)) if a.begins_with("row:") else -1
+		if _hover_row >= 0:
+			queue_redraw()
 		return
 	var was := _press
 	_press = ""
+	if _hover_row >= 0:
+		_hover_row = -1
+		queue_redraw()
 	if a == "" or a != was:
 		return
 	_activate(a)
@@ -724,9 +774,75 @@ func _draw() -> void:
 		draw_texture(_tex(_searching_tex), SEARCHING_XY)
 	elif not _results.is_empty():
 		_draw_results()
+	_draw_bar()
 	if _ours_open:
 		_draw_ours()
 	_draw_alert()
+
+
+## The bottom bar. The original's rollover readout when a row is held, and otherwise the door
+## to the OURS panel — see the BAR_* note at the top of this file for the evidence and the
+## exact measurements.
+func _draw_bar() -> void:
+	var row := rollover_row()
+	if not row.is_empty():
+		var cid := int(row.get("club_id", -1))
+		var kit := PMChrome.ridi_kit(cid) if cid >= 0 else null
+		if kit != null:
+			draw_texture(_tex(kit), BAR_KIT_XY)
+		_bar_text(BAR_CX_A, PMChrome.card_name(row))
+		_bar_text(BAR_CX_B, str(row.get("club_name", "")))
+		return
+	# ---- OURS: the door label, only in the state the original leaves blank --------------
+	# Before this the bar was blank grey with no label of any kind, so the search additions
+	# were unreachable in practice — Mats: "I don't see the new search objects" (approved
+	# 2026-07-26). Face and ink are the readout's own: proman8 at 11 px in black, on the
+	# bar's own (220,220,220) interior. No new font, no new colour, nothing outside the two
+	# segments.
+	if not _has_scout:
+		return
+	_bar_text(BAR_CX_A, EXTRA_LABEL)
+	var n := extra_filters_active()
+	var state := "CLOSE" if _ours_open else ("TAP HERE" if n == 0 else "%d ACTIVE" % n)
+	_bar_text(BAR_CX_B, state, C_NAME if n > 0 or _ours_open else C_ROW_BORDER)
+
+
+## One bar segment's text, in the original's own grammar: proman8 at 11 px, pen top 446, pen x
+## FLOORED off the segment centre (see BAR_CX_A / BAR_CX_B). `col` defaults to the readout's
+## own black; the only other value it ever takes is the bar's OWN border grey (128,128,128),
+## for the door's unset state — neither is a new colour on this screen.
+func _bar_text(cx: float, s: String, col := C_NAME) -> void:
+	if s.strip_edges().is_empty() or _f8 == null:
+		return
+	if _alert_img != null:
+		col = PMAlert.dim_color(col)
+	var w := _f8.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+	PMChrome.text(self, _f8, floorf(cx - w * 0.5), BAR_TEXT_TY, s, col, 11)
+
+
+## The row the bar reads out: the one under the finger. `{}` = none, which is every state the
+## original leaves the bar empty in (no results, a modal up, the pointer elsewhere).
+func rollover_row() -> Dictionary:
+	if _alert_img != null or _ours_open or _searching or _hover_row < 0:
+		return {}
+	var rows := view_rows()
+	if _hover_row >= rows.size():
+		return {}
+	return rows[_hover_row]
+
+
+## How many of the OURS filters are set — the number segment B reports, so a filter that is
+## silently narrowing the results can never be invisible ([[feedback_no_silent_failures]]).
+func extra_filters_active() -> int:
+	var n := 0
+	if _name_edit != null and not _name_edit.text.strip_edges().is_empty():
+		n += 1
+	for k in _attr_idx:
+		if int(_attr_idx[k]) >= 0:
+			n += 1
+	if _sort_i >= 0:
+		n += 1
+	return n
 
 
 ## Chrome/sprites under the options alert swap to their LUT-dimmed copies
@@ -775,6 +891,17 @@ func _draw_results() -> void:
 		_draw_row(rows[_first + i], ROW_Y0 + i * ROW_PITCH)
 	if rows.size() > N_ROWS:
 		_draw_scrollbar()
+	# the rollover frame, measured on p0279 vs p0283 (the same list, a different row held):
+	# 2 px black over x32..474, y (top-1)..(top+14) — it replaces the grey 1 px border and
+	# takes one row of the white gap above and below.
+	if _hover_row >= _first and _hover_row < _first + shown:
+		var top := ROW_Y0 + (_hover_row - _first) * ROW_PITCH
+		var col := PMAlert.dim_color(C_NAME) if _alert_img != null else C_NAME
+		var w := ROW_X1 - ROW_X0 + 3          # x32..474 inclusive
+		draw_rect(Rect2(ROW_X0 - 1, top - 1, w, 2), col, true)
+		draw_rect(Rect2(ROW_X0 - 1, top + 13, w, 2), col, true)
+		draw_rect(Rect2(ROW_X0 - 1, top + 1, 2, 12), col, true)
+		draw_rect(Rect2(ROW_X1, top + 1, 2, 12), col, true)
 
 
 # ---- the OURS panel --------------------------------------------------------

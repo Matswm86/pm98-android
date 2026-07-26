@@ -13,7 +13,12 @@ Masks (documented in docs/re/scout_screen_re.md + offers_map_re.md):
   the extracted .fnt bank (the goalscorers residual class, #11 follow-up);
   kit panel on non-baked states -- nano-kit fallback (the game's own art,
   positions exact; panel13 patches exist only for the frame-013 Premier set);
-  stars column (offers) -- the rating mapping is un-RE'd (FICHA precedent).
+  stars column (offers) -- the rating mapping is un-RE'd (FICHA precedent);
+  DOOR (2026-07-26) -- the two recessed segments of the bottom bar, where this
+  port prints the label for the OURS panel. That is port-only surface and the
+  ONLY such surface on this screen; `tools/re/diff_scout_door_parity.py` bounds
+  it (the original draws nothing there in any witness, and the band overlaps
+  none of its controls). It is a DECLARED bucket, not a hidden mask.
 All chrome, sprites, digit grammar, scroll geometry, row furniture, flags,
 camrols, LEDs, dims and layouts verify to 0px (2026-07-18)."""
 import os
@@ -66,17 +71,21 @@ MONEY = (280, 297, 424, 424)        # FEE + WAGE cell interiors (list)
 NAMECOL = (44, 297, 158, 424)       # bold list-name face (goalscorers residual class)
 YEARS1 = (424, 297, 447, 424)       # years digit glyphs (same bold face; "1"s + fills verified)
 YEARS2 = (453, 297, 468, 424)
+# The DECLARED port-only band: the bottom bar's two recessed segments, x40..449 y445..456
+# inclusive (ScoutScreen.EXTRA_SEG_A / EXTRA_SEG_B). Bounded by diff_scout_door_parity.py.
+DOOR = (40, 445, 450, 457)
 total += diff("shot_scout_noscout.png", f"{WD}/43_scout.png", [BARRA], "scout noscout vs 43")
 total += diff("shot_scout_idle.png", f"{WD}/61_scout_with_scout.png",
-              [BARRA, STRIP_NAME, STRIP_WAGE], "scout idle vs 61")
+              [BARRA, STRIP_NAME, STRIP_WAGE, DOOR], "scout idle vs 61")
 total += diff("shot_scout_premier.png", f"{WD}/63_premier_checked.png",
-              [BARRA, STRIP_NAME, STRIP_WAGE], "scout premier vs 63")
+              [BARRA, STRIP_NAME, STRIP_WAGE, DOOR], "scout premier vs 63")
 total += diff("shot_scout_position.png", f"{WD}/67_pos_enabled.png",
-              [BARRA, STRIP_NAME, STRIP_WAGE, DROP_TEXT], "scout position vs 67")
+              [BARRA, STRIP_NAME, STRIP_WAGE, DROP_TEXT, DOOR], "scout position vs 67")
 total += diff("shot_scout_searching.png", f"{WD}/68_results3.png",
-              [BARRA, STRIP_NAME, STRIP_WAGE, DROP_TEXT], "scout searching vs 68")
+              [BARRA, STRIP_NAME, STRIP_WAGE, DROP_TEXT, DOOR], "scout searching vs 68")
 total += diff("shot_scout_results.png", f"{WD}/81_scout_found2.png",
-              [BARRA, STRIP_NAME, STRIP_WAGE, DROP_TEXT, MONEY, NAMECOL, YEARS1, YEARS2], "scout results vs 81")
+              [BARRA, STRIP_NAME, STRIP_WAGE, DROP_TEXT, MONEY, NAMECOL, YEARS1, YEARS2, DOOR],
+              "scout results vs 81")
 
 # ---- OFFERS ----
 STARS_COL = (485, 100, 560, 335)
