@@ -194,6 +194,10 @@ jobs:
 
       # The APK filename carries the commit SHA (cache-busting, above), so any link
       # written into README.md by hand is stale the moment the next build lands. This
+      # NOTE: GitHub honours [skip ci] ANYWHERE in a commit message, including the body.
+      # Do not quote the token in a normal commit message describing this step, or that
+      # push silently builds nothing and the README is not bumped.
+      #
       # rewrites it to the APK this run just uploaded and pushes with [skip ci], so the
       # README download link is always the newest build and the commit does not rebuild.
       # The website (web/) resolves the newest asset from the API at page load instead;
