@@ -5,9 +5,12 @@
 An Android remake of **Premier Manager 98**, rebuilt from the original game's own
 data. Take over a club, build your squad, run the season.
 
-> **Early build, now playable.** Pick a club and play a career week-by-week with
-> save/load, line-up and tactics, and a transfer market, alongside the original
-> management screens rebuilt pixel-for-pixel from the game's own art.
+> **Playable.** Pick a club and run a career week by week — line-up and tactics,
+> the transfer market, the board, the money, both cups and Europe, with ten save
+> slots — across the original's own management screens, rebuilt pixel-for-pixel
+> from the game's own art and measured against photographs of the real thing.
+> The manager game is built; the match engine is the part still being finished
+> (see [Status](#status)).
 
 <sub>The menu above is a real capture from the running build: the original game's own front-door
 art and fonts, rebuilt pixel-for-pixel from the game's own resources (see the reverse-engineering
@@ -17,6 +20,8 @@ fan remake.</sub>
 ## Download
 
 📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-46655c7.apk)** — one tap downloads `pm98-46655c7.apk` (current build) straight to your phone.
+
+🌐 **[pm98.mwmai.no](https://pm98.mwmai.no)** — the project page: the same download (it resolves the newest build automatically), a gallery of the original 1998 screens, and a long write-up of what the game's own executable actually rewards, drawn straight out of `docs/re/`. Source for the page is in [`web/`](web/).
 
 > **This build (2026-07-26, latest)** is about two things the notes had given up on, and a cheat.
 >
@@ -187,15 +192,21 @@ prompted. Reinstalling over an older build? Uninstall the old one first.
   and the trophy.
 - **Watch a match:** the original's in-match **MATCH OPTIONS** view picker
   (WATCH / HIGHLIGHTS / BRIEF / RESULTS, at the exact button coordinates reversed
-  from the executable). **BRIEF** is a minute-by-minute commentary feed (goals,
-  cards, saves, corners) in the game's own English match text with real scorers;
-  **WATCH** is the **2D graphic simulador** — a side-on stadium built from the
-  game's own sprites (players, ball, the PREMIER MANAGER 98 / actua Sports boards,
-  crowd, grass and sky), animated over the very same match timeline so the two
-  views always agree on the scoreline. (HIGHLIGHTS' 3D engine is CD-only data
-  absent from the archive.)
-- **Club finances:** income and expenses over a 52-week season, structured on the
-  original game's finance ledger (tickets, TV, sponsors, wages).
+  from the executable). **BRIEF** is the minute-by-minute read-out with the engine's
+  own goals, scorers and minutes, and its own possession counters; **RESULTS** is the
+  same match jumped to full time. The shot / save / foul / booking lines come from
+  the positional engine, which the app does not yet play with, so BRIEF leaves them
+  out rather than inventing them. **WATCH** is the **2D simulador** — a side-on
+  stadium built from the game's own sprites (players, ball, the PREMIER MANAGER 98 /
+  actua Sports boards, crowd, grass and sky) over the same timeline, so the two views
+  always agree on the scoreline. HIGHLIGHTS' 3D models are absent from both the
+  archive and the CD image, so that button says so instead of faking it.
+- **Club finances:** the original's own 52-week ledger — tickets, TV, sponsors,
+  wages, transfers, loans and interest — plus the parts read byte-exact out of
+  `MANAGER.EXE`: the fee and wage lookup tables and the club-stature band that
+  indexes them, the insurance premiums and payout percentages, the injury bill,
+  and the ground-improvement cost function that prices all fifteen kinds of work
+  at every club.
 - **The original screens, rebuilt:** the Title / front-door menu, the Main Menu hub,
   League Tables, Line-Up, Squad, Finances, Transfer Market, the Board of Directors and
   the Stadium are reconstructed at the exact pixel coordinates reversed out of the
@@ -206,43 +217,72 @@ prompted. Reinstalling over an older build? Uninstall the old one first.
 ## Screenshots
 
 The career hub (the original Main Menu, running a season) and the LINE-UP screen with the
-squad, formation and pitch:
+squad, formation and pitch — both captured from the Android build:
 
 <p>
   <img src="screens/hub.png" alt="Career hub — the Main Menu running a season, with Results / League Tables / Fixtures / Line-up / Tactics / Opponent / Transfers / Finances" width="420"/>
   <img src="screens/lineup.png" alt="LINE-UP screen — the full squad with ratings, the chosen XI, the formation and the mini-pitch" width="420"/>
 </p>
 
-<sub>PREMIER MANAGER 98, the game this build rebuilds screen-for-screen from the original's
-own icons, fonts and backgrounds (the reverse-engineering notes are in `docs/re/`). Original
-game © Dinamic Multimedia / Gremlin; shown here for this non-commercial fan remake. On a phone
-each screen runs in landscape with a marble bezel in the side margins.</sub>
+<sub>PREMIER MANAGER 98, rebuilt screen-for-screen from the original's own icons, fonts and
+backgrounds (reverse-engineering notes in `docs/re/`). Original game © Dinamic Multimedia /
+Gremlin; shown here for this non-commercial fan remake. On a phone each screen runs in
+landscape with a marble bezel in the side margins. Captures of the *original 1998 PC game*,
+which is what these are measured against, are on the
+[project page](https://pm98.mwmai.no).</sub>
 
 ## Status
 
-This is an early build, but the whole front end is now PREMIER MANAGER 98, not a green
-placeholder UI: it opens on the original title screen, the career hub is the original
-Main Menu, and the database browse, the new-career club/league pickers and the
-2D match view all run in the game's own chrome (marble background, the BARRA bar, the
-PROMAN font), routing into the reversed Squad, League Tables and Finances screens. A
-couple of deep menus (team tactics, the transfer desk) are still a simpler functional UI.
+**The manager game is built.** Career, leagues, both domestic cups, Europe, transfers and
+counter-offers, contracts and renewals, finance, tactics, training, youth, backroom staff,
+scouting, insurance, injuries, the board, honours and the season-end sequence all run, and
+they run on rules read out of `MANAGER.EXE` rather than invented: the transfer fee and wage
+tables and the club-stature band that indexes them, the insurance economy, the injury model,
+the ground-improvement cost function, the morale and fitness mutators, the scout's shortlist
+cap, the sack schedule, and the instant-result match engine itself.
+
+The standard every screen has to clear is a **render diff at 0 differing pixels** against a
+photograph of the real game. Screen after screen clears it. Where a value genuinely cannot be
+reproduced, the screen is left blank and the gap is written down — the app does not fill a
+hole with a plausible number. There are **222 GDScript test suites** and 18 parity differs
+under `tools/re/`.
+
+**What is genuinely under-built is the match itself.** Two things, both named:
+
+1. **The byte-exact match engine is not the engine the app plays with.** The instruction-exact
+   port exists and is oracle-locked leaf by leaf against a Ghidra PCode emulator, and against
+   live captures of the real 1998 program under a debugger it is byte-exact over ticks 1-1032
+   — 319,335 words compared across eight recordings, zero mismatches. But tick 1032 is match
+   minute 3, about 7% of a half. Until it clears a full ninety it stays on the bench, and your
+   matches are played by a simpler engine tuned to realistic football aggregates rather than to
+   PM98's own output. Extending the verified window is a capture problem, not a research one:
+   roughly ninety minutes of wall clock per further minute of match.
+2. **The animated 2D match view is an approximation.** The faithful sprite render is specified
+   (`docs/re/jug_render_spec.md`) and deliberately deprioritised; the results/commentary
+   presentation is the one that is real and shipped.
+
+Everything else outstanding is in [`docs/REMAINING.md`](docs/REMAINING.md), which is kept
+honest rather than kept short. Per-screen truth is the `Status:` line at the top of each
+`docs/re/<screen>_re.md`.
 
 ## Coming next
 
-The stadium works/expansion sub-view and the full position model (injuries, suspensions,
-the club news feed, training/player development, the youth team, the backroom staff,
-player contracts and wages, European competitions and BOTH domestic cups — the F.A. Cup and
-the Coca-Cola Cup — are now in). The 2D
-match view now renders the original game's own sprites on a 3/4 broadcast pitch (the
-`.PGF` sprite format is fully cracked, see `docs/re/match_view_re.md`); next for it are
-the original scrolling tile-camera and per-team kit recolours. Club crests and player
-photos are decoded from the game files (the archive format is cracked, see
-`docs/re/pkf_format.md`) and are being wired in. The season simulation uses the
-original game's verified random-number generator and a per-shot model tuned to
-realistic football results.
+- **Wire the byte-exact engine in.** The one thing that raises the whole game's fidelity
+  ceiling, and the only item on the critical path.
+- **Build the European knockout screens.** Five layouts are now measured from a full season
+  recorded under Wine; nothing about them is unknown any more, they simply are not drawn yet.
+- **The MIXED PLAY variant of the three-forwards cheat**, blocked on locating the club tactic
+  byte — the TEAM TACTICS modal's geometry is measured, so the memory diff has a click target.
+- **Data completeness.** English-league squads are still sparse where the bio-interleaved
+  record format is not fully cracked, and roughly 876 directory-only teams use a separate
+  format that has not been decoded.
 
 ## Built with
 
-Godot 4 (GDScript); the APK is built in GitHub Actions. The `tools/` folder holds
-the Python that decodes the original game files into the database the app ships
-with, and `docs/` documents the file formats.
+Godot 4 (GDScript); the APK is built in GitHub Actions. `tools/re/` holds the Python
+that decodes the original game's archives, fonts and database, walks jump tables out
+of `MANAGER.EXE`, drives the real 1998 binary through a Ghidra PCode emulator to bank
+oracles, and render-diffs the app's screens against captured frames. `docs/re/` is the
+reverse-engineering record — one file per screen or subsystem, each with a `Status:`
+line that is the authority on whether that piece is faithful. `web/` is the project
+page at [pm98.mwmai.no](https://pm98.mwmai.no).
