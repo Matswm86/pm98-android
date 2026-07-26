@@ -42,7 +42,7 @@ dev-harness only, superseded by `TrainingScreen.gd`).
 | Item | Status |
 |---|---|
 | `HonoursScreen.gd` (HONOURS + CAREER RESUME) | **OURS**, approved 2026-07-25 (`SPEC_ours_additions.md` item 1); entered via a plaque the original leaves inert, so MANAGER HISTORY keeps its 0px parity |
-| THREE UP FRONT row (`MatchOptions.gd`) | Invented pixel-site, approved; MANAGER_HACK.EXE cheat port, default OFF, OFF is bit-identical to stock; bounded by `diff_options_parity.py` |
+| THREE UP FRONT row (`OptionsPanel.gd`) | Invented pixel-site, approved; MANAGER_HACK.EXE cheat port, default OFF, OFF is bit-identical to stock; bounded by `diff_options_parity.py` |
 | SCOUT door label (`ScoutScreen.gd`) | Invented pixel-site, approved 2026-07-26; state-split so it covers no pixel the original draws; bounded by `diff_scout_bar_parity.py` |
 | `BrowseScreen.gd` green DB-navigation tree | Invented *surface* (no single original counterpart), live only in DATA BASE mode navigation |
 | 7 legacy green `_set_view` ItemList views + interim training browse | Invented, but **gameplay-unreachable** (dev harness only) |

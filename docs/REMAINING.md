@@ -48,9 +48,21 @@ final build:
   the measurements).
 * **Neither cheat works in play**: MIXED PLAY (blocked on the un-located club tactic
   byte, §3b) AND the shipped THREE UP FRONT hack — Mats reports no effect ("won't get me
-  goals"). Verify the OPTIONS toggle persists, that the career's matches actually route
-  through `Pm98StatMatch` (audit S5: European ties use the legacy engine), and that the
-  hack fires on his XI.
+  goals"). ~~THREE UP FRONT~~ — **FIXED 2026-07-26 evening.** The flag/persistence/
+  routing were all sound; the TRIGGER side had three port bugs: (1) the default 4-4-2
+  never arms it (pick 4-3-3 — 463/476 clubs auto-pick exactly 2 FW on 4-4-2, all 20
+  Premier clubs field 3/3 on 4-3-3); (2) `Tactics.repaired()` replaced an injured
+  striker with the best ANY-position player (its pool carried no `pos`), silently
+  turning 4-3-3 into 4-4-2 — now same-position-first; (3) worst: `_ai_featured_xi`
+  fielded "best ten by CA" with no shape, so 16/20 Premier clubs armed the cave AGAINST
+  Mats while he never armed it — AI XIs now field position-aware 4-4-2 like the
+  original's stored club tactics. Seam-tested end-to-end (`test_three_up_front_seam`:
+  live chain arms at 4-3-3, opponent doesn't, ON = the cave's 6 goals, OFF differs on
+  the same seed). **NOTE for play: the cheat needs 3 natural forwards in the fielded
+  XI — pick 4-3-3 in PREDEF TACTICS.** MIXED PLAY remains blocked (§3b). Also found
+  and recorded: the seven TEAM TACTICS levers reach only the legacy engine —
+  `MatchSim`'s stat branch never reads `rh`/`ra` (fix belongs to the TEAM TACTICS
+  rebuild session).
 * ~~Debt alert at week 1 despite millions positive~~ — **FIXED 2026-07-26** (`2201ccf`):
   the at-a-loss trigger followed the week's P&L; it now follows the BANK BALANCE, the
   reading the refrun witnesses support (R16 correction in

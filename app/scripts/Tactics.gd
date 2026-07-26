@@ -578,7 +578,8 @@ func repaired(club: Dictionary) -> Tactics:
 		else:
 			var atk := MatchEngine.atk_score(attrs) if has else _NEUTRAL_SCORE
 			var dfn := MatchEngine.def_score(attrs) if has else _NEUTRAL_SCORE
-			outfield.append({"id": pid, "atk": atk, "def": dfn, "ovr": 0.5 * atk + 0.5 * dfn})
+			outfield.append({"id": pid, "atk": atk, "def": dfn, "ovr": 0.5 * atk + 0.5 * dfn,
+				"pos": str(p.get("pos", ""))})
 	keepers.sort_custom(func(a, b): return a["po"] > b["po"])
 
 	for i in t.xi.size():
@@ -591,9 +592,22 @@ func repaired(club: Dictionary) -> Tactics:
 				repl = int((keepers.pop_front() as Dictionary)["id"])
 		else:
 			var key := "def" if role == "DEF" else ("atk" if role == "FWD" else "ovr")
+			var want := "DF" if role == "DEF" else ("FW" if role == "FWD" else "MF")
 			outfield.sort_custom(func(a, b): return a[key] > b[key])
-			if not outfield.is_empty():
-				repl = int((outfield.pop_front() as Dictionary)["id"])
+			# Keep the SHAPE: a vacated slot takes the best fit player of its OWN
+			# position first. The old any-position fill silently turned a 4-3-3
+			# into a 4-4-2 the moment one striker was out (the pool carried no
+			# `pos` at all), disarming THREE UP FRONT with no signal on screen.
+			var pick_i := -1
+			for j in outfield.size():
+				if str((outfield[j] as Dictionary).get("pos", "")) == want:
+					pick_i = j
+					break
+			if pick_i < 0 and not outfield.is_empty():
+				pick_i = 0
+			if pick_i >= 0:
+				repl = int((outfield[pick_i] as Dictionary)["id"])
+				outfield.remove_at(pick_i)
 		t.xi[i] = repl
 	t._derive_roles(club)
 	return t

@@ -1194,24 +1194,25 @@ func _ai_featured_by_club() -> Dictionary:
 	return out
 
 
-## A rival club's best available XI (its keeper + ten outfielders, by current ability),
-## the players an AI side would field this week. Availability-filtered so an already-out
-## player is never picked, and never injured twice.
+## A rival club's fielded XI this week, availability-filtered. SHAPE-AWARE since
+## 2026-07-26: the original's AI fields its stored club tactic (the EQUIPOS slot
+## block — overwhelmingly a 4-4-2 family shape), not a scratch "best ten by
+## ability" pick. The old shape-free pick here fielded 3+ NATURAL FORWARDS at 16
+## of 20 Premier clubs, which armed the THREE UP FRONT cave for the OPPOSITION
+## whenever the cheat was on (Pm98StatMatch counts ROLE==3 per side) while the
+## manager's own default 4-4-2 never armed it — Mats: "won't get me goals".
+## Position-aware auto_pick (GK + 4 DF + 4 MF + 2 FW, best of each line) restores
+## the original's shape; _pad_xi still guarantees eleven.
 func _ai_featured_xi(id: int) -> Array:
-	var gks: Array = []
-	var outfield: Array = []
-	for p in available_squad(id):
-		if p.get("isGK"):
-			gks.append(p)
-		else:
-			outfield.append(p)
-	gks.sort_custom(func(a, b): return _ai_ovr(a) > _ai_ovr(b))
-	outfield.sort_custom(func(a, b): return _ai_ovr(a) > _ai_ovr(b))
+	var pool := available_squad(id)
+	var t := Tactics.auto_pick({"players": pool})
+	var by_id: Dictionary = {}
+	for p in pool:
+		by_id[int(p.get("id", -1))] = p
 	var xi: Array = []
-	if not gks.is_empty():
-		xi.append(gks[0])
-	for i in mini(10, outfield.size()):
-		xi.append(outfield[i])
+	for pid in t.xi:
+		if by_id.has(int(pid)):
+			xi.append(by_id[int(pid)])
 	return _pad_xi(xi, id)
 
 
