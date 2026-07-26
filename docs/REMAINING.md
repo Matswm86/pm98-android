@@ -78,9 +78,21 @@ Four more, reported 2026-07-26 evening (second round, same play session):
   (`cupdraw_screen_re.md`).
 * **Youth recruitment and training does not work like the original at all** — tracked in
   `youth_re.md`; Mats: implement it in a dedicated session.
-* **The Ground screen's stadium image never grows** — the original swaps in a bigger
-  stadium picture at each capacity expansion; the art is in the sources
-  (`stadium_screen_re.md`).
+* **The Ground screen's stadium image never grows** — **INVESTIGATED 2026-07-26 evening:
+  the mechanism is already shipped AND byte-exact, and the observed behaviour is the
+  original's own.** All 12 `estadio0..11` tiles (RECURSOS.PKF) are decoded, wired and
+  selected by `tier = clamp(capacity * 11 / 130000, 0, 11)` — re-verified instruction-level
+  against `FUN_0051a6e0` @0x51a749 (magic divisor 0x810E35C1 == /130000). The catch is
+  BAND WIDTH: a tier band is 130000/11 = 11,818 seats while the SEATS offers are
+  +4,000/+8,000/+12,000, so most single expansions do not cross a band — Arsenal at
+  39,000 stays tier 3 after +4k AND +8k, exactly as the original would. Do NOT "fix" this
+  by inventing a per-expansion swap. Closed today: `estadio3` render-verified against the
+  Villa capture (98.36% exact — second tile after tier 4). Open probes if Mats wants
+  visible feedback: (a) `remodela.png` (19x16, exported, loaded by nothing) may be the
+  original's works-in-progress marker on the picture — needs a wine capture during works;
+  (b) the original sums TWO ground fields (`[ground+4]+[ground+8]`) into the tier capacity
+  — worth a memory dump to confirm the port's single `stadium_capacity` matches; (c) 10
+  tiles still corrected-by-mapping only.
 
 ## The one-paragraph truth
 

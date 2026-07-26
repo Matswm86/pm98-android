@@ -81,22 +81,25 @@ misregistration, not a clean column roll (a plain roll fixes columns 64…319 an
 **98.15% pixel-exact / 0.83% >8**, whole GROUND screen 54.5% → 78.0% exact.
 
 Tool: `tools/re/fix_estadio_wrap.py` (`--apply` rewrites the tiles, `--verify` re-measures).
-**Scope caveat:** tier 4 is the only tile with a real render to check against. The other 11 were
-corrected by the same mapping on the strength of the shared seam signature (same column, same z
-band) and are **not** independently render-verified — capture a GROUND screen for a club in
-another capacity tier to close that. The residual 0.83% is fine dither noise; whether the live
-render dithers at blit time is not reversed. The capture's frames 01-12 have pixel-identical
-panels (0.0% between them), so the picture is static — no animation is being read as an offset.
+**Scope caveat (narrowed 2026-07-26 evening):** tier 4 was the only tile with a real render to
+check against; **tier 3 is now verified too** — Aston Villa's own GROUND capture
+(`screenshots/wine-captures-2026-07-23-renew-ground-villa/31_ground.png`, 39,339 seats → tier 3)
+diffs against `estadio3.png` at the (299,146) box at **1.64% differing (98.36% exact)**, the
+same fine-dither residual class as the tier-4 witness (0.83%), and 81% differing at the retired
+y=148 anchor — confirming both the tile and the s55 y-anchor on a second tier. The other 10
+tiles remain corrected-by-mapping, not independently render-verified. The residual is fine
+dither noise; whether the live render dithers at blit time is not reversed. The capture's frames
+01-12 have pixel-identical panels (0.0% between them), so the picture is static — no animation
+is being read as an offset.
 
 ## What is frame-true vs honest gap
 - **Frame-true (baked or reversed):** the entire body chrome — both panels, all section/
   facility/column/button labels + icons, TOTAL IMPROVEMENTS, the green header, the table
   frame, the 2×2 grid, the tier picture box, all rects.
 - **From real Career:** ground name = GameDB `club.stadium`; CAPACITY = `Career.stadium_capacity`;
-  tier = from that capacity. (Only **15/476** clubs carry a real `capacity` in `game_db.json`;
-  the rest — incl. Man Utd — fall back to `FinanceModel._CAP` per division, so the in-app
-  capacity/tier can differ from the frame's real 55,300/tier-4. That is a DB-layer gap, not a
-  screen bug.)
+  tier = from that capacity. (STALE NOTE CORRECTED 2026-07-26: **476/476** clubs carry a real
+  `capacity` in `game_db.json` since the EQUIPOS byte-exact decode — the old "15/476 …
+  FinanceModel._CAP fallback" line described the pre-decode DB; `_CAP` is dead fallback now.)
 - **HONEST GAPS (blank, never fabricated):** **CAR PARK spaces** and **PITCH quality** are in
   no `game_db.json` field. The prior build's parking = `capacity/27` and pitch = "NORMAL" were
   fabrications; both value cells are now left blank. **TOTAL IMPROVEMENTS** money = £0 (an
