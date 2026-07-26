@@ -8,6 +8,11 @@ This is the honest, full list. Nothing hidden.
 > open, and all four have since landed. **Per-screen truth is the `Status:` line at the top
 > of each `docs/re/<screen>_re.md`, not this file.** This file is the map, they are the
 > territory.
+>
+> The 2026-07-26 rewrite still carried one stale line of its own — "SAVE GAME is still a
+> toast". It has not been a toast since 2026-07-18: `Main._menu_action` "save" opens the
+> ten-slot `SaveGameDialog`, render-diffed 0 px against witnesses 51/52/53. Removed.
+> **The habit that catches these: grep the code for the entry point before repeating a gap.**
 
 ## The one-paragraph truth
 
@@ -27,18 +32,21 @@ against PM98 output. The instruction-exact engine (`Pm98Driver` / `Pm98Outer` /
 leaf by leaf against a Ghidra PCode emulator, and is **not wired into gameplay**. Swapping
 it in is the whole game's fidelity ceiling.
 
-Where it actually stands, measured 2026-07-26 (`docs/re/M5_S57_SAMPLING_ANCHOR.md`):
+Where it actually stands, measured 2026-07-26 (`docs/re/M5_S58_FRONTIER_1032.md`):
 
-* Against the live silicon capture the port is **byte-exact over clk 1-823** — 22 players
+* Against the live silicon captures the port is **byte-exact over clk 1-1032** — 22 players
   x 16 fields, the ball x 10 fields, its 51-word predicted-trajectory tail, and the LCG
-  state at all 823 tick boundaries. 72,685 words, zero mismatches, zero tolerance.
-* **clk 823 is match minute 2.** `+0x450` is the open-play tick counter and the minute is
+  state at every tick boundary. Across all **eight** banked captures: **319,335 words,
+  zero mismatches, zero tolerance.**
+* **clk 1032 is match minute 3.** `+0x450` is the open-play tick counter and the minute is
   `+0x450 * 0x2d / +0x19ac` with `+0x19ac = 14400`, so the verified window is the first
-  ~2.6 minutes of one reference match — 5.7 % of a half.
+  ~3.2 minutes of one reference match — 7.2 % of a half.
 * Therefore the frontier is a CAPTURE problem, not an engine problem. Extending
-  `tools/re/wine/m5_rsp_capture.py` past clk 823 (~1 clk/10 s in-window, one wine boot per
-  attempt, ~1-in-2 clean-XI rate, own display required) is the only thing that can falsify
-  the engine further.
+  `tools/re/wine/m5_rsp_capture.py` past clk 1032 is the only thing that can falsify the
+  engine further, and it runs at ~1 clk/10 s in-window — roughly **90 minutes of wall
+  clock per further minute of match time**, plus a fresh boot per attempt (a dead debug
+  stub cannot be re-attached; see the s58 write-up). Reaching the kill-test divergence at
+  clk ~3500 is ~7 hours of capture. That is a scheduling decision, not a research one.
 * Also open: the `run_match_from_struct.gd` kill-test divergence (first goal 11' vs the
   reference 21', i.e. clk ~3500 vs ~6700 — far beyond any capture, so unattributable
   today); unifying the three `+0x43c` null sentinels (absent / 0 / -1, behaviour-affecting);
@@ -62,14 +70,19 @@ is real and shipped, and PM98 ships two match presentations, so this is the seco
   shipped 2026-07-26 at 0 px outside the two named residuals.
 * **Draw-then-play** — `Cup.play_round` still pairs AND plays in one step; the original
   draws, shows the draw, and plays later. Wants its own session.
-* **Per-club ground prices** — only Man Utd's are witnessed (`docs/re/stadium_screen_re.md`).
-  The rest cannot be shipped without evidence; do not interpolate them.
+* ~~**Per-club ground prices**~~ — **CLOSED 2026-07-26.** The cost function `FUN_0057ddd0` is
+  reversed and every one of the 476 clubs is priced from the binary's own jump tables, keyed
+  by the club's stature band (`GroundCost.gd`, 24/24 witnessed prices exact including the
+  original's float32 dirt). See `docs/re/stadium_screen_re.md` §"The cost function". What
+  remains there is the per-club STARTING grades — `club+0x50`, the preset selector, is not
+  yet reversed, so only Man Utd's captured grades are used and nothing is interpolated.
 * **The kit-outline blit pass** — the engine's un-reversed outline/bevel pass. Tested and
   REJECTED: a 50 % blend with the background (left-edge pixels darken, right-edge lighten to
   128/144 grey, so it is a bevel or shadow sprite, not a blend).
-* **MINIBAND dither** — 99 px across the six euro group frames.
-* **SAVE GAME** is still a toast + `_career.save()`, not the original save flow
-  (`APP_VS_SPEC_AUDIT.md` §B1, verdict STUB).
+* ~~**MINIBAND dither** — 99 px across the six euro group frames.~~ **CLOSED 2026-07-26.**
+  Not dither: the flags were decoded with the shared VGA palette instead of `MANAGER.PAL`
+  plus the 20 Windows static system colours. Re-exported, **0 px** over all 24 flag cells
+  (`euro_league_screen_re.md` §Parity).
 
 ## 4. The SHOOTING appendix
 

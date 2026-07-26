@@ -168,8 +168,14 @@ def main() -> None:
     # fixture and XI and only the RNG stream changes -- which is exactly the cross-seed sweep
     # the port can mirror (diag_m5_dart209.gd honours the same PM98_SEED).
     ref_seed = int(os.environ.get("PM98_SEED", "0"), 0) or ref["meta"]["seed_0x6d3184"]
+    # PM98_NO_POKE=1 RESUMES a capture on a match that is ALREADY running from a poked frame 0
+    # (s58: the stub died mid-run and took the python client with it, but the game itself kept
+    # free-running the same deterministic trajectory). Re-poking there would overwrite live
+    # state with frame-0 values and destroy the run, so skip the poke and the frame-0 XI check
+    # and just re-arm the Z2 watch. Only ever use this on a game whose frame 0 WAS poked.
+    resume = os.environ.get("PM98_NO_POKE") == "1"
     poked, skipped = [], []
-    for off_s, ref_v in ref["match"].items():
+    for off_s, ref_v in ({} if resume else ref["match"]).items():
         off = int(off_s, 16)
         live_v = u32(base + off)
         if live_v == (ref_v & 0xFFFFFFFF):
@@ -179,7 +185,8 @@ def main() -> None:
             continue
         w32(base + off, ref_v)
         poked.append(off)
-    w32(SEED_VA, ref_seed)
+    if not resume:
+        w32(SEED_VA, ref_seed)
     post = sum(
         1 for off_s, v in ref["match"].items() if u32(base + int(off_s, 16)) == (v & 0xFFFFFFFF)
     )
@@ -262,7 +269,7 @@ def main() -> None:
         return int(src.get("dwords", {}).get(k, 0)) & 0xFFFFFFFF
 
     xi_bad = []
-    for ti, (arr, cnt) in enumerate(teams):
+    for ti, (arr, cnt) in enumerate([] if resume else teams):
         refs = ref["players"][ti]
         for i in range(min(cnt, len(refs))):
             b = mread(arr + i * PLAYER_STRIDE, PLAYER_STRIDE)

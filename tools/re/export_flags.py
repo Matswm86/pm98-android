@@ -39,7 +39,8 @@ from pathlib import Path
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import pkf_unpack as P  # noqa: E402  (local tool, after sys.path tweak)
+import pkf_image as PI  # noqa: E402  (local tool, after sys.path tweak)
+import pkf_unpack as P  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 GAME = ROOT / "extracted" / "Premier Manager 98"
@@ -51,6 +52,63 @@ def vga_palette() -> list[tuple[int, int, int]]:
     """The shared 256-colour VGA palette (DAT.PKF +0x5CA, stored R,G,B,0)."""
     b = (GAME / "DAT.PKF").read_bytes()[PAL_OFFSET : PAL_OFFSET + 1024]
     return [(b[i * 4], b[i * 4 + 1], b[i * 4 + 2]) for i in range(256)]
+
+
+# The 20 colours Windows reserves in a 256-entry logical palette (10 low, 10 high). A
+# 256-colour Windows app never gets these slots: the system writes them into the physical
+# palette whatever the app's own palette says, so they override MANAGER.PAL in the RUNNING
+# game. Measured, not assumed — MANAGER.PAL's index 8 is (192,227,192), every real frame
+# shows (192,220,192), which is Windows' "money green" (see flag_palette()).
+WIN_STATIC = {
+    0: (0, 0, 0),
+    1: (128, 0, 0),
+    2: (0, 128, 0),
+    3: (128, 128, 0),
+    4: (0, 0, 128),
+    5: (128, 0, 128),
+    6: (0, 128, 128),
+    7: (192, 192, 192),
+    8: (192, 220, 192),
+    9: (166, 202, 240),
+    246: (255, 251, 240),
+    247: (160, 160, 164),
+    248: (128, 128, 128),
+    249: (255, 0, 0),
+    250: (0, 255, 0),
+    251: (255, 255, 0),
+    252: (0, 0, 255),
+    253: (255, 0, 255),
+    254: (0, 255, 255),
+    255: (255, 255, 255),
+}
+
+
+def flag_palette() -> list[tuple[int, int, int]]:
+    """The palette the RUNNING game shows the flags in — MANAGER.PAL + the Windows statics.
+
+    The flag DIBs carry no colour table of their own (dataoff lands right after the 12-byte
+    BITMAPCOREHEADER), so the colours come from whatever palette is realised. This used to
+    use the shared VGA table at DAT.PKF +0x5CA, and that is WRONG for the flags: six palette
+    entries disagree with every real frame, which is the "99 px of MINIBAND dither" the EURO.
+    LEAGUE parity gate carried (euro_league_screen_re.md). It was never dither — each of the
+    99 pixels is a flat index rendering in the wrong colour.
+
+    Measured over all 24 MINIBAND cells in the six witnessed EURO. LEAGUE group frames:
+
+        shared VGA (DAT.PKF +0x5CA)      99 differing px
+        MANAGER.PAL                      19
+        MANAGER.PAL + Windows statics     0
+
+    The five entries MANAGER.PAL fixes are 87/88/89/90 (the green ramp: VGA has
+    (66,132,24)..(182,221,59), the frames have (140,170,30)..(200,230,60)) and 111
+    ((24,24,16) vs (10,15,0)). The sixth is index 8, where MANAGER.PAL itself is overridden
+    by the Windows static "money green".
+    """
+    flat = PI.riff_palette("MANAGER.PAL")  # the RIFF 'PAL ' file inside DAT.PKF
+    pal = [(flat[i * 3], flat[i * 3 + 1], flat[i * 3 + 2]) for i in range(256)]
+    for i, c in WIN_STATIC.items():
+        pal[i] = c
+    return pal
 
 
 def decode_os2_bmp(raw: bytes, pal: list[tuple[int, int, int]]) -> Image.Image:
@@ -88,7 +146,7 @@ def country_table() -> list[str]:
 
 
 def main() -> None:
-    pal = vga_palette()
+    pal = flag_palette()
     names = country_table()
 
     # --- flags ---
@@ -141,8 +199,10 @@ def main() -> None:
     bad = [k for k, v in anchors.items() if by_name.get(k) != v]
     print(f"flags: wrote {n} PNGs -> {flags_dir.relative_to(ROOT)}")
     print(f"countries: {len(names)} entries -> {out.relative_to(ROOT)}")
-    print(f"anchors {'OK' if not bad else 'MISMATCH: ' + str(bad)}: " + ", ".join(
-        f"{k}={by_name.get(k)}" for k in anchors))
+    print(
+        f"anchors {'OK' if not bad else 'MISMATCH: ' + str(bad)}: "
+        + ", ".join(f"{k}={by_name.get(k)}" for k in anchors)
+    )
     if bad:
         raise SystemExit(1)
 

@@ -59,8 +59,11 @@ func _run() -> void:
 		scr.setup("Manchester Utd.", "asdf", "1997-98", "Old Trafford", 55300, 34000, 21300,
 			2000, career.works_status(), 7, 750, career.week + 1, "Premier",
 			str(manu.get("objective", "")))
+		# Feed the STATURE band, exactly as Main does, so the shot exercises the live
+		# GroundCost path (FUN_0057ddd0) rather than the legacy witnessed-club lookup.
+		# Man Utd's band is 0, which is what makes these frames the price witness.
 		scr.set_improve_state(career.car_park_levels, 2_975_000, career.works_ledger(),
-			career.ground_grades, career.works_total())
+			career.ground_grades, career.works_total(), career.my_band())
 		scr.set_matchday_state(7, 750, "Manchester Utd.", "Southampton", true, false)
 		scr._view = str(st[1])
 		scr._tab = str(st[2])

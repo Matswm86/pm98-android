@@ -34,9 +34,11 @@ KITS = [(106, 6, 35, 44), (75, 178, 24, 32)] + [
 ]
 
 
-# The MINIBAND flag cells. Our 14x10 bank renders the right flag at the right place, but a
-# handful of its dithered pixels sit on a different palette entry than the frame's -- 99 px
-# over all six frames, none of them structural. Bucketed, not hidden.
+# The MINIBAND flag cells. These used to carry 99 differing px over the six frames, blamed on
+# "dither"; it was actually the wrong palette (the flags were decoded with DAT.PKF's shared VGA
+# table instead of MANAGER.PAL + the Windows static colours -- see export_flags.flag_palette
+# and euro_league_screen_re.md §Parity). Since 2026-07-26 this bucket reports **0**; the rect
+# list stays so a palette regression is reported here instead of silently landing in "outside".
 FLAGS = [(183, top + 2, 14, 10) for top in (209, 224, 239, 254)]
 
 

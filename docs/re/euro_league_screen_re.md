@@ -355,13 +355,16 @@ and **what it means is still unresolved**. It is NOT a winner marker.
 ### Parity — `tools/re/diff_euroleague_parity.py` on all six groups
 
 ```
-group A: 1268px differ (1246 kit blits, 22 MINIBAND flags, 0 outside)
-group B: 1269px differ (1255 kit blits, 14 MINIBAND flags, 0 outside)
-group C: 1290px differ (1278 kit blits, 12 MINIBAND flags, 0 outside)
-group D: 1286px differ (1258 kit blits, 28 MINIBAND flags, 0 outside)
-group E: 1259px differ (1257 kit blits,  2 MINIBAND flags, 0 outside)
-group F: 1284px differ (1263 kit blits, 21 MINIBAND flags, 0 outside)
+# after the 2026-07-26 flag-palette fix (was 1268/1269/1290/1286/1259/1284 with 99 flag px)
+group A: 1246px differ (1246 kit blits, 0 MINIBAND flags, 0 outside)
+group B: 1255px differ (1255 kit blits, 0 MINIBAND flags, 0 outside)
+group C: 1278px differ (1278 kit blits, 0 MINIBAND flags, 0 outside)
+group D: 1258px differ (1258 kit blits, 0 MINIBAND flags, 0 outside)
+group E: 1257px differ (1257 kit blits, 0 MINIBAND flags, 0 outside)
+group F: 1263px differ (1263 kit blits, 0 MINIBAND flags, 0 outside)
 ```
+
+**The kit blits are now the ONLY residual on this screen.**
 
 Every table cell, name, number, score digit, yellow marker, button face, header plate,
 ROUND label and barra value is **exact**. The two residuals, both pre-existing and both
@@ -374,8 +377,37 @@ named rather than hidden:
   sprite's 1-px outline ring, and it is **not** a plain blend of the outline with the
   background (tested: left-edge pixels darken, right-edge pixels lighten to 128/144 grey),
   so the pass is still un-reversed. Not invented, not faked.
-* **MINIBAND flags** — 99 px over all six frames, every one a single dithered pixel on a
-  neighbouring palette entry. The right flag is at the right rect in every row.
+  **It is also NOT the flag palette bug** — re-decoding the four RIDIESC kits in frame A
+  under `MANAGER.PAL` + Windows statics gives byte-identical output to the shared VGA table
+  (151/153/151/152 raw differing px either way, tested 2026-07-26). Two different root
+  causes; fixing the flags does nothing for the kits.
+* ~~**MINIBAND flags** — 99 px over all six frames, every one a single dithered pixel on a
+  neighbouring palette entry.~~ **CLOSED 2026-07-26 — it was never dither, it was the wrong
+  palette.** `export_flags.py` decoded BANDERAS/MINIBAND with the shared VGA table at
+  `DAT.PKF +0x5CA`; the flag DIBs carry no colour table of their own, and the palette
+  MANAGER.EXE actually realises is **`MANAGER.PAL`** (the RIFF `PAL ` file inside DAT.PKF)
+  **with the 20 Windows static system colours forced into slots 0-9 / 246-255**. Measured
+  over all 24 MINIBAND cells in the six frames:
+
+  | palette | differing px |
+  |---|---|
+  | shared VGA (`DAT.PKF +0x5CA`) | 99 |
+  | `MANAGER.PAL` | 19 |
+  | **`MANAGER.PAL` + Windows statics** | **0** |
+
+  Twenty-one entries differ between the two: 8, 27-29, 85-90, 111-116, 119-123. The ones the
+  flags actually hit are the green ramp 87-90 (VGA `(66,132,24)…(182,221,59)` vs the frames'
+  `(140,170,30)…(200,230,60)`), 111 (`(24,24,16)` vs `(10,15,0)`), and 8 — where MANAGER.PAL's
+  own `(192,227,192)` is overridden by Windows' "money green" `(192,220,192)`, which is why
+  MANAGER.PAL alone still left 19 px. This is the same class of finding as
+  `dbase_player_card_re.md` ("Live Dbasewin palette = LIGA_ESTRELLAS.BMP's embedded table …
+  the DAT.PKF @0x5ca palette does NOT match"): **the realised palette is a property of the
+  running process, not of the PKF.** The 30x20 BANDERAS bank is re-exported with the same
+  palette (same bank, same DIB form, same loader, same process) — but note it has no
+  independent 30x20 witness of its own yet; the proof is on the 14x10 minis.
+  Re-verified after the re-export: `build_ficha_chrome_from_frames.py` (mini_027 / mini_044
+  at (141,154), SAD 0.0) and `build_team_offer_chrome_from_frames.py` (mini_030 in both the
+  NAT band and the offer row, SAD 0.0) all still pass.
 
 ### Still not built
 

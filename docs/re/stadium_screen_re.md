@@ -1,7 +1,11 @@
 # GROUND (ESTADIO) screen — RE findings + frame-true rebuild
 
 Status: **REBUILT frame-true** (2026-07-13; **IMPROVEMENTS view added in-screen 2026-07-17**,
-charter #8). Owns `app/scenes/StadiumScreen.gd`, `tools/re/build_stadium_chrome_from_frames.py`,
+charter #8; **cost function reversed 2026-07-26** — every club priced from `FUN_0057ddd0`,
+24/24 witnesses exact, see §"The cost function"). Owns `app/scenes/StadiumScreen.gd`,
+`app/scripts/GroundCost.gd`, `tools/re/extract_ground_prices.py`,
+`app/data/ground_cost_table.json`, `app/tests/test_ground_cost.gd`,
+`tools/re/build_stadium_chrome_from_frames.py`,
 `tools/re/build_improvements_chrome_from_frames.py`, `app/art/screens/stadium/chrome.png`,
 `app/art/screens/stadium/improvements.png`, `app/tests/test_stadium_screen.gd`,
 `app/tests/test_stadium_works.gd`, `app/tests/shot_improvements_verify.gd`.
@@ -122,10 +126,10 @@ The three SEATS offer cards carry:
   NOT in the extracted disassembly; `FUN_0051bd80` is the draw fn only). Only two clubs are
   witnessed exactly: Man Utd `£4,250,000 / £7,437,500 / £10,624,999`, Bolton W
   `£2,750,000 / £4,812,499 / £6,875,000` (`StadiumScreen.OFFER_PRICES`). The three £ cells are
-  BLANKED in the bake and redrawn from that lookup; **any other managed club shows an HONEST
-  GAP (blank £ cell, no purchase)** rather than a fabricated price. Deriving a formula from two
-  data points and applying it to 476 clubs would be invention — deferred until the cost fn is
-  reversed. **Next RE step:** Ghidra the offer-cost function to unlock per-club prices.
+  BLANKED in the bake and redrawn from that lookup. **SUPERSEDED 2026-07-26:** the cost
+  function IS reversed now (§"The cost function" below) and every club is priced from the
+  binary, so the honest gap is closed; `OFFER_PRICES` / `TIER_PRICES` survive only as the
+  fallback for callers that pass no stature band.
 
 Ticking a witnessed card emits `improve_selected(added, cost, weeks)`; `Main._on_stadium_improve`
 runs `Career.start_works` (authoritative cash + ceiling gates), saves, and re-mounts the screen
@@ -190,11 +194,115 @@ sum draws). Tests: `test_ground_improvements`, `test_stadium_screen`, `test_stad
 `test_wiring_pass` all PASS; in-app `PM98_GROUNDACT_SHOT`.
 **Render fixes shipped 2026-07-23:** garbled TOTAL (cover cell), obras blob (re-sourced ⚠),
 missing detail border (added), all items live (ground_prices.json).
-**Still un-RE'd (flagged, not fabricated):** the per-club generalisation — only Man Utd is
+**Still un-RE'd (flagged, not fabricated):** the per-club STARTING GRADES — only Man Utd is
 captured, so the other 475 clubs fall back to the sparse witness default (CHANGING ROOMS +
-MEDICAL) until each is captured OR the cost fn is reversed; and the exact upgrade COMMIT trigger
+MEDICAL) until each is captured OR `club+0x50` (the preset selector) is reversed. The per-club
+PRICES are no longer a gap — see §"The cost function". Also open: the exact upgrade COMMIT trigger
 (preview-tap is observed; second-tap-to-buy is the app's inferred commit). The GROUND MATCH DAY
 sub-screen (frame 06) is already built.
+
+## The cost function — REVERSED 2026-07-26 (`FUN_0057ddd0`), the per-club gap is CLOSED
+The "Next RE step: Ghidra the offer-cost function to unlock per-club prices" above is DONE.
+Every improvement price in the game comes out of one function:
+
+```
+void __cdecl FUN_0057ddd0(int tier, int category, int index, float *price, uint *weeks)
+```
+
+`@0x0057ddd0`. Body = one 15-way jump table on `category` (`JMP [ECX*4+0x57e224]`, 1-based)
+over per-category 9-way jump tables on `tier`, each arm a single `MOV dword ptr [EAX],<f32>`
+optionally followed by `FMUL float ptr [0x00638dc4]` (= **0.5**, SEATS only). Epilogue
+`@0x0057e201`:
+
+```
+FILD qword [weeks] ; FMUL double [0x00638dc8] (= 1e6) ; FMUL float [price] ; FSTP float
+```
+
+and the money **display path divides by 200** — the game-wide convention already reversed for
+transfer fees (`transfer_value_re.md` §"Multiplier": the same `FILD/FMUL 1e6` then `/200`,
+net ×5000). So
+
+```
+GBP = trunc( float32(weeks * 1e6 * P) / 200 )        i.e. weeks * 5000 * P before rounding
+```
+
+The `FSTP float` is what produces the original's own off-by-one dirt (£10,624,999 for the
++12,000-seat card, £4,812,499 for Bolton's +8,000) — the f32 store is REPRODUCED, not
+rounded away, and both dirty values fall straight out of the model.
+
+**The `tier` argument is the club's STATURE band, not the board objective.** `FUN_0057ed09`
+loads `club+0x58` and passes it as arg4 of `FUN_0057d780`, which stores it at `ground+0x24`;
+`FUN_0057ddd0`'s callers read `[club_ground+0x24]` back out (e.g. `0x51d473`). `club+0x58` is
+the same stature 0-12 the fee/wage tables use (`transfer_value_re.md`, `FUN_0057a180`), which
+the app already computes as `TransferMarket.stature_of(squad, division tier)`. The earlier
+"the board-objective label drives the seat-price tier" note was a **correlation** — in the
+witnessed clubs Champion/U.E.F.A./Mid Table/Avoid Relegation/Promotion happen to sit on
+stature 0/1/2/3/4 — not the mechanism.
+
+Category map (the ids the callers pass, which are exactly the GROUND ledger's own order):
+
+| cat | item | weeks | price coefficient by stature 0..8, default |
+|---|---|---|---|
+| 1 | SEATS (3 offer cards) | 20 / 35 / 50 by card | 42.5 37.5 32.5 27.5 22.5 20 17.5 15 12.5, **10** |
+| 2 | (second seats table, unused on the English 97-98 grounds) | 20 / 35 / 50 | 40 35 30 25 20 17.5 15 12.5 10, **7.5** |
+| 3-6 | CAR PARK NE / NW / SE / SW | 7 | 85 75 65 55 45 40 35 30 25, **20** |
+| 7 | FLOODLIGHTS | 4 | 25 20 20 15 15 10 10 5 5, **5** |
+| 8 | UNDER-SOIL HEATING | 8 | 30 30 25 20 20 15 15 10 10, **10** |
+| 9 | CHANGING ROOMS | 3 | 15 15 15 10 10 5 5 3 3, **3** |
+| 10 | SCORE BOARD | 1 | by GRADE, not club: 0 / 20 / 80 |
+| 11 | ACCESS TO THE STADIUM | 6 | 30 30 25 25 20 20 15 15 10, **10** |
+| 12 | MEDICAL EQUIPMENT | 2 | 15 15 10 10 10 10 10 5 5, **5** |
+| 13 | CLUB SHOP | 0 / 1 / 5 / 10 by grade | 5 5 5 4 4 4 3 3 2, **2** |
+| 14 | CAFES | 1 / 5 / 10 / 20 by grade | 5 5 5 4 4 4 3 3 2, **2** |
+| 15 | TOILETS | 1 | flat 10 |
+
+`index` is the TARGET grade for 10/13/14 and the offer card for 1/2; the rest ignore it.
+Companions: `FUN_0057e3f0(_, i) = (i+1)*4000` (the +4,000/+8,000/+12,000 seat increments) and
+`FUN_0057e410() = 500` (car-park spaces per level) — both already witnessed on screen.
+
+**Port + validation.** `tools/re/extract_ground_prices.py` WALKS those jump tables in the real
+`MANAGER.EXE` (nothing transcribed by hand) into `app/data/ground_cost_table.json`; it refuses
+to write unless all **24/24** witnessed prices reproduce exactly — the five live-witnessed
+SEATS ladders (Arsenal/Man Utd, Aston Villa, Wimbledon, Bolton W, Manchester C), Man Utd's
+CAR PARK per level, and all nine FACILITIES/SERVICES items. `app/scripts/GroundCost.gd` is the
+runtime model (`PackedFloat32Array` for the f32 store); `app/tests/test_ground_cost.gd` pins
+the same 24 witnesses plus the default-arm and grade-ladder behaviour. `StadiumScreen` takes
+the band via `set_improve_state(..., cost_tier)` and `Main` feeds `Career.my_band()`, so
+**all 476 clubs are priced from the binary** — the `OFFER_PRICES` / `TIER_PRICES` /
+`_carpark_price` two-club lookups are now fallbacks for callers that pass no band.
+
+**End-to-end check (the one that matters).** Running the app's OWN `game_db.json` squads
+through `TransferMarket.stature_of`'s thresholds and into the extracted table reproduces every
+witnessed board tier without being told what they were:
+
+| club | squad avg AV | stature | SEATS ladder | witnessed board |
+|---|---|---|---|---|
+| Manchester Utd. / Arsenal | 81 / 80 | 0 | 4,250,000 / 7,437,500 / 10,624,999 | Champion |
+| Aston Villa | 78 | 1 | 3,750,000 / 6,562,499 / 9,375,000 | U.E.F.A. |
+| Wimbledon | 72 | 2 | 3,250,000 / 5,687,500 / 8,124,999 | Mid Table |
+| Bolton W | 71 | 3 | 2,750,000 / 4,812,499 / 6,875,000 | Avoid Relegation |
+| Manchester C (Div 1) | 69 | 4 | 2,250,000 / 3,937,500 / 5,624,999 | Promotion |
+
+The stature model was built for transfer fees and never touched ground prices; it lands on
+the right tier for all five clubs independently. That is why the objective LOOKS like the
+driver and is not.
+
+### Still open here
+`FUN_0057d780`'s arg3 (`club+0x50`) picks one of **four starting-grade presets** for the nine
+facility/service items and the four car-park quadrants:
+
+| preset | car park NE-SW | the nine grades (+0x29..+0x31) | +0x3e |
+|---|---|---|---|
+| 0 | 1 1 1 1 | 2 0 1 2 1 1 0 2 2 | 0x32 |
+| 1 | 0 0 0 0 | 1 0 0 1 0 0 0 1 1 | 0x19 |
+| 2, 3 | 0 0 0 0 | 0 0 0 0 0 0 0 0 0 | 0x19 |
+
+Preset 0 is **exactly** Man Utd's witnessed starting grades (FLOODLIGHTS 2 / HEATING 0 /
+CHANGING ROOMS 1 / SCORE BOARD 2 / ACCESS 1 / MEDICAL 1 / CLUB SHOP 0 / CAFES 2 / TOILETS 2),
+which confirms the field order. What is NOT yet reversed is where `club+0x50` comes from, so
+which preset a given club gets is still un-evidenced — the per-club STARTING grades stay on
+the captured Man Utd table (`app/data/ground_prices.json`) rather than being guessed. Prices
+do not depend on it.
 
 ## WIRING (Main.gd)
 `Main._show_stadium_screen()` calls `scr.setup(club, manager, season, ground, cap,

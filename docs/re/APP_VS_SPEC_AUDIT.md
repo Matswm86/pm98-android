@@ -485,6 +485,16 @@ Manager League) is CORRECT as-is; gate any future MANAGER HISTORY entry on mode.
 > The SCOUT criteria dropdowns are now BINARY-EXACT (POSITION/ROLE/AGE/QUALITY/PRICE lifted
 > from the MANAGER.EXE getter tables; see scout_screen_re.md). Row 6 SAVE-GAME slots + row
 > 11 MAN-TO-MAN remain open.
+>
+> **UPDATE 2026-07-26 — rows 5 and 6 were STALE, both are CLOSED.** Row 5's "invented GROUND
+> WORKS text browse" was removed on 2026-07-17 (`build_improvements_chrome_from_frames.py`
+> bakes the real frame-173 picker) and the CAR PARK / FACILITIES / SERVICES tabs landed
+> 2026-07-23; every price is now computed by the binary's own cost function
+> (`GroundCost.gd` / `FUN_0057ddd0`, 24/24 witnesses exact — stadium_screen_re.md
+> "Cost function"). Row 6's "slotless toast" was replaced on 2026-07-18 by the ten-slot
+> `SaveGameDialog` (`Main._show_save_dialog`, reached from the hub SAVE GAME button via
+> `Main._menu_action` "save"; render-diffed 0 px vs witnesses 51/52/53 —
+> savegame_dialog_re.md). Row 11 MAN-TO-MAN is the one still genuinely open.
 
 | # | original screen (frame) | app today (verified) |
 |---|---|---|
@@ -492,8 +502,8 @@ Manager League) is CORRECT as-is; gate any future MANAGER HISTORY entry on mode.
 | 2 | INSURANCE per-player (orig/17) | **PARTIAL** — TYPE OF INJURY column binary-exact (18 diagnoses, @0x6622e8) AND the injury roll distribution + per-type duration table now binary-exact (roll_B @0x585210 + setter @0x584e70; injury_model_re.md). Insurance ECONOMY now binary-exact too (premium FUN_0058c020, payout FUN_0058c000, injury price FUN_00584e00, the weekly finance pass @0x57f3a6; insurance_economy_re.md) — PRICE/INSUR./COST + the H column render 0 px vs witness 83, and PLAYERS' INSURANCE / HOSPITALS / INSURANCE GROUP 3 are live on FINANCES. Remaining: the insured-row document icon (unwitnessed) and the weekly-illness path (virus/cold) unmodelled |
 | 3 | SCOUT search (orig/35) | **CLOSED** — ScoutScreen built + wired + binary-exact criteria + tested |
 | 4 | OFFERS foreign-league map (orig/36) | **CLOSED** — OffersScreen built + wired |
-| 5 | GROUND IMPROVEMENTS panel: SEATS/CAR PARK/FACILITIES/SERVICES offers (orig/21) | invented "GROUND WORKS" text browse w/ invented prices (app/56) — B5-1-class stand-in still live |
-| 6 | SAVE GAME 8-slot GAME/PLAYER dialog (orig/54) | slotless toast "Game saved" (app/59) |
+| 5 | GROUND IMPROVEMENTS panel: SEATS/CAR PARK/FACILITIES/SERVICES offers (orig/21) | **CLOSED** — frame-173 picker baked (2026-07-17), all four tabs live (2026-07-23), every price from `FUN_0057ddd0` (2026-07-26) |
+| 6 | SAVE GAME 8-slot GAME/PLAYER dialog (orig/54) | **CLOSED** — `SaveGameDialog` ten slots, 0 px vs witnesses 51/52/53 (2026-07-18) |
 | 7 | TEAMS IN CHAMPIONSHIPS (orig/06) | never shown (preseason → hub directly) |
 | 8 | START OF SEASON objectives table (orig/71) | **CLOSED** — SeasonStartScreen built + tested |
 | 9 | CHARITY SHIELD trophy screen (orig/70) | **CLOSED** — CharityShieldScreen built + tested |

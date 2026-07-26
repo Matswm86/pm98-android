@@ -3473,10 +3473,11 @@ func _show_stadium_screen() -> void:
 		float(sm.get("ticket_price", 0.0)), int(sm.get("board_price", 0)), _career.week + 1,
 		_career.league_name, str(club.get("objective", "")))
 	# The live GROUND state for the CAR PARK / FACILITIES / SERVICES tabs + the WORK IN
-	# PROGRESS ledger. CAR PARK per-level price is witnessed only for Man Utd (frame 09);
-	# other clubs get an honest gap (0 -> blanked, inert) until the cost fn is reversed.
+	# PROGRESS ledger. Every improvement price now comes from the binary's own cost function
+	# (GroundCost / FUN_0057ddd0) keyed by the club's STATURE band — the value the original
+	# copies from club+0x58 into ground+0x24 — so all 476 clubs are priced, not just Man Utd.
 	scr.set_improve_state(_career.car_park_levels, _carpark_price(club), _career.works_ledger(),
-		_career.ground_grades, _career.works_total())
+		_career.ground_grades, _career.works_total(), _career.my_band())
 	# The per-club FACILITIES / SERVICES item tables mined from the real game
 	# (app/data/ground_prices.json). A captured club (Man Utd) gets every item live with real
 	# grades / prices / weeks; an un-captured club falls back to the sparse witness default.

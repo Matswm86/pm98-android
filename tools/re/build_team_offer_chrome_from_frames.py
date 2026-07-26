@@ -276,9 +276,10 @@ def main() -> None:
     # precedent): Man Utd is the only club any TEAM OFFER frame shows; the
     # screen falls back to scaled NANOESC art for the rest (documented).
     dbj = json.loads((ROOT / "app" / "data" / "game_db.json").read_text(encoding="utf-8"))
-    manu = next(
-        c for lg in dbj["leagues"] for c in dbj["clubs"] if c.get("name") == "MANCHESTER UTD."
-    )
+    # game_db stores the decoded EQUIPOS spelling "Manchester Utd."; the uppercase form is
+    # what the SCREEN prints. Compare case-insensitively — the exact-match form made this
+    # baker die with a bare StopIteration (found 2026-07-26 while re-running it).
+    manu = next(c for c in dbj["clubs"] if c.get("name", "").upper() == "MANCHESTER UTD.")
     # 24x33 at (112,181): covers the chrome's whole kit-erase scan window, so
     # the patch restores every pixel the erase could have whitened (the kit's
     # shadow tail reaches y213). Screen-owned cut: app/art/kits/ficha/ holds the

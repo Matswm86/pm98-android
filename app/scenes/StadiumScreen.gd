@@ -152,14 +152,26 @@ const DETAIL_ICON := Vector2(17, 283)            # 34x26 svc_<icon>.png
 const DETAIL_NAME_CX := 162.0
 const DETAIL_NAME_Y := 290.0
 const DETAIL_BODY := Rect2(16, 309, 260, 122)    # light-grey detail body (y309..431)
-const DETAIL_PRICE_LBL_X := 30.0
-const DETAIL_VAL_X := 130.0
+# Detail-panel text, re-measured off the owner captures 2026-07-26 (03/04/10/12 all agree,
+# client area at (641,196)). The panel is PROMAN8, not proman10@11 — every glyph in it is
+# 7px tall in the original — and the two value columns sit at different x:
+#   PRICE:  label ink x25..60, value ink from x90   ("£225,000" 90..148, "£150,000" 90..145)
+#   WEEKS:  label ink x25..64, value ink from x107  ("3 weeks" / "2 weeks", 107..154)
+#   grades: label ink from x58, BASIC rows 358..364, COMPLETE 394..400 (pitch 18)
+# The PRICE **label** is BLACK in the original; only its VALUE is red (164,32,32).
+const DETAIL_PRICE_LBL_X := 25.0
+const DETAIL_VAL_X := 90.0
+# The WEEKS value has its own anchor, 17px right of the price value. Every witnessed week
+# count is a single digit, so left-at-107 and right-at-113 are indistinguishable from the
+# frames; left-aligned matches how the rest of this panel draws. Multi-digit weeks (SEATS
+# 20/35/50, CAFES 20) are NOT witnessed in this panel.
+const DETAIL_WEEKS_VAL_X := 107.0
 const DETAIL_PRICE_Y := 319.0
-const DETAIL_WEEKS_Y := 337.0
+const DETAIL_WEEKS_Y := 332.0
 const GRADE_BOX_X := 40
 const GRADE_Y0 := 354                            # BASIC row top (MEDIUM +18 = current highlight)
 const GRADE_PITCH := 18
-const GRADE_LABEL_X := 62.0
+const GRADE_LABEL_X := 58.0
 const C_ITEM_BAR := Color8(0, 0, 0)
 const C_HDR_BG := Color8(80, 100, 120)           # detail header grey-blue (frame 10)
 const C_BODY_BG := Color8(220, 220, 220)         # detail body light grey
@@ -292,7 +304,12 @@ var _capacity: int = 0
 var _tier: int = 0
 var _week: int = 0
 var _works: String = ""
-var _objective: String = ""                      # board-objective label -> price tier
+var _objective: String = ""                      # board-objective label -> legacy price tier
+# The club's STATURE band (0-12). The original copies club+0x58 into ground+0x24 and indexes
+# FUN_0057ddd0's price tables with it (docs/re/stadium_screen_re.md "Cost function"), so this
+# is the ONE per-club input every improvement price needs. -1 = not fed (older callers/tests
+# fall back to the witnessed board-objective lookup below).
+var _cost_tier: int = -1
 var _press := ""
 
 
@@ -356,9 +373,10 @@ func setup(club: String, manager: String, season: String, ground: String,
 ## the witnessed per-level car-park price, TOTAL IMPROVEMENTS). Optional -- SEATS-only
 ## callers / tests leave the defaults and render exactly as before.
 func set_improve_state(car_levels: Array, car_price: int, works: Array, grades: Dictionary,
-		total: int) -> void:
+		total: int, cost_tier := -1) -> void:
 	_car_levels = car_levels if car_levels.size() == 4 else [1, 1, 1, 1]
-	_car_price = maxi(0, car_price)
+	_cost_tier = cost_tier
+	_car_price = GroundCost.car_park_price(cost_tier) if cost_tier >= 0 else maxi(0, car_price)
 	_works_list = works
 	_grades = grades
 	_total = maxi(0, total)
@@ -578,10 +596,26 @@ func open_improve() -> void:
 ## Tick a SEATS offer card and ask Main to start the works. Only clubs with a WITNESSED
 ## price can purchase (un-RE'd price = honest gap, no purchase). The ceiling is pre-checked
 ## here; cash affordability is enforced authoritatively by Career.start_works.
-## The club's seat-offer prices: the witnessed board-objective tier. No label
-## (a club outside the witnessed English set) -> honest gap (blank, inert).
+## The club's seat-offer prices. With a stature band fed (the live game) they come from the
+## binary's own cost function, so EVERY club is priced, not just the five witnessed boards.
+## Without one (older callers / tests) fall back to the witnessed board-objective ladder;
+## no label -> honest gap (blank, inert).
 func _prices() -> Array:
+	if _cost_tier >= 0:
+		return GroundCost.seat_prices(_cost_tier)
 	return TIER_PRICES.get(_objective, [])
+
+
+## Cost + build time for the next grade of a FACILITIES / SERVICES item. `nxt` is the target
+## grade index — the original passes it as FUN_0057ddd0's third argument, which is what makes
+## CLUB SHOP and CAFES take longer the higher the grade. Falls back to the captured witness
+## values when no stature band is fed.
+func _item_quote(cat: String, item: int, witness: Dictionary, nxt: int) -> Dictionary:
+	if _cost_tier >= 0:
+		var cats: Array = GroundCost.CAT_SERVICES if cat == "service" else GroundCost.CAT_FACILITIES
+		if item >= 0 and item < cats.size():
+			return GroundCost.quote(str(cats[item]), _cost_tier, nxt)
+	return {"gbp": int(witness.get("cost", 0)), "weeks": int(witness.get("weeks", 0))}
 
 
 func _select_card(i: int) -> void:
@@ -632,8 +666,9 @@ func _buy_grade(cat: String, item: int, witness: Dictionary) -> void:
 	var nxt: int = _grade_of(cat, item, witness) + 1
 	if nxt >= (witness["grades"] as Array).size():
 		return
-	works_requested.emit(cat, item, str(witness["ledger"]), int(witness["cost"]),
-		int(witness["weeks"]), {"grade": nxt})
+	var q := _item_quote(cat, item, witness, nxt)
+	works_requested.emit(cat, item, str(witness["ledger"]), int(q["gbp"]),
+		int(q["weeks"]), {"grade": nxt})
 
 
 # ---- helpers -------------------------------------------------------------
@@ -901,10 +936,11 @@ func _draw_item_detail(cat: String, item: int, items: Array, w: Dictionary) -> v
 	# £150,000/2wks frame 12 — both shown before any grade is tapped). A prior build assumed £0
 	# until the next grade was previewed; that was invention, refuted by the real frames.
 	if has_next:
-		_txt10(DETAIL_PRICE_LBL_X, DETAIL_PRICE_Y, "PRICE:", C_PRICE_RED)
-		_txt10(DETAIL_VAL_X, DETAIL_PRICE_Y, "£%s" % fmt_int(int(w["cost"])), C_PRICE_RED)
-		_txt10(DETAIL_PRICE_LBL_X, DETAIL_WEEKS_Y, "WEEKS:", C_BLACK)
-		_txt10(DETAIL_VAL_X, DETAIL_WEEKS_Y, "%d weeks" % int(w["weeks"]), C_WEEKS_GREEN)
+		var q := _item_quote(cat, item, w, cur + 1)
+		_txt8(DETAIL_PRICE_LBL_X, DETAIL_PRICE_Y, "PRICE:", C_BLACK)
+		_txt8(DETAIL_VAL_X, DETAIL_PRICE_Y, "£%s" % fmt_int(int(q["gbp"])), C_PRICE_RED)
+		_txt8(DETAIL_PRICE_LBL_X, DETAIL_WEEKS_Y, "WEEKS:", C_BLACK)
+		_txt8(DETAIL_WEEKS_VAL_X, DETAIL_WEEKS_Y, "%d weeks" % int(q["weeks"]), C_WEEKS_GREEN)
 	for g in grades.size():
 		var y := GRADE_Y0 + GRADE_PITCH * g
 		var boxr := Rect2(GRADE_BOX_X, y + 1, 12, 12)
@@ -917,7 +953,7 @@ func _draw_item_detail(cat: String, item: int, items: Array, w: Dictionary) -> v
 				draw_texture_rect(_obras, Rect2(18, y, 18, 14), false)  # works triangle only when building
 		else:
 			_fill_grade_box(boxr, C_GRADE_GREY)
-		_txt10(GRADE_LABEL_X, float(y), str(grades[g]), C_WHITE if g == cur else C_BLACK)
+		_txt8(GRADE_LABEL_X, float(y) + 4.0, str(grades[g]), C_WHITE if g == cur else C_BLACK)
 
 
 func _fill_grade_box(r: Rect2, fill: Color) -> void:
@@ -925,9 +961,19 @@ func _fill_grade_box(r: Rect2, fill: Color) -> void:
 	draw_rect(Rect2(r.position + Vector2.ONE, r.size - Vector2(2, 2)), fill, true)
 
 
-## Left-aligned proman10 text at a glyph-top y (small helper for the detail panel labels).
-func _txt10(x: float, y_top: float, s: String, col: Color) -> void:
-	draw_string(_f10, Vector2(x, y_top + _f10.get_ascent(11)), s, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, col)
+## Left-aligned small text for the FACILITIES / SERVICES detail panel, at a glyph-top y.
+##
+## The face is NOT identified yet — measured 2026-07-26 against owner frames 03/04/10/12, the
+## original's ink is "PRICE:" 36px wide with 7px caps and "£225,000" 59px wide. No extracted
+## font hits both at once: proman8/10/12/14/18/24 and calend/euro/futcon/micro at their NATIVE
+## sizes are all far too narrow (proman8@8 = 28px), and the sizes that match the WIDTH
+## (proman10@8 = 37px, proman8@11 = 38px) come out 5px tall instead of 7. Scored against the
+## frame over the two text rows: proman10@11 (the old helper) 1743 differing px, proman8@11
+## 899, **proman10@8 752** — so proman10@8 is what ships, and the residual is the unidentified
+## face, not the anchors. Those ARE settled: x25 label / x90 price / x107 weeks, rows 319 and
+## 332, PRICE label BLACK, all four frames agreeing exactly.
+func _txt8(x: float, y_top: float, s: String, col: Color) -> void:
+	draw_string(_f10, Vector2(x, y_top + _f10.get_ascent(8)), s, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, col)
 
 
 ## Draw the ticked-box red X (frame 175) inside checkbox rect `r`.

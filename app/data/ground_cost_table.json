@@ -1,0 +1,266 @@
+{
+ "source": "MANAGER.EXE FUN_0057ddd0 @0x0057ddd0 (jump tables walked, not transcribed)",
+ "half_constant_0x638dc4": 0.5,
+ "million_constant_0x638dc8": 1000000.0,
+ "display_divisor": 200,
+ "formula": "gbp = trunc(f32(weeks * 1e6 * price) / 200)",
+ "tier_source": "ground+0x24 \u2014 the club's START OF SEASON board objective index",
+ "categories": {
+  "seats": {
+   "category": 1,
+   "entry": "0x57ddfc",
+   "weeks_by_index": {
+    "0": 20,
+    "1": 35,
+    "2": 50
+   },
+   "price_by_tier": [
+    42.5,
+    37.5,
+    32.5,
+    27.5,
+    22.5,
+    20.0,
+    17.5,
+    15.0,
+    12.5
+   ],
+   "price_default": 10.0
+  },
+  "seats_alt": {
+   "category": 2,
+   "entry": "0x57df07",
+   "weeks_by_index": {
+    "0": 20,
+    "1": 35,
+    "2": 50
+   },
+   "price_by_tier": [
+    40.0,
+    35.0,
+    30.0,
+    25.0,
+    20.0,
+    17.5,
+    15.0,
+    12.5,
+    10.0
+   ],
+   "price_default": 7.5
+  },
+  "car_park_ne": {
+   "category": 3,
+   "entry": "0x57e012",
+   "weeks_flat": 7,
+   "price_by_tier": [
+    85.0,
+    75.0,
+    65.0,
+    55.0,
+    45.0,
+    40.0,
+    35.0,
+    30.0,
+    25.0
+   ],
+   "price_default": 20.0
+  },
+  "car_park_nw": {
+   "category": 4,
+   "entry": "0x57e012",
+   "weeks_flat": 7,
+   "price_by_tier": [
+    85.0,
+    75.0,
+    65.0,
+    55.0,
+    45.0,
+    40.0,
+    35.0,
+    30.0,
+    25.0
+   ],
+   "price_default": 20.0
+  },
+  "car_park_se": {
+   "category": 5,
+   "entry": "0x57e012",
+   "weeks_flat": 7,
+   "price_by_tier": [
+    85.0,
+    75.0,
+    65.0,
+    55.0,
+    45.0,
+    40.0,
+    35.0,
+    30.0,
+    25.0
+   ],
+   "price_default": 20.0
+  },
+  "car_park_sw": {
+   "category": 6,
+   "entry": "0x57e012",
+   "weeks_flat": 7,
+   "price_by_tier": [
+    85.0,
+    75.0,
+    65.0,
+    55.0,
+    45.0,
+    40.0,
+    35.0,
+    30.0,
+    25.0
+   ],
+   "price_default": 20.0
+  },
+  "floodlights": {
+   "category": 7,
+   "entry": "0x57e079",
+   "weeks_flat": 4,
+   "price_by_tier": [
+    25.0,
+    20.0,
+    20.0,
+    15.0,
+    15.0,
+    10.0,
+    10.0,
+    5.0,
+    5.0
+   ],
+   "price_default": 5.0
+  },
+  "under_soil_heating": {
+   "category": 8,
+   "entry": "0x57e093",
+   "weeks_flat": 8,
+   "price_by_tier": [
+    30.0,
+    30.0,
+    25.0,
+    20.0,
+    20.0,
+    15.0,
+    15.0,
+    10.0,
+    10.0
+   ],
+   "price_default": 10.0
+  },
+  "changing_rooms": {
+   "category": 9,
+   "entry": "0x57e0ad",
+   "weeks_flat": 3,
+   "price_by_tier": [
+    15.0,
+    15.0,
+    15.0,
+    10.0,
+    10.0,
+    5.0,
+    5.0,
+    3.0,
+    3.0
+   ],
+   "price_default": 3.0
+  },
+  "score_board": {
+   "category": 10,
+   "entry": "0x57e0c7",
+   "weeks_by_index": {},
+   "price_by_index": {
+    "0": 0.0,
+    "1": 20.0,
+    "2": 80.0
+   },
+   "weeks_flat": 1
+  },
+  "access_to_the_stadium": {
+   "category": 11,
+   "entry": "0x57e0f2",
+   "weeks_flat": 6,
+   "price_by_tier": [
+    30.0,
+    30.0,
+    25.0,
+    25.0,
+    20.0,
+    20.0,
+    15.0,
+    15.0,
+    10.0
+   ],
+   "price_default": 10.0
+  },
+  "medical_equipment": {
+   "category": 12,
+   "entry": "0x57e129",
+   "weeks_flat": 2,
+   "price_by_tier": [
+    15.0,
+    15.0,
+    10.0,
+    10.0,
+    10.0,
+    10.0,
+    10.0,
+    5.0,
+    5.0
+   ],
+   "price_default": 5.0
+  },
+  "club_shop": {
+   "category": 13,
+   "entry": "0x57e159",
+   "weeks_by_index": {
+    "0": 0,
+    "1": 1,
+    "2": 5,
+    "3": 10
+   },
+   "price_by_tier": [
+    5.0,
+    5.0,
+    5.0,
+    4.0,
+    4.0,
+    4.0,
+    3.0,
+    3.0,
+    2.0
+   ],
+   "price_default": 2.0
+  },
+  "cafes": {
+   "category": 14,
+   "entry": "0x57e197",
+   "weeks_by_index": {
+    "0": 1,
+    "1": 5,
+    "2": 10,
+    "3": 20
+   },
+   "price_by_tier": [
+    5.0,
+    5.0,
+    5.0,
+    4.0,
+    4.0,
+    4.0,
+    3.0,
+    3.0,
+    2.0
+   ],
+   "price_default": 2.0
+  },
+  "toilets": {
+   "category": 15,
+   "entry": "0x57e1f5",
+   "weeks_flat": 1,
+   "price_flat": 10.0
+  }
+ }
+}

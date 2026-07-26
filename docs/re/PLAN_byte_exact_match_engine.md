@@ -204,6 +204,17 @@ deprioritised (last). Approved path: build an **end-to-end oracle**, kill-test t
    we hold — so it cannot be attributed to the engine yet. Extending
    `tools/re/wine/m5_rsp_capture.py` past clk 823 remains the gate on everything downstream.
 
+   **STATUS 2026-07-26 (s58) — the capture was taken.** `docs/re/M5_S58_FRONTIER_1032.md`.
+   A fresh drive on its own `Xwayland :5` (`PM98_DESKTOP=pm98cap`, so the owner's desktop is
+   never touched) reached **clk 1032** across two runs before the debug stub died (twice) — the game itself survived,
+   and the streamed jsonl kept everything. Diffed at the same anchor the port is **byte-exact
+   over clk 1-1032**, and across all eight banked captures it is **319,335 words, 0 mismatches,
+   zero tolerance**. 202 ticks of previously unchecked ground, nothing moved. clk 1032 = match
+   minute 3.2 = 7.2 % of a half. Cost of the next step, measured: ~1 clk/10 s in-window, i.e.
+   ~90 min of wall clock per further match minute, and a fresh boot per attempt (a dead stub
+   could not be re-attached — `error 5`, twice). `PM98_NO_POKE=1` now exists on the capture
+   script for the case where a re-attach DOES succeed.
+
 ## BRIEF-specific (mostly done — verify, don't rebuild)
 - Commentary TEMPLATES already verbatim from `MANAGER.EXE` (`MatchCommentary.gd`, VAs cited); event
   taxonomy maps 1:1 to the decoded enum. GAP = the event RATES/timing (ours) → fixed by M5 (drive
