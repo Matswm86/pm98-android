@@ -34,9 +34,23 @@ class_name ResultsScreen
 ## Man Utd's game on the next date — frame truth for the 9-row table).
 
 signal back_pressed
+## A competition rail chip was tapped -- the original's own door into the cup / Europe
+## views (every knockout/Europe frame in the RE corpus was captured by clicking this
+## rail). The caller routes it; chips for competitions the career is not in are simply
+## ignored there, as the original's dimmed chips are.
+signal competition_selected(key: String)
 
 const W := 640
 const H := 480
+
+# The competition rail's chip hit rects -- x506..621, 29 px tall, the same measured
+# geometry KnockoutScreen uses (docs/re/knockout_views_re.md). The play-off chips below
+# them stay inert: the port has no play-off view (honest gap, results_screen_re.md).
+const CHIP_X := 506
+const CHIP_W := 116
+const CHIP_H := 29
+const CHIP_TOP := {"facup": 118, "cocacola": 145, "charity": 172, "euro": 209,
+	"cwc": 236, "uefa": 263, "supercup": 290, "intercont": 317}
 
 # ---- frame-measured geometry (docs/re/results_screen_re.md) -----------------
 const ROW_Y0 := 154
@@ -192,6 +206,9 @@ func _target_at(d: Vector2) -> String:
 		return "prev"
 	if R_NEXT.has_point(d) and _idx < _pages.size() - 1:
 		return "next"
+	for c in CHIP_TOP:
+		if Rect2(CHIP_X, CHIP_TOP[c], CHIP_W, CHIP_H).has_point(d):
+			return "comp:%s" % c
 	return ""
 
 
@@ -209,6 +226,9 @@ func _on_input(e: InputEvent) -> void:
 	_press = ""
 	queue_redraw()
 	if was == "" or was != _target_at(d):
+		return
+	if was.begins_with("comp:"):
+		competition_selected.emit(was.substr(5))
 		return
 	match was:
 		"return":
@@ -249,6 +269,10 @@ func _draw() -> void:
 	for key_r in [["prev", R_PREV], ["next", R_NEXT], ["return", R_RETURN]]:
 		if _press == str(key_r[0]):
 			draw_rect(key_r[1], C_PRESS, true)
+	if _press.begins_with("comp:"):
+		var c := _press.substr(5)
+		if CHIP_TOP.has(c):
+			draw_rect(Rect2(CHIP_X, CHIP_TOP[c], CHIP_W, CHIP_H), C_PRESS, true)
 
 
 ## The barra values: textless band.png patches + the header bake's text grammar

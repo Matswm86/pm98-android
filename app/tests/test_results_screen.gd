@@ -112,6 +112,15 @@ func _run() -> void:
 	_tap(screen, Vector2(320, 139))
 	_assert(screen._idx == 0, "prev arrow steps back")
 
+	# ---- the competition rail (wired 2026-07-26; it shipped inert -- audit §3a) ------
+	_assert(screen._target_at(Vector2(560, 130)) == "comp:facup", "F.A. Cup chip target")
+	_assert(screen._target_at(Vector2(560, 222)) == "comp:euro", "Euro. League chip target")
+	_assert(screen._target_at(Vector2(560, 360)) == "", "play-off chips stay inert")
+	var comp_fired: Array = [""]
+	screen.competition_selected.connect(func(k: String) -> void: comp_fired[0] = k)
+	_tap(screen, Vector2(560, 130))
+	_assert(comp_fired[0] == "facup", "chip release emits competition_selected")
+
 	# ---- empty fresh-career state: chrome only, no crash ----------------------------
 	screen.setup(header, "Premier League", "1997-98", [], [], 0, 40, {})
 	_assert(screen._pages.is_empty(), "no fixtures -> no pages (empty state)")
