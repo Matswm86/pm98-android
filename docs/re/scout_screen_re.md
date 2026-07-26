@@ -288,6 +288,32 @@ Gate: `tools/re/diff_scout_bar_parity.py` — bar body and row frame, 0 px on al
 a NAME substring box, six per-attribute "at least" thresholds (30..95 by 5, exactly
 `Training.TRAINABLE`), and a sort selector. The original has none of them.
 
+**2026-07-26 evening — REBUILT IN ORIGINAL CHROME.** Mats on the first version: *"NOT that
+AI slope image you used! REDO!"* — it was drawn procedurally in an invented navy/yellow
+palette (`C_OURS_BG (20,24,60)` etc.), colours that exist in no captured frame. Replaced by
+`app/art/screens/scout/ours_panel.png`, baked by `tools/re/build_scout_ours_from_frames.py`
+— every pixel is frame chrome or a flat fill in a sampled ink:
+
+* the **CLUB PERSONNEL trainers dialog** (walkthrough `100_154657.png`) donates the white
+  plate + 2 px black frame, the flat `(200,220,240)` header fill (measured x90..342
+  y108..122, borderless), and the six REAL `HANDLING/PASSING/DRIBBLING/HEADING/TACKLING/
+  SHOOTING` button plates — the exact six labels the six filters need — cut verbatim
+  (DRIBBLING's selected glow + HEADING's focus ring de-highlighted with the staff baker's
+  own neutralise technique, each keeping its real wording);
+* the label-free neutral plate (HANDLING with its cyan zapped) carries the panel's own
+  NAME / SORT BY / CLEAR / CLOSE, rendered live in the plates' own cyan `(85,223,255)`;
+* the SCOUT screen's own **pale-blue criteria fields** (61: wide x131..255 y131..146,
+  small x35..83 y177..192) and **enabled arrows** (67) are the value boxes and steppers;
+  the wide field is width-extended by tiling one interior column (flat fill + 1 px
+  borders — lossless);
+* the panel sits at the dialog's own witnessed origin **(67,63), 458x289**; title ink is
+  the band's own `(0,0,190)`; values/notes are black / the screen's border grey.
+* threshold display is `MIN %d` (fits the real 49 px field; "AT LEAST %d" did not).
+
+The scene (`ScoutScreen._draw_ours`) draws ONLY live text over the plate. Verified: all six
+witnessed states still 0 px (`diff_scout_offers_parity.py`), bar Part A 0 px / Part B
+bounded (`diff_scout_bar_parity.py`), and `shot_scout_ours_panel.png` renders the panel.
+
 They live in an overlay that is **closed by default**, opened by tapping the 2-segment bar at
 x11..500 y438..463, so all six witnessed states still verify at 0 px (re-run 2026-07-26 after
 the readout landed: noscout/idle/premier/position/searching/results all 0 px).

@@ -16,7 +16,7 @@ Masks (documented in docs/re/scout_screen_re.md + offers_map_re.md):
   stars column (offers) -- the rating mapping is un-RE'd (FICHA precedent);
   DOOR (2026-07-26) -- the two recessed segments of the bottom bar, where this
   port prints the label for the OURS panel. That is port-only surface and the
-  ONLY such surface on this screen; `tools/re/diff_scout_door_parity.py` bounds
+  ONLY such surface on this screen; `tools/re/diff_scout_bar_parity.py` bounds
   it (the original draws nothing there in any witness, and the band overlaps
   none of its controls). It is a DECLARED bucket, not a hidden mask.
 All chrome, sprites, digit grammar, scroll geometry, row furniture, flags,
@@ -72,7 +72,7 @@ NAMECOL = (44, 297, 158, 424)       # bold list-name face (goalscorers residual 
 YEARS1 = (424, 297, 447, 424)       # years digit glyphs (same bold face; "1"s + fills verified)
 YEARS2 = (453, 297, 468, 424)
 # The DECLARED port-only band: the bottom bar's two recessed segments, x40..449 y445..456
-# inclusive (ScoutScreen.EXTRA_SEG_A / EXTRA_SEG_B). Bounded by diff_scout_door_parity.py.
+# inclusive (ScoutScreen.EXTRA_SEG_A / EXTRA_SEG_B). Bounded by diff_scout_bar_parity.py.
 DOOR = (40, 445, 450, 457)
 total += diff("shot_scout_noscout.png", f"{WD}/43_scout.png", [BARRA], "scout noscout vs 43")
 total += diff("shot_scout_idle.png", f"{WD}/61_scout_with_scout.png",

@@ -20,10 +20,12 @@ Reported from play on the shipped build; every item verified in his hands, none 
 guess. One is already fixed (last bullet); the rest are open and OUTRANK the semifinal /
 final build:
 
-* **The SCOUT "EXTRA SEARCH FILTERS" panel is invented graphics** — approved as a door,
-  but the panel itself must be drawn in the original's own chrome (faces, plates, fonts,
-  inks cut from real frames like every other screen), not an interface the original never
-  drew. Mats: *"NOT that AI slope image you used! REDO!"* Placement is fine.
+* ~~**The SCOUT "EXTRA SEARCH FILTERS" panel is invented graphics**~~ — **REDONE
+  2026-07-26 evening**: the panel is now `ours_panel.png`, baked from real frames by
+  `tools/re/build_scout_ours_from_frames.py` (the trainers dialog's plate + its six REAL
+  HANDLING..SHOOTING button plates + the scout screen's own fields/arrows); the scene
+  draws only live text in sampled inks. All six scout witnesses still 0 px.
+  See `scout_screen_re.md` §"The OURS panel".
 * **Kit blits truncated / outside frames.** Seven screens crop FIXED sub-regions of the
   top-level kit bank that were tuned while that bank shipped WRAPPED (see §5):
   `ChampionshipsScreen`, `ManagersMonthScreen`, `MatchResultScreen`, `EndOfSeasonScreen`,
@@ -46,6 +48,20 @@ final build:
   the at-a-loss trigger followed the week's P&L; it now follows the BANK BALANCE, the
   reading the refrun witnesses support (R16 correction in
   `REFRUN_manutd_1997-98_FINDINGS.md`).
+
+Four more, reported 2026-07-26 evening (second round, same play session):
+
+* **Season-2+ talents render wrong in lineups / squad management** — "they have stars,
+  but no position or roles". New intake players must carry the same fields (position,
+  posFine role, etc.) and draw exactly like the decoded squad.
+* **The cup-draw animation is not the original's** — today the spinning ball plays with
+  every pairing already on screen; the original reveals the draw progressively
+  (`cupdraw_screen_re.md`).
+* **Youth recruitment and training does not work like the original at all** — tracked in
+  `youth_re.md`; Mats: implement it in a dedicated session.
+* **The Ground screen's stadium image never grows** — the original swaps in a bigger
+  stadium picture at each capacity expansion; the art is in the sources
+  (`stadium_screen_re.md`).
 
 ## The one-paragraph truth
 

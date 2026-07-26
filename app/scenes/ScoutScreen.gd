@@ -134,30 +134,46 @@ const BAR_CX_B := 368.0
 ## The door's own label. It is drawn ONLY while the original's readout is empty — the instant
 ## a row is pressed the readout takes the bar back — so the port never covers a pixel the
 ## original draws. That is the second and last site in this port that draws a pixel the
-## original does not; `tools/re/diff_scout_door_parity.py` bounds it exactly as
+## original does not; `tools/re/diff_scout_bar_parity.py` bounds it exactly as
 ## `diff_options_parity.py` bounds the THREE UP FRONT row.
 const EXTRA_LABEL := "EXTRA SEARCH FILTERS"
-const OURS_PANEL := Rect2(40, 92, 560, 330)
-const OURS_NAME_FIELD := Rect2(150, 136, 300, 18)
-const OURS_ROW_Y0 := 168          # first attribute row top
-const OURS_ROW_PITCH := 22
-const OURS_LABEL_X := 60
-const OURS_ARROW_L_X := 200
-const OURS_VALUE_CX := 276.0
-const OURS_ARROW_R_X := 336
+## ---- the panel itself: REBUILT IN ORIGINAL CHROME 2026-07-26 ---------------------------
+## Mats on the first version: "NOT that AI slope image you used! REDO!" — it was drawn in an
+## invented navy/yellow palette. Now every pixel of the panel is frame chrome:
+## `ours_panel.png`, baked by tools/re/build_scout_ours_from_frames.py from the CLUB
+## PERSONNEL trainers dialog (100_154657: the white plate, the flat (200,220,240) header
+## fill, the six REAL HANDLING..SHOOTING button plates — the exact six labels the filters
+## need — plus the label-free neutral plate for NAME / SORT BY / CLEAR / CLOSE) and the
+## SCOUT screen's own pale-blue criteria fields + enabled arrows (61/67). The panel sits at
+## the dialog's own witnessed screen origin (67,63). The scene draws only live text, in the
+## screen's fonts and the donors' own inks. The consts below mirror the baker's layout
+## + (67,63); change them together.
+const OURS_PANEL := Rect2(67, 63, 458, 289)
+const OURS_BAND := Rect2(91, 73, 410, 15)        # title fill (LBLUE, panel-wide)
+const OURS_NAME_PLATE := Rect2(91, 103, 82, 26)
+const OURS_NAME_FIELD := Rect2(183, 108, 220, 16)
+const OURS_ROW_YS := [141, 175, 209]             # attr plate tops; spinners at +5
+const OURS_COL_ARROW_L := [179, 395]             # per column (i % 2)
+const OURS_COL_FIELD_X := [197, 413]
+const OURS_COL_ARROW_R := [248, 464]
+const OURS_FIELD_W := 49
 const OURS_ARROW := Vector2(16, 16)
-const OURS_SORT_Y := 306
-const OURS_CLEAR := Rect2(348, 380, 96, 24)
-const OURS_CLOSE := Rect2(456, 380, 96, 24)
+const OURS_SORT_PLATE := Rect2(91, 247, 82, 26)
+const OURS_SORT_L := Vector2(179, 252)
+const OURS_SORT_FIELD := Rect2(197, 252, 125, 16)
+const OURS_SORT_R := Vector2(324, 252)
+const OURS_CLEAR := Rect2(331, 309, 82, 26)
+const OURS_CLOSE := Rect2(423, 309, 82, 26)
+const OURS_NOTE_X := 91
+const OURS_MSG_TY := 279                         # shortfall line
+const OURS_NOTE_TY := 291                        # honesty note, line 1
+const OURS_NOTE2_TY := 303                       # honesty note, line 2 (left of CLEAR)
 const OURS_SORTS := [["name", "NAME"], ["av", "AV"], ["mo", "MO"], ["fee", "CLUB FEE"],
 	["wage", "WAGE"], ["age", "AGE"]]
-# Panel inks: the PM98 desktop family (navy plate, white plate text, red heading).
-const C_OURS_BG := Color8(20, 24, 60)
-const C_OURS_EDGE := Color8(160, 180, 200)
-const C_OURS_HEAD := Color8(255, 210, 0)
-const C_OURS_TXT := Color8(230, 235, 245)
-const C_OURS_DIM := Color8(140, 150, 175)
-const C_OURS_FIELD := Color8(0, 0, 0)
+# Panel inks — every one sampled from the donor frames, none invented:
+const C_OURS_TITLE := Color8(0, 0, 190)      # the dialog header-band's own text ink
+const C_OURS_LBL := Color8(85, 223, 255)     # the skill plates' own label cyan
+const C_OURS_NOTE := Color8(128, 128, 128)   # the screen's own border grey
 
 const POSITIONS := ["GOALKEEPER", "DEFENDER", "MIDFIELDER", "FORWARD"]  # getter table PTR@0x662d10 (binary-exact)
 const POS_KEYS := ["GK", "DF", "MF", "FW"]
@@ -250,6 +266,7 @@ var _sb_dn_on: Texture2D
 var _sb_slider: Texture2D
 var _arrow_l: Texture2D
 var _arrow_r: Texture2D
+var _ours_panel_tex: Texture2D   # the frame-baked OURS panel plate (ours_panel.png)
 var _f8: Font
 var _f10: Font
 var _f12: Font
@@ -306,6 +323,7 @@ func _ready() -> void:
 	_sb_slider = load("res://art/screens/scout/scroll_slider.png")
 	_arrow_l = load("res://art/screens/scout/arrow_l_on.png")
 	_arrow_r = load("res://art/screens/scout/arrow_r_on.png")
+	_ours_panel_tex = load("res://art/screens/scout/ours_panel.png")
 	_f8 = PMChrome.font("8")
 	_f10 = PMChrome.font("10")
 	_f12 = PMChrome.font("12")
@@ -322,6 +340,8 @@ func _ready() -> void:
 
 ## The OURS name box. A real LineEdit so Android raises its own keyboard (the
 ## SeleccionScreen / SaveGameDialog precedent); hidden unless the panel is open.
+## It sits on the BAKED pale-blue field plate (SaveGameDialog's frame-cell
+## precedent), so its own boxes are empty and its ink is the field's black.
 func _build_name_edit() -> void:
 	_name_edit = LineEdit.new()
 	_name_edit.max_length = 24
@@ -329,9 +349,11 @@ func _build_name_edit() -> void:
 	_name_edit.visible = false
 	_name_edit.add_theme_font_override("font", _f10)
 	_name_edit.add_theme_font_size_override("font_size", 11)
-	_name_edit.add_theme_color_override("font_color", Color.WHITE)
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = C_OURS_FIELD
+	_name_edit.add_theme_color_override("font_color", C_NAME)
+	_name_edit.add_theme_color_override("font_placeholder_color", C_OURS_NOTE)
+	_name_edit.add_theme_color_override("caret_color", C_NAME)
+	var sb := StyleBoxEmpty.new()
+	sb.content_margin_left = 4
 	for st in ["normal", "focus", "read_only"]:
 		_name_edit.add_theme_stylebox_override(st, sb)
 	_name_edit.text_changed.connect(func(_t: String) -> void: queue_redraw())
@@ -477,6 +499,8 @@ func _hit(d: Vector2) -> String:
 
 
 ## OURS panel hit map. A tap outside the panel closes it, so it can never trap the user.
+## Geometry mirrors the ours_panel.png bake: 2 columns x 3 rows of attribute spinners
+## (column = i % 2, row = i / 2), then the SORT row and the two plate buttons.
 func _hit_ours(d: Vector2) -> String:
 	if not OURS_PANEL.has_point(d):
 		return "ours_close"
@@ -485,19 +509,20 @@ func _hit_ours(d: Vector2) -> String:
 	if OURS_CLEAR.has_point(d):
 		return "ours_clear"
 	for i in Career.SCOUT_ATTR_FILTERS.size():
-		var y := OURS_ROW_Y0 + i * OURS_ROW_PITCH
-		if d.y >= y and d.y < y + 18:
-			if Rect2(OURS_ARROW_L_X, y, OURS_ARROW.x, OURS_ARROW.y).has_point(d):
-				return "ours_attr_l:%d" % i
-			if Rect2(OURS_ARROW_R_X, y, OURS_ARROW.x, OURS_ARROW.y).has_point(d):
-				return "ours_attr_r:%d" % i
-	if d.y >= OURS_SORT_Y and d.y < OURS_SORT_Y + 18:
-		if Rect2(OURS_ARROW_L_X, OURS_SORT_Y, OURS_ARROW.x, OURS_ARROW.y).has_point(d):
-			return "ours_sort_l"
-		if Rect2(OURS_ARROW_R_X, OURS_SORT_Y, OURS_ARROW.x, OURS_ARROW.y).has_point(d):
-			return "ours_sort_r"
-		if d.x > OURS_ARROW_R_X + OURS_ARROW.x:
-			return "ours_sort_dir"
+		@warning_ignore("integer_division")
+		var y: float = OURS_ROW_YS[i / 2] + 5
+		var c := i % 2
+		if Rect2(OURS_COL_ARROW_L[c], y, OURS_ARROW.x, OURS_ARROW.y).has_point(d):
+			return "ours_attr_l:%d" % i
+		if Rect2(OURS_COL_ARROW_R[c], y, OURS_ARROW.x, OURS_ARROW.y).has_point(d):
+			return "ours_attr_r:%d" % i
+	if Rect2(OURS_SORT_L, OURS_ARROW).has_point(d):
+		return "ours_sort_l"
+	if Rect2(OURS_SORT_R, OURS_ARROW).has_point(d):
+		return "ours_sort_r"
+	if d.y >= OURS_SORT_FIELD.position.y - 2 and d.y < OURS_SORT_FIELD.position.y + 18 \
+			and d.x > OURS_SORT_R.x + OURS_ARROW.x:
+		return "ours_sort_dir"
 	return "ours_none"
 
 
@@ -906,33 +931,31 @@ func _draw_results() -> void:
 
 # ---- the OURS panel --------------------------------------------------------
 
+## The panel is the frame-baked plate; this draws ONLY live text over it, in the
+## screen's own fonts and the donor chrome's own inks (see the OURS consts note).
 func _draw_ours() -> void:
-	draw_rect(OURS_PANEL, C_OURS_BG, true)
-	draw_rect(OURS_PANEL, C_OURS_EDGE, false, 1.0)
-	var x0 := OURS_PANEL.position.x
-	PMChrome.text(self, _f12, x0 + 20, OURS_PANEL.position.y + 8,
-		"EXTRA SEARCH FILTERS", C_OURS_HEAD, 13)
-	PMChrome.text(self, _f8, x0 + 20, OURS_PANEL.position.y + 26,
-		"Not in the original game - added on request.", C_OURS_DIM, 9)
-	PMChrome.text(self, _f10, OURS_LABEL_X, OURS_NAME_FIELD.position.y + 2,
-		"NAME", C_OURS_TXT, 11)
-	draw_rect(Rect2(OURS_NAME_FIELD.position - Vector2(1, 1),
-		OURS_NAME_FIELD.size + Vector2(2, 2)), C_OURS_EDGE, false, 1.0)
+	if _ours_panel_tex != null:
+		draw_texture(_ours_panel_tex, OURS_PANEL.position)
+	_txt_center(_f10, OURS_BAND.position.x + OURS_BAND.size.x * 0.5,
+		OURS_BAND.position.y + 2, "EXTRA SEARCH FILTERS", C_OURS_TITLE, 11)
+	_plate_label(OURS_NAME_PLATE, "NAME")
 	for i in Career.SCOUT_ATTR_FILTERS.size():
-		var e: Array = Career.SCOUT_ATTR_FILTERS[i]
-		var y := OURS_ROW_Y0 + i * OURS_ROW_PITCH
-		var idx := int(_attr_idx[str(e[0])])
-		PMChrome.text(self, _f10, OURS_LABEL_X, y + 2, str(e[1]), C_OURS_TXT, 11)
-		_ours_spin(y, "AT LEAST %d" % int(Career.SCOUT_ATTR_STOPS[idx]) if idx >= 0 else "ANY",
-			idx >= 0)
+		var idx := int(_attr_idx[str(Career.SCOUT_ATTR_FILTERS[i][0])])
+		@warning_ignore("integer_division")
+		var fy: float = OURS_ROW_YS[i / 2] + 5
+		var c := i % 2
+		_txt_center(_f8, OURS_COL_FIELD_X[c] + OURS_FIELD_W * 0.5, fy + 3,
+			("MIN %d" % int(Career.SCOUT_ATTR_STOPS[idx])) if idx >= 0 else "ANY",
+			C_NAME if idx >= 0 else C_OURS_NOTE, 11)
+	_plate_label(OURS_SORT_PLATE, "SORT BY")
 	var sort_txt := "SCOUT'S ORDER" if _sort_i < 0 else str(OURS_SORTS[_sort_i][1])
-	PMChrome.text(self, _f10, OURS_LABEL_X, OURS_SORT_Y + 2, "SORT BY", C_OURS_TXT, 11)
-	_ours_spin(OURS_SORT_Y, sort_txt, _sort_i >= 0)
+	_txt_center(_f8, OURS_SORT_FIELD.position.x + OURS_SORT_FIELD.size.x * 0.5,
+		OURS_SORT_FIELD.position.y + 3, sort_txt, C_NAME if _sort_i >= 0 else C_OURS_NOTE, 11)
 	if _sort_i >= 0:
-		PMChrome.text(self, _f8, OURS_ARROW_R_X + 26, OURS_SORT_Y + 4,
-			"HIGH-LOW" if _sort_desc else "LOW-HIGH", C_OURS_HEAD, 9)
-	_ours_button(OURS_CLEAR, "CLEAR")
-	_ours_button(OURS_CLOSE, "CLOSE")
+		PMChrome.text(self, _f8, OURS_SORT_R.x + OURS_ARROW.x + 10,
+			OURS_SORT_FIELD.position.y + 3, "HIGH-LOW" if _sort_desc else "LOW-HIGH", C_NAME, 11)
+	_plate_label(OURS_CLEAR, "CLEAR")
+	_plate_label(OURS_CLOSE, "CLOSE")
 	# The shortlist shortfall. The CAP is the engine's ((quality+2)*5, FUN_00575750) and it
 	# discards at random; saying so out loud is ours, because a silent trim would read as
 	# "that is all there was" ([[feedback_no_silent_failures]]).
@@ -946,24 +969,16 @@ func _draw_ours() -> void:
 			_results.size(), _found_total, _results.size()]
 	else:
 		msg = "%d found, all shown." % _results.size()
-	PMChrome.text(self, _f8, OURS_LABEL_X, OURS_SORT_Y + 34, msg, C_OURS_TXT, 9)
-	PMChrome.text(self, _f8, OURS_LABEL_X, OURS_SORT_Y + 48,
-		"A better SCOUT brings back more names: (stars x 2 + 2) x 5.", C_OURS_DIM, 9)
+	PMChrome.text(self, _f8, OURS_NOTE_X, OURS_MSG_TY, msg, C_NAME, 9)
+	PMChrome.text(self, _f8, OURS_NOTE_X, OURS_NOTE_TY,
+		"MIN = at least. Not in the original game - added on request.", C_OURS_NOTE, 9)
+	PMChrome.text(self, _f8, OURS_NOTE_X, OURS_NOTE2_TY,
+		"Scout cap: (stars x 2 + 2) x 5 names.", C_OURS_NOTE, 9)
 
 
-func _ours_spin(y: int, value: String, lit: bool) -> void:
-	if _arrow_l != null:
-		draw_texture(_arrow_l, Vector2(OURS_ARROW_L_X, y))
-	if _arrow_r != null:
-		draw_texture(_arrow_r, Vector2(OURS_ARROW_R_X, y))
-	_txt_center(_f10, OURS_VALUE_CX, y + 2, value,
-		C_OURS_HEAD if lit else C_OURS_DIM, 11)
-
-
-func _ours_button(r: Rect2, label: String) -> void:
-	draw_rect(r, Color8(40, 48, 96), true)
-	draw_rect(r, C_OURS_EDGE, false, 1.0)
-	_txt_center(_f10, r.position.x + r.size.x * 0.5, r.position.y + 5, label, C_OURS_TXT, 11)
+## A label on one of the baked neutral button plates, in the plates' own cyan.
+func _plate_label(r: Rect2, s: String) -> void:
+	_txt_center(_f8, r.position.x + r.size.x * 0.5, r.position.y + 8, s, C_OURS_LBL, 11)
 
 
 func _draw_row(r: Dictionary, top: int) -> void:
