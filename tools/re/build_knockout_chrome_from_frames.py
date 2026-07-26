@@ -34,6 +34,11 @@ Outputs -> app/art/screens/knockout/
   list_hdr_dom.png       ... with RES. / REPLAY instead
   scroll_col.png         the scrollbar column (arrows + trough) with the thumb painted out
   scroll_thumb_tile.png  one row of the thumb bitmap, tiled to the computed length
+  bracket_panel_euro.png one 458x72 BRACKET panel strip, European columns, the six content
+                         rects blanked (tools/re/verify_bracket_split.py proves 16 panels
+                         over 4 frames are byte-identical outside them)
+  bracket_panel_dom.png  ... domestic columns (RES. / REPLAY at their own x positions --
+                         NOT the European slots minus one; 8 panels over 2 frames)
 """
 
 from __future__ import annotations
@@ -72,8 +77,37 @@ BANDS = {
                        "plate": (315, 88, 399, 108), "left": (291, 88), "right": (401, 88)},
     ("cwc", "list"): {"frame": "09_comp_cwc.png",
                       "plate": (315, 88, 399, 108), "left": (291, 88), "right": (401, 88)},
+    # The BRACKET family sits one band lower (the panel starts at y113, not 125) and the
+    # euro plate one row lower still than everyone else's -- both measured, not derived
+    # (docs/re/knockout_views_re.md "The bracket, re-measured 2026-07-26").
+    ("euro", "bracket"): {"frame": "02_euroleague_qtrfinals_UNPLAYED_1998-01.png",
+                          "plate": (213, 79, 297, 99), "left": (189, 79), "right": (299, 79)},
+    ("facup", "bracket"): {"frame": "08_facup_qtrfinals_DOMESTIC_bracket_unplayed_1999-03-04.png",
+                           "plate": (315, 78, 399, 98), "left": (291, 78), "right": (401, 78)},
+    ("cocacola", "bracket"): {"frame": "12_cocacola_qtr_bracket_DOMESTIC_probe0116.png",
+                              "plate": (315, 78, 399, 98), "left": (291, 78), "right": (401, 78)},
+    ("uefa", "bracket"): {"frame": "11_uefa_qtr_bracket_UNPLAYED_probe0116.png",
+                          "plate": (315, 78, 399, 98), "left": (291, 78), "right": (401, 78)},
+    ("cwc", "bracket"): {"frame": "10_cwc_qtr_bracket_UNPLAYED_probe0116.png",
+                         "plate": (315, 78, 399, 98), "left": (291, 78), "right": (401, 78)},
 }
 PLATE_BG = (180, 200, 220)
+
+# ---- the BRACKET panel strip (docs/re/knockout_views_re.md, re-measured 2026-07-26) ----
+# Four panels at T = 113/193/273/353, each x20..477. One strip per column set is cut from
+# one witnessed UNPLAYED panel and repeated four times -- legal because
+# verify_bracket_split.py proves 20 panels over 6 frames byte-identical outside the six
+# content rects below. The rects are blanked to the ground the app draws over: kits to the
+# panel's white, flags + name bars to the bar ground (flags are 30x20 blits that cover
+# their cell exactly, so the blank never shows).
+BRACKET_X = (20, 477)
+BRACKET_SRC = {"euro": ("02_euroleague_qtrfinals_UNPLAYED_1998-01.png", 113),
+               "dom": ("08_facup_qtrfinals_DOMESTIC_bracket_unplayed_1999-03-04.png", 113)}
+BRACKET_KITS = [(22, 2, 81, 69), (416, 2, 475, 69)]              # -> white
+BRACKET_BARS = [(83, 7, 112, 26), (385, 7, 414, 26),             # flags
+                (114, 7, 247, 26), (250, 7, 383, 26)]            # name bars -> bar ground
+BRACKET_WHITE = (255, 255, 255)
+BRACKET_BAR_BG = (180, 200, 220)
 
 # The competition rail is cut WHOLE per competition, not composed. Its chips carry three
 # witnessed states -- selected (a red plate), enabled (black plate, yellow text) and dimmed
@@ -107,6 +141,11 @@ THUMB_ROW_Y = 250           # a row safely inside the thumb bitmap
 # which no knockout layout covers. Patch it from a 16-row list frame, where that column is
 # bare wallpaper.
 DESK_PATCH = (478, 118, 509, 186)
+# It also carries a 6 px-wide fragment at x14..19, y125..177 that every LIST panel covers
+# (panel x6..477) but the narrower BRACKET panel (x20..477) exposes. Both bracket witnesses
+# show plain wallpaper there (frames 02/03/08 byte-identical over x0..19, y113..185), so it
+# is patched from the euro QTR frame.
+DESK_LEFT = (14, 125, 19, 177)
 # The division chips are all UNLIT on a knockout view -- none of the four divisions is what
 # the body is showing -- so they come from a knockout frame, not from the league RESULTS
 # frame the desktop is otherwise cut from (where PREMIER LEAGUE is lit).
@@ -134,6 +173,8 @@ def main() -> None:
     desk = Image.open(WALL).convert("RGB").crop((0, 0, 640, 480))
     desk.paste(cut(no_scroll, DESK_PATCH), (DESK_PATCH[0], DESK_PATCH[1]))
     desk.paste(cut(no_scroll, DESK_DIVS), (DESK_DIVS[0], DESK_DIVS[1]))
+    euro_qtr = frame("02_euroleague_qtrfinals_UNPLAYED_1998-01.png")
+    desk.paste(cut(euro_qtr, DESK_LEFT), (DESK_LEFT[0], DESK_LEFT[1]))
     # An all-unlit rail: F.A. Cup's unlit face comes from the U.E.F.A. frame, the rest from
     # the F.A. Cup frame -- so every chip is the original's own, in its unlit state.
     desk.paste(cut(comps["facup"], (CHIP_X[0], CHIP_TOP["cocacola"],
@@ -145,10 +186,19 @@ def main() -> None:
     desk.convert("RGBA").save(OUT / "desktop.png")
     print("desktop.png <- the empty-body RESULTS frame + an all-unlit rail")
 
-    # -- the rail, one per competition, from that competition's own band frame.
-    for (comp, _fam), spec in BANDS.items():
+    # -- the rail, one per competition, from that competition's LIST-family frame. The
+    #    bracket witnesses carry the same rails 0 px (frames 08/10/11/12, checked
+    #    2026-07-26) EXCEPT the euro pair 02/03: by March that career's cwc/uefa/supercup
+    #    chips have changed lit-state. WHICH chips are lit is career state this port does
+    #    not model, so the euro-bracket parity case buckets the rail rather than cutting
+    #    a second, equally-arbitrary rail state.
+    rails = 0
+    for (comp, fam), spec in BANDS.items():
+        if fam != "list":
+            continue
         cut(frame(spec["frame"]), RAIL_RECT).save(OUT / f"rail_{comp}.png")
-    print(f"rail_*.png <- {len(BANDS)} witnessed competition frames")
+        rails += 1
+    print(f"rail_*.png <- {rails} witnessed competition frames")
 
     # -- the arrow buttons, both states. The QTR FINALS frame has the left one ENABLED and
     #    the right DISABLED; a ROUND 1 frame has it the other way round, so all four faces
@@ -171,7 +221,9 @@ def main() -> None:
     cut(facup_r3, (401, 88, 423, 108)).save(OUT / "pager_right_off_p1.png")
     print("pager_*.png <- QTR FINALS + ROUND 1 + F.A. Cup frames, both dither parities")
 
-    # -- the competition bands, cut whole with the label plate blanked.
+    # -- the competition bands, cut whole with the label plate blanked. The bracket
+    #    family's strip stops at y112 -- its panel starts at 113 where the list's starts
+    #    at 125.
     meta = {}
     for (comp, fam), spec in BANDS.items():
         im = frame(spec["frame"]).copy()
@@ -179,7 +231,8 @@ def main() -> None:
         for y in range(py0, py1 + 1):
             for x in range(px0, px1 + 1):
                 im.putpixel((x, y), PLATE_BG)
-        cut(im, (BAND_X[0], BAND_Y[0], BAND_X[1], BAND_Y[1])).save(
+        y1 = 112 if fam == "bracket" else BAND_Y[1]
+        cut(im, (BAND_X[0], BAND_Y[0], BAND_X[1], y1)).save(
             OUT / f"band_{comp}_{fam}.png")
         meta[f"{comp}_{fam}"] = {
             "origin": [BAND_X[0], BAND_Y[0]],
@@ -189,6 +242,20 @@ def main() -> None:
         }
     (OUT / "bands.json").write_text(json.dumps(meta, indent=1, sort_keys=True) + "\n")
     print(f"band_*.png + bands.json <- {len(BANDS)} witnessed (competition, layout) pairs")
+
+    # -- the BRACKET panel strips, one per column set, content blanked.
+    for fam, (src, top) in BRACKET_SRC.items():
+        strip = cut(frame(src), (BRACKET_X[0], top, BRACKET_X[1], top + 71))
+        for x0, dy0, x1, dy1 in BRACKET_KITS:
+            for y in range(dy0, dy1 + 1):
+                for x in range(x0 - BRACKET_X[0], x1 - BRACKET_X[0] + 1):
+                    strip.putpixel((x, y), BRACKET_WHITE)
+        for x0, dy0, x1, dy1 in BRACKET_BARS:
+            for y in range(dy0, dy1 + 1):
+                for x in range(x0 - BRACKET_X[0], x1 - BRACKET_X[0] + 1):
+                    strip.putpixel((x, y), BRACKET_BAR_BG)
+        strip.save(OUT / f"bracket_panel_{fam}.png")
+    print("bracket_panel_euro.png + bracket_panel_dom.png <- two witnessed UNPLAYED panels")
 
     # -- the two compact-list header bands.
     cut(list_euro, (PANEL_X[0], LIST_HDR_Y[0], PANEL_X[1], LIST_HDR_Y[1])).save(

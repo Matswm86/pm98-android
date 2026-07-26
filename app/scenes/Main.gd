@@ -3710,6 +3710,37 @@ func _open_competition(act: String) -> void:
 	elif act == "intercont":
 		_show_comp_result("intercont", _career.intercontinental, "Tokyo")
 
+
+## A competition rail chip (RESULTS / knockout views) -> its competition view. The rail
+## chip keys are the baked chrome's own order; a chip whose competition the career is not
+## in does nothing, exactly as the original's dimmed chips do.
+func _open_rail_competition(chip: String) -> void:
+	match chip:
+		"facup":
+			if not _career.fa_cup.is_empty():
+				_open_competition("facup")
+		"cocacola":
+			if not _career.league_cup.is_empty():
+				_open_competition("lcup")
+		"charity":
+			if not _career.charity_shield.is_empty():
+				_open_competition("charity")
+		"euro":
+			if _career.euro.has("european_cup"):
+				_open_competition("euro:european_cup")
+		"cwc":
+			if _career.euro.has("cup_winners_cup"):
+				_open_competition("euro:cup_winners_cup")
+		"uefa":
+			if _career.euro.has("uefa_cup"):
+				_open_competition("euro:uefa_cup")
+		"supercup":
+			if not _career.supercup.is_empty():
+				_open_competition("supercup")
+		"intercont":
+			if not _career.intercontinental.is_empty():
+				_open_competition("intercont")
+
 ## The trophy art path for a European competition.
 func _euro_emblem(key: String) -> String:
 	match key:
@@ -4201,12 +4232,14 @@ func _show_cup_screen(b: Dictionary, key: String, title: String) -> void:
 	if not Cup.group_tables(b).is_empty() and (b.get("rounds", []) as Array).is_empty():
 		_show_euro_group_screen(b)
 		return
-	# A knockout phase big enough for the original's LIST layout has its own screen too
-	# (docs/re/knockout_views_re.md). The bracket / semifinal-card / final layouts are
-	# measured but not built yet, so those phases still fall through to the SORTEO card.
+	# A knockout phase the original has a built layout for has its own screen too
+	# (docs/re/knockout_views_re.md): the LIST at nine ties or more, the BRACKET at
+	# four. The kit-list / semifinal-card / final layouts are measured but not built
+	# yet, so those phases still fall through to the SORTEO card.
 	if _knockout_phases(b).size() > 0 and KNOCKOUT_RAIL.has(key):
 		var last: int = _knockout_phases(b).size() - 1
-		if (_knockout_ties(b, last) as Array).size() >= KnockoutScreen.MIN_LIST_TIES:
+		var n: int = (_knockout_ties(b, last) as Array).size()
+		if n >= KnockoutScreen.MIN_LIST_TIES or n == KnockoutScreen.BRACKET_TIES:
 			_show_knockout_screen(b, key, last)
 			return
 	var scr: CupDrawScreen = load("res://scenes/CupDrawScreen.gd").new()
@@ -4260,6 +4293,9 @@ func _knockout_ties(b: Dictionary, phase: int) -> Array:
 			var a := int(players[i + 1])
 			out.append({"home": _cup_name(h), "away": _cup_name(a), "winner": -1,
 				"mine": h == mine or a == mine,
+				"home_id": h, "away_id": a,
+				"home_flag": int(GameDB.club(h).get("countryCode", -1)),
+				"away_flag": int(GameDB.club(a).get("countryCode", -1)),
 				"cells": [["", ""], ["", ""], ["", ""]] if two else [["", ""], ["", ""]]})
 			i += 2
 		return out
@@ -4285,7 +4321,11 @@ func _knockout_ties(b: Dictionary, phase: int) -> Array:
 			cells = [[str(int(tie["hg"])), str(int(tie["ag"]))], replay]
 		out.append({"home": _cup_name(h), "away": _cup_name(a),
 			"winner": (0 if w == h else (1 if w == a else -1)),
-			"mine": h == mine or a == mine, "cells": cells})
+			"mine": h == mine or a == mine,
+			"home_id": h, "away_id": a,
+			"home_flag": int(GameDB.club(h).get("countryCode", -1)),
+			"away_flag": int(GameDB.club(a).get("countryCode", -1)),
+			"cells": cells})
 	return out
 
 
@@ -4302,13 +4342,20 @@ func _show_knockout_screen(b: Dictionary, key: String, phase: int) -> void:
 	var scr: KnockoutScreen = load("res://scenes/KnockoutScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
+	# The original switches presentation with the size of the round, per phase: the
+	# 4-tie bracket, else the list (the 5-8-tie kit list is not built and falls back
+	# to the list form, docs/re/knockout_views_re.md).
+	var layout := "bracket" if ties.size() == KnockoutScreen.BRACKET_TIES else "list"
 	scr.setup(_match_header(), str(KNOCKOUT_RAIL.get(key, "euro")),
 		str((phases[phase] as Dictionary).get("label", "")).to_upper(), two_legged, ties,
-		phase > 0, phase < phases.size() - 1)
+		phase > 0, phase < phases.size() - 1, 0, layout)
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
 	scr.phase_changed.connect(func(delta: int) -> void:
 		scr.queue_free()
 		_show_knockout_screen(b, key, phase + delta))
+	scr.competition_selected.connect(func(chip: String) -> void:
+		scr.queue_free()
+		_open_rail_competition(chip))
 
 
 ## Answer the SORTEO's row taps with the original's own tie-detail card: each club's
@@ -4770,6 +4817,11 @@ func _show_results_screen() -> void:
 	scr.back_pressed.connect(func() -> void:
 		AudioManager.ui_select()
 		scr.queue_free())
+	# The rail is the original's own door into the cup / Europe views (audit 2026-07-26:
+	# they shipped unreachable). A chip for a competition the career is not in is ignored,
+	# as the original's dimmed chips are.
+	scr.competition_selected.connect(func(chip: String) -> void:
+		_open_rail_competition(chip))
 
 ## The MENUPRINCIPAL FIXTURES icon opens the source-true "THE CALENDAR" (EMPAREJAMIENTOS)
 ## screen (FixturesScreen.gd, walkthrough frame 051; docs/re/fixtures_screen_re.md), replacing

@@ -4,17 +4,21 @@ class_name KnockoutScreen
 ##
 ## The original does not have "a knockout screen": it switches presentation with the size
 ## of the round and the column set with the competition (`docs/re/knockout_views_re.md`,
-## five layouts witnessed 2026-07-26). This scene is the LIST form -- the compact 15 px
-## row table every round of nine ties or more lands in, in both column sets:
+## five layouts witnessed 2026-07-26). This scene draws two of them:
 ##
-##     European   1ST LEG   2ND LEG   AGGR.
-##     domestic   RES.      REPLAY
+##   * the LIST form -- the compact 15 px row table every round of nine ties or more
+##     lands in, in both column sets:
+##         European   1ST LEG   2ND LEG   AGGR.
+##         domestic   RES.      REPLAY
+##   * the BRACKET form -- any 4-tie round: four 80 px-pitch panels, a kit and a country
+##     flag each side, the same column pair as plates over value boxes.
 ##
 ## Everything static is the original's own pixels (`art/screens/knockout/`, baked by
 ## `tools/re/build_knockout_chrome_from_frames.py` from the witnessed frames); everything
 ## a career fills is redrawn here at the measured anchors.
 ##
-## Geometry + inks: docs/re/knockout_views_re.md "Geometry banked 2026-07-26".
+## Geometry + inks: docs/re/knockout_views_re.md "Geometry banked 2026-07-26" for the
+## list, "The bracket, re-measured 2026-07-26" for the bracket.
 
 signal back_pressed
 signal phase_changed(delta: int)
@@ -79,6 +83,44 @@ const C_THROUGH := Color8(255, 223, 0)   # the club going through, and its goals
 const SCROLL_XY := Vector2(478, 125)
 const SCROLL_TROUGH := [172, 394]        # its interior, in screen rows
 
+# ---- the BRACKET layout (docs/re/knockout_views_re.md, re-measured 2026-07-26) -----
+## Any 4-tie round. Four panels x20..477 at these tops (pitch 80); one baked 458x72
+## strip per column set, repeated four times -- verify_bracket_split.py proves 20
+## witnessed panels byte-identical outside the content the code below redraws.
+const BRACKET_TIES := 4
+const BRACKET_TOPS := [113, 193, 273, 353]
+const BRACKET_PANEL_X := 20
+## The 48x64 MINIESC kit sprite's origin each side, solved by matching the exact-decoded
+## sprites against the euro QTR frame (best offset unique, second-best 3-5x worse). The
+## original draws an outline/bevel ring OUTSIDE the silhouette in a second, un-reversed
+## pass -- the sprite alone reproduces ~1470/1660 opaque px -- so the parity gate declares
+## the two kit columns per panel, exactly as it declares the barra kit.
+const BRACKET_KIT_L := Vector2(26, 8)    # + (0, T)
+const BRACKET_KIT_R := Vector2(423, 8)
+const BRACKET_FLAG_L := Vector2(83, 7)   # 30x20 dbcard flag, 0 px witnessed
+const BRACKET_FLAG_R := Vector2(385, 7)
+## Names are CENTRED, not edge-anchored: pen x = floor(cx - advance/2) with cx 178.5
+## (home) / 319.5 (away) -- solved off all 15 witnessed names of the euro and F.A. Cup
+## QTR frames (every one lands exactly). proman10, pen top T+12.
+const BRACKET_NAME_CX2 := [357, 639]     # 2*cx, so the floor is integer arithmetic
+const BRACKET_NAME_TOP_DY := 12
+const BRACKET_NAME_INK := Color8(60, 80, 100)
+## A score centres on its value box: first number's pen END at cx-5, the dash's pen at
+## cx-2, second number's pen at cx+5, pen top T+50 -- solved off the four witnessed
+## leg-1 cells (box x83..175, cx 129: ink ends 122, dash 127..129, B starts 134).
+## The dash is drawn at the .fnt's SECOND alpha level in every witnessed cell -- its six
+## pixels are the 80 % blend of the ink over the box ground, not the full ink.
+const BRACKET_SCORE_TOP_DY := 50
+const BRACKET_SCORE_INK := Color8(180, 200, 220)
+## Value-box centres per column set, in slot order (docs/re/knockout_views_re.md:
+## euro boxes x83..175 / x193..283 / x310..414, domestic x135..227 / x271..361).
+const BRACKET_BOX_CX_EURO := [129, 238, 362]
+const BRACKET_BOX_CX_DOM := [181, 316]
+## Each slot's box ground, for the dash's 80 % blend (euro slot 3 is the navy AGGR box,
+## domestic slot 2 the darker REPLAY box).
+const BRACKET_BOX_BG_EURO := [Color8(80, 100, 120), Color8(80, 100, 120), Color8(20, 0, 90)]
+const BRACKET_BOX_BG_DOM := [Color8(80, 100, 120), Color8(60, 80, 100)]
+
 # ---- the phase paginator ---------------------------------------------------------
 const C_LABEL := Color8(100, 100, 140)
 const LABEL_TOP_DY := 5                  # the label's pen top inside its plate
@@ -97,6 +139,8 @@ var _bands: Dictionary = {}              # "<comp>_<fam>" -> {tex, meta}
 var _band_meta: Dictionary = {}
 var _chips: Dictionary = {}
 var _hdr: Dictionary = {}                # "euro"/"dom" -> the panel top strip
+var _bracket: Dictionary = {}            # "euro"/"dom" -> the baked 458x72 panel strip
+var _flags: Dictionary = {}              # countryCode -> 30x20 dbcard flag
 var _pager: Dictionary = {}
 var _scroll_col: Texture2D
 var _scroll_thumb: Texture2D
@@ -111,6 +155,7 @@ var _fcal: Font
 var _header: Dictionary = {}
 var _comp := "euro"
 var _label := ""
+var _layout := "list"                    # "list" | "bracket"
 var _euro_cols := true
 var _ties: Array = []                    # [{home, away, winner, cells}]
 var _offset := 0
@@ -125,6 +170,7 @@ func _ready() -> void:
 		_chips[c] = _tex("res://art/screens/knockout/rail_%s.png" % c)
 	for key in ["euro", "dom"]:
 		_hdr[key] = _tex("res://art/screens/knockout/list_hdr_%s.png" % key)
+		_bracket[key] = _tex("res://art/screens/knockout/bracket_panel_%s.png" % key)
 	for key in ["left_on", "right_on", "left_off_p0", "left_off_p1", "right_off_p0",
 			"right_off_p1"]:
 		_pager[key] = _tex("res://art/screens/knockout/pager_%s.png" % key)
@@ -164,12 +210,19 @@ static func _load_json(path: String) -> Dictionary:
 ## `ties` is the phase's ties in draw order, each
 ##     {home: String, away: String, winner: int (0 home / 1 away / -1 undecided),
 ##      cells: Array of [String, String] -- one per column, "" for an empty cell}
+## The BRACKET layout additionally reads per tie, when present:
+##     home_id / away_id      club ids, for the 48x64 MINIESC kit blit
+##     home_flag / away_flag  dbcard countryCodes, for the 30x20 flags
 ## `euro_cols` picks 1ST LEG / 2ND LEG / AGGR. over RES. / REPLAY.
+## `layout` is "list" (9+ ties) or "bracket" (4) -- the original switches presentation
+## with the size of the round, so the caller picks per phase.
 func setup(header: Dictionary, comp: String, label: String, euro_cols: bool,
-		ties: Array, has_prev: bool, has_next: bool, offset := 0) -> void:
+		ties: Array, has_prev: bool, has_next: bool, offset := 0,
+		layout := "list") -> void:
 	_header = header
 	_comp = comp if comp in COMPS else "euro"
 	_label = label
+	_layout = layout if layout in ["list", "bracket"] else "list"
 	_euro_cols = euro_cols
 	_ties = ties
 	_has_prev = has_prev
@@ -226,7 +279,7 @@ func _to_design(p: Vector2) -> Vector2:
 
 
 func _band_key() -> String:
-	return "%s_list" % _comp
+	return "%s_%s" % [_comp, _layout]
 
 
 func _pager_rects() -> Array:
@@ -341,7 +394,10 @@ func _draw() -> void:
 		draw_texture_rect(_desktop, Rect2(0, 0, W, H), false)
 	_draw_header()
 	_draw_band()
-	_draw_panel()
+	if _layout == "bracket":
+		_draw_bracket()
+	else:
+		_draw_panel()
 	var rail: Texture2D = _chips.get(_comp)
 	if rail != null:
 		draw_texture(rail, RAIL_XY)
@@ -520,3 +576,66 @@ func _draw_scroll() -> void:
 	var top: int = SCROLL_TROUGH[0] + int(round(float(_offset) / float(max_off) * free))
 	for y in len_px:
 		draw_texture(_scroll_thumb, Vector2(SCROLL_XY.x, top + y))
+
+
+# ---- the bracket -----------------------------------------------------------------
+
+func _flag(code: int) -> Texture2D:
+	if code < 0:
+		return null
+	if not _flags.has(code):
+		var p := "res://art/flags/dbcard/%d.png" % code
+		_flags[code] = load(p) if ResourceLoader.exists(p) else null
+	return _flags[code]
+
+
+## Four 80 px-pitch panels; the strip is the original's own chrome (content blanked by
+## the baker), everything a career fills is redrawn at the measured anchors. What a
+## DECIDED tie draws here is unwitnessed -- no captured bracket has one -- so the
+## advancing-club highlight applies the LIST layout's witnessed rule (the club going
+## through and its own goals in yellow) to this layout's own base inks, and says so.
+func _draw_bracket() -> void:
+	var strip: Texture2D = _bracket.get("euro" if _euro_cols else "dom")
+	var cxs: Array = BRACKET_BOX_CX_EURO if _euro_cols else BRACKET_BOX_CX_DOM
+	var bgs: Array = BRACKET_BOX_BG_EURO if _euro_cols else BRACKET_BOX_BG_DOM
+	for i in mini(_ties.size(), BRACKET_TIES):
+		var t := int(BRACKET_TOPS[i])
+		if strip != null:
+			draw_texture(strip, Vector2(BRACKET_PANEL_X, t))
+		var tie: Dictionary = _ties[i]
+		var kl := PMChrome.kit(int(tie.get("home_id", -1)))
+		if kl != null:
+			draw_texture(kl, Vector2(BRACKET_KIT_L.x, t + BRACKET_KIT_L.y))
+		var kr := PMChrome.kit(int(tie.get("away_id", -1)))
+		if kr != null:
+			draw_texture(kr, Vector2(BRACKET_KIT_R.x, t + BRACKET_KIT_R.y))
+		var fl := _flag(int(tie.get("home_flag", -1)))
+		if fl != null:
+			draw_texture(fl, Vector2(BRACKET_FLAG_L.x, t + BRACKET_FLAG_L.y))
+		var fr := _flag(int(tie.get("away_flag", -1)))
+		if fr != null:
+			draw_texture(fr, Vector2(BRACKET_FLAG_R.x, t + BRACKET_FLAG_R.y))
+		var winner := int(tie.get("winner", -1))
+		for side in 2:
+			var s := str(tie.get("home" if side == 0 else "away", ""))
+			@warning_ignore("integer_division")
+			var pen: int = (int(BRACKET_NAME_CX2[side]) - _advance(_g_p10, s)) / 2
+			_txt(_page_p10, _g_p10, pen, t + BRACKET_NAME_TOP_DY, s,
+				C_THROUGH if winner == side else BRACKET_NAME_INK)
+		var cells: Array = tie.get("cells", [])
+		for j in mini(cells.size(), cxs.size()):
+			var pair: Array = cells[j]
+			if pair.is_empty() or (str(pair[0]) == "" and str(pair[1]) == ""):
+				continue
+			var cx := int(cxs[j])
+			var top := t + BRACKET_SCORE_TOP_DY
+			var mark := -1 if winner < 0 else (1 - winner if _is_second_leg(j) else winner)
+			_txt_right(_page_p10, _g_p10, cx - 5, top, str(pair[0]),
+				C_THROUGH if mark == 0 else BRACKET_SCORE_INK)
+			# the dash's six pixels are the .fnt's second alpha level -- the 80 % blend
+			# of the ink over that slot's own box ground, witnessed on all four leg-1
+			# cells (and applied to the unwitnessed slots by the same rule).
+			_txt(_page_p10, _g_p10, cx - 2, top, "-",
+				BRACKET_SCORE_INK.lerp(bgs[j], 0.2))
+			_txt(_page_p10, _g_p10, cx + 5, top, str(pair[1]),
+				C_THROUGH if mark == 1 else BRACKET_SCORE_INK)

@@ -1,12 +1,15 @@
 extends SceneTree
-## Frame-parity captures of the RESULTS -> cup KNOCKOUT list view, in the two states the
-## live originals show, for pixel-diffing with tools/re/diff_knockout_parity.py.
+## Frame-parity captures of the RESULTS -> cup KNOCKOUT views -- the LIST in its two
+## witnessed states and the BRACKET in both column sets -- for pixel-diffing with
+## tools/re/diff_knockout_parity.py.
 ##   DISPLAY=:1 PM98_SHOT_DIR=out ~/godot462 --rendering-driver opengl3 \
 ##       --path app --script res://tests/shot_knockout_parity.gd
 ##
 ## Every club name, score and aggregate below is transcribed off the frames themselves
 ## (tools/re/refs/knockout-2026-07-26/) -- this asserts the RENDERER, so the data has to be
-## the original's own, not the port's sim.
+## the original's own, not the port's sim. The bracket ties carry the club ids and dbcard
+## countryCodes too, because that layout blits the MINIESC kit and the flag; every id was
+## verified against its frame cell (flags 0 px, kits unique-best at the measured origin).
 
 const EURO_HEADER := {
 	"top": "MATS", "bottom": "Bolton W", "club_id": 59,
@@ -65,6 +68,39 @@ const FA_TIES := [
 # is why diff_knockout_parity.py buckets the scrollbar column separately.
 const FA_TOTAL := 20
 
+# ---- the BRACKET witnesses (docs/re/knockout_views_re.md, re-measured 2026-07-26) ----
+
+# 03_euroleague_qtrfinals_LEG1_PLAYED_1998-03-14.png -- the same Bolton W career at the
+# euro QTR FINALS with every first leg played.
+const EURO_QTR_HEADER := {
+	"top": "MATS", "bottom": "Bolton W", "club_id": 59,
+	"weekday": "Saturday", "day": "14", "month": "March", "year": "1998",
+	"status_top": "Premier", "status_bottom": "Week 32",
+}
+
+# home, away, home_id, away_id, home_flag, away_flag, leg1
+const EURO_QTR_TIES := [
+	["Borussia D.", "Manchester Utd.", 1038, 40, 2, 30, [0, 0]],
+	["Olympiakos", "F.C. Barcelona", 1189, 1000, 26, 22, [1, 1]],
+	["Real Madrid C.F.", "Bayern M.", 1003, 1042, 22, 2, [1, 0]],
+	["Parma", "Sporting Port.", 1024, 1076, 36, 47, [1, 2]],
+]
+
+# 08_facup_qtrfinals_DOMESTIC_bracket_unplayed_1999-03-04.png -- the same career's second
+# season (Bolton relegated: 1st Div., Week 31), F.A. Cup QTR FINALS drawn, unplayed.
+const FA_QTR_HEADER := {
+	"top": "MATS", "bottom": "Bolton W", "club_id": 59,
+	"weekday": "Thursday", "day": "4", "month": "March", "year": "1999",
+	"status_top": "1st Div.", "status_bottom": "Week 31",
+}
+
+const FA_QTR_TIES := [
+	["Sheffield Utd", "Aston Villa", 77, 45],
+	["Crystal Pal.", "Manchester Utd.", 63, 40],
+	["Charlton Ath", "Arsenal", 70, 46],
+	["West Ham Utd", "Leicester", 48, 57],
+]
+
 
 func _init() -> void:
 	var out := "res://out"
@@ -78,7 +114,30 @@ func _init() -> void:
 		_euro_rows(), false, true, 0)
 	await _shot(out, "knockout_facup_round3", FA_HEADER, "facup", "ROUND 3", false,
 		_fa_rows(), true, false, 0)
+	await _shot(out, "knockout_euro_qtr", EURO_QTR_HEADER, "euro", "QTR FINALS", true,
+		_bracket_rows(EURO_QTR_TIES, true), true, false, 0, "bracket")
+	await _shot(out, "knockout_facup_qtr", FA_QTR_HEADER, "facup", "QTR FINALS", false,
+		_bracket_rows(FA_QTR_TIES, false), true, false, 0, "bracket")
 	quit()
+
+
+static func _bracket_rows(ties: Array, euro: bool) -> Array:
+	var rows: Array = []
+	for t in ties:
+		var row := {"home": t[0], "away": t[1], "winner": -1,
+			"home_id": int(t[2]), "away_id": int(t[3])}
+		if euro:
+			row["home_flag"] = int(t[4])
+			row["away_flag"] = int(t[5])
+			var leg1: Array = t[6]
+			row["cells"] = [[str(int(leg1[0])), str(int(leg1[1]))], ["", ""], ["", ""]]
+		else:
+			# every F.A. Cup QTR club is English (flag 30), and the round is unplayed
+			row["home_flag"] = 30
+			row["away_flag"] = 30
+			row["cells"] = [["", ""], ["", ""]]
+		rows.append(row)
+	return rows
 
 
 func _euro_rows() -> Array:
@@ -107,11 +166,12 @@ func _fa_rows() -> Array:
 
 
 func _shot(out: String, name: String, header: Dictionary, comp: String, label: String,
-		euro_cols: bool, ties: Array, has_prev: bool, has_next: bool, offset: int) -> void:
+		euro_cols: bool, ties: Array, has_prev: bool, has_next: bool, offset: int,
+		layout := "list") -> void:
 	var scr: KnockoutScreen = load("res://scenes/KnockoutScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	get_root().add_child(scr)
-	scr.setup(header, comp, label, euro_cols, ties, has_prev, has_next, offset)
+	scr.setup(header, comp, label, euro_cols, ties, has_prev, has_next, offset, layout)
 	await process_frame
 	await process_frame
 	await process_frame
