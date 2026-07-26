@@ -136,6 +136,28 @@ drawn the moment the previous one resolves, and it is played at its own schedule
 Ported 2026-07-26 as `Cup.draw_next_round` + `b["pending_draw"]`; see
 `app/tests/test_cup_draw_then_play.gd`.
 
+## Aside — what the kit-outline residual is NOT (2026-07-26)
+
+The EURO. LEAGUE group screen's only remaining residual is the kit blits, and this session
+narrowed it without closing it. Measured on `ridi/1104.png` against
+`refs/euro-competitions-2026-07-25/15_euroleague_group_F.png` at the recorded (80,274):
+
+* the differing pixels are **32 of the 118 that carry outline index 135 `(22,22,22)`** —
+  the other 86 outline pixels render exactly, so it is the OUTERMOST ring only;
+* they are **not the background showing through**: 0 of the 32 equal the empty-body
+  desktop at the same coordinate;
+* they are **not a blend**: every frame value is an exact palette entry, and the indices it
+  lands on (54, 242, 236, 128, 134, 92, 100, 136, 248) have no arithmetic relation to
+  either the outline index or the background's;
+* they are **not an off-by-one**: (0,0) is the best of all 25 offsets in ±2 (32 differing,
+  next best 69), and none of the 32 equals a neighbouring kit pixel in any direction;
+* they are **not the realised-palette bug** that closed the MINIBAND flags — re-decoding
+  under `MANAGER.PAL` + Windows statics is byte-identical (tested 2026-07-26).
+
+What survives: the left-edge pixels take dark entries and the right-edge pixels light ones,
+which is a directional pass. So it is a **second sprite plane or an emboss table keyed on
+the silhouette**, drawn after the kit — not anything the kit decode can fix.
+
 ## What the port needs before this can be built
 
 * the bracket's `AGGR.` cell with a decided tie (page the phase paginator back);
