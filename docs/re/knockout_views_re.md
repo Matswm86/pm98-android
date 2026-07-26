@@ -237,6 +237,58 @@ Cup Winner's in BOTH — three placements that no width of the name, the label o
 accounts for. So each witnessed (competition, layout) pair is cut verbatim as a strip and
 `bands.json` records where its label and arrows sit.
 
+## Geometry banked 2026-07-26 — the BRACKET layout, for the next build
+
+Measured on `03_euroleague_qtrfinals_LEG1_PLAYED_1998-03-14.png` (European) and
+`08_facup_qtrfinals_DOMESTIC_bracket_unplayed_1999-03-04.png` (domestic), so the build
+needs no guessing either. Four panels, `T = 113, 193, 273, 353` (pitch **80**), each
+`x20..477`:
+
+| element | span, relative to the panel top T |
+|---|---|
+| black frame | rows `T`, `T+1` and `T+70`, `T+71`; columns x20-21 and x476-477 |
+| interior | white `(255,255,255)` |
+| left kit / right kit | `x22..81` / `x416..475` |
+| left flag / right flag | `x83..112` / `x385..414` |
+| the two name bars | `y T+7 .. T+26`, home `x114..247`, away `x250..383`, ground `(180,200,220)` |
+| the three plate slots | `y T+33 .. T+46`, at `x83..175`, `x193..283`, `x310..414` |
+| their value boxes | `y T+48 .. T+61`, same three x spans |
+| European | slot 1 `1ST LEG`, slot 2 `2ND LEG`, slot 3 `AGGR.` — plates `(140,160,180)`/`(140,160,180)`/`(42,95,170)`, boxes `(80,100,120)`/`(80,100,120)`/`(20,0,90)` |
+| domestic | slot 1 is EMPTY white; slot 2 `RES.`, slot 3 `REPLAY` — plates `(140,160,180)`/`(120,140,160)`, boxes `(80,100,120)`/`(60,80,100)` |
+| a leg score | white `(255,255,255)`, ink rows `y T+52 .. T+58`, `0 - 0` at x115..122 / dash x127..129 / x134..141, i.e. centred on its value box |
+
+The chrome/content split is proven twice over: the same layout in two careers and two
+competitions differs ONLY inside `y T+7 .. T+67` of each panel, and the SAME career's
+unplayed and leg-1-played frames differ in **490 px total, all of them the leg-1 score
+ink**. Everything else is static and can be baked verbatim.
+
+**Still missing for the bracket:** a tie with BOTH legs played, so the `AGGR.` cell's ink
+and the advancing-club highlight in this layout stay unwitnessed. The aggregate RULE is not
+in doubt — `06_euroleague_round1_played.png` carries it in the compact layout, two legs
+summed with the sides swapped — only where the bracket draws it.
+`tools/re/wine/knockoutwatch.py` scans a drive's frames for it (and for the cell below).
+
+## The filled WINNER band — it was already in the repo (2026-07-26)
+
+**Closed without a new capture.** `09_comp_charity.png`, banked 2026-07-25 and sitting in
+`screenshots/` ever since, carries the band with a club in it: `WINNER` over
+**Manchester Utd.**, with the winner's own kit inside the laurel wreath. It is not a
+different widget — outside the name bar itself the Charity Shield's band and the European
+final's empty one are **pixel-identical** over `x55..371, y352..417`; the ONLY rows that
+differ are 383..395, which is the name.
+
+| element | value |
+|---|---|
+| empty bar | `x60..371`, `y383..397`, ground `(200,220,240)` |
+| the winner's name | ink `x65..219`, rows `y383..395`, two-tone `(42,63,170)` + `(85,95,170)` |
+| laurel wreath | from `x374`; it overlaps the bar's right end, and holds the winner's KIT once decided |
+
+The lesson is worth keeping: the cell was called unwitnessed for two sessions because it
+was looked for on the European final, which is decided inside the season-end sequence where
+the hub never returns. The one-off finals (Charity Shield, Supercup, Intercontinental) reach
+the same view *within* the season. `knockoutwatch.py scan` over every committed frame set
+found it in seconds — **scan what you already have before driving another season.**
+
 ## What is inferred, and therefore declared
 
 Three things in the built screen are not pixel-witnessed, and the parity gate buckets or

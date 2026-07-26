@@ -72,9 +72,11 @@ is real and shipped, and PM98 ships two match presentations, so this is the seco
   visit through 1997-98 and caught **five layouts, four never seen before**: compact list,
   kit list, the four-panel bracket, the two-card semifinal view with `FINALIST` plates, and
   the trophy+`WINNER` final. Geometry, column sets and the chrome/content split are measured
-  in **`docs/re/knockout_views_re.md`**. Two cells remain unwitnessed (a bracket `AGGR.`
-  with a decided tie, and a played `WINNER` band) — both reachable by walking the phase
-  paginator back into a finished phase.
+  in **`docs/re/knockout_views_re.md`**. One cell remains unwitnessed — a bracket `AGGR.` with a
+  decided tie. The other, a filled `WINNER` band, turned out to be **already in the repo**:
+  `09_comp_charity.png` carries it, and outside the name bar that band is pixel-identical to
+  the European final's empty one. `tools/re/wine/knockoutwatch.py` finds either cell in a
+  directory of frames.
   Two seasons were driven and both missed those two cells for a structural reason (the view
   auto-advances the moment the next phase is drawn), so a third season is the wrong move —
   page the phase paginator BACK from Semifinals instead. See `knockout_views_re.md`.
@@ -85,8 +87,8 @@ is real and shipped, and PM98 ships two match presentations, so this is the seco
   Panel geometry is asserted by `app/tests/test_knockout_layout.gd`.
   **Still to build: the bracket (4 ties), the semifinal cards (2) and the final (1)** —
   all measured in `knockout_views_re.md`; a round that small still falls through to the
-  SORTEO card. The bracket also still wants a decided `AGGR.` cell and a filled `WINNER`
-  band, which the phase-paginator page-back drive is capturing.
+  SORTEO card. The bracket also still wants a decided `AGGR.` cell, which the
+  phase-paginator page-back drive is capturing; the `WINNER` band is witnessed.
 * ~~**Draw-then-play**~~ — **CLOSED 2026-07-26.** The separation is witnessed twice in two
   competitions (F.A. Cup R2 played 14 Dec → R3 drawn unplayed 20 Dec → played 10 Jan;
   Coca-Cola R4 played 1 Dec → Qtr Finals drawn unplayed 7 Dec), so the rule needed no
