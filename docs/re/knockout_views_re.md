@@ -1,6 +1,13 @@
 # The knockout views — RESULTS → any cup, every layout the original switches between
 
-**Status: the LIST layout is BUILT and 0 px (2026-07-26); layouts 3-5 measured, not built.**
+**Status: the LIST (1) and BRACKET (3) layouts are BUILT and 0 px (2026-07-26); the kit
+list (2), semifinal cards (4) and final (5) are measured, not built.** The bracket:
+`KnockoutScreen._draw_bracket`, gated by `diff_knockout_parity.py` cases 3-4 at **0 px
+outside three declared buckets** (the barra kit; the eight 60x68 kit columns, which are
+the exact-decoded MINIESC sprite plus the un-reversed outline pass; the euro case's rail,
+whose chip lit-states are career state). `Main._show_cup_screen` raises it at exactly
+4 ties, verified live via `PM98_CUP_SHOT` (F.A. Cup QTR from a real career). See "The
+bracket, as built" below for the solved anchors.
 `KnockoutScreen.gd` draws the compact list in both column sets and
 `tools/re/diff_knockout_parity.py` proves it at **0 differing pixels** against
 `06_euroleague_round1_played.png` (European, 15 ties, every aggregate filled) and
@@ -363,6 +370,62 @@ and the advancing-club highlight in this layout stay unwitnessed. The aggregate 
 in doubt — `06_euroleague_round1_played.png` carries it in the compact layout, two legs
 summed with the sides swapped — only where the bracket draws it.
 `tools/re/wine/knockoutwatch.py` scans a drive's frames for it (and for the cell below).
+
+## The bracket, as built (2026-07-26, session s62)
+
+Everything the re-measured section left open was solved off the frames before building:
+
+* **names** are proman10 CENTRED at `pen = floor(cx - advance/2)` with **cx 178.5 (home)
+  / 319.5 (away)** — all 15 witnessed names across the euro and F.A. Cup QTR frames land
+  exactly (the doc's earlier "x≈177 / x≈318" estimate refined). Pen top `T+12`, ink
+  `(60,80,100)`.
+* **scores** centre on their value box: first number's pen END at `cx-5`, dash pen
+  `cx-2`, second number's pen at `cx+5`, pen top `T+50`, ink `(180,200,220)` (euro slot 1
+  cx 129: ink ends 122, dash 127..129, B starts 134 — all four witnessed cells). **The
+  dash draws at the `.fnt`'s SECOND alpha level** — its six pixels are the 80 % blend of
+  the ink over the slot's own box ground `(160,180,200)` in every witnessed cell — so the
+  port prints it with that blend per slot ground. The unwitnessed slots (2ND LEG, AGGR.,
+  RES./REPLAY ink, the advancing-club highlight) apply the same grammar and the LIST
+  layout's winner-yellow rule, declared as inference in `KnockoutScreen.gd`.
+* **kits**: the 48x64 MINIESC sprite blits at **(26, T+8) / (423, T+8)** — unique-best
+  offset on all 16 witnessed cells (second-best 3-5x worse), ~85-90 % of opaque pixels
+  exact. The residual is the outline pass (below). NOTE the top-level
+  `app/art/kits/<id>.png` bank shipped WRAPPED until 2026-07-26 (the Pillow decode
+  honoured the stripped header's bogus bfOffBits, rotating every sprite 21 rows + 16
+  columns); it is re-exported through `pkf_image.dib_indices` and now carries the true
+  45x57-bbox sprites.
+* **desktop**: the empty-body RESULTS frame carries a 6 px fragment at `x14..19,
+  y125..177` that the list panel (x6..477) always covered but the bracket panel
+  (x20..477) exposes; patched from the euro QTR frame (frames 02/03/08 are byte-identical
+  over `x0..19, y113..185`).
+* **the euro rail differs between careers**: frames 02/03 (March) vs the baked
+  `rail_euro.png` (August) differ in 6,686 px, all of it the cwc/uefa/supercup/euro chips'
+  lit-state. WHICH chips are lit is career state the port does not model, so the euro
+  parity case buckets the rail; the domestic case's rail matches its witness 0 px and is
+  enforced.
+
+## The outline pass, narrowed again (2026-07-26, s62) — it is a DROP SHADOW plus a highlight
+
+Classifying every differing pixel of all 16 bracket kit cells against the exact-decoded
+sprites restructures the residual into three distinct components:
+
+1. **a flat `(128,128,128)` drop shadow, 1-2 px, on the BOTTOM and RIGHT of the
+   silhouette only.** The ring above and left of the silhouette stays background white
+   (464 + 336 px undrawn). This is dest-halving on the white panel (255 → 128), i.e. the
+   classic GDI half-tone shadow — which is why the group screen's earlier "50 % blend"
+   test failed: it blended the OUTLINE INDEX with the background, but the shadow ignores
+   the sprite's colours entirely.
+2. **a highlight applied to the sprite's own TOP/LEFT edge pixels** (not outside them) —
+   the differing opaque-edge pixels take light entries `(192,192,192)`, `(160,160,164)`,
+   `(144,144,144)` along the top/left silhouette edge.
+3. **scattered interior single-pixel diffs** (~115/cell) with no edge structure —
+   candidates: a palette-realisation difference or a shading pass; unexplained.
+
+A minority of ring pixels (220 over 16 cells) also match palette-snapped
+`(sprite-NW-neighbour + white)/2` half-blends exactly, so an edge anti-alias component may
+coexist with the flat shadow at concavities. **No 0 px rule yet — the kit columns stay a
+declared bucket** — but the shape of the pass is now known: shadow below-right, highlight
+on-edge above-left, plus an interior component.
 
 ## The filled WINNER band — it was already in the repo (2026-07-26)
 

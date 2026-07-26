@@ -93,16 +93,17 @@ is real and shipped, and PM98 ships two match presentations, so this is the seco
   **Still to build: the bracket (4 ties), the semifinal cards (2) and the final (1)** —
   all measured in `knockout_views_re.md`; a round that small still falls through to the
   SORTEO card. The `WINNER` band is witnessed.
-  **The bracket is now fully specified and unblocked (2026-07-26).** Re-measured off FIVE
-  competitions instead of two — the pageback drive left 14 more bracket frames nobody had
-  opened — which corrected three things the doc had wrong (the score ink is `(180,200,220)`,
-  not white; the domestic slots sit at their own x positions, they are not the European ones
-  minus slot 1; the kit art does NOT already exist). `tools/re/verify_bracket_split.py`
-  re-proves what the build needs: **20 panels over 6 frames are byte-identical outside six
-  content rects**, the flags blit at **0 px**, and `desktop.png` already covers every
-  inter-panel gap. What stays open: a decided `AGGR.` cell (all 17 bracket frames in the repo
-  checked, plus the 139-frame pageback drive — none has one), and the eight kit blits, which
-  are MINIESC plus the un-reversed outline pass and must be a declared bucket.
+  **The BRACKET is BUILT and 0 px (2026-07-26, s62).** `KnockoutScreen._draw_bracket`,
+  raised by `Main._show_cup_screen` at exactly 4 ties, gated by `diff_knockout_parity.py`
+  against both witnesses (euro leg-1-played, F.A. Cup unplayed) at **0 px outside three
+  declared buckets** (barra kit; the eight kit columns = MINIESC sprite + the un-reversed
+  outline pass; the euro case's career-state rail). Every anchor was solved off the frames
+  — see `knockout_views_re.md` §"The bracket, as built". Verified live: `PM98_CUP_SHOT`'s
+  real career raises the domestic bracket at its F.A. Cup QTR. What stays open: a decided
+  `AGGR.` cell is still unwitnessed (the port applies the leg-1 grammar + the list's
+  winner rule, declared as inference), and **the kit list (5-8 ties), semifinal cards (2)
+  and final (1) are still not built** — those rounds fall back to the list form (5-8) or
+  the SORTEO card (2/1).
 * ~~**Draw-then-play**~~ — **CLOSED 2026-07-26.** The separation is witnessed twice in two
   competitions (F.A. Cup R2 played 14 Dec → R3 drawn unplayed 20 Dec → played 10 Jan;
   Coca-Cola R4 played 1 Dec → Qtr Finals drawn unplayed 7 Dec), so the rule needed no
@@ -115,33 +116,36 @@ is real and shipped, and PM98 ships two match presentations, so this is the seco
   original's float32 dirt). See `docs/re/stadium_screen_re.md` §"The cost function". What
   remains there is the per-club STARTING grades — `club+0x50`, the preset selector, is not
   yet reversed, so only Man Utd's captured grades are used and nothing is interpolated.
-* **The kit-outline blit pass** — the engine's un-reversed outline/bevel pass. Tested and
-  REJECTED: a 50 % blend with the background (left-edge pixels darken, right-edge lighten to
-  128/144 grey, so it is a bevel or shadow sprite, not a blend).
-  **Attack it on the BRACKET, not the group screen (2026-07-26).** The bracket's 47x59 kit is
-  MINIESC — 1373 of 1661 opaque pixels match at `(27, T+11)` — and its residual is **173
-  silhouette-edge pixels carrying five known greys** `(144,144,144)` `(128,128,128)`
-  `(80,80,80)` `(44,44,44)` `(160,160,164)`, against the group screen's 32. It also settles
-  the shape question: the sprite's opaque bbox is **45x57 while the blit is 47x59**, so the
-  pass draws a ring one pixel OUTSIDE the silhouette. 115 interior pixels remain unexplained.
+* **The kit-outline blit pass** — the engine's un-reversed outline/bevel pass.
+  **Restructured 2026-07-26 (s62)** by classifying every differing pixel of all 16 bracket
+  kit cells: it is (1) a flat `(128,128,128)` **drop shadow, 1-2 px, bottom/right of the
+  silhouette only** (dest-halving on the white panel — which is why the old "50 % blend"
+  test failed: it blended the outline index, but the shadow ignores the sprite entirely),
+  (2) a **highlight applied to the sprite's own top/left edge pixels** (192/160,160,164/144
+  entries), and (3) ~115 scattered interior single-pixel diffs per cell, unexplained.
+  A minority of ring pixels also match palette-snapped half-blends of the NW sprite
+  neighbour, so an anti-alias component may coexist at concavities. No 0 px rule yet; the
+  bracket's kit columns stay a declared bucket. Full data:
+  `knockout_views_re.md` §"The outline pass, narrowed again".
 * ~~**MINIBAND dither** — 99 px across the six euro group frames.~~ **CLOSED 2026-07-26.**
   Not dither: the flags were decoded with the shared VGA palette instead of `MANAGER.PAL`
   plus the 20 Windows static system colours. Re-exported, **0 px** over all 24 flag cells
   (`euro_league_screen_re.md` §Parity).
 
-## 3a. Reachability — the knockout/Europe views ship unreachable (FOUND 2026-07-26)
+## 3a. Reachability — WIRED 2026-07-26 (s62, same day it was found)
 
-The complete-audit pass (`docs/re/AUDIT_COMPLETE_2026-07-26.md` §1) traced the call graph:
-`Main._show_competitions()` (Main.gd:3631) has **zero callers**, and `_show_cup_screen`'s
-only other callers live inside the `PM98_CUP_SHOT` dev harness. The RESULTS competition
-rail is baked, inert chrome (`ResultsScreen.gd` declares only `back_pressed`). So
-**`KnockoutScreen` (LIST, 0 px), `EuroGroupScreen`, `EuroSupercupScreen` and
-`CompResultScreen` cannot be reached by a player in a real career.** `CupDrawScreen`
-(post-week `_pop_cup_draw` chain) and `CharityShieldScreen` (season chains) ARE reachable.
-Fix belongs with the BRACKET build: wire the RESULTS rail chips (the `KNOCKOUT_RAIL` map at
-Main.gd:4223 already exists) or restore the hub entry. Also found fully dead:
-`CupScreen.gd` + its sole caller `_show_one_off_final()` (superseded by `CompResultScreen`)
-and the interim `_show_training()` browse — safe to delete in a cleanup pass.
+The complete-audit pass (`docs/re/AUDIT_COMPLETE_2026-07-26.md` §1) traced the call graph
+and found every knockout/Europe view gameplay-unreachable: `_show_competitions()` had zero
+callers and the RESULTS rail was baked, inert chrome. **Fixed the same day**: the rail is
+the original's own door (every knockout/Europe frame in the RE corpus was captured by
+clicking it), so `ResultsScreen` now hit-tests the eight competition chips and emits
+`competition_selected`; `Main._open_rail_competition` routes a chip through the existing
+`_open_competition` actions, ignoring chips whose competition the career is not in (as the
+original's dimmed chips are); `KnockoutScreen`'s own rail is connected the same way, so
+competition-to-competition hops work. Player path: hub → RESULTS → rail chip →
+cup / Europe views. The play-off chips stay inert (no play-off view exists — honest gap).
+Covered by `test_results_screen`. Still open from the audit: the dead `CupScreen.gd` +
+`_show_one_off_final()` and the interim `_show_training()` browse — a cleanup pass.
 
 ## 3b. THREE UP FRONT — the one place this port draws a pixel the original does not
 
@@ -212,14 +216,14 @@ explicit go/no-go before a line of it is written.
 * `DAT.PKF` / `DATSIM.PKF` match-sim rating tables are still LZ-packed. Only needed to tune
   the *abstracted* engine toward the original — the byte-exact engine gets these from the
   code path itself, so this is track-A work only.
-* **The top-level MINIESC kit bank looks mismapped** (noticed 2026-07-26, not chased).
-  `app/art/kits/40.png` renders as two half-shirts and `app/art/kits/1381.png` is a **star**,
-  not a kit. `map_crests.py --export` wrote that bank from `DBDAT/MINIESC.PKF`, whose entries
-  do decode correctly when rendered directly through `tools/re/pkf_image.py` — so it is the
-  export's id mapping or its crop that is wrong, not the archive. Nothing visible is broken
-  today: every screen that shows a kit uses the `nano` (24x32) or `ridi` (17x20) banks, which
-  are right. It matters the moment the BRACKET lands, because that layout's 47x59 blit is
-  MINIESC (§3).
+* ~~**The top-level MINIESC kit bank looks mismapped**~~ — **FIXED 2026-07-26 (s62).**
+  The id mapping was fine (1381 is club 9902 "STARS", whose kit sprite IS a star); the
+  DECODE was not: `export_kits()` rendered through the Pillow path, which honours the
+  stripped DIB header's bogus `bfOffBits`, rotating every 48-wide sprite 21 rows + 16
+  columns — exactly `export_art.py`'s own module warning. All 476 re-exported through
+  `exact=True` (`pkf_image.dib_indices`). Two corrections to the old note: it was NOT
+  invisible (MenuScreen, MatchSimulador and `PMChrome.kit()` consume this bank), and the
+  BRACKET now blits it.
 
 ## 6. Android packaging / device polish
 
