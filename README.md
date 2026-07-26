@@ -16,7 +16,7 @@ fan remake.</sub>
 
 ## Download
 
-📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-7b3e2de.apk)** — one tap downloads `pm98-7b3e2de.apk` (current build) straight to your phone.
+📦 **[Download the latest APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-af99077.apk)** — one tap downloads `pm98-af99077.apk` (current build) straight to your phone.
 
 > **This build (2026-07-26, latest)** is about two things the notes had given up on, and a cheat.
 >
