@@ -200,6 +200,8 @@ var _wk: Dictionary = {}
 # while this is non-zero, incrementing, and CLEARS it the moment the balance is positive
 # again -- witnessed at 1, 2 and 3 weeks, then cleared by a sale.
 var loss_weeks: int = 0
+# The 1-April season-end/contract warning has fired this season (it fires once).
+var contract_warned := false
 # The channelTV card queued for the coming HOME match: {"fee": int, "comp": String}.
 # {} when the next fixture is away, or the competition's fee is not witnessed.
 var pending_channel_tv: Dictionary = {}
@@ -374,6 +376,15 @@ const LOSS_ALERT_MSG := "You have been running the club at a loss for %d week%s 
 const LOSS_SACK_WEEKS := 4
 const DEADLINE_WARN_WEEKS := [2, 1]
 const DEADLINE_WARN_MSG := "The transfer deadline is now %d week%s away."
+# The original's 1-April season-end warning pair, verbatim from MANAGER.EXE's message
+# table (slots 0x662CDC / 0x662CE0, strings @0x663B20 / @0x663A80). FUN_005862E0
+# raises exactly one of them when today == 1 April: the SHORT one when the automatic
+# contract-renewal flag DAT_0066B1F4 is set (TRAINER + MANAGER levels), the FULL
+# warning when it is not (ACCOUNTANT + TOTAL) — docs/re/sack_path_re.md §NIVEL.
+# It sits in the same table, raised by the same function, as the transfer-deadline
+# warning above; it had simply never been ported. [Mats QA 2026-07-26]
+const SEASON_END_MSG := "The season is near to finishing."
+const CONTRACT_WARN_MSG := "The season is near to finishing,\nsome of your players contracts\nmay need renewing. Players can leave\nyour club next year if their contracts\nare not renewed."
 
 # Living league (#12): rival clubs' squads injure/develop week to week like the manager's.
 # Only a notable rival injury (this many matches or longer) is surfaced to the club news
@@ -677,6 +688,23 @@ func pending_friendly() -> Dictionary:
 	return preseason_rivals[friendlies_played]
 
 
+## The four preseason friendly dates for a season starting in `start_year`, as
+## "YYYY-MM-DD". WITNESSED twice and both reproduce exactly: 1997-98 = 1/4/6/8 Aug
+## 1997 (pretemporada_screen_re.md) and 1998-99 = 31 Jul + 3/5/7 Aug 1998 (REFRUN
+## R15 step 8, p0664). The rule both fit: F = the day before August's first
+## Saturday; the friendlies fall on F, F+3, F+5, F+7 (Fri / Mon / Wed / Fri).
+static func preseason_dates(start_year: int) -> Array:
+	var aug1 := int(Time.get_unix_time_from_datetime_dict(
+		{"year": start_year, "month": 8, "day": 1, "hour": 12, "minute": 0, "second": 0}))
+	var wd := int(Time.get_datetime_dict_from_unix_time(aug1).get("weekday", 0))  # 0 = Sun
+	var first_sat := aug1 + ((6 - wd) % 7) * 86400
+	var out: Array = []
+	for off in [-1, 2, 4, 6]:
+		var d := Time.get_datetime_dict_from_unix_time(first_sat + off * 86400)
+		out.append("%04d-%02d-%02d" % [int(d.year), int(d.month), int(d.day)])
+	return out
+
+
 ## Simulate the pending preseason friendly against `rival` (a roster-loaded club
 ## dict — the GameDB view for foreign sides). Same engine path as a league
 ## fixture: the faithful stat engine where both XIs are usable, the ratings
@@ -882,6 +910,7 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 	offers_left = OFFERS_PER_WEEK   # the board's weekly signing allowance resets
 	_tick_works()                   # stadium expansion progresses a week
 	_tick_transfer_deadline()       # the two-week / one-week deadline warnings (R10)
+	_tick_contract_warning()        # the 1-April season-end / contract-renewal warning
 	_tick_one_off_finals(rng)       # Intercontinental in December, Supercup in March (R7/R11)
 	if not manager_res.is_empty():
 		results.append({
@@ -3037,6 +3066,30 @@ func _tick_transfer_deadline() -> void:
 		return
 	pending_alerts.append(DEADLINE_WARN_MSG % [left, "" if left == 1 else "s"])
 
+
+## The 1-April warning (see SEASON_END_MSG / CONTRACT_WARN_MSG). The original tests
+## today == 1 April inside its daily pass; this port is week-grained, so it fires on
+## the week whose Sun..Sat span contains 1 April of the season's end year — the same
+## week-resolution mapping every other dated tick uses. Date math is PMChrome's own
+## anchor (week 1 == Sat 9 Aug of the start year, date_parts).
+func _tick_contract_warning() -> void:
+	if contract_warned or week < 1:
+		return
+	var start_year := 1997
+	var parts := season.split("-")
+	if parts.size() >= 1 and parts[0].is_valid_int():
+		start_year = int(parts[0])
+	var t0 := Time.get_unix_time_from_datetime_dict(
+		{"year": start_year, "month": 8, "day": 9, "hour": 12, "minute": 0, "second": 0})
+	var sat := int(t0) + (week - 1) * 7 * 86400
+	var apr1 := int(Time.get_unix_time_from_datetime_dict(
+		{"year": start_year + 1, "month": 4, "day": 1, "hour": 12, "minute": 0, "second": 0}))
+	if apr1 <= sat - 7 * 86400 or apr1 > sat:
+		return
+	contract_warned = true
+	var auto_renew := manager_level in ["trainer", "manager"]   # DAT_0066B1F4
+	pending_alerts.append(SEASON_END_MSG if auto_renew else CONTRACT_WARN_MSG)
+
 func my_squad() -> Array:
 	return rosters.get(club_id, [])
 
@@ -4153,6 +4206,10 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 		free_agents.append(p)
 		_news("contract", "%s has left on a free (contract not renewed)." % p.get("name", "?"))
 		_log("%s has left your club as his contract has not been renewed." % p.get("name", "?"))
+		# WITNESSED (REFRUN R15 step 8): the original raises these as per-player hub
+		# alerts at the new season's start, in exactly this wording.
+		pending_alerts.append(
+			"%s has left your club as his contract has not been renewed." % p.get("name", "?"))
 	if free_agents.size() > FREE_POOL_CAP:
 		free_agents = free_agents.slice(free_agents.size() - FREE_POOL_CAP)
 	# AI contracts tick but auto-renew, so rival squads stay stable across years. Their
@@ -4209,11 +4266,15 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	season_club_minutes.clear()
 	season_club_mp.clear()
 	results.clear()
-	# Preseason friendlies were a career-entry pick; season 2+ has no re-pick UI
-	# (un-walked — the walkthrough started one career), so the slate just clears.
+	# The friendly slate clears for the new season; Main re-raises the preseason
+	# picker on rollover (WITNESSED: REFRUN R15 step 8, p0664 — "Preseason for
+	# Manchester Utd." opens 1998-99 with friendlies 31 Jul / 3 / 5 / 7 Aug 1998).
+	# The old "season 2+ has no re-pick UI (un-walked)" note here was refuted by
+	# that capture. [Mats QA 2026-07-26: preseason was gone in season two]
 	preseason_rivals.clear()
 	friendlies_played = 0
 	friendly_results.clear()
+	contract_warned = false
 	transfer_listed.clear()
 	offers_left = OFFERS_PER_WEEK
 	_log("--- %s season ---" % season)
@@ -5171,6 +5232,7 @@ func to_dict() -> Dictionary:
 		"euro": euro, "euro_ratings": _str_keyed(euro_ratings),
 		"euro_names": _str_keyed(euro_names),
 		"week_ledgers": week_ledgers, "loss_weeks": loss_weeks,
+		"contract_warned": contract_warned,
 		"pending_champion_cards": pending_champion_cards, "sa_champion_id": sa_champion_id,
 		"pending_channel_tv": pending_channel_tv,
 		"euro_winner_cup": euro_winner_cup, "euro_winner_cwc": euro_winner_cwc,
@@ -5378,6 +5440,7 @@ static func from_dict(d: Dictionary) -> Career:
 	c.pending_champion_cards = d.get("pending_champion_cards", [])
 	c.sa_champion_id = int(d.get("sa_champion_id", -1))
 	c.loss_weeks = int(d.get("loss_weeks", 0))
+	c.contract_warned = bool(d.get("contract_warned", false))
 	c.pending_channel_tv = d.get("pending_channel_tv", {})
 	c.euro_winner_cup = int(d.get("euro_winner_cup", -1))
 	c.euro_winner_uefa = int(d.get("euro_winner_uefa", -1))

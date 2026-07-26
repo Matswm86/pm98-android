@@ -1874,18 +1874,7 @@ func _begin_career(manager_name: String, league: Dictionary, club: Dictionary,
 	# rivals play out via hub CONTINUE before league round 1 (Career.play_friendly).
 	_career.manager_level = _pending_level
 	_career.players_age = _pending_age
-	var dates := ["1997-08-01", "1997-08-04", "1997-08-06", "1997-08-08"]
-	var rivals_meta: Array = []
-	for i in preseason_rivals.size():
-		# null = a SKIPped slot (original SKIP consumes one date, audit §C2): that
-		# August date simply has no friendly; later picks keep their own slot dates.
-		if preseason_rivals[i] == null:
-			continue
-		var rc: Dictionary = preseason_rivals[i]
-		rivals_meta.append({"date": dates[i] if i < 4 else "", "club_id": int(rc.get("id", -1)),
-			"name": str(rc.get("name", "")), "home": bool(rc.get("home", false)),
-			"venue_stadium": str(rc.get("venue_stadium", ""))})
-	_career.preseason_rivals = rivals_meta
+	_career.preseason_rivals = _preseason_meta(preseason_rivals, Career.preseason_dates(1997))
 	# Season-1 honours: the original contests the Charity Shield + runs the
 	# European competitions from career start, seeded with the REAL 1996-97
 	# honours (witnessed TEAMS IN CHAMPIONSHIPS, orig/06). English careers only —
@@ -5453,7 +5442,48 @@ func _next_season() -> void:
 	rng.randomize()
 	_career.advance_season(GameDB.leagues, rng, _euro_pool(), _sa_champion(), TalentDB.talents)
 	_career.save()
-	_enter_career()
+	_show_preseason_rollover()
+
+
+## Preseason picks per slot date. null = a SKIPped slot (original SKIP consumes one
+## date, audit §C2): that date simply has no friendly; later picks keep their own
+## slot dates.
+func _preseason_meta(picks: Array, dates: Array) -> Array:
+	var rivals_meta: Array = []
+	for i in picks.size():
+		if picks[i] == null:
+			continue
+		var rc: Dictionary = picks[i]
+		rivals_meta.append({"date": dates[i] if i < 4 else "", "club_id": int(rc.get("id", -1)),
+			"name": str(rc.get("name", "")), "home": bool(rc.get("home", false)),
+			"venue_stadium": str(rc.get("venue_stadium", ""))})
+	return rivals_meta
+
+
+## The season-rollover preseason picker (WITNESSED: REFRUN R15 step 8, p0664 —
+## "Preseason for Manchester Utd." opens 1998-99). Same PreseasonScreen as career
+## entry; the picks land on the NEW season's own dates (Career.preseason_dates)
+## and the flow then enters the career as before. [Mats QA 2026-07-26]
+func _show_preseason_rollover() -> void:
+	if _preseason != null and is_instance_valid(_preseason):
+		_preseason.queue_free()
+	var club: Dictionary = GameDB.clubs_by_id.get(_career.club_id, {})
+	_preseason = load("res://scenes/PreseasonScreen.gd").new()
+	_preseason.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_preseason)
+	_preseason.setup(PMChrome.title_case_name(_career.club_name), _career.manager_name,
+		GameDB.leagues, GameDB.clubs_in_league, _clubs_of_country_en, _career.club_id, club)
+	_preseason.preseason_done.connect(func(rivals: Array) -> void:
+		if _preseason != null and is_instance_valid(_preseason):
+			_preseason.queue_free()
+		_preseason = null
+		var start_year := 1997
+		var parts := _career.season.split("-")
+		if parts.size() >= 1 and str(parts[0]).is_valid_int():
+			start_year = int(parts[0])
+		_career.preseason_rivals = _preseason_meta(rivals, Career.preseason_dates(start_year))
+		_career.save()
+		_enter_career())
 
 
 # ---- manager career across clubs (#14) -----------------------------------

@@ -112,12 +112,23 @@ func _run() -> bool:
 	ok = _assert(l2 != null and int(l2.pending_friendly().get("club_id", -1)) == 1000,
 		"mid-preseason resume points at Barcelona") and ok
 
-	# Season rollover clears the friendly slate (no season-2 re-pick UI).
+	# Season rollover clears the friendly slate; Main re-raises the preseason picker
+	# (REFRUN R15 step 8) and re-arms it with the NEW season's own dates.
 	while not career.season_over():
 		career.advance_week(rng, by_id)
 	career.advance_season(leagues, rng)
 	ok = _assert(career.preseason_rivals.is_empty() and career.friendlies_played == 0
 		and career.friendly_results.is_empty(), "advance_season cleared the friendly slate") and ok
+
+	# The season-derived dates reproduce BOTH witnessed seasons exactly:
+	# 1997-98 = 1/4/6/8 Aug (pretemporada_screen_re.md), 1998-99 = 31 Jul + 3/5/7 Aug
+	# (REFRUN R15 step 8, p0664).
+	ok = _assert(Career.preseason_dates(1997) == [
+		"1997-08-01", "1997-08-04", "1997-08-06", "1997-08-08"],
+		"preseason_dates(1997) == the walked 1997 dates") and ok
+	ok = _assert(Career.preseason_dates(1998) == [
+		"1998-07-31", "1998-08-03", "1998-08-05", "1998-08-07"],
+		"preseason_dates(1998) == the witnessed 1998-99 dates") and ok
 
 	print("\n%s" % ("ALL PASS" if ok else "FAILURES ABOVE"))
 	return ok
