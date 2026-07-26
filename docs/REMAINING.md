@@ -75,6 +75,10 @@ is real and shipped, and PM98 ships two match presentations, so this is the seco
   in **`docs/re/knockout_views_re.md`**. Two cells remain unwitnessed (a bracket `AGGR.`
   with a decided tie, and a played `WINNER` band) — both reachable by walking the phase
   paginator back into a finished phase.
+  **THE BUILD IS THE OUTSTANDING WORK** (Mats, 2026-07-26): `app/scenes/` holds
+  `EuroGroupScreen.gd` and nothing for a knockout round in ANY competition, so RESULTS →
+  any cup at a knockout phase still has no faithful screen. Suggested order: the compact
+  list (most rounds land there), then the bracket, then the semifinal cards, then the final.
 * ~~**Draw-then-play**~~ — **CLOSED 2026-07-26.** The separation is witnessed twice in two
   competitions (F.A. Cup R2 played 14 Dec → R3 drawn unplayed 20 Dec → played 10 Jan;
   Coca-Cola R4 played 1 Dec → Qtr Finals drawn unplayed 7 Dec), so the rule needed no
@@ -104,6 +108,15 @@ oracle fixtures reproduce draw-for-draw with the flag on and no forwards in the 
 `tools/re/diff_options_parity.py` bounds it: the rest of that modal is still 0 px against
 the MANAGER.EXE capture, the row's band overlaps none of the original's controls, and the
 original draws nothing underneath it. **No other screen carries invented pixels.**
+
+**Still to do here — the MIXED PLAY variant.** The other half of
+`docs/re/hack_three_forwards.md`: make toggling MIXED PLAY the trigger instead of three
+forwards. Blocked on locating the club tactic byte — `FUN_0056ea15` (the TEAM TACTICS
+modal) is un-disassembled and the setting is not in the stat engine's input set at all.
+Plan: memory-diff that byte in a **clone** of the play prefix (`/tmp/pm98-play/
+sandbox-prefix`, display `:8`, never the live career) while toggling ATTACKING ↔ MIXED with
+synthetic clicks, then re-target the `att3` cave at it. The modal's geometry is measured
+now (`tactics_subscreens_re.md`), so the click target is known: MIXED PLAY's X-box (103,229).
 
 ## 4. The SHOOTING appendix
 
