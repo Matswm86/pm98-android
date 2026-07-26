@@ -14,6 +14,39 @@ This is the honest, full list. Nothing hidden.
 > ten-slot `SaveGameDialog`, render-diffed 0 px against witnesses 51/52/53. Removed.
 > **The habit that catches these: grep the code for the entry point before repeating a gap.**
 
+## 0. Mats's live QA report, 2026-07-26 evening — fix FIRST, before new screens
+
+Reported from play on the shipped build; every item verified in his hands, none is a
+guess. One is already fixed (last bullet); the rest are open and OUTRANK the semifinal /
+final build:
+
+* **The SCOUT "EXTRA SEARCH FILTERS" panel is invented graphics** — approved as a door,
+  but the panel itself must be drawn in the original's own chrome (faces, plates, fonts,
+  inks cut from real frames like every other screen), not an interface the original never
+  drew. Mats: *"NOT that AI slope image you used! REDO!"* Placement is fine.
+* **Kit blits truncated / outside frames.** Seven screens crop FIXED sub-regions of the
+  top-level kit bank that were tuned while that bank shipped WRAPPED (see §5):
+  `ChampionshipsScreen`, `ManagersMonthScreen`, `MatchResultScreen`, `EndOfSeasonScreen`,
+  `CupDrawScreen`, `MenuScreen`, `RivalScreen`. The 2026-07-26 un-wrap moved every
+  sprite's content, so those crops now cut the kit. Re-tune each against its witness
+  frames (correct sprite bbox is x1..45, y3..59).
+* **Preseason is gone in season two** — no friendly setup reachable at the second
+  season's start.
+* **No contract-renewal message toward season end**, which the original raises.
+* **The finance INCOME and EXPENSE screens do nothing** when opened, although both are
+  tracked in captures.
+* **TEAM TACTICS does not match the tracked original** (`tactics_subscreens_re.md` holds
+  the measurements).
+* **Neither cheat works in play**: MIXED PLAY (blocked on the un-located club tactic
+  byte, §3b) AND the shipped THREE UP FRONT hack — Mats reports no effect ("won't get me
+  goals"). Verify the OPTIONS toggle persists, that the career's matches actually route
+  through `Pm98StatMatch` (audit S5: European ties use the legacy engine), and that the
+  hack fires on his XI.
+* ~~Debt alert at week 1 despite millions positive~~ — **FIXED 2026-07-26** (`2201ccf`):
+  the at-a-loss trigger followed the week's P&L; it now follows the BANK BALANCE, the
+  reading the refrun witnesses support (R16 correction in
+  `REFRUN_manutd_1997-98_FINDINGS.md`).
+
 ## The one-paragraph truth
 
 The **manager game** — career, leagues, transfers, finance, tactics, cups, Europe, youth,
@@ -245,10 +278,18 @@ pass (touch targets, screen sizes), app icon/splash, and a signed release build.
   driver (`Pm98Driver`), the full per-player DECIDE/ADVANCE, relationship matrix, marker
   and role selection, ball advance, the trig LUTs, the event queue and dispatcher — all
   ported and oracle-locked. They are done; they are simply not the engine the app calls.
-* **321 GDScript test scripts** under `app/tests/` (224 `test_*`, 42 `diag_*`, 55 `shot_*`;
-  the old "219" count here was stale). Caveats: a full sweep has never run to completion,
-  CI runs no test gate (`build-android.yml` only exports the APK; `screenshot.yml` steps
-  are `|| true`), and all 20 `diff_*_parity.py` gates are manual-only.
+* **322 GDScript test scripts** under `app/tests/` (225 `test_*`, 42 `diag_*`, 52+ `shot_*`).
+  **The first full sweep ran to completion 2026-07-26**: 223 of 225 `test_*` green (11 of
+  them print non-standard pass markers — "ALL GREEN", per-check "PASS", "N checks, 0
+  FAIL"), the 2 failures both accounted for (`test_decideset` = the +0x43c sentinel gap,
+  fixed the same day by `f5ab46c`, green on HEAD; `test_pyramid` = FLAKY, an RNG season
+  meeting the sparse-English-squads gap — S3's non-reproducibility makes it
+  non-deterministic). `shot_*` all ran; the two `*_tapthrough` harnesses fail their
+  boot-raises-TITLE check when a prior career save exists in `user://` (harness-state
+  contamination, not an app bug). 3 `diag_*` are rotten as scripts (missing output env /
+  old-API calls) — probes, not tests. Remaining caveats: CI still runs no test gate
+  (`build-android.yml` only exports the APK) and all 20+ `diff_*_parity.py` gates are
+  manual-only.
 * **Render-diff discipline**: screen after screen is baked from the real captured frames and
   proven at 0 differing pixels by a `tools/re/diff_*_parity.py`. That is the standard every
   new screen has to clear.
