@@ -259,7 +259,13 @@ def export_kits(id_to_code: dict[str, str]) -> None:
             break
     pal = riff_palette("MANAGER.PAL")
     for cid, code in id_to_code.items():
-        img = render("DBDAT/MINIESC.PKF", f"EQ96{code}.BMP", force_vga=True, transparent=True)
+        # exact=True: the Pillow path honours the stripped header's bfOffBits and rotates
+        # every sprite 1024//48 rows + 1024%48 columns (the bank shipped wrapped until
+        # 2026-07-26 -- "40.png is two half-shirts"). pkf_image.dib_indices reads from
+        # offset 54 and gives MINIESC its true 45x57-bbox sprites, the ones the BRACKET
+        # frames match 1373/1661 opaque px (rest = the un-reversed outline pass).
+        img = render("DBDAT/MINIESC.PKF", f"EQ96{code}.BMP", force_vga=True,
+                     transparent=True, exact=True)
         img.save(KITS_DIR / f"{cid}.png")
         decode_dib(nano[f"EQ96{code}.BMP"], pal).save(nano_dir / f"{cid}.png")
     print(f"exported {len(id_to_code)} kit PNG pairs -> {KITS_DIR.relative_to(ROOT)} (+nano/)")
