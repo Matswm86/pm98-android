@@ -2940,7 +2940,8 @@ func _show_finance_screen() -> void:
 		_career.insurance_ledger(), _career.week_books(), _career.live_week_book(),
 		_career.cash_at_close(),
 		{"supercup": not _career.supercup.is_empty(),
-			"intercontinental": not _career.intercontinental.is_empty()})
+			"intercontinental": not _career.intercontinental.is_empty(),
+			"euro_comp": _career.euro_income_comp()})
 	scr.prices_pressed.connect(_show_finance_control)
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
 	# Secret cash cheat: 5 taps on the live-cash box deposit £100M, then re-render with it.

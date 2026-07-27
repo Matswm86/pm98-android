@@ -558,7 +558,30 @@ static func _sum_of(vals: Array) -> int:
 	return t
 
 
+## The 4th income row's LABEL names the European competition the club is in, and the
+## original chooses it at draw time — `FUN_0050812e` @0x5081B0..0x50838F is a three-arm
+## ladder over two competition globals, `EUROPEAN CUP INCOME` (0x659B0C) first, then
+## `CUP WINNERS CUP INCOME` (0x659AF4 + 0x659B00, drawn as one string), and
+## `U.E.F.A. CUP INCOME` (0x659AE0) as the FALL-THROUGH. `Career.euro_income_comp()`
+## carries the key in.
+##
+## Font/pen/ink are not chosen, they are read off the frames by
+## `tools/re/probe_text_anchor.py`: proman8, pen (34,147), ink (80,110,5) — an IDENTICAL
+## bitmap match on BOTH witnesses (013 `EUROPEAN CUP INCOME`,
+## `orig/51_finance_season.png` `U.E.F.A. CUP INCOME`).
+const EURO_LABELS := {
+	"european_cup": "EUROPEAN CUP INCOME",
+	"cup_winners_cup": "CUP WINNERS CUP INCOME",
+	"uefa_cup": "U.E.F.A. CUP INCOME",
+}
+const EURO_LABEL_PEN := Vector2i(34, 147)
+const C_ROW_LABEL := Color8(80, 110, 5)
+
+
 func _draw_ledger() -> void:
+	_blit(_page8, _g8, EURO_LABEL_PEN.x, EURO_LABEL_PEN.y,
+		str(EURO_LABELS.get(str(_oneoff.get("euro_comp", "uefa_cup")),
+			EURO_LABELS["uefa_cup"])), C_ROW_LABEL)
 	var income_vals := _income_vals()
 	for i in income_vals.size():
 		_txt_right(_pageV, _gV, INC_PEN_END, ROW_PEN_TOP + i * ROW_STEP,

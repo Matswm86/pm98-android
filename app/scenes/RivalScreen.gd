@@ -103,6 +103,7 @@ var _own_tactics: Tactics = null
 var _tactics: Tactics = null
 var _assist_q: int = 0
 var _assist_name: String = ""
+var _human_manager: String = ""     # human player managing the RIVAL (club+0x5c), "" = COMPUTER
 var _division: String = ""
 var _season: String = "1997-98"
 var _week: int = 0
@@ -250,9 +251,13 @@ func _load_digit_cells() -> void:
 ## Feed the RIVAL club, the manager's OWN club + tactics (the ghost overlay is YOUR
 ## planned shape mirrored onto the scouting pitch), the assistant gate + name, and
 ## the calendar/header data.
+## `human_manager` is the name of the HUMAN PLAYER managing the rival club, "" when
+## none — see `_draw_manager_box` for the binary's own rule. This engine holds one
+## career save (SeleccionScreen's declared hot-seat gap), so it is always "" today.
 func setup(rival: Dictionary, own: Dictionary, assist_quality: int, assist_name: String = "",
 		division: String = "", season: String = "1997-98", week: int = 0, header := {},
-		own_tactics: Tactics = null) -> void:
+		own_tactics: Tactics = null, human_manager: String = "") -> void:
+	_human_manager = human_manager.strip_edges()
 	_rival = rival
 	_own = own
 	_own_tactics = own_tactics
@@ -559,11 +564,16 @@ func _draw_right_panel() -> void:
 				draw_texture(_eq_off, Vector2(x + 1, STRIP_CELL_Y + 6))
 		PMChrome.text(self, _f10, STRIP_VAL_RIGHT, STRIP_VAL_Y, str(tr), C_STRIP_VAL, 10, 2)
 
-	# COMPUTER band is baked; a human-managed rival overdraws it (un-walked).
-	# manager is null since the exact rebuild (EQUIPOS stores no manager) —
-	# null-safe read, else str(null) paints "<null>" over the baked band.
-	var mgr_v: Variant = _rival.get("manager")
-	var mgr := (str(mgr_v) if mgr_v != null else "").strip_edges()
+	# The COMPUTER band is baked. FUN_005733d0 @0x573b0a:
+	#     iVar8 = club[0x5c]; puVar10 = PTR_s_COMPUTER_00662da8;
+	#     if (iVar8 != 0xffff) puVar10 = DAT_0066c178 + iVar8 * 0x9c;
+	# club+0x5c is the HUMAN-PLAYER slot index (0xffff = none) and DAT_0066c178 is
+	# the human players' record table — so this box names a HUMAN opponent in a
+	# hot-seat game and reads the literal COMPUTER otherwise. It is NOT the club's
+	# EQUIPOS manager (that name belongs to the LINE-UP roll header and START OF
+	# SEASON, where it is witnessed): drawing it here painted "Van Gaal" over
+	# frame 015's COMPUTER, the 440 px `diff_entry_parity` failure.
+	var mgr := _human_manager
 	if mgr != "":
 		draw_rect(Rect2(R_COMPUTER.position.x + 2, R_COMPUTER.position.y + 2,
 			R_COMPUTER.size.x - 4, R_COMPUTER.size.y - 4), Color8(0, 0, 128), true)

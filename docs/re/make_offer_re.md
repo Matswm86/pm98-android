@@ -32,6 +32,15 @@ dictionary; `Main._show_make_offer_card` (the TRANSFERS route) fills it,
 `_show_browse_offer_card` (the cold route) does not. Test
 `app/tests/test_make_offer_seed.gd`.
 
+**Correction, 2026-07-27.** The code and that test had drifted from this rule: `setup`'s
+no-seed default was `fee`, not the floor, and the test asserted it, so the COLD card
+opened at £3,000,000 where frame `101_164714` shows **£5,000** — a 294 px
+`diff_entry_parity` `makeoffer_101` failure. The default is the floor again and the two
+asserts now demand the frame. Reaching a £14M bid from the floor is what the original
+asks of you on a cold approach; the ergonomic answer is the TRANSFERS route, which is
+itself witnessed (Almeyda opens at his £8,500,000 asking terms), not a pre-fill the
+original does not draw.
+
 ## Binding frames (run 3)
 
 | frame | state |

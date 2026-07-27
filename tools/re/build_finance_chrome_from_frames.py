@@ -72,6 +72,21 @@ EXP_CELL_L, EXP_CELL_R = 497, 602      # brown value cell x-span (601 is the las
 INC_SRC_X = 207                        # clean green column (digit-free)
 EXP_SRC_X = 500                        # clean brown column
 
+# ---- the DYNAMIC euro-income row label (income row 3) ---------------------
+# The 4th income row names the European competition the club is in, and the original
+# picks one of THREE strings for it (FUN_0050812e @0x5081B0..0x50838F; see
+# finance_screen_re.md "the SUMMARY view's euro label"). It was baked static out of
+# frame 013's `EUROPEAN CUP INCOME` until 2026-07-27, which printed Man Utd's
+# competition on every career.
+#
+# The plate under it is FLAT: in y146..158 the panel runs (220,220,220) from x32 to
+# x197 with white margins at x25..31 and x198..199 — asserted below against the frame
+# itself, and cross-checked between the two witnesses (013 `EUROPEAN CUP INCOME`,
+# `orig/51_finance_season.png` `U.E.F.A. CUP INCOME`), which are pixel-identical
+# everywhere outside the ink. So a flat refill IS the original's own ground.
+EURO_LABEL_BOX = (32, 146, 198, 159)   # x0,y0,x1,y1 — inside the white margins
+EURO_LABEL_BG = (220, 220, 220)
+
 # ---- totals --------------------------------------------------------------
 TOT_Y0, TOT_Y1 = 282, 296
 TOT_INC_L, TOT_INC_R, TOT_INC_SRC = 160, 306, 163   # (180,200,220) light-blue box
@@ -181,6 +196,13 @@ def blank_body(a: np.ndarray) -> None:
     for i in range(N_EXPENSE):
         y0 = ROW_Y0 + i * ROW_STEP
         col_copy(a, EXP_SRC_X, EXP_SRC_X + 1, EXP_CELL_R, y0, y0 + ROW_H)
+    # the euro-income row's LABEL (the scene redraws whichever of the three it is)
+    ex0, ey0, ex1, ey1 = EURO_LABEL_BOX
+    margin = {tuple(int(v) for v in a[y, x])
+              for y in range(ey0, ey1) for x in (25, 31, 198, 199)}
+    if margin != {(255, 255, 255)}:
+        raise SystemExit(f"euro label margins are not the white rules: {margin}")
+    fill(a, EURO_LABEL_BG, ex0, ey0, ex1, ey1)
     col_copy(a, TOT_INC_SRC, TOT_INC_SRC + 1, TOT_INC_R, TOT_Y0, TOT_Y1)
     col_copy(a, TOT_EXP_SRC, TOT_EXP_SRC + 1, TOT_EXP_R, TOT_Y0, TOT_Y1)
     blank_tiles(a)

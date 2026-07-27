@@ -70,6 +70,27 @@ func _run() -> void:
 	await process_frame
 	ok = _assert((screen._sum["income_lines"] as Array).size() == 4, "screen received the summary") and ok
 
+	# The euro-income row's three labels are the binary's own strings, and the SELECTION
+	# rule is the ladder at 0x5081B0..0x50838F: European Cup, else Cup Winners' Cup, else
+	# U.E.F.A. as the fall-through (finance_screen_re.md). Pixel proof of the two
+	# witnessed arms is `tools/re/diff_finance_eurolabel_parity.py`; this pins the rule.
+	var car := Career.new()
+	car.club_id = 40
+	car.euro_seeds = {"european_cup": [40, 7], "uefa_cup": [3, 9]}
+	ok = _assert(car.euro_income_comp() == "european_cup",
+		"in the European Cup -> EUROPEAN CUP INCOME") and ok
+	car.euro_seeds = {"cup_winners_cup": [40], "uefa_cup": [3]}
+	ok = _assert(car.euro_income_comp() == "cup_winners_cup",
+		"in the Cup Winners' Cup -> CUP WINNERS CUP INCOME") and ok
+	car.euro_seeds = {"uefa_cup": [40]}
+	ok = _assert(car.euro_income_comp() == "uefa_cup", "in the U.E.F.A. Cup -> its own row") and ok
+	car.euro_seeds = {"european_cup": [7], "uefa_cup": [3]}
+	ok = _assert(car.euro_income_comp() == "uefa_cup",
+		"in NO European competition -> the U.E.F.A. fall-through (witness orig/51)") and ok
+	ok = _assert(FinanceScreen.EURO_LABELS.size() == 3
+		and str(FinanceScreen.EURO_LABELS["cup_winners_cup"]) == "CUP WINNERS CUP INCOME",
+		"all three binary label strings are present") and ok
+
 	screen.queue_redraw()
 	for _i in 3:
 		await process_frame

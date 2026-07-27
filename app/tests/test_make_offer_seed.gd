@@ -31,19 +31,27 @@ func _run() -> void:
 	var taylor := {"id": 1, "name": "TAYLOR", "pos": "FW", "attrs": {}}
 	var club := {"id": 2, "name": "Blackpool"}
 
-	# --- cold approach: fee-seeded offer, everything else the frame-101 rest ---
+	# --- cold approach: the WHOLE panel at the floor, exactly as frame 101 shows ---
+	# Corrected 2026-07-27. These two asserts used to demand the club FEE and they
+	# contradicted the original: walkthrough frame `101_164714` is this very state —
+	# Taylor, CLUB FEE £3,000,000, CLUB OFFER **£5,000** — and asserting the fee drove
+	# a 294 px `diff_entry_parity` failure. The owner's "a £14M bid takes hundreds of
+	# taps" is answered by the TRANSFERS route below (itself witnessed: Almeyda's card
+	# opens at his £8,500,000 asking terms), not by pre-filling the cold card, which
+	# the original does not do. See make_offer_re.md "The card has TWO opening states".
 	card.setup(taylor, club, 3_000_000, 50_000_000)
-	ok = _assert(card._offer == 3_000_000,
-		"cold approach opens AT the club fee (got £%d)" % card._offer) and ok
+	ok = _assert(card._offer == MakeOfferScreen.FLOOR,
+		"cold approach opens at the FLOOR, not the club fee (got £%d)" % card._offer) and ok
 	ok = _assert(card._wage_yearly == MakeOfferScreen.FLOOR, "wage still at the floor") and ok
 	ok = _assert(card._years == MakeOfferScreen.YEARS_MIN, "YEARS 1") and ok
 	ok = _assert(card.checked_clauses().is_empty(), "no clause ticked") and ok
-	# A £16M cold approach — the owner's own example — must not open at £5,000.
+	# A £16,000,000 fee changes nothing on the cold card — the fee is the SELLER's
+	# number, printed in the CLUB FEE box; the OFFER box is the manager's own bid.
 	var ronaldo := {"id": 9, "name": "RONALDO", "pos": "FW", "attrs": {}}
 	card.setup(ronaldo, club, 16_000_000, 50_000_000)
-	ok = _assert(card._offer == 16_000_000,
-		"a £16,000,000 cold approach opens at £16,000,000 (got £%d)" % card._offer) and ok
-	# A fee UNDER the floor still clamps up to the floor.
+	ok = _assert(card._offer == MakeOfferScreen.FLOOR,
+		"a £16,000,000 cold approach still opens at the floor (got £%d)" % card._offer) and ok
+	# A fee UNDER the floor still leaves the offer at the floor.
 	card.setup(taylor, club, 1_000, 50_000_000)
 	ok = _assert(card._offer == MakeOfferScreen.FLOOR, "a sub-floor fee clamps up") and ok
 

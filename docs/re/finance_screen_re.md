@@ -2,8 +2,9 @@
 
 Status: BUILT — all six view/period combinations 0 px against their frames
 (summary: p0495/p0509; detail: 006/008/012, 2026-07-27). Open: the `N bonuses`
-count model, the SIGN-row label grammar, the summary view's dynamic euro
-label + chart axis (LATENT DEFECT §end), the two unmeasured domestic-cup TV fees.
+count model, the SIGN-row label grammar, the summary view's chart axis scale
+(LATENT DEFECT §end), the two unmeasured domestic-cup TV fees. The summary's
+dynamic euro label is CLOSED (2026-07-27, both witnessed arms 0 px).
 
 The earlier "reversed-from-MANAGER.EXE" hand-drawn version was **rejected as
 invented** (wrong labels, invented tab colours, an invented SET PRICES button + a
@@ -355,8 +356,36 @@ competition object at `DAT_0066B1B0` (`call [vt+0x48]` at 0x50823F). So the row 
 were simply two different entrants — exactly the reading the note above suspected, now
 with the code behind it.
 
-Still open here, deliberately not built this pass: the label is baked into `chrome.png`
-and drawing it live needs a baker change (blank the label box) plus a re-run of
-`diff_finance_perweek_parity.py` — worth doing with the next finance capture, since the
-same pass has to settle the `±N K.` axis scale, whose driver is still unknown (no third
-witness, and the axis static is a separate blit).
+**BUILT 2026-07-27 — the LABEL half is CLOSED, and both witnessed arms are 0 px.**
+The decompile `docs/re/finance/fn_0050812e_FUN_0050812e.c` shows the chain is a
+three-arm ladder over two competition globals, with U.E.F.A. as the **fall-through**:
+
+```
+if      ((*DAT_0066b1b4)->vt[0x48]() != 0)  ->  EUROPEAN CUP INCOME      0x659B0C
+else if ((*DAT_0066b1b0)->vt[0x48]() != 0)  ->  CUP WINNERS CUP INCOME   0x659AF4+0x659B00
+else                                        ->  U.E.F.A. CUP INCOME      0x659AE0
+```
+
+which is exactly why the non-European career reads `U.E.F.A. CUP INCOME`: it is not a
+"UEFA default", it is the arm nothing else claimed.
+
+* **Baker** (`build_finance_chrome_from_frames.py`, `EURO_LABEL_BOX`): the label plate
+  is flat — in y146..158 the panel is `(220,220,220)` from x32 to x197 between white
+  rules at x25..31 and x198..199, asserted at bake time and cross-checked between the
+  two witnesses, which are **pixel-identical everywhere outside the ink**. So the refill
+  is the original's own ground, not a reconstruction. Blanked in `blank_body`, so both
+  summary chromes get it.
+* **Scene**: `FinanceScreen.EURO_LABELS` / `_draw_ledger`, fed `oneoff.euro_comp` from
+  `Career.euro_income_comp()` (membership = entered this season, `euro_seeds`). Font,
+  pen and ink are READ, not chosen — `tools/re/probe_text_anchor.py` returns an
+  identical-bitmap match on both frames: **proman8, pen (34,147), ink (80,110,5)**.
+* **Gate**: `tools/re/diff_finance_eurolabel_parity.py` +
+  `app/tests/shot_finance_eurolabel.gd`. `european_cup` vs `013_164406` **0 px**,
+  `uefa_cup` vs `orig/51_finance_season.png` **0 px** — two arms, two different careers.
+  `diff_finance_perweek_parity` and `diff_finance_detail_parity` re-run green.
+* **Still declared**: the `CUP WINNERS CUP INCOME` arm has no capture. Its string is the
+  binary's own and the gate asserts only that it renders and differs from the other two.
+
+**Still open: the `±N K.` chart axis scale.** Its driver is unknown (013 `±2,500 K.`,
+`orig/51` `±250 K.`), the axis static is a separate blit, and no third witness exists.
+That half stays a recorded defect and wants the next finance capture.

@@ -3262,6 +3262,30 @@ func _queue_channel_tv() -> void:
 			return
 
 
+## Which European competition the club is IN this season, as the FINANCES summary's
+## euro-income row names it: `"european_cup"` / `"cup_winners_cup"` / `"uefa_cup"`.
+##
+## The original's branch chain is `FUN_0050812e` @0x5081B0..0x50838F, and it is a
+## THREE-arm ladder over two competition globals, not a two-way switch:
+##
+##     if ((*DAT_0066b1b4)->vt[0x48]() != 0)      -> `EUROPEAN CUP INCOME`  @0x659B0C
+##     else if ((*DAT_0066b1b0)->vt[0x48]() != 0) -> `CUP WINNERS CUP INCOME` @0x659AF4
+##     else                                       -> `U.E.F.A. CUP INCOME`  @0x659AE0
+##
+## so U.E.F.A. is the FALL-THROUGH, which is exactly why the parity run's non-European
+## lower-club career (`orig/51_finance_season.png`) reads `U.E.F.A. CUP INCOME` while
+## walkthrough frame 013 (Man Utd in the European Cup) reads `EUROPEAN CUP INCOME`.
+## Membership is "entered this season" (`euro_seeds`, the domestic entrant list), so the
+## row keeps naming the competition after a knockout — which is what an income row for
+## the season has to do. Declared: the original's predicate is a virtual call this port
+## cannot see through, so "entered" is the reading, not a decoded flag.
+func euro_income_comp() -> String:
+	for key in ["european_cup", "cup_winners_cup"]:
+		if (euro_seeds.get(key, []) as Array).has(club_id):
+			return key
+	return "uefa_cup"
+
+
 ## The finished week records, oldest first (the PER WEEK stepper + the BALANCE chart).
 func week_books() -> Array:
 	return week_ledgers

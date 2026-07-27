@@ -157,7 +157,38 @@ FUN_004fe2d0 band rule) with `Tactics.auto_pick_shape` selecting the XI for the 
 band counts; clubs missing from the data fall back to `Tactics.auto_pick` + stock
 formations (MatchSim still fields CPU sides with auto_pick — unchanged). The parity shot
 injects the walked marker list (the frame also pins the XI). The
-COMPUTER/mgr box shows the rival club's `manager`, else `COMPUTER`. Native 640x480;
+COMPUTER/mgr box is settled from the binary (2026-07-27) — see §"The COMPUTER box"
+below; it is NOT the club's EQUIPOS manager. Native 640x480;
 scales to fit its parent (same transform as LINE-UP). Wired at the hub OPPONENT icon
 (Main `_show_opponent`, which also passes the manager's own Tactics for the ghost
 overlay). Tests: `app/tests/test_rival_screen.gd`.
+
+## The COMPUTER box — SETTLED from the binary, 2026-07-27
+
+The right-panel band at (482,205) 152x15 was the last un-walked cell on this screen, and
+the port had guessed that "a named rival manager overdraws it". When the 476 EQUIPOS
+managers landed (2026-07-27, O3) that guess started painting Barcelona's real manager
+`Van Gaal` over the frame's `COMPUTER`, which is the 440 px `diff_entry_parity`
+`rival_015` failure that had been carried as untriaged.
+
+`FUN_005733d0` @0x573b0a settles it (`docs/re/verrival/fn_005733d0_FUN_005733d0.c`):
+
+```
+iVar8   = *(int *)(*(int *)(param_1 + 0x1928) + 0x5c);   /* club+0x5c            */
+puVar10 = PTR_s_COMPUTER_00662da8;                       /* the literal COMPUTER */
+if (iVar8 != 0xffff) {
+  puVar10 = (undefined *)(DAT_0066c178 + iVar8 * 0x9c);  /* human-player record  */
+}
+```
+
+`club+0x5c` is the **HUMAN-PLAYER slot index**, `0xffff` when the club has none — the
+same sentinel the season rollover reads to decide whose news gets the retirement message
+(`retirement_re.md` §RETIRE, 0x58ad9c). `DAT_0066c178 + idx*0x9c` is the hot-seat player
+record table, so this box names a **human opponent** and reads the literal `COMPUTER` for
+every AI club. The EQUIPOS tag-2 manager name belongs to the LINE-UP roll header and the
+START OF SEASON sheet, where it *is* witnessed ("Gregory", "Van Gaal") — not here.
+
+Ported: `RivalScreen.setup(..., human_manager := "")`, which overdraws the baked band only
+when it is non-empty. This engine holds ONE career save (SeleccionScreen's declared
+hot-seat gap), so no rival is ever human-managed today and the band always reads
+`COMPUTER`, exactly as the original does in a one-player game. `rival_015` is 0 px again.

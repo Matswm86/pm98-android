@@ -196,7 +196,12 @@ func setup(player: Dictionary, selling_club: Dictionary, fee: int, cash: int,
 	_club = selling_club
 	_fee = fee
 	_cash = cash
-	_offer = maxi(FLOOR, int(seed.get("offer", maxi(FLOOR, fee))))
+	# NO seed = the COLD approach (the OFFERS map browse), and the original opens that
+	# card at the FLOOR: frame 101_164714 shows Taylor's CLUB FEE £3,000,000 against a
+	# CLUB OFFER of £5,000 (make_offer_re.md "The card has TWO opening states"). Only
+	# the TRANSFERS route — a player already placed on the market — opens pre-filled
+	# with the seller's asking terms, and that route passes them in `seed`.
+	_offer = maxi(FLOOR, int(seed.get("offer", FLOOR)))
 	_wage_yearly = maxi(FLOOR, int(seed.get("yearly_wage", FLOOR)))
 	_years = clampi(int(seed.get("years", YEARS_MIN)), YEARS_MIN, YEARS_MAX)
 	_bonus = FLOOR

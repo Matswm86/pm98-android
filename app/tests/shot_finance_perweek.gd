@@ -49,8 +49,12 @@ func _run() -> void:
 	get_root().add_child(node)
 	node.position = Vector2.ZERO
 	node.size = Vector2(640, 480)
+	# The reference run is Manchester Utd. 1997-98, who are in the EUROPEAN CUP — so the
+	# 4th income row must name that competition, exactly as both frames show it
+	# (finance_screen_re.md "the SUMMARY view's euro label").
 	node.setup({}, "Manchester Utd.", "MWM", "1997-98", CASH, LEAGUE_WEEK, {},
-		[_full(WK29), _full(WK30)])
+		[_full(WK29), _full(WK30)], {}, FinanceScreen.NO_CASH_CLOSE,
+		{"euro_comp": "european_cup"})
 
 	node.show_week(31)
 	await process_frame
