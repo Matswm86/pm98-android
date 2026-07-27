@@ -1,4 +1,49 @@
-# PM98 Android — remaining-work inventory (refreshed 2026-07-26)
+# PM98 Android — remaining-work inventory (refreshed 2026-07-27)
+
+## 0a. Closed 2026-07-27 (session s69) — the carried fix-first tail
+
+* ~~**The PRE-EXISTING `diff_entry_parity` `rival_015` failure (440 px, untriaged).**~~ —
+  **CLOSED.** Not a kit or palette issue at all: VIEW RIVAL's `COMPUTER` band is read
+  from the HUMAN-PLAYER table, not from the club's manager. `FUN_005733d0` @0x573b0a
+  takes `club+0x5c` (the hot-seat slot, `0xffff` = none) into `DAT_0066c178`, else the
+  literal `COMPUTER` — so the 476-manager decode had started painting "Van Gaal" over
+  frame 015. `RivalScreen.setup(..., human_manager)`. The whole 18-pair gate is 0 px.
+* ~~**MAKE OFFER opened at the club fee.**~~ — **CLOSED**, found by the same gate run
+  (294 px on `makeoffer_101`, never reported): the COLD route opens at the FLOOR, which
+  is frame `101_164714` exactly (£5,000 against a £3,000,000 fee). Only the TRANSFERS
+  route pre-fills, and it passes the terms in. Two tests corrected.
+* ~~**The finance SUMMARY's euro-income label (rule decoded, build deferred).**~~ —
+  **BUILT.** `FUN_0050812e` @0x5081B0..0x50838F is a three-arm ladder with U.E.F.A. as
+  the FALL-THROUGH, which is why a non-European career reads it. Baked plate blanked,
+  label drawn live from `Career.euro_income_comp()`, font/pen/ink READ off the frames
+  (proman8, pen 34,147, ink 80,110,5). New gate `diff_finance_eurolabel_parity.py`:
+  **both witnessed arms 0 px, from two different careers.** The `±N K.` axis scale is
+  still open (§0 below).
+* ~~**OffersScreen's kit panel.**~~ — **0 px outside the kit sprites.** Three real
+  defects: foreign grids were sorted by name where the original uses the ARCHIVE's own
+  record order (England keeps its sort — witness 44 costs 899 px without it), and both
+  panel texts had the wrong font and pen (solved on four country witnesses). What is
+  left inside the cells is the shadow pass — measured, see below.
+* ~~**The never-completed full suite sweep.**~~ — **RUN END TO END: 232 files, 227
+  clean, 5 failures, all five closed.** Every one was a test that had outlived a shipped
+  model change (the two offer cards, `total_weeks` 38 -> 39 after the blank Saturday,
+  "rivals age" after S8's rebirth, and five `test_manager` asserts resting on where the
+  sim put one club — now fired through the board's table-independent FINANCIAL reason,
+  the one the binary tests first).
+* ~~**The audit's doc hygiene.**~~ — **CLOSED with generated indexes**, not 113
+  hand-written sentences: `docs/re/STATUS_INDEX.md` (125 docs vs gate/suite/EXE
+  addresses — 16 have no evidence link at all, and that is the real backlog) and
+  `docs/re/WALKTHROUGH_MANIFEST.md` (every frame named by the auto-driver's own taught
+  signatures; 182 of 636 frames cited by any doc, so 454 are captured and unread).
+  `ChannelTvScreen` has a suite. See the truth table at the end.
+
+**Still open on the 48x64 / nano kit bevel** (it needs the pass's CODE, and that is now
+stated with numbers rather than as a shrug — `offers_map_re.md`): every differing pixel
+is white in the port and grey in the original; a `dx=2, dy=2` shifted-silhouette stamp
+explains 1670 of 1992 px; it is NOT the realised-palette bug; and it is NOT
+position-constant (46 unanimous positions over 40 cells), so it cannot be baked the way
+the MINIESC ring was.
+
 
 Mats asked: "I want the game on Android as it was on PC in '98 — what's missing?"
 This is the honest, full list. Nothing hidden.
