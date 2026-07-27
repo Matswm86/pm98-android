@@ -106,6 +106,29 @@ func _run() -> void:
 	scr._on_input(_touch(fc, false))
 	ok = _assert(got == ["finance"], "hub taps work again after the modal") and ok
 
+	# The hub-EXIT confirm (WITNESSED 2026-07-27, wine-captures-2026-07-27-hubexit):
+	# EXIT raises the leave-championship Yes/No box over the LUT-dimmed hub;
+	# No dismisses back to the live hub; Yes emits exit_confirmed (-> title screen).
+	var left: Array = []
+	scr.exit_confirmed.connect(func() -> void: left.append(true))
+	scr.confirm_exit()
+	ok = _assert(scr._confirm_tex != null, "EXIT raises the confirm box") and ok
+	got.clear()
+	scr._on_input(_touch(fc, true))
+	scr._on_input(_touch(fc, false))
+	ok = _assert(got.is_empty(), "confirm is modal (hub taps swallowed)") and ok
+	var noc: Vector2 = PMAlert.no_rect(LeaveConfirm.MSG).get_center()
+	scr._on_input(_touch(noc, true))
+	scr._on_input(_touch(noc, false))
+	ok = _assert(scr._confirm_tex == null and left.is_empty(),
+		"No dismisses without leaving") and ok
+	scr.confirm_exit()
+	var yesc: Vector2 = PMAlert.yes_rect(LeaveConfirm.MSG).get_center()
+	scr._on_input(_touch(yesc, true))
+	scr._on_input(_touch(yesc, false))
+	ok = _assert(scr._confirm_tex == null and left.size() == 1,
+		"Yes emits exit_confirmed exactly once") and ok
+
 	scr.queue_free()
 	print("\n%s" % ("ALL PASS" if ok else "FAILURES ABOVE"))
 	quit(0 if ok else 1)

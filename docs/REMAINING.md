@@ -207,14 +207,19 @@ Four more, reported 2026-07-26 evening (second round, same play session):
   there: confirm **S7** (the European field shape — 24 clubs / 6 groups / 2
   qualifying rounds) is actually shipped, and extend `test_career`'s zero-fallback
   assert to cover a season WITH European fixtures.
-* **EXIT from the career hub must go straight to the ORIGINAL start screen.**
-  Today `Main.gd:4426` `"exit": _leave_career()` → `_leave_career()` (`:2036`)
-  lands on `_show_home()` = the BrowseScreen DB navigation — a port-only surface
-  the original does not show there. The witnessed precedent already in-repo:
-  the in-match EXIT confirm ("leave the championship?", `LeaveConfirm.gd`) sends
-  Yes → the TITLE screen. Route the hub EXIT the same way (career saved first,
-  as now); check the walked frames for whether the original interposes its own
-  confirm box on hub EXIT before wiring one.
+* ~~**EXIT from the career hub must go straight to the ORIGINAL start screen.**~~ —
+  **BUILT 2026-07-27, witness-first.** The open question ("does the original
+  interpose a confirm?") was answered by driving the real game: hub EXIT raises
+  the SAME "Do you want to leave the championship ?" Yes/No box as the in-match
+  EXIT, over the **LUT-dimmed** hub (pixel-checked: 255→160/160/164, 100→80 — the
+  PMAlert dim family), and Yes lands on the **TITLE screen**. Three witness frames:
+  `screenshots/wine-captures-2026-07-27-hubexit/` (hub_before_exit /
+  hub_exit_confirm / hub_exit_yes_title). Wired: `MenuScreen.confirm_exit()`
+  (modal Yes/No over the dimmed hub, LeaveConfirm's box + press feedback),
+  `Main._leave_career_to_title()` (career SAVED first — nothing is mid-flight at
+  the hub, unlike the in-match abandon), title mounted over the home browser
+  exactly like boot. The old `_leave_career()` → DB-browser route is gone.
+  `test_menu_screen.gd` +5 asserts (modal, No dismisses, Yes emits once).
 
 The **manager game** — career, leagues, transfers, finance, tactics, cups, Europe, youth,
 staff, training, contracts, board, screens, scouting, insurance, injuries, honours — is

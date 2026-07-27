@@ -1976,6 +1976,7 @@ func _mount_hub() -> void:
 		_hub.set_anchors_preset(Control.PRESET_FULL_RECT)
 		add_child(_hub)
 		_hub.action_selected.connect(_menu_action.bind(_hub))
+		_hub.exit_confirmed.connect(_leave_career_to_title)
 	else:
 		move_child(_hub, get_child_count() - 1)
 	_hub.visible = true
@@ -2031,9 +2032,12 @@ func _show_save_dialog() -> void:
 	dlg.closed.connect(func() -> void:
 		dlg.queue_free())
 
-## Leave the career back to the database/home browser (MENUPRINCIPAL EXIT). Saves first,
-## frees the hub, clears the active career.
-func _leave_career() -> void:
+## Leave the career to the ORIGINAL start screen (MENUPRINCIPAL EXIT-Yes, witnessed
+## 2026-07-27: hub EXIT raises the leave-championship confirm over the LUT-dimmed hub
+## and Yes lands on the TITLE screen — wine-captures-2026-07-27-hubexit). Saves first
+## (unlike the in-match abandon, nothing here is mid-flight), frees the hub, clears
+## the career, and mounts the title over the home browser exactly like boot does.
+func _leave_career_to_title() -> void:
 	if _career != null:
 		_career.save()
 	if _hub != null and is_instance_valid(_hub):
@@ -2042,6 +2046,7 @@ func _leave_career() -> void:
 	_career = null
 	_nav = [_show_home]
 	_show_home()
+	_show_title_screen()
 
 func _career_advance() -> void:
 	var rng := RandomNumberGenerator.new()
@@ -4424,11 +4429,11 @@ func _cup_score_for(tie: Dictionary, cid: int) -> String:
 ## via _set_view (re-shown on Back); hub feedback (save / bye / signings) raises the
 ## original's modal "PREMIER MANAGER 98" alert box on the hub (docs/re/alert_box_re.md);
 ## CONTINUE plays the week (or opens end-of-season when the campaign is over); EXIT
-## leaves the career.
+## raises the witnessed leave-championship confirm (Yes -> the TITLE screen).
 func _menu_action(action: String, scr: MenuScreen) -> void:
 	AudioManager.ui_select()
 	match action:
-		"exit": _leave_career()
+		"exit": scr.confirm_exit()
 		"save":
 			_show_save_dialog()
 		"news": _show_club_news()

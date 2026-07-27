@@ -20,6 +20,9 @@ class_name MenuScreen
 signal action_selected(action: String)
 ## Every queued alert box has been answered and the hub is live again.
 signal alerts_cleared
+## The EXIT confirm's Yes ("Do you want to leave the championship ?" — witnessed on
+## hub EXIT 2026-07-27, wine-captures-2026-07-27-hubexit): leave to the title screen.
+signal exit_confirmed
 
 const W := 640
 const H := 480
@@ -166,6 +169,14 @@ var _alert_anim: float = 1.0       # grow-in progress 0..1 (case 5/6 zoom)
 var _alert_ok_held := false
 var _bg_dim: Texture2D             # menu_bg through the exact dim LUT
 
+# The EXIT confirm — the SAME "Do you want to leave the championship ?" Yes/No box the
+# in-match EXIT raises (LeaveConfirm.MSG), WITNESSED on hub EXIT 2026-07-27 over the
+# palette-dimmed hub (screenshots/wine-captures-2026-07-27-hubexit: hub_exit_confirm
+# shows the LUT dim, hub_exit_yes_title shows Yes -> the TITLE screen).
+var _confirm_tex: ImageTexture = null
+var _confirm_box: Rect2i
+var _confirm_held := ""            # "yes" / "no" / ""
+
 
 func _ready() -> void:
 	_bg = load("res://art/screens/menu_bg.png")
@@ -228,6 +239,23 @@ func alert(msg: String) -> void:
 
 func alert_active() -> bool:
 	return _alert_tex != null
+
+
+## Raise the witnessed hub-EXIT confirm: the leave-championship Yes/No box over the
+## LUT-dimmed hub. Yes emits exit_confirmed; No dismisses back to the live hub.
+func confirm_exit() -> void:
+	if _confirm_tex != null:
+		return
+	_confirm_tex = ImageTexture.create_from_image(
+		PMAlert.render(LeaveConfirm.MSG, false, true))
+	_confirm_box = PMAlert.box_rect(LeaveConfirm.MSG)
+	_confirm_held = ""
+	queue_redraw()
+
+
+## True while ANY modal box (alert queue or the EXIT confirm) dims the hub.
+func _modal_up() -> bool:
+	return _alert_tex != null or _confirm_tex != null
 
 
 func _next_alert() -> void:
@@ -353,6 +381,27 @@ func _on_input(e: InputEvent) -> void:
 		tap = true
 	if not tap:
 		return
+	if _confirm_tex != null:
+		# Modal: only the Yes/No cells react (the witnessed leave-championship box).
+		var dc := _to_design(pos)
+		var hitc := ""
+		if PMAlert.yes_rect(LeaveConfirm.MSG).has_point(dc):
+			hitc = "yes"
+		elif PMAlert.no_rect(LeaveConfirm.MSG).has_point(dc):
+			hitc = "no"
+		if pressed:
+			_confirm_held = hitc
+		else:
+			if _confirm_held != "" and _confirm_held == hitc:
+				var amc := get_node_or_null("/root/AudioManager")
+				if amc != null:
+					amc.ui_select()
+				_confirm_tex = null
+				if hitc == "yes":
+					exit_confirmed.emit()
+			_confirm_held = ""
+		queue_redraw()
+		return
 	if _alert_tex != null:
 		# Modal: only the alert's OK button reacts (the original DoModal loop).
 		if _alert_anim < 1.0:
@@ -420,9 +469,9 @@ func _txt(f: Font, x: int, y_top: int, s: String, col: Color, sz: int, cw := 0) 
 	draw_string(f, Vector2(px, y_top + f.get_ascent(sz)), s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz, _dc(col))
 
 
-## Palette-dim a colour while the modal alert is up (exact LUT; PMAlert).
+## Palette-dim a colour while a modal box is up (exact LUT; PMAlert).
 func _dc(c: Color) -> Color:
-	return PMAlert.dim_color(c) if _alert_tex != null else c
+	return PMAlert.dim_color(c) if _modal_up() else c
 
 
 ## Circle slot text: the original's cell centring (x0 + (cell_w - (adv-1)) / 2,
@@ -451,7 +500,7 @@ func _club_txt(baseline: int, t: String, col: Color) -> void:
 func _kit(tex: Texture2D, pos: Vector2) -> void:
 	if tex == null:
 		return
-	if _alert_tex != null:
+	if _modal_up():
 		tex = PMAlert.dim_texture(tex)
 	draw_texture_rect_region(tex, Rect2(pos, KIT_VIEW.size), KIT_VIEW)
 
@@ -464,7 +513,7 @@ func _draw() -> void:
 	var s := _scale()
 	draw_set_transform(_origin(s), 0.0, Vector2(s, s))
 
-	var dimmed := _alert_tex != null
+	var dimmed := _modal_up()
 
 	# The real MENUPRINCIPAL chrome (bars + icons + section labels + circle frame + bg);
 	# under the modal alert, the pre-baked exact palette-dim of the same frame.
@@ -521,6 +570,7 @@ func _draw() -> void:
 
 	if dimmed:
 		_draw_alert()
+		_draw_confirm()
 
 
 ## The top dropdown bar (hub_dropdown_bar.png): hidden by default, revealed by a tap on
@@ -565,3 +615,19 @@ func _draw_alert() -> void:
 	var t := clampf(_alert_anim, 0.05, 1.0)
 	var c := b.get_center()
 	draw_texture_rect(tex, Rect2(c - b.size * t * 0.5, b.size * t), false)
+
+
+## The EXIT confirm box (witnessed 2026-07-27): the leave-championship Yes/No dialog
+## with the alert framework's drop shadow; the held cell gets LeaveConfirm's 20%
+## white press feedback.
+func _draw_confirm() -> void:
+	if _confirm_tex == null:
+		return
+	var b := Rect2(_confirm_box)
+	draw_rect(Rect2(b.position.x + b.size.x, b.position.y + 5, 5, b.size.y), Color(0, 0, 0, 0.45), true)
+	draw_rect(Rect2(b.position.x + 5, b.position.y + b.size.y, b.size.x, 5), Color(0, 0, 0, 0.45), true)
+	draw_texture(_confirm_tex, Vector2(b.position))
+	if _confirm_held != "":
+		var r := PMAlert.yes_rect(LeaveConfirm.MSG) if _confirm_held == "yes" \
+			else PMAlert.no_rect(LeaveConfirm.MSG)
+		draw_rect(r, Color(1, 1, 1, 0.2), true)

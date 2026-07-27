@@ -103,3 +103,24 @@ colour bars / section labels / circle, so it did not match the real screen (comp
   save/news/staff/stadium/board/opponent→toast, exit→dismiss.
 - `preview_menu.py` is RETAINED (it documents the reversed per-icon/caption rects) but is
   no longer the source of menu_bg.png.
+
+## Hub EXIT — WITNESSED 2026-07-27 (wine drive)
+
+The "exit→dismiss" line above is superseded. Driven live in the original
+(`tools/re/wine/nav_career.sh` to a fresh Bolton career hub, then EXIT at (45,268)):
+
+- EXIT raises **the SAME "Do you want to leave the championship ?" Yes/No box** as the
+  in-match EXIT (`LeaveConfirm.MSG`), over the **palette-LUT-dimmed** hub — pixel-checked
+  against the pre-click frame: (255,255,255)→(160,160,164), (100,100,100)→(80,80,80),
+  (142,165,196)→(100,120,140) — the PMAlert dim family.
+- **Yes → the TITLE screen** (DATA BASE / MANAGER LEAGUE / PRO-MANAGER LEAGUE front door).
+- Witness frames: `screenshots/wine-captures-2026-07-27-hubexit/`
+  (`hub_before_exit.png`, `hub_exit_confirm.png`, `hub_exit_yes_title.png`).
+- No-path un-witnessed on the hub; wired as the framework's standard dismiss (the
+  in-match precedent's No resumes).
+
+Port: `MenuScreen.confirm_exit()` (modal Yes/No + dim, alert-framework drop shadow,
+LeaveConfirm's 20% press feedback), `Main._leave_career_to_title()` — career SAVED
+first (nothing is mid-flight at the hub, unlike the witnessed in-match UNSAVED abandon),
+hub freed, title over the home browser exactly as boot mounts it.
+`test_menu_screen.gd` covers modal/No/Yes.
