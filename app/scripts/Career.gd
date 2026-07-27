@@ -137,10 +137,17 @@ var training_focus: Dictionary = {}      # pid:int -> focus row (Training.FOCUS_
 var pending_alerts: Array = []          # queued hub "PREMIER MANAGER 98" alert texts; Main
                                         # raises + clears them when the hub next shows (the
                                         # witnessed post-flow timing, scout_screen_re.md 78)
-var career_rng_state: String = ""       # persisted state of the career RNG (S3 step: fold the
-                                        # per-call randomize() sites into ONE seeded stream).
+var career_rng_state: String = "":      # persisted state of the career RNG (S3: every former
+                                        # per-call randomize() site draws from ONE stream).
                                         # A string because the 64-bit state does not survive a
                                         # JSON double round-trip. "" = not seeded yet.
+                                        # Assigning a state RE-PINS a live stream too — create()
+                                        # already draws from it (academy/staff pools), so the
+                                        # acceptance machinery can pin a career after the fact.
+	set(v):
+		career_rng_state = v
+		if _career_rng != null and v != "":
+			_career_rng.state = v.to_int()
 var _career_rng: RandomNumberGenerator = null
 var external_signed: Dictionary = {}    # pid -> true: players bought off static (non-roster)
                                         # squads via the OFFERS browse (hidden from re-browse)
@@ -565,8 +572,7 @@ func _init_club(club: Dictionary, league: Dictionary, league_clubs: Array, leagu
 	t0.apply_club_levers(Tactics.club_levers(club_id))
 	tactics = t0.to_dict()
 	# A fresh academy + staff pool + free-agent pool for the new club (none carry across).
-	var yrng := RandomNumberGenerator.new()
-	yrng.randomize()
+	var yrng := career_rng()   # S3: the ONE persisted career stream
 	youth = []                    # witnessed empty (orig/39, parity run 2026-07-16)
 	staff = []
 	staff_pool = Staff.generate_pool(yrng, staff_seq, STAFF_POOL_PER_ROLE)
@@ -593,8 +599,7 @@ func _seed_squad(club_dict: Dictionary) -> Array:
 	# Morale/fitness kickoff = the EXE's season reset (FUN_005825c0): morale
 	# 90 + rand(10); fitness lands on 70 (halfway from a fresh 99 toward 40 —
 	# the exact value frames 081/084 pin for week 1). docs/re/morale_re.md.
-	var form_rng := RandomNumberGenerator.new()
-	form_rng.randomize()
+	var form_rng := career_rng()   # S3: the ONE persisted career stream
 	# The club's PM98 stature band (from its own squad strength) drives every seeded wage.
 	var band := TransferMarket.stature_of(club_dict.get("players", []), tier)
 	var out: Array = []
@@ -1575,8 +1580,7 @@ func _build_divisions(pyramid: Dictionary, rng: RandomNumberGenerator) -> void:
 ## the missed rounds (same engine, not invented numbers) so the witnessed
 ## "below divisions run a round ahead" offset holds mid-career.
 func ensure_divisions(pyramid: Dictionary) -> void:
-	var rng := RandomNumberGenerator.new()
-	rng.randomize()
+	var rng := career_rng()   # S3: the ONE persisted career stream
 	if divisions.is_empty():
 		_build_divisions(pyramid, rng)
 	else:
@@ -2110,8 +2114,7 @@ func board_review() -> Dictionary:
 		if not sacked and loss_weeks >= LOSS_SACK_WEEKS:
 			sacked = true
 			sack_reason = "insolvent"
-		var rng := RandomNumberGenerator.new()
-		rng.randomize()
+		var rng := career_rng()   # S3: the ONE persisted career stream
 		headhunt_pending = not sacked and Manager.headhunted(finished_pos, objective_pos, reputation, rng)
 		if sacked:
 			reputation = Manager.apply_delta(reputation, Manager.REP_SACK)
@@ -2301,10 +2304,13 @@ func cycle_training() -> void:
 
 # ---- youth team ----------------------------------------------------------
 
-## The career's own RNG stream (S3 step). One seeding roll at first use — the original
-## also seeds from time() once — then the state is persisted across save/load, so a
-## loaded career continues the SAME stream instead of re-randomizing per call site.
-## The remaining randomize() sites migrate here as they are touched.
+## The career's own RNG stream (S3, COMPLETE 2026-07-27). One seeding roll at first use
+## — the original also seeds from time() once — then the state is persisted across
+## save/load, so a loaded career continues the SAME stream instead of re-randomizing
+## per call site. Every former per-call randomize() in Career.gd and Main's career
+## paths now draws from here, so pinning `career_rng_state` BEFORE the first draw plus
+## seeding the advance-week rng pins a whole career (test_career_seed.gd). Presentation
+## randomness (commentary narration, the DB-browser sandbox) deliberately stays local.
 func career_rng() -> RandomNumberGenerator:
 	if _career_rng == null:
 		_career_rng = RandomNumberGenerator.new()
@@ -2609,8 +2615,7 @@ func _scout_apply_cap(found: Array) -> Array:
 		return found
 	var pool: Array = found.duplicate()
 	var kept: Array = []
-	var r := RandomNumberGenerator.new()
-	r.randomize()
+	var r := career_rng()   # S3: the ONE persisted career stream
 	while kept.size() < cap and not pool.is_empty():
 		kept.append(pool.pop_at(r.randi() % pool.size()))
 	return kept
@@ -2850,8 +2855,7 @@ func inject_due_talents(pool: Array, rng: RandomNumberGenerator = null) -> int:
 	if pool.is_empty():
 		return 0
 	if rng == null:
-		rng = RandomNumberGenerator.new()
-		rng.randomize()
+		rng = career_rng()   # S3: the ONE persisted career stream
 	var start_year := 1996 + year
 	var n := 0
 	for e in _by_tier(Talent.due_catchup(pool, start_year, talents_used)):
@@ -2990,8 +2994,7 @@ func promote_youth(pid: int) -> Dictionary:
 	p["contract_term"] = TransferMarket.NEW_CONTRACT_YEARS
 	Contract.stamp_wage(p, my_band())   # a first-team wage now he's promoted
 	p["auto_renew"] = false
-	var form_rng := RandomNumberGenerator.new()
-	form_rng.randomize()
+	var form_rng := career_rng()   # S3: the ONE persisted career stream
 	Morale.ensure(p, form_rng)   # fresh dynamic form, like the season kickoff roll
 	_assign_free_no(rosters[club_id], p)
 	rosters[club_id].append(p)
@@ -3663,8 +3666,7 @@ func sign_free_agent(pid: int, offer_weekly: int = -1, rng: RandomNumberGenerato
 	if offer_weekly < 0:
 		offer_weekly = Contract.demanded_weekly(player, my_band())
 	if rng == null:
-		rng = RandomNumberGenerator.new()
-		rng.randomize()
+		rng = career_rng()   # S3: the ONE persisted career stream
 	offers_left -= 1   # an offer counts whether or not it is accepted
 	var pname: String = player.get("name", "?")
 	var verdict := Contract.evaluate_renewal(player, offer_weekly, my_band(), rng)
@@ -4426,8 +4428,7 @@ func renew(pid: int, offer_weekly: int = -1, rng: RandomNumberGenerator = null) 
 	if offer_weekly < 0:
 		offer_weekly = Contract.demanded_weekly(player, my_band())
 	if rng == null:
-		rng = RandomNumberGenerator.new()
-		rng.randomize()
+		rng = career_rng()   # S3: the ONE persisted career stream
 	var verdict := Contract.evaluate_renewal(player, offer_weekly, my_band(), rng)
 	var pname: String = player.get("name", "?")
 	if not verdict["accepted"]:
@@ -4483,8 +4484,7 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	_capture_euro_honours()
 	_capture_season_honours()    # OURS: the ledger, written while the brackets still stand
 	if rng == null:
-		rng = RandomNumberGenerator.new()
-		rng.randomize()
+		rng = career_rng()   # S3: the ONE persisted career stream
 	_return_loanees()   # loanees go home before contracts tick (never counted as your leavers)
 	var leavers: Array = []
 	for p in rosters.get(club_id, []):

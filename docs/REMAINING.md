@@ -409,11 +409,17 @@ proof `app/tests/test_cheats_live.gd`.
 From `docs/re/AUDIT_season_playthrough_2026-07-25.md` (previously /tmp-only, now in-repo);
 verified still open at HEAD `4076800`:
 
-* **S3 — a career is not reproducible at a fixed seed.** 12 `randomize()` sites in
-  `Career.gd` (500, 528, 1467, 1988, 2187, 2250, 2388, 2629, 2742, 3292, 4052, 4109).
-  Not player-facing (the original also reseeds from `time()`), but the port's own
-  acceptance machinery — save/load equivalence, the M5 kill-test, seeded parity claims —
-  assumes a seed pins a career, and it does not.
+* ~~**S3 — a career is not reproducible at a fixed seed.**~~ — **CLOSED 2026-07-27.**
+  Every former per-call `randomize()` in `Career.gd` (10 remaining sites) and Main's
+  five career paths (season-open chain, weekly advance, honours seed, free-agent
+  signing, season rollover) now draws from the ONE persisted `Career.career_rng()`
+  stream (B8's pattern, completed); assigning `career_rng_state` re-pins a live stream
+  so the acceptance machinery can pin a career after create(). Proven:
+  `test_career_seed.gd` (two same-seed careers identical after 12 weeks) — and
+  `test_pyramid`'s flake is gone (3 consecutive green runs), so BOTH now sit in the CI
+  gate (20 → 22 tests). Presentation randomness (commentary narration, the DB-browser
+  sandbox sim) deliberately stays local. Cross-BOOT determinism still bounded by
+  GameDB's load-time rolls (the original's own `time()` behaviour — not a gap).
 * ~~**S5 — European ties run on the invented legacy engine.**~~ — **CLOSED 2026-07-27**
   (§0c above): foreign entrants field their shipped TRUE XIs via `Career.euro_xis`;
   `test_career` proves a European season at zero fallbacks (53 ties resolved).

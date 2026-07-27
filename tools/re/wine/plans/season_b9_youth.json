@@ -1,0 +1,117 @@
+{
+ "out": "season_b9",
+ "note": "B9 (docs/re/youth_re.md): drive a season with a COMPLETED youth search to witness the three open visual gaps - filled PLAYERS FOUND, a filled roster row, DRIBBLING/HEADING training chips - and page the euro rail back for the decided-QTR AGGR. cell. PRE-DRIVE (scripted clicks BEFORE autodrive, verify each with snap.sh): (1) hub STAFF icon (42,433) -> CLUB PERSONNEL; (2) select YOUTH TEAM SCOUT slot card (498,385) [bar x415..582 y378..392]; (3) SIGN (420,427) [355,415,130,24] -> hire overlay dialog (67,63)-(592,415): pick a candidate row + confirm (coords from live snaps - the overlay was never driven; teach on sight); (4) RETURN (574,451); (5) hub PLAYERS/squad icon (234,390) -> SQUAD MANAGEMENT; (6) YOUTH TEAM button (579,372) [(0x20b,0x168)..(0x27b,0x181)]; (7) DRIBBLING LED card (70,193) [left col x24, row y186] + HEADING LED card (195,193) [right col x149, row y186]; (8) SEARCH (278,203) [240,185,76,37]; (9) RETURN (560,440); (10) dismiss squad -> hub. All youth/staff coords are the witnessed chrome jsons' own (app/art/screens/{youth/youth_chrome.json, staff/personnel_chrome.json}). THEN run this plan. The youth probe snaps SQUAD->YOUTH every 2nd hub; watch its snaps for a filled PLAYERS FOUND (search completes 30-55 weeks in), then STOP the drive and hand-drive: tap the found row -> sign -> snap the roster row -> TRAINING screen chips. The euro probe carries the pageback (semis on screen -> back1 = the decided QTR with AGGR. ink; scan with knockoutwatch.py).",
+ "keep": [
+  "hub",
+  "cup_draw",
+  "champion_card",
+  "the_championships",
+  "end_of_season"
+ ],
+ "rules": [
+  "hub",
+  "champion_card",
+  "start_of_season",
+  "teams_in_championships",
+  "match_options",
+  "prematch_lineups",
+  "half_time",
+  "full_time",
+  "cup_draw",
+  "manager_of_month",
+  "player_of_month",
+  "channel_tv",
+  "lineup_screen",
+  "alert_box",
+  "news_extra",
+  "finance_screen",
+  "team_offer",
+  "league_tables_final",
+  "the_championships",
+  "end_of_season",
+  "players_of_the_year",
+  "preseason"
+ ],
+ "film_secs": 20,
+ "retries": 45,
+ "loop_breaker": {
+  "cycle": [
+   "hub",
+   "alert_box"
+  ],
+  "when": "hub",
+  "action": {
+   "click": [
+    480,
+    97
+   ],
+   "settle": 3.0
+  }
+ },
+ "keep_all": false,
+ "probe": {
+  "on": "hub",
+  "every": 2,
+  "steps": [
+   {
+    "click": [
+     234,
+     390
+    ],
+    "settle": 2.2,
+    "snap": "squad"
+   },
+   {
+    "click": [
+     579,
+     372
+    ],
+    "settle": 2.2,
+    "snap": "youth"
+   },
+   {
+    "click": [
+     560,
+     440
+    ],
+    "settle": 1.8
+   },
+   {
+    "click": [
+     577,
+     450
+    ],
+    "settle": 1.8,
+    "snap": "back_on_hub"
+   },
+   {
+    "click": [
+     155,
+     97
+    ],
+    "settle": 2.2,
+    "snap": "results"
+   },
+   {
+    "click": [
+     565,
+     223
+    ],
+    "settle": 2.2,
+    "snap": "euro"
+   },
+   {
+    "click_template": "pager_left.png",
+    "settle": 2.6,
+    "snap": "euro_back1"
+   },
+   {
+    "click": [
+     562,
+     447
+    ],
+    "settle": 2.0
+   }
+  ]
+ }
+}

@@ -346,8 +346,10 @@ searches. Fixed, test-pinned in `app/tests/test_youth_loop.gd` (+ the extended
   refusal (un-RE'd).
 * **B8** — the two youth `randomize()` sites now draw from `Career.career_rng()`,
   ONE stream whose state persists across save/load (`career_rng_state`, stored as a
-  string — 64-bit state does not survive a JSON double). First S3 step; the other
-  randomize() sites migrate as touched.
+  string — 64-bit state does not survive a JSON double). First S3 step — and S3
+  COMPLETED 2026-07-27: every remaining Career.gd site + Main's five career paths
+  migrated, `career_rng_state` re-pins a live stream, `test_career_seed.gd` proves
+  two same-seed careers identical (docs/REMAINING.md §3c).
 * **B9** — OPEN: one wine capture run closes the three visual gaps at once (filled
   PLAYERS FOUND, filled roster row, DRIBBLING/HEADING training chips). Needs a
   driven career with a completed youth search (30-55 weeks at the binary's own

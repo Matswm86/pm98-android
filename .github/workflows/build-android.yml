@@ -128,10 +128,10 @@ jobs:
         working-directory: app
         run: |
           # A curated, deterministic subset of the 225-file suite: fast (<3 min all
-          # told, timed 2026-07-27), display-free, and green at head. test_pyramid is
-          # deliberately EXCLUDED until S3 (career seed reproducibility) lands — its
-          # rare failure is the S3 flake, not a regression signal. The full sweep
-          # stays a manual pre-release step (docs/REMAINING.md).
+          # told, timed 2026-07-27), display-free, and green at head. S3 landed
+          # 2026-07-27 (one persisted career RNG stream), so test_pyramid's old flake
+          # is gone and it gates again, alongside the new test_career_seed. The full
+          # sweep stays a manual pre-release step (docs/REMAINING.md).
           set -e
           FAIL=0
           for t in test_career test_refrun_findings test_league_calendar \
@@ -141,7 +141,7 @@ jobs:
                    test_cupdraw_screen test_cup_draw_then_play test_results_screen \
                    test_tactics_screen test_cheats_live \
                    test_stadium_screen test_stadium_works \
-                   test_youth_loop; do
+                   test_youth_loop test_career_seed test_pyramid; do
             echo "== $t"
             if ! "$GITHUB_WORKSPACE/godot" --headless --path . --script "res://tests/$t.gd" \
                 > "/tmp/$t.log" 2>&1; then

@@ -1865,8 +1865,7 @@ func _begin_career(manager_name: String, league: Dictionary, club: Dictionary,
 	# European competitions from career start, seeded with the REAL 1996-97
 	# honours (witnessed TEAMS IN CHAMPIONSHIPS, orig/06). English careers only —
 	# the honour clubs are resolved from GameDB by their game names.
-	var rng2 := RandomNumberGenerator.new()
-	rng2.randomize()
+	var rng2 := _career.career_rng()   # S3: the ONE persisted career stream
 	var hon := _english_honours_96_97()
 	if not hon.is_empty():
 		_career.open_first_season(hon, _euro_pool(), _sa_champion_1997(), rng2,
@@ -1950,8 +1949,7 @@ func _show_career() -> void:
 ## re-entering _show_career can't loop the chain.
 func _run_season_open_chain() -> void:
 	_career.season_opened = true
-	var rng := RandomNumberGenerator.new()
-	rng.randomize()
+	var rng := _career.career_rng()   # S3: the ONE persisted career stream
 	_career.play_season_opener(rng)
 	_career.save()
 	# A CONTESTANT plays his shield as the first fixture: go straight to START OF SEASON,
@@ -2052,8 +2050,7 @@ func _leave_career_to_title() -> void:
 	_show_title_screen()
 
 func _career_advance() -> void:
-	var rng := RandomNumberGenerator.new()
-	rng.randomize()
+	var rng := _career.career_rng()   # S3: the ONE persisted career stream
 	# A pending preseason friendly plays FIRST (the walked August dates precede
 	# round 1) through the same match flow as a league fixture — run-2 played
 	# Man Utd v Sao Paulo in BRIEF mode. League table untouched (Career).
@@ -4900,8 +4897,7 @@ func _show_free_agent_deal(player: Dictionary) -> void:
 		rows, payload, func(it): _free_agent_action(pid, int(it["wage"])))
 
 func _free_agent_action(pid: int, wage: int) -> void:
-	var rng := RandomNumberGenerator.new()
-	rng.randomize()
+	var rng := _career.career_rng()   # S3: the ONE persisted career stream
 	var res := _career.sign_free_agent(pid, wage, rng)
 	_career.save()
 	if res["ok"]:
@@ -5245,8 +5241,7 @@ func _next_season() -> void:
 	# down and unrenewed players leave on a free (handled in Career.advance_season).
 	# TalentDB's pool rides along: real talents due in the new season arrive (empty
 	# pool -- no talent_pool.json -- injects nothing and the rollover is vanilla).
-	var rng := RandomNumberGenerator.new()
-	rng.randomize()
+	var rng := _career.career_rng()   # S3: the ONE persisted career stream
 	_career.advance_season(GameDB.leagues, rng, _euro_pool(), _sa_champion(), TalentDB.talents)
 	_career.save()
 	_show_preseason_rollover()
