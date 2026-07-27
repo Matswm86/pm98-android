@@ -2943,7 +2943,10 @@ func _show_finance_screen() -> void:
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
 	scr.setup(sm, _career.club_name, "", _career.season, _career.cash, _career.week + 1,
-		_career.insurance_ledger(), _career.week_books())
+		_career.insurance_ledger(), _career.week_books(), _career.live_week_book(),
+		_career.cash_at_close(),
+		{"supercup": not _career.supercup.is_empty(),
+			"intercontinental": not _career.intercontinental.is_empty()})
 	scr.prices_pressed.connect(_show_finance_control)
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
 	# Secret cash cheat: 5 taps on the live-cash box deposit £100M, then re-render with it.

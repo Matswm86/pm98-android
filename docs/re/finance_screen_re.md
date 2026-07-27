@@ -1,5 +1,10 @@
 # FINANCES ("INCOME + EXPENSES") screen — FRAME-TRUE rebuild (2026-07-13)
 
+Status: BUILT — all six view/period combinations 0 px against their frames
+(summary: p0495/p0509; detail: 006/008/012, 2026-07-27). Open: the `N bonuses`
+count model, the SIGN-row label grammar, the summary view's dynamic euro
+label + chart axis (LATENT DEFECT §end), the two unmeasured domestic-cup TV fees.
+
 The earlier "reversed-from-MANAGER.EXE" hand-drawn version was **rejected as
 invented** (wrong labels, invented tab colours, an invented SET PRICES button + a
 cash cheat, wrong header, wrong ledger line-items). This rebuild throws that away
@@ -241,7 +246,93 @@ all three captured frames (`CURRENT 31`, `CURRENT 4`, and a bare `29` when stepp
 The LAST WEEK / CURRENT WEEK tiles and the BALANCE chart do **not** follow the stepper:
 `p0495` and `p0509` are two different selected weeks with byte-identical tiles and chart.
 
-#### Still not built
+## The INCOME + EXPENSES detail views — BUILT 2026-07-27, render-diffed at 0 px
 
-The INCOME and EXPENSES detail tabs. No frame of either was ever captured, so their tabs
-are inert rather than invented.
+> The previous edition of this file ended "No frame of either was ever captured" — a
+> claim its OWN binding table (frames 006/008/011/012, above) refuted. The same false
+> line lived in `FinanceScreen.gd`. Deleted on both sides; the habit that catches
+> these: grep the frame inventory before repeating a gap.
+
+Chromes: `tools/re/build_finance_chrome_from_frames.py` `bake_details()` —
+`chrome_income.png` off 006 (INCOME / PER WEEK) and `chrome_expenses.png` off 011
+(EXPENSES / PER SEASON; 011==012 body pixel-for-pixel, they differ only by the mouse).
+The mouse's hover ring on each frame's lit tab is repaired from the neighbouring frame
+(007's INCOME tab, 013's PER SEASON tab) and the baker asserts the transplant. The two
+UN-captured period variants are composited, not invented: 010 vs 011 proves the detail
+BODY is identical across periods, and the tab-strip / header-band rects (P1/P2) diff to
+ZERO both across careers (004 vs p0495) and across views (013 vs 011), so
+`chrome_income_perseason.png` and `chrome_expenses_perweek.png` are original pixels
+throughout.
+
+Solved on the frames (0 differing pixels, BMFont atlas method):
+
+| element | font | anchor | ink |
+|---|---|---|---|
+| value cells | euro8 | pen END 299 (left col) / 596 (right), top = plate top + 1 | black |
+| wage / hospital gross sub-rows | euro8 | same | `(80,110,5)` green |
+| insurance sub-rows | euro8 | same | `(42,95,170)` blue |
+| `SALE <name>` label | euro8 | pen 341 | `(60,90,0)` dark green |
+| `Players´ Wage` / `N bonuses` labels | euro8 | pen 43 | black |
+| `Staff Wages` label | euro8 | pen 340 | black |
+| `Not played` ×2 | euro8 | pen 339, tops 96 / 174 | `(128,128,128)` |
+| the single TOTAL bar | proman10 | pen END 605, top 381 | `(30,52,98)` / `(170,0,0)` |
+
+The view tabs: `INC. + EXP.` (8,7,100,25) · `INCOME` (116,7,100,25) · `EXPENSES`
+(224,7,100,25) — measured by the method that re-derives both period-tab rects exactly.
+
+Witnessed RULES the scene now follows:
+
+* **The data-driven labels appear only beside a posted figure** — 008's £0 week shows
+  empty label cells where 012's season shows `Players´ Wage` / `50 bonuses` /
+  `Staff Wages`.
+* **The CURRENT WEEK tile and the stepper's live week read the RUNNING record** —
+  frames 004/006 carry the Cruyff sale under CURRENT WEEK before the week has closed
+  (and the season totals of 012/013 include it). `Career.live_week_book()` (the
+  running `_wk`, now also saved as `week_open`).
+* **LAST WEEK / CASH is a STORED close-of-week figure, not a derivation** — frame 006:
+  LAST £7,556,099 + current-week income £9,120,000 = £16,676,099, £1 off the live
+  £16,676,098. A derived figure could not disagree, so the original stores it;
+  `Career.cash_close` does the same (the £1 itself is the original's own unexplained
+  dirt, reproduced in the parity harness by feeding both stored figures).
+* **Every empty cell reads £0** exactly as the frames show for a fresh save.
+
+Data mapping (`Career` detail record, `FinanceModel.new_ledger_detail`): per-competition
+TICKETS/TELEVISION split by `_post_home_match`'s own comp key (league / `cup:` /
+euro brackets / charity); every EUROPEAN CUP INCOME posting = the euro section's POINTS
+row (incl. the Charity Shield purse, which the summary already books on that line and
+which has no row of its own — keeps visible rows summing to the TOTAL); wage
+gross/refund and hospital gross/group2/group3 sub-rows from the insurance tick (pay3
+derived as pay−pay2 so sub-rows always sum exactly to the canonical line); `SALE <name>`
+from the sell flow; GROUND cats seats/carpark/facility/service → SEATS/CAR PARK/
+FACILITIES/EXTRAS.
+
+Gate: `tools/re/diff_finance_detail_parity.py` — three shots
+(`app/tests/shot_finance_detail.gd`) vs 006 / 008 / 012, **0 px everywhere**; the only
+exclusion per frame is the camera cursor's hover ring on the tab the mouse sat on.
+No chart exclusion: the detail views carry no chart.
+
+Open, honestly flagged (NOT built):
+
+* **`N bonuses`** — the count is data-driven (`detail.bonus_n`) and nothing sets it:
+  the original's per-player bonus model is not reversed ("50 bonuses" for £5,000 by
+  week 4 vs our flat £5,000/home-matchday). The label is drawn only when a count exists.
+* **A SIGN label** on the expenses TRANSFERS row — no frame witnesses the grammar
+  (Man Utd bought nobody), so a signing shows its fee with a bare label cell.
+* **Several sales in one scope** — only the single-sale `SALE <name>` grammar is
+  witnessed; more than one sale shows the summed fee with a bare label cell.
+* **The euro section header is baked static** (`EUROPEAN CUP`, Man Utd's competition).
+  A U.E.F.A. Cup / Cup Winners' Cup career keeps the witnessed header — no detail-view
+  frame of another euro competition exists.
+* **`Not played` clears when the one-off tie is played**; what the original prints
+  INSTEAD (if anything) is unwitnessed — the app prints nothing.
+
+## LATENT DEFECT recorded 2026-07-27 — the SUMMARY view's euro label + chart axis
+
+`orig/51_finance_season.png` (parity run, a non-European lower-club career) shows
+**`U.E.F.A. CUP INCOME`** where frame 013 (Man Utd, European Cup) shows
+**`EUROPEAN CUP INCOME`**, and a **`±250 K.`** chart axis where 013 shows `±2,500 K.` —
+both are DYNAMIC in the original and both are baked static into `chrome.png` (013's
+values). Two witnesses are not enough to derive either rule (the label default appears
+to be U.E.F.A. CUP INCOME with European Cup participation switching it; the axis scale
+driver is unknown — wealth? division?), so this stays a recorded defect rather than a
+guessed fix. Closes when a third career state is captured.

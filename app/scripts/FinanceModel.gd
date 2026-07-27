@@ -105,6 +105,41 @@ const CHANNEL_TV_FEE_TEXT := "For £%s"
 const LEAGUE_WEEK_OFFSET := 2
 const FINANCE_WEEK1_YMD := [1997, 7, 20]
 
+## The DETAIL sub-record behind the INCOME / EXPENSES detail views (walkthrough frames
+## 006/008/011/012). It never feeds the totals — the canonical 18 lines above stay the
+## single source of the sums — it only splits them the way the detail screens print them:
+##   comp:   per-competition-section {TICKETS/SPONSORS/TELEVISION/POINTS} buckets
+##           ("league" / "domestic" / "euro" / "charity" / "supercup" / "intercontinental")
+##   sales:  [[player name, fee], ...] — the witnessed `SALE Jordi Cruyff  £9,120,000` row
+##   wage_gross/wage_refund: the PLAYERS´ WAGE section's green + blue sub-rows
+##           (canonical line = gross - refund = the section's TOTAL row)
+##   hosp_gross/hosp_pay2/hosp_pay3: the HOSPITALS section's three sub-rows
+##           (canonical line = gross - pay2 - pay3 = Hospital Total)
+##   bonus_n: the `N bonuses` label count. NO mechanism sets it yet — the original's
+##           per-player bonus model is not reversed (frame 012 says "50 bonuses" for
+##           £5,000 by week 4; our flat £5,000/home-matchday cannot honestly count) —
+##           so the label is drawn only when a count exists.
+##   ground: per-category REFORM GROUND split, keyed by Career.begin_work's cat
+##           ("seats"/"carpark"/"facility"/"service" -> SEATS/CAR PARK/FACILITIES/EXTRAS)
+static func new_ledger_detail() -> Dictionary:
+	return {"comp": {}, "sales": [], "wage_gross": 0, "wage_refund": 0,
+		"hosp_gross": 0, "hosp_pay2": 0, "hosp_pay3": 0, "bonus_n": 0, "ground": {}}
+
+
+## A record's detail sub-record, healed for a legacy save: absent -> synthesized from the
+## canonical lines where the mapping is 1:1 (wage/hospital gross = the net line when no
+## insurance movement is recorded; the per-competition split is unknowable and stays
+## empty, reading £0 exactly as a fresh original save does).
+static func ledger_detail(rec: Dictionary) -> Dictionary:
+	if rec.has("detail"):
+		return rec["detail"]
+	var det := new_ledger_detail()
+	var exp: Dictionary = rec.get("expense", {})
+	det["wage_gross"] = maxi(0, int(exp.get("PLAYERS' WAGE", 0)))
+	det["hosp_gross"] = maxi(0, int(exp.get("HOSPITALS", 0)))
+	return det
+
+
 ## A zeroed week record: every line the screen prints, at £0. Income and expenses are
 ## kept apart because the screen does, and because the sign convention differs.
 static func new_week_ledger(week: int = 0) -> Dictionary:
@@ -114,7 +149,7 @@ static func new_week_ledger(week: int = 0) -> Dictionary:
 	var exp: Dictionary = {}
 	for k in EXPENSE_LINES:
 		exp[k] = 0
-	return {"week": week, "income": inc, "expense": exp}
+	return {"week": week, "income": inc, "expense": exp, "detail": new_ledger_detail()}
 
 
 static func ledger_total(rec: Dictionary, side: String) -> int:

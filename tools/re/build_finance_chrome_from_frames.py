@@ -41,9 +41,20 @@ FRAME = ROOT / "screenshots/original-walkthrough-2026-07-02/013_164406.png"
 # value cell on the screen already reads £0 — so the blanking passes have nothing to
 # fight and the surviving chrome is unambiguously the original's.
 FRAME_WEEK = ROOT / "tools/re/refs/refrun-manutd-1997-98/p0495_finance_perweek_wk31.png"
+# The two DETAIL views (walkthrough finance tour, run 3). 006 is INCOME/PER WEEK with the
+# named `SALE Jordi Cruyff` row; 011 is EXPENSES/PER SEASON (== 012's body pixel for
+# pixel — they differ only by the mouse). 007 donates a hover-ring-free INCOME tab
+# (006's mouse sat on it); 013 donates a clean PER SEASON tab (011's mouse sat on that).
+FRAME_INCOME = ROOT / "screenshots/original-walkthrough-2026-07-02/006_164349.png"
+FRAME_INCOME_TAB = ROOT / "screenshots/original-walkthrough-2026-07-02/007_164351.png"
+FRAME_EXPENSES = ROOT / "screenshots/original-walkthrough-2026-07-02/011_164402.png"
 OUT_DIR = ROOT / "app/art/screens/finance"
 OUT_PNG = OUT_DIR / "chrome.png"
 OUT_PNG_WEEK = OUT_DIR / "chrome_perweek.png"
+OUT_PNG_INCOME = OUT_DIR / "chrome_income.png"                    # INCOME / PER WEEK
+OUT_PNG_INCOME_SEASON = OUT_DIR / "chrome_income_perseason.png"   # INCOME / PER SEASON
+OUT_PNG_EXPENSES = OUT_DIR / "chrome_expenses.png"                # EXPENSES / PER SEASON
+OUT_PNG_EXPENSES_WEEK = OUT_DIR / "chrome_expenses_perweek.png"   # EXPENSES / PER WEEK
 OUT_JSON = OUT_DIR / "finance_chrome.json"
 
 W, H = 640, 480
@@ -107,6 +118,43 @@ CHART_BLUE = (200, 220, 240)
 CHART_YELLOW = (255, 255, 170)
 
 
+# ---- DETAIL views (frames 006 / 011, measured 2026-07-27) -----------------
+# Both detail bodies share one grid: label plates (220,220,220) at x41..196 (left column)
+# and x338..494 (right), value plates at x199..298 / x496..595 inclusive, every row 13px
+# tall. The value-plate TINTS vary by row kind (khaki income, tan expense, pale-green
+# gross sub-row, pale-blue insurance sub-row, blue transfer, loan green) and col_copy
+# picks each row's own tint up automatically. 011 vs 010 proves the whole body is
+# IDENTICAL across PER WEEK / PER SEASON except the tab strip, the arrow band and the
+# header band — so each view is baked once and the OTHER period is composited from the
+# already-proven summary bakes (P1/P2 verified 0 px cross-career AND cross-view:
+# 004 vs p0495 and 013 vs 011 both diff to zero over these rects).
+DET_VAL_L = (199, 299)        # left value plate interior [x0,x1)
+DET_VAL_R = (496, 596)        # right value plate interior
+DET_ROW_H = 13
+# income view rows (plate tops): 4 left sections x3 rows, supercup x3, intercont x2
+INC_ROWS_L = [108, 124, 140, 186, 202, 218, 264, 280, 296, 341, 357, 373]
+INC_ROWS_R = [108, 124, 140, 186, 202]
+INC_ROW_SALE = 237            # TRANSFERS row (blue plate; green SALE label pen 341)
+INC_ROW_INSGRP = 273          # INSURANCE COMPENSATION GROUP row
+INC_ROWS_LOANS = [309, 325, 341, 357]
+NOT_PLAYED = [(339, 95, 420, 107), (339, 173, 420, 185)]   # grey `Not played` spans
+SALE_LABEL = (341, 238, 494, 249)   # dynamic green label span inside the grey plate
+# expenses view rows
+EXP_ROWS_L = [96, 129, 162, 178, 194, 226, 258, 292, 325, 341, 357, 373]
+EXP_ROWS_R = [96, 136, 152, 168, 184, 224, 260, 276, 292, 308]
+# dynamic label cells (appear only with a nonzero figure: witnessed empty in 008's £0
+# week, filled in 011/012's season): Players´ Wage / N bonuses / Staff Wages
+EXP_DYN_LABELS = [(43, 163, 196, 173), (43, 227, 196, 237), (340, 97, 493, 107)]
+# the single TOTAL bar each detail view carries (proman10, pen END 605, top 381)
+DET_TOT = (460, 379, 605, 394)   # value span blanked from clean col 459
+# tab transplant rects (cover the donor tab incl. its 2px hover-ring halo)
+TAB_INCOME_RECT = (110, 2, 222, 36)     # from 007 onto 006
+TAB_PERSEASON_RECT = (492, 2, 630, 36)  # from 013 onto 011
+# period-swap composites, proven 0 px cross-career and cross-view
+P1_STRIP = (332, 2, 640, 46)     # PER WEEK / PER SEASON tabs + their arrow band
+P2_HEADER = (210, 50, 610, 80)   # week stepper bezel / season white panel
+
+
 def col_copy(a: np.ndarray, src_x: int, x0: int, x1: int, y0: int, y1: int) -> None:
     """Broadcast the clean column at src_x across [x0,x1) for rows [y0,y1)."""
     a[y0:y1, x0:x1] = a[y0:y1, src_x][:, None, :]
@@ -114,6 +162,14 @@ def col_copy(a: np.ndarray, src_x: int, x0: int, x1: int, y0: int, y1: int) -> N
 
 def fill(a: np.ndarray, rgb, x0: int, y0: int, x1: int, y1: int) -> None:
     a[y0:y1, x0:x1] = np.array(rgb, dtype=a.dtype)
+
+
+def blank_tiles(a: np.ndarray) -> None:
+    """The LAST WEEK / CURRENT WEEK value cells — identical on every view (the whole
+    y>=398 band diffs to zero between the summary and detail frames)."""
+    for (ry0, ry1) in BOT_ROWS:
+        col_copy(a, LW_SRC, LW_VAL_L, LW_VAL_R, ry0, ry1)
+        col_copy(a, CW_SRC, CW_VAL_L, CW_VAL_R, ry0, ry1)
 
 
 def blank_body(a: np.ndarray) -> None:
@@ -127,38 +183,123 @@ def blank_body(a: np.ndarray) -> None:
         col_copy(a, EXP_SRC_X, EXP_SRC_X + 1, EXP_CELL_R, y0, y0 + ROW_H)
     col_copy(a, TOT_INC_SRC, TOT_INC_SRC + 1, TOT_INC_R, TOT_Y0, TOT_Y1)
     col_copy(a, TOT_EXP_SRC, TOT_EXP_SRC + 1, TOT_EXP_R, TOT_Y0, TOT_Y1)
-    for (ry0, ry1) in BOT_ROWS:
-        col_copy(a, LW_SRC, LW_VAL_L, LW_VAL_R, ry0, ry1)
-        col_copy(a, CW_SRC, CW_VAL_L, CW_VAL_R, ry0, ry1)
+    blank_tiles(a)
     fill(a, CHART_BLUE, CHART_BAR_X0, CHART_TOP_Y, CHART_BAR_X1, CHART_ZERO_Y)
     fill(a, CHART_YELLOW, CHART_BAR_X0, CHART_ZERO_Y + 1, CHART_BAR_X1, CHART_BOT_Y)
 
 
-def bake_per_week() -> int:
+def bake_per_week() -> np.ndarray | None:
     """The INC. + EXP. / PER WEEK view (REFRUN R5).
 
     Same body, own tab strip (PER WEEK lit) and own header. The frame is the reference
     run's CURRENT week, whose every cell already reads £0, so the only pixels this has
     to clear beyond the shared body are the week label and the date span.
+    Returns the blanked array (bake_details composites its P1/P2 rects off it).
     """
     if not FRAME_WEEK.exists():
         print(f"ERROR: PER WEEK binding frame missing: {FRAME_WEEK}", file=sys.stderr)
-        return 1
+        return None
     a = np.array(Image.open(FRAME_WEEK).convert("RGB").crop((0, 0, W, H)))
     # Refuse to bake against a frame that is not this view: the PER WEEK tab must be
     # lit and the stepper's gold box must be there.
     if tuple(int(v) for v in a[65, 600]) != (255, 255, 255):
         print("ERROR: header panel is not white at (600,65) — wrong frame?", file=sys.stderr)
-        return 1
+        return None
     if tuple(int(v) for v in a[65, 301]) != WEEK_GOLD:
         print("ERROR: no gold week box at (301,65) — this is not the PER WEEK view",
               file=sys.stderr)
-        return 1
+        return None
     blank_body(a)
     fill(a, WEEK_GOLD, *WEEK_BOX_INK)
     fill(a, (255, 255, 255), *DATE_BOX)
     Image.fromarray(a).save(OUT_PNG_WEEK)
     print(f"wrote {OUT_PNG_WEEK} ({OUT_PNG_WEEK.stat().st_size} bytes)")
+    return a
+
+
+def copy_rect(dst: np.ndarray, src: np.ndarray, rect) -> None:
+    x0, y0, x1, y1 = rect
+    dst[y0:y1, x0:x1] = src[y0:y1, x0:x1]
+
+
+def _tab_lit(a: np.ndarray, x0: int, x1: int) -> bool:
+    """A lit tab glows red/green inside its box; unlit is near-black behind grey text."""
+    box = a[10:28, x0:x1].astype(int)
+    return float(box.max(axis=2).mean()) > 90.0
+
+
+def blank_detail_values(a: np.ndarray, rows_l, rows_r) -> None:
+    for y0 in rows_l:
+        col_copy(a, DET_VAL_L[0] + 1, DET_VAL_L[0] + 2, DET_VAL_L[1], y0, y0 + DET_ROW_H)
+    for y0 in rows_r:
+        col_copy(a, DET_VAL_R[0] + 1, DET_VAL_R[0] + 2, DET_VAL_R[1], y0, y0 + DET_ROW_H)
+    col_copy(a, DET_TOT[0] - 1, DET_TOT[0], DET_TOT[2], DET_TOT[1], DET_TOT[3])
+    blank_tiles(a)
+
+
+def bake_details(sum_season: np.ndarray, sum_week: np.ndarray) -> int:
+    """The INCOME and EXPENSES detail views, each baked from its own frame with the
+    hover-ringed tab transplanted from the neighbouring frame, plus the two composited
+    other-period variants (P1 strip + P2 header off the summary bakes — both rects
+    proven 0 px across careers and across views)."""
+    for f in (FRAME_INCOME, FRAME_INCOME_TAB, FRAME_EXPENSES):
+        if not f.exists():
+            print(f"ERROR: binding frame missing: {f}", file=sys.stderr)
+            return 1
+    inc = np.array(Image.open(FRAME_INCOME).convert("RGB").crop((0, 0, W, H)))
+    inc_tab = np.array(Image.open(FRAME_INCOME_TAB).convert("RGB").crop((0, 0, W, H)))
+    exp = np.array(Image.open(FRAME_EXPENSES).convert("RGB").crop((0, 0, W, H)))
+    f013 = np.array(Image.open(FRAME).convert("RGB").crop((0, 0, W, H)))
+
+    # de-ring the lit tabs (006's mouse ringed INCOME, 011's ringed PER SEASON)
+    copy_rect(inc, inc_tab, TAB_INCOME_RECT)
+    copy_rect(exp, f013, TAB_PERSEASON_RECT)
+    if tuple(int(v) for v in inc[5, 114]) == (255, 255, 255):
+        print("ERROR: hover ring survived on the INCOME tab", file=sys.stderr)
+        return 1
+    if tuple(int(v) for v in exp[5, 497]) == (255, 255, 255):
+        print("ERROR: hover ring survived on the PER SEASON tab", file=sys.stderr)
+        return 1
+
+    # INCOME / PER WEEK: values, the SALE label, the two `Not played` spans, the
+    # stepper's gold box + date span, the tiles.
+    blank_detail_values(inc, INC_ROWS_L, INC_ROWS_R + [INC_ROW_SALE, INC_ROW_INSGRP]
+                        + INC_ROWS_LOANS)
+    col_copy(inc, SALE_LABEL[2] - 1, SALE_LABEL[0], SALE_LABEL[2], SALE_LABEL[1], SALE_LABEL[3])
+    for r in NOT_PLAYED:
+        fill(inc, (255, 255, 255), *r)
+    fill(inc, WEEK_GOLD, *WEEK_BOX_INK)
+    fill(inc, (255, 255, 255), *DATE_BOX)
+
+    # EXPENSES / PER SEASON: values, the three data-driven labels, the SEASON text.
+    blank_detail_values(exp, EXP_ROWS_L, EXP_ROWS_R)
+    for (lx0, ly0, lx1, ly1) in EXP_DYN_LABELS:
+        col_copy(exp, lx1 - 1, lx0, lx1, ly0, ly1 + 1)
+    fill(exp, (255, 255, 255), *SEASON_BOX)
+
+    # other-period composites off the summary bakes (already value-blanked)
+    inc_season = inc.copy()
+    copy_rect(inc_season, sum_season, P1_STRIP)
+    copy_rect(inc_season, sum_season, P2_HEADER)
+    exp_week = exp.copy()
+    copy_rect(exp_week, sum_week, P1_STRIP)
+    copy_rect(exp_week, sum_week, P2_HEADER)
+
+    for name, arr, view_lit, week_lit in (
+            (OUT_PNG_INCOME, inc, "income", True),
+            (OUT_PNG_INCOME_SEASON, inc_season, "income", False),
+            (OUT_PNG_EXPENSES, exp, "expenses", False),
+            (OUT_PNG_EXPENSES_WEEK, exp_week, "expenses", True)):
+        ok = (_tab_lit(arr, 116, 216) == (view_lit == "income")
+              and _tab_lit(arr, 224, 324) == (view_lit == "expenses")
+              and not _tab_lit(arr, 8, 108)
+              and _tab_lit(arr, 365, 490) == week_lit
+              and _tab_lit(arr, 499, 624) != week_lit)
+        if not ok:
+            print(f"ERROR: tab lighting wrong on {name.name}", file=sys.stderr)
+            return 1
+        Image.fromarray(arr).save(name)
+        print(f"wrote {name} ({name.stat().st_size} bytes)")
     return 0
 
 
@@ -226,7 +367,10 @@ def main() -> int:
     print(f"wrote {OUT_PNG} ({OUT_PNG.stat().st_size} bytes)")
     print(f"wrote {OUT_JSON}")
     print("samples:", json.dumps(samples))
-    return bake_per_week()
+    week_arr = bake_per_week()
+    if week_arr is None:
+        return 1
+    return bake_details(a, week_arr)
 
 
 if __name__ == "__main__":

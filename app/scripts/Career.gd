@@ -195,6 +195,12 @@ var euro_winner_names: Dictionary = {}    # winner/SA-champ id:int -> String
 # bank can never disagree.
 var week_ledgers: Array = []
 var _wk: Dictionary = {}
+# Cash as the last completed week closed — a STORED figure, the way the original's LAST
+# WEEK / CASH tile behaves (walkthrough 006/013: LAST £7,556,099 + CURRENT-week income
+# £9,120,000 = £16,676,099, £1 off the live £16,676,098 — a derived figure could not
+# disagree, so the original stores it). False until a week has closed or a save carries it.
+var cash_close: int = 0
+var _cash_close_ok := false
 # Consecutive weeks the club's BANK BALANCE has been below zero (REFRUN R16, trigger
 # corrected 2026-07-26 -- see _close_week_books). The original raises one hub alert a week
 # while this is non-zero, incrementing, and CLEARS it the moment the balance is positive
@@ -927,6 +933,7 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 	# which is the sign error R9 measured; weekly_net now survives only as the FINANCES
 	# screen's season projection and as save-file compatibility.
 	_post_expense("PLAYERS' WAGE", player_weekly_wage())
+	_rec_detail()["wage_gross"] += player_weekly_wage()   # the section's green sub-row
 	_post_expense("STAFF WAGES", Staff.weekly_wage(staff))
 	_post_matchday_income(manager_res)
 	_tick_insurance()                  # premiums, hospital bills and policy payouts
@@ -1088,15 +1095,15 @@ func _play_due_cup_rounds(rng: RandomNumberGenerator, clubs_override: Dictionary
 				# qualifying through the group.
 				match str(er.get("manager_result", "")):
 					"win":
-						_post_income("EUROPEAN CUP INCOME", EURO_WIN)
+						_post_euro_points(EURO_WIN)
 					"draw":
-						_post_income("EUROPEAN CUP INCOME", EURO_DRAW)
+						_post_euro_points(EURO_DRAW)
 				if bool(er.get("manager_qualified", false)):
-					_post_income("EUROPEAN CUP INCOME", EURO_QF)
+					_post_euro_points(EURO_QF)
 			elif in_before:
 				# EUROPEAN CUP INCOME is one of the screen's own income lines (REFRUN R5),
 				# and the UEFA schedule behind these figures IS reversed from MANAGER.EXE.
-				_post_income("EUROPEAN CUP INCOME", _euro_prize(eb, er))
+				_post_euro_points(_euro_prize(eb, er))
 			var et: Dictionary = er.get("manager_tie", {})
 			if _tie_is_home(et):
 				_post_home_match(str(key))
@@ -2926,6 +2933,15 @@ func _tick_insurance() -> void:
 	# The insured-injured wage refund nets off PLAYERS' WAGE (+0x50 - +0x54 in the
 	# binary's week record, docs/re/insurance_economy_re.md).
 	_post_expense("PLAYERS' WAGE", -back_gbp)
+	# The HOSPITALS section's three sub-rows (detail view, frame 012): gross bill,
+	# group-2 payout, group-3 payout. pay3 is derived as pay - pay2 so the sub-rows
+	# always sum EXACTLY to the canonical line, whatever the £-unit rounding did.
+	var det := _rec_detail()
+	det["wage_refund"] += back_gbp
+	det["hosp_gross"] += hosp_gbp
+	var pay2_gbp := int(float(pass_["payout2"]) / Insurance.UNIT)
+	det["hosp_pay2"] += pay2_gbp
+	det["hosp_pay3"] += pay_gbp - pay2_gbp
 
 
 ## The season-to-date insurance figures the FINANCES screen posts to its own
@@ -2943,6 +2959,48 @@ func _week_rec() -> Dictionary:
 	if _wk.is_empty():
 		_wk = FinanceModel.new_week_ledger(FinanceModel.finance_week(week + 1))
 	return _wk
+
+## The accumulating week's DETAIL sub-record (the INCOME / EXPENSES detail views' split
+## of the canonical lines — see FinanceModel.new_ledger_detail).
+func _rec_detail() -> Dictionary:
+	var rec := _week_rec()
+	if not rec.has("detail"):
+		rec["detail"] = FinanceModel.new_ledger_detail()
+	return rec["detail"]
+
+
+## One competition-section cell of the detail record: bucket = the screen's own section
+## ("league" / "domestic" / "euro" / "charity" / "supercup" / "intercontinental"),
+## field = "TICKETS" / "SPONSORS" / "TELEVISION" / "POINTS".
+func _detail_comp_add(bucket: String, field: String, amount: int) -> void:
+	if amount == 0:
+		return
+	var comp: Dictionary = _rec_detail()["comp"]
+	if not comp.has(bucket):
+		comp[bucket] = {}
+	comp[bucket][field] = int((comp[bucket] as Dictionary).get(field, 0)) + amount
+
+
+## The detail section a _post_home_match competition key belongs to.
+static func _comp_bucket(comp_key: String) -> String:
+	if comp_key == "league":
+		return "league"
+	if comp_key == "charity_shield":
+		return "charity"
+	if comp_key.begins_with("cup:"):
+		return "domestic"
+	return "euro"      # european_cup / uefa_cup / cup_winners_cup
+
+
+## Prize / points money on the EUROPEAN CUP INCOME line. The detail views print that
+## line as the euro section's POINTS row (frame 006), so every posting to it lands
+## there — including the Charity Shield purse, which the summary already books on this
+## line and which has no row of its own in the detail layout (its section carries only
+## TICKETS / SPONSORS / TELEVISION), keeping the visible rows equal to the total.
+func _post_euro_points(amount: int) -> void:
+	_post_income("EUROPEAN CUP INCOME", amount)
+	_detail_comp_add("euro", "POINTS", amount)
+
 
 ## Bank `amount` and book it against one of the screen's INCOME lines. Negative amounts
 ## are legal (a reversal) and simply reduce the line.
@@ -2970,6 +3028,8 @@ func _close_week_books() -> void:
 	while week_ledgers.size() > FinanceModel.SEASON_WEEKS:
 		week_ledgers.pop_front()
 	_wk = {}
+	cash_close = cash          # the LAST WEEK / CASH tile's stored figure
+	_cash_close_ok = true
 	# REFRUN R16, corrected 2026-07-26: the trigger is the BANK BALANCE below zero, not a
 	# P&L-negative week. Three discriminating witnesses: (1) the whole 1997-98 refrun
 	# season raised NO alert although every quiet away week closes wages-only negative;
@@ -2998,9 +3058,15 @@ const HOME_MATCH_BONUS := 5_000
 ##   than a guessed figure.
 func _post_home_match(comp_key: String) -> void:
 	var fin := _fin_summary()
-	_post_income("TICKETS", int(fin.get("match_gate", 0)))
-	_post_income("TELEVISION", int(FinanceModel.TV_FEE.get(comp_key, 0)))
+	var gate := int(fin.get("match_gate", 0))
+	var fee := int(FinanceModel.TV_FEE.get(comp_key, 0))
+	_post_income("TICKETS", gate)
+	_post_income("TELEVISION", fee)
 	_post_expense("PLAYERS' BONUS", HOME_MATCH_BONUS)
+	# The detail views split these by competition section (frame 006's own layout).
+	var bucket := _comp_bucket(comp_key)
+	_detail_comp_add(bucket, "TICKETS", gate)
+	_detail_comp_add(bucket, "TELEVISION", fee)
 
 
 ## The league round's matchday income, if the manager's club was at home this week.
@@ -3031,6 +3097,22 @@ func _queue_channel_tv() -> void:
 ## The finished week records, oldest first (the PER WEEK stepper + the BALANCE chart).
 func week_books() -> Array:
 	return week_ledgers
+
+
+## The RUNNING week's record — money already posted this week (a sale, works, a prize).
+## The original's CURRENT WEEK tile and the stepper's live week read from it (walkthrough
+## 004/006: the Cruyff sale shows under CURRENT WEEK before the week has closed). {} when
+## nothing has been posted yet, exactly the state p0495 witnessed.
+func live_week_book() -> Dictionary:
+	return _wk
+
+
+## Cash as it stood when the last completed week closed (the LAST WEEK / CASH tile).
+## Falls back to deriving it off the live record for a save from before this was stored.
+func cash_at_close() -> int:
+	if _cash_close_ok:
+		return cash_close
+	return cash - FinanceModel.ledger_balance(_wk)
 
 ## One finished week record by its FINANCE week number, or {} if that week is not banked.
 func week_book(fin_week: int) -> Dictionary:
@@ -4149,6 +4231,8 @@ func accept_sale(pid: int, buyer_id: int, offer: int) -> Dictionary:
 	if rosters.has(buyer_id):
 		rosters[buyer_id].append(player)
 	_post_income("SALE + LOAN PLAY.", offer)
+	# The detail view's named TRANSFERS row: `SALE Jordi Cruyff  £9,120,000` (frame 006).
+	(_rec_detail()["sales"] as Array).append([str(player.get("name", "?")), offer])
 	transfer_listed.erase(pid)
 	var buyer_name: String = club_names.get(buyer_id, "?")
 	_log("%s has been signed by %s for £%s." % [player.get("name", "?"), buyer_name, _money(offer)])
@@ -4701,9 +4785,10 @@ func play_charity_shield_match(rng: RandomNumberGenerator, opp_view: Dictionary)
 	# is played at a neutral ground, and the original's gate for it was not captured.
 	if h == club_id or a == club_id:
 		_post_income("TELEVISION", int(FinanceModel.TV_FEE.get("charity_shield", 0)))
+		_detail_comp_add("charity", "TELEVISION", int(FinanceModel.TV_FEE.get("charity_shield", 0)))
 	var pens := " (on penalties)" if decided == "pens" else ""
 	if winner == club_id:
-		_post_income("EUROPEAN CUP INCOME", CHARITY_PRIZE)
+		_post_euro_points(CHARITY_PRIZE)
 		if club_names.has(winner) and club_names.has(loser):
 			_news("cup", "%s have won the Charity Shield, beating %s%s." % [
 				str(club_names[winner]), str(club_names[loser]), pens])
@@ -4793,7 +4878,7 @@ func mint_european_cups(euro_pool: Array, rng: RandomNumberGenerator,
 			opts["group_stage"] = EURO_GROUPS.duplicate()
 		euro[key] = Cup.create(field, fixtures.size(), opts)
 		if field.has(club_id):
-			_post_income("EUROPEAN CUP INCOME", EURO_ENTRY)
+			_post_euro_points(EURO_ENTRY)
 			_news("cup", "Your club has entered the %s (1 million from UEFA for competing)."
 				% str(EURO_OPTS[key]["name"]))
 
@@ -5034,7 +5119,7 @@ func _record_supercup_news(tie: Dictionary, comp: String, prize: int) -> void:
 	if w == club_id:
 		# Ours, not the binary's -- but a winners-of-winners final is UEFA/FIFA money, so
 		# it posts to the ledger's own EUROPEAN CUP INCOME line rather than out of thin air.
-		_post_income("EUROPEAN CUP INCOME", prize)
+		_post_euro_points(prize)
 		_news("cup", "%s have won the %s, beating %s%s." % [wn, comp, ln, pens])
 	else:
 		_news("cup", "%s: %s beat %s%s." % [comp, wn, ln, pens])
@@ -5056,6 +5141,10 @@ func begin_work(cat: String, key: int, label: String, cost: int, weeks: int,
 		if str(w.get("cat")) == cat and int(w.get("key", -1)) == key:
 			return false                 # that item is already under construction
 	_post_expense("REFORM GROUND", cost)
+	# The detail view's GROUND IMPROVEMENTS split: cat maps 1:1 onto the frame's
+	# SEATS / CAR PARK / FACILITIES / EXTRAS rows (frame 008/012, EXTRAS = services).
+	var gnd: Dictionary = _rec_detail()["ground"]
+	gnd[cat] = int(gnd.get(cat, 0)) + cost
 	works.append({"cat": cat, "key": key, "label": label, "cost": cost,
 		"weeks_left": maxi(1, weeks), "effect": effect})
 	_news("stadium", "Ground works begun: %s (-£%s, ~%d wk)." % [label, _grp(cost), maxi(1, weeks)])
@@ -5325,6 +5414,7 @@ func to_dict() -> Dictionary:
 		"euro": euro, "euro_ratings": _str_keyed(euro_ratings),
 		"euro_names": _str_keyed(euro_names),
 		"week_ledgers": week_ledgers, "loss_weeks": loss_weeks,
+		"week_open": _wk, "cash_close": cash_close, "cash_close_ok": _cash_close_ok,
 		"contract_warned": contract_warned,
 		"pending_champion_cards": pending_champion_cards, "sa_champion_id": sa_champion_id,
 		"pending_channel_tv": pending_channel_tv,
@@ -5549,6 +5639,12 @@ static func from_dict(d: Dictionary) -> Career:
 	for k in d.get("euro_names", {}):
 		c.euro_names[int(k)] = d["euro_names"][k]
 	c.week_ledgers = d.get("week_ledgers", [])
+	# The RUNNING week's record was not saved before 2026-07-27; a legacy save loses its
+	# in-week postings from the books (the bank kept them), which the detail views show
+	# as £0 exactly as a fresh original save would.
+	c._wk = d.get("week_open", {})
+	c.cash_close = int(d.get("cash_close", 0))
+	c._cash_close_ok = bool(d.get("cash_close_ok", false))
 	c.pending_champion_cards = d.get("pending_champion_cards", [])
 	c.sa_champion_id = int(d.get("sa_champion_id", -1))
 	c.loss_weeks = int(d.get("loss_weeks", 0))

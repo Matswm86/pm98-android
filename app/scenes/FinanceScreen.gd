@@ -47,8 +47,18 @@ class_name FinanceScreen
 ## WITNESSED and therefore copied: the LAST WEEK / CURRENT WEEK tiles and the BALANCE
 ## chart do NOT follow the stepper — p0495 and p0509 are two different selected weeks
 ## with byte-identical tiles and chart.
-## NOT witnessed and therefore NOT built: the INCOME and EXPENSES detail tabs have no
-## captured frame, so tapping them does nothing (docs/re/finance_screen_re.md).
+##
+## THIRD + FOURTH VIEWS — the INCOME and EXPENSES detail tabs (added 2026-07-27).
+## Both ARE captured — walkthrough frames 006 (INCOME / PER WEEK, the named
+## `SALE Jordi Cruyff  £9,120,000` row), 008 (EXPENSES / PER WEEK, all £0) and
+## 011==012 (EXPENSES / PER SEASON, wages/bonus/staff populated). Their chromes are
+## baked from those frames by tools/re/build_finance_chrome_from_frames.py, and the
+## other period of each is composited from the summary bakes over two rects proven
+## 0 px across careers AND across views (P1 strip / P2 header — see the baker).
+## Frames 010 vs 011 prove the detail BODY is pixel-identical across periods; the
+## only un-witnessed combination (INCOME / PER SEASON) therefore invents nothing.
+## Every font/pen below was solved the established way: rendered from the game's own
+## BMFont atlases against the frames at ZERO differing pixels.
 
 signal back_pressed      # RETURN button -> Main dismisses the screen
 signal prices_pressed    # RETAINED for Main compatibility; NOT emitted (see WIRING note)
@@ -88,12 +98,77 @@ const CASH_BOX := Rect2(398, 452, 98, 18)  # CURRENT WEEK / CASH cell (frame 013
 const BOT_PEN_TOP := [429, 441, 453]   # INCOME / EXPENSES / CASH pen tops
 const BTN_RETURN := Rect2(515, 439, 118, 24)
 
-# ---- PER WEEK view (REFRUN R5) -------------------------------------------
-# Tab strip and stepper rects, read off the frames' own black button borders.
+# ---- view + period axes ---------------------------------------------------
+# Tab strip and stepper rects, read off the frames' own black button borders. The three
+# VIEW tabs were measured off frame 013 by the same method that produced (and re-derives
+# exactly) the two period-tab rects.
+const VIEW_SUMMARY := 0
+const VIEW_INCOME := 1
+const VIEW_EXPENSES := 2
+const PERIOD_WEEK := 0
+const PERIOD_SEASON := 1
+# legacy aliases (show_week / older tests): the summary view's two periods
 const VIEW_SEASON := 0
 const VIEW_WEEK := 1
+const TAB_SUMMARY := Rect2(8, 7, 100, 25)
+const TAB_INCOME := Rect2(116, 7, 100, 25)
+const TAB_EXPENSES := Rect2(224, 7, 100, 25)
 const TAB_PER_WEEK := Rect2(365, 7, 125, 25)
 const TAB_PER_SEASON := Rect2(499, 7, 125, 25)
+
+# ---- DETAIL view geometry (solved on frames 006 / 011 / 012) ---------------
+# Values: euro8, right-aligned, pen END 299 (left column) / 596 (right), pen top =
+# value-plate top + 1. The single TOTAL bar: proman10, pen END 605, pen top 381.
+# Dynamic labels: euro8, pen x 43 (left label plates) / 340 (right), witnessed inks.
+const DET_VAL_L_END := 299
+const DET_VAL_R_END := 596
+const DET_TOT_END := 605
+const DET_TOT_TOP := 381
+const DET_LBL_L_X := 43
+const DET_LBL_R_X := 340
+const DET_SALE_X := 341        # the green `SALE <name>` label's own pen
+const DET_NP_X := 339          # `Not played`, on the white ground under the header
+const C_GROSS := Color8(80, 110, 5)      # green sub-row ink (wage / hospital gross)
+const C_SALE := Color8(60, 90, 0)        # the `SALE <name>` label's own darker green
+const C_SUBBLUE := Color8(42, 95, 170)   # blue insurance sub-row ink
+const C_NOTPLAYED := Color8(128, 128, 128)
+
+# INCOME view rows: [plate top, "L"/"R", comp bucket, field]. The four left sections
+# (LEAGUE + PRESEASON / F.A. CUP + COCA COLA CUP / EUROPEAN CUP / CHARITY SHIELD) and
+# the right column's EUROPEAN SUPERCUP + INTERCONTINENTAL CUP, exactly frame 006's grid.
+const INC_COMP_ROWS: Array = [
+	[108, "L", "league", "TICKETS"], [124, "L", "league", "SPONSORS"],
+	[140, "L", "league", "TELEVISION"],
+	[186, "L", "domestic", "TICKETS"], [202, "L", "domestic", "SPONSORS"],
+	[218, "L", "domestic", "TELEVISION"],
+	[264, "L", "euro", "TICKETS"], [280, "L", "euro", "SPONSORS"],
+	[296, "L", "euro", "POINTS"],
+	[341, "L", "charity", "TICKETS"], [357, "L", "charity", "SPONSORS"],
+	[373, "L", "charity", "TELEVISION"],
+	[108, "R", "supercup", "TICKETS"], [124, "R", "supercup", "SPONSORS"],
+	[140, "R", "supercup", "TELEVISION"],
+	[186, "R", "intercontinental", "TICKETS"], [202, "R", "intercontinental", "TELEVISION"],
+]
+const INC_ROW_SALE := 237      # TRANSFERS row = the SALE + LOAN PLAY. line
+const INC_ROW_INSGRP := 273    # INSURANCE COMPENSATION GROUP = the INSURANCE GROUP 3 line
+const INC_ROWS_LOANS: Array = [309, 325, 341, 357]
+const INC_NP_TOPS: Array = [96, 174]    # the two `Not played` pen tops (frame 006)
+
+# EXPENSES view rows (frames 008 / 011 / 012).
+const EXP_ROW_SIGN := 96       # TRANSFERS = SIGN PLAYER line
+const EXP_ROW_CANCEL := 129    # COMPENSATIONS OF CONTRACT = CANCELLATION line
+const EXP_ROW_WAGE_GROSS := 162
+const EXP_ROW_WAGE_INS := 178
+const EXP_ROW_WAGE_TOTAL := 194
+const EXP_ROW_BONUS := 226
+const EXP_ROW_INCENT := 258
+const EXP_ROW_PLINS := 292
+const EXP_ROW_HOSP: Array = [325, 341, 357, 373]   # gross / group2 / group3 / total
+const EXP_ROW_STAFF := 96
+const EXP_ROWS_GROUND: Array = [136, 152, 168, 184]  # SEATS / CAR PARK / FACILITIES / EXTRAS
+const EXP_GROUND_CATS: Array = ["seats", "carpark", "facility", "service"]
+const EXP_ROW_FINES := 224
+const EXP_ROWS_LOANS: Array = [260, 276, 292, 308]   # LOANS AND INTEREST + three £0 slots
 const BTN_WEEK_PREV := Rect2(278, 57, 22, 21)
 const BTN_WEEK_NEXT := Rect2(392, 57, 22, 21)
 # The week label centres on field-sum 693 (solves all three witnessed labels exactly)
@@ -123,6 +198,10 @@ const C_BAR_NEG := Color8(190, 60, 30)
 
 var _chrome: Texture2D
 var _chrome_week: Texture2D
+var _chrome_income: Texture2D          # INCOME / PER WEEK (frame 006)
+var _chrome_income_season: Texture2D   # INCOME / PER SEASON (P1/P2 composite)
+var _chrome_expenses: Texture2D        # EXPENSES / PER SEASON (frame 011)
+var _chrome_expenses_week: Texture2D   # EXPENSES / PER WEEK (P1/P2 composite)
 # Every string on this screen is blitted straight off the game's own BMFont atlases (the
 # way CupDrawScreen does) rather than through a Godot FontFile, because the pen origins
 # were solved to the pixel against the frames and that is the path that reproduces them.
@@ -146,13 +225,29 @@ var _season: String = ""
 var _cash: int = 0
 var _cheat_taps: int = 0
 var _week: int = 0
-var _view: int = VIEW_SEASON
+var _view: int = VIEW_SUMMARY
+var _period: int = PERIOD_SEASON
 var _sel_week: int = 0        # finance week the PER WEEK stepper is parked on
+# The RUNNING week's record (Career.live_week_book): the CURRENT WEEK tile and the
+# stepper's live week read it — witnessed on 004/006, where the Cruyff sale shows
+# under CURRENT WEEK before the week has closed.
+var _live: Dictionary = {}
+# Cash at the close of the last completed week (the LAST WEEK / CASH tile) — a stored
+# figure in the original (its £1 disagreement with the live cash on frame 006 proves
+# it is not derived). NO_CASH_CLOSE -> derive from the live record.
+const NO_CASH_CLOSE := -(1 << 62)
+var _cash_close: int = NO_CASH_CLOSE
+# {"supercup": bool, "intercontinental": bool} — drives the two `Not played` lines.
+var _oneoff: Dictionary = {}
 
 
 func _ready() -> void:
 	_chrome = load("res://art/screens/finance/chrome.png")
 	_chrome_week = load("res://art/screens/finance/chrome_perweek.png")
+	_chrome_income = load("res://art/screens/finance/chrome_income.png")
+	_chrome_income_season = load("res://art/screens/finance/chrome_income_perseason.png")
+	_chrome_expenses = load("res://art/screens/finance/chrome_expenses.png")
+	_chrome_expenses_week = load("res://art/screens/finance/chrome_expenses_perweek.png")
 	_pageV = PMFont.page_texture("euro8")
 	_page8 = PMFont.page_texture("proman8")
 	_page10 = PMFont.page_texture("proman10")
@@ -167,10 +262,15 @@ func _ready() -> void:
 
 
 func setup(summary: Dictionary, club: String, manager: String = "", season: String = "",
-		cash: int = 0, week: int = 0, ledger: Dictionary = {}, books: Array = []) -> void:
+		cash: int = 0, week: int = 0, ledger: Dictionary = {}, books: Array = [],
+		live_book: Dictionary = {}, cash_close: int = NO_CASH_CLOSE,
+		oneoff: Dictionary = {}) -> void:
 	_sum = summary
 	_ledger = ledger
 	_books = books
+	_live = live_book
+	_cash_close = cash_close
+	_oneoff = oneoff
 	_club = club
 	_manager = manager
 	_season = season
@@ -186,10 +286,20 @@ func current_finance_week() -> int:
 	return FinanceModel.finance_week(maxi(_week, 1))
 
 
-## Show the PER WEEK view parked on `fin_week` (render-diff harness / a test).
+## Show the summary PER WEEK view parked on `fin_week` (render-diff harness / a test).
 func show_week(fin_week: int) -> void:
-	_view = VIEW_WEEK
+	_view = VIEW_SUMMARY
+	_period = PERIOD_WEEK
 	_sel_week = clampi(fin_week, 1, current_finance_week())
+	queue_redraw()
+
+
+## Show any view/period combination (render-diff harness / a test).
+func show_view(view: int, period: int, fin_week: int = -1) -> void:
+	_view = clampi(view, VIEW_SUMMARY, VIEW_EXPENSES)
+	_period = clampi(period, PERIOD_WEEK, PERIOD_SEASON)
+	if fin_week > 0:
+		_sel_week = clampi(fin_week, 1, current_finance_week())
 	queue_redraw()
 
 
@@ -209,17 +319,29 @@ func _on_input(e: InputEvent) -> void:
 	if BTN_RETURN.has_point(d):
 		back_pressed.emit()
 		return
-	# The two view tabs whose chrome is baked off a real frame. INCOME and EXPENSES
-	# have no captured frame, so their tabs are inert rather than invented.
+	# The five tabs of the original's own strip: three views x two periods, every one
+	# of them baked off a captured frame (006 / 008 / 011 / 012 / 013 / p0495).
+	if TAB_SUMMARY.has_point(d):
+		_view = VIEW_SUMMARY
+		queue_redraw()
+		return
+	if TAB_INCOME.has_point(d):
+		_view = VIEW_INCOME
+		queue_redraw()
+		return
+	if TAB_EXPENSES.has_point(d):
+		_view = VIEW_EXPENSES
+		queue_redraw()
+		return
 	if TAB_PER_SEASON.has_point(d):
-		_view = VIEW_SEASON
+		_period = PERIOD_SEASON
 		queue_redraw()
 		return
 	if TAB_PER_WEEK.has_point(d):
-		_view = VIEW_WEEK
+		_period = PERIOD_WEEK
 		queue_redraw()
 		return
-	if _view == VIEW_WEEK and (BTN_WEEK_PREV.has_point(d) or BTN_WEEK_NEXT.has_point(d)):
+	if _period == PERIOD_WEEK and (BTN_WEEK_PREV.has_point(d) or BTN_WEEK_NEXT.has_point(d)):
 		# The stepper walks the finance year and stops at the live week: the original
 		# has no books past it, and week 1 is the floor.
 		_sel_week = clampi(_sel_week + (-1 if BTN_WEEK_PREV.has_point(d) else 1),
@@ -292,19 +414,35 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.05, 0.07, 0.14), true)
 	draw_set_transform(Vector2((size.x - W * s) * 0.5, (size.y - H * s) * 0.5), 0.0, Vector2(s, s))
 
-	var chrome: Texture2D = _chrome_week if _view == VIEW_WEEK else _chrome
+	var chrome := _pick_chrome()
 	if chrome != null:
 		draw_texture(chrome, Vector2.ZERO)
 	else:
 		draw_rect(Rect2(0, 0, W, H), Color(0.10, 0.18, 0.40), true)
 
-	if _view == VIEW_WEEK:
+	if _period == PERIOD_WEEK:
 		_draw_week_header()
 	else:
 		_draw_season()
-	_draw_ledger()
+	match _view:
+		VIEW_INCOME:
+			_draw_income_detail()
+		VIEW_EXPENSES:
+			_draw_expense_detail()
+		_:
+			_draw_ledger()
+			_draw_chart()
 	_draw_bottom_boxes()
-	_draw_chart()
+
+
+func _pick_chrome() -> Texture2D:
+	match _view:
+		VIEW_INCOME:
+			return _chrome_income if _period == PERIOD_WEEK else _chrome_income_season
+		VIEW_EXPENSES:
+			return _chrome_expenses_week if _period == PERIOD_WEEK else _chrome_expenses
+		_:
+			return _chrome_week if _period == PERIOD_WEEK else _chrome
 
 
 ## The PER WEEK header: the stepper's own label and the week's date span. The original
@@ -338,28 +476,41 @@ func _draw_season() -> void:
 	_txt_right(_page10, _g10, SEASON_PEN_END, SEASON_PEN_TOP, txt, C_BLACK)
 
 
-## Season-to-date total of one ledger line across the banked books.
+## Every record in season scope: the banked books PLUS the running week's record.
+## WITNESSED: frame 013's season totals include the Cruyff sale posted that same,
+## still-open week, so the season aggregates must see the live record too.
+func _season_recs() -> Array:
+	var recs := _books.duplicate()
+	if not _live.is_empty():
+		recs.append(_live)
+	return recs
+
+
+## Season-to-date total of one ledger line across the banked books + the live record.
 func _book_total(side: String, line: String) -> int:
 	var t := 0
-	for rec in _books:
+	for rec in _season_recs():
 		t += int(((rec as Dictionary).get(side, {}) as Dictionary).get(line, 0))
 	return t
 
 
 ## The book for the week the PER WEEK stepper is on, or {} when nothing has been posted
-## to it. A week with no record reads £0 on every line -- which is exactly what the
-## original shows for the live, not-yet-posted week (binding frame p0495).
+## to it. The LIVE week reads the running record (frames 004/006: the sale shows on the
+## CURRENT week before it closes); a week with no record reads £0 on every line — which
+## is exactly what the original shows for an un-posted live week (binding frame p0495).
 func _selected_book() -> Dictionary:
 	for rec in _books:
 		if int((rec as Dictionary).get("week", 0)) == _sel_week:
 			return rec
+	if _sel_week >= current_finance_week():
+		return _live
 	return {}
 
 
-## One side's values in the frame's own row order, for whichever view is up.
+## One side's values in the frame's own row order, for whichever period is up.
 func _line_vals(side: String, lines: Array) -> Array:
 	var out: Array = []
-	if _view == VIEW_WEEK:
+	if _period == PERIOD_WEEK:
 		var rec := _selected_book()
 		var col: Dictionary = rec.get(side, {}) if not rec.is_empty() else {}
 		for line in lines:
@@ -377,7 +528,7 @@ func _line_vals(side: String, lines: Array) -> Array:
 ## Without them (a legacy save) it falls back to the old FinanceModel projection, where
 ## INSURANCE GROUP 3 came from the insurance ledger and three lines stayed £0 gaps.
 func _income_vals() -> Array:
-	if _view == VIEW_WEEK or not _books.is_empty():
+	if _period == PERIOD_WEEK or not _season_recs().is_empty():
 		return _line_vals("income", FinanceModel.INCOME_LINES)
 	var inc: Array = _sum.get("income_lines", [])
 	var tickets := int(inc[0][1]) if inc.size() > 0 else 0
@@ -391,7 +542,7 @@ func _income_vals() -> Array:
 ## original subtracts at week-record +0x54, PLAYERS' BONUS, PLAYERS' INSURANCE, HOSPITALS)
 ## otherwise.
 func _expense_vals() -> Array:
-	if _view == VIEW_WEEK or not _books.is_empty():
+	if _period == PERIOD_WEEK or not _season_recs().is_empty():
 		return _line_vals("expense", FinanceModel.EXPENSE_LINES)
 	var exp: Array = _sum.get("expense_lines", [])
 	var players_wage := (int(exp[0][1]) if exp.size() > 0 else 0) - int(_ledger.get("wage_refund", 0))
@@ -423,6 +574,133 @@ func _draw_ledger() -> void:
 		fmt_money(_sum_of(expense_vals)), C_TOTAL_EXP)
 
 
+# ---- the DETAIL views (frames 006 / 008 / 011 / 012) ----------------------
+
+## Records in the selected period's scope: the stepper's week, or the whole season
+## (banked books + the running record — frame 013's totals include the open week).
+func _scope_recs() -> Array:
+	if _period == PERIOD_WEEK:
+		var rec := _selected_book()
+		return [] if rec.is_empty() else [rec]
+	return _season_recs()
+
+
+## One canonical ledger line in the period scope.
+func _line_in_scope(side: String, line: String) -> int:
+	var t := 0
+	for rec in _scope_recs():
+		t += int(((rec as Dictionary).get(side, {}) as Dictionary).get(line, 0))
+	return t
+
+
+## One scalar detail field (wage_gross, hosp_pay2, bonus_n, ...) in scope.
+func _det_sum(field: String) -> int:
+	var t := 0
+	for rec in _scope_recs():
+		t += int(FinanceModel.ledger_detail(rec).get(field, 0))
+	return t
+
+
+## One competition-section cell (frame 006's own sections) in scope.
+func _det_comp(bucket: String, field: String) -> int:
+	var t := 0
+	for rec in _scope_recs():
+		var comp: Dictionary = FinanceModel.ledger_detail(rec).get("comp", {})
+		t += int((comp.get(bucket, {}) as Dictionary).get(field, 0))
+	return t
+
+
+## Every named sale in scope, [[player name, fee], ...].
+func _det_sales() -> Array:
+	var out: Array = []
+	for rec in _scope_recs():
+		out.append_array(FinanceModel.ledger_detail(rec).get("sales", []))
+	return out
+
+
+## One GROUND IMPROVEMENTS category (begin_work's cat key) in scope.
+func _det_ground(cat: String) -> int:
+	var t := 0
+	for rec in _scope_recs():
+		t += int((FinanceModel.ledger_detail(rec).get("ground", {}) as Dictionary).get(cat, 0))
+	return t
+
+
+## One right-aligned detail value cell. `y0` is the value plate's top row; the ink pen
+## sits one row inside it (solved at 0 px on every measured cell).
+func _det_val(right_col: bool, y0: int, v: int, col: Color = C_BLACK) -> void:
+	_txt_right(_pageV, _gV, DET_VAL_R_END if right_col else DET_VAL_L_END,
+		y0 + 1, fmt_money(v), col)
+
+
+## The INCOME detail view (frame 006). Un-posted cells read £0 exactly as the frame's
+## fresh sections do; the two one-off European sections carry the witnessed grey
+## `Not played` line until their tie has actually been played.
+func _draw_income_detail() -> void:
+	for row in INC_COMP_ROWS:
+		_det_val(str(row[1]) == "R", int(row[0]), _det_comp(str(row[2]), str(row[3])))
+	if not bool(_oneoff.get("supercup", false)):
+		_blit(_pageV, _gV, DET_NP_X, INC_NP_TOPS[0], "Not played", C_NOTPLAYED)
+	if not bool(_oneoff.get("intercontinental", false)):
+		_blit(_pageV, _gV, DET_NP_X, INC_NP_TOPS[1], "Not played", C_NOTPLAYED)
+	# TRANSFERS: the SALE + LOAN PLAY. line, with the witnessed green `SALE <name>`
+	# label when exactly one sale is in scope (the only captured grammar; several
+	# sales in one scope have no witnessed label form, so the cell stays bare).
+	_det_val(true, INC_ROW_SALE, _line_in_scope("income", "SALE + LOAN PLAY."))
+	var sales := _det_sales()
+	if sales.size() == 1:
+		_blit(_pageV, _gV, DET_SALE_X, INC_ROW_SALE + 1,
+			"SALE %s" % str((sales[0] as Array)[0]), C_SALE)
+	_det_val(true, INC_ROW_INSGRP, _line_in_scope("income", "INSURANCE GROUP 3"))
+	# The four LOANS slots: no loan mechanic exists, so slot 1 carries the (always £0)
+	# LOANS line and the rest read £0 — precisely the frame's own fresh-save state.
+	_det_val(true, INC_ROWS_LOANS[0], _line_in_scope("income", "LOANS"))
+	for i in range(1, INC_ROWS_LOANS.size()):
+		_det_val(true, int(INC_ROWS_LOANS[i]), 0)
+	var total := 0
+	for line in FinanceModel.INCOME_LINES:
+		total += _line_in_scope("income", line)
+	_txt_right(_page10, _g10, DET_TOT_END, DET_TOT_TOP, fmt_money(total), C_TOTAL_INC)
+
+
+## The EXPENSES detail view (frames 008 / 011 / 012). The three data-driven labels
+## (Players´ Wage / N bonuses / Staff Wages) appear only beside a posted figure —
+## witnessed: empty label cells in 008's £0 week, filled in 012's season.
+func _draw_expense_detail() -> void:
+	_det_val(false, EXP_ROW_SIGN, _line_in_scope("expense", "SIGN PLAYER"))
+	_det_val(false, EXP_ROW_CANCEL, _line_in_scope("expense", "CANCELLATION"))
+	var gross := _det_sum("wage_gross")
+	_det_val(false, EXP_ROW_WAGE_GROSS, gross, C_GROSS)
+	if gross != 0:
+		_blit(_pageV, _gV, DET_LBL_L_X, EXP_ROW_WAGE_GROSS + 1, "Players´ Wage", C_BLACK)
+	_det_val(false, EXP_ROW_WAGE_INS, _det_sum("wage_refund"), C_SUBBLUE)
+	_det_val(false, EXP_ROW_WAGE_TOTAL, _line_in_scope("expense", "PLAYERS' WAGE"))
+	_det_val(false, EXP_ROW_BONUS, _line_in_scope("expense", "PLAYERS' BONUS"))
+	var bonus_n := _det_sum("bonus_n")
+	if bonus_n > 0:
+		_blit(_pageV, _gV, DET_LBL_L_X, EXP_ROW_BONUS + 1, "%d bonuses" % bonus_n, C_BLACK)
+	_det_val(false, EXP_ROW_INCENT, _line_in_scope("expense", "PLAYERS' INCENTIVE"))
+	_det_val(false, EXP_ROW_PLINS, _line_in_scope("expense", "PLAYERS' INSURANCE"))
+	_det_val(false, EXP_ROW_HOSP[0], _det_sum("hosp_gross"), C_GROSS)
+	_det_val(false, EXP_ROW_HOSP[1], _det_sum("hosp_pay2"), C_SUBBLUE)
+	_det_val(false, EXP_ROW_HOSP[2], _det_sum("hosp_pay3"), C_SUBBLUE)
+	_det_val(false, EXP_ROW_HOSP[3], _line_in_scope("expense", "HOSPITALS"))
+	var staff := _line_in_scope("expense", "STAFF WAGES")
+	_det_val(true, EXP_ROW_STAFF, staff)
+	if staff != 0:
+		_blit(_pageV, _gV, DET_LBL_R_X, EXP_ROW_STAFF + 1, "Staff Wages", C_BLACK)
+	for i in EXP_ROWS_GROUND.size():
+		_det_val(true, int(EXP_ROWS_GROUND[i]), _det_ground(str(EXP_GROUND_CATS[i])))
+	_det_val(true, EXP_ROW_FINES, _line_in_scope("expense", "FINES"))
+	_det_val(true, EXP_ROWS_LOANS[0], _line_in_scope("expense", "LOANS AND INTEREST"))
+	for i in range(1, EXP_ROWS_LOANS.size()):
+		_det_val(true, int(EXP_ROWS_LOANS[i]), 0)
+	var total := 0
+	for line in FinanceModel.EXPENSE_LINES:
+		total += _line_in_scope("expense", line)
+	_txt_right(_page10, _g10, DET_TOT_END, DET_TOT_TOP, fmt_money(total), C_TOTAL_EXP)
+
+
 ## LAST WEEK / CURRENT WEEK, from the real books.
 ##
 ## WITNESSED (REFRUN R5/R9, the two PER WEEK frames): the CURRENT WEEK tile reads £0 /
@@ -433,24 +711,26 @@ func _draw_ledger() -> void:
 func _draw_bottom_boxes() -> void:
 	var last_inc := 0
 	var last_exp := 0
-	var cur_inc := 0
-	var cur_exp := 0
-	if _books.is_empty():
+	# CURRENT WEEK = the RUNNING record (frames 004/006: the sale is on the tile before
+	# the week closes; p0495: an un-posted live week reads £0 / £0).
+	var cur_inc := FinanceModel.ledger_total(_live, "income") if not _live.is_empty() else 0
+	var cur_exp := FinanceModel.ledger_total(_live, "expense") if not _live.is_empty() else 0
+	if _books.is_empty() and _live.is_empty():
 		# Legacy save with no per-week history: the season figures spread evenly, flagged.
 		last_inc = int(round(_sum_of(_income_vals()) / float(SEASON_WEEKS)))
 		last_exp = int(round(_sum_of(_expense_vals()) / float(SEASON_WEEKS)))
 		cur_inc = last_inc
 		cur_exp = last_exp
-	else:
+	elif not _books.is_empty():
 		var last: Dictionary = _books[-1]
 		last_inc = FinanceModel.ledger_total(last, "income")
 		last_exp = FinanceModel.ledger_total(last, "expense")
-	# LAST WEEK -- cash as it stood at the close of that week is the live figure less
-	# anything posted since, which for a settled hub view is nothing.
+	# LAST WEEK / CASH is the original's own STORED close-of-week figure (frame 006's £1
+	# disagreement with the live cash proves it is not derived); derive only without one.
+	var close := _cash_close if _cash_close != NO_CASH_CLOSE else _cash - (cur_inc - cur_exp)
 	_txt_right(_page8, _g8, LW_PEN_END, BOT_PEN_TOP[0], fmt_money(last_inc), C_BLACK)
 	_txt_right(_page8, _g8, LW_PEN_END, BOT_PEN_TOP[1], fmt_money(last_exp), C_BLACK)
-	_txt_right(_page8, _g8, LW_PEN_END, BOT_PEN_TOP[2],
-		fmt_money(_cash - (cur_inc - cur_exp)), C_GOLD)
+	_txt_right(_page8, _g8, LW_PEN_END, BOT_PEN_TOP[2], fmt_money(close), C_GOLD)
 	# CURRENT WEEK
 	_txt_right(_page8, _g8, CW_PEN_END, BOT_PEN_TOP[0], fmt_money(cur_inc), C_BLACK)
 	_txt_right(_page8, _g8, CW_PEN_END, BOT_PEN_TOP[1], fmt_money(cur_exp), C_BLACK)

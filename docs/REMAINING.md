@@ -42,8 +42,22 @@ final build:
 * **Preseason is gone in season two** — no friendly setup reachable at the second
   season's start.
 * **No contract-renewal message toward season end**, which the original raises.
-* **The finance INCOME and EXPENSE screens do nothing** when opened, although both are
-  tracked in captures.
+* ~~**The finance INCOME and EXPENSE screens do nothing** when opened, although both are
+  tracked in captures.~~ — **BUILT 2026-07-27.** The in-code claim "no captured frame"
+  was FALSE (the RE doc's own binding table lists frames 006/008/011/012). All four
+  detail chromes are baked/composited from the frames (`bake_details()`), the view tabs
+  are wired, and the data layer fills what the port honestly can: per-competition
+  TICKETS/TELEVISION (new `detail` sub-record on the week books), euro POINTS, the named
+  `SALE <name>` row, wage/hospital sub-rows, staff, ground categories — the rest reads
+  £0 exactly as the frames do for a fresh save. THREE frames render-diff at **0 px**
+  (006/008/012, `diff_finance_detail_parity.py`). Bonus fixes the witnesses forced:
+  the CURRENT WEEK tile + season totals now read the RUNNING week's record
+  (`Career.live_week_book`, saved as `week_open`), and LAST WEEK / CASH is a STORED
+  close figure (`cash_close`) — frame 006's £1 disagreement proves the original stores
+  it. Recorded, not fixed: the SUMMARY chrome bakes `EUROPEAN CUP INCOME` + the
+  `±2,500 K.` axis static, but `orig/51_finance_season.png` shows `U.E.F.A. CUP INCOME`
+  + `±250 K.` — both DYNAMIC in the original, rule underdetermined by two witnesses
+  (`finance_screen_re.md` §LATENT DEFECT).
 * **TEAM TACTICS does not match the tracked original** (`tactics_subscreens_re.md` holds
   the measurements).
 * **Neither cheat works in play**: MIXED PLAY (blocked on the un-located club tactic
