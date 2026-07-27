@@ -78,6 +78,33 @@ BTN_TOPS = (183, 207, 231, 255, 279, 303)
 ROUND_PLATE = (372, 119, 456, 139)
 BG_ROUND = (170, 191, 170)
 
+# ---- the results-row kit-well OVERLAYS (2026-07-27) ---------------------------------
+# The knockout build proved the kit outline/bevel pass is POSITION-CONSTANT (every kit
+# in a bank shares one silhouette), so its result is baked verbatim per well, voted
+# across the six witnessed group frames -- six DIFFERENT clubs per well. UNDER = ring
+# pixels outside every silhouette where all six frames agree and differ from the
+# wallpaper the chrome bakes there; OVER = on-sprite positions the pass provably
+# overrides club-independently. The club ids per well are the frames' own (the same
+# transcription shot_euroleague_parity.gd carries).
+WELL_IDS = {
+    ("res0", "h"): {
+        "xy": (80, 274),
+        "ids": {"A": 40, "B": 1050, "C": 1075, "D": 1060, "E": 1131, "F": 1104},
+    },
+    ("res0", "a"): {
+        "xy": (301, 274),
+        "ids": {"A": 1038, "B": 1106, "C": 1024, "D": 1021, "E": 44, "F": 1042},
+    },
+    ("res1", "h"): {
+        "xy": (80, 296),
+        "ids": {"A": 1135, "B": 1124, "C": 1172, "D": 1189, "E": 1278, "F": 1231},
+    },
+    ("res1", "a"): {
+        "xy": (301, 296),
+        "ids": {"A": 1223, "B": 1161, "C": 1274, "D": 1262, "E": 1193, "F": 1003},
+    },
+}
+
 
 def fill(im: Image.Image, x0: int, y0: int, x1: int, y1: int, col: tuple) -> None:
     for y in range(y0, y1 + 1):
@@ -131,6 +158,43 @@ def main() -> None:
 
     base.convert("RGBA").save(OUT / "chrome.png")
     print("chrome.png <- 6 group frames + the empty-body desktop")
+
+    # -- the kit-well outline-pass overlays (see the WELL_IDS block).
+    for (row, side), spec in WELL_IDS.items():
+        wx, wy = spec["xy"]
+        cells = []
+        for L, cid in spec["ids"].items():
+            sp = Image.open(ROOT / f"app/art/kits/ridi/{cid}.png").convert("RGBA")
+            sil, col = set(), {}
+            for sy in range(sp.height):
+                for sx in range(sp.width):
+                    r, g, b, a = sp.getpixel((sx, sy))
+                    if a >= 128:
+                        sil.add((sx, sy))
+                        col[(sx, sy)] = (r, g, b)
+            cells.append((frames[L], sil, col))
+        under = Image.new("RGBA", (KIT_W, KIT_H), (0, 0, 0, 0))
+        over = Image.new("RGBA", (KIT_W, KIT_H), (0, 0, 0, 0))
+        n_u = n_o = 0
+        for ry in range(KIT_H):
+            for rx in range(KIT_W):
+                vals = {fr.getpixel((wx + rx, wy + ry)) for fr, _s, _c in cells}
+                if len(vals) != 1:
+                    continue
+                c = vals.pop()
+                covered = [((rx, ry) in sil, col.get((rx, ry))) for _f, sil, col in cells]
+                if not any(cov for cov, _ in covered):
+                    if c != wall.getpixel((wx + rx, wy + ry)):
+                        under.putpixel((rx, ry), (*c, 255))
+                        n_u += 1
+                elif any(cov and sc != c for cov, sc in covered):
+                    over.putpixel((rx, ry), (*c, 255))
+                    n_o += 1
+        under.save(OUT / f"well_under_{row}_{side}.png")
+        over.save(OUT / f"well_over_{row}_{side}.png")
+        print(
+            f"well_under/over_{row}_{side}.png <- 6 witnessed cells ({n_u} under + {n_o} over px)"
+        )
 
     for i, L in enumerate(LETTERS):
         f = frames[L]

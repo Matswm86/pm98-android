@@ -41,6 +41,11 @@ const AWAY_PEN_X := 219                      # left-aligned away name
 const BOX_SUMS := [378, 414]                 # score boxes x181..196 / x199..214
 const KIT_X := [80, 301]
 const KIT_TOPS := [274, 296]
+## The outline-pass overlays (baked 2026-07-27, knockout-build method): the pass's
+## result is POSITION-CONSTANT across every witnessed cell (six different clubs per
+## well), so it is baked verbatim per well -- under = the ring outside the silhouette,
+## over = the on-sprite positions the pass provably overrides club-independently.
+const WELL_KEYS := [["res0_h", "res0_a"], ["res1_h", "res1_a"]]
 const C_RES := Color8(80, 100, 120)
 const C_GOAL := Color8(180, 200, 220)
 const C_GOAL_MARK := Color8(255, 255, 0)
@@ -68,6 +73,7 @@ const HDR_STATUS_W := 77
 var _chrome: Texture2D
 var _plates: Dictionary = {}       # letter -> the GROUP header plate
 var _lit: Dictionary = {}          # letter -> the lit button face
+var _well: Dictionary = {}         # "under_res0_h"/... the kit-well outline overlays
 var _patches: Dictionary = {}
 var _page_cal: Texture2D
 var _page_p10: Texture2D
@@ -90,6 +96,10 @@ func _ready() -> void:
 	for L in LETTERS:
 		_plates[L] = _tex("res://art/screens/euroleague/hdr_group_%s.png" % L)
 		_lit[L] = _tex("res://art/screens/euroleague/btn_lit_%s.png" % L)
+	for row in WELL_KEYS:
+		for k in row:
+			_well["under_" + str(k)] = _tex("res://art/screens/euroleague/well_under_%s.png" % k)
+			_well["over_" + str(k)] = _tex("res://art/screens/euroleague/well_over_%s.png" % k)
 	for k in HDR_PATCH_XY:
 		_patches[k] = _tex("res://art/screens/results/%s.png" % k)
 	_page_cal = PMFont.page_texture("calend12")
@@ -338,9 +348,14 @@ func _draw_results() -> void:
 		var top: int = RES_TOPS[i]
 		var pen_top: int = top + RES_PEN_DY
 		for slot in 2:
+			var wk := str((WELL_KEYS[i] as Array)[slot])
+			if _well.get("under_" + wk) != null:
+				draw_texture(_well["under_" + wk], Vector2(KIT_X[slot], KIT_TOPS[i]))
 			var kt := PMChrome.ridi_kit(int(r.get("home_id" if slot == 0 else "away_id", -1)))
 			if kt != null:
 				draw_texture(kt, Vector2(KIT_X[slot], KIT_TOPS[i]))
+			if _well.get("over_" + wk) != null:
+				draw_texture(_well["over_" + wk], Vector2(KIT_X[slot], KIT_TOPS[i]))
 		_txt_right(_page_cal, _g_cal, HOME_PEN_END, pen_top, str(r.get("home", "")), C_RES)
 		_txt(_page_cal, _g_cal, AWAY_PEN_X, pen_top, str(r.get("away", "")), C_RES)
 		if not bool(r.get("played", true)):
