@@ -132,6 +132,23 @@ Four more, reported 2026-07-26 evening (second round, same play session):
   — worth a memory dump to confirm the port's single `stadium_capacity` matches; (c) 10
   tiles still corrected-by-mapping only.
 
+## 0b. Mats's live QA, 2026-07-27 morning — fix FIRST (next session = TEAM TACTICS)
+
+* **SCOUT name-search must be INSTANT**: searching by NAME alone returns hits right
+  away — no scout run armed, no other filter needed. Own object on the scout screen
+  in the ORIGINAL chrome (extend the s63 `ours_panel.png` bake grammar); hits land as
+  NORMAL scout results (profile tap, offer-to-buy, the standard chain). An instant DB
+  lookup, not a scouting mission — the mission machinery stays for attribute searches.
+* **TEAM TACTICS still broken end-to-end** (Session B not yet run, Mats re-confirmed
+  every symptom live): screen not the original's, controls don't function, PASSING
+  short/long %s wrong, COUNTER ATTACK % wrong, MIXED PLAY cheat dead. Map: the s63
+  handoff §3 + `tactics_subscreens_re.md` — incl. wiring the 7 levers into the
+  byte-exact engine (`team[0xc1..0xc7]`, EXACT_PORT_PLAN gap B).
+* **⚠ THREE UP FRONT still does not fire in play** despite `4b8b63a`'s trigger fixes
+  and green seam test. OPEN until witnessed working in Mats's hands on a real career
+  — verify in the REAL app (was 4-3-3 picked? if that usage gate is the whole story,
+  surface it in-game; if not, the trigger chain has a hole the seam test misses).
+
 ## The one-paragraph truth
 
 The **manager game** — career, leagues, transfers, finance, tactics, cups, Europe, youth,
