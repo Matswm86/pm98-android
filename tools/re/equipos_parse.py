@@ -205,8 +205,21 @@ def parse_club_tactic(d: bytes, dbc_id: int, collect: bool = False) -> dict:
     stadium_capacity = s.u32()
     if stadium_capacity < 10:
         stadium_capacity = 6000
+    # param_1[7] = the ground's remaining EXPANSION HEADROOM (club+0x1c). The GROUND
+    # picture's tier is the SUM ([club+0x18] + [club+0x1c]) * 11 / 130000
+    # (FUN_0051a6e0 @0x51a73a adds ground+4 + ground+8 before the magic division),
+    # so discarding this field under-tiered the 91 clubs that ship a non-zero value.
+    # Loader quantisation fn_00579c70 L103-111, verbatim: nearest multiple of 4000
+    # (remainder > 1999 rounds up), a non-zero value under 4000 rounds up to 4000,
+    # zero stays zero. 4000 = the SEATS build unit (FUN_0057e3f0).
+    headroom = 0
     if fmt >= 0x1FE:
-        s.u32()  # param_1[7]
+        raw7 = s.u32()
+        if raw7 != 0:
+            headroom = raw7 // 4000
+            if headroom == 0 or raw7 % 4000 > 1999:
+                headroom += 1
+            headroom *= 4000
     # Stadium PITCH DIMS (session_lineup_re.md §4): +0x34/+0x36 u16 pair. The
     # engine substitutes (NOT clamps) after reading: +0x34 < 0x1e -> 0x3c,
     # +0x36 < 0x34 -> 0x69 (fn_00579c70_FUN_00579c70.c L112-117). +0x36 is the
@@ -289,6 +302,9 @@ def parse_club_tactic(d: bytes, dbc_id: int, collect: bool = False) -> dict:
         "inBounds": in_bounds,
         # STADIUM CAPACITY (param_1[6], <10 -> 6000 rule applied). Real, source-verified.
         "stadiumCapacity": stadium_capacity,
+        # EXPANSION HEADROOM (param_1[7], loader-quantised to 4000s). Tier input =
+        # capacity + headroom, exactly as FUN_0051a6e0 sums ground+4 + ground+8.
+        "capacityHeadroom": headroom,
         # engine-effective values (substitute rule applied) + the raw pair
         "pitchW": 0x69 if p36 < 0x34 else p36,
         "pitchH": 0x3C if p34 < 0x1E else p34,

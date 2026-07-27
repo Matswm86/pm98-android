@@ -55,10 +55,40 @@ IMPROVE `(298,407,152,25)` · WORKS `(484,407,132,25)` · MATCH DAY `(298,442,15
 (disabled/washed in the frame) · RETURN `(488,442,124,25)`.
 
 ## Tier picture
-`tier = clamp(capacity * 11 / 130000, 0, 11)` (reversed `FUN_0051a6e0` @0x51a728, magic
-division). 12 tiles `estadio0..11.png` (320×240, MANAGER.PAL). The frame's Old-Trafford
-render = tier 4 (real capacity 55,300). The tile fills the picture box exactly and covers the
-baked tile so no tier bleed is possible.
+`tier = clamp((capacity + headroom) * 11 / 130000, 0, 11)` (reversed `FUN_0051a6e0`
+@0x51a728, magic division). 12 tiles `estadio0..11.png` (320×240, MANAGER.PAL). The
+frame's Old-Trafford render = tier 4 (real capacity 55,300, headroom 0). The tile fills
+the picture box exactly and covers the baked tile so no tier bleed is possible.
+
+**The tier input is a TWO-FIELD SUM — closed 2026-07-27 (new disassembly).**
+`FUN_0051a6e0` @0x51a728-0x51a74c reads the ground object and computes
+`([ground+4] + [ground+8]) * 11 / 130000` (`mov eax,[ecx+8]; mov ebx,[ecx+4];
+add eax,ebx` before the 0x810E35C1 magic division — emulated exact = `n*11//130000`
+for all n ≤ 141,818). The ctor `FUN_0057d780` maps `ground+4 = club+0x18` (the
+capacity the port ships) and `ground+8 = club+0x1c` = **EQUIPOS `param_1[7]`, the
+expansion HEADROOM the extractor used to discard**. The loader (`fn_00579c70`
+L103-111) quantises it to the nearest multiple of 4000 (remainder > 1999 up, a
+non-zero value under 4000 up, zero stays zero; 4000 = the SEATS build unit
+`FUN_0057e3f0` = `(card+1)*4000`). The weekly tick `FUN_0057da50` @0x57db44-0x57db84
+decrements headroom on completion ONLY for category-2 seats (the unused second
+table); the English category-1 cards grow the sum by the seats built. 91 of 476
+clubs ship non-zero headroom (~30 English — Port Vale, Cardiff, Barnsley, Burnley,
+Luton …); every render-witnessed club ships 0, which is why this never showed in a
+parity diff. Port: `capacityHeadroom` in game_db (extractor applies the loader
+quantisation verbatim), `Career.stadium_headroom` (static), tier input =
+capacity + headroom (`StadiumScreen._load_scene`).
+
+Two neighbouring findings recorded, NOT yet acted on:
+* **The SEATS ceiling in the EXE compares against 150,000** (@0x51c8d3:
+  `cmp eax, 0x249F0`), not the port's 130,000 (`Career.MAX_STADIUM`); 130,000 is
+  only the tier-11 picture threshold. The addend register wants one more trace
+  before the constant is changed — flagged, unchanged.
+* **The works-in-progress markers are real**: `FUN_0051a6e0` @0x51a7cc-0x51a80a
+  copies the four ground works flags (`ground+0x32/+0x35/+0x38/+0x3b`) into screen
+  fields `+0x192c..+0x1938` — strong evidence `remodela.png` (19x16, exported,
+  loaded by nothing) is the per-section marker on the picture. Its DRAW position is
+  still unwitnessed, so the port does not draw it (no invention); a wine capture
+  during works closes this.
 
 **The "small internal crop/palette offset … not a placement error" note was WRONG — FIXED
 2026-07-24 (s55).** It was a 256-column wrap, and it made the whole picture panel render at

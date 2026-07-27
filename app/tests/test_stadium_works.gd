@@ -55,6 +55,27 @@ func _run() -> bool:
 	ok = _assert(career.works.is_empty(), "works cleared on completion") and ok
 	ok = _assert(career.stadium_capacity == cap0 + 5000,
 		"capacity rose by the built amount (%d -> %d)" % [cap0, career.stadium_capacity]) and ok
+	# The PICTURE follows: the tier input (capacity + headroom) crossed a band iff
+	# tier_for says so — pin the exact before/after tiers so a regression in the
+	# capacity->tile chain (the "stadium image never grows" report) fails loudly.
+	var tier_before: int = StadiumScreen.tier_for(cap0 + career.stadium_headroom)
+	var tier_after: int = StadiumScreen.tier_for(career.stadium_capacity + career.stadium_headroom)
+	ok = _assert(tier_after >= tier_before, "tier never falls on expansion") and ok
+	# Force a guaranteed band-cross: +4,000 from just under a band edge.
+	var c3 := Career.create(prem[2], league, prem, leagues)
+	c3.cash = 20_000_000
+	c3.stadium_capacity = 23000   # band edge 23,637: +4,000 must cross
+	c3.stadium_headroom = 0
+	var t_lo: int = StadiumScreen.tier_for(23000)
+	ok = _assert(c3.start_works(4000, 2_250_000, 1), "band-cross works started") and ok
+	for _w in 2:
+		if c3.season_over():
+			break
+		c3.advance_week(rng, clubs_by_id)
+	ok = _assert(c3.stadium_capacity == 27000
+		and StadiumScreen.tier_for(c3.stadium_capacity + c3.stadium_headroom) == t_lo + 1,
+		"a completed +4,000 crosses the band: the picture MUST change (t%d -> t%d)"
+		% [t_lo, StadiumScreen.tier_for(c3.stadium_capacity)]) and ok
 	ok = _assert(career.weekly_net > net0,
 		"bigger gate lifts weekly_net (£%d -> £%d)" % [net0, career.weekly_net]) and ok
 
@@ -65,6 +86,10 @@ func _run() -> bool:
 	# Ceiling guard: a build that would breach MAX_STADIUM is refused.
 	career.stadium_capacity = Career.MAX_STADIUM - 1000
 	ok = _assert(not career.start_works(5000, 100, 4), "expansion past the ceiling refused") and ok
+
+	# Headroom round-trip + the legacy-save landmine: from_dict(pre-works save)
+	# loads capacity 0 — Main heals it from GameDB before any works can complete.
+	ok = _assert(career.stadium_headroom >= 0, "headroom seeded (%d)" % career.stadium_headroom) and ok
 
 	# Save / load round-trips the new state.
 	var mid := Career.create(prem[1], league, prem, leagues)

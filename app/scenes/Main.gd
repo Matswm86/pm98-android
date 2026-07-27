@@ -1638,6 +1638,15 @@ func _home_select(item: Dictionary) -> void:
 func _continue_career() -> void:
 	_career = Career.load_save()
 	if _career != null:
+		# GROUND heal for older saves: capacity 0 would collapse to `0 + added`
+		# the moment a works completed (the pre-works default relied on a
+		# display-side fallback only), and headroom did not exist before
+		# 2026-07-27. Both are static per club in GameDB, so healing is exact.
+		var gclub := GameDB.club(_career.club_id)
+		if _career.stadium_capacity <= 0:
+			_career.stadium_capacity = int(gclub.get("capacity", 0))
+		if _career.stadium_headroom <= 0:
+			_career.stadium_headroom = int(gclub.get("capacityHeadroom", 0))
 		# Re-attach the pyramid's static club records (never persisted); a
 		# pre-pyramid save gains its lower divisions here (fast-forwarded).
 		_career.ensure_divisions(_pyramid_context())
@@ -3516,7 +3525,7 @@ func _show_stadium_screen() -> void:
 	scr.setup(_career.club_name, _career.manager_name, _career.season, ground,
 		cap, seated, cap - seated, int(round(cap / 27.0)), _career.works_status(),
 		float(sm.get("ticket_price", 0.0)), int(sm.get("board_price", 0)), _career.week + 1,
-		_career.league_name, str(club.get("objective", "")))
+		_career.league_name, str(club.get("objective", "")), _career.stadium_headroom)
 	# The live GROUND state for the CAR PARK / FACILITIES / SERVICES tabs + the WORK IN
 	# PROGRESS ledger. Every improvement price now comes from the binary's own cost function
 	# (GroundCost / FUN_0057ddd0) keyed by the club's STATURE band — the value the original

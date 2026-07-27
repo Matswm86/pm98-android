@@ -180,6 +180,10 @@ def main() -> None:
             # Villa Park 39,339, The Dell 15,200). foundingYear stays laliga-only (a
             # separate real field, not yet decoded for the other 456 clubs).
             "capacity": c.get("capacity") or cap.get("capacity"),
+            # Expansion headroom (EQUIPOS param_1[7], loader-quantised to 4000s):
+            # the GROUND picture's tier reads capacity + capacityHeadroom, exactly
+            # as FUN_0051a6e0 sums ground+4 + ground+8. Non-zero for 91 clubs.
+            "capacityHeadroom": int(c.get("capacityHeadroom") or 0),
             "foundingYear": cap.get("founded"),
             "players": [emit_player(p, cid) for p in c.get("players", [])],
         }

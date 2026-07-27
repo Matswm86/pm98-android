@@ -152,6 +152,7 @@
    "countryCode": 30,
    "leagueId": "eng_prem",
    "capacity": 31367,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -1024,6 +1025,7 @@
    "countryCode": 30,
    "leagueId": "eng_prem",
    "capacity": 39655,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -1858,6 +1860,7 @@
    "countryCode": 30,
    "leagueId": "eng_prem",
    "capacity": 55300,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -2820,6 +2823,7 @@
    "countryCode": 30,
    "leagueId": "eng_prem",
    "capacity": 41000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -3742,6 +3746,7 @@
    "countryCode": 30,
    "leagueId": "eng_prem",
    "capacity": 38950,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -4655,6 +4660,7 @@
    "countryCode": 30,
    "leagueId": "eng_prem",
    "capacity": 34390,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -5688,6 +5694,7 @@
    "countryCode": 30,
    "leagueId": "eng_prem",
    "capacity": 39339,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -6405,6 +6412,7 @@
    "countryCode": 30,
    "leagueId": "eng_prem",
    "capacity": 39000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -7437,6 +7445,7 @@
    "countryCode": 30,
    "leagueId": "eng_prem",
    "capacity": 32786,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -8519,6 +8528,7 @@
    "countryCode": 30,
    "leagueId": "eng_prem",
    "capacity": 26014,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -9316,6 +9326,7 @@
    "countryCode": 30,
    "leagueId": "eng_prem",
    "capacity": 31544,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -10269,6 +10280,7 @@
    "countryCode": 30,
    "leagueId": "eng_prem",
    "capacity": 26500,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -11378,6 +11390,7 @@
    "countryCode": 30,
    "leagueId": "eng_prem",
    "capacity": 36020,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -12256,6 +12269,7 @@
    "countryCode": 30,
    "leagueId": "eng_prem",
    "capacity": 24003,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -13202,6 +13216,7 @@
    "countryCode": 30,
    "leagueId": "eng_prem",
    "capacity": 15200,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -14112,6 +14127,7 @@
    "countryCode": 30,
    "leagueId": "eng_prem",
    "capacity": 25000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -14910,6 +14926,7 @@
    "countryCode": 30,
    "leagueId": "eng_prem",
    "capacity": 22517,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -15786,6 +15803,7 @@
    "countryCode": 30,
    "leagueId": "eng_prem",
    "capacity": 20500,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -16648,6 +16666,7 @@
    "countryCode": 30,
    "leagueId": "eng_prem",
    "capacity": 26400,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -17626,6 +17645,7 @@
    "countryCode": 30,
    "leagueId": "eng_prem",
    "capacity": 19101,
+   "capacityHeadroom": 8000,
    "foundingYear": null,
    "players": [
     {
@@ -18523,6 +18543,7 @@
    "countryCode": 30,
    "leagueId": "eng_div1",
    "capacity": 30602,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -19308,6 +19329,7 @@
    "countryCode": 30,
    "leagueId": "eng_div1",
    "capacity": 30000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -20254,6 +20276,7 @@
    "countryCode": 30,
    "leagueId": "eng_div1",
    "capacity": 22657,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -21159,6 +21182,7 @@
    "countryCode": 30,
    "leagueId": "eng_div1",
    "capacity": 19148,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -22273,6 +22297,7 @@
    "countryCode": 30,
    "leagueId": "eng_div1",
    "capacity": 31257,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -23329,6 +23354,7 @@
    "countryCode": 30,
    "leagueId": "eng_div1",
    "capacity": 25936,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -24314,6 +24340,7 @@
    "countryCode": 30,
    "leagueId": "eng_div1",
    "capacity": 19500,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -25135,6 +25162,7 @@
    "countryCode": 30,
    "leagueId": "eng_div1",
    "capacity": 22600,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -26009,6 +26037,7 @@
    "countryCode": 30,
    "leagueId": "eng_div1",
    "capacity": 15760,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -27028,6 +27057,7 @@
    "countryCode": 30,
    "leagueId": "eng_div1",
    "capacity": 18100,
+   "capacityHeadroom": 8000,
    "foundingYear": null,
    "players": [
     {
@@ -27813,6 +27843,7 @@
    "countryCode": 30,
    "leagueId": "eng_div1",
    "capacity": 15000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -28788,6 +28819,7 @@
    "countryCode": 30,
    "leagueId": "eng_div1",
    "capacity": 21994,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -29460,6 +29492,7 @@
    "countryCode": 30,
    "leagueId": "eng_div1",
    "capacity": 22356,
+   "capacityHeadroom": 16000,
    "foundingYear": null,
    "players": [
     {
@@ -30318,6 +30351,7 @@
    "countryCode": 30,
    "leagueId": "eng_div1",
    "capacity": 26452,
+   "capacityHeadroom": 8000,
    "foundingYear": null,
    "players": [
     {
@@ -31295,6 +31329,7 @@
    "countryCode": 30,
    "leagueId": "eng_div1",
    "capacity": 15000,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -32452,6 +32487,7 @@
    "countryCode": 30,
    "leagueId": "eng_div1",
    "capacity": 9572,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -33304,6 +33340,7 @@
    "countryCode": 30,
    "leagueId": "eng_div1",
    "capacity": 31000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -34360,6 +34397,7 @@
    "countryCode": 30,
    "leagueId": "eng_div1",
    "capacity": 24054,
+   "capacityHeadroom": 8000,
    "foundingYear": null,
    "players": [
     {
@@ -35136,6 +35174,7 @@
    "countryCode": 30,
    "leagueId": "eng_div1",
    "capacity": 16789,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -35921,6 +35960,7 @@
    "countryCode": 30,
    "leagueId": "eng_div1",
    "capacity": 25296,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -36750,6 +36790,7 @@
    "countryCode": 30,
    "leagueId": "eng_div1",
    "capacity": 28525,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -37616,6 +37657,7 @@
    "countryCode": 30,
    "leagueId": "eng_div1",
    "capacity": 11936,
+   "capacityHeadroom": 8000,
    "foundingYear": null,
    "players": [
     {
@@ -38525,6 +38567,7 @@
    "countryCode": 30,
    "leagueId": "eng_div1",
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -39387,6 +39430,7 @@
    "countryCode": 30,
    "leagueId": "eng_div1",
    "capacity": 12086,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -40123,6 +40167,7 @@
    "countryCode": 30,
    "leagueId": "eng_div2",
    "capacity": 12485,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -40790,6 +40835,7 @@
    "countryCode": 30,
    "leagueId": "eng_div2",
    "capacity": 8686,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -41499,6 +41545,7 @@
    "countryCode": 30,
    "leagueId": "eng_div2",
    "capacity": 13700,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -42160,6 +42207,7 @@
    "countryCode": 30,
    "leagueId": "eng_div2",
    "capacity": 9654,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -42903,6 +42951,7 @@
    "countryCode": 30,
    "leagueId": "eng_div2",
    "capacity": 11000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -43764,6 +43813,7 @@
    "countryCode": 30,
    "leagueId": "eng_div2",
    "capacity": 13870,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -44555,6 +44605,7 @@
    "countryCode": 30,
    "leagueId": "eng_div2",
    "capacity": 17888,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -45501,6 +45552,7 @@
    "countryCode": 30,
    "leagueId": "eng_div2",
    "capacity": 8475,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -46403,6 +46455,7 @@
    "countryCode": 30,
    "leagueId": "eng_div2",
    "capacity": 22966,
+   "capacityHeadroom": 8000,
    "foundingYear": null,
    "players": [
     {
@@ -47195,6 +47248,7 @@
    "countryCode": 30,
    "leagueId": "eng_div2",
    "capacity": 8880,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -47939,6 +47993,7 @@
    "countryCode": 30,
    "leagueId": "eng_div2",
    "capacity": 10600,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -48647,6 +48702,7 @@
    "countryCode": 30,
    "leagueId": "eng_div2",
    "capacity": 9975,
+   "capacityHeadroom": 8000,
    "foundingYear": null,
    "players": [
     {
@@ -49537,6 +49593,7 @@
    "countryCode": 30,
    "leagueId": "eng_div2",
    "capacity": 20164,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -50518,6 +50575,7 @@
    "countryCode": 30,
    "leagueId": "eng_div2",
    "capacity": 19700,
+   "capacityHeadroom": 8000,
    "foundingYear": null,
    "players": [
     {
@@ -51217,6 +51275,7 @@
    "countryCode": 30,
    "leagueId": "eng_div2",
    "capacity": 18700,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -51995,6 +52054,7 @@
    "countryCode": 30,
    "leagueId": "eng_div2",
    "capacity": 9000,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -52656,6 +52716,7 @@
    "countryCode": 30,
    "leagueId": "eng_div2",
    "capacity": 22000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -53548,6 +53609,7 @@
    "countryCode": 45,
    "leagueId": "eng_div2",
    "capacity": 9200,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -54400,6 +54462,7 @@
    "countryCode": 30,
    "leagueId": "eng_div2",
    "capacity": 9650,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -55062,6 +55125,7 @@
    "countryCode": 30,
    "leagueId": "eng_div2",
    "capacity": 9534,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -55834,6 +55898,7 @@
    "countryCode": 30,
    "leagueId": "eng_div2",
    "capacity": 16651,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -56647,6 +56712,7 @@
    "countryCode": 30,
    "leagueId": "eng_div2",
    "capacity": 14969,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -57936,6 +58002,7 @@
    "countryCode": 30,
    "leagueId": "eng_div2",
    "capacity": 7653,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -58681,6 +58748,7 @@
    "countryCode": 30,
    "leagueId": "eng_div2",
    "capacity": 6901,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -59498,6 +59566,7 @@
    "countryCode": 30,
    "leagueId": "eng_div3",
    "capacity": 20300,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -60244,6 +60313,7 @@
    "countryCode": 30,
    "leagueId": "eng_div3",
    "capacity": 15500,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -60918,6 +60988,7 @@
    "countryCode": 30,
    "leagueId": "eng_div3",
    "capacity": 11514,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -61707,6 +61778,7 @@
    "countryCode": 30,
    "leagueId": "eng_div3",
    "capacity": 8000,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -62379,6 +62451,7 @@
    "countryCode": 30,
    "leagueId": "eng_div3",
    "capacity": 3887,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -63075,6 +63148,7 @@
    "countryCode": 30,
    "leagueId": "eng_div3",
    "capacity": 13600,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -63818,6 +63892,7 @@
    "countryCode": 30,
    "leagueId": "eng_div3",
    "capacity": 9667,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -64601,6 +64676,7 @@
    "countryCode": 45,
    "leagueId": "eng_div3",
    "capacity": 20284,
+   "capacityHeadroom": 16000,
    "foundingYear": null,
    "players": [
     {
@@ -65310,6 +65386,7 @@
    "countryCode": 30,
    "leagueId": "eng_div3",
    "capacity": 6000,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -66093,6 +66170,7 @@
    "countryCode": 30,
    "leagueId": "eng_div3",
    "capacity": 7190,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -66908,6 +66986,7 @@
    "countryCode": 30,
    "leagueId": "eng_div3",
    "capacity": 7046,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -67620,6 +67699,7 @@
    "countryCode": 30,
    "leagueId": "eng_div3",
    "capacity": 8608,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -68377,6 +68457,7 @@
    "countryCode": 30,
    "leagueId": "eng_div3",
    "capacity": 10570,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -69082,6 +69163,7 @@
    "countryCode": 30,
    "leagueId": "eng_div3",
    "capacity": 7229,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -69821,6 +69903,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 8843,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -70484,6 +70567,7 @@
    "countryCode": 30,
    "leagueId": "eng_div3",
    "capacity": 16564,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -71344,6 +71428,7 @@
    "countryCode": 30,
    "leagueId": "eng_div3",
    "capacity": 12573,
+   "capacityHeadroom": 8000,
    "foundingYear": null,
    "players": [
     {
@@ -72162,6 +72247,7 @@
    "countryCode": 30,
    "leagueId": "eng_div3",
    "capacity": 10918,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -72959,6 +73045,7 @@
    "countryCode": 30,
    "leagueId": "eng_div3",
    "capacity": 7033,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -73629,6 +73716,7 @@
    "countryCode": 30,
    "leagueId": "eng_div3",
    "capacity": 6448,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -74325,6 +74413,7 @@
    "countryCode": 30,
    "leagueId": "eng_div3",
    "capacity": 6899,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -75002,6 +75091,7 @@
    "countryCode": 30,
    "leagueId": "eng_div3",
    "capacity": 9183,
+   "capacityHeadroom": 8000,
    "foundingYear": null,
    "players": [
     {
@@ -75662,6 +75752,7 @@
    "countryCode": 45,
    "leagueId": "eng_div3",
    "capacity": 16540,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -76437,6 +76528,7 @@
    "countryCode": 30,
    "leagueId": "eng_div3",
    "capacity": 6000,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -77151,6 +77243,7 @@
    "countryCode": 22,
    "leagueId": null,
    "capacity": 108428,
+   "capacityHeadroom": 0,
    "foundingYear": 1899,
    "players": [
     {
@@ -78079,6 +78172,7 @@
    "countryCode": 22,
    "leagueId": null,
    "capacity": 35600,
+   "capacityHeadroom": 0,
    "foundingYear": 1904,
    "players": [
     {
@@ -79005,6 +79099,7 @@
    "countryCode": 22,
    "leagueId": null,
    "capacity": 34223,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -79904,6 +79999,7 @@
    "countryCode": 22,
    "leagueId": null,
    "capacity": 104779,
+   "capacityHeadroom": 0,
    "foundingYear": 1902,
    "players": [
     {
@@ -80833,6 +80929,7 @@
    "countryCode": 22,
    "leagueId": null,
    "capacity": 40300,
+   "capacityHeadroom": 0,
    "foundingYear": 1898,
    "players": [
     {
@@ -81674,6 +81771,7 @@
    "countryCode": 22,
    "leagueId": null,
    "capacity": 49100,
+   "capacityHeadroom": 0,
    "foundingYear": 1919,
    "players": [
     {
@@ -82648,6 +82746,7 @@
    "countryCode": 22,
    "leagueId": null,
    "capacity": 24075,
+   "capacityHeadroom": 0,
    "foundingYear": 1913,
    "players": [
     {
@@ -83504,6 +83603,7 @@
    "countryCode": 22,
    "leagueId": null,
    "capacity": 23500,
+   "capacityHeadroom": 8000,
    "foundingYear": null,
    "players": [
     {
@@ -84308,6 +84408,7 @@
    "countryCode": 22,
    "leagueId": null,
    "capacity": 21236,
+   "capacityHeadroom": 20000,
    "foundingYear": 1922,
    "players": [
     {
@@ -85434,6 +85535,7 @@
    "countryCode": 22,
    "leagueId": null,
    "capacity": 29350,
+   "capacityHeadroom": 0,
    "foundingYear": 1909,
    "players": [
     {
@@ -86464,6 +86566,7 @@
    "countryCode": 22,
    "leagueId": null,
    "capacity": 56500,
+   "capacityHeadroom": 0,
    "foundingYear": 1903,
    "players": [
     {
@@ -87317,6 +87420,7 @@
    "countryCode": 22,
    "leagueId": null,
    "capacity": 26512,
+   "capacityHeadroom": 0,
    "foundingYear": 1905,
    "players": [
     {
@@ -88331,6 +88435,7 @@
    "countryCode": 22,
    "leagueId": null,
    "capacity": 31990,
+   "capacityHeadroom": 0,
    "foundingYear": 1923,
    "players": [
     {
@@ -89213,6 +89318,7 @@
    "countryCode": 22,
    "leagueId": null,
    "capacity": 26512,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -90018,6 +90124,7 @@
    "countryCode": 22,
    "leagueId": null,
    "capacity": 55000,
+   "capacityHeadroom": 0,
    "foundingYear": 1900,
    "players": [
     {
@@ -90951,6 +91058,7 @@
    "countryCode": 22,
    "leagueId": null,
    "capacity": 47500,
+   "capacityHeadroom": 0,
    "foundingYear": 1907,
    "players": [
     {
@@ -91838,6 +91946,7 @@
    "countryCode": 22,
    "leagueId": null,
    "capacity": 13000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -92849,6 +92958,7 @@
    "countryCode": 22,
    "leagueId": null,
    "capacity": 23000,
+   "capacityHeadroom": 0,
    "foundingYear": 1916,
    "players": [
     {
@@ -93694,6 +93804,7 @@
    "countryCode": 22,
    "leagueId": null,
    "capacity": 15000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -94620,6 +94731,7 @@
    "countryCode": 22,
    "leagueId": null,
    "capacity": 22000,
+   "capacityHeadroom": 0,
    "foundingYear": 1923,
    "players": [
     {
@@ -95541,6 +95653,7 @@
    "countryCode": 36,
    "leagueId": null,
    "capacity": 85847,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -96396,6 +96509,7 @@
    "countryCode": 36,
    "leagueId": null,
    "capacity": 69041,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -97325,6 +97439,7 @@
    "countryCode": 36,
    "leagueId": null,
    "capacity": 43868,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -98166,6 +98281,7 @@
    "countryCode": 36,
    "leagueId": null,
    "capacity": 82922,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -99045,6 +99161,7 @@
    "countryCode": 36,
    "leagueId": null,
    "capacity": 29048,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -99923,6 +100040,7 @@
    "countryCode": 36,
    "leagueId": null,
    "capacity": 80125,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -100683,6 +100801,7 @@
    "countryCode": 36,
    "leagueId": null,
    "capacity": 82922,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -101649,6 +101768,7 @@
    "countryCode": 36,
    "leagueId": null,
    "capacity": 85847,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -102585,6 +102705,7 @@
    "countryCode": 36,
    "leagueId": null,
    "capacity": 47495,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -103384,6 +103505,7 @@
    "countryCode": 36,
    "leagueId": null,
    "capacity": 58270,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -104249,6 +104371,7 @@
    "countryCode": 36,
    "leagueId": null,
    "capacity": 20000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -105083,6 +105206,7 @@
    "countryCode": 36,
    "leagueId": null,
    "capacity": 21800,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -105923,6 +106047,7 @@
    "countryCode": 36,
    "leagueId": null,
    "capacity": 41825,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -106840,6 +106965,7 @@
    "countryCode": 36,
    "leagueId": null,
    "capacity": 20920,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -107725,6 +107851,7 @@
    "countryCode": 36,
    "leagueId": null,
    "capacity": 26724,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -108681,6 +108808,7 @@
    "countryCode": 36,
    "leagueId": null,
    "capacity": 39603,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -109556,6 +109684,7 @@
    "countryCode": 36,
    "leagueId": null,
    "capacity": 55000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -110513,6 +110642,7 @@
    "countryCode": 36,
    "leagueId": null,
    "capacity": 12826,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -111340,6 +111470,7 @@
    "countryCode": 2,
    "leagueId": null,
    "capacity": 42800,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -112326,6 +112457,7 @@
    "countryCode": 2,
    "leagueId": null,
    "capacity": 34500,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -113147,6 +113279,7 @@
    "countryCode": 2,
    "leagueId": null,
    "capacity": 40640,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -113994,6 +114127,7 @@
    "countryCode": 2,
    "leagueId": null,
    "capacity": 38500,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -114808,6 +114942,7 @@
    "countryCode": 2,
    "leagueId": null,
    "capacity": 64000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -115567,6 +115702,7 @@
    "countryCode": 2,
    "leagueId": null,
    "capacity": 33000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -116467,6 +116603,7 @@
    "countryCode": 2,
    "leagueId": null,
    "capacity": 70600,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -117372,6 +117509,7 @@
    "countryCode": 2,
    "leagueId": null,
    "capacity": 61234,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -118425,6 +118563,7 @@
    "countryCode": 2,
    "leagueId": null,
    "capacity": 25600,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -119278,6 +119417,7 @@
    "countryCode": 2,
    "leagueId": null,
    "capacity": 64000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -120128,6 +120268,7 @@
    "countryCode": 2,
    "leagueId": null,
    "capacity": 53700,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -120973,6 +121114,7 @@
    "countryCode": 2,
    "leagueId": null,
    "capacity": 60398,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -122002,6 +122144,7 @@
    "countryCode": 2,
    "leagueId": null,
    "capacity": 26000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -122707,6 +122850,7 @@
    "countryCode": 2,
    "leagueId": null,
    "capacity": 42000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -123519,6 +123663,7 @@
    "countryCode": 2,
    "leagueId": null,
    "capacity": 22000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -124413,6 +124558,7 @@
    "countryCode": 2,
    "leagueId": null,
    "capacity": 30128,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -125306,6 +125452,7 @@
    "countryCode": 2,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -126106,6 +126253,7 @@
    "countryCode": 2,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -127050,6 +127198,7 @@
    "countryCode": 24,
    "leagueId": null,
    "capacity": 38598,
+   "capacityHeadroom": 40000,
    "foundingYear": null,
    "players": [
     {
@@ -127830,6 +127979,7 @@
    "countryCode": 24,
    "leagueId": null,
    "capacity": 48712,
+   "capacityHeadroom": 48000,
    "foundingYear": null,
    "players": [
     {
@@ -128650,6 +128800,7 @@
    "countryCode": 24,
    "leagueId": null,
    "capacity": 23360,
+   "capacityHeadroom": 20000,
    "foundingYear": null,
    "players": [
     {
@@ -129517,6 +129668,7 @@
    "countryCode": 24,
    "leagueId": null,
    "capacity": 43000,
+   "capacityHeadroom": 44000,
    "foundingYear": null,
    "players": [
     {
@@ -130363,6 +130515,7 @@
    "countryCode": 24,
    "leagueId": null,
    "capacity": 20000,
+   "capacityHeadroom": 20000,
    "foundingYear": null,
    "players": [
     {
@@ -131238,6 +131391,7 @@
    "countryCode": 24,
    "leagueId": null,
    "capacity": 42000,
+   "capacityHeadroom": 44000,
    "foundingYear": null,
    "players": [
     {
@@ -132165,6 +132319,7 @@
    "countryCode": 24,
    "leagueId": null,
    "capacity": 41223,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -132937,6 +133092,7 @@
    "countryCode": 24,
    "leagueId": null,
    "capacity": 35000,
+   "capacityHeadroom": 36000,
    "foundingYear": null,
    "players": [
     {
@@ -133746,6 +133902,7 @@
    "countryCode": 24,
    "leagueId": null,
    "capacity": 22000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -134612,6 +134769,7 @@
    "countryCode": 24,
    "leagueId": null,
    "capacity": 27000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -135486,6 +135644,7 @@
    "countryCode": 24,
    "leagueId": null,
    "capacity": 18000,
+   "capacityHeadroom": 20000,
    "foundingYear": null,
    "players": [
     {
@@ -136352,6 +136511,7 @@
    "countryCode": 24,
    "leagueId": null,
    "capacity": 21000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -137199,6 +137359,7 @@
    "countryCode": 24,
    "leagueId": null,
    "capacity": 15000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -138124,6 +138285,7 @@
    "countryCode": 24,
    "leagueId": null,
    "capacity": 20000,
+   "capacityHeadroom": 20000,
    "foundingYear": null,
    "players": [
     {
@@ -138970,6 +139132,7 @@
    "countryCode": 24,
    "leagueId": null,
    "capacity": 12869,
+   "capacityHeadroom": 8000,
    "foundingYear": null,
    "players": [
     {
@@ -139777,6 +139940,7 @@
    "countryCode": 24,
    "leagueId": null,
    "capacity": 7500,
+   "capacityHeadroom": 8000,
    "foundingYear": null,
    "players": [
     {
@@ -140507,6 +140671,7 @@
    "countryCode": 24,
    "leagueId": null,
    "capacity": 46000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -141431,6 +141596,7 @@
    "countryCode": 24,
    "leagueId": null,
    "capacity": 17000,
+   "capacityHeadroom": 16000,
    "foundingYear": null,
    "players": [
     {
@@ -142282,6 +142448,7 @@
    "countryCode": 24,
    "leagueId": null,
    "capacity": 35200,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -143147,6 +143314,7 @@
    "countryCode": 47,
    "leagueId": null,
    "capacity": 76000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -144038,6 +144206,7 @@
    "countryCode": 47,
    "leagueId": null,
    "capacity": 52411,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -144856,6 +145025,7 @@
    "countryCode": 47,
    "leagueId": null,
    "capacity": 120000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -145617,6 +145787,7 @@
    "countryCode": 47,
    "leagueId": null,
    "capacity": 33000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -146444,6 +146615,7 @@
    "countryCode": 47,
    "leagueId": null,
    "capacity": 15000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -147193,6 +147365,7 @@
    "countryCode": 47,
    "leagueId": null,
    "capacity": 26000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -148065,6 +148238,7 @@
    "countryCode": 47,
    "leagueId": null,
    "capacity": 42000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -148860,6 +149034,7 @@
    "countryCode": 47,
    "leagueId": null,
    "capacity": 40000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -149655,6 +149830,7 @@
    "countryCode": 47,
    "leagueId": null,
    "capacity": 14000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -150401,6 +150577,7 @@
    "countryCode": 47,
    "leagueId": null,
    "capacity": 11000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -151196,6 +151373,7 @@
    "countryCode": 47,
    "leagueId": null,
    "capacity": 25000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -151952,6 +152130,7 @@
    "countryCode": 47,
    "leagueId": null,
    "capacity": 18000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -152741,6 +152920,7 @@
    "countryCode": 47,
    "leagueId": null,
    "capacity": 25000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -153530,6 +153710,7 @@
    "countryCode": 47,
    "leagueId": null,
    "capacity": 46000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -154334,6 +154515,7 @@
    "countryCode": 47,
    "leagueId": null,
    "capacity": 35000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -155079,6 +155261,7 @@
    "countryCode": 47,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -155875,6 +156058,7 @@
    "countryCode": 47,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -156667,6 +156851,7 @@
    "countryCode": 47,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -157497,6 +157682,7 @@
    "countryCode": 58,
    "leagueId": null,
    "capacity": 97422,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -158217,6 +158403,7 @@
    "countryCode": 58,
    "leagueId": null,
    "capacity": 50000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -158877,6 +159064,7 @@
    "countryCode": 58,
    "leagueId": null,
    "capacity": 22000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -159542,6 +159730,7 @@
    "countryCode": 58,
    "leagueId": null,
    "capacity": 10000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -160247,6 +160436,7 @@
    "countryCode": 50,
    "leagueId": null,
    "capacity": 96000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -160997,6 +161187,7 @@
    "countryCode": 50,
    "leagueId": null,
    "capacity": 51000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -161750,6 +161941,7 @@
    "countryCode": 50,
    "leagueId": null,
    "capacity": 40000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -162461,6 +162653,7 @@
    "countryCode": 50,
    "leagueId": null,
    "capacity": 30000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -163174,6 +163367,7 @@
    "countryCode": 50,
    "leagueId": null,
    "capacity": 30000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -163880,6 +164074,7 @@
    "countryCode": 50,
    "leagueId": null,
    "capacity": 7000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -164595,6 +164790,7 @@
    "countryCode": 27,
    "leagueId": null,
    "capacity": 51500,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -165497,6 +165693,7 @@
    "countryCode": 27,
    "leagueId": null,
    "capacity": 52000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -166320,6 +166517,7 @@
    "countryCode": 27,
    "leagueId": null,
    "capacity": 25000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -167179,6 +167377,7 @@
    "countryCode": 27,
    "leagueId": null,
    "capacity": 30000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -168059,6 +168258,7 @@
    "countryCode": 27,
    "leagueId": null,
    "capacity": 12000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -168899,6 +169099,7 @@
    "countryCode": 27,
    "leagueId": null,
    "capacity": 14500,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -169665,6 +169866,7 @@
    "countryCode": 27,
    "leagueId": null,
    "capacity": 13600,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -170489,6 +170691,7 @@
    "countryCode": 27,
    "leagueId": null,
    "capacity": 11996,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -171372,6 +171575,7 @@
    "countryCode": 27,
    "leagueId": null,
    "capacity": 18000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -172228,6 +172432,7 @@
    "countryCode": 27,
    "leagueId": null,
    "capacity": 18000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -172956,6 +173161,7 @@
    "countryCode": 27,
    "leagueId": null,
    "capacity": 6200,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -173686,6 +173892,7 @@
    "countryCode": 27,
    "leagueId": null,
    "capacity": 14700,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -174487,6 +174694,7 @@
    "countryCode": 27,
    "leagueId": null,
    "capacity": 14500,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -175295,6 +175503,7 @@
    "countryCode": 27,
    "leagueId": null,
    "capacity": 10900,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -176099,6 +176308,7 @@
    "countryCode": 27,
    "leagueId": null,
    "capacity": 14000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -176908,6 +177118,7 @@
    "countryCode": 27,
    "leagueId": null,
    "capacity": 6500,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -177710,6 +177921,7 @@
    "countryCode": 27,
    "leagueId": null,
    "capacity": 25000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -178441,6 +178653,7 @@
    "countryCode": 27,
    "leagueId": null,
    "capacity": 10000,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -179177,6 +179390,7 @@
    "countryCode": 12,
    "leagueId": null,
    "capacity": 28063,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -180038,6 +180252,7 @@
    "countryCode": 12,
    "leagueId": null,
    "capacity": 18021,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -180786,6 +181001,7 @@
    "countryCode": 12,
    "leagueId": null,
    "capacity": 25135,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -181541,6 +181757,7 @@
    "countryCode": 12,
    "leagueId": null,
    "capacity": 14000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -182450,6 +182667,7 @@
    "countryCode": 12,
    "leagueId": null,
    "capacity": 17500,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -183242,6 +183460,7 @@
    "countryCode": 12,
    "leagueId": null,
    "capacity": 15000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -183958,6 +184177,7 @@
    "countryCode": 12,
    "leagueId": null,
    "capacity": 20000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -184673,6 +184893,7 @@
    "countryCode": 12,
    "leagueId": null,
    "capacity": 14800,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -185385,6 +185606,7 @@
    "countryCode": 12,
    "leagueId": null,
    "capacity": 9000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -186135,6 +186357,7 @@
    "countryCode": 17,
    "leagueId": null,
    "capacity": 45000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -186837,6 +187060,7 @@
    "countryCode": 17,
    "leagueId": null,
    "capacity": 45000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -187657,6 +187881,7 @@
    "countryCode": 17,
    "leagueId": null,
    "capacity": 30000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -188356,6 +188581,7 @@
    "countryCode": 17,
    "leagueId": null,
    "capacity": 12000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -189077,6 +189303,7 @@
    "countryCode": 17,
    "leagueId": null,
    "capacity": 12000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -189762,6 +189989,7 @@
    "countryCode": 53,
    "leagueId": null,
    "capacity": 18000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -190506,6 +190734,7 @@
    "countryCode": 53,
    "leagueId": null,
    "capacity": 13000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -191192,6 +191421,7 @@
    "countryCode": 53,
    "leagueId": null,
    "capacity": 32000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -191885,6 +192115,7 @@
    "countryCode": 53,
    "leagueId": null,
    "capacity": 36000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -192580,6 +192811,7 @@
    "countryCode": 53,
    "leagueId": null,
    "capacity": 17000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -193280,6 +193512,7 @@
    "countryCode": 55,
    "leagueId": null,
    "capacity": 45000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -194097,6 +194330,7 @@
    "countryCode": 55,
    "leagueId": null,
    "capacity": 30000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -194804,6 +195038,7 @@
    "countryCode": 55,
    "leagueId": null,
    "capacity": 40000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -195639,6 +195874,7 @@
    "countryCode": 55,
    "leagueId": null,
    "capacity": 30000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -196335,6 +196571,7 @@
    "countryCode": 55,
    "leagueId": null,
    "capacity": 20000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -197067,6 +197304,7 @@
    "countryCode": 46,
    "leagueId": null,
    "capacity": 21940,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -197816,6 +198054,7 @@
    "countryCode": 46,
    "leagueId": null,
    "capacity": 14000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -198491,6 +198730,7 @@
    "countryCode": 46,
    "leagueId": null,
    "capacity": 22000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -199195,6 +199435,7 @@
    "countryCode": 46,
    "leagueId": null,
    "capacity": 34000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -199903,6 +200144,7 @@
    "countryCode": 46,
    "leagueId": null,
    "capacity": 30000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -200623,6 +200865,7 @@
    "countryCode": 46,
    "leagueId": null,
    "capacity": 35000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -201332,6 +201575,7 @@
    "countryCode": 46,
    "leagueId": null,
    "capacity": 4000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -202044,6 +202288,7 @@
    "countryCode": 46,
    "leagueId": null,
    "capacity": 23734,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -202759,6 +203004,7 @@
    "countryCode": 46,
    "leagueId": null,
    "capacity": 23000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -203473,6 +203719,7 @@
    "countryCode": 46,
    "leagueId": null,
    "capacity": 30000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -204190,6 +204437,7 @@
    "countryCode": 54,
    "leagueId": null,
    "capacity": 21000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -204886,6 +205134,7 @@
    "countryCode": 54,
    "leagueId": null,
    "capacity": 13000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -205641,6 +205890,7 @@
    "countryCode": 54,
    "leagueId": null,
    "capacity": 20300,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -206377,6 +206627,7 @@
    "countryCode": 54,
    "leagueId": null,
    "capacity": 26100,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -207023,6 +207274,7 @@
    "countryCode": 54,
    "leagueId": null,
    "capacity": 14900,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -207749,6 +208001,7 @@
    "countryCode": 54,
    "leagueId": null,
    "capacity": 25000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -208475,6 +208728,7 @@
    "countryCode": 5,
    "leagueId": null,
    "capacity": 14457,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -209170,6 +209424,7 @@
    "countryCode": 5,
    "leagueId": null,
    "capacity": 19600,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -209878,6 +210133,7 @@
    "countryCode": 5,
    "leagueId": null,
    "capacity": 11000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -210577,6 +210833,7 @@
    "countryCode": 5,
    "leagueId": null,
    "capacity": 10500,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -211270,6 +211527,7 @@
    "countryCode": 5,
    "leagueId": null,
    "capacity": 17532,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -211977,6 +212235,7 @@
    "countryCode": 5,
    "leagueId": null,
    "capacity": 10000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -212698,6 +212957,7 @@
    "countryCode": 5,
    "leagueId": null,
    "capacity": 27000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -213401,6 +213661,7 @@
    "countryCode": 5,
    "leagueId": null,
    "capacity": 11000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -214102,6 +214363,7 @@
    "countryCode": 5,
    "leagueId": null,
    "capacity": 10000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -214809,6 +215071,7 @@
    "countryCode": 18,
    "leagueId": null,
    "capacity": 13600,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -215516,6 +215779,7 @@
    "countryCode": 18,
    "leagueId": null,
    "capacity": 40300,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -216314,6 +216578,7 @@
    "countryCode": 18,
    "leagueId": null,
    "capacity": 22600,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -217133,6 +217398,7 @@
    "countryCode": 18,
    "leagueId": null,
    "capacity": 12000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -217907,6 +218173,7 @@
    "countryCode": 18,
    "leagueId": null,
    "capacity": 20000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -218692,6 +218959,7 @@
    "countryCode": 18,
    "leagueId": null,
    "capacity": 20400,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -219486,6 +219754,7 @@
    "countryCode": 18,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -220240,6 +220509,7 @@
    "countryCode": 19,
    "leagueId": null,
    "capacity": 50411,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -221136,6 +221406,7 @@
    "countryCode": 19,
    "leagueId": null,
    "capacity": 47500,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -221920,6 +222191,7 @@
    "countryCode": 19,
    "leagueId": null,
    "capacity": 14069,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -222584,6 +222856,7 @@
    "countryCode": 19,
    "leagueId": null,
    "capacity": 15745,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -223324,6 +223597,7 @@
    "countryCode": 19,
    "leagueId": null,
    "capacity": 21634,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -223993,6 +224267,7 @@
    "countryCode": 19,
    "leagueId": null,
    "capacity": 16613,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -224731,6 +225006,7 @@
    "countryCode": 19,
    "leagueId": null,
    "capacity": 18128,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -225396,6 +225672,7 @@
    "countryCode": 19,
    "leagueId": null,
    "capacity": 12608,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -226166,6 +226443,7 @@
    "countryCode": 19,
    "leagueId": null,
    "capacity": 18394,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -226906,6 +227184,7 @@
    "countryCode": 19,
    "leagueId": null,
    "capacity": 15000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -227577,6 +227856,7 @@
    "countryCode": 26,
    "leagueId": null,
    "capacity": 74433,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -228326,6 +228606,7 @@
    "countryCode": 26,
    "leagueId": null,
    "capacity": 33494,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -229073,6 +229354,7 @@
    "countryCode": 26,
    "leagueId": null,
    "capacity": 34023,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -229856,6 +230138,7 @@
    "countryCode": 26,
    "leagueId": null,
    "capacity": 17000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -230601,6 +230884,7 @@
    "countryCode": 26,
    "leagueId": null,
    "capacity": 14000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -231345,6 +231629,7 @@
    "countryCode": 26,
    "leagueId": null,
    "capacity": 40000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -231976,6 +232261,7 @@
    "countryCode": 44,
    "leagueId": null,
    "capacity": 30000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -232803,6 +233089,7 @@
    "countryCode": 44,
    "leagueId": null,
    "capacity": 13000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -233503,6 +233790,7 @@
    "countryCode": 44,
    "leagueId": null,
    "capacity": 12000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -234196,6 +234484,7 @@
    "countryCode": 44,
    "leagueId": null,
    "capacity": 17000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -234852,6 +235141,7 @@
    "countryCode": 44,
    "leagueId": null,
    "capacity": 13000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -235575,6 +235865,7 @@
    "countryCode": 44,
    "leagueId": null,
    "capacity": 24000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -236289,6 +236580,7 @@
    "countryCode": 44,
    "leagueId": null,
    "capacity": 10225,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -237022,6 +237314,7 @@
    "countryCode": 49,
    "leagueId": null,
    "capacity": 30000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -237882,6 +238175,7 @@
    "countryCode": 49,
    "leagueId": null,
    "capacity": 15000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -238654,6 +238948,7 @@
    "countryCode": 49,
    "leagueId": null,
    "capacity": 15000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -239396,6 +239691,7 @@
    "countryCode": 49,
    "leagueId": null,
    "capacity": 16000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -240111,6 +240407,7 @@
    "countryCode": 48,
    "leagueId": null,
    "capacity": 21900,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -240890,6 +241187,7 @@
    "countryCode": 48,
    "leagueId": null,
    "capacity": 16320,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -241668,6 +241966,7 @@
    "countryCode": 48,
    "leagueId": null,
    "capacity": 14694,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -242527,6 +242826,7 @@
    "countryCode": 48,
    "leagueId": null,
    "capacity": 14624,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -243300,6 +243600,7 @@
    "countryCode": 48,
    "leagueId": null,
    "capacity": 10300,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -244148,6 +244449,7 @@
    "countryCode": 48,
    "leagueId": null,
    "capacity": 50000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -244837,6 +245139,7 @@
    "countryCode": 48,
    "leagueId": null,
    "capacity": 19000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -245764,6 +246067,7 @@
    "countryCode": 11,
    "leagueId": null,
    "capacity": 25000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -246470,6 +246774,7 @@
    "countryCode": 11,
    "leagueId": null,
    "capacity": 60000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -247183,6 +247488,7 @@
    "countryCode": 11,
    "leagueId": null,
    "capacity": 21000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -247891,6 +248197,7 @@
    "countryCode": 11,
    "leagueId": null,
    "capacity": 32000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -248596,6 +248903,7 @@
    "countryCode": 11,
    "leagueId": null,
    "capacity": 30000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -249298,6 +249606,7 @@
    "countryCode": 20,
    "leagueId": null,
    "capacity": 47042,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -250153,6 +250462,7 @@
    "countryCode": 20,
    "leagueId": null,
    "capacity": 25000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -250889,6 +251199,7 @@
    "countryCode": 20,
    "leagueId": null,
    "capacity": 30312,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -251652,6 +251963,7 @@
    "countryCode": 20,
    "leagueId": null,
    "capacity": 24500,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -252382,6 +252694,7 @@
    "countryCode": 21,
    "leagueId": null,
    "capacity": 17000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -253074,6 +253387,7 @@
    "countryCode": 21,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -253737,6 +254051,7 @@
    "countryCode": 20,
    "leagueId": null,
    "capacity": 5000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -254440,6 +254755,7 @@
    "countryCode": 15,
    "leagueId": null,
    "capacity": 15000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -255145,6 +255461,7 @@
    "countryCode": 15,
    "leagueId": null,
    "capacity": 20000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -255807,6 +256124,7 @@
    "countryCode": 15,
    "leagueId": null,
    "capacity": 20000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -256506,6 +256824,7 @@
    "countryCode": 15,
    "leagueId": null,
    "capacity": 8000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -257211,6 +257530,7 @@
    "countryCode": 15,
    "leagueId": null,
    "capacity": 22000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -257913,6 +258233,7 @@
    "countryCode": 29,
    "leagueId": null,
    "capacity": 17743,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -258736,6 +259057,7 @@
    "countryCode": 29,
    "leagueId": null,
    "capacity": 32000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -259537,6 +259859,7 @@
    "countryCode": 29,
    "leagueId": null,
    "capacity": 14000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -260334,6 +260657,7 @@
    "countryCode": 29,
    "leagueId": null,
    "capacity": 24000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -261131,6 +261455,7 @@
    "countryCode": 29,
    "leagueId": null,
    "capacity": 18000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -261880,6 +262205,7 @@
    "countryCode": 56,
    "leagueId": null,
    "capacity": 40485,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -262557,6 +262883,7 @@
    "countryCode": 56,
    "leagueId": null,
    "capacity": 100169,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -263539,6 +263866,7 @@
    "countryCode": 56,
    "leagueId": null,
    "capacity": 43000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -264254,6 +264582,7 @@
    "countryCode": 38,
    "leagueId": null,
    "capacity": 3500,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -264937,6 +265266,7 @@
    "countryCode": 38,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -265630,6 +265960,7 @@
    "countryCode": 38,
    "leagueId": null,
    "capacity": 4800,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -266337,6 +266668,7 @@
    "countryCode": 77,
    "leagueId": null,
    "capacity": 10000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -267042,6 +267374,7 @@
    "countryCode": 31,
    "leagueId": null,
    "capacity": 10000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -267732,6 +268065,7 @@
    "countryCode": 31,
    "leagueId": null,
    "capacity": 13600,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -268432,6 +268766,7 @@
    "countryCode": 31,
    "leagueId": null,
    "capacity": 9500,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -269138,6 +269473,7 @@
    "countryCode": 31,
    "leagueId": null,
    "capacity": 7000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -269880,6 +270216,7 @@
    "countryCode": 31,
    "leagueId": null,
    "capacity": 20000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -270587,6 +270924,7 @@
    "countryCode": 31,
    "leagueId": null,
    "capacity": 7650,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -271288,6 +271626,7 @@
    "countryCode": 31,
    "leagueId": null,
    "capacity": 20500,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -271982,6 +272321,7 @@
    "countryCode": 31,
    "leagueId": null,
    "capacity": 4500,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -272679,6 +273019,7 @@
    "countryCode": 31,
    "leagueId": null,
    "capacity": 12800,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -273379,6 +273720,7 @@
    "countryCode": 32,
    "leagueId": null,
    "capacity": 28500,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -274083,6 +274425,7 @@
    "countryCode": 32,
    "leagueId": null,
    "capacity": 9000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -274779,6 +275122,7 @@
    "countryCode": 32,
    "leagueId": null,
    "capacity": 15000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -275444,6 +275788,7 @@
    "countryCode": 32,
    "leagueId": null,
    "capacity": 15000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -276180,6 +276525,7 @@
    "countryCode": 32,
    "leagueId": null,
    "capacity": 30000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -276881,6 +277227,7 @@
    "countryCode": 32,
    "leagueId": null,
    "capacity": 17000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -277542,6 +277889,7 @@
    "countryCode": 32,
    "leagueId": null,
    "capacity": 10000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -278252,6 +278600,7 @@
    "countryCode": 33,
    "leagueId": null,
    "capacity": 2500,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -278953,6 +279302,7 @@
    "countryCode": 33,
    "leagueId": null,
    "capacity": 3000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -279643,6 +279993,7 @@
    "countryCode": 23,
    "leagueId": null,
    "capacity": 8000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -280308,6 +280659,7 @@
    "countryCode": 23,
    "leagueId": null,
    "capacity": 10000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -280991,6 +281343,7 @@
    "countryCode": 23,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -281679,6 +282032,7 @@
    "countryCode": 45,
    "leagueId": null,
    "capacity": 10000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -282465,6 +282819,7 @@
    "countryCode": 45,
    "leagueId": null,
    "capacity": 8000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -283122,6 +283477,7 @@
    "countryCode": 45,
    "leagueId": null,
    "capacity": 5000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -283821,6 +284177,7 @@
    "countryCode": 45,
    "leagueId": null,
    "capacity": 13200,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -284467,6 +284824,7 @@
    "countryCode": 45,
    "leagueId": null,
    "capacity": 4000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -285175,6 +285533,7 @@
    "countryCode": 45,
    "leagueId": null,
    "capacity": 18000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -285886,6 +286245,7 @@
    "countryCode": 45,
    "leagueId": null,
    "capacity": 2000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -286584,6 +286944,7 @@
    "countryCode": 35,
    "leagueId": null,
    "capacity": 28000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -287246,6 +287607,7 @@
    "countryCode": 35,
    "leagueId": null,
    "capacity": 17000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -287944,6 +288306,7 @@
    "countryCode": 35,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -288648,6 +289011,7 @@
    "countryCode": 35,
    "leagueId": null,
    "capacity": 20800,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -289354,6 +289718,7 @@
    "countryCode": 35,
    "leagueId": null,
    "capacity": 7500,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -290062,6 +290427,7 @@
    "countryCode": 35,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -290776,6 +291142,7 @@
    "countryCode": 40,
    "leagueId": null,
    "capacity": 17000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -291474,6 +291841,7 @@
    "countryCode": 40,
    "leagueId": null,
    "capacity": 18000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -292181,6 +292549,7 @@
    "countryCode": 40,
    "leagueId": null,
    "capacity": 17000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -292953,6 +293322,7 @@
    "countryCode": 34,
    "leagueId": null,
    "capacity": 4000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -293601,6 +293971,7 @@
    "countryCode": 34,
    "leagueId": null,
    "capacity": 3000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -294297,6 +294668,7 @@
    "countryCode": 37,
    "leagueId": null,
    "capacity": 15000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -295007,6 +295379,7 @@
    "countryCode": 37,
    "leagueId": null,
    "capacity": 15000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -295701,6 +296074,7 @@
    "countryCode": 37,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -296404,6 +296778,7 @@
    "countryCode": 1,
    "leagueId": null,
    "capacity": 10000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -297064,6 +297439,7 @@
    "countryCode": 1,
    "leagueId": null,
    "capacity": 20000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -297765,6 +298141,7 @@
    "countryCode": 62,
    "leagueId": null,
    "capacity": 75000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -298512,6 +298889,7 @@
    "countryCode": 62,
    "leagueId": null,
    "capacity": 13000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -299187,6 +299565,7 @@
    "countryCode": 42,
    "leagueId": null,
    "capacity": 20000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -299900,6 +300279,7 @@
    "countryCode": 8,
    "leagueId": null,
    "capacity": 55000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -300590,6 +300970,7 @@
    "countryCode": 8,
    "leagueId": null,
    "capacity": 40000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -301279,6 +301660,7 @@
    "countryCode": 8,
    "leagueId": null,
    "capacity": 5000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -301975,6 +302357,7 @@
    "countryCode": 89,
    "leagueId": null,
    "capacity": 45860,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -302658,6 +303041,7 @@
    "countryCode": 89,
    "leagueId": null,
    "capacity": 28000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -303345,6 +303729,7 @@
    "countryCode": 89,
    "leagueId": null,
    "capacity": 75000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -304034,6 +304419,7 @@
    "countryCode": 7,
    "leagueId": null,
    "capacity": 50000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -304698,6 +305084,7 @@
    "countryCode": 59,
    "leagueId": null,
    "capacity": 15000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -305383,6 +305770,7 @@
    "countryCode": 59,
    "leagueId": null,
    "capacity": 32000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -306066,6 +306454,7 @@
    "countryCode": 59,
    "leagueId": null,
    "capacity": 15000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -306749,6 +307138,7 @@
    "countryCode": 10,
    "leagueId": null,
    "capacity": 122268,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -307561,6 +307951,7 @@
    "countryCode": 10,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -308350,6 +308741,7 @@
    "countryCode": 10,
    "leagueId": null,
    "capacity": 32000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -309122,6 +309514,7 @@
    "countryCode": 10,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -309905,6 +310298,7 @@
    "countryCode": 10,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -310654,6 +311048,7 @@
    "countryCode": 10,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -311360,6 +311755,7 @@
    "countryCode": 10,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -312117,6 +312513,7 @@
    "countryCode": 10,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -312815,6 +313212,7 @@
    "countryCode": 10,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -313510,6 +313908,7 @@
    "countryCode": 10,
    "leagueId": null,
    "capacity": 110000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -314211,6 +314610,7 @@
    "countryCode": 57,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -314929,6 +315329,7 @@
    "countryCode": 57,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -315647,6 +316048,7 @@
    "countryCode": 57,
    "leagueId": null,
    "capacity": 12000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -316330,6 +316732,7 @@
    "countryCode": 72,
    "leagueId": null,
    "capacity": 15000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -317013,6 +317416,7 @@
    "countryCode": 72,
    "leagueId": null,
    "capacity": 7000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -317622,6 +318026,7 @@
    "countryCode": 72,
    "leagueId": null,
    "capacity": 15000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -318231,6 +318636,7 @@
    "countryCode": 14,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -318936,6 +319342,7 @@
    "countryCode": 14,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -319657,6 +320064,7 @@
    "countryCode": 14,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -320375,6 +320783,7 @@
    "countryCode": 16,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -321090,6 +321499,7 @@
    "countryCode": 16,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -321807,6 +322217,7 @@
    "countryCode": 16,
    "leagueId": null,
    "capacity": 51300,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -322498,6 +322909,7 @@
    "countryCode": 64,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -323205,6 +323617,7 @@
    "countryCode": 64,
    "leagueId": null,
    "capacity": 30000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -323890,6 +324303,7 @@
    "countryCode": 64,
    "leagueId": null,
    "capacity": 20000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -324573,6 +324987,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 3500,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -325338,6 +325753,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 9899,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -325920,6 +326336,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 4423,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -326609,6 +327026,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 6500,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -327302,6 +327720,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 4900,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -327995,6 +328414,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 11750,
+   "capacityHeadroom": 12000,
    "foundingYear": null,
    "players": [
     {
@@ -328620,6 +329040,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 5149,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -329313,6 +329734,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 6500,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -330004,6 +330426,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 3500,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -330693,6 +331116,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 6100,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -331380,6 +331804,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 6290,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -332034,6 +332459,7 @@
    "countryCode": 30,
    "leagueId": "eng_div3",
    "capacity": 6112,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -332734,6 +333160,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -333421,6 +333848,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 14000,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -333995,6 +334423,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 3900,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -334684,6 +335113,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 5000,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -335375,6 +335805,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 6012,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -335992,6 +336423,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -336650,6 +337082,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 3700,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -337267,6 +337700,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 4600,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -337964,6 +338398,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 5500,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -338548,6 +338983,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -339171,6 +339607,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 4000,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -339825,6 +340262,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 5000,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -340520,6 +340958,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 2500,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -341209,6 +341648,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 3500,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -341902,6 +342342,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 3500,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -342591,6 +343032,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -343280,6 +343722,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 8771,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -343969,6 +344412,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 4000,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -344660,6 +345104,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 9000,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -345347,6 +345792,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 2500,
+   "capacityHeadroom": 4000,
    "foundingYear": null,
    "players": [
     {
@@ -346036,6 +346482,7 @@
    "countryCode": 112,
    "leagueId": null,
    "capacity": 13500,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -346723,6 +347170,7 @@
    "countryCode": 114,
    "leagueId": null,
    "capacity": 10000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -347410,6 +347858,7 @@
    "countryCode": 39,
    "leagueId": null,
    "capacity": 5000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -348093,6 +348542,7 @@
    "countryCode": 7,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -348794,6 +349244,7 @@
    "countryCode": 90,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -349525,6 +349976,7 @@
    "countryCode": 6,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -350212,6 +350664,7 @@
    "countryCode": 75,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -350931,6 +351384,7 @@
    "countryCode": 3,
    "leagueId": null,
    "capacity": 76687,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -351982,6 +352436,7 @@
    "countryCode": 3,
    "leagueId": null,
    "capacity": 40000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -353071,6 +353526,7 @@
    "countryCode": 3,
    "leagueId": null,
    "capacity": 49747,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -354112,6 +354568,7 @@
    "countryCode": 3,
    "leagueId": null,
    "capacity": 24268,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -355121,6 +355578,7 @@
    "countryCode": 3,
    "leagueId": null,
    "capacity": 31161,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -356364,6 +356822,7 @@
    "countryCode": 3,
    "leagueId": null,
    "capacity": 30500,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -357285,6 +357744,7 @@
    "countryCode": 3,
    "leagueId": null,
    "capacity": 41654,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -358453,6 +358913,7 @@
    "countryCode": 3,
    "leagueId": null,
    "capacity": 20461,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -359530,6 +359991,7 @@
    "countryCode": 3,
    "leagueId": null,
    "capacity": 57901,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -360604,6 +361066,7 @@
    "countryCode": 3,
    "leagueId": null,
    "capacity": 64161,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -361528,6 +361991,7 @@
    "countryCode": 3,
    "leagueId": null,
    "capacity": 60245,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -362532,6 +362996,7 @@
    "countryCode": 3,
    "leagueId": null,
    "capacity": 48314,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -363692,6 +364157,7 @@
    "countryCode": 3,
    "leagueId": null,
    "capacity": 12657,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -364663,6 +365129,7 @@
    "countryCode": 3,
    "leagueId": null,
    "capacity": 23000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -365663,6 +366130,7 @@
    "countryCode": 3,
    "leagueId": null,
    "capacity": 24268,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -366660,6 +367128,7 @@
    "countryCode": 3,
    "leagueId": null,
    "capacity": 31000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -367897,6 +368366,7 @@
    "countryCode": 3,
    "leagueId": null,
    "capacity": 32000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -368976,6 +369446,7 @@
    "countryCode": 3,
    "leagueId": null,
    "capacity": 23000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -369941,6 +370412,7 @@
    "countryCode": 3,
    "leagueId": null,
    "capacity": 30000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -370928,6 +371400,7 @@
    "countryCode": 3,
    "leagueId": null,
    "capacity": 22300,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -371975,6 +372448,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 63000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {
@@ -372482,6 +372956,7 @@
    "countryCode": 22,
    "leagueId": null,
    "capacity": 6000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": []
   },
@@ -372498,6 +372973,7 @@
    "countryCode": 30,
    "leagueId": null,
    "capacity": 76000,
+   "capacityHeadroom": 0,
    "foundingYear": null,
    "players": [
     {

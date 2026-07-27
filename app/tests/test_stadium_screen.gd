@@ -26,6 +26,13 @@ func _run() -> void:
 	ok = _assert(StadiumScreen.tier_for(500000) == 11, "tier clamps high") and ok
 	ok = _assert(StadiumScreen.tier_for(-50) == 0, "tier clamps low") and ok
 
+	# The tier INPUT is capacity + HEADROOM (FUN_0051a6e0 sums ground+4 + ground+8;
+	# EQUIPOS param_1[7] loader-quantised to 4000s, game_db `capacityHeadroom`).
+	# Man Utd ships headroom 0 (tier 4 alone); a headroom club rises accordingly.
+	ok = _assert(StadiumScreen.tier_for(55300 + 0) == 4, "Man Utd 55,300 + 0 = tier 4") and ok
+	ok = _assert(StadiumScreen.tier_for(22356) == 1 and StadiumScreen.tier_for(22356 + 16000) == 3,
+		"a headroom club (Port Vale-shaped) tiers on the SUM") and ok
+
 	# Int formatter.
 	ok = _assert(StadiumScreen.fmt_int(24500) == "24,500", "fmt_int thousands") and ok
 	ok = _assert(StadiumScreen.fmt_int(0) == "0", "fmt_int zero") and ok
@@ -70,6 +77,11 @@ func _run() -> void:
 	ok = _assert(screen._ground == "Highbury", "ground wired") and ok
 	ok = _assert(screen._tier == 2, "tier resolved from capacity") and ok
 	ok = _assert(screen._scene != null, "tier scene loaded") and ok
+	screen.setup("Arsenal", "", "1997-98", "Highbury", 24500, 18000, -5, 900,
+		"", 0.0, 0, 0, "", "", 24000)
+	await process_frame
+	ok = _assert(screen._tier == StadiumScreen.tier_for(24500 + 24000),
+		"headroom raises the rendered tier (got %d)" % screen._tier) and ok
 
 	# Action grid: WORKS + IMPROVE both reach the expansion lever, RETURN leaves, MATCH DAY
 	# opens the ticket-price / sponsor-board sub-view (owner frame 06), empty space is a no-op.

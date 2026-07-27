@@ -78,6 +78,12 @@ var objective_text: String = ""
 var finished: bool = false        # season complete + objective resolved
 var tactics: Dictionary = {}      # manager's Tactics.to_dict(): XI + shape + marking
 var stadium_capacity: int = 0     # managed club's current ground capacity (0 = GameDB default)
+# The ground's expansion HEADROOM (EQUIPOS param_1[7], loader-quantised to 4000s;
+# game_db `capacityHeadroom`). The GROUND picture's tier is the SUM capacity+headroom
+# — FUN_0051a6e0 adds ground+4 + ground+8 before the /130000 magic division. Static:
+# the English (category-1) SEATS cards never decrement it (FUN_0057da50 draws from
+# headroom only for category 2). Non-zero for 91 shipped clubs (~30 English).
+var stadium_headroom: int = 0
 # GROUND IMPROVEMENTS (frame 07): several works run at once -- a SEATS expansion, a CAR
 # PARK level, a FACILITIES grade and a SERVICES grade can all be under construction in the
 # same week. `works` is a LIST of {cat, key, label, cost, weeks_left, effect}; each ticks
@@ -527,6 +533,7 @@ func _init_club(club: Dictionary, league: Dictionary, league_clubs: Array, leagu
 	else:
 		cash = int(fin.get("total_income", 0)) / 4   # un-decoded fallback
 	stadium_capacity = int(fin.get("capacity", 0))   # ground starts at the club's known size
+	stadium_headroom = int(club.get("capacityHeadroom", 0))
 	ticket_price = float(fin.get("ticket_price", 0.0))   # prices start at the division defaults
 	board_price = int(fin.get("board_price", 0))
 	# A fresh career starts on the club's OWN .DBC tactic levers (per-club, the
@@ -4557,7 +4564,13 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	# Season 2+: the witnessed labels are the 1997-98 board table; later seasons'
 	# boards are un-witnessed, so the strength-ranked fallback applies ({} club).
 	_set_objective({}, league, views, leagues)
-	var fin := FinanceModel.summary(club_view(club_id), tier)
+	# club_view() carries no capacity, so without this the season-2+ projection
+	# silently fell back to the tier-default table and ignored every completed
+	# ground expansion.
+	var cv2 := club_view(club_id)
+	if stadium_capacity > 0:
+		cv2["capacity"] = stadium_capacity
+	var fin := FinanceModel.summary(cv2, tier)
 	weekly_net = int(fin["weekly_balance"]) + int(fin["weekly_wages"])  # wage-free; wages drawn live
 	# Refit the XI to the (possibly changed) squad while keeping the shape.
 	if not tactics.is_empty():
@@ -5464,7 +5477,7 @@ func to_dict() -> Dictionary:
 		"ins_wage_refund": ins_wage_refund, "ins_group3_income": ins_group3_income,
 		"objective_text": objective_text, "finished": finished,
 		"tactics": tactics, "tier": tier, "rosters": ros, "club_names": nms,
-		"stadium_capacity": stadium_capacity, "works": works,
+		"stadium_capacity": stadium_capacity, "stadium_headroom": stadium_headroom, "works": works,
 		"car_park_levels": car_park_levels, "ground_grades": ground_grades,
 		"ticket_price": ticket_price, "board_price": board_price,
 		"boards_sold_season": boards_sold_season,
@@ -5618,6 +5631,8 @@ static func from_dict(d: Dictionary) -> Career:
 	c.tier = int(d.get("tier", 1))
 	# Pre-stadium-works saves load with capacity 0 (-> GameDB default via Main) + no works.
 	c.stadium_capacity = int(d.get("stadium_capacity", 0))
+	# Pre-headroom saves load 0; Main heals both from GameDB on career load.
+	c.stadium_headroom = int(d.get("stadium_headroom", 0))
 	# `works` was a single {added,weeks_left,cost} dict before the multi-work ledger; migrate
 	# a legacy in-progress SEATS expansion into the new list form.
 	var raw_works: Variant = d.get("works", [])

@@ -301,6 +301,7 @@ var _season: String = ""
 var _ground: String = ""
 var _league: String = ""
 var _capacity: int = 0
+var _headroom := 0            # expansion headroom (tier input = capacity + headroom)
 var _tier: int = 0
 var _week: int = 0
 var _works: String = ""
@@ -340,7 +341,10 @@ static func tier_for(capacity: int) -> int:
 
 
 func _load_scene() -> void:
-	_tier = tier_for(_capacity)
+	# Tier input = capacity + HEADROOM: FUN_0051a6e0 @0x51a73a sums ground+4 +
+	# ground+8 before the /130000 magic division. The port fed built capacity
+	# alone, which under-tiered the 91 clubs shipping non-zero headroom.
+	_tier = tier_for(_capacity + _headroom)
 	var p := "res://art/screens/stadium/estadio%d.png" % _tier
 	_scene = load(p) if ResourceLoader.exists(p) else null
 
@@ -350,7 +354,8 @@ func _load_scene() -> void:
 ## / board are ignored — they fed the removed invented ticket-price + sponsor + split readouts.
 func setup(club: String, manager: String, season: String, ground: String,
 		capacity: int, _seated: int, _standing: int, _parking: int, works := "",
-		_ticket := 0.0, _board := 0, week := 0, league := "", objective := "") -> void:
+		_ticket := 0.0, _board := 0, week := 0, league := "", objective := "",
+		headroom := 0) -> void:
 	_club = club
 	_manager = manager
 	_season = season
@@ -358,6 +363,7 @@ func setup(club: String, manager: String, season: String, ground: String,
 	_league = league
 	_objective = objective
 	_capacity = maxi(0, capacity)
+	_headroom = maxi(0, headroom)
 	_week = week
 	_works = works
 	_view = "works"          # (re)mount always opens on the WORK IN PROGRESS ledger

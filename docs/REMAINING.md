@@ -116,21 +116,29 @@ Four more, reported 2026-07-26 evening (second round, same play session):
   BOMBO00 instead of the invented endless spin (`cupdraw_screen_re.md` §"The reveal").
 * **Youth recruitment and training does not work like the original at all** — tracked in
   `youth_re.md`; Mats: implement it in a dedicated session.
-* **The Ground screen's stadium image never grows** — **INVESTIGATED 2026-07-26 evening:
-  the mechanism is already shipped AND byte-exact, and the observed behaviour is the
-  original's own.** All 12 `estadio0..11` tiles (RECURSOS.PKF) are decoded, wired and
-  selected by `tier = clamp(capacity * 11 / 130000, 0, 11)` — re-verified instruction-level
-  against `FUN_0051a6e0` @0x51a749 (magic divisor 0x810E35C1 == /130000). The catch is
-  BAND WIDTH: a tier band is 130000/11 = 11,818 seats while the SEATS offers are
-  +4,000/+8,000/+12,000, so most single expansions do not cross a band — Arsenal at
-  39,000 stays tier 3 after +4k AND +8k, exactly as the original would. Do NOT "fix" this
-  by inventing a per-expansion swap. Closed today: `estadio3` render-verified against the
-  Villa capture (98.36% exact — second tile after tier 4). Open probes if Mats wants
-  visible feedback: (a) `remodela.png` (19x16, exported, loaded by nothing) may be the
-  original's works-in-progress marker on the picture — needs a wine capture during works;
-  (b) the original sums TWO ground fields (`[ground+4]+[ground+8]`) into the tier capacity
-  — worth a memory dump to confirm the port's single `stadium_capacity` matches; (c) 10
-  tiles still corrected-by-mapping only.
+* ~~**The Ground screen's stadium image never grows**~~ — **ROOT-CAUSED + FIXED
+  2026-07-27.** The s63 "band width means most expansions don't cross" defence was
+  **empirically false** (its Arsenal example was the worst case, not the typical one:
+  38% of English clubs cross a band on the +4k card, 74% on +8k, 100% on +12k — Man
+  Utd crosses tier 4→5 on the CHEAPEST card). The real, byte-provable bug: the
+  original's tier input is a TWO-FIELD SUM — `FUN_0051a6e0` adds `[ground+4]`
+  (built capacity) **+ `[ground+8]` (expansion HEADROOM, EQUIPOS `param_1[7]`)**
+  before the /130000 division, and the extractor DISCARDED the headroom field, so
+  91 clubs (~30 English: Port Vale, Cardiff, Barnsley, Burnley, Luton …) rendered
+  one-to-two tiers too small and needed far more seats to move. Fixed end-to-end:
+  `capacityHeadroom` decoded with the loader's exact 4000-quantisation
+  (equipos_parse → game_db, kill-tested: witnessed clubs 0, count == 91),
+  `Career.stadium_headroom` seeded/persisted/healed-on-load, tier input =
+  capacity + headroom. Also fixed while in there: the legacy-save landmine
+  (capacity-0 saves collapsed to `0 + added` on works completion — healed from
+  GameDB at load) and the season-2+ `weekly_net` projection ignoring every
+  completed expansion (`club_view` carries no capacity). Tier-transition now
+  test-pinned (`test_stadium_works`: a completed +4,000 across a band edge MUST
+  change the picture) and both stadium suites are in the CI gate. Still open,
+  doc-flagged (`stadium_screen_re.md`): the EXE's 150,000 SEATS ceiling
+  (port caps at 130,000 — one more trace wanted), `remodela.png` works-marker
+  draw position (evidence found, position unwitnessed — not drawn), 10 tiles
+  corrected-by-mapping only.
 
 ## 0b. Mats's live QA, 2026-07-27 morning — fix FIRST (next session = TEAM TACTICS)
 

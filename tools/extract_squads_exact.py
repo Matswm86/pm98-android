@@ -197,6 +197,10 @@ def main() -> None:
                 "sponsor": r["blockStrings"][1] if len(r["blockStrings"]) > 1 else None,
                 "kitMaker": r["blockStrings"][2] if len(r["blockStrings"]) > 2 else None,
                 "capacity": r["stadiumCapacity"],  # param_1[6], real stadium capacity
+                # param_1[7] loader-quantised: the ground's expansion headroom. The
+                # GROUND picture's tier reads capacity + capacityHeadroom
+                # (FUN_0051a6e0 sums ground+4 + ground+8) — non-zero for 91 clubs.
+                "capacityHeadroom": r["capacityHeadroom"],
                 "blockU32": r["capacity"],  # param_1[0x7a]; semantics UNRESOLVED
                 "players": [export_player(p, code2name, eu_codes) for p in r["players"]],
                 "dropped": [p["name"] for p in r["dropped"]],  # slot>=0x62 leavers
@@ -224,6 +228,12 @@ def main() -> None:
     assert mu["capacity"] == 55300, mu["capacity"]
     assert by_name["Aston Villa"]["capacity"] == 39339, by_name["Aston Villa"]["capacity"]
     assert by_name["Southampton"]["capacity"] == 15200, by_name["Southampton"]["capacity"]
+    # Expansion headroom: every render-witnessed club ships 0 (which is why the tier
+    # sum bug never showed in a parity diff); 91 clubs ship a non-zero value.
+    assert mu["capacityHeadroom"] == 0, mu["capacityHeadroom"]
+    assert by_name["Aston Villa"]["capacityHeadroom"] == 0
+    n_headroom = sum(1 for c in clubs if c["capacityHeadroom"] > 0)
+    assert n_headroom == 91, n_headroom
     pk = {p["name"]: p for p in mu["players"]}
     assert pk["Schmeichel"]["attrs"]["PO"] == 91
     assert pk["Schmeichel"]["nationality"] == "DENMARK"
