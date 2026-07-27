@@ -118,6 +118,10 @@ var youth_seq: int = YOUTH_ID_BASE      # monotonic id minter for youth (above s
 var youth_search: Dictionary = {}       # running scout search {skills:Array, weeks:int}; {} = idle
 var youth_found: Array = []             # finished search's prospects, awaiting a contract offer
                                         # (the PLAYERS FOUND panel; they are NOT in `youth` yet)
+var youth_caps: Dictionary = {}         # the six LED capability flags (skill key -> bool). The
+                                        # original keeps them on the criteria object (+0x10..+0x24,
+                                        # youth_re.md §3), so they survive leaving the screen —
+                                        # persisted here for the same reason.
 var youth_pool: Array = []              # the shipped 0x26e4 pool the YOUTH SCOUT searches
                                         # (Youth.pool_of(GameDB.clubs_by_id); set by the
                                         # caller so this file never reaches for an autoload).
@@ -133,6 +137,11 @@ var training_focus: Dictionary = {}      # pid:int -> focus row (Training.FOCUS_
 var pending_alerts: Array = []          # queued hub "PREMIER MANAGER 98" alert texts; Main
                                         # raises + clears them when the hub next shows (the
                                         # witnessed post-flow timing, scout_screen_re.md 78)
+var career_rng_state: String = ""       # persisted state of the career RNG (S3 step: fold the
+                                        # per-call randomize() sites into ONE seeded stream).
+                                        # A string because the 64-bit state does not survive a
+                                        # JSON double round-trip. "" = not seeded yet.
+var _career_rng: RandomNumberGenerator = null
 var external_signed: Dictionary = {}    # pid -> true: players bought off static (non-roster)
                                         # squads via the OFFERS browse (hidden from re-browse)
 var pending_bids: Array = []            # outgoing transfer bids awaiting the selling club's
@@ -986,9 +995,13 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 		_news(n["kind"], n["text"])
 	# The youth team runs the same weekly pass on its 0x20 YOUTH mode: 60% of a point on
 	# every attribute, hard-stopped at his own shipped rating, and the youth manager's
-	# "ready to be promoted" line the moment the core four get there.
+	# "ready to be promoted" line the moment the core four get there. That line is the
+	# original's own hub report ("Your youth manager has informed you that..."), so it
+	# rides pending_alerts like the scout's — not just the news feed.
 	for n in Youth.develop_week(rng, youth):
 		_news(n["kind"], n["text"])
+		if str(n["text"]).begins_with("Your youth manager has informed you"):
+			pending_alerts.append(str(n["text"]))
 	# A running YOUTH TEAM SCOUT search ticks down and reports back (YOUTH TEAM screen).
 	_tick_youth_search(rng)
 	# A running SENIOR scout search completes on its due week (SCOUT screen).
@@ -2274,20 +2287,37 @@ func cycle_training() -> void:
 
 # ---- youth team ----------------------------------------------------------
 
+## The career's own RNG stream (S3 step). One seeding roll at first use — the original
+## also seeds from time() once — then the state is persisted across save/load, so a
+## loaded career continues the SAME stream instead of re-randomizing per call site.
+## The remaining randomize() sites migrate here as they are touched.
+func career_rng() -> RandomNumberGenerator:
+	if _career_rng == null:
+		_career_rng = RandomNumberGenerator.new()
+		if career_rng_state != "":
+			_career_rng.state = career_rng_state.to_int()
+		else:
+			_career_rng.randomize()
+	return _career_rng
+
+
 ## Start a YOUTH TEAM SCOUT search (YOUTH TEAM screen's SEARCH button, frame 047's
 ## "The scout is now searching..." state). Skill keys are the screen's cap_order ids.
-## No-op without a hired scout or with a search already running. The loop itself is
-## decoded from MANAGER.EXE strings (docs/re/youth_re.md): search -> "finished his
-## search" / "...hasn't found"; the duration/yield numbers are our reconstruction.
+## No-op without a hired scout, with a search already running, or with ZERO capabilities
+## lit — a zero-LED search can never match (`FUN_00575d90` is an OR over the lit flags),
+## so arming one is a guaranteed dead 15-28 weeks; the screen shows the EXE's own
+## refusal alert (0x65d3c0) and this guard keeps headless callers honest too. The loop
+## itself is decoded from MANAGER.EXE strings (docs/re/youth_re.md): search -> "finished
+## his search" / "...hasn't found"; the duration is FUN_0053e860's own.
 func start_youth_search(skills: Array) -> void:
+	if skills.is_empty():
+		return
 	var scout := Staff.member_in_role(staff, Staff.YOUTH_TEAM_SCOUT)
 	if youth_search.is_empty() and not scout.is_empty():
-		var rng := RandomNumberGenerator.new()
-		rng.randomize()
 		# FUN_0053e860 @0x53e967: rand(6) + 0x37 - 5*((quality+1)>>1), over the owner's
 		# SEARCH_SPEEDUP. A 5-star scout is fast, a half-star one takes most of a season.
 		youth_search = {"skills": skills.duplicate(),
-			"weeks": Youth.search_weeks(rng, Staff.quality_byte(scout))}
+			"weeks": Youth.search_weeks(career_rng(), Staff.quality_byte(scout))}
 		youth_found = []      # arming a new search clears the last one's shortlist
 		_news("youth", "The scout is now searching for players with selected capabilities.")
 
@@ -2318,15 +2348,29 @@ func _tick_youth_search(rng: RandomNumberGenerator) -> void:
 
 ## Ids already out of the shipped 0x26e4 pool — in your academy, or promoted into your
 ## squad. The engine re-parents a signed youngster, so the scout can never re-find him.
+## Only POOL-scouted members count (`_from_youth_pool`): the easter-egg lane's ids
+## (wonderkid, talents) live in a different id space and are not the pool's business.
 func _youth_taken() -> Array:
 	var out: Array = []
 	for p in youth:
-		out.append(int(p.get("id", -1)))
+		if int(p.get("_from_youth_pool", 0)) == 1:
+			out.append(int(p.get("id", -1)))
 	for p in rosters.get(club_id, []):
 		var pid := int(p.get("id", -1))
 		if pid >= 0 and int(p.get("_from_youth_pool", 0)) == 1:
 			out.append(pid)
 	return out
+
+
+## How many of the academy's members came through the faithful scout loop. The declared
+## SQUAD_CAP applies to THIS number, so an easter-egg arrival (wonderkid, scheduled
+## talent — both bypass the cap on entry by design) never blocks a scouted signing.
+func _scouted_youth_count() -> int:
+	var n := 0
+	for p in youth:
+		if int(p.get("_from_youth_pool", 0)) == 1:
+			n += 1
+	return n
 
 
 ## Offer a contract to one of the scout's finds (a PLAYERS FOUND row tap). He joins the
@@ -2342,11 +2386,10 @@ func sign_youth_prospect(pid: int, rng: RandomNumberGenerator = null) -> Diction
 		return {"ok": false, "msg": "That youngster is no longer available."}
 	var p: Dictionary = youth_found[idx]
 	var nm := str(p.get("name", "?"))
-	if youth.size() >= Youth.SQUAD_CAP:
+	if _scouted_youth_count() >= Youth.SQUAD_CAP:
 		return {"ok": false, "msg": "Your Youth Team is full (%d)." % Youth.SQUAD_CAP}
 	if rng == null:
-		rng = RandomNumberGenerator.new()
-		rng.randomize()
+		rng = career_rng()
 	# Refusal chance rises with his potential and falls with the YOUTH MANAGER's pull.
 	var pot := float(Youth.potential_of(p))
 	var pull := Staff.youth_factor(staff)
@@ -5487,6 +5530,8 @@ func to_dict() -> Dictionary:
 		"training_intensity": training_intensity, "training_focus": _str_keyed(training_focus),
 		"youth": youth,
 		"youth_seq": youth_seq, "youth_search": youth_search, "youth_found": youth_found,
+		"youth_caps": youth_caps,
+		"career_rng_state": (str(_career_rng.state) if _career_rng != null else career_rng_state),
 		"scout_search": scout_search, "scout_results": scout_results,
 		"scout_found_total": scout_found_total,
 		"pending_alerts": pending_alerts, "external_signed": _str_keyed(external_signed),
@@ -5674,6 +5719,8 @@ static func from_dict(d: Dictionary) -> Career:
 	c.youth_seq = int(d.get("youth_seq", YOUTH_ID_BASE))
 	c.youth_search = d.get("youth_search", {})
 	c.youth_found = d.get("youth_found", [])
+	c.youth_caps = d.get("youth_caps", {})
+	c.career_rng_state = str(d.get("career_rng_state", ""))
 	# Pre-SCOUT-screen saves load idle with no results (inert until a search).
 	c.scout_search = d.get("scout_search", {})
 	c.scout_results = d.get("scout_results", [])

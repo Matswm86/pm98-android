@@ -299,13 +299,64 @@ plain and inside the measured interior. Render check `app/tests/shot_youth_found
 ---
 
 **Honest gaps (do NOT invent)**: filled roster-row rendering (rows witnessed EMPTY —
-values render in the game faces under the baked headers; WAGE/YEARS stay blank, youth
-contracts un-modelled); the filled PLAYERS FOUND list; frame 047's "3 PLAYERS" over an
-empty visible list (which counter that is is unresolved — live count = youth.size(),
+values render in the game faces under the baked headers; ROL borrows the CAMROL fine-
+position icon, the original's own compact ROL grammar 100%-pixel-witnessed on the
+OFFERS list; WAGE/YEARS stay blank, youth contracts un-modelled — except the declared
+OURS "PROMOTE" cue below); the filled PLAYERS FOUND list; frame 047's "3 PLAYERS" over
+an empty visible list (which counter that is is unresolved — live count = youth.size(),
 the oracle pins the witnessed text); the bottom-right skill-tile grid's behaviour
-(baked static, taps no-op); row-tap PROMOTE is an un-walked interaction (kept, no
-visual badge); the shared PMChrome live barra is an approximation of the original
-textured header (app-wide, tracked separately).
+(baked static, taps no-op); row-tap PROMOTE is an un-walked interaction — since
+2026-07-27 a READY row carries the word "PROMOTE" (the EXE's own string) in the
+screen's YES-red across the empty WAGE/YEARS band, a **declared OURS cue** (B4) that
+the B9 capture can replace with the original's own; the shared PMChrome live barra is
+an approximation of the original textured header (app-wide, tracked separately).
+
+---
+
+## THE LOOP (Session D, 2026-07-27) — B1-B10
+
+The model above was byte-exact but the LOOP around it lost state and armed dead
+searches. Fixed, test-pinned in `app/tests/test_youth_loop.gd` (+ the extended
+`test_youth_screen.gd`), all five witnesses re-run 0 px:
+
+* **B1** — the six LED capability flags persist on `Career.youth_caps` (the original
+  holds them in the criteria object, +0x10..+0x24 — §3). The screen emits
+  `caps_changed` on every toggle; Main saves. They survive leaving the screen and
+  save/load.
+* **B2** — a ZERO-LED search is refused: the predicate (§2) is an OR over the lit
+  flags, so an empty search could never match — arming it was a guaranteed dead
+  15-28 weeks, THE "recruitment doesn't work" experience. The screen raises the EXE's
+  own refusal alert ("You have to select some options to make the search.", 0x65d3c0
+  — witnessed on the senior SCOUT screen; the youth-side gate itself is un-witnessed,
+  declared), and `Career.start_youth_search` guards headless callers.
+* **B3** — the youth manager's "ready to be promoted" report rides `pending_alerts`
+  (the hub "PREMIER MANAGER 98" box), like the scout's completion lines already did.
+* **B4** — READY/PROMOTE affordance: the declared OURS "PROMOTE" cue (see honest
+  gaps above).
+* **B5** — the ROL column draws the CAMROL fine-position icon (`posFine`), not the
+  broad `pos` word.
+* **B6** — the academy is de-polluted: the declared cap counts POOL-scouted members
+  only (`Career._scouted_youth_count`), the pool exclude list carries pool ids only,
+  and a talent entering through the academy side-door now ships `attrs_base` at his
+  ceiling (`Talent._base_at_ceiling` — BASE CA == potential) so the byte-exact growth
+  (§4) can actually reach it. The side-doors themselves (wonderkid, scheduled
+  talents) are owner-approved easter eggs and stay.
+* **B7** — `Youth.SQUAD_CAP = 12` is DECLARED OURS: MANAGER.EXE carries no
+  youth-capacity string; the only join gate in the engine is the shared offer path's
+  refusal (un-RE'd).
+* **B8** — the two youth `randomize()` sites now draw from `Career.career_rng()`,
+  ONE stream whose state persists across save/load (`career_rng_state`, stored as a
+  string — 64-bit state does not survive a JSON double). First S3 step; the other
+  randomize() sites migrate as touched.
+* **B9** — OPEN: one wine capture run closes the three visual gaps at once (filled
+  PLAYERS FOUND, filled roster row, DRIBBLING/HEADING training chips). Needs a
+  driven career with a completed youth search (30-55 weeks at the binary's own
+  cadence) — the autodriver (`tools/re/wine/autodrive.py` + `plans/season.json`)
+  drove two full seasons for the euro probe, so the machinery exists.
+* **B10** — the stale `Staff.gd` blurbs corrected: the YOUTH TEAM SCOUT's quality
+  byte sets the search duration (§3 — his only engine effect, and it is real); the
+  YOUTH TEAM MANAGER's pull only affects signing refusal odds (OURS §5); growth has
+  no staff term (§4).
 
 **Verification**: `tools/re/diff_youth_parity.py` — ALL FIVE shots (`shot_youth_parity.gd`)
 diff **0px on the body** vs their binding frames (087/088/089/047/048).

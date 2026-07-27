@@ -51,6 +51,8 @@ class_name YouthScreen
 ##                  its behaviour is un-witnessed — taps are no-ops (honest gap).
 
 signal search_pressed(skills: Array)   # SEARCH armed + tapped (skill keys, cap_order ids)
+signal caps_changed(selected: Dictionary)  # an LED toggled; Career persists the six flags
+                                       # (the original's criteria object survives the screen)
 signal promote_requested(pid: int)     # tap a READY roster row (un-walked interaction)
 signal prospect_pressed(pid: int)      # tap a PLAYERS FOUND row -> offer him a contract
 signal back_pressed                    # RETURN
@@ -95,6 +97,7 @@ var _press := ""
 var _row_rects: Array = []
 var _found: Array = []             # Career.youth_found — the PLAYERS FOUND shortlist
 var _found_rects: Array = []
+var _alert_img: Texture2D          # zero-LED SEARCH refusal (PMAlert render); null = none
 
 # PLAYERS FOUND filled list. The panel interior is frame-measured (`pf_interior`); the
 # ROW grammar inside it is the app's, because the original's filled panel is not in any
@@ -207,6 +210,8 @@ func _led_card(skill: String) -> Rect2:
 	return Rect2(r.position.x, r.position.y - 1, 112.0, r.size.y + 2)
 
 func _hit(d: Vector2) -> String:
+	if _alert_img != null:
+		return "alert_ok"     # any tap answers the alert's OK (single-button box)
 	for bname in ["search", "parameters", "rating", "return"]:
 		if _btn_rect(bname).has_point(d):
 			return "btn:" + bname
@@ -238,7 +243,11 @@ func _on_input(e: InputEvent) -> void:
 	queue_redraw()
 	if was == "" or was != _hit(d):
 		return
-	if was == "btn:return":
+	if was == "alert_ok":
+		_alert_img = null
+		PMChrome.set_dim(false)
+		queue_redraw()
+	elif was == "btn:return":
 		back_pressed.emit()
 	elif was == "btn:parameters":
 		_mode = "parameters"
@@ -252,6 +261,15 @@ func _on_input(e: InputEvent) -> void:
 			for k in _selected:
 				if _selected[k]:
 					skills.append(k)
+			if skills.is_empty():
+				# A zero-LED search can never match (the predicate is an OR over the
+				# lit flags) — refuse with the EXE's own alert (0x65d3c0, witnessed on
+				# the senior SCOUT screen; the youth-side gate itself is un-witnessed).
+				_alert_img = ImageTexture.create_from_image(
+					PMAlert.render("You have to select some options to make the search."))
+				PMChrome.set_dim(true)
+				queue_redraw()
+				return
 			search_pressed.emit(skills)
 	elif was.begins_with("led:"):
 		# toggling is only live once a scout is hired (the 087 state has no
@@ -259,6 +277,7 @@ func _on_input(e: InputEvent) -> void:
 		if not _scout.is_empty():
 			var k := was.substr(4)
 			_selected[k] = not bool(_selected.get(k, false))
+			caps_changed.emit(_selected.duplicate())
 			queue_redraw()
 	elif was.begins_with("found:"):
 		prospect_pressed.emit(int(was.substr(6)))
@@ -316,9 +335,9 @@ func _stars(tex_a: Texture2D, tex_b: Texture2D, half_tex: Texture2D,
 	for i in full:
 		var tex := tex_a if i % 2 == 0 else tex_b
 		if tex != null:
-			draw_texture(tex, Vector2(x0 + i * 11.0, y))
+			draw_texture(_tex(tex), Vector2(x0 + i * 11.0, y))
 	if rating - full >= 0.5 and half_tex != null:
-		draw_texture(half_tex, Vector2(x0 + full * 11.0, y))
+		draw_texture(_tex(half_tex), Vector2(x0 + full * 11.0, y))
 
 ## Un-witnessed press feedback (PARAMETERS only): the 088/089-style white ring.
 func _ring(r: Rect2, col: Color) -> void:
@@ -326,22 +345,31 @@ func _ring(r: Rect2, col: Color) -> void:
 	draw_rect(Rect2(r.position - Vector2(pad, pad), r.size + Vector2(pad * 2, pad * 2)),
 		col, false, 2.0)
 
+## Dim pass-throughs while the refusal alert is up (the SAME palette-LUT dim the
+## walkthrough proves for a host screen under a modal — ScoutScreen's pattern).
+func _tex(t: Texture2D) -> Texture2D:
+	return PMAlert.dim_texture(t) if _alert_img != null and t != null else t
+
+func _ci(col: Color) -> Color:
+	return PMAlert.dim_color(col) if _alert_img != null else col
+
+
 func _draw() -> void:
 	var s := _scale()
 	var o := _origin(s)
 	draw_set_transform(o, 0.0, Vector2(s, s))
 	draw_rect(Rect2(0, 0, W, H), Color.BLACK, true)
 	if _body != null:
-		draw_texture(_body, Vector2(0, _body_y))
+		draw_texture(_tex(_body), Vector2(0, _body_y))
 	PMChrome.draw_header(self, "YOUTH TEAM", _manager, _club, _league, _season,
 		_week, _club_id)
 
 	var ink: Dictionary = _spec.get("ink", {})
-	var c_name := _col(ink.get("name", [255, 255, 255]))
-	var c_yes := _col(ink.get("yes", [210, 0, 0]))
-	var c_no := _col(ink.get("no", [0, 0, 0]))
-	var c_msg := _col(ink.get("msg", [0, 0, 0]))
-	var c_count := _col(ink.get("count", [166, 202, 240]))
+	var c_name := _ci(_col(ink.get("name", [255, 255, 255])))
+	var c_yes := _ci(_col(ink.get("yes", [210, 0, 0])))
+	var c_no := _ci(_col(ink.get("no", [0, 0, 0])))
+	var c_msg := _ci(_col(ink.get("msg", [0, 0, 0])))
+	var c_count := _ci(_col(ink.get("count", [166, 202, 240])))
 
 	var has_scout := not _scout.is_empty()
 
@@ -368,9 +396,9 @@ func _draw() -> void:
 			var r := _led_rect(str(skill))
 			var tex := _led_lit if bool(_selected.get(str(skill), false)) else _led_avail
 			if tex != null:
-				draw_texture(tex, r.position)
+				draw_texture(_tex(tex), r.position)
 		if _search_on != null:
-			draw_texture(_search_on, _btn_rect("search").position)
+			draw_texture(_tex(_search_on), _btn_rect("search").position)
 
 	# --- PLAYERS FOUND: the shortlist if the scout brought one back, else the
 	#     two witnessed messages verbatim ---
@@ -414,9 +442,9 @@ func _draw() -> void:
 	# --- mode plaques: baked = PARAMETERS selected; RATING mode overlays 047 pair ---
 	if _mode == "rating":
 		if _plaq_param_off != null:
-			draw_texture(_plaq_param_off, _btn_rect("parameters").position)
+			draw_texture(_tex(_plaq_param_off), _btn_rect("parameters").position)
 		if _plaq_rating_on != null:
-			draw_texture(_plaq_rating_on, _btn_rect("rating").position)
+			draw_texture(_tex(_plaq_rating_on), _btn_rect("rating").position)
 
 	# --- held states: frame-cut ring sprites (048 red SEARCH / 088 RATING /
 	#     089 RETURN); PARAMETERS press is un-witnessed -> white rect ring ---
@@ -432,14 +460,23 @@ func _draw() -> void:
 			_ring(_btn_rect(bname), _col((_spec.get("ring", {}) as Dictionary)
 				.get("white", [255, 255, 255])))
 
+	# --- the zero-LED refusal alert, over everything (the EXE's own box) ---
+	if _alert_img != null:
+		var ar := PMAlert.box_rect("You have to select some options to make the search.")
+		draw_texture(_alert_img, Vector2(ar.position))
+
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 ## Roster rows under the baked NAME/SP/ST/AG/QU/AV/ROL/WAGE/YEARS headers. The
 ## PARAMETERS columns show the FICHA parameter codes (SP=VE speed, ST=RE stamina,
-## AG=AG aggression, QU=CA quality), AV the ability average, ROL the demarcation;
-## WAGE/YEARS stay empty (youth contracts are un-modelled). Filled rendering is
-## an un-witnessed reconstruction — docs/re/youth_re.md.
+## AG=AG aggression, QU=CA quality), AV the ability average, ROL the CAMROL fine-
+## position icon (the original's own compact ROL grammar, 100%-pixel-witnessed on
+## the OFFERS list; the youth row itself is un-witnessed — B9's capture settles it);
+## WAGE/YEARS stay empty (youth contracts are un-modelled) except the declared OURS
+## "PROMOTE" cue on a READY row — the EXE's own word (its PROMOTE/PROMOTED strings),
+## marking the tap that promotes him. Filled rendering is an un-witnessed
+## reconstruction — docs/re/youth_re.md.
 func _draw_rows() -> void:
 	_row_rects = []
 	var rspec: Dictionary = _spec.get("rows", {})
@@ -449,7 +486,7 @@ func _draw_rows() -> void:
 	var nrows := int(rspec.get("count", 11))
 	var tx := float(rspec.get("text_x", 64))
 	var cols: Dictionary = rspec.get("col_cx", {})
-	var c_txt := Color8(0, 0, 0)
+	var c_txt := _ci(Color8(0, 0, 0))
 	for i in mini(_youth.size(), nrows):
 		var p: Dictionary = _youth[i]
 		var y := float(y0 + i * pitch)
@@ -465,9 +502,22 @@ func _draw_rows() -> void:
 			_txt_center(_f8, float(cols.get("QU", 421)), y + 2.0,
 				str(int(attrs.get("CA", 0))), c_txt, 11)
 		_txt_center(_f8, float(cols.get("AV", 287)), y + 2.0, str(Youth.ability(p)), c_txt, 11)
-		_txt_center(_f8, float(cols.get("ROL", 312)), y + 2.0, str(p.get("pos", "")), c_txt, 11)
-		# WAGE / YEARS stay empty (youth contracts un-modelled); readiness is
-		# reported by the youth-manager news line, no invented row badge.
+		var pf := PMChrome.iget(p, "posFine")
+		if pf >= 1 and pf <= 18:
+			var rol := PMChrome.camrol(pf)
+			if rol != null:
+				draw_texture(_tex(rol),
+					Vector2(floorf(float(cols.get("ROL", 312)) - 12.0), y - 1.0))
+			else:
+				_txt_center(_f8, float(cols.get("ROL", 312)), y + 2.0, str(p.get("pos", "")), c_txt, 11)
+		else:
+			_txt_center(_f8, float(cols.get("ROL", 312)), y + 2.0, str(p.get("pos", "")), c_txt, 11)
+		if Youth.is_ready(p):
+			# Declared OURS cue (B4): the READY/PROMOTE affordance is un-walked, so the
+			# cue borrows the EXE's own word in the screen's own YES-red, centred across
+			# the empty WAGE/YEARS band.
+			_txt_center(_f8, float(rspec.get("promote_cx", 388)), y + 2.0, "PROMOTE",
+				_ci(Color8(210, 0, 0)), 11)
 		var r := Rect2(tx - 8.0, y, 390.0, float(rh))
 		_row_rects.append({"pid": int(p.get("id", -1)), "rect": r})
 		if _press == "row:%d" % int(p.get("id", -1)):
@@ -491,15 +541,15 @@ func _draw_found() -> void:
 		var pid := int(p.get("id", -1))
 		var r := Rect2(x, y, w, PF_ROW_H)
 		var held := _press == "found:%d" % pid
-		draw_rect(r, C_PF_ROW_SEL if held else C_PF_ROW, true)
-		_txt_left(_f8, x + 4.0, y + 1.0, str(p.get("name", "")).to_upper(), C_PF_INK, 11)
-		_txt_center(_f8, x + w - 74.0, y + 1.0, str(p.get("age", 0)), C_PF_INK, 11)
-		_txt_center(_f8, x + w - 54.0, y + 1.0, str(Youth.ability(p)), C_PF_INK, 11)
+		draw_rect(r, _ci(C_PF_ROW_SEL if held else C_PF_ROW), true)
+		_txt_left(_f8, x + 4.0, y + 1.0, str(p.get("name", "")).to_upper(), _ci(C_PF_INK), 11)
+		_txt_center(_f8, x + w - 74.0, y + 1.0, str(p.get("age", 0)), _ci(C_PF_INK), 11)
+		_txt_center(_f8, x + w - 54.0, y + 1.0, str(Youth.ability(p)), _ci(C_PF_INK), 11)
 		# potential as 1-5 pips (the YOUTH screen's own star language, drawn plain
 		# because the panel has no witnessed star art of its own)
 		var pips := clampi(int(round(Youth.potential_of(p) / 20.0)), 1, 5)
 		for s in pips:
-			draw_rect(Rect2(x + w - 38.0 + s * 6.0, y + 4.0, 4.0, 5.0), C_PF_STAR, true)
+			draw_rect(Rect2(x + w - 38.0 + s * 6.0, y + 4.0, 4.0, 5.0), _ci(C_PF_STAR), true)
 		_found_rects.append({"pid": pid, "rect": r})
 		y += PF_ROW_PITCH
 

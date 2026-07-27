@@ -102,8 +102,8 @@ const _DEF := {
 	PSYCHOLOGIST: {"blurb": "boosts morale (no engine effect yet)"},
 	ASSISTANT_MANAGER: {"blurb": "auto-renews your stars"},
 	SCOUT_ROLE: {"blurb": "finds transfer targets"},
-	YOUTH_TEAM_MANAGER: {"blurb": "improves the academy"},
-	YOUTH_TEAM_SCOUT: {"blurb": "scouts youngsters (no engine effect yet)"},
+	YOUTH_TEAM_MANAGER: {"blurb": "talks prospects into signing"},
+	YOUTH_TEAM_SCOUT: {"blurb": "searches for youth players; better = faster"},
 	GROUNDSMAN: {"blurb": "keeps the pitch (no engine effect yet)"},
 }
 

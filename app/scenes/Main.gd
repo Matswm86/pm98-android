@@ -2781,12 +2781,17 @@ func _show_youth_screen() -> void:
 	var refresh := func() -> void:
 		scr.setup(_career.youth, _career.staff, _career.manager_name, _career.club_name,
 			_career.season, _career.week + 1, _career.club_id,
-			not _career.youth_search.is_empty(), null, _career.youth_found)
+			not _career.youth_search.is_empty(), _career.youth_caps, _career.youth_found)
 	refresh.call()
 	scr.search_pressed.connect(func(skills: Array) -> void:
 		_career.start_youth_search(skills)
 		_career.save()
 		refresh.call())
+	# The six LED flags live on the career (the original's criteria object survives
+	# leaving the screen — youth_re.md §3), so a toggle persists immediately.
+	scr.caps_changed.connect(func(sel: Dictionary) -> void:
+		_career.youth_caps = sel
+		_career.save())
 	# PLAYERS FOUND row tap: offer the prospect a contract. He joins, or turns you down
 	# ("The youth player %s has rejected your offer.") — the owner's "the players they
 	# find are supposed to be clickable to offer a contract".

@@ -222,6 +222,7 @@ static func make_youth(e: Dictionary, rng: RandomNumberGenerator, start_year: in
 	var is_gk := bool(e.get("isGK", false))
 	var pos := str(e.get("pos", "MF"))
 	var ca := intake_ca(e, age)
+	var row := make_attrs(rng, ca, pos, is_gk)
 	return {
 		"id": int(e.get("id", 0)),
 		"name": str(e.get("name", "?")),
@@ -235,9 +236,25 @@ static func make_youth(e: Dictionary, rng: RandomNumberGenerator, start_year: in
 		"nationality": str(e.get("nationality", "ENGLAND")),
 		"flagCode": int(e.get("flagCode", 30)),
 		"kind": str(e.get("kind", "NATIONAL")),
-		"attrs": make_attrs(rng, ca, pos, is_gk),
+		"attrs": row,
+		"attrs_base": _base_at_ceiling(row, ca, potential_of(e)),
 		"potential": potential_of(e),
 		"dev_progress": 0.0,
 		"ready": ca >= Youth.READY_CA,
 		"is_youth": true,
 	}
+
+
+## The easter-egg lane's BASE block (B6 2026-07-27): the byte-exact academy growth
+## (`Training.develop_youth_week`) climbs LIVE attrs toward `attrs_base` and stops dead,
+## so a talent whose BASE equalled his intake attrs would never grow at all — his
+## `potential` was unreachable. Seed BASE as the intake row lifted by (potential - ca),
+## capped at 99, with BASE CA = potential exactly. OURS (the regen lane always was);
+## pool youngsters keep their shipped BASE untouched.
+static func _base_at_ceiling(attrs: Dictionary, ca: int, potential: int) -> Dictionary:
+	var up := maxi(0, potential - ca)
+	var base := attrs.duplicate()
+	for k in base:
+		base[k] = clampi(int(base[k]) + up, 0, 99)
+	base["CA"] = clampi(potential, 0, 99)
+	return base

@@ -81,6 +81,31 @@ func _run() -> void:
 	ok = _assert(got.size() == 1, "SEARCH emits with a scout hired") and ok
 	ok = _assert(got[0].size() == 3, "emitted skills = 3 selected LEDs") and ok
 
+	# --- B2: zero-LED SEARCH refuses with the EXE's own alert, no signal ---
+	scr._selected = {}
+	scr._press = "btn:search"
+	scr._on_input(e)
+	ok = _assert(got.size() == 1, "B2: zero-LED SEARCH does NOT emit") and ok
+	ok = _assert(scr._alert_img != null, "B2: zero-LED SEARCH raises the refusal alert") and ok
+	# any tap answers the alert's OK
+	scr._press = scr._hit(Vector2(320, 240))
+	scr._on_input(e)
+	ok = _assert(scr._alert_img == null, "B2: a tap dismisses the alert") and ok
+	PMChrome.set_dim(false)
+
+	# --- B1: an LED toggle emits caps_changed so Career can persist the flags ---
+	var caps_got: Array = []
+	scr.caps_changed.connect(func(sel: Dictionary) -> void: caps_got.append(sel))
+	var lr: Rect2 = scr._led_card("DRIBBLING")
+	var le := InputEventMouseButton.new()
+	le.button_index = MOUSE_BUTTON_LEFT
+	le.pressed = false
+	le.position = lr.get_center()
+	scr._press = "led:DRIBBLING"
+	scr._on_input(le)
+	ok = _assert(caps_got.size() == 1 and bool((caps_got[0] as Dictionary).get("DRIBBLING", false)),
+		"B1: LED toggle emits the six flags") and ok
+
 	# --- Career search model (strings-decoded loop) ---
 	var career := Career.new()
 	career.staff = staff

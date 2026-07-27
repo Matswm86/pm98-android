@@ -66,6 +66,11 @@ const SEARCH_SPEEDUP := 2
 const INTAKE_AGE_LO := 15
 const INTAKE_AGE_HI := 17
 const GRADUATE_AGE := 19          # over this and not promoted -> released from the setup
+## OURS, declared (B7 2026-07-27): MANAGER.EXE carries NO youth-capacity string and the
+## only gate on joining is the shared offer path's refusal (un-RE'd), so this cap is the
+## app's own guard on the un-modelled youth wage bill. It counts POOL-scouted members
+## only (Career._scouted_youth_count) — easter-egg arrivals bypass it by design. At the
+## scout's own cadence (one find per 15-28 weeks) it is out of reach inside two seasons.
 const SQUAD_CAP := 12             # the youth team won't grow past this
 
 # Regen-lane constants (free agents + the talent easter egg), NOT the academy.

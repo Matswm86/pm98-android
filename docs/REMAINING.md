@@ -114,8 +114,23 @@ Four more, reported 2026-07-26 evening (second round, same play session):
   380, the 192→114 / 240→144 / 220→144·128-checkerboard paper-tone rule). OURS,
   flagged: cadence, tap-to-skip, the list-form extension. The idle screen now parks on
   BOMBO00 instead of the invented endless spin (`cupdraw_screen_re.md` §"The reveal").
-* **Youth recruitment and training does not work like the original at all** — tracked in
-  `youth_re.md`; Mats: implement it in a dedicated session.
+* ~~**Youth recruitment and training does not work like the original at all**~~ —
+  **LOOP FIXED 2026-07-27 (Session D, B1-B10** — `youth_re.md` §"THE LOOP"**).** The
+  model was already byte-exact; the loop around it lost state and armed dead searches.
+  B1 the six LED flags persist on Career; B2 a zero-LED search is refused with the
+  EXE's own alert (THE "recruitment doesn't work" bug — it armed a search that could
+  never match and sat dead 15-28 weeks); B3 the youth manager's READY report rides
+  pending_alerts; B4 a READY row carries the declared-OURS "PROMOTE" cue; B5 ROL
+  draws the CAMROL fine-position icon; B6 easter-egg arrivals no longer block or
+  pollute the faithful loop (cap + exclude list count pool members only; a talent's
+  BASE now sits at his potential so growth can reach it); B7 SQUAD_CAP declared OURS
+  (no capacity string in the EXE); B8 the two youth randomize() sites fold into ONE
+  persisted career RNG stream (first S3 step); B10 stale staff blurbs corrected.
+  `test_youth_loop.gd` (13 asserts) + extended `test_youth_screen.gd`; all five
+  youth witnesses re-run **0 px**; test_youth_loop added to the CI gate (19→20).
+  **OPEN: B9** — one wine capture run closes the three visual gaps (filled PLAYERS
+  FOUND, filled roster row, DRIBBLING/HEADING training chips); needs a driven career
+  with a completed search at the binary's own 30-55-week cadence.
 * ~~**The Ground screen's stadium image never grows**~~ — **ROOT-CAUSED + FIXED
   2026-07-27.** The s63 "band width means most expansions don't cross" defence was
   **empirically false** (its Arsenal example was the worst case, not the typical one:
