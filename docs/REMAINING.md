@@ -181,7 +181,25 @@ Four more, reported 2026-07-26 evening (second round, same play session):
   disarms the forwards trigger; MIXED PLAY is the reliable trigger now). Final
   confirmation in Mats's hands on the shipped APK remains the acceptance bar.
 
-## The one-paragraph truth
+## 0c. Mats's orders, 2026-07-27 midday — NEXT SESSION, fix-first
+
+* **S5 promoted from backlog to fix-first: European ties must run on the byte-exact
+  engine.** ~37 fixtures/season silently fall to the invented legacy `MatchEngine`
+  because foreign XIs fail `MatchSim._usable` (`MatchSim.gd:105-116`). Fix = usable
+  foreign XIs (feed from the `game_db` club records — all 384 foreign clubs carry
+  full attr squads, and `club_tactics.json` carries their TRUE XIs/levers via
+  `Pm98LineupFeeder`) or a stat-engine path that pads like `_pad_xi`. While in
+  there: confirm **S7** (the European field shape — 24 clubs / 6 groups / 2
+  qualifying rounds) is actually shipped, and extend `test_career`'s zero-fallback
+  assert to cover a season WITH European fixtures.
+* **EXIT from the career hub must go straight to the ORIGINAL start screen.**
+  Today `Main.gd:4426` `"exit": _leave_career()` → `_leave_career()` (`:2036`)
+  lands on `_show_home()` = the BrowseScreen DB navigation — a port-only surface
+  the original does not show there. The witnessed precedent already in-repo:
+  the in-match EXIT confirm ("leave the championship?", `LeaveConfirm.gd`) sends
+  Yes → the TITLE screen. Route the hub EXIT the same way (career saved first,
+  as now); check the walked frames for whether the original interposes its own
+  confirm box on hub EXIT before wiring one.
 
 The **manager game** — career, leagues, transfers, finance, tactics, cups, Europe, youth,
 staff, training, contracts, board, screens, scouting, insurance, injuries, honours — is
