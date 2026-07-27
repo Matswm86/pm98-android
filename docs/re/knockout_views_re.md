@@ -108,11 +108,12 @@ baked verbatim. The domestic form of the same bracket is
 `07_cocacola_qtr_drawn_UNPLAYED_1997-12-07.png` — identical panel geometry, `RES.` and
 `REPLAY` plates instead of the three European ones.
 
-**Still unwitnessed here:** a bracket tie with BOTH legs played, so the `AGGR.` cell's ink
-and the advancing-club highlight *in this layout* are still open. Note the aggregate itself
-IS witnessed, in the COMPACT layout — `06_euroleague_round1_played.png` carries
-`1ST LEG 2-1 · 2ND LEG 1-0 · AGGR. 2-2`, i.e. the aggregate is the two legs summed with the
-home/away sides swapped. Only the bracket form's own cell is missing.
+~~**Still unwitnessed here:** a bracket tie with BOTH legs played~~ — **WITNESSED AND
+BUILT 2026-07-28**, see §"The decided bracket" at the end of this file. The aggregate rule
+was never in doubt (the COMPACT layout carries it: `06_euroleague_round1_played.png` has
+`1ST LEG 2-1 · 2ND LEG 1-0 · AGGR. 2-2`, the two legs summed with the home/away sides
+swapped); what the frame settled is how the bracket DRAWS a decided tie, and it turned out
+to be three things the port had wrong.
 
 **Two full seasons were driven and both missed it, for a structural reason — read this
 before driving a third.** The screen auto-advances to the next phase the moment that phase
@@ -362,17 +363,10 @@ rather than on the group screen: 173 edge samples with five known greys beats 32
 `(385, T+7)` — **0 px** on four tested cells (Germany 2, Greece 26, Spain 22, England 30).
 Note `T+7`, not the `T+6` claimed above: dy 6 is the black rule.
 
-**Still unwitnessed after all 17 bracket frames in the repo were checked:** a decided
-`AGGR.` cell, and any ink at all in the domestic `RES.` / `REPLAY` boxes. The 139-frame
-pageback drive did not catch it either (`knockoutwatch.py scan` → 0). Build the ink rule from
-the leg-1 cell's own grammar and say in the code that the other boxes' placement is inferred
-from it.
-
-**Still missing for the bracket:** a tie with BOTH legs played, so the `AGGR.` cell's ink
-and the advancing-club highlight in this layout stay unwitnessed. The aggregate RULE is not
-in doubt — `06_euroleague_round1_played.png` carries it in the compact layout, two legs
-summed with the sides swapped — only where the bracket draws it.
-`tools/re/wine/knockoutwatch.py` scans a drive's frames for it (and for the cell below).
+~~**Still unwitnessed after all 17 bracket frames in the repo were checked:** a decided
+`AGGR.` cell~~ — **CLOSED 2026-07-28** (§"The decided bracket"). Still open: any ink at all
+in the domestic `RES.` / `REPLAY` boxes, which no frame in the repo carries.
+`tools/re/wine/knockoutwatch.py` scans a drive's frames for the two cells it was written for.
 
 ## The bracket, as built (2026-07-26, session s62)
 
@@ -573,3 +567,75 @@ documents each rather than hiding it:
 * the played FINAL, for the `WINNER` band;
 * the layout switch itself: count-driven for 1/2/3, round-driven for 4/5 — confirm by
   finding a 4-tie round the original does NOT draw as a bracket, if one exists.
+
+
+## The decided bracket — WITNESSED 2026-07-28, and it corrected three things
+
+The 07-26 build had no frame of a decided bracket tie, so it applied the compact LIST's
+rule (ink the winner's name yellow) and declared it. The pageback drive finally landed one:
+**`screenshots/wine-captures-2026-07-28-knockout-decided/01_euro_qtr_finals_decided.png`**
+(banked as `tools/re/refs/knockout-2026-07-26/09_euroleague_qtrfinals_DECIDED_1998-04-11.png`),
+the euro QTR FINALS of the same Bolton W career on Sat 11 April 1998, every tie played —
+plus the same state in two more competitions on the same day
+(`02_cwc_qtr_finals_decided.png`, `03_uefa_qtr_finals_decided.png`), which is what makes
+the readings below rules rather than one-offs.
+
+Root cause of the earlier misses is confirmed and now moot: the view auto-advances the
+moment the next phase is drawn, so the QF is only reachable by paging BACK from the semis,
+and the drive has to have reached the QF SECOND legs (~April) first. The 07-26/07-27 drives
+stopped in January, at which point the QF bracket exists but is unplayed.
+
+**What the frame settled, and what the port had wrong:**
+
+1. **The winner's whole NAME PLATE is repainted**, not just his ink. Fill `(42,95,170)`
+   over the strip's own `(180,200,220)`, across the full plate (`x114..247` home /
+   `x250..383` away, rows `T+7..T+26`). The yellow ink `(255,223,0)` was already right.
+2. **Two chevrons point inwards at the ends of that plate.** `(166,202,240)`, five px wide,
+   inset one px from each plate edge, nine rows tall, apex row `T+16`, width
+   `5 - |dy|` — a solid triangle. Measured on both a home winner (Manchester Utd., panel 3)
+   and an away winner (Borussia D., panel 1).
+3. **The plain score ink and the dash blend are PER BOX.** The two leg boxes print
+   `(180,200,220)` on `(80,100,120)` with the dash at the witnessed 80 % blend; the navy
+   `AGGR.` box prints `(180,180,220)` on `(20,0,90)` and its dash carries **no blended
+   pixel at all** on any of the four ties — it is the full ink. Neither could be seen
+   before, because no frame had ever had a filled aggregate.
+
+The aggregate's GRAMMAR is also now witnessed in the bracket and matches the compact
+layout: leg 2 is printed HOST-first (so it reads the other way round from leg 1) while
+`AGGR.` is always (left club, right club). Oporto `0-2` then `0-2` = `2-2` with Borussia
+through on away goals; Manchester Utd. `2-0` then `0-1` = `3-0`.
+
+Built in `KnockoutScreen._draw_winner_plate` + the per-box `BRACKET_SCORE_INK_*` /
+`BRACKET_DASH_BLEND_*`; gated by `diff_knockout_parity.py` case `knockout_euro_qtr_done`
+at **0 px** outside the standing buckets.
+
+**One declared band on that case:** the phase paginator's white plate is two rows taller on
+a paged-back frame than on a live one (white rows 77..101 at x190, against 78..100 on
+`03_euroleague_qtrfinals_LEG1_PLAYED`), at identical width and with an identical label. One
+witness of each state is not a rule, so the port keeps drawing the live-phase plate and the
+band is declared rather than guessed.
+
+## Same drive, three more bands now witnessed — NOT yet built
+
+The 2026-07-28 drive also banked the first frames of three chromes this file had listed as
+unwitnessed. They are in `screenshots/wine-captures-2026-07-28-knockout-decided/`:
+
+* **`04_facup_semifinals_finalists.png`** — the F.A. Cup SEMIFINALS band with both
+  `FINALIST` plates FILLED. Single-leg ties at a neutral ground (the venue is the panel's
+  own first row: `Hillsborough`, `Anfield`), so the domestic semifinal card is a different
+  shape from the euro two-legged one.
+* **`05_cocacola_semifinals_twolegs.png`** — the Coca-Cola SEMIFINALS with BOTH legs drawn
+  (`1ST LEG` at `Selhurst Park`, `2ND LEG` at `Ewood Park`) and both `FINALIST` plates
+  filled. This independently re-confirms the 07-27 model fix (Coca-Cola semis are
+  two-legged) from a second career.
+* **`06_cocacola_final_winner.png`** — the Coca-Cola FINAL: the cup trophy art,
+  `MATCH RESULT` over `STADIUM Wembley`, an empty `REPLAY RESULT` panel, and the filled
+  `WINNER` band with the champion's kit in a laurel wreath.
+
+Building these three is a chrome-bake pass of the same shape as the euro cards/final build;
+until then those competitions' 2/1-tie phases still fall back to the SORTEO card.
+
+`screenshots/` is LOCAL, so all five frames of that drive are ALSO banked in the tracked
+reference tree — **`tools/re/refs/knockout-2026-07-28/`** (its README maps each file to the
+cell it first witnesses). The euro one is the gate reference and sits with its siblings in
+`knockout-2026-07-26/`.

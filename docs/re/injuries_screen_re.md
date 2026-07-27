@@ -146,8 +146,17 @@ level, so it has no such branch.
    1 pays 0%**, so the icon marks "a policy exists", not "a payout happened". The sprite
    occupies **x487..494 (8 px) x y266..275 (10 px)** inside the cell (cell border x483) on
    that 640x480 frame: a document with a folded top-right corner and two darker text rules.
-   Remaining: cut it into the row strip (a baker pass); the port still draws the policy
-   digit alone.
+   ~~Remaining: cut it into the row strip (a baker pass); the port still draws the policy
+   digit alone.~~ — **BUILT 2026-07-28.** The insured branch `FUN_00543960` @0x543ae7-0x543c9b
+   is THREE pieces, not a centred digit, and the port now draws all three:
+   the sprite blitted at row-x `0x1cb` / row-y `5` (@0x543b09), the group number centred in
+   `0x1d5..0x1e0` (@0x543b6b) and the **payout percentage** centred in `0x1e1..0x1ff`
+   (@0x543c0b, value from `FUN_0058c000` = `Insurance.payout_pct`); row-relative x + the row
+   widget's origin at 28 puts them exactly where the witness has them. The sprite is
+   frame-cut by `tools/re/build_injuries_insured_icon.py`. Measured against the witness:
+   **sprite 0 px, group digit 0 px**, percentage 28 px in a declared face (see
+   `InjuriesScreen.PCT_FACE` — its glyphs are 4x10 and no extracted bank reproduces them;
+   30 face/size combinations were rendered and diffed).
 4. ~~**"N PLAYERS" = physio quality**~~ — **CLOSED 2026-07-24**: it is
    `FUN_00578b80` case 6 on the raw quality byte (see PHYS. above), not the star count;
    the old inference happened to agree because stars = q/2.

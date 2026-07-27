@@ -2017,6 +2017,18 @@ func _mount_hub() -> void:
 		c.pending_alerts = []
 		c.save()
 	AudioManager.play_music()   # resume the menu theme on return from a match
+	# ...and LAST, the board's dismissal. `FUN_00545fd0` is the hub screen's own run(): it
+	# tests the three sack conditions BEFORE it draws the menu and, on any of them, raises
+	# one modal and ends the career on the spot. The port raises the same box over the hub
+	# it has already built and then takes the original's own exit -- back to the TITLE
+	# screen, which is where CGFXException 0x4e3e lands a single-manager career
+	# (docs/re/sack_path_re.md §"Post-sack surface RESOLVED").
+	var sack_msg := c.sack_message()
+	if sack_msg != "":
+		c.sacked = true
+		c.sack_reason = c.sack_message_reason()
+		_hub.alerts_cleared.connect(_leave_career_sacked, CONNECT_ONE_SHOT)
+		_hub.alert(sack_msg)
 
 ## The hub SAVE GAME 10-slot dialog (SaveGameDialog.gd;
 ## docs/re/savegame_dialog_re.md): over the LIVE undimmed hub (witness 51).
@@ -2038,6 +2050,22 @@ func _show_save_dialog() -> void:
 ## and Yes lands on the TITLE screen — wine-captures-2026-07-27-hubexit). Saves first
 ## (unlike the in-match abandon, nothing here is mid-flight), frees the hub, clears
 ## the career, and mounts the title over the home browser exactly like boot does.
+## The post-sack exit. `FUN_0057a500(club, 0xffff)` detaches the manager and
+## `FUN_0057eb30` FREES his management data, so the running career is gone -- the player
+## is on the MAIN MENU with only whatever he last SAVED. The port matches that: the
+## autosave (the "Continue" row) is dropped so a dead career cannot be resumed, and the
+## ten explicit SAVE GAME slots are untouched, exactly as the original's own save files are.
+func _leave_career_sacked() -> void:
+	Career.delete_save()
+	if _hub != null and is_instance_valid(_hub):
+		_hub.queue_free()
+	_hub = null
+	_career = null
+	_nav = [_show_home]
+	_show_home()
+	_show_title_screen()
+
+
 func _leave_career_to_title() -> void:
 	if _career != null:
 		_career.save()
@@ -5216,25 +5244,12 @@ func _show_year_award(title: String, rows: Dictionary, after: Callable) -> void:
 ## original's own modal alert box on the hub, and the offer list is the app's own screen.
 func _season_end_board() -> void:
 	var rv := _career.board_review()
-	if bool(rv["sacked"]):
-		# The board's own words. All three are MANAGER.EXE's, verbatim off the message
-		# table FUN_00545fd0 indexes (2026-07-27): 0x662d24 -> 0x663818 (financial),
-		# 0x662d2c -> 0x663744 (results), 0x662d30 -> 0x663690 (squad too small). The
-		# port's old invented one-liner is gone.
-		var msg := "The Directors have held an urgent meeting,\nand have sacked you as manager of the club."
-		match str(rv["reason"]):
-			"insolvent":
-				msg = ("The Directors have held an urgent meeting.\n"
-					+ "They have decided to terminate your contract\n"
-					+ "as manager due to the disastrous financial management\nof the club.")
-			"squad":
-				msg = ("The Directors have decided to terminate your contract\n"
-					+ "due to bad management of your squad,\n"
-					+ "which does not have the minimum number of players\n"
-					+ "needed to play in any championship.")
-		_generate_offers(false)
-		_show_alert_then(msg, _show_job_offers)
-		return
+	# NOTE (2026-07-28): the board does NOT sack at a season's end in the original. Every
+	# dismissal it has is raised by the WEEKLY hub run `FUN_00545fd0` and ends the career
+	# there and then (`_show_career` above; docs/re/sack_path_re.md). The port's old
+	# end-of-season SACK_GAP verdict and its post-sack JOB OFFERS mount are both gone --
+	# the offers list survives only as the HEADHUNT route, which is the app's own
+	# multi-club extension and is flagged as such.
 	if bool(rv["headhunted"]):
 		_generate_offers(true)
 		_show_job_offers()

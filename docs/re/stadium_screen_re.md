@@ -78,17 +78,55 @@ parity diff. Port: `capacityHeadroom` in game_db (extractor applies the loader
 quantisation verbatim), `Career.stadium_headroom` (static), tier input =
 capacity + headroom (`StadiumScreen._load_scene`).
 
-Two neighbouring findings recorded, NOT yet acted on:
-* **The SEATS ceiling in the EXE compares against 150,000** (@0x51c8d3:
-  `cmp eax, 0x249F0`), not the port's 130,000 (`Career.MAX_STADIUM`); 130,000 is
-  only the tier-11 picture threshold. The addend register wants one more trace
-  before the constant is changed — flagged, unchanged.
-* **The works-in-progress markers are real**: `FUN_0051a6e0` @0x51a7cc-0x51a80a
-  copies the four ground works flags (`ground+0x32/+0x35/+0x38/+0x3b`) into screen
-  fields `+0x192c..+0x1938` — strong evidence `remodela.png` (19x16, exported,
-  loaded by nothing) is the per-section marker on the picture. Its DRAW position is
-  still unwitnessed, so the port does not draw it (no invention); a wine capture
-  during works closes this.
+Both neighbouring findings are now CLOSED — 2026-07-28, from the binary.
+
+**1. The SEATS ceiling is 150,000, and the addend is the capacity SUM.** The 07-27
+note ("the addend register wants one more trace") is discharged. The card builder is
+`FUN_0051c2e0` (the GROUND IMPROVEMENTS screen), and its frame is pinned by three
+reads that agree at one site:
+
+```
+0051c319  mov [esp+0x14], ecx       ; B+0x14 = the ground object   (read back @0x51c8a9 as [ebx+0x33])
+0051c32b  mov [esp+0x30], edx       ; B+0x2c = ground+0x34         (read back @0x51c8c8)
+0051c336  mov eax,[ecx+8]           ; headroom
+0051c339  mov ecx,[ecx+4]           ; capacity
+0051c33c  add ecx, eax
+0051c340  mov [esp+0x24], ecx       ; B+0x20 = capacity + headroom
+...
+0051c8d0  push edi / push 1 / call FUN_0057e3f0   ; seats = (card+1)*4000  (0x57e3f0: +1, x125, <<5)
+0051c8df  add eax, [esp+0x28]       ; = B+0x20, the sum above
+0051c8e1  cmp eax, 0x249f0          ; 150,000
+0051c8e6  jb keep                   ; else FUN_005bf8c0 -> the card is DISABLED
+```
+
+So the ceiling applies to **capacity + headroom** (the same sum the tier picture
+divides), it is tested **per card at build time** — the card greys out rather than the
+capacity clamping — and the comparison is `jb`, so a build landing exactly on 150,000
+is already refused. 130,000 was only ever the tier-11 picture threshold. Port:
+`Career.MAX_STADIUM = 150000` + the `>=` guard in `begin_work`,
+`StadiumScreen.BUILD_CEILING` split out from `MAX_CAPACITY` (still 130,000, still the
+tier divisor), pinned by `test_stadium_works`.
+
+**2. `remodela.bmp` is the IMPROVE BUTTON's icon — the "per-section marker" reading was
+WRONG.** The `.data` block at 0x65b1a4..0x65b228 is three (path, label) pairs, and
+`FUN_0051a6e0` builds one button from each, in this shape:
+`push id / push 0 / push <label> / push h / push w / ... / push y / push x / ... /
+push <bmp> / call FUN_005c06d0`:
+
+| id | label VA | bmp VA | w x h | x, y | = the reversed rect |
+|---|---|---|---|---|---|
+| 0x66 | 0x65b228 `MATCH DAY` | 0x65b200 `diapartido.bmp` | 0x98 x 0x19 | 0x12a, 0x1ba | (298,442,152,25) |
+| 0x64 | 0x65b1f8 `IMPROVE` | **0x65b1d0 `remodela.bmp`** | 0x98 x 0x19 | 0x12a, 0x197 | (298,407,152,25) |
+| 0x65 | 0x65b1c8 `WORKS` | 0x65b1a4 `obras.bmp` | 0x84 x 0x19 | 0x1e4, 0x197 | (484,407,132,25) |
+
+which reproduces the action grid measured off the frame, exactly. `remodela.bmp` has
+**one** code reference in the whole binary (0x51a989, that push); `obras.bmp` has three
+(0x51aa0c here, plus 0x51dd3a / 0x51e1da — the in-progress markers the port already
+draws and render-diffed). So there is nothing left to draw: the IMPROVE button's icon is
+inside the baked action grid, and `remodela.png` being "loaded by nothing" is correct —
+it is baked, not blitted. The four works flags copied to screen fields
+`+0x192c..+0x1938` (@0x51a7cc-0x51a80a) feed the screen's own per-category state, not a
+marker blit.
 
 **The "small internal crop/palette offset … not a placement error" note was WRONG — FIXED
 2026-07-24 (s55).** It was a 256-column wrap, and it made the whole picture panel render at

@@ -48,7 +48,14 @@ signal boards_sold()
 
 const W := 640
 const H := 480
+# The tier PICTURE divisor -- `FUN_0051a6e0` @0x51a728 divides (capacity + headroom) by
+# this to pick one of the 12 estadio tiles. It is NOT the build ceiling (that confusion was
+# the 07-27 open note): the SEATS cards are gated on 150,000 instead, per BUILD_CEILING.
 const MAX_CAPACITY := 130000
+# `FUN_0051c2e0` @0x51c8e1 `cmp eax, 0x249f0`: a SEATS card whose seats added to
+# (capacity + headroom) would REACH 150,000 is disabled by the original
+# (`FUN_005bf8c0`), so the card simply cannot be taken. Closed 2026-07-28.
+const BUILD_CEILING := 150000
 
 # Touch-friendliness (owner 2026-07-23: "super sensitive / hard to find the exact click spot").
 # The baked art + every DRAW rect stay pixel-exact; only the _hit() test rects are grown by this
@@ -628,8 +635,8 @@ func _select_card(i: int) -> void:
 	var prices: Array = _prices()
 	if prices.is_empty() or i < 0 or i >= OFFER_SEATS.size():
 		return
-	if _capacity + int(OFFER_SEATS[i]) > MAX_CAPACITY:
-		return
+	if _capacity + _headroom + int(OFFER_SEATS[i]) >= BUILD_CEILING:
+		return   # the original disables this card outright (FUN_0051c2e0 @0x51c8e1)
 	_sel = i
 	queue_redraw()
 	improve_selected.emit(int(OFFER_SEATS[i]), int(prices[i]), int(OFFER_WEEKS[i]))

@@ -8,7 +8,20 @@ extends RefCounted
 ## unit-testable headless.
 
 const SAVE_PATH := "user://career.json"
-const MAX_STADIUM := 130000   # tier-11 capacity ceiling (matches StadiumScreen.MAX_CAPACITY)
+# The ground's build ceiling, CLOSED 2026-07-28 from the binary (the 07-27 note "the addend
+# register wants one more trace" is discharged). `FUN_0051c2e0` -- the GROUND IMPROVEMENTS
+# card builder -- banks `[ground+4] + [ground+8]` (capacity + expansion HEADROOM, the same
+# sum the tier picture divides) into its frame at @0x51c340, and then per SEATS card:
+#     0x51c8d0  push edi / push 1 / call FUN_0057e3f0   ; seats = (card + 1) * 4000
+#     0x51c8df  add eax, [esp+0x28]                     ; ... + capacity + headroom
+#     0x51c8e1  cmp eax, 0x249f0                        ; 150,000
+#     0x51c8e6  jb keep                                 ; else -> FUN_005bf8c0 = DISABLE
+# So the ceiling is 150,000 on the SUM, tested per card at build time (the card greys out),
+# and 130,000 was only ever the tier-11 picture threshold (`FUN_0051a6e0`). Frame slots
+# pinned by three agreeing reads at the same site: [esp+0x14] = the ground object
+# (@0x51c319, used as `[ebx+0x33]`), [esp+0x2c] = the ground+0x34 works byte (@0x51c32b),
+# [esp+0x28] = the capacity sum (@0x51c340).
+const MAX_STADIUM := 150000
 
 var club_id: int = -1
 var club_name: String = ""
@@ -236,6 +249,18 @@ var _cash_close_ok := false
 # while this is non-zero, incrementing, and CLEARS it the moment the balance is positive
 # again -- witnessed at 1, 2 and 3 weeks, then cleared by a sale.
 var loss_weeks: int = 0
+# club+0x294 -- the board's RESULTS-REVIEW sack flag, set/cleared by the weekly update
+# `FUN_0057a980` @0x57aeb2 and consumed by the hub run `FUN_00545fd0` @0x54603a in the
+# SAME week (docs/re/sack_path_re.md; the week table is `_board_results_review`).
+var board_sack_flag: int = 0
+# The review weeks that have already posted a WARNING this season, so the same week is
+# never re-reviewed if the hub is re-mounted (the original's review runs once per weekly
+# update, not once per hub draw).
+var board_reviewed: Array = []
+# The two readings the sack arms compare against, banked at the WARNING week they review
+# (see `_board_results_review`): {round_no: bool below} and {round_no: int position}.
+var _below_at: Dictionary = {}
+var _pos_at: Dictionary = {}
 # The 1-April season-end/contract warning has fired this season (it fires once).
 var contract_warned := false
 # The channelTV card queued for the coming HOME match: {"fee": int, "comp": String}.
@@ -439,6 +464,76 @@ const LOSS_SACK_WEEKS := 4
 # FUN_00545fd0 @0x546063: the third dismissal reason -- a squad under 0x10 men, "which does
 # not have the minimum number of players needed to play in any championship" (0x662d30).
 const SACK_MIN_SQUAD := 16
+
+# ---- the board's dismissal, WHERE the original raises it ------------------
+# There is no separate "sacking screen" in MANAGER.EXE. The sack IS the modal that the
+# weekly hub screen (factory id 900) raises BEFORE it draws itself: `FUN_00545fd0` tests
+# three conditions in ONE order and, on any of them, calls
+# `FUN_005e5050(hwnd, "PREMIER MANAGER 98", msg, 0x1001, 0, 0)`, detaches the manager
+# (`FUN_0057a500(club, 0xffff)` -> club+0x5c = 0xffff) and returns WITHOUT building a next
+# screen. `FUN_004f96c0` then sees the detached club, finds no other live manager record
+# and throws `CGFXException(0x4e3e)`, which `FUN_004f8a00` catches and returns from --
+# dropping a single-manager career back on the MAIN MENU. Decoded end to end in
+# docs/re/sack_path_re.md (both sessions); the three test sites are:
+#
+#   0x546013  club+0x224 > 3    -> SACK_MSG_FINANCE  (.data slot 0x662d24 -> 0x663818)
+#   0x54603a  club+0x294 != 0   -> SACK_MSG_RESULTS  (.data slot 0x662d2c -> 0x663744)
+#   0x546063  club+0x28  < 0x10 -> SACK_MSG_SQUAD    (.data slot 0x662d30 -> 0x663690)
+#
+# All four strings below are MANAGER.EXE's own bytes, newlines included (read out of
+# .data at the VAs above, 2026-07-28 -- VA = file offset + 0x401a00).
+const SACK_MSG_FINANCE := ("The Directors have held an urgent meeting.\n"
+	+ "They have decided to terminate your contract\n"
+	+ "as manager due to the disastrous financial management\nof the club.")
+const SACK_MSG_RESULTS := ("The Directors have held an urgent meeting,\n"
+	+ "and have sacked you as manager of the club.")
+const SACK_MSG_SQUAD := ("The Directors have decided to terminate your contract\n"
+	+ "due to bad management of your squad,\n"
+	+ "which does not have the minimum number of players\n"
+	+ "needed to play in any championship.")
+# 0x66379c, posted to the club's message list by `FUN_0057d2d0` at the three WARNING weeks.
+const BOARD_WARN_MSG := ("The Directors inform you that they are very unhappy with the current\n"
+	+ "situation of the team and they expect better results.")
+
+# The board's results review, `FUN_0057a980` @0x57ad6a..0x57aec9, disassembled 2026-07-28.
+# Keyed by the division ROUND number just played; `bands` is the club+0x58 expectation
+# band the arm applies to ([] = every band), `warn` posts BOARD_WARN_MSG, and `since` is
+# the earlier week the sack arm compares against:
+#   week 10 -> warn (bands 0,1)                    | 18 -> warn (all)   | 30 -> warn (band 0)
+#   week 14 -> sack if below at 10 AND not recovered by 14 (bands 0,1)
+#   week 22 -> sack if below at 18 AND not recovered by 22 (all bands)
+#   week 26 -> sack if below at 18 AND STILL below at 26 (all bands; no `recovered` call)
+#   week 34 -> sack if below at 30 AND not recovered by 34 (band 0)
+const BOARD_REVIEW := {
+	10: {"warn": true, "bands": [0, 1]},
+	14: {"warn": false, "bands": [0, 1], "since": 10, "recover": true},
+	18: {"warn": true, "bands": []},
+	22: {"warn": false, "bands": [], "since": 18, "recover": true},
+	26: {"warn": false, "bands": [], "since": 18, "recover": false},
+	30: {"warn": true, "bands": [0]},
+	34: {"warn": false, "bands": [0], "since": 30, "recover": true},
+}
+# `FUN_0057d3a0(week)` -- "below the board's expectation" -- is a position threshold that
+# depends on club+0x58 alone (0x57d3cc..0x57d582): Premier band 1 -> pos > 8, band 2 ->
+# pos > 15, band >= 3 -> pos > 17, band 0 -> POINTS based (leader's points as of week-1
+# >= own + 7); divisions 1/2/3 use the same three-step shape, first band -> pos > 6,
+# second -> pos > 13, else -> pos > 15. So the band is a GLOBAL index: Premier 0..3,
+# Div 1 4/5/6, Div 2 7/8/9, Div 3 10/11/12.
+const BOARD_BAND_POS := {0: -1, 1: 8, 2: 15, 3: 17, 4: 6, 5: 13, 6: 15,
+	7: 6, 8: 13, 9: 15, 10: 6, 11: 13, 12: 15}
+# ...and the band the port hands it is DERIVED, not decoded: club+0x58's own loader site
+# was not located, but the game's START OF SEASON objective LABEL (witnessed for all 92
+# English clubs, club_economy.json) fits the band set 1:1 in every division -- four labels
+# and four bands in the Premier, three and three in each lower division, in the same order
+# of severity. Declared as inference in docs/re/sack_path_re.md §"The band the port uses".
+const BOARD_BAND_OF_LABEL := {
+	1: {"Champion": 0, "U.E.F.A.": 1, "Mid Table": 2, "Avoid Relegation": 3},
+	2: {"Promotion": 4, "Mid Table": 5, "Avoid Relegation": 6},
+	3: {"Promotion": 7, "Mid Table": 8, "Avoid Relegation": 9},
+	4: {"Promotion": 10, "Mid Table": 11, "Avoid Relegation": 12},
+}
+# The points gap that trips a band-0 (Champion) club: `add edi,7` @0x57d44a.
+const BOARD_TITLE_GAP := 7
 const DEADLINE_WARN_WEEKS := [2, 1]
 const DEADLINE_WARN_MSG := "The transfer deadline is now %d week%s away."
 # The original's 1-April season-end warning pair, verbatim from MANAGER.EXE's message
@@ -520,6 +615,7 @@ func _init_club(club: Dictionary, league: Dictionary, league_clubs: Array, leagu
 	week_ledgers = []
 	_wk = {}
 	loss_weeks = 0
+	_reset_board_review()
 	pending_channel_tv = {}
 	pending_division_finals = []
 	pending_cup_draws = []
@@ -1011,6 +1107,12 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 	# Training intensity scales the injury risk (harder training = more knocks).
 	for n in Availability.tick_week(my_squad()):
 		_news(n["kind"], n["text"])
+	# ...and the WEEKLY illness tick, which the original runs whether or not the club
+	# played (`FUN_0057a980`; roll_A is the only path that can produce virus or cold).
+	# It posts to the club's message list, so it rides pending_alerts like the original's.
+	for n in Availability.roll_weekly_illness(rng, my_squad()):
+		_news(n["kind"], n["text"])
+		pending_alerts.append(str(n["text"]))
 	if not manager_res.is_empty():
 		# A physiotherapist on the staff lowers the injury risk (physio_factor <= 1.0).
 		var inj_mult := Training.injury_multiplier(training_intensity) * Staff.physio_factor(staff)
@@ -1053,6 +1155,11 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 	# take, insurance, cup ties, transfers -- is inside the record before the
 	# running-at-a-loss counter reads it (REFRUN R5/R9/R16).
 	_close_week_books()
+	# The board's results review runs in the same weekly per-club update as the finance
+	# step (`FUN_0057a980`, after the books, before the hub is mounted) and reads the
+	# table the round just produced. `week` has already been advanced by the round, so the
+	# round NUMBER just played is `week` (1-based).
+	_board_results_review(week)
 	# ...then queue the channelTV card for the fixture the manager is about to play, which
 	# is how the original raises it: unprompted, on the hub, BEFORE the match (R6).
 	_queue_channel_tv()
@@ -1379,6 +1486,11 @@ func _roll_ai_squads(rng: RandomNumberGenerator, ai_featured: Dictionary) -> voi
 			continue
 		var squad: Array = rosters[cid]
 		Availability.tick_week(squad)   # recoveries (discarded -- rival feed stays quiet)
+		# The weekly illness tick is per CLUB in the original (`FUN_0057a980` runs down
+		# the whole club list), so the rivals catch colds too; their lines stay quiet,
+		# same as their recoveries, and the notable-injury feed below still surfaces the
+		# long ones.
+		Availability.roll_weekly_illness(rng, squad)
 		if ai_featured.has(int(cid)):
 			var feat: Array = ai_featured[int(cid)]
 			var before: Dictionary = {}
@@ -2101,6 +2213,133 @@ func _releg_count() -> int:
 func _won_domestic_cup() -> bool:
 	return Cup.champion_id(fa_cup) == club_id or Cup.champion_id(league_cup) == club_id
 
+## `FUN_0057a730` (the weekly reset the season loop runs at the top of every pass) zeroes
+## club+0x294 before the review can re-set it, so the flag never survives into a new season.
+func _reset_board_review() -> void:
+	board_sack_flag = 0
+	board_reviewed = []
+	_below_at = {}
+	_pos_at = {}
+
+
+## club+0x58 -- the board's expectation band for this club, derived from the game's own
+## START OF SEASON objective label (see BOARD_BAND_OF_LABEL). -1 when the club carries no
+## witnessed label (every non-English club), which is exactly the `division > 3` arm of
+## `FUN_0057d3a0`: no board review at all.
+func expectation_band() -> int:
+	var by_label: Dictionary = BOARD_BAND_OF_LABEL.get(tier, {})
+	return int(by_label.get(objective_text, -1))
+
+
+## `FUN_0057d3a0(week)`: is the club BELOW the board's expectation as of `round_no`?
+## `round_no` is the division's 1-based round number; the original queries the table as of
+## `round_no - 1`, which for the app is the standings after that many rounds have been
+## played. Returns false for an unknown band (no review) and for round 0.
+func below_expectation(round_no: int) -> bool:
+	if round_no <= 0:
+		return false
+	var band := expectation_band()
+	if band < 0:
+		return false
+	var rows := standings()
+	var pos := 0
+	for i in rows.size():
+		if int(rows[i]["id"]) == club_id:
+			pos = i + 1
+			break
+	if pos == 0:
+		return false
+	if band == 0:
+		# The points arm: the leader's points against the club's own, +7 (0x57d44a).
+		var leader := int(rows[0]["Pts"]) if not rows.is_empty() else 0
+		var mine := 0
+		for r in rows:
+			if int(r["id"]) == club_id:
+				mine = int(r["Pts"])
+				break
+		return leader >= mine + BOARD_TITLE_GAP
+	return pos > int(BOARD_BAND_POS.get(band, 99))
+
+
+## The board's weekly results review, `FUN_0057a980` @0x57ad6a. Runs once per league round
+## the manager's own division plays, from round 10 on, and either posts the WARNING message
+## or sets/clears club+0x294 (`board_sack_flag`) per BOARD_REVIEW. The original gates the
+## whole block on the Promanager career flag `DAT_0066b1e4` (a Manager League career is
+## never results-reviewed); this port routes both front-door choices through one career and
+## so runs it always -- recorded in docs/re/sack_path_re.md, not silently.
+func _board_results_review(round_no: int) -> void:
+	var arm: Dictionary = BOARD_REVIEW.get(round_no, {})
+	if arm.is_empty() or board_reviewed.has(round_no):
+		return
+	var band := expectation_band()
+	if band < 0:
+		return
+	var bands: Array = arm["bands"]
+	if not bands.is_empty() and not bands.has(band):
+		return
+	board_reviewed.append(round_no)
+	if bool(arm["warn"]):
+		# The original re-queries the league table AS OF the warning week when the sack
+		# arm runs four weeks later (`vt[0x88](club, week-1)`); the port keeps no historic
+		# tables, so it banks the same two readings here. Every `since` week in
+		# BOARD_REVIEW is a warn week over the SAME band set, so the two agree.
+		var below := below_expectation(round_no)
+		_below_at[round_no] = below
+		_pos_at[round_no] = position()
+		if below:
+			pending_alerts.append(BOARD_WARN_MSG)
+		return
+	# A sack arm: it fires ONLY when the club was already below at the warning week.
+	var since := int(arm["since"])
+	if not _below_at.has(since) or not bool(_below_at[since]):
+		board_sack_flag = 0
+		return
+	# `recover` = the original calls FUN_0057d5b0(since, now) -- did the club IMPROVE its
+	# standing between the two weeks? -- while week 26 simply re-tests "still below".
+	var still_bad := below_expectation(round_no)
+	if bool(arm["recover"]):
+		still_bad = still_bad and not _recovered(since, round_no)
+	board_sack_flag = 1 if still_bad else 0
+
+
+## `FUN_0057d5b0(wkA, wkB)`: did the club's standing IMPROVE between the two review weeks?
+## The port keeps the position it recorded at the warning week and compares (`setl`, the
+## mirror of below_expectation's `setge`).
+func _recovered(wk_a: int, wk_b: int) -> bool:
+	if not _pos_at.has(wk_a):
+		return false
+	var then := int(_pos_at[wk_a])
+	var now := position()
+	if expectation_band() == 0:
+		# Band 0 compares POINTS to the leader, not places.
+		return not below_expectation(wk_b)
+	return now < then
+
+
+## `FUN_00545fd0`'s three dismissal tests, in the binary's own order. Returns the message
+## the original would raise, or "" when the board keeps you. Consumed by Main at the hub
+## mount -- the same place the original consumes it.
+func sack_message() -> String:
+	if loss_weeks >= LOSS_SACK_WEEKS:
+		return SACK_MSG_FINANCE
+	if board_sack_flag != 0:
+		return SACK_MSG_RESULTS
+	if (rosters.get(club_id, []) as Array).size() < SACK_MIN_SQUAD:
+		return SACK_MSG_SQUAD
+	return ""
+
+
+## The reason word behind `sack_message()`, for the career record and the tests.
+func sack_message_reason() -> String:
+	if loss_weeks >= LOSS_SACK_WEEKS:
+		return "insolvent"
+	if board_sack_flag != 0:
+		return "results"
+	if (rosters.get(club_id, []) as Array).size() < SACK_MIN_SQUAD:
+		return "squad"
+	return ""
+
+
 ## The board's end-of-season verdict, computed ONCE per season (idempotent on repeat calls
 ## within the same `year`): applies the season's reputation change, decides whether you are
 ## sacked, and whether a stronger club is headhunting you. Returns a display summary. The
@@ -2112,25 +2351,12 @@ func board_review() -> Dictionary:
 		var titles := {"league": finished_pos == 1, "cup": _won_domestic_cup()}
 		reputation = Manager.apply_delta(reputation,
 			Manager.reputation_delta(finished_pos, objective_pos, total, _releg_count(), titles))
-		var survival := objective_text == "Avoid relegation"
-		var sd := Manager.sack_decision(finished_pos, objective_pos, total,
-			_releg_count(), survival, seasons_at_club())
-		sacked = bool(sd["sacked"])
-		sack_reason = str(sd["reason"])
-		# The board's three dismissal reasons, all read off FUN_00545fd0 (the original's
-		# own sacking screen, 2026-07-27) in ITS order of test:
-		#   0x546013  club+0x224 > 3          -> "disastrous financial management"
-		#   0x54603a  club+0x294 != 0         -> results/objective (Manager.sack_decision)
-		#   0x546063  club+0x28  < 0x10 men   -> "does not have the minimum number of
-		#                                        players needed to play in any championship"
-		# WHERE the board acts is still ours: the original raises the screen mid-season,
-		# the port dismisses at the review it already has.
-		if not sacked and loss_weeks >= LOSS_SACK_WEEKS:
-			sacked = true
-			sack_reason = "insolvent"
-		if not sacked and (rosters.get(club_id, []) as Array).size() < SACK_MIN_SQUAD:
-			sacked = true
-			sack_reason = "squad"
+		# The board does NOT dismiss at a season's end: all three of MANAGER.EXE's
+		# dismissals are raised by the WEEKLY hub run `FUN_00545fd0` and end the career on
+		# the spot (`sack_message()` above, consumed by Main at the hub mount). What is
+		# left for the season review is the reputation move and the headhunt -- the app's
+		# own multi-club extension. `sacked` here only reports a sack that has ALREADY
+		# happened, so a review run after one still reads true.
 		var rng := career_rng()   # S3: the ONE persisted career stream
 		headhunt_pending = not sacked and Manager.headhunted(finished_pos, objective_pos, reputation, rng)
 		if sacked:
@@ -4674,6 +4900,7 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	week_ledgers = []
 	_wk = {}
 	loss_weeks = 0
+	_reset_board_review()
 	pending_channel_tv = {}
 	pending_cup_draws = []
 	pending_champion_cards = []
@@ -5405,7 +5632,10 @@ func begin_work(cat: String, key: int, label: String, cost: int, weeks: int,
 		effect: Dictionary = {}) -> bool:
 	if cost > cash:
 		return false
-	if cat == "seats" and stadium_capacity + _pending_seats() + int(effect.get("added", 0)) > MAX_STADIUM:
+	# The binary's own test: this card's seats + (capacity + headroom) >= 150,000 disables
+	# the card, so the refusal is `>=` on the SUM, not `>` on the capacity alone.
+	if cat == "seats" and stadium_capacity + stadium_headroom + _pending_seats() \
+			+ int(effect.get("added", 0)) >= MAX_STADIUM:
 		return false
 	for w in works:
 		if str(w.get("cat")) == cat and int(w.get("key", -1)) == key:
@@ -5473,7 +5703,7 @@ func _complete_work(w: Dictionary) -> void:
 	var cat := str(w.get("cat"))
 	match cat:
 		"seats":
-			stadium_capacity = mini(MAX_STADIUM, stadium_capacity + int(eff.get("added", 0)))
+			stadium_capacity = mini(MAX_STADIUM - stadium_headroom, stadium_capacity + int(eff.get("added", 0)))
 			_news("stadium", "Ground expansion complete: capacity now %s." % _grp(stadium_capacity))
 		"carpark":
 			var q := int(w.get("key", 0))
@@ -5686,6 +5916,8 @@ func to_dict() -> Dictionary:
 		"euro": euro, "euro_ratings": _str_keyed(euro_ratings),
 		"euro_names": _str_keyed(euro_names),
 		"week_ledgers": week_ledgers, "loss_weeks": loss_weeks,
+		"board_sack_flag": board_sack_flag, "board_reviewed": board_reviewed,
+		"board_below_at": _str_keyed(_below_at), "board_pos_at": _str_keyed(_pos_at),
 		"week_open": _wk, "cash_close": cash_close, "cash_close_ok": _cash_close_ok,
 		"contract_warned": contract_warned,
 		"pending_champion_cards": pending_champion_cards, "sa_champion_id": sa_champion_id,
@@ -5924,6 +6156,10 @@ static func from_dict(d: Dictionary) -> Career:
 	c.pending_champion_cards = d.get("pending_champion_cards", [])
 	c.sa_champion_id = int(d.get("sa_champion_id", -1))
 	c.loss_weeks = int(d.get("loss_weeks", 0))
+	c.board_sack_flag = int(d.get("board_sack_flag", 0))
+	c.board_reviewed = d.get("board_reviewed", [])
+	c._below_at = _int_keyed(d.get("board_below_at", {}))
+	c._pos_at = _int_keyed(d.get("board_pos_at", {}))
 	c.contract_warned = bool(d.get("contract_warned", false))
 	c.pending_channel_tv = d.get("pending_channel_tv", {})
 	for t in d.get("pending_division_finals", []):

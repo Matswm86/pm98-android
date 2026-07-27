@@ -1,5 +1,8 @@
 # M5 Thread B — the ps=4 (WATCH) faithful-branch post-goal deadlock
 
+Evidence: tools/re/wine/m5_gdbrsp_watch.py, app/tests/test_driver_advance_engine.gd, app/scripts/Pm98Driver.gd
+  -- the live write-watchpoint that produced the trace, and the suite + engine leaf it fixed.
+
 Continues `handoff-pm98-m5-killtest-rebaseline-div2-rootcause-2026-07-15` (Thread B root-cause) and
 the live drive `handoff-pm98-m5-kickoff-lockstep-confirmed-2026-07-15`. This doc records the
 **live-validated** replay-ring semantics, the **record=1 fix**, and the **second, deeper blocker**

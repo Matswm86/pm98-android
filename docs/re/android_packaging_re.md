@@ -1,5 +1,8 @@
 # Android packaging: icon, splash, signing
 
+Evidence: tools/re/export_exe_icon.py, .github/workflows/build-android.yml, app/art/screens/title/fondo7.png
+  -- the PE resource-tree icon exporter, the workflow that ships the APK, and the extracted title frame used as the splash.
+
 Status: **icon + splash BUILT 2026-07-27 from the original's own files; release signing
 WIRED and waiting on one repository secret.** Nothing here is drawn or invented.
 

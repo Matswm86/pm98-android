@@ -1,4 +1,9 @@
-# SACK path decode — MANAGER.EXE (2026-07-17)
+# SACK path decode — MANAGER.EXE (2026-07-17, BUILT 2026-07-28)
+
+Status: **SHIPPED** — the three dismissals, the seven-week board review and the
+post-sack exit to the TITLE screen are live; gate `app/tests/test_sacking.gd`
+(MANAGER.EXE `FUN_00545fd0` / `FUN_0057a980` / `FUN_0057d3a0`). See
+§"BUILT 2026-07-28" for what shipped and the two declared divergences.
 
 Answers the open question in `promanager_career_screens_re.md` ("What screen
 follows a sack is NOT witnessed and NOT string-provable"). Session 1 (night)
@@ -287,7 +292,83 @@ session.
   (`FUN_0052afc0`, `FUN_0052b8a0`) for offers on the manager's players —
   consistent with team_offer_re.md's flow.
 
-## App implications (no code changed for this doc)
+## BUILT 2026-07-28 — the sacking is now where the original raises it
+
+Status: **the three dismissals SHIP**, in `FUN_00545fd0`'s own order, raised by the
+weekly hub mount and exiting to the TITLE screen.
+
+Session 3 re-read the two functions above straight off the bytes with capstone
+(`extracted/Premier Manager 98/MANAGER.EXE`, .text VA = file offset + 0x400c00) rather
+than trusting the session-2 transcription. **Everything in §"Sack internals decoded"
+reproduced exactly**, including the arms the port now implements:
+
+* `FUN_0057a980` @0x57ad6a..0x57aec9 — the Promanager gate (`DAT_0066b1e4`), the
+  division match (`club+0x50 == DAT_0066b1dc`), `FUN_0057d5a0() >= 10`, then the seven
+  week arms 0xa/0xe/0x12/0x16/0x1a/0x1e/0x22 with the band gates
+  (`[esi+0x58] == 0 || == 1` at 10/14, unrestricted at 18/22/26, `== 0` at 30/34),
+  `mov [esi+0x294], eax` @0x57aeb2 and the warning post `FUN_0057d2d0(0x662d28)`.
+  Week 26 is the one arm that calls `FUN_0057d3a0` TWICE (0x57ae47 + 0x57ae58) instead
+  of the recovery check — "still below", not "did not improve".
+* `FUN_0057d3a0` @0x57d3cc..0x57d582 — the thresholds, as literals:
+  Premier band 1 `mov ecx,8`, band 2 `mov ecx,0xf`, else `mov edx,0x11`; band 0 the
+  points arm with `add edi,7`. Divisions 1/2/3 repeat one shape: first band `mov ecx,6`,
+  second `mov edx,0xd`, else `mov ecx,0xf` — with the band literals **4/5** (div 1),
+  **7/8** (div 2), **0xa/0xb** (div 3). So club+0x58 is a GLOBAL index, Premier 0..3 and
+  three bands per lower division.
+
+### The band the port uses — DECLARED INFERENCE
+
+`club+0x58`'s own loader site was **not** located (no `mov [reg+0x58]` write survives a
+linear scan of the club-loader region, and `FUN_00579c70` never writes `param_1[0x16]`),
+so the port does **not** read the band from the archive. It derives it from the game's own
+START OF SEASON objective LABEL, which is witnessed for all 92 English clubs
+(`club_economy.json`, frames s29..s32 of 2026-07-19):
+
+| division | labels witnessed | bands in the binary | port's map |
+|---|---|---|---|
+| Premier | Champion / U.E.F.A. / Mid Table / Avoid Relegation | 0 / 1 / 2 / 3 | in that order |
+| Div 1 | Promotion / Mid Table / Avoid Relegation | 4 / 5 / 6 | in that order |
+| Div 2 | same three | 7 / 8 / 9 | in that order |
+| Div 3 | same three | 10 / 11 / 12 | in that order |
+
+The fit is 1:1 in every division and the threshold order matches the label order of
+severity (title / European places / mid-table / the drop), which is what makes the map
+forced rather than chosen — but it is still an inference, and it is flagged as one in
+`Career.BOARD_BAND_OF_LABEL`. A club with no witnessed label gets band −1, which behaves
+exactly like the binary's `division > 3` arm: **no review at all**.
+
+### What shipped
+
+| piece | where |
+|---|---|
+| the three messages, MANAGER.EXE's own bytes | `Career.SACK_MSG_FINANCE` / `_RESULTS` / `_SQUAD` |
+| the board warning, 0x66379c | `Career.BOARD_WARN_MSG` |
+| the seven review weeks + band gates | `Career.BOARD_REVIEW`, `_board_results_review()` |
+| the thresholds + the 7-point title arm | `Career.BOARD_BAND_POS`, `below_expectation()` |
+| club+0x294 | `Career.board_sack_flag` (saved, cleared by `_reset_board_review()`) |
+| FUN_00545fd0's order of test | `Career.sack_message()` |
+| the modal + the exit | `Main._show_career` → `_leave_career_sacked()` → TITLE |
+
+`app/tests/test_sacking.gd` pins all of it (the order of test, the band table, the
+verbatim strings, a driven season that only ever reviews on the seven weeks, and the
+save/load round trip).
+
+### Two divergences, both deliberate and both recorded
+
+1. **The Promanager gate is not applied.** The original runs the results review only when
+   `DAT_0066b1e4 != 0`; this port routes MANAGER LEAGUE and PRO-MANAGER LEAGUE through one
+   career (`Main._title_action`), and it already ships the Promanager-gated screens
+   (OFFERS SELECTION, MANAGER HISTORY, END OF THE SEASON), so the review runs always.
+2. **The post-sack surface drops the autosave.** `FUN_0057a500`/`FUN_0057eb30` free the
+   manager's data outright, so the running career is gone and the player has only what he
+   last SAVED. `_leave_career_sacked()` deletes the "Continue" autosave and leaves the ten
+   explicit SAVE GAME slots alone — the closest the port's autosaving hub can come.
+
+**The port's old end-of-season SACK_GAP verdict and its post-sack JOB OFFERS mount are
+both deleted** (`Manager.sack_decision` is gone). The offers list survives only as the
+HEADHUNT route, which was always an app-side extension and is still flagged as one.
+
+## App implications (superseded 2026-07-28 by the section above; kept for the record)
 
 - **Post-sack surface is now PROVEN: the original quits to the MAIN MENU**
   (single-manager career). The app's post-sack `_show_job_offers()` mount is

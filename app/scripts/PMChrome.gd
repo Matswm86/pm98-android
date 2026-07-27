@@ -125,6 +125,12 @@ static func font(name: String) -> Font:
 		# Calend8 (DATA BASE legend caption face) — also keyed by full name.
 		if ResourceLoader.exists("res://art/fonts/calend8.fnt"):
 			_fonts["calend8"] = load("res://art/fonts/calend8.fnt")
+		# The remaining extracted faces, keyed by full name so a screen that needs one
+		# can ask for it by name instead of re-loading it privately.
+		for extra in ["euro8", "futcon8", "micro8", "kkita"]:
+			var ep := "res://art/fonts/%s.fnt" % extra
+			if ResourceLoader.exists(ep):
+				_fonts[extra] = load(ep)
 		# Calend12 (the 'Result' face) — the match-header status-plaque face.
 		if ResourceLoader.exists("res://art/fonts/calend12.fnt"):
 			_fonts["calend12"] = load("res://art/fonts/calend12.fnt")

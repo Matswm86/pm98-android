@@ -64,6 +64,13 @@ CARD_ICONS = [
 # and the wells are declared.
 FINAL_KITS = [("final kit L", 146, 158, 48, 60), ("final kit R", 306, 158, 48, 60)]
 
+# The phase paginator's plate is TWO ROWS TALLER on the paged-back frame than on the live
+# one: white rows 77..101 at x190 against 78..100 on 03_euroleague_qtrfinals_LEG1, at the
+# identical width (139..322) and with the identical label. One witness of each state is not
+# a rule, so the band is declared for the decided case rather than guessed at; the port
+# renders the live-phase plate, which is 0 px on every other case here.
+PAGINATOR = [("paginator plate", 139, 76, 184, 27)]
+
 CASES = [
     ("knockout_euro_round1", "06_euroleague_round1_played.png", [BARRA_KIT, SCROLL_COL]),
     ("knockout_facup_round3", "03_facup_r3_drawn_UNPLAYED_1997-12-20.png", [BARRA_KIT, SCROLL_COL]),
@@ -71,6 +78,14 @@ CASES = [
         "knockout_euro_qtr",
         "03_euroleague_qtrfinals_LEG1_PLAYED_1998-03-14.png",
         [BARRA_KIT, RAIL, *KIT_COLS],
+    ),
+    # The DECIDED bracket -- both legs played, AGGR. filled, the winner inked through.
+    # Witness banked 2026-07-28 (screenshots/wine-captures-2026-07-28-knockout-decided);
+    # it is the cell the 07-26 bracket build had to declare as an inference.
+    (
+        "knockout_euro_qtr_done",
+        "09_euroleague_qtrfinals_DECIDED_1998-04-11.png",
+        [BARRA_KIT, RAIL, *KIT_COLS, *PAGINATOR],
     ),
     (
         "knockout_facup_qtr",

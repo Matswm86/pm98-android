@@ -1,5 +1,8 @@
 # M5 s55: the parity frontier was a measurement artefact — clk 270-660 is clean, all 22 players
 
+Evidence: tools/re/wine/m5_rsp_capture.py, tools/re/m5_clk_posdiff.py, app/tests/test_driver_advance_engine.gd
+  -- the capture harness, the differ whose SAMPLING PHASE was the artefact, and the suite that stayed green through it.
+
 s54 handed over "push the frontier past 651 — the other four forking players (t1.i3/4/5/8/9)".
 Those four are not forking. Neither were the three at clk 587, nor the ones at 630, nor the
 clk-643 freeze that the s54 fix removed. **The per-clk differ's alignment premise is false**, and

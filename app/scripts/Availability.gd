@@ -60,6 +60,37 @@ const MATCH_INJURY_CDF := [
 	[0x61, 14], [0x62, 15],
 ]
 
+# The WEEKLY-illness diagnosis distribution -- roll_A @0x5850b0, transcribed compare by
+# compare 2026-07-28 (the same shape as roll_B, a different ladder). It is roll_B's
+# ladder with virus/cold at the head AND a SECOND virus band at [0x45,0x4a) where roll_B
+# puts sprained wrist -- which is where virus's 24 % comes from (19 + 5), not one band.
+# Same 98/99 tail (`cmp 0x63; sbb eax,eax; add eax,0x11`). Sums to 100 %.
+const WEEK_INJURY_CDF := [
+	[0x13, 0], [0x14, 1], [0x19, 2], [0x23, 3], [0x2d, 4], [0x35, 5],
+	[0x3d, 6], [0x45, 7], [0x4a, 0], [0x4b, 9], [0x50, 10], [0x55, 11],
+	[0x57, 12], [0x5c, 13], [0x61, 14], [0x62, 15],
+]
+# The illness news line, MANAGER.EXE's own format string (.data slot 0x662d84 ->
+# 0x663230), with the plural "s" at 0x6588a0 and the empty string at 0x666f70 -- so a
+# one-week knock reads "... is out for 1 week with a virus.", exactly the wording the
+# refrun witnessed on the hub (matchday_flow_witness_re.md, hub_alert_injury_virus.png).
+const WEEK_ILLNESS_MSG := "%s is out for %d week%s with a %s."
+# The weekly tick's own gates, `FUN_0057a980` @0x57a9f4-0x57aa2b:
+#   2 * already_injured >= squad  -> nothing (0x57aa08 `cmp edx,eax / jae`)
+#   already_injured + 16 >= squad -> nothing (0x57aa13 `cmp ebp,eax / jae`)
+#   rand(7) != 0                  -> nothing (0x57aa1b `push 7` ... `test eax,eax / jne`)
+const ILLNESS_FREE_MIN := 16       # the +0x10 in `add ebp,0x10`
+const ILLNESS_ONE_IN := 7          # `push 7; call rand`
+# ...then the victim pick, @0x57aa2f-0x57aaae: `rand(100) < 0x46` searches squad slots
+# 1..12 (`mov ebx,1 / mov eax,0xc`), else slots 12..size (`mov ebx,0xc`, span size-12);
+# FIVE candidate draws (`mov [esp+0x10], 5`), each skipped if already injured, and a
+# later candidate REPLACES the current pick when `rand(100) > candidate fitness`
+# (+0xa7) -- so the less fit a man is, the likelier he is the one who falls ill.
+const ILLNESS_FIRST_TEAM_PCT := 0x46
+const ILLNESS_FIRST_TEAM_BASE := 1
+const ILLNESS_FIRST_TEAM_SPAN := 12
+const ILLNESS_DRAWS := 5
+
 # Per featured player, per match (probabilities, not permil -- rolled with randf).
 const INJ_CHANCE := 0.018      # ~0.2 injuries / match across an XI (~1 every 5)
 const RED_CHANCE := 0.004      # ~1 sending-off a season for a side
@@ -167,6 +198,67 @@ static func roll_match(rng: RandomNumberGenerator, featured: Array, injury_mult 
 			else:
 				p["yellows"] = y
 	return news
+
+
+## The WEEKLY illness/injury tick -- `FUN_0057a980` @0x57a9f4-0x57aac8, the one the
+## original runs for EVERY club once a week, independently of whether it played. This is
+## where virus and cold come from: they exist only in roll_A, which only this path calls.
+## Ported gate for gate (see the constants above), including the five candidate draws and
+## the fitness-weighted replacement, so the shape of who falls ill matches the original's.
+## Returns the news lines; mutates the squad in place. `squad` is the club's own list in
+## its stored order, because slots 1..12 ARE the original's first-team window.
+static func roll_weekly_illness(rng: RandomNumberGenerator, squad: Array) -> Array:
+	var news: Array = []
+	var n := squad.size()
+	var injured := 0
+	for p in squad:
+		if int(p.get("injured_weeks", 0)) > 0:
+			injured += 1
+	if injured * 2 >= n or injured + ILLNESS_FREE_MIN >= n:
+		return news
+	if rng.randi_range(0, ILLNESS_ONE_IN - 1) != 0:
+		return news
+	var base := ILLNESS_FIRST_TEAM_BASE
+	var span := ILLNESS_FIRST_TEAM_SPAN
+	if rng.randi_range(0, 99) >= ILLNESS_FIRST_TEAM_PCT:
+		base = ILLNESS_FIRST_TEAM_SPAN
+		span = n - ILLNESS_FIRST_TEAM_SPAN
+	if span <= 0:
+		return news
+	var pick: Dictionary = {}
+	for _i in ILLNESS_DRAWS:
+		var idx := rng.randi_range(0, span - 1) + base
+		if idx < 0 or idx >= n:
+			continue                    # FUN_0057a2e0 returns null -> `test edi,edi / je`
+		var cand: Dictionary = squad[idx]
+		if int(cand.get("injured_weeks", 0)) > 0:
+			continue                    # `mov al,[edi+0x68] / test al,al / jne`
+		if pick.is_empty():
+			pick = cand
+		elif rng.randi_range(0, 99) > int(cand.get("fitness", 99)):
+			pick = cand                 # `cmp eax,ebp / jbe keep-old`
+	if pick.is_empty():
+		return news
+	# apply(player, kind=1) @0x584b80 -> roll_A -> the shared duration setter.
+	var ti := _roll_week_injury_type(rng)
+	var wk := _injury_weeks(rng, ti)
+	pick["injured_weeks"] = maxi(int(pick.get("injured_weeks", 0)), wk)
+	pick["injury_weeks_total"] = int(pick["injured_weeks"])
+	pick["injury_type"] = ti
+	news.append({"kind": "injury", "type": ti,
+		"text": WEEK_ILLNESS_MSG % [_nm(pick), wk, "" if wk <= 1 else "s",
+			INJURY_TYPES[ti] if ti >= 0 and ti < INJURY_TYPES.size() else "?"]})
+	return news
+
+
+## roll_A @0x5850b0 -- the WEEKLY diagnosis ladder (WEEK_INJURY_CDF), same shape as
+## `_roll_match_injury_type` and the same 98/99 tail.
+static func _roll_week_injury_type(rng: RandomNumberGenerator) -> int:
+	var r := rng.randi_range(0, 99)
+	for row in WEEK_INJURY_CDF:
+		if r < int(row[0]):
+			return int(row[1])
+	return 16 if r < 0x63 else 17
 
 
 ## Reset every availability counter (start-of-season clean slate: bans don't

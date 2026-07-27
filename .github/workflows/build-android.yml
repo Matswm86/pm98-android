@@ -172,7 +172,7 @@ jobs:
                    test_tactics_screen test_cheats_live \
                    test_stadium_screen test_stadium_works \
                    test_youth_loop test_career_seed test_pyramid \
-                   test_retirement; do
+                   test_retirement test_sacking test_weekly_illness; do
             echo "== $t"
             if ! "$GITHUB_WORKSPACE/godot" --headless --path . --script "res://tests/$t.gd" \
                 > "/tmp/$t.log" 2>&1; then

@@ -141,11 +141,12 @@ func _run() -> bool:
 		"no rival is older than the keeper retirement age (oldest %d)" % oldest) and ok
 	# Your own squad is NOT floored against retirement (the original floors releases only),
 	# and the board's answer to a squad that thin is FUN_00545fd0's third dismissal.
+	# Re-pointed 2026-07-28: the dismissal is raised by the WEEKLY hub run, not by the
+	# season review -- `sack_message()` is FUN_00545fd0's own three tests in its own order.
 	var mine: int = (c2.rosters[c2.club_id] as Array).size()
 	if mine < Career.SACK_MIN_SQUAD:
-		c2.finished = true
-		var rv := c2.board_review()
-		ok = _assert(bool(rv["sacked"]), "a squad under 16 gets you dismissed (squad %d)" % mine) and ok
+		ok = _assert(c2.sack_message() == Career.SACK_MSG_SQUAD,
+			"a squad under 16 gets you dismissed (squad %d)" % mine) and ok
 
 	# ---- FUN_00545fd0 @0x546013: the sacking threshold ----------------------
 	ok = _assert(Career.LOSS_SACK_WEEKS == 4, "sacked on the 4th loss week (cmp 3 / jbe)") and ok

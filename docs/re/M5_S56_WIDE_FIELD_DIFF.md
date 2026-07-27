@@ -13,6 +13,9 @@
 
 # M5 s56: the differ was only ever checking x/y — widened, and it finds real forks
 
+Evidence: tools/re/m5_field_posdiff.py, tools/re/wine/m5_rsp_capture.py, app/tests/test_driver_advance_engine.gd
+  -- the wide-field differ itself, its capture harness, and the suite.
+
 `m5_seq_posdiff.py` (s55) fixed the sampling-phase artefact and reported **22/22 players +
 ball PASS over clk 270-823**. That verdict is about **x and y and nothing else**. The Z2
 capture already carries the whole player row — orientation, facing, yaw, speed, the mover

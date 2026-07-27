@@ -24,11 +24,12 @@ const REP_CUP := 6.0           # winning a domestic cup
 const REP_RELEGATED := -10.0   # the drop on top of the place gap when you go down
 const REP_SACK := -8.0         # an extra dent for being sacked
 
-# Sacking: the board's patience. You are sacked when you finish well below the objective,
-# or are relegated when survival was not the brief. A first season at a club is judged more
-# leniently (a new manager is given time).
-const SACK_GAP := 6            # finishing this many places below the objective -> sacked
-const SACK_GAP_YEAR1 := 9      # ... more slack in your first season at the club
+# Sacking is NOT decided here. MANAGER.EXE has no end-of-season dismissal at all: every
+# sack it raises comes out of the WEEKLY hub run `FUN_00545fd0` and ends the career on the
+# spot, and the results arm behind it is the board's own week-10/14/18/22/26/30/34 review
+# (`FUN_0057a980` @0x57ad6a). Both live in Career (`sack_message`, `_board_results_review`,
+# docs/re/sack_path_re.md); the invented SACK_GAP verdict this file used to hold is gone.
+# REP_SACK above still applies, because a sack is still a dent in the manager's standing.
 
 # Headhunting: overachieve while safe and a stronger club may come calling.
 const HEADHUNT_GAP := 4        # finishing this many places ABOVE objective can attract suitors
@@ -51,20 +52,6 @@ static func reputation_delta(finished_pos: int, objective_pos: int, total: int,
 
 static func apply_delta(reputation: float, delta: float) -> float:
 	return clampf(reputation + delta, REP_MIN, REP_MAX)
-
-
-## The board's end-of-season verdict. Sacked when finishing far below the objective, or
-## relegated when the brief was not survival. `seasons_at_club` = seasons you have had at
-## this club (1 = your first). {sacked: bool, reason: String}.
-static func sack_decision(finished_pos: int, objective_pos: int, total: int,
-		releg_count: int, objective_is_survival: bool, seasons_at_club: int) -> Dictionary:
-	if finished_pos > total - releg_count and not objective_is_survival:
-		return {"sacked": true, "reason": "relegated"}
-	var gap := finished_pos - objective_pos
-	var bar := SACK_GAP_YEAR1 if seasons_at_club <= 1 else SACK_GAP
-	if gap >= bar:
-		return {"sacked": true, "reason": "missed"}
-	return {"sacked": false, "reason": ""}
 
 
 ## Does a stronger club come headhunting after a strong, safe season? Only when you beat the

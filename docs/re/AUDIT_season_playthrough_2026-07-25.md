@@ -1,5 +1,8 @@
 # PM98 — SEASON PLAYTHROUGH AUDIT (2026-07-25)
 
+Evidence: app/tests/test_career_seed.gd, app/tests/test_retirement.gd, app/scripts/Retirement.gd
+  -- S3 (a career reproducible at a fixed seed) and S8 (retirement + rebirth), the two divergences this audit found that have since been closed in code.
+
 > **RESCUED INTO THE REPO 2026-07-26.** This file previously existed only in a session
 > scratchpad under `/tmp` (referenced by
 > `handoff-pm98-season-audit-and-manutd-reference-run-2026-07-25.md` as "read this first")

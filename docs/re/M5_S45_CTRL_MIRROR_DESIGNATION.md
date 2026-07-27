@@ -1,5 +1,8 @@
 # M5 s45: the m+0x1650 controller-mirror fix — one alias read closes five drift onsets
 
+Evidence: tools/re/wine/m5_rsp_capture.py, app/tests/test_decideset.gd, app/scripts/Pm98Movement.gd
+  -- the capture harness this session's readings came from, and the suite + leaf they pin.
+
 ## Symptom
 
 Orbit position diff (s44): earliest drift onset t0.i9 during the clk-47 SHOT tick

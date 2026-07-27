@@ -1,5 +1,8 @@
 # PM98 — COMPLETE AUDIT (2026-07-26)
 
+Evidence: app/tests/test_results_screen.gd, app/scenes/ResultsScreen.gd, docs/REMAINING.md
+  -- the reachability fix this audit forced (the RESULTS rail became the real door) and the file that carries the rest of its findings.
+
 > Full-project audit against the binding rule (faithful port of the real Premier Manager
 > 98 PC game, no invented content). Performed read-only at HEAD `4076800` (2026-07-26,
 > clean tree): 64 scenes, 120 RE docs, 321 test scripts, 20 manual parity gates.

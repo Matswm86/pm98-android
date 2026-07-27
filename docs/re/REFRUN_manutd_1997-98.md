@@ -1,5 +1,8 @@
 # REFERENCE RUN — Manchester Utd. 1997-98, played by hand (2026-07-25)
 
+Evidence: screenshots/refrun-manutd-1997-98, docs/re/REFRUN_manutd_1997-98_FINDINGS.md
+  -- the run's own captured frames and the findings extracted from them.
+
 > **What this is.** The original `MANAGER.EXE` driven through a **complete season** by a
 > human, with a passive recorder banking every screen change. It exists because every
 > automated drive in this repo dies at the same wall — the XI-validity gate ("The initial

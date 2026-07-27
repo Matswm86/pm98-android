@@ -31,9 +31,11 @@ class_name InjuriesScreen
 ## INSURANCE button opens the real INSURANCE screen (InsuranceScreen.gd, ported
 ## 2026-07-18 from wine witnesses 33-39). Suspensions are NOT injuries, excluded.
 ##
-## HONEST GAP: an INSURED injured row also draws a small document icon at row-x
-## 459 (@0x543b09). No frame witnesses that sprite on THIS screen, so the port
-## draws the policy digit alone rather than guess the art.
+## The INSURED row draws three things in the INSUR. cell, not one: the policy document
+## sprite (@0x543b09, blitted at row-x 459 / row-y 5), the group number, and the group's
+## PAYOUT percentage. CLOSED 2026-07-28 -- the sprite is frame-cut from the one witness
+## that shows it (tools/re/build_injuries_insured_icon.py) and the two texts sit in the
+## binary's own sub-rects.
 ## Native 640x480.
 
 signal back_pressed        # RETURN -> Main reopens LINE-UP
@@ -72,6 +74,33 @@ const CELL_WEEK := [358, 385]
 const CELL_H := [387, 408]
 const CELL_PRICE := [410, 482]
 const CELL_INSUR := [484, 538]
+# ...and the INSURED row's own three-part layout inside that cell, read off
+# `FUN_00543960`'s insured branch (@0x543ae7-0x543c9b) rather than centred as one string.
+# Row-relative x + the row widget's origin at STRIP_X (28) gives the screen x:
+#   0x543b09  icon blit at (0x1cb, 5)                   -> screen x 487, row_top + 5
+#   0x543b6b  group digit centred in (0x1d5 .. 0x1e0)    -> screen 497 .. 508
+#   0x543c0b  payout "N%" centred in (0x1e1 .. 0x1ff)    -> screen 509 .. 539
+# All three reproduce the only frame that witnesses an insured row (Giggs, Group 1, 0%,
+# wine-captures-2026-07-24-cadence-season-store/07_injuries_row_insured_giggs.png): its
+# icon sits at x487..494 / y266..275 with the row borders at y261/y278, its "1" at
+# x500..503 and its "0%" at x518..527. Both texts are black (`mov dword [eax], 0`
+# @0x543b5a / @0x543be2).
+const INSURED_ICON_X := 487
+const INSURED_ICON_DY := 4   # row-y 5 in the binary; the port's `y` is the row's fill top, one lower
+const CELL_INSUR_GROUP := [497, 508]
+const CELL_INSUR_PCT := [509, 539]
+# DECLARED FACE. The payout percentage is the one piece of the insured row that does not
+# land 0 px: its glyphs in the witness are 4 px wide and TEN rows tall (x518..527,
+# y265..274 on `07_injuries_row_insured_giggs.png`) and no extracted bank reproduces them.
+# Thirty face/size combinations were rendered and diffed against that cell on 2026-07-28 --
+# proman8/10/12, calend8, calend12, euro8, futcon8, micro8, kkita, each at 8..12 and at its
+# own native size -- and the best is euro8 at 9 (28 px inside the 30x16 sub-cell; proman8@8
+# 42, calend8@9 31, futcon8@8 37). The digit and the document sprite beside it are both
+# exactly 0 px, so this is the whole residual. The value itself is not in doubt: it is
+# `FUN_0058c000` (Insurance.payout_pct), the same function the COST cell nets against.
+# Same class of declared residual as the finance modal's text bands.
+const PCT_FACE := "euro8"
+const PCT_SIZE := 9
 const CELL_COST := [540, 609]
 const TEXT_DY := 3            # value baseline inside the row (witness ink y110..118)
 
@@ -124,6 +153,8 @@ var _phys_star_half: Texture2D
 var _row_strip: Texture2D
 var _phys_off: Texture2D
 var _phys_on: Texture2D
+var _f_pct: Font                  # the payout-percentage face (see the sweep below)
+var _doc_icon: Texture2D          # the INSURED row's policy document sprite
 
 
 func _ready() -> void:
@@ -131,6 +162,8 @@ func _ready() -> void:
 	_f10 = PMChrome.font("10")
 	_chrome = load("res://art/screens/injuries/chrome.png")
 	_title = load("res://art/screens/injuries/title.png")
+	_f_pct = PMChrome.font(PCT_FACE)
+	_doc_icon = load("res://art/screens/injuries/insured_doc.png")
 	_phys_star = load("res://art/screens/injuries/phys_star.png")
 	_phys_star_half = load("res://art/screens/injuries/phys_star_half.png")
 	_row_strip = load("res://art/screens/injuries/row_strip.png")
@@ -286,14 +319,22 @@ func _draw_row(p: Dictionary, y: int) -> void:
 	if group <= 0:
 		_cell_text(CELL_INSUR, y, "NO", C_INSUR_NO)
 	else:
-		_cell_text(CELL_INSUR, y, str(group), C_NAME)
+		# The insured row is three pieces, not one centred digit: the policy document
+		# sprite, the group number, and the group's PAYOUT percentage -- the last two in
+		# their own sub-rects. `payout_pct` is FUN_0058c000, the same function the COST
+		# cell below nets against, so the row can never disagree with itself.
+		if _doc_icon != null:
+			draw_texture(_doc_icon, Vector2(INSURED_ICON_X, y + INSURED_ICON_DY))
+		_cell_text(CELL_INSUR_GROUP, y, str(group), C_NAME)
+		_cell_text(CELL_INSUR_PCT, y, "%d%%" % Insurance.payout_pct(group), C_NAME, PCT_SIZE, _f_pct)
 	var cost := Insurance.injury_cost(total, group)
 	if cost != 0:   # a fully-covered (GROUP 3) injury leaves the cell EMPTY (@0x543cd2)
 		_cell_text(CELL_COST, y, FinanceScreen.fmt_money(cost), C_COST_INK)
 
 
-func _cell_text(cell: Array, y: int, s: String, col: Color) -> void:
-	PMChrome.text(self, _f8, int(cell[0]), y + TEXT_DY, s, col, 11, 1,
+func _cell_text(cell: Array, y: int, s: String, col: Color, size: int = 11,
+		font: Font = null) -> void:
+	PMChrome.text(self, font if font != null else _f8, int(cell[0]), y + TEXT_DY, s, col, size, 1,
 		float(cell[1] - cell[0] + 1))
 
 

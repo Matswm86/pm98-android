@@ -1,5 +1,8 @@
 # Club crest / escudo (T1 #2, D3)
 
+Evidence: tools/re/map_crests.py, app/art/kits, docs/re/pkf
+  -- the mapper/exporter, the 476 exported kits it writes, and the PKF format notes underneath.
+
 ## Finding: in PM98 the "crest" IS the kit
 The roadmap listed "club crests / badges (escudos)" as a separate, unrendered asset. It is
 not separate. PM98 has no club badge/logo art. The club's on-screen identity is its **kit

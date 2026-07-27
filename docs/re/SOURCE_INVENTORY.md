@@ -1,5 +1,8 @@
 # PM98 — SOURCE ASSET INVENTORY (source of truth)
 
+Evidence: extracted/Premier Manager 98, tools/re/enum_pcf5dat.py, tools/re/equipos_parse.py
+  -- the decode target this inventory describes, the archive enumerator, and the record parser that proved the DBC row.
+
 > **Purpose.** This is the single authoritative list of every original Premier Manager 98
 > asset, its real size/member-count, and **whether we can actually open it (YES / PARTIAL /
 > NO)** — proven by decoding a representative, not inferred from filename. It is the binding

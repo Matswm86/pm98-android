@@ -1,5 +1,8 @@
 # CAREER MATCHDAY FLOW — LIVE WITNESS RUN (2026-07-17)
 
+Evidence: screenshots/wine-captures-2026-07-17-matchflow, docs/re/match_flow_re.md
+  -- the captured frames this file is a reading of, and the flow document they feed.
+
 The complete career matchday chain driven LIVE in the original (wine harness
 `tools/re/wine/boot.sh`, fresh Manager-League "mwm" @ Bolton W, TOTAL level,
 played: Villa friendly + Southampton wk-1 + into wk-3), captured as stills AND

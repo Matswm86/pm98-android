@@ -1,5 +1,8 @@
 # M5 s58: the capture pushed to clk 1032, and the engine still does not move
 
+Evidence: tools/re/wine/m5_rsp_capture.py, app/tests/test_driver_advance_engine.gd, app/tests/test_resolver_tree.gd
+  -- the capture harness that set the frontier, and the two suites the banked captures are replayed against (superseded by M5_S59_FRONTIER_2836.md).
+
 s57 closed with the engine byte-exact over **clk 1-830** and one sentence for the next
 session: *"nothing in the engine can be falsified further without a longer capture."* This
 session took two. The port is byte-exact over **clk 1-1032**.

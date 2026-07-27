@@ -60,8 +60,27 @@ wrist(8) instead of virus(0). Tail (both): `cmp 0x63; sbb eax,eax; add eax,0x11`
 | 17 | broken leg | 1 | 1 |
 
 The app's `roll_match` fires per featured player after a match, so it uses **roll_B**
-(`Availability.MATCH_INJURY_CDF`). The weekly-illness path (roll_A, virus/cold) is a
-separate mechanic the app does not yet model — flagged, not faked.
+(`Availability.MATCH_INJURY_CDF`). ~~The weekly-illness path (roll_A, virus/cold) is a
+separate mechanic the app does not yet model~~ — **PORTED 2026-07-28**
+(`Availability.roll_weekly_illness` + `WEEK_INJURY_CDF`, gate
+`app/tests/test_weekly_illness.gd`). Note what the ladder actually does: **virus's 24 % is
+TWO bands, not one** — `[0,0x13)` at the head and `[0x45,0x4a)` where roll_B puts sprained
+wrist — which is why sprained wrist cannot happen weekly and virus cannot happen in a match.
+
+**The trigger, `FUN_0057a980` @0x57a9f4-0x57aac8, ported gate for gate:**
+
+1. `DAT_0066b1e8 != 0` skips the whole block (the dead dev flag — never set in retail).
+2. `2 * already_injured >= squad` → nothing (`lea edx,[ebp+ebp] / cmp edx,eax / jae`).
+3. `already_injured + 16 >= squad` → nothing (`add ebp,0x10 / cmp ebp,eax / jae`), so a
+   squad of sixteen or fewer is exempt outright.
+4. `rand(7) != 0` → nothing. **One week in seven.**
+5. `rand(100) < 0x46` (70 %) searches squad slots **1..12**, else slots **12..size**.
+6. **Five** candidate draws (`mov [esp+0x10],5`); a candidate already injured is skipped,
+   and a later candidate REPLACES the current pick when `rand(100) > candidate +0xa7`
+   (his FITNESS) — so the less fit a man is, the likelier he is the one who falls ill.
+7. `apply(player, 1)` @0x584b80 → roll_A → the shared duration setter, then the news line
+   from `.data` slot 0x662d84 → 0x663230: `"%s is out for %u week%s with a %s."`, which is
+   the wording `matchday_flow_witness_re.md` witnessed on the hub verbatim.
 
 ## Duration table (setter @0x584e70 + jump table @0x585048)
 

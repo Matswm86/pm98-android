@@ -124,13 +124,43 @@ const BRACKET_FLAG_R := Vector2(385, 7)
 const BRACKET_NAME_CX2 := [357, 639]     # 2*cx, so the floor is integer arithmetic
 const BRACKET_NAME_TOP_DY := 12
 const BRACKET_NAME_INK := Color8(60, 80, 100)
+## The WINNER's name plate, CLOSED 2026-07-28 against the first frame that ever showed a
+## decided bracket tie (screenshots/wine-captures-2026-07-28-knockout-decided/
+## 01_euro_qtr_finals_decided.png -> tools/re/refs/knockout-2026-07-26/
+## 09_euroleague_qtrfinals_DECIDED_1998-04-11.png). The 07-26 build had only the LIST's
+## rule to go on and inked the winner's name yellow on the plain plate; the original also
+## REPAINTS his whole plate blue and puts a chevron at each end of it, pointing inwards.
+## Measured on both witnessed sides of the frame (Borussia D. away, Manchester Utd. home):
+##   plates      x114..247 (home) and x250..383 (away), rows T+7..T+26
+##   fill        (42,95,170) over the strip's own (180,200,220)
+##   chevrons    (166,202,240), 5 px wide, inset 1 px from each plate edge,
+##               9 rows tall, apex row T+16, width = 5 - |dy| (a solid triangle)
+const BRACKET_PLATE_X := [[114, 247], [250, 383]]
+const BRACKET_PLATE_DY := 7
+const BRACKET_PLATE_H := 20
+const BRACKET_PLATE_WIN := Color8(42, 95, 170)
+const BRACKET_CHEVRON := Color8(166, 202, 240)
+const BRACKET_CHEVRON_W := 5
+const BRACKET_CHEVRON_APEX_DY := 16
 ## A score centres on its value box: first number's pen END at cx-5, the dash's pen at
 ## cx-2, second number's pen at cx+5, pen top T+50 -- solved off the four witnessed
 ## leg-1 cells (box x83..175, cx 129: ink ends 122, dash 127..129, B starts 134).
 ## The dash is drawn at the .fnt's SECOND alpha level in every witnessed cell -- its six
 ## pixels are the 80 % blend of the ink over the box ground, not the full ink.
 const BRACKET_SCORE_TOP_DY := 50
+## The plain (not-through) score ink is PER BOX, not one colour: the two leg boxes print
+## (180,200,220) on their (80,100,120) ground, and the navy AGGR box prints (180,180,220)
+## on (20,0,90). Only witnessable once a frame carried a filled aggregate -- the
+## 2026-07-28 decided-bracket witness -- so it was one constant until then.
 const BRACKET_SCORE_INK := Color8(180, 200, 220)
+const BRACKET_SCORE_INK_EURO := [Color8(180, 200, 220), Color8(180, 200, 220),
+	Color8(180, 180, 220)]
+const BRACKET_SCORE_INK_DOM := [Color8(180, 200, 220), Color8(180, 200, 220)]
+## ...and the dash's second-alpha blend is per box too. The navy AGGR box carries NO
+## blended pixel at all in the decided witness -- its dash is the full ink on all four
+## ties, while both leg boxes keep the witnessed 80 % blend over their own ground.
+const BRACKET_DASH_BLEND_EURO := [0.2, 0.2, 0.0]
+const BRACKET_DASH_BLEND_DOM := [0.2, 0.2]
 ## Value-box centres per column set, in slot order (docs/re/knockout_views_re.md:
 ## euro boxes x83..175 / x193..283 / x310..414, domestic x135..227 / x271..361).
 const BRACKET_BOX_CX_EURO := [129, 238, 362]
@@ -716,6 +746,8 @@ func _draw_bracket() -> void:
 	var strip: Texture2D = _bracket.get("euro" if _euro_cols else "dom")
 	var cxs: Array = BRACKET_BOX_CX_EURO if _euro_cols else BRACKET_BOX_CX_DOM
 	var bgs: Array = BRACKET_BOX_BG_EURO if _euro_cols else BRACKET_BOX_BG_DOM
+	var inks: Array = BRACKET_SCORE_INK_EURO if _euro_cols else BRACKET_SCORE_INK_DOM
+	var blends: Array = BRACKET_DASH_BLEND_EURO if _euro_cols else BRACKET_DASH_BLEND_DOM
 	for i in mini(_ties.size(), BRACKET_TIES):
 		var t := int(BRACKET_TOPS[i])
 		if strip != null:
@@ -742,6 +774,9 @@ func _draw_bracket() -> void:
 		if fr != null:
 			draw_texture(fr, Vector2(BRACKET_FLAG_R.x, t + BRACKET_FLAG_R.y))
 		var winner := int(tie.get("winner", -1))
+		# The winner's plate is repainted BEFORE his name goes on it.
+		if winner >= 0:
+			_draw_winner_plate(t, winner)
 		for side in 2:
 			var s := str(tie.get("home" if side == 0 else "away", ""))
 			@warning_ignore("integer_division")
@@ -756,15 +791,34 @@ func _draw_bracket() -> void:
 			var cx := int(cxs[j])
 			var top := t + BRACKET_SCORE_TOP_DY
 			var mark := -1 if winner < 0 else (1 - winner if _is_second_leg(j) else winner)
+			var plain_ink: Color = inks[j] if j < inks.size() else BRACKET_SCORE_INK
 			_txt_right(_page_p10, _g_p10, cx - 5, top, str(pair[0]),
-				C_THROUGH if mark == 0 else BRACKET_SCORE_INK)
+				C_THROUGH if mark == 0 else plain_ink)
 			# the dash's six pixels are the .fnt's second alpha level -- the 80 % blend
 			# of the ink over that slot's own box ground, witnessed on all four leg-1
 			# cells (and applied to the unwitnessed slots by the same rule).
 			_txt(_page_p10, _g_p10, cx - 2, top, "-",
-				BRACKET_SCORE_INK.lerp(bgs[j], 0.2))
+				plain_ink.lerp(bgs[j], float(blends[j]) if j < blends.size() else 0.2))
 			_txt(_page_p10, _g_p10, cx + 5, top, str(pair[1]),
-				C_THROUGH if mark == 1 else BRACKET_SCORE_INK)
+				C_THROUGH if mark == 1 else plain_ink)
+
+
+## Repaint one bracket tie's winning name plate and stamp its two inward chevrons
+## (BRACKET_PLATE_* above). `t` is the panel top, `side` 0 = home / 1 = away.
+func _draw_winner_plate(t: int, side: int) -> void:
+	var span: Array = BRACKET_PLATE_X[side]
+	var x0 := int(span[0])
+	var x1 := int(span[1])
+	draw_rect(Rect2(x0, t + BRACKET_PLATE_DY, x1 - x0 + 1, BRACKET_PLATE_H),
+		BRACKET_PLATE_WIN, true)
+	var apex := t + BRACKET_CHEVRON_APEX_DY
+	for dy in range(-(BRACKET_CHEVRON_W - 1), BRACKET_CHEVRON_W):
+		var w := BRACKET_CHEVRON_W - absi(dy)
+		if w <= 0:
+			continue
+		# left edge: the triangle grows rightwards to its apex; right edge mirrors it.
+		draw_rect(Rect2(x0 + 1, apex + dy, w, 1), BRACKET_CHEVRON, true)
+		draw_rect(Rect2(x1 - w, apex + dy, w, 1), BRACKET_CHEVRON, true)
 
 
 # ---- the semifinal cards -----------------------------------------------------------

@@ -418,8 +418,13 @@ minute — since MatchSim `goals`).
    and rebuilt frame-true (0px both states; promanager_career_screens_re.md).
    **JOB OFFERS: CLOSED 2026-07-16 s5** — original = OFFERS SELECTION, witnessed live
    and rebuilt frame-true (0px all five states incl. the club-detail popup + palette
-   dim; the app's post-sack mount uses the witnessed chrome, original mid-career
-   surface still unknown). End-of-season list remains a flagged substitute (the
+   dim). ~~The app's post-sack mount uses the witnessed chrome, original mid-career
+   surface still unknown~~ — **RESOLVED 2026-07-28: there IS no post-sack surface.**
+   `FUN_004f96c0` sees the detached club, throws CGFXException 0x4e3e and
+   `FUN_004f8a00` returns, so a single-manager career lands on the MAIN MENU
+   (`sack_path_re.md`). The post-sack OFFERS mount is DELETED; OFFERS SELECTION now
+   serves only the career start and the app's own HEADHUNT extension.
+   End-of-season list remains a flagged substitute (the
    0x25aa60 directors'-report text engine needs a season-end witness).
 2. Wire the orphaned TRUE screens: SquadScreen (PLANTILLA) into the hub where the
    original puts it; fix opponent (RIVAL) to a VERRIVAL port, not the DB browser.
@@ -508,7 +513,7 @@ Manager League) is CORRECT as-is; gate any future MANAGER HISTORY entry on mode.
 | # | original screen (frame) | app today (verified) |
 |---|---|---|
 | 1 | GOAL SCORERS graph+list (orig/12) | ~~dead~~ **CLOSED** — GoalScorersScreen built + tested |
-| 2 | INSURANCE per-player (orig/17) | **PARTIAL** — TYPE OF INJURY column binary-exact (18 diagnoses, @0x6622e8) AND the injury roll distribution + per-type duration table now binary-exact (roll_B @0x585210 + setter @0x584e70; injury_model_re.md). Insurance ECONOMY now binary-exact too (premium FUN_0058c020, payout FUN_0058c000, injury price FUN_00584e00, the weekly finance pass @0x57f3a6; insurance_economy_re.md) — PRICE/INSUR./COST + the H column render 0 px vs witness 83, and PLAYERS' INSURANCE / HOSPITALS / INSURANCE GROUP 3 are live on FINANCES. Remaining: the insured-row document icon (unwitnessed) and the weekly-illness path (virus/cold) unmodelled |
+| 2 | INSURANCE per-player (orig/17) | **PARTIAL** — TYPE OF INJURY column binary-exact (18 diagnoses, @0x6622e8) AND the injury roll distribution + per-type duration table now binary-exact (roll_B @0x585210 + setter @0x584e70; injury_model_re.md). Insurance ECONOMY now binary-exact too (premium FUN_0058c020, payout FUN_0058c000, injury price FUN_00584e00, the weekly finance pass @0x57f3a6; insurance_economy_re.md) — PRICE/INSUR./COST + the H column render 0 px vs witness 83, and PLAYERS' INSURANCE / HOSPITALS / INSURANCE GROUP 3 are live on FINANCES. **CLOSED 2026-07-28**: the insured-row document sprite + group digit render 0 px (`FUN_00543960`'s three sub-rects; only the payout percentage keeps a declared face), and the weekly-illness path IS modelled (`FUN_0057a980` @0x57a9f4 + roll_A @0x5850b0, gate `test_weekly_illness`) |
 | 3 | SCOUT search (orig/35) | **CLOSED** — ScoutScreen built + wired + binary-exact criteria + tested |
 | 4 | OFFERS foreign-league map (orig/36) | **CLOSED** — OffersScreen built + wired |
 | 5 | GROUND IMPROVEMENTS panel: SEATS/CAR PARK/FACILITIES/SERVICES offers (orig/21) | **CLOSED** — frame-173 picker baked (2026-07-17), all four tabs live (2026-07-23), every price from `FUN_0057ddd0` (2026-07-26) |

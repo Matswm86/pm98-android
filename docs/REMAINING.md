@@ -1,4 +1,84 @@
-# PM98 Android — remaining-work inventory (refreshed 2026-07-27)
+# PM98 Android — remaining-work inventory (refreshed 2026-07-28)
+
+## 0aa. Closed 2026-07-28 (session s70) — the sacking screen, the ground ceiling, the decided bracket
+
+* **The SACKING SCREEN — BUILT, and it is not a screen.** `FUN_00545fd0` IS the weekly hub
+  screen's own run(): it tests three conditions BEFORE it draws the menu and, on any of
+  them, raises one modal, detaches the manager and ends the career (`docs/re/sack_path_re.md`
+  §"BUILT 2026-07-28"). The port now does the same, in the binary's own order
+  (`Career.sack_message()`), with MANAGER.EXE's own message bytes, at the hub mount, and it
+  exits to the TITLE screen — the surface `FUN_004f96c0`'s CGFXException 0x4e3e actually
+  lands on. **The board's week-10/14/18/22/26/30/34 RESULTS REVIEW is ported too**
+  (`FUN_0057a980` @0x57ad6a, disassembled this session; band gates, the position thresholds
+  of `FUN_0057d3a0`, and the 7-point title arm). The port's invented end-of-season
+  `SACK_GAP` verdict and its post-sack JOB OFFERS mount are DELETED. Two declared
+  divergences, both written down. Gate: `app/tests/test_sacking.gd`.
+* **The stadium 150,000 SEATS ceiling — CLOSED.** The 07-27 note "the addend register wants
+  one more trace" is discharged: `FUN_0051c2e0` banks `[ground+4] + [ground+8]` (capacity +
+  headroom) at @0x51c340 and per SEATS card tests `(card+1)*4000 + that >= 0x249f0`,
+  disabling the card. `Career.MAX_STADIUM` 130,000 -> **150,000** on the SUM with `>=`;
+  130,000 stays as `StadiumScreen.MAX_CAPACITY`, which is only the tier-picture divisor.
+* **`remodela.png` — the "works marker" hypothesis was WRONG.** The `.data` block at
+  0x65b1a4 is three (path, label) pairs and `FUN_0051a6e0` builds one button from each:
+  `diapartido.bmp`+MATCH DAY, **`remodela.bmp`+IMPROVE**, `obras.bmp`+WORKS, at exactly the
+  rects measured off the frame. `remodela.bmp` has ONE code reference in the whole binary.
+  Nothing to draw: it is the IMPROVE button's icon, already inside the baked action grid.
+* **The euro AGGR cell — WITNESSED AND BUILT, and it corrected three things.** The pageback
+  drive finally reached the QF second legs; the frame
+  (`screenshots/wine-captures-2026-07-28-knockout-decided/01_euro_qtr_finals_decided.png`)
+  shows the winner's whole NAME PLATE repainted `(42,95,170)` with an inward chevron at each
+  end, and the score ink AND the dash blend are PER BOX (the navy AGGR box prints
+  `(180,180,220)` and its dash carries no blended pixel at all). All three were wrong in the
+  port, all three are fixed, and `diff_knockout_parity.py` case `knockout_euro_qtr_done` is
+  **0 px**. One declared band: the paginator plate is two rows taller on a paged-back frame.
+* **The WEEKLY-ILLNESS path — BUILT.** `FUN_0057a980` @0x57a9f4-0x57aac8 ported gate for
+  gate (the two squad guards, the 1-in-7 week roll, the 70/30 first-team window, five
+  candidate draws, and the fitness-weighted replacement) plus `roll_A` @0x5850b0, which is
+  the only ladder in the game that can produce a **virus or a cold** — 24 % of it, from two
+  separate bands. News line is the EXE's own format string (0x663230). Runs for every club,
+  as the original does. Gate: `app/tests/test_weekly_illness.gd`.
+* **The insured-row DOCUMENT ICON — BUILT.** `FUN_00543960`'s insured branch is three
+  pieces, not a centred digit: the sprite at row-x 459 / row-y 5, the group number centred
+  in 0x1d5..0x1e0, and the **payout percentage** centred in 0x1e1..0x1ff. All three land
+  exactly where the one witness puts them; the sprite is frame-cut by
+  `tools/re/build_injuries_insured_icon.py`. The port had been drawing the digit alone.
+* **The 16 evidence-less RE docs — CLOSED, and the index now enforces it.**
+  `build_status_index.py` gained a fourth evidence class: an `Evidence:` line naming
+  repo-relative artefacts, **every path of which the script checks exists** (a path that
+  does not resolve is a hard failure — it caught one stale line on the first run). The 16
+  now name a banked runner, a witness directory or an extraction tool. **0 docs have no
+  evidence link.**
+* **New reusable tool: `tools/re/wine/screenwatch.py`** — a passive second pair of eyes on a
+  running drive. It grabs the same window on a timer, names the frame with `autodrive`'s own
+  signatures and keeps the ones you asked for, without clicking, so screens the plan throws
+  away (a cup channelTV card, a one-off board) can still be banked.
+
+### One pre-existing failure found and NOT fixed
+
+`shot_squad_card_tapthrough.gd` fails 2 of its 10 checks — "card RETURN dismisses the card"
+and "squad RETURN exits" — and it **fails identically on a pristine checkout of HEAD**
+(verified 2026-07-28 in a detached `git worktree`, so it is not this session's doing). The
+07-27 note "10/10 + 23/23 green" was recorded on a different display; this run was on a
+bare Xvfb with no window manager, so the emulated-touch RETURN release may simply not land
+there. Either way it is a harness/environment question, not an app change, and it is left
+open rather than papered over.
+
+### Still open from this session, stated plainly
+
+* **The Coca-Cola / F.A. Cup TV fee is STILL unmeasured.** Three more channelTV cards were
+  banked by the watcher and all three are the LEAGUE £90,000 (now confirmed on a second
+  club and a second season). The fee is not a constant in the binary — the card reads
+  `club+0x290`, which the weekly pass books and clears — so it needs a captured CUP home
+  tie, and the drive did not reach one.
+* **The kit-list layout (5-8 ties)** was not captured either; no phase of that size came up.
+* **MAN-TO-MAN, B9** untouched this session.
+* **The 48x64 kit bevel is NOT reversed.** It still needs the pass's code; the 07-27
+  measurements remain the starting point. Not attempted this session.
+* **Three newly witnessed chromes are banked but NOT built**: the F.A. Cup semifinals band
+  with filled FINALIST plates, the Coca-Cola semifinals in their two-legged form, and the
+  Coca-Cola FINAL with its filled WINNER band. Frames are in
+  `screenshots/wine-captures-2026-07-28-knockout-decided/`; building them is a chrome-bake
+  pass of the same shape as the euro cards/final build.
 
 ## 0a. Closed 2026-07-27 (session s69) — the carried fix-first tail
 
@@ -211,10 +291,10 @@ Four more, reported 2026-07-26 evening (second round, same play session):
   completed expansion (`club_view` carries no capacity). Tier-transition now
   test-pinned (`test_stadium_works`: a completed +4,000 across a band edge MUST
   change the picture) and both stadium suites are in the CI gate. Still open,
-  doc-flagged (`stadium_screen_re.md`): the EXE's 150,000 SEATS ceiling
-  (port caps at 130,000 — one more trace wanted), `remodela.png` works-marker
-  draw position (evidence found, position unwitnessed — not drawn), 10 tiles
-  corrected-by-mapping only.
+  doc-flagged (`stadium_screen_re.md`): ~~the EXE's 150,000 SEATS ceiling~~ —
+  **CLOSED 2026-07-28 (§0aa), the addend is capacity + headroom;** ~~`remodela.png`
+  works-marker draw position~~ — **the hypothesis was WRONG: it is the IMPROVE button's
+  icon, already baked (§0aa).** Still open: 10 tiles corrected-by-mapping only.
 
 ## 0b. Mats's live QA, 2026-07-27 morning — fix FIRST (next session = TEAM TACTICS)
 
@@ -372,7 +452,9 @@ is real and shipped, and PM98 ships two match presentations, so this is the seco
   — see `knockout_views_re.md` §"The bracket, as built". Verified live: `PM98_CUP_SHOT`'s
   real career raises the domestic bracket at its F.A. Cup QTR. What stays open: a decided
   `AGGR.` cell is still unwitnessed (the port applies the leg-1 grammar + the list's
-  winner rule, declared as inference).
+  winner rule, declared as inference) — **WITNESSED AND CORRECTED 2026-07-28 (§0aa): the
+  winner's whole plate is repainted with a chevron at each end, and the AGGR. box has
+  its own score ink and no dash blend; gate case `knockout_euro_qtr_done` is 0 px.**
   **The SEMIFINAL CARDS and the FINAL are BUILT and 0 px (2026-07-27).**
   `KnockoutScreen._draw_cards` / `_draw_final`, raised at 2 / 1 ties, gated by
   `diff_knockout_parity.py` cases 5-7 against three witnesses (euro semis leg-1-played,
@@ -383,10 +465,12 @@ is real and shipped, and PM98 ships two match presentations, so this is the seco
   original's Coca-Cola SEMIFINALS are two-legged (`Cup` `semi_legs`, LEAGUE_CUP_OPTS 2).
   The FINAL's neutral ground is a declared-OURS rng pick (Das Antas 1998 = one witness,
   no rule derivable). See `knockout_views_re.md` §"The semifinal cards and the final, as
-  built". **Still open here: the kit list (5-8 ties) falls back to the list form, and
-  the cards/final chromes for F.A. Cup / U.E.F.A. / Cup Winner's (their bands + the
-  non-euro trophies) are unwitnessed** — those competitions' 2/1-tie phases still fall
-  back to the SORTEO; a capture closes each.
+  built". **Still open here: the kit list (5-8 ties) falls back to the list form.** The
+  F.A. Cup semifinals band, the Coca-Cola semifinals (two-legged) and the Coca-Cola FINAL
+  are **no longer unwitnessed** — frames banked 2026-07-28 in
+  `screenshots/wine-captures-2026-07-28-knockout-decided/` — but they are **not built**, so
+  those phases still fall back to the SORTEO. The U.E.F.A. and Cup Winner's 2/1-tie bands
+  remain unwitnessed.
 * ~~**Draw-then-play**~~ — **CLOSED 2026-07-26.** The separation is witnessed twice in two
   competitions (F.A. Cup R2 played 14 Dec → R3 drawn unplayed 20 Dec → played 10 Jan;
   Coca-Cola R4 played 1 Dec → Qtr Finals drawn unplayed 7 Dec), so the rule needed no
@@ -516,9 +600,12 @@ verified still open at HEAD `4076800`:
   red (`LOSS_SACK_WEEKS = 4`, which the port had guessed and flagged as ours), and a THIRD
   dismissal reason exists — **a squad under 16 men** (@0x546063). All three of the board's
   messages are now the binary's own strings verbatim, and the weekly pass's reputation
-  move (-5 in the red, +1 back in the black) is wired. Still open: the sacking SCREEN
-  itself (the port dismisses at its season review); the Coca-Cola Cup home TV fee (pays £0,
-  flagged); the weekly-illness (virus/cold) insurance path; the insured-row document icon;
+  move (-5 in the red, +1 back in the black) is wired. ~~Still open: the sacking SCREEN
+  itself~~ — **BUILT 2026-07-28 (§0aa): it is the weekly hub run's own modal, and the port
+  now raises it there and exits to the title.** Still open: the Coca-Cola Cup home TV fee
+  (pays £0, flagged — three more channelTV captures on 07-28 were all the league £90,000);
+  ~~the weekly-illness (virus/cold) insurance path~~ — **BUILT 2026-07-28**;
+  ~~the insured-row document icon~~ — **BUILT 2026-07-28**;
   ~~**O1** board objective is a category~~ — **CLOSED 2026-07-27**: the START OF SEASON
   sheet now prints the game's OWN witnessed label (`club_economy.json`, 92 of the 94
   English records, merged by `GameDB._apply_club_economy`); the app's position-derived

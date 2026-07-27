@@ -1,5 +1,8 @@
 # PM98 — BINDING SPEC (the authority)
 
+Evidence: tools/re/equipos_parse.py, tools/extract_squads_exact.py, app/data/game_db.json
+  -- the engine-exact parser, the extractor built on it, and the database they produce -- the binding this file asserts.
+
 > **BINDING CLAUSE.** No object, screen, mechanic, or asset may be added to PM98 Android
 > unless it traces to a real file listed in [`SOURCE_INVENTORY.md`](SOURCE_INVENTORY.md) or a
 > reversed function in `MANAGER.EXE` cited here. **Gaps are listed in §5 and flagged — never

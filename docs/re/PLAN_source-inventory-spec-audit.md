@@ -1,5 +1,8 @@
 # PM98 — Source Inventory + Binding Spec + App Audit (anti-invention pass)
 
+Evidence: docs/re/SOURCE_INVENTORY.md, docs/re/SPEC_BINDING.md, docs/re/APP_VS_SPEC_AUDIT.md, tools/re/enum_pcf5dat.py
+  -- the three documents this plan called for, all delivered, plus the enumerator it specified.
+
 ## Context
 The PM98 Android port must be a faithful port of the real Premier Manager 98 (rule
 `pm98_stay_true_to_original`). Recent sessions introduced invented content. The user has

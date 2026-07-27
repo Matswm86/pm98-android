@@ -174,9 +174,11 @@ addresses above.
   1 pays 0%**, so the icon marks "a policy exists", not "a payout happened". The sprite
   occupies **x487..494 (8 px) x y266..275 (10 px)** inside the cell (cell border x483) on
   that 640x480 frame: a document with a folded top-right corner and two darker text rules.
-  Remaining: cut it into the row strip (a baker pass); the port still draws the policy
-  digit alone.
+  **BUILT 2026-07-28** — `tools/re/build_injuries_insured_icon.py` cuts it, and the
+  port draws sprite + group digit at 0 px each (see `injuries_screen_re.md` gap 6).
 - **PHYS.** (the treatment checkbox) is still resting furniture — the row strip
   carries its unticked face verbatim; the ticked state is unwitnessed.
-- **The weekly-illness path** (`roll_A` @0x5850b0) still isn't modelled, so only
-  match injuries ever reach this economy (`injury_model_re.md` §Still open).
+- ~~**The weekly-illness path** (`roll_A` @0x5850b0) still isn't modelled, so only
+  match injuries ever reach this economy~~ — **PORTED 2026-07-28**
+  (`injury_model_re.md` §"The trigger"), so virus and cold now reach the insurance
+  economy the same way match injuries do.

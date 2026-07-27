@@ -86,6 +86,27 @@ const EURO_QTR_TIES := [
 	["Parma", "Sporting Port.", 1024, 1076, 36, 47, [1, 2]],
 ]
 
+# 01_euro_qtr_finals_decided.png (wine-captures-2026-07-28-knockout-decided) -- the
+# BRACKET with every tie DECIDED: both legs played, the AGGR. cell filled, and the winner
+# inked through with the arrow at his end. This is the cell the 07-26 build had to leave
+# as an inference; the frame settles it, and it settles the aggregate's GRAMMAR too --
+# leg 2 is printed HOST-first (so it reads the other way round from leg 1), while AGGR. is
+# always (left club, right club). Oporto 0-2 then 0-2 = 2-2 with Borussia through on away
+# goals; Man Utd 2-0 then 0-1 = 3-0. Same career, Saturday 11 April 1998, Week 36.
+const EURO_QTR_DONE_HEADER := {
+	"top": "mats", "bottom": "Bolton W", "club_id": 59,
+	"weekday": "Saturday", "day": "11", "month": "April", "year": "1998",
+	"status_top": "Premier", "status_bottom": "Week 36",
+}
+
+# home, away, home_id, away_id, home_flag, away_flag, leg1, leg2 (host first), aggr, winner
+const EURO_QTR_DONE_TIES := [
+	["Oporto", "Borussia D.", 1075, 1038, 47, 2, [0, 2], [0, 2], [2, 2], 1],
+	["Parma", "Juventus", 1024, 1021, 36, 36, [0, 1], [1, 1], [1, 2], 1],
+	["Manchester Utd.", "Bayern M.", 40, 1042, 30, 2, [2, 0], [0, 1], [3, 0], 0],
+	["F.C. Barcelona", "Mónaco", 1000, 1060, 22, 24, [2, 1], [0, 1], [3, 1], 0],
+]
+
 # 08_facup_qtrfinals_DOMESTIC_bracket_unplayed_1999-03-04.png -- the same career's second
 # season (Bolton relegated: 1st Div., Week 31), F.A. Cup QTR FINALS drawn, unplayed.
 const FA_QTR_HEADER := {
@@ -154,6 +175,11 @@ func _init() -> void:
 		_fa_rows(), true, false, 0)
 	await _shot(out, "knockout_euro_qtr", EURO_QTR_HEADER, "euro", "QTR FINALS", true,
 		_bracket_rows(EURO_QTR_TIES, true), true, false, 0, "bracket")
+	# Both paginator arrows are LIT here: the frame was paged BACK from the semifinals, so
+	# a later phase exists and the right arrow is enabled (it is greyed on the leg-1 frame,
+	# which was the live phase).
+	await _shot(out, "knockout_euro_qtr_done", EURO_QTR_DONE_HEADER, "euro", "QTR FINALS",
+		true, _bracket_rows(EURO_QTR_DONE_TIES, true), true, true, 0, "bracket")
 	await _shot(out, "knockout_facup_qtr", FA_QTR_HEADER, "facup", "QTR FINALS", false,
 		_bracket_rows(FA_QTR_TIES, false), true, false, 0, "bracket")
 	# The cards family prints the euro label AS the sequential scheme spells it
@@ -195,6 +221,15 @@ static func _bracket_rows(ties: Array, euro: bool) -> Array:
 			row["away_flag"] = int(t[5])
 			var leg1: Array = t[6]
 			row["cells"] = [[str(int(leg1[0])), str(int(leg1[1]))], ["", ""], ["", ""]]
+			if t.size() > 9:      # a DECIDED tie also carries leg 2, the aggregate and the winner
+				var leg2: Array = t[7]
+				var aggr: Array = t[8]
+				row["cells"] = [
+					[str(int(leg1[0])), str(int(leg1[1]))],
+					[str(int(leg2[0])), str(int(leg2[1]))],
+					[str(int(aggr[0])), str(int(aggr[1]))],
+				]
+				row["winner"] = int(t[9])
 		else:
 			# every F.A. Cup QTR club is English (flag 30), and the round is unplayed
 			row["home_flag"] = 30

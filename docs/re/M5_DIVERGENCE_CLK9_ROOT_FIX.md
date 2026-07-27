@@ -1,5 +1,8 @@
 # M5 clk-9 extra draw — ROOT CAUSE FOUND + FIXED: the dead B0040 designated-interceptor route (s30, 2026-07-11)
 
+Evidence: tools/re/wine/m5_clk9_analyze.py, app/tests/test_decideset.gd, app/scripts/Pm98Action.gd
+  -- the analyser that localised clk 9, and the suite + leaf the fix landed in.
+
 Executes the NEXT of `M5_CLK9_CANDIDATE2_REFUTED.md` (s29). The s29 plan was "single-step the
 gate-4 g0 chain at clk 9"; doing that (new `app/tests/diag_m5_g0chain.gd` + a gated
 `Pm98Movement.lean_trace` hook) proved the g0 chain is NOT the bug — and the position evidence

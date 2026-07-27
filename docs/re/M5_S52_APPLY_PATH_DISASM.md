@@ -1,5 +1,8 @@
 # M5 s52: the b0040 → heading APPLY path, disassembled
 
+Evidence: tools/re/wine/m5_rsp_capture.py, app/tests/test_driver_advance_engine.gd, app/scripts/Pm98Movement.gd
+  -- the capture harness, and the suite + leaf the apply path lives in.
+
 Closes the s51 next-session item 1 ("disassemble the apply path between `_move_b0040`'s return
 and the write to t1.i10 `0x34/0x64`; does live `b1420` pick the B0040 arm, or does the caller
 clamp the overflow?").

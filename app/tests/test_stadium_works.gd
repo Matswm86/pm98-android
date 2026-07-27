@@ -83,9 +83,17 @@ func _run() -> bool:
 	var sm := FinanceModel.summary({"capacity": career.stadium_capacity, "players": career.my_squad()}, career.tier)
 	ok = _assert(int(sm["capacity"]) == cap0 + 5000, "finance sees the expanded capacity") and ok
 
-	# Ceiling guard: a build that would breach MAX_STADIUM is refused.
-	career.stadium_capacity = Career.MAX_STADIUM - 1000
+	# Ceiling guard, re-pinned 2026-07-28 against the binary: `FUN_0051c2e0` @0x51c8e1
+	# disables a SEATS card when (card seats + capacity + HEADROOM) REACHES 0x249f0 =
+	# 150,000. The port refuses the same build, on the same sum, with the same `>=`.
+	ok = _assert(Career.MAX_STADIUM == 150000, "the ceiling is the EXE's 150,000") and ok
+	career.stadium_capacity = Career.MAX_STADIUM - career.stadium_headroom - 1000
 	ok = _assert(not career.start_works(5000, 100, 4), "expansion past the ceiling refused") and ok
+	ok = _assert(not career.start_works(1000, 100, 4),
+		"a build landing EXACTLY on 150,000 is refused too (`jb`, not `jbe`)") and ok
+	career.stadium_capacity = Career.MAX_STADIUM - career.stadium_headroom - 5000
+	ok = _assert(career.start_works(4000, 100, 4),
+		"...but one that stays under it is allowed") and ok
 
 	# Headroom round-trip + the legacy-save landmine: from_dict(pre-works save)
 	# loads capacity 0 — Main heals it from GameDB before any works can complete.

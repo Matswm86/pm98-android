@@ -30,17 +30,10 @@ func _unit_manager() -> bool:
 	ok = _assert(Manager.reputation_delta(19, 8, 20, 3) < Manager.reputation_delta(12, 8, 20, 3),
 		"relegation (19th) costs more reputation than a mid-table miss") and ok
 
-	# Sacking: relegated when survival wasn't the brief -> sacked; a big gap -> sacked.
-	ok = _assert(bool(Manager.sack_decision(19, 8, 20, 3, false, 3)["sacked"]),
-		"relegated with a non-survival objective is a sacking") and ok
-	ok = _assert(not bool(Manager.sack_decision(19, 17, 20, 3, true, 3)["sacked"]),
-		"relegated is forgiven when the brief was survival") and ok
-	ok = _assert(bool(Manager.sack_decision(15, 8, 20, 3, false, 3)["sacked"]),
-		"finishing 7 below objective (>= SACK_GAP) is a sacking") and ok
-	ok = _assert(not bool(Manager.sack_decision(13, 8, 20, 3, false, 1)["sacked"]),
-		"first season gets more slack (5 below objective survives)") and ok
-	ok = _assert(not bool(Manager.sack_decision(9, 8, 20, 3, false, 3)["sacked"]),
-		"just below objective is not a sacking") and ok
+	# Sacking left this file on 2026-07-28: the original has no end-of-season dismissal at
+	# all, so Manager.sack_decision (an invented SACK_GAP verdict) is gone and the three
+	# real reasons live in Career, tested in test_sacking.gd against the binary's own
+	# FUN_00545fd0 order and FUN_0057a980 review weeks.
 
 	# Offers: a stronger reputation commands a higher strength band; a sacking dents it.
 	var strong := Manager.offer_band(90.0, false)
@@ -127,18 +120,23 @@ func _integration() -> bool:
 	# tests first: FUN_00545FD0 @0x546013 is `cmp [club+0x224],3 / jbe`, i.e. dismissal on
 	# the FOURTH consecutive week in the red (measured 2026-07-27; `LOSS_SACK_WEEKS`).
 	# The threshold is pinned from both sides.
+	# Re-pointed 2026-07-28 at the weekly path, which is where the original sacks: the
+	# board never dismisses at a season's end (docs/re/sack_path_re.md), so the verdict is
+	# `sack_message()` and the season review only carries the reputation consequence.
 	career.loss_weeks = Career.LOSS_SACK_WEEKS - 1
-	var rv3 := career.board_review()
-	ok = _assert(not bool(rv3["sacked"]),
+	ok = _assert(career.sack_message() == "",
 		"three weeks in the red is NOT a sacking (the binary's `jbe 3`)") and ok
-	career._rep_year = -1        # re-arm the once-a-year review for the paired check
-	career.sacked = false
 	career.loss_weeks = Career.LOSS_SACK_WEEKS
+	ok = _assert(career.sack_message() == Career.SACK_MSG_FINANCE,
+		"a FOURTH week in the red gets you sacked") and ok
+	ok = _assert(career.sack_message_reason() == "insolvent",
+		"and the board's reason is the financial one (%s)" % career.sack_message_reason()) and ok
+	# Main flags the career the moment it raises that box; the review then carries the dent.
+	career.sacked = true
+	career.sack_reason = "insolvent"
 	var rep_before := career.reputation
 	var rv := career.board_review()
-	ok = _assert(bool(rv["sacked"]), "a FOURTH week in the red gets you sacked") and ok
-	ok = _assert(str(rv["reason"]) == "insolvent",
-		"and the board's reason is the financial one (%s)" % rv["reason"]) and ok
+	ok = _assert(bool(rv["sacked"]), "the season review reports the sack that happened") and ok
 	ok = _assert(career.sacked, "the career is flagged sacked") and ok
 	ok = _assert(career.reputation < rep_before, "a sacking lowers reputation (%.1f -> %.1f)" % [
 		rep_before, career.reputation]) and ok
