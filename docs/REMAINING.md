@@ -517,8 +517,27 @@ explicit go/no-go before a line of it is written.
 ## 6. Android packaging / device polish
 
 APKs build in GitHub Actions (`build-android.yml`) and publish to the rolling `latest`
-pre-release; **never run `./gradlew` on this box** (8 GB, it OOMs). Remaining: a real-device
-pass (touch targets, screen sizes), app icon/splash, and a signed release build.
+pre-release; **never run `./gradlew` on this box** (8 GB, it OOMs).
+
+~~app icon/splash~~ — **BUILT 2026-07-27 from the original's own files**
+(`docs/re/android_packaging_re.md`): the launcher icon is `MANAGER.EXE`'s own 32x32 8bpp
+`RT_ICON` — the football Windows drew for the game — decoded straight out of the PE
+resource tree by `tools/re/export_exe_icon.py` and scaled 6x nearest-neighbour; the boot
+splash is the extracted title frame `art/screens/title/fondo7.png`, unfiltered and 1:1.
+Godot's default `icon.svg` is deleted. **No adaptive icon on purpose** — it needs a
+background layer the original does not have, and any plate colour would be a guess.
+
+~~a signed release build~~ — **WIRED 2026-07-27, waiting on one secret.** The workflow
+exports `--export-release` when `ANDROID_RELEASE_KEYSTORE_BASE64` (+ `_KEY_ALIAS`,
+`_KEYSTORE_PASSWORD`) is set and falls back to the debug-signed APK when it is not, so
+nothing breaks without it. Verified against the shipped engine rather than assumed: Godot
+4.6 has no `export/android/release_keystore` editor setting, so the key is passed through
+`GODOT_ANDROID_KEYSTORE_RELEASE_{PATH,USER,PASSWORD}`. Generating the keystore is
+deliberately left to Mats (a key made in CI would change every run, which makes every
+build a different app to Android); the exact three commands are in the packaging doc.
+
+Still open: **the real-device pass** (touch targets, tall-phone letterboxing, the launcher
+mask) — it needs the APK on a phone, which this box cannot do.
 
 ## What is NOT missing (so the list above reads correctly)
 

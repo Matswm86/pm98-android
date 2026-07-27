@@ -59,6 +59,31 @@ jobs:
           mv templates/* "$TPL_DIR/"
           ls "$TPL_DIR" | head -20
 
+      # RELEASE signing (2026-07-27). If the three ANDROID_RELEASE_* secrets are set the
+      # build produces a RELEASE-signed APK; with them unset it falls back to the
+      # debug-signed one exactly as before, so the pipeline never breaks on a fork or a
+      # clone. Creating the keystore is deliberately NOT automated -- a release key is the
+      # owner's to hold, and one generated in CI would be worthless (a fresh key every run
+      # means every update is a different app to Android). To turn it on, once:
+      #   keytool -genkeypair -v -keystore pm98-release.keystore -alias pm98 \
+      #     -keyalg RSA -keysize 4096 -validity 10000 -storetype PKCS12
+      #   base64 -w0 pm98-release.keystore     # -> secret ANDROID_RELEASE_KEYSTORE_BASE64
+      # plus ANDROID_RELEASE_KEY_ALIAS and ANDROID_RELEASE_KEYSTORE_PASSWORD.
+      # KEEP THE .keystore FILE. Lose it and the app can never be updated in place.
+      - name: Restore release keystore (optional)
+        env:
+          REL_B64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          set -e
+          if [ -n "$REL_B64" ]; then
+            echo -n "$REL_B64" | base64 -d > "$GITHUB_WORKSPACE/release.keystore"
+            echo "BUILD_MODE=release" >> "$GITHUB_ENV"
+            echo "Release keystore restored - this build will be RELEASE-signed."
+          else
+            echo "BUILD_MODE=debug" >> "$GITHUB_ENV"
+            echo "No ANDROID_RELEASE_KEYSTORE_BASE64 secret - falling back to a debug-signed APK."
+          fi
+
       - name: Restore (or generate) debug keystore
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
@@ -96,12 +121,17 @@ jobs:
           export/android/debug_keystore_user = "androiddebugkey"
           export/android/debug_keystore_pass = "android"
           EOF
-          echo "Wrote $SETTINGS_FILE"
+          echo "Wrote $SETTINGS_FILE (mode: $BUILD_MODE)"
           cat "$SETTINGS_FILE"
+          # NOTE: there is no `export/android/release_keystore` EDITOR setting in Godot
+          # 4.6 (only the three debug ones exist; verified against the shipped binary).
+          # The release key is supplied to the exporter through its own environment
+          # variables instead -- GODOT_ANDROID_KEYSTORE_RELEASE_{PATH,USER,PASSWORD} --
+          # which also keeps the password out of any file on the runner.
 
-      # Using the prebuilt export template (gradle_build/use_gradle_build=false),
-      # so no Android Gradle build template install is needed — the bundled
-      # android_debug.apk template is repackaged and signed with the debug keystore.
+      # Using the prebuilt export templates (gradle_build/use_gradle_build=false), so no
+      # Android Gradle build template install is needed — the bundled android_debug.apk /
+      # android_release.apk template is repackaged and signed with the matching keystore.
 
       - name: Pre-import project resources
         working-directory: app
@@ -174,11 +204,21 @@ jobs:
           echo "--- SDK build-tools (apksigner/zipalign) ---"
           ls "$ANDROID_HOME/build-tools/" 2>/dev/null || true
 
-      - name: Export Android debug APK
+      - name: Export Android APK (release-signed when the secret is set)
         working-directory: app
+        env:
+          GODOT_ANDROID_KEYSTORE_RELEASE_USER: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
         run: |
           set -o pipefail
-          "$GITHUB_WORKSPACE/godot" --headless --verbose --export-debug "Android" "${EXPORT_NAME}.apk" 2>&1 | tee export.log
+          if [ "$BUILD_MODE" = "release" ]; then
+            EXPORT_FLAG="--export-release"
+            export GODOT_ANDROID_KEYSTORE_RELEASE_PATH="$GITHUB_WORKSPACE/release.keystore"
+          else
+            EXPORT_FLAG="--export-debug"
+          fi
+          echo "Exporting with $EXPORT_FLAG"
+          "$GITHUB_WORKSPACE/godot" --headless --verbose "$EXPORT_FLAG" "Android" "${EXPORT_NAME}.apk" 2>&1 | tee export.log
           rc=$?
           echo "--- export.log error/warning lines ---"
           grep -iE "error|warning|template|keystore|sdk|missing|invalid|config|not found|valid" export.log | head -60 || true
@@ -208,7 +248,8 @@ jobs:
           prerelease: true
           body: |
             Auto-built APK from latest `main` commit (${{ github.sha }}).
-            Sideload only — debug-signed, not for distribution.
+            Sideload only — signed with the project key when one is configured,
+            otherwise debug-signed.
 
             **Install on phone:** download `${{ env.APK_FILE }}` (filename changes every
             build so your browser/Android can't serve a cached old APK), open it, allow
@@ -266,6 +307,7 @@ jobs:
           name: ${{ github.ref_name }}
           body: |
             Release ${{ github.ref_name }}.
-            Sideload only — debug-signed, not for distribution.
+            Sideload only — signed with the project key when one is configured,
+            otherwise debug-signed.
           files: app/${{ env.EXPORT_NAME }}.apk
           fail_on_unmatched_files: true
