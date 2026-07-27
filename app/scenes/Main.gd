@@ -1652,6 +1652,8 @@ func _continue_career() -> void:
 		_career.ensure_divisions(_pyramid_context())
 		# ...and the shipped 0x26e4 youth pool, which is game data, not save data.
 		_career.youth_pool = Youth.pool_of(GameDB.clubs_by_id)
+		# ...and the shipped TRUE XIs, so European ties run on the byte-exact engine (S5).
+		_career.euro_xis = _true_xi_index()
 		# An in-progress career in its first seasons still gets the guaranteed gem on resume.
 		var before: int = (_career.youth as Array).size()
 		_career._ensure_wonderkid()
@@ -1852,6 +1854,7 @@ func _begin_career(manager_name: String, league: Dictionary, club: Dictionary,
 	var league_clubs := GameDB.clubs_in_league(league["id"])
 	_career = Career.create(club, league, league_clubs, GameDB.leagues, _pyramid_context())
 	_career.youth_pool = Youth.pool_of(GameDB.clubs_by_id)   # the shipped 0x26e4 pool
+	_career.euro_xis = _true_xi_index()   # shipped TRUE XIs -> euro ties on the stat engine (S5)
 	_career.manager_name = manager_name
 	# Entry-flow picks (NIVEL level + Players age ? + preseason friendlies). The
 	# rivals play out via hub CONTINUE before league round 1 (Career.play_friendly).
@@ -3713,6 +3716,46 @@ func _euro_emblem(key: String) -> String:
 			return "res://art/screens/cup/uefa.png"
 		_:
 			return "res://art/screens/cup/recopa.png"
+
+## Ordered TRUE-XI index (club id -> 11 game_db player dicts, slot 0 GK): each club's own
+## shipped XI (club_tactics.json `xi`, the tactic slots' stored player ids) resolved over
+## its game_db attr squad. Only fully-resolvable XIs (all 11 ids present with attrs) are
+## indexed — all 383 foreign clubs qualify (verified 2026-07-27), so European ties run on
+## the byte-exact stat engine instead of the legacy fallback (S5). Game data, rebuilt per
+## boot, never persisted; fed to Career like youth_pool. Cached after the first build.
+var _true_xis: Dictionary = {}
+
+func _true_xi_index() -> Dictionary:
+	if not _true_xis.is_empty():
+		return _true_xis
+	var f := FileAccess.open("res://data/club_tactics.json", FileAccess.READ)
+	if f == null:
+		return {}
+	var parsed: Variant = JSON.parse_string(f.get_as_text())
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return {}
+	var tacts: Dictionary = (parsed as Dictionary).get("clubs", {})
+	for c in GameDB.clubs:
+		var cid := int(c.get("id", -1))
+		var t: Variant = tacts.get(str(cid))
+		if not (t is Dictionary):
+			continue
+		var xi_ids: Variant = (t as Dictionary).get("xi")
+		if not (xi_ids is Array) or (xi_ids as Array).size() != 11:
+			continue
+		var by_id: Dictionary = {}
+		for p in c.get("players", []):
+			by_id[int(p.get("id", -1))] = p
+		var xi: Array = []
+		for pid in xi_ids:
+			var p: Variant = by_id.get(int(pid))
+			if p is Dictionary and (p.get("attrs") is Dictionary) \
+					and not (p.get("attrs") as Dictionary).is_empty():
+				xi.append(p)
+		if xi.size() == 11:
+			_true_xis[cid] = xi
+	return _true_xis
+
 
 ## Strong foreign clubs (outside the English pyramid) to fill the European fields. The
 ## international set in game_db has no leagueId; rate each and take the strongest, frozen

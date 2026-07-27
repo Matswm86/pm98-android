@@ -198,15 +198,20 @@ Four more, reported 2026-07-26 evening (second round, same play session):
 
 ## 0c. Mats's orders, 2026-07-27 midday — NEXT SESSION, fix-first
 
-* **S5 promoted from backlog to fix-first: European ties must run on the byte-exact
-  engine.** ~37 fixtures/season silently fall to the invented legacy `MatchEngine`
-  because foreign XIs fail `MatchSim._usable` (`MatchSim.gd:105-116`). Fix = usable
-  foreign XIs (feed from the `game_db` club records — all 384 foreign clubs carry
-  full attr squads, and `club_tactics.json` carries their TRUE XIs/levers via
-  `Pm98LineupFeeder`) or a stat-engine path that pads like `_pad_xi`. While in
-  there: confirm **S7** (the European field shape — 24 clubs / 6 groups / 2
-  qualifying rounds) is actually shipped, and extend `test_career`'s zero-fallback
-  assert to cover a season WITH European fixtures.
+* ~~**S5 promoted from backlog to fix-first: European ties must run on the byte-exact
+  engine.**~~ — **CLOSED 2026-07-27.** Foreign entrants now field their own shipped
+  TRUE XIs: `Main._true_xi_index()` resolves every club's `club_tactics.json` `xi`
+  (the tactic slots' stored player ids) over its `game_db` attr squad — **475 clubs
+  fully resolve, including all 383 foreign clubs** — and feeds `Career.euro_xis`
+  (game data, never persisted, youth_pool pattern). `Career._xi_for`'s euro branch
+  returns the TRUE XI instead of `[]`, so `MatchSim._usable` passes and the tie runs
+  on `Pm98StatMatch`. Proven end-to-end: `test_career` now drives a season WITH the
+  European competitions minted — 53 ties resolved, **fallback_count == 0** (was ~37
+  `[MATCHSIM_FALLBACK]`/season). **S7 CONFIRMED shipped** while in there: 24 clubs /
+  6 groups is `Career.EURO_FIELD`+`EURO_GROUPS` (witnessed field sizes,
+  euro_league_screen_re.md); the original's TWO QUALIFYING ROUNDS are deliberately
+  not modelled — a DECLARED divergence (Career.gd `EURO_FIELD` comment: the app's
+  field enters at the group phase).
 * ~~**EXIT from the career hub must go straight to the ORIGINAL start screen.**~~ —
   **BUILT 2026-07-27, witness-first.** The open question ("does the original
   interpose a confirm?") was answered by driving the real game: hub EXIT raises
@@ -235,8 +240,8 @@ The app plays every match on `MatchSim.simulate` (`Career.gd`, `Cup.gd`), which 
 the byte-exact port of the original's instant-result runner (`FUN_0044ee70` family,
 oracle-anchored), whenever both XIs pass `_usable`. Only when an XI is unusable does it fall
 back to the abstracted legacy `MatchEngine` (app-tuned constants, validated against
-real-football aggregates, NOT against PM98 output) — and that fallback fires ~37 times a
-season on European ties because foreign clubs carry no usable XI (S5 below). The
+real-football aggregates, NOT against PM98 output) — since S5 closed (2026-07-27: foreign
+clubs field their shipped TRUE XIs) a full EUROPEAN season runs at ZERO fallbacks. The
 instruction-exact POSITIONAL engine (`Pm98Driver` / `Pm98Outer` / `Pm98Movement` /
 `Pm98Action` / `Pm98Resolver` / `Pm98CollBuilder`) exists, is oracle-locked leaf by leaf
 against a Ghidra PCode emulator, and is **not wired into gameplay**. Swapping it in is the
@@ -398,11 +403,9 @@ verified still open at HEAD `4076800`:
   Not player-facing (the original also reseeds from `time()`), but the port's own
   acceptance machinery — save/load equivalence, the M5 kill-test, seeded parity claims —
   assumes a seed pins a career, and it does not.
-* **S5 — European ties run on the invented legacy engine.** Foreign XIs fail `_usable`
-  (`MatchSim.gd:105-110`), ~37 loud `[MATCHSIM_FALLBACK]` warnings per season.
-  `test_career.gd` asserts zero fallbacks and passes because it only checks the manager's
-  own league. Fix = usable foreign XIs (feed from `game_db` directory records) or a
-  stat-engine path that does not need a full XI.
+* ~~**S5 — European ties run on the invented legacy engine.**~~ — **CLOSED 2026-07-27**
+  (§0c above): foreign entrants field their shipped TRUE XIs via `Career.euro_xis`;
+  `test_career` proves a European season at zero fallbacks (53 ties resolved).
 * **S8 — no player ever retires.** No retirement/ageing-intake mechanic exists in
   `app/scripts`; squads age without bound and a multi-season career ages into a dead end.
   Blocked on reversing `FUN_005865b0` / `FUN_005c1df0` / `FUN_00443180`.
@@ -411,8 +414,9 @@ verified still open at HEAD `4076800`:
   flagged); the weekly-illness (virus/cold) insurance path; the insured-row document icon;
   **O1** board objective is a category (Champion / U.E.F.A. / Mid Table / Avoid Relegation),
   the port shows a position; **O3** the original names every club's manager on START OF
-  SEASON; **S7 remainder** — the European field shape (24 clubs / 6 groups / 2 qualifying
-  rounds) is not confirmed shipped.
+  SEASON; ~~**S7 remainder**~~ — **CONFIRMED 2026-07-27**: 24 clubs / 6 groups IS shipped
+  (`Career.EURO_FIELD`/`EURO_GROUPS`, witnessed field sizes); the 2 qualifying rounds
+  are a DECLARED divergence (the app's field enters at the group phase).
 
 ## 4. The SHOOTING appendix
 

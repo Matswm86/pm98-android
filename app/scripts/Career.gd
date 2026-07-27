@@ -190,6 +190,14 @@ var _month_goal_mark: Dictionary = {}   # tier -> scorer-log length at month sta
 # FROZEN here at draw time so the brackets resolve + save without GameDB.
 var euro: Dictionary = {}               # {"european_cup"/"uefa_cup"/"cup_winners_cup" -> bracket}
 var euro_ratings: Dictionary = {}       # foreign club id:int -> {att,def,gk}
+var euro_xis: Dictionary = {}           # foreign club id:int -> ordered 11-dict XI (slot 0
+                                        # GK) resolved from the club's shipped TRUE XI
+                                        # (club_tactics.json) over its game_db attr squad.
+                                        # NOT persisted — game data, not save data; fed by
+                                        # Main (like youth_pool) so European ties run on
+                                        # the byte-exact engine instead of the legacy
+                                        # fallback (S5). {} on a stale feed -> the loud
+                                        # [MATCHSIM_FALLBACK] path, exactly as before.
 var euro_names: Dictionary = {}         # foreign club id:int -> String
 
 # Winners-of-winners finals (season-openers from LAST season's European winners). The
@@ -1205,13 +1213,14 @@ func _ratings_for(id: int, clubs_override: Dictionary = {}) -> Dictionary:
 
 ## The ordered fit XI (slot 0 = GK) for a club id, the parallel of `_ratings_for` that
 ## feeds the faithful statistical engine via MatchSim. Mirrors the same fit/repair logic
-## so injuries weaken the side the same way. A foreign euro opponent (frozen ratings, no
-## live players) returns [] -> MatchSim falls back to its ratings path.
+## so injuries weaken the side the same way. A foreign euro opponent fields its shipped
+## TRUE XI (`euro_xis`, fed by Main from club_tactics.json + game_db — S5 2026-07-27);
+## with no feed it returns [] -> the loud legacy fallback, as before.
 func _xi_for(id: int, clubs_override: Dictionary = {}) -> Array:
 	if id == club_id and not tactics.is_empty():
 		return _mgr_featured_xi()
 	if not rosters.has(id) and euro_ratings.has(id):
-		return []
+		return euro_xis.get(id, [])
 	if rosters.has(id):
 		return _ai_featured_xi(id)
 	if _div_clubs.has(id):

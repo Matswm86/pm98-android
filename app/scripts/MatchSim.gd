@@ -25,8 +25,9 @@ extends RefCounted
 static var use_stat_engine := true
 static var _legacy_env := -1   # lazy cache of OS.has_environment("PM98_LEGACY_ENGINE")
 # Legacy results served where a caller PASSED an XI and so expected the faithful stat
-# engine (audit §B3: that fallback used to be silent). Empty XIs are the documented
-# legacy route (euro frozen-ratings opponents) and do not count.
+# engine (audit §B3: that fallback used to be silent). Empty XIs do not count; since
+# S5 (2026-07-27) euro opponents field their shipped TRUE XIs (Career.euro_xis), so an
+# empty XI only remains on a career whose euro_xis feed is missing (stale headless rig).
 static var fallback_count := 0
 
 
