@@ -107,6 +107,15 @@ const BRACKET_PANEL_X := 20
 ## the two kit columns per panel, exactly as it declares the barra kit.
 const BRACKET_KIT_L := Vector2(26, 8)    # + (0, T)
 const BRACKET_KIT_R := Vector2(423, 8)
+## The outline-pass overlays (baked 2026-07-27): the pass's ring turned out to be
+## POSITION-CONSTANT across every witnessed cell (all MINIESC kits share one
+## silhouette), so its result is baked verbatim per column -- kitwell_under_* draws
+## under the sprite (the drop shadow + outer bevel), the icons additionally carry an
+## OVER layer (positions the pass provably overrides on the sprite itself). See the
+## baker's OVERLAYS block; the on-sprite bevel of the 48x64 kits is club-dependent
+## and stays the declared bucket.
+const BRACKET_WELL_L := Vector2(22, 2)   # + (0, T)
+const BRACKET_WELL_R := Vector2(416, 2)
 const BRACKET_FLAG_L := Vector2(83, 7)   # 30x20 dbcard flag, 0 px witnessed
 const BRACKET_FLAG_R := Vector2(385, 7)
 ## Names are CENTRED, not edge-anchored: pen x = floor(cx - advance/2) with cx 178.5
@@ -203,6 +212,8 @@ var _hdr: Dictionary = {}                # "euro"/"dom" -> the panel top strip
 var _bracket: Dictionary = {}            # "euro"/"dom" -> the baked 458x72 panel strip
 var _cards_body: Texture2D               # the two SEMIFINAL cards, content blanked
 var _final_body: Texture2D               # per competition, loaded in setup()
+var _well: Dictionary = {}               # "under_L"/"over_L"/... the kit-well overlays
+var _icon_ol: Dictionary = {}            # "under_sf1"/"over_sf1"/... the icon overlays
 var _flags: Dictionary = {}              # countryCode -> 30x20 dbcard flag
 var _ridi: Dictionary = {}               # club id -> 17x20 ridi kit icon
 var _pager: Dictionary = {}
@@ -241,6 +252,10 @@ func _ready() -> void:
 		_hdr[key] = _tex("res://art/screens/knockout/list_hdr_%s.png" % key)
 		_bracket[key] = _tex("res://art/screens/knockout/bracket_panel_%s.png" % key)
 	_cards_body = _tex("res://art/screens/knockout/cards_body.png")
+	for k in ["under_L", "over_L", "under_R", "over_R"]:
+		_well[k] = _tex("res://art/screens/knockout/kitwell_%s.png" % k)
+	for k in ["under_sf1", "over_sf1", "under_sf2", "over_sf2"]:
+		_icon_ol[k] = _tex("res://art/screens/knockout/icon_%s.png" % k)
 	for key in ["left_on", "right_on", "left_off_p0", "left_off_p1", "right_off_p0",
 			"right_off_p1"]:
 		_pager[key] = _tex("res://art/screens/knockout/pager_%s.png" % key)
@@ -706,12 +721,20 @@ func _draw_bracket() -> void:
 		if strip != null:
 			draw_texture(strip, Vector2(BRACKET_PANEL_X, t))
 		var tie: Dictionary = _ties[i]
+		if _well.get("under_L") != null:
+			draw_texture(_well["under_L"], Vector2(BRACKET_WELL_L.x, t + BRACKET_WELL_L.y))
+		if _well.get("under_R") != null:
+			draw_texture(_well["under_R"], Vector2(BRACKET_WELL_R.x, t + BRACKET_WELL_R.y))
 		var kl := PMChrome.kit(int(tie.get("home_id", -1)))
 		if kl != null:
 			draw_texture(kl, Vector2(BRACKET_KIT_L.x, t + BRACKET_KIT_L.y))
 		var kr := PMChrome.kit(int(tie.get("away_id", -1)))
 		if kr != null:
 			draw_texture(kr, Vector2(BRACKET_KIT_R.x, t + BRACKET_KIT_R.y))
+		if _well.get("over_L") != null:
+			draw_texture(_well["over_L"], Vector2(BRACKET_WELL_L.x, t + BRACKET_WELL_L.y))
+		if _well.get("over_R") != null:
+			draw_texture(_well["over_R"], Vector2(BRACKET_WELL_R.x, t + BRACKET_WELL_R.y))
 		var fl := _flag(int(tie.get("home_flag", -1)))
 		if fl != null:
 			draw_texture(fl, Vector2(BRACKET_FLAG_L.x, t + BRACKET_FLAG_L.y))
@@ -787,9 +810,16 @@ func _draw_cards() -> void:
 				var side := host if r == 0 else guest
 				var side_i := 0 if side == "home" else 1
 				var bar_top := int((CARDS_BARS[leg] as Array)[r])
+				var ol := "sf%d" % (i + 1)
+				if _icon_ol.get("under_" + ol) != null:
+					draw_texture(_icon_ol["under_" + ol],
+						Vector2(CARDS_ICON_X + dx, bar_top))
 				var kt := _ridi_kit(int(tie.get(side + "_id", -1)))
 				if kt != null:
 					draw_texture(kt, Vector2(CARDS_ICON_X + dx, bar_top))
+				if _icon_ol.get("over_" + ol) != null:
+					draw_texture(_icon_ol["over_" + ol],
+						Vector2(CARDS_ICON_X + dx, bar_top))
 				_txt(_page_p10, _g_p10, CARDS_NAME_PEN_X + dx,
 					bar_top + CARDS_TEXT_PEN_DY, str(tie.get(side, "")),
 					C_THROUGH if winner == side_i else CARDS_NAME_INK[i])

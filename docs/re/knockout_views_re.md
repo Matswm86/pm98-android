@@ -407,6 +407,42 @@ Everything the re-measured section left open was solved off the frames before bu
   parity case buckets the rail; the domestic case's rail matches its witness 0 px and is
   enforced.
 
+## The outline pass, SOLVED in two of three parts (2026-07-27)
+
+The s62 narrowing below stands, but two of its three components are now CLOSED:
+
+1. **The "unexplained ~115 interior px/cell" was the realised-palette bug** — the same
+   family as the MINIBAND flags. The MINIESC bank was exported with `force_vga=True`
+   (the shared VGA table at DAT.PKF+0x5CA); the running game realises MANAGER.PAL + the
+   20 Windows statics. Measured over the 16 bracket witness cells the disagreement is a
+   CONSISTENT per-entry remap — (24,24,16)→(10,15,0) in 203/204 px (index 111, the very
+   entry export_flags.py documents), the green ramp (90,126,71)→(39,159,59) 69/69,
+   (115,148,99)→(61,191,82) 41/41, (37,78,12)→(0,95,0) 38/38,
+   (192,227,192)→(192,220,192) 26/26 (index 8, the money-green static). Fixed in
+   `map_crests.export_kits` (realised palette); all 476 kits re-exported. The
+   kit-consuming gates re-ran green (cupdraw PASS, supercup, seasonend 0, euroleague
+   unchanged, entry — its one FAIL, rival_015, reproduces with the OLD kits, i.e.
+   pre-existing).
+2. **The ring (shadow + outer bevel) is POSITION-CONSTANT and now baked verbatim.**
+   Every MINIESC kit shares one silhouette, so the pass's outside-silhouette result is
+   the same pixels for every club: across the 16 witnessed cells, the L column's ring is
+   248 static px vs 9 club-varying, the R column's 211 vs 57 (Sporting Port.'s deviant
+   silhouette). The baker votes every witnessed cell and bakes
+   `kitwell_under_L/R.png` (244 / 202 px) drawn UNDER the sprite, and per-card icon
+   overlays `icon_under/over_sf1/sf2.png` (55 under + 33 over px) around the cards'
+   ridi icons — the OVER layer carries the positions where the pass provably overrides
+   the sprite itself and the result is club-independent across 12 witnessed cells.
+3. **Still open: the on-sprite edge bevel of the 48x64 kits.** Its values depend on the
+   sprite's own underlying colours (the 16 cells disagree), so it cannot be baked and
+   its rule is still un-reversed — ~160-190 px per bracket cell after 1+2.
+
+Measured effect on the parity buckets (diff_knockout_parity.py): bracket kit columns
+3868/3556 → **1659/1691**; the cards' eight icon buckets → **0 px on the cocacola
+witness, 0 on six of eight euro cells** (the two Sporting Port. icons keep 53 px — the
+deviant silhouette). The buckets stay declared for the club-dependent remainder.
+The same bake should port to the OTHER ridi/kit sites (EuroGroupScreen's 24 group cells
+still carry ~1260 px/frame, OffersScreen's panel) — follow-up, same method.
+
 ## The outline pass, narrowed again (2026-07-26, s62) — it is a DROP SHADOW plus a highlight
 
 Classifying every differing pixel of all 16 bracket kit cells against the exact-decoded

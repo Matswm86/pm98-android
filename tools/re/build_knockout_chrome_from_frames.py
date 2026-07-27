@@ -238,6 +238,60 @@ BRACKET_BARS = [
 BRACKET_WHITE = (255, 255, 255)
 BRACKET_BAR_BG = (180, 200, 220)
 
+# ---- the kit-well OVERLAYS: the outline/bevel pass, baked verbatim (2026-07-27) -----
+# The s62 "un-reversed outline pass" turned out to be POSITION-CONSTANT: every MINIESC
+# kit shares one silhouette, so the pass's result is the same pixels for every club --
+# measured across all 16 witnessed bracket cells, the L column's outside-silhouette
+# residual is 248 static px vs 9 club-varying, the R column's 211 vs 57. That makes it
+# BAKEABLE, no rule needed: two layers per site, voted across every witnessed cell --
+#   UNDER  every position outside ALL witnessed silhouettes where the frames agree on a
+#          non-ground colour (the drop shadow + outer bevel ring);
+#   OVER   every position where the frames agree AND at least one cell's sprite differs
+#          there (the pass provably overrides club art at that position, and the result
+#          is club-independent across 8-12 different kits).
+# Applying them to unwitnessed clubs is the standing baked-chrome inference; clubs whose
+# silhouette deviates from the shared one (e.g. Sporting Port.) keep a small residual,
+# which is why the parity buckets stay declared.
+# Cell inventories are transcribed off the frames (ids verified against each cell).
+BRACKET_CELLS = {
+    "L": {"win": (22, 2, 60, 68), "spr": (4, 6)},  # window x22..81, sprite at +({4},{6})
+    "R": {"win": (416, 2, 60, 68), "spr": (7, 6)},  # window x416..475, sprite at (423,T+8)
+}
+BRACKET_TIES_IDS = {
+    "03_euroleague_qtrfinals_LEG1_PLAYED_1998-03-14.png": [
+        (1038, 40),
+        (1189, 1000),
+        (1003, 1042),
+        (1024, 1076),
+    ],
+    "08_facup_qtrfinals_DOMESTIC_bracket_unplayed_1999-03-04.png": [
+        (77, 45),
+        (63, 40),
+        (70, 46),
+        (48, 57),
+    ],
+}
+BRACKET_TOPS = [113, 193, 273, 353]
+# The CARDS ridi icons: 17x20 windows at (13 / 271, bar_top), sprite at (0,0) in-window;
+# grounds differ per card (SF1 (200,220,240) / SF2 (192,220,192)). 12 cells per side.
+CARDS_ICON_FRAMES = {
+    "06_cocacola_semifinals_drawn_1998-01-10.png": {
+        "sf1": [80, 40, 40, 80],
+        "sf2": [54, 66, 66, 54],
+    },
+    "04_euroleague_semifinals_LEG1_PLAYED_1998-04-04.png": {
+        "sf1": [40, 1189, 1189, 40],
+        "sf2": [1076, 1003, 1003, 1076],
+    },
+    "09_euroleague_semifinals_DRAWN_unplayed_1999-03-27.png": {
+        "sf1": [1010, 1077, 1077, 1010],
+        "sf2": [1104, 1058, 1058, 1104],
+    },
+}
+CARDS_ICON_X = {"sf1": 13, "sf2": 271}
+CARDS_ICON_TOPS = [209, 231, 301, 323]
+CARDS_ICON_GROUND = {"sf1": (200, 220, 240), "sf2": (192, 220, 192)}
+
 # The competition rail is cut WHOLE per competition, not composed. Its chips carry three
 # witnessed states -- selected (a red plate), enabled (black plate, yellow text) and dimmed
 # (drawn through to the wallpaper) -- and WHICH competitions are dimmed is a career state
@@ -299,6 +353,46 @@ def cut(im: Image.Image, box: tuple[int, int, int, int]) -> Image.Image:
 
 def frame(name: str) -> Image.Image:
     return Image.open(REFS / name).convert("RGB").crop((0, 0, 640, 480))
+
+
+def _sprite_maps(png: Path, ox: int, oy: int) -> tuple[set, dict]:
+    """A sprite's opaque positions + colours, keyed by in-window coordinates."""
+    sp = Image.open(png).convert("RGBA")
+    sil: set = set()
+    col: dict = {}
+    for sy in range(sp.height):
+        for sx in range(sp.width):
+            r, g, b, a = sp.getpixel((sx, sy))
+            if a >= 128:
+                sil.add((ox + sx, oy + sy))
+                col[(ox + sx, oy + sy)] = (r, g, b)
+    return sil, col
+
+
+def _overlay_vote(cells: list, ww: int, wh: int, ground: tuple) -> tuple:
+    """Vote the outline pass across witnessed cells (see the OVERLAYS header block).
+
+    cells: (frame, win_x, win_y, silhouette, sprite_colours) per witnessed cell.
+    Returns (under RGBA, over RGBA, n_under, n_over).
+    """
+    under = Image.new("RGBA", (ww, wh), (0, 0, 0, 0))
+    over = Image.new("RGBA", (ww, wh), (0, 0, 0, 0))
+    n_under = n_over = 0
+    for ry in range(wh):
+        for rx in range(ww):
+            vals = {fr.getpixel((wx + rx, wy + ry)) for fr, wx, wy, _s, _c in cells}
+            if len(vals) != 1:
+                continue  # club-varying -> stays the sprite's own (bucketed residual)
+            c = vals.pop()
+            covered = [((rx, ry) in sil, col.get((rx, ry))) for _f, _x, _y, sil, col in cells]
+            if not any(cov for cov, _ in covered):
+                if c != ground:
+                    under.putpixel((rx, ry), (*c, 255))
+                    n_under += 1
+            elif any(cov and sc != c for cov, sc in covered):
+                over.putpixel((rx, ry), (*c, 255))
+                n_over += 1
+    return under, over, n_under, n_over
 
 
 def main() -> None:
@@ -401,6 +495,39 @@ def main() -> None:
                     strip.putpixel((x, y), BRACKET_BAR_BG)
         strip.save(OUT / f"bracket_panel_{fam}.png")
     print("bracket_panel_euro.png + bracket_panel_dom.png <- two witnessed UNPLAYED panels")
+
+    # -- the kit-well outline-pass overlays (see the OVERLAYS header block).
+    for side, spec in BRACKET_CELLS.items():
+        wx0, wy0, ww, wh = spec["win"]
+        ox, oy = spec["spr"]
+        cells = []
+        for fname, ties in BRACKET_TIES_IDS.items():
+            fr = frame(fname)
+            for i, pair in enumerate(ties):
+                cid = pair[0] if side == "L" else pair[1]
+                sil, col = _sprite_maps(ROOT / f"app/art/kits/{cid}.png", ox, oy)
+                cells.append((fr, wx0, BRACKET_TOPS[i] + wy0, sil, col))
+        under, over, nu, no = _overlay_vote(cells, ww, wh, BRACKET_WHITE)
+        under.save(OUT / f"kitwell_under_{side}.png")
+        over.save(OUT / f"kitwell_over_{side}.png")
+        print(
+            f"kitwell_under/over_{side}.png <- {len(cells)} witnessed cells "
+            f"({nu} under + {no} over px)"
+        )
+    for card, ground in CARDS_ICON_GROUND.items():
+        cells = []
+        for fname, sides in CARDS_ICON_FRAMES.items():
+            fr = frame(fname)
+            for i, cid in enumerate(sides[card]):
+                sil, col = _sprite_maps(ROOT / f"app/art/kits/ridi/{cid}.png", 0, 0)
+                cells.append((fr, CARDS_ICON_X[card], CARDS_ICON_TOPS[i], sil, col))
+        under, over, nu, no = _overlay_vote(cells, 17, 20, ground)
+        under.save(OUT / f"icon_under_{card}.png")
+        over.save(OUT / f"icon_over_{card}.png")
+        print(
+            f"icon_under/over_{card}.png <- {len(cells)} witnessed cells "
+            f"({nu} under + {no} over px)"
+        )
 
     # -- the SEMIFINAL cards body, one strip for both column sets (see the header).
     cards = frame(CARDS_SRC).copy()

@@ -338,17 +338,16 @@ is real and shipped, and PM98 ships two match presentations, so this is the seco
   original's float32 dirt). See `docs/re/stadium_screen_re.md` §"The cost function". What
   remains there is the per-club STARTING grades — `club+0x50`, the preset selector, is not
   yet reversed, so only Man Utd's captured grades are used and nothing is interpolated.
-* **The kit-outline blit pass** — the engine's un-reversed outline/bevel pass.
-  **Restructured 2026-07-26 (s62)** by classifying every differing pixel of all 16 bracket
-  kit cells: it is (1) a flat `(128,128,128)` **drop shadow, 1-2 px, bottom/right of the
-  silhouette only** (dest-halving on the white panel — which is why the old "50 % blend"
-  test failed: it blended the outline index, but the shadow ignores the sprite entirely),
-  (2) a **highlight applied to the sprite's own top/left edge pixels** (192/160,160,164/144
-  entries), and (3) ~115 scattered interior single-pixel diffs per cell, unexplained.
-  A minority of ring pixels also match palette-snapped half-blends of the NW sprite
-  neighbour, so an anti-alias component may coexist at concavities. No 0 px rule yet; the
-  bracket's kit columns stay a declared bucket. Full data:
-  `knockout_views_re.md` §"The outline pass, narrowed again".
+* **The kit-outline blit pass** — **TWO of its THREE components CLOSED 2026-07-27**
+  (`knockout_views_re.md` §"The outline pass, SOLVED in two of three parts"): the
+  "unexplained interior" was the realised-palette bug (MINIESC exported under the shared
+  VGA table; all 476 kits re-exported under MANAGER.PAL + Windows statics — the MINIBAND
+  fix, third bank), and the ring is POSITION-CONSTANT (shared silhouette) and now baked
+  verbatim (`kitwell_under_L/R.png`, `icon_under/over_sf1/sf2.png`). Bracket kit residual
+  3868/3556 → 1659/1691; the semifinal cards' icons hit **0 px** on the cocacola witness.
+  Still open: (a) the on-sprite edge bevel of the 48x64 kits (club-dependent, rule
+  un-reversed, ~160-190 px/cell — the buckets stay), (b) porting the same bake to
+  EuroGroupScreen's 24 group kit cells (~1260 px/frame) and OffersScreen's panel.
 * ~~**MINIBAND dither** — 99 px across the six euro group frames.~~ **CLOSED 2026-07-26.**
   Not dither: the flags were decoded with the shared VGA palette instead of `MANAGER.PAL`
   plus the 20 Windows static system colours. Re-exported, **0 px** over all 24 flag cells

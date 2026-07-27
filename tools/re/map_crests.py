@@ -167,14 +167,14 @@ def main() -> None:
     # id assignment therefore maps every foreign id to its record's code exactly.
     # Cross-check: the crest-index name must EQUAL the teams_all header name
     # wherever both decoded (teams_all '?' headers are recovered by the index).
-    teams_all = json.loads(
-        (ROOT / "assets" / "teams_all.json").read_text(encoding="utf-8")
-    )["teams"]
+    teams_all = json.loads((ROOT / "assets" / "teams_all.json").read_text(encoding="utf-8"))[
+        "teams"
+    ]
     eng_names = {
         c["name"]
-        for c in json.loads(
-            (ROOT / "assets" / "squads_english.json").read_text(encoding="utf-8")
-        )["clubs"]
+        for c in json.loads((ROOT / "assets" / "squads_english.json").read_text(encoding="utf-8"))[
+            "clubs"
+        ]
     }
     foreign = {}
     recovered = []
@@ -242,7 +242,8 @@ def export_kits(id_to_code: dict[str, str]) -> None:
     app/art/kits/nano/<club_id>.png. NANOESC entries are palette-less OS/2-core
     DIBs -> export_icons.decode_dib. Runs only where the owned PKFs exist
     (extracted/ is gitignored); the PNGs are committed, CI just regenerates .import."""
-    from export_art import render, riff_palette  # noqa: PLC0415 - tool-local import
+    from export_art import riff_palette  # noqa: PLC0415 - tool-local import
+    from export_flags import flag_palette  # noqa: PLC0415 - tool-local import
     from export_icons import decode_dib  # noqa: PLC0415 - tool-local import
     from pkf_unpack import parse  # noqa: PLC0415 - tool-local import
 
@@ -258,14 +259,31 @@ def export_kits(id_to_code: dict[str, str]) -> None:
         if r.get("end"):
             break
     pal = riff_palette("MANAGER.PAL")
+    # MINIESC decodes through the REALISED palette -- MANAGER.PAL + the 20 Windows
+    # static entries -- NOT the shared VGA table. Same bug family the MINIBAND flags
+    # had (export_flags.flag_palette): measured on the 16 bracket witness kit cells
+    # 2026-07-27, the VGA decode disagrees with every frame in a CONSISTENT per-entry
+    # remap -- (24,24,16)->(10,15,0) in 203/204 px (index 111), the green ramp
+    # (90,126,71)->(39,159,59) 69/69, (115,148,99)->(61,191,82) 41/41,
+    # (37,78,12)->(0,95,0) 38/38, (192,227,192)->(192,220,192) 26/26 (index 8, the
+    # Windows money-green static). Re-decode under the realised palette kills the
+    # whole interior residual class.
+    realized_flat: list[int] = []
+    for r, g, bb in flag_palette():
+        realized_flat += [r, g, bb]
+    import pkf_image  # noqa: PLC0415 - tool-local import
+    from pkf_unpack import files_of  # noqa: PLC0415 - tool-local import
+
+    mini_buf = MINIESC.read_bytes()
+    mini_off = {n: (o, s) for n, o, s in files_of(mini_buf)}
     for cid, code in id_to_code.items():
-        # exact=True: the Pillow path honours the stripped header's bfOffBits and rotates
-        # every sprite 1024//48 rows + 1024%48 columns (the bank shipped wrapped until
-        # 2026-07-26 -- "40.png is two half-shirts"). pkf_image.dib_indices reads from
-        # offset 54 and gives MINIESC its true 45x57-bbox sprites, the ones the BRACKET
-        # frames match 1373/1661 opaque px (rest = the un-reversed outline pass).
-        img = render("DBDAT/MINIESC.PKF", f"EQ96{code}.BMP", force_vga=True,
-                     transparent=True, exact=True)
+        # exact decode: rows from offset 54, no bfOffBits (the bank shipped WRAPPED
+        # until 2026-07-26 because the Pillow path honoured the stripped header's
+        # bogus bfOffBits -- "40.png is two half-shirts"). pkf_image.dib_indices gives
+        # MINIESC its true 45x57-bbox sprites.
+        off, size = mini_off[f"EQ96{code}.BMP"]
+        idx = pkf_image.dib_indices(mini_buf[off : off + size])
+        img = pkf_image.rgba(idx, realized_flat, transparent=True)
         img.save(KITS_DIR / f"{cid}.png")
         decode_dib(nano[f"EQ96{code}.BMP"], pal).save(nano_dir / f"{cid}.png")
     print(f"exported {len(id_to_code)} kit PNG pairs -> {KITS_DIR.relative_to(ROOT)} (+nano/)")
