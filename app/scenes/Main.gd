@@ -4404,8 +4404,10 @@ func _pop_division_finals(after: Callable) -> void:
 
 ## Rides the same post-week card chain the channelTV card and the monthly awards do,
 ## because that is how the original raises it: over the hub, with no menu step. FINISH
-## and CONTINUE both dismiss it -- the live drive proved CONTINUE cross-fades straight
-## out to the hub and does not run a draw animation.
+## and CONTINUE both dismiss it. The card plays the one-by-one reveal (p0125->p0131:
+## drum spinning, each club on the hand's slip, park on BOMBO00) — the 2026-07-25 film
+## that "did not run a draw animation" had filmed an ALREADY-FINISHED draw, parked,
+## which is exactly the post-reveal state.
 func _pop_cup_draw(after: Callable) -> void:
 	if _career == null or (_career.pending_cup_draws as Array).is_empty():
 		if after.is_valid():
@@ -4419,6 +4421,7 @@ func _pop_cup_draw(after: Callable) -> void:
 	scr.setup(str(d.get("key", "fa_cup")), str(d.get("title", "")), str(d.get("round", "")),
 		ties, int(d.get("total", ties.size())), d.get("legs", ["MATCH", "REPLAY"]),
 		_career.club_id, _career.manager_name)
+	scr.reveal()   # the live, unprompted card plays the draw; hub re-views stay parked
 	_wire_cup_draw_rows(scr, ties, d.get("legs", []))
 	var dismiss := func() -> void:
 		AudioManager.ui_select()

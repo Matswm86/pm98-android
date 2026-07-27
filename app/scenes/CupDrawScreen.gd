@@ -35,12 +35,25 @@ class_name CupDrawScreen
 ## against p0131 and p0747 at ZERO differing pixels, and the MANAGER'S OWN name comes out
 ## green (42,191,85) where another manager's is pale blue.
 ##
-## NOT witnessed, and therefore NOT drawn: the hand (MANO0..7) and ball (BOLA0..3)
-## sprites the EXE loads for this screen appear in no captured frame, so they are
-## exported but unused; and the CONTINUE ball's lit/unlit rule is unknown, so the chrome
-## keeps frame 74's phase. The white row the frames show is a MOUSE-HOVER highlight,
-## which a touch app has no equivalent of -- it is bound to the tapped row instead, so
-## the state is the original's own even though the trigger cannot be.
+## THE DRAW IS A ONE-BY-ONE REVEAL, witnessed end to end (REFRUN, Coca-Cola ROUND 3,
+## 2026-07-27 forensics): `p0125` empty grid, drum on BOMBO03 -> `p0126` ONE tie landed,
+## drum on BOMBO08 -> `p0127` the HAND out of the drum — MANO7 byte-exact at (106,144) —
+## holding the slip with the NEXT club's name ("Bradford City", tie 2's HOME side, not
+## yet in the grid) -> `p0131` the full grid, drum parked on BOMBO00. So: the drum SPINS
+## during the draw (every mid-draw frame is on a different BOMBO), each CLUB is revealed
+## on the hand's slip and then lands in MATCHES (home first, then away), and a finished
+## draw parks on BOMBO00 — which is why the 2026-07-25 film of an already-finished draw
+## "did not animate": it was parked, not proof there is no animation.
+## The slip name: calend12, pen centred on field-sum 380, pen top 152, inked through the
+## slip's own tones — (192)->114 flat, (240)->144 flat, (220)-> a 144/128 checkerboard
+## by (x+y) parity — all 265 name-ink pixels of p0127 reproduce exactly.
+## OURS, flagged: the reveal CADENCE (rise/hold/gap timings), the MANO0..6 rising
+## sequence's use and rate, extending the reveal to the LIST form (witnessed only on the
+## grid), and tap-to-skip. BOLA0..3 stay exported and unused (no witnessed frame).
+## The CONTINUE ball's lit/unlit rule is unknown, so the chrome keeps frame 74's phase.
+## The white row the frames show is a MOUSE-HOVER highlight, which a touch app has no
+## equivalent of -- it is bound to the tapped row instead, so the state is the
+## original's own even though the trigger cannot be.
 
 signal continue_pressed
 signal finish_pressed
@@ -56,6 +69,21 @@ const PICTURE := Rect2(31, 76, 260, 144)
 const STRIP_AT := Vector2(31, 76)
 const FONDO_AT := Vector2(103, 76)
 const BOMBO_AT := Vector2(136, 76)
+
+# ---- the reveal (witnessed p0125 -> p0126 -> p0127 -> p0131) ----------------
+const MANO_AT := Vector2(106, 144)   # MANO7 byte-exact on p0127
+const SLIP_SUM := 380                # name pen centres here (calend12; solved, 0 px)
+const SLIP_PEN_TOP := 152            # absolute pen top of the slip name
+# The slip's three tones and the ink each one takes (all 265 name pixels of p0127):
+# (192)->114, (240)->144, (220)-> 144 when (x+y) even, 128 when odd.
+const SLIP_INK := {192: 114, 240: 144}
+const SLIP_DITHER_EVEN := 144
+const SLIP_DITHER_ODD := 128
+# Cadence — OURS, flagged: no two witnessed stills are a known time apart, so these are
+# chosen for readability, and any tap skips straight to the finished draw.
+const REVEAL_RISE := 0.35            # MANO0..7 rising
+const REVEAL_HOLD := 0.85            # MANO7 + the name held readable
+const REVEAL_GAP := 0.15             # hand away before the next club
 
 # Both witnessed titles centre on the same field: pen_x = (TITLE_SUM - advance) / 2 gives
 # 96 for "Coca-Cola Cup" (adv 133) and 121 for "F.A. Cup" (adv 83), which is where the two
@@ -175,8 +203,21 @@ var _legs: Array = ["MATCH", "REPLAY"]
 var _ties: Array = []             # [{home: String, away: String}], away "" while undrawn
 var _total := 0                   # ties in the round; drives the scrollbar
 var _first := 0                   # first visible row
-var _spin := 0.0                  # drum animation phase (seconds)
+var _spin := 0.0                  # drum animation phase (seconds; reveal only)
+var _pinned := -1                 # pin_drum's frame, or -1
 var _press := ""
+# The one-by-one reveal (see the docstring): a flattened list of the clubs in draw
+# order; _reveal_step of them have LANDED in MATCHES, the one at _reveal_step is on
+# the hand's slip. Inactive (-1 total) outside a reveal — the parked, finished state.
+var _reveal_on := false
+var _reveal_names: Array = []
+var _reveal_step := 0
+var _reveal_t := 0.0
+var _mano: Array[Texture2D] = []
+var _mano7_img: Image = null      # slip tones for the name ink LUT
+var _slip_name := ""              # cache key for _slip_tex
+var _slip_tex: Texture2D = null
+var _font12c_img: Image = null
 var _own_club_id := -1            # the manager's club — its tie takes the dark plate
 var _own_manager := ""            # his name — it renders green on the card
 var _sel := -1                    # the tapped row, whose tie fills the detail card
@@ -191,6 +232,12 @@ func _ready() -> void:
 		var t: Texture2D = load("res://art/screens/cupdraw/bombo%02d_opaque.png" % i)
 		if t != null:
 			_bombo.append(t)
+	for i in 8:
+		var m: Texture2D = load("res://art/screens/cupdraw/mano%d.png" % i)
+		if m != null:
+			_mano.append(m)
+	if _mano.size() == 8:
+		_mano7_img = _mano[7].get_image()
 	_page10 = PMFont.page_texture("proman10")
 	_page14 = PMFont.page_texture("proman14")
 	_page12c = PMFont.page_texture("calend12")
@@ -201,7 +248,9 @@ func _ready() -> void:
 	custom_minimum_size = Vector2(W, H)
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	gui_input.connect(_on_input)
-	set_process(true)
+	# Parked on BOMBO00 until reveal() runs — the witnessed finished-draw state
+	# (p0131, p0133, p0747). The old always-spinning idle was the port's invention.
+	set_process(false)
 	queue_redraw()
 
 
@@ -248,19 +297,58 @@ func show_tie(card: Dictionary, row := -1) -> void:
 ## Hold the drum on one of the twelve frames (render-diff harness / a still capture).
 func pin_drum(i: int) -> void:
 	set_process(false)
-	_spin = float(i) / 12.0 + 0.0001
+	_reveal_on = false
+	_pinned = i % 12
+	queue_redraw()
+
+
+## Play the draw as the original does (see the docstring): drum spinning, each club
+## revealed on the hand's slip and then landing in MATCHES, park on BOMBO00 when done.
+## Call after setup(); without it the screen shows the finished, parked draw.
+func reveal() -> void:
+	_reveal_names = []
+	for tie in _ties:
+		if str((tie as Dictionary).get("home", "")) != "":
+			_reveal_names.append(str(tie["home"]))
+		if str((tie as Dictionary).get("away", "")) != "":
+			_reveal_names.append(str(tie["away"]))
+	if _reveal_names.is_empty():
+		return
+	_reveal_on = true
+	_reveal_step = 0
+	_reveal_t = 0.0
+	_spin = 0.0
+	_pinned = -1
+	set_process(true)
+	queue_redraw()
+
+
+## End the reveal instantly — the full grid, drum parked (tap-to-skip; OURS).
+func skip_reveal() -> void:
+	if not _reveal_on:
+		return
+	_reveal_on = false
+	_reveal_step = _reveal_names.size()
+	set_process(false)
 	queue_redraw()
 
 
 func _process(delta: float) -> void:
-	# The drum turns: frames 74 and 10 hold BOMBO08 and BOMBO07 at the same spot, so the
-	# twelve frames are a cycle. The RATE is not witnessed — 12/s is ours, flagged.
-	if _bombo.is_empty():
+	# The drum turns DURING the draw only (p0125/p0126 sit on different BOMBO frames;
+	# every finished frame is parked). The RATE is not witnessed — 12/s is ours, flagged;
+	# frames 74 and 10 hold BOMBO08 and BOMBO07 at the same spot, so the twelve cycle.
+	if not _reveal_on or _bombo.is_empty():
+		set_process(false)
 		return
-	var was := int(_spin * 12.0) % _bombo.size()
 	_spin += delta
-	if int(_spin * 12.0) % _bombo.size() != was:
-		queue_redraw()
+	_reveal_t += delta
+	if _reveal_t >= REVEAL_RISE + REVEAL_HOLD:
+		_reveal_step += 1
+		_reveal_t = -REVEAL_GAP
+		if _reveal_step >= _reveal_names.size():
+			_reveal_on = false
+			set_process(false)
+	queue_redraw()
 
 
 # ---- input ---------------------------------------------------------------
@@ -280,6 +368,12 @@ func _to_design(p: Vector2) -> Vector2:
 
 func _on_input(e: InputEvent) -> void:
 	if not (e is InputEventScreenTouch or e is InputEventMouseButton):
+		return
+	# During the reveal any tap completes the draw instantly (OURS, flagged) — the
+	# buttons and the row cards come back once the grid is full.
+	if _reveal_on:
+		if not e.pressed:
+			skip_reveal()
 		return
 	var d := _to_design(e.position)
 	if e.pressed:
@@ -375,14 +469,41 @@ func _draw() -> void:
 			Color(1, 1, 1, 0.18), true)
 
 
+## The ties as the current reveal step shows them: clubs land one at a time, home
+## before away (p0126/p0127) — a club not yet landed reads as un-drawn, which both
+## panel forms already render (the away-empty partial states of frames 74/75).
+func _masked_ties() -> Array:
+	if not _reveal_on:
+		return _ties
+	var out: Array = []
+	var n := _reveal_step
+	for tie in _ties:
+		var t: Dictionary = (tie as Dictionary).duplicate()
+		if str(t.get("home", "")) != "":
+			if n > 0:
+				n -= 1
+			else:
+				t["home"] = ""
+				t["home_id"] = -1
+		if str(t.get("away", "")) != "":
+			if n > 0:
+				n -= 1
+			else:
+				t["away"] = ""
+				t["away_id"] = -1
+		out.append(t)
+	return out
+
+
 ## The GRID form: sixteen four-column bands, home kit | home club | away club | away kit.
 ## A band whose tie is the MANAGER'S takes the dark plate and prints his club in bright
 ## yellow; the tapped band goes white. Both are the frames' own states.
 func _draw_grid() -> void:
+	var ties := _masked_ties()
 	for k in GRID_ROWS_N:
-		if k >= _ties.size():
+		if k >= ties.size():
 			break
-		var tie: Dictionary = _ties[k]
+		var tie: Dictionary = ties[k]
 		var home := str(tie.get("home", ""))
 		if home == "":
 			continue
@@ -453,8 +574,9 @@ func _draw_card() -> void:
 				Rect2(1, 3, 45, 57))
 
 
-## Black window, competition strip, drum backdrop, drum frame (opaque). Exactly the
-## original's layer order — see the module docstring.
+## Black window, competition strip, drum backdrop, drum frame (opaque), and — during a
+## reveal — the hand with the slip over it. Exactly the original's layer order: p0127
+## proves MANO7 blits over the drum at (106,144) with the club's name on the slip.
 func _draw_picture() -> void:
 	draw_rect(PICTURE, Color(0, 0, 0), true)
 	if _strip != null:
@@ -462,7 +584,68 @@ func _draw_picture() -> void:
 	if _fondo != null:
 		draw_texture(_fondo, FONDO_AT)
 	if not _bombo.is_empty():
-		draw_texture(_bombo[int(_spin * 12.0) % _bombo.size()], BOMBO_AT)
+		var idx := 0                          # parked = BOMBO00 (p0131/p0133/p0747)
+		if _pinned >= 0:
+			idx = _pinned % _bombo.size()
+		elif _reveal_on:
+			idx = int(_spin * 12.0) % _bombo.size()
+		draw_texture(_bombo[idx], BOMBO_AT)
+	if _reveal_on and _reveal_t >= 0.0 and _reveal_step < _reveal_names.size() \
+			and not _mano.is_empty():
+		var mi := 7
+		if _reveal_t < REVEAL_RISE:
+			mi = clampi(int(_reveal_t / REVEAL_RISE * 8.0), 0, 7)
+		draw_texture(_mano[mini(mi, _mano.size() - 1)], MANO_AT)
+		if mi == 7:
+			var tex := _slip_name_tex(str(_reveal_names[_reveal_step]))
+			if tex != null:
+				draw_texture(tex, MANO_AT)
+
+
+## The name on the hand's slip, pre-rendered per club: calend12 centred on field-sum
+## 380, inked THROUGH the slip's own tones — (192)->114, (240)->144, (220)-> the
+## 144/128 checkerboard by (x+y) parity. Reproduces p0127's 265 name pixels exactly;
+## pixels that would fall off the slip's paper are simply not inked.
+func _slip_name_tex(club: String) -> Texture2D:
+	if club == _slip_name and _slip_tex != null:
+		return _slip_tex
+	if _mano7_img == null or _page12c == null:
+		return null
+	if _font12c_img == null:
+		_font12c_img = _page12c.get_image()
+	var img := Image.create(_mano7_img.get_width(), _mano7_img.get_height(),
+		false, Image.FORMAT_RGBA8)
+	@warning_ignore("integer_division")
+	var pen := (SLIP_SUM - _advance(_g12c, club)) / 2 - int(MANO_AT.x)
+	var top := SLIP_PEN_TOP - int(MANO_AT.y)
+	for i in club.length():
+		var g: Dictionary = _g12c.get(club.unicode_at(i), {})
+		if g.is_empty():
+			continue
+		var r: Rect2i = g["rect"]
+		var off: Vector2i = g["off"]
+		for py in r.size.y:
+			for px in r.size.x:
+				if _font12c_img.get_pixel(r.position.x + px, r.position.y + py).a < 0.5:
+					continue
+				var sx := pen + off.x + px
+				var sy := top + off.y + py
+				if sx < 0 or sy < 0 or sx >= img.get_width() or sy >= img.get_height():
+					continue
+				var bg := _mano7_img.get_pixel(sx, sy)
+				if bg.a < 0.5 or bg.r8 != bg.g8 or bg.g8 != bg.b8:
+					continue                     # off the slip's paper: no ink
+				var v := -1
+				if bg.r8 == 220:
+					v = SLIP_DITHER_EVEN if ((sx + sy) & 1) == 0 else SLIP_DITHER_ODD
+				elif SLIP_INK.has(bg.r8):
+					v = int(SLIP_INK[bg.r8])
+				if v >= 0:
+					img.set_pixel(sx, sy, Color8(v, v, v))
+		pen += int(g["adv"])
+	_slip_name = club
+	_slip_tex = ImageTexture.create_from_image(img)
+	return _slip_tex
 
 
 ## The MATCHES list. Home club right-aligned so its pen ENDS at 465, the fixed "-" at
@@ -470,11 +653,12 @@ func _draw_picture() -> void:
 ## rows across the two careers. A tie whose away club has not been drawn yet shows the
 ## home club and the dash alone, which is what frames 74 and 75 both catch mid-draw.
 func _draw_rows() -> void:
+	var ties := _masked_ties()
 	for k in LIST_ROWS:
 		var i := _first + k
-		if i >= _ties.size():
+		if i >= ties.size():
 			break
-		var tie: Dictionary = _ties[i]
+		var tie: Dictionary = ties[i]
 		var home := str(tie.get("home", ""))
 		var away := str(tie.get("away", ""))
 		if home == "":

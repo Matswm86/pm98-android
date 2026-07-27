@@ -1,5 +1,10 @@
 # The SORTEO screen — the cup DRAW (frame-exact, 2026-07-24)
 
+Status: BUILT, incl. the ONE-BY-ONE REVEAL (2026-07-27, §"The reveal") — clubs land
+on the hand's slip exactly as p0125→p0131 witness; the slip render reproduces p0127's
+265 name pixels at 0 px. OURS, flagged: the reveal cadence, tap-to-skip, the list-form
+extension. Open: the CONTINUE ball's lit/unlit rule, the shadow-pass driver.
+
 The screen MANAGER.EXE raises when a knockout round is drawn. It replaces
 `app/scenes/CupScreen.gd`, which was an invented marble-panel surface with no original
 counterpart (APP_VS_SPEC_AUDIT B2). Scene: `app/scenes/CupDrawScreen.gd`.
@@ -302,28 +307,44 @@ from the bracket's LATEST round:
 * ~~**The two long value cells** in the bottom-left panel~~ — **CLOSED 2026-07-25.** They
   are the tie-detail card, populated and specified above (REFRUN R8). The `flecha
   azul/verde` arrows the EXE loads are still exported and unused.
-* **MANO0..7 and BOLA0..3** — the hand and ball the EXE loads for this screen appear in
-  no captured frame. Exported, unused.
+* ~~**MANO0..7 and BOLA0..3** — the hand and ball the EXE loads for this screen appear in
+  no captured frame.~~ — **FALSIFIED and CLOSED 2026-07-27.**
+  `refrun-manutd-1997-98/named/p0127_cup_draw.png` shows **MANO7 byte-exact at
+  (106,144)** (5.4 mean|d| best match on the earlier sweep; re-verified here at 0
+  differing pixels over the sprite's whole alpha once the slip name is inked). See
+  §"The reveal" below. BOLA0..3 remain unwitnessed — exported, unused.
 
-  **2026-07-25 hunt, negative result — recorded so it is not repeated.** A live Coca-Cola
-  Cup ROUND 2 draw was reached twice on a driven career and filmed at 25 fps
-  (`tools/re/wine/film.sh`). What was ruled out:
+  **The 2026-07-25 "does not animate" film — EXPLAINED, not contradicted.** That film
+  had captured an ALREADY-FINISHED draw: BOMBO-frame forensics across every capture show
+  each mid-draw frame on a DIFFERENT drum frame (p0125 = BOMBO03, p0126 = BOMBO08) while
+  every finished-draw frame is parked on **BOMBO00** (p0131, and p0133/p0747 = BOMBO00
+  under the shadow pass). A parked draw is a still — which is exactly what was filmed.
+  What that film DID establish and still stands: CONTINUE on a finished draw
+  cross-fades straight out, and the bottom-left panel is a per-tie detail card.
 
-  * **The screen does not animate on open.** 20 s of film from ~1 s after the screen
-    appeared: the ONLY changing pixels in the whole 640x480 frame are x503..528 y442..462
-    — the CONTINUE button's spinning football. The drum is a still.
-  * **CONTINUE does not run the draw.** Clicking it (551, 451) cross-fades straight out to
-    the hub. In 350 filmed frames the only non-spinner change is that 5-frame wipe.
-  * The tie panel bottom-left has TWO states: **empty** (this draw, ties already listed in
-    MATCHES) and **populated** with kits, club names and 1ST/2ND LEG stadiums (a week-1
-    draw). So the panel is a per-tie detail view, not the drum's output.
+## The reveal (witnessed 2026-07-27; built the same day)
 
-  Still untried, in order of likelihood: the red **FINISH** button (405, 451), a click on
-  the drum art itself, and selecting a MATCHES row. Also possible the animation runs only
-  the first time a competition's draw is raised in a career, i.e. it must be caught on the
-  very first CONTINUE that opens it. The harness is ready either way — `cup_draw` is
-  parked out of `screens.json` into `screens_parked.json`, so a draw reads as UNKNOWN and
-  `autodrive.py` films it at 25 fps automatically.
+The witnessed sequence, Coca-Cola ROUND 3: `p0125` EMPTY grid, drum spinning (BOMBO03)
+→ `p0126` ONE tie landed (BOMBO08) → `p0127` the HAND out of the drum — MANO7 at
+(106,144) — holding the slip with the NEXT club's name, **"Bradford City" = tie 2's
+HOME side, not yet in the grid** (so the unit of reveal is the CLUB, home before away)
+→ `p0131` the full grid, drum parked on BOMBO00.
+
+The slip name (all 265 ink pixels of p0127 reproduce at ZERO differing pixels,
+rendered from the rule, not sampled): **calend12**, pen centred on **field-sum 380**,
+pen top **152**, inked through the slip's own paper tones —
+`(192)→114` flat, `(240)→144` flat, `(220)→` a **144/128 checkerboard by (x+y)
+parity** (even → 144). Ink lands only on the paper (greyscale slip pixels).
+
+Built: `CupDrawScreen.reveal()` — grid empty, drum cycling; per club: MANO0..7 rise,
+the slip name at MANO7, the club lands in MATCHES; park on BOMBO00 + CONTINUE when
+done. `Main._pop_cup_draw` (the live, unprompted card) calls it; hub re-views of an
+already-drawn round stay parked, and the idle screen no longer spins (the old
+always-spinning idle was the port's own invention — the finished state is parked).
+OURS, flagged: the cadence (`REVEAL_RISE/HOLD/GAP`, no two stills are a known time
+apart), the MANO0..6 rising rate, extending the reveal to the LIST form (witnessed on
+the grid only), tap-to-skip (any tap completes the draw; the buttons return after).
+BOLA frames stay unused.
 * **The CONTINUE ball's lit/unlit rule.** Frame 74 is dark, frame 75 is green, frame 10
   differs again; the trigger is unknown, so the chrome bakes frame 74's phase and the
   differ excludes that rect. This is the only exclusion.

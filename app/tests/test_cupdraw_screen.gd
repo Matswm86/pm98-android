@@ -113,6 +113,41 @@ func _run() -> void:
 	await process_frame
 	_check(not bool(fired["continue"]), "a tap off the buttons emits nothing")
 
+	# 7. The one-by-one reveal (p0125->p0131): clubs land home-first, one at a time;
+	# a tap skips to the finished, parked draw; buttons come back afterwards.
+	scr.setup("league_cup", "Coca-Cola Cup", "ROUND 3", [
+		{"home": "Aston Villa", "away": "Carlisle U."},
+		{"home": "Bradford City", "away": "Manchester Utd."},
+	], 16, ["MATCH", "REPLAY"])
+	scr.reveal()
+	_check(scr.is_processing(), "reveal() starts the draw")
+	var m0: Array = scr._masked_ties()
+	_check(str((m0[0] as Dictionary)["home"]) == "", "step 0: nothing landed yet")
+	scr._reveal_step = 1
+	var m1: Array = scr._masked_ties()
+	_check(str((m1[0] as Dictionary)["home"]) == "Aston Villa"
+		and str((m1[0] as Dictionary)["away"]) == "",
+		"step 1: tie 1's HOME alone (p0126's grammar)")
+	scr._reveal_step = 3
+	var m3: Array = scr._masked_ties()
+	_check(str((m3[1] as Dictionary)["home"]) == "Bradford City"
+		and str((m3[1] as Dictionary)["away"]) == "",
+		"step 3: tie 2 mid-reveal exactly as p0127 shows it")
+	var slip: Texture2D = scr._slip_name_tex("Bradford City")
+	_check(slip != null, "the slip name renders (calend12 + the p0127 ink rule)")
+	fired["continue"] = false
+	_tap(scr, CupDrawScreen.BTN_CONTINUE.get_center())
+	await process_frame
+	_check(not scr._reveal_on and not scr.is_processing(),
+		"a tap during the reveal skips to the parked draw")
+	_check(not bool(fired["continue"]), "the skipping tap is swallowed")
+	var mf: Array = scr._masked_ties()
+	_check(str((mf[1] as Dictionary)["away"]) == "Manchester Utd.",
+		"after the skip every club has landed")
+	_tap(scr, CupDrawScreen.BTN_CONTINUE.get_center())
+	await process_frame
+	_check(bool(fired["continue"]), "CONTINUE works again once the draw is parked")
+
 	print("\n%s" % ("ALL PASS" if _fail == 0 else "%d FAILED" % _fail))
 	quit(0 if _fail == 0 else 1)
 

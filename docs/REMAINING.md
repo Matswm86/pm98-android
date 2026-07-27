@@ -102,9 +102,18 @@ Four more, reported 2026-07-26 evening (second round, same play session):
 * **Season-2+ talents render wrong in lineups / squad management** — "they have stars,
   but no position or roles". New intake players must carry the same fields (position,
   posFine role, etc.) and draw exactly like the decoded squad.
-* **The cup-draw animation is not the original's** — today the spinning ball plays with
-  every pairing already on screen; the original reveals the draw progressively
-  (`cupdraw_screen_re.md`).
+* ~~**The cup-draw animation is not the original's** — today the spinning ball plays with
+  every pairing already on screen; the original reveals the draw progressively.~~ —
+  **BUILT 2026-07-27.** The RE doc's "MANO appears in no captured frame" was FALSIFIED:
+  p0127 holds MANO7 byte-exact at (106,144) with the drawn club's name on the slip, and
+  the p0125→p0131 chain witnesses the whole sequence (empty grid → clubs land one at a
+  time, home first → park on BOMBO00; every mid-draw frame is on a different BOMBO =
+  the drum spins DURING the draw, which also explains the 07-25 "does not animate" film
+  — it filmed a finished, parked draw). `CupDrawScreen.reveal()` plays it on the live
+  card; the slip name reproduces p0127's 265 ink pixels at 0 px (calend12, field-sum
+  380, the 192→114 / 240→144 / 220→144·128-checkerboard paper-tone rule). OURS,
+  flagged: cadence, tap-to-skip, the list-form extension. The idle screen now parks on
+  BOMBO00 instead of the invented endless spin (`cupdraw_screen_re.md` §"The reveal").
 * **Youth recruitment and training does not work like the original at all** — tracked in
   `youth_re.md`; Mats: implement it in a dedicated session.
 * **The Ground screen's stadium image never grows** — **INVESTIGATED 2026-07-26 evening:
