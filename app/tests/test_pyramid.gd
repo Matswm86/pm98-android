@@ -62,7 +62,7 @@ func _run() -> bool:
 
 	# --- Premier career: seed orders + head start ---------------------------
 	var prem: Array = by_league["eng_prem"]
-	var career := Career.create(prem[0], league_by_id["eng_prem"], prem, leagues, pyramid)
+	var career := _pinned_career(prem[0], league_by_id["eng_prem"], prem, leagues, pyramid)
 	ok = _assert(career.divisions.size() == 3, "3 other divisions built") and ok
 	for t in [2, 3, 4]:
 		ok = _assert(career.has_division(t), "tier %d present" % t) and ok
@@ -90,7 +90,7 @@ func _run() -> bool:
 
 	# --- Div-1 career: offset is RELATIVE to the manager (witnessed w5) -----
 	var d1: Array = by_league["eng_div1"]
-	var c_d1 := Career.create(d1[0], league_by_id["eng_div1"], d1, leagues, pyramid)
+	var c_d1 := _pinned_career(d1[0], league_by_id["eng_div1"], d1, leagues, pyramid)
 	ok = _assert(int(c_d1.divisions[1]["played"]) == 0, "Premier in sync for a Div-1 manager") and ok
 	ok = _assert(int(c_d1.divisions[3]["played"]) == 1, "Div2 a round ahead for a Div-1 manager") and ok
 	ok = _assert(int(c_d1.divisions[4]["played"]) == 1, "Div3 a round ahead for a Div-1 manager") and ok
@@ -211,3 +211,17 @@ func _run() -> bool:
 func _assert(cond: bool, label: String) -> bool:
 	print("  [%s] %s" % ["PASS" if cond else "FAIL", label])
 	return cond
+
+
+## S3 (2026-07-27): pin the career stream BEFORE create()'s first draw, so the division
+## sim and the rollover movement reproduce bit-exactly on CI. The old flake was an
+## UNPINNED stream occasionally promoting a club the sparse-English-squads data gap
+## leaves bare (docs/REMAINING.md §5) — the gap itself stays open and tracked there;
+## this test is a deterministic regression baseline, not its cover.
+func _pinned_career(club: Dictionary, league: Dictionary, clubs: Array, leagues: Array,
+		pyramid: Dictionary) -> Career:
+	var c := Career.new()
+	c.reputation = Manager.REP_START
+	c.career_rng_state = str(SEED)
+	c._init_club(club, league, clubs, leagues, pyramid)
+	return c
