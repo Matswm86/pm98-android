@@ -84,9 +84,17 @@ final build:
   and is pinned by `diff_entry_parity`'s full-frame 0 px case; untouched. Gates re-run
   green: seasonend-year, cupdraw, supercup (+ scout/knockout unaffected).
   `LineupRollScreen`/`FixturesScreen` draw the whole sheet (no truncation) — left as-is.
-* **Preseason is gone in season two** — no friendly setup reachable at the second
-  season's start.
-* **No contract-renewal message toward season end**, which the original raises.
+* ~~**Preseason is gone in season two** — no friendly setup reachable at the second
+  season's start.~~ — **FIXED 2026-07-26** (`5f64638`, in HEAD). The rollover assumption
+  "season 2+ has no re-pick UI (un-walked)" was refuted by the refrun (R15 step 8,
+  `p0664`: "Preseason for Manchester Utd." opens 1998-99, friendlies 31 Jul + 3/5/7 Aug
+  1998). `Main._next_season` -> `_show_preseason_rollover()` re-raises PreseasonScreen
+  after `advance_season`, picks landing on the NEW season's own `Career.preseason_dates`.
+  Covered by `test_friendly.gd`.
+* ~~**No contract-renewal message toward season end**, which the original raises.~~ —
+  **FIXED 2026-07-26** (`5f64638`, in HEAD): the 1-April contract warning is ported,
+  `test_contract_warning.gd` (ALL PASS, incl. "1998-99 fires on its own late-March/
+  early-April week").
 * ~~**The finance INCOME and EXPENSE screens do nothing** when opened, although both are
   tracked in captures.~~ — **BUILT 2026-07-27.** The in-code claim "no captured frame"
   was FALSE (the RE doc's own binding table lists frames 006/008/011/012). All four
