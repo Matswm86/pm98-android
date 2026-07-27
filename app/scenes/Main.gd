@@ -5208,15 +5208,23 @@ func _show_year_award(title: String, rows: Dictionary, after: Callable) -> void:
 func _season_end_board() -> void:
 	var rv := _career.board_review()
 	if bool(rv["sacked"]):
-		var why := "relegation"
+		# The board's own words. All three are MANAGER.EXE's, verbatim off the message
+		# table FUN_00545fd0 indexes (2026-07-27): 0x662d24 -> 0x663818 (financial),
+		# 0x662d2c -> 0x663744 (results), 0x662d30 -> 0x663690 (squad too small). The
+		# port's old invented one-liner is gone.
+		var msg := "The Directors have held an urgent meeting,\nand have sacked you as manager of the club."
 		match str(rv["reason"]):
-			"missed":
-				why = "falling short of the board's target"
 			"insolvent":
-				why = "running the club at a loss"
+				msg = ("The Directors have held an urgent meeting.\n"
+					+ "They have decided to terminate your contract\n"
+					+ "as manager due to the disastrous financial management\nof the club.")
+			"squad":
+				msg = ("The Directors have decided to terminate your contract\n"
+					+ "due to bad management of your squad,\n"
+					+ "which does not have the minimum number of players\n"
+					+ "needed to play in any championship.")
 		_generate_offers(false)
-		_show_alert_then("The board has terminated your contract after %s." % why,
-			_show_job_offers)
+		_show_alert_then(msg, _show_job_offers)
 		return
 	if bool(rv["headhunted"]):
 		_generate_offers(true)

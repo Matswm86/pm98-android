@@ -423,11 +423,40 @@ verified still open at HEAD `4076800`:
 * ~~**S5 — European ties run on the invented legacy engine.**~~ — **CLOSED 2026-07-27**
   (§0c above): foreign entrants field their shipped TRUE XIs via `Career.euro_xis`;
   `test_career` proves a European season at zero fallbacks (53 ties resolved).
-* **S8 — no player ever retires.** No retirement/ageing-intake mechanic exists in
-  `app/scripts`; squads age without bound and a multi-season career ages into a dead end.
-  Blocked on reversing `FUN_005865b0` / `FUN_005c1df0` / `FUN_00443180`.
-* Smaller opens from the same audit + refrun: the running-at-a-loss **sacking threshold**
-  (>3 weeks, unmeasured) and the sacking screen; the Coca-Cola Cup home TV fee (pays £0,
+* ~~**S8 — no player ever retires.**~~ — **CLOSED 2026-07-27**
+  (`docs/re/retirement_re.md`, `app/scripts/Retirement.gd`, gate `test_retirement`, in CI).
+  The three "blocking" functions were the wrong lead — `FUN_005865b0` is a list teardown,
+  `FUN_005c1df0` is `SetCursor`, `FUN_00443180` is an unrelated UI dispatcher. The real
+  entry point comes off the STRING: 0x663A58 sits in the message table at slot 0x662CE4,
+  read once, from inside **`FUN_0058AC90`** — the original's retire/release/keep decision,
+  called per player by the rollover pass `FUN_0057A730`. Ported byte-for-byte:
+  **retirement age = 35 for a keeper, 33 for an outfielder** (`FUN_0058B020`:
+  `0x23 - 2*(player+0x1c != 0)`, and `+0x1c` is the position band `equipos_parse.py`
+  already decodes), fired **only on a contract that has run out** (`FUN_00584340 >= 1`
+  returns early); the record is then **reborn** by `FUN_0058B030` — birth year advanced by
+  `rand(3)+10` so he comes back 10-12 years younger, VE/RE/AG/EN restored from the shipped
+  base block at +0xaa, a new name from the game's own NOMBRES.30/APELLIDO.30 pool, a new
+  id. At a rival the reborn man **stays at his club**, so the population is conserved
+  (measured: 441 rival players, unchanged over five seasons) and the "ages into a dead
+  end" is gone; at YOUR club he lands in the free-agent pool (club 0x26de), exactly as the
+  binary's 0x58AD9C overwrite does.
+* ~~**The manager's squad melts across a season.**~~ — **ROOT-CAUSED + FIXED 2026-07-27**,
+  and it was NOT the "sparse English squads" data gap it had been filed under (§5). Probe
+  `app/tests/diag_bare_roster_probe.gd`: club 38 finished a season with **6-10 men on 15 of
+  40 career seeds** while its static record holds 22 — every expiring contract left and
+  nothing replaced them. `FUN_0058AC90` @0x58AE55 is `cmp ecx,0xd / jb keep`: **the
+  original never releases anyone from a squad under thirteen** (the count is the running
+  one, tested before the man in hand is dropped, so the resting point is twelve). With the
+  floor: 0 bare rosters in 20 seeds. The matches-to-renew clause (`player+0x86`/`+0x87`,
+  seeded since 07-24 and never fired) now renews the deal too.
+* Smaller opens from the same audit + refrun: ~~the running-at-a-loss **sacking
+  threshold**~~ — **MEASURED 2026-07-27**: `FUN_00545FD0` @0x546013 is
+  `cmp [club+0x224],3 / jbe`, so the board acts on the **fourth** consecutive week in the
+  red (`LOSS_SACK_WEEKS = 4`, which the port had guessed and flagged as ours), and a THIRD
+  dismissal reason exists — **a squad under 16 men** (@0x546063). All three of the board's
+  messages are now the binary's own strings verbatim, and the weekly pass's reputation
+  move (-5 in the red, +1 back in the black) is wired. Still open: the sacking SCREEN
+  itself (the port dismisses at its season review); the Coca-Cola Cup home TV fee (pays £0,
   flagged); the weekly-illness (virus/cold) insurance path; the insured-row document icon;
   **O1** board objective is a category (Champion / U.E.F.A. / Mid Table / Avoid Relegation),
   the port shows a position; **O3** the original names every club's manager on START OF
@@ -444,7 +473,16 @@ explicit go/no-go before a line of it is written.
 
 `app/data/game_db.json` carries the decoded database. Still partial:
 
-* English-league squads are sparse (the bio-interleaved record format is not fully cracked).
+* ~~English-league squads are sparse (the bio-interleaved record format is not fully
+  cracked).~~ — **STALE, REMOVED 2026-07-27.** Measured against the shipped
+  `app/data/game_db.json`: **9,547 players, every one with a full 10-attribute row and a
+  position**; the 92 English clubs field 17-30 men each (avg 21.3, min Norwich C 17). The
+  bio-interleaved format stopped mattering when `tools/extract_squads_exact.py` replaced
+  `extract_english.py`'s anchor hunt with the byte-exact engine parser
+  (`tools/re/equipos_parse.py` == `FUN_00579c70` + `FUN_005820f0`) on 2026-07-06 — this
+  line simply outlived it. What the gap was actually being blamed for (a career squad
+  melting to six men, and `test_pyramid`'s "every live-division club fields a squad after
+  movement" flake) is the missing 13-man release floor, fixed in §3c.
 * ~876 directory-only teams beyond the detailed records (separate format).
 * `DAT.PKF` / `DATSIM.PKF` match-sim rating tables are still LZ-packed. Only needed to tune
   the *abstracted* engine toward the original — the byte-exact engine gets these from the

@@ -214,10 +214,13 @@ func _assert(cond: bool, label: String) -> bool:
 
 
 ## S3 (2026-07-27): pin the career stream BEFORE create()'s first draw, so the division
-## sim and the rollover movement reproduce bit-exactly on CI. The old flake was an
-## UNPINNED stream occasionally promoting a club the sparse-English-squads data gap
-## leaves bare (docs/REMAINING.md §5) — the gap itself stays open and tracked there;
-## this test is a deterministic regression baseline, not its cover.
+## sim and the rollover movement reproduce bit-exactly on CI.
+## The flake this was written for was mis-attributed to a "sparse English squads" DATA gap.
+## Measured 2026-07-27: game_db ships 9,547 players and every English club fields 17-30 of
+## them. The bare roster was the MANAGER's own club, drained by contract expiry because the
+## port had no release floor — MANAGER.EXE FUN_0058AC90 @0x58AE55 refuses to release from a
+## squad under thirteen. Fixed in Career.advance_season; see docs/re/retirement_re.md.
+## The pin stays: it is a deterministic regression baseline in its own right.
 func _pinned_career(club: Dictionary, league: Dictionary, clubs: Array, leagues: Array,
 		pyramid: Dictionary) -> Career:
 	var c := Career.new()

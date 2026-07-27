@@ -109,7 +109,9 @@ func _weekly_books() -> bool:
 	career.advance_week(rng)
 	var neg_alert := false
 	for a in career.pending_alerts:
-		if str(a).begins_with("You have been running the club at a loss"):
+		# The message carries MANAGER.EXE's own newline ("…the club\nat a loss for…",
+		# .data 0x662d20 -> 0x6638b4), so match the first line only.
+		if str(a).begins_with("You have been running the club"):
 			neg_alert = true
 	career.pending_alerts.clear()
 	ok = _assert(neg_alert and career.loss_weeks == 1,
@@ -138,7 +140,7 @@ func _weekly_books() -> bool:
 					and FinanceModel.ledger_total(rec, "expense") == flat:
 				away_exact += 1
 		for a in career.pending_alerts:
-			if str(a).begins_with("You have been running the club at a loss"):
+			if str(a).begins_with("You have been running the club"):
 				loss_alerts += 1
 		career.pending_alerts.clear()
 	ok = _assert(home_weeks > 0 and away_weeks > 0,

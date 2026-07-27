@@ -423,14 +423,22 @@ const DEADLINE_TAIL := 5
 # then shuts silently -- there is no deadline-day event (owner, 2026-07-25: not a concept
 # in 1998). The two-week wording is the witnessed string; the one-week form is the same
 # string pluralised the way PM98 pluralises OFFERS_PER_WEEK's own alert ("%u offer%s").
-# REFRUN R16, verbatim off p0685_alert_box.png / p0716_alert_box.png:
-#   "You have been running the club at a loss for 1 week now."
-#   "You have been running the club at a loss for 2 weeks now."
-# The counter reached 3 and was cleared by a sale, so the SACKING threshold is > 3 and
-# remains unmeasured -- LOSS_SACK_WEEKS is therefore OURS, set to the first value the
-# witness does not contradict, and flagged as such on the board review.
-const LOSS_ALERT_MSG := "You have been running the club at a loss for %d week%s now."
+# REFRUN R16 witnessed the alert on p0685_alert_box.png / p0716_alert_box.png; the exact
+# STRING is now read straight out of MANAGER.EXE instead (.data slot 0x662d20 -> 0x6638b4,
+# raised by FUN_0057ee50 @0x57efff): "You have been running the club\nat a loss for %u
+# week%c now.", where the %c is `(-(1 < n) & 0x53) + 0x20` = 's' for n > 1 and a SPACE for
+# n == 1 (the original's own quirk -- "for 1 week  now." -- which the hand transcription in
+# REFRUN_manutd_1997-98_FINDINGS.md R16 did not preserve; the frames are not in the repo).
+# The same pass moves the manager's reputation: -5 on a loss week, +1 on a clear one,
+# clamped to 0..1000 (FUN_0057ee50 @0x57ef3f / 0x57efbb).
+const LOSS_ALERT_MSG := "You have been running the club\nat a loss for %d week%s now."
+# MEASURED 2026-07-27, no longer ours: the sacking screen FUN_00545fd0 @0x546013 tests
+# `cmp [club+0x224],3 / jbe`, so the board dismisses you the moment the counter passes 3,
+# i.e. on the FOURTH consecutive week in the red -- exactly the value the port had guessed.
 const LOSS_SACK_WEEKS := 4
+# FUN_00545fd0 @0x546063: the third dismissal reason -- a squad under 0x10 men, "which does
+# not have the minimum number of players needed to play in any championship" (0x662d30).
+const SACK_MIN_SQUAD := 16
 const DEADLINE_WARN_WEEKS := [2, 1]
 const DEADLINE_WARN_MSG := "The transfer deadline is now %d week%s away."
 # The original's 1-April season-end warning pair, verbatim from MANAGER.EXE's message
@@ -624,6 +632,10 @@ func _seed_squad(club_dict: Dictionary) -> Array:
 		dup["clauses"] = (seeded["indices"] as Array).duplicate()
 		if int(seeded["matches"]) > 0:
 			dup["clause_matches"] = int(seeded["matches"])
+			# player+0x87, the counter FUN_0058ac90 @0x58aec7 compares the target against.
+			# Seeded here so a shipped record's clause can actually reach its target;
+			# advance_week already ticks `clause_apps` for every featured man.
+			dup["clause_apps"] = 0
 		if int(seeded["bonus"]) > 0:
 			dup["clause_bonus"] = int(seeded["bonus"])
 		dup["injured_weeks"] = 0       # availability state (Availability.gd)
@@ -2105,15 +2117,20 @@ func board_review() -> Dictionary:
 			_releg_count(), survival, seasons_at_club())
 		sacked = bool(sd["sacked"])
 		sack_reason = str(sd["reason"])
-		# REFRUN R16: the running-at-a-loss counter "feeds the sacking path". The counter
-		# and its weekly alert are witnessed (1, 2, 3 weeks, then cleared); the THRESHOLD
-		# is not -- Mats cleared it at 3, so all that is known is > 3. LOSS_SACK_WEEKS is
-		# therefore ours. The original's sacking SCREEN was never reached either, so the
-		# board acts here, at the review the app already has, rather than through an
-		# invented mid-season dismissal.
+		# The board's three dismissal reasons, all read off FUN_00545fd0 (the original's
+		# own sacking screen, 2026-07-27) in ITS order of test:
+		#   0x546013  club+0x224 > 3          -> "disastrous financial management"
+		#   0x54603a  club+0x294 != 0         -> results/objective (Manager.sack_decision)
+		#   0x546063  club+0x28  < 0x10 men   -> "does not have the minimum number of
+		#                                        players needed to play in any championship"
+		# WHERE the board acts is still ours: the original raises the screen mid-season,
+		# the port dismisses at the review it already has.
 		if not sacked and loss_weeks >= LOSS_SACK_WEEKS:
 			sacked = true
 			sack_reason = "insolvent"
+		if not sacked and (rosters.get(club_id, []) as Array).size() < SACK_MIN_SQUAD:
+			sacked = true
+			sack_reason = "squad"
 		var rng := career_rng()   # S3: the ONE persisted career stream
 		headhunt_pending = not sacked and Manager.headhunted(finished_pos, objective_pos, reputation, rng)
 		if sacked:
@@ -3185,8 +3202,13 @@ func _close_week_books() -> void:
 	# 2026-07-26 -- which the original does not do.
 	if cash < 0:
 		loss_weeks += 1
-		pending_alerts.append(LOSS_ALERT_MSG % [loss_weeks, "" if loss_weeks == 1 else "s"])
+		# FUN_0057ee50: `%c` is 's' above one week and a SPACE at one, and the board's
+		# patience drains at -5 reputation a week (+1 on every week back in the black).
+		pending_alerts.append(LOSS_ALERT_MSG % [loss_weeks, " " if loss_weeks <= 1 else "s"])
+		reputation = Manager.apply_delta(reputation, -5)
 	else:
+		if loss_weeks > 0:
+			reputation = Manager.apply_delta(reputation, 1)
 		loss_weeks = 0
 
 ## PLAYERS' BONUS on a home matchday. WITNESSED ONCE: £5,000 in Man Utd's week-29 ledger,
@@ -4487,11 +4509,32 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 		rng = career_rng()   # S3: the ONE persisted career stream
 	_return_loanees()   # loanees go home before contracts tick (never counted as your leavers)
 	var leavers: Array = []
+	var retirees: Array = []
+	# S8, BINARY-EXACT (Retirement.gd / docs/re/retirement_re.md): the original's rollover
+	# pass FUN_0058ac90 walks the squad with a RUNNING head count (the caller's iStack_28,
+	# decremented every time the callee returns 0) and refuses to release anyone once that
+	# count is under thirteen. Retirement is checked first and has no such floor.
+	var squad_n := (rosters.get(club_id, []) as Array).size()
 	for p in rosters.get(club_id, []):
 		var yrs := int(p.get("contract_years", 1)) - 1
 		p["contract_years"] = yrs
 		p["age"] = int(p.get("age", 26)) + 1   # your squad ages a year (drives training)
 		if yrs > 0:
+			continue
+		# 0x58acf2: out of contract. RETIREMENT is decided before anything else.
+		if Retirement.retires(p):
+			retirees.append(p)
+			squad_n -= 1
+			continue
+		# 0x58aebd: the MATCHES-TO-RENEW clause (rec+0x1a) renews the deal by itself once
+		# he has played its target this season -- player+0x86 != 0 && +0x86 <= +0x87.
+		var clause_n := int(p.get("clause_matches", 0))
+		if clause_n > 0 and int(p.get("clause_apps", 0)) >= clause_n:
+			_renew_expiring(p, rng, "clause")
+			continue
+		# 0x58ae55: `cmp ecx,0xd / jb keep` -- never released below thirteen men.
+		if squad_n < Retirement.SQUAD_FLOOR:
+			_renew_expiring(p, rng, "squad")
 			continue
 		# Contract up. An auto-renew player is re-signed at his demand if the club can fund the
 		# deal (a season's wage); otherwise -- and for everyone without auto-renew -- he leaves
@@ -4514,10 +4557,28 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 			_log("%s has renewed his contract on £%s/wk (%s)." % [p.get("name", "?"), _money(demand_wk), how])
 		else:
 			leavers.append(p)
+			squad_n -= 1
 	# A fresh batch of free agents for the new season; the manager's own released players join
 	# the pool (you can re-sign one for nothing but a wage), capped so it never grows forever.
 	free_agents = TransferMarket.generate_free_agents(rng, FREE_POOL_SIZE, free_seq)
 	free_seq += FREE_POOL_SIZE
+	# RETIREMENT at YOUR club (0x58ad08): the news line is the binary's own string, the man
+	# leaves, and his record is reborn into the FREE PLAYERS pool (club 0x26de) as a new,
+	# 10-12-years-younger player -- the original's ageing intake, which is what keeps the
+	# world's population from collapsing as the veterans go.
+	for p in retirees:
+		rosters[club_id].erase(p)
+		var line := Retirement.RETIRED_MSG % p.get("name", "?")
+		_news("contract", line)
+		_log(line)
+		pending_alerts.append(line)
+		free_seq += 1
+		Retirement.rebirth(p, rng, free_seq)
+		p["free_agent"] = true
+		p["contract_years"] = 0
+		p["value"] = 0            # 0x58ad9c: the managed-club branch zeroes the record's fee
+		Contract.stamp_wage(p, my_band())
+		free_agents.append(p)
 	for p in leavers:
 		rosters[club_id].erase(p)
 		p["free_agent"] = true
@@ -4536,12 +4597,25 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	# players age a year and the season resets like the manager's (#12 living league): bans
 	# and injuries clear, the development carry-over zeroes, so the dev engine re-evaluates
 	# each rival from his new age (young rivals keep climbing, veterans keep sliding).
+	# S8: a rival's veterans DO retire, on the same FUN_0058b020 ages as yours -- and at an
+	# UNMANAGED club the reborn record keeps its own club id (FUN_00576cd0's arg2 at
+	# 0x58ad8b is player+0x14), so the man is replaced in place and the squad never shrinks.
+	# That in-place rebirth is the whole reason the original's rival squads do not age into
+	# a dead end; the port's auto-renew above stays as the (declared) stand-in for the rest
+	# of FUN_0058ac90's unmanaged-club release ladder.
 	for cid in rosters:
 		if int(cid) == club_id:
 			continue
+		var rival_band := TransferMarket.stature_of(rosters[cid], tier)
 		for p in rosters[cid]:
 			p["contract_years"] = maxi(1, int(p.get("contract_years", 2)) - 1) + 1
 			p["age"] = int(p.get("age", 26)) + 1
+			if Retirement.retires(p):
+				free_seq += 1
+				Retirement.rebirth(p, rng, free_seq)
+				p["contract_years"] = OfferRecord.seed_years(int(p.get("age", 20)), rng)
+				p["contract_term"] = int(p["contract_years"])
+				Contract.stamp_wage(p, rival_band)
 		Availability.reset(rosters[cid])
 		Training.reset_progress(rosters[cid])
 	# Fresh season = clean slate: bans don't carry over, everyone reports fit, and the
@@ -4640,6 +4714,29 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	mint_european_cups(euro_pool, rng)
 	# Winners-of-winners curtain-raisers from last season's European champions.
 	_arm_one_off_finals(sa_champion)
+
+
+## FUN_0058ac90's KEEP branch (0x58af37 -> 0x58aff6): the expiring man is NOT released.
+## The engine copies his freshly re-valued offer record (player+0x6c, re-seeded earlier in
+## the same pass by FUN_00576cd0) onto him with `rec+0x19 = rec+0x18`, i.e. LEFT = the
+## generated TERM, so the deal simply runs on for `OfferRecord.seed_years(age)` more years
+## at the re-valued wage. `why` only picks the news wording.
+func _renew_expiring(p: Dictionary, rng: RandomNumberGenerator, why: String) -> void:
+	var term := OfferRecord.seed_years(int(p.get("age", 26)), rng)
+	p["contract_years"] = term
+	p["contract_term"] = term
+	Contract.stamp_wage(p, my_band())
+	p["clause_apps"] = 0
+	if why == "clause":
+		# .data 0x662d7c: "…has played his %s match this season, because of this his
+		# contract will be automatically renewed."
+		_news("contract", "%s has renewed his contract (matches clause)." % p.get("name", "?"))
+		_log("%s has renewed his contract on the matches-to-renew clause (%d matches)."
+			% [p.get("name", "?"), int(p.get("clause_matches", 0))])
+	else:
+		_news("contract", "%s has renewed his contract." % p.get("name", "?"))
+		_log("%s stays: the squad is at the engine's %d-man floor (FUN_0058ac90 @0x58ae55)."
+			% [p.get("name", "?"), Retirement.SQUAD_FLOOR])
 
 
 ## Record the just-finished season's league champion, runners-up order and F.A. Cup
