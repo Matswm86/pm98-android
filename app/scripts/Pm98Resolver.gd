@@ -67,29 +67,27 @@ static func shot_proceeds(rng: MatchEngine.Pm98Rng, attr: int) -> bool:
 ## action switch dispatches to (Pm98Action._resolve_action). The decompile has THREE sections:
 ##
 ##   * L41-118  the finishing PRE-BLOCK (fires only when player play-state +0x2c == 3 AND +0x30 == 0):
-##              a tackle/intercept windup laid on the TARGET. STAGE-3 DEFERRED -- its body uses the
-##              still-unported positional helpers FUN_005b1230 / FUN_005a1700 (vector reads) +
-##              FUN_005a7220 / FUN_0058ed50 (trajectory set). It is provably INERT (draws 0 RNG, writes
-##              nothing) UNLESS the target is in play-state [0,3] with target+0x68 > 0x1332; the resolver
-##              is only reached with the target live in the tree (play-state 5), so the pre-block falls
-##              straight through. The GREEN tree oracle (run_tree_oracle.sh, target T+0x40 = 5) confirms
-##              this bit-for-bit -- its first RNG draw is the tree's, not the pre-block's.
+##              a tackle/intercept windup laid on the TARGET. PORTED s59 (2026-07-26) as
+##              _finishing_1b -- the s59 capture falsified the old "provably inert" claim at
+##              clk 1449 (silicon drew its C79 roll there). FUN_005b1230/FUN_005a1700 are
+##              trivial vec3 ops (scale / add), FUN_005a7220 arms the motion-lerp.
 ##   * L120-485 the play-state dispatch (chase for +0x2c < 3 / > 8; tree for [3,8]) + the main
 ##              goal/save/miss DECISION TREE -> resolve_tree() below (oracle-GREEN, test_resolver_tree).
-##   * L491-607 the post-resolution MOVEMENT tail (re-aim + relocate the ball). STAGE-3 DEFERRED
-##              (LUT/positional: FUN_005ee0f0 projection, FUN_00590aa0, FUN_0058eca0, FUN_005ee170/670,
-##              the FUN_0044ea40/ec00 deflection counters). The tree oracle gates it OFF via match+0x70
-##              != 0; resolve_tree omits it, matching that gating exactly.
+##   * L491-607 the post-resolution ball-touch MOVEMENT tail (probe + touch + velocity
+##              redirect). PORTED s59 as _touch_tail, reached through _afabf on every
+##              LAB_005afabf route exactly as the binary falls through -- it is the mid-air
+##              deflection the s59 capture showed at clk 1450 (ball vy 686 -> 5414, carrier
+##              cleared, ball+0x70 cooldown armed).
 ##
-## So for every state the engine actually reaches today (case 8/9 with the target live in the tree),
-## resolve_action == resolve_tree == the binary. The two deferred blocks get their own leaf ports + a
-## dedicated integration oracle in the follow-up (handoff Task #4b-tail). `p`/`t`/`m`/`stats` are
-## offset->int dicts; `rng` is MatchEngine.Pm98Rng. Returns resolve_tree's result dict.
+## `p`/`t`/`m`/`stats` are offset->int dicts; `rng` is MatchEngine.Pm98Rng. Returns
+## resolve_tree's result dict.
 static func resolve_action(p: Dictionary, t: Dictionary, m: Dictionary, stats: Dictionary,
 		rng: MatchEngine.Pm98Rng) -> Dictionary:
-	# L38 entry guard (match+0x448 != 0 -> no resolution this tick) is inside resolve_tree.
-	# The finishing pre-block (L41-118) and the movement tail (L491-607) are Stage-3 deferred and
-	# provably not taken for the resolver-reachable fixtures (see the function-level note above).
+	# L38 entry guard (match+0x448 != 0 -> no resolution this tick) is inside resolve_tree,
+	# and since s59 (2026-07-26) so are the finishing pre-block (L41-118, _finishing_1b) and
+	# the ball-touch movement tail (L491-607, _touch_tail via _afabf). The old "provably
+	# inert" claim was falsified by the s59 capture at clk 1449-1450: silicon ran the C79
+	# finishing roll and the touch tail's C550/C585 draws + mid-air deflection there.
 	return resolve_tree(p, t, m, stats, rng)
 
 
@@ -189,9 +187,15 @@ static func resolve_tree(p: Dictionary, t: Dictionary, m: Dictionary, stats: Dic
 		res.draws = dc[0]
 		return res
 
+	# L41-118: the finishing pre-block runs BEFORE the play-state dispatch (its own
+	# ps==3 gate keeps it inert elsewhere). Draws C79 (+C102 on success).
+	_finishing_1b(p, t, draw)
+
 	var ps := int(p.get(0x2c, 0))
 	if ps < 3 or ps > 8:
-		# L121-170: play-state-9 chase / out-of-range -- geometry only, 0 RNG draws.
+		# L120-170: out-of-range play-states RETURN DIRECTLY (C L128-133 `return`s) --
+		# they never reach LAB_005afabf, so no touch tail and no p54/58 epilogue here.
+		# The ps==9 chase branch is geometry + RNG-neutral commentary only (deferred).
 		res.draws = dc[0]
 		return res
 
@@ -204,17 +208,28 @@ static func resolve_tree(p: Dictionary, t: Dictionary, m: Dictionary, stats: Dic
 		# L174/181/188 type guards -> fall to LAB_005afabf (no resolution).
 		if t40 == 8 or t40 == 9 or t40 == 6 or t40 == 7 \
 				or t40 == 0x17 or t40 == 0x15 or t40 == 0x14:
-			return _afabf(p, m, t, dc, res)
+			return _afabf(p, m, t, dc, res, draw, 0xC000)
 
 		# L196: reach-radius local_34 (consumes 1 draw; geometry result unused here).
 		var reach := ((100 - int(t.get(0x388, 0))) * 0x13333) / 100
 		var _local_34 := _prob_scale(draw.call(), reach) + 0x4000
 
-		# L207 projection + L212-235 distance gate. Geometry firstgate (L212) is
-		# LUT-dependent -> deferred to S3; the LUT-free position fallback (L223-235)
-		# governs the validated fixtures. If it fails -> LAB_005afabf.
-		if not _position_gate(p, t, _local_34):
-			return _afabf(p, m, t, dc, res)
+		# L207 projection: the reach point 0x4ccc ahead of the resolver's facing
+		# (FUN_005ee0f0 polar + FUN_005a1700 vec3 add with this = P.pos). L212-222 is
+		# the REAL first gate -- target within local_34 of that point, per axis; the
+		# L223-235 position fallback only runs when it misses. Formerly the first gate
+		# was deferred and only the fallback ran: s59 caught silicon resolving t0.i6's
+		# chase at clk 1449 (4 draws -> the clk-1450 mid-air deflection) where the
+		# fallback-only port bailed after 1 draw.
+		var pv: Array = Pm98Trig.polar_vec(0x4ccc, _s16(int(p.get(0x34, 0))))
+		var gate := true
+		for ax in 3:
+			var ahead := Pm98Trig._i32(int(p.get(4 + 4 * ax, 0)) + int(pv[ax]))
+			if absi(Pm98Trig._i32(int(t.get(4 + 4 * ax, 0)) - ahead)) >= _local_34:
+				gate = false
+				break
+		if not gate and not _position_gate(p, t, _local_34):
+			return _afabf(p, m, t, dc, res, draw, _local_34)
 
 		var ang := absi(_s16(int(p.get(0x34, 0)) - int(t.get(0x34, 0))))   # iVar12
 		# L243: shot-power scale iVar13 (consumes 1 draw).
@@ -230,14 +245,36 @@ static func resolve_tree(p: Dictionary, t: Dictionary, m: Dictionary, stats: Dic
 		var bvar8 := false
 		var bvar5 := false
 
-		# L257: header block (only when 8 < M+4). Consumes draws as it goes.
-		if 8 < int(m.get(4, 0)) \
+		# L257: header block. The C gate is `8 < *(*(target+0x184) + 4)` -- the TARGET's
+		# team-header roster count (gs+4, = 11 in a real match), NOT a match scalar.
+		# The old m.get(4) mapping only ever passed in fixtures that poked m[4] (s59:
+		# silicon ran the header trio at clk 1460 where the port skipped it).
+		if 8 < int(Pm98Movement._ref(t, 0x184).get(0x4, 0)) \
 				and _permil(draw.call()) < ((300 if ang < power else 0) + 400):
-			t[0x40] = (1 if ang < 0x4000 else 0) + 6            # L261 set target state 6/7
-			var iv14 := int(t[0x40])
-			# L272: keeper-beaten flag (consumes 1 draw).
+			# L261: FUN_005a5430 with this=TARGET (disasm 0x5af328) -- the remap LUT
+			# clears t+0x2c/+0x30 since LUT[6]=LUT[7]=10; the s59 fork at clk 1495 was
+			# the old bare t[0x40]= keeping a stale anim frame alive.
+			Pm98Movement.set_position_code(t, (1 if ang < 0x4000 else 0) + 6)
+			# L263-269: arm the target's motion-lerp to a point 0x20000 ahead of its
+			# facing (FUN_005ee0f0 + FUN_005a7220 this=target @0x5af374, steps 0x30),
+			# then release the ball's carrier if it IS the target (FUN_0058ed50
+			# this=ball @0x5af39e).
+			var pvh: Array = Pm98Trig.polar_vec(0x20000, _s16(int(t.get(0x34, 0))))
+			for ax in 3:
+				t[0x94 + 4 * ax] = Pm98Trig._i32(int(t.get(4 + 4 * ax, 0)) + int(pvh[ax]))
+			t[0x84] = 0x30
+			t[0x80] = 1
+			t[0x66] = int(t.get(0x34, 0)) & 0xffff
+			var ballh: Dictionary = Pm98Movement._ref(p, 0x190)
+			if not ballh.is_empty() and is_same(ballh.get(0x40, null), t):
+				ballh[0x40] = 0
+			var iv14 := int(t.get(0x40, 0))
+			# L272: keeper-beaten flag (consumes 1 draw). On success match+0x440 = the
+			# TARGET pointer (C L275 comma-expr -- not a flag) and, live
+			# (DAT_006d31c4 == 0), the target's team stats +0xa4 = 1.
 			if _permil(draw.call()) < ((-50 if iv14 != 7 else 0) + 100):
-				m[0x440] = 1                                     # (resolver-owner slot)
+				m[0x440] = t
+				Pm98Movement._ref(t, 0x3b8)[0xa4] = 1
 			bvar6 = true
 			res.header = true
 			m[0x461] = int(m.get(0x461, 0)) | 8                  # L281
@@ -259,7 +296,7 @@ static func resolve_tree(p: Dictionary, t: Dictionary, m: Dictionary, stats: Dic
 							if bvar6 else skill << 1
 					if iv13c <= _permil(draw.call()):                   # L345
 						bvar5 = false
-						return _resolve_outcome(p, t, m, stats, dc, res, bvar5, bvar6, bvar7, bvar8, draw)
+						return _resolve_outcome(p, t, m, stats, dc, res, bvar5, bvar6, bvar7, bvar8, draw, _local_34)
 				bvar5 = true
 			elif not engaged:
 				# L353 branch.
@@ -278,9 +315,9 @@ static func resolve_tree(p: Dictionary, t: Dictionary, m: Dictionary, stats: Dic
 				else:
 					bvar8 = true
 
-		return _resolve_outcome(p, t, m, stats, dc, res, bvar5, bvar6, bvar7, bvar8, draw)
+		return _resolve_outcome(p, t, m, stats, dc, res, bvar5, bvar6, bvar7, bvar8, draw, _local_34)
 
-	return _afabf(p, m, t, dc, res)
+	return _afabf(p, m, t, dc, res, draw, 0xC000)
 
 
 ## L213-235 position fallback gate (LUT-free): true if |target - player| < reach on
@@ -298,12 +335,13 @@ static func _position_gate(p: Dictionary, t: Dictionary, reach: int) -> bool:
 ## player may enqueue a deflection/corner (0x13/0x14). Then LAB_005afabf.
 static func _resolve_outcome(p: Dictionary, t: Dictionary, m: Dictionary, stats: Dictionary,
 		dc: Array, res: Dictionary, bvar5: bool, bvar6: bool, bvar7: bool, bvar8: bool,
-		draw: Callable) -> Dictionary:
+		draw: Callable, local_34: int = 0xC000) -> Dictionary:
 	if bvar5:
-		# L392: low-rated already-flagged states clear the save flag. The C's
-		# `(bVar7 = false, bVar8)` comma-expr also forces bvar7 false whenever M+4 < 9
-		# (redundant -- bvar7 implies bvar6 implies M+4 > 8 -- but ported faithfully).
-		if int(m.get(4, 0)) < 9:
+		# L392: the C reads `*(*(param_1+0x184) + 4) < 9` -- the RESOLVER's own
+		# team-header roster count (gs+4), not a match scalar (s59 correction, same
+		# mis-mapping as the L257 header gate). The comma-expr also forces bvar7
+		# false on that branch (redundant but ported faithfully).
+		if int(Pm98Movement._ref(p, 0x184).get(0x4, 0)) < 9:
 			bvar7 = false
 			if bvar8 and int(p.get(0x2da, 0)) != 0:
 				bvar8 = false
@@ -330,24 +368,32 @@ static func _resolve_outcome(p: Dictionary, t: Dictionary, m: Dictionary, stats:
 			p[0x2d9] = 1
 		res.goal = bvar8
 		res.save = bvar7
-		return _afabf(p, m, t, dc, res)
+		return _afabf(p, m, t, dc, res, draw, local_34)
 
 	# L466: engaged player, shot not resolved -> deflection / corner.
 	if int(p.get(0x60, 0)) != 0:
 		var code := -1
 		if bvar6:
 			if (100 - int(p.get(0x384, 0))) * 10 <= _permil(draw.call()):   # L469
-				return _afabf(p, m, t, dc, res)
+				return _afabf(p, m, t, dc, res, draw, local_34)
 			code = 0x14
 		else:
 			code = 0x14 if 499 < _permil(draw.call()) else 0x13            # L478
 		res.enqueue = code                                                  # FUN_00594470(code,P,0)
-	return _afabf(p, m, t, dc, res)
+	return _afabf(p, m, t, dc, res, draw, local_34)
 
 
-## LAB_005afabf / LAB_005afe9e tail: clears P+0x54/+0x58 and finalises the result
-## (reads back the mutated match+0x461 bits + target play-state for assertions).
-static func _afabf(p: Dictionary, m: Dictionary, t: Dictionary, dc: Array, res: Dictionary) -> Dictionary:
+## LAB_005afabf -> LAB_005afe9e: EVERY route (guard bails, out-of-range play-state,
+## post-commit, post-deflection-enqueue) lands at LAB_005afabf, where p+0x60
+## ("already touched this play") skips straight to the epilogue and everyone else
+## runs the ball-touch tail (L491-607). `local_34` is the C's live reach box:
+## 0xc000 from the prologue on pre-draw routes, the drawn reach + 0x4000 after
+## L196 (the binary never resets it). The epilogue clears P+0x54/+0x58 and
+## finalises the result (match+0x461 bits + target play-state for assertions).
+static func _afabf(p: Dictionary, m: Dictionary, t: Dictionary, dc: Array, res: Dictionary,
+		draw: Callable, local_34: int) -> Dictionary:
+	if int(p.get(0x60, 0)) == 0:
+		_touch_tail(p, m, t, draw, local_34)
 	p[0x54] = 0
 	p[0x58] = 0
 	res.bits = int(m.get(0x461, 0))
@@ -355,3 +401,112 @@ static func _afabf(p: Dictionary, m: Dictionary, t: Dictionary, dc: Array, res: 
 	res.off_target = (res.bits & 4) != 0
 	res.draws = dc[0]
 	return res
+
+
+## L41-118: the Stage-1b finishing pre-block (the tackle-intercept windup). Fires only
+## for P in play-state 3 frame 0 with a live target in action 0..3 moving fast
+## (t+0x68 > 0x1332). Both players project 8 ticks ahead (pos + vel*8 -- FUN_005b1230
+## vec3*k + FUN_005a1700 vec3 add, this-regs disasm-verified at 0x5aee38-0x5aee5f);
+## within 0x10000 per axis the C79 roll (permil < adj(t+0x398)*9, adj = t/3 truncating
+## below 0x37 else t-0x19) catches the target: state 0x17 (this=TARGET at 0x5aef0c),
+## motion-lerp to its 32-tick projection (FUN_005a7220, this=target; DAT_00665014=8,
+## k=8*4), the ball mirroring the lerp when the target carries it, and the C102
+## commentary-pick draw (its save/restore triple is RNG-neutral; leaf headless-gated
+## on m+0x180b, elided).
+static func _finishing_1b(p: Dictionary, t: Dictionary, draw: Callable) -> void:
+	if int(p.get(0x2c, 0)) != 3 or int(p.get(0x30, 0)) != 0 or t.is_empty():
+		return
+	var t40 := int(t.get(0x40, 0))
+	if t40 < 0 or t40 > 3 or int(t.get(0x68, 0)) <= 0x1332:
+		return
+	for ax in 3:
+		var pj_p := Pm98Trig._i32(int(p.get(4 + 4 * ax, 0)) + Pm98Trig._i32(int(p.get(0x20 + 4 * ax, 0)) * 8))
+		var pj_t := Pm98Trig._i32(int(t.get(4 + 4 * ax, 0)) + Pm98Trig._i32(int(t.get(0x20 + 4 * ax, 0)) * 8))
+		if absi(Pm98Trig._i32(pj_t - pj_p)) >= 0x10000:
+			return
+	var sk := int(t.get(0x398, 0))
+	sk = Pm98Trig._tdiv(sk, 3) if sk < 0x37 else sk - 0x19
+	if _permil(draw.call()) >= sk * 9:
+		return
+	Pm98Movement.set_position_code(t, 0x17)
+	var k := 8 * 4                                  # DAT_00665014 (= 8, .data 0x665014) * 4
+	for ax in 3:
+		t[0x94 + 4 * ax] = Pm98Trig._i32(int(t.get(4 + 4 * ax, 0)) + Pm98Trig._i32(int(t.get(0x20 + 4 * ax, 0)) * k))
+	t[0x84] = k
+	t[0x80] = 1
+	t[0x66] = int(t.get(0x34, 0)) & 0xffff
+	var ball: Dictionary = Pm98Movement._ref(p, 0x190)
+	if not ball.is_empty() and is_same(ball.get(0x40, null), t):
+		ball[0x68] = 1
+		ball[0x6c] = k
+		for ax in 3:
+			ball[0x9C + 4 * ax] = Pm98Trig._i32(int(ball.get(4 + 4 * ax, 0)) + Pm98Trig._i32(int(t.get(0x20 + 4 * ax, 0)) * k))
+	var _pick := _permil(draw.call()) < 600          # C102: commentary choice draw only
+
+
+## L491-607: the resolver's ball-touch tail. The player probes the ball against a
+## per-axis local_34 box at three points -- polar(0x9998) ahead of facing,
+## polar(0x4ccc) ahead, then the player itself. A hit is a TOUCH: the C550 power
+## roll; the possession stat swap when the toucher is not the recorded actor at
+## match+0x43c (the unified pointer model); p+0x60 = 1; engage the ball to the
+## toucher (FUN_0058eca0, this=BALL, disasm 0x5afd43/0x5afda5) and -- on the strong
+## arm (power + 0x20000 >= 0x10ccd, always for sane attributes; the weak arm's
+## commentary triple is RNG-neutral and headless-gated) -- release the carrier
+## (FUN_0058ed70: ball+0x40 = 0); the 0xc touch cooldown on ball+0x70 (the once-only
+## gate the s59 capture proved at clk 1450-1452); then the redirect: ball.vel =
+## trunc(ball.vel/16) + rot(scale_vec3(P.vel, power+0x20000), jitter) with the C585
+## jitter draw (jit = prob_scale(jbase*2+1) - jbase, jbase = (100-p390)*0x2000/100).
+static func _touch_tail(p: Dictionary, m: Dictionary, t: Dictionary,
+		draw: Callable, local_34: int) -> void:
+	var ball: Dictionary = Pm98Movement._ref(p, 0x190)
+	if ball.is_empty() or int(ball.get(0x70, 0)) != 0:
+		return
+	var carr: Variant = ball.get(0x40, null)
+	if carr is Dictionary:
+		if is_same(carr, p) or int((carr as Dictionary).get(0x2bc, 0)) == 0:
+			return
+	if not t.is_empty() and int(t.get(0x40, 0)) == 0x17:
+		return
+	var hit := false
+	for reach in [0x9998, 0x4CCC, -1]:
+		var probe := [int(p.get(4, 0)), int(p.get(8, 0)), int(p.get(0xc, 0))]
+		if reach > 0:
+			var pv: Array = Pm98Trig.polar_vec(reach, _s16(int(p.get(0x34, 0))))
+			for ax in 3:
+				probe[ax] = Pm98Trig._i32(int(probe[ax]) + int(pv[ax]))
+		hit = true
+		for ax in 3:
+			if absi(Pm98Trig._i32(int(ball.get(4 + 4 * ax, 0)) - int(probe[ax]))) >= local_34:
+				hit = false
+				break
+		if hit:
+			break
+	if not hit:
+		return
+	# C550: the touch-power draw.
+	var pow_base := Pm98Trig._tdiv(int(p.get(0x384, 0)) << 0x11, 100) \
+			+ Pm98Trig._tdiv((100 - int(p.get(0x390, 0))) * 0x10000, 100)
+	var powr := _prob_scale(draw.call(), pow_base)
+	# L558 stat swap (DAT_006d31c4 == 0 live).
+	var stats: Dictionary = Pm98Movement._ref(p, 0x3b8)
+	if not is_same(m.get(0x43c, 0), p):
+		stats[0x90] = int(stats.get(0x90, 0)) - 1
+		stats[0x8c] = int(stats.get(0x8c, 0)) + 1
+	p[0x60] = 1
+	Pm98Movement._ball_engage_player(ball, p)
+	if powr + 0x20000 >= 0x10CCD:
+		ball[0x40] = 0                              # FUN_0058ed70: release the carrier
+	if int(ball.get(0x70, 0)) < 0xd:
+		ball[0x70] = 0xc                            # the touch cooldown
+	# C585: the jitter draw + the velocity redirect.
+	var jbase := Pm98Trig._tdiv((100 - int(p.get(0x390, 0))) * 0x2000, 100)
+	var ang := Pm98Trig._i32(_prob_scale(draw.call(), jbase * 2 + 1) - jbase)
+	for off in [0x20, 0x24, 0x28]:
+		var v := int(ball.get(off, 0))
+		ball[off] = (v + ((v >> 31) & 0xf)) >> 4
+	var buf: Array = Pm98Trig.scale_vec3(int(p.get(0x20, 0)), int(p.get(0x24, 0)),
+			int(p.get(0x28, 0)), Pm98Trig._i32(powr + 0x20000))
+	Pm98Trig.rot_vec3(buf, ang, 0)
+	for ax in 3:
+		var voff := 0x20 + 4 * ax
+		ball[voff] = Pm98Trig._i32(int(ball.get(voff, 0)) + int(buf[ax]))

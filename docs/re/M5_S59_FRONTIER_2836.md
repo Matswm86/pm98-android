@@ -1,0 +1,101 @@
+# M5 s59: the 7-hour capture, four real engine bugs, and clk 2836
+
+s58 closed at clk 1032 (match minute 3) with one sentence: the frontier is a capture
+problem, not an engine problem. s59 ran the capture — and the capture immediately made it
+an engine problem again, four times over. The port is now byte-exact over **clk 1-2836**
+(match minute ~8.9, 19.7 % of a half, 2.75x the s58 window).
+
+## The result
+
+Against **all nine** banked Z2 captures in `~/MWM-AI/data/pm98-m4-oracle/capture2/`, one
+port dump (`diag_m5_dart209.gd` to clk 2850), zero tolerance:
+
+| capture | window | words compared | result |
+|---|---|---|---|
+| `oracle_dartwatch_s45_ext` | clk 1-303 | 8,289 | EXACT |
+| `oracle_dartwatch_s47a_300_588` | clk 1-588 | 73,416 | EXACT |
+| `oracle_dartwatch_s51_630_660` | clk 1-661 | 10,054 | EXACT |
+| `oracle_dartwatch_s53_arm_630_660` | clk 1-661 | 13,464 | EXACT |
+| `oracle_dartwatch_s55_555_655` | clk 1-656 | 42,369 | EXACT |
+| `oracle_dartwatch_s55b_650_1250` | clk 1-830 | 75,583 | EXACT |
+| `oracle_dartwatch_s58_820_964` | clk 1-964 | 60,849 | EXACT |
+| `oracle_dartwatch_s58c_950_1032` | clk 1-1032 | 35,311 | EXACT |
+| **`oracle_dartwatch_s59_1020_2837`** | **clk 1-2836** | **753,257** | **EXACT** |
+
+**1,072,592 words, nine captures, zero mismatches.**
+
+## The capture
+
+Per the s58 handoff: `Xvfb :5` (not rootful Xwayland — COSMIC stalls hidden Wayland
+surfaces), `PM98_DESKTOP=pm98m5`, `boot.sh` → `nav_kickoff.sh mats` (BAD ROLL on boot 1,
+clean on boot 2) → `winedbg --gdb` → `m5_rsp_capture.py 51359 <lpid> frame0_struct_import.json
+out.jsonl 3600 1020 3600` → KICK OFF at (320,457).
+
+* New base this boot: **`0x03dcf0d8`** — added to the script's candidate list (all six
+  observed bases are now candidates; the HOT-band scan ran once, ~4 min, then found it).
+* The stub did NOT die this time. The run stalled at **clk 2837** after ~4 h in-window —
+  the WATCH event-board pause wanting its KICK OFF click — and was stopped there. The
+  streamed jsonl banked clk 1020→2837 in full (~30.9 MB): in-window rate ~1 clk/9 s,
+  free-run 0→1020 in ~20 min, exactly the s58 arithmetic.
+
+## The four engine bugs the new ground exposed (in discovery order)
+
+1. **`_steer_carrier_drag` compared the RAW world ball vx** where the binary rotates a
+   stack copy of the ball velocity by -facing and compares the ROTATED forward component
+   (disasm `0x5a92e9-0x5a92f2` rot, `0x5af33f-0x5a9346` compare; the Ghidra decompile's
+   pre-rotation `iVar7` is an artifact). A ball kicked toward -x compared negative
+   forever, so the knock-on re-fired EVERY tick, re-accelerating the ball with the
+   carrier's ramping speed. First mismatch clk 1422; fixed → 1450.
+2. **The resolver's ball-touch tail (fn_005aeda0 L491-607) was not ported** — the old
+   "provably inert" claim was falsified at clk 1449-1450: silicon runs it on every
+   LAB_005afabf route (bails included) and it is the mid-air deflection (probe at
+   polar 0x9998/0x4ccc/self vs the live local_34 box; C550 power draw; engage
+   ball→toucher, strong arm releases the carrier; **ball+0x70 = 0xc touch cooldown** —
+   the once-only gate; C585 jitter draw; `ball.vel = trunc(ball.vel/16) +
+   rot(scale_vec3(P.vel, power+0x20000), jit-jbase)`). Ported as
+   `Pm98Resolver._touch_tail` via `_afabf`, threading the live `local_34`
+   (0xc000 pre-draw, drawn reach+0x4000 after L196). NOTE: out-of-range play-states
+   RETURN DIRECTLY in the C (L128-133) — they never reach the tail; wiring them through
+   it regressed the frontier to 1160 before the revert.
+3. **The header-block gate read a phantom match scalar.** The C reads
+   `8 < *(*(target+0x184)+4)` — the target's TEAM-HEADER roster count (= 11 live), and
+   L392 reads the resolver's own `gs+4`. The port read `m[4]`, absent from the live
+   struct — the header block never ran outside fixtures (the tree-oracle template
+   aliases T+0x184 → M, which is where the `m[4]` literalization came from). Fixed both
+   reads to gs+4; `test_resolver_tree` fixtures now mirror the template's cross-refs.
+4. **The header body was a stub of the real thing.** The C: `FUN_005a5430(this=TARGET)`
+   — the remap LUT (LUT[6]=LUT[7]=10) clears t+0x2c/+0x30, which the port's bare
+   `t[0x40]=` skipped (stale anim frame → a phantom 6/7 windup draw at clk 1495); the
+   target's motion-lerp to polar(0x20000, t.face) over 0x30 steps (FUN_005a7220,
+   this=target @0x5af374); the carrier release when the target holds the ball
+   (FUN_0058ed50, this=ball @0x5af39e); and on the keeper-beaten roll,
+   `match+0x440 = the TARGET POINTER` (not literal 1) + target stats +0xa4 = 1.
+
+Also landed with s59 (committed separately as `f5ab46c`): the three `+0x43c` null
+sentinels unified to the binary's model (player pointer, null = 0) — which this session's
+touch tail then consumed (`is_same(m.get(0x43c, 0), p)` at the L558 stat swap), and the
+finishing pre-block (fn_005aeda0 L41-118) ported as `_finishing_1b` (8-tick projections,
+adj(t+0x398) roll, target caught → state 0x17 + 32-tick lerp + ball mirror + C102 draw).
+
+## Still open
+
+1. The `run_match_from_struct.gd` kill test (first goal 11' vs the reference 21') — the
+   engine changed materially in exactly the post-shot region; re-run in progress.
+   clk ~3500 is now only ~660 clks past the verified window.
+2. The ps-9 chase geometry (fn_005aeda0 L121-170) — still deferred, RNG-free, returns
+   directly (no tail).
+3. The cross-seed sweep (`PM98_SEED`) — still unrun.
+4. The engine is still not the engine the app plays with (`MatchSim.simulate`).
+
+## Reproduce
+
+```bash
+~/godot462 --headless --path app --import
+PM98_CLK_LO=0 PM98_CLK_HI=2850 PM98_TICK_CAP=3000 \
+  ~/godot462 --headless --path app --script res://tests/diag_m5_dart209.gd > port_2850.txt
+C=~/MWM-AI/data/pm98-m4-oracle/capture2
+python3 tools/re/m5_anchor_posdiff.py port_2850.txt $C/oracle_dartwatch_s59_1020_2837.jsonl 1 2836
+```
+
+Diff over an explicit `[1, hi]`; clk 2837 itself is the pause tick (thousands of
+board-loop draws with the clock frozen) — cap at 2836.

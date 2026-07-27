@@ -1589,7 +1589,16 @@ static func _steer_carrier_drag(p: Dictionary, ctrl: Dictionary, pvel: Array) ->
 	Pm98Trig.rot_vec3(rel, negf, 0)                        # rotate (ball - P) by -facing
 	var relx := int(rel[0])
 	var rely := int(rel[1])
-	var ballvelx := _g(ctrl, 0x20)
+	# 5a92e9-5a92f2: the binary rotates a STACK COPY of the ball velocity by -facing too, and
+	# the 5a9346 guard compares the ROTATED forward component (5a933f reads it back from the
+	# rotated buffer) -- not the raw world vx. The Ghidra decompile's pre-rotation `iVar7` is
+	# an artifact (in-place rot through a stack pointer it does not track). Raw vx broke the
+	# once-only knock-on: a ball kicked toward -x compared negative forever, so the drag
+	# re-fired every tick and re-accelerated the ball with the carrier's ramping speed
+	# (s59 first mismatch, clk 1422).
+	var bvel_r := [_g(ctrl, 0x20), _g(ctrl, 0x24), _g(ctrl, 0x28)]
+	Pm98Trig.rot_vec3(bvel_r, negf, 0)
+	var ballvelx := int(bvel_r[0])
 	if _g(p, 0x6c) == 0:
 		ctrl[0x20] = int(pvel[0])
 		ctrl[0x24] = int(pvel[1])

@@ -56,8 +56,20 @@ func _run() -> bool:
 		# Reconstruct the fixture's struct fields (same offsets as resolver_tree.tmpl).
 		var p := {0x2c: 3, 0x30: 0, 0x34: fx.pang, 0x40: fx.pos, 0x60: fx.eng, 0x384: fx.skill}
 		var t := {0x34: fx.tang, 0x40: 5, 0x2bc: 1, 0x388: 0}
-		var m := {4: fx.hdr, 0x43c: 0, 0x448: 0, 0x461: 0}
+		var m := {4: fx.hdr, 0x43c: 0, 0x448: 0, 0x461: 0, 0x70: 1}
 		var stats := {}
+		# resolver_tree.tmpl cross-refs (s59): P/T+0x184 -> &M, so the gs+4 header/save
+		# gates read M+4 = HDR through the SAME aliased layout the oracle ran with;
+		# P+0x190 -> &M is the template's ball alias, whose +0x70 = 1 gates the
+		# ball-touch tail OFF exactly like the oracle's "M+0x70 != 0" line.
+		p[0x184] = m
+		p[0x188] = m
+		p[0x18c] = m
+		p[0x190] = m
+		p[0x3b8] = stats
+		t[0x184] = m
+		t[0x190] = t
+		t[0x3b8] = stats
 		var rng := MatchEngine.Pm98Rng.new(1)
 		var r := Pm98Resolver.resolve_tree(p, t, m, stats, rng)
 

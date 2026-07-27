@@ -215,6 +215,19 @@ deprioritised (last). Approved path: build an **end-to-end oracle**, kill-test t
    could not be re-attached — `error 5`, twice). `PM98_NO_POKE=1` now exists on the capture
    script for the case where a re-attach DOES succeed.
 
+   **STATUS 2026-07-27 (s59) — the long capture ran, and it falsified the engine four
+   times.** `docs/re/M5_S59_FRONTIER_2836.md`. One boot on `Xvfb :5` banked clk 1020→2837
+   (~4 h in-window; the run ended at the clk-2837 WATCH event-board pause, not a stub
+   death). The new ground exposed and fixed: the carrier-drag raw-vs-rotated ball-vx guard
+   (clk 1422), the UNPORTED resolver ball-touch tail = the mid-air deflection + ball+0x70
+   once-only cooldown (clk 1450), the header-block gate reading a phantom `m[4]` instead of
+   the target's gs+4 roster count (clk 1460), and the header body missing set_position_code's
+   LUT-remap frame clears + the target lerp + the m+0x440 target POINTER (clk 1495). The
+   finishing pre-block (L41-118) is ported too. Result: **byte-exact over clk 1-2836**
+   (match minute ~8.9, 19.7 % of a half); across all nine banked captures **1,072,592
+   words, 0 mismatches, zero tolerance**. The kill-test divergence at clk ~3500 is now only
+   ~660 clks beyond the verified window.
+
 ## BRIEF-specific (mostly done — verify, don't rebuild)
 - Commentary TEMPLATES already verbatim from `MANAGER.EXE` (`MatchCommentary.gd`, VAs cited); event
   taxonomy maps 1:1 to the decoded enum. GAP = the event RATES/timing (ours) → fixed by M5 (drive
