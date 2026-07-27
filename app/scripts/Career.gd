@@ -205,6 +205,10 @@ var contract_warned := false
 # The channelTV card queued for the coming HOME match: {"fee": int, "comp": String}.
 # {} when the next fixture is away, or the competition's fee is not witnessed.
 var pending_channel_tv: Dictionary = {}
+# R13 (witnessed): tiers whose FINAL tables the hub presents after the penultimate
+# league round, BEFORE the last one is played — the divisions that have already
+# finished (lower divisions run ahead, R12). Drained by Main's post-week chain.
+var pending_division_finals: Array = []
 ## Knockout rounds whose draw the hub still has to raise, oldest first (REFRUN R4). The
 ## original raises the pixel-exact SORTEO screen UNPROMPTED when a round is drawn; the
 ## port had the screen at 0 differing pixels and NO live caller at all. Each entry is
@@ -357,11 +361,23 @@ const STAFF_MAX := 13                   # the 13 single-occupancy role slots (on
 
 # "The Directors will only let you make %u offer%s to sign a player per week."
 const OFFERS_PER_WEEK := 3
-# Transfer window shuts this many rounds before the season ends. WITNESSED (REFRUN R10):
-# on Sunday 8 March 1998, Premier Week 32, the original raised "The transfer deadline is
-# now 2 weeks away." -- so the deadline falls on week 34 of a 38-round Premier season,
-# i.e. total_weeks() - 4. Was 6 (which put it at week 32, two weeks early).
-const DEADLINE_TAIL := 4
+# The Premier calendar is 38 rounds over THIRTY-NINE weeks: one blank league Saturday
+# in the run-in. Witness chain: the badge reads "Premier Week 32" on Sun 8 Mar 1998
+# (REFRUN R10, p0524 — so NO round had been skipped by March), "Premier Week 37" as
+# the NEXT fixture on Sat 18 Apr (R12, p0610), and the Third Division's finished P=46
+# table dated 2/5/1998 appears BEFORE the Premier's last match (R12/R13, p0638) — so
+# the final round falls on Sat 2 MAY = week 39, and exactly one Saturday in weeks
+# 33..37 carries no Premier round. Week 35 (Sat 4 Apr 1998) is the unique real-1998
+# calendar fit — the F.A. Cup semi-final weekend — and rounds 35-38 then land
+# 11 / 18 / 25 Apr + 2 May, reproducing both badge witnesses. The old straight
+# 38-in-38 calendar finished on 25 April. [Mats QA 2026-07-26: "Premier league was
+# already done in april, too soon"]
+const BLANK_LEAGUE_WEEK := 35
+# Transfer window shuts before the season ends. WITNESSED (REFRUN R10): on Sunday
+# 8 March 1998, Premier Week 32, the original raised "The transfer deadline is now
+# 2 weeks away." -- so the deadline falls on week 34, i.e. total_weeks() - 5 of the
+# 39-week calendar above (was "- 4" of the straight 38-week one: same witnessed date).
+const DEADLINE_TAIL := 5
 # The original raises exactly TWO warnings, at two weeks and one week out, and the window
 # then shuts silently -- there is no deadline-day event (owner, 2026-07-25: not a concept
 # in 1998). The two-week wording is the witnessed string; the one-week form is the same
@@ -456,6 +472,7 @@ func _init_club(club: Dictionary, league: Dictionary, league_clubs: Array, leagu
 	_wk = {}
 	loss_weeks = 0
 	pending_channel_tv = {}
+	pending_division_finals = []
 	pending_cup_draws = []
 	pending_champion_cards = []
 	sa_champion_id = -1
@@ -485,7 +502,7 @@ func _init_club(club: Dictionary, league: Dictionary, league_clubs: Array, leagu
 		ids.append(int(lc["id"]))
 		club_names[int(lc["id"])] = lc.get("name", "?")
 		rosters[int(lc["id"])] = _seed_squad(lc)
-	fixtures = SeasonSim.fixtures(ids)
+	fixtures = _league_fixtures(ids)
 	_init_table(league_clubs)
 	_set_objective(club, league, league_clubs, leagues)
 	var fin := FinanceModel.summary(club, tier)
@@ -663,6 +680,17 @@ static func objective_for(for_club_id: int, for_league_id: String,
 
 func total_weeks() -> int:
 	return fixtures.size()
+
+
+## The manager-league fixture list: the double round-robin with the witnessed blank
+## run-in Saturday inserted (see BLANK_LEAGUE_WEEK). Rounds 1..34 play on their own
+## week; rounds 35..38 play weeks 36..39 (final round Sat 2 May). Only the 20-club
+## 38-round shape is witnessed; other league sizes keep straight scheduling.
+static func _league_fixtures(ids: Array) -> Array:
+	var fx := SeasonSim.fixtures(ids)
+	if fx.size() == 38:
+		fx.insert(BLANK_LEAGUE_WEEK - 1, [])
+	return fx
 
 func season_over() -> bool:
 	return week >= fixtures.size()
@@ -912,6 +940,8 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 	_tick_transfer_deadline()       # the two-week / one-week deadline warnings (R10)
 	_tick_contract_warning()        # the 1-April season-end / contract-renewal warning
 	_tick_one_off_finals(rng)       # Intercontinental in December, Supercup in March (R7/R11)
+	if week == total_weeks() - 1:
+		_queue_division_finals()    # R13: the finished divisions' tables, before your last round
 	if not manager_res.is_empty():
 		results.append({
 			"week": week, "opp_id": manager_res["away_id"] if manager_res["manager_home"] else manager_res["home_id"],
@@ -1604,9 +1634,14 @@ func _advance_other_divisions(rng: RandomNumberGenerator) -> void:
 
 
 ## How many rounds a division of `n_rounds` should have played by the manager's current
-## week. See _advance_other_divisions for the witness this reproduces.
+## week. See _advance_other_divisions for the witness this reproduces. The denominator
+## is the manager league's ROUND count (the blank run-in Saturday excluded), while
+## `week` keeps counting calendar weeks INCLUDING the blank — that pairing reproduces
+## both R12 witnesses on the 39-week calendar: First Division P=44 (+head 1) at the
+## 18-Apr hub read (week 37), and P=46 complete at week 38, BEFORE the 2-May final
+## round (p0638). A round-count of `total_weeks()` here delayed both by a week.
 func _division_rounds_due(n_rounds: int) -> int:
-	var mw := total_weeks()
+	var mw := total_weeks() - _blank_rounds()
 	if mw <= 0 or n_rounds <= 0:
 		return 0
 	if n_rounds <= mw:
@@ -1614,6 +1649,15 @@ func _division_rounds_due(n_rounds: int) -> int:
 	@warning_ignore("integer_division")
 	var extra := ((n_rounds - mw) * week) / mw
 	return mini(week + extra, n_rounds)
+
+
+## Blank (empty) rounds in the manager league's fixture list (the run-in Saturday).
+func _blank_rounds() -> int:
+	var n := 0
+	for r in fixtures:
+		if (r as Array).is_empty():
+			n += 1
+	return n
 
 
 # Witnessed zone structure per tier (the live tables' tag columns, 2026-07-19):
@@ -3119,6 +3163,23 @@ func _tick_contract_warning() -> void:
 	var auto_renew := manager_level in ["trainer", "manager"]   # DAT_0066B1F4
 	pending_alerts.append(SEASON_END_MSG if auto_renew else CONTRACT_WARN_MSG)
 
+
+## R13 (witnessed): after the penultimate league round the original presents the
+## FINAL tables of every division that has already completed its rounds — blank
+## club plate, the division in the badge — BEFORE the last round is played (p0638:
+## Third Division P=46, dated 2/5/1998, shown before the Premier's last match).
+## Lowest tier first (they finish first, R12). Never the manager's own division.
+func _queue_division_finals() -> void:
+	pending_division_finals = []
+	for t in [4, 3, 2, 1]:
+		if int(t) == tier:
+			continue
+		var dv: Dictionary = divisions.get(int(t), {})
+		if dv.is_empty():
+			continue
+		if int(dv.get("played", 0)) >= int((dv.get("fixtures", []) as Array).size()):
+			pending_division_finals.append(int(t))
+
 func my_squad() -> Array:
 	return rosters.get(club_id, [])
 
@@ -4326,7 +4387,7 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	var views: Array = []
 	for id in ids:
 		views.append(club_view(id))
-	fixtures = SeasonSim.fixtures(ids)
+	fixtures = _league_fixtures(ids)
 	_mint_domestic_cups(ids)                    # fresh 92-club cups each season
 	_init_table(views)
 	var league := {"id": league_id, "name": league_name, "tier": tier}
@@ -5267,6 +5328,7 @@ func to_dict() -> Dictionary:
 		"contract_warned": contract_warned,
 		"pending_champion_cards": pending_champion_cards, "sa_champion_id": sa_champion_id,
 		"pending_channel_tv": pending_channel_tv,
+		"pending_division_finals": pending_division_finals,
 		"euro_winner_cup": euro_winner_cup, "euro_winner_cwc": euro_winner_cwc,
 		"euro_winner_uefa": euro_winner_uefa,
 		"euro_winner_ratings": _str_keyed(euro_winner_ratings),
@@ -5492,6 +5554,8 @@ static func from_dict(d: Dictionary) -> Career:
 	c.loss_weeks = int(d.get("loss_weeks", 0))
 	c.contract_warned = bool(d.get("contract_warned", false))
 	c.pending_channel_tv = d.get("pending_channel_tv", {})
+	for t in d.get("pending_division_finals", []):
+		c.pending_division_finals.append(int(t))
 	c.euro_winner_cup = int(d.get("euro_winner_cup", -1))
 	c.euro_winner_uefa = int(d.get("euro_winner_uefa", -1))
 	c.euro_winner_cwc = int(d.get("euro_winner_cwc", -1))

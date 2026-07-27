@@ -42,7 +42,12 @@ func _run() -> bool:
 		career.objective_text, career.objective_pos, career.cash, career.weekly_net])
 
 	var ok := true
-	ok = _assert(career.total_weeks() == 38, "38 rounds scheduled (got %d)" % career.total_weeks()) and ok
+	# 38 rounds over 39 weeks: the witnessed blank run-in Saturday (Career.
+	# BLANK_LEAGUE_WEEK; final round Sat 2 May — REFRUN p0610/p0638).
+	ok = _assert(career.total_weeks() == 39,
+		"39 calendar weeks scheduled (got %d)" % career.total_weeks()) and ok
+	ok = _assert(career.total_weeks() - career._blank_rounds() == 38,
+		"38 actual rounds (one blank Saturday)") and ok
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = SEED

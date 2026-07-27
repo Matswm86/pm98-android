@@ -265,8 +265,8 @@ func _euro_group_badge() -> bool:
 func _deadline_warnings() -> bool:
 	print("=== R10: the transfer-deadline warnings ===")
 	var ok := true
-	ok = _assert(Career.DEADLINE_TAIL == 4,
-		"DEADLINE_TAIL is 4 (a 38-round season shuts the window on week 34)") and ok
+	ok = _assert(Career.DEADLINE_TAIL == 5,
+		"DEADLINE_TAIL is 5 (the 39-week calendar shuts the window on week 34)") and ok
 	var career := _new_career()
 	if career == null:
 		return _assert(false, "career built")
@@ -289,8 +289,8 @@ func _deadline_warnings() -> bool:
 			"the two-week warning is the original's own wording (%s)" % str(seen[0][1])) and ok
 		ok = _assert(str(seen[1][1]) == "The transfer deadline is now 1 week away.",
 			"the one-week warning is the same string, pluralised (%s)" % str(seen[1][1])) and ok
-		ok = _assert(int(seen[0][0]) == career.total_weeks() - 6,
-			"the first warning lands two weeks before the deadline (week %d)"
+		ok = _assert(int(seen[0][0]) == 32,
+			"the first warning lands on the witnessed week 32 (Sun 8 Mar, R10) (week %d)"
 			% int(seen[0][0])) and ok
 	ok = _assert(deadline_week == career.total_weeks() - Career.DEADLINE_TAIL,
 		"the window shuts on week %d" % deadline_week) and ok

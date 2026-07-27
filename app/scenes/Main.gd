@@ -2093,13 +2093,13 @@ func _career_advance() -> void:
 			_career.save()
 			_show_shield_card(_career.charity_shield, func() -> void:
 				_show_career()
-				_pop_cup_draw(func() -> void: _pop_month_awards(func() -> void: _pop_channel_tv(_pop_pending_team_offers)))))
+				_pop_division_finals(func() -> void: _pop_cup_draw(func() -> void: _pop_month_awards(func() -> void: _pop_channel_tv(_pop_pending_team_offers))))))
 		return
 	var res := _career.advance_week(rng)   # ratings come from the live roster
 	if res.is_empty():
 		_career.save()   # bye / season end: no presentation, save immediately
 		_show_career()   # refresh the hub in place
-		_pop_cup_draw(func() -> void: _pop_month_awards(func() -> void: _pop_channel_tv(_pop_pending_team_offers)))
+		_pop_division_finals(func() -> void: _pop_cup_draw(func() -> void: _pop_month_awards(func() -> void: _pop_channel_tv(_pop_pending_team_offers))))
 		return
 	_show_match_result(res)
 
@@ -2167,7 +2167,7 @@ func _show_match_result(res: Dictionary, on_finish: Callable = Callable()) -> vo
 	var finish := on_finish if on_finish.is_valid() else func() -> void:
 		_career.save()   # the deferred week autosave (EXIT-Yes never gets here)
 		_show_career()
-		_pop_cup_draw(func() -> void: _pop_month_awards(func() -> void: _pop_channel_tv(_pop_pending_team_offers)))
+		_pop_division_finals(func() -> void: _pop_cup_draw(func() -> void: _pop_month_awards(func() -> void: _pop_channel_tv(_pop_pending_team_offers))))
 	var open_match := func() -> void:
 		_open_match(home, away, int(res["hg"]), int(res["ag"]), m["lines"],
 			"%s  -  back to the dugout" % verdict, finish, result_data, res.get("possession", []))
@@ -4375,6 +4375,30 @@ func _cup_draw_side(club_id: int, fallback: String) -> Dictionary:
 
 
 ## The unprompted SORTEO the original raises when a knockout round is drawn (REFRUN R4).
+## R13 (witnessed): after the penultimate league round the original presents the
+## finished divisions' FINAL tables — blank club plate, the division in the badge —
+## before the last round is played (p0610/p0638). Queued by
+## Career._queue_division_finals; presented here at the head of the post-week chain,
+## one LeagueTableScreen per tier, lowest first.
+func _pop_division_finals(after: Callable) -> void:
+	if _career == null or (_career.pending_division_finals as Array).is_empty():
+		if after.is_valid():
+			after.call()
+		return
+	var t := int((_career.pending_division_finals as Array).pop_front())
+	_career.save()
+	var scr: LeagueTableScreen = load("res://scenes/LeagueTableScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	# Blank manager plate — the original shows no manager in this mode (R13).
+	scr.setup(_career.standings_for(t), _career.club_name, _career.season,
+		"Week %d" % _career.week, t, _career.club_id, "")
+	scr.back_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		scr.queue_free()
+		_pop_division_finals(after))
+
+
 ## Rides the same post-week card chain the channelTV card and the monthly awards do,
 ## because that is how the original raises it: over the hub, with no menu step. FINISH
 ## and CONTINUE both dismiss it -- the live drive proved CONTINUE cross-fades straight

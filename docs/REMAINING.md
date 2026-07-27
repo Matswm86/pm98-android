@@ -68,6 +68,21 @@ final build:
   reading the refrun witnesses support (R16 correction in
   `REFRUN_manutd_1997-98_FINDINGS.md`).
 
+* ~~**The league calendar ended in April + the divisions overview came too late**~~ —
+  **FIXED 2026-07-27.** The port played 38 rounds in 38 straight weeks (final round
+  25 Apr). Witness chain (R10 p0524 badge "Week 32" on 8 Mar — nothing skipped by
+  March; R12 p0610 badge "Week 37" next on Sat 18 Apr; R12/R13 p0638 Third Div P=46
+  dated 2/5 BEFORE the Premier's last match) forces 38 rounds over 39 weeks with ONE
+  blank Saturday in weeks 33..37 and the final round on Sat 2 MAY. Week 35 (Sat 4 Apr,
+  the F.A. Cup semi weekend) is the unique real-1998 fit → `Career.BLANK_LEAGUE_WEEK`,
+  `_league_fixtures()`. `DEADLINE_TAIL` 4→5 (same witnessed week-34 deadline).
+  Division pacing re-anchored to the ROUND count so both R12 witnesses reproduce
+  (P=44 at the 18-Apr read, P=46 complete by week 38). AND the R13 sequence now
+  exists: after the penultimate round the hub presents the finished divisions' final
+  tables (blank club plate, division badge, lowest tier first) via
+  `pending_division_finals` + `Main._pop_division_finals` — before the last round,
+  exactly as witnessed. `test_league_calendar.gd` (11 asserts) pins all of it.
+
 Four more, reported 2026-07-26 evening (second round, same play session):
 
 * **Season-2+ talents render wrong in lineups / squad management** — "they have stars,
