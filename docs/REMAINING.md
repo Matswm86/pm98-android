@@ -110,9 +110,9 @@ final build:
   names **the European competition the club is in**. Building it needs the baker to
   blank the label box + a `diff_finance_perweek_parity.py` re-run, which belongs with the
   next finance capture — the `±N K.` axis scale is a separate blit and still has no rule.
-* **TEAM TACTICS does not match the tracked original** (`tactics_subscreens_re.md` holds
+* ~~**TEAM TACTICS does not match the tracked original**~~ — **REBUILT 2026-07-27, see §0b.** (`tactics_subscreens_re.md` holds
   the measurements).
-* **Neither cheat works in play**: MIXED PLAY (blocked on the un-located club tactic
+* ~~**Neither cheat works in play**~~ — **BOTH LIVE-PROVEN 2026-07-27, see §0b.** Original entry: MIXED PLAY (blocked on the un-located club tactic
   byte, §3b) AND the shipped THREE UP FRONT hack — Mats reports no effect ("won't get me
   goals"). ~~THREE UP FRONT~~ — **FIXED 2026-07-26 evening.** The flag/persistence/
   routing were all sound; the TRIGGER side had three port bugs: (1) the default 4-4-2
@@ -151,7 +151,8 @@ final build:
 
 Four more, reported 2026-07-26 evening (second round, same play session):
 
-* **Season-2+ talents render wrong in lineups / squad management** — "they have stars,
+* ~~**Season-2+ talents render wrong in lineups / squad management**~~ — **FIXED 2026-07-27** (`6e2cee8`, in HEAD).
+  Original entry: — "they have stars,
   but no position or roles". New intake players must carry the same fields (position,
   posFine role, etc.) and draw exactly like the decoded squad.
 * ~~**The cup-draw animation is not the original's** — today the spinning ball plays with
@@ -602,7 +603,7 @@ mask) — it needs the APK on a phone, which this box cannot do.
   driver (`Pm98Driver`), the full per-player DECIDE/ADVANCE, relationship matrix, marker
   and role selection, ball advance, the trig LUTs, the event queue and dispatcher — all
   ported and oracle-locked. They are done; they are simply not the engine the app calls.
-* **322 GDScript test scripts** under `app/tests/` (225 `test_*`, 42 `diag_*`, 52+ `shot_*`).
+* **325 GDScript test scripts** under `app/tests/` (**232** `test_*`, 42 `diag_*`, 52+ `shot_*`).
   **The first full sweep ran to completion 2026-07-26**: 223 of 225 `test_*` green (11 of
   them print non-standard pass markers — "ALL GREEN", per-check "PASS", "N checks, 0
   FAIL"), the 2 failures both accounted for (`test_decideset` = the +0x43c sentinel gap,
