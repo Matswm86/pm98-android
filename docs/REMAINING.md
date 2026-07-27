@@ -262,8 +262,15 @@ clicking it), so `ResultsScreen` now hit-tests the eight competition chips and e
 original's dimmed chips are); `KnockoutScreen`'s own rail is connected the same way, so
 competition-to-competition hops work. Player path: hub → RESULTS → rail chip →
 cup / Europe views. The play-off chips stay inert (no play-off view exists — honest gap).
-Covered by `test_results_screen`. Still open from the audit: the dead `CupScreen.gd` +
-`_show_one_off_final()` and the interim `_show_training()` browse — a cleanup pass.
+Covered by `test_results_screen`. ~~Still open from the audit: the dead `CupScreen.gd` +
+`_show_one_off_final()` and the interim `_show_training()` browse — a cleanup pass.~~ —
+**CLEANED 2026-07-27**: `CupScreen.gd` deleted along with its whole orphan family
+(`_show_one_off_final`, `_show_competitions` — the zero-caller browse the rail replaced —
+`_cup_view`/`_cup_group_view` payload builders, the three `*_status_word` helpers, the
+interim `_show_training` browse and its `PM98_TRAIN_SHOT` rig, `test_cup_screen.gd`).
+The live routes (rail → `_open_competition` → `_show_cup_screen`, LINE-UP →
+`_show_training_screen`) are untouched — parse check, `test_results_screen`,
+`test_cupdraw_screen` and the cupdraw parity gate re-run green.
 
 ## 3b. THREE UP FRONT — the one place this port draws a pixel the original does not
 
@@ -369,12 +376,16 @@ pass (touch targets, screen sizes), app icon/splash, and a signed release build.
   FAIL"), the 2 failures both accounted for (`test_decideset` = the +0x43c sentinel gap,
   fixed the same day by `f5ab46c`, green on HEAD; `test_pyramid` = FLAKY, an RNG season
   meeting the sparse-English-squads gap — S3's non-reproducibility makes it
-  non-deterministic). `shot_*` all ran; the two `*_tapthrough` harnesses fail their
-  boot-raises-TITLE check when a prior career save exists in `user://` (harness-state
-  contamination, not an app bug). 3 `diag_*` are rotten as scripts (missing output env /
-  old-API calls) — probes, not tests. Remaining caveats: CI still runs no test gate
-  (`build-android.yml` only exports the APK) and all 20+ `diff_*_parity.py` gates are
-  manual-only.
+  non-deterministic). `shot_*` all ran; ~~the two `*_tapthrough` harnesses fail their
+  boot-raises-TITLE check when a prior career save exists in `user://`~~ — **FIXED
+  2026-07-27**: both harnesses now `Career.delete_save()` before boot (tests own their
+  state) and the squad tap-through drives the real entry chain (TEAMS IN CHAMPIONSHIPS
+  → shield card → START OF SEASON) instead of racing it — 10/10 + 23/23 green. The 3
+  rotten `diag_*` are runtime-rot only (all 42 parse clean, re-verified 2026-07-27) —
+  probes, not tests, left as probes. **CI test gate ADDED 2026-07-27**:
+  `build-android.yml` now runs a curated 15-test headless gate (<3 min, deterministic,
+  `test_pyramid` excluded until S3) before every APK; the 20+ `diff_*_parity.py`
+  gates remain manual-only.
 * **Render-diff discipline**: screen after screen is baked from the real captured frames and
   proven at 0 differing pixels by a `tools/re/diff_*_parity.py`. That is the standard every
   new screen has to clear.

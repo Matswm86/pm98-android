@@ -63,7 +63,7 @@ func _ready() -> void:
 	if OS.has_environment("PM98_SHOT_DIR") and not OS.has_environment("PM98_BOOT_SHOT") \
 			and not OS.has_environment("PM98_HUB_SHOT") and not OS.has_environment("PM98_BROWSE_SHOT") \
 			and not OS.has_environment("PM98_MATCH_SHOT") and not OS.has_environment("PM98_NEWS_SHOT") \
-			and not OS.has_environment("PM98_TRAIN_SHOT") and not OS.has_environment("PM98_CUP_SHOT") \
+			and not OS.has_environment("PM98_CUP_SHOT") \
 			and not OS.has_environment("PM98_YOUTH_SHOT") and not OS.has_environment("PM98_STAFF_SHOT") \
 			and not OS.has_environment("PM98_CONTRACT_SHOT") and not OS.has_environment("PM98_SCREENS_SHOT") \
 			and not OS.has_environment("PM98_MANAGER_SHOT") and not OS.has_environment("PM98_FICHA_SHOT") \
@@ -89,9 +89,6 @@ func _boot() -> void:
 		return
 	if OS.has_environment("PM98_NEWS_SHOT"):
 		_news_shot()
-		return
-	if OS.has_environment("PM98_TRAIN_SHOT"):
-		_train_shot()
 		return
 	if OS.has_environment("PM98_CONTRACT_SHOT"):
 		_contract_shot()
@@ -408,29 +405,6 @@ func _news_shot() -> void:
 	get_tree().quit()
 
 
-## Faithful real-render of the TRAINING screen (player development). Begins a career,
-## sets intensity to Intensive, and captures the TRAINING browse (intensity row +
-## the squad's development trend). Run as the NORMAL app under Xvfb+GL: PM98_TRAIN_SHOT=1.
-func _train_shot() -> void:
-	var dir := OS.get_environment("PM98_SHOT_DIR")
-	if GameDB.leagues.is_empty():
-		print("TRAIN-SHOT no leagues loaded")
-		get_tree().quit()
-		return
-	var lg: Dictionary = GameDB.leagues[0]
-	var clubs := GameDB.clubs_in_league(lg["id"])
-	clubs.sort_custom(func(a, b): return a["name"] < b["name"])
-	_begin_career("Manager", lg, clubs[0])
-	_career.training_intensity = "Intensive"
-	_show_career()               # raise the hub
-	await _settle()
-	_show_training()
-	await _settle()
-	_save_shot(dir, "training.png")
-	print("TRAIN-SHOT done intensity=%s squad=%d" % [_career.training_intensity, _career.my_squad().size()])
-	get_tree().quit()
-
-
 ## Faithful real-render of the RENEW negotiation. Begins a career, finds a player on a
 ## final-year (EXPIRING) deal -- the seed squad's veterans start on one-year contracts -- and
 ## mounts his renewal screen over the hub so the capture shows his current wage, his demand
@@ -573,7 +547,7 @@ func _cup_shot() -> void:
 	await _settle()
 	_save_shot(dir, "cup_knockout_list.png")
 	for c in get_children():
-		if c is KnockoutScreen or c is CupScreen or c is CupDrawScreen:
+		if c is KnockoutScreen or c is CupDrawScreen:
 			c.queue_free()
 	await _settle()
 	for _i in 12:                # past several scheduled rounds of both cups
@@ -586,7 +560,7 @@ func _cup_shot() -> void:
 	await _settle()
 	_save_shot(dir, "cup.png")
 	for c in get_children():
-		if c is CupScreen or c is CupDrawScreen:
+		if c is CupDrawScreen:
 			c.queue_free()
 	await _settle()
 	_show_cup_screen(_career.league_cup, "league_cup", "Coca-Cola Cup")
@@ -597,7 +571,7 @@ func _cup_shot() -> void:
 	# Finish the season and roll over so the Charity Shield (champions v F.A. Cup winners)
 	# is contested, then capture it around the real CHARITY shield art.
 	for c in get_children():
-		if c is CupScreen or c is CupDrawScreen:
+		if c is CupDrawScreen:
 			c.queue_free()
 	while not _career.season_over():
 		_career.advance_week(rng)
@@ -609,7 +583,7 @@ func _cup_shot() -> void:
 	# Into the new season far enough for European rounds to have been drawn + played,
 	# then capture the European Cup screen around its real trophy art.
 	for c in get_children():
-		if c is CupScreen or c is CupDrawScreen:
+		if c is CupDrawScreen:
 			c.queue_free()
 	# First, partway in: the European Cup group stage in flight (a few matchdays played).
 	for _g in 13:
@@ -623,7 +597,7 @@ func _cup_shot() -> void:
 	await _settle()
 	_save_shot(dir, "european_cup_group.png")
 	for c in get_children():
-		if c is CupScreen or c is CupDrawScreen:
+		if c is CupDrawScreen:
 			c.queue_free()
 	# Then deeper, into the knockout rounds.
 	for _j in 18:
@@ -650,7 +624,7 @@ func _cup_shot() -> void:
 	# Finish this European season and roll over once more so the winners-of-winners finals
 	# (European Supercup + Intercontinental Cup) are contested, then capture the Supercup.
 	for c in get_children():
-		if c is CupScreen or c is CupDrawScreen:
+		if c is CupDrawScreen:
 			c.queue_free()
 	while not _career.season_over():
 		_career.advance_week(rng)
@@ -1214,7 +1188,7 @@ func _free_overlays() -> void:
 			continue
 		if c is LeagueTableScreen or c is LineupScreen or c is SquadScreen \
 				or c is FinanceScreen or c is TransferScreen or c is DirectivaScreen \
-				or c is StadiumScreen or c is CupScreen or c is CupDrawScreen or c is YouthScreen \
+				or c is StadiumScreen or c is CupDrawScreen or c is YouthScreen \
 				or c is StaffScreen or c is BrowseScreen \
 				or c is PlayerInfoScreen or c is RivalScreen or c is ManagerHistoryScreen \
 				or c is TrainingScreen or c is InjuriesScreen or c is StatisticsScreen \
@@ -3617,43 +3591,6 @@ func _on_stadium_works(cat: String, key: int, label: String, cost: int, weeks: i
 		_career.save()
 	_show_stadium_screen()
 
-## The COMPETITIONS chooser on the hub CALEN/fixtures icon (the season-calendar slot): a
-## PM98-chrome browse listing the two domestic cups, each routing to its CupScreen. The
-## next-match readout stays on the RIVAL/opponent icon; a full fixture calendar is future.
-func _show_competitions() -> void:
-	# Build the list dynamically: the Charity Shield + European comps only appear once
-	# qualified for (from the second season on), so route by an action tag, not an index.
-	var rows: Array = []
-	var acts: Array = []
-	rows.append({"text": "SEASON FIXTURES", "value": "league calendar", "accent": Color(0.27, 1.0, 0.53)})
-	acts.append("calendar")
-	if not _career.charity_shield.is_empty():
-		rows.append({"text": "CHARITY SHIELD", "value": _charity_status_word(), "accent": CupScreen.C_GOLD})
-		acts.append("charity")
-	rows.append({"text": "F.A. CUP", "value": _cup_status_word(_career.fa_cup), "accent": CupScreen.C_GOLD})
-	acts.append("facup")
-	rows.append({"text": "COCA-COLA CUP", "value": _cup_status_word(_career.league_cup), "accent": CupScreen.C_GOLD})
-	acts.append("lcup")
-	for key in ["european_cup", "uefa_cup", "cup_winners_cup"]:
-		if _career.euro.has(key):
-			var b: Dictionary = _career.euro[key]
-			rows.append({"text": str(b.get("name", "Europe")).to_upper(),
-				"value": _cup_status_word(b), "accent": CupScreen.C_GOLD})
-			acts.append("euro:" + key)
-	if not _career.supercup.is_empty():
-		rows.append({"text": "EUROPEAN SUPERCUP", "value": _oneoff_status_word(_career.supercup),
-			"accent": CupScreen.C_GOLD})
-		acts.append("supercup")
-	if not _career.intercontinental.is_empty():
-		rows.append({"text": "INTERCONTINENTAL CUP", "value": _oneoff_status_word(_career.intercontinental),
-			"accent": CupScreen.C_GOLD})
-		acts.append("intercont")
-	_mount_browse("%s  -  COMPETITIONS" % _career.club_name, "Cups, shield & Europe", rows,
-		func(i: int) -> void:
-			_dismiss_career_browse()
-			_open_competition(acts[i]),
-		func() -> void: _dismiss_career_browse())
-
 ## The SEASON FIXTURES calendar (T2 #13): the manager's full league season, one row per
 ## round, with the result filled in once played (W green / D neutral / L red) and the next
 ## fixture flagged. PM98-chrome browse driven by Career.season_fixtures(). RETURN -> hub.
@@ -3682,8 +3619,8 @@ func _show_calendar() -> void:
 		func(_i: int) -> void: pass,
 		func() -> void: _dismiss_career_browse())
 
-## Route a COMPETITIONS chooser pick to its screen (each is a Cup.gd bracket on CupScreen,
-## bar the single-match Charity Shield), around the competition's own trophy art.
+## Route a competition key to its screen (the Cup.gd brackets go to the SORTEO /
+## knockout views via _show_cup_screen; the one-off finals to their own screens).
 func _open_competition(act: String) -> void:
 	if act == "calendar":
 		_show_calendar()
@@ -3992,19 +3929,6 @@ func _show_season_start(on_done: Callable) -> void:
 		on_done.call())
 
 
-## A one-word status of the Charity Shield for the competitions list.
-func _charity_status_word() -> String:
-	return _oneoff_status_word(_career.charity_shield)
-
-## A one-word status of any single-match final (shield / supercup / intercontinental).
-func _oneoff_status_word(res: Dictionary) -> String:
-	if res.is_empty():
-		return "not played"
-	var w := int(res.get("winner_id", -1))
-	if w == _career.club_id:
-		return "WINNERS"
-	return "won by %s" % _cup_name(w).substr(0, 14)
-
 ## The Charity Shield on the ORIGINAL's own screen (champions v F.A. Cup winners, a single
 ## match at Wembley — the ground the real frame prints).
 func _show_charity_shield() -> void:
@@ -4157,62 +4081,6 @@ func _show_euro_group_screen(b: Dictionary, gi := 0, rnd := 0) -> void:
 		scr.queue_free()
 		_show_euro_group_screen(b, gi, rnd + delta))
 
-
-## A single-match final (Charity Shield / European Supercup / Intercontinental Cup) as a
-## CupScreen overlay: the manager's result if his club is in it, else who lifted it, around
-## the competition's own trophy. `res` is a Cup.single_neutral_match dict (home_id/away_id/
-## winner_id). Display-only, tap-to-dismiss.
-func _show_one_off_final(res: Dictionary, title: String, emblem: String,
-		round_label: String, sub: String) -> void:
-	var scr: CupScreen = load("res://scenes/CupScreen.gd").new()
-	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(scr)
-	var cid: int = _career.club_id
-	var status := "NOT PLAYED"
-	var status_col: Color = CupScreen.C_DIM
-	var run_rows: Array = []
-	var draw_rows: Array = []
-	if not res.is_empty():
-		var w := int(res.get("winner_id", -1))
-		var home := int(res.get("home_id", -1))
-		var away := int(res.get("away_id", -1))
-		var pens: String = "  (pens)" if res.get("decided", "") == "pens" else ""
-		var score := "%d-%d" % [int(res.get("hg", 0)), int(res.get("ag", 0))]
-		draw_rows = [{"line": "%s  v  %s   %s%s" % [
-			_cup_name(home), _cup_name(away), score, pens],
-			"mine": cid == home or cid == away}]
-		if w == cid:
-			status = "WINNERS!"
-			status_col = CupScreen.C_GOLD
-		elif cid == home or cid == away:
-			status = "RUNNERS-UP"
-			status_col = CupScreen.C_LOSS
-		else:
-			status = "WON BY %s" % _cup_name(w).substr(0, 12).to_upper()
-			status_col = CupScreen.C_TEXT
-		if cid == home or cid == away:
-			var opp := away if cid == home else home
-			var won := w == cid
-			run_rows = [{"round": round_label,
-				"line": "%s %s  %s%s" % ["bt" if won else "lost to",
-					_cup_name(opp).substr(0, 16), score, pens],
-				"accent": CupScreen.C_WIN if won else CupScreen.C_LOSS}]
-	scr.setup(_career.club_name, "", str(res.get("season", _career.season)), status, status_col,
-		sub, run_rows, round_label, draw_rows, 0, title, emblem)
-	scr.gui_input.connect(func(e: InputEvent) -> void:
-		if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
-			scr.queue_free())
-
-## A one-word status of the manager's run in a cup, for the competitions list.
-func _cup_status_word(b: Dictionary) -> String:
-	if b.is_empty():
-		return "not started"
-	var champ := int(b.get("champion_id", -1))
-	if champ == _career.club_id:
-		return "WINNERS"
-	if champ != -1:
-		return "won by %s" % _cup_name(champ).substr(0, 14)
-	return "still in" if Cup.still_in(b, _career.club_id) else "out"
 
 ## The original's SORTEO screen as a full-screen overlay: the latest round's draw, on the
 ## real chrome, around the competition's own trophy strip and the lottery drum. `key` picks
@@ -4501,172 +4369,6 @@ func _cup_tie_line(tie: Dictionary) -> String:
 	var tag := " (replay)" if decided == "replay" else (" (pens)" if decided == "pens" else "")
 	return "%s bt %s  %d-%d%s" % [_cup_name(w), _cup_name(l), hi, lo, tag]
 
-## Build the CupScreen payload from a Cup.gd bracket: status, the manager's per-round run,
-## and the latest round's draw (manager's tie first, the rest capped).
-func _cup_view(b: Dictionary) -> Dictionary:
-	var cid: int = _career.club_id
-	var cup_nm: String = str(b.get("name", "Cup")) if not b.is_empty() else "Cup"
-	var out := {"status": "NOT DRAWN", "status_col": CupScreen.C_DIM,
-		"sub": "The %s has not started." % cup_nm, "run_rows": [],
-		"draw_label": "", "draw_rows": [], "draw_more": 0}
-	if b.is_empty():
-		return out
-	var rounds: Array = b.get("rounds", [])
-
-	# Group phase (the European Cup before its knockout): show the group standings + the
-	# manager's group results instead of a knockout draw.
-	var groups: Array = Cup.group_tables(b)
-	if not groups.is_empty() and rounds.is_empty():
-		return _cup_group_view(b, groups, out)
-
-	# The manager's tie in each played round -> a run row.
-	var run_rows: Array = []
-	for rnd in rounds:
-		for tie in rnd.get("ties", []):
-			if int(tie["home_id"]) != cid and int(tie.get("away_id", -1)) != cid:
-				continue
-			var label := str(rnd.get("label", ""))
-			if tie.get("bye", false):
-				run_rows.append({"round": label, "line": "bye", "accent": CupScreen.C_DIM})
-				break
-			var won := int(tie["winner_id"]) == cid
-			var opp := int(tie["away_id"]) if int(tie["home_id"]) == cid else int(tie["home_id"])
-			var line := "%s %s  %s" % ["bt" if won else "lost to", _cup_name(opp).substr(0, 16),
-				_cup_score_for(tie, cid)]
-			run_rows.append({"round": label, "line": line,
-				"accent": CupScreen.C_WIN if won else CupScreen.C_LOSS})
-			break
-	out["run_rows"] = run_rows
-
-	# Status line.
-	var champ := int(b.get("champion_id", -1))
-	# A competition the manager never entered (European comps he didn't qualify for): no
-	# run, not a survivor. Domestic cups always include the whole division, so this never
-	# fires there. Still show the trophy + the draw, just flagged as not qualified.
-	if not Cup.still_in(b, cid) and run_rows.is_empty():
-		out["status"] = "NOT QUALIFIED"
-		out["status_col"] = CupScreen.C_DIM
-		if champ != -1:
-			out["sub"] = "%s won the %s." % [_cup_name(champ), cup_nm]
-		else:
-			out["sub"] = "You did not qualify. %d clubs remain." % (b.get("survivors", []) as Array).size()
-	elif champ == cid:
-		out["status"] = "WINNERS!"
-		out["status_col"] = CupScreen.C_GOLD
-		out["sub"] = "You have won the %s." % cup_nm
-	elif champ != -1:
-		out["status"] = "KNOCKED OUT"
-		out["status_col"] = CupScreen.C_LOSS
-		out["sub"] = "%s won the cup." % _cup_name(champ)
-	else:
-		var remain: int = (b.get("survivors", []) as Array).size()
-		var k := Cup.weeks_until_next(b, _career.week)
-		var nxt := Cup.next_label(b)
-		var wk_txt := (", %s in %d wk%s" % [nxt, k, "" if k == 1 else "s"]) if k >= 0 and nxt != "" else ""
-		if Cup.still_in(b, cid):
-			out["status"] = "STILL IN"
-			out["status_col"] = CupScreen.C_WIN
-			out["sub"] = "%d clubs remain%s" % [remain, wk_txt]
-		else:
-			out["status"] = "KNOCKED OUT"
-			out["status_col"] = CupScreen.C_LOSS
-			out["sub"] = "%d clubs remain%s" % [remain, wk_txt]
-
-	# The latest round's draw: manager's tie first, the rest capped to fit.
-	if not rounds.is_empty():
-		var last: Dictionary = rounds[-1]
-		out["draw_label"] = str(last.get("label", ""))
-		var ties: Array = (last.get("ties", []) as Array).duplicate()
-		ties.sort_custom(func(x, y):
-			var xm: bool = int(x["home_id"]) == cid or int(x.get("away_id", -1)) == cid
-			var ym: bool = int(y["home_id"]) == cid or int(y.get("away_id", -1)) == cid
-			return xm and not ym)
-		var cap := 9
-		var draw_rows: Array = []
-		for tie in ties.slice(0, cap):
-			var mine: bool = int(tie["home_id"]) == cid or int(tie.get("away_id", -1)) == cid
-			draw_rows.append({"line": _cup_tie_line(tie), "mine": mine})
-		out["draw_rows"] = draw_rows
-		out["draw_more"] = maxi(0, ties.size() - cap)
-	return out
-
-
-## The CupScreen payload during the European Cup group phase: the manager's group table in
-## THE DRAW panel, his matchday results in YOUR CUP RUN, and a group-position status.
-func _cup_group_view(b: Dictionary, groups: Array, out: Dictionary) -> Dictionary:
-	var cid: int = _career.club_id
-	var cup_nm: String = str(b.get("name", "Cup"))
-	var gs: Dictionary = b.get("group_stage", {})
-	var advance := int(gs.get("advance", 2))
-	# The manager's group (else group A, when browsing a comp he's not in).
-	var my_gi := -1
-	for gi in groups.size():
-		for row in groups[gi].get("table", []):
-			if int(row.get("id", -1)) == cid:
-				my_gi = gi
-	var gi: int = my_gi if my_gi >= 0 else 0
-	var grp: Dictionary = groups[gi]
-	var ranked: Array = Cup._sorted_table(grp.get("table", []))
-	out["draw_label"] = "GROUP %s" % char(65 + gi)
-
-	# Standings rows (top `advance` flagged by colour via the manager-gold "mine").
-	var draw_rows: Array = []
-	var pos_me := -1
-	for i in ranked.size():
-		var row: Dictionary = ranked[i]
-		if int(row.get("id", -1)) == cid:
-			pos_me = i + 1
-		draw_rows.append({"line": "%d %s  P%d  %d-%d  %dpts" % [i + 1,
-			_cup_name(int(row.get("id", -1))).substr(0, 13), int(row.get("p", 0)),
-			int(row.get("gf", 0)), int(row.get("ga", 0)), int(row.get("pts", 0))],
-			"mine": int(row.get("id", -1)) == cid})
-	out["draw_rows"] = draw_rows
-
-	# The manager's matchday results.
-	var run_rows: Array = []
-	if my_gi >= 0:
-		var md := 0
-		for md_results in grp.get("results", []):
-			md += 1
-			for m in md_results:
-				if int(m["h"]) != cid and int(m["a"]) != cid:
-					continue
-				var home := int(m["h"]) == cid
-				var mine_g := int(m["hg"]) if home else int(m["ag"])
-				var their_g := int(m["ag"]) if home else int(m["hg"])
-				var opp := int(m["a"]) if home else int(m["h"])
-				var verb := "drew" if mine_g == their_g else ("bt" if mine_g > their_g else "lost to")
-				var acc: Color = CupScreen.C_DIM if mine_g == their_g else \
-					(CupScreen.C_WIN if mine_g > their_g else CupScreen.C_LOSS)
-				run_rows.append({"round": "Matchday %d" % md,
-					"line": "%s %s  %d-%d" % [verb, _cup_name(opp).substr(0, 14), mine_g, their_g], "accent": acc})
-	out["run_rows"] = run_rows
-
-	# Status: in / through / out of the group.
-	var qualified := bool(gs.get("qualified", false))
-	if my_gi < 0:
-		out["status"] = "NOT QUALIFIED"
-		out["status_col"] = CupScreen.C_DIM
-		out["sub"] = "You are not in the %s." % cup_nm
-	elif qualified and pos_me > 0 and pos_me <= advance:
-		out["status"] = "QUALIFIED"
-		out["status_col"] = CupScreen.C_GOLD
-		out["sub"] = "Through to the knockout from Group %s." % char(65 + gi)
-	elif qualified:
-		out["status"] = "GROUP EXIT"
-		out["status_col"] = CupScreen.C_LOSS
-		out["sub"] = "Out at the group stage (Group %s)." % char(65 + gi)
-	else:
-		out["status"] = "GROUP STAGE"
-		out["status_col"] = CupScreen.C_WIN if (pos_me > 0 and pos_me <= advance) else CupScreen.C_TEXT
-		var k := Cup.weeks_until_next(b, _career.week)
-		var nxt := Cup.next_label(b)
-		var wk_txt := (", %s in %d wk%s" % [nxt, k, "" if k == 1 else "s"]) if k >= 0 and nxt != "" else ""
-		out["sub"] = "Group %s: %d%s of %d%s" % [char(65 + gi), pos_me,
-			_ord_suffix(pos_me), ranked.size(), wk_txt]
-	return out
-
-
 ## The manager's scoreline string for a tie (decisive leg / aggregate, his goals first).
 func _cup_score_for(tie: Dictionary, cid: int) -> String:
 	var decided: String = str(tie.get("decided", ""))
@@ -4953,50 +4655,6 @@ func _show_club_news() -> void:
 		if _news_overlay != null and is_instance_valid(_news_overlay):
 			_news_overlay.queue_free()
 		_news_overlay = null)
-
-## The TRAINING screen on the hub's staff (EMPLE) icon. Tap the top row to cycle the
-## training intensity (Light/Normal/Intensive -- the lever that trades faster player
-## development against injury risk); the rest is the squad's development trend
-## (improving / holding / declining by age + ability). Interim PM98-chrome BrowseScreen.
-## NB: EMPLE is the original game's employees/staff slot; a full staff screen is deferred,
-## training is the interim occupant of this icon (flagged in the handoff).
-func _show_training() -> void:
-	var c := _career
-	var rows: Array = []
-	var payload: Array = []
-	rows.append({"text": "Training intensity:   %s" % c.training_intensity,
-		"value": "tap to change", "accent": Color(1.0, 0.87, 0.0)})
-	payload.append({"a": "cycle"})
-
-	# Squad development, improving players first, then by ability.
-	var squad: Array = c.my_squad().duplicate()
-	var order := {"up": 0, "hold": 1, "down": 2}
-	squad.sort_custom(func(a, b):
-		var ta := Training.trend(a)
-		var tb := Training.trend(b)
-		if order[ta["dir"]] != order[tb["dir"]]:
-			return order[ta["dir"]] < order[tb["dir"]]
-		return int(ta["ability"]) > int(tb["ability"]))
-	if squad.is_empty():
-		rows.append({"text": "No players to develop yet.", "enabled": false})
-		payload.append({"a": "noop"})
-	for p in squad:
-		var t := Training.trend(p)
-		var word := "improving" if t["dir"] == "up" else ("declining" if t["dir"] == "down" else "at his peak")
-		rows.append({
-			"text": "%s  %-16s  CA %d" % [t["arrow"], str(t["name"]).substr(0, 16), int(t["ability"])],
-			"value": word, "accent": t["colour"], "enabled": false,
-		})
-		payload.append({"a": "noop"})
-
-	_mount_browse("%s  -  TRAINING" % c.club_name,
-		"Intensive develops faster but risks more injuries", rows,
-		func(i: int) -> void:
-			if i < payload.size() and payload[i]["a"] == "cycle":
-				_career.cycle_training()
-				_career.save()
-				_show_training(),
-		func() -> void: _dismiss_career_browse())
 
 ## Dismiss a browse overlay shown from the hub (results) and re-raise the hub beneath it.
 func _dismiss_career_browse() -> void:

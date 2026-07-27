@@ -117,6 +117,11 @@ func _run() -> void:
 	DirAccess.make_dir_recursive_absolute(_dir)
 	get_root().size = Vector2i(640, 480)
 
+	# Harness isolation: a prior career save in user:// makes boot resume past the
+	# TITLE door and the boot assert fails (2026-07-26 sweep note — harness-state
+	# contamination, not an app bug). Tests own their state.
+	Career.delete_save()
+
 	var main: Node = load("res://scenes/Main.tscn").instantiate()
 	get_root().add_child(main)
 	for _i in 30:

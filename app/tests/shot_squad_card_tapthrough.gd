@@ -79,6 +79,11 @@ func _run() -> void:
 	DirAccess.make_dir_recursive_absolute(_dir)
 	get_root().size = Vector2i(640, 480)
 
+	# Harness isolation: a prior career save in user:// makes boot resume past the
+	# TITLE door and the boot assert fails (2026-07-26 sweep note — harness-state
+	# contamination, not an app bug). Tests own their state.
+	Career.delete_save()
+
 	var main: Node = load("res://scenes/Main.tscn").instantiate()
 	get_root().add_child(main)
 	for _i in 30:
@@ -91,8 +96,25 @@ func _run() -> void:
 			league = lg
 	var club: Dictionary = gamedb.clubs_in_league("eng_prem")[0]
 	main._begin_career("Tap Mgr", league, club)
-	for _i in 10:
-		await process_frame
+	# The real entry flow runs TEAMS IN CHAMPIONSHIPS -> (shield card) -> START OF
+	# SEASON before the hub (Main._begin_career / _run_season_open_chain). Drive each
+	# sheet's own continue the way the player would until the hub stands.
+	for _i in 20:
+		for _j in 5:
+			await process_frame
+		if main._hub != null and is_instance_valid(main._hub):
+			break
+		var champs: Node = _find(main, ChampsScreen)
+		if champs != null:
+			champs.continue_pressed.emit()
+			continue
+		var shield: Node = _find(main, CharityShieldScreen)
+		if shield != null:
+			shield.ok_pressed.emit()
+			continue
+		var sos: Node = _find(main, SeasonStartScreen)
+		if sos != null:
+			sos.continue_pressed.emit()
 	_assert(main._hub != null and is_instance_valid(main._hub), "career hub up")
 
 	# PLAYERS: mount the squad screen (the surface under test is the row tap).
