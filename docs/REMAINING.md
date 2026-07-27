@@ -484,8 +484,10 @@ verified still open at HEAD `4076800`:
 
 ## 4. The SHOOTING appendix
 
-NOT APPROVED and not built. It changes every result in the game, so it needs Mats's
-explicit go/no-go before a line of it is written.
+**NO-GO, decided by Mats 2026-07-27.** Asked directly and answered "no-go for now": it
+changes every result in the game, and the M5 engine wire-in is the next session and will
+re-decide how shots resolve anyway, so building the appendix first would tune against an
+engine that is about to be replaced. Not built, not started. Re-ask after the wire-in.
 
 ## 5. Data completeness
 
