@@ -318,6 +318,25 @@ They live in an overlay that is **closed by default**, opened by tapping the 2-s
 x11..500 y438..463, so all six witnessed states still verify at 0 px (re-run 2026-07-26 after
 the readout landed: noscout/idle/premier/position/searching/results all 0 px).
 
+**2026-07-27 — the NAME box is INSTANT (Mats, live QA).** Typing in the panel's NAME
+field now runs `Career.instant_name_search` on every keystroke: a synchronous lookup
+over the whole decoded database (live division rosters + all 384+ static GameDB clubs
++ free agents, own club excluded), matching the folded surname OR the folded full
+rendered name (`legalName` — "patrick" finds Kluivert). No scout mission is armed, no
+other criterion is needed, and the hits land as NORMAL scout results — the same
+`_scout_row` shape, the same PLAYERS FOUND rows, the same tap-through to the offer
+card. Enter closes the panel so the rows are fully visible; SEARCH with a name and
+nothing else re-fires the lookup instead of the witnessed refusal alert (which stays
+the answer for a truly empty tap). The mission machinery is untouched and still owns
+every attribute/band search; the scout's shortlist cap is a mission rule and does NOT
+apply — the lookup builds at most `Career.INSTANT_NAME_ROWS` (200) rows and the panel
+message says "N of M shown - type more of the name" when it clips. No new chrome was
+needed: the panel already carried the NAME object, so this cost zero new pixels
+(all six witnesses + both bar gates re-run 0 px / PASS 2026-07-27). The panel is
+still gated on a hired scout — the witnessed 43-state ("You need to hire a scout")
+binds the screen without one; the distinction Mats drew is mission vs lookup, not
+scout employment.
+
 **2026-07-26 — the bar got a visible label, and the bar turned out to be the original's.**
 Mats: *"I don't see the new search objects. Scout screen looks like it always has still."* The
 panel had been shipped and working since 07-25 behind a bar with no label of any kind, which

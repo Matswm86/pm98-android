@@ -3171,6 +3171,20 @@ func _show_scout_screen() -> void:
 	scr.player_pressed.connect(func(row: Dictionary) -> void:
 		AudioManager.ui_select()
 		_show_make_offer_card(row))
+	# OURS (Mats, 2026-07-27): the INSTANT name lookup — every keystroke in the
+	# panel's NAME box queries the whole decoded database at once; no mission, no
+	# criteria, no wait. Career never reads GameDB, so the static world (every
+	# club outside the live division) is bridged here once per mount.
+	var statics: Array = []
+	for cl in GameDB.clubs:
+		var scd: Dictionary = cl
+		var scid := int(scd.get("id", -1))
+		if scid == c.club_id or c.rosters.has(scid):
+			continue
+		statics.append(scd)
+	scr.name_search.connect(func(name_raw: String) -> void:
+		if c.instant_name_search(name_raw, statics) >= 0:
+			scr.apply_instant_results(c.scout_results, c.scout_found_total))
 
 ## The OFFERS map-browse screen (docs/re/offers_map_re.md): country flags ->
 ## kit grid -> squad list -> the make-offer card (witness 47 = MakeOfferScreen,

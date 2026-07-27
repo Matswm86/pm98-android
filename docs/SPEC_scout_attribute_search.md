@@ -58,6 +58,14 @@ with a different grouping. Not resolved here; do not assume `pos` follows from `
 A free-text field that filters `PLAYERS FOUND` (and the searchable pool) by player name.
 Substring, case-insensitive, accent-insensitive if cheap.
 
+**Revised 2026-07-27 (Mats, live QA): the name search is INSTANT.** Typing alone returns
+hits right away — every keystroke runs `Career.instant_name_search`, a synchronous lookup
+over the whole decoded database with no scout mission, no other criterion and no wait.
+Hits are normal scout results (same row shape, same tap-through to the offer card). The
+name still ALSO narrows a mission when one is armed with other criteria (the original
+Addition-1 behaviour); the surname AND the full rendered name (`legalName`) are searched.
+The mission machinery keeps every attribute/band search unchanged.
+
 ## Addition 2 — per-attribute thresholds
 
 Six independent "at least" filters, one per **skill** attribute. These are exactly the six

@@ -2432,6 +2432,75 @@ func start_scout_search(criteria: Dictionary, foreign_clubs: Array = [],
 func scout_searching() -> bool:
 	return not scout_search.is_empty()
 
+## OURS (Mats, 2026-07-27): the INSTANT name search. Typing in the SCOUT panel's
+## NAME box is a LOOKUP over the decoded database, not a scouting mission — no
+## scout is dispatched, no other criterion is needed, and the hits land as NORMAL
+## scout results (the `_scout_row` shape, so the standard tap-through to the
+## offer card applies unchanged). The weeks-long mission machinery above is
+## untouched and still owns every attribute / band search; a mission in flight
+## keeps ticking and overwrites these rows when it lands, exactly as it would
+## overwrite an older mission's rows. No cap is applied — the scout's shortlist
+## trim (`FUN_00575750`) belongs to missions; a lookup is bounded by
+## INSTANT_NAME_ROWS instead, with the true count kept in `scout_found_total`.
+## `static_clubs` = every GameDB club outside the live division (Career never
+## reads GameDB — Main bridges, the `start_scout_search` precedent). Matches the
+## folded surname OR the folded full rendered name, so "kluivert" and "patrick"
+## both find him. Returns the match count, or -1 when the query folds to fewer
+## than INSTANT_NAME_MIN characters (too broad to mean anything — results keep
+## whatever they held).
+const INSTANT_NAME_MIN := 2
+const INSTANT_NAME_ROWS := 200
+
+func instant_name_search(name_raw: String, static_clubs: Array = []) -> int:
+	var want := fold_name(name_raw)
+	if want.length() < INSTANT_NAME_MIN:
+		return -1
+	var rows: Array = []
+	var total := 0
+	for cid in rosters:                       # the live division first (own club excluded,
+		if int(cid) == club_id:               # the mission scan's own rule)
+			continue
+		var cv := club_view(int(cid))
+		for p in rosters[cid]:
+			if _name_hit(p, want):
+				total += 1
+				if rows.size() < INSTANT_NAME_ROWS:
+					rows.append(_scout_row(p, int(cid), str(club_names.get(int(cid), "?")), cv, true))
+	for club in static_clubs:
+		var cd: Dictionary = club
+		for p in cd.get("players", []):
+			if _name_hit(p, want):
+				total += 1
+				if rows.size() < INSTANT_NAME_ROWS:
+					rows.append(_scout_row(p, int(cd.get("id", -1)), str(cd.get("name", "?")), cd, false))
+	for p in free_agents:
+		if _name_hit(p, want):
+			total += 1
+			if rows.size() < INSTANT_NAME_ROWS:
+				var frow := _scout_row(p, -1, "-", {}, false)
+				frow["fee"] = 0               # a free agent costs no fee
+				rows.append(frow)
+	scout_results = rows
+	scout_found_total = total
+	return total
+
+## The lookup runs on every keystroke over ~9.5k names, so the folded keys are
+## cached — `fold_name` walks the string char by char and would dominate a frame.
+var _name_fold_cache := {}
+
+func _name_hit(p: Dictionary, want: String) -> bool:
+	if _fold_cached(str(p.get("name", ""))).contains(want):
+		return true
+	var legal := str(p.get("legalName", ""))
+	return legal != "" and _fold_cached(legal).contains(want)
+
+func _fold_cached(s: String) -> String:
+	var v: Variant = _name_fold_cache.get(s)
+	if v == null:
+		v = fold_name(s)
+		_name_fold_cache[s] = v
+	return str(v)
+
 func _tick_scout_search() -> void:
 	if scout_search.is_empty():
 		return

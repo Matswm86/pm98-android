@@ -50,6 +50,9 @@ class_name ScoutScreen
 signal back_pressed
 signal search_started(criteria: Dictionary)
 signal player_pressed(row: Dictionary)
+## OURS (Mats, 2026-07-27): fired on every NAME keystroke — the INSTANT lookup.
+## No mission is armed; Main answers with apply_instant_results().
+signal name_search(name: String)
 
 const W := 640
 const H := 480
@@ -294,6 +297,7 @@ var _attr_idx := {}              # attr code -> index into Career.SCOUT_ATTR_STO
 var _sort_i := -1                # index into OURS_SORTS, -1 = the scan order (the default)
 var _sort_desc := true
 var _found_total := 0            # pre-cap match count (Career.scout_found_total)
+var _instant := false            # the shown rows came from the instant name lookup
 var _alert_img: Texture2D        # options alert (PMAlert render); null = none
 var _hover_row := -1             # the row under the finger (the original's rollover), -1 none
 var _press := ""
@@ -356,7 +360,14 @@ func _build_name_edit() -> void:
 	sb.content_margin_left = 4
 	for st in ["normal", "focus", "read_only"]:
 		_name_edit.add_theme_stylebox_override(st, sb)
-	_name_edit.text_changed.connect(func(_t: String) -> void: queue_redraw())
+	# OURS (Mats, 2026-07-27): every keystroke IS the search — an instant lookup
+	# over the decoded database, no scout run, no other filter. Enter drops the
+	# keyboard and the panel so the hits are fully visible.
+	_name_edit.text_changed.connect(func(t: String) -> void:
+		name_search.emit(t.strip_edges())
+		queue_redraw())
+	_name_edit.text_submitted.connect(func(_t: String) -> void:
+		_activate("ours_close"))
 	add_child(_name_edit)
 	_reposition_name()
 
@@ -395,6 +406,7 @@ func setup(scout: Dictionary, searching: bool, results: Array, club: String,
 		if _regions[rk] and not region_enabled(rk):
 			_regions[rk] = false
 	_armed_flash = false
+	_instant = false
 	_club = club
 	_manager = manager
 	_season = season
@@ -447,6 +459,18 @@ func view_rows() -> Array:
 			return c > 0 if desc else c < 0
 		return float(av) > float(bv) if desc else float(av) < float(bv))
 	return rows
+
+
+## OURS: the instant name lookup landed — show it as a normal result set. A
+## pending mission keeps ticking in Career and overwrites these rows when it
+## lands; `_searching` is dropped locally so the rows are visible NOW.
+func apply_instant_results(rows: Array, total: int) -> void:
+	_results = rows
+	_found_total = total
+	_searching = false
+	_instant = true
+	_first = 0
+	queue_redraw()
 
 
 ## Can the hired scout reach this region? (REGION_STARS, live-measured — see above.)
@@ -690,6 +714,14 @@ func _try_search() -> void:
 		if _regions[rk]:
 			any_region = true
 	if not any_tog or not any_region:
+		# OURS: with a NAME typed and nothing else, SEARCH is the instant lookup —
+		# the hits are already on screen from typing; re-fire and skip the refusal
+		# (the witnessed alert stays the answer for a truly empty tap).
+		var nm := _name_edit.text.strip_edges() if _name_edit != null else ""
+		if nm != "":
+			name_search.emit(nm)
+			queue_redraw()
+			return
 		_alert_img = ImageTexture.create_from_image(
 			PMAlert.render("You have to select some options to make the search."))
 		PMChrome.set_dim(true)
@@ -698,6 +730,7 @@ func _try_search() -> void:
 	_armed_flash = true
 	_searching = true
 	_results = []
+	_instant = false
 	queue_redraw()
 	search_started.emit(criteria())
 
@@ -964,6 +997,8 @@ func _draw_ours() -> void:
 		msg = "The scout is still out."
 	elif _results.is_empty():
 		msg = "No search has come back yet."
+	elif _instant and _found_total > _results.size():
+		msg = "%d of %d shown - type more of the name." % [_results.size(), _found_total]
 	elif _found_total > _results.size():
 		msg = "%d of %d shown - your scout could only bring back %d." % [
 			_results.size(), _found_total, _results.size()]

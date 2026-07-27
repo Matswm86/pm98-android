@@ -134,11 +134,15 @@ Four more, reported 2026-07-26 evening (second round, same play session):
 
 ## 0b. Mats's live QA, 2026-07-27 morning — fix FIRST (next session = TEAM TACTICS)
 
-* **SCOUT name-search must be INSTANT**: searching by NAME alone returns hits right
-  away — no scout run armed, no other filter needed. Own object on the scout screen
-  in the ORIGINAL chrome (extend the s63 `ours_panel.png` bake grammar); hits land as
-  NORMAL scout results (profile tap, offer-to-buy, the standard chain). An instant DB
-  lookup, not a scouting mission — the mission machinery stays for attribute searches.
+* ~~**SCOUT name-search must be INSTANT**~~ — **BUILT 2026-07-27.** Every keystroke in
+  the panel's NAME box runs `Career.instant_name_search`: a synchronous lookup over the
+  whole decoded database (live division + all static GameDB clubs + free agents),
+  matching surname OR full rendered name; hits land as NORMAL scout results with the
+  standard tap-through to the offer card. No mission armed, no other filter needed;
+  Enter drops the panel; SEARCH with name-only re-fires the lookup instead of the
+  refusal alert. Zero new chrome (the panel already carried the NAME object) — all six
+  witnesses + both bar gates re-run 0 px / PASS. The mission machinery is untouched
+  for attribute searches. See `scout_screen_re.md` §OURS panel.
 * **TEAM TACTICS still broken end-to-end** (Session B not yet run, Mats re-confirmed
   every symptom live): screen not the original's, controls don't function, PASSING
   short/long %s wrong, COUNTER ATTACK % wrong, MIXED PLAY cheat dead. Map: the s63

@@ -247,6 +247,36 @@ func _run() -> void:
 		"the six filters are exactly Training.TRAINABLE") and ok
 	c.rosters[60] = [_mk(2, "Beeney", "GK", 60), _mk(3, "Kewell", "FW", 80)]
 
+	# ---- OURS (2026-07-27): the INSTANT name lookup — no mission, no wait ---
+	c.scout_results = []
+	c.scout_found_total = 0
+	var stat_club := {"id": 300, "name": "Ajax", "players": [
+		_mk(20, "Kluivert", "FW", 85), _mk(21, "Blind", "DF", 70)]}
+	(stat_club["players"][0] as Dictionary)["legalName"] = "Patrick Kluivert"
+	var n_found := c.instant_name_search("klu", [stat_club])
+	ok = _assert(n_found == 1 and c.scout_results.size() == 1
+		and str(c.scout_results[0]["name"]) == "Kluivert",
+		"instant lookup finds a static-club player with no mission armed") and ok
+	ok = _assert(c.scout_search.is_empty(), "instant lookup never arms a mission") and ok
+	ok = _assert(c.instant_name_search("patrick", [stat_club]) == 1
+		and str(c.scout_results[0]["name"]) == "Kluivert",
+		"the full rendered name (legalName) is searched too") and ok
+	ok = _assert(c.instant_name_search("k", [stat_club]) == -1
+		and c.scout_results.size() == 1,
+		"an under-2-char query is a no-op and keeps the shown rows") and ok
+	ok = _assert(c.instant_name_search("beeney", [stat_club]) == 1
+		and int(c.scout_results[0]["club_id"]) == 60,
+		"the live own division is scanned (own club excluded)") and ok
+	var big := {"id": 301, "name": "Big", "players": []}
+	for i in Career.INSTANT_NAME_ROWS + 20:
+		(big["players"] as Array).append(_mk(1000 + i, "Common%d" % i, "MF", 60))
+	ok = _assert(c.instant_name_search("common", [big]) == Career.INSTANT_NAME_ROWS + 20
+		and c.scout_results.size() == Career.INSTANT_NAME_ROWS
+		and c.scout_found_total == Career.INSTANT_NAME_ROWS + 20,
+		"the row build is bounded; the true count is kept for the panel") and ok
+	c.scout_results = []
+	c.scout_found_total = 0
+
 	# ---- the E.U. list is the binary's own (FUN_0058d2f0, 18 codes) ---------
 	ok = _assert(Career.EU_CODES.size() == 18 and Career.EU_NATIONS.size() == 18,
 		"18 E.U. country codes, 18 names") and ok
