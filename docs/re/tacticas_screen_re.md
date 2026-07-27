@@ -2,7 +2,7 @@
 
 The full TACTICS board, reached from the LINE-UP screen's `TACTICS` button
 (frame `013_162412` → `014_162413`). Distinct from the **TEAM TACTICS** modal
-(ma_9, `TacticsScreen.gd` = the ATTACK|DEFENCE panel): this is the outer screen
+(`TeamTacticsScreen.gd` = the ATTACK|DEFENCE panel, frame-baked from parity-run orig/25): this is the outer screen
 titled just `TACTICS %s` (club name) that shows the XI with ROLE/POS columns, a
 skill-emphasis grid, and the big pitch with the formation's two-phase markers.
 
@@ -161,7 +161,7 @@ pixel-exact since 2026-07-03). Rows = template blit by
 slot band + dynamic text/stars/camrol; markers = cached ImageTexture composites
 (sprite + rect-clipped digits). Buttons are baked chrome with live hit-rects.
 PREDEF → picker overlay; LOAD/SAVE → `_load_tactics`/`_save_tactics`;
-TEAM TACTICS → `TacticsScreen` modal; VIEW RIVAL → `RivalScreen`; LINE-UP →
+TEAM TACTICS → `TeamTacticsScreen` modal; VIEW RIVAL → `RivalScreen`; LINE-UP →
 `LineupScreen`; RETURN → hub. PARAM./RATING toggles the stat columns.
 
 ## Honest gaps (documented, not faked)

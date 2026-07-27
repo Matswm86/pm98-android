@@ -529,7 +529,12 @@ func _init_club(club: Dictionary, league: Dictionary, league_clubs: Array, leagu
 	stadium_capacity = int(fin.get("capacity", 0))   # ground starts at the club's known size
 	ticket_price = float(fin.get("ticket_price", 0.0))   # prices start at the division defaults
 	board_price = int(fin.get("board_price", 0))
-	tactics = Tactics.auto_pick(club, Tactics.DEFAULT_FORMATION).to_dict()
+	# A fresh career starts on the club's OWN .DBC tactic levers (per-club, the
+	# witnessed original behaviour — parity-run orig/25: fresh Bolton = 45/50/
+	# MIXED/MEDIUM/ZONAL/SHORT/OWN, its exact stream bytes), not global defaults.
+	var t0 := Tactics.auto_pick(club, Tactics.DEFAULT_FORMATION)
+	t0.apply_club_levers(Tactics.club_levers(club_id))
+	tactics = t0.to_dict()
 	# A fresh academy + staff pool + free-agent pool for the new club (none carry across).
 	var yrng := RandomNumberGenerator.new()
 	yrng.randomize()
@@ -1155,7 +1160,12 @@ func _ratings_for(id: int, clubs_override: Dictionary = {}) -> Dictionary:
 		# Field only the available players: the chosen XI is repaired around any
 		# injured/suspended player, so absences actually weaken the side.
 		var fit := _fit_view(id)
-		return Tactics.from_dict(tactics).repaired(fit).ratings(fit)
+		var mt := Tactics.from_dict(tactics).repaired(fit)
+		var r := mt.ratings(fit)
+		# MIXED PLAY cheat trigger (manager side ONLY — hack_three_forwards.md
+		# §MIXED PLAY): read by MatchSim's stat branch, inert with the cheat off.
+		r["mixed_play"] = mt.mentality == "Mixed"
+		return r
 	if not rosters.has(id) and euro_ratings.has(id):
 		# A foreign European opponent: its frozen ratings (plus a name for the feed).
 		var r: Dictionary = (euro_ratings[id] as Dictionary).duplicate()

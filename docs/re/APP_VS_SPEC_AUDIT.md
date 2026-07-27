@@ -558,9 +558,10 @@ Manager League) is CORRECT as-is; gate any future MANAGER HISTORY entry on mode.
   posts none after identical hires, app/58 vs orig/53); staff-hire candidate pools/wages
   invented; GROUND capacity 35,000 vs 20,500, CAR PARK/PITCH rows empty, different
   stadium art (app/55 vs orig/20).
-- **TEAM TACTICS overlay compressed**: option labels missing (SOFT/MEDIUM/AGGRESSIVE,
-  ZONAL/MAN TO MAN, SHORT/LONG, OWN/MIDFIELD/OPPONENT), no OK button, close-X art at
-  ~627,124 but hitbox at 528,120 (app/24, TeamTacticsScreen.gd:46) (orig/25).
+- ~~**TEAM TACTICS overlay compressed**~~ — **RESOLVED 2026-07-27**: the modal is
+  frame-baked from orig/25 at (57,95) 526x303 (all labels are chrome), the OK exit is
+  real, the invented close-X is gone (EQWINX = the tick). Gate:
+  `tools/re/diff_teamtactics_parity.py`, 0 px chrome vs orig/25 AND orig/26.
 - **Header state**: date card shows next-fixture date on sub-screens (original keeps
   current game date); header identity block shows fixture clubs on RESULTS (original
   keeps mwm/club); SQUAD MANAGEMENT manager-name bar empty; date card art squeezed on

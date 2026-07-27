@@ -176,10 +176,38 @@ not encode).
   [0..3] = open-play x, y, dx, dy — the match lineup's ROAM BOX (min/max of transformed
   [0]±[2], [1]±[3] → rec+0x18..+0x24); [4..7] = mk1/mk2 become the two START positions
   (rec+0x8..+0x14). Same 318×198→pitch transform `FUN_0058c300` for all of them.
-- The 7 lever bytes are stored RAW; byte→lever mapping is EXACT_PORT_PLAN gap B — but they
-  now have a traced engine path: `FUN_0044d5f0` puts them in the lineup header in order
-  [0x1d9,0x1da,0x1db,0x1dd,0x1de,0x1df,0x1dc] → `team[0xc1..0xc7]`; `team[0xc7]` (lever
-  +0x1dc) selects the 0xe1 ftol constant (`stat_match_engine_re.md`).
+- ~~The 7 lever bytes are stored RAW; byte→lever mapping is EXACT_PORT_PLAN gap B~~ —
+  **the byte→lever MAP is CLOSED (2026-07-27).** The decisive witness: parity-run
+  `orig/25_team_tactics.png` is a FRESH Bolton career whose modal reads PASSING 45 /
+  COUNTER 50 / MIXED / MEDIUM / ZONAL / SHORT / OWN, and Bolton's shipped stream is
+  exactly `[45, 50, 2, 1, 0, 0, 0]` — all seven line up 1:1, the 45-vs-50 pair pinning
+  bytes 0/1 unambiguously. The map (stream order = offsets +0x1d9..+0x1df):
+
+  | offset | stream idx | modal lever | encoding |
+  |---|---|---|---|
+  | `+0x1d9` | 0 | PASSING % (LONG BALL = 100−v) | 0..100 |
+  | `+0x1da` | 1 | COUNTER ATTACK YES % (NO = 100−v) | 0..100 |
+  | `+0x1db` | 2 | MENTALITY | 0 ATTACKING / 1 SPECULATIVE / 2 MIXED |
+  | `+0x1dc` | 3 | TACKLING | 0 SOFT / 1 MEDIUM / 2 AGGRESSIVE |
+  | `+0x1dd` | 4 | MARKING | 0 ZONAL / 1 MAN TO MAN |
+  | `+0x1de` | 5 | CLEARANCES | 0 SHORT / 1 LONG |
+  | `+0x1df` | 6 | PRESSURISE FROM… | 0 OWN / 1 MIDFIELD / 2 OPPONENT |
+
+  Corroboration from the already-ported positional-engine read sites (header
+  permutation `[0x1d9,0x1da,0x1db,0x1dd,0x1de,0x1df,0x1dc]` → `team[0xc1..0xc7]`):
+  `0xc1/0xc2` read in %/per-mille idioms (`Pm98Movement.gd` 6510, 6524-7007),
+  `0xc3` is the explicit 3-way zone switch (4853-4856 …), `0xc4` drives the
+  mark-target box-vs-band mode (391/426/448 — zonal-vs-man semantics exactly),
+  `0xc6` the port already named "the DEFENSIVE-LINE tactic" (= PRESSURISE) and
+  `0xc7` "aggression" (= TACKLING; also the 0xe1 ftol selector,
+  `Pm98Match.gd:745-765`). **Caveat:** the three 3-way encodings rest on ONE clean
+  fresh-career witness (Bolton); a second fresh career at a club with different
+  bytes would harden them. (The 2026-07-26 Man Utd capture is NOT a counter-witness
+  — that career was played and edited, 4-of-7 away from Man Utd's shipped stream.)
+  Port side: `Tactics.apply_club_levers/levers/club_levers` (Career.create seeds a
+  fresh career from the club's own stream); `Pm98LineupFeeder.build` takes
+  `lever_overrides` so the LIVE modal levers reach `team[0xc1..0xc7]` when a
+  career match runs on the positional engine.
 - Player bytes +0x16/+0x17/+0x1a and the 6-byte fine array's entries [1..5]
   un-RE'd. (+0x16/+0x17 now have a CONSUMER: `FUN_0044d5f0` copies them to match rec
   +0x2c/+0x30 → player +0x370/+0x36c (each −1); engine-side semantics still open. The

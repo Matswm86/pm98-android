@@ -1108,9 +1108,16 @@ a `5b70e0; 5b73a0` pair; the 5b8bf0/5b8c20 vtable loops are driven from 0x598b35
 - **B. Tactics→sim coupling.** The tactics struct is FOUND (2026-07-06, `club_tactics_re.md`):
   it IS the 0x2a4 club object — 11 slots at +0x60+i*0x20 (mk1 +0x10/+0x14, mk2 +0x18/+0x1c)
   and **7 lever bytes at club+0x1d9..+0x1df**, loaded from the club's EQUIPOS.PKF `.DBC`
-  (`FUN_00579c70`). Remaining: map each lever byte to its ma_9 modal row, find its sim read
-  sites (`FindFieldUsers.java` on 0x1d9..0x1df) → which behavior thresholds they modify; port,
-  then replace the `Tactics.gd` `_*_FACTOR` multipliers + `ratings()` math. Keep the modal UI.
+  (`FUN_00579c70`). **2026-07-27: the byte→modal-row MAP is CLOSED** (frame-25 Bolton
+  witness, table in `club_tactics_re.md`) and the plumbing is wired: fresh careers seed
+  from the club's own stream (`Tactics.apply_club_levers`), the LIVE modal levers reach
+  the positional engine's `team[0xc1..0xc7]` via `Pm98LineupFeeder.build(lever_overrides)`,
+  and the positional read sites are corroborated in `Pm98Movement`/`Pm98Match`. Remaining:
+  the levers only CHANGE a played result when the positional engine is the one playing —
+  the instant/stat runner (`FUN_0044ee70`, what the app plays on) reads NO levers in the
+  ORIGINAL either (`hack_three_forwards.md` §1), so the honest coupling lands with the M5
+  wire-in, not with an invented stat-engine multiplier. The legacy-fallback path keeps the
+  `Tactics.ratings()` factors.
 - **C. Attribute mapping.** Map `game_db` attr codes (EN/VE/RE/AG/CA/RM/RG/PA/TI/PO) → sim
   player-struct offsets, confirmed via `005923f0` squad→match-player copy.
 

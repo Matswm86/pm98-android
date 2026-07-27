@@ -2,7 +2,7 @@ extends Control
 class_name TacticsBoardScreen
 ## PM98 TACTICS board (TACTICAS) at pixel parity (binding frame 014_162413,
 ## docs/re/tacticas_screen_re.md). Distinct from the TEAM TACTICS modal
-## (TacticsScreen.gd = the ATTACK|DEFENCE panel): this is the outer screen titled
+## (TeamTacticsScreen.gd = the ATTACK|DEFENCE panel): this is the outer screen titled
 ## "TACTICS <club>" reached from LINE-UP's TACTICS button.
 ##
 ## Static chrome = the REAL frame baked verbatim below the shared barra

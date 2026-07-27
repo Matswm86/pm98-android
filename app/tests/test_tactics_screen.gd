@@ -1,11 +1,12 @@
 extends SceneTree
-## Headless wiring test for the corrected TEAM TACTICS modal (TeamTacticsScreen —
-## source-true ATTACK|DEFENCE art from the RECURSOS EQWIN cluster; the modal is
-## un-walked so its layout is a documented reconstruction, but its control SET is
-## authoritative from MANAGER.EXE 0x25ff3c..0x260014). Confirms it mounts with a
-## live career Tactics, builds a hit-rect for every source-true control, that a
-## simulated click on each mutates the Tactics through the right setter, and that
-## `changed` fires on levers while the EQWINX close fires `done`.
+## Headless wiring test for the FRAME-BAKED TEAM TACTICS modal (TeamTacticsScreen,
+## rebuilt 2026-07-27 from parity-run orig/25+26: chrome cut at (57,95) 526x303,
+## EQWINX = the TICK, exit = the baked OK plate; gate =
+## tools/re/diff_teamtactics_parity.py). Confirms the chrome + spec load, every
+## control has a hit-rect, each click mutates the Tactics through the right
+## setter, `changed` fires on levers, OK fires `done`, STEP = 5 (forced by the
+## witnessed Bolton 45/55), and the .DBC lever seeding reproduces the frame-25
+## witness state.
 ##   ~/godot462 --headless --path app --script res://tests/test_tactics_screen.gd
 
 
@@ -29,36 +30,53 @@ func _run() -> void:
 			break
 	ok = _assert(not club.is_empty(), "found a Premier club with a full squad") and ok
 
+	# ---- the .DBC lever map (closed 2026-07-27, club_tactics_re.md) --------
+	# Bolton's shipped stream [45,50,2,1,0,0,0] must reproduce the frame-25
+	# witness state exactly: 45/50 + MIXED/MEDIUM/ZONAL/SHORT/OWN.
+	var bt := Tactics.new()
+	bt.apply_club_levers([45, 50, 2, 1, 0, 0, 0])
+	ok = _assert(bt.passing_pct == 45 and bt.counter_pct == 50, "levers 0/1 = the %s") and ok
+	ok = _assert(bt.mentality == "Mixed" and bt.tackling == "Medium"
+		and bt.marking == "Zonal" and bt.clearances == "Short" and bt.pressurise == "Own",
+		"levers 2..6 = MIXED/MEDIUM/ZONAL/SHORT/OWN (the frame-25 state)") and ok
+	ok = _assert(bt.levers() == [45, 50, 2, 1, 0, 0, 0], "levers() round-trips the stream") and ok
+	var bolton_lv := Tactics.club_levers(59)
+	ok = _assert(bolton_lv == [45, 50, 2, 1, 0, 0, 0],
+		"club_levers(59) = Bolton's shipped stream") and ok
+	ok = _assert(TeamTacticsScreen.STEP == 5,
+		"STEP = 5 (witnessed 45/55 unreachable in 10s)") and ok
+
 	var t := Tactics.auto_pick(club, "4-4-2")
 	var screen: TeamTacticsScreen = load("res://scenes/TeamTacticsScreen.gd").new()
 	screen.size = Vector2(800, 600)
 	get_root().add_child(screen)
 	for _i in 3:
 		await process_frame
-	ok = _assert(screen._f12 != null and screen._f10 != null, "PROMAN fonts loaded into screen") and ok
-	# the source-true checkbox spec loaded from the bake's samples json
-	ok = _assert(not screen._cbx.is_empty(), "checkbox spec loaded from samples json") and ok
+	ok = _assert(screen._f10 != null, "PROMAN font loaded into screen") and ok
+	ok = _assert(not screen._spec.is_empty(), "team_tactics_modal spec loaded") and ok
+	ok = _assert((screen._spec.get("tick_xy", {}) as Dictionary).size() == 5,
+		"5 lever tick maps in the spec") and ok
 
 	screen.setup(t)
 	screen.queue_redraw()
 	for _i in 3:
 		await process_frame
-	ok = _assert(screen._hits.size() >= 12, "modal built its control hit-rects (%d)" % screen._hits.size()) and ok
+	ok = _assert(screen._hits.size() >= 18,
+		"modal built its control hit-rects (%d)" % screen._hits.size()) and ok
 
-	# Every source-true control kind is present and reachable.
+	# Every control kind present: 13 radio boxes + 4 steppers + OK.
 	var kinds: Dictionary = {}
 	for h in screen._hits:
 		kinds[str(h["kind"])] = true
 	for k in ["mentality", "tackling", "marking", "clearances", "pressurise",
-			"pass_inc", "pass_dec", "cnt_inc", "cnt_dec", "close"]:
+			"pass_inc", "pass_dec", "cnt_inc", "cnt_dec", "ok"]:
 		ok = _assert(kinds.has(k), "control present: %s" % k) and ok
+	ok = _assert(not kinds.has("close"), "the invented close-X is GONE") and ok
 
-	# Track the signals.
 	var fired := {"changed": 0, "done": 0}
 	screen.changed.connect(func(_d): fired["changed"] += 1)
 	screen.done.connect(func(): fired["done"] += 1)
 
-	# Clicking each radio sets that lever (values from the binary string block).
 	screen._apply("mentality", "Attacking")
 	ok = _assert(t.mentality == "Attacking", "click ATTACKING set mentality") and ok
 	screen._apply("tackling", "Aggressive")
@@ -70,7 +88,6 @@ func _run() -> void:
 	screen._apply("pressurise", "Opponent")
 	ok = _assert(t.pressurise == "Opponent", "click OPPONENT set pressurise") and ok
 
-	# Steppers move the sliders by STEP and clamp.
 	var p0: int = t.passing_pct
 	screen._apply("pass_inc", null)
 	ok = _assert(t.passing_pct == mini(p0 + TeamTacticsScreen.STEP, 100), "pass + steps up") and ok
@@ -80,16 +97,17 @@ func _run() -> void:
 	screen._apply("cnt_inc", null)
 	ok = _assert(t.counter_pct == mini(c0 + TeamTacticsScreen.STEP, 100), "counter + steps up") and ok
 
-	# Each lever should have emitted `changed` (not done).
 	ok = _assert(fired["changed"] >= 8, "mutations emitted `changed` (%d)" % fired["changed"]) and ok
 
-	# The EQWINX close fires `done` (the modal's only exit control).
-	screen._apply("close", null)
-	ok = _assert(fired["done"] == 1, "close (EQWINX) emitted done") and ok
-
-	# Hit-test math: the close rect contains its centre.
-	ok = _assert(TeamTacticsScreen.CLOSE.has_point(TeamTacticsScreen.CLOSE.get_center()),
-		"CLOSE rect contains its centre") and ok
+	# OK is the modal's real exit (the baked plate at x288..362 y365..392).
+	ok = _assert(TeamTacticsScreen.OK_BTN.has_point(Vector2(325, 378)),
+		"OK rect covers the baked plate centre") and ok
+	screen._ok_held = true
+	var e := InputEventMouseButton.new()
+	e.position = screen._origin + Vector2(325, 378) * screen._scale
+	e.pressed = false
+	screen._on_input(e)
+	ok = _assert(fired["done"] == 1, "OK release emitted done") and ok
 
 	screen.queue_free()
 	print("\n%s" % ("ALL PASS" if ok else "FAILURES ABOVE"))

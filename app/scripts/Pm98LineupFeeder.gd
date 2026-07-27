@@ -57,7 +57,13 @@ static func load_data() -> Dictionary:
 ## Build the full match input for home_id vs away_id (game_db app ids):
 ## {"session": Dictionary, "lineups": [home, away]} — lineups in the port's team[0x9c]
 ## shape {"header": [9 ints], "slots": [rec x11]} (Pm98Match._build_team contract).
-static func build(home_id: int, away_id: int, data: Dictionary) -> Dictionary:
+## `lever_overrides` (2026-07-27, gap-B wiring): {club_id: 7-byte stream array} — the
+## LIVE career tactics (Tactics.levers()) in place of the club's shipped .DBC bytes.
+## This is how the TEAM TACTICS modal reaches the positional engine's
+## team[0xc1..0xc7] when a career match runs on it (the manager's side passes his
+## edited levers; every other club keeps its own .DBC stream, as the original does).
+static func build(home_id: int, away_id: int, data: Dictionary,
+		lever_overrides: Dictionary = {}) -> Dictionary:
 	# Venue pitch dims = the HOME club's stadium pair << 16 (fn_0044d5f0 L75-80:
 	# FUN_00585ee0(fixture+0x44) -> club u16s +0x36/+0x34 << 0x10 -> session+0x4c/+0x50).
 	var home_t: Dictionary = _tactic(data, home_id)
@@ -85,7 +91,7 @@ static func build(home_id: int, away_id: int, data: Dictionary) -> Dictionary:
 		# levers in ENGINE order +0x1d9,1da,1db,1dd,1de,1df,1dc == stream indexes
 		# [0,1,2,4,5,6,3] of club_tactics `levers` (loader fn_00579c70 L171-191:
 		# stream byte 3 lands at +0x1dc). team[0xc7]=levers[3] picks the 0xe1 ftol C.
-		var lv: Array = t["levers"]
+		var lv: Array = lever_overrides.get(cid, t["levers"])
 		lineups.append({
 			"header": [
 				_transform_xline(0xC6, pitch_w),

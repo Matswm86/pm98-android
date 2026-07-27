@@ -117,6 +117,17 @@ const MINUTE_OFFSET := [0, 0x2d, 0x5a, 0x69]
 ## computing the stock `3 - rand()%3` cap (and consuming its draws) before flooring.
 static var cheat_three_up_front := false
 
+## MIXED PLAY variant (2026-07-27, docs/re/hack_three_forwards.md §MIXED PLAY): the
+## side index (0/1) whose MIXED PLAY lever is ticked AND is the MANAGER's own side;
+## -1 = nobody. Set by MatchSim around each simulate and reset after, so AI-vs-AI
+## fixtures can never inherit it. Manager-side-only BY DESIGN: 178 of the 476
+## shipped clubs default to MIXED, so an any-side trigger would hand a third of
+## the league six goals a week. Gated on the same cheat_three_up_front switch —
+## the OPTIONS row arms BOTH triggers (3 natural forwards fielded, OR the modal's
+## MIXED PLAY box ticked). With the switch OFF this is always -1 and every read
+## below short-circuits identically to stock — the oracle fixtures are untouched.
+static var cheat_mixed_play_side := -1
+
 
 static func _player(side: int, idx: int) -> int:
 	return side * SIDE_STRIDE + idx * PLAYER_STRIDE
@@ -131,6 +142,14 @@ static func _att_count(mem: Mem, side: int) -> int:
 		if mem.u16(pb + SEL) != 0 and mem.s32(pb + ROLE) == 3:
 			n += 1
 	return n
+
+
+## Is the cheat armed for `side`? Either trigger: three natural forwards fielded
+## (the MANAGER_HACK.EXE original) or the manager's MIXED PLAY lever (the variant).
+static func _cheat_armed(mem: Mem, side: int) -> bool:
+	if not cheat_three_up_front:
+		return false
+	return side == cheat_mixed_play_side or _att_count(mem, side) >= 3
 
 
 # --- FUN_004510b0: append an event ------------------------------------------
@@ -199,7 +218,7 @@ static func _resolve(mem: Mem, rng: Rng, side: int, seg: int, minute: int) -> vo
 	# when the ATTACKING side triggers, the gate is skipped entirely -- draws included,
 	# exactly as the cave does, so cheat-ON is not a re-roll of cheat-OFF.
 	var kbase := _player(1 - side, 0)
-	if not (cheat_three_up_front and _att_count(mem, side) >= 3):
+	if not _cheat_armed(mem, side):
 		if mem.u16(kbase + SEL) != 0:
 			if rng.mod(130) < mem.u8(kbase + GKSAVE):
 				return
@@ -431,12 +450,12 @@ static func _half_chances(mem: Mem, rng: Rng, seg: int, span: int) -> void:
 	# THREE UP FRONT (hooks 0x44f802 / 0x44f899 / 0x44fb16 / 0x44fbb7): the stock cap
 	# above has already run and consumed its draws; the cave only raises the result.
 	# H1/H2 only — the extra-time loops (`_et_half`) are NOT patched, as in the EXE.
-	if cheat_three_up_front and _att_count(mem, 0) >= 3:
+	if _cheat_armed(mem, 0):
 		c0 = maxi(c0, 3)
 	for _i in range(c0):
 		_resolve(mem, rng, 0, seg, ((rng.next() * span) >> 15) + 1)
 	var c1 := _chance_count(rng, avg1, avg0)
-	if cheat_three_up_front and _att_count(mem, 1) >= 3:
+	if _cheat_armed(mem, 1):
 		c1 = maxi(c1, 3)
 	for _i in range(c1):
 		_resolve(mem, rng, 1, seg, ((rng.next() * span) >> 15) + 1)

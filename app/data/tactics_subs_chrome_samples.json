@@ -346,5 +346,179 @@
    ],
    "mentality_tile": 34
   }
+ },
+ "team_tactics_modal": {
+  "SOURCE_NOTE": "frame-baked from parity-run-2026-07-16 orig/25_team_tactics.png (fresh Bolton career = the .DBC lever defaults); 26_mantoman.png is the 74-px MARKING-toggle witness; EQWINX = the TICK; exit = the baked OK plate",
+  "modal_rect": [
+   57,
+   95,
+   526,
+   303
+  ],
+  "tick_xy": {
+   "mentality": {
+    "Attacking": [
+     104,
+     178
+    ],
+    "Speculative": [
+     104,
+     204
+    ],
+    "Mixed": [
+     104,
+     230
+    ]
+   },
+   "tackling": {
+    "Soft": [
+     375,
+     191
+    ],
+    "Medium": [
+     443,
+     191
+    ],
+    "Aggressive": [
+     524,
+     191
+    ]
+   },
+   "marking": {
+    "Zonal": [
+     375,
+     237
+    ],
+    "Man-to-man": [
+     485,
+     237
+    ]
+   },
+   "clearances": {
+    "Short": [
+     374,
+     283
+    ],
+    "Long": [
+     484,
+     283
+    ]
+   },
+   "pressurise": {
+    "Own": [
+     373,
+     331
+    ],
+    "Midfield": [
+     445,
+     331
+    ],
+    "Opponent": [
+     517,
+     331
+    ]
+   }
+  },
+  "value_plates": {
+   "passing": [
+    116,
+    276,
+    41,
+    21
+   ],
+   "long_ball": [
+    227,
+    276,
+    41,
+    21
+   ],
+   "counter_yes": [
+    116,
+    330,
+    41,
+    21
+   ],
+   "counter_no": [
+    227,
+    330,
+    41,
+    21
+   ]
+  },
+  "value_inks": {
+   "passing": [
+    200,
+    230,
+    60
+   ],
+   "long_ball": [
+    166,
+    202,
+    240
+   ],
+   "counter_yes": [
+    170,
+    223,
+    255
+   ],
+   "counter_no": [
+    212,
+    127,
+    0
+   ]
+  },
+  "ok_button": [
+   288,
+   365,
+   75,
+   28
+  ],
+  "steppers": {
+   "pass_left": [
+    167,
+    279,
+    20,
+    17
+   ],
+   "pass_right": [
+    197,
+    279,
+    20,
+    17
+   ],
+   "counter_left": [
+    167,
+    332,
+    20,
+    17
+   ],
+   "counter_right": [
+    197,
+    332,
+    20,
+    17
+   ]
+  },
+  "defaults_witness": {
+   "club": "Bolton W",
+   "levers": [
+    45,
+    50,
+    2,
+    1,
+    0,
+    0,
+    0
+   ],
+   "state": {
+    "mentality": "Mixed",
+    "tackling": "Medium",
+    "marking": "Zonal",
+    "clearances": "Short",
+    "pressurise": "Own"
+   },
+   "passing_pct": 45,
+   "counter_pct": 50
+  }
  }
 }

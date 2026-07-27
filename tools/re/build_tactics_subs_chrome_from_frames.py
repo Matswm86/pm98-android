@@ -364,6 +364,78 @@ def main() -> None:
         },
     }
 
+    # ================= 3. TEAM TACTICS modal chrome (FRAME-BAKED) =========
+    # The modal IS walked: the 2026-07-16 parity run holds a fresh-career Bolton
+    # capture (25_team_tactics.png = the club's own .DBC lever defaults) and
+    # 26_mantoman.png, which differs in EXACTLY 74 px = the two MARKING boxes
+    # (2 x the 37-ink-px EQWINX sprite). That proves EQWINX is the TICK (not a
+    # close button) and that the modal's only dynamic pixels are the 13 tick
+    # boxes and the four value digits. The real exit is the baked OK plate.
+    parity = ROOT / "screenshots" / "parity-run-2026-07-16" / "orig"
+    f25 = np.asarray(Image.open(parity / "25_team_tactics.png").convert("RGB"))[:, :640].astype(int)
+    f26 = np.asarray(Image.open(parity / "26_mantoman.png").convert("RGB"))[:, :640].astype(int)
+    mx, my, mw, mh = 57, 95, 526, 303
+    for r in (my, my + 1, my + mh - 2, my + mh - 1):
+        expect((f25[r, mx:mx + mw] == 0).all(), f"modal frame row {r} not black")
+    for c in (mx, mx + 1, mx + mw - 2, mx + mw - 1):
+        expect((f25[my:my + mh, c] == 0).all(), f"modal frame col {c} not black")
+    dm = np.abs(f25 - f26).sum(2) > 0
+    expect(int(dm.sum()) == 74, f"25-vs-26 witness: {int(dm.sum())} px, want 74")
+    tick = np.asarray(Image.open(ART / "eqwin_close.png").convert("RGB")).astype(int)
+    # tick blit top-left per lever option (absolute design coords; plate = tick-(2,2))
+    ticks = {
+        "mentality": {"Attacking": (104, 178), "Speculative": (104, 204), "Mixed": (104, 230)},
+        "tackling": {"Soft": (375, 191), "Medium": (443, 191), "Aggressive": (524, 191)},
+        "marking": {"Zonal": (375, 237), "Man-to-man": (485, 237)},
+        "clearances": {"Short": (374, 283), "Long": (484, 283)},
+        "pressurise": {"Own": (373, 331), "Midfield": (445, 331), "Opponent": (517, 331)},
+    }
+    zx, zy = ticks["marking"]["Zonal"]
+    mmx, mmy = ticks["marking"]["Man-to-man"]
+    expect((f25[zy:zy + 7, zx:zx + 9] == tick).all(), "frame 25 ZONAL box != EQWINX")
+    expect((f26[mmy:mmy + 7, mmx:mmx + 9] == tick).all(), "frame 26 MAN TO MAN box != EQWINX")
+    expect((f26[zy:zy + 7, zx:zx + 9] == 255).all(), "frame 26 ZONAL box not empty white")
+    # Bolton's witnessed fresh-career state (= its .DBC levers [45,50,2,1,0,0,0]):
+    # erase its five ticks so the chrome is the RESTING state, every box empty.
+    bolton = {"mentality": "Mixed", "tackling": "Medium", "marking": "Zonal",
+              "clearances": "Short", "pressurise": "Own"}
+    chrome = f25[my:my + mh, mx:mx + mw].copy()
+    for lever, opt in bolton.items():
+        tx, ty = ticks[lever][opt]
+        expect((f25[ty:ty + 7, tx:tx + 9] == tick).all(), f"25: {lever}/{opt} box != EQWINX")
+        chrome[ty - my:ty - my + 7, tx - mx:tx - mx + 9] = 255
+    # The four 41x21 value plates (the eqwin_pass sprite module): solid black
+    # fields carrying the bold value digits + % — blanked to black; the scene
+    # draws the values live. Their inks are sampled here for the scene.
+    plates = {"passing": (116, 276), "long_ball": (227, 276),
+              "counter_yes": (116, 330), "counter_no": (227, 330)}
+    # each plate carries exactly TWO colours: black ground + one value ink
+    # (digits AND the % glyph share it) — census-verified on frame 25
+    inks = {"passing": (200, 230, 60), "long_ball": (166, 202, 240),
+            "counter_yes": (170, 223, 255), "counter_no": (212, 127, 0)}
+    for key, (px, py) in plates.items():
+        region = f25[py:py + 21, px:px + 41]
+        ink = np.array(inks[key])
+        expect(bool((region == ink).all(2).any()), f"{key}: ink {inks[key]} absent from plate")
+        chrome[py - my:py - my + 21, px - mx:px - mx + 41] = 0
+    save(chrome, ART / "teamtactics_chrome.png")
+
+    samples["team_tactics_modal"] = {
+        "SOURCE_NOTE": "frame-baked from parity-run-2026-07-16 orig/25_team_tactics.png "
+            "(fresh Bolton career = the .DBC lever defaults); 26_mantoman.png is the "
+            "74-px MARKING-toggle witness; EQWINX = the TICK; exit = the baked OK plate",
+        "modal_rect": [mx, my, mw, mh],
+        "tick_xy": {lever: {opt: list(xy) for opt, xy in opts.items()}
+                    for lever, opts in ticks.items()},
+        "value_plates": {k: [v[0], v[1], 41, 21] for k, v in plates.items()},
+        "value_inks": {k: list(v) for k, v in inks.items()},
+        "ok_button": [288, 365, 75, 28],
+        "steppers": {"pass_left": [167, 279, 20, 17], "pass_right": [197, 279, 20, 17],
+                     "counter_left": [167, 332, 20, 17], "counter_right": [197, 332, 20, 17]},
+        "defaults_witness": {"club": "Bolton W", "levers": [45, 50, 2, 1, 0, 0, 0],
+                             "state": bolton, "passing_pct": 45, "counter_pct": 50},
+    }
+
     SPECS.mkdir(parents=True, exist_ok=True)
     out = SPECS / "tactics_subs_chrome_samples.json"
     out.write_text(json.dumps(samples, indent=1) + "\n")

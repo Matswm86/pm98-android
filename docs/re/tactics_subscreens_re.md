@@ -61,20 +61,28 @@ the same class as the board's "TACTICS <formation>" title redraw).
 
 ---
 
-## 2. TEAM TACTICS — SOURCE-TRUE ART, UN-WALKED LAYOUT (ATTACK|DEFENCE modal)
+## 2. TEAM TACTICS — FRAME-BAKED (ATTACK|DEFENCE modal)
 
 Board button `equipo.bmp` (478,330); modal spawn `FUN_0056ea15`
 (`tacticas_screen_re.md`).
 
-### HONEST GAP: the modal is UN-WALKED
-It appears in **NO** walkthrough frame. Run-1 (board→PREDEF→board→LINE-UP),
-run-2 (board `014`→VIEW RIVAL `015`→hub), and run-3 (finance/transfers/Euro-cup)
-were all scanned frame-by-frame (per-run contact sheets); `APP_VS_SPEC_AUDIT` B6
-lists the captured tactics screens as "TACTICS + PREDEFINED (10 formations) +
-VIEW RIVAL" and, separately, "MAN-TO-MAN MARKINGS" — **never** a team-tactics /
-attack-defence modal. `FUN_0056ea15` is not disassembled and no `lift_widgets.py`
-exists. So the modal **cannot be frame-baked** and its assembled window geometry
-was **NOT MEASURED** for parity.
+### Status: BAKED 2026-07-27, 0 px on BOTH witnesses
+The old "UN-WALKED / cannot be frame-baked" prose below this heading was stale
+TWICE over: the modal is in the **2026-07-16 parity run** —
+`orig/25_team_tactics.png` (a FRESH Bolton career, Friday 1 Aug 1997 =
+the club's own .DBC lever defaults) and `orig/26_mantoman.png`, which differs in
+**exactly 74 px = the two MARKING boxes** (2 x the 37-ink-px EQWINX sprite,
+byte-verified). Chrome `app/art/screens/tactics/teamtactics_chrome.png` is the
+frame cut at (57,95) 526x303 with the five witnessed ticks erased and the four
+41x21 value plates blanked (baker PART 3,
+`tools/re/build_tactics_subs_chrome_from_frames.py`, every step asserted). Gate:
+`tools/re/diff_teamtactics_parity.py` — chrome 0 px vs BOTH frames; the four
+value plates are the declared app-font bucket (the original's bold value raster
+is not in the extracted .fnt bank — the scout MONEY precedent; each plate's ink
+is census-verified: passing (200,230,60), long ball (166,202,240), counter YES
+(170,223,255), counter NO (212,127,0)). The five witnessed defaults in frame 25
+(MIXED/MEDIUM/ZONAL/SHORT/OWN + 45/55, 50/50) are exactly Bolton's shipped
+stream `[45,50,2,1,0,0,0]` — the byte→lever map in `club_tactics_re.md`.
 
 **MEASURED 2026-07-26.** It is witnessed now:
 `screenshots/wine-captures-2026-07-26-team-tactics/01_team_tactics_modal_live.png`, a live
@@ -93,9 +101,9 @@ frame-baked; what follows is what a bake needs, measured off it:
 | MARKING ZONAL / MAN TO MAN | `(374,236)`, `(484,236)` |
 | CLEARANCES SHORT / LONG | `(373,282)`, `(483,282)` |
 | PRESSURISE OWN / MIDFIELD / OPPONENT | `(372,330)`, `(444,330)`, `(516,330)` |
-| PASSING ↔ LONG BALL slider handle | around `(184..200, 268..270)`; the frame reads 70 % / 30 % |
-| COUNTER ATTACK | YES 80 % / NO 20 % on the same slider idiom |
-| OK | centred under both panels, `y≈365..385` |
+| PASSING ↔ LONG BALL | NO slider: two static sprite ends + two 41x21 black value plates (x116/x227, y276) with bold digits; `(183,254)` is the static EQWINPICOS peak decoration. The live capture's 70/30 was that career's edited state, not a default |
+| COUNTER ATTACK | same idiom: YES/NO plates + two 41x21 value plates (x116/x227, y330); the 80/20 was the edited career, defaults are per-club |
+| OK | black plate `x288..359, y365..389` + drop shadow to `(362,392)` — **the modal's real (only) exit** |
 
 Worth remembering WHY the levers on this modal do not change an instant result: the
 statistical engine reads only `SEL`, `STR`, `GKSAVE`, `PASS`, `POS`, `ROLE`, and none of
@@ -142,7 +150,7 @@ these settings is among them (`docs/re/hack_three_forwards.md` §1).
    | eqwin_pass_long.png | EQWINLARGO.BMP | 41x21 | LONG BALL slider end |
    | eqwin_peak.png | EQWINPICOS.BMP | 18x18 | slider peak marker (unused yet) |
    | eqwin_step.png | EQWINBOTON.BMP | 20x17 | +/- stepper button |
-   | eqwin_close.png | EQWINX.BMP | 9x7 | window close (the modal's ONLY exit) |
+   | eqwin_close.png | EQWINX.BMP | 9x7 | **the selection TICK** (byte-exact in every ticked box of frames 25/26; the "window close" reading was FALSE — the exit is the OK plate) |
    | eqwin_arrow.png | EQWINFLECHA1.BMP | 6x11 | slider pointer (unused yet) |
    | equipo_icon.png | EQUIPO.BMP | 26x15 | the board's TEAM TACTICS button icon |
 
@@ -151,25 +159,29 @@ these settings is among them (`docs/re/hack_three_forwards.md` §1).
    `[31,100,180]`, marking `[35,145]`, clear `[31,143]`, press `[34,105,177]`,
    mentality-tile `34`. The selected option gets a tick painted into its box.
 
-### What is RECONSTRUCTED (un-walked, flagged NOT MEASURED)
-- The two-panel window arrangement and every y-position (`TeamTacticsScreen.gd`
-  geometry constants). Grounded in the art: each header is 198px wide → two white
-  panels side by side ≈ a ~448px modal, sized like PREDEF.
-- The **strip→control assignment** is inferred from icon semantics: shoe=tackle,
-  1-vs-2 players=marking, kick/smoke=clearances, pitch-zones=pressurise. The
-  binary string block confirms the option NAMES and counts (3/2/2/3) but not which
-  DIB strip the engine draws for which control.
-- The **mentality tile order** (Attacking/Speculative/Mixed) is un-walked; the
-  binary stores them as MIXED/SPECULATIVE/ATTACKING (low→high VA).
+### Frame-confirmed 2026-07-27 (formerly "reconstructed")
+Template-matching every EQWIN sprite against frame 25 confirmed the whole layout:
+panels ATTACK `x67..317` / DEFENCE `x335..573`, both `y140..359`; headers at
+`(82,125)`/`(352,125)`; mentality tiles `(75,173)/(75,199)/(75,225)` — order
+**ATTACKING / SPECULATIVE / MIXED top-to-bottom**; strips tackle `(349,188)` /
+marking `(347,234)` / clear `(344,280)` / press `(345,328)`; pass ends
+`(75,276)`/`(268,276)`; steppers `(167,279)/(197,279)/(167,332)/(197,332)`;
+arrow `(160,281)` and peak `(183,254)` static. The 13 tick blits (9x7, plate
+top-left −(2,2)): mentality `(104,178)/(104,204)/(104,230)`; tackling
+`(375,191)/(443,191)/(524,191)`; marking `(375,237)/(485,237)`; clearances
+`(374,283)/(484,283)`; pressurise `(373,331)/(445,331)/(517,331)`. All carried
+in the samples JSON key `team_tactics_modal`.
 
-**Screen** `app/scenes/TeamTacticsScreen.gd`: dim + a bevelled window with the
-blue "TEAM TACTICS" title, EQWINX close, the two real headers, the mentality tiles,
-the four option strips (with selection ticks), and the PASSING/COUNTER sliders
-(real TOQUE/LARGO ends + EQWINBOTON steppers). Every control mutates the live
-`Tactics` and emits `changed`; the EQWINX emits `done`. **There is no OK/SAVE/RETURN
-in this modal** — SAVE/LOAD TACTICS are BOARD buttons, not modal controls; the
-modal exits only via the X. This corrects the retired `TacticsScreen.gd`, which
-invented OK/SAVE/RETURN and the crude bevel layout.
+**Screen** `app/scenes/TeamTacticsScreen.gd` (rewritten 2026-07-27): the baked
+chrome + EQWINX ticks + live value digits + the OK exit. The interim modal's
+inventions are GONE: the close-X (EQWINX misread), the bevelled title bar, the
+proportional PASSING bar, the hand-drawn tick glyph, the reconstructed geometry
+and STEP=10 (now 5 — 45/55 is unreachable in tens). The old paragraph here
+claiming "there is no OK in this modal / the modal exits only via the X" was
+**exactly inverted** — the retired `TacticsScreen.gd` was right about OK.
+Remaining honest gaps: stepper DIRECTION un-witnessed (left = toward the left
+value, inferred from the flanking arrows, flagged OURS); the backdrop dim is an
+approximation of the original's palette-LUT dim (measured 144→100, 44→22).
 
 ---
 

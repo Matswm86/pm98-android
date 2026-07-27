@@ -2731,12 +2731,13 @@ func _show_tactics_board_screen() -> void:
 		_show_lineup_screen())
 	scr.return_pressed.connect(func() -> void: scr.queue_free())
 
-## The source-true TEAM TACTICS modal (ATTACK | DEFENCE, EQWIN* art + MANAGER.EXE label
-## block; TeamTacticsScreen.gd, docs/re/tactics_subscreens_re.md) over a real LINE-UP
-## backdrop. Each control mutates the career Tactics live (its ratings() feed the match
-## engine), persisted on `changed`; the modal's ONLY exit is the EQWINX close (emits `done`,
-## which frees both overlays) — there is no in-modal SAVE (SAVE/LOAD are BOARD buttons), so no
-## save_requested connect. Supersedes the retired TacticsScreen.gd (which invented OK/SAVE/RETURN).
+## The frame-baked TEAM TACTICS modal (ATTACK | DEFENCE; TeamTacticsScreen.gd,
+## docs/re/tactics_subscreens_re.md, witnessed by parity-run orig/25+26) over a real
+## LINE-UP backdrop. Each control mutates the career Tactics live, persisted on
+## `changed`; the exit is the modal's own baked OK plate (emits `done`, which frees
+## both overlays) — the retired TacticsScreen.gd was RIGHT about OK; the close-X the
+## interim modal carried was the invention (EQWINX is the tick). No in-modal SAVE
+## (SAVE/LOAD are BOARD buttons), so no save_requested connect.
 func _show_tactics_screen() -> void:
 	var bg: LineupScreen = load("res://scenes/LineupScreen.gd").new()
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -4495,6 +4496,16 @@ func _show_matchday_options() -> void:
 func _show_audio_options(_scr: MenuScreen) -> void:
 	var op: OptionsPanel = load("res://scenes/OptionsPanel.gd").new()
 	op.set_anchors_preset(Control.PRESET_FULL_RECT)
+	# THREE UP FRONT arming readout (Mats QA 2026-07-27: the cheat's state was
+	# invisible — nothing distinguished armed from disarmed). The natural-FW count
+	# of the XI that would actually be fielded this week; >= 3 = the forwards
+	# trigger is armed. Drawn in the cheat row's own declared band.
+	if _career != null:
+		var fw := 0
+		for p in _career._mgr_featured_xi():
+			if str((p as Dictionary).get("pos", "")) == "FW":
+				fw += 1
+		op.xi_fw = fw
 	add_child(op)
 	op.closed.connect(func() -> void: op.queue_free())
 

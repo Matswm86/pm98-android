@@ -55,6 +55,11 @@ var _checked: Texture2D
 var _empty: Texture2D
 var _ok_held := false
 var _drag := ""   # "music"/"sfx" while dragging a slider
+## Natural forwards in the XI the career would field this week (-1 = no career
+## mounted). Drawn beside the cheat row when the cheat is ON, so the THREE UP
+## FRONT trigger's armed state is visible in-game (Mats QA 2026-07-27): >= 3 FW
+## = armed. Set by Main._show_audio_options; stays inside R_CHEAT_BAND.
+var xi_fw := -1
 
 
 func _ready() -> void:
@@ -187,5 +192,11 @@ func _draw() -> void:
 	PMChrome.text(self, f, LABEL_END_X, 327, "THREE UP FRONT", C_LABEL, 10, 2)
 	PMChrome.text(self, f, R_CHEAT_ON.position.x - 3, 327, "ON", Color.WHITE, 10, 2)
 	PMChrome.text(self, f, R_CHEAT_OFF.position.x - 3, 327, "OFF", Color.WHITE, 10, 2)
+	# the arming readout: this week's XI natural-FW count (>= 3 = the forwards
+	# trigger is armed). White = armed, the label gold = not yet — both are the
+	# row's own inks. Only with the cheat ON and a career mounted.
+	if cheat_on and xi_fw >= 0:
+		PMChrome.text(self, f, R_CHEAT_OFF.end.x + 8, 327, "%d FW" % xi_fw,
+			Color.WHITE if xi_fw >= 3 else C_LABEL, 10)
 	if _ok_held:
 		draw_rect(R_OK, C_PRESS, true)

@@ -81,7 +81,7 @@ layout/rects, not an invented one.
 | `CupScreen` | `docs/re/cup_re.md` + `europe_re.md` |
 | `StaffScreen` / `YouthScreen` | `docs/re/staff_re.md` / `youth_re.md` |
 | `MatchScreen` / `MatchOptions` / `MatchSimulador` | `docs/re/match_view_re.md` + engine docs |
-| `LeagueTableScreen` / `TacticsScreen` / `BrowseScreen` | (per engine/season docs) |
+| `LeagueTableScreen` / `TeamTacticsScreen` / `BrowseScreen` | (per engine/season docs; TEAM TACTICS: `tactics_subscreens_re.md` §2) |
 
 Match engine: `docs/re/EXACT_PORT_PLAN.md`, `match_engine_re.md`, `stat_match_engine_re.md`,
 `MATCH_TICK_DRIVER_MAP.md` (bit-exact port, oracle-validated against MANAGER.EXE).

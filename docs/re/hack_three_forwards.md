@@ -117,6 +117,33 @@ three forwards with the cheat OFF gives the stock 3-2 / 3-3 / 2-1 / 4-2; with it
 the hacked 6-2 / 6-2 / 6-0 / 6-3. `test_options_panel.gd` pins the band's containment and
 the setter wiring. Real render of both states: `PM98_OPTIONS_SHOT=1` (`Main._options_shot`).
 
+## 4b. The MIXED PLAY variant — LANDED 2026-07-27 (the club-tactic byte is FOUND)
+
+The "memory-diff the club tactic byte" plan is obsolete: the byte is the MENTALITY
+lever `club+0x1db` (value 2 = MIXED PLAY), pinned analytically by the frame-25
+Bolton witness (`club_tactics_re.md` byte->lever table). Port wiring:
+
+* `Pm98StatMatch.cheat_mixed_play_side` — the side index whose MIXED PLAY box is
+  ticked AND is the MANAGER's own side; set by `MatchSim` around each simulate and
+  always reset, so AI-vs-AI fixtures can never inherit it.
+* Trigger: `_cheat_armed(mem, side)` = the SAME `cheat_three_up_front` switch, armed
+  by EITHER three natural forwards fielded (the original hack) OR the manager's
+  MIXED PLAY lever. Same two effects (chance floor + keeper-gate skip).
+* **Manager-side-only BY DESIGN**: 178 of the 476 shipped clubs default to MIXED —
+  an any-side trigger would hand a third of the league six goals a week. The
+  original hack's trigger (3 fielded forwards) is rare for AI sides; this one is
+  not, so the port bounds it. Declared OURS.
+* With the switch OFF nothing reads the variant — the eight banked oracle fixtures
+  still reproduce draw-for-draw (test_three_up_front_seam + test_cheats_live case C).
+* Live proof through the REAL career chain (AudioManager switch -> saved tactics
+  dict -> advance_week -> repaired/_pad_xi -> MatchSim): `app/tests/test_cheats_live.gd`
+  — 4-3-3 arms the forwards trigger (>= 6 goals every week), MIXED PLAY on 4-4-2
+  arms the variant, OFF holds the stock cap.
+* Visibility (Mats QA 2026-07-27): the OPTIONS cheat row now prints the fielded
+  XI's natural-FW count ("N FW", white when >= 3 = armed) beside the OFF box, so
+  the forwards trigger's state is readable in-game; the MIXED PLAY trigger is
+  visible as its own tick on the TEAM TACTICS modal.
+
 ## 5. README wording (drop under the Download section)
 
 ```markdown

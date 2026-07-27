@@ -446,6 +446,68 @@ func long_ball_pct() -> int:
 	return 100 - passing_pct
 
 
+# ---- the 7 .DBC lever bytes (club+0x1d9..+0x1df, stream order) ------------
+# Byte -> lever map closed 2026-07-27 (club_tactics_re.md §levers): the fresh
+# Bolton career witness (parity-run orig/25) reads PASSING 45 / COUNTER 50 /
+# MIXED / MEDIUM / ZONAL / SHORT / OWN and Bolton's shipped stream is exactly
+# [45, 50, 2, 1, 0, 0, 0] — all seven line up 1:1, and the 45-vs-50 pair pins
+# bytes 0/1 unambiguously. The 3-way encodings rest on this one clean witness
+# (flagged in the doc). Stream order: [passing%, counter%, mentality, tackling,
+# marking, clearances, pressurise].
+const LEVER_MENTALITY := ["Attacking", "Speculative", "Mixed"]   # +0x1db 0/1/2
+const LEVER_TACKLING := ["Soft", "Medium", "Aggressive"]         # +0x1dc 0/1/2
+const LEVER_MARKING := ["Zonal", "Man-to-man"]                   # +0x1dd 0/1
+const LEVER_CLEARANCES := ["Short", "Long"]                      # +0x1de 0/1
+const LEVER_PRESSURISE := ["Own", "Midfield", "Opponent"]        # +0x1df 0/1/2
+
+static var _club_levers_cache: Dictionary = {}
+
+## The club's own shipped lever bytes (club_tactics.json, keyed by app club id).
+## [] when unknown — callers keep the neutral defaults then.
+static func club_levers(club_id: int) -> Array:
+	if _club_levers_cache.is_empty():
+		var f := FileAccess.open("res://data/club_tactics.json", FileAccess.READ)
+		if f == null:
+			return []
+		var d: Variant = JSON.parse_string(f.get_as_text())
+		if d is Dictionary:
+			_club_levers_cache = (d as Dictionary).get("clubs", {})
+		if _club_levers_cache.is_empty():
+			return []
+	var e: Variant = _club_levers_cache.get(str(club_id))
+	if e is Dictionary:
+		var lv: Array = (e as Dictionary).get("levers", [])
+		if lv.size() == 7:
+			var out: Array = []
+			for v in lv:               # JSON numbers parse as float
+				out.append(int(v))
+			return out
+	return []
+
+## Seed the modal levers from a club's raw .DBC stream — how the original starts
+## a fresh career (per-club, NOT the port's old global constants).
+func apply_club_levers(lv: Array) -> void:
+	if lv.size() != 7:
+		return
+	passing_pct = clampi(int(lv[0]), 0, 100)
+	counter_pct = clampi(int(lv[1]), 0, 100)
+	mentality = LEVER_MENTALITY[clampi(int(lv[2]), 0, 2)]
+	tackling = LEVER_TACKLING[clampi(int(lv[3]), 0, 2)]
+	marking = LEVER_MARKING[clampi(int(lv[4]), 0, 1)]
+	clearances = LEVER_CLEARANCES[clampi(int(lv[5]), 0, 1)]
+	pressurise = LEVER_PRESSURISE[clampi(int(lv[6]), 0, 2)]
+
+## The inverse: the live modal state as the 7 raw stream bytes — what the
+## positional engine's lineup feeder consumes (Pm98LineupFeeder overrides).
+func levers() -> Array:
+	return [passing_pct, counter_pct,
+		maxi(0, LEVER_MENTALITY.find(mentality)),
+		maxi(0, LEVER_TACKLING.find(tackling)),
+		maxi(0, LEVER_MARKING.find(marking)),
+		maxi(0, LEVER_CLEARANCES.find(clearances)),
+		maxi(0, LEVER_PRESSURISE.find(pressurise))]
+
+
 # ---- helpers -------------------------------------------------------------
 
 func _players_by_id(club: Dictionary) -> Dictionary:

@@ -143,15 +143,35 @@ Four more, reported 2026-07-26 evening (second round, same play session):
   refusal alert. Zero new chrome (the panel already carried the NAME object) — all six
   witnesses + both bar gates re-run 0 px / PASS. The mission machinery is untouched
   for attribute searches. See `scout_screen_re.md` §OURS panel.
-* **TEAM TACTICS still broken end-to-end** (Session B not yet run, Mats re-confirmed
-  every symptom live): screen not the original's, controls don't function, PASSING
-  short/long %s wrong, COUNTER ATTACK % wrong, MIXED PLAY cheat dead. Map: the s63
-  handoff §3 + `tactics_subscreens_re.md` — incl. wiring the 7 levers into the
-  byte-exact engine (`team[0xc1..0xc7]`, EXACT_PORT_PLAN gap B).
-* **⚠ THREE UP FRONT still does not fire in play** despite `4b8b63a`'s trigger fixes
-  and green seam test. OPEN until witnessed working in Mats's hands on a real career
-  — verify in the REAL app (was 4-3-3 picked? if that usage gate is the whole story,
-  surface it in-game; if not, the trigger chain has a hole the seam test misses).
+* ~~**TEAM TACTICS still broken end-to-end**~~ — **REBUILT 2026-07-27 (Session B).**
+  The modal is frame-baked from parity-run `orig/25_team_tactics.png` at (57,95)
+  526x303 (`teamtactics_chrome.png`, baker PART 3); EQWINX is the TICK (byte-proven
+  by the 74-px `orig/26` diff); the exit is the real baked OK plate; the invented
+  close-X, proportional PASSING bar, hand-drawn tick and reconstructed geometry are
+  GONE; STEP is 5. The %s were wrong because the port used GLOBAL defaults — the
+  original's are PER-CLUB `.DBC` lever bytes, and the byte→lever map is now CLOSED
+  (Bolton witness; `club_tactics_re.md`): fresh careers seed from the club's own
+  stream (Bolton starts 45/55, MIXED/MEDIUM/ZONAL/SHORT/OWN exactly as frame 25).
+  Gate `diff_teamtactics_parity.py`: chrome 0 px vs BOTH frames (value plates =
+  declared app-font bucket). Levers→engine: the LIVE modal levers now reach the
+  positional engine's `team[0xc1..0xc7]` (`Pm98LineupFeeder.build lever_overrides`)
+  — but the app PLAYS on the instant/stat runner, which reads NO levers in the
+  ORIGINAL either (`hack_three_forwards.md` §1), so lever→result coupling on the
+  played path honestly lands with the M5 wire-in (§1). The MIXED PLAY cheat is the
+  exception and works NOW (below). The `MENTALITIES` order and legacy-fallback
+  factors are unchanged.
+* ~~**⚠ THREE UP FRONT still does not fire in play**~~ / ~~MIXED PLAY cheat dead~~ —
+  **BOTH LIVE-PROVEN + MADE VISIBLE 2026-07-27.** `app/tests/test_cheats_live.gd`
+  drives the REAL career chain (AudioManager switch → saved tactics dict →
+  advance_week → repaired/_pad_xi → MatchSim): 4-3-3 arms the forwards trigger
+  (≥6 manager goals every week), and the NEW MIXED PLAY variant arms on the
+  manager's MIXED PLAY tick even on 4-4-2 (the club-tactic byte hunt is over —
+  it is mentality `+0x1db==2`, so §3b's memory-diff plan is obsolete; manager-side
+  only BY DESIGN, 178 clubs default to MIXED). Cheat OFF holds the stock cap.
+  Visibility: the OPTIONS cheat row now prints the fielded XI's natural-FW count
+  ("N FW", white when ≥3 = armed) — the seam the QA flagged (a 4-4-2 XI silently
+  disarms the forwards trigger; MIXED PLAY is the reliable trigger now). Final
+  confirmation in Mats's hands on the shipped APK remains the acceptance bar.
 
 ## The one-paragraph truth
 
@@ -313,14 +333,14 @@ readout, nothing held → the label. `tools/re/diff_scout_bar_parity.py` bounds 
 frames: all ten committed frames of that screen are either a readout or blank, and the two
 segments overlap none of the 21 original controls. **No other screen carries invented pixels.**
 
-**Still to do here — the MIXED PLAY variant.** The other half of
-`docs/re/hack_three_forwards.md`: make toggling MIXED PLAY the trigger instead of three
-forwards. Blocked on locating the club tactic byte — `FUN_0056ea15` (the TEAM TACTICS
-modal) is un-disassembled and the setting is not in the stat engine's input set at all.
-Plan: memory-diff that byte in a **clone** of the play prefix (`/tmp/pm98-play/
-sandbox-prefix`, display `:8`, never the live career) while toggling ATTACKING ↔ MIXED with
-synthetic clicks, then re-target the `att3` cave at it. The modal's geometry is measured
-now (`tactics_subscreens_re.md`), so the click target is known: MIXED PLAY's X-box (103,229).
+~~**Still to do here — the MIXED PLAY variant.**~~ — **LANDED 2026-07-27.** The club
+tactic byte hunt is over without a memory-diff: it is the MENTALITY lever
+`club+0x1db` (2 = MIXED), pinned analytically by the frame-25 Bolton witness
+(`club_tactics_re.md`). The same OPTIONS switch now arms EITHER trigger — three
+natural forwards fielded, OR the manager's MIXED PLAY tick (manager-side only BY
+DESIGN: 178/476 clubs default to MIXED, an any-side trigger would break the league).
+OFF is still stock (oracle fixtures reproduce). `hack_three_forwards.md` §4b; live
+proof `app/tests/test_cheats_live.gd`.
 
 ## 3c. Model-level divergences from the season audit — OPEN (rescued 2026-07-26)
 
