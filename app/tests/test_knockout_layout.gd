@@ -34,6 +34,33 @@ func _initialize() -> void:
 	_ties(scr, 15, false)
 	_a(scr.cols() == KnockoutScreen.COLS_DOM, "domestic ties -> RES./REPLAY")
 
+	# The CARDS / FINAL layouts (2026-07-27): availability follows the witnessed chrome
+	# -- cards for euro + cocacola, the final for euro only -- and the setup() routing
+	# accepts the two new layout names.
+	_a(KnockoutScreen.cards_available("euro"), "euro cards chrome shipped")
+	_a(KnockoutScreen.cards_available("cocacola"), "cocacola cards chrome shipped")
+	_a(not KnockoutScreen.cards_available("facup"),
+		"facup cards UNWITNESSED -> not available")
+	_a(not KnockoutScreen.cards_available("uefa"), "uefa cards UNWITNESSED")
+	_a(not KnockoutScreen.cards_available("cwc"), "cwc cards UNWITNESSED")
+	_a(KnockoutScreen.final_available("euro"), "euro final chrome shipped")
+	_a(not KnockoutScreen.final_available("cocacola"), "cocacola final UNWITNESSED")
+	scr.setup({}, "euro", "Semifinals", true,
+		[{"home": "A", "away": "B", "winner": -1, "two_legged": true,
+			"home_ground": "GA", "away_ground": "GB",
+			"cells": [["", ""], ["", ""], ["", ""]]}],
+		true, false, 0, "cards")
+	_a(scr._layout == "cards", "setup accepts the cards layout")
+	_a(scr._band_key() == "euro_cards", "cards -> the euro_cards band")
+	scr.setup({}, "euro", "Final", true,
+		[{"home": "A", "away": "B", "winner": -1, "venue": "V", "cells": [["", ""]]}],
+		true, false, 0, "final")
+	_a(scr._layout == "final", "setup accepts the final layout")
+	_a(scr._band_key() == "euro_cards",
+		"the final shares the cards band (292-px label diff witness)")
+	scr.setup({}, "euro", "X", true, [], false, false, 0, "nonsense")
+	_a(scr._layout == "list", "an unknown layout falls back to the list")
+
 	print("test_knockout_layout: %s" % ("ALL PASS" if _fail == 0 else "%d FAILED" % _fail))
 	quit(1 if _fail > 0 else 0)
 

@@ -101,6 +101,44 @@ const FA_QTR_TIES := [
 	["West Ham Utd", "Leicester", 48, 57],
 ]
 
+# ---- the SEMIFINAL cards + FINAL witnesses (measured 2026-07-27) --------------------
+
+# 04_euroleague_semifinals_LEG1_PLAYED_1998-04-04.png -- the Bolton W career at the euro
+# Semifinals, both first legs played (SF1 0-0, SF2 1-2), second legs pending.
+const EURO_SEMI_HEADER := {
+	"top": "MATS", "bottom": "Bolton W", "club_id": 59,
+	"weekday": "Saturday", "day": "4", "month": "April", "year": "1998",
+	"status_top": "Premier", "status_bottom": "Week 35",
+}
+
+# home, away, home_id, away_id, home_ground, away_ground, leg1 [hg, ag] or []
+const EURO_SEMI_TIES := [
+	["Manchester Utd.", "Olympiakos", 40, 1189, "Old Trafford", "Karaiskakis", [0, 0]],
+	["Sporting Port.", "Real Madrid C.F.", 1076, 1003, "Jose Alvalade",
+		"Santiago Bernabéu", [1, 2]],
+]
+
+# 06_cocacola_semifinals_drawn_1998-01-10.png -- the same career, Coca-Cola Cup
+# SEMIFINALS drawn, nothing played.
+const CC_SEMI_HEADER := {
+	"top": "MATS", "bottom": "Bolton W", "club_id": 59,
+	"weekday": "Saturday", "day": "10", "month": "January", "year": "1998",
+	"status_top": "Premier", "status_bottom": "Week 23",
+}
+
+const CC_SEMI_TIES := [
+	["WBA", "Manchester Utd.", 80, 40, "The Hawthorns", "Old Trafford", []],
+	["Southampton", "Ipswich", 54, 66, "The Dell", "Portman Road", []],
+]
+
+# 05_euroleague_final_UNDECIDED_1998-04-25.png -- the euro Final at the neutral
+# Das Antas, undecided.
+const EURO_FINAL_HEADER := {
+	"top": "MATS", "bottom": "Bolton W", "club_id": 59,
+	"weekday": "Saturday", "day": "25", "month": "April", "year": "1998",
+	"status_top": "Premier", "status_bottom": "Week 38",
+}
+
 
 func _init() -> void:
 	var out := "res://out"
@@ -118,7 +156,33 @@ func _init() -> void:
 		_bracket_rows(EURO_QTR_TIES, true), true, false, 0, "bracket")
 	await _shot(out, "knockout_facup_qtr", FA_QTR_HEADER, "facup", "QTR FINALS", false,
 		_bracket_rows(FA_QTR_TIES, false), true, false, 0, "bracket")
+	# The cards family prints the euro label AS the sequential scheme spells it
+	# ("Semifinals" / "Final", witnessed mixed-case) and the domestic one uppercased
+	# ("SEMIFINALS", witnessed) -- Main applies the same rule.
+	await _shot(out, "knockout_euro_semis", EURO_SEMI_HEADER, "euro", "Semifinals", true,
+		_card_rows(EURO_SEMI_TIES), true, false, 0, "cards")
+	await _shot(out, "knockout_cocacola_semis", CC_SEMI_HEADER, "cocacola", "SEMIFINALS",
+		false, _card_rows(CC_SEMI_TIES), true, false, 0, "cards")
+	await _shot(out, "knockout_euro_final", EURO_FINAL_HEADER, "euro", "Final", true,
+		[{"home": "Real Madrid C.F.", "away": "Olympiakos", "home_id": 1003,
+			"away_id": 1189, "home_flag": 22, "away_flag": 26, "venue": "Das Antas",
+			"winner": -1, "cells": [["", ""]]}],
+		true, false, 0, "final")
 	quit()
+
+
+static func _card_rows(ties: Array) -> Array:
+	var rows: Array = []
+	for t in ties:
+		var leg1: Array = t[6]
+		var cells: Array = [["", ""], ["", ""], ["", ""]]
+		if not leg1.is_empty():
+			cells[0] = [str(int(leg1[0])), str(int(leg1[1]))]
+		rows.append({"home": t[0], "away": t[1], "winner": -1,
+			"home_id": int(t[2]), "away_id": int(t[3]),
+			"home_ground": str(t[4]), "away_ground": str(t[5]),
+			"two_legged": true, "cells": cells})
+	return rows
 
 
 static func _bracket_rows(ties: Array, euro: bool) -> Array:

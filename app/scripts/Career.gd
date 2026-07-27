@@ -311,6 +311,11 @@ const FA_CUP_OPTS := {
 }
 const LEAGUE_CUP_OPTS := {
 	"name": "Coca-Cola Cup", "legs": 1, "two_legged_final": false,
+	# The SEMIFINALS are two-legged in the original -- witnessed 1998-01-10: the
+	# SEMIFINALS card view carries 1ST LEG / 2ND LEG blocks with both clubs' own
+	# venues (docs/re/knockout_views_re.md). Earlier rounds keep single-leg + replay
+	# (the R4 list frame), and the final is a single match.
+	"semi_legs": 2,
 	"label_scheme": "sequential", "qtr_label": "Qtr Finals",
 	"prize_round": 0, "prize_winner": 0, "span_lo": 0.0, "span_hi": 0.7,
 }

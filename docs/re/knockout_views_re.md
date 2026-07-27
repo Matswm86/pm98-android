@@ -1,7 +1,10 @@
 # The knockout views — RESULTS → any cup, every layout the original switches between
 
-**Status: the LIST (1) and BRACKET (3) layouts are BUILT and 0 px (2026-07-26); the kit
-list (2), semifinal cards (4) and final (5) are measured, not built.** The bracket:
+**Status: the LIST (1), BRACKET (3), SEMIFINAL CARDS (4) and FINAL (5) layouts are BUILT
+and 0 px outside declared buckets (cards + final 2026-07-27, see "The semifinal cards and
+the final, as built"); only the kit list (2) is measured, not built.** Cards ship for
+EURO. LEAGUE + Coca-Cola Cup and the final for EURO. LEAGUE — the other competitions'
+cards/final chromes are unwitnessed and fall back to the SORTEO (honest gap). The bracket:
 `KnockoutScreen._draw_bracket`, gated by `diff_knockout_parity.py` cases 3-4 at **0 px
 outside three declared buckets** (the barra kit; the eight 60x68 kit columns, which are
 the exact-decoded MINIESC sprite plus the un-reversed outline pass; the euro case's rail,
@@ -447,6 +450,71 @@ was looked for on the European final, which is decided inside the season-end seq
 the hub never returns. The one-off finals (Charity Shield, Supercup, Intercontinental) reach
 the same view *within* the season. `knockoutwatch.py scan` over every committed frame set
 found it in seconds — **scan what you already have before driving another season.**
+
+## The semifinal cards and the final, as built (2026-07-27)
+
+Both layouts went in against the frames named in §4/§5 plus
+`09_euroleague_semifinals_DRAWN_unplayed_1999-03-27.png` (a SECOND career's euro semis) —
+`tools/re/diff_knockout_parity.py` cases 5-7, **0 px outside declared buckets** on all
+three witnesses. What the measuring settled:
+
+* **The band is a THIRD family (`cards`), shared by the semis and the final.** The euro
+  final band differs from the euro semis band in the 292 label pixels only ("Final" vs
+  "Semifinals"), so one strip serves both. The euro cards band is byte-identical to the
+  euro BRACKET band outside the plate + arrows (0 px); the cocacola cards band is NOT —
+  its own strip, trophy bottom at y117, plate interior `(336,87)..(420,107)`, arrows
+  left_on at `(312,87)` / right_off_p1 at `(422,87)` (both EXACT matches of the baked
+  pager faces). So a domestic cards band cannot be derived from the bracket's — F.A. Cup
+  / U.E.F.A. / Cup Winner's semis stay SORTEO until captured.
+* **The plate label case is witnessed per family**: euro cards plates print the
+  sequential scheme's own mixed case ("Semifinals", "Final"); the domestic plate prints
+  caps ("SEMIFINALS"). The list/bracket plates are caps everywhere. `Main` applies
+  exactly that rule.
+* **One cards body strip serves both column sets**: the euro and cocacola cards frames
+  are byte-identical below the band outside the content rects (3 frames, 2 competitions,
+  2 careers). Baked from the fully-unplayed cocacola frame
+  (`cards_body.png`, x0..499 y120..427).
+* **Geometry** (per card, SF2 = SF1 + 258 for every dynamic element): leg blocks at
+  y190/y282 (venue rows, black grounds), club bars at y209/231 and y301/323 (20 px,
+  grounds SF1 `(200,220,240)` / SF2 `(192,220,192)`), score boxes x191..226 / x449..484
+  (grounds SF1 `(42,63,170)` / SF2 `(80,110,5)`), FINALIST boxes x20..216 / x281..477.
+* **Text**: everything dynamic is NATIVE proman10. Venue pen `(33, block_top+4)`
+  left-aligned (leftmost ink identical on all three frames); club name pen
+  `(34, bar_top+5)`; score digits centred on the box (`_txt_mid` field sums 418/934 —
+  the witnessed "1" lands x464..468, the "2" x462..469, white ink). Venue inks
+  SF1 `(117,147,187)` / SF2 `(61,191,82)`; name inks SF1 `(42,95,170)` /
+  SF2 `(80,110,5)`.
+* **The kit icon is the ridi bank** (17x20), matched unique-best at `(13, bar_top)` —
+  Man Utd 188/221 opaque px; the residual is the same un-reversed outline pass the
+  bracket's MINIESC columns carry, so the eight 17x20 icon rects are declared buckets.
+* **The 2ND LEG block swaps sides** (its host first, its venue the away club's own
+  ground) — witnessed on all three frames; same grammar as the list layout's leg-2
+  column.
+* **The FINAL's card + WINNER band chrome is byte-identical to `09_comp_charity.png`'s
+  outside the content rects (0 px)**, so the redraw grammar is CompResultScreen's
+  witnessed one — kits aspect-fitted into the 48x60 wells (the hi-res panel kit bank is
+  still un-extracted; the two wells are declared buckets), 30x20 dbcard flags at
+  `(199,163)`/`(270,163)` (exact), stadium value centred on 243 in `(17,90,34)`. The
+  finalists' names are NATIVE proman12 — the witness 'R' is 11x9 with advance 12,
+  proman12's own metrics — at pen `(155, bar_top+4)` (y271/y302), ink `(80,100,120)`.
+* **Model fix the cocacola witness forced**: the original's Coca-Cola SEMIFINALS are
+  two-legged (1ST/2ND LEG blocks + both venues on the 1998-01-10 frame) while its other
+  rounds stay single-leg + replay — `Cup` now takes `semi_legs` and `LEAGUE_CUP_OPTS`
+  sets 2. The F.A. Cup's semis stay single-leg (unwitnessed either way, per the
+  Career.gd comment).
+* **The FINAL is at a NEUTRAL ground** — Das Antas 1998, neither finalist's stadium.
+  One witness fixes no selection rule, so the pick is DECLARED OURS: a deterministic
+  rng draw from the competition's own field, never a finalist's ground, recorded on the
+  draw (`Cup._pair_round` → `venue_id`). A competition without a stored field records
+  -1 and the view (euro-only anyway) would leave the line empty.
+
+Declared inferences added by this build (on top of the list below): the advancing-club
+highlight on a DECIDED semifinal (the list layout's yellow rule applied to the cards'
+own inks) and the FINALIST plate fill (the winner centred in the WINNER band's ink) —
+**no captured frame anywhere in the corpus shows a decided semifinal** (scanned all
+committed sets 2026-07-27); the FA-model replay printed in a card's 2ND LEG block; the
+played FINAL's score digits + WINNER name, which keep CompResultScreen's approximation
+(the witnessed charity digits and two-tone winner ink match no extracted font bank).
 
 ## What is inferred, and therefore declared
 

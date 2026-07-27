@@ -45,18 +45,56 @@ REFS = ROOT / "tools/re/refs/knockout-2026-07-26"
 BARRA_KIT = ("barra kit", 106, 6, 35, 44)
 SCROLL_COL = ("scrollbar", 478, 125, 16, 286)
 RAIL = ("rail", 500, 110, 140, 321)
-KIT_COLS = [(f"kit {side} T{top}", x, top + 2, 60, 68)
-            for top in (113, 193, 273, 353) for side, x in (("L", 22), ("R", 416))]
+KIT_COLS = [
+    (f"kit {side} T{top}", x, top + 2, 60, 68)
+    for top in (113, 193, 273, 353)
+    for side, x in (("L", 22), ("R", 416))
+]
+# The CARDS layout's 17x20 ridi kit icons (x13 / x271 at the four bar tops per card):
+# the sprite is the game's own ridi bank, matched unique-best at (13, bar_top), but the
+# original draws the same un-reversed outline/bevel pass over it (~30 px per icon) --
+# the identical residual the bracket's MINIESC columns and the euro group screen carry.
+CARD_ICONS = [
+    (f"icon {side} y{top}", x, top, 17, 20)
+    for top in (209, 231, 301, 323)
+    for side, x in (("L", 13), ("R", 271))
+]
+# The FINAL's two 48x60 kit wells keep CompResultScreen's documented approximation: the
+# original's hi-res panel kit bank is un-extracted, so the app's own art is aspect-fitted
+# and the wells are declared.
+FINAL_KITS = [("final kit L", 146, 158, 48, 60), ("final kit R", 306, 158, 48, 60)]
 
 CASES = [
-    ("knockout_euro_round1", "06_euroleague_round1_played.png",
-     [BARRA_KIT, SCROLL_COL]),
-    ("knockout_facup_round3", "03_facup_r3_drawn_UNPLAYED_1997-12-20.png",
-     [BARRA_KIT, SCROLL_COL]),
-    ("knockout_euro_qtr", "03_euroleague_qtrfinals_LEG1_PLAYED_1998-03-14.png",
-     [BARRA_KIT, RAIL, *KIT_COLS]),
-    ("knockout_facup_qtr", "08_facup_qtrfinals_DOMESTIC_bracket_unplayed_1999-03-04.png",
-     [BARRA_KIT, *KIT_COLS]),
+    ("knockout_euro_round1", "06_euroleague_round1_played.png", [BARRA_KIT, SCROLL_COL]),
+    ("knockout_facup_round3", "03_facup_r3_drawn_UNPLAYED_1997-12-20.png", [BARRA_KIT, SCROLL_COL]),
+    (
+        "knockout_euro_qtr",
+        "03_euroleague_qtrfinals_LEG1_PLAYED_1998-03-14.png",
+        [BARRA_KIT, RAIL, *KIT_COLS],
+    ),
+    (
+        "knockout_facup_qtr",
+        "08_facup_qtrfinals_DOMESTIC_bracket_unplayed_1999-03-04.png",
+        [BARRA_KIT, *KIT_COLS],
+    ),
+    # The euro cases bucket the rail (career-state chip lit-states, as the bracket case
+    # documents); the cocacola semis rail matches the baked rail_cocacola.png 0 px and
+    # is enforced.
+    (
+        "knockout_euro_semis",
+        "04_euroleague_semifinals_LEG1_PLAYED_1998-04-04.png",
+        [BARRA_KIT, RAIL, *CARD_ICONS],
+    ),
+    (
+        "knockout_cocacola_semis",
+        "06_cocacola_semifinals_drawn_1998-01-10.png",
+        [BARRA_KIT, *CARD_ICONS],
+    ),
+    (
+        "knockout_euro_final",
+        "05_euroleague_final_UNDECIDED_1998-04-25.png",
+        [BARRA_KIT, RAIL, *FINAL_KITS],
+    ),
 ]
 
 

@@ -39,6 +39,28 @@ Outputs -> app/art/screens/knockout/
                          over 4 frames are byte-identical outside them)
   bracket_panel_dom.png  ... domestic columns (RES. / REPLAY at their own x positions --
                          NOT the European slots minus one; 8 panels over 2 frames)
+  band_euro_cards.png    the CARDS-family band (semifinal cards AND the final share it:
+  band_cocacola_cards.png  the euro final band differs from the euro semis band in the
+                         label pixels ONLY, 292 px, measured 2026-07-27). The euro cards
+                         band is byte-identical to the euro BRACKET band outside the plate
+                         and arrows (0 px); the cocacola cards band is NOT (its own strip,
+                         trophy lower, plate at (336,87)). F.A. Cup / U.E.F.A. / Cup
+                         Winner's semifinals were never photographed, so those comps have
+                         no cards band and fall back to the SORTEO -- an honest gap.
+  cards_body.png         the two SEMIFINAL cards, x0..499 y120..427, cut from the witnessed
+                         Coca-Cola frame -- legal for BOTH column sets because the euro and
+                         cocacola cards frames are byte-identical below the band outside
+                         the content rects (measured 2026-07-27: only the venue texts, club
+                         rows and band tail differ across 3 frames / 2 competitions / 2
+                         careers). Venue texts blanked to the row's black, club bars to
+                         their per-card grounds, score boxes to their per-card grounds.
+  final_body_euro.png    the FINAL view's body (trophy + RESULTS card + WINNER band),
+                         x0..499 y120..427 from the witnessed euro final. The card + winner
+                         band chrome is byte-identical to 09_comp_charity's outside the
+                         content rects (0 px, measured 2026-07-27), so the redraw grammar
+                         is CompResultScreen's witnessed one. Only the euro final is
+                         witnessed -- the other competitions' final bodies (their trophies)
+                         are honest gaps that fall back to the SORTEO.
 """
 
 from __future__ import annotations
@@ -58,40 +80,141 @@ OUT = ROOT / "app/art/screens/knockout"
 # derivations are in docs/re/knockout_views_re.md "Geometry banked 2026-07-26".
 
 PANEL_X = (6, 477)
-LIST_HDR_Y = (125, 153)     # panel top border + the gradient title band + its underline
+LIST_HDR_Y = (125, 153)  # panel top border + the gradient title band + its underline
 
-BAND_Y = (64, 124)          # the strip the competition band paints into, list family
-BAND_X = (0, 503)           # full width up to the rail, so exposed desktop comes along
+BAND_Y = (64, 124)  # the strip the competition band paints into, list family
+BAND_X = (0, 503)  # full width up to the rail, so exposed desktop comes along
 
 # The phase-label plate and the two arrow buttons inside each band, measured per frame.
 # `plate` is the label plate's interior (blanked here, redrawn by the app);
 # `left` / `right` are the arrow buttons' top-left corners.
 BANDS = {
-    ("euro", "list"): {"frame": "06_euroleague_round1_played.png",
-                       "plate": (254, 88, 338, 108), "left": (230, 88), "right": (340, 88)},
-    ("facup", "list"): {"frame": "03_facup_r3_drawn_UNPLAYED_1997-12-20.png",
-                        "plate": (315, 88, 399, 108), "left": (291, 88), "right": (401, 88)},
-    ("cocacola", "list"): {"frame": "09_comp_cocacola.png",
-                           "plate": (315, 88, 399, 108), "left": (291, 88), "right": (401, 88)},
-    ("uefa", "list"): {"frame": "09_comp_uefa.png",
-                       "plate": (315, 88, 399, 108), "left": (291, 88), "right": (401, 88)},
-    ("cwc", "list"): {"frame": "09_comp_cwc.png",
-                      "plate": (315, 88, 399, 108), "left": (291, 88), "right": (401, 88)},
+    ("euro", "list"): {
+        "frame": "06_euroleague_round1_played.png",
+        "plate": (254, 88, 338, 108),
+        "left": (230, 88),
+        "right": (340, 88),
+    },
+    ("facup", "list"): {
+        "frame": "03_facup_r3_drawn_UNPLAYED_1997-12-20.png",
+        "plate": (315, 88, 399, 108),
+        "left": (291, 88),
+        "right": (401, 88),
+    },
+    ("cocacola", "list"): {
+        "frame": "09_comp_cocacola.png",
+        "plate": (315, 88, 399, 108),
+        "left": (291, 88),
+        "right": (401, 88),
+    },
+    ("uefa", "list"): {
+        "frame": "09_comp_uefa.png",
+        "plate": (315, 88, 399, 108),
+        "left": (291, 88),
+        "right": (401, 88),
+    },
+    ("cwc", "list"): {
+        "frame": "09_comp_cwc.png",
+        "plate": (315, 88, 399, 108),
+        "left": (291, 88),
+        "right": (401, 88),
+    },
     # The BRACKET family sits one band lower (the panel starts at y113, not 125) and the
     # euro plate one row lower still than everyone else's -- both measured, not derived
     # (docs/re/knockout_views_re.md "The bracket, re-measured 2026-07-26").
-    ("euro", "bracket"): {"frame": "02_euroleague_qtrfinals_UNPLAYED_1998-01.png",
-                          "plate": (213, 79, 297, 99), "left": (189, 79), "right": (299, 79)},
-    ("facup", "bracket"): {"frame": "08_facup_qtrfinals_DOMESTIC_bracket_unplayed_1999-03-04.png",
-                           "plate": (315, 78, 399, 98), "left": (291, 78), "right": (401, 78)},
-    ("cocacola", "bracket"): {"frame": "12_cocacola_qtr_bracket_DOMESTIC_probe0116.png",
-                              "plate": (315, 78, 399, 98), "left": (291, 78), "right": (401, 78)},
-    ("uefa", "bracket"): {"frame": "11_uefa_qtr_bracket_UNPLAYED_probe0116.png",
-                          "plate": (315, 78, 399, 98), "left": (291, 78), "right": (401, 78)},
-    ("cwc", "bracket"): {"frame": "10_cwc_qtr_bracket_UNPLAYED_probe0116.png",
-                         "plate": (315, 78, 399, 98), "left": (291, 78), "right": (401, 78)},
+    ("euro", "bracket"): {
+        "frame": "02_euroleague_qtrfinals_UNPLAYED_1998-01.png",
+        "plate": (213, 79, 297, 99),
+        "left": (189, 79),
+        "right": (299, 79),
+    },
+    ("facup", "bracket"): {
+        "frame": "08_facup_qtrfinals_DOMESTIC_bracket_unplayed_1999-03-04.png",
+        "plate": (315, 78, 399, 98),
+        "left": (291, 78),
+        "right": (401, 78),
+    },
+    ("cocacola", "bracket"): {
+        "frame": "12_cocacola_qtr_bracket_DOMESTIC_probe0116.png",
+        "plate": (315, 78, 399, 98),
+        "left": (291, 78),
+        "right": (401, 78),
+    },
+    ("uefa", "bracket"): {
+        "frame": "11_uefa_qtr_bracket_UNPLAYED_probe0116.png",
+        "plate": (315, 78, 399, 98),
+        "left": (291, 78),
+        "right": (401, 78),
+    },
+    ("cwc", "bracket"): {
+        "frame": "10_cwc_qtr_bracket_UNPLAYED_probe0116.png",
+        "plate": (315, 78, 399, 98),
+        "left": (291, 78),
+        "right": (401, 78),
+    },
+    # The CARDS family (semifinal cards + the final -- the euro final band differs from the
+    # euro semis band in the 292 label pixels only). Euro: plate + arrows at the euro
+    # BRACKET positions (byte-identical outside them, 0 px). Cocacola: its own strip --
+    # plate interior (336,87)..(420,107), arrows left_on at (312,87) / right_off_p1 at
+    # (422,87), both EXACT matches of the already-baked pager faces. The strip runs to
+    # y119: the cocacola trophy bottom reaches y117 where the euro band stops at y110.
+    ("euro", "cards"): {
+        "frame": "09_euroleague_semifinals_DRAWN_unplayed_1999-03-27.png",
+        "plate": (213, 79, 297, 99),
+        "left": (189, 79),
+        "right": (299, 79),
+    },
+    ("cocacola", "cards"): {
+        "frame": "06_cocacola_semifinals_drawn_1998-01-10.png",
+        "plate": (336, 87, 420, 107),
+        "left": (312, 87),
+        "right": (422, 87),
+    },
 }
 PLATE_BG = (180, 200, 220)
+
+# ---- the SEMIFINAL cards body (docs/re/knockout_views_re.md, measured 2026-07-27) ----
+# One strip serves both column sets: the euro (04/09) and cocacola (06) cards frames are
+# byte-identical below y119 outside the content rects (2 competitions, 2 careers). Cut
+# from the cocacola frame because it is fully UNPLAYED (every score box empty).
+CARDS_SRC = "06_cocacola_semifinals_drawn_1998-01-10.png"
+CARDS_STRIP = (0, 120, 499, 427)
+# The two cards' content rects, absolute frame coords. Venue rows are black grounds with
+# the venue name left-aligned at pen x33/x291 (leftmost ink identical across all three
+# witnessed frames); the static venue icon left of the text is chrome and stays.
+CARDS_VENUE_TXT = [
+    (33, 190, 227, 208),
+    (291, 190, 485, 208),
+    (33, 282, 227, 300),
+    (291, 282, 485, 300),
+]
+CARDS_BAR_ROWS = [(209, 228), (231, 250), (301, 320), (323, 342)]
+CARDS_SF1_BAR = (12, 188)
+CARDS_SF1_BOX = (191, 226)
+CARDS_SF2_BAR = (270, 446)
+CARDS_SF2_BOX = (449, 484)
+CARDS_SF1_BAR_BG = (200, 220, 240)
+CARDS_SF1_BOX_BG = (42, 63, 170)
+CARDS_SF2_BAR_BG = (192, 220, 192)
+CARDS_SF2_BOX_BG = (80, 110, 5)
+
+# ---- the FINAL body (euro only -- the one witnessed final) --------------------------
+FINAL_SRC = "05_euroleague_final_UNDECIDED_1998-04-25.png"
+FINAL_STRIP = (0, 120, 499, 427)
+# Content rects, all blanked to the ground the ring around them proves: the kit wells and
+# flag boxes sit on white / inside black borders the 30x20 dbcard flag covers exactly; the
+# STADIUM value line ("Das Antas", ink (17,90,34), bbox x201..283 y241..249) sits on the
+# card's white; the club-name bars are (200,220,240) rows y267..286 / y298..317 with ink
+# (80,100,120) only. Score boxes, WINNER bar and laurel are empty in the witness already.
+FINAL_WHITE = [
+    (146, 158, 193, 217),
+    (306, 158, 353, 217),  # kit wells
+    (199, 163, 228, 182),
+    (270, 163, 299, 182),  # flag boxes
+    (150, 238, 355, 252),
+]  # stadium value line
+FINAL_BARS = [(150, 267, 304, 286), (150, 298, 304, 317)]  # club-name bar interiors
+FINAL_BAR_BG = (200, 220, 240)
 
 # ---- the BRACKET panel strip (docs/re/knockout_views_re.md, re-measured 2026-07-26) ----
 # Four panels at T = 113/193/273/353, each x20..477. One strip per column set is cut from
@@ -101,11 +224,17 @@ PLATE_BG = (180, 200, 220)
 # panel's white, flags + name bars to the bar ground (flags are 30x20 blits that cover
 # their cell exactly, so the blank never shows).
 BRACKET_X = (20, 477)
-BRACKET_SRC = {"euro": ("02_euroleague_qtrfinals_UNPLAYED_1998-01.png", 113),
-               "dom": ("08_facup_qtrfinals_DOMESTIC_bracket_unplayed_1999-03-04.png", 113)}
-BRACKET_KITS = [(22, 2, 81, 69), (416, 2, 475, 69)]              # -> white
-BRACKET_BARS = [(83, 7, 112, 26), (385, 7, 414, 26),             # flags
-                (114, 7, 247, 26), (250, 7, 383, 26)]            # name bars -> bar ground
+BRACKET_SRC = {
+    "euro": ("02_euroleague_qtrfinals_UNPLAYED_1998-01.png", 113),
+    "dom": ("08_facup_qtrfinals_DOMESTIC_bracket_unplayed_1999-03-04.png", 113),
+}
+BRACKET_KITS = [(22, 2, 81, 69), (416, 2, 475, 69)]  # -> white
+BRACKET_BARS = [
+    (83, 7, 112, 26),
+    (385, 7, 414, 26),  # flags
+    (114, 7, 247, 26),
+    (250, 7, 383, 26),
+]  # name bars -> bar ground
 BRACKET_WHITE = (255, 255, 255)
 BRACKET_BAR_BG = (180, 200, 220)
 
@@ -121,21 +250,31 @@ RAIL_RECT = (500, 110, 639, 430)
 CHIP_X = (506, 621)
 CHIP_H = 29
 CHIP_TOP = {
-    "facup": 118, "cocacola": 145, "charity": 172,
-    "euro": 209, "cwc": 236, "uefa": 263, "supercup": 290, "intercont": 317,
+    "facup": 118,
+    "cocacola": 145,
+    "charity": 172,
+    "euro": 209,
+    "cwc": 236,
+    "uefa": 263,
+    "supercup": 290,
+    "intercont": 317,
 }
 COMP_FRAME = {
-    "facup": "09_comp_facup.png", "cocacola": "09_comp_cocacola.png",
-    "charity": "09_comp_charity.png", "euro": "09_comp_euro.png",
-    "cwc": "09_comp_cwc.png", "uefa": "09_comp_uefa.png",
-    "supercup": "09_comp_supercup.png", "intercont": "09_comp_intercont.png",
+    "facup": "09_comp_facup.png",
+    "cocacola": "09_comp_cocacola.png",
+    "charity": "09_comp_charity.png",
+    "euro": "09_comp_euro.png",
+    "cwc": "09_comp_cwc.png",
+    "uefa": "09_comp_uefa.png",
+    "supercup": "09_comp_supercup.png",
+    "intercont": "09_comp_intercont.png",
 }
 
 # The scrollbar column, present only when the list is longer than the panel.
 SCROLL_X = (478, 493)
 SCROLL_Y = (125, 410)
-THUMB_TROUGH = (172, 394)   # the trough's interior, measured on 01_facup_r2
-THUMB_ROW_Y = 250           # a row safely inside the thumb bitmap
+THUMB_TROUGH = (172, 394)  # the trough's interior, measured on 01_facup_r2
+THUMB_ROW_Y = 250  # a row safely inside the thumb bitmap
 
 # The empty-body RESULTS frame still carries the MATCHES ON band's right end at x478..509,
 # which no knockout layout covers. Patch it from a 16-row list frame, where that column is
@@ -177,12 +316,19 @@ def main() -> None:
     desk.paste(cut(euro_qtr, DESK_LEFT), (DESK_LEFT[0], DESK_LEFT[1]))
     # An all-unlit rail: F.A. Cup's unlit face comes from the U.E.F.A. frame, the rest from
     # the F.A. Cup frame -- so every chip is the original's own, in its unlit state.
-    desk.paste(cut(comps["facup"], (CHIP_X[0], CHIP_TOP["cocacola"],
-                                    CHIP_X[1], CHIP_TOP["intercont"] + CHIP_H - 1)),
-               (CHIP_X[0], CHIP_TOP["cocacola"]))
-    desk.paste(cut(comps["uefa"], (CHIP_X[0], CHIP_TOP["facup"],
-                                   CHIP_X[1], CHIP_TOP["facup"] + CHIP_H - 1)),
-               (CHIP_X[0], CHIP_TOP["facup"]))
+    desk.paste(
+        cut(
+            comps["facup"],
+            (CHIP_X[0], CHIP_TOP["cocacola"], CHIP_X[1], CHIP_TOP["intercont"] + CHIP_H - 1),
+        ),
+        (CHIP_X[0], CHIP_TOP["cocacola"]),
+    )
+    desk.paste(
+        cut(
+            comps["uefa"], (CHIP_X[0], CHIP_TOP["facup"], CHIP_X[1], CHIP_TOP["facup"] + CHIP_H - 1)
+        ),
+        (CHIP_X[0], CHIP_TOP["facup"]),
+    )
     desk.convert("RGBA").save(OUT / "desktop.png")
     print("desktop.png <- the empty-body RESULTS frame + an all-unlit rail")
 
@@ -231,9 +377,8 @@ def main() -> None:
         for y in range(py0, py1 + 1):
             for x in range(px0, px1 + 1):
                 im.putpixel((x, y), PLATE_BG)
-        y1 = 112 if fam == "bracket" else BAND_Y[1]
-        cut(im, (BAND_X[0], BAND_Y[0], BAND_X[1], y1)).save(
-            OUT / f"band_{comp}_{fam}.png")
+        y1 = 112 if fam == "bracket" else (119 if fam == "cards" else BAND_Y[1])
+        cut(im, (BAND_X[0], BAND_Y[0], BAND_X[1], y1)).save(OUT / f"band_{comp}_{fam}.png")
         meta[f"{comp}_{fam}"] = {
             "origin": [BAND_X[0], BAND_Y[0]],
             "plate": list(spec["plate"]),
@@ -257,22 +402,58 @@ def main() -> None:
         strip.save(OUT / f"bracket_panel_{fam}.png")
     print("bracket_panel_euro.png + bracket_panel_dom.png <- two witnessed UNPLAYED panels")
 
+    # -- the SEMIFINAL cards body, one strip for both column sets (see the header).
+    cards = frame(CARDS_SRC).copy()
+    for x0, y0, x1, y1 in CARDS_VENUE_TXT:
+        for y in range(y0, y1 + 1):
+            for x in range(x0, x1 + 1):
+                cards.putpixel((x, y), (0, 0, 0))
+    for ry0, ry1 in CARDS_BAR_ROWS:
+        for bar, bar_bg, box, box_bg in [
+            (CARDS_SF1_BAR, CARDS_SF1_BAR_BG, CARDS_SF1_BOX, CARDS_SF1_BOX_BG),
+            (CARDS_SF2_BAR, CARDS_SF2_BAR_BG, CARDS_SF2_BOX, CARDS_SF2_BOX_BG),
+        ]:
+            for y in range(ry0, ry1 + 1):
+                for x in range(bar[0], bar[1] + 1):
+                    cards.putpixel((x, y), bar_bg)
+                for x in range(box[0], box[1] + 1):
+                    cards.putpixel((x, y), box_bg)
+    cut(cards, CARDS_STRIP).save(OUT / "cards_body.png")
+    print("cards_body.png <- the witnessed Coca-Cola SEMIFINALS frame, content blanked")
+
+    # -- the FINAL body, euro only (the one witnessed final).
+    fin = frame(FINAL_SRC).copy()
+    for x0, y0, x1, y1 in FINAL_WHITE:
+        for y in range(y0, y1 + 1):
+            for x in range(x0, x1 + 1):
+                fin.putpixel((x, y), (255, 255, 255))
+    for x0, y0, x1, y1 in FINAL_BARS:
+        for y in range(y0, y1 + 1):
+            for x in range(x0, x1 + 1):
+                fin.putpixel((x, y), FINAL_BAR_BG)
+    cut(fin, FINAL_STRIP).save(OUT / "final_body_euro.png")
+    print("final_body_euro.png <- the witnessed euro FINAL frame, content blanked")
+
     # -- the two compact-list header bands.
     cut(list_euro, (PANEL_X[0], LIST_HDR_Y[0], PANEL_X[1], LIST_HDR_Y[1])).save(
-        OUT / "list_hdr_euro.png")
+        OUT / "list_hdr_euro.png"
+    )
     cut(list_dom, (PANEL_X[0], LIST_HDR_Y[0], PANEL_X[1], LIST_HDR_Y[1])).save(
-        OUT / "list_hdr_dom.png")
+        OUT / "list_hdr_dom.png"
+    )
     print("list_hdr_euro.png + list_hdr_dom.png <- two witnessed panel tops")
 
     # -- the scrollbar: the column with the thumb painted out, plus one row of the thumb.
     col = cut(list_dom, (SCROLL_X[0], SCROLL_Y[0], SCROLL_X[1], SCROLL_Y[1]))
-    trough_row = col.crop((0, THUMB_TROUGH[1] - SCROLL_Y[0] + 4,
-                           col.width, THUMB_TROUGH[1] - SCROLL_Y[0] + 5))
+    trough_row = col.crop(
+        (0, THUMB_TROUGH[1] - SCROLL_Y[0] + 4, col.width, THUMB_TROUGH[1] - SCROLL_Y[0] + 5)
+    )
     for y in range(THUMB_TROUGH[0] - SCROLL_Y[0], THUMB_TROUGH[1] - SCROLL_Y[0] + 1):
         col.paste(trough_row, (0, y))
     col.save(OUT / "scroll_col.png")
     cut(list_dom, (SCROLL_X[0], THUMB_ROW_Y, SCROLL_X[1], THUMB_ROW_Y)).save(
-        OUT / "scroll_thumb_tile.png")
+        OUT / "scroll_thumb_tile.png"
+    )
     print("scroll_col.png + scroll_thumb_tile.png <- the F.A. Cup R2 frame")
 
 

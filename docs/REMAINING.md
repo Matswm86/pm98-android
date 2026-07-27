@@ -311,9 +311,21 @@ is real and shipped, and PM98 ships two match presentations, so this is the seco
   — see `knockout_views_re.md` §"The bracket, as built". Verified live: `PM98_CUP_SHOT`'s
   real career raises the domestic bracket at its F.A. Cup QTR. What stays open: a decided
   `AGGR.` cell is still unwitnessed (the port applies the leg-1 grammar + the list's
-  winner rule, declared as inference), and **the kit list (5-8 ties), semifinal cards (2)
-  and final (1) are still not built** — those rounds fall back to the list form (5-8) or
-  the SORTEO card (2/1).
+  winner rule, declared as inference).
+  **The SEMIFINAL CARDS and the FINAL are BUILT and 0 px (2026-07-27).**
+  `KnockoutScreen._draw_cards` / `_draw_final`, raised at 2 / 1 ties, gated by
+  `diff_knockout_parity.py` cases 5-7 against three witnesses (euro semis leg-1-played,
+  euro semis drawn in a SECOND career, cocacola semis drawn; euro final undecided) at
+  0 px outside the declared buckets (barra kit; euro career-state rail; the eight 17x20
+  ridi icon rects = the un-reversed outline pass; the final's two 48x60 kit wells = the
+  un-extracted hi-res panel kit bank). The cocacola witness FORCED a model fix — the
+  original's Coca-Cola SEMIFINALS are two-legged (`Cup` `semi_legs`, LEAGUE_CUP_OPTS 2).
+  The FINAL's neutral ground is a declared-OURS rng pick (Das Antas 1998 = one witness,
+  no rule derivable). See `knockout_views_re.md` §"The semifinal cards and the final, as
+  built". **Still open here: the kit list (5-8 ties) falls back to the list form, and
+  the cards/final chromes for F.A. Cup / U.E.F.A. / Cup Winner's (their bands + the
+  non-euro trophies) are unwitnessed** — those competitions' 2/1-tie phases still fall
+  back to the SORTEO; a capture closes each.
 * ~~**Draw-then-play**~~ — **CLOSED 2026-07-26.** The separation is witnessed twice in two
   competitions (F.A. Cup R2 played 14 Dec → R3 drawn unplayed 20 Dec → played 10 Jan;
   Coca-Cola R4 played 1 Dec → Qtr Finals drawn unplayed 7 Dec), so the rule needed no

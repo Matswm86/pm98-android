@@ -12,6 +12,16 @@ class_name KnockoutScreen
 ##         domestic   RES.      REPLAY
 ##   * the BRACKET form -- any 4-tie round: four 80 px-pitch panels, a kit and a country
 ##     flag each side, the same column pair as plates over value boxes.
+##   * the SEMIFINAL CARDS -- any 2-tie round: two cards, SEMIFINAL 1 (blue) and
+##     SEMIFINAL 2 (green), each a 1ST LEG block (the home club's own ground, then the
+##     two clubs with a score box) over a 2ND LEG block (sides swapped) over a FINALIST
+##     plate. Witnessed for EURO. LEAGUE (two careers) and the Coca-Cola Cup; the other
+##     competitions' cards bands are unwitnessed, so those fall back to the SORTEO.
+##   * the FINAL -- a 1-tie round: the competition trophy, a RESULTS card (kits + flags,
+##     STADIUM + the neutral ground, the two finalists with score cells) and the
+##     laurelled WINNER band. The card + band chrome is byte-identical to the witnessed
+##     CHARITY SHIELD screen's outside the content (0 px, 2026-07-27), so the redraw
+##     grammar is CompResultScreen's. Witnessed for EURO. LEAGUE only.
 ##
 ## Everything static is the original's own pixels (`art/screens/knockout/`, baked by
 ## `tools/re/build_knockout_chrome_from_frames.py` from the witnessed frames); everything
@@ -121,6 +131,57 @@ const BRACKET_BOX_CX_DOM := [181, 316]
 const BRACKET_BOX_BG_EURO := [Color8(80, 100, 120), Color8(80, 100, 120), Color8(20, 0, 90)]
 const BRACKET_BOX_BG_DOM := [Color8(80, 100, 120), Color8(60, 80, 100)]
 
+# ---- the SEMIFINAL cards (docs/re/knockout_views_re.md, measured 2026-07-27) -------
+## Two cards, one tie each. Chrome = the baked cards_body.png strip (one strip serves
+## both column sets: the euro and cocacola cards frames are byte-identical below the band
+## outside the content). Every pen below is solved off the three witnessed frames.
+const CARDS_TIES := 2
+const FINAL_TIES := 1
+const CARDS_BODY_XY := Vector2(0, 120)
+const CARDS_DX := [0, 258]               # every SF2 dynamic element = SF1 + 258
+const CARDS_VENUE_PEN_X := 33            # leftmost venue ink, identical on all 3 frames
+const CARDS_NAME_PEN_X := 34             # leftmost club ink, identical on all 3 frames
+const CARDS_ICON_X := 13                 # the 17x20 ridi kit icon (matched at bar top)
+const CARDS_LEG_TOPS := [190, 282]       # the two venue blocks' tops (black grounds)
+const CARDS_BARS := [[209, 231], [301, 323]]   # club-bar tops per leg block
+const CARDS_VENUE_PEN_DY := 4            # venue pen top = block top + 4 (ink rows +2)
+const CARDS_TEXT_PEN_DY := 5             # names + digits: pen top = bar top + 5
+## Score digits centre on their box: box x191..226 (SF1) / x449..484 (SF2), so the
+## _txt_mid field sums are 418 / 934 -- the witnessed "1" lands at x464..468 and the
+## "2" at x462..469 exactly.
+const CARDS_BOX_FIELD := [418, 934]
+const CARDS_NAME_INK := [Color8(42, 95, 170), Color8(80, 110, 5)]
+const CARDS_VENUE_INK := [Color8(117, 147, 187), Color8(61, 191, 82)]
+const CARDS_SCORE_INK := Color8(255, 255, 255)
+## The FINALIST plates' empty white boxes (y376..411). What a DECIDED semifinal fills
+## them with is unwitnessed -- no captured frame has one -- so the port prints the
+## advancing club centred in the WINNER band's ink, declared OURS.
+const CARDS_FINALIST := [[20, 216], [281, 477]]
+const CARDS_FINALIST_TOP := 385
+
+# ---- the FINAL (docs/re/knockout_views_re.md, measured 2026-07-27) -----------------
+## One tie. Chrome = final_body_<comp>.png (euro is the one witnessed final). The card +
+## WINNER band chrome is byte-identical to the CHARITY SHIELD frame's outside the content
+## rects, so every anchor below is CompResultScreen's witnessed grammar verbatim.
+const FINAL_KIT_L := Rect2(146, 158, 48, 60)
+const FINAL_KIT_R := Rect2(306, 158, 48, 60)
+const FINAL_FLAG_L := Vector2(199, 163)  # 30x20 dbcard flag boxes
+const FINAL_FLAG_R := Vector2(270, 163)
+const FINAL_STADIUM_X := 143.0           # centred in a 200-wide box -> centre 243
+const FINAL_STADIUM_Y := 240
+const FINAL_ROW_Y := [269, 300]
+## The finalists' names are NATIVE proman12 -- the witness 'R' is 11x9 with advance 12,
+## proman12's own metrics exactly -- at pen (155, bar interior top + 4): ink row 1 of the
+## glyph cell lands on the witnessed y272/y303.
+const FINAL_NAME_PEN_X := 155
+const FINAL_NAME_PEN_Y := [271, 302]
+const FINAL_SCORE_CELL := [306.0, 39.0]
+const FINAL_WINNER_XY := [65.0, 382.0]
+const FINAL_LAUREL := Rect2(408, 342, 32, 44)
+const FINAL_C_NAME := Color8(80, 100, 120)
+const FINAL_C_STADIUM := Color8(17, 90, 34)
+const FINAL_C_WINNER := Color8(42, 63, 170)
+
 # ---- the phase paginator ---------------------------------------------------------
 const C_LABEL := Color8(100, 100, 140)
 const LABEL_TOP_DY := 5                  # the label's pen top inside its plate
@@ -140,17 +201,25 @@ var _band_meta: Dictionary = {}
 var _chips: Dictionary = {}
 var _hdr: Dictionary = {}                # "euro"/"dom" -> the panel top strip
 var _bracket: Dictionary = {}            # "euro"/"dom" -> the baked 458x72 panel strip
+var _cards_body: Texture2D               # the two SEMIFINAL cards, content blanked
+var _final_body: Texture2D               # per competition, loaded in setup()
 var _flags: Dictionary = {}              # countryCode -> 30x20 dbcard flag
+var _ridi: Dictionary = {}               # club id -> 17x20 ridi kit icon
 var _pager: Dictionary = {}
 var _scroll_col: Texture2D
 var _scroll_thumb: Texture2D
 var _patches: Dictionary = {}
 var _page_cal: Texture2D
 var _page_p10: Texture2D
+var _page_p12: Texture2D
 var _g_cal: Dictionary = {}
 var _g_p10: Dictionary = {}
+var _g_p12: Dictionary = {}
 var _f8: Font
 var _fcal: Font
+var _f10g: Font
+var _f12g: Font
+var _f14g: Font
 
 var _header: Dictionary = {}
 var _comp := "euro"
@@ -171,6 +240,7 @@ func _ready() -> void:
 	for key in ["euro", "dom"]:
 		_hdr[key] = _tex("res://art/screens/knockout/list_hdr_%s.png" % key)
 		_bracket[key] = _tex("res://art/screens/knockout/bracket_panel_%s.png" % key)
+	_cards_body = _tex("res://art/screens/knockout/cards_body.png")
 	for key in ["left_on", "right_on", "left_off_p0", "left_off_p1", "right_off_p0",
 			"right_off_p1"]:
 		_pager[key] = _tex("res://art/screens/knockout/pager_%s.png" % key)
@@ -183,10 +253,15 @@ func _ready() -> void:
 		_patches[k] = _tex("res://art/screens/results/%s.png" % k)
 	_page_cal = PMFont.page_texture("calend12")
 	_page_p10 = PMFont.page_texture("proman10")
+	_page_p12 = PMFont.page_texture("proman12")
 	_g_cal = PMFont.chars("calend12")
 	_g_p10 = PMFont.chars("proman10")
+	_g_p12 = PMFont.chars("proman12")
 	_f8 = PMChrome.font("8")
 	_fcal = PMChrome.font("calend12")
+	_f10g = PMChrome.font("10")
+	_f12g = PMChrome.font("12")
+	_f14g = PMChrome.font("14")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	gui_input.connect(_on_input)
@@ -213,16 +288,23 @@ static func _load_json(path: String) -> Dictionary:
 ## The BRACKET layout additionally reads per tie, when present:
 ##     home_id / away_id      club ids, for the 48x64 MINIESC kit blit
 ##     home_flag / away_flag  dbcard countryCodes, for the 30x20 flags
+## The CARDS layout reads home_id/away_id (ridi icons), home_ground/away_ground (the
+## clubs' own venues) and two_legged; the FINAL reads ids, flags and `venue` (the
+## neutral ground).
 ## `euro_cols` picks 1ST LEG / 2ND LEG / AGGR. over RES. / REPLAY.
-## `layout` is "list" (9+ ties) or "bracket" (4) -- the original switches presentation
-## with the size of the round, so the caller picks per phase.
+## `layout` is "list" (9+ ties), "bracket" (4), "cards" (2) or "final" (1) -- the
+## original switches presentation with the size of the round, so the caller picks per
+## phase (cards/final only where that competition's chrome is witnessed, see
+## cards_available / final_available).
 func setup(header: Dictionary, comp: String, label: String, euro_cols: bool,
 		ties: Array, has_prev: bool, has_next: bool, offset := 0,
 		layout := "list") -> void:
 	_header = header
 	_comp = comp if comp in COMPS else "euro"
 	_label = label
-	_layout = layout if layout in ["list", "bracket"] else "list"
+	_layout = layout if layout in ["list", "bracket", "cards", "final"] else "list"
+	if _layout == "final":
+		_final_body = _tex("res://art/screens/knockout/final_body_%s.png" % _comp)
 	_euro_cols = euro_cols
 	_ties = ties
 	_has_prev = has_prev
@@ -278,8 +360,24 @@ func _to_design(p: Vector2) -> Vector2:
 	return (p - _origin(s)) / s
 
 
+## The FINAL shares the cards family's band: the witnessed euro final band differs from
+## the euro semis band in the 292 label pixels only (2026-07-27).
 func _band_key() -> String:
-	return "%s_%s" % [_comp, _layout]
+	var fam := "cards" if _layout in ["cards", "final"] else _layout
+	return "%s_%s" % [_comp, fam]
+
+
+## Whether this competition's SEMIFINAL-cards chrome is witnessed (euro + cocacola
+## today). A 2-tie phase of any other competition falls back to the SORTEO card --
+## an honest gap recorded in docs/re/knockout_views_re.md.
+static func cards_available(comp: String) -> bool:
+	return ResourceLoader.exists("res://art/screens/knockout/band_%s_cards.png" % comp)
+
+
+## Whether this competition's FINAL body (its trophy) is witnessed (euro today).
+static func final_available(comp: String) -> bool:
+	return cards_available(comp) and ResourceLoader.exists(
+		"res://art/screens/knockout/final_body_%s.png" % comp)
 
 
 func _pager_rects() -> Array:
@@ -394,10 +492,15 @@ func _draw() -> void:
 		draw_texture_rect(_desktop, Rect2(0, 0, W, H), false)
 	_draw_header()
 	_draw_band()
-	if _layout == "bracket":
-		_draw_bracket()
-	else:
-		_draw_panel()
+	match _layout:
+		"bracket":
+			_draw_bracket()
+		"cards":
+			_draw_cards()
+		"final":
+			_draw_final()
+		_:
+			_draw_panel()
 	var rail: Texture2D = _chips.get(_comp)
 	if rail != null:
 		draw_texture(rail, RAIL_XY)
@@ -639,3 +742,111 @@ func _draw_bracket() -> void:
 				BRACKET_SCORE_INK.lerp(bgs[j], 0.2))
 			_txt(_page_p10, _g_p10, cx + 5, top, str(pair[1]),
 				C_THROUGH if mark == 1 else BRACKET_SCORE_INK)
+
+
+# ---- the semifinal cards -----------------------------------------------------------
+
+func _ridi_kit(club_id: int) -> Texture2D:
+	if club_id < 0:
+		return null
+	if not _ridi.has(club_id):
+		var p := "res://art/kits/ridi/%d.png" % club_id
+		_ridi[club_id] = load(p) if ResourceLoader.exists(p) else null
+	return _ridi[club_id]
+
+
+## Two cards, one tie each (docs/re/knockout_views_re.md "The semifinal cards, as
+## built"). The chrome is the baked strip; the port redraws each leg block's venue (the
+## HOST club's own ground -- the 2ND LEG swaps sides, its host first, as all three
+## witnessed frames show), the ridi kit icon + club name + score digit per row, and the
+## FINALIST plate once the tie is decided. UNWITNESSED and declared: the advancing-club
+## highlight (the LIST layout's yellow rule applied here) and the FINALIST fill.
+func _draw_cards() -> void:
+	if _cards_body != null:
+		draw_texture(_cards_body, CARDS_BODY_XY)
+	for i in mini(_ties.size(), CARDS_TIES):
+		var dx := int(CARDS_DX[i])
+		var tie: Dictionary = _ties[i]
+		var winner := int(tie.get("winner", -1))
+		var cells: Array = tie.get("cells", [])
+		var two := bool(tie.get("two_legged", cells.size() >= 3))
+		for leg in 2:
+			var host := "away" if leg == 1 else "home"
+			var guest := "home" if leg == 1 else "away"
+			var pair: Array = cells[leg] if cells.size() > leg else ["", ""]
+			var played := pair.size() >= 2 and (str(pair[0]) != "" or str(pair[1]) != "")
+			# The 2ND LEG block of a SINGLE-leg tie holds the REPLAY when one was
+			# played, in the same swapped grammar -- and stays empty otherwise. The
+			# F.A. Cup model's replay in this layout is unwitnessed; declared.
+			if leg == 1 and not two and not played:
+				continue
+			_txt(_page_p10, _g_p10, CARDS_VENUE_PEN_X + dx,
+				int(CARDS_LEG_TOPS[leg]) + CARDS_VENUE_PEN_DY,
+				str(tie.get(host + "_ground", "")), CARDS_VENUE_INK[i])
+			for r in 2:
+				var side := host if r == 0 else guest
+				var side_i := 0 if side == "home" else 1
+				var bar_top := int((CARDS_BARS[leg] as Array)[r])
+				var kt := _ridi_kit(int(tie.get(side + "_id", -1)))
+				if kt != null:
+					draw_texture(kt, Vector2(CARDS_ICON_X + dx, bar_top))
+				_txt(_page_p10, _g_p10, CARDS_NAME_PEN_X + dx,
+					bar_top + CARDS_TEXT_PEN_DY, str(tie.get(side, "")),
+					C_THROUGH if winner == side_i else CARDS_NAME_INK[i])
+				var g := str(pair[r]) if pair.size() > r else ""
+				if g != "":
+					_txt_mid(_page_p10, _g_p10, int(CARDS_BOX_FIELD[i]),
+						bar_top + CARDS_TEXT_PEN_DY, g,
+						C_THROUGH if winner == side_i else CARDS_SCORE_INK)
+		if winner >= 0:
+			var fx: Array = CARDS_FINALIST[i]
+			PMChrome.text(self, _f14g, float(fx[0]), CARDS_FINALIST_TOP,
+				str(tie.get("home" if winner == 0 else "away", "")),
+				FINAL_C_WINNER, 15, 1, float(int(fx[1]) - int(fx[0]) + 1))
+
+
+# ---- the final ----------------------------------------------------------------------
+
+## The one-tie view: trophy + RESULTS card + WINNER band. Every anchor is
+## CompResultScreen's witnessed grammar -- the card and band chrome are byte-identical
+## to the CHARITY SHIELD frame's outside the content rects (0 px, 2026-07-27). The kit
+## wells keep that screen's documented approximation: the original's hi-res panel kit
+## bank is un-extracted, so the app's own kit art is aspect-fitted into the measured
+## rects and the parity gate declares the two wells.
+func _draw_final() -> void:
+	if _final_body != null:
+		draw_texture(_final_body, CARDS_BODY_XY)
+	if _ties.is_empty():
+		return
+	var tie: Dictionary = _ties[0]
+	PMChrome.draw_crest(self, int(tie.get("home_id", -1)), FINAL_KIT_L)
+	PMChrome.draw_crest(self, int(tie.get("away_id", -1)), FINAL_KIT_R)
+	var fl := _flag(int(tie.get("home_flag", -1)))
+	if fl != null:
+		draw_texture(fl, FINAL_FLAG_L)
+	var fr := _flag(int(tie.get("away_flag", -1)))
+	if fr != null:
+		draw_texture(fr, FINAL_FLAG_R)
+	var venue := str(tie.get("venue", ""))
+	if venue != "":
+		PMChrome.text(self, _f12g, FINAL_STADIUM_X, FINAL_STADIUM_Y, venue,
+			FINAL_C_STADIUM, 13, 1, 200.0)
+	var cells: Array = tie.get("cells", [])
+	var pair: Array = cells[0] if cells.size() > 0 else ["", ""]
+	for r in 2:
+		_txt(_page_p12, _g_p12, FINAL_NAME_PEN_X, int(FINAL_NAME_PEN_Y[r]),
+			str(tie.get("home" if r == 0 else "away", "")), FINAL_C_NAME)
+		# The played state's score digits (and the WINNER band below) keep
+		# CompResultScreen's grammar: the witnessed CHARITY digits and winner name match
+		# no extracted font bank (the winner ink is two-tone), so that screen's declared
+		# approximation carries over until the face is reversed.
+		var g := str(pair[r]) if pair.size() > r else ""
+		if g != "":
+			PMChrome.text(self, _f14g, FINAL_SCORE_CELL[0], FINAL_ROW_Y[r] - 1, g,
+				Color(1, 1, 1), 15, 1, FINAL_SCORE_CELL[1])
+	var winner := int(tie.get("winner", -1))
+	if winner >= 0:
+		var side := "home" if winner == 0 else "away"
+		PMChrome.text(self, _f14g, FINAL_WINNER_XY[0], FINAL_WINNER_XY[1],
+			str(tie.get(side, "")), FINAL_C_WINNER, 15, 0, 280.0)
+		PMChrome.draw_crest(self, int(tie.get(side + "_id", -1)), FINAL_LAUREL)

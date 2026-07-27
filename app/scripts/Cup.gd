@@ -127,6 +127,12 @@ static func create(club_ids: Array, total_weeks: int, opts: Dictionary = {}) -> 
 		"n0": ids.size(),                  # starting field size (for labels)
 		"legs": int(opts.get("legs", 1)),
 		"two_legged_final": bool(opts.get("two_legged_final", false)),
+		# Per-round override for the SEMIFINALS (4 survivors): the Coca-Cola Cup's semis
+		# are TWO-LEGGED in the original -- witnessed 1998-01-10, the SEMIFINALS card
+		# view carries 1ST LEG / 2ND LEG blocks with both clubs' own venues
+		# (docs/re/knockout_views_re.md) -- while its earlier rounds keep the
+		# single-leg + replay model the R4 list frame shows. 0 = no override.
+		"semi_legs": int(opts.get("semi_legs", 0)),
 		"label_scheme": str(opts.get("label_scheme", "facup")),
 		"qtr_label": str(opts.get("qtr_label", "Qtr. Finals")),
 		"prize_round": int(opts.get("prize_round", ROUND_PRIZE)),
@@ -425,9 +431,28 @@ static func _pair_round(b: Dictionary, rng: RandomNumberGenerator) -> Dictionary
 	var legs := int(b.get("legs", 1))
 	var two_final := bool(b.get("two_legged_final", false))
 	var round_legs := 1 if (legs <= 1 or (start_count == 2 and not two_final)) else legs
+	if start_count == 4 and int(b.get("semi_legs", 0)) > 0:
+		round_legs = int(b.get("semi_legs", 0))
 
 	# Open random draw of the survivors.
 	_shuffle(survivors, rng)
+
+	# The FINAL is played at a NEUTRAL ground: the witnessed 1998 euro final ran at
+	# Das Antas, a stadium belonging to NEITHER finalist. One witness fixes no selection
+	# rule, so the pick is declared OURS -- a deterministic rng draw from the
+	# competition's own field, never a finalist's ground -- and is recorded on the draw
+	# so the view names the same venue before and after the match. A competition
+	# without a stored field (no group stage) records -1; only the euro final view
+	# ships today (docs/re/knockout_views_re.md).
+	var venue_id := -1
+	if start_count == 2:
+		var pool: Array = ((b.get("group_stage", {}) as Dictionary).get("field", []) as Array)
+		var cand: Array = []
+		for v in pool:
+			if int(v) != int(survivors[0]) and int(v) != int(survivors[1]):
+				cand.append(int(v))
+		if not cand.is_empty():
+			venue_id = int(cand[rng.randi_range(0, cand.size() - 1)])
 
 	# Round one may need byes to bring an off-power-of-two field down to a power of
 	# two; later rounds are a clean halving (survivors is always even by then). A field
@@ -446,6 +471,7 @@ static func _pair_round(b: Dictionary, rng: RandomNumberGenerator) -> Dictionary
 	return {
 		"label": label, "round": this_round, "round_legs": round_legs,
 		"byes": survivors.slice(0, byes), "players": survivors.slice(byes),
+		"venue_id": venue_id,
 	}
 
 
@@ -483,7 +509,8 @@ static func play_round(b: Dictionary, rng: RandomNumberGenerator,
 		next_survivors.append(int(tie["winner_id"]))
 		i += 2
 
-	b["rounds"] = (b.get("rounds", []) as Array) + [{"label": label, "ties": ties}]
+	b["rounds"] = (b.get("rounds", []) as Array) + [{"label": label, "ties": ties,
+		"venue_id": int(d.get("venue_id", -1))}]
 	b["survivors"] = next_survivors
 
 	# The manager's tie + news for this round.

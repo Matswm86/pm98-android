@@ -107,6 +107,45 @@ func _run() -> bool:
 	_a(Cup.draw_leg_plates(lc) == ["1ST LEG", "2ND LEG"],
 		"a two-legged drawn round shows 1ST LEG / 2ND LEG")
 
+	# --- the Coca-Cola SEMIFINALS are two-legged (witnessed 1998-01-10, the SEMIFINALS
+	# --- card view: 1ST LEG / 2ND LEG blocks with both clubs' own venues) while the
+	# --- earlier rounds keep single-leg + replay and the final is a single match ------
+	var cc := Cup.create(ids, 40, {"legs": 1, "semi_legs": 2, "name": "Coca-Cola Cup"})
+	var rng4 := _rng()
+	Cup.play_round(cc, rng4, _ratings_fn(), -1, _names_fn())       # R1: 16 -> 8
+	var d8 := Cup.draw_next_round(cc, rng4)                        # QTR draw: 8 clubs
+	_a(int(d8["round_legs"]) == 1, "semi_legs leaves the QTR single-leg")
+	Cup.play_round(cc, rng4, _ratings_fn(), -1, _names_fn())       # QTR: 8 -> 4
+	var d4 := Cup.draw_next_round(cc, rng4)                        # SEMI draw: 4 clubs
+	_a(int(d4["round_legs"]) == 2, "semi_legs=2 makes the SEMIFINALS two-legged")
+	_a(Cup.draw_leg_plates(cc) == ["1ST LEG", "2ND LEG"],
+		"the drawn semis show 1ST LEG / 2ND LEG")
+	Cup.play_round(cc, rng4, _ratings_fn(), -1, _names_fn())       # SEMI: 4 -> 2
+	var semis: Dictionary = (cc["rounds"] as Array)[-1]
+	_a(bool(((semis["ties"] as Array)[0] as Dictionary).get("two_legged", false)),
+		"the played semis record two-legged ties")
+	var d2 := Cup.draw_next_round(cc, rng4)                        # FINAL draw: 2 clubs
+	_a(int(d2["round_legs"]) == 1, "the final stays a single match")
+	# No stored field (no group stage) -> no neutral-venue pool -> -1, honestly absent.
+	_a(int(d2.get("venue_id", -2)) == -1, "a domestic final records no neutral venue")
+
+	# --- the FINAL's neutral ground: drawn from the competition's own field, never a
+	# --- finalist's (the witnessed 1998 final ran at Das Antas -- neither finalist's;
+	# --- the selection rule is un-reversed and the pick is declared OURS) -------------
+	var eu := Cup.create(ids, 40, {"legs": 2, "name": "Euro. League",
+		"group_stage": {"n_groups": 4, "advance": 2, "label": "1/8 FINALS"}})
+	var rng5 := _rng()
+	while int(eu.get("champion_id", -1)) == -1:
+		var step := Cup.play_next(eu, rng5, _ratings_fn(), -1, _names_fn())
+		if step.is_empty():
+			break
+	var final_rd: Dictionary = (eu["rounds"] as Array)[-1]
+	var fvid := int(final_rd.get("venue_id", -1))
+	_a(fvid >= 0, "a group-stage competition's final records a neutral venue")
+	var f_home := int(((final_rd["ties"] as Array)[0] as Dictionary)["home_id"])
+	var f_away := int(((final_rd["ties"] as Array)[0] as Dictionary)["away_id"])
+	_a(fvid != f_home and fvid != f_away, "the neutral venue is NEITHER finalist's")
+
 	# --- a finished competition draws nothing ----------------------------------------
 	var small := Cup.create([1, 2], 40)
 	var rng3 := _rng()

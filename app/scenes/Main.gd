@@ -4171,12 +4171,17 @@ func _show_cup_screen(b: Dictionary, key: String, title: String) -> void:
 		return
 	# A knockout phase the original has a built layout for has its own screen too
 	# (docs/re/knockout_views_re.md): the LIST at nine ties or more, the BRACKET at
-	# four. The kit-list / semifinal-card / final layouts are measured but not built
-	# yet, so those phases still fall through to the SORTEO card.
+	# four, the SEMIFINAL cards at two and the FINAL at one -- the last two only for
+	# competitions whose chrome is witnessed (cards: euro + cocacola; final: euro).
+	# The kit list (5-8 ties) and the unwitnessed cards/final competitions still fall
+	# through to the SORTEO card.
 	if _knockout_phases(b).size() > 0 and KNOCKOUT_RAIL.has(key):
 		var last: int = _knockout_phases(b).size() - 1
 		var n: int = (_knockout_ties(b, last) as Array).size()
-		if n >= KnockoutScreen.MIN_LIST_TIES or n == KnockoutScreen.BRACKET_TIES:
+		var chip := str(KNOCKOUT_RAIL[key])
+		if n >= KnockoutScreen.MIN_LIST_TIES or n == KnockoutScreen.BRACKET_TIES \
+				or (n == KnockoutScreen.CARDS_TIES and KnockoutScreen.cards_available(chip)) \
+				or (n == KnockoutScreen.FINAL_TIES and KnockoutScreen.final_available(chip)):
 			_show_knockout_screen(b, key, last)
 			return
 	var scr: CupDrawScreen = load("res://scenes/CupDrawScreen.gd").new()
@@ -4233,6 +4238,9 @@ func _knockout_ties(b: Dictionary, phase: int) -> Array:
 				"home_id": h, "away_id": a,
 				"home_flag": int(GameDB.club(h).get("countryCode", -1)),
 				"away_flag": int(GameDB.club(a).get("countryCode", -1)),
+				"home_ground": str(GameDB.club(h).get("stadium", "")),
+				"away_ground": str(GameDB.club(a).get("stadium", "")),
+				"two_legged": two,
 				"cells": [["", ""], ["", ""], ["", ""]] if two else [["", ""], ["", ""]]})
 			i += 2
 		return out
@@ -4262,6 +4270,9 @@ func _knockout_ties(b: Dictionary, phase: int) -> Array:
 			"home_id": h, "away_id": a,
 			"home_flag": int(GameDB.club(h).get("countryCode", -1)),
 			"away_flag": int(GameDB.club(a).get("countryCode", -1)),
+			"home_ground": str(GameDB.club(h).get("stadium", "")),
+			"away_ground": str(GameDB.club(a).get("stadium", "")),
+			"two_legged": bool(tie.get("two_legged", false)),
 			"cells": cells})
 	return out
 
@@ -4280,11 +4291,32 @@ func _show_knockout_screen(b: Dictionary, key: String, phase: int) -> void:
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
 	# The original switches presentation with the size of the round, per phase: the
-	# 4-tie bracket, else the list (the 5-8-tie kit list is not built and falls back
-	# to the list form, docs/re/knockout_views_re.md).
-	var layout := "bracket" if ties.size() == KnockoutScreen.BRACKET_TIES else "list"
-	scr.setup(_match_header(), str(KNOCKOUT_RAIL.get(key, "euro")),
-		str((phases[phase] as Dictionary).get("label", "")).to_upper(), two_legged, ties,
+	# 4-tie bracket, the 2-tie SEMIFINAL cards, the 1-tie FINAL, else the list (the
+	# 5-8-tie kit list and the unwitnessed cards/final competitions fall back to the
+	# list form / SORTEO, docs/re/knockout_views_re.md).
+	var chip := str(KNOCKOUT_RAIL.get(key, "euro"))
+	var layout := "list"
+	if ties.size() == KnockoutScreen.BRACKET_TIES:
+		layout = "bracket"
+	elif ties.size() == KnockoutScreen.CARDS_TIES and KnockoutScreen.cards_available(chip):
+		layout = "cards"
+	elif ties.size() == KnockoutScreen.FINAL_TIES and KnockoutScreen.final_available(chip):
+		layout = "final"
+		# The FINAL's neutral ground, recorded on the draw (Cup._pair_round).
+		var ph: Dictionary = phases[phase]
+		var vid := int((ph.get("pending", {}) as Dictionary).get("venue_id",
+			ph.get("venue_id", -1)))
+		if not ties.is_empty():
+			ties[0]["venue"] = str(GameDB.club(vid).get("stadium", "")) if vid >= 0 else ""
+	# The phase plate's case is witnessed per family: the list/bracket plates are
+	# UPPERCASE everywhere, the cards/final plates keep the euro competitions' own
+	# mixed case ("Semifinals" / "Final") and uppercase the domestic ones
+	# ("SEMIFINALS", the Coca-Cola witness).
+	var disp := str((phases[phase] as Dictionary).get("label", ""))
+	if not (layout in ["cards", "final"]
+			and key in ["european_cup", "cup_winners_cup", "uefa_cup"]):
+		disp = disp.to_upper()
+	scr.setup(_match_header(), chip, disp, two_legged, ties,
 		phase > 0, phase < phases.size() - 1, 0, layout)
 	scr.back_pressed.connect(func() -> void: scr.queue_free())
 	scr.phase_changed.connect(func(delta: int) -> void:
