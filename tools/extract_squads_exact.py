@@ -19,8 +19,9 @@ Field identities (pinned empirically this pass, 2026-07-06, not guessed):
     ENGLAND(30) + Wrexham/Cardiff/Swansea = WALES; Barcelona=SPAIN(22),
     Bayern=GERMANY(2), Celtic=SCOTLAND(19), Boca=ARGENTINA(3).
   - flag==0 block strings (94 extended records) = [chairman, sponsor, kit
-    maker] ("C M Edwards", "SHARP", "UMBRO" for Man Utd) — NO manager field
-    exists in EQUIPOS. The u32 the RE labelled "stadium capacity"
+    maker] ("C M Edwards", "SHARP", "UMBRO" for Man Utd). The MANAGER is a
+    separate field -- the tag-2 side record's name, decoded 2026-07-27; the old
+    "NO manager field exists in EQUIPOS" reading here was wrong. The u32 the RE labelled "stadium capacity"
     (param_1[0x7a]) ranges 1..1500 (Man Utd 1500) — NOT a plausible seat
     count; kept raw as `blockU32`, semantics unresolved, never consumed.
   - NATIONALITY (2026-07-14): the engine's OWN per-player country code, player
@@ -193,6 +194,11 @@ def main() -> None:
                 "fullName": r["hdr3"],
                 "countryCode": r["hdrByte"],
                 "country": code2name[r["hdrByte"]],
+                # MANAGER: the tag-2 side record's name (equipos_parse.parse_side_record,
+                # identified 2026-07-27 -- all 476 clubs carry exactly one). This replaces
+                # the old "NO manager field exists in EQUIPOS" reading; the app's
+                # 44-row transcription table is now a fallback nobody needs.
+                "manager": r["managers"][0] if r["managers"] else None,
                 "chairman": r["blockStrings"][0] if r["blockStrings"] else None,
                 "sponsor": r["blockStrings"][1] if len(r["blockStrings"]) > 1 else None,
                 "kitMaker": r["blockStrings"][2] if len(r["blockStrings"]) > 2 else None,
@@ -222,6 +228,16 @@ def main() -> None:
     mu = by_name["Manchester Utd."]
     assert mu["stadium"] == "Old Trafford" and mu["countryCode"] == 30
     assert mu["chairman"] == "C M Edwards" and mu["kitMaker"] == "UMBRO"
+    # 2b. MANAGERS (tag-2 side record, 2026-07-27). Every club ships exactly one, and
+    #     the names reproduce the START OF SEASON column the season audit transcribed
+    #     (docs/re/AUDIT_season_playthrough_2026-07-25.md O3).
+    assert mu["manager"] == "Ferguson", mu["manager"]
+    assert by_name["Arsenal"]["manager"] == "Wenger", by_name["Arsenal"]["manager"]
+    assert by_name["Aston Villa"]["manager"] == "Gregory"
+    assert by_name["Liverpool"]["manager"] == "Evans"
+    assert by_name["Chelsea"]["manager"] == "Vialli"
+    n_mgr = sum(1 for c in clubs if c["manager"])
+    assert n_mgr == len(clubs), f"managers decoded for {n_mgr}/{len(clubs)} clubs"
     # Stadium capacity (param_1[6]) vs the LIVE witnessed FULL TIME read-outs
     # (screenshots/wine-captures-2026-07-17-matchflow/): Old Trafford 55,300,
     # Villa Park 39,339, The Dell 15,200.

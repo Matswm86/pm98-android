@@ -85,17 +85,30 @@ class Stream:
         self.p += struct.unpack_from("<H", self.d, self.p)[0] + extra
 
 
-def parse_side_record(s: Stream, flag: int, heap_base: int) -> None:
-    """FUN_00579170 (tag-2 record): heap cursor resets to heap_base first."""
+def parse_side_record(s: Stream, flag: int, heap_base: int) -> str:
+    """FUN_00579170 (tag-2 record): heap cursor resets to heap_base first.
+
+    IDENTIFIED 2026-07-27: this record is the club's MANAGER, and its first (and for
+    most records only) string is his NAME. Found by searching EQUIPOS.PKF for the
+    XOR-0x61 encoding of "Wenger": the hit lands at Arsenal's first tag-2 string, and
+    every one of the 476 clubs carries exactly one such record — Ferguson, Evans,
+    Gregory, Vialli, Todd … matching the START OF SEASON column the season audit
+    listed under O3. This refutes the standing note in tools/extract_squads_exact.py
+    ("NO manager field exists in EQUIPOS"), which was written before anyone decoded
+    the tag-2 body. The remaining fields (the leading u16 and, on flag==0 records,
+    seven len-prefixed fields, an optional type-3 field and one more) are still
+    un-identified and still skipped exactly as the engine skips them.
+    """
     s.heap = heap_base
     s.u16()
-    s.string()
+    name = s.string()
     if flag == 0:
         for _ in range(7):
             s.skip_lenpfx()
         if s.u8() == 3:
             s.skip_lenpfx()
         s.skip_lenpfx()
+    return name
 
 
 def parse_player(s: Stream, flag: int, dbc_id: int, collect: bool = False) -> dict:
@@ -268,9 +281,10 @@ def parse_club_tactic(d: bytes, dbc_id: int, collect: bool = False) -> dict:
 
     # ---- squad loop (FUN_00579c70 tail) ------------------------------------
     heap_after_header = s.heap  # uVar11: side-records reset the heap here
+    managers: list[str] = []
     tag = s.u8()
     while tag == 2:
-        parse_side_record(s, flag, heap_after_header)
+        managers.append(parse_side_record(s, flag, heap_after_header))
         tag = s.u8()
     players = []
     dropped = []  # collect-mode only: the engine-discarded leavers (audit)
@@ -309,6 +323,9 @@ def parse_club_tactic(d: bytes, dbc_id: int, collect: bool = False) -> dict:
         "pitchW": 0x69 if p36 < 0x34 else p36,
         "pitchH": 0x3C if p34 < 0x1E else p34,
         "pitchRaw": [p34, p36],
+        # The tag-2 side records' names == the club's MANAGER (see parse_side_record).
+        # All 476 clubs carry exactly one; the list keeps the stream's own order.
+        "managers": managers,
     }
     if collect:
         out.update(

@@ -167,7 +167,11 @@ def main() -> None:
             "name": c["name"],
             "fullName": c.get("fullName") or c["name"],  # header string 3, exact
             "stadium": c.get("stadium"),  # header string 2, exact
-            "manager": None,  # NOT stored in EQUIPOS (block strings = chairman/sponsor/kit)
+            # MANAGER: EQUIPOS' tag-2 side record, decoded 2026-07-27 (all 476 clubs
+            # ship exactly one; Ferguson / Wenger / Gregory / Evans / Vialli reproduce
+            # the START OF SEASON column). The old "NOT stored in EQUIPOS" reading was
+            # wrong -- the record was parsed and skipped, never decoded.
+            "manager": c.get("manager"),
             "chairman": c.get("chairman"),
             "sponsor": c.get("sponsor"),
             "kitMaker": c.get("kitMaker"),

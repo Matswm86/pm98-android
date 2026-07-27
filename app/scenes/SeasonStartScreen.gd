@@ -6,10 +6,12 @@ class_name SeasonStartScreen
 ## DIVISION 24 rows; EXE 0x25546c). Chrome = the real PREMIER frame with the
 ## division-name band + all row texts blanked; 24-club divisions blit the
 ## 24-row box cut from the 3RD DIV frame. The managed club's row blits the
-## witnessed black user-row style. Division tabs switch the sheet: entrants of
-## other divisions render from GameDB + the transcription manager table +
-## Career.objective_for (the app's own board rule -- the original's assignment
-## rule is un-RE'd; divergence documented in APP_VS_SPEC_AUDIT). Only
+## witnessed black user-row style. Division tabs switch the sheet.
+## BOTH data columns are now the game's own (2026-07-27): MANAGER is EQUIPOS' tag-2
+## side record, decoded for all 476 clubs (was a 44-row transcription table), and
+## OBJECTIVE is the witnessed START OF SEASON category from club_economy.json for 92
+## of the 94 English records -- Career.objective_for's position-derived label survives
+## only as the fallback for the two records without one. Only
 ## PREMIER-hot + 3RD-hot tab chips are witnessed; other hot tabs reuse the
 ## chip art with the label drawn live (approximation, flagged). CONTINUE emits.
 

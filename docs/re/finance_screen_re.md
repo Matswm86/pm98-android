@@ -336,3 +336,27 @@ values). Two witnesses are not enough to derive either rule (the label default a
 to be U.E.F.A. CUP INCOME with European Cup participation switching it; the axis scale
 driver is unknown — wealth? division?), so this stays a recorded defect rather than a
 guessed fix. Closes when a third career state is captured.
+
+**HALF-CLOSED 2026-07-27 — the LABEL rule is no longer a guess, it is read from the
+binary.** No third capture was needed. `.data` holds **three** labels, not two:
+
+| VA | string |
+|---|---|
+| 0x659B0C | `EUROPEAN CUP INCOME` |
+| 0x659AE0 | `U.E.F.A. CUP INCOME` |
+| 0x659AF4 + 0x659B00 | `CUP WINNERS` + ` CUP INCOME` (drawn as one label) |
+
+and the drawing site is one chain of branches in `0x5081B0..0x50838F`, each arm pushing
+its own label into the same `FUN_005DA180` / `FUN_00436240` text call — 0x5081E3 and
+0x508219 push `EUROPEAN CUP INCOME`, 0x508295 and 0x5082CB push the `CUP WINNERS` pair,
+0x508334 and 0x508367 push `U.E.F.A. CUP INCOME`, selected by a virtual predicate on the
+competition object at `DAT_0066B1B0` (`call [vt+0x48]` at 0x50823F). So the row is
+**"the European competition this club is IN"**, one of the three, and the two witnesses
+were simply two different entrants — exactly the reading the note above suspected, now
+with the code behind it.
+
+Still open here, deliberately not built this pass: the label is baked into `chrome.png`
+and drawing it live needs a baker change (blank the label box) plus a re-run of
+`diff_finance_perweek_parity.py` — worth doing with the next finance capture, since the
+same pass has to settle the `±N K.` axis scale, whose driver is still unknown (no third
+witness, and the axis static is a separate blit).

@@ -57,7 +57,14 @@ final build:
   it. Recorded, not fixed: the SUMMARY chrome bakes `EUROPEAN CUP INCOME` + the
   `±2,500 K.` axis static, but `orig/51_finance_season.png` shows `U.E.F.A. CUP INCOME`
   + `±250 K.` — both DYNAMIC in the original, rule underdetermined by two witnesses
-  (`finance_screen_re.md` §LATENT DEFECT).
+  (`finance_screen_re.md` §LATENT DEFECT). **The LABEL half is now settled from the
+  binary (2026-07-27), without a third capture**: `.data` holds THREE labels
+  (0x659B0C `EUROPEAN CUP INCOME`, 0x659AE0 `U.E.F.A. CUP INCOME`, 0x659AF4+0x659B00
+  `CUP WINNERS CUP INCOME`) and one branch chain at 0x5081B0..0x50838F picks between
+  them off a virtual predicate on the competition object at `DAT_0066B1B0`, so the row
+  names **the European competition the club is in**. Building it needs the baker to
+  blank the label box + a `diff_finance_perweek_parity.py` re-run, which belongs with the
+  next finance capture — the `±N K.` axis scale is a separate blit and still has no rule.
 * **TEAM TACTICS does not match the tracked original** (`tactics_subscreens_re.md` holds
   the measurements).
 * **Neither cheat works in play**: MIXED PLAY (blocked on the un-located club tactic
@@ -458,9 +465,20 @@ verified still open at HEAD `4076800`:
   move (-5 in the red, +1 back in the black) is wired. Still open: the sacking SCREEN
   itself (the port dismisses at its season review); the Coca-Cola Cup home TV fee (pays £0,
   flagged); the weekly-illness (virus/cold) insurance path; the insured-row document icon;
-  **O1** board objective is a category (Champion / U.E.F.A. / Mid Table / Avoid Relegation),
-  the port shows a position; **O3** the original names every club's manager on START OF
-  SEASON; ~~**S7 remainder**~~ — **CONFIRMED 2026-07-27**: 24 clubs / 6 groups IS shipped
+  ~~**O1** board objective is a category~~ — **CLOSED 2026-07-27**: the START OF SEASON
+  sheet now prints the game's OWN witnessed label (`club_economy.json`, 92 of the 94
+  English records, merged by `GameDB._apply_club_economy`); the app's position-derived
+  label survives only as the fallback for the two records without one;
+  ~~**O3** the original names every club's manager on START OF SEASON~~ — **CLOSED
+  2026-07-27, from source**: the manager IS in EQUIPOS.PKF. It is the **tag-2 side
+  record's name** — the record `equipos_parse.py` had always walked and skipped as
+  "un-identified". Found by searching the archive for the XOR-0x61 encoding of "Wenger";
+  the hit lands on Arsenal's tag-2 string and **all 476 clubs carry exactly one**
+  (Ferguson / Evans / Gregory / Vialli / Todd …). `game_db.json` rebuilt: 476 managers,
+  up from a 44-row hand transcription, and 43 of those 44 agree exactly — the one that
+  does not is Lincoln C. ("Westley" transcribed, **Beck** in the data, and Beck is the
+  1997-98 man). The extractor's standing note "NO manager field exists in EQUIPOS" was
+  simply wrong and is corrected in place; ~~**S7 remainder**~~ — **CONFIRMED 2026-07-27**: 24 clubs / 6 groups IS shipped
   (`Career.EURO_FIELD`/`EURO_GROUPS`, witnessed field sizes); the 2 qualifying rounds
   are a DECLARED divergence (the app's field enters at the group phase).
 

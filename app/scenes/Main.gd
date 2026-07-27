@@ -3980,10 +3980,18 @@ func _season_divisions() -> Array:
 			var cid := int(cl["id"])
 			var user: bool = _career != null and cid == _career.club_id \
 				and lid == _career.league_id
-			var pos: int = _career.objective_pos if user \
-				else int(Career.objective_for(cid, lid, clubs, GameDB.leagues)["pos"])
 			var mgr := _career.manager_name if user else _mgr_of(cid)
-			rows.append([str(cl["name"]), mgr, _objective_label(pos, total, tier), user])
+			# O1: the board objective is a CATEGORY the game ships per club, not a
+			# position the app derives. club_economy.json carries the witnessed
+			# START OF SEASON label for 92 of the 94 English records (merged onto the
+			# club dict by GameDB._apply_club_economy), so use it whenever it exists and
+			# keep the position-derived label only as the fallback for the rest.
+			var label := str(cl.get("objective", ""))
+			if label == "":
+				var pos: int = _career.objective_pos if user \
+					else int(Career.objective_for(cid, lid, clubs, GameDB.leagues)["pos"])
+				label = _objective_label(pos, total, tier)
+			rows.append([str(cl["name"]), mgr, label, user])
 		out.append({"title": str(DIV_BAND_LABELS.get(str(lg["name"]), lg["name"])), "rows": rows})
 	return out
 

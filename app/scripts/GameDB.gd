@@ -101,10 +101,16 @@ func _apply_loader_defaults() -> void:
 				Youth.degrade(p, rng)
 
 
-## Fill the empty `manager` field from the source-true transcription table
-## (data/real_managers_1997.json: witnessed START OF SEASON / TEAMS IN
-## CHAMPIONSHIPS frames — English manager data is not in EQUIPOS.PKF). Clubs
-## absent from the table keep null and render an honest blank.
+## Fallback only, since 2026-07-27: `manager` now ships DECODED for all 476 clubs.
+## It is EQUIPOS' tag-2 side record — the record the parser had always walked and
+## skipped as "un-identified" (docs/re/retirement_re.md is a different pass; the decode
+## is in tools/re/equipos_parse.py parse_side_record). Cross-check against the 44-row
+## transcription table below: 43 agree exactly; the one disagreement is Lincoln C.,
+## transcribed "Westley" where EQUIPOS says "Beck" — and John Beck is the 1997-98 man,
+## Westley his 1998 successor, so the source wins and the frame was a later one.
+## This table therefore fills nothing any more; it stays as a fallback for records
+## that ever come through with a null manager, and clubs absent from both render an
+## honest blank.
 func _apply_real_managers() -> void:
 	if not FileAccess.file_exists("res://data/real_managers_1997.json"):
 		return
