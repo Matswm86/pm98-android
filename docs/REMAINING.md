@@ -582,6 +582,8 @@ mask) — it needs the APK on a phone, which this box cannot do.
 | question | file |
 |---|---|
 | is screen X faithful? | `docs/re/<screen>_re.md` `Status:` line |
+| ...and what backs that claim? | `docs/re/STATUS_INDEX.md` — every RE doc against its gate / suite / EXE addresses |
+| which frame witnesses screen X? | `docs/re/WALKTHROUGH_MANIFEST.md` — all 636 frames named + who cites them |
 | what does the app do that the original does not (and vice versa)? | `docs/re/APP_VS_SPEC_AUDIT.md` |
 | what is decoded already? | `docs/re/EXACT_PORT_PLAN.md` §"Already decoded — cite, don't redo" |
 | where is the byte-exact engine? | `docs/re/PLAN_byte_exact_match_engine.md` + `docs/re/M5_S58_FRONTIER_1032.md` (supersedes s57) |

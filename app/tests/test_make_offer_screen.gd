@@ -57,10 +57,13 @@ func _run() -> void:
 			"PA": 79, "TI": 73, "EN": 57, "PO": 19}}
 	var card: MakeOfferScreen = MakeOfferScreen.new()
 	card.setup(taylor, {"id": 82, "name": "BLACKPOOL"}, 3000000, 3200000)
-	# CLUB OFFER now opens at the CLUB FEE on every route (owner deviation, see
-	# MakeOfferScreen.setup); YEARLY WAGE / YEARS keep the frame-101 constants.
-	ok = _assert(card._offer == 3000000 and card._wage_yearly == 5000 and card._years == 1,
-		"opens at the fee, £5,000 wage, 1 year") and ok
+	# Corrected 2026-07-27: the COLD route (no seed) opens at the FLOOR on all three
+	# fields, which is frame 101_164714 exactly — Taylor at CLUB FEE £3,000,000 with a
+	# CLUB OFFER of £5,000. The "opens at the CLUB FEE" reading was an owner-ergonomics
+	# deviation the original does not draw; the pre-filled card is the TRANSFERS route,
+	# which passes the seller's terms in `seed` (make_offer_re.md, two opening states).
+	ok = _assert(card._offer == 5000 and card._wage_yearly == 5000 and card._years == 1,
+		"cold route opens at £5,000 offer, £5,000 wage, 1 year") and ok
 	ok = _assert(card._scoring_enabled(), "Scoring bonus active for a forward") and ok
 	# The stepper ladder itself is unchanged — walk it from the floor.
 	card.setup(taylor, {"id": 82, "name": "BLACKPOOL"}, 3000000, 3200000, {"offer": 5000})

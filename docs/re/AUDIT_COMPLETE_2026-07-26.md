@@ -101,6 +101,31 @@ Everything else traces to source. The de-invention record (`SPEC_BINDING.md` §6
 **Gated on Mats, do not start:** the SHOOTING appendix (NOT APPROVED, asked 3×); the
 modern-era data pack (NOT authorised).
 
+> **Three of the five gaps below are CLOSED, 2026-07-27** — with generated indexes, not
+> with 113 hand-written sentences:
+>
+> * **frame→screen manifest** → `docs/re/WALKTHROUGH_MANIFEST.md`
+>   (`tools/re/build_walkthrough_manifest.py`). Every frame is named by the SAME taught
+>   pixel signatures the wine auto-driver uses, so a name is a chrome match and not a
+>   caption: **636 frames at 641x480** (cropped to 640, as every `diff_*` already does)
+>   **+ 2 desktop screenshots = the 638 on disk**; 196 identified, 440 UNKNOWN. An
+>   UNKNOWN run is a screen the harness has never been taught — `autodrive.py learn`
+>   removes it from the list.
+> * **citation coverage** → measured exactly in the same file: **182 of 636 frames
+>   (28.6 %) are cited by a doc under `docs/`** (the "~19 %" estimate was close), so 454
+>   frames are captured and unread. That set is where new evidence is cheapest.
+> * **the missing `Status:` lines** → `docs/re/STATUS_INDEX.md`
+>   (`tools/re/build_status_index.py`) indexes all 125 RE docs against the artefacts that
+>   can CONFIRM them: **33 are covered by a `diff_*_parity.py` render-diff gate, 60 by a
+>   headless suite, 83 cite MANAGER.EXE addresses, 16 have none of the three.** Those 16
+>   are the real backlog — not a missing sentence, missing evidence. `docs/REMAINING.md`'s
+>   truth table now points at both indexes.
+>
+> Still open from this section: the gitignored evidence tree, and the stored gate-results
+> ledger (the two indexes give the map, not a pass/fail history).
+> Also closed 2026-07-27: `ChannelTvScreen.gd`'s zero test coverage
+> (`app/tests/test_channeltv_screen.gd`, ALL PASS).
+
 ## 5. Evidence & reproducibility gaps
 
 - The walkthrough is **638 PNGs on disk** (601 unique by md5; three capture runs with

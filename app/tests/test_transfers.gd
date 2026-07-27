@@ -311,7 +311,12 @@ func _ai_and_season(prem: Array, league: Dictionary, leagues: Array) -> bool:
 	career.advance_season(leagues)
 	ok = _assert(career.year == prev_year + 1, "year advanced") and ok
 	ok = _assert(career.week == 0 and not career.finished, "calendar reset for the new season") and ok
-	ok = _assert(career.total_weeks() == 38, "fixtures rebuilt (38 rounds)") and ok
+	# 39 since the 2026-07-27 league-calendar fix, not 38: the original plays 38 rounds
+	# over 39 weeks with ONE blank Saturday in the run-in (`Career.BLANK_LEAGUE_WEEK`,
+	# witnessed R10/R12/R13 — REMAINING.md §0, `test_league_calendar.gd`). This assert
+	# is here to prove the rollover REBUILDS the calendar, so it tracks that shape.
+	ok = _assert(career.total_weeks() == 39,
+		"fixtures rebuilt (38 rounds over 39 weeks, one blank Saturday)") and ok
 	ok = _assert(career._find_in(career.club_id, leaver_id).is_empty(), "unrenewed player left on a free") and ok
 	return ok
 

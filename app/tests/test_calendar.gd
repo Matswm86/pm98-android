@@ -33,8 +33,16 @@ func _run() -> bool:
 
 	# Before any match: one entry per round, none played, round 0 is next.
 	var cal0 := career.season_fixtures()
-	ok = _assert(cal0.size() == career.total_weeks(),
-		"calendar has one row per round (%d)" % cal0.size()) and ok
+	# Corrected 2026-07-27. `total_weeks()` counts WEEKS and `season_fixtures()` returns
+	# the manager's MATCHES, and since the league-calendar fix those differ by exactly
+	# one: the witnessed blank Saturday in the run-in (`Career.BLANK_LEAGUE_WEEK`, 38
+	# rounds over 39 weeks, final round Sat 2 May — see REMAINING.md §0 and
+	# `test_league_calendar.gd`). A blank week has no fixture, so it draws no row, which
+	# is what the original does too. The old `size() == total_weeks()` predated it.
+	ok = _assert(cal0.size() == career.total_weeks() - 1,
+		"calendar has one row per PLAYED round (%d rows over %d weeks)"
+		% [cal0.size(), career.total_weeks()]) and ok
+	ok = _assert(cal0.size() == 38, "a 20-club double round-robin is 38 rounds") and ok
 	ok = _assert(not cal0[0]["played"] and bool(cal0[0]["is_next"]),
 		"round 1 is the next fixture, unplayed") and ok
 	# Ordered by round.

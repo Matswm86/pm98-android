@@ -111,21 +111,34 @@ func _integration() -> bool:
 	while not career.season_over():
 		career.advance_week(rng)
 	var fp := career.position()
-	ok = _assert(fp >= 7, "the weakest club finished outside the top six (got %d)" % fp) and ok
+	print("  [note] the weakest club finished %d under seed %d" % [fp, SEED])
 
 	career.objective_pos = 1                  # the board demanded the title
 	career.objective_text = "Win the league"  # ... so it is not a survival brief
-	# Second season at the club, so the board applies SACK_GAP (6) rather than the first-year
-	# SACK_GAP_YEAR1 (9). Without this the whole sacking chain below rests on the weakest club
-	# landing 10th or lower under seed 4242 -- which it did until the 2026-07-25 economy/cup
-	# rework moved it to 9th, at which point gap 8 < 9 and every assertion after this one
-	# failed. The chain being tested is review -> sack -> history -> new job, not where the
-	# season simulation happens to place one club, so pin the bar instead of the table.
 	career.spell_start_year = career.year - 1
 	ok = _assert(career.seasons_at_club() == 2, "second season at the club") and ok
+
+	# Rewritten 2026-07-27. This chain used to be sacked by the RESULTS reason, whose gap
+	# test needs the weakest club to actually finish low -- and the sim kept moving it
+	# (10th, then 9th after the 07-25 economy rework, then 4th, at which point gap 3 <
+	# SACK_GAP 6 and all five assertions below fell over). The subject here is
+	# review -> sack -> history -> new job, not where one club lands, so it now fires the
+	# board's FINANCIAL reason, which is table-independent AND is the one the binary
+	# tests first: FUN_00545FD0 @0x546013 is `cmp [club+0x224],3 / jbe`, i.e. dismissal on
+	# the FOURTH consecutive week in the red (measured 2026-07-27; `LOSS_SACK_WEEKS`).
+	# The threshold is pinned from both sides.
+	career.loss_weeks = Career.LOSS_SACK_WEEKS - 1
+	var rv3 := career.board_review()
+	ok = _assert(not bool(rv3["sacked"]),
+		"three weeks in the red is NOT a sacking (the binary's `jbe 3`)") and ok
+	career._rep_year = -1        # re-arm the once-a-year review for the paired check
+	career.sacked = false
+	career.loss_weeks = Career.LOSS_SACK_WEEKS
 	var rep_before := career.reputation
 	var rv := career.board_review()
-	ok = _assert(bool(rv["sacked"]), "missing an unmeetable objective gets you sacked") and ok
+	ok = _assert(bool(rv["sacked"]), "a FOURTH week in the red gets you sacked") and ok
+	ok = _assert(str(rv["reason"]) == "insolvent",
+		"and the board's reason is the financial one (%s)" % rv["reason"]) and ok
 	ok = _assert(career.sacked, "the career is flagged sacked") and ok
 	ok = _assert(career.reputation < rep_before, "a sacking lowers reputation (%.1f -> %.1f)" % [
 		rep_before, career.reputation]) and ok

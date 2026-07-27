@@ -94,10 +94,35 @@ func _run() -> bool:
 	ok = _assert(sizes_ok, "every rival squad stayed at or above the SQUAD_MIN floor") and ok
 
 	# --- Rollover: rivals age a year and the season resets (bans/injuries cleared). ---
+	# Corrected 2026-07-27 for S8. "Mean age must RISE" stopped being true the moment
+	# retirement shipped: at a rival club the retiree is REBORN IN PLACE 10-12 years
+	# younger (`FUN_0058B030`, `Retirement.rebirth`, population conserved — the binary's
+	# own 0x58AD8B passes the club's own id), so two rebirths in a 20-man squad already
+	# pull the mean DOWN. The measured -0.1 was the faithful model, not a bug. What must
+	# hold is the rule underneath: every SURVIVING player is exactly one year older, and
+	# the squad does not shrink.
+	var pre_by_id: Dictionary = {}
+	for p in career.squad_of(rival_id):
+		pre_by_id[int(p.get("id", -1))] = int(p.get("age", 0))
+	var pre_size := career.squad_of(rival_id).size()
 	var pre_age := _avg_age(career.squad_of(rival_id))
 	career.advance_season(leagues, rng)
 	var post_age := _avg_age(career.squad_of(rival_id))
-	ok = _assert(post_age > pre_age, "rivals aged across the rollover (%.1f -> %.1f)" % [pre_age, post_age]) and ok
+	var aged_ok := true
+	var survivors := 0
+	for p in career.squad_of(rival_id):
+		var pid := int(p.get("id", -1))
+		if not pre_by_id.has(pid):
+			continue          # a reborn record carries a NEW id — not a survivor
+		survivors += 1
+		if int(p.get("age", 0)) != int(pre_by_id[pid]) + 1:
+			aged_ok = false
+	ok = _assert(survivors > 0 and aged_ok,
+		"every surviving rival is exactly one year older (%d survivors, mean %.1f -> %.1f)"
+		% [survivors, pre_age, post_age]) and ok
+	ok = _assert(career.squad_of(rival_id).size() >= pre_size,
+		"the rival squad is conserved across the rollover (%d -> %d)"
+		% [pre_size, career.squad_of(rival_id).size()]) and ok
 
 	var reset_ok := true
 	for id in career.rosters:
