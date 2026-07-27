@@ -41,6 +41,12 @@ s = re.sub(r'<div id="dlmeta">.*?</div>',
            % (name, mb, commit, date), s, flags=re.S)
 s = re.sub(r'<span class="sub">latest build &middot;[^<]*</span>',
            '<span class="sub">latest build &middot; %s</span>' % date, s)
+# the hub's build plate and the narrow menu's build row, which app.js also
+# refreshes at load; this keeps them right when the API call fails.
+s = re.sub(r'(id="buildline-(?:hub|badge|narrow)">)[^<]*',
+           lambda m: '%s%s &middot; %s MB' % (m.group(1), name, mb), s)
+s = re.sub(r'(id="builddate-(?:hub|narrow)">)[^<]*',
+           lambda m: m.group(1) + date, s)
 open(html, 'w', encoding='utf-8').write(s)
 print('index.html: unchanged' if s == before else 'index.html: rewritten')
 PY
