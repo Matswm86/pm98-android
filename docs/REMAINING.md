@@ -534,7 +534,9 @@ exports `--export-release` when `ANDROID_RELEASE_KEYSTORE_BASE64` (+ `_KEY_ALIAS
 `_KEYSTORE_PASSWORD`) is set and falls back to the debug-signed APK when it is not, so
 nothing breaks without it. Verified against the shipped engine rather than assumed: Godot
 4.6 has no `export/android/release_keystore` editor setting, so the key is passed through
-`GODOT_ANDROID_KEYSTORE_RELEASE_{PATH,USER,PASSWORD}`. Generating the keystore is
+`GODOT_ANDROID_KEYSTORE_RELEASE_{PATH,USER,PASSWORD}`. **Mats declined the keystore 2026-07-27** — the only thing it buys him is not having to
+uninstall before installing a new build, and he does not care. Do NOT raise it again.
+The wiring stays (it costs nothing dormant); if it is ever wanted, generating the keystore is
 deliberately left to Mats (a key made in CI would change every run, which makes every
 build a different app to Android); the exact three commands are in the packaging doc.
 
