@@ -15,6 +15,7 @@ const FRAME0_SEED := 0xea0d2a8d
 var TICK_CAP := int(OS.get_environment("PM98_TICK_CAP")) if OS.get_environment("PM98_TICK_CAP") != "" else 1520
 var CLK_LO := int(OS.get_environment("PM98_CLK_LO")) if OS.get_environment("PM98_CLK_LO") != "" else 1410
 var CLK_HI := int(OS.get_environment("PM98_CLK_HI")) if OS.get_environment("PM98_CLK_HI") != "" else 1432
+var _last_score := [0, 0]
 
 
 func _init() -> void:
@@ -64,6 +65,18 @@ func _run() -> void:
 		if ret == 0:
 			m[0x1a1e] = 1
 		var clk := _g(m, 0x450)
+		# GOAL lines print on any score change, independent of the log window, so a
+		# full-match run can grep goals without per-tick output (s59 kill-test aid).
+		var sc := [_g(m, 0x478), _g(m, 0x798)]
+		if sc != _last_score:
+			_last_score = sc
+			print("GOAL clk=%d bank=%d tick=%d score=%d-%d min=%d" % [clk, _g(m, 0x19a8), t,
+				int(sc[0]), int(sc[1]),
+				((_g(m, 0x19a8) + clk) * 0x2d) / max(1, _g(m, 0x19ac))])
+		if _g(m, 0x1a38) == 10:
+			print("FULLTIME clk=%d bank=%d tick=%d score=%d-%d" % [clk, _g(m, 0x19a8), t,
+				int(sc[0]), int(sc[1])])
+			break
 		if not in_win:
 			continue
 		MatchEngine.Pm98Rng._log_on = false
@@ -87,6 +100,16 @@ func _run() -> void:
 			_si(ball, 0x9c), _si(ball, 0xa0), _si(ball, 0xa4),
 			_si(ball, 0x74), _si(ball, 0x78), _si(ball, 0x7c)])
 		print("   CARRIER %s  RECV %s" % [cdesc, rdesc])
+		var taker_v: Variant = m.get(0x438, null)
+		var tkdesc := "-"
+		if taker_v is Dictionary:
+			tkdesc = "t%d.id%d act=0x%x p48=%d" % [_g(taker_v as Dictionary, 0x2b8),
+				_g(taker_v as Dictionary, 0x2c8), _g(taker_v as Dictionary, 0x40),
+				_si(taker_v as Dictionary, 0x48)]
+		print("   MATCH score=%d-%d bank19a8=%d ph448=%d disp1a38=%d m19a0=%d m460=%d m45c=%d m44c=%d gate1a1e=%d cool454=%d m461=0x%x m160c=%d taker=%s" % [
+			_g(m, 0x478), _g(m, 0x798), _g(m, 0x19a8),
+			_g(m, 0x448), _g(m, 0x1a38), _g(m, 0x19a0), _g(m, 0x460), _g(m, 0x45c),
+			_g(m, 0x44c), _g(m, 0x1a1e) & 0xff, _g(m, 0x454), _g(m, 0x461), _g(m, 0x160c) & 0xff, tkdesc])
 		for r in Pm98Driver.ballvel_probe:
 			print("   BV %s -> (%d,%d)" % [r[0], int(r[1]), int(r[2])])
 		print("   DRAWS %s" % str(MatchEngine.Pm98Rng._draws))

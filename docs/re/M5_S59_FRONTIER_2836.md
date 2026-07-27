@@ -77,11 +77,28 @@ touch tail then consumed (`is_same(m.get(0x43c, 0), p)` at the L558 stat swap), 
 finishing pre-block (fn_005aeda0 L41-118) ported as `_finishing_1b` (8-tick projections,
 adj(t+0x398) roll, target caught → state 0x17 + 32-tick lerp + ball mirror + C102 draw).
 
+## The kill test: the first goal is EXACT
+
+The old framing ("port 11' vs reference 21'") died twice over. "21'" belonged to the OLD
+M4 2-2 reference (seed 0x8abd86a4) — the capture2 5-2 reference for THIS fixture (seed
+0xea0d2a8d) first-goals at **minute 8, Aston Villa, clk 2837, bank 0**. And the fixed
+engine, run raw to full time (`diag_m5_s59_fork.gd`, GOAL lines, 34k ticks in ~9 min),
+produces **exactly that: GOAL clk=2837 bank=0 score=1-0 min=8**. Same tick, same team.
+It also retro-explains the s59 capture stall: silicon paused at clk 2837 because the
+GOAL raised the events board — the port scores on the same tick the capture stopped.
+
+Goals 2-7 (ref: 24' 35' 43' 53' 62' 71', 5-2) are NOT attributable via the raw loop —
+after goal 1 the WATCH path consumes replay-cut draws (`Pm98Outer._replay_cut`) the raw
+driver loop does not, so the trajectories legitimately fork (raw loop: 26' 51' 55',
+1-3). Attribution needs the WATCH harness — and `run_match_from_struct.gd` is now the
+blocker: post-s59 it grinds >5 h at full CPU without terminating (the raw engine does
+full time in 9 min), i.e. the Outer WATCH wait-loop / goal-latch (+0x1a2c) interplay
+spins after the first real goal. That harness-side loop is the next kill-test item.
+
 ## Still open
 
-1. The `run_match_from_struct.gd` kill test (first goal 11' vs the reference 21') — the
-   engine changed materially in exactly the post-shot region; re-run in progress.
-   clk ~3500 is now only ~660 clks past the verified window.
+1. The WATCH-path harness spin above — Outer/pause-branch after a real goal fires;
+   engine-side full time is clean (dispatch 10 at clk 14400, final 1-3 raw).
 2. The ps-9 chase geometry (fn_005aeda0 L121-170) — still deferred, RNG-free, returns
    directly (no tail).
 3. The cross-seed sweep (`PM98_SEED`) — still unrun.
