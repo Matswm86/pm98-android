@@ -176,3 +176,68 @@ app applies the ≥17 renumber rule.
   (un-witnessed; furniture stays).
 * The card opened from here = the EXISTING MakeOfferScreen (witness 47 IS that
   card; loan/offer plumbing already wired through Career.sign_player/sign_loan).
+
+## The kit panel — order, texts and the shadow pass (2026-07-27)
+
+The whole 321x130 panel used to be excluded from `diff_scout_offers_parity.py` as
+"nano-kit fallback". Un-masking it found three real defects and left exactly one
+un-reversed pass, and the gate now masks only the 20 kit SPRITE rects.
+
+**1. Foreign grids were sorted; the original does not sort them.** Matching every cell
+of witness 45 against the shot cell-by-cell gives a clean BIJECTION at ~100 px each, so
+the same 20 kits were being drawn in the wrong places. The original's cell 0 is
+F.C. Barcelona = `EQ96001.DBC` = archive idx 0, cell 1 R.C. Deportivo = idx 1, cell 2
+R. Zaragoza = idx 2 — i.e. **the archive's own record order**, which is exactly what
+`GameDB.clubs_in_country` already returns. The app's `sort_custom` by display name put
+Athletic Club first. Removed.
+
+**2. ENGLAND is different, and that is witnessed, not assumed.** The Premier resting
+panel (witness 44) is 0 px only WITH the alphabetical sort — dropping it costs 899 px.
+So `_select_england()` keeps its sort and `_act`'s country branch has none. Do not
+"unify" these.
+
+**3. Both panel texts were the wrong font and pen.** `tools/re/probe_text_anchor.py`
+returns identical-bitmap matches on the real frames:
+
+| text | original | the port had |
+|---|---|---|
+| country title | proman10 @10, pen top **346**, GDI-centred on field sum **336** | proman12 @13, centred on the panel rect (4 px left, 4 px high) |
+| picked-club label | proman10 @10, pen top **449**, same field sum 336 | pen top 447 |
+
+The field sum is solved on FOUR countries, exact on all four: SPAIN adv 43 -> pen 146,
+MACEDONIA 85 -> 125, HUNGARY 69 -> 133, SWEDEN 60 -> 138
+(`screenshots/wine-captures-2026-07-25-offers-map-countries/`). Witness 46's
+"F.C. Barcelona" gives pen 117 / advance 102, i.e. 2*117 + 102 = 336, the same field.
+
+**Result: the panel is 0 px outside the kit sprites on both foreign witnesses**
+(spain 2369 -> 0, barca 3171 -> 0 outside cells).
+
+### What is left inside the cells — the shadow pass, measured
+
+2007 px over Spain's 20 cells, 2421 over Barcelona's, and it is ONE class: every
+differing pixel is **white in the port and grey in the original**
+((255,255,255) -> (80,80,80) / (192,192,192) / (100,100,100) / (160,160,164) /
+(128,128,128) / (144,144,144) / (170,191,170) / (240,240,240)). So the original casts a
+grey drop shadow around each nano kit that this port does not draw. It is the same
+un-reversed pass as the knockout 48x64 bevel (`knockout_views_re.md` §"The outline
+pass"). Measured here so the next attempt starts from data:
+
+* it is NOT the realised-palette bug — the nano bank already decodes under MANAGER.PAL
+  and is SAD-0.0 against walkthrough frames 008/013;
+* a single **shifted-silhouette** stamp at **dx=2, dy=2** explains 1670 of the 1992
+  shadow pixels (fp 386, fn 322) — the best of all 15 offsets tried, so the geometry is
+  a diagonal down-right stamp;
+* it is NOT position-constant, so it cannot be baked the way the MINIESC ring was: only
+  46 positions are unanimous across the 40 witnessed cells, and a unanimous-vote bake
+  leaves 2398 of 4428 px. The multi-level greys say multi-offset (the alert box's
+  "3 double-stamped diagonal layers" family);
+* closing it needs the pass's CODE, not another witness set.
+
+### Still open: the ENGLAND panel in a non-Premier division
+
+`shot_offers_blackpool` vs run-3 frame 100 does NOT reduce to a permutation — the
+best per-cell match is non-bijective at ~500 px/cell, i.e. the panel is showing a
+DIFFERENT SET of clubs from the frame's. The frame also shows no gold OVER cell while
+the shot stages one. Which division frame 100's panel is on, and how the original marks
+the picked club there, are unanswered; that state keeps the whole-panel mask until a
+witness settles it.

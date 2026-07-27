@@ -89,15 +89,32 @@ total += diff("shot_scout_results.png", f"{WD}/81_scout_found2.png",
 
 # ---- OFFERS ----
 STARS_COL = (485, 100, 560, 335)
-KIT_PANEL = (10, 338, 328, 464)     # nano-kit fallback states (documented)
+# The kit panel used to be masked WHOLE. It is now masked CELL BY CELL: the panel's
+# chrome, its country title and the picked-club label are gated at 0 px (2026-07-27 --
+# the grid order was alphabetical where the original uses the ARCHIVE's own record
+# order, and both texts were the wrong font/pen). What stays masked is the 20 kit
+# SPRITE rects, where the original casts a grey shadow/bevel around each nano kit that
+# this port does not draw -- the same un-reversed pass as the knockout 48x64 bevel
+# (offers_map_re.md "The kit panel", knockout_views_re.md "The outline pass").
+def _kit_cells():
+    out = []
+    for i in range(20):
+        c = i % 10
+        x = 13 - 1 + (c * 95) // 3
+        y = [368, 405][i // 10] - 2
+        out.append((x, y, x + 26, y + 36))
+    return out
+
+KIT_CELLS = _kit_cells()
+KIT_PANEL = (10, 338, 328, 464)     # England panel only -- its own open question below
 STRIP_TXT = (60, 306, 280, 325)     # strip country name (outlined face)
 ONAMES = (375, 104, 484, 332)       # bold list-name face (same residual class)
 OTITLE = (420, 78, 550, 96)         # club title (same bold family)
 total += diff("shot_offers_resting.png", f"{WD}/44_offers_map.png", [BARRA], "offers resting vs 44")
 total += diff("shot_offers_spain.png", f"{WD}/45_offers_country.png",
-              [BARRA, KIT_PANEL, STRIP_TXT], "offers spain vs 45 (kit panel masked)")
+              [BARRA, STRIP_TXT] + KIT_CELLS, "offers spain vs 45 (kit sprites masked)")
 total += diff("shot_offers_barca.png", f"{WD}/46_offers_club.png",
-              [BARRA, STARS_COL, KIT_PANEL, ONAMES, OTITLE], "offers barca vs 46 (kit panel masked)")
+              [BARRA, STARS_COL, ONAMES, OTITLE] + KIT_CELLS, "offers barca vs 46 (kit sprites masked)")
 total += diff("shot_offers_blackpool.png", f"{RD}/100_164712.png",
               [BARRA, STARS_COL, (8, 336, 330, 470), ONAMES, OTITLE], "offers blackpool vs 100 (kit panel masked)")
 print(f"\nTOTAL: {total}")

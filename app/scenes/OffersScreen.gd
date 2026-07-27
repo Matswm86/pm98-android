@@ -54,6 +54,9 @@ const R_PANEL := Rect2(8, 336, 321, 130)
 const KIT_X0 := 13
 const KIT_PITCH := 31
 const KIT_Y := [368, 405]
+const PANEL_TITLE_TOP := 346    # pen TOP row of the panel's country title
+const PANEL_TITLE_FIELD := 336  # GDI centring field sum (4 country witnesses, exact)
+const LAST_PICK_TOP := 449      # pen TOP row of the picked club's name (witness 46)
 const C_TITLE_BLUE := Color8(0, 0, 160)
 const C_PRESS := Color(1, 1, 1, 0.2)
 const C_LAST_PICK := Color8(120, 120, 160)
@@ -241,6 +244,11 @@ func _select_england() -> void:
 	_country_clubs = []
 	if _div < _leagues.size() and _clubs_of.is_valid():
 		_country_clubs = _clubs_of.call(str(_leagues[_div].get("id", "")))
+		# ENGLAND sorts, and that is not a stylistic choice: witness 44 (the resting
+		# Premier panel) is 0 px only with this sort, and removing it costs 899 px.
+		# FOREIGN countries do NOT sort -- witness 45's Spain grid is the archive's own
+		# record order (Barcelona = EQ96001.DBC first). The two are genuinely different
+		# in the original; see `_act`'s country branch and offers_map_re.md.
 		_country_clubs.sort_custom(func(a, b): return str(a.get("name", "")) < str(b.get("name", "")))
 
 
@@ -409,7 +417,12 @@ func _route_target(was: String) -> void:
 			var cc: Array = _clubs_of_country.call(nm) if _clubs_of_country.is_valid() else []
 			if not cc.is_empty():
 				_country = nm
-				cc.sort_custom(func(a, b): return str(a.get("name", "")) < str(b.get("name", "")))
+				# NO SORT. The grid is the ARCHIVE's own record order, which is what
+				# `clubs_in_country` already hands back (EQUIPOS entry order ==
+				# EQ96NNNN.DBC order == the app's club ids). Witness 45's Spain panel
+				# reads Barcelona, Deportivo, Zaragoza, Real Madrid, Athletic, ...
+				# = idx 0,1,2,3,4 — while an alphabetical sort put Athletic first, which
+				# is where the panel's whole-grid permutation came from.
 				_country_clubs = cc
 				_sel_club_i = -1
 		queue_redraw()
@@ -525,7 +538,13 @@ func _draw() -> void:
 	_draw_kit_panel()
 
 	if _last_pick != "":
-		_txt(_f10, R_PANEL.position.x, 447, _last_pick, C_LAST_PICK, 10, R_PANEL.size.x, true)
+		# Same grammar as the panel title, two rows lower: proman10, GDI-centred on
+		# field sum 336, pen top 449 -- probe_text_anchor on witness 46 returns
+		# pen_x 117 / advance 102 for "F.C. Barcelona", i.e. 2*117 + 102 = 336 exactly.
+		# The pen top had been 447.
+		var padv := _f10.get_string_size(_last_pick, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x
+		_txt(_f10, floor((PANEL_TITLE_FIELD - padv) * 0.5), LAST_PICK_TOP,
+			_last_pick, C_LAST_PICK, 10)
 
 	_draw_buttons()
 	_draw_list()
@@ -544,8 +563,15 @@ func _draw_kit_panel() -> void:
 		draw_rect(Rect2(R_PANEL.position + Vector2(2, 2), R_PANEL.size - Vector2(4, 4)),
 			Color.WHITE, true)
 		if _country != "":
-			_txt(_f12, R_PANEL.position.x, R_PANEL.position.y + 6, _country,
-				C_TITLE_BLUE, 13, R_PANEL.size.x, true)
+			# Solved off FOUR country witnesses with `tools/re/probe_text_anchor.py`
+			# (identical-bitmap match, so this is read not chosen): the panel title is
+			# **proman10 @10**, pen top **346**, GDI-centred on FIELD SUM 336 --
+			# pen_x = floor((336 - advance) / 2). SPAIN adv 43 -> 146, MACEDONIA 85 ->
+			# 125, HUNGARY 69 -> 133, SWEDEN 60 -> 138, all four exact. It had been
+			# proman12 @13 centred on the panel rect, landing 4 px left and 4 px high.
+			var tadv := _f10.get_string_size(_country, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x
+			_txt(_f10, floor((PANEL_TITLE_FIELD - tadv) * 0.5), PANEL_TITLE_TOP,
+				_country, C_TITLE_BLUE, 10)
 	for i in _country_clubs.size():
 		if i >= _kit_cols() * 2:
 			break

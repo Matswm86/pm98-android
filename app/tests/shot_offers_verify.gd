@@ -48,8 +48,8 @@ func _run() -> void:
 			scr._sel_flag = m
 			scr._sel_tab = 0
 	scr._strip_country = "SPAIN"
+	# Archive order, NOT alphabetical — witness 45 opens on Barcelona (EQ96001.DBC).
 	var cc: Array = gamedb.clubs_in_country("SPAIN")
-	cc.sort_custom(func(a, b): return str(a.get("name", "")) < str(b.get("name", "")))
 	scr._country = "SPAIN"
 	scr._country_clubs = cc
 	scr.queue_redraw()
