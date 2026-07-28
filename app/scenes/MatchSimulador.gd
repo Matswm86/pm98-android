@@ -119,6 +119,9 @@ const C_HOME_DEF := Color(0.86, 0.20, 0.20)    # fallback kit tints if no escudo
 const C_AWAY_DEF := Color(0.24, 0.42, 0.86)
 
 var _cam := Pm98Camera.new()
+## The original's own camera controller, built on the first LIVE frame (see `_drive_camera`).
+## Null on the non-live timeline path, which keeps the fitted still pose.
+var _cam_ctrl: Pm98CamCtrl = null
 var _half_len := DEF_HALF_LEN
 var _half_wid := DEF_HALF_WID
 
@@ -472,6 +475,24 @@ func _step_live(delta: float) -> void:
 	var want := int(round(delta * ENGINE_FPS))
 	_live.advance(clampi(want, 1, MAX_FRAMES_PER_TICK))
 	_sync_live()
+	_drive_camera(delta)
+
+
+## Run the ORIGINAL's own camera controller for this display frame and let it move the
+## view. `Pm98CamCtrl` is the exact port of `FUN_005f5850` plus the display driver at
+## 0x597906; `Pm98Camera.follow` applies its movement to the fitted pose (see the note in
+## that file for why the motion is applied as a delta and the rotation is not applied at
+## all). Anchored on the first live frame so the view starts exactly where the fit put it.
+func _drive_camera(delta: float) -> void:
+	var st := _live.camera_state()
+	var dt := maxi(1, int(round(delta * 1000.0)))
+	if _cam_ctrl == null:
+		_cam_ctrl = Pm98CamCtrl.new()
+		_cam_ctrl.settle(st)
+		_cam.anchor_to(_cam_ctrl)
+		return
+	_cam_ctrl.drive(st, dt)
+	_cam.follow(_cam_ctrl)
 
 
 func _sync_live() -> void:
@@ -573,6 +594,11 @@ func _draw() -> void:
 	# minute and scoreline instead of a stale 0:0.
 	if _live != null:
 		_sync_live()
+		# A harness that drives the engine itself turns _process off (PM98_LIVEWATCH_SHOT),
+		# so the camera would never see a frame. Give it the nominal display frame here so
+		# the captured shots show the camera where the driver really puts it.
+		if not is_processing():
+			_drive_camera(1.0 / 60.0)
 		var half := _live.pitch_half()
 		if half.x > 0 and half.y > 0:
 			_half_len = Pm98Camera.fx(half.x)

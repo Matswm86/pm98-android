@@ -1289,11 +1289,21 @@ func _tie_is_home(tie: Dictionary) -> bool:
 	return int(tie.get("home_id", -1)) == club_id
 
 
-## FinanceModel.TV_FEE key for a domestic cup by display name. Neither the F.A. Cup nor
-## the Coca-Cola Cup home TV fee was captured, so both fall through to a key with no
-## entry and pay £0 rather than a guess (REFRUN R6, "not measured").
+## FinanceModel.TV_FEE key for a domestic cup by display name.
+##
+## 2026-07-28 (s78): both domestic cups pay £0, and it is now PROVED rather than unmeasured.
+## Neither the F.A. Cup's nor the Coca-Cola Cup's competition class in MANAGER.EXE contains
+## a single write to `club+0x290`, the channelTV fee field (`docs/re/channeltv_fee_re.md`),
+## so the original raises no card and books no TELEVISION row for a domestic cup tie. The
+## £0 is the game's own figure. Any other cup name falls through to a key with no entry,
+## which is still 0.
+const CUP_TV_KEY := {
+	"F.A. Cup": "fa_cup",
+	"Coca-Cola Cup": "coca_cola",
+}
+
 func _tv_key_for_cup(cup_name: String) -> String:
-	return "cup:%s" % cup_name
+	return str(CUP_TV_KEY.get(cup_name, "cup:%s" % cup_name))
 
 
 ## The manager's UEFA prize for a European round just played (he was in it beforehand):
@@ -3397,8 +3407,12 @@ static func _comp_bucket(comp_key: String) -> String:
 		return "league"
 	if comp_key == "charity_shield":
 		return "charity"
-	if comp_key.begins_with("cup:"):
+	# The two domestic cups have their own proved-zero fee keys since s78; a `cup:` key is
+	# still produced for any cup name outside those two.
+	if comp_key in ["fa_cup", "coca_cola"] or comp_key.begins_with("cup:"):
 		return "domestic"
+	if comp_key == "supercup" or comp_key == "intercontinental":
+		return comp_key
 	return "euro"      # european_cup / uefa_cup / cup_winners_cup
 
 
@@ -3477,7 +3491,7 @@ func _post_home_match(comp_key: String) -> void:
 	# The LEAGUE fee is per-division (witnessed 2026-07-28: Premier GBP 90,000, First
 	# Division GBP 45,000); every other competition keeps its own measured constant.
 	var fee := FinanceModel.league_tv_fee(league_id) if comp_key == "league" \
-		else int(FinanceModel.TV_FEE.get(comp_key, 0))
+		else FinanceModel.tv_fee(comp_key)
 	_post_income("TICKETS", gate)
 	_post_income("TELEVISION", fee)
 	_post_expense("PLAYERS' BONUS", HOME_MATCH_BONUS)
@@ -5305,8 +5319,8 @@ func play_charity_shield_match(rng: RandomNumberGenerator, opp_view: Dictionary)
 	# is paid for BROADCASTING the match, so it lands whoever wins. No TICKETS: the Shield
 	# is played at a neutral ground, and the original's gate for it was not captured.
 	if h == club_id or a == club_id:
-		_post_income("TELEVISION", int(FinanceModel.TV_FEE.get("charity_shield", 0)))
-		_detail_comp_add("charity", "TELEVISION", int(FinanceModel.TV_FEE.get("charity_shield", 0)))
+		_post_income("TELEVISION", FinanceModel.tv_fee("charity_shield"))
+		_detail_comp_add("charity", "TELEVISION", FinanceModel.tv_fee("charity_shield"))
 	var pens := " (on penalties)" if decided == "pens" else ""
 	if winner == club_id:
 		_post_euro_points(CHARITY_PRIZE)
@@ -5542,6 +5556,7 @@ func _tick_one_off_finals(rng: RandomNumberGenerator) -> void:
 		var t2 := Cup.single_neutral_match(rng, euro_winner_cup, sa_champion_id, r_fn)
 		t2["season"] = season
 		intercontinental = t2
+		_post_one_off_tv(t2, "intercontinental")
 		_record_supercup_news(t2, "Intercontinental Cup", INTERCONTINENTAL_PRIZE)
 		_queue_champion_card("intercontinental", "INTERCONTINENTAL CUP", t2)
 	# March: the European Supercup, two legs, the Cup Winners' Cup holder hosting the first.
@@ -5551,8 +5566,27 @@ func _tick_one_off_finals(rng: RandomNumberGenerator) -> void:
 		tie["euro_cup_id"] = euro_winner_cup     # first-named on TEAMS IN CHAMPIONSHIPS
 		tie["cwc_id"] = euro_winner_cwc
 		supercup = tie
+		_post_one_off_tv(tie, "supercup")
 		_record_supercup_news(tie, "European Supercup", SUPERCUP_PRIZE)
 		_queue_champion_card("supercup", "EUROPEAN SUPERCUP", tie)
+
+
+## The channelTV fee for a winners-of-winners final, booked exactly the way the Charity
+## Shield's already is and for the same source-read reason: the `SCEUR` and `INTER`
+## competition classes each write `club+0x290` for BOTH sides of the tie, gated only on
+## `club+0x5c != 0xffff` (the managed club) -- `0x463dc0`/`0x463de6`/`0x463ee4`/`0x463f06`
+## for the Supercup at £375,000 and `0x43275d`/`0x432768` for the Intercontinental at
+## £187,500 (`docs/re/channeltv_fee_re.md`). TELEVISION only: no TICKETS, because the
+## Intercontinental is played at a neutral ground and the Supercup's gate was never
+## captured -- the same declared limit the Shield carries.
+func _post_one_off_tv(tie: Dictionary, comp_key: String) -> void:
+	var ids := [int(tie.get("home_id", -1)), int(tie.get("away_id", -1)),
+		int(tie.get("winner_id", -1)), int(tie.get("loser_id", -1))]
+	if not ids.has(club_id):
+		return
+	var fee := FinanceModel.tv_fee(comp_key)
+	_post_income("TELEVISION", fee)
+	_detail_comp_add(_comp_bucket(comp_key), "TELEVISION", fee)
 
 
 ## Queue one CAMPEON card for the hub. `comp` keys the card art; the winner's club name

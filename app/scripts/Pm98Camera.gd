@@ -64,6 +64,44 @@ var eye := Vector3(EYE_X, EYE_Y, EYE_Z)
 var origin := Vector2(ORIGIN_X, ORIGIN_Y)
 var focal := F_PX
 
+## ## The MOTION, added 2026-07-28 (s78)
+##
+## `Pm98CamCtrl` is the exact port of the original's camera controller and of the driver
+## that feeds it, so the app now has the engine's own eye every frame. What it does NOT
+## have is the original's view MATRIX: `FUN_005eec60` consumes `camctrl+0x8c`/`+0x8e`
+## (yaw/pitch) through `SetCamera`, and this projection is the axis-aligned reduction the
+## fit was solved against. Feeding the controller's ABSOLUTE eye into it would move the
+## camera to a pose the fit does not calibrate, and there is no banked frame to re-fit
+## against — five WATCH captures, five unknown instants.
+##
+## So the controller drives this camera by DELTA: the fitted pose stays the anchor and the
+## controller supplies the per-frame movement away from it. That is exactly the motion the
+## captures measure — `camera_re.md` §6 records the grass/hoarding seam at rows 82/65/90/82,
+## i.e. the camera TRANSLATING vertically between frames, which an axis-aligned projection
+## reproduces exactly. The rotation it cannot reproduce is stated here rather than faked.
+var _anchor_eye := Vector3.ZERO
+var _has_anchor := false
+
+
+## Take the controller's current eye as the zero point of the motion. Called once, when the
+## live match starts driving the camera.
+func anchor_to(ctrl: Pm98CamCtrl) -> void:
+	_anchor_eye = _ctrl_eye(ctrl)
+	_has_anchor = true
+	eye = Vector3(EYE_X, EYE_Y, EYE_Z)
+
+
+## Move the fitted pose by however far the controller has moved from its anchor.
+func follow(ctrl: Pm98CamCtrl) -> void:
+	if not _has_anchor:
+		anchor_to(ctrl)
+		return
+	eye = Vector3(EYE_X, EYE_Y, EYE_Z) + (_ctrl_eye(ctrl) - _anchor_eye)
+
+
+static func _ctrl_eye(ctrl: Pm98CamCtrl) -> Vector3:
+	return Vector3(fx(int(ctrl.eye[0])), fx(int(ctrl.eye[1])), fx(int(ctrl.eye[2])))
+
 
 ## Depth of a world point along the view axis, in metres. <= 0 means behind the camera.
 func depth(world: Vector3) -> float:

@@ -98,10 +98,48 @@ const EXPENSE_LINES := ["SIGN PLAYER", "CANCELLATION", "PLAYERS' WAGE", "PLAYERS
 ## screen to settle it, and ALL FOUR English divisions are now witnessed (see
 ## `LEAGUE_TV_FEE`). `TV_FEE["league"]` keeps the Premier value it was measured on;
 ## `league_tv_fee()` is the division-aware reader every caller uses.
+##
+## 2026-07-28 (s78): the PRODUCER was found and the whole table is now READ out of
+## MANAGER.EXE rather than captured -- `docs/re/channeltv_fee_re.md`, reproducible with
+## `tools/re/dump_tv_fee_table.py`. Each competition class writes `club+0x290` itself, as
+## an imm32, gated on `club+0x5c != 0xffff` (the managed club). The four captured league
+## figures and both previously unsourced cards (£187,500 Charity Shield, £375,000 European
+## Cup) all fall straight out of it, so nothing below is interpolated any more.
+##
+## ⭐ AND THE TWO DOMESTIC CUPS PAY NOTHING -- that is a RESULT, not a gap. Neither the
+## `FACUP` nor the `CCCUP` class block contains a single write to `club+0x290`, by
+## displacement or through any lea/add alias chain. Five driven careers never saw a
+## domestic-cup channelTV card because the game never raises one.
+
+## The engine's own money unit: 200 internal = £1 (`docs/re/transfer_value_re.md` §10).
+const MONEY_PER_POUND := 200
+
+## The raw imm32 each competition class writes to `club+0x290`, keyed the way the rest of
+## the port keys competitions. Held in ENGINE UNITS so the numbers here are literally the
+## bytes in MANAGER.EXE; `TV_FEE` below is this table in pounds and cannot drift from it.
+const TV_FEE_INTERNAL := {
+	"league": 18_000_000,            # 0x112a880, the Premier arm (see LEAGUE_TV_FEE)
+	"charity_shield": 37_500_000,    # 0x23c3460 @0x405b18 / 0x405b23
+	"intercontinental": 37_500_000,  # 0x23c3460 @0x43275d / 0x432768
+	"european_cup": 75_000_000,      # 0x47868c0 @0x454cfd ...
+	"uefa_cup": 75_000_000,          # 0x47868c0 @0x45c8e8 ...
+	"cup_winners_cup": 75_000_000,   # 0x47868c0 @0x461f77 ...
+	"supercup": 75_000_000,          # 0x47868c0 @0x463dc0 ...
+	"fa_cup": 0,                     # NO writer in the FACUP class block
+	"coca_cola": 0,                  # NO writer in the CCCUP class block
+}
+
+## The same table in pounds. Derived, never typed twice.
 const TV_FEE := {
 	"league": 90_000,
 	"charity_shield": 187_500,
+	"intercontinental": 187_500,
 	"european_cup": 375_000,
+	"uefa_cup": 375_000,
+	"cup_winners_cup": 375_000,
+	"supercup": 375_000,
+	"fa_cup": 0,
+	"coca_cola": 0,
 }
 
 ## The witnessed home-league channelTV fee per English division, keyed by the game_db
@@ -125,9 +163,23 @@ const LEAGUE_TV_FEE := {
 
 ## The home-league TV fee for a club's division. A division outside the witnessed four
 ## returns 0, which raises NO channelTV card and books NO television line -- an honest gap
-## in the ledger rather than a fabricated figure, exactly as the un-measured cups behave.
+## in the ledger rather than a fabricated figure.
 static func league_tv_fee(league_id: String) -> int:
 	return int(LEAGUE_TV_FEE.get(league_id, 0))
+
+
+## The channelTV fee for one competition, in pounds. Every key in `TV_FEE` is read out of
+## MANAGER.EXE (`docs/re/channeltv_fee_re.md`); `"fa_cup"` and `"coca_cola"` return 0
+## because the binary writes nothing for them, NOT because nobody measured them. An
+## unknown key returns 0 as well, which raises no card and books no TELEVISION row.
+static func tv_fee(comp_key: String) -> int:
+	return int(TV_FEE.get(comp_key, 0))
+
+
+## The same fee in the engine's own unit, for anything that wants to compare against the
+## binary directly. Kept exact: `TV_FEE` is `TV_FEE_INTERNAL / 200` for every key.
+static func tv_fee_internal(comp_key: String) -> int:
+	return int(TV_FEE_INTERNAL.get(comp_key, 0))
 
 ## The channelTV card's own wording, verbatim off the frame (two lines, then the fee).
 const CHANNEL_TV_TEXT := "A TV station has bought the rights\nto broadcast the current match."

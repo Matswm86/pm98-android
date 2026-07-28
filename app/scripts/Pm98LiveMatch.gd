@@ -165,6 +165,73 @@ func pitch_half() -> Vector2i:
 	return Vector2i(_half_len, _half_wid)
 
 
+## Exactly what the display driver `0x597906..0x598276` reads out of `matchctx` to place
+## the camera, in the shape `Pm98CamCtrl.drive` wants. Every key is a real engine field:
+##   `+0x1820`/`+0x1824` the pitch halves, `+0x17fc` the MATCH OPTIONS camera mode,
+##   `+0x438` the tracked actor, `+0x440` the designated carrier, `+0x444` the ball,
+##   `+0x448` the restart type, `+0x461` the flag byte, `+0x19dc` the goal-cut suppressor,
+##   `+0x1614` the ball anchor the driver falls back to, `+0x285c` the pan X.
+## ## Two DECLARED substitutions, because the port models the SIMULATION and some of the
+## driver's inputs are DISPLAY fields the simulation never writes
+##
+## 1. **The look-at fallback.** @0x597c42 the driver falls back to the ball ANCHOR
+##    `matchctx+0x1614`. That field does not exist in this port (`match_state.has(0x1614)`
+##    is false) because it belongs to the display side. The ball object's OWN position is
+##    what that anchor tracks, so it stands in. Named here, not hidden.
+## 2. **The camera MODE.** `matchctx+0x17fc` comes from `session+0xfe0`, a MATCH OPTIONS
+##    setting; the port's session has no `+0xfe0` and the field reads back `0xffffffff`.
+##    So the mode is chosen, not read: the banked WATCH capture puts the hoardings across
+##    the TOP as the far touchline, which places the eye on the **-Y** side, and mode 6 is
+##    the one arm of the eleven that does that. `DEFAULT_MODE` is that choice and it is a
+##    CHOICE -- the moment a MATCH OPTIONS capture exists, read `+0xfe0` instead.
+##
+## Everything else is a real engine field: `+0x448` (restart), `+0x438` (tracked actor),
+## `+0x440` (designated carrier), `+0x461` (flags), `+0x19dc`, the pitch halves.
+const DEFAULT_CAMERA_MODE := 6
+
+func camera_state() -> Dictionary:
+	var actor: Variant = match_state.get(0x438, null)
+	# @0x597c0e: `+0x43c` when it is a player and `+0x460 <= 1`, else `+0x440`, else the
+	# ball. The `+0x43c` sentinel is an INT when unset (the s59 unification), so the type
+	# test is what distinguishes "a player" from "none".
+	var focus: Variant = match_state.get(0x43c, null)
+	if not (focus is Dictionary) or int(match_state.get(0x460, 0)) > 1:
+		focus = match_state.get(0x440, null)
+	var look: Array
+	if focus is Dictionary:
+		var f: Dictionary = focus
+		look = [Pm98Trig._i32(int(f.get(4, 0))), Pm98Trig._i32(int(f.get(8, 0))),
+			Pm98Trig._i32(int(f.get(0xc, 0)))]
+	else:
+		look = [Pm98Trig._i32(int(_ball.get(4, 0))), Pm98Trig._i32(int(_ball.get(8, 0))),
+			Pm98Trig._i32(int(_ball.get(0xc, 0)))]
+	var mode := int(match_state.get(0x17fc, DEFAULT_CAMERA_MODE))
+	if mode < 0 or mode > Pm98CamCtrl.MODE_MAX:
+		mode = DEFAULT_CAMERA_MODE
+	var out := {
+		"half_len": _half_len, "half_wid": _half_wid,
+		"mode": mode,
+		"look_target": look,
+		"pan_x": Pm98Trig._i32(int(match_state.get(0x285c, 0))),
+		"restart": int(match_state.get(0x448, -1)),
+		"restart_blocked": int(match_state.get(0x19dc, 0)) != 0,
+		"flags": int(match_state.get(0x461, 0)),
+	}
+	if actor is Dictionary:
+		var a: Dictionary = actor
+		out["actor"] = {"x": Pm98Trig._i32(int(a.get(4, 0))),
+			"y": Pm98Trig._i32(int(a.get(8, 0))), "facing": int(a.get(0x34, 0)) & 0xffff}
+	# The ball swing's own gate is `+0x461 & 0x40`, which this port never sets, so the swing
+	# never fires here. The wiring is kept complete anyway so it works the day it does.
+	out["ball"] = {
+		"x": Pm98Trig._i32(int(_ball.get(4, 0))), "y": Pm98Trig._i32(int(_ball.get(8, 0))),
+		"z": Pm98Trig._i32(int(_ball.get(0xc, 0))),
+		"travel_x": Pm98Trig._i32(int(_ball.get(0x1e0, 0))) - Pm98Trig._i32(int(_ball.get(4, 0))),
+		"travel_y": Pm98Trig._i32(int(_ball.get(0x1e4, 0))) - Pm98Trig._i32(int(_ball.get(8, 0))),
+	}
+	return out
+
+
 ## The ball as {nx, ny, height} — `height` in metres off the +0xc fixed-point field.
 func ball_position() -> Dictionary:
 	return {

@@ -63,6 +63,53 @@ func _run() -> void:
 	ok = _assert(FinanceScreen.fmt_money(45_000) == "£45,000",
 		"the First Division fee renders as the card's own '£45,000'") and ok
 
+	# 2026-07-28 (s78): the PRODUCER is found and the whole table is READ out of
+	# MANAGER.EXE -- docs/re/channeltv_fee_re.md, reproducible byte-for-byte with
+	# `python tools/re/dump_tv_fee_table.py`. Every competition class writes club+0x290
+	# itself as an imm32, in the engine's own unit (200 internal = £1). Pin the RAW
+	# immediates as well as the pounds, so neither table can drift from the image.
+	ok = _assert(FinanceModel.MONEY_PER_POUND == 200,
+		"the engine's money unit is 200 internal per pound") and ok
+	for key in FinanceModel.TV_FEE_INTERNAL:
+		var raw := int(FinanceModel.TV_FEE_INTERNAL[key])
+		ok = _assert(raw % FinanceModel.MONEY_PER_POUND == 0,
+			"%s: the imm32 %d divides exactly by 200" % [key, raw]) and ok
+		ok = _assert(raw / FinanceModel.MONEY_PER_POUND == FinanceModel.tv_fee(key),
+			"%s: £%d is exactly the imm32 / 200" % [key, FinanceModel.tv_fee(key)]) and ok
+	ok = _assert(FinanceModel.tv_fee_internal("league") == 18_000_000,
+		"Premier arm imm32 0x112a880 @0x417468") and ok
+	ok = _assert(FinanceModel.tv_fee_internal("charity_shield") == 37_500_000,
+		"Charity Shield imm32 0x23c3460 @0x405b18") and ok
+	ok = _assert(FinanceModel.tv_fee_internal("european_cup") == 75_000_000,
+		"European Cup imm32 0x47868c0 @0x454cfd") and ok
+	# The four European/one-off competitions the port had never sourced.
+	ok = _assert(FinanceModel.tv_fee("uefa_cup") == 375_000,
+		"U.E.F.A. Cup TV fee £375,000 (CUEFA class, @0x45c8e8)") and ok
+	ok = _assert(FinanceModel.tv_fee("cup_winners_cup") == 375_000,
+		"Cup Winners' Cup TV fee £375,000 (RECOP class, @0x461f77)") and ok
+	ok = _assert(FinanceModel.tv_fee("supercup") == 375_000,
+		"European Supercup TV fee £375,000 (SCEUR class, @0x463dc0)") and ok
+	ok = _assert(FinanceModel.tv_fee("intercontinental") == 187_500,
+		"Intercontinental Cup TV fee £187,500 (INTER class, @0x43275d)") and ok
+	# ⭐ The two domestic cups pay NOTHING, and that is a RESULT: neither the FACUP nor the
+	# CCCUP class block writes club+0x290 at all. Pinned so a later session cannot "fill
+	# the gap" with an invented figure.
+	ok = _assert(FinanceModel.tv_fee("fa_cup") == 0,
+		"F.A. Cup pays £0 -- the FACUP class has NO club+0x290 writer") and ok
+	ok = _assert(FinanceModel.tv_fee("coca_cola") == 0,
+		"Coca-Cola Cup pays £0 -- the CCCUP class has NO club+0x290 writer") and ok
+	ok = _assert(FinanceModel.TV_FEE.has("fa_cup") and FinanceModel.TV_FEE.has("coca_cola"),
+		"both domestic cups are PRESENT in the table at 0, not absent from it") and ok
+	# And they must still land in the DOMESTIC detail section, not the euro one.
+	ok = _assert(Career._comp_bucket("fa_cup") == "domestic",
+		"the F.A. Cup books into the domestic detail section") and ok
+	ok = _assert(Career._comp_bucket("coca_cola") == "domestic",
+		"the Coca-Cola Cup books into the domestic detail section") and ok
+	ok = _assert(Career._comp_bucket("uefa_cup") == "euro",
+		"the U.E.F.A. Cup books into the euro detail section") and ok
+	ok = _assert(Career._comp_bucket("supercup") == "supercup",
+		"the Supercup books into its own detail section") and ok
+
 	var scr: ChannelTvScreen = ChannelTvScreen.new()
 	get_root().add_child(scr)
 	scr.size = Vector2(640, 480)

@@ -122,17 +122,23 @@ So the camera translates vertically between frames, and `watch_04` is the cut. T
 fitted to `watch_02` alone, so **it is that one instant's camera**, and it is correct for that
 instant only.
 
-## 7. Still open — stated plainly
+## 7. ✅ CLOSED 2026-07-28 (s78) — see `camera_motion_re.md`
 
-The **port**. `app/scripts/Pm98Camera.gd` still holds the single fitted pose, and the app's
-camera does not move. What a port needs on top of this document:
+This section listed three prerequisites for a port. **All three are read out of the image
+and the port is built, gated and rendering**: `docs/re/camera_motion_re.md`,
+`app/scripts/Pm98CamCtrl.gd`, `app/tests/test_cam_ctrl.gd`.
 
-1. the eight `switch` arms of the mode table, and what `matchctx+0x194c` / `+0x1950` / `+0x1960`
-   are built from (they are written elsewhere in the same un-framed function);
-2. `FUN_005f5850`'s interpolation rates — the `ftol()` calls Ghidra drops are the per-frame
-   fraction, and they need the raw disassembly to recover;
-3. `matchctx+0x438` / `+0x444` / `+0x461` — which actor the camera is tracking, and when.
+Two things on THIS page turned out to be wrong and are corrected there:
 
-None of that is guessed here. What IS closed is the object's layout, the eye formula, the
-orientation formula, the clamp boxes, the restart cut and the fact — now measured — that the
-original's camera moves.
+* **"eight arms, one per mode"** (§5) — the guard is `cmp eax, 0xa / ja` and the jump table
+  at `0x59830c` has **eleven** entries. The eight are the compass ring; modes 8 and 9 are
+  two low goal-line angles and mode 10 is a free camera.
+* **"`eye = lookAt - dir*distance`"** (§3) — `+0x48` is an ANCHOR POINT, not a unit
+  direction. The binary normalises `lookAt - anchor` first (`FUN_005ee200`) and `+0x78` is
+  the eye's distance **from the look-at**. Read literally, §3's form would put the eye
+  kilometres away.
+
+Also newly read there: the interpolation rate is `ftol(dt_ms * 0.003 * 65536.0)`, the arc
+path is a polar lerp about the look-at with the angle delta sign-extended to 16 bits, the
+look-at box is inset 2 m in X/Y before its clamp, and the restart cut sets a **distance** as
+well as a height (9 m, or 5.5 m on a goal).
