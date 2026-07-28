@@ -109,14 +109,28 @@ different things and only one of them was the outer loop:
   leaves, not on the harness.** Recorded here rather than buried.
 * A **stall guard** was added so this reports instead of hanging: the harness watches
   `clk + banked` and gives up with a state line after 3 frozen steps.
-* **Goals 2-7 were NOT reached this session, and that is said plainly.** With the board
-  pause modelled the harness gets past the clk-2837 goal and step 3 goes back to open play
-  (phase 8 -> 2, dispatch 6 -> 0), but that step then runs for 25+ minutes without
-  reporting, and the run was stopped rather than left to guess at. Whether it is walking
-  the rest of the half toward the next event (which is what a correct WATCH step looks
-  like: one step per event, and events are thousands of clks apart) or breaching the
-  40,000-frame wait guard is the FIRST thing to settle next session — the stall guard and
-  the two probes are there to make that a minutes-long question.
+* **RESULT: the match now plays ON past the goal, and where it stops next is a SET PIECE.**
+  The full run reads:
+
+  | step | clk | phase | dispatch | +0x1a1e | kickoffs |
+  |---|---|---|---|---|---|
+  | 1 | 2837 | 8 | 6 (GOAL) | 0 | 1 |
+  | 2 | 2837 | 8 | 6 | **1** (armed) | 1 |
+  | 3 | **3885** | 8 | **3** | 0 | 2 |
+  | 4 | 3885 | 8 | 3 | **1** (armed) | 2 |
+  | 5 | — | — | — | — | wait-loop guard breached |
+
+  Step 3 is the proof: play resumed after the goal and ran **another 1,048 clks** to the
+  next event on its own. The board-pause model is therefore right, and the ">5 h post-goal
+  spin" is closed.
+
+  What stops it now is **dispatch 3** — a set piece — and it stops with the wait loop's own
+  pre-existing message: *"set-piece never resolves; +0x1a20 latch caveat"*. That is exactly
+  the three still-deferred leaves (the IF-B same-team set-piece runner, b1420's b1500/b1c80
+  role sub-leaves, ps-9 chase geometry), all of which are set-piece machinery. So this is a
+  LIVE confirmation, not an inference, that road step (c) is the next blocker and that
+  goals 2-7 come after it, not before. **Goals 2-7 and full time were NOT reached this
+  session** and are not claimed.
 
 ### The 48x64 MINIESC "56 px" entry is STALE
 
