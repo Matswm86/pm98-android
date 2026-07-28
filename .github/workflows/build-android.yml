@@ -176,7 +176,7 @@ jobs:
                    test_tactics_screen test_cheats_live \
                    test_stadium_screen test_stadium_works \
                    test_youth_loop test_career_seed test_pyramid \
-                   test_retirement test_sacking test_weekly_illness \
+                   test_retirement test_sacking test_unsackable test_weekly_illness \
                    test_mantoman test_shadow_blit \
                    test_ground_preset test_live_match \
                    test_jug_render test_match_simulador; do

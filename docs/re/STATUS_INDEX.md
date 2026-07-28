@@ -7,12 +7,12 @@ and the 2026-07-26 complete audit found only ~12 of 125 docs carry one. This is
 what that delegation needs instead of 113 hand-written sentences: for every doc,
 the artefacts that can CONFIRM it, each of them checkable.
 
-* **131 docs**, 18 with a `Status:` line of their own.
-* **35** are covered by a `diff_*_parity.py` render-diff gate — the
+* **132 docs**, 18 with a `Status:` line of their own.
+* **36** are covered by a `diff_*_parity.py` render-diff gate — the
   strongest evidence here, since a gate compares the app to a captured frame.
-* **65** have a headless `test_*.gd` suite; **89** cite MANAGER.EXE
+* **65** have a headless `test_*.gd` suite; **90** cite MANAGER.EXE
   addresses, i.e. their claims are anchored in the binary and not only in frames.
-* **24** name their proof directly on an `Evidence:` line — for the plans,
+* **25** name their proof directly on an `Evidence:` line — for the plans,
   audits and M5 session notes, whose evidence is a banked capture, an oracle
   runner or a witness directory rather than a screen gate. Every path on those
   lines is checked to exist by this script.
@@ -92,6 +92,7 @@ nothing are the ones to distrust.
 | `fixtures_screen_re.md` | — | `diff_fixtures_parity.py` | `test_fixtures_screen.gd` | `FixturesScreen.gd` | — | — | 3 |
 | `goalscorers_screen_re.md` | — | — | `test_goalscorers_screen.gd` | `GoalScorersScreen.gd` | — | — | 4 |
 | `hack_three_forwards.md` | — | `diff_options_parity.py` | — | — | 16 | — | 2 |
+| `hack_unsackable.md` | — | `diff_options_parity.py` | — | — | 30 | 2 path(s) | 1 |
 | `hub_circle_re.md` | — | — | — | — | 25 | — | — |
 | `injuries_screen_re.md` | — | `diff_injuries_row_parity.py` | `test_injuries_screen.gd` | `InjuriesScreen.gd` | 21 | — | 2 |
 | `injury_model_re.md` | — | — | — | — | 33 | — | — |
@@ -129,7 +130,7 @@ nothing are the ones to distrust.
 | `results_screen_re.md` | — | — | `test_results_screen.gd` | `CompResultScreen.gd`, `MatchResultScreen.gd` | — | — | 3 |
 | `retirement_re.md` | yes | — | `test_retirement.gd` | `Retirement.gd` | 53 | — | 2 |
 | `rival_screen_re.md` | — | — | `test_rival_screen.gd` | `RivalScreen.gd` | 10 | — | 2 |
-| `sack_path_re.md` | yes | — | `test_sacking.gd` | — | 58 | — | 3 |
+| `sack_path_re.md` | yes | — | `test_sacking.gd`, `test_unsackable.gd` | — | 58 | — | 3 |
 | `savegame_dialog_re.md` | — | — | `test_savegame_dialog.gd` | `SaveGameDialog.gd` | — | — | 2 |
 | `scout_screen_re.md` | — | `diff_scout_bar_parity.py`, `diff_scout_offers_parity.py` | `test_scout_bar.gd`, `test_scout_offer_route.gd` | `ScoutScreen.gd` | 27 | — | 5 |
 | `season_end_sequence_re.md` | — | `diff_seasonend_year_parity.py` | `test_season_start_screen.gd`, `test_season_stat_store.gd` | `EndOfSeasonScreen.gd`, `PreseasonScreen.gd` | — | — | 1 |

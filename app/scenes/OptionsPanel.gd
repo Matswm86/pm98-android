@@ -14,9 +14,10 @@ class_name OptionsPanel
 ## truncation. Honest gap: a sub-100 volume render is unwitnessed — the
 ## gradient is truncated from the right with the trough navy (inferred).
 ##
-## DECLARED DEVIATION (2026-07-26): this modal now carries ONE row the original does
-## not — THREE UP FRONT, the port-side switch for the MANAGER_HACK.EXE cheat
-## (docs/re/hack_three_forwards.md). It is drawn in the box's empty bottom-left band
+## DECLARED DEVIATION (2026-07-26, extended 2026-07-28): this modal carries TWO rows the
+## original does not — the port-side switches for the two MANAGER_HACK.EXE cheats,
+## UNSACKABLE (docs/re/hack_unsackable.md) and THREE UP FRONT
+## (docs/re/hack_three_forwards.md). Both are drawn in the box's empty bottom-left band
 ## (R_CHEAT_BAND), left of the OK plate, in the game's own proman font and the modal's
 ## own frame-sampled label ink. `tools/re/diff_options_parity.py` is the gate: it proves
 ## the rest of the modal is still 0 px against the MANAGER.EXE capture, that the band
@@ -36,15 +37,29 @@ const R_SFX_BOX := Rect2(393, 248, 13, 13)
 const R_TRANS_ON := Rect2(310, 287, 13, 13)
 const R_TRANS_OFF := Rect2(360, 287, 13, 13)
 const R_OK := Rect2(432, 320, 46, 22)      # plate around the red OK glyphs (446,328)
-# THREE UP FRONT — the ONLY row on this modal that is NOT in the original. The port-side
-# switch for the MANAGER_HACK.EXE cheat (docs/re/hack_three_forwards.md), placed in the
-# box's empty bottom-left band (design y318..344, left of the OK plate at x432) so it
-# overdraws nothing the frame cut carries. Same ON/OFF X-box idiom as TRANSITIONS.
-# Its pixels are declared, not hidden: `tools/re/diff_options_parity.py` excludes exactly
-# this band and asserts the REST of the modal is still 0 px vs the MANAGER.EXE capture.
-const R_CHEAT_ON := Rect2(310, 322, 13, 13)
-const R_CHEAT_OFF := Rect2(360, 322, 13, 13)
-const R_CHEAT_BAND := Rect2(146, 318, 280, 22)   # what the parity diff excludes
+# The TWO cheat rows — the only rows on this modal that are NOT in the original. They are
+# the port-side switches for the MANAGER_HACK.EXE cheats (docs/re/hack_unsackable.md and
+# docs/re/hack_three_forwards.md), placed in the box's empty bottom-left band, left of the
+# OK plate at x432, so they overdraw nothing the frame cut carries. Same ON/OFF X-box
+# idiom as TRANSITIONS.
+#   The band was (146,318,280,22) while there was one row. Adding the second row meant
+#   re-measuring what the ORIGINAL actually paints in the bottom of this box, and the old
+#   measurement was WRONG: it tested only for label-gold and OK-plate red, so it missed the
+#   TRANSITIONS row's own WHITE ON / OFF captions at rows 308..314, x307..380 — which the
+#   first two-row layout then drew straight through. Measured again over gold + red +
+#   white, the box's genuinely empty rows below TRANSITIONS are 315..343 (the OK glyphs at
+#   328..334 sit at x446..463, right of this band), and the left bound is 138 — 2 px inside
+#   the box — because "THREE UP FRONT" is the widest caption and its right-aligned ink
+#   reaches x141. Band (138,315,288,29) carries ZERO gold, red or white pixels of the
+#   original's own. `tools/re/diff_options_parity.py` re-proves that, the containment, and
+#   now the LIVE render at 0 px outside it.
+#   Row geometry, measured off the rendered frame: a 13 px X-box at y=Y covers Y..Y+12; a
+#   size-10 proman caption at y_top=T inks T+2..T+8.
+const R_UNSACK_ON := Rect2(310, 315, 13, 13)
+const R_UNSACK_OFF := Rect2(360, 315, 13, 13)
+const R_CHEAT_ON := Rect2(310, 331, 13, 13)
+const R_CHEAT_OFF := Rect2(360, 331, 13, 13)
+const R_CHEAT_BAND := Rect2(138, 315, 288, 29)   # what the parity diff excludes
 const LABEL_END_X := 266.0                  # every baked label's ink ends here (measured)
 const C_LABEL := Color8(255, 223, 0)        # the modal's own label ink (frame-sampled)
 const C_TROUGH := Color8(0, 0, 50)          # box interior navy (frame-sampled)
@@ -142,6 +157,10 @@ func _on_input(e: InputEvent) -> void:
 			am.call("set_transitions", true)
 		elif R_TRANS_OFF.has_point(d):
 			am.call("set_transitions", false)
+		elif R_UNSACK_ON.has_point(d):
+			am.call("set_unsackable", true, true)
+		elif R_UNSACK_OFF.has_point(d):
+			am.call("set_unsackable", false, true)
 		elif R_CHEAT_ON.has_point(d):
 			am.call("set_three_up_front", true, true)
 		elif R_CHEAT_OFF.has_point(d):
@@ -175,28 +194,33 @@ func _draw() -> void:
 			draw_rect(Rect2(lx, r.position.y, r.end.x - lx, r.size.y), C_TROUGH, true)
 	# X-boxes: baked = channels OFF (checked) + transitions ON (checked)
 	var cheat_on: bool = am != null and bool(am.get("cheat_three_up_front"))
+	var unsack_on: bool = am != null and bool(am.get("cheat_unsackable"))
 	for trio in [[R_MUSIC_BOX, not music_on], [R_SFX_BOX, not sfx_on],
 			[R_TRANS_ON, trans_on], [R_TRANS_OFF, not trans_on],
+			[R_UNSACK_ON, unsack_on], [R_UNSACK_OFF, not unsack_on],
 			[R_CHEAT_ON, cheat_on], [R_CHEAT_OFF, not cheat_on]]:
 		var tex := _checked if bool(trio[1]) else _empty
 		if tex != null:
 			draw_texture(tex, (trio[0] as Rect2).position)
-	# THREE UP FRONT caption row — port-only, drawn in the game's own proman font and the
+	# The two cheat caption rows — port-only, drawn in the game's own proman font and the
 	# modal's own frame-sampled label ink, inside R_CHEAT_BAND.
 	# Geometry copied from the modal's own three rows rather than invented: all three
 	# baked labels are RIGHT-aligned with their ink ending at design x=266 (measured on
 	# options_box.png), and the ON/OFF captions are white, not label-gold. The captions sit
 	# LEFT of the boxes here because the original's place for them — under the boxes —
-	# falls outside the box on this row.
+	# falls outside the box on these rows.
 	var f := PMChrome.font("10")
-	PMChrome.text(self, f, LABEL_END_X, 327, "THREE UP FRONT", C_LABEL, 10, 2)
-	PMChrome.text(self, f, R_CHEAT_ON.position.x - 3, 327, "ON", Color.WHITE, 10, 2)
-	PMChrome.text(self, f, R_CHEAT_OFF.position.x - 3, 327, "OFF", Color.WHITE, 10, 2)
+	PMChrome.text(self, f, LABEL_END_X, 317, "UNSACKABLE", C_LABEL, 10, 2)
+	PMChrome.text(self, f, R_UNSACK_ON.position.x - 3, 317, "ON", Color.WHITE, 10, 2)
+	PMChrome.text(self, f, R_UNSACK_OFF.position.x - 3, 317, "OFF", Color.WHITE, 10, 2)
+	PMChrome.text(self, f, LABEL_END_X, 333, "THREE UP FRONT", C_LABEL, 10, 2)
+	PMChrome.text(self, f, R_CHEAT_ON.position.x - 3, 333, "ON", Color.WHITE, 10, 2)
+	PMChrome.text(self, f, R_CHEAT_OFF.position.x - 3, 333, "OFF", Color.WHITE, 10, 2)
 	# the arming readout: this week's XI natural-FW count (>= 3 = the forwards
 	# trigger is armed). White = armed, the label gold = not yet — both are the
 	# row's own inks. Only with the cheat ON and a career mounted.
 	if cheat_on and xi_fw >= 0:
-		PMChrome.text(self, f, R_CHEAT_OFF.end.x + 8, 327, "%d FW" % xi_fw,
+		PMChrome.text(self, f, R_CHEAT_OFF.end.x + 8, 333, "%d FW" % xi_fw,
 			Color.WHITE if xi_fw >= 3 else C_LABEL, 10)
 	if _ok_held:
 		draw_rect(R_OK, C_PRESS, true)

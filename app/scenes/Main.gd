@@ -261,21 +261,49 @@ func _options_shot() -> void:
 		get_tree().quit()
 		return
 	var was: bool = AudioManager.cheat_three_up_front
+	var was_unsack: bool = AudioManager.cheat_unsackable
 	AudioManager.set_three_up_front(false)
+	AudioManager.set_unsackable(false)
 	op.queue_redraw()
 	await _settle()
 	_save_shot(dir, "options_cheat_off.png")
-	# tap the ON box through the panel's own gui handler, not by setting the flag
-	for pressed in [true, false]:
-		var e := InputEventScreenTouch.new()
-		e.position = OptionsPanel.R_CHEAT_ON.get_center()
-		e.pressed = pressed
-		op._on_input(e)
+	# ...and one frame in the CAPTURE's own MANAGER.INI state (MUSIC: OFF / SOUND: OFF /
+	# TRANSITIONS: ON, both volumes 100), so tools/re/diff_options_parity.py can diff the
+	# LIVE render against the MANAGER.EXE frame instead of only the baked chrome. Restored
+	# straight after; nothing is persisted.
+	var s_music: bool = AudioManager.music_enabled
+	var s_sfx: bool = AudioManager.sfx_enabled
+	var s_trans: bool = AudioManager.transitions_enabled
+	var s_mv: int = AudioManager.music_volume
+	var s_sv: int = AudioManager.sfx_volume
+	AudioManager.set_music_enabled(false)
+	AudioManager.set_sfx_enabled(false)
+	AudioManager.set_transitions(true)
+	AudioManager.set_music_volume(100)
+	AudioManager.set_sfx_volume(100)
+	op.xi_fw = -1                      # the arming readout is off with the cheat off anyway
+	op.queue_redraw()
+	await _settle()
+	_save_shot(dir, "options_witness_state.png")
+	AudioManager.set_music_enabled(s_music)
+	AudioManager.set_sfx_enabled(s_sfx)
+	AudioManager.set_transitions(s_trans)
+	AudioManager.set_music_volume(s_mv)
+	AudioManager.set_sfx_volume(s_sv)
+	# tap each ON box through the panel's own gui handler, not by setting the flag
+	for r in [OptionsPanel.R_CHEAT_ON, OptionsPanel.R_UNSACK_ON]:
+		for pressed in [true, false]:
+			var e := InputEventScreenTouch.new()
+			e.position = (r as Rect2).get_center()
+			e.pressed = pressed
+			op._on_input(e)
 	await _settle()
 	_save_shot(dir, "options_cheat_on.png")
-	print("OPTIONS-SHOT done cheat=%s engine=%s" % [
-		str(AudioManager.cheat_three_up_front), str(Pm98StatMatch.cheat_three_up_front)])
+	print("OPTIONS-SHOT done cheat=%s engine=%s unsackable=%s career=%s" % [
+		str(AudioManager.cheat_three_up_front), str(Pm98StatMatch.cheat_three_up_front),
+		str(AudioManager.cheat_unsackable), str(Career.cheat_unsackable)])
 	AudioManager.set_three_up_front(was, true)
+	AudioManager.set_unsackable(was_unsack, true)
 	get_tree().quit()
 
 

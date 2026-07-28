@@ -47,6 +47,7 @@ var snd_comments := true
 var camera_mode := "static"     # static/auto/free
 var lineups_on := true          # LINE-UPS: pre-match XI-vs-XI photo roll (live consumer)
 var cheat_three_up_front := false   # port-only cheat, NOT a PM98 option — see set_three_up_front
+var cheat_unsackable := false       # port-only cheat, NOT a PM98 option — see set_unsackable
 
 const _SETTINGS := "user://settings.cfg"
 const _MUSIC_DB := -8.0   # the module theme sits under the UI
@@ -94,6 +95,7 @@ func _load_settings() -> void:
 	camera_mode = str(cf.get_value("match", "camera_mode", camera_mode))
 	lineups_on = bool(cf.get_value("match", "lineups", lineups_on))
 	set_three_up_front(bool(cf.get_value("cheats", "three_up_front", cheat_three_up_front)))
+	set_unsackable(bool(cf.get_value("cheats", "unsackable", cheat_unsackable)))
 
 
 func save_settings() -> void:
@@ -115,6 +117,7 @@ func save_settings() -> void:
 	cf.set_value("match", "camera_mode", camera_mode)
 	cf.set_value("match", "lineups", lineups_on)
 	cf.set_value("cheats", "three_up_front", cheat_three_up_front)
+	cf.set_value("cheats", "unsackable", cheat_unsackable)
 	cf.save(_SETTINGS)
 
 
@@ -125,6 +128,18 @@ func save_settings() -> void:
 func set_three_up_front(on: bool, persist := false) -> void:
 	cheat_three_up_front = on
 	Pm98StatMatch.cheat_three_up_front = on
+	if persist:
+		save_settings()
+
+
+## UNSACKABLE — the port of the MANAGER_HACK.EXE unsackable patch
+## (docs/re/hack_unsackable.md). Also not a PM98 setting, so it shares the `cheats`
+## block. The EXE patch makes FUN_00545fd0's three dismissal arms unreachable; the port
+## mirrors that with one early return in `Career.sack_message()`. Default OFF, and OFF
+## leaves every dismissal exactly as the original raises it.
+func set_unsackable(on: bool, persist := false) -> void:
+	cheat_unsackable = on
+	Career.cheat_unsackable = on
 	if persist:
 		save_settings()
 

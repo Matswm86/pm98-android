@@ -69,6 +69,20 @@ is an approximation, and HIGHLIGHTS cannot be built at all, the 3D models are no
 
 Full list with per-item status: [`docs/REMAINING.md`](docs/REMAINING.md).
 
+## Cheats
+
+Two, both off by default, both toggled on the hub's OPTIONS panel (tap the top edge for the
+dropdown bar, then the headphones). Neither is a Premier Manager 98 setting: each is a patch
+worked out against the real `MANAGER.EXE` and then ported, so with the switch off the game
+behaves exactly as the original does.
+
+**Unsackable.** The board can hold as many urgent meetings as it likes. Three weeks in the red,
+a results review gone against you, a squad down to ten men: none of them end the career.
+
+**Three up front.** Field three forwards and the match engine stops pretending: your chance
+count is floored and the opposing keeper stops saving. Instant results only, watched matches
+play normally.
+
 ## Built with
 
 Godot 4, and the APK is built in GitHub Actions. `tools/` is the Python that decodes the

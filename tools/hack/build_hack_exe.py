@@ -1,6 +1,17 @@
 #!/usr/bin/env python3
-"""Build MANAGER_HACK.EXE — "three forwards = the keeper cannot save, and you always
-get at least three chances a half" patch for the PM98 statistical (BRIEF/RESULT) engine.
+"""Build MANAGER_HACK.EXE — the PM98 cheat patches, applied to a COPY of the owned
+MANAGER.EXE (the original is never modified).
+
+Two cheats, selected with `--cheats=` (default: both):
+
+  three_forwards  "three forwards = the keeper cannot save, and you always get at least
+                  three chances a half" — the statistical (BRIEF/RESULT) engine.
+  unsackable      the board can never dismiss you — FUN_00545fd0's three tests.
+
+Usage:
+    build_hack_exe.py [SRC_EXE] [DST_EXE] [--cheats=three_forwards,unsackable]
+
+--- three_forwards ---------------------------------------------------------------
 
 Trigger: the attacking XI contains >= 3 players whose ROLE byte (participant +0xcc,
 sourced from player+0x1c) is 3 = ATT/FOR. Evaluated per side, per chance, off the live
@@ -21,6 +32,34 @@ gets the same buff.
 Patch mechanism: five 5-byte E9 hooks into a code cave in the .text raw-size slack
 (VA 0x622847, file 0x221c47, 441 zero bytes before .rdata). Nothing is relocated, the
 image layout is untouched, and every hook site's original bytes are asserted first.
+
+--- unsackable -------------------------------------------------------------------
+
+`FUN_00545fd0` IS the weekly hub screen's own run(): before it draws the menu it tests
+three dismissal conditions in one order and, on ANY of them, raises one modal
+(`FUN_005e5050`), detaches the manager (`FUN_0057a500(club, 0xffff)` @0x54609e) and
+returns without building a next screen — which is how a career ends. The three tests,
+read off the real bytes (docs/re/sack_path_re.md, and disassembled again 2026-07-28):
+
+    00546013  cmp dword ptr [eax+0x224], edi   ; edi = 3, weeks running at a loss
+    00546019  jbe 0x54603a                     ; -> keep him, fall to test 2
+    0054603a  mov ecx, dword ptr [eax+0x294]   ; the board's RESULTS-REVIEW sack flag
+    00546042  cmp ecx, ebx                     ; ebx = 0
+    00546044  je  0x546063                     ; -> keep him, fall to test 3
+    00546063  cmp dword ptr [eax+0x28], 0x10   ; squad size vs the 16-man minimum
+    00546067  jae 0x5460a8                     ; -> keep him, carry on drawing the hub
+
+Every "keep him" branch is a short conditional jump whose target is exactly the NEXT
+test (or, for the third, the hub build at 0x5460a8). So the whole cheat is THREE BYTES:
+flip each opcode to `JMP rel8` (0xEB) and leave the displacement alone. No cave, no
+relocation, no displaced instruction, and the three MessageBox arms become unreachable
+code. The builder asserts both the stock opcode and the decoded target before writing.
+
+NOT covered, and said plainly: `FUN_0057b6b0` @0x57b6e5 is a SECOND `push 0xffff /
+call FUN_0057a500` detach, swept over a club list by `FUN_005865b0`. It is gated on the
+Promanager career flag `DAT_0066b1e4` and on `FUN_0057a570` (the club's own competition
+`vtbl[0xc8]` test), it is not one of the board's three dismissals, and it is not
+reversed. This patch does not touch it — and neither the port nor this cheat models it.
 
 Usage:
     build_hack_exe.py [SRC_EXE] [DST_EXE]
@@ -66,6 +105,17 @@ P_STRIDE = 0xAC
 ROLE_ATT = 3
 MIN_FORWARDS = 3
 CHANCE_FLOOR = 3
+
+# --- unsackable: FUN_00545fd0's three dismissal tests -----------------------
+# (name, VA of the "keep him" jump, stock opcode, the target it must decode to).
+# Each is a 2-byte short jump; only the opcode byte changes (-> 0xEB = JMP rel8).
+UNSACKABLE_SITES = [
+    ("finance", 0x546019, 0x76, 0x54603A),  # jbe  club+0x224 (weeks in the red) <= 3
+    ("results", 0x546044, 0x74, 0x546063),  # je   club+0x294 (board sack flag) == 0
+    ("squad", 0x546067, 0x73, 0x5460A8),  # jae  club+0x28 (squad size) >= 0x10
+]
+JMP_REL8 = 0xEB
+ALL_CHEATS = ("three_forwards", "unsackable")
 
 
 class Asm:
@@ -208,10 +258,52 @@ def va_to_off(va: int) -> int:
     return va - TEXT_VA + TEXT_OFF
 
 
+def patch_unsackable(data: bytearray) -> None:
+    """Flip FUN_00545fd0's three "keep him" branches to unconditional jumps.
+
+    Asserts the stock opcode AND that the 2-byte short jump still decodes to the
+    documented target, so a different build cannot be silently mispatched.
+    """
+    for name, va, opcode, target in UNSACKABLE_SITES:
+        off = va_to_off(va)
+        if data[off] != opcode:
+            raise SystemExit(
+                f"unsackable/{name}: opcode at {va:#x} is {data[off]:#04x}, expected {opcode:#04x}"
+            )
+        got = va + 2 + struct.unpack_from("<b", data, off + 1)[0]
+        if got != target:
+            raise SystemExit(
+                f"unsackable/{name}: {va:#x} jumps to {got:#x}, expected {target:#x}"
+            )
+        data[off] = JMP_REL8
+        print(f"  unsackable/{name:<8} {va:#x}: {opcode:#04x} -> 0xeb (jmp {target:#x})")
+
+
 def main() -> int:
-    src = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_SRC
-    dst = Path(sys.argv[2]) if len(sys.argv) > 2 else src.with_name("MANAGER_HACK.EXE")
+    argv = [a for a in sys.argv[1:] if not a.startswith("--")]
+    opts = [a for a in sys.argv[1:] if a.startswith("--")]
+    cheats = list(ALL_CHEATS)
+    for o in opts:
+        if o.startswith("--cheats="):
+            cheats = [c.strip() for c in o.split("=", 1)[1].split(",") if c.strip()]
+        else:
+            raise SystemExit(f"unknown option {o}")
+    unknown = [c for c in cheats if c not in ALL_CHEATS]
+    if unknown:
+        raise SystemExit(f"unknown cheat(s) {unknown}; known: {', '.join(ALL_CHEATS)}")
+
+    src = Path(argv[0]) if argv else DEFAULT_SRC
+    dst = Path(argv[1]) if len(argv) > 1 else src.with_name("MANAGER_HACK.EXE")
     data = bytearray(src.read_bytes())
+    print(f"cheats: {', '.join(cheats)}")
+
+    if "unsackable" in cheats:
+        patch_unsackable(data)
+
+    if "three_forwards" not in cheats:
+        dst.write_bytes(bytes(data))
+        print(f"wrote {dst} ({len(data)} bytes)")
+        return 0
 
     cave, labels = build_cave()
     if len(cave) > CAVE_LIMIT:

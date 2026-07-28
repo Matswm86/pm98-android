@@ -2324,10 +2324,21 @@ func _recovered(wk_a: int, wk_b: int) -> bool:
 	return now < then
 
 
+## UNSACKABLE -- the port of the MANAGER_HACK.EXE unsackable patch
+## (docs/re/hack_unsackable.md). Not a PM98 setting: the original has no such option.
+## The EXE patch flips FUN_00545fd0's three "keep him" branches to unconditional jumps,
+## which makes all three dismissal arms unreachable; here the same three tests are the
+## whole of `sack_message()`, so the port's equivalent is one early return at its head.
+## Mirrored from `AudioManager.set_unsackable`, exactly as `Pm98StatMatch`'s two cheat
+## statics are. OFF by default, and OFF leaves every arm exactly as it was.
+static var cheat_unsackable := false
+
 ## `FUN_00545fd0`'s three dismissal tests, in the binary's own order. Returns the message
 ## the original would raise, or "" when the board keeps you. Consumed by Main at the hub
 ## mount -- the same place the original consumes it.
 func sack_message() -> String:
+	if cheat_unsackable:
+		return ""
 	if loss_weeks >= LOSS_SACK_WEEKS:
 		return SACK_MSG_FINANCE
 	if board_sack_flag != 0:
@@ -2339,6 +2350,8 @@ func sack_message() -> String:
 
 ## The reason word behind `sack_message()`, for the career record and the tests.
 func sack_message_reason() -> String:
+	if cheat_unsackable:
+		return ""
 	if loss_weeks >= LOSS_SACK_WEEKS:
 		return "insolvent"
 	if board_sack_flag != 0:

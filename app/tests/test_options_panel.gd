@@ -32,6 +32,8 @@ func _run() -> void:
 		["R_OK", OptionsPanel.R_OK],
 		["R_CHEAT_ON", OptionsPanel.R_CHEAT_ON],
 		["R_CHEAT_OFF", OptionsPanel.R_CHEAT_OFF],
+		["R_UNSACK_ON", OptionsPanel.R_UNSACK_ON],
+		["R_UNSACK_OFF", OptionsPanel.R_UNSACK_OFF],
 		["R_CHEAT_BAND", OptionsPanel.R_CHEAT_BAND],
 	]
 	for entry in controls:
@@ -39,14 +41,21 @@ func _run() -> void:
 		ok = _assert(canvas.encloses(r), "%s in canvas" % entry[0]) and ok
 		ok = _assert(OptionsPanel.BOX.encloses(r), "%s inside BOX" % entry[0]) and ok
 
-	# THREE UP FRONT is the ONE declared deviation from the original modal
-	# (docs/re/hack_three_forwards.md). Its two X-boxes must live inside the band the
-	# parity gate tools/re/diff_options_parity.py excludes, and the band must not touch
-	# any control the original actually draws -- else the deviation stops being bounded.
-	ok = _assert(OptionsPanel.R_CHEAT_BAND.encloses(OptionsPanel.R_CHEAT_ON),
-		"R_CHEAT_ON inside the declared band") and ok
-	ok = _assert(OptionsPanel.R_CHEAT_BAND.encloses(OptionsPanel.R_CHEAT_OFF),
-		"R_CHEAT_OFF inside the declared band") and ok
+	# The two cheat rows are the ONLY declared deviation from the original modal
+	# (docs/re/hack_unsackable.md, docs/re/hack_three_forwards.md). Their four X-boxes must
+	# live inside the band the parity gate tools/re/diff_options_parity.py excludes, and the
+	# band must not touch any control the original actually draws -- else the deviation
+	# stops being bounded. The two rows must also not overlap each other.
+	for entry in [["R_CHEAT_ON", OptionsPanel.R_CHEAT_ON],
+			["R_CHEAT_OFF", OptionsPanel.R_CHEAT_OFF],
+			["R_UNSACK_ON", OptionsPanel.R_UNSACK_ON],
+			["R_UNSACK_OFF", OptionsPanel.R_UNSACK_OFF]]:
+		ok = _assert(OptionsPanel.R_CHEAT_BAND.encloses(entry[1] as Rect2),
+			"%s inside the declared band" % entry[0]) and ok
+	ok = _assert(not OptionsPanel.R_UNSACK_ON.intersects(OptionsPanel.R_CHEAT_ON),
+		"the two cheat rows do not overlap") and ok
+	ok = _assert(not OptionsPanel.R_UNSACK_ON.intersects(OptionsPanel.R_TRANS_ON),
+		"the UNSACKABLE row clears the TRANSITIONS row") and ok
 	for entry in [["R_MUSIC_SLIDER", OptionsPanel.R_MUSIC_SLIDER],
 			["R_SFX_SLIDER", OptionsPanel.R_SFX_SLIDER],
 			["R_MUSIC_BOX", OptionsPanel.R_MUSIC_BOX], ["R_SFX_BOX", OptionsPanel.R_SFX_BOX],
@@ -106,6 +115,17 @@ func _run() -> void:
 		ok = _assert(not am.cheat_three_up_front and not Pm98StatMatch.cheat_three_up_front,
 			"AudioManager.set_three_up_front disarms the engine") and ok
 		am.set_three_up_front(orig_cheat)
+		# UNSACKABLE: the panel's R_UNSACK_ON/OFF hits forward to set_unsackable, which
+		# must move BOTH the stored flag and Career's own static (the port's mirror of the
+		# EXE patch that makes FUN_00545fd0's three dismissal arms unreachable).
+		var orig_unsack: bool = am.cheat_unsackable
+		am.set_unsackable(true)
+		ok = _assert(am.cheat_unsackable and Career.cheat_unsackable,
+			"AudioManager.set_unsackable arms the career") and ok
+		am.set_unsackable(false)
+		ok = _assert(not am.cheat_unsackable and not Career.cheat_unsackable,
+			"AudioManager.set_unsackable disarms the career") and ok
+		am.set_unsackable(orig_unsack)
 		# Restore so this headless run doesn't leak state into user://settings.cfg for
 		# other test scripts (test_audio.gd follows the same restore convention).
 		am.set_music_volume(orig_mv)
