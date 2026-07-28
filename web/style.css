@@ -73,51 +73,83 @@ table{border-collapse:collapse}
 code{font-family:var(--f-mono);background:#dde4f0;border:1px solid var(--steel-2);padding:1px 5px}
 ::selection{background:#d81f26;color:#fff}
 
-/* The hub and the front door each have two layouts: the real 4:3 screen with
-   its buttons made live, and a stacked version for a phone. !important because
-   the layout rules below set display on the same elements. */
-@media(max-width:719.98px){.wide-only{display:none !important}}
-@media(min-width:720px){.narrow-only{display:none !important}}
+/* ==========================================================================
+   THE BOARD — the real 4:3 game screen, fitted to whatever it is opened on
+   --------------------------------------------------------------------------
+   There is no reconstructed layout on this site. The front door and the hub
+   are the captured screens themselves, with a live button sitting on each of
+   the game's own plates, at every width. All the type inside a board is sized
+   in `cqw`, so it scales with the board and the geometry never drifts.
+
+   A portrait phone turns the board sideways rather than shrinking it to a
+   strip: 4:3 across a 390px-wide screen is ~293px tall, rotated it is ~520px
+   along its long edge, which is a third bigger in every direction.
+   ========================================================================== */
+.board-fit{
+  --reserve:76px;                 /* whatever sits under the board on this screen */
+  --bw:min(100vw - 20px, (100svh - var(--reserve)) * 4 / 3);
+  position:relative;z-index:1;min-height:100svh;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;padding:10px;
+}
+.splash .board-fit{--reserve:78px}
+.menu .board-fit{--reserve:40px}
+
+.board-slot{position:relative;flex:none;width:var(--bw);height:calc(var(--bw) * .75)}
+.board{position:absolute;inset:0;container-type:inline-size;
+  border:3px solid #cfd8ea;box-shadow:0 18px 50px rgba(4,10,32,.6)}
+
+.rotate-hint{display:none;margin:0;font-family:var(--f-head);font-weight:500;font-size:12px;
+  letter-spacing:.16em;text-transform:uppercase;color:#cdd8f5;text-align:center;
+  text-shadow:0 1px 3px rgba(0,0,0,.7)}
+
+/* Portrait phone: turn the board sideways rather than shrink it to a strip.
+   The short edge then takes the full screen width, which is a third more board
+   in every direction — and it is already the right way up once you turn the
+   phone, whether or not rotation lock is on. */
+@media (orientation:portrait) and (max-width:899px){
+  .board-fit{--bw:min(100svh - var(--reserve), (100vw - 16px) * 4 / 3)}
+  .board-slot{width:calc(var(--bw) * .75);height:var(--bw)}
+  .board{inset:auto;top:50%;left:50%;width:var(--bw);height:calc(var(--bw) * .75);
+    transform:translate(-50%,-50%) rotate(90deg)}
+  .rotate-hint{display:block}
+}
+@media (orientation:portrait) and (max-width:899px) and (prefers-reduced-motion:no-preference){
+  .rotate-hint{animation:pm98pulse 2.6s ease-in-out infinite}
+}
+@keyframes pm98pulse{0%,100%{opacity:.55}50%{opacity:1}}
+
+/* The surround is the same screen, blurred right down, so the window is filled
+   with the game and nothing else — no invented backdrop, and no second legible
+   copy of the art competing with the board. */
+.splash-shade,.menu-shade{position:fixed;inset:-60px;z-index:0;
+  background-position:center;background-size:cover;background-repeat:no-repeat}
+.splash-shade{background-image:url(img/start_screen.webp);
+  filter:blur(34px) brightness(.34) saturate(.75)}
+.menu-shade{background-image:url(img/bg_menu.webp);
+  filter:blur(34px) brightness(.62) saturate(.7)}
 
 .nojs{margin:0;padding:14px 18px;background:#fdf1d4;color:#3a2a05;font-size:15px;line-height:1.6;
   border-bottom:2px solid #a4791f}
 
 /* ==========================================================================
    SPLASH — the 1998 front door
+   The captured start screen is both the page background and the board, so the
+   art fills the window and the three ovals land on the game's own three.
    ========================================================================== */
-.splash{
-  position:relative;min-height:100vh;
-  display:grid;grid-template-rows:1fr auto;
-  background:#050a1e url(img/bg_dbase.webp) center/cover no-repeat;
-}
-.splash-shade{
-  position:absolute;inset:0;
-  background:linear-gradient(100deg,rgba(4,10,40,.94) 0%,rgba(6,14,54,.86) 42%,
-             rgba(12,26,88,.62) 68%,rgba(4,10,40,.8) 100%);
-}
+.splash{position:relative;min-height:100svh;background:#050a1e}
 
-/* wide: the real start screen, its three ovals made live */
-.splash-wide{position:relative;display:flex;align-items:center;justify-content:center;
-  padding:clamp(8px,1.4vw,20px)}
-.startframe{
-  position:relative;width:100%;max-width:1280px;aspect-ratio:4/3;
-  container-type:inline-size;
-  background:#050a1e url(img/start_screen.webp) center/100% 100% no-repeat;
-  border:3px solid #cfd8ea;box-shadow:0 18px 50px rgba(4,10,32,.6);
-}
-.startframe .oval{
-  position:absolute;left:3.8%;width:50.8%;height:8.2%;
-  font-size:2.3cqw;
-}
-.startframe .oval:nth-of-type(1){top:41.4%}
-.startframe .oval:nth-of-type(2){top:54.6%}
-.startframe .oval:nth-of-type(3){top:67.4%;height:8.4%}
+.startframe{background:#050a1e url(img/start_screen.webp) center/100% 100% no-repeat}
+.startframe .oval{position:absolute;left:3.8%;width:50.8%;height:8.2%;font-size:2.5cqw}
+.oval-1{top:41.4%}
+.oval-2{top:54.6%}
+.oval-3{top:67.4%;height:8.4%}
 
 .oval{
-  border:2px solid var(--mgr-hi);border-radius:999px;
+  border:.22cqw solid var(--mgr-hi);border-radius:999px;
   background:radial-gradient(120% 200% at 32% 0%,#4a63d8 0%,#1c2aa8 45%,#0b1272 100%);
   color:#fff;font-family:var(--f-head);font-weight:600;letter-spacing:.11em;
-  text-transform:uppercase;text-shadow:0 2px 3px rgba(0,0,0,.5);
+  text-transform:uppercase;text-shadow:0 2px 3px rgba(0,0,0,.5);white-space:nowrap;
   box-shadow:0 4px 14px rgba(0,0,0,.45),inset 0 2px 0 rgba(255,255,255,.35);
 }
 .oval:hover{border-color:#fff;
@@ -129,59 +161,20 @@ code{font-family:var(--f-mono);background:#dde4f0;border:1px solid var(--steel-2
              inset 0 2px 0 rgba(255,255,255,.4)}
 .oval-dl:hover{border-color:#fff}
 
-/* narrow: the logo, the pitch, a plain stack */
-.splash-narrow{position:relative;display:flex;flex-direction:column;justify-content:center;
-  gap:clamp(28px,5vw,64px);padding:clamp(24px,5vw,72px)}
-.pmlogo{display:flex;align-items:stretch;align-self:flex-start;max-width:100%;
-  filter:drop-shadow(0 10px 24px rgba(0,0,0,.6))}
-.pmlogo-l{background:linear-gradient(180deg,#3a4c86 0%,#243566 55%,#16224a 100%);
-  border:2px solid var(--navy-hi);border-right:none;border-radius:14px 0 0 14px;
-  padding:clamp(10px,1.6vw,18px) clamp(14px,2.4vw,30px);
-  display:flex;flex-direction:column;justify-content:center;line-height:.86}
-.pmlogo-l b{font-family:var(--f-head);font-weight:700;font-style:italic;
-  font-size:clamp(26px,5.4vw,62px);color:#fff;letter-spacing:.01em;
-  text-transform:uppercase;text-shadow:2px 3px 0 rgba(0,0,0,.55)}
-.pmlogo-r{background:linear-gradient(180deg,#e8262d 0%,#c8161d 60%,#8d0d12 100%);
-  border:2px solid #ff8b8f;border-left:none;border-radius:0 14px 14px 0;
-  padding:clamp(10px,1.6vw,18px) clamp(14px,2.4vw,26px);display:flex;align-items:center}
-.pmlogo-r b{font-family:var(--f-head);font-weight:700;font-style:italic;
-  font-size:clamp(46px,9vw,104px);color:#fff;line-height:.8;
-  text-shadow:3px 4px 0 rgba(0,0,0,.4)}
-.pmlogo-sm .pmlogo-l{border-radius:8px 0 0 8px;padding:5px 12px;line-height:.9}
-.pmlogo-sm .pmlogo-l b{font-size:13px;text-shadow:none}
-.pmlogo-sm .pmlogo-r{border-radius:0 8px 8px 0;padding:5px 12px}
-.pmlogo-sm .pmlogo-r b{font-size:26px;line-height:.9;text-shadow:none}
-
-.splash-lede{margin:0;max-width:44ch;font-size:clamp(15px,1.5vw,19px);line-height:1.5;
-  color:#cdd8f5;text-wrap:pretty}
-.splash-stack{display:flex;flex-direction:column;gap:clamp(14px,2vw,26px);
-  align-items:flex-start;width:100%;max-width:520px}
-.splash-stack .oval{width:100%;border-width:3px;padding:clamp(13px,1.7vw,20px) 28px;
-  font-size:clamp(15px,1.9vw,23px);letter-spacing:.1em}
-.splash-legal{position:relative;margin:0;
-  padding:0 clamp(24px,5vw,72px) clamp(20px,3vw,36px);
-  font-size:12px;line-height:1.6;color:#8fa0cf;max-width:80ch}
+.splash-legal{position:relative;margin:0;max-width:80ch;text-align:center;
+  font-size:11px;line-height:1.6;color:#8fa0cf}
 
 /* ==========================================================================
    MENU — the career hub
+   The captured MANAGER MENU, with a button on each of the game's own sixteen
+   plates and the site's club plate filling the centre disc.
    ========================================================================== */
-.menu{min-height:100vh;background:#8d99b8 url(img/bg_dbase.webp) center/cover no-repeat fixed}
-.menu-shade{min-height:100vh;padding:clamp(10px,1.6vw,22px);
-  background:linear-gradient(180deg,rgba(150,163,196,.82),rgba(116,130,168,.86))}
+.menu{position:relative;min-height:100svh;background:#4a5470}
+.menuframe{background:#8d99b8 url(img/bg_menu.webp) center/100% 100% no-repeat;
+  border-color:#dfe6f0;box-shadow:0 18px 50px rgba(10,18,40,.5)}
 
-/* --- wide: the real MANAGER MENU art with the plates over the plates ----- */
-.menu-wide{display:flex;justify-content:center;align-items:flex-start;min-height:100vh;
-  padding:clamp(4px,1vw,14px)}
-.menuframe{
-  position:relative;width:100%;max-width:1280px;aspect-ratio:4/3;
-  container-type:inline-size;
-  background:#8d99b8 url(img/bg_menu.webp) center/100% 100% no-repeat;
-  border:3px solid #dfe6f0;box-shadow:0 18px 50px rgba(10,18,40,.5);
-}
-
-/* the club plate stack, sitting where the game's own plates sit */
-/* measured off the art: the ring is centred at 50%/54% with rx 16.4% and
-   ry 22.2%, so this box is the circle's bounding box to the pixel. */
+/* the club plate stack. Measured off the art: the ring is centred at 50%/54%
+   with rx 16.4% and ry 22.2%, so this box is the circle's bounding box. */
 .hub-plate{
   position:absolute;left:33.6%;top:31.8%;width:32.8%;height:44.4%;
   border-radius:50%;
@@ -201,9 +194,9 @@ code{font-family:var(--f-mono);background:#dde4f0;border:1px solid var(--steel-2
   text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
 .hub-slot-blank{height:1.1cqw;padding:0 1cqw;font-size:1.2cqw}
-.hub-slot-lg{font-size:2.1cqw}
-.hub-slot-md{font-size:1.1cqw;letter-spacing:.06em}
-.hub-slot-num{font-family:var(--f-body);font-size:1.35cqw;letter-spacing:.04em;
+.hub-slot-lg{font-size:2.2cqw}
+.hub-slot-md{font-size:1.15cqw;letter-spacing:.06em}
+.hub-slot-num{font-family:var(--f-body);font-size:1.4cqw;letter-spacing:.04em;
   text-transform:none}
 /* widths are chords of the disc, so each row has to clear the ring */
 .hub-w38{width:40%;height:1cqw}
@@ -217,8 +210,8 @@ code{font-family:var(--f-mono);background:#dde4f0;border:1px solid var(--steel-2
   position:absolute;left:.6%;top:2.4%;width:17.2%;height:5.9%;
   background:linear-gradient(180deg,#eef2fa,#b9c4d8);border:1px solid #fff;
   display:flex;align-items:center;justify-content:center;
-  font-family:var(--f-head);font-weight:600;font-size:1.6cqw;letter-spacing:.14em;
-  color:#2b3861;text-transform:uppercase;
+  font-family:var(--f-head);font-weight:600;font-size:1.7cqw;letter-spacing:.14em;
+  color:#2b3861;text-transform:uppercase;white-space:nowrap;
 }
 .hub-build{
   position:absolute;left:83.9%;top:2.6%;width:13.2%;height:7.1%;
@@ -226,19 +219,19 @@ code{font-family:var(--f-mono);background:#dde4f0;border:1px solid var(--steel-2
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:.25cqw;line-height:1;padding:0 .6cqw;
 }
-.hub-build-k{font-family:var(--f-head);font-weight:600;font-size:1.05cqw;
+.hub-build-k{font-family:var(--f-head);font-weight:600;font-size:1.1cqw;
   letter-spacing:.13em;color:#5c6136;text-transform:uppercase}
-.hub-build-v{font-family:var(--f-body);font-weight:600;font-size:1.15cqw;color:#2c3216;
+.hub-build-v{font-family:var(--f-body);font-weight:600;font-size:1.2cqw;color:#2c3216;
   max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* the twelve section buttons — the game's own clipped parallelogram plates */
 .hb{
   position:absolute;height:5.9%;
-  font-family:var(--f-head);font-weight:600;font-size:1.95cqw;letter-spacing:.06em;
+  font-family:var(--f-head);font-weight:600;font-size:2.15cqw;letter-spacing:.04em;
   text-transform:uppercase;text-shadow:.16cqw .16cqw 0 rgba(0,0,0,.55);white-space:nowrap;
 }
 .hb:hover{filter:brightness(1.2)}
-.hb:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.hb:focus-visible{outline:.2cqw solid #fff;outline-offset:.2cqw}
 
 /* left column plates cut away on the right, right column on the left */
 .hb-info,.hb-tm{padding:0 4% 0 2%;text-align:right;
@@ -282,13 +275,13 @@ code{font-family:var(--f-mono);background:#dde4f0;border:1px solid var(--steel-2
   background:linear-gradient(180deg,var(--steel-1),var(--steel-2));
   border:2px solid #fff;border-right-color:var(--steel-lo);border-bottom-color:var(--steel-lo);
   color:#1d2748;font-family:var(--f-head);font-weight:600;font-size:13px;
-  letter-spacing:.08em;text-transform:uppercase;padding:6px 12px;
+  letter-spacing:.08em;text-transform:uppercase;padding:6px 12px;white-space:nowrap;
 }
 a.hs{border-bottom-width:2px}
 .hs:hover{filter:brightness(1.09);color:#1d2748;border-bottom-color:var(--steel-lo)}
 .hs:focus-visible{outline:2px solid var(--pm-red);outline-offset:2px}
 .menuframe .hs{position:absolute;top:52.8%;height:6.4%;padding:0;
-  border-width:.16cqw;font-size:1.6cqw;gap:.8cqw}
+  border-width:.16cqw;font-size:1.75cqw;gap:.8cqw}
 .hs-1{left:.8%;width:13.2%}
 .hs-2{left:14.3%;width:18.1%}
 .hs-3{left:69.6%;width:14.3%}
@@ -303,108 +296,6 @@ a.hs{border-bottom-width:2px}
 .ic-go{border-radius:50%;
   background:radial-gradient(circle at 40% 35%,#fff,#2f7a3a 60%,#14401d)}
 
-/* --- narrow: the same hub taken apart into its four real sections -------- */
-.menu-narrow{max-width:1320px;margin:0 auto;display:flex;flex-direction:column;
-  gap:clamp(10px,1.4vw,18px)}
-.mn-top{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;
-  align-items:stretch}
-.mn-crest{display:flex;align-items:center;gap:10px;
-  background:linear-gradient(180deg,#eef2fa,#b9c4d8);border:2px solid #fff;
-  border-right-color:#7d8aa3;border-bottom-color:#7d8aa3;border-radius:10px;padding:8px 10px}
-.mn-crest-badge{width:40px;height:40px;flex:none;
-  background:linear-gradient(180deg,#23315e,#101a3c);border:2px solid #94a3cc;
-  border-radius:6px;display:grid;place-items:center;font-family:var(--f-head);
-  font-weight:700;font-style:italic;color:#fff;font-size:15px}
-.mn-crest-a{font-family:var(--f-head);font-weight:600;font-size:13px;letter-spacing:.16em;
-  color:#2b3861}
-.mn-crest-b{font-size:11px;letter-spacing:.08em;color:#5a678c}
-.mn-title{background:linear-gradient(180deg,#4b62c4,#1c2a86);border:2px solid var(--mgr-hi);
-  border-bottom-color:#0d1447;border-right-color:#0d1447;border-radius:10px;
-  display:grid;place-items:center;padding:10px 16px}
-.mn-title h1{margin:0;font-family:var(--f-head);font-weight:600;
-  font-size:clamp(18px,2.6vw,32px);letter-spacing:.14em;color:#fff;text-transform:uppercase;
-  text-shadow:2px 2px 0 rgba(0,0,0,.5);text-align:center}
-.mn-build{display:flex;align-items:center;gap:10px;
-  background:linear-gradient(180deg,#f7f8f2,#d9dcc6);border:2px solid #fff;
-  border-right-color:#8d9077;border-bottom-color:#8d9077;border-radius:10px;padding:8px 12px}
-.mn-build>div:first-child{flex:1;min-width:0}
-.mn-build-k{font-family:var(--f-head);font-weight:600;font-size:11px;letter-spacing:.14em;
-  color:#6b7040;text-transform:uppercase}
-.mn-build-v{font-weight:600;font-size:14px;color:#2c3216;overflow:hidden;
-  text-overflow:ellipsis;white-space:nowrap}
-.mn-cup{width:26px;height:34px;flex:none;background:linear-gradient(180deg,#f0d97a,#a8801c);
-  border:1px solid #fff6c9;border-radius:4px 4px 12px 12px}
-
-.mn-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
-  gap:clamp(10px,1.4vw,18px)}
-.mn-col{display:flex;flex-direction:column;gap:8px}
-.mn-band{background:#000;padding:9px 14px;display:flex;align-items:center;
-  justify-content:space-between;gap:12px}
-.mn-band span{font-family:var(--f-head);font-weight:600;font-size:clamp(15px,1.9vw,24px);
-  letter-spacing:.13em;color:#fff;text-transform:uppercase}
-.mn-band i{width:26px;height:12px;flex:none}
-.mn-band-info{border-top:2px solid #6d7a52}
-.mn-band-info i{background:linear-gradient(90deg,#8fa832,#c8dd6a)}
-.mn-band-mgr{border-top:2px solid #4f5f9e}
-.mn-band-mgr i{background:linear-gradient(90deg,#7f95ee,#1c2a86)}
-.mn-band-tm{border-top:2px solid #8c3232}
-.mn-band-tm i{background:linear-gradient(90deg,#c8161d,#f26a70)}
-.mn-band-fin{border-top:2px solid #8a5e1c}
-.mn-band-fin i{background:linear-gradient(90deg,#f0b03c,#a45c08)}
-
-.mnb{
-  display:block;width:100%;text-align:left;
-  padding:11px 30px 11px 16px;
-  clip-path:polygon(0 0,100% 0,calc(100% - 16px) 100%,0 100%);
-  font-family:var(--f-head);font-weight:600;font-size:clamp(15px,1.8vw,22px);
-  letter-spacing:.09em;text-transform:uppercase;text-shadow:2px 2px 0 rgba(0,0,0,.5);
-  box-shadow:0 6px 12px rgba(0,0,0,.3);
-}
-.mnb.mnb-r{padding:11px 16px 11px 30px;clip-path:polygon(16px 0,100% 0,100% 100%,0 100%)}
-.mnb:hover{filter:brightness(1.18)}
-.mnb:focus-visible{outline:2px solid #fff;outline-offset:2px}
-.mnb small{display:block;font-family:var(--f-body);font-weight:500;font-size:12px;
-  letter-spacing:.02em;text-transform:none;text-shadow:none;margin-top:2px}
-.mnb-info{background:linear-gradient(180deg,var(--info-1) 0%,var(--info-2) 46%,var(--info-3) 100%);
-  border-top:2px solid var(--info-hi);border-left:2px solid var(--info-hi);
-  border-bottom:2px solid var(--info-lo);border-right:2px solid var(--info-lo);color:#f3fad4}
-.mnb-info small{color:#e3f0b4}
-.mnb-mgr{background:linear-gradient(180deg,var(--mgr-1) 0%,var(--mgr-2) 46%,var(--mgr-3) 100%);
-  border-top:2px solid var(--mgr-hi);border-left:2px solid var(--mgr-hi);
-  border-bottom:2px solid var(--mgr-lo);border-right:2px solid var(--mgr-lo);color:#a9e6ff}
-.mnb-mgr small{color:#cfe6ff}
-.mnb-tm{background:linear-gradient(180deg,var(--tm-1) 0%,var(--tm-2) 46%,var(--tm-3) 100%);
-  border-top:2px solid var(--tm-hi);border-left:2px solid var(--tm-hi);
-  border-bottom:2px solid var(--tm-lo);border-right:2px solid var(--tm-lo);color:#fff}
-.mnb-tm small{color:#ffd7d9}
-.mnb-fin{background:linear-gradient(180deg,var(--fin-1) 0%,var(--fin-2) 46%,var(--fin-3) 100%);
-  border-top:2px solid var(--fin-hi);border-left:2px solid var(--fin-hi);
-  border-bottom:2px solid var(--fin-lo);border-right:2px solid var(--fin-lo);color:#fff8e0}
-.mnb-fin small{color:#ffeec9}
-
-.mn-circle{display:flex;justify-content:center;padding:clamp(2px,1vw,10px) 0}
-.mn-circle-in{flex:none;width:clamp(240px,60vw,320px);height:clamp(240px,60vw,320px);
-  overflow:hidden;border:3px solid #fff;border-radius:50%;
-  background:radial-gradient(circle at 50% 30%,rgba(255,255,255,.32),rgba(120,138,180,.28));
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
-  padding:10% 11%;
-  box-shadow:0 10px 30px rgba(20,30,60,.35),inset 0 0 30px rgba(255,255,255,.25)}
-.mn-slot{flex:none;border:1px solid #fff;text-align:center;color:#28345c}
-.mn-slot-bar{width:50%;height:10px;background:linear-gradient(180deg,#c6cfe2,#8f9cb8);
-  border-color:#eef2fa}
-.mn-slot-a{width:86%;background:linear-gradient(180deg,#dfe6f3,#aab6cd);padding:3px 8px;
-  font-family:var(--f-head);font-weight:600;font-size:13px;letter-spacing:.1em;
-  text-transform:uppercase;color:#1e2a52}
-.mn-slot-b{width:100%;background:linear-gradient(180deg,#eff3fa,#c2cbdd);padding:4px 8px;
-  font-weight:600;font-size:11px;line-height:1.2}
-.mn-slot-c{width:74%;background:linear-gradient(180deg,#dfe6f3,#aab6cd);padding:3px 8px;
-  font-weight:600;font-size:11px}
-
-.mn-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px}
-.mn-strip .hs{justify-content:flex-start;gap:10px;padding:9px 14px;font-size:15px;
-  letter-spacing:.09em}
-.mn-foot{display:flex;justify-content:center;padding:clamp(6px,1.4vw,16px) 0 4px}
-.mn-legal{margin:0 0 6px;text-align:center;font-size:12px;color:#1f2a4a;opacity:.85}
 
 /* ==========================================================================
    CONTENT — the reading screens

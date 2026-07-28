@@ -30,11 +30,19 @@ DATE=$(date -u -d "$UPLOADED" +'%-d %b %Y')
 COMMIT=${NAME#pm98-}; COMMIT=${COMMIT%.apk}
 echo "  -> $NAME  ${MB} MB  uploaded $DATE"
 
-python3 - "$HTML" "$NAME" "$MB" "$DATE" "$COMMIT" <<'PY'
+# style.css and app.js are served with a week of Cache-Control, so a returning
+# visitor would otherwise run the new index.html against the old stylesheet. Stamp
+# both URLs with a hash of their own contents; the browser refetches only when the
+# file actually changed.
+ASSETV=$(cat "$DIR/style.css" "$DIR/app.js" | md5sum | cut -c1-8)
+echo "  asset version $ASSETV"
+
+python3 - "$HTML" "$NAME" "$MB" "$DATE" "$COMMIT" "$ASSETV" <<'PY'
 import re, sys
-html, name, mb, date, commit = sys.argv[1:6]
+html, name, mb, date, commit, assetv = sys.argv[1:7]
 s = open(html, encoding='utf-8').read()
 before = s
+s = re.sub(r'(style\.css|app\.js)\?v=\w+', lambda m: '%s?v=%s' % (m.group(1), assetv), s)
 s = re.sub(r'pm98-[0-9a-f]{7,40}\.apk', name, s)
 s = re.sub(r'<div id="dlmeta">.*?</div>',
            '<div id="dlmeta">file &nbsp;%s &middot; %s MB &middot; build %s &middot; uploaded %s</div>'

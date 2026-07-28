@@ -8,14 +8,15 @@
 <meta name="robots" content="index,follow">
 <link rel="preload" href="fonts/oswald-var.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/barlow-400.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=e65b16ca">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23cc1122'/><text x='16' y='24' font-size='20' font-family='Arial' font-weight='bold' font-style='italic' fill='white' text-anchor='middle'>98</text></svg>">
 </head>
 <body class="boot">
 
 <!-- ======================================================== SPLASH: FRONT DOOR -->
-<!-- The 1998 front-door screen. Wide screens get the real captured screen with
-     the three oval buttons live; narrow screens get the logo and a plain stack. -->
+<!-- The 1998 front-door screen itself, at every width, with its three ovals made
+     live. There is no reconstructed fallback anywhere on this page: if a layout
+     cannot show the real art it does not ship. -->
 <noscript>
   <p class="nojs">This page needs JavaScript for the menu and the squad book. The build itself does
   not: grab the newest <b>pm98-*.apk</b> straight off
@@ -26,156 +27,69 @@
 <section class="splash" id="splash">
   <div class="splash-shade"></div>
 
-  <div class="splash-wide wide-only">
-    <div class="startframe">
-      <button class="oval" data-go="menu">Manager Menu</button>
-      <button class="oval" data-go="book">Squad Book</button>
-      <button class="oval oval-dl" data-go="download">Download the APK</button>
+  <div class="board-fit">
+    <div class="board-slot">
+      <div class="board startframe">
+        <button class="oval oval-1" data-go="menu">Manager Menu</button>
+        <button class="oval oval-2" data-go="book">Squad Book</button>
+        <button class="oval oval-3 oval-dl" data-go="download">Download the APK</button>
+      </div>
     </div>
+    <p class="rotate-hint">Turn your phone sideways &#8635;</p>
+    <p class="splash-legal">A non-commercial fan project. Premier Manager 98 and all original game
+      art, data and trademarks remain the property of their owners.</p>
   </div>
-
-  <div class="splash-narrow narrow-only">
-    <div class="pmlogo" aria-label="Premier Manager 98">
-      <span class="pmlogo-l"><b>Premier</b><b>Manager</b></span>
-      <span class="pmlogo-r"><b>98</b></span>
-    </div>
-    <p class="splash-lede">A hobby port of Premier Manager 98 to Android, rebuilt from my own
-      copy of the PC game. Not for sale, not affiliated with anyone.</p>
-    <div class="splash-stack">
-      <button class="oval" data-go="menu">Manager Menu</button>
-      <button class="oval" data-go="book">Data Base</button>
-      <button class="oval oval-dl" data-go="download">Download the APK</button>
-    </div>
-  </div>
-
-  <p class="splash-legal">A non-commercial fan project. Premier Manager 98 and all original game
-    art, data and trademarks remain the property of their owners.</p>
 </section>
 
 <!-- ======================================================= MENU: THE CAREER HUB -->
+<!-- The real MANAGER MENU, with one button sitting on each of the game's own
+     plates. Same board at every width; a portrait phone turns it sideways. -->
 <section class="menu" id="menu" hidden>
-<div class="menu-shade">
+  <div class="menu-shade"></div>
 
-  <!-- WIDE: the real MANAGER MENU art, with the site's own plates over the game's -->
-  <div class="menu-wide wide-only">
-    <div class="menuframe">
+  <div class="board-fit">
+    <div class="board-slot">
+      <div class="board menuframe">
 
-      <div class="hub-plate">
-        <div class="hub-slot hub-slot-blank hub-w46"></div>
-        <div class="hub-slot hub-slot-lg hub-w72">PM98</div>
-        <div class="hub-slot hub-slot-md hub-w100">Premier Manager 98 &middot; rebuilt for Android</div>
-        <div class="hub-slot hub-slot-num hub-w92" id="buildline-hub">pm98-19fae7d.apk &middot; 61.6 MB</div>
-        <div class="hub-slot hub-slot-num hub-w66" id="builddate-hub">27 Jul 2026</div>
-        <div class="hub-slot hub-slot-blank hub-w38"></div>
-      </div>
-
-      <div class="hub-crest">MWM &middot; PM98</div>
-      <div class="hub-build">
-        <span class="hub-build-k">Build</span>
-        <span class="hub-build-v" id="buildline-badge">pm98-19fae7d.apk &middot; 61.6 MB</span>
-      </div>
-
-      <button class="hb hb-info hb-1" data-go="build">The Game</button>
-      <button class="hb hb-info hb-2" data-go="money">Price Tables</button>
-      <button class="hb hb-info hb-3" data-go="sources">Still Open</button>
-
-      <button class="hb hb-mgr hb-4" data-go="beat">Beat It</button>
-      <button class="hb hb-mgr hb-5" data-go="beat">Tactics</button>
-      <button class="hb hb-mgr hb-6" data-go="beat">The Cheat</button>
-
-      <button class="hb hb-tm hb-7" data-go="download">Download</button>
-      <button class="hb hb-tm hb-8" data-go="book">Squad Book</button>
-      <button class="hb hb-tm hb-9" data-go="money">Staff</button>
-
-      <button class="hb hb-fin hb-10" data-go="money">Money</button>
-      <button class="hb hb-fin hb-11" data-go="beat">Board Room</button>
-      <button class="hb hb-fin hb-12" data-go="sources">Sources</button>
-
-      <a class="hs hs-1" href="https://github.com/Matswm86/pm98-android"><span class="ic ic-exit"></span>Source</a>
-      <button class="hs hs-2" data-go="download"><span class="ic ic-save"></span>Get the APK</button>
-      <button class="hs hs-3" data-go="sources"><span class="ic ic-news"></span>About</button>
-      <button class="hs hs-4" data-go="start"><span class="ic ic-go"></span>Start</button>
-    </div>
-  </div>
-
-  <!-- NARROW: the same hub taken apart into the four real sections -->
-  <div class="menu-narrow narrow-only">
-
-    <div class="mn-top">
-      <div class="mn-crest">
-        <div class="mn-crest-badge">98</div>
-        <div>
-          <div class="mn-crest-a">MWM</div>
-          <div class="mn-crest-b">Manager</div>
+        <div class="hub-plate">
+          <div class="hub-slot hub-slot-blank hub-w46"></div>
+          <div class="hub-slot hub-slot-lg hub-w72">PM98</div>
+          <div class="hub-slot hub-slot-md hub-w100">Premier Manager 98 &middot; rebuilt for Android</div>
+          <div class="hub-slot hub-slot-num hub-w92" id="buildline-hub">pm98-527f4e9.apk &middot; 61.6 MB</div>
+          <div class="hub-slot hub-slot-num hub-w66" id="builddate-hub">28 Jul 2026</div>
+          <div class="hub-slot hub-slot-blank hub-w38"></div>
         </div>
-      </div>
-      <div class="mn-title"><h1>Manager Menu</h1></div>
-      <div class="mn-build">
-        <div>
-          <div class="mn-build-k">Latest build</div>
-          <div class="mn-build-v" id="buildline-narrow">pm98-19fae7d.apk &middot; 61.6 MB</div>
+
+        <div class="hub-crest">MWM &middot; PM98</div>
+        <div class="hub-build">
+          <span class="hub-build-k">Build</span>
+          <span class="hub-build-v" id="buildline-badge">pm98-527f4e9.apk &middot; 61.6 MB</span>
         </div>
-        <div class="mn-cup"></div>
-      </div>
-    </div>
 
-    <div class="mn-cols">
-      <div class="mn-col">
-        <div class="mn-band mn-band-info"><span>Information</span><i></i></div>
-        <button class="mnb mnb-info" data-go="build">Results<small>The game, screen by screen</small></button>
-        <button class="mnb mnb-info" data-go="money">League Tables<small>The price tables, every fee and wage</small></button>
-        <button class="mnb mnb-info" data-go="sources">Fixtures<small>What is still open, what is next</small></button>
-      </div>
-      <div class="mn-col">
-        <div class="mn-band mn-band-mgr"><i></i><span>Manager</span></div>
-        <button class="mnb mnb-mgr mnb-r" data-go="beat">Line-Up<small>Beat it: what the engine actually reads</small></button>
-        <button class="mnb mnb-mgr mnb-r" data-go="beat">Tactics<small>The screen that does nothing at all</small></button>
-        <button class="mnb mnb-mgr mnb-r" data-go="beat">Opponent<small>Three up front, the cheat</small></button>
-      </div>
-    </div>
+        <button class="hb hb-info hb-1" data-go="build">The Game</button>
+        <button class="hb hb-info hb-2" data-go="money">Price Tables</button>
+        <button class="hb hb-info hb-3" data-go="sources">Still Open</button>
 
-    <div class="mn-circle">
-      <div class="mn-circle-in">
-        <div class="mn-slot mn-slot-bar"></div>
-        <div class="mn-slot mn-slot-a">PM98</div>
-        <div class="mn-slot mn-slot-b">Premier Manager 98<br>rebuilt for Android</div>
-        <div class="mn-slot mn-slot-c" id="builddate-narrow">27 Jul 2026</div>
-        <div class="mn-slot mn-slot-bar"></div>
-      </div>
-    </div>
+        <button class="hb hb-mgr hb-4" data-go="beat">Beat It</button>
+        <button class="hb hb-mgr hb-5" data-go="beat">Tactics</button>
+        <button class="hb hb-mgr hb-6" data-go="beat">The Cheat</button>
 
-    <div class="mn-strip">
-      <a class="hs" href="https://github.com/Matswm86/pm98-android"><span class="ic ic-exit"></span>Exit &middot; Source</a>
-      <button class="hs" data-go="download"><span class="ic ic-save"></span>Save Game &middot; APK</button>
-      <button class="hs" data-go="sources"><span class="ic ic-news"></span>News &middot; About</button>
-      <button class="hs" data-go="book"><span class="ic ic-go"></span>Continue &middot; Squad Book</button>
-    </div>
+        <button class="hb hb-tm hb-7" data-go="download">Download</button>
+        <button class="hb hb-tm hb-8" data-go="book">Squad Book</button>
+        <button class="hb hb-tm hb-9" data-go="money">Staff</button>
 
-    <div class="mn-cols">
-      <div class="mn-col">
-        <div class="mn-band mn-band-tm"><span>Transfer Market</span><i></i></div>
-        <button class="mnb mnb-tm" data-go="download">Transfers<small>Download the Android build</small></button>
-        <button class="mnb mnb-tm" data-go="book">Players<small>Squad book, top 20 by position</small></button>
-        <button class="mnb mnb-tm" data-go="money">Staff<small>Which of the thirteen jobs pay</small></button>
-      </div>
-      <div class="mn-col">
-        <div class="mn-band mn-band-fin"><i></i><span>Finances</span></div>
-        <button class="mnb mnb-fin mnb-r" data-go="money">Finance<small>Money, running the club</small></button>
-        <button class="mnb mnb-fin mnb-r" data-go="beat">Board Room<small>Your four sack dates</small></button>
-        <button class="mnb mnb-fin mnb-r" data-go="sources">Ground<small>Where this comes from</small></button>
-      </div>
-    </div>
+        <button class="hb hb-fin hb-10" data-go="money">Money</button>
+        <button class="hb hb-fin hb-11" data-go="beat">Board Room</button>
+        <button class="hb hb-fin hb-12" data-go="sources">Sources</button>
 
-    <div class="mn-foot">
-      <div class="pmlogo pmlogo-sm">
-        <span class="pmlogo-l"><b>Premier</b><b>Manager</b></span>
-        <span class="pmlogo-r"><b>98</b></span>
+        <a class="hs hs-1" href="https://github.com/Matswm86/pm98-android"><span class="ic ic-exit"></span>Source</a>
+        <button class="hs hs-2" data-go="download"><span class="ic ic-save"></span>Get the APK</button>
+        <button class="hs hs-3" data-go="sources"><span class="ic ic-news"></span>About</button>
+        <button class="hs hs-4" data-go="start"><span class="ic ic-go"></span>Start</button>
       </div>
     </div>
-    <p class="mn-legal">A hobby project &middot; not for sale &middot; not affiliated with anyone</p>
+    <p class="rotate-hint">Turn your phone sideways &#8635;</p>
   </div>
-
-</div>
 </section>
 
 <!-- ============================================================ CONTENT SCREENS -->
@@ -243,7 +157,7 @@
 <article class="screen" id="scr-download" hidden>
   <div class="band b-fin">
     <h2 class="band-title">Download <em>&middot;</em> the Android build</h2>
-    <span class="sub">latest build &middot; 27 Jul 2026</span>
+    <span class="sub">latest build &middot; 28 Jul 2026</span>
   </div>
 
   <div class="cols">
@@ -251,9 +165,9 @@
       <h3>Get the APK</h3>
       <p>One tap and it downloads straight to your phone. Android only. You will need to allow
       "install from this source" when it asks.</p>
-      <a class="btn" id="dlbtn" href="https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-19fae7d.apk">Download PM98 &nbsp;&darr;</a>
+      <a class="btn" id="dlbtn" href="https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-527f4e9.apk">Download PM98 &nbsp;&darr;</a>
       <div class="dl-meta">
-        <div id="dlmeta">file &nbsp;pm98-19fae7d.apk &middot; 61.6 MB &middot; build 19fae7d &middot; uploaded 27 Jul 2026</div>
+        <div id="dlmeta">file &nbsp;pm98-527f4e9.apk &middot; 61.6 MB &middot; build 527f4e9 &middot; uploaded 28 Jul 2026</div>
         <div><a href="https://github.com/Matswm86/pm98-android/releases/tag/latest">all builds</a>
         &middot; <a href="https://github.com/Matswm86/pm98-android">source</a></div>
       </div>
@@ -706,6 +620,6 @@
 
 </div><!-- /content -->
 
-<script src="app.js"></script>
+<script src="app.js?v=e65b16ca"></script>
 </body>
 </html>

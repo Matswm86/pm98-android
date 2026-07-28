@@ -56,9 +56,29 @@ works: `#menu`, `#start`, `#build`, `#beat`, `#money`, `#book`, `#sources`,
 `#download`. `#hack` still lands on the three-up-front card, as it did when the
 site was one long page.
 
-Below 720px the front door and the hub each swap to a stacked layout. That is a
-CSS media query on `.wide-only` / `.narrow-only`, not a JS width check, so there
-is no flash on load.
+### The board, and why there is no phone fallback
+
+**Do not re-add a stacked, CSS-drawn version of the front door or the hub for
+small screens.** One existed for a day and was rejected on sight: a phone got
+coloured `<div>`s where the game should be. The captured screen is the layout, at
+every width. If a viewport cannot show the real art, it shows the real art
+smaller — it never shows a reconstruction.
+
+Both boards are `.board` inside `.board-slot` inside `.board-fit`. The board is
+always 4:3 and always fitted to the viewport; everything inside it is sized in
+`cqw` off a `container-type: inline-size`, so the geometry never drifts from the
+percentages measured off the art. `--reserve` is whatever sits under the board on
+that screen (78px on the front door for the legal line, 40px on the hub).
+
+A **portrait phone turns the board sideways** rather than shrinking it to a strip:
+`transform: rotate(90deg)` with the slot's width and height swapped. 4:3 across a
+390px screen is 293px tall; rotated it is ~520px along its long edge, a third more
+board in every direction. It is also already the right way up the moment the phone
+is turned, whether or not rotation lock is on — and if the OS does rotate, the
+`orientation: landscape` query drops the transform and the board simply fits.
+
+The surround is the same screen, blurred and dimmed (`.splash-shade`,
+`.menu-shade`), so the window is filled with the game and nothing invented.
 
 ## Fonts
 

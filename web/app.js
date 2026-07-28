@@ -291,9 +291,8 @@
         if (a.browser_download_url) btn.href = a.browser_download_url;
         setAll(['dlmeta'],
           'file  ' + a.name + ' · ' + mb + ' MB · build ' + commit + ' · uploaded ' + when);
-        setAll(['buildline-hub', 'buildline-badge', 'buildline-narrow'],
-          a.name + ' · ' + mb + ' MB');
-        setAll(['builddate-hub', 'builddate-narrow'], when);
+        setAll(['buildline-hub', 'buildline-badge'], a.name + ' · ' + mb + ' MB');
+        setAll(['builddate-hub'], when);
       })
       .catch(function () { /* keep the baked-in link */ });
   })();
