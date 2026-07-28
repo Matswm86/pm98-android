@@ -804,7 +804,11 @@ Four more, reported 2026-07-26 evening (second round, same play session):
   doc-flagged (`stadium_screen_re.md`): ~~the EXE's 150,000 SEATS ceiling~~ —
   **CLOSED 2026-07-28 (§0aa), the addend is capacity + headroom;** ~~`remodela.png`
   works-marker draw position~~ — **the hypothesis was WRONG: it is the IMPROVE button's
-  icon, already baked (§0aa).** Still open: 10 tiles corrected-by-mapping only.
+  icon, already baked (§0aa).** ~~Still open: 10 tiles corrected-by-mapping only.~~ — **NARROWED 2026-07-28 (s76):**
+`fix_estadio_wrap.py --verify` puts the strongest vertical seam of **all twelve** shipped tiles
+at z = 3.0..3.9 (no seam) and at z = 13.1..14.8 if the wrap is re-applied, so the **+256 column
+wrap is validated on 12 of 12 as a property of the data**. What only the two rendered tiers
+(3 and 4) confirm is the ROW offset, which the seam statistic cannot see.
 
 ## 0b. Mats's live QA, 2026-07-27 morning — fix FIRST (next session = TEAM TACTICS)
 

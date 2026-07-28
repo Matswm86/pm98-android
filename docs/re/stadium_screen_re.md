@@ -155,7 +155,14 @@ check against; **tier 3 is now verified too** — Aston Villa's own GROUND captu
 diffs against `estadio3.png` at the (299,146) box at **1.64% differing (98.36% exact)**, the
 same fine-dither residual class as the tier-4 witness (0.83%), and 81% differing at the retired
 y=148 anchor — confirming both the tile and the s55 y-anchor on a second tier. The other 10
-tiles remain corrected-by-mapping, not independently render-verified. The residual is fine
+tiles have no real render to diff against, but they are no longer *unchecked*: **NARROWED
+2026-07-28 (s76).** `fix_estadio_wrap.py --verify` measures the strongest vertical seam in each
+tile as a z-score, and across **all twelve** shipped tiles it reads **z = 3.0..3.9** — no hard
+seam — while re-applying the wrap to any of them puts a seam back at x=63 at **z = 13.1..14.8**.
+So the **+256 column wrap is validated on 12 of 12 tiles as a property of the data itself**,
+independent of any render. What the two renders (tiers 3 and 4) add on top, and what the other
+ten still lack, is confirmation of the **row offset** (`+2` for `bx < 64`, `+1` otherwise) — a
+one- or two-row error would not move the seam statistic. The residual is fine
 dither noise; whether the live render dithers at blit time is not reversed. The capture's frames
 01-12 have pixel-identical panels (0.0% between them), so the picture is static — no animation
 is being read as an offset.

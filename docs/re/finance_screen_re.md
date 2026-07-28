@@ -183,6 +183,12 @@ divisions are now witnessed** (frames in `tools/re/refs/lowdiv-2026-07-28/`):
 | First | Birmingham C | **£45,000** | seven cards, weeks 9-24 |
 | Second | Blackpool | **£35,000** | week 8 |
 | Third | Barnet | **£35,000** | week 7 |
+| Third | Brighton & HA | **£35,000** | weeks 14 + 16 (s76, `tools/re/refs/cupfee-2026-07-28/`) |
+
+**The Third-Division rung is now witnessed on a SECOND club.** A fourth career was driven at
+TOTAL control for s76 (Brighton & HA, Third Division, from the title screen) and both channelTV
+cards it raised — Sat 8 Nov 1997 (week 14) and Sat 22 Nov 1997 (week 16) — read the same
+**£35,000**. So the figure is not a Barnet-specific one.
 
 Two things worth keeping. **The ladder is not proportional** — 90k → 45k is a halving, but
 45k → 35k is not, so no formula was inferred and each rung is a captured number. And
