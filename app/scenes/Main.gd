@@ -69,7 +69,8 @@ func _ready() -> void:
 			and not OS.has_environment("PM98_MANAGER_SHOT") and not OS.has_environment("PM98_FICHA_SHOT") \
 			and not OS.has_environment("PM98_MATCHOPTS_SHOT") and not OS.has_environment("PM98_PLAYERACT_SHOT") \
 			and not OS.has_environment("PM98_CUPDRAW_SHOT") \
-			and not OS.has_environment("PM98_GROUNDACT_SHOT"):
+			and not OS.has_environment("PM98_GROUNDACT_SHOT") \
+			and not OS.has_environment("PM98_LIVEWATCH_SHOT"):
 		_devshot()
 
 
@@ -86,6 +87,9 @@ func _boot() -> void:
 		return
 	if OS.has_environment("PM98_MATCH_SHOT"):
 		_match_shot()
+		return
+	if OS.has_environment("PM98_LIVEWATCH_SHOT"):
+		_livewatch_shot()
 		return
 	if OS.has_environment("PM98_NEWS_SHOT"):
 		_news_shot()
@@ -356,6 +360,40 @@ func _match_shot() -> void:
 		_save_shot(dir, shot[0])
 	print("MATCH-SHOT done %s v %s %d:%d goal@%d" % [str(home.get("name", "?")),
 		str(away.get("name", "?")), int(m["home_goals"]), int(m["away_goals"]), goal_min])
+	get_tree().quit()
+
+
+## THE M5 WIRE-IN, rendered by the REAL APP (the "green tests are not a running app"
+## rule). Raises the WATCH view on a live `Pm98LiveMatch` and captures it at kickoff and
+## after two spells of play, so the frames show the POSITIONAL engine's own 22 players and
+## ball — not the timeline interpolation this view used to run on.
+##
+## Run as the normal app under Xvfb + GL:
+##   PM98_LIVEWATCH_SHOT=1 PM98_SHOT_DIR=<dir> godot --path app --rendering-driver opengl3
+func _livewatch_shot() -> void:
+	var dir := OS.get_environment("PM98_SHOT_DIR")
+	var sim: MatchSimulador = load("res://scenes/MatchSimulador.gd").new()
+	sim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(sim)
+	var home := GameDB.club(40)      # Manchester Utd.
+	var away := GameDB.club(42)      # Liverpool
+	sim.setup(str(home.get("name", "?")), str(away.get("name", "?")), 0, 0, [], 40, 42)
+	var live := Pm98LiveMatch.create(40, 42, 1)
+	if live == null or live.match_state.is_empty():
+		print("LIVEWATCH-SHOT could not build the live match")
+		get_tree().quit()
+		return
+	sim.set_live(live)
+	sim.set_process(false)           # the harness drives the engine, not the clock
+	for shot in [["livewatch_kickoff.png", 0], ["livewatch_early.png", 600],
+			["livewatch_mid.png", 3000]]:
+		live.advance(int(shot[1]))
+		sim.queue_redraw()
+		await _settle()
+		_save_shot(dir, str(shot[0]))
+	var pos := live.player_positions()
+	print("LIVEWATCH-SHOT done: frame %d minute %d score %d-%d, %d players drawn" % [
+		live.frames, live.minute(), live.score[0], live.score[1], pos.size()])
 	get_tree().quit()
 
 
@@ -1597,6 +1635,14 @@ func _open_match(home: Dictionary, away: Dictionary, hg: int, ag: int,
 		add_child(sim)
 		sim.setup(str(home.get("name", "?")), str(away.get("name", "?")), hg, ag, lines,
 			int(home.get("id", -1)), int(away.get("id", -1)))
+		# THE M5 WIRE-IN: a WATCHED match runs on the instruction-exact POSITIONAL engine,
+		# which is the engine MANAGER.EXE itself uses for one (`FUN_0044ee70`'s `PS != 5`
+		# branch); every fixture the manager does NOT watch stays on `Pm98StatMatch`, the
+		# port of the same function's `PS == 5` instant-result branch, exactly as the
+		# original routes them. See `Pm98LiveMatch` for the whole routing argument.
+		var live := _build_live_match(home, away)
+		if live != null:
+			sim.set_live(live)
 		sim.brief_pressed.connect(func() -> void: sim.queue_free())
 		sim.back_pressed.connect(func() -> void:
 			sim.queue_free()
@@ -1606,6 +1652,38 @@ func _open_match(home: Dictionary, away: Dictionary, hg: int, ag: int,
 
 
 # ---- views ---------------------------------------------------------------
+
+## Build the POSITIONAL engine's live match for a WATCHED fixture, carrying the manager's
+## own live state into it: his TEAM TACTICS levers (`team[0xc1..0xc7]`) and his MAN-TO-MAN
+## table + marking lines, through `Pm98LineupFeeder`'s override hooks — the same route the
+## original's career layer uses to hand the engine its own club's stored bytes. Every other
+## club keeps its shipped `.DBC` stream, as the original does.
+##
+## Returns null when the fixture cannot be resolved onto the shipped data (an id the feeder
+## does not carry). The caller then leaves the WATCH view on its timeline presentation
+## rather than inventing a match, and says so in the log.
+func _build_live_match(home: Dictionary, away: Dictionary) -> Pm98LiveMatch:
+	var hid := int(home.get("id", -1))
+	var aid := int(away.get("id", -1))
+	if hid < 0 or aid < 0:
+		return null
+	var levers: Dictionary = {}
+	var marks: Dictionary = {}
+	var lines_ov: Dictionary = {}
+	if _career != null:
+		var mine := _career.club_id
+		if not _career.tactics.is_empty():
+			levers[mine] = Tactics.from_dict(_career.tactics).levers()
+		marks[mine] = _career.man_marking.duplicate()
+		lines_ov[mine] = _career.marking_lines.duplicate()
+	var seed_ := int(Time.get_ticks_msec()) ^ (hid << 8) ^ aid
+	var live: Pm98LiveMatch = null
+	live = Pm98LiveMatch.create(hid, aid, seed_, levers, marks, lines_ov)
+	if live == null or live.match_state.is_empty():
+		push_warning("[M5] live match unavailable for %d v %d -> WATCH stays on the timeline view" % [hid, aid])
+		return null
+	return live
+
 
 ## The database root (B3): the original-art browse hub. Continue / new career at the top,
 ## then every league + International. A BrowseScreen overlay; TITLE re-raises the front door.
@@ -3598,9 +3676,10 @@ func _show_stadium_screen() -> void:
 	# copies from club+0x58 into ground+0x24 — so all 476 clubs are priced, not just Man Utd.
 	scr.set_improve_state(_career.car_park_levels, _carpark_price(club), _career.works_ledger(),
 		_career.ground_grades, _career.works_total(), _career.my_band())
-	# The per-club FACILITIES / SERVICES item tables mined from the real game
-	# (app/data/ground_prices.json). A captured club (Man Utd) gets every item live with real
-	# grades / prices / weeks; an un-captured club falls back to the sparse witness default.
+	# The per-club FACILITIES / SERVICES item tables. Since 2026-07-28 EVERY club gets live
+	# grades / prices / weeks (GroundPreset: the binary's own starting-grade preset for the
+	# club's competition index + FUN_0057ddd0's price at its stature band) — there is no
+	# longer a captured-club-only path.
 	scr.set_ground_items(_ground_items(club, "facilities"), _ground_items(club, "services"))
 	scr.improve_selected.connect(_on_stadium_improve)
 	scr.works_requested.connect(_on_stadium_works)
@@ -3651,19 +3730,16 @@ func _board_sale_offer(club: Dictionary) -> int:
 func _carpark_price(club: Dictionary) -> int:
 	return 2_975_000 if str(club.get("name", "")).to_lower().contains("manchester utd") else 0
 
-## The per-club FACILITIES / SERVICES item table (real data mined from the original game,
-## app/data/ground_prices.json). Returns the club's ordered item array for `cat` in
-## ("facilities" | "services"), or [] for a club not yet captured (honest gap, no invention).
-var _ground_prices_cache: Dictionary = {}
+## The per-club FACILITIES / SERVICES item table, for `cat` in ("facilities" | "services").
+##
+## Generated for ALL 476 clubs since 2026-07-28: the labels are MANAGER.EXE's own per-item
+## strings, the STARTING grade is `FUN_0057d780`'s preset for the club's competition index
+## (`GroundPreset`, bound to the divisions by the Birmingham C / Barnet capture), and the
+## upgrade cost/weeks are `FUN_0057ddd0`'s own price at the club's stature band. The result
+## reproduces every one of the 9 captured Man Utd rows exactly (`test_ground_preset.gd`), so
+## the old "captured club only, everyone else an empty gap" fallback is gone.
 func _ground_items(club: Dictionary, cat: String) -> Array:
-	if _ground_prices_cache.is_empty():
-		var f := FileAccess.open("res://data/ground_prices.json", FileAccess.READ)
-		if f != null:
-			var parsed: Variant = JSON.parse_string(f.get_as_text())
-			if parsed is Dictionary:
-				_ground_prices_cache = parsed
-	var by_club: Dictionary = _ground_prices_cache.get(cat, {})
-	return by_club.get(str(club.get("name", "")), [])
+	return GroundPreset.items(cat, str(club.get("leagueId", "")), _career.my_band())
 
 ## A SEATS offer card was ticked on the in-screen IMPROVEMENTS view: run the real Career
 ## expansion (start_works enforces cash + ceiling), persist, and re-mount the GROUND screen

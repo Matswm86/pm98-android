@@ -122,3 +122,8 @@ scratchpad/
 
 # ── PM98 hack tooling transients
 tools/hack/_*
+
+# web/img/hi/ — the 4x upscale masters + the 1280/1920/2560 ladder (34 MB).
+# The page serves only the four committed webp files; the ladder is derivable and is
+# documented as workstation-only in web/README.md. Kept out of git deliberately.
+web/img/hi/

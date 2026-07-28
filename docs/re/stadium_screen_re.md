@@ -396,11 +396,36 @@ reads (`DAT_0066B1B0` is entry 8 of it). Entries 0..3 are scanned first and 7..1
 
 **Proven:** entry 0 is the Premier League. Preset 0 is exactly Man Utd's witnessed starting
 grades, and Man Utd is a Premier club, so the club that selects preset 0 is a Premier club.
-**Not yet proven:** that entries 1/2/3 are the First / Second / Third Divisions in that order.
-It is the natural reading of a four-entry scan whose presets degrade monotonically
-(2 0 1 2 1 1 0 2 2 → 1 0 0 1 0 0 0 1 1 → zeros), but it wants **one capture of a lower-division
-club's IMPROVE panel** to confirm before the port seeds 476 clubs off it — which is the same
-bar every other number on this screen was held to.
+
+### BOUND 2026-07-28: the divisions are entries 0 / 1 / 2 / 3, and it is witnessed
+
+The missing capture was taken. Two careers were driven from the title screen under wine
+(`tools/re/refs/lowdiv-2026-07-28/`, TOTAL control):
+
+| club | division | witnessed grades | preset |
+|---|---|---|---|
+| Birmingham C (St. Andrews) | First | FLOODLIGHTS **500.000 K.W.** (1), CHANGING ROOMS BASIC (0), SCORE BOARD **ELECTRONIC** (1), MEDICAL BASIC (0), CAFES **MEDIUM** (1), TOILETS **20 W.C.** (1) | **1** |
+| Barnet (Underhill Stadium) | Third | FLOODLIGHTS NONE (0), CHANGING ROOMS BASIC (0), SCORE BOARD MANUAL (0) | **2/3** |
+
+Six of the nine grades were re-witnessed on the First Division club and every one matches
+preset 1 (`1 0 0 1 0 0 0 1 1`) exactly; the Third Division club sits at zero on all three
+of the items that separate the presets. Since entry 0 is Man Utd's Premier preset, the scan
+order **0 = Premier, 1 = First, 2 = Second, 3 = Third** is now witnessed rather than read off
+the monotone degradation. Second vs Third is not observable and does not need to be:
+**0x57d834's jump table sends indices 2 and 3 to the SAME arm** (`0057d80b`), so they seed
+identically, and anything above 3 — the 384 directory-only foreign clubs, which
+`FUN_0057a180` numbers 7..12 — is a bare `ja 0057d830` to `ret`, so those clubs keep the
+ctor's zeros. Ported: `app/scripts/GroundPreset.gd`, gate `app/tests/test_ground_preset.gd`.
+
+**Two NEW price witnesses came out of the same drive — the first ground prices ever seen
+away from Man Utd, and both fall out of `FUN_0057ddd0` unchanged:**
+* Birmingham C, FLOODLIGHTS 500.000 → 1.000.000 K.W.: **£200,000 / 4 weeks** = coefficient
+  10.0 = the floodlights arm at band 5 or 6 (a First Division club's band is 4/5/6).
+* Barnet, the three SEATS cards: **£1,000,000 / £1,750,000 / £2,500,000 at 20 / 35 / 50
+  weeks** = coefficient 10.0 = the seats arm's `price_default`, i.e. band ≥ 9 (a Third
+  Division club's band is 10/11/12).
+Both are pinned in `test_ground_preset.gd`. Until this drive the whole cost model rested on
+one club; it now reproduces three clubs across three divisions.
 
 ### Still open here
 `FUN_0057d780`'s arg3 (`club+0x50`) picks one of **four starting-grade presets** for the nine
@@ -415,11 +440,11 @@ facility/service items and the four car-park quadrants:
 Preset 0 is **exactly** Man Utd's witnessed starting grades (FLOODLIGHTS 2 / HEATING 0 /
 CHANGING ROOMS 1 / SCORE BOARD 2 / ACCESS 1 / MEDICAL 1 / CLUB SHOP 0 / CAFES 2 / TOILETS 2),
 which confirms the field order. ~~What is NOT yet reversed is where `club+0x50` comes from~~ —
-**reversed 2026-07-28, see the section above: it is the club's competition index.** What is
-left is ONE capture of a lower-division club's IMPROVE panel to bind indices 1/2/3 to the
-First / Second / Third Divisions; until then the per-club STARTING grades stay on the captured
-Man Utd table (`app/data/ground_prices.json`) rather than being seeded off an unconfirmed
-ordering. Prices do not depend on it.
+**reversed 2026-07-28: it is the club's competition index.** ~~What is left is ONE capture of
+a lower-division club's IMPROVE panel~~ — **TAKEN 2026-07-28 (Birmingham C + Barnet), so the
+binding is witnessed and CLOSED.** All 476 clubs are now seeded from the preset by
+`GroundPreset.items()`; `app/data/ground_prices.json` is retained only as the captured Man Utd
+reference the generator is gated against.
 
 ## WIRING (Main.gd)
 `Main._show_stadium_screen()` calls `scr.setup(club, manager, season, ground, cap,

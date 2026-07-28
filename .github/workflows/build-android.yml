@@ -162,6 +162,9 @@ jobs:
           # 2026-07-27 (one persisted career RNG stream), so test_pyramid's old flake
           # is gone and it gates again, alongside the new test_career_seed. The full
           # sweep stays a manual pre-release step (docs/REMAINING.md).
+          # test_live_match runs its FAST half here (build + 400 frames + coordinate
+          # checks, ~17 s); its two full-time runs are ~5 min of CPU each and are opt-in
+          # via PM98_LIVE_FULL=1 as a pre-release gate.
           set -e
           FAIL=0
           for t in test_career test_refrun_findings test_league_calendar \
@@ -174,7 +177,8 @@ jobs:
                    test_stadium_screen test_stadium_works \
                    test_youth_loop test_career_seed test_pyramid \
                    test_retirement test_sacking test_weekly_illness \
-                   test_mantoman test_shadow_blit; do
+                   test_mantoman test_shadow_blit \
+                   test_ground_preset test_live_match; do
             echo "== $t"
             if ! "$GITHUB_WORKSPACE/godot" --headless --path . --script "res://tests/$t.gd" \
                 > "/tmp/$t.log" 2>&1; then

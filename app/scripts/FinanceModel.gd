@@ -92,11 +92,42 @@ const EXPENSE_LINES := ["SIGN PLAYER", "CANCELLATION", "PLAYERS' WAGE", "PLAYERS
 ## NOT measured: the Coca-Cola Cup, the F.A. Cup, the U.E.F.A. Cup and the Cup Winners'
 ## Cup. Those pay 0 here rather than a guessed figure -- the gap is visible in the ledger
 ## and in docs/re/finance_screen_re.md, and closes the moment one is captured.
+##
+## 2026-07-28: the LEAGUE fee is NOT one constant -- it is PER DIVISION, and the port had
+## been paying every club the Premier figure. Three careers were driven from the title
+## screen to settle it, and ALL FOUR English divisions are now witnessed (see
+## `LEAGUE_TV_FEE`). `TV_FEE["league"]` keeps the Premier value it was measured on;
+## `league_tv_fee()` is the division-aware reader every caller uses.
 const TV_FEE := {
 	"league": 90_000,
 	"charity_shield": 187_500,
 	"european_cup": 375_000,
 }
+
+## The witnessed home-league channelTV fee per English division, keyed by the game_db
+## `leagueId`. All four captured, none interpolated:
+##   Premier   GBP 90,000  Man Utd      p0210_channel_tv.png / p0474_channel_tv.png (x2)
+##   First     GBP 45,000  Birmingham C seven cards, weeks 9-24
+##   Second    GBP 35,000  Blackpool    week 8
+##   Third     GBP 35,000  Barnet       week 7
+## Frames: `tools/re/refs/lowdiv-2026-07-28/`. Note the ladder is NOT a clean ratio, which
+## is why each rung was captured: 90k -> 45k is a halving but 45k -> 35k is not, and
+## **Second and Third pay the SAME fee** -- the same shared-arm shape the ground-grade
+## preset selector has, where `FUN_0057d780`'s jump table sends competition indices 2 and 3
+## to one arm (`docs/re/stadium_screen_re.md`). Foreign clubs are not modelled here.
+const LEAGUE_TV_FEE := {
+	"eng_prem": 90_000,
+	"eng_div1": 45_000,
+	"eng_div2": 35_000,
+	"eng_div3": 35_000,
+}
+
+
+## The home-league TV fee for a club's division. A division outside the witnessed four
+## returns 0, which raises NO channelTV card and books NO television line -- an honest gap
+## in the ledger rather than a fabricated figure, exactly as the un-measured cups behave.
+static func league_tv_fee(league_id: String) -> int:
+	return int(LEAGUE_TV_FEE.get(league_id, 0))
 
 ## The channelTV card's own wording, verbatim off the frame (two lines, then the fee).
 const CHANNEL_TV_TEXT := "A TV station has bought the rights\nto broadcast the current match."

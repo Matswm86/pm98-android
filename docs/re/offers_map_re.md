@@ -233,11 +233,32 @@ pass"). Measured here so the next attempt starts from data:
   "3 double-stamped diagonal layers" family);
 * closing it needs the pass's CODE, not another witness set.
 
-### Still open: the ENGLAND panel in a non-Premier division
+### ~~Still open: the ENGLAND panel in a non-Premier division~~ — WITNESSED 2026-07-28
 
 `shot_offers_blackpool` vs run-3 frame 100 does NOT reduce to a permutation — the
 best per-cell match is non-bijective at ~500 px/cell, i.e. the panel is showing a
 DIFFERENT SET of clubs from the frame's. The frame also shows no gold OVER cell while
 the shot stages one. Which division frame 100's panel is on, and how the original marks
-the picked club there, are unanswered; that state keeps the whole-panel mask until a
-witness settles it.
+the picked club there, were unanswered.
+
+**Both are now witnessed** (`tools/re/refs/lowdiv-2026-07-28/`, frames 01-05, driven from
+the title screen under wine at TOTAL control):
+
+* **All three non-Premier panels are banked**: `01_offers_panel_first_division.png`,
+  `02_..._second_division.png`, `03_..._third_division.png`. Each is 20 kits in a 2x10 grid,
+  same rect as the Premier panel.
+* **The panel title changes with the division AND so does its icon.** Premier League draws
+  the gold/orange ball; First / Second / Third draw the blue-silver globe, with the title
+  string as the division's own chrome label ("First Division" / "Second Division" /
+  "Third Division"). The selected DIVISION BUTTON is the maroon face with red text; the
+  other three stay on the neutral grey-blue face.
+* **The picked club is marked EXACTLY as in the Premier panel** — this is the answer to the
+  open question, and it is a null result in the best sense: a **gold/yellow filled cell
+  behind the kit**, plus the club's name centred in the strip **below** the grid
+  (`04_offers_third_picked_barnet.png`: Barnet, Third Division). No division-specific
+  marking exists. Committing the pick (`05_offers_first_picked_birmingham.png`) writes
+  `MATS | Birmingham C` into the numbered manager row and advances to PLAYER 2.
+
+So the whole-panel mask can come off: the port's per-division grids need no new marking
+rule, only the correct club SET per division (which the db already carries) and the
+division-specific title icon.

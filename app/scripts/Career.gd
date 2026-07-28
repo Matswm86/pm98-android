@@ -3461,7 +3461,10 @@ const HOME_MATCH_BONUS := 5_000
 func _post_home_match(comp_key: String) -> void:
 	var fin := _fin_summary()
 	var gate := int(fin.get("match_gate", 0))
-	var fee := int(FinanceModel.TV_FEE.get(comp_key, 0))
+	# The LEAGUE fee is per-division (witnessed 2026-07-28: Premier GBP 90,000, First
+	# Division GBP 45,000); every other competition keeps its own measured constant.
+	var fee := FinanceModel.league_tv_fee(league_id) if comp_key == "league" \
+		else int(FinanceModel.TV_FEE.get(comp_key, 0))
 	_post_income("TICKETS", gate)
 	_post_income("TELEVISION", fee)
 	_post_expense("PLAYERS' BONUS", HOME_MATCH_BONUS)
@@ -3488,7 +3491,7 @@ func _queue_channel_tv() -> void:
 		return
 	for m in fixtures[week]:
 		if int(m[0]) == club_id:
-			var fee := int(FinanceModel.TV_FEE.get("league", 0))
+			var fee := FinanceModel.league_tv_fee(league_id)
 			if fee > 0:
 				pending_channel_tv = {"fee": fee, "comp": "league"}
 			return

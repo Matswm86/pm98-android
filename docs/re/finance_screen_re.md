@@ -171,6 +171,31 @@ fee IS that week's TELEVISION line (proved on week 29). The Coca-Cola Cup, F.A. 
 U.E.F.A. Cup and Cup Winners' Cup fees were **not measured** and pay £0 — a visible gap,
 not a guess.
 
+#### CORRECTED 2026-07-28: the LEAGUE fee is PER DIVISION, and the port was paying everyone the Premier figure
+
+"Premier League £90,000 (confirmed constant)" was true only of the division it was measured
+in. Three careers were driven from the title screen at TOTAL control and **all four English
+divisions are now witnessed** (frames in `tools/re/refs/lowdiv-2026-07-28/`):
+
+| division | club | fee | when |
+|---|---|---|---|
+| Premier | Manchester Utd. | **£90,000** | Sat 25 Oct 1997 + Sat 7 Feb 1998 (REFRUN R6) |
+| First | Birmingham C | **£45,000** | seven cards, weeks 9-24 |
+| Second | Blackpool | **£35,000** | week 8 |
+| Third | Barnet | **£35,000** | week 7 |
+
+Two things worth keeping. **The ladder is not proportional** — 90k → 45k is a halving, but
+45k → 35k is not, so no formula was inferred and each rung is a captured number. And
+**Second and Third pay the SAME fee**, which is the same shared-arm shape the ground-grade
+preset selector has: `FUN_0057d780`'s jump table sends competition indices 2 and 3 to one
+arm (`stadium_screen_re.md`). That is circumstantial, not proof, and is recorded as such —
+but it does say the producer is very likely keyed on the same `club+0x50` competition index.
+
+Ported: `FinanceModel.LEAGUE_TV_FEE` + `league_tv_fee()`, read by `Career._post_home_match`
+and `Career._queue_channel_tv`; gate `app/tests/test_channeltv_screen.gd`, which also pins
+the non-proportionality so a later tidy-up cannot smooth it into a formula the game does
+not have.
+
 #### The field, traced in the binary (2026-07-28)
 
 The 2026-07-28 claim "the card reads `club+0x290`" is now **verified against MANAGER.EXE**,
@@ -197,6 +222,15 @@ file under the game directory finds none of them either. It is computed at runti
 
 So the cup fees still cannot be ported without either that producer or a captured CUP home
 tie, and the port continues to pay £0 and flag it.
+
+**2026-07-28 addendum — the search now has a shape it did not have.** The three driven
+careers proved the LEAGUE fee varies by division (above), so whatever writes `club+0x290`
+takes the competition into account; it is not a per-club data byte any more than
+`club+0x50` was. The three lower-division drives banked ten channelTV cards between them
+and **not one was a cup tie** — the Birmingham career reached week 24 (F.A. Cup third-round
+territory) before stalling on an injured-XI modal, and the two shorter drives never got
+past the autumn. So the cup fee is still open, and it is open for the same reason as
+before: nobody has watched the card come up on a cup home tie.
 
 ### The channelTV card — BUILT
 

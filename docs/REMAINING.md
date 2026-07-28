@@ -1,5 +1,91 @@
 # PM98 Android — remaining-work inventory (refreshed 2026-07-28)
 
+## 0aaaaaa. Closed 2026-07-28 (session s74) — THE M5 WIRE-IN, and the lower-division drive
+
+### The M5 wire-in — DONE, and the framing it was carrying was WRONG
+
+**The carried plan said "wire the exact engine into the app (replace `MatchSim.simulate`)"
+and worried that "~9 min/match is too slow for instant fixture results … open question
+whether MANAGER.EXE even has a quick-sim path". Both halves are wrong, and the binary says
+so.** `FUN_0044ee70` L128 is `if (local_1c[1000] != 5)` — `local_1c` is the session and
+index 1000 is byte offset `0xfa0`, the play-state — so ONE function holds BOTH engines:
+
+| play-state | branch | engine |
+|---|---|---|
+| `!= 5` | L51-333, ends `goto LAB_0044f520` | the POSITIONAL sim (22 players, ball physics, the `FUN_00598740` tick driver) — a WATCHED match |
+| `== 5` | L357-792 | the STATISTICAL instant-result sim, pure `rand()` + integer arithmetic — every match the manager does NOT watch |
+
+So the app's played path was **already the original's own engine**: `MatchSim.simulate`
+routes to `Pm98StatMatch`, the byte-exact port of that `PS == 5` branch. Replacing it with
+the positional engine would have made the port LESS faithful, and the performance worry is
+moot — the original never uses the positional engine for instant results either.
+
+What WAS missing is the engine the original runs when you watch, and that is now wired:
+
+* **`app/scripts/Pm98LiveMatch.gd`** — builds a fixture from live career data through
+  `Pm98LineupFeeder` (carrying the manager's own TEAM TACTICS levers and MAN-TO-MAN table
+  through its override hooks), steps `Pm98Outer.step` frame by frame, harvests goals off
+  the event queue, and exposes per-frame player/ball coordinates.
+* **Coordinate space, MEASURED not assumed** (`app/tests/diag_live_coords.gd`): positions
+  are 16.16 fixed point about the centre spot; `match+0x1820` is half the pitch length and
+  `match+0x1824` half its width (Old Trafford 116x76 → 3801088 / 2490368), and ball `+0xc`
+  is height, reaching ~321000 (≈4.9 m) on a lofted ball.
+* **`MatchSimulador` (the WATCH view) renders it.** `set_live()` swaps the old
+  interpolated-timeline motion for the engine's own 22 players and ball, the binary's own
+  clock `(banked + clk) * 0x2d / scale`, its `+0x19a0` half counter, its dispatch-10 full
+  time, and its designated carrier (`match+0x440`) for the active arrow. `Main` raises it
+  on the MATCH OPTIONS **WATCH** tap.
+* **Proven in the REAL APP, not just headless** — `PM98_LIVEWATCH_SHOT=1` renders it under
+  Xvfb + GL: `tools/re/refs/m5-livewatch-2026-07-28/` shows 22 players spread in real match
+  shape, both keepers on their lines, the ball in play, clock 19:00, score 1-0.
+* **Gate `app/tests/test_live_match.gd`** — build, in-pitch coordinates at kickoff and after
+  400 frames, the ball on the centre spot, the roster actually moving, then (opt-in
+  `PM98_LIVE_FULL=1`) full time at dispatch 10, minute 90, the goal list agreeing with the
+  scoreline, and the same seed replaying the same match. **Ran green: 3-0 in 18,458 frames.**
+
+**The ~9 min/match question, answered with a measurement.** A full 90 minutes is **18,458
+outer frames** and takes **4 m 50 s of CPU** on this desktop = **63.6 engine frames/s**. A
+watched match wants ~1 engine frame per display frame, so the desktop has headroom. The
+view therefore steps `round(delta * 60)` frames capped at 12 per `_process`, so a slower
+device falls behind in match time instead of stalling the render loop. **What is still
+open is the on-device number** — that is the real-device pass, not an engine question.
+
+### The lower-division wine drive — two of its four items CLOSED
+
+Two careers driven from the title screen at TOTAL control (`tools/re/refs/lowdiv-2026-07-28/`):
+Birmingham C (First Division) and Barnet (Third Division).
+
+* **`club+0x50` — BOUND AND SHIPPED.** Six of the nine starting grades re-witnessed on the
+  First Division club match preset 1 exactly; the Third Division club is at zero on all
+  three of the items that separate the presets. With Man Utd's Premier preset 0 already
+  proven, the scan order **0 Premier / 1 First / 2 Second / 3 Third** is witnessed. The
+  jump table at 0x57d834 sends indices 2 and 3 to the SAME arm and anything above 3 (the
+  384 foreign clubs) to a bare `ret`, so **all 476 clubs now seed** —
+  `app/scripts/GroundPreset.gd`, gate `app/tests/test_ground_preset.gd`, which also
+  reproduces every one of the nine captured Man Utd rows.
+* **Two NEW ground-price witnesses, the first ever away from Man Utd**, both falling out of
+  `FUN_0057ddd0` unchanged: Birmingham C's floodlight upgrade £200,000 / 4 weeks, and
+  Barnet's three SEATS cards £1,000,000 / £1,750,000 / £2,500,000 at 20 / 35 / 50 weeks.
+* **The England non-Premier offers panel — WITNESSED, and the answer is a null result.**
+  All three non-Premier panels are banked; the picked club is marked EXACTLY as in the
+  Premier panel (gold cell behind the kit + the name centred below the grid). No
+  division-specific marking exists. `offers_map_re.md` §"Still open" is closed.
+* **The channelTV LEAGUE fee — a REAL finding, and the port was wrong.** It is not the
+  constant £90,000 the port shipped to every club. Three driven careers give all four
+  English divisions: **Premier £90,000 · First £45,000 · Second £35,000 · Third £35,000**.
+  The ladder is NOT proportional (90→45 halves, 45→35 does not), and Second and Third share
+  one figure — the same shared-arm shape `FUN_0057d780` has for competition indices 2/3.
+  Ported as `FinanceModel.LEAGUE_TV_FEE` + `league_tv_fee()`, gated in
+  `test_channeltv_screen.gd`. Full record: `finance_screen_re.md`.
+* **B9 and the CUP fee stay OPEN** — said plainly. Ten channelTV cards were banked across
+  the three drives and **not one was a cup tie**; the Birmingham career reached week 24
+  before stalling on an injured-XI modal, and no youth search completed in the driven
+  weeks. Both need a longer driven career, not a new idea.
+* **NOT attempted, deliberately:** moving `KnockoutScreen`'s baked `kitwell_*`/`icon_*`
+  rings and `PMChrome.panel_kit` onto `PMShadow`. Those render correctly today and their
+  parity gates are green on the baked art, so it is a pure refactor with regression risk
+  and no visible change — the session spent the time on the evidence gaps instead.
+
 ## 0aaaaa. Closed 2026-07-28 (session s73) — the shadow pass and the F.A. Cup semis card
 
 * **The shadowed bitmap blit is REVERSED AND PORTED.** `FUN_004b7f60` is not an outline

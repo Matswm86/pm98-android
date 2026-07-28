@@ -101,6 +101,22 @@ var _away_face := PackedInt32Array()
 var _home_prev: Array = []
 var _away_prev: Array = []
 
+# ---- LIVE ENGINE (the M5 wire-in) -----------------------------------------
+# When `set_live()` has been called this view stops interpolating a finished timeline and
+# renders the POSITIONAL engine's own per-frame state: real player and ball coordinates,
+# the binary's own clock, and goals as the engine raises them. See Pm98LiveMatch for why
+# this is the engine the original uses for a WATCHED match and Pm98StatMatch is the one it
+# uses for every other fixture.
+var _live: Pm98LiveMatch = null
+## Engine frames per second of wall clock. The original steps its match once per display
+## frame; this is the port's equivalent rate, and one full match is ~18.5k frames.
+const ENGINE_FPS := 60.0
+## Never spend more than this many engine frames in one _process call — a slow device
+## falls behind in match time rather than dropping the render loop.
+const MAX_FRAMES_PER_TICK := 12
+var _live_score := Vector2i.ZERO
+var _live_feed: Array = []         # goal lines the engine raised, newest last
+
 
 func _ready() -> void:
 	_base = _tex("res://art/match/player_base.png")
@@ -153,15 +169,39 @@ func setup(home_name: String, away_name: String, _hg: int, _ag: int, lines: Arra
 	queue_redraw()
 
 
-## Jump the clock (tests / screenshots). Pure.
+## Jump the clock (tests / screenshots). Pure. Ignored on a live match — the engine owns
+## the clock there and cannot be seeked, exactly as the original's watched match cannot.
 func seek(minute: float) -> void:
+	if _live != null:
+		return
 	_minute = clampf(minute, 0.0, 90.0)
 	queue_redraw()
+
+
+## THE M5 WIRE-IN. Hand this view a `Pm98LiveMatch` and it renders that engine instead of
+## interpolating a finished timeline: every player and the ball are drawn at the engine's
+## own coordinates, the clock is the binary's `(banked + clk) * 0x2d / scale`, and the
+## score changes when the engine's event queue raises code 7 / 8.
+func set_live(live: Pm98LiveMatch) -> void:
+	_live = live
+	_lines = []
+	_live_feed = []
+	_live_score = Vector2i.ZERO
+	_minute = 0.0
+	_playing = true
+	queue_redraw()
+
+
+## The live match, or null when this view is running a finished timeline.
+func live_match() -> Pm98LiveMatch:
+	return _live
 
 
 # ---- data: identical pure functions to MatchScreen, so the views agree -----
 
 func _score_at(minute: float) -> Vector2i:
+	if _live != null:
+		return _live_score
 	var h := 0
 	var a := 0
 	for ln in _lines:
@@ -193,6 +233,12 @@ func _possession_at(minute: float) -> int:
 
 
 func _half_label(minute: float) -> String:
+	# LIVE: the half comes off the engine's own +0x19a0 counter and full time off its
+	# dispatch-10 flag, not off a minute threshold the clock might not land on.
+	if _live != null:
+		if _live.over:
+			return "FULL TIME"
+		return "SECOND HALF" if _live.half() == 1 else "FIRST HALF"
 	if minute >= 90.0:
 		return "FULL TIME"
 	if minute >= 46.0:
@@ -273,9 +319,31 @@ func _club_colour(club_id: int, fallback: Color) -> Color:
 
 func _process(delta: float) -> void:
 	_t += delta
-	if _playing and _minute < 90.0:
+	if _live != null:
+		_step_live(delta)
+	elif _playing and _minute < 90.0:
 		_minute = minf(90.0, _minute + delta * MIN_PER_SEC)
 	queue_redraw()
+
+
+## Advance the positional engine by the frames this display frame is worth, then read the
+## clock and the score back off it. The cap keeps a slow device from stalling the render
+## loop: it falls behind in match time instead, which is visible and honest.
+func _step_live(delta: float) -> void:
+	if not _playing or _live.over:
+		_sync_live()
+		return
+	var want := int(round(delta * ENGINE_FPS))
+	_live.advance(clampi(want, 1, MAX_FRAMES_PER_TICK))
+	_sync_live()
+
+
+func _sync_live() -> void:
+	_minute = float(_live.minute())
+	_live_score = Vector2i(_live.score[0], _live.score[1])
+	while _live_feed.size() < _live.goals.size():
+		var g: Dictionary = _live.goals[_live_feed.size()]
+		_live_feed.append({"minute": int(g["minute"]), "side": int(g["team"]), "goal": true})
 
 
 # ---- input -----------------------------------------------------------------
@@ -302,8 +370,15 @@ func _on_input(e: InputEvent) -> void:
 		if rel != -1 and rel == _press:
 			match rel:
 				0: brief_pressed.emit()
-				1:    # CONTINUE: run to full time and hold on the result
-					_minute = 90.0
+				1:    # CONTINUE: run to full time and hold on the result. On a live match
+					# that means actually PLAYING the rest of it on the engine — the
+					# original's own "skip to the end" is the same spin (Pm98Outer's
+					# skip-request branch), not a jump to a precomputed scoreline.
+					if _live != null:
+						_live.run_to_full_time()
+						_sync_live()
+					else:
+						_minute = 90.0
 				2: back_pressed.emit()
 		_press = -1
 	queue_redraw()
@@ -326,8 +401,15 @@ func _field(nx: float, ny: float) -> Vector2:
 		PITCH.position.y + clampf(ny, 0.0, 1.0) * PITCH.size.y)
 
 
-## Ball position in SCREEN coords at the current minute (deterministic-ish flow).
+## Ball position in SCREEN coords. On a LIVE match this is the engine's own ball, with its
+## +0xc height lifting the sprite off the deck; otherwise it is the timeline-driven flow.
 func _ball_field() -> Vector2:
+	if _live != null:
+		var b := _live.ball_position()
+		var p := _field(float(b["nx"]), float(b["ny"]))
+		# The engine's ball height is metres; the side-on view lifts the sprite by the same
+		# fraction of the pitch depth a player's height occupies, so a lofted ball reads.
+		return Vector2(p.x, p.y - clampf(float(b["height"]), 0.0, 12.0) * 2.2)
 	var atk := _attacking_side(_minute)
 	# home (0) attacks the RIGHT goal (nx~0.80), away (1) the LEFT (nx~0.20)
 	var tx := 0.5
@@ -351,6 +433,11 @@ func _ball_field() -> Vector2:
 # ---- drawing ---------------------------------------------------------------
 
 func _draw() -> void:
+	# LIVE: read the clock/score off the engine here rather than only in _process, so a
+	# harness that drives the engine itself (PM98_LIVEWATCH_SHOT) still shows the real
+	# minute and scoreline instead of a stale 0:0.
+	if _live != null:
+		_sync_live()
 	draw_rect(Rect2(Vector2.ZERO, size), C_BG, true)
 	var s := _scale()
 	draw_set_transform(_origin(s), 0.0, Vector2(s, s))
@@ -416,6 +503,9 @@ func _goal_at(x: float, y: float, w: float, h: float, left: bool) -> void:
 
 
 func _draw_teams(ball: Vector2) -> void:
+	if _live != null:
+		_draw_teams_live()
+		return
 	var atk := _attacking_side(_minute)
 	# nearest home + away outfielder to the ball gets the active arrow
 	var near_home := _draw_side(0, HOME_FORM, _home_col, ball, atk == 0)
@@ -424,6 +514,34 @@ func _draw_teams(ball: Vector2) -> void:
 		_draw_arrow(near_home)
 	elif atk == 1 and near_away != Vector2.ZERO:
 		_draw_arrow(near_away)
+
+
+## LIVE: draw all 22 players where the ENGINE puts them. Nothing here interpolates or
+## invents a position — `nx`/`ny` are `player+0x4` / `player+0x8` normalised over the
+## session's own pitch dims. The active arrow goes to the engine's designated carrier
+## (`match+0x440`), which is the original's own notion of who is on the ball, not a
+## nearest-man guess.
+func _draw_teams_live() -> void:
+	var drawn: Array = []
+	var carrier := Vector2.ZERO
+	for p in _live.player_positions():
+		var side := int(p["side"])
+		var slot := int(p["slot"])
+		var pos := _field(float(p["nx"]), float(p["ny"]))
+		var prev: Array = _home_prev if side == 0 else _away_prev
+		var faces: PackedInt32Array = _home_face if side == 0 else _away_face
+		if slot < prev.size():
+			faces[slot] = _facing(prev[slot], pos)
+			prev[slot] = pos
+		drawn.append({"pos": pos, "col": _home_col if side == 0 else _away_col,
+			"face": faces[slot] if slot < faces.size() else 0})
+		if bool(p["carrying"]):
+			carrier = pos
+	drawn.sort_custom(func(a, b): return (a["pos"] as Vector2).y < (b["pos"] as Vector2).y)
+	for d in drawn:
+		_draw_player(d["pos"], d["col"], int(d["face"]), _run_phase())
+	if carrier != Vector2.ZERO:
+		_draw_arrow(carrier)
 
 
 ## Mirror the home formation to the away half (ny -> 1-ny).

@@ -40,6 +40,29 @@ func _run() -> void:
 	ok = _assert(FinanceScreen.fmt_money(90_000) == "£90,000",
 		"the fee renders as the frame's own '£90,000'") and ok
 
+	# 2026-07-28: the league fee is PER DIVISION, and it is NOT a clean ratio -- which is
+	# exactly why each rung was captured rather than interpolated. All four English
+	# divisions are witnessed (tools/re/refs/lowdiv-2026-07-28/): Man Utd £90,000,
+	# Birmingham C £45,000, Blackpool £35,000, Barnet £35,000. A division outside the
+	# four pays 0 -- no card, no TELEVISION row -- rather than a guess.
+	ok = _assert(FinanceModel.league_tv_fee("eng_prem") == 90_000,
+		"Premier home-league TV fee £90,000") and ok
+	ok = _assert(FinanceModel.league_tv_fee("eng_div1") == 45_000,
+		"First Division home-league TV fee £45,000") and ok
+	ok = _assert(FinanceModel.league_tv_fee("eng_div2") == 35_000,
+		"Second Division home-league TV fee £35,000") and ok
+	ok = _assert(FinanceModel.league_tv_fee("eng_div3") == 35_000,
+		"Third Division home-league TV fee £35,000") and ok
+	ok = _assert(FinanceModel.league_tv_fee("esp_liga") == 0,
+		"an unmodelled competition stays an honest gap") and ok
+	# The ladder is not proportional: halving from Premier to First, then a 10k step, then
+	# Second and Third SHARING one figure. Pin the shape so a future "tidy-up" cannot
+	# smooth it into a formula the game does not have.
+	ok = _assert(FinanceModel.league_tv_fee("eng_div2") == FinanceModel.league_tv_fee("eng_div3"),
+		"Second and Third share one fee (the shared-arm shape)") and ok
+	ok = _assert(FinanceScreen.fmt_money(45_000) == "£45,000",
+		"the First Division fee renders as the card's own '£45,000'") and ok
+
 	var scr: ChannelTvScreen = ChannelTvScreen.new()
 	get_root().add_child(scr)
 	scr.size = Vector2(640, 480)
