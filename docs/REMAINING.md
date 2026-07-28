@@ -144,13 +144,27 @@ pure black and the port has transparent" description is the wrong way round.
 ### NOT touched in s77, said plainly
 
 The **camera-motion port**, **B9**, the **cup channelTV fee** (a fifth career was driven
-this session and is recorded below), the **stadium tiles' row offset**, **"free if
-relegated"**, the **unmanaged-club release ladder**, the **`KnockoutScreen` -> `PMShadow`
-refactor** (same reason s74 and s76 gave: it renders correctly today, its gates are green,
-and it is a pure refactor with regression risk and no visible change), **HIGHLIGHTS** (an
-unchanged DATA gap — the `.p3d` models are absent) and the **real-device pass** (there is
-no Android device on this box; the desktop number is 63.6 engine frames/s and the phone is
-still unmeasured).
+this session and is recorded below), the **48x64 kit on-sprite EDGE BEVEL and the port of
+the s73 shadow bake to EuroGroupScreen's 24 group cells + OffersScreen's panel**, the
+**MINIESC residual** (now measured at 15 px, see above), the **stadium tiles' row offset**,
+**"free if relegated"**, the **unmanaged-club release ladder**, the **`KnockoutScreen` ->
+`PMShadow` refactor** (same reason s74 and s76 gave: it renders correctly today, its gates
+are green, and it is a pure refactor with regression risk and no visible change),
+**HIGHLIGHTS** (an unchanged DATA gap — the `.p3d` models are absent) and the **real-device
+pass** (there is no Android device on this box and it cannot run the built APK; the desktop
+number is 63.6 engine frames/s and the phone is still unmeasured — this one needs Mats).
+
+And on the M5 road, past the set piece §11 above stops at: **goals 2-7 + full time**,
+**stoppage-time handling** (reference `ft_clk` 14599 vs the port's raw-loop 14400, an
+unverified engine area), the **H1-remainder + H2 capture loop**, the **cross-seed sweep**
+(`PM98_SEED`, plumbed s55, still unrun — the only thing that proves the engine exact as a
+FUNCTION rather than on one trajectory) and **unifying the three `+0x43c` null sentinels**
+(absent / 0 / -1, behaviour-affecting).
+
+One lead worth carrying on the cup fee rather than a sixth drive: `club+0x290`'s PRODUCER
+was never found by a disp32 xref sweep, and s76 proved that class of miss is real
+(`FUN_005f5850` writes through a REGISTER pointer, which a disp32 sweep cannot see). A
+register-base search may beat another four hours of driving.
 
 ## 0aaaaaaaa. Closed 2026-07-28 (session s76) — THE KIT RECOLOUR, THE CAMERA OBJECT, THE MARKINGS
 
