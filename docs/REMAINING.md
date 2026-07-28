@@ -1,5 +1,52 @@
 # PM98 Android — remaining-work inventory (refreshed 2026-07-28)
 
+## 0aaaaa. Closed 2026-07-28 (session s73) — the shadow pass and the F.A. Cup semis card
+
+* **The shadowed bitmap blit is REVERSED AND PORTED.** `FUN_004b7f60` is not an outline
+  pass and not a bevel — it is a soft DROP SHADOW, and it is ONE pass. `FUN_005d66f0`
+  builds a 0/255 silhouette over the whole padded buffer; `FUN_005d6590` spreads it with
+  an IIR filter that walks the buffer LINEARLY from `stride + 1` (so a silhouette at a
+  row's right edge tails into the row below), decaying by `0x21` a step and clamped at a
+  per-call-site `cap`; `FUN_005d5220` composites it and re-quantises through a **two-table**
+  RGB565 lookup picked by an ordered-dither bit on **absolute screen parity**. That last
+  bit is the CAUSE of the rule the kit-list bake found empirically the same day —
+  `parity(X, Y) = (X + Y + 1) & 1`. Both call sites were disassembled, so the caps are read
+  and not guessed: `FUN_0050f970` pushes `0x63` (the marking markers), `FUN_0050fae0`
+  pushes `0x84` (the 48x64 kit). Full record: **`docs/re/shadow_blit_re.md`**; port:
+  `app/scripts/PMShadow.gd`; tables: `tools/re/build_shadow_lut.py`.
+  - The two 64K tables are built at startup and are not constants in the image, so they are
+    RECONSTRUCTED (nearest palette entry to the 565 cell CENTRE, ties high; the partner is
+    the entry that puts the pair's mean on that centre) and **validated at 751/751** on
+    every shadow pixel of the two MAN-TO-MAN markers. Ties broken low scores 750/751;
+    plain nearest-with-no-dither scores 428/751.
+  - Two byte wraps in the composite are load-bearing and are NOT clamps (the product
+    truncates to 16 bits before the shift; the sum lands in a byte, so `255 + 123` is 122).
+  - `diff_mantoman_parity`, three cases over two careers: the shadow bucket **944 -> 92 px**.
+    The markers are EXACT. What is left is the D/M letters the original draws as text
+    (36 px) and 56 px where the original paints black and the port's 48x64 MINIESC bank has
+    transparency — a KIT-ART gap, identical on both careers, still open below.
+  - Still open: moving `KnockoutScreen`'s baked `kitwell_*`/`icon_*` rings and
+    `PMChrome.panel_kit`'s per-screen banks onto this module, one gate at a time.
+* **The F.A. Cup SINGLE-LEG semifinal card — BUILT, 0 px.** One block whose bar reads
+  `RESULT`, the neutral ground as its first row, the panel ending after it. Proven rather
+  than assumed: blanking BOTH witnesses with the same content rects leaves exactly the bar
+  label (y178..184) and the second block (y263..344). New `cards_body_single.png` + the
+  F.A. Cup's own cards band; gate case `knockout_facup_semis`. The neutral ground is
+  modelled with the FINAL's own declared-OURS draw (`Cup._pair_round` -> `tie_venue_ids`),
+  with the divergence stated: it names the venue, it does not move the match.
+  `app/tests/test_cup_semis_neutral.gd`.
+* **Corrected while in there:** the Coca-Cola two-legged semifinals were ALREADY built and
+  gated at 0 px (`knockout_cocacola_semis_done`) — the carried list called them unbuilt.
+
+### NOT done in s73, stated plainly
+
+**The Coca-Cola FINAL body** is the one chrome of the 07-28 drive still open; its geometry
+is now measured into `knockout_views_re.md` (card frame x137..363 y124..332, olive bars
+y132..143 / y244..255, club bars y178..197 / y200..219, bar ground x144..318, score box
+x321..356) so the next session starts from numbers. **B9**, the **England non-Premier offers
+panel**, the **cup channelTV fee**, the **M5 wire-in** and the whole data/device tail are
+untouched and stay exactly as written below.
+
 ## 0aaaa. Closed 2026-07-28 (session s72) — MAN-TO-MAN MARKINGS
 
 * **MAN-TO-MAN MARKINGS — BUILT, and it was the last dead in-match door.**
