@@ -63,8 +63,31 @@ func _initialize() -> void:
 	feed[4] = 7
 	_ok(feed[4] - 1 == 6, "table entry 7 reaches the engine as 6")
 
+	# THE DOOR. The BRIEF's MAN-TO-MAN button was one of four `_: pass` stubs; drive
+	# the real widget with a press/release inside its own rect and check it fires.
+	var brief: MatchScreen = load("res://scenes/MatchScreen.gd").new()
+	brief.size = Vector2(640, 480)
+	get_root().add_child(brief)
+	var fired := [false]
+	brief.mtm_pressed.connect(func() -> void: fired[0] = true)
+	var r: Rect2 = brief.BTN["mtm"]
+	_tap(brief, r.position + r.size * 0.5)
+	_ok(fired[0], "the BRIEF's MAN-TO-MAN button opens the door")
+	fired[0] = false
+	_tap(brief, (brief.BTN["exit"] as Rect2).position + Vector2(4, 4))
+	_ok(not fired[0], "and no other button does")
+
 	print("test_mantoman: %s" % ("ALL PASS" if _fail == 0 else "%d FAILED" % _fail))
 	quit(1 if _fail else 0)
+
+
+func _tap(ci: Control, at: Vector2) -> void:
+	for pressed in [true, false]:
+		var e := InputEventMouseButton.new()
+		e.button_index = MOUSE_BUTTON_LEFT
+		e.pressed = pressed
+		e.position = at
+		ci._on_input(e)
 
 
 func _xi(prefix: String) -> Array:
