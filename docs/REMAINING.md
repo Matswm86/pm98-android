@@ -69,6 +69,12 @@ half-angle is the binary's own `0x2640` = 53.79 deg**, not the derived
 not dots. The touchlines / goal lines / halfway line now come out of the engine's own two loops.
 Still not source-read, and said so: the grass shading.
 
+### The full suite sweep — RUN, and clean
+
+The "232-file manual pre-release step" was run end to end: **all 241 `test_*.gd` files**,
+headless, 400 s timeout each. **241 of 241 clean, zero failures.** (CI's curated gate is 32 of
+them; the rest are the M5 engine-leaf oracles and the per-screen suites.)
+
 ### The two carried "opens" that turned out not to be
 
 * **`shot_squad_card_tapthrough` DOES NOT REPRODUCE.** Open since s70 as "2 of 10". Run three
