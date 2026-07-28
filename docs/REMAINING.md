@@ -1,5 +1,135 @@
 # PM98 Android — remaining-work inventory (refreshed 2026-07-28)
 
+## 0aaaaaaaaa. Closed 2026-07-28 (session s77) — UNSACKABLE, and the HUB CIRCLE
+
+Mats's brief was: a new UNSACKABLE cheat on the hub dropdown first, then the s76 carried
+list. What closed, what moved, and what did not, said plainly.
+
+### UNSACKABLE — BUILT, and it is three bytes
+
+`FUN_00545fd0` IS the weekly hub screen's own `run()`. Before it draws the menu it tests
+three dismissal conditions and on ANY of them raises one modal, calls
+`FUN_0057a500(club, 0xffff)` and ends the career. Every "keep him" branch is a **2-byte
+short jump whose target is exactly the next test**, so the whole cheat is flipping three
+opcodes to `JMP rel8` with their displacements untouched:
+
+| site | VA | stock | patched | target (unchanged) |
+|---|---|---|---|---|
+| finance | `0x546019` | `0x76` `jbe` | `0xEB` | `0x54603a` |
+| results | `0x546044` | `0x74` `je` | `0xEB` | `0x546063` |
+| squad | `0x546067` | `0x73` `jae` | `0xEB` | `0x5460a8` |
+
+No cave, no relocation, no displaced instruction. `build_hack_exe.py` gained `--cheats=`
+and asserts both the stock opcode AND the decoded target before writing; a
+`--cheats=unsackable` build differs from `MANAGER.EXE` at **exactly three file offsets**.
+
+**Proof is CFG reachability on the real bytes** (`tools/hack/verify_unsackable.py`): all
+three message arms and the shared modal+detach block are reachable from the function entry
+in `MANAGER.EXE` and **unreachable** in `MANAGER_HACK.EXE`. The stock rows are the load-
+bearing ones — they show the walk really does reach all three arms.
+
+Port: `Career.cheat_unsackable`, one early return at the head of `sack_message()` /
+`sack_message_reason()` (which ARE those three tests, in the binary's order). Switch is
+`AudioManager.set_unsackable`, persisted in the same `[cheats]` block; UI is a second
+OPTIONS row above THREE UP FRONT. Gate `app/tests/test_unsackable.gd`, 31 checks — a
+39-week driven season with all three conditions **re-armed after every week** raises zero
+dismissals, while the identical state with the cheat off does dismiss.
+
+**Found doing it, and it was a real defect in the standard:** the OPTIONS band's emptiness
+test only looked for label-gold and OK-plate red, so it MISSED the modal's own **white**
+ON/OFF captions at rows 308..314 and the first two-row layout drew straight through them.
+Re-measured over gold + red + white the free band is `(138,315,288,29)`.
+`diff_options_parity.py` now tests white too **and diffs the LIVE Godot render** as well as
+the baked chrome — **0 px vs the MANAGER.EXE capture outside the band**, which that file's
+own docstring had said was never built.
+
+**NOT covered, said plainly:** `FUN_0057b6b0` @`0x57b6e5` is a SECOND
+`push 0xffff / call FUN_0057a500`, swept over a club list by `FUN_005865b0`, gated on the
+Promanager flag `DAT_0066b1e4` and on `FUN_0057a570` (`club+0x50` -> the competition's
+`vtbl[0xc8]`). It is not one of the board's three dismissals, it is **not reversed**, and
+neither the patch nor the port touches it. It is the same thread as "free if relegated"
+and "the unmanaged-club release ladder" below.
+
+### THE HUB CIRCLE — REBUILT from the game's own pixels (s76 items 12 + 13, both closed)
+
+The shipped `menu_bg.png` had one career's six bars baked in plus two flat
+`(108,120,150)` blocks, and a hand-cut `circle_home.png` repainted it for the other
+arrangement. Nothing about the circle is hand-cut any more:
+
+* **`RECURSOS.PKF` `FONDO3.BMP` IS the hub background**, circle, white rim and inner
+  marble included — pixel-identical to the real MENUPRINCIPAL frame everywhere except the
+  six bars and the two kits. `menu_bg.png`'s circle interior is now exactly those pixels
+  (gate: **0 px**).
+* **The bars are `FUN_00549240`'s own literal rects** (six `FUN_0043ce50` fills, six 1 px
+  `FUN_00468c90` frames) at the widget rect `(220,173) 205x173` (`FUN_00436fb0` operands
+  @0x547cad). Frames are pure white on the player's side, pure black on the other,
+  measured on all twelve borders.
+* **The fill is a DITHER, not an alpha blend.** `FUN_0043ce50`'s 100/256 does not
+  reproduce in RGB: the best-fit alpha is 96..106 and still only ~50 % of non-ink pixels
+  come out right after snapping to MANAGER.PAL. Measured, the result is an exact function
+  of **(destination FONDO3 palette INDEX, `(x+y)&1`)** — the same absolute-screen-parity
+  checkerboard `shadow_blit_re.md` found in `FUN_005d5220`. The baker learns that table off
+  **179 hub frames** discovered in the corpus and repaints both schemes; exactly one cell
+  no frame covers is derived from its parity partner and printed.
+  **Result: chip and manager bars 0 px on BOTH arrangements**; the two club bars keep a
+  small residual that is the proman12 club name's own drop shadow, capped and named.
+* **The hub kit is the 24x32 NANOESC sprite**, not the "~50x65 two-shirt group" the doc
+  carried: `FUN_00579710` caches `club+0x18` from `DBDAT\NANOESC\eq96%04u.bmp`, blitted at
+  widget `(2,48)`/`(178,94)` -> screen `(222,221)`/`(398,267)`. The 45x57 stand-in is gone.
+* **The NATION FLAGS are BUILT.** `BANDERAS.PKF`'s 127 entries all decode **30x20**, and
+  the port's own `flag_022` (Spain) / `flag_030` (England) reproduce walkthrough
+  `001_160008` at **0 px** at `(308,143)` and `(308,355)`. The old "~55x35 at ~(295,138)"
+  estimate is superseded.
+
+New gate `tools/re/diff_hub_circle_parity.py`; `hub/circle_home.png` retired.
+
+### THE M5 HARNESS SPIN — the outer-loop half is FIXED, and the rest is now LOCALISED
+
+s76 item 11(a) carried this as "fix the `run_match_from_struct.gd` WATCH-harness spin
+(>5 h post-goal; Outer wait-loop / +0x1a2c goal-latch interplay)". Measured, it is two
+different things and only one of them was the outer loop:
+
+* **The outer-loop half is closed.** Under the dump's play-state 4 the wait loop breaks on
+  the goal's `+0x1a2c` and then `_dequeue_flush` CLEARS it, so the next step has nothing
+  left to break on and spins its whole 40,000-frame guard with the clock frozen. Two
+  things were missing, both modelled now: `+0x1a1f`, which `_live_branch` sets from the
+  GLOBAL PAUSE byte `DAT_00674cb3` (0 headless) and which is exactly what is set while an
+  events board is up; and the KICK OFF click itself, which reaches `FUN_00593ab0` as a
+  nonzero pump result whose skip path arms `+0x1a1e`. `Pm98Outer.next_pump_result` is the
+  injection point; the reference capture was itself driven with one KICK OFF click per
+  board pause, so this reproduces how the reference was made. **Verified: the clock and the
+  RNG move again and `+0x1a1e` arms in two steps instead of never.**
+* **What is left is the RESTART, and it is the deferred leaves.** With `PM98_TICK_PROBE`
+  the driver was called directly 3,000 times straight after the goal: it returns 1 for
+  **eight** ticks and then **0 forever**, with `clk` / phase(`+0x448`=8) / dispatch
+  (`+0x1a38`=6) all frozen. So the engine IS reporting "segment over" and it is the
+  restart ladder — `Pm98Driver.restart_handler`, reached through the `+0x1a1e` one-shot
+  gate — that does not complete. That is precisely where the three still-deferred leaves
+  live. **So road step (a) is not independent of step (c): goals 2-7 are blocked on the
+  leaves, not on the harness.** Recorded here rather than buried.
+* A **stall guard** was added so this reports instead of hanging: the harness watches
+  `clk + banked` and gives up with a state line after 3 frozen steps.
+
+### The 48x64 MINIESC "56 px" entry is STALE
+
+Re-measured this session against the same witness (`058_162622`, Man Utd vs F.C.
+Barcelona): the kit rect's residual is **15 px**, not 56, and they are a single 1 px column
+at kit-local x=33, rows 30..63, where the port paints black and the original paints
+panel/shadow. The two crops are visually identical. It is a real residual and it stays
+open, but at a twentieth of the size the list claimed, and the doc's "the original paints
+pure black and the port has transparent" description is the wrong way round.
+
+### NOT touched in s77, said plainly
+
+The **camera-motion port**, **B9**, the **cup channelTV fee** (a fifth career was driven
+this session and is recorded below), the **stadium tiles' row offset**, **"free if
+relegated"**, the **unmanaged-club release ladder**, the **`KnockoutScreen` -> `PMShadow`
+refactor** (same reason s74 and s76 gave: it renders correctly today, its gates are green,
+and it is a pure refactor with regression risk and no visible change), **HIGHLIGHTS** (an
+unchanged DATA gap — the `.p3d` models are absent) and the **real-device pass** (there is
+no Android device on this box; the desktop number is 63.6 engine frames/s and the phone is
+still unmeasured).
+
 ## 0aaaaaaaa. Closed 2026-07-28 (session s76) — THE KIT RECOLOUR, THE CAMERA OBJECT, THE MARKINGS
 
 Mats's list was s75 §6 and §7 plus the data/doc tail. What closed, and what did not, said

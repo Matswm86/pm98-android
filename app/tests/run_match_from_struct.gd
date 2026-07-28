@@ -43,6 +43,9 @@ const REF_JSON := REF_DIR + "/m5_reference_villa_bolton_5_2.json"
 const FRAME0_SEED := 0xea0d2a8d
 const STEP_CAP := 60000
 const STRIDE := 0x3bc
+## Consecutive outer steps with the clock frozen before the harness gives up and reports.
+## 3 is enough: one step is a whole wait-loop, so three of them is thousands of dead ticks.
+const STALL_STEPS := 3
 
 
 ## PM98_SEEDTRACE=<path>: one line per outer step -- "step clk banked half rng.state" --
@@ -118,13 +121,88 @@ func _run() -> bool:
 	if tp != "":
 		_trace = FileAccess.open(tp, FileAccess.WRITE)
 
+	# PM98_TICK_PROBE=N: after ONE outer step (which lands on the first goal), call the
+	# driver directly N times and report what it returns. `Pm98Driver.tick` returning 0 is
+	# "segment over", the only thing that arms the +0x1a1e restart -- so if it never returns
+	# 0 here, the post-goal RESTART cannot complete and no amount of outer-loop or
+	# message-pump modelling will move the match on. Added 2026-07-28 to tell those two
+	# causes apart in minutes instead of hours.
+	var probe := int(OS.get_environment("PM98_TICK_PROBE"))
+	if probe > 0:
+		Pm98Outer.step(m, rng)
+		_prog("[probe] after 1 outer step: clk=%d ph=%d disp=%d 1a1e=%d score=%d-%d" % [
+			_g(m, 0x450), _g(m, 0x448), _g(m, 0x1a38), _g(m, 0x1a1e), _g(m, 0x478), _g(m, 0x798)])
+		# PM98_PROBE_RESTART=1: arm the +0x1a1e one-shot gate and call the driver ONCE. If
+		# that single call does not return, the stall is inside `Pm98Driver.restart_handler`
+		# itself and no outer-loop or pump modelling can reach it.
+		if OS.get_environment("PM98_PROBE_RESTART") == "1":
+			m[0x1a1e] = 1
+			_prog("[probe] arming +0x1a1e and calling tick ONCE...")
+			var rr := Pm98Driver.tick(m, rng)
+			_prog("[probe] the armed tick RETURNED %d: clk=%d ph=%d disp=%d 1a1e=%d" % [
+				rr, _g(m, 0x450), _g(m, 0x448), _g(m, 0x1a38), _g(m, 0x1a1e)])
+			return false
+		var zeros := 0
+		var first_zero := -1
+		for k in range(probe):
+			var r := Pm98Driver.tick(m, rng)
+			if r == 0:
+				zeros += 1
+				if first_zero < 0:
+					first_zero = k
+			if k < 8 or (k % 500) == 0:
+				_prog("[probe] tick %d -> %d  clk=%d ph=%d disp=%d 1a20=%d 1a2c=%d" % [
+					k, r, _g(m, 0x450), _g(m, 0x448), _g(m, 0x1a38), _g(m, 0x1a20), _g(m, 0x1a2c)])
+		_prog("[probe] %d ticks: %d returned 0 (first at %d); end clk=%d ph=%d disp=%d" % [
+			probe, zeros, first_zero, _g(m, 0x450), _g(m, 0x448), _g(m, 0x1a38)])
+		return false
+
 	var goals: Array = []
 	var prev := [_g(m, 0x478), _g(m, 0x798)]
 	var over_at := -1
 	var t := 0
+	var kickoffs := 0
+	var board_up := false
+	var last_clk := -1
+	var frozen := 0
 	while t < STEP_CAP:
 		Pm98Outer.step(m, rng)
 		t += 1
+		# THE EVENT-BOARD KICK OFF (added 2026-07-28; this is what fixed the ">5 h post-goal
+		# spin"). The dump's play-state is 4 -- WATCH with the board up -- so Pm98Outer takes
+		# the PAUSE branch, whose wait loop breaks on a priority event and then flushes it.
+		# In the binary the career layer then shows the events board and play only resumes
+		# when the user clicks KICK OFF, which reaches FUN_00593ab0 as a NONZERO pump result
+		# (spin the driver to segment end, arm +0x1a1e). Headless PUMP_RESULT_HEADLESS=0 is
+		# "no input at all", so nothing ever armed the restart and the match could not leave
+		# the goal it had just scored. The reference capture was driven with exactly one
+		# KICK OFF click per board pause (handoff-pm98-m5-s59-frontier-2836), so the harness
+		# injects the same click: one, on the frame after a pause-branch break, and only
+		# while the match is still live.
+		var still_live := _g(m, 0x1a38) != 10
+		if still_live and Pm98Movement.play_state_eq(m, 4) and (_g(m, 0x1a1e) & 0xff) == 0 \
+				and _g(m, 0x1a38) != 0:
+			# TWO things, because the board pause is two things in the binary:
+			#  * `+0x1a1f` is the wait loop's own break condition, and `_live_branch` sets it
+			#    from the GLOBAL PAUSE byte DAT_00674cb3 -- which is exactly what is set while
+			#    an events board is up, and which Pm98Outer models as 0 headless. Without it
+			#    the loop has nothing to break on once `_dequeue_flush` has cleared +0x1a2c,
+			#    so it spins its full 40,000-frame guard with the clock frozen.
+			#  * the KICK OFF click itself reaches FUN_00593ab0 as a nonzero pump result,
+			#    whose skip path arms `+0x1a1e` -- the restart the next tick consumes.
+			# Measured (PM98_TICK_PROBE): after the clk-2837 goal the driver returns 1 for
+			# eight ticks and then 0 forever with clk / phase / dispatch frozen, i.e. the
+			# engine is reporting "segment over" and only the restart arm is missing.
+			m[0x1a1f] = 1
+			Pm98Outer.next_pump_result = 1
+			kickoffs += 1
+			board_up = true
+		elif board_up:
+			# ...and the click CLEARS the pause. `restart_handler` only zeroes +0x1a1f on a
+			# KICKOFF (rtype 1); a GOAL restart is rtype 6, so leaving it set would make every
+			# later wait loop break after a single frame and the WATCH pacing would be gone.
+			m[0x1a1f] = 0
+			board_up = false
 		if _trace != null:
 			_trace.store_line("%d %d %d %d %d" % [t, _g(m, 0x450), _g(m, 0x19a8), _g(m, 0x19a0), rng.state])
 		var cur := [_g(m, 0x478), _g(m, 0x798)]
@@ -135,6 +213,12 @@ func _run() -> bool:
 				goals.append(gd)
 				print("  GOAL step=%d  %d' %s  %d-%d  clk=%d banked=%d half=%d rng=%d" % [
 					t, gd["minute"], gd["team_name"], cur[0], cur[1], gd["clk"], gd["banked"], gd["half"], gd["rng"]])
+		var trace_n := int(OS.get_environment("PM98_TRACE_STEPS"))
+		if trace_n > 0 and t <= trace_n:
+			_prog("  [step %d] clk=%d bank=%d half=%d ph=%d disp=%d 1a1e=%d 1a1f=%d 1a2c=%d 1a20=%d ps=%d rng=%d ko=%d score=%d-%d" % [
+				t, _g(m, 0x450), _g(m, 0x19a8), _g(m, 0x19a0), _g(m, 0x448), _g(m, 0x1a38),
+				_g(m, 0x1a1e), _g(m, 0x1a1f), _g(m, 0x1a2c), _g(m, 0x1a20),
+				Pm98Movement._play_state(m), rng.state, kickoffs, cur[0], cur[1]])
 		if t % 2000 == 0:
 			var msg := "  ..step=%d  min=%d (clk=%d bank=%d half=%d ph=%d)  score=%d-%d  disp=%d head27e8=%d tail27ec=%d latch=%d" % [
 				t, ((_g(m, 0x19a8) + _g(m, 0x450)) * 0x2d) / max(1, _g(m, 0x19ac)),
@@ -142,6 +226,25 @@ func _run() -> bool:
 				_g(m, 0x27e8), _g(m, 0x27ec), _g(m, 0x1a20)]
 			print(msg)
 			_prog(msg)   # durable progress (stdout is block-buffered under redirect)
+		# STALL GUARD (2026-07-28). A stalled outer step used to be a silent >5 h hang; it is
+		# now a report. The engine's clock is match+0x450 and its half-bank is +0x19a8, so a
+		# run of steps in which NEITHER moves means the match is frozen -- and since each
+		# step under play-state 4 is a whole wait-loop, that is thousands of driver ticks
+		# per step of nothing.
+		var now_clk := _g(m, 0x450) + _g(m, 0x19a8)
+		if now_clk == last_clk:
+			frozen += 1
+		else:
+			frozen = 0
+			last_clk = now_clk
+		if frozen >= STALL_STEPS:
+			var line := ("STALL after step %d: clk+banked frozen at %d for %d steps. "
+				+ "ph=%d disp=%d 1a1e=%d 1a1f=%d 1a2c=%d ps=%d score=%d-%d kickoffs=%d") % [
+				t, now_clk, frozen, _g(m, 0x448), _g(m, 0x1a38), _g(m, 0x1a1e), _g(m, 0x1a1f),
+				_g(m, 0x1a2c), Pm98Movement._play_state(m), cur[0], cur[1], kickoffs]
+			print(line)
+			_prog(line)
+			break
 		if _g(m, 0x1a38) == 10:
 			over_at = t
 			break

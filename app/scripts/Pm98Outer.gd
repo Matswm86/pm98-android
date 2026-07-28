@@ -57,6 +57,21 @@ extends RefCounted
 ## iteration guard (push_error, no silent failure) until the e2e oracle settles it.
 
 const PUMP_RESULT_HEADLESS := 0    # FUN_005bce40(0) modeled: no input, no quit (see header)
+## ONE frame's message-pump result, injected by a harness to model a real user action.
+## -1 (the default) means "use PUMP_RESULT_HEADLESS", i.e. no input at all. Any other value
+## is consumed by the NEXT `_wait_frame` and then reset.
+##
+## Why this exists: `PUMP_RESULT_HEADLESS = 0` says "no user input, keep playing", and that
+## is right while play is live. It is NOT right when the game has raised the EVENT BOARD --
+## play-state 4, the state the M5 capture's frame-0 dump was taken in. There the binary's
+## wait loop breaks on the priority event, the career layer shows the board, and play only
+## resumes when the user clicks KICK OFF, which reaches the sim as a NONZERO pump result
+## (FUN_00593ab0's skip path: spin the driver to segment end, then arm +0x1a1e). With no
+## input modelled at all the segment is never armed, so the match cannot leave the goal it
+## just scored -- exactly the ">5 h post-goal spin" run_match_from_struct.gd was showing.
+## The reference capture itself was driven with one KICK OFF click per event-board pause,
+## so injecting that click is what reproduces it.
+static var next_pump_result := -1
 const WAIT_LOOP_GUARD := 40000     # > 2 halves of ticks; breach = deadlock -> push_error
 
 
@@ -197,6 +212,9 @@ static func _wait_frame(m: Dictionary, rng: MatchEngine.Pm98Rng) -> void:
 	m[0x198c] = 6000
 	Pm98Driver.tick(m, rng)                              # FUN_00598740 (ret discarded)
 	var pump := PUMP_RESULT_HEADLESS                     # FUN_005bce40(0); -1 -> 10 (quit)
+	if next_pump_result != -1:                           # a harness-injected user action
+		pump = next_pump_result
+		next_pump_result = -1
 	m[0x1a3c] = pump
 	if pump == 10:
 		m[0x1a38] = 10
