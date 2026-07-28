@@ -63,6 +63,21 @@ CARD_ICONS = [
 # original's hi-res panel kit bank is un-extracted, so the app's own art is aspect-fitted
 # and the wells are declared.
 FINAL_KITS = [("final kit L", 146, 158, 48, 60), ("final kit R", 306, 158, 48, 60)]
+# The FINALIST plates' 24x32 nano kits, at plate_x0 + 2 / y377.
+FINALIST_KITS = [("finalist kit 1", 22, 377, 24, 32), ("finalist kit 2", 283, 377, 24, 32)]
+
+# The KIT LIST's 28x22 kit wells: eight rows at pitch 30 from y154, one well each side --
+# x15 in both column sets, x289 (European) / x344 (domestic) on the right.
+KL_WELLS_EURO = [
+    (f"kit {side} y{154 + 30 * i}", x, 154 + 30 * i, 28, 22)
+    for i in range(8)
+    for side, x in (("L", 15), ("R", 289))
+]
+KL_WELLS_DOM = [
+    (f"kit {side} y{154 + 30 * i}", x, 154 + 30 * i, 28, 22)
+    for i in range(8)
+    for side, x in (("L", 15), ("R", 344))
+]
 
 # The phase paginator's plate is TWO ROWS TALLER on the paged-back frame than on the live
 # one: white rows 77..101 at x190 against 78..100 on 03_euroleague_qtrfinals_LEG1, at the
@@ -70,6 +85,13 @@ FINAL_KITS = [("final kit L", 146, 158, 48, 60), ("final kit R", 306, 158, 48, 6
 # a rule, so the band is declared for the decided case rather than guessed at; the port
 # renders the live-phase plate, which is 0 px on every other case here.
 PAGINATOR = [("paginator plate", 139, 76, 184, 27)]
+# The same phenomenon on the CARDS family, witnessed 2026-07-28 on the paged-back
+# Coca-Cola semifinals: the label plate's white surround reaches x310..336 on rows 85 and
+# 109 and one column further left at x336 on the rows between, where the LIVE-phase frame
+# the band was cut from has the plate's black border there. One witness of each state is
+# not a rule, so the plate's outer frame is declared for the paged-back case exactly as
+# the bracket's is; the port renders the live-phase plate, 0 px on every live case here.
+PAGINATOR_CARDS = [("paginator plate", 310, 85, 27, 25)]
 
 CASES = [
     ("knockout_euro_round1", "06_euroleague_round1_played.png", [BARRA_KIT, SCROLL_COL]),
@@ -104,6 +126,33 @@ CASES = [
         "knockout_cocacola_semis",
         "06_cocacola_semifinals_drawn_1998-01-10.png",
         [BARRA_KIT, *CARD_ICONS],
+    ),
+    # The DECIDED Coca-Cola semifinals (tools/re/refs/knockout-2026-07-28): both legs
+    # played, both FINALIST plates FILLED. The two 24x32 nano kits in those plates carry
+    # the same un-reversed outline pass as every other kit blit here.
+    (
+        "knockout_cocacola_semis_done",
+        "../knockout-2026-07-28/13_cocacola_semifinals_TWOLEGS_1998-04-11.png",
+        [BARRA_KIT, RAIL, *CARD_ICONS, *FINALIST_KITS, *PAGINATOR_CARDS],
+    ),
+    # The KIT LIST (5-8 ties), built 2026-07-28: three witnesses, two competitions, two
+    # careers, both column sets. Its 28x22 kit wells carry the same un-reversed on-sprite
+    # bevel every other kit blit in this file does, so the two wells per row are declared
+    # exactly as the bracket's columns are.
+    (
+        "knockout_uefa_kitlist",
+        "01_uefa_1_8finals_leg1_played_1997-12-07.png",
+        [BARRA_KIT, *KL_WELLS_EURO],
+    ),
+    (
+        "knockout_cwc_kitlist",
+        "09_comp_cwc.png",
+        [BARRA_KIT, *KL_WELLS_EURO],
+    ),
+    (
+        "knockout_cocacola_kitlist",
+        "13_cocacola_r4_KITLIST_PLAYED_1997-12-01.png",
+        [BARRA_KIT, *KL_WELLS_DOM],
     ),
     (
         "knockout_euro_final",

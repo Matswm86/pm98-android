@@ -161,6 +161,102 @@ const EURO_FINAL_HEADER := {
 }
 
 
+# ---- the KIT LIST witnesses (measured 2026-07-28) -----------------------------------
+
+# 01_uefa_1_8finals_leg1_played_1997-12-07.png -- the same Bolton W career at the U.E.F.A.
+# Cup 1/8 FINALS with every FIRST leg played and the other two columns still empty.
+const UEFA_KL_HEADER := {
+	"top": "MATS", "bottom": "Bolton W", "club_id": 59,
+	"weekday": "Sunday", "day": "7", "month": "December", "year": "1997",
+	"status_top": "Premier", "status_bottom": "Week 19",
+}
+
+# home, away, home_id, away_id, leg1 (or [] for a drawn-but-unplayed round)
+const UEFA_KL_TIES := [
+	["Inter", "Estrasburgo", 1027, 1062, [1, 2]],
+	["Jazz", "Vitesse", 1260, 1107, [0, 3]],
+	["Twente", "Bastia", 1112, 1071, [0, 0]],
+	["Auxerre", "Bochum", 1058, 1051, [1, 2]],
+	["Munich 1860", "W.Lodz", 1047, 1147, [2, 0]],
+	["R.C. Deportivo", "Lazio", 1001, 1023, [1, 0]],
+	["Leicester", "Ajax", 57, 1103, [2, 0]],
+	["Trabzonspor", "Udinese", 1141, 1032, [1, 1]],
+]
+
+# 09_comp_cwc.png -- the Cup Winner's Cup 1/8 FINALS, drawn, nothing played.
+const CWC_KL_HEADER := {
+	"top": "MATS", "bottom": "Bolton W", "club_id": 59,
+	"weekday": "Saturday", "day": "4", "month": "October", "year": "1997",
+	"status_top": "Premier", "status_bottom": "Week 9",
+}
+
+const CWC_KL_TIES := [
+	["Copenaghen", "G. Ekeren", 1171, 1125, []],
+	["AIK Estoc.", "Vicenza", 1138, 1033, []],
+	["Lokomotiv M.", "Kocaelispor", 1101, 1144, []],
+	["AEK Atenas", "Beitar", 1188, 1270, []],
+	["R. Betis B.", "Niza", 1015, 1068, []],
+	["Boavista", "Chelsea", 1080, 49, []],
+	["Stuttgart", "Roda", 1048, 1105, []],
+	["Apoel Nic.", "Tromso", 1224, 1199, []],
+]
+
+# 13_cocacola_r4_KITLIST_PLAYED_1997-12-01.png -- the DOMESTIC column set of the same
+# layout, PLAYED: RES. filled, REPLAY empty, and the club going through inked yellow
+# together with its own goal digit. Row 0 finished level, so neither club is inked.
+const CC_KL_HEADER := {
+	"top": "MATS", "bottom": "Bolton W", "club_id": 59,
+	"weekday": "Monday", "day": "1", "month": "December", "year": "1997",
+	"status_top": "Premier", "status_bottom": "Week 18",
+}
+
+# home, away, home_id, away_id, res, winner (0 home / 1 away / -1 level)
+const CC_KL_TIES := [
+	["Crystal Pal.", "Manchester C", 63, 60, [1, 1], -1],
+	["Oxford Utd", "Ipswich", 76, 66, [1, 3], 1],
+	["Coventry", "Southend Utd", 53, 61, [3, 0], 0],
+	["Reading", "Norwich C", 75, 71, [3, 1], 0],
+	["WBA", "Derby County", 80, 56, [2, 1], 0],
+	["Arsenal", "Tottenham H", 46, 47, [1, 0], 0],
+	["Manchester Utd.", "Nottingham F.", 40, 41, [1, 0], 0],
+	["Southampton", "Bournemouth", 54, 83, [2, 1], 0],
+]
+
+
+static func _kitlist_rows(ties: Array, euro: bool) -> Array:
+	var rows: Array = []
+	for t in ties:
+		var cells: Array = [["", ""], ["", ""], ["", ""]] if euro else [["", ""], ["", ""]]
+		var got: Array = t[4]
+		if not got.is_empty():
+			cells[0] = [str(int(got[0])), str(int(got[1]))]
+		rows.append({"home": t[0], "away": t[1],
+			"winner": int(t[5]) if t.size() > 5 else -1,
+			"home_id": int(t[2]), "away_id": int(t[3]), "cells": cells})
+	return rows
+
+
+# 13_cocacola_semifinals_TWOLEGS_1998-04-11.png (tools/re/refs/knockout-2026-07-28) --
+# the FIRST witness of a DECIDED semifinal: both legs played, both FINALIST plates filled.
+# It is what closed the port's invented FINALIST fill, and it refutes the port's other
+# inference here -- nothing in this layout is inked yellow, not the winning club's name and
+# not his goals.
+const CC_SEMI_DONE_HEADER := {
+	"top": "mats", "bottom": "Bolton W", "club_id": 59,
+	"weekday": "Saturday", "day": "11", "month": "April", "year": "1998",
+	"status_top": "Premier", "status_bottom": "Week 36",
+}
+
+# home, away, home_id, away_id, home_ground, away_ground, leg1 [host, guest],
+# leg2 [host, guest], winner
+const CC_SEMI_DONE_TIES := [
+	["Wimbledon", "Blackburn R.", 51, 38, "Selhurst Park", "Ewood Park",
+		[1, 1], [1, 2], 0],
+	["Arsenal", "Manchester Utd.", 46, 40, "Highbury", "Old Trafford",
+		[2, 0], [0, 1], 0],
+]
+
+
 func _init() -> void:
 	var out := "res://out"
 	if OS.has_environment("PM98_SHOT_DIR"):
@@ -189,6 +285,14 @@ func _init() -> void:
 		_card_rows(EURO_SEMI_TIES), true, false, 0, "cards")
 	await _shot(out, "knockout_cocacola_semis", CC_SEMI_HEADER, "cocacola", "SEMIFINALS",
 		false, _card_rows(CC_SEMI_TIES), true, false, 0, "cards")
+	await _shot(out, "knockout_cocacola_semis_done", CC_SEMI_DONE_HEADER, "cocacola",
+		"SEMIFINALS", false, _card_done_rows(CC_SEMI_DONE_TIES), true, true, 0, "cards")
+	await _shot(out, "knockout_uefa_kitlist", UEFA_KL_HEADER, "uefa", "1/8 FINALS", true,
+		_kitlist_rows(UEFA_KL_TIES, true), true, false, 0, "kitlist")
+	await _shot(out, "knockout_cwc_kitlist", CWC_KL_HEADER, "cwc", "1/8 FINALS", true,
+		_kitlist_rows(CWC_KL_TIES, true), true, false, 0, "kitlist")
+	await _shot(out, "knockout_cocacola_kitlist", CC_KL_HEADER, "cocacola", "ROUND 4",
+		false, _kitlist_rows(CC_KL_TIES, false), true, false, 0, "kitlist")
 	await _shot(out, "knockout_euro_final", EURO_FINAL_HEADER, "euro", "Final", true,
 		[{"home": "Real Madrid C.F.", "away": "Olympiakos", "home_id": 1003,
 			"away_id": 1189, "home_flag": 22, "away_flag": 26, "venue": "Das Antas",
@@ -208,6 +312,20 @@ static func _card_rows(ties: Array) -> Array:
 			"home_id": int(t[2]), "away_id": int(t[3]),
 			"home_ground": str(t[4]), "away_ground": str(t[5]),
 			"two_legged": true, "cells": cells})
+	return rows
+
+
+static func _card_done_rows(ties: Array) -> Array:
+	var rows: Array = []
+	for t in ties:
+		var l1: Array = t[6]
+		var l2: Array = t[7]
+		rows.append({"home": t[0], "away": t[1], "winner": int(t[8]),
+			"home_id": int(t[2]), "away_id": int(t[3]),
+			"home_ground": str(t[4]), "away_ground": str(t[5]),
+			"two_legged": true,
+			"cells": [[str(int(l1[0])), str(int(l1[1]))],
+				[str(int(l2[0])), str(int(l2[1]))], ["", ""]]})
 	return rows
 
 

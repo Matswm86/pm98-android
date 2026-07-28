@@ -89,6 +89,45 @@ const SCORE_TOP_DY := 2
 const C_OUT := Color8(42, 63, 85)        # the eliminated club and its goals
 const C_THROUGH := Color8(255, 223, 0)   # the club going through, and its goals
 
+# ---- the KIT LIST (layout 2), measured 2026-07-28 --------------------------------
+## The form the original switches to for a round of 5-8 ties: 22 px rows, a 17x20 ridi kit
+## blitted each side of the two names, and the SAME column pair as the compact list. Three
+## witnesses -- 09_comp_cwc (European, drawn), 01_uefa_1_8finals_leg1_played (European,
+## leg 1 in) and 13_cocacola_r4_KITLIST_PLAYED (DOMESTIC, played, winners inked) -- two
+## competitions, two careers, both column sets.
+##
+## Its panel is x6..493, three columns WIDER than the compact list's, because a round this
+## small never scrolls: the scrollbar column is simply part of the panel here.
+##
+## Every witnessed round of this layout has EIGHT ties, and eight is also the only size the
+## port's own cup structure can produce (every competition halves 16 -> 8 -> 4 -> 2 -> 1),
+## so the 5-7 tie panel heights are neither witnessed nor reachable. The rows are drawn
+## top-aligned from the compact list's own witnessed BODY_TOP and the panel tail follows
+## the last row, which is exact at 8.
+##
+## The row grounds do NOT alternate here (all 24 witnessed rows carry the same five), and
+## no witness shows the MANAGER's own tie in this layout, so it draws like any other --
+## the port adds no highlight it has not seen (docs/re/knockout_views_re.md).
+const KITLIST_MIN_TIES := 5
+const KITLIST_MAX_TIES := 8
+const KL_PANEL_X0 := 6
+const KL_HDR_XY := Vector2(6, 125)
+const KL_BODY_TOP := 154
+const KL_ROW_H := 22
+const KL_PITCH := 30
+## Cells, inclusive x spans, in draw order: kit L, home, away, kit R, then the score cells.
+const KL_COLS_EURO := [[15, 42], [44, 164], [167, 287], [289, 316], [319, 372],
+	[374, 427], [429, 482]]
+const KL_COLS_DOM := [[15, 42], [44, 192], [195, 342], [344, 371], [374, 427], [429, 482]]
+## The 17x20 ridi kit's origin inside its 28x22 well -- the unique best offset on all 48
+## witnessed cells. The well's outline pass is baked exactly like the bracket's.
+const KL_SPR_DXY := Vector2(5, 1)
+## Pen tops, solved off the frames: every name and every score digit sits at row_top + 6
+## (the compact list's +2, moved down by the taller row). The cell-relative x anchors are
+## the compact list's own, unchanged -- NAME_RIGHT_DX / NAME_LEFT_DX / SCORE_*_DX all
+## reproduce exactly here.
+const KL_TEXT_TOP_DY := 6
+
 # ---- the scrollbar ---------------------------------------------------------------
 const SCROLL_XY := Vector2(478, 125)
 const SCROLL_TROUGH := [172, 394]        # its interior, in screen rows
@@ -192,11 +231,13 @@ const CARDS_BOX_FIELD := [418, 934]
 const CARDS_NAME_INK := [Color8(42, 95, 170), Color8(80, 110, 5)]
 const CARDS_VENUE_INK := [Color8(117, 147, 187), Color8(61, 191, 82)]
 const CARDS_SCORE_INK := Color8(255, 255, 255)
-## The FINALIST plates' empty white boxes (y376..411). What a DECIDED semifinal fills
-## them with is unwitnessed -- no captured frame has one -- so the port prints the
-## advancing club centred in the WINNER band's ink, declared OURS.
+## The FINALIST plates' white boxes (interior x20..216 / x281..477, y376..411). What a
+## DECIDED semifinal fills them with was unwitnessed until 2026-07-28; both frames of that
+## drive have them filled, and the grammar is the kit + the name, not a centred string.
 const CARDS_FINALIST := [[20, 216], [281, 477]]
-const CARDS_FINALIST_TOP := 385
+const CARDS_FINALIST_KIT := Vector2(2, 377)   # + plate_x0 on x; y is absolute
+const CARDS_FINALIST_PEN_DX := 43
+const CARDS_FINALIST_PEN_Y := 380
 
 # ---- the FINAL (docs/re/knockout_views_re.md, measured 2026-07-27) -----------------
 ## One tie. Chrome = final_body_<comp>.png (euro is the one witnessed final). The card +
@@ -243,6 +284,7 @@ var _bracket: Dictionary = {}            # "euro"/"dom" -> the baked 458x72 pane
 var _cards_body: Texture2D               # the two SEMIFINAL cards, content blanked
 var _final_body: Texture2D               # per competition, loaded in setup()
 var _well: Dictionary = {}               # "under_L"/"over_L"/... the kit-well overlays
+var _kl: Dictionary = {}                 # the KIT LIST strips + its own well overlays
 var _icon_ol: Dictionary = {}            # "under_sf1"/"over_sf1"/... the icon overlays
 var _flags: Dictionary = {}              # countryCode -> 30x20 dbcard flag
 var _ridi: Dictionary = {}               # club id -> 17x20 ridi kit icon
@@ -281,6 +323,11 @@ func _ready() -> void:
 	for key in ["euro", "dom"]:
 		_hdr[key] = _tex("res://art/screens/knockout/list_hdr_%s.png" % key)
 		_bracket[key] = _tex("res://art/screens/knockout/bracket_panel_%s.png" % key)
+		_kl["hdr_%s" % key] = _tex("res://art/screens/knockout/kitlist_hdr_%s.png" % key)
+		_kl["row_%s" % key] = _tex("res://art/screens/knockout/kitlist_row_%s.png" % key)
+		_kl["foot_%s" % key] = _tex("res://art/screens/knockout/kitlist_foot_%s.png" % key)
+	for k in ["under_p0", "over_p0", "under_p1", "over_p1"]:
+		_kl[k] = _tex("res://art/screens/knockout/kitwell_kl_%s.png" % k)
 	_cards_body = _tex("res://art/screens/knockout/cards_body.png")
 	for k in ["under_L", "over_L", "under_R", "over_R"]:
 		_well[k] = _tex("res://art/screens/knockout/kitwell_%s.png" % k)
@@ -347,7 +394,7 @@ func setup(header: Dictionary, comp: String, label: String, euro_cols: bool,
 	_header = header
 	_comp = comp if comp in COMPS else "euro"
 	_label = label
-	_layout = layout if layout in ["list", "bracket", "cards", "final"] else "list"
+	_layout = layout if layout in ["list", "kitlist", "bracket", "cards", "final"] else "list"
 	if _layout == "final":
 		_final_body = _tex("res://art/screens/knockout/final_body_%s.png" % _comp)
 	_euro_cols = euro_cols
@@ -409,6 +456,10 @@ func _to_design(p: Vector2) -> Vector2:
 ## the euro semis band in the 292 label pixels only (2026-07-27).
 func _band_key() -> String:
 	var fam := "cards" if _layout in ["cards", "final"] else _layout
+	# The KIT LIST shares the LIST family's band: the U.E.F.A. and Cup Winner's kit-list
+	# witnesses carry the same strip, plate and arrow positions as their list frames.
+	if fam == "kitlist":
+		fam = "list"
 	return "%s_%s" % [_comp, fam]
 
 
@@ -538,6 +589,8 @@ func _draw() -> void:
 	_draw_header()
 	_draw_band()
 	match _layout:
+		"kitlist":
+			_draw_kitlist()
 		"bracket":
 			_draw_bracket()
 		"cards":
@@ -707,6 +760,77 @@ func _is_second_leg(col_index: int) -> bool:
 	return _euro_cols and col_index == 1
 
 
+# ---- the kit list ------------------------------------------------------------------
+
+## Layout 2: a round of 5-8 ties. Chrome = three baked strips (panel top, one 30-row row
+## unit repeated per tie, the tail), all cut from the witnessed frames with their content
+## rects blanked; everything a career fills is redrawn at the measured anchors. The score
+## grammar is the compact list's, unchanged, and re-verified here on the DOMESTIC witness:
+## the club going through takes the yellow ink and so does its own goal digit.
+func _draw_kitlist() -> void:
+	var key := "euro" if _euro_cols else "dom"
+	var hdr: Texture2D = _kl.get("hdr_%s" % key)
+	if hdr != null:
+		draw_texture(hdr, KL_HDR_XY)
+	var n := mini(_ties.size(), KITLIST_MAX_TIES)
+	if n <= 0:
+		return
+	var row: Texture2D = _kl.get("row_%s" % key)
+	var cs: Array = KL_COLS_EURO if _euro_cols else KL_COLS_DOM
+	for i in n:
+		var t := KL_BODY_TOP + KL_PITCH * i
+		if row != null:
+			draw_texture(row, Vector2(KL_PANEL_X0, t))
+	var foot: Texture2D = _kl.get("foot_%s" % key)
+	if foot != null:
+		draw_texture(foot, Vector2(KL_PANEL_X0, KL_BODY_TOP + KL_ROW_H + KL_PITCH * (n - 1)))
+	for i in n:
+		_draw_kitlist_row(i, cs)
+
+
+func _draw_kitlist_row(i: int, cs: Array) -> void:
+	var tie: Dictionary = _ties[i]
+	var t := KL_BODY_TOP + KL_PITCH * i
+	var top := t + KL_TEXT_TOP_DY
+	var winner := int(tie.get("winner", -1))
+	for side in 2:
+		var well: Array = cs[0] if side == 0 else cs[3]
+		var wx := int(well[0])
+		# The outline pass is DITHERED against absolute screen parity, exactly like the
+		# paginator's disabled arrow: the left well (x15) and the EUROPEAN right well
+		# (x289) are both odd and agree pixel for pixel across all three witnesses, while
+		# the DOMESTIC right well (x344, even) disagrees at 222 of the well's 616
+		# positions. So both phases are baked from real frames and picked here.
+		var par := (wx + t) & 1
+		var ul: Texture2D = _kl.get("under_p%d" % par)
+		if ul != null:
+			draw_texture(ul, Vector2(wx, t))
+		var kit := _ridi_kit(int(tie.get("home_id" if side == 0 else "away_id", -1)))
+		if kit != null:
+			draw_texture(kit, Vector2(wx + KL_SPR_DXY.x, t + KL_SPR_DXY.y))
+		var ol: Texture2D = _kl.get("over_p%d" % par)
+		if ol != null:
+			draw_texture(ol, Vector2(wx, t))
+	var home_cell: Array = cs[1]
+	var away_cell: Array = cs[2]
+	_txt_right(_page_p10, _g_p10, int(home_cell[1]) + NAME_RIGHT_DX, top,
+		str(tie.get("home", "")), C_THROUGH if winner == 0 else C_OUT)
+	_txt(_page_p10, _g_p10, int(away_cell[0]) + NAME_LEFT_DX, top,
+		str(tie.get("away", "")), C_THROUGH if winner == 1 else C_OUT)
+	var cells: Array = tie.get("cells", [])
+	for j in mini(cells.size(), cs.size() - 4):
+		var pair: Array = cells[j]
+		if pair.is_empty() or (str(pair[0]) == "" and str(pair[1]) == ""):
+			continue
+		var x0: int = int((cs[j + 4] as Array)[0])
+		var mark := -1 if winner < 0 else (1 - winner if _is_second_leg(j) else winner)
+		_txt_right(_page_p10, _g_p10, x0 + SCORE_A_END_DX, top, str(pair[0]),
+			C_THROUGH if mark == 0 else C_OUT)
+		_txt(_page_p10, _g_p10, x0 + SCORE_DASH_DX, top, "-", C_OUT)
+		_txt(_page_p10, _g_p10, x0 + SCORE_B_DX, top, str(pair[1]),
+			C_THROUGH if mark == 1 else C_OUT)
+
+
 ## The scrollbar only exists when the list is longer than the panel. Its arrows and trough
 ## are the original's own; the thumb is drawn proportional to the window -- the two frames
 ## in hand differ only in its LENGTH, so the tracking rule itself is an inference and is
@@ -874,19 +998,40 @@ func _draw_cards() -> void:
 				if _icon_ol.get("over_" + ol) != null:
 					draw_texture(_icon_ol["over_" + ol],
 						Vector2(CARDS_ICON_X + dx, bar_top))
+				# A DECIDED tie inks NOTHING yellow in this layout -- the two
+				# 2026-07-28 witnesses (F.A. Cup and Coca-Cola semifinals, both
+				# played out) print every club name and every goal digit in the
+				# card's own ink. The list layout's yellow rule does not reach
+				# here, and the port's earlier `C_THROUGH` was an inference from
+				# that sibling layout; the frames refute it.
 				_txt(_page_p10, _g_p10, CARDS_NAME_PEN_X + dx,
 					bar_top + CARDS_TEXT_PEN_DY, str(tie.get(side, "")),
-					C_THROUGH if winner == side_i else CARDS_NAME_INK[i])
+					CARDS_NAME_INK[i])
 				var g := str(pair[r]) if pair.size() > r else ""
 				if g != "":
 					_txt_mid(_page_p10, _g_p10, int(CARDS_BOX_FIELD[i]),
-						bar_top + CARDS_TEXT_PEN_DY, g,
-						C_THROUGH if winner == side_i else CARDS_SCORE_INK)
+						bar_top + CARDS_TEXT_PEN_DY, g, CARDS_SCORE_INK)
 		if winner >= 0:
-			var fx: Array = CARDS_FINALIST[i]
-			PMChrome.text(self, _f14g, float(fx[0]), CARDS_FINALIST_TOP,
-				str(tie.get("home" if winner == 0 else "away", "")),
-				FINAL_C_WINNER, 15, 1, float(int(fx[1]) - int(fx[0]) + 1))
+			_draw_finalist(i, str(tie.get("home_id" if winner == 0 else "away_id", "-1")),
+				str(tie.get("home" if winner == 0 else "away", "")))
+
+
+## The FINALIST plate, FILLED -- witnessed 2026-07-28 on two frames (the F.A. Cup and the
+## Coca-Cola semifinals, both played out), which is what closed the port's declared-OURS
+## guess (a GDI string centred in the plate, in the WINNER band's ink). The original puts
+## the club's 24x32 NANO kit at the plate's left and prints his name proman10 beside it,
+## LEFT-aligned, in THAT CARD's own name ink -- the same blue/green the club rows use.
+## Pens solved off all four witnessed plates: name (plate_x0 + 43, 380), kit (plate_x0 + 2,
+## 377). The kit keeps the un-reversed outline pass every other kit blit here carries
+## (~80 px of 419 opaque), so the parity gate declares the two sprite wells.
+func _draw_finalist(card: int, club_id: String, club: String) -> void:
+	var fx: Array = CARDS_FINALIST[card]
+	var x0 := int(fx[0])
+	var kit := PMChrome.nano_kit(int(club_id))
+	if kit != null:
+		draw_texture(kit, Vector2(x0 + CARDS_FINALIST_KIT.x, CARDS_FINALIST_KIT.y))
+	_txt(_page_p10, _g_p10, x0 + CARDS_FINALIST_PEN_DX, CARDS_FINALIST_PEN_Y, club,
+		CARDS_NAME_INK[card])
 
 
 # ---- the final ----------------------------------------------------------------------

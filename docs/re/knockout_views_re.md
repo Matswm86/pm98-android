@@ -1,8 +1,8 @@
 # The knockout views — RESULTS → any cup, every layout the original switches between
 
-**Status: the LIST (1), BRACKET (3), SEMIFINAL CARDS (4) and FINAL (5) layouts are BUILT
-and 0 px outside declared buckets (cards + final 2026-07-27, see "The semifinal cards and
-the final, as built"); only the kit list (2) is measured, not built.** Cards ship for
+**Status: ALL FIVE layouts are BUILT and 0 px outside declared buckets** -- the LIST (1),
+the KIT LIST (2, built 2026-07-28, see "The kit list, as built"), the BRACKET (3), the
+SEMIFINAL CARDS (4) and the FINAL (5). Cards ship for
 EURO. LEAGUE + Coca-Cola Cup and the final for EURO. LEAGUE — the other competitions'
 cards/final chromes are unwitnessed and fall back to the SORTEO (honest gap). The bracket:
 `KnockoutScreen._draw_bracket`, gated by `diff_knockout_parity.py` cases 3-4 at **0 px
@@ -639,3 +639,103 @@ until then those competitions' 2/1-tie phases still fall back to the SORTEO card
 reference tree — **`tools/re/refs/knockout-2026-07-28/`** (its README maps each file to the
 cell it first witnesses). The euro one is the gate reference and sits with its siblings in
 `knockout-2026-07-26/`.
+
+
+## The kit list, as built (2026-07-28)
+
+Layout 2 is the form the original switches to for a round of **5-8 ties**: 22 px rows, a
+17x20 `ridi` kit blitted each side of the two names, and the SAME column pair as the
+compact list. Three witnesses, two competitions, two careers, BOTH column sets:
+
+| frame | what it witnesses |
+|---|---|
+| `09_comp_cwc.png` | European, 8 ties, drawn -- every score cell empty |
+| `01_uefa_1_8finals_leg1_played_1997-12-07.png` | European, 8 ties, `1ST LEG` filled |
+| `13_cocacola_r4_KITLIST_PLAYED_1997-12-01.png` | **DOMESTIC**, 8 ties, `RES.` filled, winners inked |
+
+The domestic one is new to the reference tree this session (it was local-only in
+`screenshots/wine-captures-2026-07-26-cup-draw-then-play/`); a sweep of the whole local
+corpus for this layout's signature found **20 frames and every one of them has EIGHT
+ties**, which matters below.
+
+### Geometry (all spans inclusive, design space 640x480)
+
+| element | span |
+|---|---|
+| panel | `x6..493` -- three columns WIDER than the compact list's x6..477, because a round this small never scrolls and the scrollbar column is simply part of the panel |
+| panel top | border + gradient title band + the white gap + the first row rule, `y125..153` |
+| one row unit | `y154..183`: 22 content rows, the black rule, 6 white rows, the next rule. Pitch **30** |
+| the tail | `y386..398` on an 8-tie round: the rule under the last row, 10 white rows, the 2-row bottom border |
+| cells, European | kit L `15..42` · home `44..164` · away `167..287` · kit R `289..316` · 1ST LEG `319..372` · 2ND LEG `374..427` · AGGR. `429..482` |
+| cells, domestic | kit L `15..42` · home `44..192` · away `195..342` · kit R `344..371` · RES. `374..427` · REPLAY `429..482` |
+| grounds | kit wells `(140,160,180)` · name cells `(100,120,140)` · score cells `(120,120,160)` · the LAST score cell `(100,100,140)` |
+| the ridi kit | `(+5, +1)` inside its 28x22 well -- the unique best offset on all 48 witnessed cells |
+| text | pen top `row_top + 6` for every name and every score digit; the cell-relative x anchors are the compact list's OWN, unchanged (`-4` / `+4` / `+21` / `+24` / `+31`), and all reproduce exactly here |
+| inks | through `(255,223,0)`, out `(42,63,85)` -- the compact list's rule, re-verified on the DOMESTIC witness (a level tie inks neither club; a decided one inks the winner AND his own goal digit) |
+
+**The row grounds do NOT alternate.** All 24 witnessed rows carry the same five grounds,
+which is why one baked row strip serves every row. Outside the content rects the three
+frames are byte-identical, so the strip is the original's own pixels.
+
+**No witness shows the MANAGER's own tie in this layout** (Bolton W is in none of the 20
+frames' ties), so the port draws it like any other row rather than importing the compact
+list's `mine` grounds. Recorded, not invented.
+
+**5-7 ties are neither witnessed nor reachable.** Every competition in the port halves
+16 -> 8 -> 4 -> 2 -> 1, so 8 is the only size this layout can be raised at; the rows are
+drawn top-aligned from the compact list's own witnessed `BODY_TOP` and the tail follows
+the last row, which is exact at 8.
+
+Gate: `diff_knockout_parity.py` cases `knockout_uefa_kitlist`, `knockout_cwc_kitlist` and
+`knockout_cocacola_kitlist` -- **0 px outside the barra kit and the 16 kit wells**.
+
+## The outline pass is DITHERED ON SCREEN PARITY (2026-07-28) -- the 07-27 note was wrong
+
+The 2026-07-27 entry below concluded the on-sprite pass "is NOT position-constant". That
+is false, and the kit list is what proved it: the pass is position-constant **per absolute
+screen parity**, exactly like the phase paginator's disabled arrow.
+
+The evidence is clean because this layout puts the same sprite bank in three wells at two
+parities: the left well (`x15`) and the EUROPEAN right well (`x289`) are both odd and agree
+pixel for pixel across all three witness frames, while the DOMESTIC right well (`x344`,
+even) disagrees with them at **222 of the well's 616 positions**. Voting the overlay per
+side -- which is what the bracket does -- therefore produced an almost empty right-hand
+overlay; voting it per `(well_x + row_top) & 1` produces two full ones.
+
+Measured effect on the gate, same shots, same witnesses:
+
+| case | kit residual, per-side vote | per-parity vote |
+|---|---|---|
+| `knockout_uefa_kitlist` | 556 | **68** |
+| `knockout_cwc_kitlist` | 552 | **64** |
+| `knockout_cocacola_kitlist` | 548 | **28** |
+
+**What this does NOT close: the 48x64 MINIESC bevel.** All four bracket wells sit at one
+parity (`x22`/`x416` with tops 113/193/273/353, all odd sums), so per-parity baking cannot
+help there -- the bracket's residual is club-varying silhouettes, not dither. A dilation
+model was measured against all 16 witnessed bracket cells and REJECTED: the union kernel
+`0<=dx,dy<=3` covers 4090 of the 4098 outside-silhouette pixels but paints **1988** the
+original leaves white, and no single shift explains more than 94.8 %. The pass is a real
+bevel with its own ramp, and it still needs the code.
+
+## The FINALIST plate, FILLED -- witnessed 2026-07-28
+
+`tools/re/refs/knockout-2026-07-28/12_facup_semifinals_FINALISTS_1998-04-11.png` and
+`13_cocacola_semifinals_TWOLEGS_1998-04-11.png` are the first frames that show a DECIDED
+semifinal, and they correct the cards layout twice:
+
+1. **The plate's fill.** The port printed the advancing club as a GDI string centred in the
+   plate, in the WINNER band's ink -- flagged as declared-OURS since the build. The
+   original puts the club's **24x32 `nano` kit** at `(plate_x0 + 2, 377)` and prints his
+   name **proman10** at `(plate_x0 + 43, 380)`, LEFT-aligned, in THAT CARD's own name ink
+   (blue for SEMIFINAL 1, green for SEMIFINAL 2). All four witnessed plates land exactly.
+2. **Nothing in this layout is inked yellow.** Both frames are played out, and every club
+   name and every goal digit prints in the card's own ink -- including the winner's. The
+   port's `C_THROUGH` here was an inference from the LIST layout; the frames refute it.
+
+Gate: `diff_knockout_parity.py` case `knockout_cocacola_semis_done` -- 0 px outside the
+barra kit, the rail (career state), the ridi icons, the two nano kits and the paged-back
+paginator plate. That last one is the same declared band the decided BRACKET carries: on a
+paged-back frame the label plate's white surround reaches `x310..336` on rows 85 and 109
+where the live-phase frame the band was cut from has its black border. One witness of each
+state is not a rule, so it is declared rather than guessed at.

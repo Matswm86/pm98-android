@@ -26,6 +26,7 @@ row's exact background (green income tint, brown expense tint, the lavender /
 dark-blue bottom-box rows, the yellow/blue total boxes, the white header panel)
 without hand-coding any colour, and keeps any 1px top/bottom cell border intact.
 """
+
 from __future__ import annotations
 
 import json
@@ -51,10 +52,10 @@ FRAME_EXPENSES = ROOT / "screenshots/original-walkthrough-2026-07-02/011_164402.
 OUT_DIR = ROOT / "app/art/screens/finance"
 OUT_PNG = OUT_DIR / "chrome.png"
 OUT_PNG_WEEK = OUT_DIR / "chrome_perweek.png"
-OUT_PNG_INCOME = OUT_DIR / "chrome_income.png"                    # INCOME / PER WEEK
-OUT_PNG_INCOME_SEASON = OUT_DIR / "chrome_income_perseason.png"   # INCOME / PER SEASON
-OUT_PNG_EXPENSES = OUT_DIR / "chrome_expenses.png"                # EXPENSES / PER SEASON
-OUT_PNG_EXPENSES_WEEK = OUT_DIR / "chrome_expenses_perweek.png"   # EXPENSES / PER WEEK
+OUT_PNG_INCOME = OUT_DIR / "chrome_income.png"  # INCOME / PER WEEK
+OUT_PNG_INCOME_SEASON = OUT_DIR / "chrome_income_perseason.png"  # INCOME / PER SEASON
+OUT_PNG_EXPENSES = OUT_DIR / "chrome_expenses.png"  # EXPENSES / PER SEASON
+OUT_PNG_EXPENSES_WEEK = OUT_DIR / "chrome_expenses_perweek.png"  # EXPENSES / PER WEEK
 OUT_JSON = OUT_DIR / "finance_chrome.json"
 
 W, H = 640, 480
@@ -63,14 +64,14 @@ W, H = 640, 480
 # 7 income rows / 11 expense rows on a 16px grid; first cell top at y=98.
 ROW_Y0 = 98
 ROW_STEP = 16
-ROW_H = 13            # green/brown tint height per cell
+ROW_H = 13  # green/brown tint height per cell
 N_INCOME = 7
 N_EXPENSE = 11
-INC_CELL_L, INC_CELL_R = 200, 306      # green value cell x-span
-EXP_CELL_L, EXP_CELL_R = 497, 602      # brown value cell x-span (601 is the last
+INC_CELL_L, INC_CELL_R = 200, 306  # green value cell x-span
+EXP_CELL_L, EXP_CELL_R = 497, 602  # brown value cell x-span (601 is the last
 #                                        interior column; 602 is the cell's own edge)
-INC_SRC_X = 207                        # clean green column (digit-free)
-EXP_SRC_X = 500                        # clean brown column
+INC_SRC_X = 207  # clean green column (digit-free)
+EXP_SRC_X = 500  # clean brown column
 
 # ---- the DYNAMIC euro-income row label (income row 3) ---------------------
 # The 4th income row names the European competition the club is in, and the original
@@ -84,16 +85,16 @@ EXP_SRC_X = 500                        # clean brown column
 # itself, and cross-checked between the two witnesses (013 `EUROPEAN CUP INCOME`,
 # `orig/51_finance_season.png` `U.E.F.A. CUP INCOME`), which are pixel-identical
 # everywhere outside the ink. So a flat refill IS the original's own ground.
-EURO_LABEL_BOX = (32, 146, 198, 159)   # x0,y0,x1,y1 — inside the white margins
+EURO_LABEL_BOX = (32, 146, 198, 159)  # x0,y0,x1,y1 — inside the white margins
 EURO_LABEL_BG = (220, 220, 220)
 
 # ---- totals --------------------------------------------------------------
 TOT_Y0, TOT_Y1 = 282, 296
-TOT_INC_L, TOT_INC_R, TOT_INC_SRC = 160, 306, 163   # (180,200,220) light-blue box
-TOT_EXP_L, TOT_EXP_R, TOT_EXP_SRC = 458, 604, 461   # (255,255,170) pale-yellow box
+TOT_INC_L, TOT_INC_R, TOT_INC_SRC = 160, 306, 163  # (180,200,220) light-blue box
+TOT_EXP_L, TOT_EXP_R, TOT_EXP_SRC = 458, 604, 461  # (255,255,170) pale-yellow box
 
 # ---- SEASON header text (white panel) ------------------------------------
-SEASON_BOX = (468, 57, 606, 74)        # fill white
+SEASON_BOX = (468, 57, 606, 74)  # fill white
 
 # ---- PER WEEK header (REFRUN R5) -----------------------------------------
 # The PER WEEK view replaces the SEASON stamp with a week stepper and a date span:
@@ -106,9 +107,9 @@ SEASON_BOX = (468, 57, 606, 74)        # fill white
 # are the frame's own pixels and are never redrawn.
 # Both spans are two-colour (ink on one flat ground, verified on the frame), so a flat
 # refill IS the original's own ground and nothing is approximated.
-WEEK_BOX_INK = (302, 60, 391, 72)      # gold box interior, text span only
+WEEK_BOX_INK = (302, 60, 391, 72)  # gold box interior, text span only
 WEEK_GOLD = (181, 105, 9)
-DATE_BOX = (416, 60, 593, 72)          # white panel
+DATE_BOX = (416, 60, 593, 72)  # white panel
 
 # ---- bottom LAST WEEK / CURRENT WEEK value cells --------------------------
 # rows: INCOME / EXPENSES / CASH; value area is the right portion of each box.
@@ -116,21 +117,36 @@ DATE_BOX = (416, 60, 593, 72)          # white panel
 # is at x=228 and CURRENT WEEK's at x=461, and the last interior column is the one before
 # it. The old 248 / 498 reached PAST both, wiping the LAST WEEK box's right border, the
 # CURRENT WEEK box's left border and 30px of the desktop behind it.
-LW_VAL_L, LW_VAL_R, LW_SRC = 131, 228, 130          # LAST WEEK box
-CW_VAL_L, CW_VAL_R, CW_SRC = 369, 461, 368          # CURRENT WEEK box
+LW_VAL_L, LW_VAL_R, LW_SRC = 131, 228, 130  # LAST WEEK box
+CW_VAL_L, CW_VAL_R, CW_SRC = 369, 461, 368  # CURRENT WEEK box
 # value rows only (title "LAST WEEK"/"CURRENT WEEK" is y414-426 and must be kept)
-BOT_ROWS = [(428, 441), (442, 453), (454, 465)]     # INCOME, EXPENSES, CASH y-spans
+BOT_ROWS = [(428, 441), (442, 453), (454, 465)]  # INCOME, EXPENSES, CASH y-spans
 
 # ---- balance chart bars (blank the captured Man-Utd bars) -----------------
-# plot field: blue (200,220,240) above the zero axis (y~353), yellow
-# (255,255,170) below. Blank the FULL plot width (the field is otherwise
-# uniform; the witnessed bars sit near weeks 1-4 but we clear the lot so no
-# stub survives) and let the scene redraw the model's balance bars.
-CHART_BAR_X0, CHART_BAR_X1 = 60, 634
-CHART_TOP_Y, CHART_BOT_Y = 333, 377
+# plot field: blue (200,220,240) above the zero axis (y353), yellow (255,255,170) below.
+# Re-measured 2026-07-28 on BOTH witnesses (013 and orig/51_finance_season): the field is
+# x76..604, blue y332..352, the zero rule y353, yellow y354..374 -- the old x60..634 /
+# y333..377 reached PAST the field on every side and, worse, painted over the two AXIS
+# LABEL PLATES at x28..74, which is why the shipped chrome reads "+2,500" with its " K."
+# wiped off (visible in art/screens/finance/chrome.png before this fix).
+CHART_BAR_X0, CHART_BAR_X1 = 76, 604
+CHART_TOP_Y, CHART_BOT_Y = 332, 374
 CHART_ZERO_Y = 353
 CHART_BLUE = (200, 220, 240)
 CHART_YELLOW = (255, 255, 170)
+
+# ---- the +/-N K. axis label plates ---------------------------------------
+# The scale is NOT static. FUN_00509760 walks the plotted weeks accumulating the largest
+# |week-on-week balance delta|, then picks the SMALLEST entry of a three-float table in
+# .data that is >= it -- 0x659540 50,000,000f, 0x659544 100,000,000f, 0x659548
+# 500,000,000f, walked downwards from the largest at @0x509a31..0x509a57 -- and prints
+# that entry x 5e-06 (the double at 0x62d930) with "+"/"-" (0x6587d4 / 0x654448) and
+# " K." (0x659b2c) around it, in the font the same routine selects by name at @0x509d92:
+# "euro8" (0x6597a4). So the three axis states the original can draw are exactly
+# +/-250 K., +/-500 K. and +/-2,500 K., and both witnessed frames are among them.
+# The plates themselves are flat two-colour spans, so a flat refill IS the original's
+# own ground: the scene draws the label live.
+AXIS_PLATES = [(28, 332, 74, 352, (0, 0, 160)), (28, 354, 74, 374, (85, 0, 0))]
 
 
 # ---- DETAIL views (frames 006 / 011, measured 2026-07-27) -----------------
@@ -143,17 +159,17 @@ CHART_YELLOW = (255, 255, 170)
 # header band — so each view is baked once and the OTHER period is composited from the
 # already-proven summary bakes (P1/P2 verified 0 px cross-career AND cross-view:
 # 004 vs p0495 and 013 vs 011 both diff to zero over these rects).
-DET_VAL_L = (199, 299)        # left value plate interior [x0,x1)
-DET_VAL_R = (496, 596)        # right value plate interior
+DET_VAL_L = (199, 299)  # left value plate interior [x0,x1)
+DET_VAL_R = (496, 596)  # right value plate interior
 DET_ROW_H = 13
 # income view rows (plate tops): 4 left sections x3 rows, supercup x3, intercont x2
 INC_ROWS_L = [108, 124, 140, 186, 202, 218, 264, 280, 296, 341, 357, 373]
 INC_ROWS_R = [108, 124, 140, 186, 202]
-INC_ROW_SALE = 237            # TRANSFERS row (blue plate; green SALE label pen 341)
-INC_ROW_INSGRP = 273          # INSURANCE COMPENSATION GROUP row
+INC_ROW_SALE = 237  # TRANSFERS row (blue plate; green SALE label pen 341)
+INC_ROW_INSGRP = 273  # INSURANCE COMPENSATION GROUP row
 INC_ROWS_LOANS = [309, 325, 341, 357]
-NOT_PLAYED = [(339, 95, 420, 107), (339, 173, 420, 185)]   # grey `Not played` spans
-SALE_LABEL = (341, 238, 494, 249)   # dynamic green label span inside the grey plate
+NOT_PLAYED = [(339, 95, 420, 107), (339, 173, 420, 185)]  # grey `Not played` spans
+SALE_LABEL = (341, 238, 494, 249)  # dynamic green label span inside the grey plate
 # expenses view rows
 EXP_ROWS_L = [96, 129, 162, 178, 194, 226, 258, 292, 325, 341, 357, 373]
 EXP_ROWS_R = [96, 136, 152, 168, 184, 224, 260, 276, 292, 308]
@@ -161,13 +177,13 @@ EXP_ROWS_R = [96, 136, 152, 168, 184, 224, 260, 276, 292, 308]
 # week, filled in 011/012's season): Players´ Wage / N bonuses / Staff Wages
 EXP_DYN_LABELS = [(43, 163, 196, 173), (43, 227, 196, 237), (340, 97, 493, 107)]
 # the single TOTAL bar each detail view carries (proman10, pen END 605, top 381)
-DET_TOT = (460, 379, 605, 394)   # value span blanked from clean col 459
+DET_TOT = (460, 379, 605, 394)  # value span blanked from clean col 459
 # tab transplant rects (cover the donor tab incl. its 2px hover-ring halo)
-TAB_INCOME_RECT = (110, 2, 222, 36)     # from 007 onto 006
+TAB_INCOME_RECT = (110, 2, 222, 36)  # from 007 onto 006
 TAB_PERSEASON_RECT = (492, 2, 630, 36)  # from 013 onto 011
 # period-swap composites, proven 0 px cross-career and cross-view
-P1_STRIP = (332, 2, 640, 46)     # PER WEEK / PER SEASON tabs + their arrow band
-P2_HEADER = (210, 50, 610, 80)   # week stepper bezel / season white panel
+P1_STRIP = (332, 2, 640, 46)  # PER WEEK / PER SEASON tabs + their arrow band
+P2_HEADER = (210, 50, 610, 80)  # week stepper bezel / season white panel
 
 
 def col_copy(a: np.ndarray, src_x: int, x0: int, x1: int, y0: int, y1: int) -> None:
@@ -182,7 +198,7 @@ def fill(a: np.ndarray, rgb, x0: int, y0: int, x1: int, y1: int) -> None:
 def blank_tiles(a: np.ndarray) -> None:
     """The LAST WEEK / CURRENT WEEK value cells — identical on every view (the whole
     y>=398 band diffs to zero between the summary and detail frames)."""
-    for (ry0, ry1) in BOT_ROWS:
+    for ry0, ry1 in BOT_ROWS:
         col_copy(a, LW_SRC, LW_VAL_L, LW_VAL_R, ry0, ry1)
         col_copy(a, CW_SRC, CW_VAL_L, CW_VAL_R, ry0, ry1)
 
@@ -198,16 +214,17 @@ def blank_body(a: np.ndarray) -> None:
         col_copy(a, EXP_SRC_X, EXP_SRC_X + 1, EXP_CELL_R, y0, y0 + ROW_H)
     # the euro-income row's LABEL (the scene redraws whichever of the three it is)
     ex0, ey0, ex1, ey1 = EURO_LABEL_BOX
-    margin = {tuple(int(v) for v in a[y, x])
-              for y in range(ey0, ey1) for x in (25, 31, 198, 199)}
+    margin = {tuple(int(v) for v in a[y, x]) for y in range(ey0, ey1) for x in (25, 31, 198, 199)}
     if margin != {(255, 255, 255)}:
         raise SystemExit(f"euro label margins are not the white rules: {margin}")
     fill(a, EURO_LABEL_BG, ex0, ey0, ex1, ey1)
     col_copy(a, TOT_INC_SRC, TOT_INC_SRC + 1, TOT_INC_R, TOT_Y0, TOT_Y1)
     col_copy(a, TOT_EXP_SRC, TOT_EXP_SRC + 1, TOT_EXP_R, TOT_Y0, TOT_Y1)
     blank_tiles(a)
-    fill(a, CHART_BLUE, CHART_BAR_X0, CHART_TOP_Y, CHART_BAR_X1, CHART_ZERO_Y)
+    fill(a, CHART_BLUE, CHART_BAR_X0, CHART_TOP_Y, CHART_BAR_X1, CHART_ZERO_Y - 1)
     fill(a, CHART_YELLOW, CHART_BAR_X0, CHART_ZERO_Y + 1, CHART_BAR_X1, CHART_BOT_Y)
+    for px0, py0, px1, py1, bg in AXIS_PLATES:
+        fill(a, bg, px0, py0, px1, py1)
 
 
 def bake_per_week() -> np.ndarray | None:
@@ -228,8 +245,9 @@ def bake_per_week() -> np.ndarray | None:
         print("ERROR: header panel is not white at (600,65) — wrong frame?", file=sys.stderr)
         return None
     if tuple(int(v) for v in a[65, 301]) != WEEK_GOLD:
-        print("ERROR: no gold week box at (301,65) — this is not the PER WEEK view",
-              file=sys.stderr)
+        print(
+            "ERROR: no gold week box at (301,65) — this is not the PER WEEK view", file=sys.stderr
+        )
         return None
     blank_body(a)
     fill(a, WEEK_GOLD, *WEEK_BOX_INK)
@@ -285,8 +303,9 @@ def bake_details(sum_season: np.ndarray, sum_week: np.ndarray) -> int:
 
     # INCOME / PER WEEK: values, the SALE label, the two `Not played` spans, the
     # stepper's gold box + date span, the tiles.
-    blank_detail_values(inc, INC_ROWS_L, INC_ROWS_R + [INC_ROW_SALE, INC_ROW_INSGRP]
-                        + INC_ROWS_LOANS)
+    blank_detail_values(
+        inc, INC_ROWS_L, INC_ROWS_R + [INC_ROW_SALE, INC_ROW_INSGRP] + INC_ROWS_LOANS
+    )
     col_copy(inc, SALE_LABEL[2] - 1, SALE_LABEL[0], SALE_LABEL[2], SALE_LABEL[1], SALE_LABEL[3])
     for r in NOT_PLAYED:
         fill(inc, (255, 255, 255), *r)
@@ -295,7 +314,7 @@ def bake_details(sum_season: np.ndarray, sum_week: np.ndarray) -> int:
 
     # EXPENSES / PER SEASON: values, the three data-driven labels, the SEASON text.
     blank_detail_values(exp, EXP_ROWS_L, EXP_ROWS_R)
-    for (lx0, ly0, lx1, ly1) in EXP_DYN_LABELS:
+    for lx0, ly0, lx1, ly1 in EXP_DYN_LABELS:
         col_copy(exp, lx1 - 1, lx0, lx1, ly0, ly1 + 1)
     fill(exp, (255, 255, 255), *SEASON_BOX)
 
@@ -308,15 +327,18 @@ def bake_details(sum_season: np.ndarray, sum_week: np.ndarray) -> int:
     copy_rect(exp_week, sum_week, P2_HEADER)
 
     for name, arr, view_lit, week_lit in (
-            (OUT_PNG_INCOME, inc, "income", True),
-            (OUT_PNG_INCOME_SEASON, inc_season, "income", False),
-            (OUT_PNG_EXPENSES, exp, "expenses", False),
-            (OUT_PNG_EXPENSES_WEEK, exp_week, "expenses", True)):
-        ok = (_tab_lit(arr, 116, 216) == (view_lit == "income")
-              and _tab_lit(arr, 224, 324) == (view_lit == "expenses")
-              and not _tab_lit(arr, 8, 108)
-              and _tab_lit(arr, 365, 490) == week_lit
-              and _tab_lit(arr, 499, 624) != week_lit)
+        (OUT_PNG_INCOME, inc, "income", True),
+        (OUT_PNG_INCOME_SEASON, inc_season, "income", False),
+        (OUT_PNG_EXPENSES, exp, "expenses", False),
+        (OUT_PNG_EXPENSES_WEEK, exp_week, "expenses", True),
+    ):
+        ok = (
+            _tab_lit(arr, 116, 216) == (view_lit == "income")
+            and _tab_lit(arr, 224, 324) == (view_lit == "expenses")
+            and not _tab_lit(arr, 8, 108)
+            and _tab_lit(arr, 365, 490) == week_lit
+            and _tab_lit(arr, 499, 624) != week_lit
+        )
         if not ok:
             print(f"ERROR: tab lighting wrong on {name.name}", file=sys.stderr)
             return 1
@@ -331,7 +353,7 @@ def main() -> int:
         return 1
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    im = Image.open(FRAME).convert("RGB").crop((0, 0, W, H))   # 641 -> 640
+    im = Image.open(FRAME).convert("RGB").crop((0, 0, W, H))  # 641 -> 640
     a = np.array(im)
 
     def C(x: int, y: int):
@@ -345,7 +367,7 @@ def main() -> int:
         "total_income_ink": [30, 52, 98],
         "total_expense_ink": [170, 0, 0],
         "season_ink": [0, 0, 0],
-        "cash_gold_ink": list(C(171, 462)),          # (255,223,0)
+        "cash_gold_ink": list(C(171, 462)),  # (255,223,0)
         "bottom_ink": [0, 0, 0],
         "income_cell_bg": list(C(INC_SRC_X, 104)),
         "expense_cell_bg": list(C(EXP_SRC_X, 104)),
@@ -362,27 +384,38 @@ def main() -> int:
     spec = {
         "binding_frame": FRAME.name,
         "note": "INC.+EXP. / PER SEASON summary; dynamic values redrawn by "
-                "FinanceScreen.gd from FinanceModel.summary + Career cash.",
+        "FinanceScreen.gd from FinanceModel.summary + Career cash.",
         "size": [W, H],
         "samples": samples,
         "anchors": {
-            "row_y0": ROW_Y0, "row_step": ROW_STEP,
-            "income_right": INC_CELL_R - 1, "expense_right": EXP_CELL_R - 1,
+            "row_y0": ROW_Y0,
+            "row_step": ROW_STEP,
+            "income_right": INC_CELL_R - 1,
+            "expense_right": EXP_CELL_R - 1,
             "total_y": TOT_Y0 + 2,
-            "total_income_right": TOT_INC_R - 1, "total_expense_right": TOT_EXP_R - 1,
-            "season_right": 600, "season_y": 60,
-            "last_week_right": LW_VAL_R - 2, "current_week_right": CW_VAL_R - 2,
+            "total_income_right": TOT_INC_R - 1,
+            "total_expense_right": TOT_EXP_R - 1,
+            "season_right": 600,
+            "season_y": 60,
+            "last_week_right": LW_VAL_R - 2,
+            "current_week_right": CW_VAL_R - 2,
             "bottom_rows_y": BOT_ROWS,
             "chart_zero_y": CHART_ZERO_Y,
         },
         "per_week": {
             "binding_frame": FRAME_WEEK.name,
-            "week_box_font": "proman10", "week_box_ink": [255, 223, 0],
-            "week_box_field_sum": 693, "week_box_pen_top": 62,
-            "date_font": "proman8", "date_ink": [128, 128, 128],
-            "date_pen_x": 416, "date_pen_top": 62,
-            "prev_btn": [278, 57, 22, 21], "next_btn": [392, 57, 22, 21],
-            "tab_per_week": [365, 7, 125, 25], "tab_per_season": [499, 7, 125, 25],
+            "week_box_font": "proman10",
+            "week_box_ink": [255, 223, 0],
+            "week_box_field_sum": 693,
+            "week_box_pen_top": 62,
+            "date_font": "proman8",
+            "date_ink": [128, 128, 128],
+            "date_pen_x": 416,
+            "date_pen_top": 62,
+            "prev_btn": [278, 57, 22, 21],
+            "next_btn": [392, 57, 22, 21],
+            "tab_per_week": [365, 7, 125, 25],
+            "tab_per_season": [499, 7, 125, 25],
         },
     }
     OUT_JSON.write_text(json.dumps(spec, indent=2))

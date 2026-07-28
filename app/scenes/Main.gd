@@ -4207,13 +4207,16 @@ func _show_cup_screen(b: Dictionary, key: String, title: String) -> void:
 	# (docs/re/knockout_views_re.md): the LIST at nine ties or more, the BRACKET at
 	# four, the SEMIFINAL cards at two and the FINAL at one -- the last two only for
 	# competitions whose chrome is witnessed (cards: euro + cocacola; final: euro).
-	# The kit list (5-8 ties) and the unwitnessed cards/final competitions still fall
-	# through to the SORTEO card.
+	# The KIT LIST at 5-8 (built 2026-07-28). Only the unwitnessed cards/final
+	# competitions still fall through to the SORTEO card.
 	if _knockout_phases(b).size() > 0 and KNOCKOUT_RAIL.has(key):
 		var last: int = _knockout_phases(b).size() - 1
 		var n: int = (_knockout_ties(b, last) as Array).size()
 		var chip := str(KNOCKOUT_RAIL[key])
-		if n >= KnockoutScreen.MIN_LIST_TIES or n == KnockoutScreen.BRACKET_TIES \
+		if n >= KnockoutScreen.MIN_LIST_TIES \
+				or (n >= KnockoutScreen.KITLIST_MIN_TIES
+					and n <= KnockoutScreen.KITLIST_MAX_TIES) \
+				or n == KnockoutScreen.BRACKET_TIES \
 				or (n == KnockoutScreen.CARDS_TIES and KnockoutScreen.cards_available(chip)) \
 				or (n == KnockoutScreen.FINAL_TIES and KnockoutScreen.final_available(chip)):
 			_show_knockout_screen(b, key, last)
@@ -4325,13 +4328,16 @@ func _show_knockout_screen(b: Dictionary, key: String, phase: int) -> void:
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
 	# The original switches presentation with the size of the round, per phase: the
-	# 4-tie bracket, the 2-tie SEMIFINAL cards, the 1-tie FINAL, else the list (the
-	# 5-8-tie kit list and the unwitnessed cards/final competitions fall back to the
-	# list form / SORTEO, docs/re/knockout_views_re.md).
+	# 4-tie bracket, the 5-8-tie KIT LIST, the 2-tie SEMIFINAL cards, the 1-tie FINAL,
+	# else the list (the unwitnessed cards/final competitions fall back to the SORTEO,
+	# docs/re/knockout_views_re.md).
 	var chip := str(KNOCKOUT_RAIL.get(key, "euro"))
 	var layout := "list"
 	if ties.size() == KnockoutScreen.BRACKET_TIES:
 		layout = "bracket"
+	elif ties.size() >= KnockoutScreen.KITLIST_MIN_TIES \
+			and ties.size() <= KnockoutScreen.KITLIST_MAX_TIES:
+		layout = "kitlist"
 	elif ties.size() == KnockoutScreen.CARDS_TIES and KnockoutScreen.cards_available(chip):
 		layout = "cards"
 	elif ties.size() == KnockoutScreen.FINAL_TIES and KnockoutScreen.final_available(chip):

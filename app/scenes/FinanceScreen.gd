@@ -179,14 +179,33 @@ const DATE_PEN_X := 416
 const C_WEEK_LABEL := Color8(255, 223, 0)
 const C_DATE := Color8(128, 128, 128)
 
-# chart plot (the baked blue/yellow field): +2,500K at the top of blue, 0 at the
-# axis, -2,500K at the bottom of yellow (the fixed axis the game bakes).
-const CHART_L := 64
-const CHART_R := 633
+# chart plot (the baked blue/yellow field), re-measured 2026-07-28 on BOTH witnesses:
+# the field is x76..604, blue y332..352, the zero rule y353, yellow y354..374. The old
+# x64..633 / y333..377 overran the field on every side (and the baker's matching blank
+# wiped the " K." off both axis labels).
+const CHART_L := 76
+const CHART_R := 604
 const CHART_ZERO_Y := 353
-const CHART_TOP_Y := 333       # == +CHART_SCALE
-const CHART_BOT_Y := 377       # == -CHART_SCALE
-const CHART_SCALE := 2_500_000
+const CHART_TOP_Y := 332       # == +axis_scale()
+const CHART_BOT_Y := 374       # == -axis_scale()
+## The original's own bar cadence: FUN_00509760 plots 52 slots at a 10 px pitch
+## (@0x509a67 edi = 0x3a, += 0xa, until 0x242).
+const CHART_PITCH := 10
+
+## The +/-N K. axis is NOT fixed. `FUN_00509760` accumulates the largest |week-on-week
+## balance delta| over the plotted weeks (@0x50994a..0x509990), then picks the SMALLEST
+## entry of a three-float table that is >= it -- .data 0x659540 = 50,000,000f,
+## 0x659544 = 100,000,000f, 0x659548 = 500,000,000f, walked downwards from the largest
+## @0x509a31..0x509a57 -- and prints that entry x 5e-06 (the double at 0x62d930) between
+## "+"/"-" and " K.". So the three states the original can draw are exactly these, and
+## the two witnessed frames are two of them (013 +/-2,500 K., orig/51 +/-250 K.).
+const AXIS_STEPS := [250_000, 500_000, 2_500_000]
+## The two label plates (x28..74) and their pens, solved off both frames: euro8 -- the
+## face the routine selects by name @0x509d92 -- centred in the plate (field sum
+## 28 + 74 + 1 = 103), pen top = plate top + 5.
+const AXIS_FIELD_SUM := 103
+const AXIS_PEN_TOP := [337, 359]
+const AXIS_INK := [Color8(117, 147, 187), Color8(255, 31, 0)]
 
 # frame-sampled inks
 const C_BLACK := Color(0, 0, 0)
@@ -766,7 +785,8 @@ func _draw_bottom_boxes() -> void:
 ## red bars below it, and weeks with no bar at all). It used to be a single constant
 ## drawn flat across the elapsed weeks, because there were no per-week books to plot.
 func _draw_chart() -> void:
-	var wpp := float(CHART_R - CHART_L) / float(SEASON_WEEKS)
+	var scale := axis_scale()
+	_draw_axis_labels(scale)
 	if _books.is_empty():
 		# Legacy save: the one constant the projection yields, flat, as before.
 		var wk := int(_sum.get("weekly_balance", 0))
@@ -774,22 +794,60 @@ func _draw_chart() -> void:
 			return
 		var weeks := clampi(_week if _week > 0 else 1, 1, SEASON_WEEKS)
 		for i in weeks:
-			_bar(CHART_L + i * wpp, wpp, wk)
+			_bar(CHART_L + i * CHART_PITCH, wk, scale)
 		return
 	for rec in _books:
 		var slot := clampi(int((rec as Dictionary).get("week", 1)) - 1, 0, SEASON_WEEKS - 1)
-		_bar(CHART_L + slot * wpp, wpp, FinanceModel.ledger_balance(rec))
+		_bar(CHART_L + slot * CHART_PITCH, FinanceModel.ledger_balance(rec), scale)
+
+
+## The axis the original would pick for these books: the smallest of AXIS_STEPS that is
+## at least the largest |weekly balance| plotted, and the largest step when none is.
+func axis_scale() -> int:
+	var peak := 0
+	if _books.is_empty():
+		peak = absi(int(_sum.get("weekly_balance", 0)))
+	else:
+		for rec in _books:
+			peak = maxi(peak, absi(FinanceModel.ledger_balance(rec)))
+	for step in AXIS_STEPS:
+		if peak <= int(step):
+			return int(step)
+	return int(AXIS_STEPS[AXIS_STEPS.size() - 1])
+
+
+func _draw_axis_labels(scale: int) -> void:
+	@warning_ignore("integer_division")
+	var k := _thousands(scale / 1000) + " K."
+	for i in 2:
+		var label := ("+" if i == 0 else "-") + k
+		@warning_ignore("integer_division")
+		var pen := (AXIS_FIELD_SUM - _advance(_gV, label)) / 2
+		_blit(_pageV, _gV, pen, int(AXIS_PEN_TOP[i]), label, AXIS_INK[i])
+
+
+## fmt_money without the pound sign: the axis prints "2,500 K.", not "£2,500 K.".
+static func _thousands(v: int) -> String:
+	var s := str(absi(v))
+	var out := ""
+	var c := 0
+	for i in range(s.length() - 1, -1, -1):
+		out = s[i] + out
+		c += 1
+		if c % 3 == 0 and i > 0:
+			out = "," + out
+	return out
 
 
 ## One balance bar: up from the axis in blue for a week in profit, down in red for a week
 ## in the red, clipped to the frame's baked +/-2,500K scale.
-func _bar(bx: float, wpp: float, value: int) -> void:
-	if value == 0:
+func _bar(bx: float, value: int, scale: int) -> void:
+	if value == 0 or scale <= 0:
 		return
 	var up: bool = value > 0
 	var span: int = (CHART_ZERO_Y - CHART_TOP_Y) if up else (CHART_BOT_Y - CHART_ZERO_Y)
-	var hh: float = clampf(absf(float(value)) / float(CHART_SCALE), 0.0, 1.0) * span
+	var hh: float = clampf(absf(float(value)) / float(scale), 0.0, 1.0) * span
 	if up:
-		draw_rect(Rect2(bx, CHART_ZERO_Y - hh, maxf(1.0, wpp - 1.0), hh), C_BAR_POS, true)
+		draw_rect(Rect2(bx, CHART_ZERO_Y - hh, CHART_PITCH - 1, hh), C_BAR_POS, true)
 	else:
-		draw_rect(Rect2(bx, CHART_ZERO_Y + 1, maxf(1.0, wpp - 1.0), hh), C_BAR_NEG, true)
+		draw_rect(Rect2(bx, CHART_ZERO_Y + 1, CHART_PITCH - 1, hh), C_BAR_NEG, true)

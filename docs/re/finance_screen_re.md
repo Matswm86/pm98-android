@@ -171,6 +171,33 @@ fee IS that week's TELEVISION line (proved on week 29). The Coca-Cola Cup, F.A. 
 U.E.F.A. Cup and Cup Winners' Cup fees were **not measured** and pay £0 — a visible gap,
 not a guess.
 
+#### The field, traced in the binary (2026-07-28)
+
+The 2026-07-28 claim "the card reads `club+0x290`" is now **verified against MANAGER.EXE**,
+and the field's whole lifetime is mapped:
+
+| site | what it does |
+|---|---|
+| `FUN_00545FD0` @0x546188 | `cmp [club+0x290], 0` — the weekly hub run raises the card only when the fee is non-zero |
+| @0x546214 | reads it into the card's draw call |
+| @0x54624a | clears it to 0 once the card has been shown |
+| `FUN_005724E0` | the card itself: the fee arrives as its FIRST stack argument (a float), is money-formatted (flags 0x1402) and concatenated after `"For "` (0x661c30); the art is `RECURSOS\PREMIER\ICONOS\TV\canalTV.bmp` (0x661c08) |
+| `FUN_0057A980` @0x57ab1d | the weekly pass books it as income — and ONLY for the club whose `+0x5c != 0xffff` (the hot-seat slot), which is why it is a manager-only line |
+| @0x5799d7 | zero-initialised when a club record is built |
+| @0x57cb15 / @0x57cb1f, @0x57bed8 | round-trips through the save |
+
+**What is still not found, stated so the next session does not repeat the search:** the
+site that WRITES the fee. There is no `mov [reg+0x290], <value>` anywhere in `.text`
+outside the three sites above (a byte-accurate scan of the whole section for the
+displacement `0x00000290`, including the imm32 encodings, returns 40 instructions and none
+of them is a producer on the club record), so the producer must reach the field through an
+aliased base pointer. And the fee is **not a constant anywhere**: 90,000 / 187,500 /
+375,000 appear as neither u32 nor f32 nor f64 in MANAGER.EXE, and a scan of every shipped
+file under the game directory finds none of them either. It is computed at runtime.
+
+So the cup fees still cannot be ported without either that producer or a captured CUP home
+tie, and the port continues to pay £0 and flag it.
+
 ### The channelTV card — BUILT
 
 `app/scenes/ChannelTvScreen.gd`, chrome from
@@ -386,6 +413,36 @@ which is exactly why the non-European career reads `U.E.F.A. CUP INCOME`: it is 
 * **Still declared**: the `CUP WINNERS CUP INCOME` arm has no capture. Its string is the
   binary's own and the gate asserts only that it renders and differs from the other two.
 
-**Still open: the `±N K.` chart axis scale.** Its driver is unknown (013 `±2,500 K.`,
-`orig/51` `±250 K.`), the axis static is a separate blit, and no third witness exists.
+~~**Still open: the `±N K.` chart axis scale.**~~ — **CLOSED 2026-07-28, from the binary,
+and it took a render defect with it.**
+
+`FUN_00509760` walks the plotted weeks accumulating the largest **|week-on-week balance
+delta|** (@0x50994a..0x509990 — the routine also proves the chart plots the DELTA, not the
+running total: `FUN_0057fce0` returns the cumulative balance and the loop stores
+`value - running` per week). It then picks the **smallest entry of a three-float table that
+is at least that peak**, walking down from the largest at @0x509a31..0x509a57:
+
+| .data | value | label |
+|---|---|---|
+| 0x659540 | 50,000,000f | `250` |
+| 0x659544 | 100,000,000f | `500` |
+| 0x659548 | 500,000,000f | `2,500` |
+
+and prints that entry × `5e-06` (the double at 0x62d930) between `"+"` / `"-"` (0x6587d4 /
+0x654448) and `" K."` (0x659b2c), in the face the same routine selects by name at
+@0x509d92: **`euro8`** (0x6597a4). So the original can draw exactly three axes, and both
+witnessed frames are two of them.
+
+**The render defect it exposed.** The baker blanked the plot field over `x60..634 /
+y333..377`, but the field is `x76..604 / y332..374` — so the blank ran over the two AXIS
+LABEL PLATES at `x28..74` and wiped the `" K."` off both of them. The shipped chrome read
+`+2,500` / `-2,500` with the unit missing and the plate edge overpainted. Both are fixed:
+the plates are blanked to their own flat grounds ((0,0,160) and (85,0,0)) and the label is
+drawn live, centred in the plate (field sum 28 + 74 + 1 = 103) at pen top plate + 5, in the
+witnessed inks (117,147,187) / (255,31,0). The bars now use the original's own cadence too
+(52 slots at a 10 px pitch, @0x509a67).
+
+Gate: `tools/re/diff_finance_axis_parity.py` — **both witnessed states 0 px** on both
+plates (`013_164406.png` ±2,500 K., `orig/51_finance_season.png` ±250 K.), and the
+un-captured middle step renders and is asserted distinct from both.
 That half stays a recorded defect and wants the next finance capture.

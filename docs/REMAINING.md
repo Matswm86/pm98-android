@@ -1,5 +1,88 @@
 # PM98 Android — remaining-work inventory (refreshed 2026-07-28)
 
+## 0aaa. Closed 2026-07-28 (session s71) — the carried named list
+
+Mats's list was: *the cup TV fee, the 5-8 tie kit list, MAN-TO-MAN, B9, the 48x64 bevel,
+the ±N K. axis, the England non-Premier offers panel, the pre-existing tap-through failure
+and the sweep's 234/1 result.* Five closed, three did not, one was already closed — said
+plainly at the end.
+
+* **The 5-8 tie KIT LIST — BUILT, 0 px.** Layout 2 of the five (`knockout_views_re.md`
+  §"The kit list, as built"): 22 px rows at pitch 30 in an `x6..493` panel, a 17x20 ridi
+  kit each side at (+5,+1) in its 28x22 well, and the compact list's own cell-relative text
+  anchors at pen top `row_top + 6`. Three witnesses, two competitions, two careers, BOTH
+  column sets — the DOMESTIC one (`13_cocacola_r4_KITLIST_PLAYED_1997-12-01.png`) was
+  local-only and is now in the tracked reference tree. Gate:
+  `diff_knockout_parity.py` cases `knockout_uefa_kitlist` / `knockout_cwc_kitlist` /
+  `knockout_cocacola_kitlist`. `Main._show_cup_screen` raises it at 5-8 ties; 8 is the only
+  size the port's own cup structure can produce, and it is the only size any of the 20
+  kit-list frames in the corpus shows, so 5-7 is declared.
+* **The outline pass is DITHERED ON ABSOLUTE SCREEN PARITY — the 07-27 "NOT
+  position-constant" conclusion was WRONG.** The kit list proved it because it puts the
+  same sprite bank in wells at two parities: `x15` and `x289` (both odd) agree pixel for
+  pixel across all three witnesses, `x344` (even) disagrees at 222 of 616 positions.
+  Voting the overlay per `(well_x + row_top) & 1` instead of per side cut the gate's kit
+  residual **556/552/548 -> 68/64/28**. It is the same rule the paginator's disabled arrow
+  already carried.
+* **The ±N K. finance axis — CLOSED from the binary, and it exposed a render defect.**
+  `FUN_00509760` accumulates the largest |week-on-week balance delta| and snaps to the
+  smallest of three .data floats (0x659540/4/8 = 50M/100M/500M), printing it × 5e-06
+  between "+"/"-" and " K." in **euro8**. So the original draws exactly ±250 / ±500 /
+  ±2,500 K. The defect: the baker's plot-field blank ran `x60..634` where the field is
+  `x76..604`, painting over both axis label plates — the shipped chrome read "+2,500" with
+  the " K." wiped off. Fixed, and the labels are drawn live. New gate
+  `tools/re/diff_finance_axis_parity.py`: **both witnessed states 0 px on both plates**.
+* **The FILLED FINALIST plate — BUILT, and it deleted two port inferences.** The 07-28
+  drive's two decided-semifinal frames show the plate carrying the club's 24x32 nano kit at
+  `(plate_x0 + 2, 377)` and his name in proman10 at `(plate_x0 + 43, 380)` in that card's
+  OWN ink — not the centred GDI string in the WINNER band's ink the port had declared as
+  OURS. They also refute the port's yellow winner ink in this layout: both frames are
+  played out and NOTHING is inked yellow. Gate case `knockout_cocacola_semis_done`.
+* **The channelTV fee — the field is now traced end to end in MANAGER.EXE** and the search
+  that does NOT work is written down (`finance_screen_re.md`). `club+0x290` is confirmed as
+  the fee (raise test @0x546188, read @0x546214, cleared @0x54624a, booked by the weekly
+  pass @0x57ab1d for the hot-seat club only, zeroed at build @0x5799d7, saved
+  @0x57cb15/@0x57bed8). **Not found: the producer** — there is no write to `[reg+0x290]`
+  anywhere in `.text` outside those sites, so it reaches the field through an aliased base;
+  and the fee is not a constant, since 90,000 / 187,500 / 375,000 appear as neither u32 nor
+  f32 nor f64 in the EXE nor in ANY shipped game file. Cup ties still pay £0 and still say
+  so.
+* **The "pre-existing tap-through failure" does NOT reproduce.** Both harnesses are green
+  on this box with the documented command (`--rendering-driver opengl3`, Xvfb :1
+  1280x960x24): `shot_squad_card_tapthrough` **10/10**, `shot_dbase_card_tapthrough`
+  **23/23**. The 07-28 2-of-10 was that run's display, not the app.
+* **The sweep's 234/1** was already closed in `527f4e9` (`test_living_league` now claims the
+  drift over the LEAGUE, not one lottery club). Re-verified: the curated 25-test CI gate is
+  green test by test, and so are `diff_knockout_parity` (12/12), the three finance parity
+  gates and `diff_finance_axis_parity`.
+
+### NOT done this session, stated plainly
+
+1. **MAN-TO-MAN MARKINGS** (`APP_VS_SPEC_AUDIT` row 11, the last dead in-match door) —
+   untouched. It is NOT blocked on evidence: `screenshots/parity-run-2026-07-16/orig/
+   66_mantoman_match.png` is a full, clean witness of the screen (squad list with a DEF/MID/
+   FOR column and a PLAYER N. column, the opponent XI panel with its kit and vertical club
+   plate, the DEFENDING / MIDFIELDING MARKING LINE pitch widget, DELETE and RETURN). It is a
+   whole screen build and wants its own session.
+2. **B9** (the youth loop's three visual gaps) — untouched; it needs a driven career with a
+   completed search at the binary's own 30-55-week cadence.
+3. **The 48x64 MINIESC bevel is still NOT reversed.** The parity finding above does not
+   reach it: all four bracket wells sit at one parity, so the residual there is
+   club-varying silhouettes. A dilation model was measured on all 16 witnessed bracket
+   cells and REJECTED — the union kernel `0<=dx,dy<=3` covers 4090 of 4098 outside-
+   silhouette pixels but paints 1988 the original leaves white. It needs the pass's code.
+4. **The England non-Premier offers panel** — still wants a witness, and this is a real
+   evidence gap, not a shrug: `offers_map_re.md` §"Still open" records that the shot and
+   frame 100 do not even reduce to a permutation (the panel is showing a different SET of
+   clubs), so which division that frame is on cannot be inferred. No frame in the local
+   corpus, including the 07-19 lower-division drive, shows it.
+5. **The F.A. Cup single-leg semifinal card and the Coca-Cola FINAL** are still SORTEO
+   fallbacks. Their frames are banked (`tools/re/refs/knockout-2026-07-28/`) and the
+   FINALIST half of that family is now built, but both need their own chrome bake: the
+   F.A. Cup semis are a different card shape (one `RESULT` block, not two legs) and the
+   Coca-Cola final is a different body from the euro one (`MATCH RESULT` over `STADIUM`, an
+   empty `REPLAY RESULT` panel, and the WINNER band bottom-left).
+
 ## 0aa. Closed 2026-07-28 (session s70) — the sacking screen, the ground ceiling, the decided bracket
 
 * **The SACKING SCREEN — BUILT, and it is not a screen.** `FUN_00545fd0` IS the weekly hub

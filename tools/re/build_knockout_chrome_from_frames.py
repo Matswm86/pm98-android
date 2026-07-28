@@ -22,6 +22,11 @@ recorded per strip in `bands.json`.
 Sources (all under tools/re/refs/, because screenshots/ is gitignored)
   knockout-2026-07-26/06_euroleague_round1_played.png    compact list, EUROPEAN, 15 ties
   knockout-2026-07-26/01_facup_r2_PLAYED_1997-12-14.png  compact list, DOMESTIC, scrolled
+  knockout-2026-07-26/09_comp_cwc.png                    kit list, EUROPEAN, 8 ties, drawn
+  knockout-2026-07-26/01_uefa_1_8finals_leg1_played_1997-12-07.png
+                                                         kit list, EUROPEAN, leg 1 played
+  knockout-2026-07-26/13_cocacola_r4_KITLIST_PLAYED_1997-12-01.png
+                                                         kit list, DOMESTIC, played
   knockout-2026-07-26/09_comp_*.png                      one frame per competition
   euroleague-group-2026-07-26/01_results_premier_empty_body.png   the RESULTS desktop
 
@@ -34,6 +39,21 @@ Outputs -> app/art/screens/knockout/
   list_hdr_dom.png       ... with RES. / REPLAY instead
   scroll_col.png         the scrollbar column (arrows + trough) with the thumb painted out
   scroll_thumb_tile.png  one row of the thumb bitmap, tiled to the computed length
+  kitlist_hdr_<set>.png  the KIT LIST panel top (border + title band + the column titles);
+                         its panel is x6..493 -- WIDER than the compact list's x6..477,
+                         because a round this small never scrolls and the scrollbar column
+                         is simply part of the panel
+  kitlist_row_<set>.png  one 30-row KIT LIST unit: the black rule, the 22-row content band
+                         and the 6 white rows + rule that separate it from the next. Cut
+                         from a witnessed row with its content rects blanked; legal because
+                         the layout does NOT alternate its row grounds (every one of the 24
+                         witnessed rows carries the same five grounds) and the three
+                         witnessed frames -- two competitions, two careers, both column
+                         sets -- are byte-identical outside those rects
+  kitlist_foot_<set>.png the panel tail under the last row (10 white rows + the 2-row
+                         bottom border)
+  kitwell_kl_*_p<0|1>.png the kit wells' outline pass, voted per ABSOLUTE SCREEN
+                         PARITY -- the pass is dithered exactly like the pager arrows
   bracket_panel_euro.png one 458x72 BRACKET panel strip, European columns, the six content
                          rects blanked (tools/re/verify_bracket_split.py proves 16 panels
                          over 4 frames are byte-identical outside them)
@@ -324,6 +344,70 @@ COMP_FRAME = {
     "intercont": "09_comp_intercont.png",
 }
 
+# ---- the KIT LIST (layout 2), measured 2026-07-28 on three frames -------------------
+# Every span below is an inclusive pixel row/column read off
+#   09_comp_cwc.png                              European, 8 ties, all cells empty
+#   01_uefa_1_8finals_leg1_played_1997-12-07.png European, 8 ties, 1ST LEG filled
+#   13_cocacola_r4_KITLIST_PLAYED_1997-12-01.png DOMESTIC, 8 ties, RES. filled + winners
+# and reproduced in docs/re/knockout_views_re.md "The kit list, as built".
+KL_PANEL_X = (6, 493)  # WIDER than the compact list: this layout never scrolls
+KL_HDR_Y = (125, 153)  # border + title band + the white gap + the first row rule
+KL_ROW_Y = (154, 183)  # one unit: 22 content rows, the rule, 6 white rows, the next rule
+KL_ROW_H = 22
+KL_PITCH = 30
+KL_FOOT_Y = (386, 398)  # the rule under the last row, 10 white rows, the 2-row border
+# Cells, inclusive x spans, in draw order: kit L, home, away, kit R, then the score cells.
+KL_CELLS = {
+    "euro": [(15, 42), (44, 164), (167, 287), (289, 316), (319, 372), (374, 427), (429, 482)],
+    "dom": [(15, 42), (44, 192), (195, 342), (344, 371), (374, 427), (429, 482)],
+}
+KL_WELL_BG = (140, 160, 180)
+KL_NAME_BG = (100, 120, 140)
+KL_SCORE_BG = (120, 120, 160)
+KL_LAST_BG = (100, 100, 140)
+KL_SRC = {
+    "euro": ("09_comp_cwc.png", 154),
+    "dom": ("13_cocacola_r4_KITLIST_PLAYED_1997-12-01.png", 154),
+}
+KL_HDR_SRC = {"euro": "09_comp_cwc.png", "dom": "13_cocacola_r4_KITLIST_PLAYED_1997-12-01.png"}
+# The 17x20 ridi kit sits at (+5, +1) inside its 28x22 well -- the unique best offset on
+# all 48 witnessed cells (each reproduces ~188/221 opaque px; the residual is the same
+# outline pass the bracket and the cards carry, voted into overlays below).
+KL_SPR = (5, 1)
+KL_TOPS = [154 + KL_PITCH * i for i in range(8)]
+KL_CELL_IDS = {
+    "01_uefa_1_8finals_leg1_played_1997-12-07.png": (
+        "euro",
+        [
+            (1027, 1062),
+            (1260, 1107),
+            (1112, 1071),
+            (1058, 1051),
+            (1047, 1147),
+            (1001, 1023),
+            (57, 1103),
+            (1141, 1032),
+        ],
+    ),
+    "09_comp_cwc.png": (
+        "euro",
+        [
+            (1171, 1125),
+            (1138, 1033),
+            (1101, 1144),
+            (1188, 1270),
+            (1015, 1068),
+            (1080, 49),
+            (1048, 1105),
+            (1224, 1199),
+        ],
+    ),
+    "13_cocacola_r4_KITLIST_PLAYED_1997-12-01.png": (
+        "dom",
+        [(63, 60), (76, 66), (53, 61), (75, 71), (80, 56), (46, 47), (40, 41), (54, 83)],
+    ),
+}
+
 # The scrollbar column, present only when the list is longer than the panel.
 SCROLL_X = (478, 493)
 SCROLL_Y = (125, 410)
@@ -569,6 +653,51 @@ def main() -> None:
         OUT / "list_hdr_dom.png"
     )
     print("list_hdr_euro.png + list_hdr_dom.png <- two witnessed panel tops")
+
+    # -- the KIT LIST: panel top, one repeating row unit, the foot, and the well overlays.
+    for cset, src in KL_HDR_SRC.items():
+        cut(frame(src), (KL_PANEL_X[0], KL_HDR_Y[0], KL_PANEL_X[1], KL_HDR_Y[1])).save(
+            OUT / f"kitlist_hdr_{cset}.png"
+        )
+    print("kitlist_hdr_euro.png + kitlist_hdr_dom.png <- the two witnessed panel tops")
+    for cset, (src, top) in KL_SRC.items():
+        row = cut(frame(src), (KL_PANEL_X[0], top, KL_PANEL_X[1], top + KL_PITCH - 1))
+        cells = KL_CELLS[cset]
+        for j, (x0, x1) in enumerate(cells):
+            bg = KL_WELL_BG if j in (0, 3) else KL_NAME_BG
+            if j > 3:
+                bg = KL_LAST_BG if j == len(cells) - 1 else KL_SCORE_BG
+            for y in range(KL_ROW_H):
+                for x in range(x0 - KL_PANEL_X[0], x1 - KL_PANEL_X[0] + 1):
+                    row.putpixel((x, y), bg)
+        row.save(OUT / f"kitlist_row_{cset}.png")
+        cut(frame(src), (KL_PANEL_X[0], KL_FOOT_Y[0], KL_PANEL_X[1], KL_FOOT_Y[1])).save(
+            OUT / f"kitlist_foot_{cset}.png"
+        )
+    print("kitlist_row_*.png + kitlist_foot_*.png <- one witnessed row unit + the tail")
+    # The pass is DITHERED against absolute screen parity -- the same rule the paginator
+    # arrows carry. Proof: the left well (x15) and the EUROPEAN right well (x289) are both
+    # odd and agree pixel for pixel across all three frames, while the DOMESTIC right well
+    # (x344, even) disagrees with them at 222 of the well's 616 positions. So the overlay
+    # is voted per parity, not per side, and every cell of a parity votes together.
+    buckets: dict[int, list] = {}
+    for fname, (cset, ties) in KL_CELL_IDS.items():
+        fr = frame(fname)
+        for slot, which in ((0, 0), (3, 1)):
+            wx0 = KL_CELLS[cset][slot][0]
+            for i, pair in enumerate(ties):
+                sil, col = _sprite_maps(ROOT / f"app/art/kits/ridi/{pair[which]}.png", *KL_SPR)
+                buckets.setdefault((wx0 + KL_TOPS[i]) & 1, []).append(
+                    (fr, wx0, KL_TOPS[i], sil, col)
+                )
+    for par, cells in sorted(buckets.items()):
+        under, over, nu, no = _overlay_vote(cells, 28, KL_ROW_H, KL_WELL_BG)
+        under.save(OUT / f"kitwell_kl_under_p{par}.png")
+        over.save(OUT / f"kitwell_kl_over_p{par}.png")
+        print(
+            f"kitwell_kl_under/over_p{par}.png <- {len(cells)} witnessed cells "
+            f"({nu} under + {no} over px)"
+        )
 
     # -- the scrollbar: the column with the thumb painted out, plus one row of the thumb.
     col = cut(list_dom, (SCROLL_X[0], SCROLL_Y[0], SCROLL_X[1], SCROLL_Y[1]))

@@ -61,6 +61,29 @@ func _initialize() -> void:
 	scr.setup({}, "euro", "X", true, [], false, false, 0, "nonsense")
 	_a(scr._layout == "list", "an unknown layout falls back to the list")
 
+	# ---- the KIT LIST (5-8 ties), measured 2026-07-28 -------------------------------
+	# The witnessed 8-tie panel: rows 22 px tall at pitch 30 from y154, the panel x6..493
+	# (three columns wider than the compact list, because this layout never scrolls), and
+	# the tail starting right under the last row.
+	_a(KnockoutScreen.KL_BODY_TOP == 154, "kit list body top y154")
+	_a(KnockoutScreen.KL_ROW_H == 22, "kit list rows are 22 px")
+	_a(KnockoutScreen.KL_PITCH == 30, "kit list pitch is 30")
+	_a(KnockoutScreen.KL_PANEL_X0 == 6, "kit list panel starts at x6")
+	var kl_cols: Array = KnockoutScreen.KL_COLS_EURO
+	_a(kl_cols.size() == 7, "European kit list has 7 cells (2 wells + 2 names + 3 scores)")
+	_a(int((kl_cols[0] as Array)[0]) == 15 and int((kl_cols[0] as Array)[1]) == 42,
+		"the left kit well is x15..42")
+	_a(int((kl_cols[3] as Array)[0]) == 289, "the European right well is x289")
+	_a(int((KnockoutScreen.KL_COLS_DOM[3] as Array)[0]) == 344,
+		"the domestic right well is x344 (its name cells are wider)")
+	_a(KnockoutScreen.KL_COLS_DOM.size() == 6, "the domestic kit list has 2 score cells")
+	# The last row's content ends at y385 and the tail runs from y386 on the witnesses.
+	_a(KnockoutScreen.KL_BODY_TOP + KnockoutScreen.KL_ROW_H
+		+ KnockoutScreen.KL_PITCH * 7 == 386, "8 ties -> the tail starts at y386")
+	scr.setup({}, "cwc", "1/8 FINALS", true, [], false, false, 0, "kitlist")
+	_a(scr._layout == "kitlist", "setup accepts the kit-list layout")
+	_a(scr._band_key() == "cwc_list", "the kit list shares the LIST family band")
+
 	print("test_knockout_layout: %s" % ("ALL PASS" if _fail == 0 else "%d FAILED" % _fail))
 	quit(1 if _fail > 0 else 0)
 
