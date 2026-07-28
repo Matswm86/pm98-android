@@ -910,6 +910,14 @@ whole game's fidelity ceiling.
 
 Where it actually stands, measured 2026-07-26 (`docs/re/M5_S58_FRONTIER_1032.md`):
 
+> ⛔ **THIS SECTION IS STALE (flagged 2026-07-28, s76) — read the two sentences below first.**
+> "Not wired into gameplay" is wrong since **s74**: `MatchSim.simulate` routes every fixture to
+> one of the original's OWN two engines, and a WATCHED match runs the positional one.
+> "Byte-exact over clk 1-1032" is wrong since **s59**: the verified window is **clk 1-2836**,
+> 1,072,592 words across NINE captures, zero mismatches — minute ~8.9, 19.7 % of a half. The
+> open road is steps (a)-(d) of `handoff-pm98-m5-s59-frontier-2836-2026-07-27` §Open, and it is
+> the largest remaining item in the project. The rest of this section is kept for its history.
+
 * Against the live silicon captures the port is **byte-exact over clk 1-1032** — 22 players
   x 16 fields, the ball x 10 fields, its 51-word predicted-trajectory tail, and the LCG
   state at every tick boundary. Across all **eight** banked captures: **319,335 words,
@@ -1072,7 +1080,7 @@ DESIGN: 178/476 clubs default to MIXED, an any-side trigger would break the leag
 OFF is still stock (oracle fixtures reproduce). `hack_three_forwards.md` §4b; live
 proof `app/tests/test_cheats_live.gd`.
 
-## 3c. Model-level divergences from the season audit — OPEN (rescued 2026-07-26)
+## 3c. Model-level divergences from the season audit — ALL CLOSED (heading corrected 2026-07-28)
 
 From `docs/re/AUDIT_season_playthrough_2026-07-25.md` (previously /tmp-only, now in-repo);
 verified still open at HEAD `4076800`:
