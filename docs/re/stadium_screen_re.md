@@ -358,6 +358,50 @@ The stature model was built for transfer fees and never touched ground prices; i
 the right tier for all five clubs independently. That is why the objective LOOKS like the
 driver and is not.
 
+### `club+0x50` — REVERSED 2026-07-28: it is the club's COMPETITION INDEX
+
+The preset selector is not a stored data byte at all, which is why the EQUIPOS parser could
+never find it: **`FUN_00579c70` does not write `club+0x50`**. Checked mechanically — the club
+loader writes 0x4, 0x8, 0xc, 0x14, 0x18, 0x1c, 0x20, 0x24, 0x28, 0x34, 0x36, 0x38, 0x3a,
+0x1d9..0x1df, 0x1e8, 0x1ec, 0x278, 0x27a, and nothing else.
+
+It is COMPUTED, by **`FUN_0057a180`** (`docs/re/groundpreset/fn_0057a180_FUN_0057a180.c`,
+found by scanning `.text` for stores to `[reg+0x50]` and filtering to the club module):
+
+```
+FUN_0057a180(club):
+    id = club+0x10
+    if id in (0x26e4, 0x26de):  i, cap = 0xd, 0xc          # the parser's own special ids
+    elif id == 0x26ae:          club+0x50 = 0xd; club+0x58 = 0; return
+    else:
+        i = 0
+        for p in DAT_0066b190 .. DAT_0066b1a0:              # entries 0..3
+            if p->vtbl[0x48](id) != 0: break                # "is this club in me?"
+            i += 1
+        if i > 3:
+            i = 7
+            for p in DAT_0066b1ac .. DAT_0066b1c4:          # entries 7..12
+                if p->vtbl[0x48](id) != 0: break
+                i += 1
+        cap = min(DAT_0066b190[i]->vtbl[0x78](FUN_0057a340()), 0xc)
+    club+0x50 = i
+    club+0x58 = cap
+```
+
+So **`club+0x50` is the index of the first competition in the table at `DAT_0066b190` that
+CONTAINS the club** — the same competition-pointer table the finance euro-income label decode
+reads (`DAT_0066B1B0` is entry 8 of it). Entries 0..3 are scanned first and 7..12 second, and
+`club+0x58` — the other argument `FUN_0057d780` takes — is that competition's own
+`vtbl[0x78]` value clamped to 0xc.
+
+**Proven:** entry 0 is the Premier League. Preset 0 is exactly Man Utd's witnessed starting
+grades, and Man Utd is a Premier club, so the club that selects preset 0 is a Premier club.
+**Not yet proven:** that entries 1/2/3 are the First / Second / Third Divisions in that order.
+It is the natural reading of a four-entry scan whose presets degrade monotonically
+(2 0 1 2 1 1 0 2 2 → 1 0 0 1 0 0 0 1 1 → zeros), but it wants **one capture of a lower-division
+club's IMPROVE panel** to confirm before the port seeds 476 clubs off it — which is the same
+bar every other number on this screen was held to.
+
 ### Still open here
 `FUN_0057d780`'s arg3 (`club+0x50`) picks one of **four starting-grade presets** for the nine
 facility/service items and the four car-park quadrants:
@@ -370,10 +414,12 @@ facility/service items and the four car-park quadrants:
 
 Preset 0 is **exactly** Man Utd's witnessed starting grades (FLOODLIGHTS 2 / HEATING 0 /
 CHANGING ROOMS 1 / SCORE BOARD 2 / ACCESS 1 / MEDICAL 1 / CLUB SHOP 0 / CAFES 2 / TOILETS 2),
-which confirms the field order. What is NOT yet reversed is where `club+0x50` comes from, so
-which preset a given club gets is still un-evidenced — the per-club STARTING grades stay on
-the captured Man Utd table (`app/data/ground_prices.json`) rather than being guessed. Prices
-do not depend on it.
+which confirms the field order. ~~What is NOT yet reversed is where `club+0x50` comes from~~ —
+**reversed 2026-07-28, see the section above: it is the club's competition index.** What is
+left is ONE capture of a lower-division club's IMPROVE panel to bind indices 1/2/3 to the
+First / Second / Third Divisions; until then the per-club STARTING grades stay on the captured
+Man Utd table (`app/data/ground_prices.json`) rather than being seeded off an unconfirmed
+ordering. Prices do not depend on it.
 
 ## WIRING (Main.gd)
 `Main._show_stadium_screen()` calls `scr.setup(club, manager, season, ground, cap,

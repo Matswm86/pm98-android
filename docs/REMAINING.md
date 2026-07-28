@@ -49,6 +49,20 @@
   rows where proman12 gives 9; no extracted bank matches). **All 14 knockout gate cases
   pass.**
 
+* **`club+0x50`, the per-club ground-grade PRESET SELECTOR — REVERSED.** It is not a stored
+  data byte, which is why the EQUIPOS parser could never find it: `FUN_00579c70` never writes
+  `club+0x50` (checked mechanically against every offset it does write). **`FUN_0057a180`
+  COMPUTES it**: it is the index of the first competition in the table at `DAT_0066b190` that
+  contains the club (entries 0..3 scanned first, then 7..12), and `club+0x58` is that
+  competition's `vtbl[0x78]` value clamped to 0xc. Entry 0 is PROVEN to be the Premier League
+  (preset 0 is exactly Man Utd's witnessed grades). What is left before 476 clubs can be
+  seeded off it is ONE capture of a lower-division club's IMPROVE panel, to bind indices
+  1/2/3 to the First / Second / Third Divisions — the natural reading of the monotonically
+  degrading presets, but not yet witnessed, so not yet shipped.
+  Record: `docs/re/stadium_screen_re.md` §"`club+0x50` — REVERSED", decompile in
+  `docs/re/groundpreset/`. **This folds into the B9 / offers-panel wine drive**: the same
+  driven lower-division career answers all three.
+
 ### NOT done in s73, stated plainly
 
 **B9**, the **England non-Premier offers panel**, the **cup channelTV fee**, the
