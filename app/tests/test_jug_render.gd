@@ -215,6 +215,22 @@ func _initialize() -> void:
 					kit_px += 1
 		ok = _assert(kit_px > 20, "United's sprite carries real RED kit pixels") and ok
 
+	# --- the marking geometry is FUN_0059a8c0's own (docs/re/pitch_markings_re.md) ------
+	var sim: MatchSimulador = load("res://scenes/MatchSimulador.gd").new()
+	ok = _assert(absf(sim.LINE_W - 0.1) < 1e-9, "0x1999 = the 0.1 m line width") and ok
+	ok = _assert(absf(rad_to_deg(sim.D_HALF_ANGLE) - 53.7890625) < 1e-4,
+		"the D's half-angle is the binary's 0x2640, not acos((16.5-11)/9.15)") and ok
+	ok = _assert(rad_to_deg(sim.D_HALF_ANGLE) > rad_to_deg(acos((16.5 - 11.0) / 9.15)),
+		"and it is WIDER than the textbook construction") and ok
+	ok = _assert(absf(sim.SPOT_W - 0.4) < 1e-9 and absf(sim.SPOT_H - 0.2) < 1e-9,
+		"the spots are 0x6664 x 0x3332 quads") and ok
+	for pair in [[sim.CIRCLE_R, 9.15], [sim.PEN_DEPTH, 16.5], [sim.PEN_HALF_W, 20.16],
+			[sim.GOALAREA_DEPTH, 5.5], [sim.GOALAREA_HALF_W, 9.16], [sim.PEN_SPOT, 11.0],
+			[sim.CORNER_R, 1.0]]:
+		ok = _assert(absf(float(pair[0]) - float(pair[1])) < 0.005,
+			"marking constant %s is FUN_0059a8c0's own" % pair[1]) and ok
+	sim.free()
+
 	print("\n%s" % ("ALL PASS" if ok else "FAILURES ABOVE"))
 	quit(0 if ok else 1)
 

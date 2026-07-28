@@ -15,8 +15,12 @@ model, which was an invention (AUDIT A7 / A8).**
   per frame (`param_1[1]` = frame count, stride `* 0x4c`). JUG.PGF = **4211 frames**.
 - On disk each frame header is `LFGP`-bank: 4-byte tag + `6×int32`
   `[h0, H(=h1), h2, h3, W(=h4), h5]` then `W*H` 8-bit pixels
-  (see `tools/re/export_match_art.py:pgf_frames`). `h5 ∈ {1,2}` is **NOT** a mirror
-  flag (mirroring is render-side, §3); its meaning is still a GAP.
+  (see `tools/re/export_jug_bank.py:pgf_frames`). **`h5` is CLOSED 2026-07-28: it is the
+  `JUGCAM.IND` SHIRT-MAP index**, stored at frame slot `+0x10` by `FUN_005caae0` and used by
+  `FUN_005a5460`'s kit pass; across the 4211 frames it spans exactly **0..71**, the 72 maps
+  (`docs/re/kit_palette_re.md` §6-7). The earlier "h5 ∈ {1,2}" reading came from the first
+  handful of frames only. **`h0`, not `h4`, is the frame's visible WIDTH** (`h4` is the stored
+  row stride; `h0 <= h4` in all 4211 and the columns past `h0` are blank in all of them).
 
 ## 2. Frame-index formula (the core of A7)
 `FUN_005a5460:331-343`, per player each tick:
@@ -189,9 +193,14 @@ Remaining:
   `FUN_005923f0`'s re-entry (`+0x5fac != 0`) block and passed to the file-open method
   `FUN_005ec020` (TLS -> `FUN_005eaf80`, handle stored at `obj+0x100`). It is **NOT read by
   `FUN_005a5460`'s per-player frame-index math** (that path uses only `ctx+0x2468` JUG bank +
-  the `.data` kind tables + `DAT_006653e0` thresholds). STILL GAP: its internal record layout
-  and its actual consumer function.
-- PGF header `h5 ∈ {1,2}` meaning.
+  the `.data` kind tables + `DAT_006653e0` thresholds).
+  **CLOSED 2026-07-28** — the record layout and the consumer are both found, and the name
+  misled this note: `JUGCAM.IND` is not a camera table but the **shirt-texture -> sprite-palette
+  index map**, read by `FUN_005a5460`'s KIT pass (not its frame-index math, which is why the
+  search missed it). Layout: **72 maps x 16 columns x 8 rows x 6 shades = 55,296 bytes**, the
+  file's exact size; the buffer is `matchctx+0x1a64` (stored @0x592d1b). See
+  `docs/re/kit_palette_re.md` §6.
+- ~~PGF header `h5 ∈ {1,2}` meaning.~~ **CLOSED** — it is the JUGCAM map index (§1).
 - Camera-angle source (`param_2 + 0xdc`) — **ORIGIN RESOLVED 2026-07-01 (s3), full write chain
   traced byte-for-byte.** The draw `FUN_005a5460` is a virtual method reached through **four**
   distinct vtables that all carry `0x5a5460` (whole-image search for the pointer: `.rdata`
@@ -286,10 +295,15 @@ Remaining:
     there is no look-at/target argument.** Each `R` (`FUN_005eea80` etc.) is a single-axis rotation
     read from a **cos/sin LUT** `DAT_006d31c8` (angle unit `0x10000` = full turn; index
     `(angle+8)>>4 & 0xfff`, sin via `(0x3ff8-angle)>>4`), matmul'd via `FUN_005ee800` (3×3 16.16).
-  - Since yaw=pitch=roll are the **constant-0** words `camctrl+0x8c/0x8e/0x90` (s4), every `R` reduces
-    to identity (`cos0=0x10000`, `sin0≈0`, and `param_1[8]=0x10000` unconditionally) ⇒ **`V` = pure
-    translation `T(-eye)`.** The camera is world-axis-aligned; it never rotates toward the tracked
-    actor (no look-at→Euler conversion exists — consistent with §5 "yaw is a constant 0").
+  - ⛔ **REFUTED 2026-07-28, twice.** This paragraph claimed yaw=pitch=roll are constant 0 and
+    therefore `V` is a pure translation. s75 refuted it from the game's own rendered frame; the
+    camera pass then refuted it from the CODE. `camctrl+0x8c` (yaw) and `+0x8e` (pitch) are
+    **recomputed every frame** at the end of `FUN_005f5850` from the eye->look-at vector
+    (`yaw = atan2_16(look.x, look.y)`, `pitch = atan2_16(rot_z(look,-yaw).x, look.z)`), and the
+    eye `camctrl+0x3c` is computed there too. The earlier sweep missed all three because they are
+    written **through a register pointer** (`puVar19 = param_1 + 0xf`), never through a
+    `[reg + disp32]`. Only **roll** (`+0x90`) is genuinely never written. Full record:
+    `docs/re/camera_re.md`.
   - **The 2nd matrix `SetCamera` composes is a projection SCALE, not a tilt:** `FUN_005eea50(0x10000,
     k, k)` (Ghidra: a diagonal builder — sets `[0]/[4]/[8]` only) composed via `FUN_005ee800`, where
     `k = FUN_005edfa0(ftol(width · C1 · C2), camctrl+0x88) = (that·camctrl+0x88)>>16`, `width =

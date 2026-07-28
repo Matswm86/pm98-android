@@ -50,8 +50,12 @@ const MIN_PER_SEC := 3.6           # match minutes per real second (matches Matc
 # `match+0x1820` / `+0x1824`; a live match overrides them with its session's real dims.
 const DEF_HALF_LEN := 58.0
 const DEF_HALF_WID := 38.0
-# Marking geometry: the laws of the game. PM98 stores only the pitch's length and width, so
-# everything inside them is the standard layout — declared, and the same in every stadium.
+# Marking geometry — SOURCE-READ 2026-07-28, not declared any more. `FUN_0059a8c0` is the
+# simulador's pitch builder and every figure below is one of its literal 16.16 operands
+# (`docs/re/pitch_markings_re.md`). It builds them from `matchctx+0x1820` / `+0x1824` (the
+# session's own half-length and half-width) and mirrors each end by negation.
+#   0x92666 = 9.15   0x108000 = 16.5   0x1428f5 = 20.16   0x58000 = 5.5   0x928f5 = 9.16
+#   0xb0000 = 11.0   0x10000 = 1.0     0x1999   = 0.1 (the line width, used for every line)
 const CIRCLE_R := 9.15
 const PEN_DEPTH := 16.5
 const PEN_HALF_W := 20.16
@@ -59,6 +63,18 @@ const GOALAREA_DEPTH := 5.5
 const GOALAREA_HALF_W := 9.16
 const PEN_SPOT := 11.0
 const CORNER_R := 1.0
+## `0x1999` — the width of every painted line, and the amount the touchlines, goal lines and
+## halfway line overrun the corners (`iVar6*2 + 0x3332`, i.e. length + 2 * 0.1).
+const LINE_W := 0.1
+## `0x2640` of a 0x10000 turn = 53.79 degrees. The D is the arc of the 9.15 m circle about the
+## penalty spot between +/- this angle. The port used to DERIVE it as
+## `acos((16.5 - 11) / 9.15)` = 53.06 degrees; the binary's own figure is 0.73 degrees wider,
+## and the binary is the authority.
+const D_HALF_ANGLE := TAU * 0x2640 / 65536.0
+## `0x6664` x `0x3332` at `0xaccce` — the penalty and centre spots are 0.4 m x 0.2 m marks,
+## not dots, and the penalty one is centred at 10.8 + 0.2 = 11.0 m from the goal line.
+const SPOT_W := 0.4
+const SPOT_H := 0.2
 const GOAL_HALF_W := 3.66
 const GOAL_H := 2.44
 # Grass, sampled off the original capture (tools/re/refs/watch-2026-07-28/watch_02.png):
@@ -605,11 +621,13 @@ func _draw_pitch() -> void:
 	# a light band where the mower turned, sampled from the capture
 	_ground_quad(-hl - m, hl + m, hw - 2.0, hw + m, GRASS_LIGHT)
 
-	_line([Vector3(-hl, -hw, 0), Vector3(hl, -hw, 0)])
-	_line([Vector3(-hl, hw, 0), Vector3(hl, hw, 0)])
-	_line([Vector3(-hl, -hw, 0), Vector3(-hl, hw, 0)])
-	_line([Vector3(hl, -hw, 0), Vector3(hl, hw, 0)])
-	_line([Vector3(0, -hw, 0), Vector3(0, hw, 0)])
+	# `FUN_0059a8c0`'s own two loops: the touchlines step y by 2*halfWid from -halfWid, and the
+	# goal/halfway lines step x by halfLen from -halfLen (so x = -hl, 0, +hl — the halfway line
+	# falls out of the same loop). Both overrun the corners by one line width at each end.
+	for sy in [-1.0, 1.0]:
+		_line([Vector3(-hl - LINE_W, sy * hw, 0), Vector3(hl + LINE_W, sy * hw, 0)])
+	for sx in [-1.0, 0.0, 1.0]:
+		_line([Vector3(sx * hl, -hw - LINE_W, 0), Vector3(sx * hl, hw + LINE_W, 0)])
 	_arc(Vector2.ZERO, CIRCLE_R, 0.0, TAU, 48)
 	_spot(Vector2.ZERO)
 	for s in [-1.0, 1.0]:
@@ -623,10 +641,10 @@ func _draw_pitch() -> void:
 			Vector3(ax, GOALAREA_HALF_W, 0), Vector3(gx, GOALAREA_HALF_W, 0)])
 		var spot := Vector2(sgn * (hl - PEN_SPOT), 0.0)
 		_spot(spot)
-		# the D: the arc of radius 9.15 about the spot that lies OUTSIDE the penalty area
-		var half_ang := acos(clampf((PEN_DEPTH - PEN_SPOT) / CIRCLE_R, -1.0, 1.0))
+		# the D — the arc of radius 9.15 about the penalty spot, spanning the binary's own
+		# +/-0x2640 (`FUN_005d9640(&v, 0x92666, 0x1999, 0xffffd9c0, 0x2640)` and its mirror).
 		var base := 0.0 if sgn < 0.0 else PI
-		_arc(spot, CIRCLE_R, base - half_ang, base + half_ang, 20)
+		_arc(spot, CIRCLE_R, base - D_HALF_ANGLE, base + D_HALF_ANGLE, 20)
 		for sy in [-1.0, 1.0]:
 			_arc(Vector2(gx, sy * hw), CORNER_R, 0.0, TAU, 12)
 		_draw_goal(sgn)
@@ -718,10 +736,11 @@ func _arc(centre: Vector2, r: float, from_a: float, to_a: float, steps: int) -> 
 	_line(pts)
 
 
+## The centre and penalty marks. `FUN_0059a8c0` draws each as a `0x6664` x `0x3332`
+## (0.4 m x 0.2 m) ground quad, not a dot, so that is what this draws.
 func _spot(centre: Vector2) -> void:
-	var p := _cam.project(Vector3(centre.x, centre.y, 0.0))
-	draw_circle(p, maxf(1.0, _cam.scale_at(_cam.depth(Vector3(centre.x, centre.y, 0.0))) * 0.11),
-		LINE_COL)
+	_ground_quad(centre.x - SPOT_W * 0.5, centre.x + SPOT_W * 0.5,
+		centre.y - SPOT_H * 0.5, centre.y + SPOT_H * 0.5, LINE_COL)
 
 
 ## Fill `r` by repeating `tex` from its top-left (clips the last row/column).
