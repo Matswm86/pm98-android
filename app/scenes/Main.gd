@@ -2114,9 +2114,14 @@ func _mount_hub() -> void:
 		opp_id = int(fx[1]) if is_home else int(fx[0])
 		opp_name = str(GameDB.club(opp_id).get("name", ""))
 		opp_mgr = str(GameDB.club(opp_id).get("manager", "") if GameDB.club(opp_id).get("manager") != null else "")
+	# The circle's nation flags fire only when the two clubs' countries differ, so the hub
+	# needs both PAISES codes (game_db.json `countryCode`, the same index PMChrome.flag takes).
+	var own_country := int(GameDB.club(c.club_id).get("countryCode", -1))
+	var opp_country := int(GameDB.club(opp_id).get("countryCode", -1)) if opp_id >= 0 else -1
 	_hub.setup(c.club_name, c.league_name, c.season, c.cash,
 		"%d%s" % [c.position(), _ord_suffix(c.position())], c.club_id,
-		c.week + 1, opp_name, opp_id, is_home, c.manager_name, opp_mgr)
+		c.week + 1, opp_name, opp_id, is_home, c.manager_name, opp_mgr,
+		own_country, opp_country)
 	# Queued career alerts (the scout's "finished his search", ...) raise as the
 	# witnessed hub "PREMIER MANAGER 98" boxes once the hub is up (witness 78,
 	# docs/re/scout_screen_re.md).

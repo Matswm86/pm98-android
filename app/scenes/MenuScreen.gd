@@ -72,15 +72,14 @@ const CTRL_HITS := {
 	"continue": Rect2(552, 246, 86, 38),
 }
 
-# Central club CIRCLE (design space; boxes baked in menu_bg). The original
-# stacks the HOME side on top and styles the PLAYER's half dark-with-white-ink,
-# the CPU half pale-with-black-ink (witnessed: orig/73 + promanager 13 away =
-# pale top; ma_6 home = dark top). menu_bg bakes the away arrangement; the
-# hub/circle_home overlay (cut from ma_6) repaints the circle for home. The
-# controller chips sit outermost ("CPU" / "PL n" = the entry-screen player
+# Central club CIRCLE. The original stacks the HOME side on top and styles the
+# PLAYER's half dark-with-white-ink, the CPU half pale-with-black-ink (witnessed:
+# orig/73 + promanager 13 away = pale top; ma_6 home = dark top). Since 2026-07-28
+# NOTHING of the circle is baked into menu_bg: its interior is the game's own
+# RECURSOS FONDO3.BMP marble and the six bars are one of two patches drawn here.
+# The controller chips sit outermost ("CPU" / "PL n" = the entry-screen player
 # slot, witnessed "PL 1" across Premier AND 3rd-Div careers), the ► pointer
 # rides the player's manager bar. All anchors frame-measured off orig/73.
-const CIRCLE_HOME_POS := Vector2(195, 168)
 const ARROW_X := 238.0
 const ARROW_Y_TOP := 196.0                 # beside the top manager bar (home)
 const ARROW_Y_BOT := 302.0                 # beside the bottom manager bar (away)
@@ -93,20 +92,32 @@ const MGR_BASE_TOP := 211
 const MGR_BASE_BOT := 317
 const CLUB_BASE_TOP := 240
 const CLUB_BASE_BOT := 286
-# Witnessed kit boxes: top x195-244 y200-264, bottom x395-444 y255-318. The
-# original's free-floating 50x65 hub kit render is un-extracted (the panel
-# bank bakes a white panel behind it, unusable over the circle); the kits
-# sheet's figure content (bbox x1..45 y3..59 on the exact decode) draws 1:1
-# centred on the witnessed box (flagged approximation, shield-card precedent).
-const KIT_VIEW := Rect2(1, 3, 45, 57)      # the figure's content bbox
-const KIT_TOP_POS := Vector2(197, 204)     # 45x57 centred in x195..244 y200..264
-const KIT_BOT_POS := Vector2(397, 259)     # 45x57 centred in x395..444 y255..318
+# The circle widget's own screen rect, FUN_00436fb0(0xcd,0xad)/(0xdc,0xad) at
+# 0x547cad-0x547cd4. Everything inside it is now drawn LIVE over a menu_bg whose
+# circle interior is the game's own RECURSOS FONDO3.BMP: the six bars come from
+# circle_bars_top/bot.png (baked by tools/re/build_menu_bg_from_ref.py from the
+# binary's rects + the measured (index, screen-parity) dither), and the kits,
+# arrow and texts are drawn here.
+const CIRCLE_WIDGET := Vector2(220, 173)
+# The hub kit is the 24x32 NANOESC art, not a 50x65 render: FUN_00579710 loads
+# `DBDAT\NANOESC\eq96%04u.bmp` into club+0x18, and FUN_00549240 blits it at widget
+# (2,48) / (178,94) via FUN_004b7f60(0x10,0x40,0xff,..) at 0x549679 / 0x5496f6.
+const KIT_TOP_POS := Vector2(222, 221)     # CIRCLE_WIDGET + (2, 48)
+const KIT_BOT_POS := Vector2(398, 267)     # CIRCLE_WIDGET + (178, 94)
+# The NATION FLAGS, drawn by a sibling widget ABOVE and BELOW the ring and only when
+# the two clubs' countries differ (all-England fixtures show none: orig/07/73/78).
+# Measured on walkthrough 001_160008 (Man Utd vs F.C. Barcelona), whose flag ink spans
+# exactly x308..337 / y143..162 and y355..374 -- 30x20, the size every BANDERAS
+# `ba96%04u.bmp` decodes to.
+const FLAG_TOP_POS := Vector2(308, 143)
+const FLAG_BOT_POS := Vector2(308, 355)
 const C_INK_CPU := Color8(0, 0, 0)         # CPU half: black on the pale boxes
 const C_INK_PLAYER := Color8(255, 255, 255)  # player half: white on the dark boxes
 
 var _bg: Texture2D
 var _bezel: Texture2D            # marble fill for the landscape letterbox margins
-var _circle_home: Texture2D      # ma_6 circle overlay (player-home arrangement)
+var _bars_top: Texture2D         # the six circle bars, player on the HOME (top) side
+var _bars_bot: Texture2D         # ...and player AWAY (bottom side active)
 var _arrow_tex: Texture2D        # the player-side ► pointer (cut from orig/73)
 var _f8: Font
 var _f10: Font
@@ -126,6 +137,8 @@ var _week: int = 0
 var _opp_name: String = ""      # next-fixture opponent (circle)
 var _opp_id: int = -1
 var _opp_manager: String = ""   # next-fixture opponent manager (circle), if known
+var _country: int = -1          # the managed club's PAISES country code (circle flags)
+var _opp_country: int = -1      # the opponent's, for the differs-rule
 var _is_home: bool = true
 var _opp_tex: Texture2D
 var _press: String = ""        # action currently held down (for the highlight)
@@ -182,8 +195,10 @@ func _ready() -> void:
 	_bg = load("res://art/screens/menu_bg.png")
 	_bg_dim = load("res://art/screens/alert/menu_bg_dim.png")
 	_bezel = load("res://art/screens/fondo_marble.png")
-	if ResourceLoader.exists("res://art/screens/hub/circle_home.png"):
-		_circle_home = load("res://art/screens/hub/circle_home.png")
+	if ResourceLoader.exists("res://art/screens/hub/circle_bars_top.png"):
+		_bars_top = load("res://art/screens/hub/circle_bars_top.png")
+	if ResourceLoader.exists("res://art/screens/hub/circle_bars_bot.png"):
+		_bars_bot = load("res://art/screens/hub/circle_bars_bot.png")
 	if ResourceLoader.exists("res://art/screens/hub/arrow.png"):
 		_arrow_tex = load("res://art/screens/hub/arrow.png")
 	if ResourceLoader.exists("res://art/screens/dropdown/bar.png"):
@@ -204,7 +219,7 @@ func _ready() -> void:
 ## opponent + week + the opponent manager for the circle's lower slot), repaint.
 func setup(club: String, league := "", season := "", cash := 0, position := "", club_id := -1,
 		week := 0, opp_name := "", opp_id := -1, is_home := true, manager_name := "",
-		opp_manager := "") -> void:
+		opp_manager := "", country := -1, opp_country := -1) -> void:
 	_club = club
 	_league = league
 	_manager_name = manager_name
@@ -215,13 +230,15 @@ func setup(club: String, league := "", season := "", cash := 0, position := "", 
 	_opp_name = opp_name
 	_opp_manager = opp_manager
 	_is_home = is_home
+	_country = country
+	_opp_country = opp_country
 	if club_id != _club_id:
 		_club_id = club_id
-		var path := "res://art/kits/%d.png" % club_id
+		var path := "res://art/kits/nano/%d.png" % club_id
 		_kit_tex = load(path) if club_id >= 0 and ResourceLoader.exists(path) else null
 	if opp_id != _opp_id:
 		_opp_id = opp_id
-		var op := "res://art/kits/%d.png" % opp_id
+		var op := "res://art/kits/nano/%d.png" % opp_id
 		_opp_tex = load(op) if opp_id >= 0 and ResourceLoader.exists(op) else null
 	queue_redraw()
 
@@ -496,13 +513,13 @@ func _club_txt(baseline: int, t: String, col: Color) -> void:
 	draw_string(_f12, Vector2(px + 1, baseline), t, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, c)
 
 
-## A side's kit: the kits-sheet front view 1:1 (see KIT_TOP_POS note).
+## A side's kit: the 24x32 NANOESC sprite 1:1 at the binary's own anchor.
 func _kit(tex: Texture2D, pos: Vector2) -> void:
 	if tex == null:
 		return
 	if _modal_up():
 		tex = PMAlert.dim_texture(tex)
-	draw_texture_rect_region(tex, Rect2(pos, KIT_VIEW.size), KIT_VIEW)
+	draw_texture(tex, pos)
 
 
 func _draw() -> void:
@@ -531,9 +548,12 @@ func _draw() -> void:
 	# menu_bg bakes the away arrangement; home blits the ma_6 overlay first.
 	var have_opp := _opp_name != ""
 	var player_top := have_opp and _is_home
-	if player_top and _circle_home != null:
-		var ct := PMAlert.dim_texture(_circle_home) if dimmed else _circle_home
-		draw_texture(ct, CIRCLE_HOME_POS)
+	# The six bars. menu_bg's circle interior is the bare FONDO3 marble, so ONE of these
+	# two patches is always blitted -- there is no "baked arrangement" any more.
+	var bars := _bars_top if player_top else _bars_bot
+	if bars != null:
+		var bt := PMAlert.dim_texture(bars) if dimmed else bars
+		draw_texture(bt, CIRCLE_WIDGET)
 	var top_ink := C_INK_PLAYER if player_top else C_INK_CPU
 	var bot_ink := C_INK_CPU if player_top else C_INK_PLAYER
 	# db surnames render title-cased ("Ferguson"); the player's name as typed
@@ -557,6 +577,15 @@ func _draw() -> void:
 	if _arrow_tex != null:
 		var at := PMAlert.dim_texture(_arrow_tex) if dimmed else _arrow_tex
 		draw_texture(at, Vector2(ARROW_X, ARROW_Y_TOP if player_top else ARROW_Y_BOT))
+	# The nation flags: only when the two clubs' countries differ, which is the rule every
+	# witness shows (all-England fixtures draw none). Top slot = HOME side, as the bars are.
+	if have_opp and _country != _opp_country and _country >= 0 and _opp_country >= 0:
+		var top_flag := PMChrome.flag(_country if player_top else _opp_country)
+		var bot_flag := PMChrome.flag(_opp_country if player_top else _country)
+		for pair in [[top_flag, FLAG_TOP_POS], [bot_flag, FLAG_BOT_POS]]:
+			var ft: Texture2D = pair[0]
+			if ft != null:
+				draw_texture(PMAlert.dim_texture(ft) if dimmed else ft, pair[1] as Vector2)
 	PMChrome.set_dim(false)
 
 	# Press highlight over the held icon / bar / button (never under the modal).

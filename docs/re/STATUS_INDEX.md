@@ -8,11 +8,11 @@ what that delegation needs instead of 113 hand-written sentences: for every doc,
 the artefacts that can CONFIRM it, each of them checkable.
 
 * **132 docs**, 18 with a `Status:` line of their own.
-* **36** are covered by a `diff_*_parity.py` render-diff gate — the
+* **37** are covered by a `diff_*_parity.py` render-diff gate — the
   strongest evidence here, since a gate compares the app to a captured frame.
 * **65** have a headless `test_*.gd` suite; **90** cite MANAGER.EXE
   addresses, i.e. their claims are anchored in the binary and not only in frames.
-* **25** name their proof directly on an `Evidence:` line — for the plans,
+* **26** name their proof directly on an `Evidence:` line — for the plans,
   audits and M5 session notes, whose evidence is a banked capture, an oracle
   runner or a witness directory rather than a screen gate. Every path on those
   lines is checked to exist by this script.
@@ -93,7 +93,7 @@ nothing are the ones to distrust.
 | `goalscorers_screen_re.md` | — | — | `test_goalscorers_screen.gd` | `GoalScorersScreen.gd` | — | — | 4 |
 | `hack_three_forwards.md` | — | `diff_options_parity.py` | — | — | 16 | — | 2 |
 | `hack_unsackable.md` | — | `diff_options_parity.py` | — | — | 30 | 2 path(s) | 1 |
-| `hub_circle_re.md` | — | — | — | — | 25 | — | — |
+| `hub_circle_re.md` | — | `diff_hub_circle_parity.py` | — | — | 29 | 4 path(s) | — |
 | `injuries_screen_re.md` | — | `diff_injuries_row_parity.py` | `test_injuries_screen.gd` | `InjuriesScreen.gd` | 21 | — | 2 |
 | `injury_model_re.md` | — | — | — | — | 33 | — | — |
 | `insurance_economy_re.md` | — | — | `test_insurance.gd`, `test_insurance_screen.gd` | `Insurance.gd`, `InsuranceScreen.gd` | 24 | — | 2 |
@@ -138,7 +138,7 @@ nothing are the ones to distrust.
 | `seasonend_flow_re.md` | — | `diff_seasonend_year_parity.py` | — | — | 46 | — | — |
 | `seleccion_screen_re.md` | — | — | — | `SeleccionScreen.gd` | 1 | — | 1 |
 | `session_lineup_re.md` | — | — | — | — | 11 | — | 3 |
-| `shadow_blit_re.md` | yes | `diff_knockout_parity.py`, `diff_mantoman_parity.py` | `test_shadow_blit.gd` | `PMShadow.gd` | 5 | 1 path(s) | 1 |
+| `shadow_blit_re.md` | yes | `diff_hub_circle_parity.py`, `diff_knockout_parity.py` | `test_shadow_blit.gd` | `PMShadow.gd` | 5 | 1 path(s) | 1 |
 | `squad_number_re.md` | — | — | `test_squad_screen.gd` | `SquadScreen.gd` | — | — | — |
 | `squad_screen_re.md` | — | — | `test_squad_screen.gd` | `SquadScreen.gd` | 3 | — | 1 |
 | `stadium_screen_re.md` | yes | — | `test_stadium_screen.gd`, `test_stadium_works.gd` | `StadiumScreen.gd` | 26 | — | 5 |

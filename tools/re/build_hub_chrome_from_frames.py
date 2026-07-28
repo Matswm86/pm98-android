@@ -12,7 +12,6 @@ top; ma_6 home = dark top; promanager 13 away = pale top). The box fills are
 dithered mottles, so both arrangements ship as REAL pixels:
   menu_bg.png          the orig/73 frame (away arrangement) with ONLY the live
                        text/kit/arrow zones cleared
-  hub/circle_home.png  the ma_6 circle region, same zones cleared (home overlay)
   hub/ident_block.png  the manager/club identity block cut from the cleared bg
                        (PMChrome.draw_header blits it on every screen)
   hub/arrow.png        the player-side pointer cut from orig/73
@@ -84,7 +83,6 @@ BAND_CLEARS = [
 
 ARROW_RECT = (238, 302, 247, 322)  # the away-frame arrow (player side pointer)
 
-CIRCLE_HOME_RECT = (195, 168, 445, 352)
 
 
 def patch_rows(a: np.ndarray, src_x: tuple, zone: tuple) -> None:
@@ -148,10 +146,11 @@ def main() -> None:
     for zone, src in BAND_CLEARS:
         patch_rows(away, src, zone)
 
-    save(away, "menu_bg.png")
-
-    x0, y0, x1, y1 = CIRCLE_HOME_RECT
-    save(home[y0:y1, x0:x1].copy(), "hub/circle_home.png")
+    # NOT menu_bg.png any more, and NOT hub/circle_home.png: since 2026-07-28 the hub
+    # background and the circle's two bar schemes are built by
+    # tools/re/build_menu_bg_from_ref.py, which restores the circle interior from the
+    # game's own RECURSOS FONDO3.BMP instead of baking one career's bars into it. This
+    # script keeps only the ident block, which is unaffected.
 
     x0, y0, x1, y1 = IDENT_RECT
     save(away[y0:y1, x0:x1].copy(), "hub/ident_block.png")

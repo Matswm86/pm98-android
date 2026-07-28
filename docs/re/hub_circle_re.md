@@ -83,11 +83,14 @@ at 0x547cad-0x547cd4; add (220,173) for full-screen)
 | BOT chip      | (76,158) 50x14 | (75,157) 52x16 | (76,158,126,172) |
 
 - Kit bitmaps: TOP at (2,48), BOTTOM at (178,94) — `clubByIdx(+0x10)` →
-  `FUN_00579710()` bitmap, drawn via `FUN_004b7f60(0x10,0x40,0xff,…)`. The
-  witnessed art is the club's TWO-shirt kit group (home+away, diagonally
-  stacked, ~50x65 — e.g. claret+white for Villa top-left, white+navy for
-  Bolton bottom-right). Single asset per club; un-extracted (the app's
-  single-front-kit stand-in stays a flagged approximation).
+  `FUN_00579710()` bitmap, drawn via `FUN_004b7f60(0x10,0x40,0xff,…)` at
+  **0x549679 / 0x5496f6** (the anchors are the literals `mov [esp+0x2c],2 /
+  [esp+0x30],0x30` and `0xb2 / 0x5e`). **CORRECTED 2026-07-28: the asset is the
+  24x32 NANOESC kit, not a ~50x65 two-shirt group.** `FUN_00579710` caches
+  `club+0x18` from the format string at `0x662120` = `DBDAT\NANOESC\eq96%04u.bmp`
+  (its sibling `FUN_00579730` does `club+0x1c` from `DBDAT\RIDIESC\`, the 17x20
+  icon the knockout kit lists use). Screen anchors therefore (222,221) and
+  (398,267). Ported and shipped; the old 45x57 stand-in is deleted.
 - Arrow: `recursos\iconos\menuprincipal\flechanegra.bmp` (0x65e22c), loaded
   into the widget surface at init (0x546a7f); drawn at **(18,22)** when the
   active club is TOP, **(18,128)** when BOTTOM (first block of the render,
@@ -124,13 +127,24 @@ against orig/07 pixels:
 ("Indust18" (0x65e25c) is set at 0x546a6b on the SCREEN object, not this
 widget — it is NOT the club-band face.)
 
-### Nation flags (outside this function)
+### Nation flags (outside this function) — MEASURED AND BUILT 2026-07-28
 
 Witnessed above/below the circle only when the two clubs' NATIONS differ
 (Swansea↔Brighton: Wales/England, pro/13; Barcelona↔Man Utd: Spain/England,
 walkthrough 001_160008; all-England fixtures show none — orig/07/73/78).
-Drawn by a sibling widget; not decoded here. Manager-League domestic careers
-never show them.
+Drawn by a sibling widget, still not decoded — but the ART and the RECTS are
+now settled from the game's own files rather than estimated:
+
+* the sprite is `DBDAT\BANDERAS\ba96%04u.bmp` (`0x654a94`), and every one of
+  `BANDERAS.PKF`'s 127 entries decodes **30x20**;
+* on `001_160008` the flags land at **(308,143)** and **(308,355)** — and the
+  port's own `flag_022` (Spain) and `flag_030` (England) reproduce that frame at
+  **0 differing pixels** in both rects (`tools/re/diff_hub_circle_parity.py`).
+  The earlier "~55x35 at ~(295,138)/(295,348)" estimate is superseded.
+* TOP carries the HOME side's nation, BOTTOM the AWAY side's — the same
+  home/away rule the bars follow.
+
+Manager-League domestic careers still never show them.
 
 ## App implications (charter #2, hub geometry+content)
 
@@ -162,10 +176,23 @@ never show them.
 
 ## Un-chased
 
-- The two-shirt kit-group bitmap asset (which PKF entry `FUN_00579710`
-  resolves to) — needed to replace the front-kit stand-in.
-- The nation-flag sibling widget (asset + exact anchors + the differs-rule).
+- ~~The two-shirt kit-group bitmap asset~~ — CLOSED 2026-07-28: `NANOESC`, see above.
+- The nation-flag sibling widget's own CODE (the asset, both rects and the
+  differs-rule are closed above; what is not read is the function that draws it,
+  so "differ" is still the witnessed rule rather than a decoded predicate).
 - The DB manager-name table behind `[club+0x2c]` (full source-true manager
   list for all clubs; real_managers_1997.json covers witnessed ones only).
-- `FUN_005d4910` alpha-blend exactness (100/256 assumed linear; sampled
-  values fit, but the palette path was not stepped through).
+- ~~`FUN_005d4910` alpha-blend exactness~~ — SUPERSEDED 2026-07-28 by a
+  measurement. A linear 100/256 RGB blend does NOT reproduce the bars: fitted
+  against `RECURSOS.PKF` `FONDO3.BMP` (which IS this screen's background, circle
+  marble and rim included) the best alpha is 96..106 but only ~50 % of non-ink
+  pixels come out right even after snapping to MANAGER.PAL. The result is
+  instead an exact function of **(destination FONDO3 palette INDEX, (x+y)&1)** —
+  a 50/50 checkerboard on ABSOLUTE screen coordinates, the same rule
+  [`shadow_blit_re.md`](shadow_blit_re.md) found in `FUN_005d5220`. Held to
+  **100.00 %** on the chip and manager bars across 179 hub frames; the club bars
+  keep a small residual that is the club name's own drop shadow. The table is
+  learned and applied by `tools/re/build_menu_bg_from_ref.py`; what is still not
+  read is `FUN_005d4910` ITSELF, i.e. WHY the pair is what it is.
+
+Evidence: tools/re/diff_hub_circle_parity.py, tools/re/build_menu_bg_from_ref.py, app/scenes/MenuScreen.gd, app/tests/test_menu_screen.gd
