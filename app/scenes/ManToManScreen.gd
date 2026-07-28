@@ -426,6 +426,9 @@ func _draw_cells() -> void:
 func _draw_opp_panel(origin: Vector2, s: float) -> void:
 	var kit := PMChrome.kit(_opp_id)
 	if kit != null:
+		# The 48x64 kit is the OTHER shadowed blit on this screen: `FUN_0050fae0`
+		# pushes cap 0x84 where the markers push 0x63.
+		_shadow(kit, KIT_XY, PMShadow.CAP_KIT, "mtm_kit%d" % _opp_id)
 		draw_texture(kit, KIT_XY)
 	if _opp_name == "" or _f10 == null:
 		return
@@ -447,10 +450,27 @@ func _draw_opp_panel(origin: Vector2, s: float) -> void:
 	draw_set_transform(origin, 0.0, Vector2(s, s))
 
 
+## Lay the shadowed blit's spread stamp under `sprite` at `at`. The background is
+## the baked body, whose own (0,0) sits at screen (0, BODY_Y0); the dither parity is
+## resolved in screen space inside PMShadow.
+func _shadow(sprite: Texture2D, at: Vector2, cap: int, key: String) -> void:
+	if _body == null:
+		return
+	var dest := Vector2i(int(at.x), int(at.y))
+	var t := PMShadow.for_sprite("%s@%d,%d" % [key, dest.x, dest.y], _body,
+		Vector2i(0, BODY_Y0), sprite, dest, cap)
+	if t != null:
+		draw_texture(t, at)
+
+
 func _draw_markers() -> void:
+	# Both markers go through `FUN_0050f970` -> `FUN_004b7f60(0x10, 0x21, 0x63, ...)`,
+	# so each carries the shadowed blit's spread stamp under it (PMShadow).
 	if _linead != null:
+		_shadow(_linead, _d_rect().position, PMShadow.CAP_MARKER, "mtm_d")
 		draw_texture(_linead, _d_rect().position)
 	if _lineam != null:
+		_shadow(_lineam, _m_rect().position, PMShadow.CAP_MARKER, "mtm_m")
 		draw_texture(_lineam, _m_rect().position)
 	# the D / M letters are TEXT the original draws over the sprite
 	var d := _d_rect().position

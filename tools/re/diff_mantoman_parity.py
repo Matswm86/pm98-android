@@ -25,14 +25,19 @@ TWO DECLARED BUCKETS, both named and bounded:
 
   shadow  the three rects the original blits through `FUN_004b7f60` (the shadowed
           bitmap blit): the two 22x109 marking-line markers and the 48x64 opponent
-          kit. That pass is the SAME un-ported one the knockout gates already
-          bucket. What this session added to it (docs/re/mantoman_screen_re.md §7):
-          `FUN_004b7f60` -> `FUN_005cbea0(0x10, 0x21, id, rect, bmp, 0,0,0, 0x100)`
-          -> `FUN_005d66f0` (silhouette) / `FUN_005d6590` (tint) / `FUN_005d5220`
-          (composite), and the effect measured on these frames is a PALETTE-DARKENING
-          stamp offset right of the silhouette, applied once per overlapping stamp
-          (index 85 -> 116 -> 115 -> 114; 255 -> 7 -> 247 -> 134), which is NOT the
-          dilation model measured and rejected on 2026-07-28.
+          kit. **The pass itself is BUILT since 2026-07-28** — reversed leaf for leaf
+          and ported as `app/scripts/PMShadow.gd`, full record in
+          `docs/re/shadow_blit_re.md`. The bucket went 944 -> 92 px and what is left
+          in it is NOT the pass:
+
+            * the markers' 20 + 16 px are the D and M LETTERS, which the original
+              draws as TEXT over the sprite (a font-rasteriser difference, the same
+              class as the `plate` bucket);
+            * the kit's 56 px are pixels the original paints pure BLACK and the
+              port's `art/kits/<id>.png` carries as transparent — the 48x64 MINIESC
+              bank is missing content. Identical count on both careers (Aston Villa
+              and F.C. Barcelona), so it is structural to the bank, not to a club,
+              and it is tracked under the 48x64 kit entry in `docs/REMAINING.md`.
 
 Both buckets are reported separately with their own pixel counts; neither may
 touch anything outside its own rect.
