@@ -106,8 +106,13 @@ var _cam := Pm98Camera.new()
 var _half_len := DEF_HALF_LEN
 var _half_wid := DEF_HALF_WID
 
-var _base: Texture2D
-var _kit: Texture2D
+## The recolour state, built by `JugKit` from the clubs' own `P96A`/`P96B` ramps.
+## `_kits[side]` = the team dictionary; `_squad[side][slot]` = {pattern, skin, hair} for the
+## fielded player, empty on the timeline path where no XI exists.
+var _pal := PackedColorArray()
+var _kits: Array = [{}, {}]
+var _squad: Array = [[], []]
+
 var _ball: Texture2D
 var _arrow: Texture2D
 var _crowd: Texture2D
@@ -153,10 +158,10 @@ var _live_feed: Array = []         # goal lines the engine raised, newest last
 
 
 func _ready() -> void:
-	# The engine-layout JUG bank (74 kinds x [direction][phase], 4211 frames). The old
-	# player_base/player_kit pair was the transposed 24-frame slice and is gone.
-	_base = _tex("res://art/match/jug_base.png")
-	_kit = _tex("res://art/match/jug_kit.png")
+	# The engine-layout JUG bank is 8-bit PALETTE INDICES (`jug_index.bin`), exactly as the
+	# original keeps it; `JugKit` builds the per-player 256-byte LUT and `JugRender.composite`
+	# runs `FUN_005d34a0`'s remap. Nothing about a player is coloured at bake time any more.
+	_pal = JugKit.palette(0)
 	_ball = _tex("res://art/match/ball.png")
 	_arrow = _tex("res://art/match/arrow.png")
 	_crowd = _tex("res://art/match/crowd.png")
@@ -196,6 +201,7 @@ func setup(home_name: String, away_name: String, _hg: int, _ag: int, lines: Arra
 	_lines = lines
 	_home_col = _club_colour(home_id, C_HOME_DEF)
 	_away_col = _club_colour(away_id, C_AWAY_DEF)
+	_build_kits(home_id, away_id)
 	# Keep the two teams visually distinct even when both escudos read similar.
 	if _col_dist(_home_col, _away_col) < 0.30:
 		_away_col = C_AWAY_DEF if _col_dist(_home_col, C_AWAY_DEF) > 0.30 else C_HOME_DEF
@@ -226,12 +232,71 @@ func set_live(live: Pm98LiveMatch) -> void:
 	_live_score = Vector2i.ZERO
 	_minute = 0.0
 	_playing = true
+	_build_squad_kits()
 	queue_redraw()
 
 
 ## The live match, or null when this view is running a finished timeline.
 func live_match() -> Pm98LiveMatch:
 	return _live
+
+
+## `FUN_005b63e0`, once per side. The away side wears its CHANGE strip when its own class byte
+## equals the home side's — the binary's `param_2 == 1 && matchctx+0x742 == team+0x2c6`, where
+## `matchctx+0x742` is literally team 0's `+0x2d6` (`0x46c + 0x2d6 == 0x742`).
+##
+## The keeper strips follow the same function's re-roll rule; its draw comes from the DISPLAY
+## LCG, whose stream this port does not reproduce, so the seed is the fixture's own club ids.
+## That divergence is declared here and in `JugKit.keeper_kit`.
+func _build_kits(home_id: int, away_id: int) -> void:
+	_squad = [[], []]
+	if not JugKit.load_tables():
+		_kits = [{}, {}]
+		return
+	var home := JugKit.team_kit(home_id)
+	var away := JugKit.team_kit(away_id, int(home.get("cls", -1)) if not home.is_empty() else -1)
+	var hk := JugKit.keeper_kit(home_id, int(home.get("cls", -1)) if not home.is_empty() else -1)
+	var hcls: Array = []
+	if not home.is_empty():
+		hcls.append(int(home["cls"]))
+	if not hk.is_empty():
+		hcls.append(int(hk["cls"]))
+	var ak := JugKit.keeper_kit(away_id, int(away.get("cls", -1)) if not away.is_empty() else -1,
+		hcls)
+	if not home.is_empty():
+		home["keeper"] = hk
+	if not away.is_empty():
+		away["keeper"] = ak
+	_kits = [home, away]
+
+
+## `FUN_005a2830`, once per fielded player: his own copy of the team's shirt pattern with his
+## SHIRT NUMBER stamped into it, plus his skin and hair ramps. The three inputs are the lineup
+## record's `+0x42` / `+0x2c` / `+0x30`, which are the .DBC's `+0xf8` / `+0x16` / `+0x17`
+## carried through verbatim (`Pm98LineupFeeder`).
+func _build_squad_kits() -> void:
+	_squad = [[], []]
+	if _live == null or _live.match_state.is_empty():
+		return
+	for side in 2:
+		var team: Dictionary = (_live.match_state["sim"] as Array)[side]
+		var lineup: Dictionary = team[0x9C] if team.get(0x9C) is Dictionary else {}
+		var slots: Array = lineup.get("slots", [])
+		var kit: Dictionary = _kits[side] if side < _kits.size() else {}
+		var rows: Array = []
+		for slot in slots.size():
+			if not (slots[slot] is Dictionary):
+				rows.append({"pattern": PackedByteArray(), "skin": PackedByteArray(),
+					"hair": PackedByteArray()})
+				continue
+			var rec: Dictionary = slots[slot]
+			var sh := JugKit.skin_hair(int(rec.get(0x2C, 0)), int(rec.get(0x30, 0)))
+			var pat := PackedByteArray()
+			if not kit.is_empty():
+				pat = JugKit.stamp_number(kit["pattern"], int(rec.get(0x42, slot + 1)),
+					int(kit["cls"]), int(kit["ink"]))
+			rows.append({"pattern": pat, "skin": sh["skin"], "hair": sh["hair"]})
+		_squad[side] = rows
 
 
 # ---- data: identical pure functions to MatchScreen, so the views agree -----
@@ -705,13 +770,15 @@ func _draw_teams_live() -> void:
 		var w := Vector3(Pm98Camera.fx(int(p["x"])), Pm98Camera.fx(int(p["y"])),
 			Pm98Camera.fx(int(p["z"])))
 		drawn.append({"w": w, "col": _home_col if side == 0 else _away_col,
-			"kind": int(p["kind"]), "facing": int(p["facing"]), "phase": int(p["phase"])})
+			"kind": int(p["kind"]), "facing": int(p["facing"]), "phase": int(p["phase"]),
+			"side": side, "slot": int(p["slot"])})
 		if bool(p["carrying"]):
 			carrier = w
 	# painter's order: farthest first, so a near player overlaps a far one
 	drawn.sort_custom(func(a, b): return (a["w"] as Vector3).y > (b["w"] as Vector3).y)
 	for d in drawn:
-		_draw_player(d["w"], d["col"], int(d["kind"]), int(d["facing"]), int(d["phase"]))
+		_draw_player(d["w"], d["col"], int(d["kind"]), int(d["facing"]), int(d["phase"]),
+			int(d["side"]), int(d["slot"]))
 	if carrier != Vector3.ZERO:
 		_draw_arrow(carrier)
 
@@ -758,7 +825,7 @@ func _draw_side(side: int, form: Array, col: Color, ball: Vector3, has_ball: boo
 		var idx: int = slot0 + i
 		var st: Dictionary = _anim[idx] if idx < _anim.size() and _anim[idx] is Dictionary \
 			else {"kind": 3, "phase": 0}
-		_draw_player(w, col, int(st["kind"]), face, int(st["phase"]))
+		_draw_player(w, col, int(st["kind"]), face, int(st["phase"]), side, i)
 	return poss[nearest_i] if nearest_i >= 0 else Vector3.ZERO
 
 
@@ -776,7 +843,8 @@ func _travel_angle(prev_pos, pos: Vector3) -> int:
 ## One player as the engine draws him: the JUG frame `FUN_005a5460` would pick, sized from the
 ## frame's OWN anchor and the `0x1b333/0x30` world-height scale, standing on the ground at his
 ## world position, with the drop shadow the original casts.
-func _draw_player(w: Vector3, col: Color, kind: int, facing: int, phase: int) -> void:
+func _draw_player(w: Vector3, col: Color, kind: int, facing: int, phase: int,
+		side := -1, slot := -1) -> void:
 	var d := _cam.depth(w)
 	if d <= _cam.MIN_DEPTH:
 		return
@@ -805,10 +873,44 @@ func _draw_player(w: Vector3, col: Color, kind: int, facing: int, phase: int) ->
 	draw_circle(Vector2(foot.x, foot.y), maxf(1.0, dw * 0.36), Color(0, 0, 0, 0.30))
 	if bool(r["flip"]):
 		dst = Rect2(dst.position.x + dst.size.x, dst.position.y, -dst.size.x, dst.size.y)
-	if _kit != null:
-		draw_texture_rect_region(_kit, dst, src, col)
-	if _base != null:
-		draw_texture_rect_region(_base, dst, src, Color.WHITE)
+	var tex := _player_sprite(int(r["frame"]), int(r["map"]), bool(r["flip"]), side, slot)
+	if tex != null:
+		draw_texture_rect_region(tex, dst, src, Color.WHITE)
+	else:
+		draw_circle(_cam.project(w), maxf(1.0, px * 0.25), col)
+
+
+## `FUN_005a5460:519-556` then `FUN_005d34a0` — build this player's 256-byte LUT and remap the
+## frame through it. Slot 0 is the goalkeeper, who wears the team's `palpor` strip and whose
+## shirt pattern is NOT painted (the binary gates that pass on `actor+0x2d4 = (slot != 0)`).
+## With no XI (the timeline path) the team LUT's own defaults stand: `P96A0000.DAT` already
+## carries a skin ramp at 1..8 and a hair ramp at 0x15..0x18, so nothing is invented.
+func _player_sprite(frame: int, map_id: int, flip: bool, side: int, slot: int) -> Texture2D:
+	if _pal.size() < 256 or side < 0 or side >= _kits.size():
+		return null
+	var kit: Dictionary = _kits[side]
+	if kit.is_empty():
+		return null
+	var keeper := slot == 0
+	var team_lut: PackedByteArray = kit["lut"]
+	if keeper:
+		var kk: Dictionary = kit.get("keeper", {})
+		if kk.is_empty():
+			return null
+		team_lut = kk["lut"]
+	var pattern := PackedByteArray()
+	var skin := PackedByteArray()
+	var hair := PackedByteArray()
+	var rows: Array = _squad[side] if side < _squad.size() else []
+	if slot >= 0 and slot < rows.size():
+		var row: Dictionary = rows[slot]
+		pattern = row["pattern"]
+		skin = row["skin"]
+		hair = row["hair"]
+	elif not keeper:
+		pattern = kit["pattern"]
+	var lut := JugKit.draw_lut(team_lut, pattern, skin, hair, map_id, flip, not keeper)
+	return JugRender.composite(frame, lut, _pal)
 
 
 func _draw_ball(ball: Vector3) -> void:

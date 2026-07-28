@@ -122,6 +122,99 @@ func _initialize() -> void:
 	# Perspective: the same 1.63 m man is bigger when nearer.
 	ok = _assert(cam.scale_at(20.0) > cam.scale_at(60.0), "nearer is larger") and ok
 
+	# --- the kit recolour chain (docs/re/kit_palette_re.md) ----------------------------
+	ok = _assert(JugKit.load_tables(), "the kit tables load") and ok
+	var pal := JugKit.palette(0)
+	ok = _assert(pal.size() == 256, "SIMUL0.PAL is 256 entries") and ok
+	# The palette's six-entry colour bands are what make a pattern cell a RAMP BASE.
+	ok = _assert(pal[0x8C] == Color8(2, 2, 247) and pal[0x91] == Color8(2, 2, 97),
+		"0x8c..0x91 is the blue ramp, bright first") and ok
+	ok = _assert(pal[0x80] == Color8(229, 0, 0) and pal[0x85] == Color8(79, 0, 0),
+		"0x80..0x85 is the red ramp") and ok
+
+	# Manchester Utd. (40) vs Liverpool (42): both first-choice kits are red, so the away
+	# side must fall to its P96B change strip — FUN_005b63e0's own collision test.
+	var mu := JugKit.team_kit(40)
+	var lv := JugKit.team_kit(42, int(mu["cls"]))
+	ok = _assert(not mu.is_empty() and not lv.is_empty(), "both clubs resolve a ramp") and ok
+	ok = _assert(mu["lut"].size() == 256 and mu["pattern"].size() == 128,
+		"a team kit is a 256-byte LUT and a 16x8 pattern") and ok
+	ok = _assert(bool(lv["change"]), "the away side wears its change strip on a class clash") and ok
+	ok = _assert(int(mu["ink"]) == 0x67 or int(mu["ink"]) == 0x7F,
+		"the number ink is the palette-green test's 0x67 or 0x7f") and ok
+
+	# The 48 club entries land on LUT slots 9..56 and nowhere else.
+	var base := JugKit.team_kit(-1)          # no ramp -> the P96A0000 fallback
+	var moved: Array = []
+	for i in 256:
+		if int(base["lut"][i]) != int(mu["lut"][i]):
+			moved.append(i)
+	var in_band := true
+	for i in moved:
+		if int(i) < 9 or int(i) > 56:
+			in_band = false
+	ok = _assert(in_band, "a club ramp only ever writes LUT slots 9..56") and ok
+
+	# The number stamp must change the pattern's RIGHT half (the back of the shirt) only.
+	var stamped := JugKit.stamp_number(mu["pattern"], 9, int(mu["cls"]), int(mu["ink"]))
+	var left_same := true
+	var right_diff := false
+	for row in 8:
+		for col in 16:
+			var i := row * 16 + col
+			if int(stamped[i]) != int(mu["pattern"][i]):
+				if col < 8:
+					left_same = false
+				else:
+					right_diff = true
+	ok = _assert(left_same, "the number never touches the front of the shirt") and ok
+	ok = _assert(right_diff, "the number does mark the back of the shirt") and ok
+
+	# Skin and hair: three ramps, and hair index 1 is the BALD redirect to skin + 6.
+	var sh1 := JugKit.skin_hair(1, 3)
+	var sh2 := JugKit.skin_hair(2, 3)
+	ok = _assert(sh1["skin"][0] == 72 and sh2["skin"][0] == 88,
+		"the three skin ramps are 72../88../80..") and ok
+	var bald := JugKit.skin_hair(1, 2)
+	ok = _assert(bald["hair"] == JugKit.skin_hair(1, 7)["hair"],
+		"hair index 1 is BALD and redirects to skin + 6") and ok
+	ok = _assert(int(bald["skin"][6]) == int(bald["skin"][5])
+		and int(bald["skin"][7]) == int(bald["skin"][5]),
+		"the bald branch flattens the two darkest skin shades") and ok
+
+	# The per-draw LUT: skin lands at 1..8, hair at 0x15..0x18, and the pattern pass writes
+	# only slots JUGCAM names for this frame's map.
+	var lut := JugKit.draw_lut(mu["lut"], stamped, sh1["skin"], sh1["hair"], 1, false)
+	ok = _assert(int(lut[1]) == 72 and int(lut[8]) == 79, "skin lands on LUT 1..8") and ok
+	ok = _assert(int(lut[0x15]) == int(sh1["hair"][0]), "hair lands on LUT 0x15") and ok
+	# The mirror is a WITHIN-HALF column swap (`((col & 8) - (col & 7)) + 7`), applied to the
+	# JUGCAM lookup only. A pattern that differs across a half must therefore recolour
+	# differently when flipped; Man Utd's own solid shirt would not prove it.
+	var asym := PackedByteArray()
+	asym.resize(128)
+	for row in 8:
+		for col in 16:
+			asym[row * 16 + col] = 0x80 if col in [0, 8] else 0x8C
+	var lut_a := JugKit.draw_lut(mu["lut"], asym, sh1["skin"], sh1["hair"], 1, false)
+	var lut_m := JugKit.draw_lut(mu["lut"], asym, sh1["skin"], sh1["hair"], 1, true)
+	ok = _assert(lut_a != lut_m, "the mirrored draw remaps a different JUGCAM column") and ok
+
+	# And the whole chain must produce a real sprite through the index bank.
+	var res := JugRender.resolve(1, 0, 0)
+	ok = _assert(not res.is_empty() and int(res["map"]) >= 0 and int(res["map"]) <= 71,
+		"a resolved frame carries its JUGCAM map id") and ok
+	var tex := JugRender.composite(int(res["frame"]), lut, pal)
+	ok = _assert(tex != null, "the frame composites through the LUT") and ok
+	if tex != null:
+		var img := tex.get_image()
+		var kit_px := 0
+		for y in img.get_height():
+			for x in img.get_width():
+				var c := img.get_pixel(x, y)
+				if c.a > 0.5 and c.r > 0.55 and c.g < 0.25 and c.b < 0.25:
+					kit_px += 1
+		ok = _assert(kit_px > 20, "United's sprite carries real RED kit pixels") and ok
+
 	print("\n%s" % ("ALL PASS" if ok else "FAILURES ABOVE"))
 	quit(0 if ok else 1)
 

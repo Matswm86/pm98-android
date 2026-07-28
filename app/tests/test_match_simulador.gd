@@ -13,8 +13,9 @@ func _initialize() -> void:
 func _run() -> void:
 	var ok := true
 
-	for path in ["res://art/match/jug_base.png", "res://art/match/jug_kit.png",
-			"res://art/match/jug_bank.json",
+	for path in ["res://art/match/jug_index.bin", "res://art/match/jug_bank.json",
+			"res://art/match/jugcam.bin", "res://art/match/kitpal.bin",
+			"res://art/match/simulpal.bin", "res://art/match/numcam.bin",
 			"res://art/match/ball.png", "res://art/match/arrow.png"]:
 		ok = _assert(ResourceLoader.exists(path) or FileAccess.file_exists(path),
 			"real DATSIM sprite present: %s" % path) and ok

@@ -23,6 +23,12 @@ extends RefCounted
 ## measured against the ball-yaw word `matchctx+0x181e` rather than the camera.
 
 const BANK_PATH := "res://art/match/jug_bank.json"
+const INDEX_PATH := "res://art/match/jug_index.bin"
+
+## Composited sprites are cached by (frame, LUT). A running player cycles 14 phases per
+## direction, so the working set is small and steady-state redraws are pure cache hits; the cap
+## exists so a long match cannot grow it without bound.
+const CACHE_CAP := 1536
 
 ## `FUN_005a5460`'s direction term is `facing - cameraYaw + 0x4000`. The camera yaw is 0x4000
 ## (a quarter turn), which is DERIVED, not assumed, from two things that agree:
@@ -39,6 +45,10 @@ const BANK_PATH := "res://art/match/jug_bank.json"
 const CAMERA_YAW := 0x4000
 
 static var _bank: Dictionary = {}
+static var _index := PackedByteArray()
+static var _index_tried := false
+static var _cache: Dictionary = {}
+static var _cache_order: Array = []
 
 
 ## Load (once) the tables baked out of MANAGER.EXE. Returns {} if the bake is missing, which
@@ -55,6 +65,82 @@ static func bank() -> Dictionary:
 	if parsed is Dictionary:
 		_bank = parsed
 	return _bank
+
+
+## The 8-bit PALETTE INDICES of every frame, packed contiguously at each frame's own visible
+## width. This is what the original keeps in memory too — it never stores a coloured player.
+static func index_bank() -> PackedByteArray:
+	if _index_tried:
+		return _index
+	_index_tried = true
+	var f := FileAccess.open(INDEX_PATH, FileAccess.READ)
+	if f == null:
+		push_warning("JugRender: %s missing; players cannot be drawn" % INDEX_PATH)
+		return _index
+	_index = f.get_buffer(f.get_length())
+	var want := int(bank().get("index_bytes", 0))
+	if want > 0 and _index.size() != want:
+		push_warning("JugRender: %s is %d bytes, bank says %d" % [INDEX_PATH, _index.size(), want])
+	return _index
+
+
+## One frame's sprite, coloured through `lut` and `pal` — `FUN_005d34a0`'s per-pixel remap,
+## then the palette. Cached on (frame, LUT), so a repeating run cycle costs nothing after the
+## first pass. Returns null when the bank is missing; callers must not substitute a guess.
+static func composite(frame: int, lut: PackedByteArray, pal: PackedColorArray) -> Texture2D:
+	var frames: Array = bank().get("frames", [])
+	if frame < 0 or frame >= frames.size() or lut.size() < 256 or pal.size() < 256:
+		return null
+	var key := "%d:%d" % [frame, hash(lut)]
+	var hit: Variant = _cache.get(key)
+	if hit != null:
+		return hit as Texture2D
+	var src := index_bank()
+	if src.is_empty():
+		return null
+	var fr: Dictionary = frames[frame]
+	var w := int(fr["w"])
+	var h := int(fr["h"])
+	var off := int(fr["off"])
+	if w <= 0 or h <= 0 or off + w * h > src.size():
+		return null
+	var rgba := PackedByteArray()
+	rgba.resize(w * h * 4)
+	# Precompute the 256 mapped RGBA quads once; the inner loop is then a straight copy.
+	var r8 := PackedByteArray(); r8.resize(256)
+	var g8 := PackedByteArray(); g8.resize(256)
+	var b8 := PackedByteArray(); b8.resize(256)
+	for i in 256:
+		var c: Color = pal[lut[i]]
+		r8[i] = int(c.r8)
+		g8[i] = int(c.g8)
+		b8[i] = int(c.b8)
+	var o := 0
+	for i in w * h:
+		var v := int(src[off + i])
+		if v == 0:
+			o += 4
+			continue
+		rgba[o] = r8[v]
+		rgba[o + 1] = g8[v]
+		rgba[o + 2] = b8[v]
+		rgba[o + 3] = 255
+		o += 4
+	var tex := ImageTexture.create_from_image(Image.create_from_data(w, h, false,
+		Image.FORMAT_RGBA8, rgba))
+	if _cache_order.size() >= CACHE_CAP:
+		var oldest: String = _cache_order.pop_front()
+		_cache.erase(oldest)
+	_cache[key] = tex
+	_cache_order.append(key)
+	return tex
+
+
+## Drop every composited sprite — called when a match ends so one fixture's kits do not keep
+## another's memory alive.
+static func clear_cache() -> void:
+	_cache.clear()
+	_cache_order.clear()
 
 
 static func kind_count() -> int:
@@ -180,9 +266,11 @@ static func resolve(kind: int, facing: int, phase: int) -> Dictionary:
 	return {
 		"frame": idx,
 		"flip": bool(dd["flip"]),
-		"rect": Rect2(int(fr["x"]), int(fr["y"]), int(fr["w"]), int(fr["h"])),
+		"rect": Rect2(0, 0, int(fr["w"]), int(fr["h"])),
 		"ax": int(fr["ax"]),
 		"ay": int(fr["ay"]),
+		# `.PGF` header `h5` -> frame slot `+0x10`: the JUGCAM.IND shirt-map this frame wears.
+		"map": int(fr["map"]),
 	}
 
 
