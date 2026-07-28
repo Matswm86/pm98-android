@@ -69,6 +69,30 @@ half-angle is the binary's own `0x2640` = 53.79 deg**, not the derived
 not dots. The touchlines / goal lines / halfway line now come out of the engine's own two loops.
 Still not source-read, and said so: the grass shading.
 
+### ⚠ FOUND 2026-07-28 FROM MATS'S OWN REPORT — the MANAGER MENU hub circle is broken
+
+A shipped, user-visible defect on the game's MAIN screen, not previously on any list.
+
+* **`app/art/screens/menu_bg.png` is not reproducible from its own baker.** Re-running
+  `tools/re/build_menu_bg_from_ref.py` against `tools/re/refs/menuprincipal_ma_6.png` changes
+  **26,888 px below the header band** — so the shipped asset is stale or hand-edited.
+* **In the shipped asset the circle's white rim is BROKEN and the club bars run OUTSIDE the
+  ring.** The reference frame's ring is complete and its bars are inset. Re-baking fixes that
+  much.
+* **But re-baking alone is not the fix.** The baker's `CREST_SPOTS =
+  [(222,208,258,258), (394,256,426,306)]` are 36x50 / 32x50 filled with a FLAT `(108,120,150)`,
+  and they land on the bar frames and the rim. The hub's kit is the **24x32 NANOESC** art
+  (verified: `NANOESC.PKF` entries decode 24x32, a shirt+shorts pair; the 48x64 MINIESC pair is
+  what the match view uses) over a fine DITHERED marble — so the blocks are both oversized and
+  the wrong texture. Fixing it needs the widget's SCREEN ORIGIN read out of the binary so
+  `hub_circle_re.md`'s own anchors (widget `(2,48)` top, `(178,94)` bottom) resolve to exact
+  rects. **Deliberately not guessed**, and the shipped asset was left untouched rather than
+  replaced with a differently-wrong one.
+* **The nation FLAGS are absent.** When the clubs' nations differ the original draws one above
+  and one below the ring — `001_160008.png` (Man Utd vs F.C. Barcelona) has the Spanish flag at
+  ~(295,138) and the English at ~(295,348), ~55x35 each. `hub_circle_re.md` lists the flag
+  sibling widget as un-chased; the port draws neither.
+
 ### The full suite sweep — RUN, and clean
 
 The "232-file manual pre-release step" was run end to end: **all 241 `test_*.gd` files**,
