@@ -1,5 +1,164 @@
 # PM98 Android — remaining-work inventory (refreshed 2026-07-28)
 
+## 0aaaaaaaaaa. Closed 2026-07-28 (session s78) — THE CUP TV FEE, THE CAMERA MOTION, THE KIT RESIDUAL
+
+Mats's brief was the whole s77 carried list, "get the game done now". Six items moved. Three
+did not, and they are named at the end with the reason.
+
+### ⭐ THE CUP channelTV FEE — CLOSED, and the search that had failed was the fault
+
+`finance_screen_re.md` concluded "there is no `mov [reg+0x290], <value>` anywhere in `.text`
+… so the producer must reach the field through an aliased base". **Both halves were wrong.**
+The earlier scan was a LINEAR sweep, and this image has data interleaved in `.text`, so it
+desynchronised and walked past whole functions. Decoding **per function entry** finds 80
+`disp == 0x290` operands where that sweep reported 40 — and twenty-four of them are the
+producers. The aliased-base theory is not merely unproven but refuted:
+`tools/re/scan_alias_writes.py` does that search properly (a forward abstract interpretation
+tracking `(root, offset)` per register) and finds nothing.
+
+Each competition class writes the fee itself as an imm32, gated on `club+0x5c != 0xffff` (the
+managed club). At 200 internal = £1 the whole table falls out, and both previously unsourced
+captured cards are explained:
+
+| competition | writer | £ |
+|---|---|---|
+| Premier / First / **Second and Third (ONE shared jump-table arm)** | `FUN_00417240`, table @`0x417570` | 90,000 / 45,000 / **35,000 / 35,000** |
+| European Cup · U.E.F.A. Cup · Cup Winners' Cup · European Supercup | `0x454cfd` · `0x45c8e8` · `0x461f77` · `0x463dc0` | **375,000** each |
+| Charity Shield · Intercontinental Cup | `0x405b18` · `0x43275d` | **187,500** each |
+| **F.A. Cup · Coca-Cola Cup** | **none** | **0** |
+
+**And that last row is a RESULT, not a gap.** Neither the `FACUP` nor the `CCCUP` class block
+contains a single write to `club+0x290`, by displacement or through any alias chain. Five
+driven careers never saw a domestic-cup channelTV card because **the game never raises one**.
+The port's long-standing "cup ties pay £0 and say so" was already correct; it stops being a
+flagged gap. A sixth four-hour drive was not needed and is not needed.
+
+Record: `docs/re/channeltv_fee_re.md`. Reproduce every row from the bytes:
+`python tools/re/dump_tv_fee_table.py`. Ported as `FinanceModel.TV_FEE_INTERNAL` (the raw
+imm32s) + `TV_FEE` (the same in £) + `tv_fee()`; the Supercup and Intercontinental now book
+their TELEVISION line the way the Charity Shield already did. Gate:
+`test_channeltv_screen.gd`, which pins every row, the ×200 relation and both proved zeros.
+
+### THE CAMERA MOTION — `camera_re.md` §7 CLOSED, ported, and rendering
+
+All three prerequisites §7 listed are read out of the image (`docs/re/camera_motion_re.md`),
+and **two things `camera_re.md` itself asserted turned out to be wrong**:
+
+* **"eight arms, one per mode"** — the guard is `cmp eax, 0xa / ja` and the jump table at
+  `0x59830c` has **ELEVEN** entries. The eight are the compass ring around the ground; modes
+  8 and 9 are two low goal-line angles and mode 10 is a free camera.
+* **"`eye = lookAt - dir*distance`"** — `+0x48` is an ANCHOR POINT, not a unit direction.
+  The binary normalises `lookAt - anchor` first (`FUN_005ee200`) and `+0x78` is the eye's
+  distance **from the look-at**. Read literally, that formula would put the eye kilometres
+  away.
+
+Also newly read: the rate is `ftol(dt_ms * 0.003 * 65536)` — a 4.8 %-per-frame ease, not a
+speed; the anchor's far path is an **ARC**, a polar lerp about the look-at with the angle
+delta sign-extended to 16 bits first (which is what makes it take the short way round); the
+look-at box is inset 2 m in X/Y before its clamp; and the restart cut sets a **distance**
+(9 m, or 5.5 m on a goal) as well as a height.
+
+`app/scripts/Pm98CamCtrl.gd` is that controller in integer 16.16 on `Pm98Trig`'s own LUTs,
+fed by `Pm98LiveMatch.camera_state()` off the live `matchctx` and run once per display frame
+by `MatchSimulador`. **Verified three ways:** 70 arithmetic identities
+(`app/tests/test_cam_ctrl.gd`); a run on the byte-exact engine (the camera moves, and the eye
+never leaves the box the driver rebuilds each frame); and **the REAL APP under Xvfb + GL**
+(`tools/re/refs/cammotion-2026-07-28/`), where the grass/hoarding seam lands at rows
+**77 / 79 / 80** against the original's own five captures at **82 / 65 / 90 / 82**. Same band,
+moving frame to frame — corroboration, not a pixel match, and the strongest check five
+unknown instants of a live match can support.
+
+Declared divergences are in `camera_motion_re.md` §6: the rotation is applied as a DELTA to
+the fitted pose rather than absolutely (the app's projection is the axis-aligned reduction the
+fit was solved against, and nothing can re-fit a moving one); the camera MODE is a choice
+(mode 6, the only arm that puts the eye on -Y as the capture shows) because `session+0xfe0`
+is not modelled; the ball-anchor look-at falls back to the ball itself; and the scripted shot
+paths are not modelled at all.
+
+### ⭐ THE "48x64 MINIESC" RESIDUAL — CLOSED, and it was never the kit bank
+
+The MAN-TO-MAN kit rect now diffs at **0 px on both careers**. The cause was **one column of
+a bake**: the vertical club plate is NINETEEN columns of black (`x243..x261`), not the twenty
+its panel-relative box suggests, and `build_mantoman_chrome_from_frames.py` filled `x262`
+black too. `x262` is kit-local `x = 33` — the exact column of the residual.
+
+| bucket | before | after |
+|---|---|---|
+| kit rect, both careers | 15 px | **0 px** |
+| shadow-pass bucket | 50 / 51 px | **36 px** (the D and M letter glyphs, unchanged) |
+| plate bucket | 122 / 123 px | **19 px** |
+
+Two carried claims die with it: "the 48x64 MINIESC bank is missing content" (the bank is
+correct — the PNGs are already transparent there) and "the original paints pure black and the
+port has transparent" (the reverse — the port's baked body was black and the original's panel
+is white). Measured on both witnesses at `y = 430`, a plain plate row well clear of the kit.
+
+### THE STADIUM TILES' ROW OFFSET — validated on 12 of 12, from the data alone
+
+`stadium_screen_re.md` had the ±256 column wrap validated on all twelve tiles but the ROW
+offset (`+2` for `bx < 64`, `+1` otherwise) confirmed only on tiers 3 and 4, where a real
+GROUND capture exists, "because a one- or two-row error would not move the seam statistic".
+True of that statistic, false of the right one: the row offset is a RELATIVE shift between two
+blocks of the SAME picture meeting at `x = 63|64`, so a wrong offset leaves a one-row vertical
+discontinuity exactly there. `tools/re/verify_estadio_rowoffset.py` scores that boundary under
+five candidate shifts on every shipped tile — **the shipped offset is the minimum on all
+twelve**. Margins are small (1.5–4.5 mean-|Δ|) because the two sides are different stand
+geometry and the join is never smooth; what the test settles is WHICH shift is least bad, and
+it is the shipped one twelve times out of twelve.
+
+### ⛔ THE EURO-GROUP KIT SHADOW PORT — TESTED AND WITHDRAWN
+
+This list carried "port the s73 shadow bake to EuroGroupScreen's 24 group kit cells (~1260
+px/frame)" on the assumption that those blits are the same `FUN_004b7f60` class the MAN-TO-MAN
+screen's are. **That assumption was never tested, and it is wrong.** `PMShadow` was wired under
+the group leader's NANOESC kit and the four RIDIESC kits against this screen's own chrome; the
+gate got WORSE: 864/873/896/876/875/881 → 1048/1059/1078/1060/1058/1063, and the leader cell
+alone 1236 → 1269 over six frames. The wiring is reverted and the entry is withdrawn rather
+than left open against a wrong theory.
+
+What the residual actually is, measured on group A's leader cell (202 of 768 px): a one-pixel
+rim following the silhouette where the original is consistently **LIGHTER** than the port
+(`(59,85,130)` vs `(20,0,90)`) — the opposite direction to a drop shadow, which only blends
+toward black — plus a solid block over the sprite's right half. Two different causes, neither
+reversed. Recorded in `euro_league_screen_re.md`.
+
+And the arithmetic of that gate is worth stating: the four RIDIESC cells are already at
+16 / 0 / 5 / 0 px per frame, and **649 of the ~880 per frame is the barra manager kit**, which
+is not a rendering gap at all but a CAPTURE gap — `art/kits/header/40.png` is a verbatim cut of
+Man Utd's manager-mode panel, kit and furniture together, and no frame in the corpus shows that
+panel with any other club's kit, so the background behind it has never been seen unoccluded.
+
+### THE UNMANAGED-CLUB RELEASE LADDER — read in full
+
+`FUN_0057b6b0` is no longer "not reversed". It skips foreign clubs (`club+0x10 > 0x26ae`),
+runs only for the hot seat and only in season-advance MODE 1 (`DAT_0066b1e4`, set by
+`FUN_004f80a0`'s `0x4e35`/`0x4e36` dispatch), and detaches the manager exactly when
+`FUN_0057a570` says his club is **no longer a member of the league it was hired into**
+(`club+0x50` indexes `DAT_0066b190`; `vtbl[0xc8]` is the membership test; index ≥ 4 counts as
+"still in"). Single caller: `FUN_005865b0`, itself called once from the season driver
+`FUN_004f8a00 @0x4f8dd6`. **Not ported** — the port has no league-membership model to hang it
+on, and that is said rather than approximated. Record: `sack_path_re.md`.
+
+### NOT done in s78, said plainly
+
+* **The three M5 set-piece leaves** (the IF-B same-team set-piece runner, b1420's b1500/b1c80
+  role sub-leaves, ps-9 chase geometry) — untouched. Still the live-confirmed M5 blocker at
+  dispatch 3, and still the gate on goals 2-7 and full time. This is a multi-session
+  exact-port job and the budget went to the six items above.
+* **"Free if relegated"** — the clause is fully settled as offer-record `rec+0x10` with a 0-px
+  checkbox render, but what it DOES on relegation is STILL not found. The offer-COMMIT path was
+  followed to `FUN_005889c0` (the accept test reads only the asking price and the player's own
+  `+0x70`/`+0x98`/`+0x9a`) and carries no consumer of the clause.
+* **`KnockoutScreen` → `PMShadow`** — deferred a fourth time, same reason, and the euro-group
+  measurement above makes it weaker still: `PMShadow` is demonstrably not the universal answer
+  for kit blits, so a refactor onto it is not obviously even correct.
+* **B9** — needs a driven career with a COMPLETED youth search (30-55 weeks), which has never
+  been driven.
+* **The 48x64 on-sprite EDGE BEVEL** and **OffersScreen's panel** — un-reversed.
+* **HIGHLIGHTS** — unchanged DATA gap, the `.p3d` models are absent from the shipped files.
+* **The real-device pass** — there is no Android device on this box. **This one needs Mats.**
+
+
 ## 0aaaaaaaaa. Closed 2026-07-28 (session s77) — UNSACKABLE, and the HUB CIRCLE
 
 Mats's brief was: a new UNSACKABLE cheat on the hub dropdown first, then the s76 carried

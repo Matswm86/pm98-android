@@ -71,8 +71,15 @@ CELL_FILL = (212, 255, 170)
 # --- the opponent panel's kit + vertical club plate --------------------------
 KIT_XY = (229, 283)  # opp-panel-rel (206,5); 48x64 MINIESC (kit 45 = SAD 0 here)
 KIT_WH = (48, 64)
-PLATE = (243, 313, 262, 445)  # opp-panel-rel (220,35)-(239,167)
-PLATE_TEXT = (243, 338, 262, 445)  # opp-panel-rel (220,60)-(239,167)
+# ⚠ The plate is NINETEEN columns of black, x243..x261 -- NOT the twenty the panel-rel
+# figure (220..239) suggests. Measured on both witnesses at y=430, a plain plate row well
+# below the kit: x243..x261 are (0,0,0) and x262 is the panel's own white. x262 is likewise
+# panel (or the kit's drop shadow on it) at every row the kit covers. Filling it black cost
+# exactly 15 px on the MAN-TO-MAN gate -- the residual that was mis-attributed to "the
+# 48x64 MINIESC bank is missing content" until 2026-07-28 (s78). The bank is fine; this
+# bake was one column too wide.
+PLATE = (243, 313, 261, 445)  # opp-panel-rel (220,35)-(238,167)
+PLATE_TEXT = (243, 338, 261, 445)  # opp-panel-rel (220,60)-(238,167)
 
 # --- the pitch (FUN_0050f720) ------------------------------------------------
 PITCH_WHITE = (321, 300, 509, 434)  # panel-rel (2,22)-(190,156)

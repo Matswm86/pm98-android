@@ -160,9 +160,21 @@ tiles have no real render to diff against, but they are no longer *unchecked*: *
 tile as a z-score, and across **all twelve** shipped tiles it reads **z = 3.0..3.9** — no hard
 seam — while re-applying the wrap to any of them puts a seam back at x=63 at **z = 13.1..14.8**.
 So the **+256 column wrap is validated on 12 of 12 tiles as a property of the data itself**,
-independent of any render. What the two renders (tiers 3 and 4) add on top, and what the other
-ten still lack, is confirmation of the **row offset** (`+2` for `bx < 64`, `+1` otherwise) — a
-one- or two-row error would not move the seam statistic. The residual is fine
+independent of any render.
+
+**✅ And so is the ROW OFFSET, since 2026-07-28 (s78) — 12 of 12, also from the data alone.**
+The claim this section used to carry, that "a one- or two-row error would not move the seam
+statistic", is true of the ±256 seam statistic and false of the right one. The row offset is a
+RELATIVE shift between two blocks of the SAME picture that meet at `x = 63|64`, so a wrong
+offset leaves a one-row vertical discontinuity exactly there, and the picture's own horizontal
+continuity measures it with no render involved.
+`tools/re/verify_estadio_rowoffset.py` scores that boundary column pair under five candidate
+shifts of the left block (−2…+2) on every shipped tile: **the shipped offset is the minimum on
+all twelve.** The margins are small (1.5–4.5 mean-|Δ| units) because the two sides of the join
+are different stand geometry and it is never smooth — the test does not claim a seamless
+boundary, it says which shift is LEAST bad, and it is the shipped one twelve times out of
+twelve with five candidates each. So the ten tiles without a render witness are no longer
+unconfirmed on the row offset either. The residual is fine
 dither noise; whether the live render dithers at blit time is not reversed. The capture's frames
 01-12 have pixel-identical panels (0.0% between them), so the picture is static — no animation
 is being read as an offset.

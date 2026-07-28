@@ -231,3 +231,29 @@ That is **not** the dilation model measured and REJECTED on 2026-07-28 (union
 kernel `0<=dx,dy<=3`, which painted 1988 px the original leaves white). Porting
 `FUN_005d66f0` / `FUN_005d6590` closes this bucket here AND the same bucket in
 `diff_knockout_parity.py` and `OffersScreen` — it is one pass, not three.
+
+
+## The vertical club plate is NINETEEN columns wide — and that was the whole kit residual
+
+Recorded 2026-07-28 (s78). The plate's panel-relative box reads `(220,35)-(239,167)`, which
+looks like twenty columns and was baked as `x243..x262`. **The pixels say nineteen.** On a
+plain plate row well clear of the kit (`y = 430`) both witnesses have `(0,0,0)` at
+`x243..x261` and the panel's own white at `x262`; at every row the kit covers, `x262` is the
+panel or the kit's drop shadow on it, never plate black.
+
+That single extra column is `kit-local x = 33`, and it was the ENTIRE residual the shadow-pass
+bucket had been carrying against the 48x64 kit:
+
+| | before | after |
+|---|---|---|
+| kit rect (`229,283` 48x64), both careers | 15 px | **0 px** |
+| shadow-pass bucket | 50 / 51 px | **36 px** (the D and M letter glyphs, unchanged) |
+| plate bucket | 122 / 123 px | **19 px** |
+
+Two carried claims die with it: that the residual was "the 48x64 MINIESC bank is missing
+content" (the bank is correct — the PNGs are already transparent in that column), and that
+"the original paints pure black and the port has transparent" (the reverse: the port's baked
+body was black and the original's panel is white there). `PLATE` / `PLATE_TEXT` in
+`build_mantoman_chrome_from_frames.py` now end at `x261`, with the measurement in the comment.
+`ManToManScreen.PLATE_TEXT` is untouched — it is a centring box for the rotated name, and its
+width is not used for the x pen.

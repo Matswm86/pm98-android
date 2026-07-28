@@ -417,3 +417,38 @@ named rather than hidden:
 The **knockout view** (`MATCHES` with `1ST LEG` / `2ND LEG` / `AGGR.`), which
 `16_euroleague_qtr_finals.png` holds, and the bracket art (`flecha cuartos`,
 `gana derecha`, `gana izquierda`) the screen loads.
+
+
+## ⛔ The kit residual is NOT the `FUN_004b7f60` shadow pass — measured 2026-07-28 (s78)
+
+`docs/REMAINING.md` carried "port the s73 shadow bake to EuroGroupScreen's 24 group kit
+cells" as open work, on the assumption that this screen's kit blits are the same
+shadowed-bitmap call class the MAN-TO-MAN screen's are. **They are not, and the assumption
+was never tested until now.**
+
+`PMShadow` was wired under both the group leader's 24x32 NANOESC kit and the four 17x20
+RIDIESC results kits, against this screen's own chrome as the destination, at the marker
+cap `0x63`. The gate got **worse**, not better:
+
+| bucket | without the pass | with it |
+|---|---|---|
+| all kit blits, six frames | 864/873/896/876/875/881 | 1048/1059/1078/1060/1058/1063 |
+| the leader kit rect alone, six frames | 1236 | 1269 |
+
+So this screen's kits do not go through that pass, and the entry is withdrawn rather than
+left open against a wrong theory.
+
+**What the residual actually looks like**, measured on group A's leader cell (202 of 768 px):
+a one-pixel rim following the sprite's silhouette, where the original is consistently
+LIGHTER than the port (`(59,85,130)` against `(20,0,90)`, `(42,63,170)` against
+`(0,0,160)`) — the opposite direction to the drop shadow, which only ever blends toward
+black — plus a solid block over the sprite's right half. A lightening edge blend and a
+half-sprite block are two different causes, and neither is reversed. That is the real
+open item here, and it is stated as un-reversed rather than mis-attributed.
+
+The other buckets are already effectively clean: the four RIDIESC cells carry 16 / 0 / 5 / 0
+differing px per frame. And the barra manager kit (rect `(106,6,35x44)`, **649 px per frame**,
+three quarters of the whole residual) is not a rendering gap at all — it is a CAPTURE gap:
+`app/art/kits/header/40.png` is a verbatim cut of Man Utd's manager-mode panel, kit and
+panel furniture together, and no frame in the corpus shows that panel with any other club's
+kit, so the background behind it has never been seen unoccluded.

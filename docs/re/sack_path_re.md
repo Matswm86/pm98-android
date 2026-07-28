@@ -384,3 +384,66 @@ HEADHUNT route, which was always an app-side extension and is still flagged as o
 - The app's squad-floor guards PREVENT the state that triggers sack #3 rather
   than simulating the sack — divergence documented, not invented away; note
   the waiver global is dead in retail, so the original ALWAYS sacks at ≤15.
+
+
+## The UNMANAGED-CLUB RELEASE LADDER — `FUN_0057b6b0`, read in full 2026-07-28 (s78)
+
+`handoff-pm98-unsackable-hub-circle-2026-07-28` flagged `FUN_0057b6b0` @`0x57b6e5` as "a
+SECOND `push 0xffff / call FUN_0057a500`, swept over a club list by `FUN_005865b0`, gated on
+`DAT_0066b1e4` and on `FUN_0057a570` — not reversed, not touched". It is reversed now, and it
+is a small function:
+
+```
+FUN_0057b6b0(club):
+    if club[+0x10] > 0x26ae:      goto staff        ; club id above 9902 = a FOREIGN club
+    FUN_0057f700()                                   ; a global per-club season step
+    FUN_005883d0(club)
+    if club[+0x5c] == 0xffff:     goto staff        ; not the hot seat -> nothing to release
+    if DAT_0066b1e4 == 0:         goto staff        ; only in season-advance MODE 1
+    if FUN_0057a570(club) != 0:   goto staff        ; the club is still IN its competition
+    FUN_0057a500(club, 0xffff)                       ; DETACH THE MANAGER
+staff:
+    for (s = club[+0x24]; s; s = s[+0x100]):  FUN_00582c80(s)
+```
+
+and its one gate that was not previously read is the interesting one:
+
+```
+FUN_0057a570(club):
+    idx = club[+0x50]                       ; the competition-index selector (stadium_screen_re.md)
+    if idx >= 4: return 1                   ; a cup / foreign index counts as "still in"
+    comp = DAT_0066b190[idx]                ; the league object for that index
+    return comp->vtbl[0xc8](club[+0x10])    ; does that league still contain this club?
+```
+
+So the ladder is: **when the season advances and the manager's club is no longer a member of
+the league it was hired into, the manager is detached from it** — the same
+`FUN_0057a500(club, 0xffff)` the board's three dismissals use, so it ends the career the same
+way. It is not one of the board's dismissals and the UNSACKABLE patch (`hack_unsackable.md`)
+deliberately does not touch it, which is why that document's "not covered, said plainly" note
+stands.
+
+**Timing, and the mode flag.** `FUN_005865b0` sweeps a club-id list through it, and it has
+exactly ONE caller: `FUN_004f8a00 @0x4f8dd6`, the season/competition driver. `DAT_0066b1e4` is
+not a general "Promanager" flag but that driver's own MODE: `FUN_004f80a0` dispatches
+`0x4e35 -> DAT_0066b1e4 = 0` and `0x4e36 -> DAT_0066b1e4 = 1`, calling `FUN_004f8a00` either
+way, and the release only runs in mode 1.
+
+**Not ported, and why.** The port has no equivalent of "the league object no longer contains
+this club" as a separate fact — `Career` moves a relegated club's `league_id` directly — so
+wiring this would need the membership model first. It is recorded here rather than
+approximated.
+
+## "FREE IF RELEGATED" — still not closed, and this is exactly how far it got
+
+The clause itself is fully settled: it is offer-record field `rec+0x10`, its checkbox is the
+top row of the CONTRACT panel, its generation rule is AV-banded, and the port ticks it with a
+0-px render-diff (`offer_record_re.md` §5.1). Its DRAW is `0x52bfc0`, keyed on bit 3 of the
+offer flags at `screen+0x144`.
+
+What it DOES on relegation is **still not found.** The s76 note said a sweep of `screen+0x144`
+was the wrong instrument (370 sites, almost all vtable calls) and that the offer-COMMIT path
+was needed instead; that path was followed as far as `FUN_005889c0` (the accept test, which
+reads only the asking price at `+0x1c` and the player's own `+0x70`/`+0x98`/`+0x9a`), and no
+consumer of the clause turned up there. So the gap is unchanged and is stated as unchanged:
+the clause is generated, stored, and drawn, and nothing has been found that reads it back.

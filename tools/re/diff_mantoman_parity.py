@@ -33,11 +33,15 @@ TWO DECLARED BUCKETS, both named and bounded:
             * the markers' 20 + 16 px are the D and M LETTERS, which the original
               draws as TEXT over the sprite (a font-rasteriser difference, the same
               class as the `plate` bucket);
-            * the kit's 56 px are pixels the original paints pure BLACK and the
-              port's `art/kits/<id>.png` carries as transparent — the 48x64 MINIESC
-              bank is missing content. Identical count on both careers (Aston Villa
-              and F.C. Barcelona), so it is structural to the bank, not to a club,
-              and it is tracked under the 48x64 kit entry in `docs/REMAINING.md`.
+            * ⛔ the kit's residual is **CLOSED as of 2026-07-28 (s78), and the
+              diagnosis above it was wrong twice over.** It was never 56 px (15,
+              re-measured), the original was never the one painting black (the PORT
+              was), and the MINIESC bank was never missing content. The cause was a
+              one-column bake error: the vertical club plate is NINETEEN columns of
+              black (x243..x261), not the twenty the panel-relative figure suggests,
+              and `build_mantoman_chrome_from_frames.py` filled x262 black as well.
+              x262 is kit-local x=33 — the exact column of the residual. The kit rect
+              now diffs at **0 px on both careers**.
 
 Both buckets are reported separately with their own pixel counts; neither may
 touch anything outside its own rect.
