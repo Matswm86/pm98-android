@@ -262,6 +262,21 @@ const FINAL_C_NAME := Color8(80, 100, 120)
 const FINAL_C_STADIUM := Color8(17, 90, 34)
 const FINAL_C_WINNER := Color8(42, 63, 170)
 
+# ---- the DOMESTIC final (the Coca-Cola Cup), measured 2026-07-28 --------------------
+## A different card from the euro one: MATCH RESULT over STADIUM, a second olive REPLAY
+## RESULT header with an empty panel under it, and NO kit/flag row -- the two club bars
+## carry a 17x20 `ridi` icon each, exactly as the CARDS layout's rows do. The WINNER band
+## and the laurel below are the euro final's, unchanged (the two frames agree pixel for
+## pixel outside the card and the trophy). Every anchor solved on
+## `tools/re/refs/knockout-2026-07-28/14`.
+const DOM_FINAL_STADIUM_X := 151.0        # centred in a 200-wide box -> centre 251
+const DOM_FINAL_STADIUM_Y := 161
+const DOM_FINAL_BAR_TOP := [178, 200]     # bar interiors y178..197 / y200..219
+const DOM_FINAL_ICON_X := 145             # the 17x20 ridi kit, at the bar's own top
+const DOM_FINAL_NAME_PEN_X := 167         # leftmost club ink on both bars
+const DOM_FINAL_NAME_PEN_DY := 4          # ink row 1 lands on y183 / y205
+const DOM_FINAL_SCORE_FIELD := 677            # box x321..356, so 2*cx for integer maths
+
 # ---- the phase paginator ---------------------------------------------------------
 const C_LABEL := Color8(100, 100, 140)
 const LABEL_TOP_DY := 5                  # the label's pen top inside its plate
@@ -472,7 +487,9 @@ static func cards_available(comp: String) -> bool:
 	return ResourceLoader.exists("res://art/screens/knockout/band_%s_cards.png" % comp)
 
 
-## Whether this competition's FINAL body (its trophy) is witnessed (euro today).
+## Whether this competition's FINAL body (its trophy + card) is witnessed. Two today: the
+## euro one (2026-07-27) and the DOMESTIC one the Coca-Cola frame gave (2026-07-28), which
+## is a different card entirely -- MATCH RESULT over STADIUM plus a REPLAY RESULT panel.
 static func final_available(comp: String) -> bool:
 	return cards_available(comp) and ResourceLoader.exists(
 		"res://art/screens/knockout/final_body_%s.png" % comp)
@@ -1064,6 +1081,9 @@ func _draw_final() -> void:
 		draw_texture(_final_body, CARDS_BODY_XY)
 	if _ties.is_empty():
 		return
+	if _comp != "euro":
+		_draw_final_domestic(_ties[0])
+		return
 	var tie: Dictionary = _ties[0]
 	PMChrome.draw_crest(self, int(tie.get("home_id", -1)), FINAL_KIT_L)
 	PMChrome.draw_crest(self, int(tie.get("away_id", -1)), FINAL_KIT_R)
@@ -1092,7 +1112,49 @@ func _draw_final() -> void:
 				Color(1, 1, 1), 15, 1, FINAL_SCORE_CELL[1])
 	var winner := int(tie.get("winner", -1))
 	if winner >= 0:
-		var side := "home" if winner == 0 else "away"
-		PMChrome.text(self, _f14g, FINAL_WINNER_XY[0], FINAL_WINNER_XY[1],
-			str(tie.get(side, "")), FINAL_C_WINNER, 15, 0, 280.0)
-		PMChrome.draw_crest(self, int(tie.get(side + "_id", -1)), FINAL_LAUREL)
+		_draw_final_winner(tie, winner)
+
+
+## The WINNER band + laurel, shared by both final bodies: the two witnessed frames are
+## pixel-identical there outside the name row and the wreath's middle.
+func _draw_final_winner(tie: Dictionary, winner: int) -> void:
+	var side := "home" if winner == 0 else "away"
+	# The 2026-07-28 Coca-Cola witness is the FIRST frame with this band FILLED, and it
+	# settles the pen exactly (ink x65..134, y383..395, so the pen is FINAL_WINNER_XY) but
+	# NOT the face: the champion's name is 13 ink rows tall where proman12 gives 9, and no
+	# extracted bank matches it (proman12 costs 608 px here, the GDI approximation 530).
+	# So CompResultScreen's declared approximation stays and the row is a named bucket in
+	# diff_knockout_parity until the face is reversed -- measured, not shrugged at.
+	PMChrome.text(self, _f14g, FINAL_WINNER_XY[0], FINAL_WINNER_XY[1],
+		str(tie.get(side, "")), FINAL_C_WINNER, 15, 0, 280.0)
+	PMChrome.draw_crest(self, int(tie.get(side + "_id", -1)), FINAL_LAUREL)
+
+
+## The DOMESTIC final's card (`tools/re/refs/knockout-2026-07-28/14`): MATCH RESULT over
+## STADIUM, two club bars each carrying a 17x20 ridi icon, and an empty REPLAY RESULT panel
+## that the port leaves empty -- a replayed domestic FINAL is not witnessed and is not
+## invented. The WINNER band and the laurel are the shared ones.
+func _draw_final_domestic(tie: Dictionary) -> void:
+	var venue := str(tie.get("venue", ""))
+	if venue != "":
+		PMChrome.text(self, _f12g, DOM_FINAL_STADIUM_X, DOM_FINAL_STADIUM_Y, venue,
+			FINAL_C_STADIUM, 13, 1, 200.0)
+	var cells: Array = tie.get("cells", [])
+	var pair: Array = cells[0] if cells.size() > 0 else ["", ""]
+	for r in 2:
+		var top := int(DOM_FINAL_BAR_TOP[r])
+		var kt := _ridi_kit(int(tie.get("home_id" if r == 0 else "away_id", -1)))
+		if kt != null:
+			draw_texture(kt, Vector2(DOM_FINAL_ICON_X, top))
+		_txt(_page_p12, _g_p12, DOM_FINAL_NAME_PEN_X, top + DOM_FINAL_NAME_PEN_DY,
+			str(tie.get("home" if r == 0 else "away", "")), FINAL_C_NAME)
+		var g := str(pair[r]) if pair.size() > r else ""
+		if g != "":
+			# Unlike the euro final -- whose only witness is UNPLAYED, so its digits stay
+			# on CompResultScreen's declared GDI approximation -- this card has a PLAYED
+			# witness, and its digits are the same proman12 bank the club names are.
+			_txt_mid(_page_p12, _g_p12, DOM_FINAL_SCORE_FIELD,
+				top + DOM_FINAL_NAME_PEN_DY, g, Color(1, 1, 1))
+	var winner := int(tie.get("winner", -1))
+	if winner >= 0:
+		_draw_final_winner(tie, winner)

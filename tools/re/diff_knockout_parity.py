@@ -69,6 +69,25 @@ CARD_ICONS_TOP = [
 # original's hi-res panel kit bank is un-extracted, so the app's own art is aspect-fitted
 # and the wells are declared.
 FINAL_KITS = [("final kit L", 146, 158, 48, 60), ("final kit R", 306, 158, 48, 60)]
+# The DOMESTIC final's two 17x20 ridi icons carry the same shadowed-blit residual as every
+# other ridi cell in this file (the pass is ported for MAN-TO-MAN but these screens are
+# still on their baked rings -- docs/re/shadow_blit_re.md §7).
+DOM_FINAL_ICONS = [
+    (f"icon y{top}", 145, top, 17, 20) for top in (178, 200)
+]
+# The laurel wreath's kit keeps CompResultScreen's documented approximation (the original's
+# hi-res panel kit bank is un-extracted), exactly as the euro final's two wells do.
+DOM_FINAL_LAUREL = [("laurel kit", 398, 338, 53, 57)]
+# Two faces this card's PLAYED witness settles the PEN of but not the GLYPHS, so each is a
+# named, bounded bucket rather than a silent difference:
+#   * the score digits -- the closest extracted bank is proman12 (the club rows' own), which
+#     costs 193 px over the two boxes against 244 for the GDI approximation, so proman12 is
+#     what ships; the residual is the last few px of a face nobody has cut yet;
+#   * the WINNER band's champion -- 13 ink rows where proman12 gives 9, and no extracted
+#     bank matches (proman12 608 px, the GDI approximation 530), so CompResultScreen's
+#     declared approximation carries over. Both are recorded in knockout_views_re.md.
+DOM_FINAL_SCORES = [(f"score y{top}", 321, top, 36, 20) for top in (178, 200)]
+DOM_FINAL_WINNER = [("winner name", 55, 382, 317, 17)]
 # The FINALIST plates' 24x32 nano kits, at plate_x0 + 2 / y377.
 FINALIST_KITS = [("finalist kit 1", 22, 377, 24, 32), ("finalist kit 2", 283, 377, 24, 32)]
 
@@ -172,6 +191,15 @@ CASES = [
         "knockout_euro_final",
         "05_euroleague_final_UNDECIDED_1998-04-25.png",
         [BARRA_KIT, RAIL, *FINAL_KITS],
+    ),
+    # The DOMESTIC final's own body, built 2026-07-28 from
+    # tools/re/refs/knockout-2026-07-28/14: MATCH RESULT over STADIUM, two club bars with a
+    # ridi icon each, an empty REPLAY RESULT panel, and the shared filled WINNER band.
+    (
+        "knockout_cocacola_final",
+        "../knockout-2026-07-28/14_cocacola_final_WINNER_1998-04-11.png",
+        [BARRA_KIT, RAIL, *DOM_FINAL_ICONS, *DOM_FINAL_LAUREL,
+         *DOM_FINAL_SCORES, *DOM_FINAL_WINNER],
     ),
 ]
 

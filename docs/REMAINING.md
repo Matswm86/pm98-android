@@ -38,13 +38,24 @@
 * **Corrected while in there:** the Coca-Cola two-legged semifinals were ALREADY built and
   gated at 0 px (`knockout_cocacola_semis_done`) — the carried list called them unbuilt.
 
+* **The DOMESTIC (Coca-Cola) FINAL body — BUILT, 0 px.** A different card from the euro
+  one: `MATCH RESULT` over `STADIUM`, two club bars each carrying a 17x20 `ridi` icon
+  instead of the euro's 48x60 kit + flag row, and an empty `REPLAY RESULT` panel. The
+  `WINNER` band and the laurel are the euro final's, and the bake restores them by pasting
+  the euro frame's own pixels (the whole y340..429 band differs only at the name and the
+  wreath). Gate case `knockout_cocacola_final`. Two faces the witness settles the PEN of
+  but not the glyphs are named buckets with their measurements, not shrugs: the score
+  digits (proman12, 193 px against the GDI's 244) and the WINNER band's champion (13 ink
+  rows where proman12 gives 9; no extracted bank matches). **All 14 knockout gate cases
+  pass.**
+
 ### NOT done in s73, stated plainly
 
-**The Coca-Cola FINAL body** is the one chrome of the 07-28 drive still open; its geometry
-is now measured into `knockout_views_re.md` (card frame x137..363 y124..332, olive bars
-y132..143 / y244..255, club bars y178..197 / y200..219, bar ground x144..318, score box
-x321..356) so the next session starts from numbers. **B9**, the **England non-Premier offers
-panel**, the **cup channelTV fee**, the **M5 wire-in** and the whole data/device tail are
+**B9**, the **England non-Premier offers panel**, the **cup channelTV fee**, the
+**M5 wire-in** (and the ~9 min/match question), the **2D/JUG view**, and the whole data /
+device tail (~876 directory-only teams, the LZ-packed `DAT.PKF`/`DATSIM.PKF` rating tables,
+the real-device pass, the unmanaged-club release ladder, the "Free if relegated" clause,
+the per-club STARTING ground grades and the 10 corrected-by-mapping stadium tiles) are
 untouched and stay exactly as written below.
 
 ## 0aaaa. Closed 2026-07-28 (session s72) — MAN-TO-MAN MARKINGS

@@ -325,6 +325,14 @@ func _init() -> void:
 		_kitlist_rows(CWC_KL_TIES, true), true, false, 0, "kitlist")
 	await _shot(out, "knockout_cocacola_kitlist", CC_KL_HEADER, "cocacola", "ROUND 4",
 		false, _kitlist_rows(CC_KL_TIES, false), true, false, 0, "kitlist")
+	# 14_cocacola_final_WINNER_1998-04-11.png -- the DOMESTIC final's own body: MATCH RESULT
+	# over STADIUM Wembley, an empty REPLAY RESULT panel, and the WINNER band filled.
+	await _shot(out, "knockout_cocacola_final", CC_SEMI_DONE_HEADER, "cocacola", "FINAL",
+		false,
+		[{"home": "Wimbledon", "away": "Arsenal", "home_id": 51, "away_id": 46,
+			"home_flag": 30, "away_flag": 30, "venue": "Wembley",
+			"winner": 1, "cells": [["1", "2"]]}],
+		true, false, 0, "final")
 	await _shot(out, "knockout_euro_final", EURO_FINAL_HEADER, "euro", "Final", true,
 		[{"home": "Real Madrid C.F.", "away": "Olympiakos", "home_id": 1003,
 			"away_id": 1189, "home_flag": 22, "away_flag": 26, "venue": "Das Antas",

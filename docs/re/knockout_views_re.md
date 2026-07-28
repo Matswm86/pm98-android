@@ -615,7 +615,7 @@ a paged-back frame than on a live one (white rows 77..101 at x190, against 78..1
 witness of each state is not a rule, so the port keeps drawing the live-phase plate and the
 band is declared rather than guessed.
 
-## Same drive, three more bands witnessed — TWO now built, ONE still open
+## Same drive, three more bands witnessed — ALL THREE now built
 
 The 2026-07-28 drive banked the first frames of three chromes this file had listed as
 unwitnessed. They are in `screenshots/wine-captures-2026-07-28-knockout-decided/`:
@@ -631,16 +631,45 @@ unwitnessed. They are in `screenshots/wine-captures-2026-07-28-knockout-decided/
   `knockout_cocacola_semis_done`, 0 px; the sentence that called it unbuilt was stale.
 * **`06_cocacola_final_winner.png`** — the Coca-Cola FINAL: the cup trophy art,
   `MATCH RESULT` over `STADIUM Wembley`, an empty `REPLAY RESULT` panel, and the filled
-  `WINNER` band with the champion's kit in a laurel wreath. **STILL OPEN.** Measured
-  2026-07-28 against the euro final so the next session starts with the geometry: the two
-  frames are byte-identical over x136 and x364..400, so only the CARD (outer black frame
-  x137..363, white interior x139..361, running y124..332) and the left-hand trophy differ —
-  the `WINNER` band and the laurel are the euro final's, already built. Inside the card:
-  olive header bars at **y132..143** (`MATCH RESULT`) and **y244..255** (`REPLAY RESULT`),
-  both x139..361; the `STADIUM` label + value in the white between y144..175; two club bars
-  with black borders at y176..177 / y198..199 / y220..221, interiors **y178..197** and
-  **y200..219**, bar ground x144..318 with a 17x20 `ridi` kit icon at its left and the
-  score box x321..356; the `REPLAY RESULT` panel below is white and empty on this witness.
+  `WINNER` band with the champion's kit in a laurel wreath. **BUILT 2026-07-28, 0 px** —
+  see below.
+
+### The DOMESTIC final, as built (2026-07-28)
+
+Measured against the euro final, which is byte-identical to it over x136 and x364..400: only
+the CARD (outer black frame x137..363, white interior x139..361, running y124..332) and the
+left-hand trophy differ, so the `WINNER` band and the laurel below are the euro final's,
+unchanged. Inside the card:
+
+| piece | where |
+|---|---|
+| `MATCH RESULT` olive bar | y132..143, x139..361 |
+| `STADIUM` label | y150..158 (chrome) |
+| its value | pen (151, 161) centred in a 200-wide box, ink rows 162..172 |
+| club bars | interiors y178..197 and y200..219, ground x144..318 |
+| the 17x20 `ridi` icon | at (145, bar top) — this card has NO 48x60 kit / flag row |
+| club name | pen (167, bar top + 4), proman12, ink (80,100,120) |
+| score box | x321..356 |
+| `REPLAY RESULT` olive bar | y244..255, its panel white and empty on this witness |
+
+`final_body_cocacola.png` is cut from the frame with the card's content blanked; the WINNER
+name row and the laurel are restored by **pasting the euro frame's own pixels** rather than
+repainting to a guessed ground — legal exactly because the whole y340..429 band differs only
+at x65..134 and x401..447. Gate case **`knockout_cocacola_final`**.
+
+Two faces this PLAYED witness settles the PEN of but not the GLYPHS, both named buckets
+rather than silent differences:
+
+* **the score digits** — the closest extracted bank is proman12, the club rows' own, which
+  costs 193 px over the two boxes against 244 px for the GDI approximation, so proman12 is
+  what ships;
+* **the `WINNER` band's champion** — 13 ink rows where proman12 gives 9, and no extracted
+  bank matches it (proman12 608 px, the GDI approximation 530), so CompResultScreen's
+  declared approximation carries over. The PEN, at least, is now settled: ink x65..134
+  y383..395, i.e. exactly `FINAL_WINNER_XY`.
+
+A replayed domestic final is still unwitnessed, so the `REPLAY RESULT` panel is left empty
+rather than filled by inference.
 
 ### The SINGLE-LEG semifinal card, as built (2026-07-28)
 

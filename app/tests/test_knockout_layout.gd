@@ -45,7 +45,10 @@ func _initialize() -> void:
 	_a(not KnockoutScreen.cards_available("uefa"), "uefa cards UNWITNESSED")
 	_a(not KnockoutScreen.cards_available("cwc"), "cwc cards UNWITNESSED")
 	_a(KnockoutScreen.final_available("euro"), "euro final chrome shipped")
-	_a(not KnockoutScreen.final_available("cocacola"), "cocacola final UNWITNESSED")
+	# The Coca-Cola FINAL body was witnessed 2026-07-28
+	# (tools/re/refs/knockout-2026-07-28/14) and built the same day.
+	_a(KnockoutScreen.final_available("cocacola"), "cocacola final chrome shipped")
+	_a(not KnockoutScreen.final_available("uefa"), "uefa final UNWITNESSED")
 	scr.setup({}, "euro", "Semifinals", true,
 		[{"home": "A", "away": "B", "winner": -1, "two_legged": true,
 			"home_ground": "GA", "away_ground": "GB",

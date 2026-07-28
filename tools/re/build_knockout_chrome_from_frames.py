@@ -264,6 +264,24 @@ FINAL_WHITE = [
 FINAL_BARS = [(150, 267, 304, 286), (150, 298, 304, 317)]  # club-name bar interiors
 FINAL_BAR_BG = (200, 220, 240)
 
+# ---- the DOMESTIC FINAL body (the Coca-Cola Cup), measured 2026-07-28 -----------------
+# A different card from the euro one: MATCH RESULT over STADIUM, a second olive REPLAY
+# RESULT header with an empty panel under it, and no kit/flag row at the top -- the two
+# club bars carry a 17x20 `ridi` icon each instead. Measured against the euro witness,
+# which is byte-identical everywhere except the card (x137..363, y124..332) and the trophy
+# (x0..135), so the WINNER band and the laurel below are the ones already built.
+DOM_FINAL_SRC = "../knockout-2026-07-28/14_cocacola_final_WINNER_1998-04-11.png"
+DOM_FINAL_WHITE = [(150, 160, 355, 175)]        # the STADIUM value line
+DOM_FINAL_BARS = [(144, 178, 318, 197), (144, 200, 318, 219)]
+DOM_FINAL_BOXES = [(321, 178, 356, 197), (321, 200, 356, 219)]
+DOM_FINAL_BOX_BG = (42, 63, 170)
+# The WINNER band's name row and the laurel are chrome this frame has FILLED and the euro
+# witness has EMPTY. Rather than repaint them to a guessed ground, they are copied verbatim
+# from the euro frame -- legal exactly because the two frames agree pixel for pixel outside
+# the card, the trophy and these two content rects (measured: the whole y340..429 band
+# differs only at x65..134 and x401..447).
+DOM_FINAL_FROM_EURO = [(55, 380, 371, 399), (398, 338, 450, 394)]
+
 # ---- the BRACKET panel strip (docs/re/knockout_views_re.md, re-measured 2026-07-26) ----
 # Four panels at T = 113/193/273/353, each x20..477. One strip per column set is cut from
 # one witnessed UNPLAYED panel and repeated four times -- legal because
@@ -698,6 +716,26 @@ def main() -> None:
                 fin.putpixel((x, y), FINAL_BAR_BG)
     cut(fin, FINAL_STRIP).save(OUT / "final_body_euro.png")
     print("final_body_euro.png <- the witnessed euro FINAL frame, content blanked")
+
+    # -- the DOMESTIC FINAL body (Coca-Cola Cup), same strip, its own card.
+    dom = frame(DOM_FINAL_SRC).copy()
+    euro_src = frame(FINAL_SRC)
+    for x0, y0, x1, y1 in DOM_FINAL_FROM_EURO:
+        dom.paste(euro_src.crop((x0, y0, x1 + 1, y1 + 1)), (x0, y0))
+    for x0, y0, x1, y1 in DOM_FINAL_WHITE:
+        for y in range(y0, y1 + 1):
+            for x in range(x0, x1 + 1):
+                dom.putpixel((x, y), (255, 255, 255))
+    for x0, y0, x1, y1 in DOM_FINAL_BARS:
+        for y in range(y0, y1 + 1):
+            for x in range(x0, x1 + 1):
+                dom.putpixel((x, y), FINAL_BAR_BG)
+    for x0, y0, x1, y1 in DOM_FINAL_BOXES:
+        for y in range(y0, y1 + 1):
+            for x in range(x0, x1 + 1):
+                dom.putpixel((x, y), DOM_FINAL_BOX_BG)
+    cut(dom, FINAL_STRIP).save(OUT / "final_body_cocacola.png")
+    print("final_body_cocacola.png <- the witnessed Coca-Cola FINAL frame, content blanked")
 
     # -- the two compact-list header bands.
     cut(list_euro, (PANEL_X[0], LIST_HDR_Y[0], PANEL_X[1], LIST_HDR_Y[1])).save(
