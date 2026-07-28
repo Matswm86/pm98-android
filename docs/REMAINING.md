@@ -109,6 +109,14 @@ different things and only one of them was the outer loop:
   leaves, not on the harness.** Recorded here rather than buried.
 * A **stall guard** was added so this reports instead of hanging: the harness watches
   `clk + banked` and gives up with a state line after 3 frozen steps.
+* **Goals 2-7 were NOT reached this session, and that is said plainly.** With the board
+  pause modelled the harness gets past the clk-2837 goal and step 3 goes back to open play
+  (phase 8 -> 2, dispatch 6 -> 0), but that step then runs for 25+ minutes without
+  reporting, and the run was stopped rather than left to guess at. Whether it is walking
+  the rest of the half toward the next event (which is what a correct WATCH step looks
+  like: one step per event, and events are thousands of clks apart) or breaching the
+  40,000-frame wait guard is the FIRST thing to settle next session — the stall guard and
+  the two probes are there to make that a minutes-long question.
 
 ### The 48x64 MINIESC "56 px" entry is STALE
 

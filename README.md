@@ -79,8 +79,9 @@ dropdown bar, then the headphones). Neither is a Premier Manager 98 setting: eac
 worked out against the real `MANAGER.EXE` and then ported, so with the switch off the game
 behaves exactly as the original does.
 
-**Unsackable.** The board can hold as many urgent meetings as it likes. Three weeks in the red,
-a results review gone against you, a squad down to ten men: none of them end the career.
+**Unsackable.** The board can hold as many urgent meetings as it likes. Four straight weeks in
+the red, a results review gone against you, a squad under sixteen men: those are the three things
+that end a career in this game, and none of them will.
 
 **Three up front.** Field three forwards and the match engine stops pretending: your chance
 count is floored and the opposing keeper stops saving. Instant results only, watched matches
