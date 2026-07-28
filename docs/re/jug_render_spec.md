@@ -116,17 +116,61 @@ described only as far as the branch condition proves):
 - **Misc actions**: 0xb(11)/0xd(13) `FUN_005a9490`, 0x17(23) `FUN_005aeda0`, 0x1c(28)
   `FUN_005b73a0`, 0x23(35) `FUN_005a8f20`.
 
-## 4. Consequence for the app (AUDIT A7 → A8)
-`app/scenes/MatchSimulador.gd` is a side-on 2D WATCH view the engine never renders.
-Its `_facing()` (uniform 45° `atan2`, frame 0 = "down") and the `export_match_art.py`
-`[3×8]` bake are stylised app constructs, **not** the source model — same class of
-documented app-layout choice already noted for the WATCH camera/tiling in
-`match_view_re.md §3`. They are now labelled as such in code; the false "source-faithful
-8-compass" claim is removed. **No invented remap is applied.**
+## 3b. ⛔ CORRECTION 2026-07-28 — "yaw is a constant 0 / pure translation" is REFUTED
 
-Faithful-rebuild path (not done; needs the still-un-reversed PCF5DAT 3/4 camera +
-the `kind` byte): implement §2 `[dir][phase]` indexing + §3 mirror against a recovered
-camera angle. Until then the WATCH view stays an honest approximation.
+§5 below concluded, from a static trace, that the match camera never rotates: yaw/pitch/roll
+are the constant-0 words `camctrl+0x8c/0x8e/0x90` whose only writer is the ctor
+`FUN_005f56a0`, so `FUN_005eeba0`'s view matrix reduces to the pure translation `T(-eye)`.
+
+**A real WATCH capture of the running game contradicts that, and the game's own output wins.**
+`tools/re/refs/watch-2026-07-28/watch_02.png` (driven through wine at TOTAL control, MATCH
+OPTIONS -> WATCH -> KICK OFF) shows the advertising hoardings running flat across the top as
+the **far touchline** and the halfway line **receding from the viewer**. So the camera's depth
+axis is world **Y**, the pitch WIDTH — and `FUN_005eec60` takes depth from matrix column 0,
+which for a rotation-free matrix would be world **X**. A translation-only view cannot produce
+that frame.
+
+Two things are therefore NOT reversed, and must not be written down as if they were:
+- **the eye** — `camctrl+0x3c` is zeroed by the ctor at `0x5f56d2` and a disassembly sweep of
+  `0x5d7000..0x5f9000` finds no other writer, yet `FUN_005f6230` passes exactly that address
+  to `SetCamera` as the camera position;
+- **the orientation** the rendered frame plainly has.
+
+What IS reversed and needs no fitting: the projection. `FUN_005eec60` is
+`sx = ox + u/z, sy = oy + v/z` with `z = -(d>>8)`, and `SetCamera` composes the diagonal scale
+`FUN_005eea50(0x10000, k, k)` with `k = ftol(width * 0.00390625 * 65536.0) * camctrl+0x88 >> 16`
+— and `0.00390625 * 65536 = 256`, so **the focal length is exactly the viewport width in
+pixels**. The app fits only the POSE, against three exact pitch landmarks, and labels it a fit:
+`tools/re/fit_watch_camera.py`, `app/scripts/Pm98Camera.gd`.
+
+Consequence for §2/§3 above (which stand): the camera yaw in the draw's
+`facing - cameraYaw + 0x4000` is a quarter turn, not 0, because the billboard axis
+`sVar23 = cameraYaw - 0x4000` must be perpendicular to a view along +Y. That makes the term
+collapse to the facing word itself, and it puts a player running toward the camera on bank
+direction 0 — the front-facing frame, which is what the bank holds. `JugRender.CAMERA_YAW`.
+
+## 4. Consequence for the app (AUDIT A7 → A8) — CLOSED 2026-07-28
+~~`app/scenes/MatchSimulador.gd` is a side-on 2D WATCH view the engine never renders.~~
+**BUILT 2026-07-28.** The side-on view, `_facing()`'s uniform-45° `atan2` and
+`export_match_art.py`'s `[3×8]` transpose bake are all DELETED. What replaced them:
+
+* **`tools/re/export_jug_bank.py`** bakes all **4211 frames of all 74 kinds** in the engine's
+  own `[direction][phase]` layout, with each frame's own `.PGF` header anchor, and hard-fails
+  if the reconstructed `base[]` total is not exactly 4211.
+* **`app/scripts/JugRender.gd`** ports §2's `base[kind] + fpd[kind]*dir + phase`, §3's
+  threshold bucketing and mode-gated mirror (including the mirrored-14-phase half-cycle
+  shift), and `FUN_005a50c0`'s phase advance. `kind` / `phase` / `facing` come off the live
+  engine's own `player+0x40` / `+0x2c` / `+0x34`.
+* **`app/scripts/Pm98Camera.gd`** is the 3/4 camera: the binary's projection, pose fitted to a
+  real capture (§3b).
+* **`app/tests/test_jug_render.gd`** pins all of it — 29 assertions, green.
+
+The `kind` byte was never missing: the port already keeps it. `Pm98Movement.set_position_code`
+IS `FUN_005a5430`, and the `POS_REMAP_LUT` it tests against is literally the next-state table
+`DAT_00665208` of §2. It was only mislabelled as a "position code".
+
+And the PCF5DAT blocker was a misidentification — that file is a CD-presence check, not the
+pitch (`docs/re/pcf5dat_re.md`).
 
 ## 5. Still-open GAPs
 **RESOLVED this pass (2026-07-01):** `kind` numeric range (74 kinds), all per-kind

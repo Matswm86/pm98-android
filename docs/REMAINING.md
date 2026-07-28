@@ -1,5 +1,108 @@
 # PM98 Android — remaining-work inventory (refreshed 2026-07-28)
 
+## 0aaaaaaa. Closed 2026-07-28 (session s75) — THE MATCH PRESENTATION
+
+Mats's brief was the match-engine graphics: *"APP_VS_SPEC_AUDIT A6/A7/A8 — the engine renders
+a pseudo-3D two-billboard sprite under a fixed 3/4 camera, it has no side-on 2D view at all;
+`_facing()`'s 45-degree compass is an invention; the sprite sheet is the transpose of the real
+JUG layout"*, with **PCF5DAT.PKF named as the one hard gap**. All three audit rows are closed
+and the "hard gap" turned out not to exist.
+
+### PCF5DAT.PKF is NOT the pitch background — it is a CD check
+
+The carried claim was never checked against the binary. `PCF5DAT.PKF` has **exactly one xref**
+in `MANAGER.EXE` (@`0x4f82ed`): the function at `0x4f82e0` opens it, `_llseek`s to **`0xecbf`**,
+`_lread`s **six bytes** and compares them to the literal **`D.G.C.`** — which the file really
+does carry at that offset. That is a CD-presence check on a 314,854,588-byte PC Futbol 5 data
+pack, nothing more; `enum_pcf5dat.py` independently reports it does not follow the PM98 PKF
+directory grammar at all. **The simulador's art is DATSIM's own throughout** (`campina.raw`
+@0x59311f, `hierprem.raw` @0x59302c, `hierba`/`hierarg`/`hiebarsa`/`hiercal`/`hiercale`/
+`hieprees`, `cielo1.bmp`, `red.bmp`, `balon.raw`, `jug.pgf`, `NumCam.bmp`). Full record:
+**`docs/re/pcf5dat_re.md`**.
+
+### The real WATCH view was CAPTURED, and it corrected the reversed camera
+
+There was no capture of the original's WATCH view anywhere in the corpus, so one was driven:
+wine at TOTAL control, title -> career -> MATCH OPTIONS -> **WATCH** -> KICK OFF. Frames are in
+**`tools/re/refs/watch-2026-07-28/`**. They refute `jug_render_spec.md` §5's static conclusion
+that *"yaw/pitch/roll are the constant-0 words `camctrl+0x8c/0x8e/0x90`, so the view matrix is
+pure translation"*: the hoardings run flat across the top as the **far touchline** and the
+halfway line **recedes**, so depth is world **Y** (the width), which a rotation-free matrix
+cannot produce. Recorded as a correction in `jug_render_spec.md` §3b.
+
+* **What IS reversed, exactly**: the projection. `FUN_005eec60` is
+  `sx = ox + u/z`, `sy = oy + v/z`, `z = -(d>>8)`; `SetCamera` composes the diagonal scale
+  `FUN_005eea50(0x10000,k,k)` with `k = ftol(width * 0.00390625 * 65536.0) * camctrl+0x88 >> 16`,
+  and `0.00390625 * 65536 = 256`, so **focal length = the viewport width in pixels**.
+* **What is NOT reversed, and is said so**: the eye (`camctrl+0x3c` — zeroed by its ctor
+  `FUN_005f56a0` @`0x5f56d2`, no other writer in `0x5d7000..0x5f9000`) and the orientation.
+  The POSE is therefore **fitted** to the capture on three exact pitch landmarks (the
+  grass/hoarding seam at world Y=+38 m and the centre circle's two arcs at +/-9.15 m):
+  eye (-6.08, -36.02, 18.65) m, origin (320.4, -72.2), **vertical residuals ~1e-12 px**.
+  Re-run it: `tools/re/fit_watch_camera.py`. Ported: `app/scripts/Pm98Camera.gd`.
+
+### The JUG bank is now indexed the engine's way (A7/A8)
+
+* **`tools/re/export_jug_bank.py`** bakes **all 4211 frames of all 74 kinds** in the real
+  `[direction][phase]` layout with each frame's own `.PGF` anchor, and hard-fails unless the
+  `base[]` total rebuilt by `FUN_005a2830`'s algorithm is exactly 4211. The old
+  `player_base/player_kit` pair — 24 frames in the `[3 phase x 8 dir]` TRANSPOSE — is deleted.
+* **`app/scripts/JugRender.gd`** ports `FUN_005a5460`: `base[kind] + fpd[kind]*dir + phase`,
+  the non-uniform `DAT_006653e0` bucketing, the mode-gated mirror (mode 8 stores all eight and
+  never mirrors; mode 5 stores 0..4 and flips the rest; mode 1 ignores facing; negative mode is
+  a mirror twin on its positive twin's base), the mirrored-14-phase half-cycle shift, and
+  `FUN_005a50c0`'s phase advance with its next-state hand-off.
+* **`CAMERA_YAW` is a quarter turn, derived not assumed**: the billboard axis
+  `sVar23 = cameraYaw - 0x4000` must be perpendicular to a view along +Y, and that choice also
+  puts a player running toward the camera on bank direction 0 — the front-facing frame the
+  bank actually holds.
+* **The `kind` byte was never missing.** `Pm98Movement.set_position_code` IS `FUN_005a5430`,
+  and the `POS_REMAP_LUT` it tests against is literally the next-state table `DAT_00665208`.
+  It was only mislabelled. `Pm98LiveMatch.player_positions()` now exposes `x`/`y`/`z` in raw
+  16.16, plus `facing` (`+0x34`), `kind` (`+0x40`) and `phase` (`+0x2c`).
+* **Axes measured, not inferred** (`app/tests/diag_watch_axes.gd`): world **X = pitch LENGTH**
+  (`+0x1820`, +/-58 m at Old Trafford), **Y = WIDTH** (`+0x1824`, +/-38 m), **Z = height**.
+
+### The view itself
+
+`MatchSimulador` draws a 3/4 perspective pitch: mown bands along the depth axis in the two
+greens sampled from the capture, the markings and both goals as projected world geometry with
+near-plane clipping, the hoarding + terrace band from DATSIM's own HIERPREM tiles at their
+measured heights, 22 JUG billboards sized from each frame's own anchor and the `0x1b333/0x30`
+world scale (a standing frame is 1.63 m), drop shadows, and the original's slim top-left score
+line plus the ball carrier's shirt number and name bottom-right.
+
+Proven in the REAL APP under Xvfb + GL (`PM98_LIVEWATCH_SHOT=1`), not only headless. Gate
+**`app/tests/test_jug_render.gd`** (29 assertions) + the reworked `test_match_simulador`, both
+added to the CI gate (30 -> 32 tests); the representative slice re-run green here.
+
+### Still open on the match view, stated plainly
+
+1. **The per-club kit ramps.** `DatSim\paletas\P96A####.DAT` / `P96B####.DAT` (829 of each,
+   192 bytes = 64 RGB entries, plus one 256-byte `P96A0000.DAT` index remap) are decoded, but
+   **which palette slots they write is NOT reversed**. The kit is therefore a two-colour
+   stand-in — tinted shirt + neutral shorts/socks — split on the art's own per-band histogram,
+   not on the loader. Reversing `FUN_005b645d` / `FUN_005b6771`'s target slots closes it.
+2. **The camera does not move.** The original's does: `FUN_005f5850` runs a shot-transition
+   system (eye `+0x48`/`+0x54`, look-at `+0x60`/`+0x6c`, zoom `+0x80`/`+0x84`, lerped per
+   frame), and the capture shows it cutting to a close, low angle on a goal. Not ported.
+3. **The pitch marking geometry is the laws of the game**, scaled to the session's own length
+   and width, because PM98 stores only those two figures. Declared, not source-read.
+4. **`JUGCAM.IND`'s record layout** and its consumer are still a gap (unchanged from §5 of
+   `jug_render_spec.md`).
+5. **HIGHLIGHTS (`3D ENGINE`) still cannot be built** — its `.p3d` models are absent from the
+   shipped files. Unchanged: a DATA gap, not a work gap.
+6. **The real-device pass** is still the missing half of the performance answer (desktop does
+   63.6 engine frames/s; the phone is unmeasured).
+
+### NOT touched this session, said plainly
+
+**B9** (the youth loop's three visual gaps), the **cup channelTV fee**, the whole **P2 data
+tail** (~876 directory-only foreign teams, the LZ-packed `DAT.PKF`/`DATSIM.PKF` rating tables,
+the 48x64 MINIESC bank's missing 56 px, the 10 corrected-by-mapping stadium tiles, "free if
+relegated", the unmanaged-club release ladder), the **`KnockoutScreen` -> `PMShadow` refactor**
+and the **doc-hygiene tail**. All stay exactly as written below.
+
 ## 0aaaaaa. Closed 2026-07-28 (session s74) — THE M5 WIRE-IN, and the lower-division drive
 
 ### The M5 wire-in — DONE, and the framing it was carrying was WRONG

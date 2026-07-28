@@ -44,13 +44,22 @@ Comment: *"(don't invent a table) — flagged for the season-loop pass."* The le
 yet computed from a real season loop. **Honest gap, already flagged.** Do not populate with an
 invented standings table; build the season loop or show the honest empty/seed state.
 
-### A6 — GAP · `MatchSimulador.gd` side-on camera/layout
-The side-on simulador's band layout / camera / per-tick positions are **app substitutes**
-(PCF5DAT not reversed — INVENTORY §5.1). The art tiles are 100% source; the geometry is not.
-**Action:** never present the side-on view as source-faithful geometry; keep the documented
-"faithful substitute, not invented match data" framing (`MatchSimulador.gd:20`).
+### A6 — CLOSED 2026-07-28 · the side-on camera is gone; the view is a 3/4 camera now
+~~The side-on simulador's band layout / camera / per-tick positions are **app substitutes**
+(PCF5DAT not reversed — INVENTORY §5.1).~~ **Both halves of that were wrong.**
+* `PCF5DAT.PKF` is **not** the pitch. Its only reference in `MANAGER.EXE` (@`0x4f82ed`) opens
+  it, seeks `0xecbf` and reads six bytes `D.G.C.` — a CD-presence check. Full disassembly and
+  the byte read: **`docs/re/pcf5dat_re.md`**. The simulador's art is DATSIM's own throughout.
+* The view is rebuilt on **`Pm98Camera`**, which is `FUN_005eec60`'s own projection with the
+  focal length `SetCamera` computes (`k = width*256*zoom` ⇒ focal = viewport width in px). It
+  looks ACROSS the pitch, depth along world Y, as the game's own capture does.
+**Still declared, and small:** the camera POSE is a FIT to a real WATCH capture
+(`tools/re/fit_watch_camera.py`, `tools/re/refs/watch-2026-07-28/`, vertical residuals ~1e-12
+px), because the eye `camctrl+0x3c` and the orientation are not reversed — `Pm98Camera`'s
+header states exactly why. Marking geometry inside the pitch rectangle is the laws of the
+game, since PM98 stores only length and width.
 
-### A7 — RESOLVED 2026-07-01 · engine sprite-select recovered; `_facing()` model was invented
+### A7 — RESOLVED 2026-07-01, and now BUILT 2026-07-28 (see A8)
 The engine player-draw is **`FUN_005a5460`** (`docs/re/move/fn_005a5460_FUN_005a5460.c`), reached
 via JUG loader `FUN_005923f0` (`jug.pgf`→`ctx+0x2468`) / `.PGF` parser `FUN_005d3f60`. Full recovered
 spec: **`docs/re/jug_render_spec.md`**. The frame index (`:337/343`) is
@@ -68,7 +77,24 @@ sprite under a fixed 3/4 camera — **it has no side-on 2D view at all.**
 `export_match_art.py` (behaviour unchanged — no invented remap applied); the side-on WATCH view is now
 labelled a documented app approximation, consistent with the already-noted app-choice camera/tiling.
 
-### A8 — GAP (opened by A7) · faithful JUG render not built; side-on WATCH view is an approximation
+### A8 — CLOSED 2026-07-28 · the faithful JUG render is built
+**`tools/re/export_jug_bank.py`** bakes all 4211 frames of all 74 kinds in the engine's own
+`[direction][phase]` order (hard-failing unless the reconstructed `base[]` total is exactly
+4211), and **`app/scripts/JugRender.gd`** ports the selection arithmetic: `base[kind] +
+fpd[kind]*dir + phase`, the non-uniform `DAT_006653e0` bucketing, the mode-gated mirror with
+its 14-phase half-cycle shift, and `FUN_005a50c0`'s phase advance. `kind` / `phase` / `facing`
+come off the live engine's own `player+0x40` / `+0x2c` / `+0x34` — the `kind` byte was never
+missing, only mislabelled: `Pm98Movement.set_position_code` IS `FUN_005a5430` and its
+`POS_REMAP_LUT` is literally the next-state table `DAT_00665208`.
+Gate: **`app/tests/test_jug_render.gd`**, 29 assertions, green. Rendered in the real app under
+Xvfb + GL via `PM98_LIVEWATCH_SHOT=1`.
+**Open, and named:** the per-club kit ramps `DatSim\paletas\P96A####.DAT` / `P96B####.DAT`
+(829 of each, 64 RGB entries) are decoded but the palette slots they write are NOT reversed,
+so the kit is a two-colour stand-in (tinted shirt + neutral shorts/socks) read off the art's
+own per-band histogram. The camera does not move; the original's does (`FUN_005f5850` runs a
+shot-transition system that is not ported).
+
+#### A8 — the historical record (what the gap was)
 A source-faithful player render needs §2 `[dir][phase]` indexing + §3 mirror against a recovered
 camera angle, plus the `kind` byte and the un-reversed PCF5DAT 3/4 tile-scroll camera. Until those
 land the WATCH sprites are a stylised slice (the baked 24 frames are ~1-2 real directions' phases,

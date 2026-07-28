@@ -5,14 +5,12 @@ Reads the originals out of DATSIM.PKF (extracted on the fly), decodes the cracke
 PGF sprite format (see pgf_decode.py / docs/re/match_view_re.md), recolours the
 player kit, and writes ready-to-use RGBA PNG atlases under app/art/match/:
 
-  player_base.png / player_kit.png  — a STYLISED 24-frame slice of JUG.PGF for the
-        side-on WATCH view, kit split off (luma layer tinted per club at runtime).
-        NOTE: this grid is an app construct, NOT the engine layout. The real engine
-        lays JUG out per-kind as [direction][phase] (direction OUTER), stores only 5
-        unique directions + a render-side horizontal mirror, and buckets direction by
-        camera-relative perspective thresholds — see docs/re/jug_render_spec.md
-        (FUN_005a5460). `fr[row*8+d]` below is the transpose of that and does not map
-        frames to compass facings; the WATCH view is a documented approximation.
+  ⛔ The player sprites are NOT baked here any more. This module used to write a stylised
+     24-frame `player_base.png` / `player_kit.png` pair laid out `[3 phase x 8 dir]` — the
+     TRANSPOSE of the real bank, and only ~24 of its 4211 frames (AUDIT A7). Both files are
+     deleted. The engine-layout bake is **tools/re/export_jug_bank.py**, which emits
+     `jug_base.png` / `jug_kit.png` / `jug_bank.json` for all 74 kinds.
+
   ball.png    — a single clean on-ground football, idx0/bg keyed out.
   arrow.png   — the 8-angle COFLECHA selection arrow (active-player marker).
 
@@ -22,10 +20,11 @@ player kit, and writes ready-to-use RGBA PNG atlases under app/art/match/:
   sky.png     — CIELO1.BMP, the original 640x480 sky backdrop.
   goal_net.png— RED.BMP goal-net mesh, black backing keyed out.
 
-The WATCH simulador (app/scenes/MatchSimulador.gd) composes the side-on stadium from
-these REAL tiles — no invented pitch art. Only the tile LAYOUT / camera is the app's
-choice, because PCF5DAT's exact 3/4 tile-scroll camera was not reversed (documented in
-docs/re/match_view_re.md, same honesty as the STADIUM pre-render approach).
+The WATCH simulador (app/scenes/MatchSimulador.gd) composes its stands from these REAL
+tiles under the reversed 3/4 camera (app/scripts/Pm98Camera.gd). The old note here — "the
+camera is the app's choice because PCF5DAT's tile-scroll camera was not reversed" — was
+wrong on its premise: PCF5DAT.PKF is a CD-presence check, not the pitch background
+(docs/re/pcf5dat_re.md).
 """
 from __future__ import annotations
 
@@ -62,46 +61,6 @@ def pgf_frames(name):
         out.append((W, H, h[2], b[off + 28 : off + 28 + W * H]))
         off += 28 + W * H
     return out
-
-
-# The JUG base kit is the green shading ramp (PALETA indices 16..42) plus a set of
-# saturated VGA placeholder indices the original remaps via the team kit-LUT. We fold
-# both into the kit so the shirt/shorts recolour solidly instead of speckling.
-KIT_IDX = set(range(16, 43)) | {1, 2, 4, 5, 6, 9}
-
-
-def _kit_luma(rgb):
-    """Kit-ramp pixel -> a luma the match view tints per club (modulate x club colour)."""
-    r, g, b = rgb
-    luma = min(255, int(0.30 * r + 0.59 * g + 0.11 * b) + 60)   # lift so dark kit shades still read
-    return (luma, luma, luma)
-
-
-def player_layers(pal):
-    """Split JUG into a true-colour BASE (skin/boots/detail) + a kit-LUMA layer, so the
-    match view can tint the kit to each club's real colour at runtime (no shader)."""
-    base = Image.new("RGBA", (CELL_W * DIRS, CELL_H * ANIM_ROWS), (0, 0, 0, 0))
-    kit = Image.new("RGBA", (CELL_W * DIRS, CELL_H * ANIM_ROWS), (0, 0, 0, 0))
-    bp, kp = base.load(), kit.load()
-    fr = pgf_frames("JUG.PGF")
-    for row in range(ANIM_ROWS):
-        for d in range(DIRS):
-            W, H, ax, px = fr[row * 8 + d]
-            dst_x = d * CELL_W + (CELL_W - W) // 2
-            dst_y = row * CELL_H + (CELL_H - H)          # bottom-align (feet on cell floor)
-            for y in range(H):
-                for x in range(W):
-                    v = px[y * W + x]
-                    if not v:
-                        continue
-                    if v in KIT_IDX:
-                        kp[dst_x + x, dst_y + y] = (*_kit_luma(pal[v]), 255)
-                    else:
-                        bp[dst_x + x, dst_y + y] = (*pal[v], 255)
-    pb, pk = OUT / "player_base.png", OUT / "player_kit.png"
-    base.save(pb)
-    kit.save(pk)
-    return pb, pk
 
 
 def ball_png(pal):
@@ -195,8 +154,7 @@ def main():
         raise SystemExit(f"extract DATSIM first: python3 {PKF} --extract /tmp/datsim_out DATSIM.PKF")
     OUT.mkdir(parents=True, exist_ok=True)
     pal = load_pal()
-    pb, pk = player_layers(pal)
-    wrote = [pb, pk, ball_png(pal), arrow_png(pal)]
+    wrote = [ball_png(pal), arrow_png(pal)]
     wrote += stadium_tiles(pal)
     for f in wrote:
         print("wrote", f.relative_to(ROOT), Image.open(f).size)

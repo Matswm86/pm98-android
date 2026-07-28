@@ -4,37 +4,36 @@ class_name MatchSimulador
 ## Premier Manager 98 reskins). Reached from the reversed MATCH OPTIONS picker's WATCH
 ## button (docs/re/match_view_re.md, FUN_004e2630). This is build-plan step 3.
 ##
-## SOURCE FIDELITY (honest, same convention as MatchScreen's vectorial pitch):
-##   * Player / ball / arrow sprites are the REAL DATSIM.PKF art, decoded by
-##     tools/re/pgf_decode.py and baked by tools/re/export_match_art.py into
-##     app/art/match/{player_base,player_kit,ball,arrow}.png. The 26x52 sprite grid is a
-##     STYLISED 24-frame slice — the real engine lays JUG out per-kind as [direction][phase]
-##     with 5 unique dirs + mirror and camera-relative perspective bucketing (NOT an 8-compass;
-##     see docs/re/jug_render_spec.md / AUDIT A7). The pixels are real DATSIM art; the grid
-##     labelling and side-on facing are the app's approximation. The kit layer is a luma sheet
-##     the view tints per club at runtime (modulate x club colour) — exactly what the exporter
-##     split it for. BALON.RAW -> ball.png, COFLECHA.PGF -> arrow.png (active marker).
-##   * The pitch surface + markings are drawn vectorially. The original's exact
-##     PCF5DAT 3/4 tile-scroll camera is NOT in the reversed source we hold.
-##   * MOTION: since the M5 wire-in (2026-07-28) a live match is driven by the POSITIONAL
-##     engine and the coordinates drawn ARE the original's own (see Pm98LiveMatch). With no
-##     live match the view still interpolates the MatchCommentary timeline the BRIEF view
-##     uses, so both stay in lock-step on clock / score / possession.
+## REBUILT 2026-07-28 onto the original's own presentation. What changed and why it is now
+## defensible (the previous side-on framing is gone — AUDIT A6/A7/A8 are addressed, not
+## restated):
 ##
-## ⛔ THIS VIEW IS NOT THE ORIGINAL'S PRESENTATION — never call it faithful.
-## APP_VS_SPEC_AUDIT A6/A7/A8, restated here so it cannot be missed:
-##   * The original has NO SIDE-ON 2D VIEW AT ALL. It renders a pseudo-3D two-billboard
-##     sprite under a FIXED 3/4 camera. This side-on framing is an app construct.
-##   * `_facing()`'s uniform-45° atan2 is an INVENTION. The engine buckets direction on the
-##     non-uniform perspective thresholds DAT_006653e0, stores only 5 directions and mirrors
-##     the rest (jug_render_spec.md §3).
-##   * The baked sprite sheet is the TRANSPOSE of the real JUG layout: the engine lays the
-##     bank out per kind as [direction][phase] across 74 kinds; export_match_art.py baked
-##     [3 phase × 8 dir]. The 24 baked frames are ~1-2 real directions' phases, not 8 facings.
-## The engine's POSITIONS are exact; the CAMERA, the FACING and the SPRITE GRID are not.
-## Fixing it is mostly assembly rather than research — jug_render_spec.md already has the
-## bank layout, the direction thresholds and the camera (translation + projection scale, no
-## rotation) reversed. Only PCF5DAT, the pitch background, is a hard gap.
+##   * **3/4 PERSPECTIVE CAMERA, not side-on.** `Pm98Camera` is the binary's own projection
+##     (`FUN_005eec60`, focal length = viewport width from `SetCamera`'s `k = width*256*zoom`),
+##     with its POSE fitted to a REAL WATCH capture of the running game
+##     (`tools/re/refs/watch-2026-07-28/`, fit by `tools/re/fit_watch_camera.py`, vertical
+##     residuals ~1e-12 px). The camera looks ACROSS the pitch — depth is world Y, the width
+##     axis — which is what the capture shows and what the old side-on view got wrong.
+##   * **The JUG bank is indexed the engine's way.** `JugRender` ports `FUN_005a5460`'s
+##     `base[kind] + fpd[kind]*dir + phase` over all 74 kinds and 4211 frames, buckets
+##     direction on the non-uniform thresholds `DAT_006653e0` (NOT a uniform-45 `atan2`),
+##     applies the mode-gated mirror, and takes `kind` / `phase` / `facing` from the live
+##     engine's own `player+0x40` / `+0x2c` / `+0x34`. The old `[3 phase x 8 dir]` bake — the
+##     transpose of the real layout — and `_facing()` are both deleted.
+##   * **The pitch background is not a gap.** `PCF5DAT.PKF` was believed to hold it; it does
+##     not. Its ONLY reference in `MANAGER.EXE` (@0x4f82ed) opens it, seeks 0xecbf and reads
+##     six bytes `D.G.C.` — a CD-presence check. The simulador's art is DATSIM's own
+##     (`campina.raw` @0x59311f, `hierprem.raw` @0x59302c, `cielo1.bmp`, `red.bmp`, `jug.pgf`).
+##     See `docs/re/pcf5dat_re.md`.
+##   * **MOTION is the original's engine.** A live match runs the byte-exact positional sim
+##     (`Pm98LiveMatch`); with no live match the view interpolates the same MatchCommentary
+##     timeline the BRIEF view uses, through the same camera, so the two stay in lock-step.
+##
+## DECLARED (ours, and small): the camera POSE is a FIT, because the eye `camctrl+0x3c` and
+## the orientation are not reversed (`Pm98Camera` documents exactly why); the pitch MARKING
+## geometry is the laws of the game scaled to the session's own pitch dims, since PM98 stores
+## only length and width; the stand/hoarding band above the far touchline is composed from
+## DATSIM's own HIERPREM tiles at a measured height. Nothing here is drawn from imagination.
 ##
 ## Without a live match the view is a pure function of the match minute over the timeline;
 ## _process advances the clock, seek() drives the minute for tests / screenshots.
@@ -46,15 +45,37 @@ const W := 640
 const H := 480
 const MIN_PER_SEC := 3.6           # match minutes per real second (matches MatchScreen)
 
-# Side-on stadium bands (640x480 design space). The pitch is the grass band; home attacks
-# RIGHT, away attacks LEFT — the original PC-Futbol simulador's side camera. Every band is
-# filled with REAL DATSIM art (sky CIELO1, crowd + board + grass HIERPREM); the band layout
-# is the app's choice because PCF5DAT's exact tile-scroll camera was not reversed.
-const SKY := Rect2(0, 0, 640, 64)
-const CROWD := Rect2(0, 46, 640, 40)
-const BOARD := Rect2(0, 86, 640, 22)
-const PITCH := Rect2(20, 108, 600, 308)     # grass play area (ny=0 far, ny=1 near)
-const GOAL_DEPTH := 0.30                     # goal mouth half-height as a fraction of depth
+# --- pitch, in METRES about the centre spot ---------------------------------
+# Defaults are Old Trafford's, the figures `diag_watch_axes.gd` measured off the engine's own
+# `match+0x1820` / `+0x1824`; a live match overrides them with its session's real dims.
+const DEF_HALF_LEN := 58.0
+const DEF_HALF_WID := 38.0
+# Marking geometry: the laws of the game. PM98 stores only the pitch's length and width, so
+# everything inside them is the standard layout — declared, and the same in every stadium.
+const CIRCLE_R := 9.15
+const PEN_DEPTH := 16.5
+const PEN_HALF_W := 20.16
+const GOALAREA_DEPTH := 5.5
+const GOALAREA_HALF_W := 9.16
+const PEN_SPOT := 11.0
+const CORNER_R := 1.0
+const GOAL_HALF_W := 3.66
+const GOAL_H := 2.44
+# Grass, sampled off the original capture (tools/re/refs/watch-2026-07-28/watch_02.png):
+# base (41,71,35) with the mown bands running ALONG the depth axis, so their edges are
+# constant-X lines — which is exactly how they read in the capture.
+const GRASS_A := Color8(41, 71, 35)
+const GRASS_B := Color8(38, 64, 34)
+const GRASS_LIGHT := Color8(43, 85, 38)
+const STRIPE_W := 8.0                        # metres per mown band
+const LINE_COL := Color8(214, 218, 214)
+# The hoarding + terrace band above the far touchline, in metres of real height.
+const BOARD_H := 1.05
+const STAND_H := 14.0
+## Nothing nearer than this is drawn. The camera is 2 m past the near touchline, so the near
+## half of the pitch genuinely runs behind the lens — the binary's own guard is the
+## `(d & 0xffffff00) == 0 -> z = -1` clamp in FUN_005eec60.
+const NEAR_PLANE := 3.0
 
 # Buttons (bottom bar)
 const BRIEF_BTN := Rect2(14, 449, 150, 26)
@@ -81,16 +102,14 @@ const C_BTN_LO := Color(0.03, 0.06, 0.16)
 const C_HOME_DEF := Color(0.86, 0.20, 0.20)    # fallback kit tints if no escudo colour
 const C_AWAY_DEF := Color(0.24, 0.42, 0.86)
 
-const CELL_W := 26
-const CELL_H := 52
-const SPR_SC := 0.62               # on-pitch sprite scale
+var _cam := Pm98Camera.new()
+var _half_len := DEF_HALF_LEN
+var _half_wid := DEF_HALF_WID
 
 var _base: Texture2D
 var _kit: Texture2D
 var _ball: Texture2D
 var _arrow: Texture2D
-var _sky: Texture2D
-var _grass: Texture2D
 var _crowd: Texture2D
 var _board: Texture2D
 var _net: Texture2D
@@ -109,11 +128,12 @@ var _minute := 0.0
 var _t := 0.0                      # free-running time for liveliness (not score-bearing)
 var _playing := true
 var _press := -1
-# remembered facing per player so an idle sprite doesn't snap to frame 0
-var _home_face := PackedInt32Array()
-var _away_face := PackedInt32Array()
 var _home_prev: Array = []
 var _away_prev: Array = []
+## Per-drawn-player {kind, phase} for the TIMELINE path only. A live match takes all three
+## animation inputs off the engine's own player record instead — see `_draw_teams_live`.
+var _anim: Array = []
+var _anim_acc := 0.0
 
 # ---- LIVE ENGINE (the M5 wire-in) -----------------------------------------
 # When `set_live()` has been called this view stops interpolating a finished timeline and
@@ -133,22 +153,25 @@ var _live_feed: Array = []         # goal lines the engine raised, newest last
 
 
 func _ready() -> void:
-	_base = _tex("res://art/match/player_base.png")
-	_kit = _tex("res://art/match/player_kit.png")
+	# The engine-layout JUG bank (74 kinds x [direction][phase], 4211 frames). The old
+	# player_base/player_kit pair was the transposed 24-frame slice and is gone.
+	_base = _tex("res://art/match/jug_base.png")
+	_kit = _tex("res://art/match/jug_kit.png")
 	_ball = _tex("res://art/match/ball.png")
 	_arrow = _tex("res://art/match/arrow.png")
-	_sky = _tex("res://art/match/sky.png")
-	_grass = _tex("res://art/match/grass.png")
 	_crowd = _tex("res://art/match/crowd.png")
 	_board = _tex("res://art/match/board_pm98.png")
 	_net = _tex("res://art/match/goal_net.png")
 	_f18 = _font("res://art/fonts/proman18.fnt", "res://art/fonts/proman14.fnt")
 	_f12 = _font("res://art/fonts/proman12.fnt", "res://art/fonts/proman10.fnt")
 	_f10 = _font("res://art/fonts/proman10.fnt", "res://art/fonts/proman12.fnt")
-	_home_face.resize(11)
-	_away_face.resize(11)
 	_home_prev.resize(11)
 	_away_prev.resize(11)
+	_anim.clear()
+	for i in 22:
+		# kind 3 is the fastest of the four gait tiers (mode 5, 14 phases, self-looping);
+		# staggering the phase keeps 22 timeline-path players from marching in lock-step.
+		_anim.append({"kind": 3, "phase": i % 14})
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2(W, H)
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -335,9 +358,27 @@ func _process(delta: float) -> void:
 	_t += delta
 	if _live != null:
 		_step_live(delta)
-	elif _playing and _minute < 90.0:
-		_minute = minf(90.0, _minute + delta * MIN_PER_SEC)
+	else:
+		if _playing and _minute < 90.0:
+			_minute = minf(90.0, _minute + delta * MIN_PER_SEC)
+		_step_anim(delta)
 	queue_redraw()
+
+
+## TIMELINE path only: run `FUN_005a50c0`'s own phase advance for each drawn player, so even
+## the no-live-match view animates through the real bank rather than a modulo of wall clock.
+## A live match never comes here — its `phase` is the engine's own `player+0x2c`.
+func _step_anim(delta: float) -> void:
+	_anim_acc += delta * JugRender.ANIM_HZ
+	var steps: int = mini(int(_anim_acc), 6)
+	if steps <= 0:
+		return
+	_anim_acc -= float(steps)
+	for i in _anim.size():
+		var st: Dictionary = _anim[i] if _anim[i] is Dictionary else {"kind": 3, "phase": 0}
+		for _s in steps:
+			st = JugRender.advance(int(st["kind"]), int(st["phase"]))
+		_anim[i] = st
 
 
 ## Advance the positional engine by the frames this display frame is worth, then read the
@@ -410,20 +451,19 @@ func _btn_at(d: Vector2) -> int:
 
 # ---- field <-> screen ------------------------------------------------------
 
-func _field(nx: float, ny: float) -> Vector2:
-	return Vector2(PITCH.position.x + clampf(nx, 0.0, 1.0) * PITCH.size.x,
-		PITCH.position.y + clampf(ny, 0.0, 1.0) * PITCH.size.y)
+## Normalised pitch coords (the timeline path's own space, nx along the length, ny across the
+## width) -> WORLD metres about the centre spot, so both paths feed one camera.
+func _world(nx: float, ny: float, z := 0.0) -> Vector3:
+	return Vector3((clampf(nx, 0.0, 1.0) * 2.0 - 1.0) * _half_len,
+		(clampf(ny, 0.0, 1.0) * 2.0 - 1.0) * _half_wid, z)
 
 
-## Ball position in SCREEN coords. On a LIVE match this is the engine's own ball, with its
-## +0xc height lifting the sprite off the deck; otherwise it is the timeline-driven flow.
-func _ball_field() -> Vector2:
+## Ball position in WORLD metres. On a LIVE match this is the engine's own ball, `+0xc` height
+## included; otherwise it is the timeline-driven flow.
+func _ball_world() -> Vector3:
 	if _live != null:
 		var b := _live.ball_position()
-		var p := _field(float(b["nx"]), float(b["ny"]))
-		# The engine's ball height is metres; the side-on view lifts the sprite by the same
-		# fraction of the pitch depth a player's height occupies, so a lofted ball reads.
-		return Vector2(p.x, p.y - clampf(float(b["height"]), 0.0, 12.0) * 2.2)
+		return _world(float(b["nx"]), float(b["ny"]), clampf(float(b["height"]), 0.0, 20.0))
 	var atk := _attacking_side(_minute)
 	# home (0) attacks the RIGHT goal (nx~0.80), away (1) the LEFT (nx~0.20)
 	var tx := 0.5
@@ -441,7 +481,7 @@ func _ball_field() -> Vector2:
 		var goal_x := 0.96 if int(gp["side"]) == 0 else 0.04
 		nx = lerpf(nx, goal_x, k)
 		ny = lerpf(ny, 0.5, k)
-	return _field(clampf(nx, 0.04, 0.96), clampf(ny, 0.04, 0.96))
+	return _world(clampf(nx, 0.04, 0.96), clampf(ny, 0.04, 0.96))
 
 
 # ---- drawing ---------------------------------------------------------------
@@ -452,37 +492,179 @@ func _draw() -> void:
 	# minute and scoreline instead of a stale 0:0.
 	if _live != null:
 		_sync_live()
+		var half := _live.pitch_half()
+		if half.x > 0 and half.y > 0:
+			_half_len = Pm98Camera.fx(half.x)
+			_half_wid = Pm98Camera.fx(half.y)
 	draw_rect(Rect2(Vector2.ZERO, size), C_BG, true)
 	var s := _scale()
 	draw_set_transform(_origin(s), 0.0, Vector2(s, s))
 
+	_draw_stands()
 	_draw_pitch()
-	var ball := _ball_field()
+	var ball := _ball_world()
 	_draw_teams(ball)
 	_draw_ball(ball)
 	_draw_hud()
 	_draw_buttons()
 
 
-## The side-on stadium, composed entirely from REAL DATSIM tiles (sky / crowd / board /
-## grass) plus the real goal net. Only the band layout is the app's choice.
+## Everything beyond the FAR touchline: the advertising hoardings and the terrace above them,
+## both from DATSIM's own HIERPREM atlas. They sit at a constant depth, so the camera gives
+## their screen band directly — no invented horizon line.
+func _draw_stands() -> void:
+	var far := _cam.project(Vector3(0.0, _half_wid, 0.0)).y
+	var board_top := _cam.project(Vector3(0.0, _half_wid, BOARD_H)).y
+	var stand_top := _cam.project(Vector3(0.0, _half_wid, STAND_H)).y
+	draw_rect(Rect2(0, 0, W, maxf(stand_top, 0.0)), Color8(20, 24, 30), true)
+	_tile(_crowd, Rect2(0, stand_top, W, maxf(board_top - stand_top, 1.0)))
+	_tile(_board, Rect2(0, board_top, W, maxf(far - board_top, 1.0)))
+
+
+## The playing surface: mown bands running ALONG the depth axis (so their edges are
+## constant-X lines, which is how they read in the original capture), then the markings, then
+## the two goals. Every band and line is a projected WORLD quantity, so the perspective is the
+## camera's rather than a hand-drawn trapezoid.
 func _draw_pitch() -> void:
-	if _sky != null:
-		draw_texture_rect(_sky, SKY, false)
-	else:
-		draw_rect(SKY, Color(0.45, 0.62, 0.85), true)
-	_tile(_crowd, CROWD)
-	_tile(_board, BOARD)
-	_tile(_grass, PITCH)
-	# subtle far-touchline shade where the grass meets the boards
-	draw_rect(Rect2(PITCH.position.x, PITCH.position.y, PITCH.size.x, 2), Color(0, 0, 0, 0.22), true)
-	_draw_goals()
+	var hl := _half_len
+	var hw := _half_wid
+	# grass out to a margin beyond the touchlines, as the original shows
+	var m := 6.0
+	var x := -hl - m
+	var i := 0
+	while x < hl + m:
+		var x1: float = minf(x + STRIPE_W, hl + m)
+		_ground_quad(x, x1, -hw - m, hw + m, GRASS_A if i % 2 == 0 else GRASS_B)
+		x = x1
+		i += 1
+	# a light band where the mower turned, sampled from the capture
+	_ground_quad(-hl - m, hl + m, hw - 2.0, hw + m, GRASS_LIGHT)
+
+	_line([Vector3(-hl, -hw, 0), Vector3(hl, -hw, 0)])
+	_line([Vector3(-hl, hw, 0), Vector3(hl, hw, 0)])
+	_line([Vector3(-hl, -hw, 0), Vector3(-hl, hw, 0)])
+	_line([Vector3(hl, -hw, 0), Vector3(hl, hw, 0)])
+	_line([Vector3(0, -hw, 0), Vector3(0, hw, 0)])
+	_arc(Vector2.ZERO, CIRCLE_R, 0.0, TAU, 48)
+	_spot(Vector2.ZERO)
+	for s in [-1.0, 1.0]:
+		var sgn: float = s
+		var gx: float = sgn * hl
+		var px: float = sgn * (hl - PEN_DEPTH)
+		var ax: float = sgn * (hl - GOALAREA_DEPTH)
+		_line([Vector3(gx, -PEN_HALF_W, 0), Vector3(px, -PEN_HALF_W, 0),
+			Vector3(px, PEN_HALF_W, 0), Vector3(gx, PEN_HALF_W, 0)])
+		_line([Vector3(gx, -GOALAREA_HALF_W, 0), Vector3(ax, -GOALAREA_HALF_W, 0),
+			Vector3(ax, GOALAREA_HALF_W, 0), Vector3(gx, GOALAREA_HALF_W, 0)])
+		var spot := Vector2(sgn * (hl - PEN_SPOT), 0.0)
+		_spot(spot)
+		# the D: the arc of radius 9.15 about the spot that lies OUTSIDE the penalty area
+		var half_ang := acos(clampf((PEN_DEPTH - PEN_SPOT) / CIRCLE_R, -1.0, 1.0))
+		var base := 0.0 if sgn < 0.0 else PI
+		_arc(spot, CIRCLE_R, base - half_ang, base + half_ang, 20)
+		for sy in [-1.0, 1.0]:
+			_arc(Vector2(gx, sy * hw), CORNER_R, 0.0, TAU, 12)
+		_draw_goal(sgn)
+
+
+## A goal, drawn as real 3D geometry: two posts, the crossbar, and the net panel between
+## them. RED.BMP (the game's own net mesh) fills the mouth.
+func _draw_goal(sgn: float) -> void:
+	var gx := sgn * _half_len
+	var back := gx + sgn * 1.8
+	var tl := _cam.project(Vector3(gx, -GOAL_HALF_W, GOAL_H))
+	var tr := _cam.project(Vector3(gx, GOAL_HALF_W, GOAL_H))
+	var bl := _cam.project(Vector3(gx, -GOAL_HALF_W, 0.0))
+	var br := _cam.project(Vector3(gx, GOAL_HALF_W, 0.0))
+	if _net != null:
+		var r := Rect2(minf(tl.x, bl.x), minf(tl.y, tr.y),
+			absf(tr.x - tl.x), maxf(bl.y, br.y) - minf(tl.y, tr.y))
+		if r.size.x > 1.0 and r.size.y > 1.0:
+			draw_texture_rect(_net, r, false, Color(1, 1, 1, 0.75))
+	_line([Vector3(back, -GOAL_HALF_W, 0), Vector3(back, -GOAL_HALF_W, GOAL_H),
+		Vector3(back, GOAL_HALF_W, GOAL_H), Vector3(back, GOAL_HALF_W, 0)], Color8(180, 186, 190))
+	_line([Vector3(gx, -GOAL_HALF_W, 0), Vector3(gx, -GOAL_HALF_W, GOAL_H)], Color.WHITE, 2.0)
+	_line([Vector3(gx, GOAL_HALF_W, 0), Vector3(gx, GOAL_HALF_W, GOAL_H)], Color.WHITE, 2.0)
+	_line([Vector3(gx, -GOAL_HALF_W, GOAL_H), Vector3(gx, GOAL_HALF_W, GOAL_H)], Color.WHITE, 2.0)
+
+
+## Fill a ground-plane rectangle (world metres) as its projected quad, clipped to the near
+## plane. The camera sits 2 m PAST the near touchline, so most pitch geometry crosses it —
+## dropping such geometry (the first cut of this did) silently loses the halfway line and half
+## the mown bands.
+func _ground_quad(x0: float, x1: float, y0: float, y1: float, col: Color) -> void:
+	var ny: float = maxf(y0, _cam.eye.y + NEAR_PLANE)
+	if y1 <= ny:
+		return
+	var pts := PackedVector2Array([
+		_cam.project(Vector3(x0, y1, 0)), _cam.project(Vector3(x1, y1, 0)),
+		_cam.project(Vector3(x1, ny, 0)), _cam.project(Vector3(x0, ny, 0))])
+	draw_colored_polygon(pts, col)
+
+
+## Project a world polyline and stroke it, clipping every segment at the near plane instead of
+## discarding lines that cross it. Line width follows the nearest surviving point's scale, so
+## a far touchline thins out the way the original's does.
+func _line(pts: Array, col := LINE_COL, w := 0.0) -> void:
+	var out := PackedVector2Array()
+	var width := w
+	var prev: Variant = null
+	for p in pts:
+		var v: Vector3 = p
+		var inside := _cam.depth(v) > NEAR_PLANE
+		if prev != null:
+			var u: Vector3 = prev
+			var u_in := _cam.depth(u) > NEAR_PLANE
+			if u_in != inside:
+				var clipped := _clip_near(u, v)
+				if out.is_empty() and inside:
+					out.append(_cam.project(clipped))
+				elif not inside:
+					out.append(_cam.project(clipped))
+					_stroke(out, col, width, w)
+					out = PackedVector2Array()
+		if inside:
+			out.append(_cam.project(v))
+			if w == 0.0:
+				width = maxf(width, _cam.scale_at(_cam.depth(v)) * 0.12)
+		prev = v
+	_stroke(out, col, width, w)
+
+
+func _stroke(out: PackedVector2Array, col: Color, width: float, w: float) -> void:
+	if out.size() >= 2:
+		draw_polyline(out, col, clampf(width if w == 0.0 else w, 1.0, 4.0))
+
+
+## The point where segment a->b crosses the near plane.
+func _clip_near(a: Vector3, b: Vector3) -> Vector3:
+	var da := _cam.depth(a)
+	var db := _cam.depth(b)
+	if is_equal_approx(da, db):
+		return b
+	return a.lerp(b, (NEAR_PLANE - da) / (db - da))
+
+
+func _arc(centre: Vector2, r: float, from_a: float, to_a: float, steps: int) -> void:
+	var pts: Array = []
+	for i in steps + 1:
+		var a := lerpf(from_a, to_a, float(i) / float(steps))
+		pts.append(Vector3(centre.x + cos(a) * r, centre.y + sin(a) * r, 0.0))
+	_line(pts)
+
+
+func _spot(centre: Vector2) -> void:
+	var p := _cam.project(Vector3(centre.x, centre.y, 0.0))
+	draw_circle(p, maxf(1.0, _cam.scale_at(_cam.depth(Vector3(centre.x, centre.y, 0.0))) * 0.11),
+		LINE_COL)
 
 
 ## Fill `r` by repeating `tex` from its top-left (clips the last row/column).
 func _tile(tex: Texture2D, r: Rect2) -> void:
+	if r.size.y <= 0.0:
+		return
 	if tex == null:
-		draw_rect(r, Color(0.12, 0.40, 0.18), true)
+		draw_rect(r, Color8(30, 34, 40), true)
 		return
 	var tw := float(tex.get_width())
 	var th := float(tex.get_height())
@@ -497,64 +679,40 @@ func _tile(tex: Texture2D, r: Rect2) -> void:
 		y += th
 
 
-func _draw_goals() -> void:
-	var top := _field(0.0, 0.5 - GOAL_DEPTH).y
-	var bot := _field(0.0, 0.5 + GOAL_DEPTH).y
-	_goal_at(PITCH.position.x - 14.0, top, 14.0, bot - top, true)    # left goal
-	_goal_at(PITCH.end.x, top, 14.0, bot - top, false)               # right goal
-
-
-func _goal_at(x: float, y: float, w: float, h: float, left: bool) -> void:
-	if _net != null:
-		draw_texture_rect(_net, Rect2(x, y, w, h), false)
-	else:
-		draw_rect(Rect2(x, y, w, h), Color(0.8, 0.84, 0.88, 0.5), true)
-	# white frame (crossbar + the upright on the goal-line side)
-	draw_rect(Rect2(x, y - 1, w, 2), Color(0.96, 0.98, 1.0), true)
-	draw_rect(Rect2(x, y + h - 1, w, 2), Color(0.96, 0.98, 1.0), true)
-	var post_x: float = x + w - 2.0 if left else x
-	draw_rect(Rect2(post_x, y - 1, 2, h + 2), Color(0.97, 0.99, 1.0), true)
-
-
-func _draw_teams(ball: Vector2) -> void:
+func _draw_teams(ball: Vector3) -> void:
 	if _live != null:
 		_draw_teams_live()
 		return
 	var atk := _attacking_side(_minute)
-	# nearest home + away outfielder to the ball gets the active arrow
 	var near_home := _draw_side(0, HOME_FORM, _home_col, ball, atk == 0)
 	var near_away := _draw_side(1, _mirror(HOME_FORM), _away_col, ball, atk == 1)
-	if atk == 0 and near_home != Vector2.ZERO:
+	if atk == 0 and near_home != Vector3.ZERO:
 		_draw_arrow(near_home)
-	elif atk == 1 and near_away != Vector2.ZERO:
+	elif atk == 1 and near_away != Vector3.ZERO:
 		_draw_arrow(near_away)
 
 
-## LIVE: draw all 22 players where the ENGINE puts them. Nothing here interpolates or
-## invents a position — `nx`/`ny` are `player+0x4` / `player+0x8` normalised over the
-## session's own pitch dims. The active arrow goes to the engine's designated carrier
-## (`match+0x440`), which is the original's own notion of who is on the ball, not a
-## nearest-man guess.
+## LIVE: draw all 22 players where the ENGINE puts them, with the sprite the ENGINE would
+## pick. `x`/`y` are `player+0x4`/`+0x8`, `facing` is `+0x34`, `kind` is `+0x40` and `phase`
+## is `+0x2c` — the exact four inputs `FUN_005a5460` reads. Nothing is interpolated, guessed
+## or remembered here. The active arrow goes to the engine's designated carrier
+## (`match+0x440`), the original's own notion of who is on the ball.
 func _draw_teams_live() -> void:
 	var drawn: Array = []
-	var carrier := Vector2.ZERO
+	var carrier := Vector3.ZERO
 	for p in _live.player_positions():
 		var side := int(p["side"])
-		var slot := int(p["slot"])
-		var pos := _field(float(p["nx"]), float(p["ny"]))
-		var prev: Array = _home_prev if side == 0 else _away_prev
-		var faces: PackedInt32Array = _home_face if side == 0 else _away_face
-		if slot < prev.size():
-			faces[slot] = _facing(prev[slot], pos)
-			prev[slot] = pos
-		drawn.append({"pos": pos, "col": _home_col if side == 0 else _away_col,
-			"face": faces[slot] if slot < faces.size() else 0})
+		var w := Vector3(Pm98Camera.fx(int(p["x"])), Pm98Camera.fx(int(p["y"])),
+			Pm98Camera.fx(int(p["z"])))
+		drawn.append({"w": w, "col": _home_col if side == 0 else _away_col,
+			"kind": int(p["kind"]), "facing": int(p["facing"]), "phase": int(p["phase"])})
 		if bool(p["carrying"]):
-			carrier = pos
-	drawn.sort_custom(func(a, b): return (a["pos"] as Vector2).y < (b["pos"] as Vector2).y)
+			carrier = w
+	# painter's order: farthest first, so a near player overlaps a far one
+	drawn.sort_custom(func(a, b): return (a["w"] as Vector3).y > (b["w"] as Vector3).y)
 	for d in drawn:
-		_draw_player(d["pos"], d["col"], int(d["face"]), _run_phase())
-	if carrier != Vector2.ZERO:
+		_draw_player(d["w"], d["col"], int(d["kind"]), int(d["facing"]), int(d["phase"]))
+	if carrier != Vector3.ZERO:
 		_draw_arrow(carrier)
 
 
@@ -566,133 +724,160 @@ func _mirror(form: Array) -> Array:
 	return out
 
 
-## Draw one team; returns the screen pos of the outfielder nearest the ball (or ZERO).
-func _draw_side(side: int, form: Array, col: Color, ball: Vector2, has_ball: bool) -> Vector2:
-	var faces: PackedInt32Array = _home_face if side == 0 else _away_face
+## Draw one team on the TIMELINE path; returns the world pos of the outfielder nearest the
+## ball (or ZERO). Facing here is the direction of travel converted to the engine's own 16-bit
+## angle word and then bucketed by `JugRender` exactly as a live match's is — the picker is
+## never bypassed, only its input is the app's on this path.
+func _draw_side(side: int, form: Array, col: Color, ball: Vector3, has_ball: bool) -> Vector3:
 	var prev: Array = _home_prev if side == 0 else _away_prev
-	var ball_n := Vector2((ball.x - PITCH.position.x) / PITCH.size.x,
-		(ball.y - PITCH.position.y) / PITCH.size.y)
-	# resolve every player's screen pos once, tracking the nearest outfielder to the ball
+	var slot0 := 0 if side == 0 else 11
+	var ball_n := Vector2((ball.x / _half_len + 1.0) * 0.5, (ball.y / _half_wid + 1.0) * 0.5)
 	var poss: Array = []
 	var nearest_i := -1
 	var nearest_d := 1e9
 	for i in form.size():
 		var base: Vector2 = form[i]
-		var follow := 0.0 if i == 0 else 0.30          # GK holds its line
+		var follow := 0.0 if i == 0 else 0.30
 		var nx := base.x + (ball_n.x - 0.5) * (follow * 0.7) + sin(_t * 1.3 + i) * 0.012
 		var ny := base.y + (ball_n.y - 0.5) * follow
-		var pos := _field(nx, ny)
-		poss.append(pos)
+		var w := _world(nx, ny)
+		poss.append(w)
 		if i != 0:
-			var d := pos.distance_to(ball)
+			var d := w.distance_to(ball)
 			if d < nearest_d:
 				nearest_d = d
 				nearest_i = i
-	# the possessing team's nearest man steps onto the ball
 	if has_ball and nearest_i >= 0:
-		poss[nearest_i] = (poss[nearest_i] as Vector2).lerp(ball, 0.55)
-	# resolve facing + remember it, then draw back-to-front (far players first)
-	for i in poss.size():
-		faces[i] = _facing(prev[i], poss[i])
-		prev[i] = poss[i]
+		poss[nearest_i] = (poss[nearest_i] as Vector3).lerp(ball, 0.55)
 	var order := range(poss.size())
-	order.sort_custom(func(a, b): return (poss[a] as Vector2).y < (poss[b] as Vector2).y)
+	order.sort_custom(func(a, b): return (poss[a] as Vector3).y > (poss[b] as Vector3).y)
 	for i in order:
-		_draw_player(poss[i], col, faces[i], _run_phase())
-	return poss[nearest_i] if nearest_i >= 0 else Vector2.ZERO
+		var w: Vector3 = poss[i]
+		var face := _travel_angle(prev[i], w)
+		prev[i] = w
+		var idx: int = slot0 + i
+		var st: Dictionary = _anim[idx] if idx < _anim.size() and _anim[idx] is Dictionary \
+			else {"kind": 3, "phase": 0}
+		_draw_player(w, col, int(st["kind"]), face, int(st["phase"]))
+	return poss[nearest_i] if nearest_i >= 0 else Vector3.ZERO
 
 
-func _run_phase() -> int:
-	# run-cycle frame off the clock so legs animate while play flows
-	return int(_t * 6.0) % 3
-
-
-## Side-on WATCH-view facing approximation (app construct, NOT the engine model).
-## The real engine (docs/re/jug_render_spec.md, FUN_005a5460) buckets direction by
-## camera-relative perspective thresholds, stores 5 unique dirs + a mirror, and indexes
-## JUG as [direction][phase]. This uniform-45deg atan2 is a documented stylisation for
-## the side-on view (which the engine never renders); it is NOT a source-faithful compass.
-func _facing(prev_pos, pos: Vector2) -> int:
-	if not (prev_pos is Vector2):
+## Direction of travel as the engine's own 16-bit angle word (full circle = 65536), so the
+## timeline path hands `JugRender` the same kind of input a live player's `+0x34` carries.
+func _travel_angle(prev_pos, pos: Vector3) -> int:
+	if not (prev_pos is Vector3):
 		return 0
-	var v: Vector2 = pos - (prev_pos as Vector2)
-	if v.length() < 0.4:
+	var v: Vector3 = pos - (prev_pos as Vector3)
+	if Vector2(v.x, v.y).length() < 0.02:
 		return 0
-	var ang := atan2(v.x, v.y)            # 0 == +y (down)
-	return int(round(ang / (PI / 4.0))) & 7
+	return int(round(atan2(v.y, v.x) / TAU * 65536.0)) & 0xffff
 
 
-func _draw_player(pos: Vector2, col: Color, face: int, row: int) -> void:
-	face = clampi(face, 0, 7)
-	row = clampi(row, 0, 2)
-	var src := Rect2(face * CELL_W, row * CELL_H, CELL_W, CELL_H)
-	# mild perspective: nearer (lower on screen) players are a touch larger
-	var depth := clampf((pos.y - PITCH.position.y) / PITCH.size.y, 0.0, 1.0)
-	var dsc := SPR_SC * lerpf(0.82, 1.10, depth)
-	var dw := CELL_W * dsc
-	var dh := CELL_H * dsc
-	var dst := Rect2(pos.x - dw * 0.5, pos.y - dh, dw, dh)   # feet at pos
-	# soft contact shadow
-	draw_circle(Vector2(pos.x, pos.y - 1), dw * 0.34, Color(0, 0, 0, 0.28))
+## One player as the engine draws him: the JUG frame `FUN_005a5460` would pick, sized from the
+## frame's OWN anchor and the `0x1b333/0x30` world-height scale, standing on the ground at his
+## world position, with the drop shadow the original casts.
+func _draw_player(w: Vector3, col: Color, kind: int, facing: int, phase: int) -> void:
+	var d := _cam.depth(w)
+	if d <= _cam.MIN_DEPTH:
+		return
+	var r: Dictionary = JugRender.resolve(kind, facing, phase)
+	var px := _cam.scale_at(d)
+	var mz := JugRender.metres_per_pixel_z()
+	var mx := JugRender.metres_per_pixel_x()
+	if r.is_empty() or mz <= 0.0:
+		draw_circle(_cam.project(w), maxf(1.0, px * 0.25), col)
+		return
+	var src: Rect2 = r["rect"]
+	var ax := float(int(r["ax"]))
+	var ay := float(int(r["ay"]))
+	# world extents of the billboard, from the frame header (jug_render_spec.md §"the draw")
+	var z_top := ay * mz
+	var z_bot := (ay - src.size.y) * mz
+	var x_left := -ax * mx
+	var x_right := (src.size.x - ax) * mx
+	var top := _cam.project(Vector3(w.x, w.y, w.z + z_top))
+	var bot := _cam.project(Vector3(w.x, w.y, w.z + z_bot))
+	var dw := (x_right - x_left) * px
+	var dst := Rect2(_cam.project(Vector3(w.x + x_left, w.y, w.z)).x, top.y, dw,
+		maxf(bot.y - top.y, 1.0))
+	# contact shadow on the deck, at the feet
+	var foot := _cam.project(Vector3(w.x, w.y, 0.0))
+	draw_circle(Vector2(foot.x, foot.y), maxf(1.0, dw * 0.36), Color(0, 0, 0, 0.30))
+	if bool(r["flip"]):
+		dst = Rect2(dst.position.x + dst.size.x, dst.position.y, -dst.size.x, dst.size.y)
 	if _kit != null:
-		draw_texture_rect_region(_kit, dst, src, col)        # tint kit to club colour
+		draw_texture_rect_region(_kit, dst, src, col)
 	if _base != null:
 		draw_texture_rect_region(_base, dst, src, Color.WHITE)
-	if _base == null and _kit == null:
-		draw_rect(dst, col, true)
 
 
-func _draw_ball(ball: Vector2) -> void:
-	var sc := 0.42
+func _draw_ball(ball: Vector3) -> void:
+	var d := _cam.depth(ball)
+	if d <= _cam.MIN_DEPTH:
+		return
+	var p := _cam.project(ball)
+	var px := _cam.scale_at(d)
+	var r: float = maxf(1.5, px * 0.11)                # a 22 cm ball
+	var shadow := _cam.project(Vector3(ball.x, ball.y, 0.0))
+	draw_circle(shadow, maxf(1.0, r * 0.9), Color(0, 0, 0, 0.28))
 	if _ball != null:
-		var bw: float = _ball.get_width() * sc
-		var bh: float = _ball.get_height() * sc
-		draw_circle(Vector2(ball.x, ball.y + 1), bw * 0.5, Color(0, 0, 0, 0.30))
-		draw_texture_rect(_ball, Rect2(ball.x - bw * 0.5, ball.y - bh * 0.5, bw, bh), false)
+		draw_texture_rect(_ball, Rect2(p.x - r, p.y - r, r * 2.0, r * 2.0), false)
 	else:
-		draw_circle(ball, 4, Color.WHITE)
-	# net flash at the scoring end on a goal minute (home -> right goal, away -> left)
+		draw_circle(p, r, Color.WHITE)
 	var gp := _goal_pulse(_minute)
 	if gp["side"] != -1 and float(gp["dist"]) < 0.35:
 		var a := (0.35 - float(gp["dist"])) / 0.35
-		var top := _field(0.0, 0.5 - GOAL_DEPTH).y
-		var bot := _field(0.0, 0.5 + GOAL_DEPTH).y
-		var gx: float = PITCH.end.x if int(gp["side"]) == 0 else PITCH.position.x - 14.0
-		draw_rect(Rect2(gx, top, 14.0, bot - top), Color(1.0, 0.95, 0.2, a * 0.7), true)
+		var gx: float = _half_len if int(gp["side"]) == 0 else -_half_len
+		var tl := _cam.project(Vector3(gx, -GOAL_HALF_W, GOAL_H))
+		var br := _cam.project(Vector3(gx, GOAL_HALF_W, 0.0))
+		draw_rect(Rect2(tl, br - tl).abs(), Color(1.0, 0.95, 0.2, a * 0.55), true)
 
 
-func _draw_arrow(pos: Vector2) -> void:
+func _draw_arrow(w: Vector3) -> void:
 	if _arrow == null:
 		return
-	# COFLECHA.PGF is a horizontal strip of frames; use the first, bobbing above the head.
-	var fw: int = maxi(1, int(_arrow.get_height()))   # square-ish frames
-	var sc := 0.6
-	var bob := sin(_t * 6.0) * 1.5
+	var d := _cam.depth(w)
+	if d <= _cam.MIN_DEPTH:
+		return
+	var px := _cam.scale_at(d)
+	var head := _cam.project(Vector3(w.x, w.y, w.z + 2.1))
+	var fw: int = maxi(1, int(_arrow.get_height()))
+	var sc: float = maxf(0.25, px / 90.0)
 	var dw := fw * sc
 	var dh: float = _arrow.get_height() * sc
-	var src := Rect2(0, 0, fw, _arrow.get_height())
-	draw_texture_rect_region(_arrow, Rect2(pos.x - dw * 0.5, pos.y - CELL_H * SPR_SC - dh + bob, dw, dh), src)
+	draw_texture_rect_region(_arrow, Rect2(head.x - dw * 0.5, head.y - dh, dw, dh),
+		Rect2(0, 0, fw, _arrow.get_height()))
 
 
+## The original's WATCH overlay, from the capture (tools/re/refs/watch-2026-07-28/watch_02.png):
+## ONE slim line top-left reading "<home> <hg> - <ag> <away>" in white over a dark plate, and
+## the ball carrier's shirt number + name bottom-right. No score pill, no possession bars —
+## those belong to the BRIEF view, which is a different screen.
 func _draw_hud() -> void:
 	var sc := _score_at(_minute)
-	# top score/clock strip
-	draw_rect(Rect2(0, 0, W, 54), Color(0.05, 0.08, 0.18, 0.92), true)
-	_txt(_f12, 40, 10, _home.substr(0, 18), C_TITLE, 14)
-	_txt(_f12, W - 40, 10, _away.substr(0, 18), C_TITLE, 14, true)
-	# clock pill
-	var cb := Rect2(W * 0.5 - 44, 6, 88, 24)
-	draw_rect(cb, C_LCD_BG, true)
-	draw_rect(cb, Color(0.5, 0.6, 0.7, 0.5), false, 1.0)
-	var clock := "%02d:00" % int(_minute) if _minute < 90.0 else "90:00"
-	_txt(_f18, int(cb.position.x), int(cb.position.y) + 4, clock, C_LCD, 18, false, int(cb.size.x))
-	# score
-	_txt(_f18, 0, 30, "%d : %d" % [sc.x, sc.y], C_GOLD, 20, false, W)
-	_txt(_f10, 0, 40, _half_label(_minute), C_TITLE, 10, false, W)
-	# possession ticks under the bar
-	var ph := _possession_at(_minute)
-	_txt(_f10, 40, 40, "%d%%" % ph, C_TITLE, 10)
-	_txt(_f10, W - 40, 40, "%d%%" % (100 - ph), C_TITLE, 10, true)
+	var line := "%s %d - %d %s" % [_home.substr(0, 18), sc.x, sc.y, _away.substr(0, 18)]
+	var wd := 0.0
+	if _f12 != null:
+		wd = _f12.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+	draw_rect(Rect2(0, 0, wd + 12.0, 20), Color(0.05, 0.07, 0.12, 0.78), true)
+	_txt(_f12, 5, 2, line, C_TITLE, 14)
+	# clock + half, small, under the score line so a watched match still reads its own time
+	_txt(_f10, 5, 21, "%02d:00  %s" % [int(_minute), _half_label(_minute)], C_LCD, 10)
+	var who := _carrier_label()
+	if who != "":
+		_txt(_f12, W - 8, H - 46, who, C_TITLE, 14, true)
+
+
+## The engine's designated carrier (`match+0x440`) as "<shirt> <surname>", the pairing the
+## original prints bottom-right. Empty when nobody is on the ball or no live match is running.
+func _carrier_label() -> String:
+	if _live == null:
+		return ""
+	for p in _live.player_positions():
+		if bool(p["carrying"]):
+			var nm := _live.player_name(int(p["side"]), int(p["slot"]))
+			return ("%d  %s" % [int(p["slot"]) + 1, nm]) if nm != "" else ""
+	return ""
 
 
 func _draw_buttons() -> void:

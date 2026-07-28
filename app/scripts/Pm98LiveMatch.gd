@@ -53,6 +53,8 @@ var score := [0, 0]
 var frames := 0
 var over := false
 
+## [home XI names, away XI names] — display only (the WATCH view prints the ball carrier's).
+var names: Array = []
 var _ball: Dictionary = {}
 var _half_len := 1
 var _half_wid := 1
@@ -77,6 +79,7 @@ static func create(home: int, away: int, seed_: int, lever_overrides: Dictionary
 	(m["sim"][1] as Dictionary)[0x9c] = (input["lineups"] as Array)[1]
 	Pm98Match.kickoff_init(m, input["session"], live.rng)
 	live.match_state = m
+	live.names = input.get("names", [])
 	live._ball = Pm98Driver._ball(m)
 	live._half_len = maxi(1, absi(Pm98Trig._i32(int(m.get(0x1820, 1)))))
 	live._half_wid = maxi(1, absi(Pm98Trig._i32(int(m.get(0x1824, 1)))))
@@ -119,8 +122,12 @@ func half() -> int:
 	return int(match_state.get(0x19a0, 0))
 
 
-## Every player as {side, slot, nx, ny, carrying} with nx/ny in 0..1 over the pitch.
-## `carrying` marks the engine's own designated ball carrier (match+0x440).
+## Every player as {side, slot, nx, ny, x, y, z, facing, kind, phase, carrying}.
+## `nx`/`ny` are the 0..1 normalisation the old side-on view used; `x`/`y`/`z` are the RAW
+## 16.16 world fields (`player+4/+8/+0xc`) the 3/4 WATCH camera projects, and `facing` /
+## `kind` / `phase` are the engine's own `player+0x34` / `+0x40` / `+0x2c` — the three inputs
+## `FUN_005a5460` uses to pick a JUG frame (`JugRender`). `carrying` marks the engine's own
+## designated ball carrier (`match+0x440`).
 func player_positions() -> Array:
 	var out: Array = []
 	var carrier: Variant = match_state.get(0x440, null)
@@ -129,13 +136,33 @@ func player_positions() -> Array:
 		var roster: Array = team.get("players", [])
 		for slot in roster.size():
 			var p: Dictionary = roster[slot]
+			var wx := Pm98Trig._i32(int(p.get(4, 0)))
+			var wy := Pm98Trig._i32(int(p.get(8, 0)))
 			out.append({
 				"side": side, "slot": slot,
-				"nx": _nx(Pm98Trig._i32(int(p.get(4, 0)))),
-				"ny": _ny(Pm98Trig._i32(int(p.get(8, 0)))),
+				"nx": _nx(wx), "ny": _ny(wy),
+				"x": wx, "y": wy, "z": Pm98Trig._i32(int(p.get(0xc, 0))),
+				"facing": int(p.get(0x34, 0)) & 0xffff,
+				"kind": int(p.get(0x40, 0)),
+				"phase": int(p.get(0x2c, 0)),
 				"carrying": carrier is Dictionary and (carrier as Dictionary) == p,
 			})
 	return out
+
+
+## The fielded player's name for a side/slot, or "" when the feeder gave none.
+func player_name(side: int, slot: int) -> String:
+	if side < 0 or side >= names.size():
+		return ""
+	var xi: Array = names[side]
+	return str(xi[slot]) if slot >= 0 and slot < xi.size() else ""
+
+
+## Half the pitch LENGTH and half its WIDTH in 16.16 (`match+0x1820` / `+0x1824`) — Old
+## Trafford's 116x76 m reads 3801088 / 2490368. The WATCH camera needs the raw figures, not
+## the normalisation, because it projects world metres.
+func pitch_half() -> Vector2i:
+	return Vector2i(_half_len, _half_wid)
 
 
 ## The ball as {nx, ny, height} — `height` in metres off the +0xc fixed-point field.

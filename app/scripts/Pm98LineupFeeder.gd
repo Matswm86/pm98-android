@@ -79,6 +79,7 @@ static func build(home_id: int, away_id: int, data: Dictionary,
 
 	var lineups: Array = []
 	var lever_dwords: Array = []
+	var names: Array = []
 	for cid in [home_id, away_id]:
 		var t: Dictionary = _tactic(data, cid)
 		var club: Dictionary = data["clubs"][cid]
@@ -87,6 +88,7 @@ static func build(home_id: int, away_id: int, data: Dictionary,
 		for p in (club.get("players", []) as Array):
 			by_id[int(p["id"])] = p
 		var slots: Array = []
+		var xi_names: Array = []
 		for i in range(11):
 			var pid := int((t["xi"] as Array)[i])
 			assert(pid != -1, "%s: XI slot %d unfilled" % [club["name"], i])
@@ -98,6 +100,7 @@ static func build(home_id: int, away_id: int, data: Dictionary,
 			if i > 0 and i - 1 < mtab.size():
 				mk = int(mtab[i - 1]) - 1
 			slots.append(_rec(by_id[pid], i, raw, pitch_w, pitch_h, is_league, mk))
+			xi_names.append(str((by_id[pid] as Dictionary).get("name", "")))
 		# header 9 dwords -> team[0xbf..0xc7] (lineup+0x4..+0x28 skip +0x0/+0xc):
 		# two transformed x-lines from club+0x260/+0x25c (ctor defaults 198/79, the
 		# .DBC parser never overwrites them — session_lineup_re.md §6), then the 7
@@ -114,6 +117,7 @@ static func build(home_id: int, away_id: int, data: Dictionary,
 			],
 			"slots": slots,
 		})
+		names.append(xi_names)
 		lever_dwords.append([int(lv[0]), int(lv[1]), int(lv[2]),
 				int(lv[4]), int(lv[5]), int(lv[6]), int(lv[3])])
 
@@ -142,7 +146,9 @@ static func build(home_id: int, away_id: int, data: Dictionary,
 	for k in range(7):
 		session[0x68 + k * 4] = (lever_dwords[0] as Array)[k]
 		session[0x808 + k * 4] = (lever_dwords[1] as Array)[k]
-	return {"session": session, "lineups": lineups}
+	# `names` is display-only (the WATCH view prints the ball carrier's) and never reaches the
+	# engine: the lineup records it feeds are byte-keyed and stay untouched.
+	return {"session": session, "lineups": lineups, "names": names}
 
 
 ## One lineup record (= slot base, the port's byte-keyed `rec`) — fn_0044d5f0 present-

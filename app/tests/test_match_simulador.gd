@@ -13,9 +13,11 @@ func _initialize() -> void:
 func _run() -> void:
 	var ok := true
 
-	for path in ["res://art/match/player_base.png", "res://art/match/player_kit.png",
+	for path in ["res://art/match/jug_base.png", "res://art/match/jug_kit.png",
+			"res://art/match/jug_bank.json",
 			"res://art/match/ball.png", "res://art/match/arrow.png"]:
-		ok = _assert(ResourceLoader.exists(path), "real DATSIM sprite present: %s" % path) and ok
+		ok = _assert(ResourceLoader.exists(path) or FileAccess.file_exists(path),
+			"real DATSIM sprite present: %s" % path) and ok
 
 	# A synthetic timeline in the exact MatchCommentary shape: 1-1, home @12, away @58.
 	var lines: Array = [
@@ -52,13 +54,13 @@ func _run() -> void:
 	ok = _assert(sim._possession_home() == 50, "balanced possession = 50%") and ok
 	ok = _assert(sim._possession_at(0) == 50, "possession eases from 50 at KO") and ok
 
-	# The ball never leaves the pitch, at any minute.
+	# The ball never leaves the pitch, at any minute. The view now works in WORLD metres, so
+	# this is checked against the session's own half-length/half-width rather than a screen band.
 	var inside := true
 	for mm in range(0, 91, 3):
 		sim.seek(float(mm))
-		var b: Vector2 = sim._ball_field()
-		if b.x < sim.PITCH.position.x - 0.5 or b.x > sim.PITCH.end.x + 0.5 \
-				or b.y < sim.PITCH.position.y - 0.5 or b.y > sim.PITCH.end.y + 0.5:
+		var b: Vector3 = sim._ball_world()
+		if absf(b.x) > sim._half_len + 0.5 or absf(b.y) > sim._half_wid + 0.5:
 			inside = false
 	ok = _assert(inside, "ball stays on the pitch at every minute") and ok
 
