@@ -454,6 +454,29 @@ static func _pair_round(b: Dictionary, rng: RandomNumberGenerator) -> Dictionary
 		if not cand.is_empty():
 			venue_id = int(cand[rng.randi_range(0, cand.size() - 1)])
 
+	# A SINGLE-LEG SEMIFINAL is played at a neutral ground too, and unlike the final each
+	# tie gets its OWN: the F.A. Cup witness (2026-07-28, tools/re/refs/knockout-2026-07-28)
+	# puts Ipswich vs Blackburn R. at Hillsborough and Stoke C vs Southampton at Anfield,
+	# neither of them a competitor's ground. That the ground is NEUTRAL is witnessed; WHICH
+	# one is not, so the pick is the same declared-OURS draw the final already uses -- from
+	# the clubs this competition has actually fielded, never one of the two playing.
+	# DECLARED DIVERGENCE: this names the venue, it does not move the match. `_play_tie`
+	# still resolves the tie with the drawn home side's advantage, because making a domestic
+	# semifinal neutral changes every played result and wants its own look at how the
+	# original weights a neutral tie (docs/re/knockout_views_re.md).
+	var tie_venue_ids: Array = []
+	if start_count == 4 and round_legs == 1:
+		var entrants := _entrants(b)
+		var i := 0
+		while i + 1 < survivors.size():
+			var cand2: Array = []
+			for v in entrants:
+				if int(v) != int(survivors[i]) and int(v) != int(survivors[i + 1]):
+					cand2.append(int(v))
+			tie_venue_ids.append(
+				int(cand2[rng.randi_range(0, cand2.size() - 1)]) if not cand2.is_empty() else -1)
+			i += 2
+
 	# Round one may need byes to bring an off-power-of-two field down to a power of
 	# two; later rounds are a clean halving (survivors is always even by then). A field
 	# already a power of two needs no byes -- it just halves.
@@ -471,8 +494,27 @@ static func _pair_round(b: Dictionary, rng: RandomNumberGenerator) -> Dictionary
 	return {
 		"label": label, "round": this_round, "round_legs": round_legs,
 		"byes": survivors.slice(0, byes), "players": survivors.slice(byes),
-		"venue_id": venue_id,
+		"venue_id": venue_id, "tie_venue_ids": tie_venue_ids,
 	}
+
+
+## Every club this cup has actually fielded: the current survivors plus everyone who has
+## appeared in a played round. Used as the pool the neutral grounds are drawn from, so a
+## domestic cup -- which has no `group_stage.field` -- still draws from its OWN entrants.
+static func _entrants(b: Dictionary) -> Array:
+	var seen := {}
+	for v in (b.get("survivors", []) as Array):
+		seen[int(v)] = true
+	for r in (b.get("rounds", []) as Array):
+		for t in ((r as Dictionary).get("ties", []) as Array):
+			var tie := t as Dictionary
+			seen[int(tie.get("home_id", -1))] = true
+			if int(tie.get("away_id", -1)) >= 0:
+				seen[int(tie.get("away_id", -1))] = true
+	for v in (b.get("late_ids", []) as Array):
+		seen[int(v)] = true
+	seen.erase(-1)
+	return seen.keys()
 
 
 static func play_round(b: Dictionary, rng: RandomNumberGenerator,
@@ -499,12 +541,18 @@ static func play_round(b: Dictionary, rng: RandomNumberGenerator,
 		ties.append({"home_id": int(cid), "away_id": -1, "hg": 0, "ag": 0,
 			"winner_id": int(cid), "loser_id": -1, "decided": "bye", "bye": true})
 		next_survivors.append(int(cid))
+	var tie_venues: Array = d.get("tie_venue_ids", []) as Array
 	var i := 0
 	while i + 1 < players.size():
 		var h := int(players[i])
 		var a := int(players[i + 1])
 		var tie := _play_tie(rng, h, a, ratings_fn, round_legs, xi_fn,
 			(on_report if (h == club_id or a == club_id) else Callable()))
+		# The neutral ground a single-leg semifinal is played at, drawn with the round
+		# (see _pair_round). Carried on the tie so the view names the same ground before
+		# and after the match.
+		if tie_venues.size() > i / 2 and int(tie_venues[i / 2]) >= 0:
+			tie["venue_id"] = int(tie_venues[i / 2])
 		ties.append(tie)
 		next_survivors.append(int(tie["winner_id"]))
 		i += 2

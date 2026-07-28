@@ -615,25 +615,70 @@ a paged-back frame than on a live one (white rows 77..101 at x190, against 78..1
 witness of each state is not a rule, so the port keeps drawing the live-phase plate and the
 band is declared rather than guessed.
 
-## Same drive, three more bands now witnessed — NOT yet built
+## Same drive, three more bands witnessed — TWO now built, ONE still open
 
-The 2026-07-28 drive also banked the first frames of three chromes this file had listed as
+The 2026-07-28 drive banked the first frames of three chromes this file had listed as
 unwitnessed. They are in `screenshots/wine-captures-2026-07-28-knockout-decided/`:
 
 * **`04_facup_semifinals_finalists.png`** — the F.A. Cup SEMIFINALS band with both
   `FINALIST` plates FILLED. Single-leg ties at a neutral ground (the venue is the panel's
   own first row: `Hillsborough`, `Anfield`), so the domestic semifinal card is a different
-  shape from the euro two-legged one.
+  shape from the euro two-legged one. **BUILT 2026-07-28, 0 px** — see below.
 * **`05_cocacola_semifinals_twolegs.png`** — the Coca-Cola SEMIFINALS with BOTH legs drawn
   (`1ST LEG` at `Selhurst Park`, `2ND LEG` at `Ewood Park`) and both `FINALIST` plates
   filled. This independently re-confirms the 07-27 model fix (Coca-Cola semis are
-  two-legged) from a second career.
+  two-legged) from a second career. **Already BUILT** — gate case
+  `knockout_cocacola_semis_done`, 0 px; the sentence that called it unbuilt was stale.
 * **`06_cocacola_final_winner.png`** — the Coca-Cola FINAL: the cup trophy art,
   `MATCH RESULT` over `STADIUM Wembley`, an empty `REPLAY RESULT` panel, and the filled
-  `WINNER` band with the champion's kit in a laurel wreath.
+  `WINNER` band with the champion's kit in a laurel wreath. **STILL OPEN.** Measured
+  2026-07-28 against the euro final so the next session starts with the geometry: the two
+  frames are byte-identical over x136 and x364..400, so only the CARD (outer black frame
+  x137..363, white interior x139..361, running y124..332) and the left-hand trophy differ —
+  the `WINNER` band and the laurel are the euro final's, already built. Inside the card:
+  olive header bars at **y132..143** (`MATCH RESULT`) and **y244..255** (`REPLAY RESULT`),
+  both x139..361; the `STADIUM` label + value in the white between y144..175; two club bars
+  with black borders at y176..177 / y198..199 / y220..221, interiors **y178..197** and
+  **y200..219**, bar ground x144..318 with a 17x20 `ridi` kit icon at its left and the
+  score box x321..356; the `REPLAY RESULT` panel below is white and empty on this witness.
 
-Building these three is a chrome-bake pass of the same shape as the euro cards/final build;
-until then those competitions' 2/1-tie phases still fall back to the SORTEO card.
+### The SINGLE-LEG semifinal card, as built (2026-07-28)
+
+The domestic cup plays its semifinals as ONE match at a neutral ground, so the card carries
+one block whose bar reads `RESULT` where the two-legged one reads `1ST LEG`, and the panel
+simply ENDS after it: at x20 the rows run header bar y173..189, venue y192..206, club bars
+y209..228 and y231..250, and then the desktop again from y253 — where the two-legged frame
+starts its second block at y263.
+
+That is proven rather than assumed. Blanking BOTH this frame and the two-legged witness with
+the SAME content rects (the venue rows, the four bar rows, the two FINALIST plate interiors)
+leaves exactly two differences inside the strip: the bar label at **y178..184** and the whole
+second block at **y263..344**. Everything else is byte-identical across two competitions and
+two careers, which is what licenses one baked strip per shape:
+`cards_body_single.png` from `tools/re/refs/knockout-2026-07-28/12`, and the F.A. Cup's own
+cards band (plate x336..420 y87..107, arrows at (312,87) / (422,87) — the Coca-Cola
+positions, with the F.A. Cup trophy, whose bottom reaches y119, exactly where this family's
+band strip already ends).
+
+Its only witness is a PAGED-BACK frame, so the plate's white surround reaches x336 where a
+live-phase frame would have the plate's black border. That state is what is baked (via the
+baker's new `blank` override), rather than borrowing the Coca-Cola band's live-phase border
+for a frame nobody has — so this case needs no paginator bucket at all.
+
+Gate: `diff_knockout_parity.py` case **`knockout_facup_semis`, 0 px** outside the shared
+barra kit, the career-state rail (564 px, the same class the euro cases carry), the two icon
+rows and the two FINALIST nano kits.
+
+**The neutral ground is modelled, and what is modelled is stated.** Witnessed: the ground is
+neutral and there is one per tie (Ipswich vs Blackburn R. at Hillsborough, Stoke C vs
+Southampton at Anfield). Declared OURS: WHICH ground — a deterministic draw from the clubs
+the competition has actually fielded, never one of the two playing, the same rule the FINAL
+already uses, recorded on the draw so the view names the same ground before and after the
+match (`Cup._pair_round` → `tie_venue_ids`, `Cup._entrants`). **Declared divergence:** this
+names the venue, it does not move the match — `_play_tie` still resolves the tie with the
+drawn home side's advantage, because making a domestic semifinal neutral changes every
+played result and wants its own look at how the original weights a neutral tie.
+Pinned by `app/tests/test_cup_semis_neutral.gd`.
 
 `screenshots/` is LOCAL, so all five frames of that drive are ALSO banked in the tracked
 reference tree — **`tools/re/refs/knockout-2026-07-28/`** (its README maps each file to the

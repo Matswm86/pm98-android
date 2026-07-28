@@ -257,6 +257,36 @@ const CC_SEMI_DONE_TIES := [
 ]
 
 
+# 12_facup_semifinals_FINALISTS_1998-04-11.png (tools/re/refs/knockout-2026-07-28) --
+# the FIRST witness of a SINGLE-LEG semifinal phase: the domestic cup plays its semis as one
+# match at a neutral ground, so each card carries ONE block whose bar reads RESULT (the
+# two-legged one reads 1ST LEG), the venue is that block's own first row, and the panel ENDS
+# after it. Both FINALIST plates are filled.
+const FA_SEMI_HEADER := {
+	"top": "mats", "bottom": "Bolton W", "club_id": 59,
+	"weekday": "Saturday", "day": "11", "month": "April", "year": "1998",
+	"status_top": "Premier", "status_bottom": "Week 36",
+}
+
+# home, away, home_id, away_id, neutral ground, result [home, away], winner
+const FA_SEMI_TIES := [
+	["Ipswich", "Blackburn R.", 66, 38, "Hillsborough", [1, 3], 1],
+	["Stoke C", "Southampton", 78, 54, "Anfield", [3, 0], 0],
+]
+
+
+static func _card_single_rows(ties: Array) -> Array:
+	var rows: Array = []
+	for t in ties:
+		var res: Array = t[5]
+		rows.append({"home": t[0], "away": t[1], "winner": int(t[6]),
+			"home_id": int(t[2]), "away_id": int(t[3]),
+			"home_ground": str(t[4]), "away_ground": str(t[4]),
+			"two_legged": false,
+			"cells": [[str(int(res[0])), str(int(res[1]))], ["", ""]]})
+	return rows
+
+
 func _init() -> void:
 	var out := "res://out"
 	if OS.has_environment("PM98_SHOT_DIR"):
@@ -287,6 +317,8 @@ func _init() -> void:
 		false, _card_rows(CC_SEMI_TIES), true, false, 0, "cards")
 	await _shot(out, "knockout_cocacola_semis_done", CC_SEMI_DONE_HEADER, "cocacola",
 		"SEMIFINALS", false, _card_done_rows(CC_SEMI_DONE_TIES), true, true, 0, "cards")
+	await _shot(out, "knockout_facup_semis", FA_SEMI_HEADER, "facup", "SEMIFINALS",
+		false, _card_single_rows(FA_SEMI_TIES), true, true, 0, "cards")
 	await _shot(out, "knockout_uefa_kitlist", UEFA_KL_HEADER, "uefa", "1/8 FINALS", true,
 		_kitlist_rows(UEFA_KL_TIES, true), true, false, 0, "kitlist")
 	await _shot(out, "knockout_cwc_kitlist", CWC_KL_HEADER, "cwc", "1/8 FINALS", true,

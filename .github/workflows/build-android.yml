@@ -168,7 +168,8 @@ jobs:
                    test_contract_warning test_three_up_front_seam test_knockout_layout \
                    test_finance test_finance_detail test_finance_screen \
                    test_finance_control test_insurance test_insurance_screen \
-                   test_cupdraw_screen test_cup_draw_then_play test_results_screen \
+                   test_cupdraw_screen test_cup_draw_then_play test_cup_semis_neutral \
+                   test_results_screen \
                    test_tactics_screen test_cheats_live \
                    test_stadium_screen test_stadium_works \
                    test_youth_loop test_career_seed test_pyramid \

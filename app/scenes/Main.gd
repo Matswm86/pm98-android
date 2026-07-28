@@ -4293,16 +4293,22 @@ func _knockout_ties(b: Dictionary, phase: int) -> Array:
 		var pd: Dictionary = ph["pending"]
 		var players: Array = pd.get("players", [])
 		var two := int(pd.get("round_legs", 1)) >= 2
+		var pend_venues: Array = pd.get("tie_venue_ids", []) as Array
 		var i := 0
 		while i + 1 < players.size():
 			var h := int(players[i])
 			var a := int(players[i + 1])
+			# A single-leg SEMIFINAL is played at a neutral ground the draw records; the
+			# card's first row names it in place of the home club's own (Cup._pair_round).
+			var ground := str(GameDB.club(h).get("stadium", ""))
+			if pend_venues.size() > i / 2 and int(pend_venues[i / 2]) >= 0:
+				ground = str(GameDB.club(int(pend_venues[i / 2])).get("stadium", ""))
 			out.append({"home": _cup_name(h), "away": _cup_name(a), "winner": -1,
 				"mine": h == mine or a == mine,
 				"home_id": h, "away_id": a,
 				"home_flag": int(GameDB.club(h).get("countryCode", -1)),
 				"away_flag": int(GameDB.club(a).get("countryCode", -1)),
-				"home_ground": str(GameDB.club(h).get("stadium", "")),
+				"home_ground": ground,
 				"away_ground": str(GameDB.club(a).get("stadium", "")),
 				"two_legged": two,
 				"cells": [["", ""], ["", ""], ["", ""]] if two else [["", ""], ["", ""]]})
@@ -4334,7 +4340,9 @@ func _knockout_ties(b: Dictionary, phase: int) -> Array:
 			"home_id": h, "away_id": a,
 			"home_flag": int(GameDB.club(h).get("countryCode", -1)),
 			"away_flag": int(GameDB.club(a).get("countryCode", -1)),
-			"home_ground": str(GameDB.club(h).get("stadium", "")),
+			"home_ground": (str(GameDB.club(int(tie["venue_id"])).get("stadium", ""))
+				if int(tie.get("venue_id", -1)) >= 0
+				else str(GameDB.club(h).get("stadium", ""))),
 			"away_ground": str(GameDB.club(a).get("stadium", "")),
 			"two_legged": bool(tie.get("two_legged", false)),
 			"cells": cells})

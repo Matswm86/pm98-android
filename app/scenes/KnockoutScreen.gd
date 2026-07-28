@@ -282,6 +282,7 @@ var _chips: Dictionary = {}
 var _hdr: Dictionary = {}                # "euro"/"dom" -> the panel top strip
 var _bracket: Dictionary = {}            # "euro"/"dom" -> the baked 458x72 panel strip
 var _cards_body: Texture2D               # the two SEMIFINAL cards, content blanked
+var _cards_body_single: Texture2D        # the SINGLE-LEG (F.A. Cup) shape of the same
 var _final_body: Texture2D               # per competition, loaded in setup()
 var _well: Dictionary = {}               # "under_L"/"over_L"/... the kit-well overlays
 var _kl: Dictionary = {}                 # the KIT LIST strips + its own well overlays
@@ -329,6 +330,7 @@ func _ready() -> void:
 	for k in ["under_p0", "over_p0", "under_p1", "over_p1"]:
 		_kl[k] = _tex("res://art/screens/knockout/kitwell_kl_%s.png" % k)
 	_cards_body = _tex("res://art/screens/knockout/cards_body.png")
+	_cards_body_single = _tex("res://art/screens/knockout/cards_body_single.png")
 	for k in ["under_L", "over_L", "under_R", "over_R"]:
 		_well[k] = _tex("res://art/screens/knockout/kitwell_%s.png" % k)
 	for k in ["under_sf1", "over_sf1", "under_sf2", "over_sf2"]:
@@ -963,8 +965,17 @@ func _ridi_kit(club_id: int) -> Texture2D:
 ## FINALIST plate once the tie is decided. UNWITNESSED and declared: the advancing-club
 ## highlight (the LIST layout's yellow rule applied here) and the FINALIST fill.
 func _draw_cards() -> void:
-	if _cards_body != null:
-		draw_texture(_cards_body, CARDS_BODY_XY)
+	# The phase's SHAPE picks the strip: a two-legged phase carries the 1ST LEG / 2ND LEG
+	# pair, a single-leg one (the F.A. Cup semifinals, witnessed 2026-07-28) carries ONE
+	# block whose bar reads RESULT and simply ends after it. Both ties in a phase are the
+	# same shape, so tie 0 decides.
+	var phase_two := true
+	if not _ties.is_empty():
+		var t0: Dictionary = _ties[0]
+		phase_two = bool(t0.get("two_legged", (t0.get("cells", []) as Array).size() >= 3))
+	var body := _cards_body if phase_two or _cards_body_single == null else _cards_body_single
+	if body != null:
+		draw_texture(body, CARDS_BODY_XY)
 	for i in mini(_ties.size(), CARDS_TIES):
 		var dx := int(CARDS_DX[i])
 		var tie: Dictionary = _ties[i]
@@ -972,6 +983,12 @@ func _draw_cards() -> void:
 		var cells: Array = tie.get("cells", [])
 		var two := bool(tie.get("two_legged", cells.size() >= 3))
 		for leg in 2:
+			# The single-leg strip has NO second block to draw a replay into: the one
+			# witnessed F.A. Cup semifinal frame ends the panel after the RESULT block.
+			# A replayed domestic semifinal in this layout is still unwitnessed, so the
+			# port shows the original tie rather than inventing a second block.
+			if leg == 1 and not phase_two:
+				break
 			var host := "away" if leg == 1 else "home"
 			var guest := "home" if leg == 1 else "away"
 			var pair: Array = cells[leg] if cells.size() > leg else ["", ""]

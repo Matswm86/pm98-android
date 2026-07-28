@@ -59,6 +59,12 @@ CARD_ICONS = [
     for top in (209, 231, 301, 323)
     for side, x in (("L", 13), ("R", 271))
 ]
+# The SINGLE-LEG card has only the first block, so only its two icon rows exist.
+CARD_ICONS_TOP = [
+    (f"icon {side} y{top}", x, top, 17, 20)
+    for top in (209, 231)
+    for side, x in (("L", 13), ("R", 271))
+]
 # The FINAL's two 48x60 kit wells keep CompResultScreen's documented approximation: the
 # original's hi-res panel kit bank is un-extracted, so the app's own art is aspect-fitted
 # and the wells are declared.
@@ -134,6 +140,14 @@ CASES = [
         "knockout_cocacola_semis_done",
         "../knockout-2026-07-28/13_cocacola_semifinals_TWOLEGS_1998-04-11.png",
         [BARRA_KIT, RAIL, *CARD_ICONS, *FINALIST_KITS, *PAGINATOR_CARDS],
+    ),
+    # The SINGLE-LEG (F.A. Cup) semifinals, built 2026-07-28 from
+    # tools/re/refs/knockout-2026-07-28/12: one RESULT block per card, the neutral ground
+    # as its first row, the panel ending after it, and both FINALIST plates filled.
+    (
+        "knockout_facup_semis",
+        "../knockout-2026-07-28/12_facup_semifinals_FINALISTS_1998-04-11.png",
+        [BARRA_KIT, RAIL, *CARD_ICONS_TOP, *FINALIST_KITS],
     ),
     # The KIT LIST (5-8 ties), built 2026-07-28: three witnesses, two competitions, two
     # careers, both column sets. Its 28x22 kit wells carry the same un-reversed on-sprite

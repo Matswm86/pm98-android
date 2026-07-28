@@ -39,8 +39,9 @@ func _initialize() -> void:
 	# accepts the two new layout names.
 	_a(KnockoutScreen.cards_available("euro"), "euro cards chrome shipped")
 	_a(KnockoutScreen.cards_available("cocacola"), "cocacola cards chrome shipped")
-	_a(not KnockoutScreen.cards_available("facup"),
-		"facup cards UNWITNESSED -> not available")
+	# The F.A. Cup's cards band + its SINGLE-LEG body were witnessed 2026-07-28
+	# (tools/re/refs/knockout-2026-07-28/12) and built the same day.
+	_a(KnockoutScreen.cards_available("facup"), "facup cards chrome shipped")
 	_a(not KnockoutScreen.cards_available("uefa"), "uefa cards UNWITNESSED")
 	_a(not KnockoutScreen.cards_available("cwc"), "cwc cards UNWITNESSED")
 	_a(KnockoutScreen.final_available("euro"), "euro final chrome shipped")

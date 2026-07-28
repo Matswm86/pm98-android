@@ -190,6 +190,19 @@ BANDS = {
         "left": (312, 87),
         "right": (422, 87),
     },
+    # The F.A. Cup's own cards band, witnessed 2026-07-28: the same plate and arrow
+    # positions as the Coca-Cola one (both domestic), with the F.A. Cup trophy, whose
+    # bottom reaches y119 -- exactly where this family's strip already ends. The only
+    # witness is a PAGED-BACK frame, so its plate's white surround reaches x336 where a
+    # live-phase frame would have the plate's black border; that state is what is baked,
+    # rather than borrowing the Coca-Cola band's live-phase border for a frame nobody has.
+    ("facup", "cards"): {
+        "frame": "../knockout-2026-07-28/12_facup_semifinals_FINALISTS_1998-04-11.png",
+        "plate": (336, 87, 420, 107),
+        "blank": (337, 87, 420, 107),
+        "left": (312, 87),
+        "right": (422, 87),
+    },
 }
 PLATE_BG = (180, 200, 220)
 
@@ -217,6 +230,21 @@ CARDS_SF1_BAR_BG = (200, 220, 240)
 CARDS_SF1_BOX_BG = (42, 63, 170)
 CARDS_SF2_BAR_BG = (192, 220, 192)
 CARDS_SF2_BOX_BG = (80, 110, 5)
+## The FILLED FINALIST plates (interiors x20..216 / x281..477, y376..411). The strip cut
+## from the DRAWN Coca-Cola frame has them empty already; the F.A. Cup one below does not.
+CARDS_FINALIST_BOX = [(20, 376, 216, 411), (281, 376, 477, 411)]
+
+# ---- the SINGLE-LEG cards body (the F.A. Cup semifinals), measured 2026-07-28 ---------
+# The domestic cup's semifinals are ONE match at a neutral ground, so the card carries a
+# single block whose bar reads RESULT where the two-legged one reads 1ST LEG, and the
+# panel simply ENDS after it (rows y253+ are the desktop again, not a second block).
+# Proven, not assumed: blanking BOTH this frame and the two-legged witness with the same
+# content rects leaves exactly two differences inside the strip -- the bar label
+# (y178..184) and the whole second block (y263..344). Everything else is byte-identical
+# across two competitions and two careers, which is what licenses one strip per shape.
+CARDS_SINGLE_SRC = "../knockout-2026-07-28/12_facup_semifinals_FINALISTS_1998-04-11.png"
+CARDS_SINGLE_VENUE_TXT = CARDS_VENUE_TXT[:2]
+CARDS_SINGLE_BAR_ROWS = CARDS_BAR_ROWS[:2]
 
 # ---- the FINAL body (euro only -- the one witnessed final) --------------------------
 FINAL_SRC = "05_euroleague_final_UNDECIDED_1998-04-25.png"
@@ -551,7 +579,10 @@ def main() -> None:
     meta = {}
     for (comp, fam), spec in BANDS.items():
         im = frame(spec["frame"]).copy()
-        px0, py0, px1, py1 = spec["plate"]
+        # `blank` overrides which columns are repainted when the witness's own plate
+        # ground does not start where the label's box does -- the paged-back F.A. Cup
+        # frame keeps its white surround at x336, which is chrome, not plate.
+        px0, py0, px1, py1 = spec.get("blank", spec["plate"])
         for y in range(py0, py1 + 1):
             for x in range(px0, px1 + 1):
                 im.putpixel((x, y), PLATE_BG)
@@ -631,6 +662,29 @@ def main() -> None:
                     cards.putpixel((x, y), box_bg)
     cut(cards, CARDS_STRIP).save(OUT / "cards_body.png")
     print("cards_body.png <- the witnessed Coca-Cola SEMIFINALS frame, content blanked")
+
+    # -- the SINGLE-LEG cards body (F.A. Cup semifinals), same rects, one block.
+    single = frame(CARDS_SINGLE_SRC).copy()
+    for x0, y0, x1, y1 in CARDS_SINGLE_VENUE_TXT:
+        for y in range(y0, y1 + 1):
+            for x in range(x0, x1 + 1):
+                single.putpixel((x, y), (0, 0, 0))
+    for ry0, ry1 in CARDS_SINGLE_BAR_ROWS:
+        for bar, bar_bg, box, box_bg in [
+            (CARDS_SF1_BAR, CARDS_SF1_BAR_BG, CARDS_SF1_BOX, CARDS_SF1_BOX_BG),
+            (CARDS_SF2_BAR, CARDS_SF2_BAR_BG, CARDS_SF2_BOX, CARDS_SF2_BOX_BG),
+        ]:
+            for y in range(ry0, ry1 + 1):
+                for x in range(bar[0], bar[1] + 1):
+                    single.putpixel((x, y), bar_bg)
+                for x in range(box[0], box[1] + 1):
+                    single.putpixel((x, y), box_bg)
+    for x0, y0, x1, y1 in CARDS_FINALIST_BOX:
+        for y in range(y0, y1 + 1):
+            for x in range(x0, x1 + 1):
+                single.putpixel((x, y), (255, 255, 255))
+    cut(single, CARDS_STRIP).save(OUT / "cards_body_single.png")
+    print("cards_body_single.png <- the witnessed F.A. Cup SEMIFINALS frame, content blanked")
 
     # -- the FINAL body, euro only (the one witnessed final).
     fin = frame(FINAL_SRC).copy()
