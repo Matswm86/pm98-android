@@ -4,8 +4,10 @@ Status: **CLOSED 2026-07-28. The "hard gap" was a misidentification.** `PCF5DAT.
 the simulador's tile-scroll pitch and holds nothing the WATCH view needs. `MANAGER.EXE` opens
 it exactly once, to check that the CD is in the drive.
 
-Evidence: `tools/re/enum_pcf5dat.py` (container probe), the disassembly below, and a byte read
-of the file itself. Source: `~/backup/Div/premier manager 98.iso`.
+Evidence: `tools/re/enum_pcf5dat.py`
+
+The container probe, the disassembly below, and a byte read of the file itself. Source ISO:
+`~/backup/Div/premier manager 98.iso` (the pack is on the ISO only, never installed).
 
 ## The claim this replaces
 

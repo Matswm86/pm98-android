@@ -2,11 +2,12 @@
 
 Status: **SOURCE-READ + PORTED 2026-07-28.**
 
-Evidence: Ghidra 12.1.2 headless on **`FUN_0059a8c0`** — the simulador's pitch builder — plus
-a constant sweep of `.text` for the 16.16 encodings of the laws' figures
-(`tools/re/export_jug_bank.py`'s sibling scan; every hit below is a literal operand at a call
-site inside that one function). Port: `app/scenes/MatchSimulador.gd`. Gate:
-`app/tests/test_jug_render.gd`.
+Evidence: `extracted/Premier Manager 98/MANAGER.EXE`, `app/scenes/MatchSimulador.gd`,
+`app/tests/test_jug_render.gd`
+
+Method: Ghidra 12.1.2 headless on **`FUN_0059a8c0`** — the simulador's pitch builder — plus a
+constant sweep of `.text` for the 16.16 encodings of the laws' figures; every hit below is a
+literal operand at a call site inside that one function.
 
 ## What was carried, and why it was worth checking
 

@@ -3,7 +3,7 @@
 Status: **BUILT 2026-07-28.** Reversed leaf for leaf out of `MANAGER.EXE`, ported as
 `app/scripts/PMShadow.gd`, and gated live on the MAN-TO-MAN marking markers at
 **0 differing px outside the D/M letter box**.
-Evidence: `tools/re/diff_mantoman_parity.py` (three cases, two careers),
+Evidence: `tools/re/diff_mantoman_parity.py`,
 `tools/re/build_shadow_lut.py`, `app/tests/test_shadow_blit.gd`,
 `screenshots/parity-run-2026-07-16/orig/66_mantoman_match.png`,
 `screenshots/original-walkthrough-2026-07-02/058_162622.png`.

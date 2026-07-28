@@ -7,12 +7,12 @@ and the 2026-07-26 complete audit found only ~12 of 125 docs carry one. This is
 what that delegation needs instead of 113 hand-written sentences: for every doc,
 the artefacts that can CONFIRM it, each of them checkable.
 
-* **125 docs**, 12 with a `Status:` line of their own.
-* **33** are covered by a `diff_*_parity.py` render-diff gate — the
+* **131 docs**, 18 with a `Status:` line of their own.
+* **35** are covered by a `diff_*_parity.py` render-diff gate — the
   strongest evidence here, since a gate compares the app to a captured frame.
-* **61** have a headless `test_*.gd` suite; **83** cite MANAGER.EXE
+* **65** have a headless `test_*.gd` suite; **89** cite MANAGER.EXE
   addresses, i.e. their claims are anchored in the binary and not only in frames.
-* **18** name their proof directly on an `Evidence:` line — for the plans,
+* **24** name their proof directly on an `Evidence:` line — for the plans,
   audits and M5 session notes, whose evidence is a banked capture, an oracle
   runner or a witness directory rather than a screen gate. Every path on those
   lines is checked to exist by this script.
@@ -25,7 +25,7 @@ nothing are the ones to distrust.
 
 | doc | own Status: | gate | suite | scene | EXE addrs | evidence | open |
 |---|---|---|---|---|---|---|---|
-| `APP_VS_SPEC_AUDIT.md` | — | — | — | — | 41 | — | 9 |
+| `APP_VS_SPEC_AUDIT.md` | — | — | — | — | 42 | — | 10 |
 | `AUDIT_COMPLETE_2026-07-26.md` | — | — | — | — | — | 3 path(s) | 6 |
 | `AUDIT_season_playthrough_2026-07-25.md` | — | — | — | — | — | 3 path(s) | 2 |
 | `EXACT_PORT_PLAN.md` | — | — | — | — | 166 | — | — |
@@ -72,6 +72,7 @@ nothing are the ones to distrust.
 | `android_packaging_re.md` | yes | — | — | — | — | 3 path(s) | — |
 | `audio_re.md` | — | — | `test_audio.gd` | `AudioManager.gd` | — | — | — |
 | `awards_screens_re.md` | — | — | `test_month_awards.gd` | — | — | — | — |
+| `camera_re.md` | yes | — | — | `Pm98Camera.gd` | 9 | 2 path(s) | — |
 | `club_tactics_re.md` | — | — | — | — | 5 | — | 5 |
 | `comp_result_screen_re.md` | — | — | `test_comp_result.gd` | `CompResultScreen.gd` | 7 | — | — |
 | `contract_re.md` | — | — | `test_contract.gd`, `test_contract_warning.gd` | `Contract.gd` | — | — | 1 |
@@ -86,8 +87,8 @@ nothing are the ones to distrust.
 | `europe_re.md` | — | — | `test_europe.gd` | — | 1 | — | — |
 | `faces_re.md` | — | — | `test_faces.gd` | — | — | — | — |
 | `ficha_card_re.md` | — | `diff_entry_parity.py` | — | — | — | — | 4 |
-| `finance_constants.md` | — | `diff_finance_detail_parity.py`, `diff_finance_eurolabel_parity.py` | `test_finance.gd`, `test_finance_control.gd` | `FinanceModel.gd`, `FinanceScreen.gd` | 42 | — | — |
-| `finance_screen_re.md` | yes | `diff_finance_detail_parity.py`, `diff_finance_eurolabel_parity.py` | `test_finance.gd`, `test_finance_control.gd` | `FinanceModel.gd`, `FinanceScreen.gd` | 13 | — | 4 |
+| `finance_constants.md` | — | `diff_finance_axis_parity.py`, `diff_finance_detail_parity.py` | `test_finance.gd`, `test_finance_control.gd` | `FinanceModel.gd`, `FinanceScreen.gd` | 42 | — | — |
+| `finance_screen_re.md` | yes | `diff_finance_axis_parity.py`, `diff_finance_detail_parity.py` | `test_finance.gd`, `test_finance_control.gd` | `FinanceModel.gd`, `FinanceScreen.gd` | 38 | — | 5 |
 | `fixtures_screen_re.md` | — | `diff_fixtures_parity.py` | `test_fixtures_screen.gd` | `FixturesScreen.gd` | — | — | 3 |
 | `goalscorers_screen_re.md` | — | — | `test_goalscorers_screen.gd` | `GoalScorersScreen.gd` | — | — | 4 |
 | `hack_three_forwards.md` | — | `diff_options_parity.py` | — | — | 16 | — | 2 |
@@ -96,17 +97,19 @@ nothing are the ones to distrust.
 | `injury_model_re.md` | — | — | — | — | 33 | — | — |
 | `insurance_economy_re.md` | — | — | `test_insurance.gd`, `test_insurance_screen.gd` | `Insurance.gd`, `InsuranceScreen.gd` | 24 | — | 2 |
 | `insurance_screen_re.md` | — | — | `test_insurance.gd`, `test_insurance_screen.gd` | `Insurance.gd`, `InsuranceScreen.gd` | — | — | 3 |
-| `jug_render_spec.md` | — | — | — | — | 63 | — | 1 |
-| `knockout_views_re.md` | — | `diff_knockout_parity.py`, `diff_scout_offers_parity.py` | `test_knockout_bracket.gd`, `test_knockout_layout.gd` | `KnockoutScreen.gd` | — | — | 33 |
+| `jug_render_spec.md` | — | — | `test_jug_render.gd` | `JugKit.gd`, `JugRender.gd` | 67 | — | — |
+| `kit_palette_re.md` | yes | — | — | `JugKit.gd` | 5 | 2 path(s) | 2 |
+| `knockout_views_re.md` | — | `diff_knockout_parity.py`, `diff_scout_offers_parity.py` | `test_knockout_bracket.gd`, `test_knockout_layout.gd` | `KnockoutScreen.gd` | — | — | 42 |
 | `league_table_screen_re.md` | — | `diff_euroleague_parity.py` | `test_league_calendar.gd`, `test_league_screen.gd` | `LeagueTableScreen.gd` | — | — | 1 |
 | `lineup_screen_re.md` | — | `diff_lineup_ban_parity.py` | `test_brief_lineup.gd`, `test_lineup_roll.gd` | `LineupRollScreen.gd`, `LineupScreen.gd` | 2 | — | 2 |
 | `living_league_re.md` | — | — | `test_living_league.gd` | — | — | — | — |
 | `make_offer_re.md` | — | `diff_entry_parity.py` | `test_make_offer_screen.gd`, `test_make_offer_seed.gd` | `MakeOfferScreen.gd` | — | — | 7 |
 | `manager_career_re.md` | — | `diff_managerhistory_parity.py` | `test_manager.gd`, `test_manager_history_screen.gd` | `AudioManager.gd`, `Manager.gd` | — | — | — |
-| `match_engine_re.md` | yes | — | `test_match_init.gd`, `test_match_options.gd` | `MatchCommentary.gd`, `MatchEngine.gd` | 52 | — | — |
-| `match_flow_re.md` | — | — | `test_match_init.gd`, `test_match_options.gd` | `MatchCommentary.gd`, `MatchEngine.gd` | — | — | 2 |
-| `match_header_re.md` | — | — | `test_match_init.gd`, `test_match_options.gd` | `MatchCommentary.gd`, `MatchEngine.gd` | — | — | 2 |
-| `match_view_re.md` | yes | — | `test_match_init.gd`, `test_match_options.gd` | `MatchCommentary.gd`, `MatchEngine.gd` | 30 | — | — |
+| `mantoman_screen_re.md` | yes | `diff_mantoman_parity.py` | `test_mantoman.gd` | `ManToManScreen.gd` | 29 | 1 path(s) | — |
+| `match_engine_re.md` | yes | — | `test_live_match.gd`, `test_match_init.gd` | `MatchCommentary.gd`, `MatchEngine.gd` | 52 | — | — |
+| `match_flow_re.md` | — | — | `test_live_match.gd`, `test_match_init.gd` | `MatchCommentary.gd`, `MatchEngine.gd` | — | — | 2 |
+| `match_header_re.md` | — | — | `test_live_match.gd`, `test_match_init.gd` | `MatchCommentary.gd`, `MatchEngine.gd` | — | — | 2 |
+| `match_view_re.md` | yes | — | `test_live_match.gd`, `test_match_init.gd` | `MatchCommentary.gd`, `MatchEngine.gd` | 30 | — | — |
 | `matchday_flow_witness_re.md` | — | — | — | — | — | 2 path(s) | — |
 | `menu_screen_re.md` | — | — | `test_menu_screen.gd` | `MenuScreen.gd` | 7 | — | — |
 | `morale_re.md` | — | `diff_entry_parity.py` | `test_morale.gd` | `Morale.gd` | 1 | — | 3 |
@@ -115,6 +118,8 @@ nothing are the ones to distrust.
 | `ofertas_screen_re.md` | — | — | — | — | 17 | — | 3 |
 | `offer_record_re.md` | — | `diff_offers_selection_parity.py`, `diff_scout_offers_parity.py` | `test_current_offers.gd`, `test_current_offers_screen.gd` | `CurrentOffersScreen.gd`, `MakeOfferScreen.gd` | 29 | — | 2 |
 | `offers_map_re.md` | — | `diff_offers_selection_parity.py`, `diff_role_popup_parity.py` | `test_current_offers.gd`, `test_current_offers_screen.gd` | `CurrentOffersScreen.gd`, `MakeOfferScreen.gd` | — | — | 7 |
+| `pcf5dat_re.md` | yes | — | — | — | 41 | 1 path(s) | 1 |
+| `pitch_markings_re.md` | yes | — | `test_halfpitch.gd` | — | 10 | 2 path(s) | 1 |
 | `pkf_format.md` | — | — | — | — | 2 | — | 1 |
 | `player_info_re.md` | — | — | `test_player_actions.gd`, `test_player_build.gd` | `PlayerInfoScreen.gd`, `PlayersMonthScreen.gd` | 11 | — | 6 |
 | `positions_re.md` | — | — | — | — | 8 | — | — |
@@ -132,9 +137,10 @@ nothing are the ones to distrust.
 | `seasonend_flow_re.md` | — | `diff_seasonend_year_parity.py` | — | — | 46 | — | — |
 | `seleccion_screen_re.md` | — | — | — | `SeleccionScreen.gd` | 1 | — | 1 |
 | `session_lineup_re.md` | — | — | — | — | 11 | — | 3 |
+| `shadow_blit_re.md` | yes | `diff_knockout_parity.py`, `diff_mantoman_parity.py` | `test_shadow_blit.gd` | `PMShadow.gd` | 5 | 1 path(s) | 1 |
 | `squad_number_re.md` | — | — | `test_squad_screen.gd` | `SquadScreen.gd` | — | — | — |
 | `squad_screen_re.md` | — | — | `test_squad_screen.gd` | `SquadScreen.gd` | 3 | — | 1 |
-| `stadium_screen_re.md` | yes | — | `test_stadium_screen.gd`, `test_stadium_works.gd` | `StadiumScreen.gd` | 25 | — | 5 |
+| `stadium_screen_re.md` | yes | — | `test_stadium_screen.gd`, `test_stadium_works.gd` | `StadiumScreen.gd` | 26 | — | 5 |
 | `staff_re.md` | — | — | `test_staff.gd`, `test_staff_overlay.gd` | `Staff.gd`, `StaffHireOverlay.gd` | — | — | 4 |
 | `stat_commit_cadence_re.md` | yes | `diff_statistics_parity.py` | `test_result_statistics.gd`, `test_season_stat_store.gd` | `Pm98StatMatch.gd`, `Pm98StatStore.gd` | 34 | — | — |
 | `stat_match_engine_re.md` | — | `diff_statistics_parity.py` | `test_result_statistics.gd`, `test_season_stat_store.gd` | `Pm98StatMatch.gd`, `Pm98StatStore.gd` | 20 | — | — |

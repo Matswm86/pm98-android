@@ -1,5 +1,98 @@
 # PM98 Android — remaining-work inventory (refreshed 2026-07-28)
 
+## 0aaaaaaaa. Closed 2026-07-28 (session s76) — THE KIT RECOLOUR, THE CAMERA OBJECT, THE MARKINGS
+
+Mats's list was s75 §6 and §7 plus the data/doc tail. What closed, and what did not, said
+plainly at the end.
+
+### THE PER-CLUB KIT RAMPS — CLOSED. This was "the biggest remaining visual gap".
+
+**The original never bakes a coloured player.** `JUG.PGF` stays 8-bit PALETTE INDICES and
+`FUN_005d34a0` remaps every pixel through a 256-byte LUT immediately before the blit. The whole
+chain that builds that LUT is reversed and ported (**`docs/re/kit_palette_re.md`**):
+
+* `FUN_005b63e0` — `DatSim\paletas\P96A<key>.DAT` is 192 bytes: `[0..127]` the **16x8 shirt
+  pattern grid** (each cell a palette RAMP BASE), `[128..175]` the 48 LUT entries that land on
+  palette slots **9..56**, `[176]` the kit CLASS colour. The away side falls to **P96B — its
+  CHANGE STRIP** — exactly when its class equals the home side's, and `matchctx+0x742` IS team
+  0's own `+0x2d6` (`0x46c + 0x2d6 == 0x742`). The number ink is `0x67` or `0x7f` on the GREEN
+  byte of the match palette's entry for that class.
+* `FUN_005a2830` — the player's own copy of the pattern with his **SHIRT NUMBER** stamped into
+  its right half out of `NumCam.bmp`'s sixty 8x8 glyphs, plus his SKIN and HAIR ramps.
+  **`.DBC +0x16` and `+0x17` — both carried as "semantics un-RE'd" — ARE skin tone and hair
+  colour**: the 9,547-player database uses `{1,2,3}` and `{1..6}`, exactly the three skin ramps
+  and the six non-redirect hair rows, and hair index 1 is the BALD redirect to `skin + 6`.
+* `FUN_005a5460` — skin to LUT[1..8], hair to LUT[0x15..0x18], then the pattern painted through
+  JUGCAM for this frame's map.
+
+**`JUGCAM.IND` is CLOSED and it is not a camera table** — the name misled the old spec. Its one
+consumer gives the layout with no ambiguity: **72 maps x 16 cols x 8 rows x 6 shades = 55,296
+bytes, the file's EXACT size**. The `.PGF` header word **`h5`**, listed as an open GAP, is that
+map index and spans exactly 0..71. And **`h0`, not `h4`, is a frame's visible width** (`h0 <=
+h4` in all 4211 frames and the columns past `h0` are blank in all of them) — the old bake made
+every padded frame slightly too wide.
+
+Proven in the REAL APP under Xvfb + GL: `tools/re/refs/kit-2026-07-28/` shows United in red
+shirts and white shorts, Liverpool in their CHANGE strip, per-player skin and hair, numbered
+backs. Gate `test_jug_render` +22 assertions.
+**One declared divergence**: the keeper strip's re-roll RULE is the binary's, but its draw comes
+from the display LCG, a stream this port does not reproduce, so the seed is the fixture's clubs.
+
+### THE CAMERA OBJECT — REVERSED, and it corrects two s75 "NOT reversed" rows
+
+`docs/re/camera_re.md`. The controller is `matchctx + 0x27f0`, fixed by `FUN_00598141`'s two
+clamp boxes. With that base:
+
+* **THE EYE.** s75 recorded "`camctrl+0x3c` is zeroed by its ctor and a sweep finds no other
+  writer — yet `FUN_005f6230` passes that very address to `SetCamera`." The writer is
+  `FUN_005f5850`, and it writes **through a register pointer**, which a disp32 sweep cannot see.
+  `eye = lookAt - dir*distance`, then clamped.
+* **THE ORIENTATION.** Same story — `yaw` and `pitch` are recomputed every frame from the
+  eye->look-at vector. `jug_render_spec.md` §5's "constant-0 words, therefore a pure
+  translation" is now refuted from the CODE as well as from the capture. Only **roll** is
+  genuinely never written.
+* Also read: both clamp boxes exactly, the eight-arm camera MODE switch driven by
+  `session+0xfe0` (a MATCH OPTIONS setting), and the **RESTART CUT** — on `matchctx+0x448` in
+  {3,4,5,6,7} the eye jumps 50 m behind the tracked actor at 6 m, or 5 m on a GOAL.
+* And it is **measured**, not asserted, that the original's camera moves: the grass/hoarding
+  seam sits at screen row **82 / 65 / 90 / 82 / 0** across the five banked WATCH frames.
+
+**The PORT of the motion is still open** and §7 of that doc lists exactly the three things it
+needs. The app still holds the s75 fitted pose, which is `watch_02`'s instant.
+
+### THE PITCH MARKINGS — SOURCE-READ (they were "declared, not source-read")
+
+`docs/re/pitch_markings_re.md`. `FUN_0059a8c0` builds the whole set from `matchctx+0x1820` /
+`+0x1824` with every other figure a literal operand. Two things the port had wrong: the **D's
+half-angle is the binary's own `0x2640` = 53.79 deg**, not the derived
+`acos((16.5-11)/9.15)` = 53.06 deg; and the centre and penalty marks are **0.4 x 0.2 quads**,
+not dots. The touchlines / goal lines / halfway line now come out of the engine's own two loops.
+Still not source-read, and said so: the grass shading.
+
+### The two carried "opens" that turned out not to be
+
+* **`shot_squad_card_tapthrough` DOES NOT REPRODUCE.** Open since s70 as "2 of 10". Run three
+  ways on this box: headless (the harness self-skips — it needs a rendering driver), Xvfb
+  800x600 + GL **10/10**, Xvfb 1280x960 + GL **10/10**. It was that one run's display.
+* **The `.bin` assets were not in the Android export filter.** `export_filter=all_resources`
+  with an empty `include_filter` does not carry plain binaries, and the match bank is now
+  3.9 MB of them (and `data/shadow_lut.bin` was already one). `include_filter="*.bin"`.
+
+### NOT touched in s76, said plainly
+
+The **camera-motion port**, **B9**, the **cup channelTV fee** (a lower-division career was
+driven for it this session and is recorded below), the **P2 data tail** (~876 directory-only
+foreign teams, the LZ-packed rating tables, the MINIESC 56 px, the 10 stadium tiles, "free if
+relegated", the unmanaged-club release ladder) and the **`KnockoutScreen` -> `PMShadow`
+refactor** — the last deliberately, for the same reason s74 gave: those render correctly today
+and their parity gates are green on the baked art, so it is a pure refactor with regression
+risk and no visible change.
+
+**"Free if relegated" got one step, not a close**: the string's only code reference is
+`0x52bfc0`, where **bit 3 of the offer flags at `screen+0x144`** picks between a checked and an
+unchecked checkbox draw at (230, 420). So it is a contract-offer CHECKBOX and its flag bit is
+known; what the flag DOES on relegation is not found, and is not guessed.
+
 ## 0aaaaaaa. Closed 2026-07-28 (session s75) — THE MATCH PRESENTATION
 
 Mats's brief was the match-engine graphics: *"APP_VS_SPEC_AUDIT A6/A7/A8 — the engine renders
@@ -838,7 +931,10 @@ is real and shipped, and PM98 ships two match presentations, so this is the seco
 
 ## 3. The screen / model tail
 
-* **The knockout views** — NO LONGER BLOCKED ON EVIDENCE, still NOT BUILT. The old entry
+* ~~**The knockout views** — NO LONGER BLOCKED ON EVIDENCE, still NOT BUILT.~~ — **STALE
+  PROSE, corrected 2026-07-28.** All five layouts were built across s71 / s73, and
+  `tools/re/diff_knockout_parity.py` is **14 of 14 cases at 0 differing pixels**. The
+  paragraph below is kept for the evidence trail it records, not as a status. The old entry
   said "the frame is in hand"; one frame was, and every tie in it was unplayed, so leg
   scores, aggregates and the winner ink were unwitnessed. A scheduled-probe drive
   (`plans/season_euro_probe.json`) photographed the whole competition rail every second hub
