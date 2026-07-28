@@ -1157,10 +1157,25 @@ engine that is about to be replaced. Not built, not started. Re-ask after the wi
   line simply outlived it. What the gap was actually being blamed for (a career squad
   melting to six men, and `test_pyramid`'s "every live-division club fields a squad after
   movement" flake) is the missing 13-man release floor, fixed in §3c.
-* ~876 directory-only teams beyond the detailed records (separate format).
-* `DAT.PKF` / `DATSIM.PKF` match-sim rating tables are still LZ-packed. Only needed to tune
-  the *abstracted* engine toward the original — the byte-exact engine gets these from the
-  code path itself, so this is track-A work only.
+* ~~~876 directory-only teams beyond the detailed records (separate format).~~ — **STALE,
+  REMOVED 2026-07-28 (s76), and it is a measurement, not a judgement.** There is no such
+  set. Every club archive in `DBDAT` holds **exactly 476 entries** — `EQUIPOS.PKF` 476
+  `.DBC` payloads, `MINIESC`/`RIDIESC`/`NANOESC` 476 `.BMP` each (`BIGESC` 92, the English
+  clubs only) — and `app/data/game_db.json` carries **476 clubs and 9,547 players**, every
+  club populated but two, both of which are the game's OWN special records: id 1381 "Stars"
+  (the all-star XI, 13 men) and id 1382 "Free players" (the free-agent pool, empty at season
+  start). Nothing is missing and there is no second format to crack.
+  - The number that DOES exceed 476 is the kit-ramp set: **829 `P96A`/`P96B` files**, because
+    `DatSim\paletas` is inherited from the engine's PC Fútbol parent and covers clubs PM98
+    does not ship. 470 of PM98's 476 resolve one; the other six fall back to `P96A0000.DAT`,
+    which is the engine's own miss branch (`kit_palette_re.md` §2).
+* ~~`DAT.PKF` / `DATSIM.PKF` match-sim rating tables are still LZ-packed.~~ — **MOOT, closed
+  2026-07-28 (s76).** This entry already carried its own answer: *"Only needed to tune the
+  abstracted engine toward the original — the byte-exact engine gets these from the code path
+  itself, so this is track-A work only."* Track A is gone. Since s74 BOTH of the original's
+  engines are ported byte-exact and `MatchSim.simulate` routes every fixture to one of them
+  (`Pm98StatMatch` for an instant result, `Pm98LiveMatch` for a watched match), so there is no
+  abstracted engine left to tune. Unpacking them would buy nothing.
 * ~~**The top-level MINIESC kit bank looks mismapped**~~ — **FIXED 2026-07-26 (s62).**
   The id mapping was fine (1381 is club 9902 "STARS", whose kit sprite IS a star); the
   DECODE was not: `export_kits()` rendered through the Pillow path, which honours the
