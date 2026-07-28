@@ -61,11 +61,14 @@ not find you. Screens are measured against photographs of the real game running 
 come out at zero differing pixels. Where a value genuinely is not known yet the screen is left
 blank instead of filled with something that looks about right.
 
-The match is the part still being built. The exact copy of the original's match engine is
-written, and it tracks the real game move for move as far as I have managed to check it, which is
-the first three minutes of a half. Until it clears a full ninety it sits on the bench and your
-matches are played by a simpler engine tuned to sensible football numbers. The animated 2D view
-is an approximation, and HIGHLIGHTS cannot be built at all, the 3D models are not on the disc.
+Your results come out of the 1998 game's own engine. Premier Manager 98 has two: a positional
+one that runs the twenty-two players when you watch a match, and a statistical one that decides
+every match you do not watch. The second one is copied exactly, and it is what plays your season.
+
+The first one is the part still being built. It is written, and it tracks the real game move for
+move as far as I have managed to check it, which is the first nine minutes of a half. Watching a
+match runs it for real; the drawing over the top of it is an approximation. HIGHLIGHTS cannot be
+built at all, the 3D models are not on the disc.
 
 Full list with per-item status: [`docs/REMAINING.md`](docs/REMAINING.md).
 

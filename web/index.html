@@ -315,6 +315,20 @@
       the converted kicks on, purely for the read-out.</p>
     </div>
 
+    <div class="tip tip-cheat" id="unsackable">
+      <h4>Unsackable, the other cheat <span class="chip cheat">cheat</span></h4>
+      <p>The board's dismissal is one function &mdash; the weekly hub screen's own <code>run()</code>
+      &mdash; and it tests exactly three things before it draws the menu: four straight weeks in the
+      red, a results review that has gone against you, or a squad under sixteen men. Any one of them
+      raises the modal, detaches you from the club and ends the career on the spot.</p>
+      <p>Each of those three tests keeps you by taking a <b>two-byte jump straight to the next
+      one</b>. Turn all three into unconditional jumps and every dismissal becomes unreachable
+      code: the whole cheat is <b>three bytes</b>, and it is proved by walking the function's
+      control-flow graph in both binaries &mdash; all three arms reachable in the original, none of
+      them reachable in the patched one. Switch it on in OPTIONS; off by default, and off is the
+      original exactly.</p>
+    </div>
+
     <div class="tip tip-cheat" id="hack">
       <h4>Three up front, the cheat <span class="chip cheat">cheat</span></h4>
       <p>Field three or more attackers and switch <b>THREE UP FRONT</b> on in OPTIONS. Your chance
@@ -589,9 +603,11 @@
     <div class="panel">
       <h3>What is still open</h3>
       <ul>
-        <li>The <b>positional match engine</b> tracks the original exactly for the first three
-            minutes of a half and is unchecked after that, so the match you actually play is still
-            the simpler engine until it clears a full ninety.</li>
+        <li>The <b>positional match engine</b> &mdash; the one that runs twenty-two players when
+            you WATCH &mdash; tracks the original exactly for the first nine minutes of a half and
+            is unchecked after that. The results themselves come from the original's OTHER engine,
+            the statistical one it uses for every match you do not watch, and that one is copied
+            exactly.</li>
         <li><b>HIGHLIGHTS</b> cannot be built. The 3D models are not on the disc. That is the one
             part genuinely out of reach.</li>
         <li>A few finance rows, the coach-quality multiplier on top of the training step (the
