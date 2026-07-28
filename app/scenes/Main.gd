@@ -1567,6 +1567,9 @@ func _open_match(home: Dictionary, away: Dictionary, hg: int, ag: int,
 		scr.queue_free()   # watched (non-career) match: EXIT just leaves
 		if on_back.is_valid():
 			on_back.call())
+	# MAN-TO-MAN: the original's own in-match door (walkthrough 057 -> 058). The
+	# board only offers it before KICK OFF, which MatchScreen._hit already enforces.
+	scr.mtm_pressed.connect(func() -> void: _show_man_to_man(home, away))
 	# Full time: the BRIEF hands off to the separate FULL TIME / RESULT page (frame 083),
 	# then CONTINUE from there returns to the hub (frame 084). Career match only has the
 	# read-out data; a watched match just leaves the running screen.
@@ -2364,6 +2367,30 @@ func _halftime_data(data: Dictionary) -> Dictionary:
 	# finished match (MIN 45, and every column a prefix of the full-time sheet).
 	ht["report"] = data.get("report_ht")
 	return ht
+
+## MAN-TO-MAN MARKINGS, the last in-match door (docs/re/mantoman_screen_re.md).
+## Raised over the running BRIEF exactly as the original does (walkthrough
+## 057_162619 -> 058_162622); RETURN drops back to the board underneath.
+## The manager's side is whichever of the two clubs he holds; the ten rows a side
+## are lineup slots 2..11 of each XI, which is what `FUN_0057a2e0` asks for.
+func _show_man_to_man(home: Dictionary, away: Dictionary) -> void:
+	var mine := int(home.get("id", -1))
+	var theirs := int(away.get("id", -1))
+	if theirs == _career.club_id:
+		mine = int(away.get("id", -1))
+		theirs = int(home.get("id", -1))
+	var scr: ManToManScreen = load("res://scenes/ManToManScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	scr.setup(mine, _career._xi_for(mine), theirs,
+		PMChrome.title_case_name(str(GameDB.club(theirs).get("name", ""))),
+		_career._xi_for(theirs), _career.man_marking, _career.marking_lines,
+		_match_header())
+	scr.markings_changed.connect(func(m: Array) -> void: _career.man_marking = m)
+	scr.back_pressed.connect(func() -> void:
+		_career.marking_lines = scr.lines()
+		scr.queue_free())
+
 
 ## EXIT during a career match: the witnessed leave-championship confirm (§6).
 ## The match pauses under the box; No resumes it; Yes drops to the title

@@ -1,5 +1,49 @@
 # PM98 Android — remaining-work inventory (refreshed 2026-07-28)
 
+## 0aaaa. Closed 2026-07-28 (session s72) — MAN-TO-MAN MARKINGS
+
+* **MAN-TO-MAN MARKINGS — BUILT, and it was the last dead in-match door.**
+  `app/scenes/ManToManScreen.gd`, raised by the BRIEF's own MAN-TO-MAN button
+  (`MatchScreen.mtm_pressed` -> `Main._show_man_to_man`), which is the door the
+  walkthrough itself walks: `057_162619` (the board, the button lit) ->
+  `058_162622` (the screen). Layout, cells, colours and model all come out of
+  `MANAGER.EXE` — `FUN_0050e980` (the init) plus the four draw overrides
+  `FUN_005100a0` / `FUN_0050fc40` / `FUN_005103c0` / `FUN_0050fee0`. Full record:
+  **`docs/re/mantoman_screen_re.md`**. Gate `tools/re/diff_mantoman_parity.py`:
+  **three cases, two careers, 0 differing px** across the whole body band
+  (Bolton W. vs Aston Villa idle, Manchester Utd. vs F.C. Barcelona idle, and the
+  same career after two commits). `app/tests/test_mantoman.gd` pins the model and
+  is in the CI gate (25 -> 26 tests).
+  - The **assignment table is the original's own** `team+0x234 + 4*i` (0 = unmarked,
+    2..11 = the marked opponent's lineup slot); it persists on `Career.man_marking`
+    and reaches the positional engine through `Pm98LineupFeeder` as
+    `rec+0x28 = entry - 1`, the binding `session_lineup_re.md` already recorded.
+  - The **two marking lines** are `club+0x25c` / `club+0x260` scaled `*148/318`
+    (ctor defaults 79/198 -> panel x 36/92, exactly where both witnesses put them),
+    persisted on `Career.marking_lines` and fed to the engine's lineup header.
+    Their tracks bound each other, so D can never pass M.
+  - Three sprites are the game's own: `linead.bmp` / `lineam.bmp` / `flechas.bmp`
+    from `RECURSOS.PKF` under `MANAGER.PAL` (FLECHAS reproduces witness
+    `061_162628` at **0 px**; the markers at 0 px outside their D/M letter box,
+    which the original draws as text over the sprite). The pitch under the markers
+    is the game's own `campo.bmp`, so a dragged line uncovers original pixels.
+* **The un-reversed "bevel"/outline pass is IDENTIFIED — it is one pass, not three.**
+  The markers and the 48x64 kit go through `FUN_004b7f60` ->
+  `FUN_005cbea0(0x10, 0x21, …)` -> `FUN_005d66f0` (silhouette) / `FUN_005d6590`
+  (tint) / `FUN_005d5220` (composite). Measured on these frames it is a
+  **palette-darkening stamp offset right of the silhouette, applied once per
+  overlapping stamp** (index 85 -> 116 -> 115 -> 114; 255 -> 7 -> 247 -> 134) —
+  NOT the dilation model rejected earlier the same day. Porting those two leaves
+  closes the bucket here AND in `diff_knockout_parity.py` and `OffersScreen`.
+  Still open: the port itself.
+
+### NOT done in s72, stated plainly
+
+The rest of the carried list is untouched and stays open exactly as written below:
+**B9**, the **England non-Premier offers panel**, the **F.A. Cup single-leg
+semifinal card + the Coca-Cola FINAL body**, the **M5 wire-in** (and the
+~9 min/match performance question), the **2D/JUG view**, and the data/device tail.
+
 ## 0aaa. Closed 2026-07-28 (session s71) — the carried named list
 
 Mats's list was: *the cup TV fee, the 5-8 tie kit list, MAN-TO-MAN, B9, the 48x64 bevel,

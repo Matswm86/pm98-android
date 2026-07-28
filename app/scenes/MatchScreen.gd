@@ -20,6 +20,7 @@ class_name MatchScreen
 
 signal back_pressed
 signal continue_pressed   # full time: leave the BRIEF for the separate RESULT page (frame 083)
+signal mtm_pressed        # MAN-TO-MAN: the door frames 057 -> 058 walk (ManToManScreen)
 
 const W := 640
 const H := 480
@@ -368,8 +369,12 @@ func _activate(target: String) -> void:
 				continue_pressed.emit()
 			else:
 				back_pressed.emit()
+		"mtm":
+			# The original's own door: walkthrough 057_162619 (this board, the
+			# MAN-TO-MAN button lit) -> 058_162622 (the MARKINGS screen).
+			mtm_pressed.emit()
 		_:
-			pass   # LINE-UP/TACTICS/MAN-TO-MAN/STATISTICS: in-match chrome (no sub-screen here)
+			pass   # LINE-UP/TACTICS/STATISTICS: in-match chrome (no sub-screen here)
 
 
 # ---- drawing -------------------------------------------------------------

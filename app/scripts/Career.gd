@@ -90,6 +90,14 @@ var objective_pos: int = 17       # board wants: finish at least this high (1-ba
 var objective_text: String = ""
 var finished: bool = false        # season complete + objective resolved
 var tactics: Dictionary = {}      # manager's Tactics.to_dict(): XI + shape + marking
+# MAN-TO-MAN MARKINGS (docs/re/mantoman_screen_re.md). `man_marking` is the
+# original's own `team+0x234` table: ten entries, one per OUTFIELD lineup slot
+# (2..11), 0 = unmarked and 2..11 = the opponent lineup slot that player marks.
+# `marking_lines` is [club+0x25c, club+0x260] in the binary's own units — the
+# DEFENDING and MIDFIELDING marking lines, ctor defaults 79 and 198
+# (session_lineup_re.md); the screen scales them by 148/318 to draw.
+var man_marking: Array = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+var marking_lines: Array = [79, 198]
 var stadium_capacity: int = 0     # managed club's current ground capacity (0 = GameDB default)
 # The ground's expansion HEADROOM (EQUIPOS param_1[7], loader-quantised to 4000s;
 # game_db `capacityHeadroom`). The GROUND picture's tier is the SUM capacity+headroom
@@ -5871,6 +5879,7 @@ func to_dict() -> Dictionary:
 	for pid in sale_offers:
 		offers[str(pid)] = sale_offers[pid]
 	return {
+		"man_marking": man_marking, "marking_lines": marking_lines,
 		"club_id": club_id, "club_name": club_name, "manager_name": manager_name,
 		"manager_level": manager_level, "players_age": players_age,
 		"match_options_shown": match_options_shown,
@@ -6040,6 +6049,8 @@ static func from_dict(d: Dictionary) -> Career:
 	c.objective_text = d.get("objective_text", "")
 	c.finished = bool(d.get("finished", false))
 	c.tactics = d.get("tactics", {})
+	c.man_marking = d.get("man_marking", [0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+	c.marking_lines = d.get("marking_lines", [79, 198])
 	c.tier = int(d.get("tier", 1))
 	# Pre-stadium-works saves load with capacity 0 (-> GameDB default via Main) + no works.
 	c.stadium_capacity = int(d.get("stadium_capacity", 0))

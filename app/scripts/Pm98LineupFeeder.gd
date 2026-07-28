@@ -62,8 +62,15 @@ static func load_data() -> Dictionary:
 ## This is how the TEAM TACTICS modal reaches the positional engine's
 ## team[0xc1..0xc7] when a career match runs on it (the manager's side passes his
 ## edited levers; every other club keeps its own .DBC stream, as the original does).
+## `marking_overrides` / `line_overrides` (2026-07-28, the MAN-TO-MAN wiring):
+## {club_id: ten-entry `team+0x234` table} and {club_id: [club+0x25c, club+0x260]}.
+## The screen's own model reaches the engine here — `rec+0x28 = entry - 1` and the
+## two transformed x-lines in the lineup header (docs/re/mantoman_screen_re.md §4,
+## session_lineup_re.md §6). With neither passed the ctor defaults stand, which is
+## what every banked oracle fixture was captured with.
 static func build(home_id: int, away_id: int, data: Dictionary,
-		lever_overrides: Dictionary = {}) -> Dictionary:
+		lever_overrides: Dictionary = {}, marking_overrides: Dictionary = {},
+		line_overrides: Dictionary = {}) -> Dictionary:
 	# Venue pitch dims = the HOME club's stadium pair << 16 (fn_0044d5f0 L75-80:
 	# FUN_00585ee0(fixture+0x44) -> club u16s +0x36/+0x34 << 0x10 -> session+0x4c/+0x50).
 	var home_t: Dictionary = _tactic(data, home_id)
@@ -84,7 +91,13 @@ static func build(home_id: int, away_id: int, data: Dictionary,
 			var pid := int((t["xi"] as Array)[i])
 			assert(pid != -1, "%s: XI slot %d unfilled" % [club["name"], i])
 			var raw: Array = ((t["slots"] as Array)[i] as Dictionary)["raw"]
-			slots.append(_rec(by_id[pid], i, raw, pitch_w, pitch_h, is_league))
+			# slot 0 is the keeper, whom MAN-TO-MAN never lists; slots 1..10 read the
+			# club's table entry, which the engine stores one lower (0 -> -1).
+			var mk := -1
+			var mtab: Array = marking_overrides.get(cid, [])
+			if i > 0 and i - 1 < mtab.size():
+				mk = int(mtab[i - 1]) - 1
+			slots.append(_rec(by_id[pid], i, raw, pitch_w, pitch_h, is_league, mk))
 		# header 9 dwords -> team[0xbf..0xc7] (lineup+0x4..+0x28 skip +0x0/+0xc):
 		# two transformed x-lines from club+0x260/+0x25c (ctor defaults 198/79, the
 		# .DBC parser never overwrites them — session_lineup_re.md §6), then the 7
@@ -94,8 +107,8 @@ static func build(home_id: int, away_id: int, data: Dictionary,
 		var lv: Array = lever_overrides.get(cid, t["levers"])
 		lineups.append({
 			"header": [
-				_transform_xline(0xC6, pitch_w),
-				_transform_xline(0x4F, pitch_w),
+				_transform_xline(int(_lines_of(line_overrides, cid)[1]), pitch_w),
+				_transform_xline(int(_lines_of(line_overrides, cid)[0]), pitch_w),
 				int(lv[0]), int(lv[1]), int(lv[2]),
 				int(lv[4]), int(lv[5]), int(lv[6]), int(lv[3]),
 			],
@@ -136,7 +149,7 @@ static func build(home_id: int, away_id: int, data: Dictionary,
 ## branch L177-262, field map session_lineup_re.md §3. slot_i is the 0-based tactic
 ## slot (XI slot byte s = slot_i+1); slot_raw = the club's OWN 8-u16 block for it.
 static func _rec(player: Dictionary, slot_i: int, slot_raw: Array,
-		pitch_w: int, pitch_h: int, is_league: bool) -> Dictionary:
+		pitch_w: int, pitch_h: int, is_league: bool, mark: int = -1) -> Dictionary:
 	var attrs: Dictionary = player.get("attrs", {})
 	var ve := int(attrs.get("VE", 0))
 	var re_ := int(attrs.get("RE", 0))
@@ -168,7 +181,7 @@ static func _rec(player: Dictionary, slot_i: int, slot_raw: Array,
 		0x10: b[6], 0x14: b[7],                              # start pos B (mk2)
 		0x18: mini(b[0], sx), 0x1c: mini(b[1], sy),          # roam box min
 		0x20: maxi(b[0], sx), 0x24: maxi(b[1], sy),          # roam box max
-		0x28: -1,                                            # marking idx (career table 0-1)
+		0x28: mark,                                          # marking idx (career table 0-1)
 		0x2c: int(player.get("b16", 0)),                     # .DBC +0x16 verbatim
 		0x30: int(player.get("b17", 0)),                     # .DBC +0x17 verbatim
 		0x34: CAP_INIT,                                      # +0xa8 cap byte
@@ -227,6 +240,13 @@ static func _transform_block(raw: Array, pitch_w: int, pitch_h: int) -> Array:
 ## The two header x-lines: FUN_0058c300 on a single stack dword — only block[0]'s path
 ## lands (scale by pitchW/318 then -= pitchW>>1); the block[1..7] stack writes are
 ## discarded by the binary too (fn_0044d5f0 L104-108).
+## [club+0x25c, club+0x260] for a club: the career's live MAN-TO-MAN lines when the
+## caller supplies them, else the ctor defaults the .DBC parser never overwrites.
+static func _lines_of(overrides: Dictionary, cid: int) -> Array:
+	var v: Array = overrides.get(cid, [])
+	return v if v.size() == 2 else [0x4F, 0xC6]
+
+
 static func _transform_xline(v: int, pitch_w: int) -> int:
 	return _i32(_u32(pitch_w * v) / DESIGN_W - (pitch_w >> 1))
 
