@@ -86,6 +86,35 @@ Birmingham C (First Division) and Barnet (Third Division).
   parity gates are green on the baked art, so it is a pure refactor with regression risk
   and no visible change — the session spent the time on the evidence gaps instead.
 
+### ⛔ CORRECTION, same day: the WATCH VIEW is still an app invention
+
+The wire-in gives the view the engine's real COORDINATES. It does **not** make the
+presentation faithful, and the s74 write-up did not say that loudly enough. §A6/A7/A8 of
+`APP_VS_SPEC_AUDIT.md` stand unchanged and are the authority:
+
+* **The original has no side-on 2D view at all** — it draws a pseudo-3D two-billboard
+  sprite under a **fixed 3/4 camera**. Ours is side-on.
+* **`_facing()`'s uniform-45° atan2 is an invention**; the engine buckets direction on the
+  non-uniform thresholds `DAT_006653e0`, stores 5 directions and mirrors the rest.
+* **The baked sprite sheet is the transpose of the real JUG layout** — `[direction][phase]`
+  across 74 kinds in the engine, `[3 phase × 8 dir]` in `export_match_art.py`.
+* **`3D ENGINE` = HIGHLIGHTS, and it cannot be built**: its `.p3d` models are absent from
+  the shipped game files. A data gap, not a work gap.
+
+**Four of the five pieces needed for a faithful render are ALREADY reversed** in
+`jug_render_spec.md`: the JUG bank layout (74 kinds, validated to exactly 4211 frames), the
+direction thresholds + 5-dir-and-mirror rule, the camera orientation (yaw/pitch/roll are
+constant 0, so the view matrix is pure translation — **not** a tilted camera), and the
+camera position (eye = the ball anchor `matchctx+0x1614` + `0x500000`, look-at on the
+tracked actor). **The one hard gap is `PCF5DAT.PKF`, the 3/4 tile-scroll pitch background.**
+
+On importing another Android football engine (GFootball `Apache-2.0`, GameplayFootball
+`Unlicense`, both verified via the GitHub API 2026-07-28; asset licensing NOT verified —
+check before use): **not recommended.** The players are PM98's own `JUG.PGF` and are
+already decoded; a donor renderer would make the match look like that game, not like PM98.
+The only piece a donor could supply is the pitch background, and the game's own `HIERPREM`
+grass tiles already cover that as a declared substitute.
+
 ## 0aaaaa. Closed 2026-07-28 (session s73) — the shadow pass and the F.A. Cup semis card
 
 * **The shadowed bitmap blit is REVERSED AND PORTED.** `FUN_004b7f60` is not an outline

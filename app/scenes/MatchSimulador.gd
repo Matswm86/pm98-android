@@ -15,15 +15,29 @@ class_name MatchSimulador
 ##     the view tints per club at runtime (modulate x club colour) — exactly what the exporter
 ##     split it for. BALON.RAW -> ball.png, COFLECHA.PGF -> arrow.png (active marker).
 ##   * The pitch surface + markings are drawn vectorially. The original's exact
-##     PCF5DAT 3/4 tile-scroll camera and its per-tick positional stream are NOT in the
-##     reversed source we hold (PCF5DAT.PKF positional playback was not cracked), so
-##     player/ball motion is INTERPOLATED from the same MatchCommentary event timeline
-##     the BRIEF view uses. That keeps both views in lock-step: identical clock, score,
-##     possession and events — only the presentation differs. This is the documented
-##     faithful substitute, not invented match data.
+##     PCF5DAT 3/4 tile-scroll camera is NOT in the reversed source we hold.
+##   * MOTION: since the M5 wire-in (2026-07-28) a live match is driven by the POSITIONAL
+##     engine and the coordinates drawn ARE the original's own (see Pm98LiveMatch). With no
+##     live match the view still interpolates the MatchCommentary timeline the BRIEF view
+##     uses, so both stay in lock-step on clock / score / possession.
 ##
-## The whole view is a pure function of the match minute over that timeline; _process
-## only advances the clock, seek() drives the minute for tests / screenshots.
+## ⛔ THIS VIEW IS NOT THE ORIGINAL'S PRESENTATION — never call it faithful.
+## APP_VS_SPEC_AUDIT A6/A7/A8, restated here so it cannot be missed:
+##   * The original has NO SIDE-ON 2D VIEW AT ALL. It renders a pseudo-3D two-billboard
+##     sprite under a FIXED 3/4 camera. This side-on framing is an app construct.
+##   * `_facing()`'s uniform-45° atan2 is an INVENTION. The engine buckets direction on the
+##     non-uniform perspective thresholds DAT_006653e0, stores only 5 directions and mirrors
+##     the rest (jug_render_spec.md §3).
+##   * The baked sprite sheet is the TRANSPOSE of the real JUG layout: the engine lays the
+##     bank out per kind as [direction][phase] across 74 kinds; export_match_art.py baked
+##     [3 phase × 8 dir]. The 24 baked frames are ~1-2 real directions' phases, not 8 facings.
+## The engine's POSITIONS are exact; the CAMERA, the FACING and the SPRITE GRID are not.
+## Fixing it is mostly assembly rather than research — jug_render_spec.md already has the
+## bank layout, the direction thresholds and the camera (translation + projection scale, no
+## rotation) reversed. Only PCF5DAT, the pitch background, is a hard gap.
+##
+## Without a live match the view is a pure function of the match minute over the timeline;
+## _process advances the clock, seek() drives the minute for tests / screenshots.
 
 signal back_pressed                # EXIT — leave the match
 signal brief_pressed               # BRIEF — drop back to the commentary view
