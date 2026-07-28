@@ -46,6 +46,11 @@ func _run() -> bool:
 	ok = _assert(rival_id != -1, "found a rival club to track") and ok
 	var start_rating: Dictionary = MatchEngine.team_ratings(career.club_view(rival_id))
 	var start_attr_sum := _attr_sum(career.squad_of(rival_id))
+	# ...and every rival's attribute sum, because the drift claim below is about the LEAGUE.
+	var start_attrs: Dictionary = {}
+	for id in career.rosters:
+		if int(id) != career.club_id:
+			start_attrs[int(id)] = _attr_sum(career.squad_of(int(id)))
 	var start_sizes := _sizes(career)
 
 	var rng := RandomNumberGenerator.new()
@@ -75,14 +80,26 @@ func _run() -> bool:
 			break
 	ok = _assert(injury_news, "a notable rival injury surfaced in the club news feed") and ok
 
-	# Rival ratings drifted over the season (development moved the dial).
+	# Rival ratings drifted over the season (development moved the dial). Measured across
+	# the WHOLE league, not on one tracked club: an AI side carries no TRAINING focus, so
+	# its weekly pass is pure decay and a club whose players all sit at their shipped
+	# ratings legitimately ends the season where it started. Whether the FIRST rival in
+	# roster order is such a club is an RNG lottery -- it broke this assertion on
+	# 2026-07-28 when the weekly-illness tick shifted the stream, with nothing else about
+	# the drift changed. The claim underneath is that the pass reaches the rivals at all.
 	var end_rating: Dictionary = MatchEngine.team_ratings(career.club_view(rival_id))
 	var end_attr_sum := _attr_sum(career.squad_of(rival_id))
-	var drift: bool = end_attr_sum != start_attr_sum \
+	var moved := 0
+	for id in start_attrs:
+		if _attr_sum(career.squad_of(int(id))) != int(start_attrs[id]):
+			moved += 1
+	var drift: bool = moved > 0 \
+		or end_attr_sum != start_attr_sum \
 		or absf(float(end_rating["att"]) - float(start_rating["att"])) > 0.01 \
 		or absf(float(end_rating["def"]) - float(start_rating["def"])) > 0.01
-	ok = _assert(drift, "rival ratings/attributes drift across the season (was %d -> %d attr-sum)" % [
-		start_attr_sum, end_attr_sum]) and ok
+	ok = _assert(drift,
+		"rival ratings/attributes drift across the season (%d of %d rival squads moved; the tracked one %d -> %d)"
+		% [moved, start_attrs.size(), start_attr_sum, end_attr_sum]) and ok
 
 	# Squads stay fieldable: injuries never remove players, and the pre-existing AI transfer
 	# market refuses to sell a club below SQUAD_MIN. A club that began under that floor (rare
