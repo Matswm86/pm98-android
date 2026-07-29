@@ -179,7 +179,8 @@ jobs:
                    test_retirement test_sacking test_unsackable test_weekly_illness \
                    test_mantoman test_shadow_blit \
                    test_ground_preset test_live_match \
-                   test_jug_render test_match_simulador; do
+                   test_jug_render test_match_simulador \
+                   test_channeltv_screen test_cam_ctrl; do
             echo "== $t"
             if ! "$GITHUB_WORKSPACE/godot" --headless --path . --script "res://tests/$t.gd" \
                 > "/tmp/$t.log" 2>&1; then
