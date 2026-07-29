@@ -805,9 +805,18 @@ func _set_objective(club: Dictionary, league: Dictionary, league_clubs: Array, l
 		objective_text = label
 		objective_pos = _objective_pos_for(label, league_clubs.size())
 		return
+	# No witnessed label — the season-2+ board, and any non-English club. The RANK is
+	# still the app's own strength-ranked rule (the original's assignment rule is un-RE'd),
+	# but the LABEL has to be one of the game's own five categories, because that is the
+	# only kind of thing the original's board ever issues (START OF SEASON, all four
+	# divisions witnessed 2026-07-19). Until 2026-07-29 the fallback shipped its own prose
+	# instead — "Finish 13 or higher", "Avoid relegation" with a small r — which is audit
+	# finding O1, and which also broke `expectation_band()`: no fallback string is a key of
+	# BOARD_BAND_OF_LABEL, so from season two on every band lookup returned -1 and the board
+	# review, the sack ladder and the improvement test all ran on the -1 arm.
 	var obj := objective_for(club_id, league_id, league_clubs, leagues)
-	objective_pos = int(obj["pos"])
-	objective_text = str(obj["text"])
+	objective_text = objective_label(int(obj["pos"]), league_clubs.size(), tier)
+	objective_pos = _objective_pos_for(objective_text, league_clubs.size())
 
 
 ## The finish position the app holds the board's label to (sack/bonus checks).
@@ -825,6 +834,27 @@ func _objective_pos_for(label: String, total: int) -> int:
 		_:                  # Avoid Relegation: stay above the drop zone
 			var zone: Dictionary = SeasonSim.ZONES.get(tier, {"releg": 3})
 			return maxi(1, total - int(zone.get("releg", 3)) - 1)
+
+
+## The original's objective CATEGORIES (Champion / U.E.F.A. / Mid Table / Avoid Relegation
+## / Promotion — witnessed on START OF SEASON for all four English divisions, 2026-07-19)
+## mapped from a finish position. The original's own assignment rule is un-RE'd, so the
+## CATEGORIES ride the app's positions; the vocabulary is the game's, the choice is ours.
+## Lived in Main as `_objective_label` until 2026-07-29, where only the OFFERS SELECTION
+## preview could reach it — `_set_objective`'s own fallback needs the same rule (audit O1).
+static func objective_label(pos: int, total: int, for_tier: int) -> String:
+	var releg := int(SeasonSim.ZONES.get(for_tier, {"releg": 3}).get("releg", 3))
+	if pos >= total - releg - 1:
+		return "Avoid Relegation"
+	if for_tier == 1:
+		if pos <= 4:
+			return "Champion"
+		if pos <= 7:
+			return "U.E.F.A."
+		return "Mid Table"
+	if pos <= 3:
+		return "Promotion"
+	return "Mid Table"
 
 
 ## The objective the board would set for `for_club_id` in its division — the

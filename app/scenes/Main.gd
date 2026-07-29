@@ -4114,23 +4114,11 @@ const DIV_BAND_LABELS := {"Premier League": "PREMIER LEAGUE", "Division One": "1
 	"Division Two": "2ND DIVISION", "Division Three": "3RD DIVISION"}
 
 
-## The original's objective CATEGORIES (Champion / U.E.F.A. / Mid Table / Avoid
-## Relegation / Promotion, witnessed orig/71 + pro/12) mapped from the app's own
-## board rule (Career.objective_for) -- the original's assignment rule is
-## un-RE'd, so the categories ride our positions (documented divergence).
+## The original's objective CATEGORIES mapped from the app's own board rule. Moved to
+## `Career.objective_label` on 2026-07-29 so `_set_objective`'s season-2+ fallback issues
+## the same categories this preview does (audit O1); kept as a thin forward.
 func _objective_label(pos: int, total: int, tier: int) -> String:
-	var releg := int(SeasonSim.ZONES.get(tier, {"releg": 3}).get("releg", 3))
-	if pos >= total - releg - 1:
-		return "Avoid Relegation"
-	if tier == 1:
-		if pos <= 4:
-			return "Champion"
-		if pos <= 7:
-			return "U.E.F.A."
-		return "Mid Table"
-	if pos <= 3:
-		return "Promotion"
-	return "Mid Table"
+	return Career.objective_label(pos, total, tier)
 
 
 func _season_divisions() -> Array:
@@ -5582,12 +5570,19 @@ func _offer_row(o: Dictionary) -> Dictionary:
 	var league_clubs := GameDB.clubs_in_league(lid)
 	var obj := Career.objective_for(int(o["club_id"]), lid, league_clubs, GameDB.leagues)
 	var tier := FinanceModel.tier_of({"leagueId": lid}, GameDB.leagues)
+	# The OBJECTIVE cell is a CATEGORY, like every other place the board states one: the
+	# club's own witnessed START OF SEASON label where there is one, else the same
+	# position->category map `Career._set_objective` uses. `obj["text"]` is the raw
+	# strength-ranked prose and was printing "Finish 13 or higher" here (audit O1).
+	var obj_label := str(club.get("objective", ""))
+	if obj_label == "":
+		obj_label = Career.objective_label(int(obj["pos"]), league_clubs.size(), tier)
 	var fin := FinanceModel.summary(club, tier)
 	var cap := int(fin.get("capacity", 0))
 	var stadium := str(club.get("stadium", ""))
 	return {
 		"team": str(o["club_name"]), "division": _div_short(str(o["league_name"])),
-		"division_full": str(o["league_name"]), "objective": str(obj["text"]),
+		"division_full": str(o["league_name"]), "objective": obj_label,
 		"club_id": int(o["club_id"]),
 		"stadium": stadium if stadium != "" and stadium != "<null>" else "-",
 		"capacity": "%s seats" % Career._grp(cap) if cap > 0 else "-",

@@ -105,6 +105,63 @@ DECLARED OURS: no frame shows what the original does for a non-participant (the 
 run's club was in the European Cup and both domestic cups all season). The bracket is
 unchanged and every round stays readable on the KNOCKOUT screen.
 
+### 6. TWO CARRIED ITEMS WERE ALREADY CLOSED — the s78 §7 list was wrong about both
+
+Re-checked against the code rather than relayed, which is how the other three in that
+section turned out to be closed too:
+
+**S5 — "European ties run on the LEGACY engine ... verified still live in `MatchSim.gd`".
+FALSE.** What is still live is the fallback CODE PATH, not its use. The only
+`[MATCHSIM_FALLBACK]` lines anyone sees come from `test_europe.gd`'s own rig, which invents
+opponents at ids 90000+ that have no `club_tactics.json` entry and therefore cannot be in
+the true-XI index — a property of the test fixture, not of the game. Driven on the REAL
+data (the true-XI index `Main._true_xi_index` builds, the real foreign pool
+`Main._euro_pool` builds), a whole European season runs with **zero** fallbacks and all
+three competitions reach a champion. All 96 pool clubs are indexed, out of 475 in the whole
+index. Pinned so it cannot silently regress: **`app/tests/test_euro_stat_engine.gd`**.
+
+**"The three `+0x43c` null sentinels — absent / 0 / -1, behaviour-affecting, not
+unified". FALSE, and by a commit that predates the claim.** `f5ab46c` (s59) unified them to
+the binary's own model — null = int 0, non-null = the player Dictionary. Every read is
+`m.get(0x43c, 0)` and every clear is `m[0x43c] = 0`; there is no `-1` sentinel left in
+`Pm98Driver` or `Pm98Dispatch`, and `Pm98LiveMatch` documents the int-when-unset contract
+at its own read site.
+
+### 7. ⭐ O1 — the board objective was a POSITION from season two on, and it broke the band
+
+The audit's O1 ("the board objective is the wrong kind of thing": the original states
+`Avoid Relegation`, the port stated `Finish 13 or higher`) was half closed already —
+`club_economy.json` carries the witnessed START OF SEASON label for 92 of the 94 English
+records and `_set_objective` uses it. But only in season ONE. Every rollover calls
+`_set_objective({}, ...)` with an EMPTY club, because a season-2+ board is un-witnessed, so
+it fell through to `objective_for`, which writes its own prose.
+
+Driven for four seasons with Bolton W — the audit's own example — the port read:
+
+| season | objective | band |
+|---|---|---|
+| 1 | `Avoid Relegation` | 3 |
+| 2, 3, 4 | `Avoid relegation` (small r, the fallback's own string) | **-1** |
+
+**And the -1 is the real damage.** No fallback string is a key of `BOARD_BAND_OF_LABEL`, so
+from season two onward `expectation_band()` answered -1 for the rest of the career and the
+board review, the sack ladder and the improvement test all silently took the -1 arm.
+
+**Fix:** Main's own position→category map (`_objective_label`, which until now only the
+OFFERS SELECTION preview could reach) moved to `Career.objective_label`, and the fallback
+uses it — so the RANK stays the app's strength-ranked rule (the original's assignment rule
+is un-RE'd and still declared ours) while the LABEL is always one of the game's own five
+categories. `objective_pos` is then re-derived from the label, so the position and the
+category can no longer disagree. The OFFERS SELECTION OBJECTIVE cell was printing the raw
+prose too and now prefers the club's own witnessed label. All four seasons read
+`Avoid Relegation` / band 3. Pinned by **`app/tests/test_board_objective.gd`**.
+
+### 8. M5 s59 IS in the shipped build
+
+Asked directly. `f5ab46c` and `8b73433` — the +0x43c unification and the four engine bugs
+the 7-hour capture falsified (byte-exact clk 1-2836, 1,072,592 words, 0 mismatches) — are
+both ancestors of HEAD, so they are in `pm98-d9d470d.apk` and in every build since s59.
+
 ## 0aaaaaaaaaa. Closed 2026-07-28 (session s78) — THE CUP TV FEE, THE CAMERA MOTION, THE KIT RESIDUAL
 
 Mats's brief was the whole s77 carried list, "get the game done now". Six items moved. Three
