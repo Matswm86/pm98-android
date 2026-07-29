@@ -156,7 +156,21 @@ category can no longer disagree. The OFFERS SELECTION OBJECTIVE cell was printin
 prose too and now prefers the club's own witnessed label. All four seasons read
 `Avoid Relegation` / band 3. Pinned by **`app/tests/test_board_objective.gd`**.
 
-### 8. M5 s59 IS in the shipped build
+### 8. Gates
+
+`run_full_sweep.sh` **245 of 245 PASS, 0 FAIL** on an undisturbed box, including the two new
+suites. `diff_entry_parity` 18/18 with `makeoffer_101` at 0 px. `diff_options_parity` PASS.
+The hub header and the OPTIONS cheat rows were confirmed by LOOKING at real-app renders
+(`PM98_HUB_SHOT`, `PM98_OPTIONS_SHOT`), not inferred.
+
+Two instrument notes, because both cost time this session: the sweep's 400 s per-suite
+timeout means any other Godot job running alongside it makes the M5 oracles time out and
+report FAIL (each passed instantly when re-run alone) — run it on an idle box. And `~/godot4`
+(4.3) and `~/godot462` (4.6.2, what CI uses) fight over the same `.godot` import cache, so
+after the other one has touched it every suite dies on a `class_name` parse error; re-run
+`--headless --import` for whichever binary you are about to use.
+
+### 9. M5 s59 IS in the shipped build
 
 Asked directly. `f5ab46c` and `8b73433` — the +0x43c unification and the four engine bugs
 the 7-hour capture falsified (byte-exact clk 1-2836, 1,072,592 words, 0 mismatches) — are
