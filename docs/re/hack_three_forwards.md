@@ -139,10 +139,41 @@ Bolton witness (`club_tactics_re.md` byte->lever table). Port wiring:
   dict -> advance_week -> repaired/_pad_xi -> MatchSim): `app/tests/test_cheats_live.gd`
   — 4-3-3 arms the forwards trigger (>= 6 goals every week), MIXED PLAY on 4-4-2
   arms the variant, OFF holds the stock cap.
-* Visibility (Mats QA 2026-07-27): the OPTIONS cheat row now prints the fielded
-  XI's natural-FW count ("N FW", white when >= 3 = armed) beside the OFF box, so
-  the forwards trigger's state is readable in-game; the MIXED PLAY trigger is
-  visible as its own tick on the TEAM TACTICS modal.
+## 4c. THE SHAPE TRIGGER — added 2026-07-29 (what the switch says on the tin)
+
+Mats reported the cheat dead twice ("won't get me goals" 2026-07-27, "the 4-3-3 cheat
+with guaranteed goals STILL doesn't work at all" 2026-07-29) while every seam and live
+test was green. The tests were green because they field three NATURAL forwards. The
+game does not have to:
+
+`Tactics.set_formation("4-3-3")` fills the front line with the best available players
+by line, and a squad holding two natural forwards puts a midfielder in the third slot.
+`_fill_participant` writes `ROLE` from the player's own `pos`, so that XI carries TWO
+`ROLE == 3` records and `att3` never reaches three. The board says 4-3-3, the switch
+says ON, and the match plays stock. Nothing was broken — the trigger just was not the
+one a manager reads off his own team sheet.
+
+So a THIRD trigger was added, and it is declared OURS, not the hack's:
+
+* `Career._ratings_for` publishes `front_three` = `Tactics.forward_slots(formation) >= 3`
+  for the MANAGER's club only (true for 3-4-3, 4-3-3, 4-2-4, 5-2-3).
+* `MatchSim` folds it into `Pm98StatMatch.cheat_manager_side` alongside `mixed_play`
+  (the static was renamed from `cheat_mixed_play_side` — it now carries two triggers).
+* `_cheat_armed` is unchanged in shape: `side == cheat_manager_side or att3 >= 3`.
+
+The MANAGER_HACK.EXE trigger itself is untouched, so §3's PCode oracle table still
+describes the patched binary exactly, and with the switch OFF `cheat_manager_side` is
+always -1 and every read short-circuits to stock.
+
+Proof: `test_cheats_live` case A2 drives ALL TWENTY Premier clubs on an ATTACKING
+4-3-3 (so MIXED PLAY cannot be what arms it) and every one scores at least six — worst
+case Blackburn R. at exactly 6.
+
+* Visibility (Mats QA 2026-07-27, re-reported 2026-07-29): the OPTIONS cheat row
+  prints **ARMED** (white) or **IDLE** (gold) beside the OFF box, computed from the
+  same three triggers the engine reads, so the row can never claim armed while the
+  match plays stock. The old "N FW" readout is gone — it answered a question about
+  one of the three triggers, which is what made the cheat look dead.
 
 ## 5. README wording (drop under the Download section)
 

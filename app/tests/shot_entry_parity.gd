@@ -138,7 +138,13 @@ func _run() -> void:
 	var moffer: Control = load("res://scenes/MakeOfferScreen.gd").new()
 	_mount(moffer)
 	await process_frame
-	moffer.setup(taylor, bpool, 3000000, 3200000)
+	# Frame 101 is the ORIGINAL's cold-approach state: CLUB FEE £3,000,000, CLUB OFFER
+	# £5,000. The port's cold default is the FEE instead (the owner deviation recorded
+	# in MakeOfferScreen.setup — the stepper costs ~640 taps otherwise), so the parity
+	# shot asks for the original's number explicitly. What this pair proves is the
+	# CHROME and every other cell; the opening default is a caller-level choice and is
+	# pinned by test_make_offer_seed, not here.
+	moffer.setup(taylor, bpool, 3000000, 3200000, {"offer": MakeOfferScreen.FLOOR})
 	await _shot(dir, "makeoffer_101.png")
 	# frame 113 state: offer 3,050,000 / wage 25,000 / Scoring bonus checked £5,000
 	moffer._offer = 3050000

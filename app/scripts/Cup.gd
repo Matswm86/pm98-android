@@ -64,6 +64,7 @@ const _LABELS := [
 ##   qtr_label        "Qtr. Finals" (FA Cup) or "Qtr Finals" (League Cup)
 ##   prize_round / prize_winner   bank credit per round survived / for lifting the cup
 ##   span_lo / span_hi            fraction of the season the rounds spread across [0,1]
+##   tail_fracs       season fractions PINNING the last N rounds (the European break)
 static func create(club_ids: Array, total_weeks: int, opts: Dictionary = {}) -> Dictionary:
 	var ids: Array = []
 	for v in club_ids:
@@ -122,7 +123,8 @@ static func create(club_ids: Array, total_weeks: int, opts: Dictionary = {}) -> 
 		# The round DRAWN but not yet played (see draw_next_round): {label, round,
 		# round_legs, byes, players}. {} when the next round has not been drawn yet.
 		"pending_draw": {},
-		"round_weeks": _schedule(total_weeks, num_rounds, span_lo, span_hi),
+		"round_weeks": _schedule(total_weeks, num_rounds, span_lo, span_hi,
+			opts.get("tail_fracs", [])),
 		"champion_id": -1,
 		"n0": ids.size(),                  # starting field size (for labels)
 		"legs": int(opts.get("legs", 1)),
@@ -194,19 +196,33 @@ static func _num_rounds_with_entry(n: int, late_round: int, n_late: int) -> int:
 ## across the [span_lo, span_hi] fraction of the season. The default span [0,1] spaces the
 ## rounds evenly to the run-in (the F.A. Cup); a tighter span (e.g. [0,0.7]) finishes a cup
 ## earlier (the League Cup, so the two finals don't coincide).
-static func _schedule(total_weeks: int, num_rounds: int, span_lo := 0.0, span_hi := 1.0) -> Array:
+##
+## `tail_fracs`, when given, PINS the last `tail_fracs.size()` rounds at those season
+## fractions and spreads only the rounds before them over [span_lo, span_hi]. That is what
+## the European competitions need: an even spread is wrong for them, because the real
+## calendar has a break — the early rounds run Sep..Dec and the quarter-finals onward are
+## March..May. See `Career.EURO_TAIL_FRACS` for the witnesses those fractions come from.
+static func _schedule(total_weeks: int, num_rounds: int, span_lo := 0.0, span_hi := 1.0,
+		tail_fracs: Array = []) -> Array:
 	var out: Array = []
 	if num_rounds <= 0 or total_weeks <= 0:
 		return out
+	var n_tail := mini(tail_fracs.size(), num_rounds)
+	var n_head := num_rounds - n_tail
 	var span := span_hi - span_lo
-	for k in range(num_rounds):
-		var frac := span_lo + float(k + 1) / float(num_rounds + 1) * span
-		var w := int(round(frac * total_weeks))
-		w = clampi(w, 1, total_weeks)
-		if not out.is_empty() and w <= int(out[-1]):
-			w = int(out[-1]) + 1            # keep strictly increasing
-		out.append(w)
+	for k in range(n_head):
+		var frac := span_lo + float(k + 1) / float(n_head + 1) * span
+		_append_week(out, frac, total_weeks)
+	for k in range(n_tail):
+		_append_week(out, float(tail_fracs[tail_fracs.size() - n_tail + k]), total_weeks)
 	return out
+
+
+static func _append_week(out: Array, frac: float, total_weeks: int) -> void:
+	var w := clampi(int(round(frac * total_weeks)), 1, total_weeks)
+	if not out.is_empty() and w <= int(out[-1]):
+		w = int(out[-1]) + 1                # keep strictly increasing
+	out.append(w)
 
 
 # ---- queries -------------------------------------------------------------

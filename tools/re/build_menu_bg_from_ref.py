@@ -109,6 +109,34 @@ BLACK = (0, 0, 0)
 # Clean marble sample points (away from header / bars / icons) for the top-band fill.
 MARBLE_PTS = [(12, 210), (627, 210), (12, 300), (627, 300), (320, 470)]
 TOP_BAND_H = 56
+# --- the header band (y0..55) ---------------------------------------------
+# The hub's header BARRA is chrome, not live data: the MANAGER MENU title bar, the
+# identity plaque, the spiral calendar sheet and the banded plaque + trophy are all
+# painted by the engine before any club value is known. Only four things in it are
+# live, and the port draws every one of them itself (MenuScreen -> PMChrome
+# .draw_ident_texts / .draw_sheet_band_texts + the kit blit):
+#   * the manager name and club name on the identity plaque
+#   * the club kit in the plaque's box
+#   * the calendar sheet's weekday/day/month/year stack
+#   * the right plaque's league and week captions
+# So the band is kept from the real frame with exactly those four cleared. The first
+# three are cleared by blitting the project's own already-baked, already-cleared
+# sprites over them (ident_block.png and cal_sheet.png, both cut from real frames by
+# tools/re/build_hub_chrome_from_frames.py / build_header_topright_from_frames.py);
+# the two plaque captions are erased in place by repainting each caption row with the
+# row's OWN dominant colour, which is the band plate the engine filled it with.
+#
+# Flattening the whole band to marble (what this baker did until 2026-07-29) is what
+# put a grey stripe across the top of the hub: MenuScreen draws only the live TEXTS
+# over this bake, never draw_header's sprites, so the flatten deleted the chrome with
+# no one left to redraw it.
+HDR_SPRITES = [
+    (ROOT / "app" / "art" / "screens" / "hub" / "ident_block.png", (0, 4)),
+    (ROOT / "app" / "art" / "screens" / "header" / "cal_sheet.png", (445, 6)),
+]
+# The two plaque caption rows, left of the trophy (which starts at x616 on this frame).
+HDR_BAND_X = (541, 613)
+HDR_BAND_PLATES = {(127, 159, 85), (85, 95, 0)}
 
 
 def _load(p: Path) -> np.ndarray:
@@ -119,6 +147,32 @@ def _load(p: Path) -> np.ndarray:
 def _is_ink(fg: np.ndarray) -> np.ndarray:
     """Text ink: the bars' captions are pure white or pure black single strikes."""
     return (fg.min(axis=-1) >= 200) | (fg.max(axis=-1) <= 25)
+
+
+def clear_header_band(px: np.ndarray) -> int:
+    """Clear the four LIVE things out of the header band, in place. Returns the count.
+
+    See the HDR_* block above for why the band is kept rather than flattened.
+    """
+    before = px[:TOP_BAND_H].copy()
+    for path, (ox, oy) in HDR_SPRITES:
+        sp = Image.open(path).convert("RGBA")
+        a = np.asarray(sp, dtype=np.uint8)
+        h, w = a.shape[:2]
+        op = a[:, :, 3] > 0
+        dst = px[oy:oy + h, ox:ox + w]
+        dst[op] = a[:, :, :3][op]
+    # The two plaque captions: repaint every caption row with the row's own dominant
+    # colour, which IS the plate the engine filled the band with (the captions are a
+    # minority of each row). Rows that are not a plate row are left alone, so the
+    # bevel above/below and the trophy right of HDR_BAND_X are untouched.
+    x0, x1 = HDR_BAND_X
+    for y in range(TOP_BAND_H):
+        row = px[y, x0:x1]
+        dom, n = Counter(map(tuple, row)).most_common(1)[0]
+        if dom in HDR_BAND_PLATES and n > (x1 - x0) // 2:
+            row[:] = dom
+    return int((before != px[:TOP_BAND_H]).any(axis=-1).sum())
 
 
 def _arrangement(a: np.ndarray) -> bool | None:
@@ -249,12 +303,12 @@ def main() -> None:
         dtype=int,
     )
 
-    # --- menu_bg: the real frame, header band flattened, circle restored from FONDO3 ---
+    # --- menu_bg: the real frame, header band cleared, circle restored from FONDO3 ---
     px = np.asarray(ref, dtype=np.uint8).copy()
     marble = tuple(
         int(sum(int(px[y, x, c]) for x, y in MARBLE_PTS) / len(MARBLE_PTS)) for c in range(3)
     )
-    px[:TOP_BAND_H, :, :] = marble
+    cleared = clear_header_band(px)
     wx, wy, ww, wh = WIDGET
     px[wy:wy + wh, wx:wx + ww] = fondo[wy:wy + wh, wx:wx + ww]
     OUT.parent.mkdir(parents=True, exist_ok=True)
@@ -278,7 +332,8 @@ def main() -> None:
             raise SystemExit(f"unresolved dither cells: {sorted(set(left))}")
         img.save(dst)
 
-    print(f"wrote {OUT.relative_to(ROOT)} — real MENUPRINCIPAL chrome, top band {marble}, "
+    print(f"wrote {OUT.relative_to(ROOT)} — real MENUPRINCIPAL chrome, header band kept "
+          f"with {cleared} live pixels cleared (marble would have been {marble}), "
           f"circle restored from RECURSOS FONDO3.BMP")
     print(f"wrote {OUT_TOP.relative_to(ROOT)} / {OUT_BOT.relative_to(ROOT)} ({ww}x{wh}) "
           f"from a {len(lut)}-key (colour, index, parity) dither table learned on "

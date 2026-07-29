@@ -76,16 +76,18 @@ static func simulate(rng: RandomNumberGenerator, rh: Dictionary, ra: Dictionary,
 		xi_h: Array, xi_a: Array, tid_h: int, tid_a: int, minutes := 90, \
 		stats := false) -> Dictionary:
 	if _stat_on() and _usable(xi_h) and _usable(xi_a):
-		# MIXED PLAY cheat variant (hack_three_forwards.md §MIXED PLAY): the ratings
-		# dict of the MANAGER's side carries `mixed_play` when his TEAM TACTICS
-		# MENTALITY lever is on MIXED (Career._ratings_for sets it for his club
-		# only). Armed here per simulate and ALWAYS reset, so no other fixture in
-		# the same week loop can inherit it.
+		# THREE UP FRONT, manager-side triggers (hack_three_forwards.md §MIXED PLAY
+		# and §THE SHAPE TRIGGER): only the MANAGER's ratings dict carries `front_three`
+		# (his chosen shape fields 3+ forward SLOTS) and `mixed_play` (his MENTALITY
+		# lever is on MIXED) — Career._ratings_for sets them for his club alone. Armed
+		# here per simulate and ALWAYS reset, so no other fixture in the same week loop
+		# can inherit it. The third trigger (3 natural forwards) needs no plumbing: the
+		# engine reads it off the match struct.
 		if Pm98StatMatch.cheat_three_up_front:
-			if bool(rh.get("mixed_play", false)):
-				Pm98StatMatch.cheat_mixed_play_side = 0
-			elif bool(ra.get("mixed_play", false)):
-				Pm98StatMatch.cheat_mixed_play_side = 1
+			if bool(rh.get("front_three", false)) or bool(rh.get("mixed_play", false)):
+				Pm98StatMatch.cheat_manager_side = 0
+			elif bool(ra.get("front_three", false)) or bool(ra.get("mixed_play", false)):
+				Pm98StatMatch.cheat_manager_side = 1
 		var mem := Pm98StatMatch.build_mem(xi_h, xi_a, tid_h, tid_a)
 		var prng := Pm98StatMatch.Rng.new(rng.randi())
 		var rep = null
@@ -101,7 +103,7 @@ static func simulate(rng: RandomNumberGenerator, rh: Dictionary, ra: Dictionary,
 		else:
 			Pm98StatMatch.simulate_extra_time(mem, prng, rep, pids)
 		var sc := Pm98StatMatch.score(mem)
-		Pm98StatMatch.cheat_mixed_play_side = -1
+		Pm98StatMatch.cheat_manager_side = -1
 		return {
 			"home_goals": int(sc.get(tid_h & 0xFFFF, 0)),
 			"away_goals": int(sc.get(tid_a & 0xFFFF, 0)),

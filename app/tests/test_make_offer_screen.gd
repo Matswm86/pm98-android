@@ -57,13 +57,14 @@ func _run() -> void:
 			"PA": 79, "TI": 73, "EN": 57, "PO": 19}}
 	var card: MakeOfferScreen = MakeOfferScreen.new()
 	card.setup(taylor, {"id": 82, "name": "BLACKPOOL"}, 3000000, 3200000)
-	# Corrected 2026-07-27: the COLD route (no seed) opens at the FLOOR on all three
-	# fields, which is frame 101_164714 exactly — Taylor at CLUB FEE £3,000,000 with a
-	# CLUB OFFER of £5,000. The "opens at the CLUB FEE" reading was an owner-ergonomics
-	# deviation the original does not draw; the pre-filled card is the TRANSFERS route,
-	# which passes the seller's terms in `seed` (make_offer_re.md, two opening states).
-	ok = _assert(card._offer == 5000 and card._wage_yearly == 5000 and card._years == 1,
-		"cold route opens at £5,000 offer, £5,000 wage, 1 year") and ok
+	# The COLD route (no seed) opens at the FLOOR on the wage and the term, and at the
+	# CLUB FEE on the offer. The floor on all three is what frame 101_164714 draws —
+	# Taylor at CLUB FEE £3,000,000 with a CLUB OFFER of £5,000 — and the offer is the
+	# one owner-ergonomics deviation from it (2026-07-24, re-affirmed 2026-07-29 after
+	# 4583ab0 reverted it): the stepper costs ~640 taps to walk up to a £16M asking
+	# price. See MakeOfferScreen.setup and test_make_offer_seed.
+	ok = _assert(card._offer == 3000000 and card._wage_yearly == 5000 and card._years == 1,
+		"cold route opens at the CLUB FEE, £5,000 wage, 1 year") and ok
 	ok = _assert(card._scoring_enabled(), "Scoring bonus active for a forward") and ok
 	# The stepper ladder itself is unchanged — walk it from the floor.
 	card.setup(taylor, {"id": 82, "name": "BLACKPOOL"}, 3000000, 3200000, {"offer": 5000})

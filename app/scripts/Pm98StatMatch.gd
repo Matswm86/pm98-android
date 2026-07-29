@@ -117,16 +117,31 @@ const MINUTE_OFFSET := [0, 0x2d, 0x5a, 0x69]
 ## computing the stock `3 - rand()%3` cap (and consuming its draws) before flooring.
 static var cheat_three_up_front := false
 
-## MIXED PLAY variant (2026-07-27, docs/re/hack_three_forwards.md §MIXED PLAY): the
-## side index (0/1) whose MIXED PLAY lever is ticked AND is the MANAGER's own side;
-## -1 = nobody. Set by MatchSim around each simulate and reset after, so AI-vs-AI
-## fixtures can never inherit it. Manager-side-only BY DESIGN: 178 of the 476
-## shipped clubs default to MIXED, so an any-side trigger would hand a third of
-## the league six goals a week. Gated on the same cheat_three_up_front switch —
-## the OPTIONS row arms BOTH triggers (3 natural forwards fielded, OR the modal's
-## MIXED PLAY box ticked). With the switch OFF this is always -1 and every read
-## below short-circuits identically to stock — the oracle fixtures are untouched.
-static var cheat_mixed_play_side := -1
+## The MANAGER-SIDE forced arm (2026-07-27, widened 2026-07-29): the side index (0/1)
+## the manager is on when one of the manager-side triggers holds; -1 = nobody. Set by
+## MatchSim around each simulate and reset after, so AI-vs-AI fixtures can never
+## inherit it. Manager-side-only BY DESIGN: 178 of the 476 shipped clubs default to
+## MIXED, so an any-side trigger would hand a third of the league six goals a week.
+##
+## Two manager-side triggers feed it (MatchSim decides, from the ratings dict
+## Career._ratings_for builds):
+##   * the chosen SHAPE fields three or more forward SLOTS (4-3-3, 3-4-3, 4-2-4, 5-2-3)
+##   * the TEAM TACTICS MENTALITY lever is on MIXED PLAY
+## The third trigger, the MANAGER_HACK.EXE original, is read off the match struct
+## itself: three selected players whose NATURAL role is ATT (`_att_count`).
+##
+## The shape trigger was added because the natural-role one alone did not answer what
+## the switch says on the tin. `Tactics.set_formation("4-3-3")` fills the front line
+## with whoever is best available, and a squad with two natural forwards fields a
+## midfielder in the third slot — so a manager who picked 4-3-3, saw 4-3-3 on the
+## board and turned THREE UP FRONT on still got stock scorelines (Mats, 2026-07-27
+## and again 2026-07-29: "the 4-3-3 cheat with guaranteed goals STILL doesn't work").
+## This is a CHEAT, not an engine claim: the EXE patch's own trigger is unchanged and
+## still the one the PCode oracle tests.
+##
+## With the switch OFF this is always -1 and every read below short-circuits
+## identically to stock — the oracle fixtures are untouched.
+static var cheat_manager_side := -1
 
 
 static func _player(side: int, idx: int) -> int:
@@ -144,12 +159,14 @@ static func _att_count(mem: Mem, side: int) -> int:
 	return n
 
 
-## Is the cheat armed for `side`? Either trigger: three natural forwards fielded
-## (the MANAGER_HACK.EXE original) or the manager's MIXED PLAY lever (the variant).
+## Is the cheat armed for `side`? Any trigger: three natural forwards fielded (the
+## MANAGER_HACK.EXE original, read off the match struct) or one of the manager-side
+## triggers MatchSim resolved into `cheat_manager_side` (a three-forward SHAPE, or the
+## MIXED PLAY lever).
 static func _cheat_armed(mem: Mem, side: int) -> bool:
 	if not cheat_three_up_front:
 		return false
-	return side == cheat_mixed_play_side or _att_count(mem, side) >= 3
+	return side == cheat_manager_side or _att_count(mem, side) >= 3
 
 
 # --- FUN_004510b0: append an event ------------------------------------------

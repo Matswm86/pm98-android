@@ -281,7 +281,7 @@ func _options_shot() -> void:
 	AudioManager.set_transitions(true)
 	AudioManager.set_music_volume(100)
 	AudioManager.set_sfx_volume(100)
-	op.xi_fw = -1                      # the arming readout is off with the cheat off anyway
+	op.has_career = false              # the arming readout is off with the cheat off anyway
 	op.queue_redraw()
 	await _settle()
 	_save_shot(dir, "options_witness_state.png")
@@ -290,6 +290,7 @@ func _options_shot() -> void:
 	AudioManager.set_transitions(s_trans)
 	AudioManager.set_music_volume(s_mv)
 	AudioManager.set_sfx_volume(s_sv)
+	op.has_career = true               # ...and back on, so the ARMED readout is captured
 	# tap each ON box through the panel's own gui handler, not by setting the flag
 	for r in [OptionsPanel.R_CHEAT_ON, OptionsPanel.R_UNSACK_ON]:
 		for pressed in [true, false]:
@@ -4774,16 +4775,20 @@ func _show_matchday_options() -> void:
 func _show_audio_options(_scr: MenuScreen) -> void:
 	var op: OptionsPanel = load("res://scenes/OptionsPanel.gd").new()
 	op.set_anchors_preset(Control.PRESET_FULL_RECT)
-	# THREE UP FRONT arming readout (Mats QA 2026-07-27: the cheat's state was
-	# invisible — nothing distinguished armed from disarmed). The natural-FW count
-	# of the XI that would actually be fielded this week; >= 3 = the forwards
-	# trigger is armed. Drawn in the cheat row's own declared band.
+	# THREE UP FRONT arming readout (Mats QA 2026-07-27, re-reported 2026-07-29: the
+	# cheat's state was invisible — nothing distinguished armed from disarmed). Reads
+	# the SAME three triggers the engine does, so the row cannot claim armed while the
+	# match plays stock: a 3+ forward SHAPE, the MIXED PLAY lever, or three natural
+	# forwards in the XI that would actually be fielded this week.
 	if _career != null:
+		op.has_career = true
+		var t := Tactics.from_dict(_career.tactics)
 		var fw := 0
 		for p in _career._mgr_featured_xi():
 			if str((p as Dictionary).get("pos", "")) == "FW":
 				fw += 1
-		op.xi_fw = fw
+		op.cheat_armed = Tactics.forward_slots(t.formation) >= 3 \
+			or t.mentality == "Mixed" or fw >= 3
 	add_child(op)
 	op.closed.connect(func() -> void: op.queue_free())
 

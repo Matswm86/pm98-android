@@ -196,12 +196,16 @@ func setup(player: Dictionary, selling_club: Dictionary, fee: int, cash: int,
 	_club = selling_club
 	_fee = fee
 	_cash = cash
-	# NO seed = the COLD approach (the OFFERS map browse), and the original opens that
-	# card at the FLOOR: frame 101_164714 shows Taylor's CLUB FEE £3,000,000 against a
-	# CLUB OFFER of £5,000 (make_offer_re.md "The card has TWO opening states"). Only
-	# the TRANSFERS route — a player already placed on the market — opens pre-filled
-	# with the seller's asking terms, and that route passes them in `seed`.
-	_offer = maxi(FLOOR, int(seed.get("offer", FLOOR)))
+	# NO seed = the COLD approach (the OFFERS map browse). The ORIGINAL opens that card
+	# at the FLOOR: frame 101_164714 shows Taylor's CLUB FEE £3,000,000 against a CLUB
+	# OFFER of £5,000 (make_offer_re.md "The card has TWO opening states"). The port
+	# does NOT, by the owner decision recorded in this file's header: on a touch screen
+	# the £5,000/£10,000/£25,000 stepper makes bidding the asking price hundreds of
+	# taps, so EVERY route opens at the CLUB FEE and the steppers walk DOWN. Reverted to
+	# the floor by 4583ab0 and re-reported by the owner 2026-07-29 ("starts at 5000
+	# again"); the default lives here so no caller can lose it again. `test_offer_card`
+	# pins it.
+	_offer = maxi(FLOOR, int(seed.get("offer", maxi(FLOOR, fee))))
 	_wage_yearly = maxi(FLOOR, int(seed.get("yearly_wage", FLOOR)))
 	_years = clampi(int(seed.get("years", YEARS_MIN)), YEARS_MIN, YEARS_MAX)
 	_bonus = FLOOR

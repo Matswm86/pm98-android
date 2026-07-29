@@ -83,9 +83,12 @@ behaves exactly as the original does.
 the red, a results review gone against you, a squad under sixteen men: those are the three things
 that end a career in this game, and none of them will.
 
-**Three up front.** Field three forwards and the match engine stops pretending: your chance
-count is floored and the opposing keeper stops saving. Instant results only, watched matches
-play normally.
+**Three up front.** Pick a shape with three up front (4-3-3, 3-4-3, 4-2-4, 5-2-3) and the match
+engine stops pretending: your chance count is floored and the opposing keeper stops saving. Six
+goals a game unless the dice give you more. A Mixed Play mentality arms it too, as does actually
+fielding three natural forwards in any shape. The row says **ARMED** when the coming match will
+get it and **IDLE** when the switch is on but nothing has triggered. Instant results only,
+watched matches play normally.
 
 ## Built with
 

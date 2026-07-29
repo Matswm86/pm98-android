@@ -43,6 +43,25 @@ func _run() -> bool:
 		"cheat ON + 4-3-3: every week >= 6 manager goals (min %d over %d games)"
 		% [goals_a["min"], goals_a["games"]]) and ok
 
+	# ---- A2. the SHAPE trigger on a squad WITHOUT three natural forwards ---
+	# The bug Mats reported twice: pick 4-3-3, see 4-3-3 on the board, turn the cheat
+	# on, get stock scorelines — because the front line was filled by a midfielder and
+	# the natural-role trigger never fired. Every Premier club is driven here on an
+	# ATTACKING 4-3-3 (so MIXED PLAY cannot be what arms it) and every one must score
+	# six. Any club whose 4-3-3 happens to hold 3 natural FW would pass on the old
+	# trigger too, so the test is only meaningful because it sweeps all 20.
+	var worst := 99
+	var worst_club := ""
+	for i in prem.size():
+		var g := _play_weeks(prem, league, leagues, clubs_by_id, true, "4-3-3",
+			"Attacking", i)
+		if int(g["min"]) < worst:
+			worst = int(g["min"])
+			worst_club = str((prem[i] as Dictionary).get("name", "?"))
+	ok = _assert(worst >= 6,
+		"the SHAPE alone arms it at EVERY Premier club on an attacking 4-3-3 "
+		+ "(worst %d, %s)" % [worst, worst_club]) and ok
+
 	# ---- B. MIXED PLAY variant (4-4-2 = only 2 FW, forwards trigger off) ---
 	var goals_b := _play_weeks(prem, league, leagues, clubs_by_id, true, "4-4-2", "Mixed")
 	ok = _assert(goals_b["min"] >= 6,
@@ -55,8 +74,8 @@ func _run() -> bool:
 		"cheat OFF: stock cap holds (max %d <= 3 per match)" % goals_c["max"]) and ok
 
 	# ---- D. no leakage: the mixed-play side is always reset ------------------
-	ok = _assert(Pm98StatMatch.cheat_mixed_play_side == -1,
-		"cheat_mixed_play_side reset after every simulate") and ok
+	ok = _assert(Pm98StatMatch.cheat_manager_side == -1,
+		"cheat_manager_side reset after every simulate") and ok
 	ok = _assert(MatchSim.fallback_count == 0,
 		"no legacy fallback (got %d)" % MatchSim.fallback_count) and ok
 
@@ -81,10 +100,11 @@ func _am() -> Node:
 ## (to_dict -> career.tactics -> save-shape), three advanced weeks. Returns the
 ## manager's min/max goals over the played fixtures.
 func _play_weeks(prem: Array, league: Dictionary, leagues: Array,
-		clubs_by_id: Dictionary, cheat: bool, form: String, ment: String) -> Dictionary:
+		clubs_by_id: Dictionary, cheat: bool, form: String, ment: String,
+		club_idx := 0) -> Dictionary:
 	_am().set_three_up_front(cheat)
 	MatchSim.fallback_count = 0
-	var career := Career.create(prem[0], league, prem, leagues)
+	var career := Career.create(prem[club_idx], league, prem, leagues)
 	var t := Tactics.from_dict(career.tactics)
 	t.set_formation(form, career.club_view(career.club_id))
 	t.set_mentality(ment)

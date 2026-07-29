@@ -7,10 +7,11 @@ extends SceneTree
 ##   * COLD APPROACH (OFFERS map browse, nobody has listed him) — frame
 ##     `101_164714.png`: Scott Taylor, CLUB FEE £3,000,000 and the panel opens at the
 ##     FLOOR, CLUB OFFER £5,000 / YEARLY WAGE £5,000 / YEARS 1, no clause ticked.
-##     ANDROID DEVIATION (owner decision 2026-07-24): the CLUB OFFER of this state is
-##     seeded at the CLUB FEE instead, because the £5,000/£10,000/£25,000 stepper costs
-##     ~640 taps to reach a £16M asking price. Everything else about the state is the
-##     original's — wage at the floor, YEARS 1, no clause.
+##     ANDROID DEVIATION (owner decision 2026-07-24, re-affirmed 2026-07-29): the CLUB
+##     OFFER of this state is seeded at the CLUB FEE instead, because the
+##     £5,000/£10,000/£25,000 stepper costs ~640 taps to reach a £16M asking price.
+##     Everything else about the state is the original's — wage at the floor, YEARS 1,
+##     no clause. The frame-101 parity pair passes the floor in explicitly.
 ##   * PLACED ON TRANSFER MARKET (the TRANSFERS list) — wine `35_make_offer.png`:
 ##     Almeyda, CLUB FEE £8,500,000 and the panel opens pre-filled at CLUB OFFER
 ##     **£8,500,000**, YEARLY WAGE £575,000, YEARS 1, "Free if relegated" ticked.
@@ -31,29 +32,32 @@ func _run() -> void:
 	var taylor := {"id": 1, "name": "TAYLOR", "pos": "FW", "attrs": {}}
 	var club := {"id": 2, "name": "Blackpool"}
 
-	# --- cold approach: the WHOLE panel at the floor, exactly as frame 101 shows ---
-	# Corrected 2026-07-27. These two asserts used to demand the club FEE and they
-	# contradicted the original: walkthrough frame `101_164714` is this very state —
-	# Taylor, CLUB FEE £3,000,000, CLUB OFFER **£5,000** — and asserting the fee drove
-	# a 294 px `diff_entry_parity` failure. The owner's "a £14M bid takes hundreds of
-	# taps" is answered by the TRANSFERS route below (itself witnessed: Almeyda's card
-	# opens at his £8,500,000 asking terms), not by pre-filling the cold card, which
-	# the original does not do. See make_offer_re.md "The card has TWO opening states".
+	# --- cold approach: the panel at the floor EXCEPT the CLUB OFFER --------------
+	# The ORIGINAL opens this whole panel at the floor — walkthrough frame `101_164714`
+	# is this very state, Taylor, CLUB FEE £3,000,000, CLUB OFFER £5,000 — and that
+	# frame is not in dispute. The PORT deviates on the CLUB OFFER alone, by the owner
+	# decision of 2026-07-24, re-affirmed 2026-07-29 after 4583ab0 reverted it: the
+	# £5,000/£10,000/£25,000 stepper costs ~640 taps to walk up to a £16M asking price.
+	# `shot_entry_parity` passes the floor in explicitly for the frame-101 pair, so the
+	# deviation costs nothing in `diff_entry_parity`.
 	card.setup(taylor, club, 3_000_000, 50_000_000)
-	ok = _assert(card._offer == MakeOfferScreen.FLOOR,
-		"cold approach opens at the FLOOR, not the club fee (got £%d)" % card._offer) and ok
+	ok = _assert(card._offer == 3_000_000,
+		"cold approach opens at the CLUB FEE (got £%d)" % card._offer) and ok
 	ok = _assert(card._wage_yearly == MakeOfferScreen.FLOOR, "wage still at the floor") and ok
 	ok = _assert(card._years == MakeOfferScreen.YEARS_MIN, "YEARS 1") and ok
 	ok = _assert(card.checked_clauses().is_empty(), "no clause ticked") and ok
-	# A £16,000,000 fee changes nothing on the cold card — the fee is the SELLER's
-	# number, printed in the CLUB FEE box; the OFFER box is the manager's own bid.
+	# The whole point of the deviation: the big fee is what the card opens on.
 	var ronaldo := {"id": 9, "name": "RONALDO", "pos": "FW", "attrs": {}}
 	card.setup(ronaldo, club, 16_000_000, 50_000_000)
-	ok = _assert(card._offer == MakeOfferScreen.FLOOR,
-		"a £16,000,000 cold approach still opens at the floor (got £%d)" % card._offer) and ok
+	ok = _assert(card._offer == 16_000_000,
+		"a £16,000,000 cold approach opens at £16,000,000 (got £%d)" % card._offer) and ok
 	# A fee UNDER the floor still leaves the offer at the floor.
 	card.setup(taylor, club, 1_000, 50_000_000)
 	ok = _assert(card._offer == MakeOfferScreen.FLOOR, "a sub-floor fee clamps up") and ok
+	# And the original's own state is still reachable, explicitly.
+	card.setup(taylor, club, 3_000_000, 50_000_000, {"offer": MakeOfferScreen.FLOOR})
+	ok = _assert(card._offer == MakeOfferScreen.FLOOR,
+		"frame 101's state is reachable by passing the floor in") and ok
 
 	# --- a listed player: the seller's own asking terms ----------------------
 	var almeyda := {"id": 3, "name": "ALMEYDA", "pos": "MF", "attrs": {}}

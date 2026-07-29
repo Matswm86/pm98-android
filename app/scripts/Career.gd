@@ -394,6 +394,29 @@ const EURO_FIELD := {"european_cup": 24, "uefa_cup": 32, "cup_winners_cup": 16}
 const EURO_GROUPS := {"groups": 6, "advance": 1, "best_runners_up": 2,
 	"label": "1/8 Final"}
 const UEFA_SPOTS := 2                   # league places below the champions that enter the UEFA Cup
+# THE EUROPEAN CALENDAR HAS A BREAK, and Cup's even spread does not (owner-reported
+# 2026-07-29: "European cup draws appear too soon. Getting quarter finals in first half of
+# season"). He is right, and it is measurable: with 39 league weeks starting Sat 9 Aug 1997
+# (the hub's own week-1 date) an even spread put the Cup Winners' Cup quarter-final at week
+# ~16, mid-November, and the U.E.F.A. Cup's at week ~20.
+#
+# The witnesses (docs/re/knockout_views_re.md, from the reference run's own probe log):
+#   * euro QTR FINALS **drawn, unplayed, January 1998** (`02_euroleague_qtrfinals_...`)
+#   * euro QTR FINALS **1st legs played Sat 14 Mar 1998** (`03_...`)  -> week 32
+#   * 1998-99: same, 1st legs Sat 13 Mar 1999, and the SEMIFINALS Sat 27 Mar -> +2 weeks
+#   * the FINAL was still undecided at week 38 in BOTH seasons and is played inside the
+#     season-end sequence
+# and for the group phase the hub badge itself: 1 Oct (wk 9), 5 Nov (wk 14), 26 Nov 1997
+# (wk 17) — so the six matchdays run roughly weeks 6..20.
+#
+# So the last three rounds are PINNED at those fractions and only the rounds before them
+# are spread. 32/39 = 0.82 (QF), 34/39 = 0.87 (SF), and the final on the LAST week, which
+# is what "still undecided at week 38 in both seasons" means. DECLARED OURS: the three
+# fractions are fitted to the four dates above, not read out of MANAGER.EXE — the
+# round-week table itself has never been located. What is witnessed is that the
+# quarter-finals are a MARCH event, and that is what this restores.
+const EURO_TAIL_FRACS := [0.82, 0.87, 1.0]       # quarter-final, semi-final, final
+const EURO_HEAD_SPAN := [0.15, 0.54]             # weeks ~6..21 — the autumn rounds
 const EURO_OPTS := {
 	"european_cup": {"name": "European Cup", "emblem": "ligacamp"},
 	"uefa_cup": {"name": "U.E.F.A. Cup", "emblem": "uefa"},
@@ -1187,6 +1210,22 @@ func _queue_cup_draw(b: Dictionary) -> void:
 	var pd: Dictionary = b.get("pending_draw", {})
 	if pd.is_empty():
 		return
+	# ...and only for a competition the manager's club is STILL IN. The card is a hub
+	# INTERRUPT, so raising it for a cup you are out of (or never entered) stops the week
+	# for a draw that cannot involve you — owner-reported 2026-07-29, on the European
+	# quarter-finals of a career with no European place at all. DECLARED OURS: no frame
+	# shows what the original does for a non-participant (the reference run's club was in
+	# the European Cup and both domestic cups all season, so every draw it saw was its
+	# own). The bracket itself is unchanged and every round stays readable on the
+	# KNOCKOUT screen — only the unprompted card is gated.
+	#
+	# The test is the DRAWN ROUND's own player list, not `Cup.still_in`: the domestic cups
+	# hold the Premier clubs out until Round 3 (`late_entry`), so a survivors test would
+	# suppress the very draw the reference run witnesses being raised ("Sun 14 Dec 1997
+	# F.A. Cup Round 2 played ... the SORTEO for Round 3 is raised unprompted", with Man
+	# Utd entering AT Round 3).
+	if not (pd.get("players", []) as Array).has(club_id):
+		return
 	var ties: Array = []
 	# The byes are skipped: a bye has no opponent and the original lists no line for it.
 	var players: Array = pd.get("players", [])
@@ -1337,9 +1376,14 @@ func _ratings_for(id: int, clubs_override: Dictionary = {}) -> Dictionary:
 		var fit := _fit_view(id)
 		var mt := Tactics.from_dict(tactics).repaired(fit)
 		var r := mt.ratings(fit)
-		# MIXED PLAY cheat trigger (manager side ONLY — hack_three_forwards.md
-		# §MIXED PLAY): read by MatchSim's stat branch, inert with the cheat off.
+		# THREE UP FRONT triggers (manager side ONLY — hack_three_forwards.md
+		# §MIXED PLAY / §THE SHAPE TRIGGER): read by MatchSim's stat branch, inert
+		# with the cheat off. `front_three` is the CHOSEN SHAPE's forward-slot count,
+		# not who happens to fill those slots — that is the whole point of it (a
+		# 4-3-3 fielded by a squad with two natural forwards never armed the
+		# natural-role trigger).
 		r["mixed_play"] = mt.mentality == "Mixed"
+		r["front_three"] = Tactics.forward_slots(mt.formation) >= 3
 		return r
 	if not rosters.has(id) and euro_ratings.has(id):
 		# A foreign European opponent: its frozen ratings (plus a name for the feed).
@@ -5404,7 +5448,11 @@ func mint_european_cups(euro_pool: Array, rng: RandomNumberGenerator,
 		cursor += need
 		var opts := {"name": str(EURO_OPTS[key]["name"]), "legs": 2,
 			"two_legged_final": false, "label_scheme": "sequential",
-			"qtr_label": "Quarter Finals", "prize_round": 0, "prize_winner": 0}
+			"qtr_label": "Quarter Finals", "prize_round": 0, "prize_winner": 0,
+			# The European break — see EURO_TAIL_FRACS. Autumn rounds (or the six group
+			# matchdays) inside EURO_HEAD_SPAN, then QF/SF/Final in March..May.
+			"span_lo": EURO_HEAD_SPAN[0], "span_hi": EURO_HEAD_SPAN[1],
+			"tail_fracs": EURO_TAIL_FRACS.duplicate()}
 		# Only the European Cup runs a group phase: 24 clubs into six groups of four,
 		# double round-robin (`Round 1`..`Round 6` under the original's `1/8 FINALS`
 		# header), then the six winners plus the two best runners-up into the quarter

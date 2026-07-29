@@ -169,6 +169,14 @@ func roles() -> Array:
 	return slot_roles(formation)
 
 
+## Forward SLOTS in a formation (the third line count) — 3 for 3-4-3 / 4-3-3 / 5-2-3,
+## 4 for 4-2-4, 2 for 4-4-2. Read by the THREE UP FRONT cheat's shape trigger, which
+## asks what shape the manager PICKED, not who ended up filling the slots.
+static func forward_slots(form: String) -> int:
+	var lines: Array = FORMATIONS.get(form, FORMATIONS[DEFAULT_FORMATION])
+	return int(lines[2])
+
+
 # ---- construction --------------------------------------------------------
 
 ## Build sensible default tactics for `club`: best keeper, then fill the shape by

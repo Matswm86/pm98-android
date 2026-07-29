@@ -1,4 +1,109 @@
-# PM98 Android — remaining-work inventory (refreshed 2026-07-28)
+# PM98 Android — remaining-work inventory (refreshed 2026-07-29)
+
+## 0aaaaaaaaaaa. Closed 2026-07-29 (session s79) — FIVE OWNER-REPORTED DEFECTS
+
+Mats reported four regressions plus a scheduling bug and asked for them ahead of everything
+else in the s78 carried list. All five are closed, each against the thing that caused it.
+
+### 1. ⭐ THE GREY STRIPE ACROSS THE TOP OF THE HUB — the s77 bake deleted the header
+
+`build_menu_bg_from_ref.py` ends with `px[:TOP_BAND_H] = marble`, which flattens the whole
+header BARRA (y0..55) to flat grey. That line predates s77; what changed in s77 (`4ec77a4`)
+is that the baker was RE-RUN, and the shipped `menu_bg.png` had been carrying a
+hand-composed header band that the baker could not reproduce — the s77 docstring says so
+itself ("the shipped `menu_bg.png` stopped being reproducible from its own baker"). The
+rebuild replaced the band with marble, and `MenuScreen` draws only the header TEXTS over
+this bake (`PMChrome.draw_ident_texts` / `draw_sheet_band_texts`), never `draw_header`'s
+sprites. So there was no one left to draw the chrome. Manager name, club, MANAGER MENU, the
+calendar sheet and the Premier/Week plaque were all painting onto bare grey.
+
+**Fix:** the baker now KEEPS the reference frame's own header band and clears only the four
+LIVE things out of it — the two identity captions and the kit box (by blitting the project's
+own already-cleared `hub/ident_block.png`), the calendar date stack (`header/cal_sheet.png`),
+and the two plaque captions (repainted with each caption row's own dominant colour, which is
+the plate the engine filled it with). 2,267 px cleared; every other pixel in the band is a
+pixel the real game put on screen. `menu_bg.png` is still 100 % reproducible from the baker.
+Verified in the REAL app under Xvfb + GL (`PM98_HUB_SHOT`), not just in the asset.
+
+### 2. THE OFFERS CARD OPENED AT £5,000 AGAIN — a deviation reverted by a parity fix
+
+`4583ab0` (2026-07-27) changed `MakeOfferScreen.setup`'s no-seed default from the club FEE
+back to the £5,000 FLOOR, to close a 294 px `diff_entry_parity` failure on frame
+`101_164714`. The frame is right — the original DOES open the cold card at £5,000 — but the
+port's opening bid is an owner decision from 2026-07-24 (the £5,000/£10,000/£25,000 stepper
+costs ~640 taps to reach a £16M asking price), and reverting it undid that.
+
+**Fix:** the default is the fee again, and the parity pair no longer depends on it —
+`shot_entry_parity` passes `{"offer": FLOOR}` in explicitly for the frame-101 capture, so
+that pair proves the CHROME and every other cell while the opening default is pinned by
+`test_make_offer_seed` instead. `diff_entry_parity`: 18 of 18 pairs, makeoffer_101 **0 px**.
+
+### 3. ⭐ THREE UP FRONT DID NOTHING — the trigger was not the one a manager can see
+
+Every seam and live test was green and the cheat still did nothing in play, twice reported.
+The tests field three NATURAL forwards. The game does not have to:
+`Tactics.set_formation("4-3-3")` fills the front line with the best available players by
+line, and a squad with two natural forwards puts a midfielder in the third slot.
+`_fill_participant` writes `ROLE` from the player's own `pos`, so that XI carries TWO
+`ROLE == 3` records and the cave's `att3` never reaches three. Board says 4-3-3, switch says
+ON, match plays stock.
+
+**Fix:** a third trigger, declared OURS — the CHOSEN SHAPE's forward-slot count.
+`Career._ratings_for` publishes `front_three`; `MatchSim` folds it into
+`Pm98StatMatch.cheat_manager_side` (renamed from `cheat_mixed_play_side`, which now carries
+two triggers). The MANAGER_HACK.EXE trigger is untouched, so the PCode oracle table still
+describes the patched binary exactly, and OFF is still bit-identical to stock.
+`test_cheats_live` case A2 drives **all twenty Premier clubs** on an attacking 4-3-3 and
+every one scores at least six (worst: Blackburn R., exactly 6).
+
+The OPTIONS row now prints **ARMED** / **IDLE** from the same three triggers the engine
+reads, so it cannot claim armed while the match plays stock. The old "N FW" readout answered
+a question about only one of the three, which is what made the cheat look dead.
+
+### 4. UNSACKABLE — already shipped, and verified end to end rather than relayed
+
+Reported as "not implemented". It is: `Career.cheat_unsackable` (one early return at the
+head of `sack_message()`, the port of the EXE patch's three unconditional jumps),
+`AudioManager.set_unsackable` mirroring it, the OPTIONS row, the persisted `cheats` block.
+Verified in the REAL app this session, not from the tests: `PM98_OPTIONS_SHOT` mounts the
+hub, walks the dropdown to the panel, taps the ON box through the panel's own input handler
+and reports `unsackable=true career=true`, and the rendered modal shows the row ticked. The
+only live dismissal path in the port is `sack_message()` at the hub mount (`Main.gd:2140`);
+`Main.gd:5691` is a screenshot harness. Nothing to fix — see the README for where it lives.
+
+### 5. EUROPEAN QUARTER-FINALS IN NOVEMBER — the European calendar has a break
+
+`Cup._schedule` spreads a competition's rounds EVENLY across the season. The real European
+calendar does not: the early rounds run Sep..Dec and the quarter-finals onward are
+Mar..May. With 39 league weeks from Sat 9 Aug 1997 the even spread put the Cup Winners' Cup
+quarter-final at week ~16 (mid-November) and the U.E.F.A. Cup's at ~20.
+
+Witnesses (`knockout_views_re.md`, the reference run's own probe log): euro QTR FINALS drawn
+unplayed **January 1998**, 1st legs played **Sat 14 Mar 1998** (week 32); 1998-99 the same,
+1st legs Sat 13 Mar 1999 and the SEMIFINALS Sat 27 Mar (+2 weeks); the FINAL still undecided
+at week 38 in both seasons. Group phase from the hub badge: 1 Oct, 5 Nov, 26 Nov 1997.
+
+**Fix:** `Cup._schedule` takes `tail_fracs`, which PINS the last N rounds and spreads only
+the rounds before them. `Career.EURO_TAIL_FRACS = [0.82, 0.87, 1.0]` and
+`EURO_HEAD_SPAN = [0.15, 0.54]`. Result on a 39-week season:
+
+| competition | round weeks |
+|---|---|
+| European Cup | 8, 10, 12, 15, 17, 19 (six group matchdays) then **32, 34, 39** |
+| U.E.F.A. Cup | 11, 16 then **32, 34, 39** |
+| Cup Winners' Cup | 13 then **32, 34, 39** |
+
+DECLARED OURS: the three fractions are fitted to those four dates; MANAGER.EXE's own
+round-week table has never been located. What is witnessed is that the quarter-finals are a
+MARCH event. `test_europe` still resolves every competition to a champion inside the season.
+
+**And the SORTEO no longer interrupts you for a cup you are not in.** `_queue_cup_draw`
+tests the drawn round's own player list for the manager's club — the drawn round, not
+`Cup.still_in`, because the domestic cups hold the Premier clubs out until Round 3 and a
+survivors test would suppress the very draw the reference run witnesses being raised. Also
+DECLARED OURS: no frame shows what the original does for a non-participant (the reference
+run's club was in the European Cup and both domestic cups all season). The bracket is
+unchanged and every round stays readable on the KNOCKOUT screen.
 
 ## 0aaaaaaaaaa. Closed 2026-07-28 (session s78) — THE CUP TV FEE, THE CAMERA MOTION, THE KIT RESIDUAL
 
