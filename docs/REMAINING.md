@@ -1,5 +1,87 @@
 # PM98 Android — remaining-work inventory (refreshed 2026-08-01)
 
+## 0aaaaaaaaaaaaaa. Closed 2026-08-01 (session s82) — THE EIGHT COUNTERPART-LESS SCREENS
+
+The whole §B2 list of "original screens with NO app counterpart" is resolved, and it
+resolved to **one** real missing screen. Record: `docs/re/fines_re.md`.
+
+### 1. ⭐ THE FINES (MULTAS) — the one screen that really was missing, BUILT
+
+The board fines the club when its GROUND is below the standard the competition it has just
+played in demands, and says so on its own card. The port had the **FINES expense line** in
+the finance screen since the ledger was reversed and nothing that ever wrote to it.
+
+* **The levy** is `FUN_0057a980` @0x57ab85..0x57ad6a, the club's POST-MATCH pass —
+  `FUN_00448b60` calls it on BOTH clubs of a finished fixture, so a fine is levied per match
+  played, **home or away**, against the competition that match belonged to. Three arms on
+  `DAT_0066b1dc`: **PREMIER** (floodlights ≥2 / changing rooms, score board, access, medical
+  ≥1 → £25,000 x3 + £50,000 x2), **F.A. CUP** (floodlights ≥1 → £15,000) and one shared
+  **EUROPE** arm for indices 7..11 (→ £50,000 x3 + £75,000 x2). The three lower divisions,
+  the Coca-Cola Cup and the Charity Shield fine nothing, and that is a RESULT of the binary's
+  own `jb`/`ja` bounds, not an omission. Each float32 debit equals the integer it banks, and
+  £ = internal / 200.
+* **The competition index** is mapped in full for the first time (0 Premier … 11
+  Intercontinental) from each class ctor's own index argument in `FUN_00441ea0` matched to
+  the class block owning its `ACTLIGA\<TAG>` template. Two independent confirmations: the
+  FACUP ctor allocates 8 round slots and the CCCUP ctor 7 — the exact ladder lengths s81 had
+  to pin the cup calendar against.
+* **The card** is `FUN_00549d40`, raised by the weekly hub run @0x546164 — BEFORE the
+  channelTV card @0x546226, which is the order the post-week chain now uses.
+* **The art needs no bake.** Every pixel is a whole `RECURSOS.PKF` entry blitted at a literal
+  coordinate, exported 1:1 by `tools/re/build_fines_card_from_pkf.py`. The archive and the
+  disassembly agree three times without either being consulted for the other: the MULTAS
+  panel is **418x316** and so is the binary's panel `CRect`; the ESTADIO equipment icons are
+  **40x26** and so is its icon `CRect`; `MULTA.GIF` is **54x58** and so is the empty-string
+  `CRect` it is blitted into.
+* Gate `app/tests/test_fines.gd` (73 checks); the card was **rendered and looked at** under
+  Xvfb + GL (`app/tests/shot_fines.gd`), not just asserted.
+* Declared: the OK plate's hit rect (grown 2 px, the border `ChannelTvScreen`'s witnessed
+  plate has), and the outer gate `club+0x54 > club+0x50`, which is NOT reversed — `+0x54` is
+  simply the byte the record reader stores next to the competition index. Said, not guessed.
+
+### 2. THE OTHER SEVEN WERE NEVER SCREENS
+
+Six of the eight names came off RECURSOS **folder names** and belong to screens already
+shipping at 0 px: **TV** = the channelTV card (s78); **EMPAREJAMIENTOS** = MAN-TO-MAN
+MARKINGS (`FUN_0050e980`, the function `mantoman_screen_re.md` is about — "emparejamientos"
+is *markings*, not the cup draw); **SININFO** = the TITLE SCREEN's own art group;
+**SECRETARIO** = the SEARCH button art of the SCOUT and YOUTH search panels;
+**SELECCIONPRO** = the OFFERS SELECTION screen's arrows and info plate. **CREDITOS** has
+**zero references in either executable** — dead PC Fútbol 5 inheritance, so building one
+would be inventing a screen PM98 does not have. **HIGHLIGHTS** stays the unchanged hard data
+gap (the `.p3d` models are absent from both sources).
+
+### 3. THE EUROPEAN ENTRY ALERT — raised, and one figure corrected from its own string
+
+The port credited all four UEFA payments silently. All four alerts are raised now with
+MANAGER.EXE's own text. Reading them corrected a figure: the £2,000,000 was paid as a
+trophy-lift bonus, and its string (@0x65369c) says *"your qualification\nto the final"* — so
+it is the milestone for winning the semifinal, and there is no reversed lift bonus at all.
+Declared: the alerts fire for the **European Cup only**, because all four strings live in
+that class's block.
+
+### 4. B9's WINE DRIVE — the blocker was the CAREER LEVEL, not a coordinate
+
+s80 filed B9 as "the plan's hub click (234,390) does not reach SQUAD MANAGEMENT". Walked
+live against the window this session: **(234,390) is correct** — it is the PLAYERS icon —
+but at **TRAINER** level it answers with the modal *"This option is automatic in Trainer
+level."*, because at Trainer level the whole TRANSFER MARKET quarter is automatic (the hub
+draws those six icons GREY, and in colour at TOTAL). Every career the driver has ever built
+was a Trainer career. `nav_career.sh` now takes `PM98_LEVEL` (trainer | manager | accountant
+| **total**), and with `total` the entire B9 path was walked and photographed step by step:
+SQUAD MANAGEMENT → YOUTH TEAM → CLUB PERSONNEL → **C. Stump 4.5★ hired as YOUTH TEAM SCOUT**
+→ **P. Klachinsky 5★ as YOUTH MANAGER** → six LEDs armed → SEARCH answers *"The scout is now
+searching for players with selected capabilities."* B9 is no longer blocked on an unknown;
+it is driving time. Full step list in `plans/season_youth_b9.json`'s own note.
+
+### 5. NOT done in s82, said plainly
+
+The **M5 set-piece leaves** (and with them goals 2-7, full time, stoppage time and the
+cross-seed sweep), the **four visual residuals** (48x64 on-sprite bevel, EuroGroupScreen's
+group kit cells, OffersScreen's panel, the barra manager-kit CAPTURE gap) and the
+**real-device pass** are all untouched. The first is a multi-session exact-port job; the
+second is un-reversed or un-captured rather than un-built; the third needs Mats and a phone.
+
 ## 0aaaaaaaaaaaaa. Closed 2026-08-01 (session s81) — THE OWNER'S PLAYTHROUGH LIST
 
 Ten reports off a live playthrough, each traced to code before anything was changed.

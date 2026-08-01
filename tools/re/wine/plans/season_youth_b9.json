@@ -1,6 +1,6 @@
 {
  "out": "season_youth_b9",
- "note": "B9 (docs/re/youth_re.md): a Man Utd TOTAL-level career with YOUTH TEAM SCOUT R. Staples (4.5*) and YOUTH MANAGER B. Beckett (4*) hired and a six-LED search armed at 1 Aug 1997. Drive weeks until the scout reports; the probe snaps SQUAD -> YOUTH every 3rd hub so the filled PLAYERS FOUND panel is captured.",
+ "note": "B9 (docs/re/youth_re.md): drive a career whose YOUTH TEAM SCOUT + YOUTH TEAM MANAGER are hired and whose six-LED search is armed, until the scout reports; the probe snaps SQUAD MANAGEMENT -> YOUTH TEAM every 3rd hub so the filled PLAYERS FOUND panel is captured. PREREQUISITE, verified live 2026-08-01: the career MUST be at TOTAL level (`PM98_LEVEL=total nav_career.sh`). At TRAINER level the hub's PLAYERS icon answers \"This option is automatic in Trainer level.\" instead of opening SQUAD MANAGEMENT, which is what stopped the s79/E drive -- the probe coordinates below are CORRECT and were re-proven click by click against the live window (hub 234,390 -> SQUAD MANAGEMENT; 579,372 -> YOUTH TEAM). Staff + search must be armed before `run`: STAFF (hub 102,441) -> SIGN (426,425) -> YOUTH SCOUT (493,293) -> top row SIGN (131,308) -> YOUTH MAN. (493,263) -> top row SIGN (131,308) -> OK (493,375) -> RETURN (571,445); then YOUTH TEAM, the six LED cards at (36|161, 176|194|212), then SEARCH (278,203) until PLAYERS FOUND reads \"The scout is now searching\".",
  "keep": [
   "alert_box",
   "hub"

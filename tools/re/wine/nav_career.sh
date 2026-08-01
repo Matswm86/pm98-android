@@ -6,7 +6,8 @@
 # because MATCH OPTIONS has to stay on the plan's own setting and the hub is the drive's
 # entry screen. Same proven coords, same alert guard, cut at the hub.
 #
-# Usage: nav_career.sh [manager_name]   (boot.sh must have run first)
+# Usage: PM98_LEVEL=total nav_career.sh [manager_name]   (boot.sh must have run first)
+# PM98_LEVEL: trainer (default) | manager | accountant | total
 set -euo pipefail
 source "$(dirname "$0")/env.sh"
 NAME="${1:-mats}"
@@ -31,7 +32,21 @@ sleep "${PM98_NAV_SETTLE:-8}"
 bash "$S" nav_00_title >/dev/null
 
 step 165 277            # MANAGER LEAGUE
-step 175 135            # TRAINER
+# SELECT LEVEL. Coordinates are the centres of NivelScreen's reversed client rects offset
+# by the dialog origin (93,32): TRAINER (123,87,120x105), MANAGER (372,88,149x104),
+# ACCOUNTANT (121,241,132x124), TOTAL (365,238,153x128).
+#
+# The level is LOAD-BEARING for any drive that touches the squad: at TRAINER level the
+# whole TRANSFER MARKET quarter is automatic, and clicking PLAYERS answers with the modal
+# "This option is automatic in Trainer level." instead of opening SQUAD MANAGEMENT. That is
+# what really stopped B9's probe (2026-08-01, verified live against the window) -- not the
+# hub coordinate, which is correct.
+case "${PM98_LEVEL:-trainer}" in
+  total)      step 441 302 ;;   # TOTAL
+  manager)    step 446 140 ;;   # MANAGER
+  accountant) step 187 303 ;;   # ACCOUNTANT
+  *)          step 175 135 ;;   # TRAINER (default, unchanged)
+esac
 
 step 160 110 1 1        # name row 1
 W=$(win_id)

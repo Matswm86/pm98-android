@@ -1,0 +1,38 @@
+{
+  "panel_origin": [
+    111,
+    82
+  ],
+  "panel_size": [
+    418,
+    316
+  ],
+  "row_y": [
+    78,
+    122,
+    166,
+    210,
+    254
+  ],
+  "icon_origin_x": 19,
+  "icon_size": [
+    40,
+    26
+  ],
+  "text_origin_x": 71,
+  "text_size": [
+    345,
+    42
+  ],
+  "text_dy": -8,
+  "ok_origin": [
+    336,
+    284
+  ],
+  "ok_size": [
+    74,
+    25
+  ],
+  "title_font": "ProMan14",
+  "row_font": "ProMan8"
+}

@@ -344,9 +344,33 @@ never fill with invented stand-ins)
 > VERRIVAL → `RivalScreen`, HISTORIAL → `ManagerHistoryScreen`, LESIONADOS →
 > `InjuriesScreen`, NIVELES → `NivelScreen`, OFERTAS → `OffersScreen`/`CurrentOffersScreen`,
 > OPCIONES → `OptionsPanel`/`MatchOptions`, SEGUROS → `InsuranceScreen`, and the SquadScreen
-> orphan is fixed. Still genuinely without a counterpart: **MULTAS, SECRETARIO, TV,
-> HIGHLIGHTS (hard gap), CREDITOS, SELECCIONPRO, SININFO**, the European entry alert, and
-> the group-phase half of EMPAREJAMIENTOS. See `AUDIT_COMPLETE_2026-07-26.md` §4.
+> orphan is fixed.
+>
+> ✅ **RESOLVED IN FULL 2026-08-01 (s82) — `docs/re/fines_re.md` §6.** The eight names this
+> list still carried were read off RECURSOS.PKF **folder names**, and six of them are not
+> screens: they are art groups belonging to screens this port already ships at 0 px. Traced
+> to the function that loads each folder's own files:
+> * **MULTAS** → `FUN_00549d40`, the FINES card the weekly hub run raises. A real screen, and
+>   the only real one in the list — **BUILT** (`FinesScreen`, `Fines.gd`, `test_fines.gd`).
+> * **TV** → `FUN_005724e0` = the channelTV card, **already built** (`ChannelTvScreen`, s78).
+> * **EMPAREJAMIENTOS** → `FUN_0050e980` = **MAN-TO-MAN MARKINGS** (the function
+>   `mantoman_screen_re.md` is written about). "emparejamientos" is *markings*, not the cup
+>   draw; the cup draw is `CupDrawScreen`, from a different frame set. Built, 0 px.
+> * **SININFO** → `FUN_00545180` = the **TITLE SCREEN**'s own art group (`title_screen_re.md`
+>   says so in its own §"button bitmaps"). Built.
+> * **SECRETARIO** → the SEARCH button art of the **SCOUT** (`FUN_00555ea0`) and **YOUTH**
+>   (`FUN_0053d710`) search panels. Both built.
+> * **SELECCIONPRO** → the **OFFERS SELECTION** screen's arrows + info plate
+>   (`FUN_00561569`). Built, parity-gated.
+> * **CREDITOS** → 10 Spanish-captioned entries and **zero references in `MANAGER.EXE` or
+>   `Dbasewin.exe`**: dead PC Fútbol 5 inheritance. PM98 has no credits screen and building
+>   one would be inventing a screen the game does not have.
+> * **HIGHLIGHTS** → the replay viewer's BUTTONS; the content is 3D and the `.p3d` models are
+>   absent from both sources. Unchanged **hard data gap**.
+>
+> The **European entry alert** is also closed: the four `"from UEFA"` strings are raised
+> verbatim now (`Career.EURO_ALERT_*`), and reading them corrected the £2,000,000 rung from a
+> trophy-lift bonus to "qualification to the final" — `fines_re.md` §7.
 ENTRENAMIENTO · ~~EMPAREJAMIENTOS~~ (the cup DRAW half PORTED 2026-07-24 as
 `CupDrawScreen`, frame-exact — the group-phase half is still open) · NOTICIAS ·
 TACTICAS (screen itself) · VERRIVAL ·

@@ -2223,7 +2223,7 @@ func _career_advance() -> void:
 			_career.save()
 			_show_shield_card(_career.charity_shield, func() -> void:
 				_show_career()
-				_pop_division_finals(func() -> void: _pop_cup_draw(func() -> void: _pop_month_awards(func() -> void: _pop_channel_tv(_pop_pending_team_offers))))))
+				_pop_division_finals(func() -> void: _pop_cup_draw(func() -> void: _pop_month_awards(func() -> void: _pop_fines(func() -> void: _pop_channel_tv(_pop_pending_team_offers)))))))
 		return
 	var res := _career.advance_week(rng)   # ratings come from the live roster
 	# Every cup + European tie the manager's club played this week, in the order it was
@@ -2234,7 +2234,7 @@ func _career_advance() -> void:
 		if ties.is_empty():
 			_career.save()   # bye / season end: no presentation, save immediately
 			_show_career()   # refresh the hub in place
-			_pop_division_finals(func() -> void: _pop_cup_draw(func() -> void: _pop_month_awards(func() -> void: _pop_channel_tv(_pop_pending_team_offers))))
+			_pop_division_finals(func() -> void: _pop_cup_draw(func() -> void: _pop_month_awards(func() -> void: _pop_fines(func() -> void: _pop_channel_tv(_pop_pending_team_offers)))))
 			return
 		_present_tie_chain(ties, 0)
 		return
@@ -2247,7 +2247,7 @@ func _present_tie_chain(ties: Array, i: int) -> void:
 	if i >= ties.size():
 		_career.save()   # the deferred week autosave, once the whole week has presented
 		_show_career()
-		_pop_division_finals(func() -> void: _pop_cup_draw(func() -> void: _pop_month_awards(func() -> void: _pop_channel_tv(_pop_pending_team_offers))))
+		_pop_division_finals(func() -> void: _pop_cup_draw(func() -> void: _pop_month_awards(func() -> void: _pop_fines(func() -> void: _pop_channel_tv(_pop_pending_team_offers)))))
 		return
 	_show_match_result(ties[i] as Dictionary, func() -> void: _present_tie_chain(ties, i + 1))
 
@@ -2320,7 +2320,7 @@ func _show_match_result(res: Dictionary, on_finish: Callable = Callable()) -> vo
 	var finish := on_finish if on_finish.is_valid() else func() -> void:
 		_career.save()   # the deferred week autosave (EXIT-Yes never gets here)
 		_show_career()
-		_pop_division_finals(func() -> void: _pop_cup_draw(func() -> void: _pop_month_awards(func() -> void: _pop_channel_tv(_pop_pending_team_offers))))
+		_pop_division_finals(func() -> void: _pop_cup_draw(func() -> void: _pop_month_awards(func() -> void: _pop_fines(func() -> void: _pop_channel_tv(_pop_pending_team_offers)))))
 	var open_match := func() -> void:
 		_open_match(home, away, int(res["hg"]), int(res["ag"]), m["lines"],
 			"%s  -  back to the dugout" % verdict, finish, result_data, res.get("possession", []))
@@ -5376,6 +5376,26 @@ func _season_end_champion_cards(after: Callable) -> void:
 ## at home and that competition's fee is witnessed. The fee is booked to the week's
 ## TELEVISION line when the match is actually played -- the card announces it, it does not
 ## pay it -- so answering OK just clears the queue and runs `after`.
+## THE FINES (MULTAS), FUN_00549d40 -- the weekly hub run raises this BEFORE the channelTV
+## card (@0x546164 against @0x546226), so it sits first in the chain here too. Career banks a
+## line per fine when the match is played; the card shows them and clears the accumulators.
+func _pop_fines(after: Callable) -> void:
+	var rows: Array = _career.take_fines() if _career != null else []
+	if rows.is_empty():
+		if after.is_valid():
+			after.call()
+		return
+	var fscr: FinesScreen = load("res://scenes/FinesScreen.gd").new()
+	fscr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(fscr)
+	fscr.setup(rows)
+	fscr.ok_pressed.connect(func() -> void:
+		AudioManager.ui_select()
+		fscr.queue_free()
+		if after.is_valid():
+			after.call())
+
+
 func _pop_channel_tv(after: Callable) -> void:
 	if _career == null or (_career.pending_channel_tv as Dictionary).is_empty():
 		if after.is_valid():

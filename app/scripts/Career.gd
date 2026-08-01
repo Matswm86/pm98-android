@@ -302,6 +302,12 @@ var contract_warned := false
 # The channelTV card queued for the coming HOME match: {"fee": int, "comp": String}.
 # {} when the next fixture is away, or the competition's fee is not witnessed.
 var pending_channel_tv: Dictionary = {}
+# THE FINES (MULTAS). The five accumulators `club+0x27c/0x280/0x284/0x288/0x28c`, keyed by
+# the item id `Fines.ITEMS` uses -> {"icon", "message", "pounds"}. `FUN_0057a980` writes a
+# slot with `mov` (not `add`) after every match the club plays, so a second fine on the same
+# item in the same hub visit REPLACES the line while still debiting the cash; the weekly hub
+# run raises the card the moment any slot is set and clears all five (`FUN_00549d40`).
+var pending_fines: Dictionary = {}
 # R13 (witnessed): tiers whose FINAL tables the hub presents after the penultimate
 # league round, BEFORE the last one is played — the divisions that have already
 # finished (lower divisions run ahead, R12). Drained by Main's post-week chain.
@@ -494,13 +500,28 @@ const EURO_OPTS := {
 # UEFA prize schedule -- the ONLY code-resident prize figures (reversed from MANAGER.EXE,
 # docs/re/finance_constants.md). Per-match draw/win is collapsed to per-tie (legs are
 # abstracted into one tie), so a tie won pays the "win" figure; milestones pay on reaching
-# the round. EURO_WINNER (lifting it) is a documented bonus, not a reversed figure.
+# the round. Every rung below is a reversed figure carrying its own string.
 const EURO_ENTRY := 1_000_000           # "1 million from UEFA for competing"
 const EURO_WIN := 510_000               # "510.000 for every match won"
 const EURO_DRAW := 255_000              # "255.000 for every draw match" (the group phase)
 const EURO_QF := 1_500_000              # "1.5 million ... qualification" (reach the last 8)
 const EURO_SF := 1_625_000              # "1.625 million ... qualification" (reach the last 4)
-const EURO_WINNER := 2_000_000
+# CORRECTED 2026-08-01 from the strings themselves (@0x65369c): the £2 million is the
+# milestone for "your qualification\nto the final", NOT a trophy-lift bonus. There are
+# exactly FOUR "from UEFA" strings in MANAGER.EXE, all four inside the CEURO class block
+# (bracketed by 'European Cup' @0x6534d8 and '%c:ACTLIGA\CEURO%03u.CPT' @0x6534f4), and
+# none of them is about lifting the cup. The port used to pay this on `champion`, which was
+# the one figure in the ladder placed by inference rather than by the text.
+const EURO_FINAL := 2_000_000           # "2 million ... qualification\nto the final"
+
+# The four alerts the original raises for these four payments, verbatim — the port credited
+# every one of them silently (REFRUN_manutd_1997-98_FINDINGS "Open on the European entry
+# alert"; the entry card is witnessed at refrun p0110). The `\n ` after the first line is
+# the binary's own, space included.
+const EURO_ALERT_ENTRY := "Your team receives £1 million from UEFA for competing in this championship\n From now on, you will receive £255.000 for every draw match\n and £510.000 for every match won."
+const EURO_ALERT_QF := "Your team receives £1.5 million from UEFA for your qualification\nto the quarter finals of this competition."
+const EURO_ALERT_SF := "Your team receives £1.625 million from UEFA for your qualification\nto the semifinals of this competition."
+const EURO_ALERT_FINAL := "Your team receives £2 million from UEFA for your qualification\nto the final of this competition."
 # Winners-of-winners one-off finals. Documented prizes (not reversed figures).
 const SUPERCUP_PRIZE := 500_000         # European Supercup (Euro Cup winner v Cup Winners' winner)
 const INTERCONTINENTAL_PRIZE := 750_000 # Intercontinental Cup (Euro Cup winner v S. American champion)
@@ -717,6 +738,7 @@ func _init_club(club: Dictionary, league: Dictionary, league_clubs: Array, leagu
 	loss_weeks = 0
 	_reset_board_review()
 	pending_channel_tv = {}
+	pending_fines = {}
 	pending_division_finals = []
 	pending_cup_draws = []
 	pending_champion_cards = []
@@ -1390,6 +1412,10 @@ func _play_due_cup_rounds(rng: RandomNumberGenerator, clubs_override: Dictionary
 			# exactly as a league Saturday (REFRUN R6/R9). The TV fee for the two domestic
 			# cups is NOT witnessed, so _post_home_match pays 0 for them.
 			var ct: Dictionary = cr.get("manager_tie", {})
+			if not ct.is_empty():
+				# The fine is levied per MATCH PLAYED, home or away (FUN_00448b60 runs the
+				# post-match pass on both clubs), so this sits outside the home-only gate.
+				_levy_fines(_tv_key_for_cup(str(cup.get("name", ""))))
 			if _tie_is_home(ct):
 				_post_home_match(_tv_key_for_cup(str(cup.get("name", ""))))
 	# European competitions: same chassis, but prizes follow the reversed UEFA schedule
@@ -1427,6 +1453,8 @@ func _play_due_cup_rounds(rng: RandomNumberGenerator, clubs_override: Dictionary
 				# and the UEFA schedule behind these figures IS reversed from MANAGER.EXE.
 				_post_euro_points(_euro_prize(eb, er))
 			var et: Dictionary = er.get("manager_tie", {})
+			if not et.is_empty():
+				_levy_fines(str(key))
 			if _tie_is_home(et):
 				_post_home_match(str(key))
 
@@ -1483,14 +1511,31 @@ func _euro_prize(bracket: Dictionary, result: Dictionary) -> int:
 		and not (result.get("manager_tie", {}) as Dictionary).is_empty()
 	if won_tie:
 		prize += EURO_WIN
+		# The milestone ladder is "qualification TO the next round", so it is keyed on the
+		# survivor count AFTER the round resolved: 8 = into the last 8, 4 = into the last
+		# 4, 2 = into the FINAL. The last rung used to be paid for lifting the trophy; the
+		# string it comes from says otherwise (see EURO_FINAL).
 		match (bracket.get("survivors", []) as Array).size():
 			8:
-				prize += EURO_QF        # winning the round of 16 -> into the last 8
+				prize += EURO_QF
+				_euro_alert(bracket, EURO_ALERT_QF)
 			4:
-				prize += EURO_SF        # winning the quarter-final -> into the last 4
-	if bool(result.get("champion", false)):
-		prize += EURO_WINNER
+				prize += EURO_SF
+				_euro_alert(bracket, EURO_ALERT_SF)
+			2:
+				prize += EURO_FINAL
+				_euro_alert(bracket, EURO_ALERT_FINAL)
 	return prize
+
+
+## Raise one of the four UEFA money alerts. All four strings live inside the EUROPEAN CUP
+## class block, so that is the only competition they are raised for — whether the U.E.F.A.
+## Cup and the Cup Winners' Cup show an equivalent is NOT established (their class blocks
+## carry no such string), and an invented one would be worse than the honest gap.
+func _euro_alert(bracket: Dictionary, msg: String) -> void:
+	if str(bracket.get("name", "")) == str((EURO_OPTS.get("european_cup", {}) as Dictionary
+			).get("name", "European Cup")):
+		pending_alerts.append(msg)
 
 
 ## Ratings for a club: the manager's own club uses the chosen XI + shape; every
@@ -3876,9 +3921,61 @@ func _post_home_match(comp_key: String) -> void:
 
 ## The league round's matchday income, if the manager's club was at home this week.
 func _post_matchday_income(res: Dictionary) -> void:
-	if res.is_empty() or not bool(res.get("manager_home", false)):
+	if res.is_empty():
+		return
+	_levy_fines("league")   # per match played, home or away
+	if not bool(res.get("manager_home", false)):
 		return
 	_post_home_match("league")
+
+
+# ---- THE FINES (MULTAS) -------------------------------------------------------------
+# `FUN_0057a980` @0x57ab85..0x57ad6a is the club's POST-MATCH pass — FUN_00448b60 calls it
+# on BOTH clubs of a finished fixture (@0x448dd8/de3/dea), so a fine is levied per match
+# played, HOME OR AWAY, and the competition tested is the one the match belonged to. The
+# money leaves at once (`FUN_00581240`, whose float32 immediate equals the value banked in
+# the accumulator) and the card is raised later, by the weekly hub run.
+#
+# DECLARED DIVERGENCE, stated rather than guessed: the whole block sits behind
+# `cmp [club+0x54],[club+0x50] / jbe skip` @0x57ab77. `club+0x50` is the club's competition
+# index (the same byte `FUN_0057d780` reads for the ground preset); `club+0x54` is the byte
+# the save reader stores next to it (`FUN_0057bfb0` @0x57c18d) and it is NOT reversed. The
+# port applies the arm whenever the manager's club actually plays in that competition, which
+# is the block's behaviour with that gate open. Man Utd's preset-0 ground clears every
+# standard, which is why five driven careers never saw this card either way.
+
+## The current grade of one GroundPreset item, seeded from the club's own preset and then
+## overridden by any completed works — the same read StadiumScreen makes.
+func _fine_grade_of(cat: String, key: int) -> int:
+	var vec := GroundPreset.grades_for_league(league_id)
+	var idx := key + (GroundPreset.SERVICE_GRADE_OFFSET if cat == "services" else 0)
+	var seed_grade := int(vec[idx]) if idx >= 0 and idx < vec.size() else 0
+	return ground_grade(cat, key, seed_grade)
+
+
+## Levy every fine one played match in `comp_key` earns. Called once per match the
+## manager's club plays, in the competition that match belonged to.
+func _levy_fines(comp_key: String) -> void:
+	for f in Fines.for_match(comp_key, league_id, _fine_grade_of):
+		var row: Dictionary = f
+		_post_expense("FINES", int(row["pounds"]))
+		pending_fines[str(row["id"])] = {
+			"icon": row["icon"], "message": row["message"], "pounds": row["pounds"],
+		}
+
+
+## Drain the five accumulators in the binary's own field order, the way `FUN_00549d40`
+## reads them (0x27c, 0x280, 0x284, 0x288, 0x28c) and clears each one it drew.
+func take_fines() -> Array:
+	if pending_fines.is_empty():
+		return []
+	var out: Array = []
+	for item in Fines.ITEMS:
+		var id := str(item["id"])
+		if pending_fines.has(id):
+			out.append(pending_fines[id])
+	pending_fines = {}
+	return out
 
 
 ## Queue the channelTV card for the coming week's fixture, so the hub can raise it BEFORE
@@ -5348,6 +5445,7 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	loss_weeks = 0
 	_reset_board_review()
 	pending_channel_tv = {}
+	pending_fines = {}
 	pending_cup_draws = []
 	pending_champion_cards = []
 	sa_champion_id = -1
@@ -5847,6 +5945,8 @@ func mint_european_cups(euro_pool: Array, rng: RandomNumberGenerator,
 			_post_euro_points(EURO_ENTRY)
 			_news("cup", "Your club has entered the %s (1 million from UEFA for competing)."
 				% str(EURO_OPTS[key]["name"]))
+			if key == "european_cup":
+				pending_alerts.append(EURO_ALERT_ENTRY)
 
 
 ## The Cup Winners' Cup seed: last season's F.A. Cup winners, or the league runners-up if
@@ -6414,7 +6514,7 @@ func to_dict() -> Dictionary:
 		"week_open": _wk, "cash_close": cash_close, "cash_close_ok": _cash_close_ok,
 		"contract_warned": contract_warned,
 		"pending_champion_cards": pending_champion_cards, "sa_champion_id": sa_champion_id,
-		"pending_channel_tv": pending_channel_tv,
+		"pending_channel_tv": pending_channel_tv, "pending_fines": pending_fines,
 		"pending_division_finals": pending_division_finals,
 		"euro_winner_cup": euro_winner_cup, "euro_winner_cwc": euro_winner_cwc,
 		"euro_winner_uefa": euro_winner_uefa,
@@ -6667,6 +6767,7 @@ static func from_dict(d: Dictionary) -> Career:
 	c._pos_at = _int_keyed(d.get("board_pos_at", {}))
 	c.contract_warned = bool(d.get("contract_warned", false))
 	c.pending_channel_tv = d.get("pending_channel_tv", {})
+	c.pending_fines = d.get("pending_fines", {})
 	for t in d.get("pending_division_finals", []):
 		c.pending_division_finals.append(int(t))
 	c.euro_winner_cup = int(d.get("euro_winner_cup", -1))

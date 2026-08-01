@@ -579,11 +579,38 @@ board-delta signs plus their save/load round-trip.
 **Still open**: the un-occluded filled PLAYERS FOUND and a filled roster row (B9), and the
 enabled-PROMOTE / disabled-TRAINING plates.
 
-**B9's drive did not fail on the sim — it failed on navigation.** It ran 207 steps deep
-(15 probes, into January 1998) and stopped on an unknown screen, but every probe frame it
-banked is the **LINE-UP** screen, not YOUTH: the plan's probe path opens with a hub click
-at (234,390) that does not reach SQUAD MANAGEMENT, and the follow-up (579,372) — which IS
-the YOUTH TEAM plaque *on SQUAD MANAGEMENT*, witnessed at y16 — lands on LINE-UP's TRAINING
-instead. Fix the hub coordinate first, live against the window; re-running the plan as it
-stands will burn another 200 steps for seven more LINE-UP frames. The wine career itself
-has no save (`drive_c/PM98/ACTLIGA` is empty), so a re-run restarts from a new career.
+**B9's drive did not fail on the sim — it failed on navigation, and the cause is now
+found: the CAREER LEVEL (2026-08-01, s82, verified click by click against the live
+window).**
+
+The s80 read of this — "the plan's hub click at (234,390) does not reach SQUAD MANAGEMENT"
+— was wrong about the coordinate. (234,390) sits inside `MenuScreen.ICON_HITS["sell"]`
+(184,353,101x78), the PLAYERS/VENDE icon, and it is correct. What it does at **TRAINER**
+level is raise the modal
+
+> This option is automatic in Trainer level.
+
+because at Trainer level the whole TRANSFER MARKET quarter is played by the game. The hub
+even shows it: at Trainer level TRANSFERS / PLAYERS / STAFF / FINANCE / BOARD ROOM / GROUND
+are drawn GREY, and at TOTAL level they are drawn in their colours. `nav_career.sh` clicked
+TRAINER (175,135) on SELECT LEVEL, so every career the driver ever built was a Trainer
+career — and the probe's follow-up click then landed on whatever the modal left on screen.
+
+`nav_career.sh` now takes **`PM98_LEVEL`** = `trainer` (default, unchanged) | `manager` |
+`accountant` | `total`, clicking the centre of `NivelScreen`'s reversed client rect plus the
+dialog origin (93,32): TRAINER (175,135), MANAGER (446,140), ACCOUNTANT (187,303),
+**TOTAL (441,302)**.
+
+With `PM98_LEVEL=total` the whole B9 path was then walked live and every step photographed:
+hub (234,390) → **SQUAD MANAGEMENT**; (579,372) → **YOUTH TEAM**; hub (102,441) → CLUB
+PERSONNEL; SIGN (426,425) → the staff dialog; YOUTH SCOUT (493,293) → the youth-scout list;
+top-row SIGN (131,308) → **C. Stump 4.5★ £32,000 hired**; YOUTH MAN. (493,263) → SIGN →
+**P. Klachinsky 5★ £36,000**; back on YOUTH TEAM the six LED cards at
+(36|161, 176|194|212) flip all six SEARCH CAPABILITY rows NO → YES, and SEARCH (278,203)
+answers with the engine's own **"The scout is now searching for players with selected
+capabilities."**
+
+So B9 is no longer blocked on an unknown: it is a driving-time item. The plan
+(`plans/season_youth_b9.json`) carries the whole prerequisite in its `note`. The wine career
+has no save (`drive_c/PM98/ACTLIGA` is empty), so a re-run restarts from a new career and
+must re-arm the staff and the search before `autodrive.py run`.
