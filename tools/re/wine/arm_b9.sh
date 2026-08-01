@@ -18,6 +18,10 @@ source ./env.sh
 
 NAME="${1:-mats}"
 step() { bash ./click.sh "$1" "$2" "${3:-1}" >/dev/null; sleep "${4:-2}"; }
+# A snapshot is a progress note, not a step. ffmpeg x11grab fails whenever the game
+# has just re-created its window, and under `set -e` that killed a run that was
+# otherwise fine (three times on 2026-08-01) -- so snaps may never abort the drive.
+snap() { bash ./snap.sh "$1" >/dev/null 2>&1 || echo "  (snap $1 skipped)"; }
 
 bash ./boot.sh
 PM98_LEVEL=total bash ./nav_career.sh "$NAME"
@@ -33,20 +37,20 @@ step 131 308            # top row SIGN -> P. Klachinsky 5* GBP36,000
 sleep 2
 step 493 375            # OK
 step 571 445            # RETURN -> hub
-bash ./snap.sh b9_00_staff_hired >/dev/null
+snap b9_00_staff_hired
 
 # --- YOUTH TEAM: flip all six SEARCH CAPABILITY LEDs NO -> YES, then SEARCH -----------
 step 234 390            # hub -> SQUAD MANAGEMENT
 step 579 372            # -> YOUTH TEAM
-bash ./snap.sh b9_01_youth_before >/dev/null
+snap b9_01_youth_before
 for x in 36 161; do
   for y in 176 194 212; do
     step "$x" "$y" 1 0.8
   done
 done
-bash ./snap.sh b9_02_leds_armed >/dev/null
+snap b9_02_leds_armed
 step 278 203            # SEARCH -> "The scout is now searching for players ..."
-bash ./snap.sh b9_03_search_armed >/dev/null
+snap b9_03_search_armed
 step 571 440            # back out of YOUTH TEAM
 step 577 450            # back out of SQUAD MANAGEMENT -> hub
 
