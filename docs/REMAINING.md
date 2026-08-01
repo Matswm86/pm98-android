@@ -1,5 +1,116 @@
 # PM98 Android — remaining-work inventory (refreshed 2026-08-01)
 
+## 0a-s87. Closed 2026-08-01 (session s87) — B9 CLOSES, THE CAPABILITY LADDER IS READ OFF THE BINARY, AND TWO CARRIED ITEMS TURN OUT NOT TO BE CAPTURE PROBLEMS
+
+The theme: three of the carried items were filed as "needs another career" or "deferred
+again", and none of them was. Two came out of `MANAGER.EXE` and one came out of a document
+that was already in the repo.
+
+### 1. ⭐ B9's ROSTER ROW — 1,816 px REPORTED → 0 px GATED, and it took five defects with it
+
+`diff_youth_parity` now GATES the `youth_b9roster` pair, so all SEVEN youth pairs are at
+0 px. Each defect was measured off the s86 witness rather than argued:
+
+* the row's PLATE and per-cell GRID are the frame's own pixels — two rules, nine dividers,
+  the black-bordered ROL box, and a LEFT CHIP that differs from the empty row's by **162 px
+  in that same frame** (`tools/re/build_youth_rowgrid_from_frame.py`);
+* **AV is the four-attribute AVERAGE, not CA** — the row reads 20/19/20/21 with AV 20;
+* the row's text baseline is **+3** inside the plate, not +2;
+* NAME starts at x62 (not 59), WAGE centres on 359 (not 358), ST on 212 (not 211);
+* the ROL icon is **`camrol01`**, matched at 0 mismatched pixels against all eighteen.
+
+### 2. ⭐ AND IT SETTLED THREE THINGS THE PANEL ABOVE IT HAD LEFT OPEN
+
+* **The PLAYERS FOUND cell grid belongs to the POPULATED ROW, not the slot.** The roster
+  witness is the second frame that was missing — the same career with the panel EMPTY. The
+  two differ inside the list rect by **1,270 px, ALL in slot 0's grid band**, and all six of
+  the idle frame's plates are flat. So `found_list.png` is the idle widget cut verbatim and
+  every populated row stamps its own grid, slot 0 included.
+* **The panel's IDLE state is the widget, not nothing.** The port drew the list only when a
+  prospect was on it, so a scout who had already delivered left a bare black box where the
+  original shows the header row, six plates and the scrollbar.
+* **The half star has TWO parities.** The bar alternates two sprites and the half glyph takes
+  the parity of the cell it lands on; the port carried one per colour and drew it at both.
+  Four glyphs now, each with its own named witness.
+* **An UNAVAILABLE LED keeps the baked pink-hatched chip** — the port stamped the dark-maroon
+  "available" sprite over all six the moment a scout existed.
+
+### 3. ⭐ THE SEARCH CAPABILITY LADDER IS READ, NOT FITTED — no more careers needed
+
+s86 left the rungs between 1.5★ and 4.5★ as "a career at 2.0 / 3.0 / 3.5 is the capture that
+fills them". They needed no capture. It is an eight-entry **jump table at `0x53d520`**,
+dispatched on the scout's 1..10 quality byte at the tail of the YOUTH TEAM screen's
+constructor, with q ≥ 9 disabling nothing and every arm falling through the ones below it:
+
+    q 1-2 HANDLING | q 3 +TACKLING | q 4-5 +PASSING | q 6 +DRIBBLING
+    q 7-8 +HEADING | q 9-10 +SHOOTING (all six)
+
+which reproduces all five witnessed scouts exactly. The same read names the six widgets (a
+`0x418`-stride array from `[esi+0xa68]`, identified by the coordinates their own constructors
+push), proves `FUN_005bf8c0(0, 1)` is the DISABLE call against frame 087, and shows the
+YES/NO value cell is bit 7 of the widget's `+0xac` — availability, never selection.
+
+s85's other half is answered too: `operator_new(0x28)` + vtable `0x632fc8` happens at exactly
+two sites and **NEITHER is a hire** — `0x53cd8f` is the screen's own constructor and
+`0x57c7f6` is the SAVEGAME LOAD path. The flags are selection, they start at zero, and only
+an LED tap sets them. Gate: `test_youth_caps.gd`, 61 checks.
+
+### 4. ⭐ SIX MORE CUP DRAWS — and the leg plates are a COMPETITION axis too
+
+A Manchester Utd career driven from scratch banked six frames, two of them new kinds. s86's
+"ROUND 2 is two-legged, the rest are not" is right about the **Coca-Cola Cup** and does not
+generalise: the **EUROPEAN CUP's `QTR. FINALS` reads 1ST LEG / 2ND LEG**. The port already
+builds European brackets with `legs: 2`, so this CONFIRMS it — but the corpus note said
+otherwise and would have led the next session to "fix" it the wrong way.
+
+🆕 **NEW OPEN ITEM — the European Cup GROUP DRAW is a screen FORM the port does not have.**
+`manutd_s1_eurocup_groups_1_8_final.png`: the header plate reads **GROUPS** in black on
+white, under it six group boxes in a 2×3 grid each with a green `GROUP <letter>` header and
+four `kit | club | flag` rows, the bottom-left tie card **entirely blank** (leg plates
+included), round plate `1/8 FINAL`. The port raises no draw at all while the group phase is
+live (`Cup.draw_next_round` is a deliberate no-op). Frame banked; not built.
+
+### 5. `KnockoutScreen` → `PMShadow` — KILLED, not deferred an eighth time
+
+The proposal is WRONG and both documents that kill it were already in the repo. `PMShadow`'s
+own header, derived from `FUN_005cbea0`: the mask is only ever partial OUTSIDE the silhouette
+and every shadow pixel is the destination blended toward BLACK. s62 + s85: what is left on
+the bracket kits is a highlight on the sprite's own TOP/LEFT edge taking LIGHT palette
+entries, **415 of 449 px INSIDE the sprite's opaque mask**. An on-sprite LIGHTENING pass is
+the one thing that blit cannot be. What would revive it is named: locate the knockout view's
+code — its whole RE is frame-derived and cites no VA — among the thunk's **57 call sites**,
+now enumerated by byte scan.
+
+### 6. `PCF5DAT.PKF` — the s86 handoff re-opened a CLOSED item
+
+§7f carried "never enumerated ... may unblock the whole 3D match view". Re-measured from
+scratch: exactly ONE xref in the image (VA `0x4f82ed`), `D.G.C.` present at `0xecbf` read
+straight off the ISO extent, and the enumerator still finds no directory-like chain in
+314,854,588 bytes. It is a CD-presence check. The 3D path's real blocker is unchanged and is
+a DATA gap: the `.p3d` models are absent from both sources.
+
+### 7. One FLAKY GATE fixed
+
+`test_relegation_clause` failed about 1 run in 6 — **on HEAD too**, so it was not a
+regression. The cause is a real engine rung on an under-specified fixture: the binary's
+13-man floor sits AHEAD of the relegation rung, so a season with enough expiries renewed the
+second clause-holder instead of releasing him. The fixture pads the squad with multi-year
+men. 10/10 green.
+
+### 8. NOT done in s87, said plainly
+
+* **The M5 goal-2 divergence** (26' against 24', right team, `2837 < clk < 8469`) —
+  untouched, and it is still the largest carried RE item.
+* **The 1-px on-sprite kit-edge pass** — not moved. The state is unchanged and precise: the
+  drop shadow is ported, the residual is an on-sprite TOP/LEFT highlight plus an interior
+  component, four models are dead, and s85's LUT inversion gives the shape any future model
+  has to hit — at the witness cell the original wrote **(56, 52, 64..72)** where the port
+  paints `(44,44,44)`. Attempting a rule without the pass located would be a guess.
+* **A SEMIFINAL / FINAL cup draw** — three drives have now tried. This one got as far as
+  F.A. Cup `ROUND 5`.
+* **The European Cup GROUP DRAW form** — newly witnessed this session, §4, not built.
+* **The real-device pass** — still needs Mats and a phone.
+
 ## 0b. Closed 2026-08-01 (session s86) — THE WATCH MATCH PLAYS AT SPEED, THE CUP DRAW'S AXIS IS FOUND, AND TWO EARLIER READINGS ARE CORRECTED
 
 The theme is that three of the carried items were answerable from measurement, and two of
@@ -114,7 +225,9 @@ goals, the full-time state, the 2679052131 RNG) is exact, and that A/B is also w
 * **A SEMIFINAL / FINAL cup draw.** Two drives tried this session; neither reached one. The
   draw only appears for a round the manager's own club is still IN, so it is a matter of
   surviving to April, not of driving longer.
-* **The 1-px on-sprite kit-edge pass** and **`KnockoutScreen` → `PMShadow`** — untouched.
+* ~~**`KnockoutScreen` → `PMShadow`**~~ — **KILLED s87** (§0a-s87.5): the blit provably
+  cannot write inside the silhouette, and the residual is on-sprite. The **1-px on-sprite
+  kit-edge pass** itself is still open.
 * **The youth-scout HIRE-path seed.** The mask is now known to follow the rating, so the RE
   question s85 posed (where the hire seeds `+0x10..+0x24`) is no longer load-bearing for the
   render; it would settle the rungs between 1.5★ and 4.5★ without four more careers.
@@ -408,8 +521,7 @@ is what decides who can move it.
   arms `+0x1a1e`. Fixed by modelling the board dismissal. FULL TIME is attributed and goals
   2-7 ARE now a run — goal 2 is the frontier at 26' against the reference's 24', right
   team.** Stoppage time and the cross-seed `PM98_SEED` sweep are still unrun.
-* **B9's filled YOUTH TEAM roster row** — needs a SIGNED prospect.
-  `plans/season_youth_b9_sign.json` drives it; roughly a season of wall clock.
+* ~~**B9's filled YOUTH TEAM roster row**~~ — **CLOSED s87 at 0 px** (§0a-s87.1).
 * **The per-round cup-draw chrome** — **advanced, s85.** The corpus had twelve SORTEO frames
   and four round labels across three competitions, so the per-round axis was unanswerable.
   This session's drive banked five more (`tools/re/refs/cupdraw-rounds-2026-08-01/`),
@@ -432,14 +544,15 @@ is what decides who can move it.
 * ~~**The 48x64 on-sprite EDGE BEVEL** and **OffersScreen's panel**.~~ **s85: both are the
   same on-sprite kit-edge pass as the line above — OffersScreen's panel is already 0 px
   outside the kit sprites. ONE open item, not three.**
-* 🆕 **The YOUTH SCOUT capability mask** (s85 §3). Where does the HIRE path seed the six
-  flags at `+0x10..+0x24` of the youth-scout object (vtable `0x632fc8`, `operator_new(0x28)`,
-  `+4` club / `+6` quality / `+7` weeks) that `FUN_00575d90` then ORs over?
+* ~~**The YOUTH SCOUT capability mask**~~ — **CLOSED s87 from the binary** (§0a-s87.3).
+  There is no hire-path seed: the flags are SELECTION, zeroed by the criteria ctor, and the
+  availability ladder is the jump table at `0x53d520`.
 * ~~**What "Free if relegated" DOES.**~~ **CLOSED s85** — `FUN_0058AC90` @0x58ae5e, the only
   consumer in the image. `docs/re/retirement_re.md` §6.
-* **`KnockoutScreen` → `PMShadow`** — deferred a fifth time. s83's call graph makes it
-  weaker still: `PMShadow` is demonstrably not the universal answer for kit blits, so the
-  refactor is not obviously even correct.
+* ~~**`KnockoutScreen` → `PMShadow`**~~ — **KILLED s87**, with the reason measured rather
+  than suspected: the blit only ever writes OUTSIDE the silhouette and only ever toward
+  BLACK, and the residual is an on-sprite HIGHLIGHT (415 of 449 px inside the opaque
+  mask). See `knockout_views_re.md`.
 
 **Closed as far as it can be — do not reopen**
 
