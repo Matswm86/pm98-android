@@ -1,5 +1,125 @@
 # PM98 Android — remaining-work inventory (refreshed 2026-08-01)
 
+## 0b. Closed 2026-08-01 (session s86) — THE WATCH MATCH PLAYS AT SPEED, THE CUP DRAW'S AXIS IS FOUND, AND TWO EARLIER READINGS ARE CORRECTED
+
+The theme is that three of the carried items were answerable from measurement, and two of
+them had been closed WRONGLY because a number was read by eye instead of by pixel.
+
+### 1. ⭐ THE POSITIONAL ENGINE NOW PLAYS AT REAL TIME — 0.58x → 0.99x, with no fidelity change
+
+The largest carried item read *"the M5 3D / positional engine is not wired into
+`MatchSim`"*. **It is wired, and has been since the M5 wire-in** — `Main` builds a
+`Pm98LiveMatch` for a WATCHED fixture and `MatchSimulador.set_live` renders it, while every
+unwatched fixture runs `Pm98StatMatch`, which is the routing `FUN_0044ee70` itself does on
+the play-state. Wiring the positional engine into `MatchSim.simulate` would make the port
+LESS faithful, and `Pm98LiveMatch`'s own header has argued that for sessions.
+
+What was real is THROUGHPUT, and it had never been measured — "~9 min per match" is a total,
+and a total cannot say whether the match plays at the right SPEED. It could not:
+`MatchSimulador` needs **60 outer frames a second** and the engine sustained **34.5**.
+
+`bench_live_match.gd` + `PM98_TICK_PROF` (new, off by default) attribute the tick, and two
+passes were doing work they discarded:
+
+* **the off-ball "lean" built a 16-row rotated grid before the guards that abort it.** The
+  binary computes it at L189-220 and reaches the ball guards at L222-227; while the ball is
+  carried those guards abort EVERY off-ball player, so up to 21 of 22 a frame were rotating
+  sixteen 3-vectors and throwing them away. Both builders are pure, so deferring them is
+  observably identical. **6,686 → 1,138 us/tick.**
+* **the marker scan recomputed per-opponent constants per defender.** 11 x 11 a team, with
+  the matrix column, the z, the team and both arms of the q-metric hoisted out.
+
+**34.5 → 59.2 outer-fps**, i.e. 0.99x real time on this box. No draw order, no RNG, no
+arithmetic moved; `test_9490*`, `test_assignmarker`, `test_marktarget`, `test_relmatrix` and
+`test_live_match` are the gates. Record: `docs/re/M5_S86_ENGINE_THROUGHPUT.md`.
+
+### 2. ⭐ STOPPAGE TIME WAS NEVER MISSING — it is the period-end rung, now pinned
+
+Filed as "unrun" since s85. It is `Pm98Driver._buildup_branch`'s second half, a straight
+transcription of `fn_00598740` L595-606, and the rule is the original's own: the period does
+NOT end on the whistle. It ends at the first evaluation after it at which EITHER the ball has
+left the 0x1e0000 (30 m) band in front of a goal OR `half/9` ticks have run out — **five
+minutes** at the shipped 45-minute period, and extra time keeps that same cap against a
+period a third as long. `app/tests/test_stoppage_time.gd` pins all four rungs (14 checks).
+
+### 3. ⭐ THE CUP DRAW'S PER-ROUND AXIS — found, and the port was playing a round wrongly
+
+`tools/re/probe_cupdraw_per_round.py` measures the animated region off three frames of ONE
+round rather than guessing it, masks that plus the round plate, the MATCHES panel and the
+picture box, and scores all six pairs of s85's four same-competition frames:
+**ROUND 2 differs from the other three by 397 px, all of it on the LEG PLATES, and by 0 px
+everywhere else.** ROUND 2 reads `1ST LEG / 2ND LEG`; ROUND 3, ROUND 4 and QTR. FINALS read
+`MATCH / REPLAY`. A second career banked this session says the same.
+
+That is not decoration — it says how the tie is PLAYED, and the port had the Coca-Cola Cup
+on one competition-wide `legs: 1`, so it resolved a two-legged second round on a single
+result. `Career.LEAGUE_CUP_OPTS.round_legs_by_round = {2: 2}` — the witnessed round and no
+other; ROUND 1 is unwitnessed and stays unpinned. Gate `app/tests/test_cup_round_legs.gd`.
+
+### 4. ⭐ THE SEARCH CAPABILITY MASK IS A STAR LADDER AFTER ALL — s85's reading was a miscount
+
+s85 killed the ladder hypothesis on "two 2★ scouts, two different masks".
+`tools/re/probe_youth_cap_mask.py` measures the star bar by GOLD AREA (a full glyph is a
+13-px diamond, a half glyph 8 — run WIDTH cannot separate them, 4 columns against 5) and the
+value cells by ink. **All three scouts previously read as "2★" measure 1.5★, and all three
+carry the identical {HANDLING, TACKLING}.** There are no two same-rating scouts with
+different masks.
+
+`YouthScreen.CAP_BY_STARS` carries the two witnessed ends — 1.5★ → two capabilities,
+4.5★/5.0★ → all six — and an unwitnessed rating returns `[]`, which renders exactly as the
+port always did, so frame 047 stays at 0 px. Taps on an unavailable LED are refused, as
+`b9_02_leds_armed.png` witnesses. The rungs between 1.5 and 4.5 are NOT invented. Gate
+`app/tests/test_youth_caps.gd` (24 checks), which fails if a rung is added without a frame.
+
+### 5. B9's LAST GAP HAS ITS WITNESS — the row's inks and columns are closed, the plate is not
+
+The `season_youth_b9_sign` drive s84 wrote finally reached a SIGNED prospect
+(`tools/re/refs/youth-roster-2026-08-01/`, Bolton W, 3 October 1998,
+`Burgess 20 19 20 21 20 [ROL] £5,000 3 3`; two frames 14 months apart differ only in the
+header date plaque, so one cut is enough). Three defects fall straight out of it and are
+fixed: the name is **not** upper-cased, the five parameter cells are the AV column's
+**(212,63,0)** (NOT their own headers' slate — the s84 "value carries its header's ink" rule
+does not hold here), the money is (150,0,0) and there are **TWO** figures under the single
+YEARS header, at cx **406** and **432**, where the port drew one at 418.
+
+**Still open, and named:** the row PLATE and its per-cell GRID are still the port's own.
+`diff_youth_parity.py` REPORTS the new `youth_b9roster` pair at 1,816 px over the row band
+and does not gate on it — the same bake `build_youth_found_list_from_frames.py` did for the
+PLAYERS FOUND widget, against this frame.
+
+### 6. ⭐ THE CROSS-SEED SWEEP RAN — and the reason it never had is one line
+
+`tools/re/run_match_sweep.sh` has been in the repo since s55 and every session since listed
+the sweep as "unrun". It defaults to `$HOME/godot462`, which is not this box's binary
+(`tools/run_tests.sh` has always used `godot4`), so it could not start. It falls back now.
+
+**16 seeds, first 4 run twice: 16/16 reached FULL TIME on dispatch 10, 4/4 digest-identical
+across two runs, 0 failures**, scorelines 0-0 to 4-2. That certifies exactly what the
+harness's header says — the engine plays 90 minutes from real squads on an arbitrary seed
+without stalling, and it is deterministic. It is NOT silicon parity, and the one seed that
+IS compared still diverges at goal 2.
+
+### 7. AND A NUMBER IN THE s85 RECORD IS CORRECTED
+
+s85 reported the full-time run as "37,059 outer steps". It is **34,198** — and 34,198 on
+s85's own code too, checked by restoring `Pm98Movement` / `Pm98Driver` / `Pm98Action` from
+`HEAD` into a scratch copy and running both to full time. Everything else s85 recorded (both
+goals, the full-time state, the 2679052131 RNG) is exact, and that A/B is also what proves
+§1 changed nothing: the two runs are identical bit for bit over all 34,198 frames.
+
+### 8. NOT done in s86, said plainly
+
+* **The M5 goal-2 divergence** (26' against the reference's 24', right team) is untouched.
+  It is a normal frontier-localisation job in 2837 < clk < 8469 and it wants a quiet box.
+* **A SEMIFINAL / FINAL cup draw.** Two drives tried this session; neither reached one. The
+  draw only appears for a round the manager's own club is still IN, so it is a matter of
+  surviving to April, not of driving longer.
+* **The 1-px on-sprite kit-edge pass** and **`KnockoutScreen` → `PMShadow`** — untouched.
+* **The youth-scout HIRE-path seed.** The mask is now known to follow the rating, so the RE
+  question s85 posed (where the hire seeds `+0x10..+0x24`) is no longer load-bearing for the
+  render; it would settle the rungs between 1.5★ and 4.5★ without four more careers.
+* **The real-device pass** — still needs Mats and a phone.
+
 ## 0aaaaaaaaaaaaaaaaa. Closed 2026-08-01 (session s85) — THE WATCH MATCH RUNS TO FULL TIME, THE CLAUSE FINDS ITS CONSUMER, AND TWO "CAPTURE" ITEMS TURN OUT NOT TO BE
 
 ### 1. ⭐ THE M5 WATCH HARNESS REACHES FULL TIME — the blocker was the PLAY-STATE
