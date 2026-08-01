@@ -416,6 +416,47 @@ func setup(scout: Dictionary, searching: bool, results: Array, club: String,
 	queue_redraw()
 
 
+## Re-arm every criteria widget from a dict `criteria()` produced. The original keeps
+## the panel exactly as you left it — the scout's report does not wipe the form (Mats
+## QA 2026-08-01) — but a fresh ScoutScreen node is built on every entry, so the state
+## has to be restored from the career. `{}` leaves the defaults alone; unknown keys are
+## ignored, so an older save's smaller dict restores what it does carry.
+func restore_criteria(c: Dictionary) -> void:
+	if c.is_empty():
+		return
+	var pos := str(c.get("pos", ""))
+	_tog["pos"] = pos != ""
+	if _tog["pos"] and POS_KEYS.has(pos):
+		_pos_idx = POS_KEYS.find(pos)
+	var role := int(c.get("role", 0))
+	_tog["role"] = role > 0
+	if _tog["role"]:
+		_role = role
+	for pair in [["age", "age_band"], ["quality", "quality_band"], ["price", "price_band"]]:
+		var band := int(c.get(str(pair[1]), -1))
+		_tog[str(pair[0])] = band >= 0
+		if band >= 0:
+			match str(pair[0]):
+				"age": _age_idx = band
+				"quality": _quality_idx = band
+				"price": _price_idx = band
+	for lid in _leagues:
+		_leagues[lid] = (c.get("leagues", []) as Array).has(lid)
+	# A scout downgraded since the search can no longer reach every region; setup()
+	# re-applies that filter after this call, so a stale box cannot survive it.
+	_regions["eu"] = bool(c.get("eu", false))
+	_regions["non_eu"] = bool(c.get("non_eu", false))
+	_regions["no_team"] = bool(c.get("no_team", false))
+	_attr_idx = {}
+	var stops: Array = Career.SCOUT_ATTR_STOPS
+	for code in c.get("attr_min", {}):
+		var i := stops.find(int((c["attr_min"] as Dictionary)[code]))
+		if i >= 0:
+			_attr_idx[code] = i
+	if _name_edit != null:
+		_name_edit.text = str(c.get("name", ""))
+
+
 func criteria() -> Dictionary:
 	var leagues: Array = []
 	for lid in _leagues:

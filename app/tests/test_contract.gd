@@ -81,15 +81,22 @@ func _unit_demand() -> bool:
 	var my := Contract.market_weekly(young, 1)
 	var mp := Contract.market_weekly(prime, 1)
 	var mv := Contract.market_weekly(vet, 1)
-	ok = _assert(dy > my, "a young player demands a raise over market") and ok
-	# The RAISE asked over market (ambition) falls with age, though the RE'd PM98 table's
-	# market wage itself peaks at prime age -- so compare the demand/market ratio, not the raw £.
-	ok = _assert(float(dy) / my > float(dp) / mp and float(dp) / mp > float(dv) / mv,
-		"ambition (raise-over-market) falls with age (%.2f > %.2f > %.2f)" % [float(dy)/my, float(dp)/mp, float(dv)/mv]) and ok
+	# CORRECTED 2026-08-01 (Contract.demanded_weekly): the demand is HIS CURRENT TERMS,
+	# floored at his market rate. The invented age/CA "ambition" premium is gone — the one
+	# witnessed renewal on the real game accepted his exact current terms silently
+	# (renew_negotiation_re.md §Mechanics witnessed), which the premium made impossible.
+	# These three assertions used to pin the premium; they now pin its absence.
+	ok = _assert(dy == my and dp == mp and dv == mv,
+		"an unstamped player asks exactly his market wage, no premium (%d/%d/%d)" % [dy, dp, dv]) and ok
 	# Never a pay cut: demand is floored at the current wage even for a veteran.
 	vet["wage"] = dv + 9000
 	ok = _assert(Contract.demanded_weekly(vet, 1) >= int(vet["wage"]), "demand never undercuts the current wage") and ok
-	# A stronger player demands more than a weaker one at the same age.
+	# ...and a player already ON his market wage re-signs at exactly that — the witness.
+	var settled := {"age": 27, "attrs": {"CA": 75}}
+	Contract.stamp_wage(settled, 1)
+	ok = _assert(Contract.demanded_weekly(settled, 1) == int(settled["wage"]),
+		"a player on his market wage asks for exactly it (the witnessed renewal)") and ok
+	# A stronger player is still worth more, through the RE'd wage table itself.
 	var weak := {"age": 27, "attrs": {"CA": 45}}
 	ok = _assert(Contract.demanded_weekly(prime, 1) > Contract.demanded_weekly(weak, 1),
 		"higher CA demands more at the same age") and ok
@@ -113,12 +120,18 @@ func _unit_renewal() -> bool:
 	# Meeting / bettering the demand always re-signs him.
 	ok = _assert(bool(Contract.evaluate_renewal(young, dem, 1, rng)["accepted"]), "meeting the demand is accepted") and ok
 	ok = _assert(bool(Contract.evaluate_renewal(young, dem + 1000, 1, rng)["accepted"]), "bettering the demand is accepted") and ok
-	# A clear lowball (his current wage, well under his demand) is refused every time.
+	# His CURRENT terms are now exactly his demand, so they re-sign him — the witness
+	# ("offering his exact current terms accepted silently", frame 28_offerresult).
+	ok = _assert(bool(Contract.evaluate_renewal(young, int(young["wage"]), 1, rng)["accepted"]),
+		"his current terms re-sign him (the witnessed silent accept)") and ok
+	# A real lowball — under the soft-floor band — is still refused every time, which is
+	# what the engine's "%s has rejected your offer for renewal." string exists for.
 	var refusals := 0
+	var low := int(round(float(dem) * (Contract.SOFT_FLOOR - 0.05)))
 	for _i in 20:
-		if not Contract.evaluate_renewal(young, int(young["wage"]), 1, rng)["accepted"]:
+		if not Contract.evaluate_renewal(young, low, 1, rng)["accepted"]:
 			refusals += 1
-	ok = _assert(refusals == 20, "a lowball (current terms, far below demand) is always refused") and ok
+	ok = _assert(refusals == 20, "a lowball under the soft floor is always refused") and ok
 	# Expiring flag.
 	ok = _assert(Contract.is_expiring({"contract_years": 1}), "1-year deal is expiring") and ok
 	ok = _assert(not Contract.is_expiring({"contract_years": 3}), "3-year deal is not expiring") and ok
@@ -173,19 +186,16 @@ func _career_negotiation(prem: Array, league: Dictionary, leagues: Array) -> boo
 	var career := Career.create(prem[0], league, prem, leagues)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = SEED
-	# Find a raise-wanting player (demand strictly above current) and make him expiring.
-	var p: Dictionary = {}
-	for cand in career.my_squad():
-		if Contract.demanded_weekly(cand, career.my_band()) > Contract.current_weekly(cand, career.my_band()):
-			p = cand
-			break
-	ok = _assert(not p.is_empty(), "found a player who wants a raise") and ok
+	var p: Dictionary = career.my_squad()[0]
 	p["contract_years"] = 1
 	var pid := int(p["id"])
 	var cur := Contract.current_weekly(p, career.my_band())
 	var dem := Contract.demanded_weekly(p, career.my_band())
-	# Lowball (current terms) is rejected with the faithful message; nothing changes.
-	var low := career.renew(pid, cur, rng)
+	# A real lowball — under the soft-floor band — is rejected with the faithful message
+	# and changes nothing. (Since 2026-08-01 his CURRENT terms are his demand, so the
+	# lowball has to be a genuine one; see Contract.demanded_weekly.)
+	var low_offer := int(round(float(dem) * (Contract.SOFT_FLOOR - 0.05)))
+	var low := career.renew(pid, low_offer, rng)
 	ok = _assert(not low["ok"] and low["msg"].contains("rejected your offer for renewal"),
 		"a lowball renewal is rejected (PM98 message)") and ok
 	ok = _assert(int(low["demanded"]) == dem, "the rejection reports his wage demand") and ok
@@ -196,6 +206,32 @@ func _career_negotiation(prem: Array, league: Dictionary, leagues: Array) -> boo
 	ok = _assert(good["ok"] and good["msg"].contains("renewed his contract"), "meeting the demand renews him") and ok
 	ok = _assert(int(p["contract_years"]) == Contract.NEW_TERM_YEARS, "renewal resets the term") and ok
 	ok = _assert(int(p["wage"]) == dem, "renewal stores the agreed wage") and ok
+	# The OFFERED term is honoured (offer_record_re.md §3: YEARS runs 1..5), instead of
+	# every renewal stamping NEW_TERM_YEARS.
+	p["contract_years"] = 1
+	var five := career.renew(pid, dem, rng, 5, [])
+	ok = _assert(five["ok"] and int(p["contract_years"]) == 5 and int(p["contract_term"]) == 5,
+		"a 5-year offer signs a 5-year deal (term %d)" % int(p["contract_years"])) and ok
+	# ...and so are the OFFERED clauses. On a 1-year deal MATCHES TO RENEW sticks and
+	# carries the engine's own 20-match target; on a longer one the engine clears it
+	# (@0x529e40), exactly as at generation.
+	p["contract_years"] = 1
+	var cl1 := career.renew(pid, dem, rng, 1,
+		[OfferRecord.CLAUSE_FREE_IF_RELEGATED, OfferRecord.CLAUSE_MATCHES_TO_RENEW])
+	ok = _assert(cl1["ok"] and (p.get("clauses", []) as Array).has(OfferRecord.CLAUSE_MATCHES_TO_RENEW)
+		and int(p.get("clause_matches", 0)) == OfferRecord.MATCHES_TO_RENEW,
+		"a 1-year offer can add MATCHES TO RENEW (target %d)" % int(p.get("clause_matches", 0))) and ok
+	var cl3 := career.renew(pid, dem, rng, 3,
+		[OfferRecord.CLAUSE_FREE_IF_RELEGATED, OfferRecord.CLAUSE_MATCHES_TO_RENEW])
+	ok = _assert(cl3["ok"] and not (p.get("clauses", []) as Array).has(OfferRecord.CLAUSE_MATCHES_TO_RENEW)
+		and not p.has("clause_matches"),
+		"a term above one year clears MATCHES TO RENEW") and ok
+	ok = _assert((p.get("clauses", []) as Array).has(OfferRecord.CLAUSE_FREE_IF_RELEGATED),
+		"the other offered clauses stick") and ok
+	# ...and an empty clause list REMOVES them.
+	var cl0 := career.renew(pid, dem, rng, 3, [])
+	ok = _assert(cl0["ok"] and (p.get("clauses", []) as Array).is_empty(),
+		"offering no clauses removes them") and ok
 	# Default renew(pid) meets his demand and always succeeds (back-compat with the old call).
 	p["contract_years"] = 1
 	ok = _assert(career.renew(pid)["ok"], "default renew(pid) meets the demand and succeeds") and ok

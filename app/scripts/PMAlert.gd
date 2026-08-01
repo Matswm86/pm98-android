@@ -110,11 +110,49 @@ static func line_ink(s: String) -> int:
 	return last_end + 3 if last_end > 0 else 0
 
 
+## Widest box that still fits the 640x480 design surface while centred on CENTER.x
+## (317): the box spans [317 - w/2, 317 + w/2), so w <= 634 keeps both edges — and
+## therefore the OK button anchored at (w-6, h-6) — on screen.
+const MAX_W := 634
+const MAX_INK := MAX_W - 31
+
+
+## FAIL-SAFE, not a faithful behaviour: the original has NO auto-wrap (every message
+## string in .data carries its own explicit `\n`, alert_box_re.md §strings). A port-side
+## message that lost its break measures wider than the surface, and the box then draws
+## its OK button off screen — an undismissable modal that halts the game (Mats QA
+## 2026-08-01, the youth "ready to be promoted" notice). Rather than trap the player,
+## wrap the offending line and say so loudly, so the real bug — the missing `\n` — is
+## visible in the log instead of silently papered over. In-bounds messages, i.e. every
+## faithful one, pass through byte-identical and the parity shots are untouched.
+static func _fit(msg: String) -> String:
+	var out: PackedStringArray = []
+	var wrapped := false
+	for line in msg.split("\n"):
+		if line_ink(line) <= MAX_INK:
+			out.append(line)
+			continue
+		wrapped = true
+		var cur := ""
+		for word in line.split(" "):
+			var probe: String = word if cur.is_empty() else cur + " " + word
+			if line_ink(probe) > MAX_INK and not cur.is_empty():
+				out.append(cur)
+				cur = word
+			else:
+				cur = probe
+		out.append(cur)
+	if wrapped:
+		push_warning("PMAlert: message wider than the 640px surface was auto-wrapped " +
+			"(the original string should carry its own \\n): " + msg)
+	return "\n".join(out)
+
+
 ## The box rect for a message (design space). EXE: content = max(extent, 160);
 ## empirical (frames 093/149): w = ink + 31 rounded up to even,
 ## h = 72 + 10*lines, centred on (317, 237).
 static func box_rect(msg: String) -> Rect2i:
-	var lines := msg.split("\n")
+	var lines := _fit(msg).split("\n")
 	var mw := 160
 	for l in lines:
 		mw = maxi(mw, line_ink(l))
@@ -148,8 +186,9 @@ static func _rail_pattern(rail_w: int) -> Array[bool]:
 ## Render the finished alert into an Image (the original draws once, then blits).
 ## `yesno` renders the witnessed confirm variant (Yes/No cells, no OK) — the
 ## "Do you want to leave the championship ?" box (matchday_flow_witness_re §6).
-static func render(msg: String, ok_hot := false, yesno := false) -> Image:
+static func render(msg_in: String, ok_hot := false, yesno := false) -> Image:
 	_load()
+	var msg := _fit(msg_in)
 	var box := box_rect(msg)
 	var w := box.size.x
 	var h := box.size.y

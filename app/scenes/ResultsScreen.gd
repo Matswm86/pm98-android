@@ -52,6 +52,17 @@ const CHIP_H := 29
 const CHIP_TOP := {"facup": 118, "cocacola": 145, "charity": 172, "euro": 209,
 	"cwc": 236, "uefa": 263, "supercup": 290, "intercont": 317}
 
+# The four DIVISION chips along the bottom edge. Measured off frame 038 by scanning for
+# the plaques' solid-black border columns: they sit at x 14/134/254/374, each 112 wide,
+# y 435..459. Tier order is the frame's own left-to-right reading (Premier League, First,
+# Second, Third Division). The RE doc called these "chrome-only, not interactive" — that
+# was true of the port, not of the original, whose RESULTS view switches division on them
+# (Mats QA 2026-08-01: "Can't switch between different competitions").
+const DIV_CHIPS := [[1, 14], [2, 134], [3, 254], [4, 374]]
+const DIV_CHIP_Y := 435
+const DIV_CHIP_W := 112
+const DIV_CHIP_H := 25
+
 # ---- frame-measured geometry (docs/re/results_screen_re.md) -----------------
 const ROW_Y0 := 154
 const ROW_PITCH := 23
@@ -96,9 +107,13 @@ var _results: Array = []
 var _week := 0
 var _club_id := -1
 var _club_names: Dictionary = {}
+var _scores: Dictionary = {}       # 1-based round -> Array of [home_id, away_id, hg, ag]
 var _pages: Array = []             # [{round:int, day_off:int, pairs:Array}]
 var _idx := 0
 var _press := ""
+var _tier := 1                     # the division currently shown by the four bottom chips
+var _home_tier := 1                # the manager's own division (the chip the chrome bakes lit)
+var _divisions: Dictionary = {}    # tier -> {name, fixtures, scores, names}
 
 
 func _ready() -> void:
@@ -128,7 +143,8 @@ func _ready() -> void:
 ## weekday/day/month/year, status_top, status_bottom. `fixtures`/`results`/`week`
 ## come straight off Career; `club_names` maps club_id -> display name.
 func setup(header: Dictionary, league_name: String, season: String, fixtures: Array,
-		results: Array, week: int, club_id: int, club_names: Dictionary) -> void:
+		results: Array, week: int, club_id: int, club_names: Dictionary,
+		scores: Dictionary = {}, divisions: Dictionary = {}, tier := 1) -> void:
 	_header = header
 	_league_name = league_name
 	_season = season
@@ -137,7 +153,34 @@ func setup(header: Dictionary, league_name: String, season: String, fixtures: Ar
 	_week = week
 	_club_id = club_id
 	_club_names = club_names
+	_scores = scores
+	# `divisions` = tier -> {name, fixtures, scores, names}: every division the career is
+	# simulating, so the bottom chips can switch between them. The manager's own tier is
+	# included by the caller. Empty = the pre-2026-08-01 single-division behaviour.
+	_divisions = divisions
+	_tier = tier
+	_home_tier = tier
 	_build_pages()
+	queue_redraw()
+
+
+## Repaint the table for another division. Keeps the page index on the same ROUND when
+## that round exists in the new division's schedule (the lower divisions run more rounds).
+func _show_tier(t: int) -> void:
+	if t == _tier or not _divisions.has(t):
+		return
+	var want := int((_pages[_idx] as Dictionary).get("round", 0)) if _idx < _pages.size() else 0
+	var dv: Dictionary = _divisions[t]
+	_tier = t
+	_league_name = str(dv.get("name", ""))
+	_fixtures = dv.get("fixtures", [])
+	_scores = dv.get("scores", {})
+	_club_names = dv.get("names", {})
+	_build_pages()
+	for i in _pages.size():
+		if int((_pages[i] as Dictionary)["round"]) == want:
+			_idx = i
+			break
 	queue_redraw()
 
 
@@ -163,14 +206,27 @@ func _build_pages() -> void:
 			break
 
 
-## The manager-only persisted score for round r (results[].week is 1-based).
-## Returns [] when unknown — every AI fixture, honestly empty.
+## The persisted score for one fixture of round r (round keys are 1-based).
+## Returns [] for a round that has not been played yet — an empty pair of cells,
+## which is what the original shows for a future matchday.
+##
+## Until 2026-08-01 this answered ONLY for the manager's own fixture, because
+## `Career.results` is a manager-only ledger — so eight of the nine plates on every
+## page were blank forever (Mats QA: "the result screen doesn't really work").
+## `Career.round_scores` / `divisions[t].scores` now carry every fixture in the
+## division, and `_results` survives as the fallback for saves written before that.
 func _score_for(r: int, home_id: int, away_id: int) -> Array:
+	var row: Variant = _scores.get(r + 1, _scores.get(str(r + 1), []))
+	if row is Array:
+		for e in (row as Array):
+			var ent: Array = e
+			if ent.size() >= 4 and int(ent[0]) == home_id and int(ent[1]) == away_id:
+				return [int(ent[2]), int(ent[3])]
 	if home_id != _club_id and away_id != _club_id:
 		return []
-	for e in _results:
-		if int(e.get("week", -1)) == r + 1:
-			return [int(e.get("hg", 0)), int(e.get("ag", 0))]
+	for e2 in _results:
+		if int(e2.get("week", -1)) == r + 1:
+			return [int(e2.get("hg", 0)), int(e2.get("ag", 0))]
 	return []
 
 
@@ -209,6 +265,10 @@ func _target_at(d: Vector2) -> String:
 	for c in CHIP_TOP:
 		if Rect2(CHIP_X, CHIP_TOP[c], CHIP_W, CHIP_H).has_point(d):
 			return "comp:%s" % c
+	for dc in DIV_CHIPS:
+		if _divisions.has(int(dc[0])) \
+				and Rect2(int(dc[1]), DIV_CHIP_Y, DIV_CHIP_W, DIV_CHIP_H).has_point(d):
+			return "div:%d" % int(dc[0])
 	return ""
 
 
@@ -229,6 +289,9 @@ func _on_input(e: InputEvent) -> void:
 		return
 	if was.begins_with("comp:"):
 		competition_selected.emit(was.substr(5))
+		return
+	if was.begins_with("div:"):
+		_show_tier(int(was.substr(4)))
 		return
 	match was:
 		"return":
@@ -273,6 +336,26 @@ func _draw() -> void:
 		var c := _press.substr(5)
 		if CHIP_TOP.has(c):
 			draw_rect(Rect2(CHIP_X, CHIP_TOP[c], CHIP_W, CHIP_H), C_PRESS, true)
+	_draw_div_chips()
+
+
+## The bottom rail's four DIVISION chips. The chrome bake has the manager's own division
+## permanently lit (frame 038 was captured in the Premier), and no frame was ever captured
+## with another chip selected, so the SELECTED state for the other three is a port-side
+## indicator, not a witness: a 1px white ring around the active chip. Declared, not
+## invented as chrome — the underlying plaques are still the frame's own pixels.
+func _draw_div_chips() -> void:
+	if _divisions.size() <= 1:
+		return
+	for dc in DIV_CHIPS:
+		var t := int(dc[0])
+		if not _divisions.has(t):
+			continue
+		var r := Rect2(int(dc[1]), DIV_CHIP_Y, DIV_CHIP_W, DIV_CHIP_H)
+		if _press == "div:%d" % t:
+			draw_rect(r, C_PRESS, true)
+		elif t == _tier and t != _home_tier:
+			draw_rect(r, Color(1, 1, 1), false, 1.0)
 
 
 ## The barra values: textless band.png patches + the header bake's text grammar

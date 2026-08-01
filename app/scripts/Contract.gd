@@ -99,32 +99,25 @@ static func monthly(weekly: int) -> int:
 
 # ---- renewal negotiation -------------------------------------------------
 
-## How hard a player pushes on a new deal: young, improving players want a clear raise; a
-## settled prime player a modest one; an aging veteran is content to re-sign near his rate.
-## A stronger player (higher CA) pushes a little harder on top.
-static func _ambition(player: Dictionary) -> float:
-	var age := int(player.get("age", 26))
-	var amb: float
-	if age <= 21:
-		amb = 1.40
-	elif age <= 24:
-		amb = 1.28
-	elif age <= 28:
-		amb = 1.18
-	elif age <= 31:
-		amb = 1.08
-	else:
-		amb = 0.98   # past it; happy to re-sign near current terms
-	var ca := float(_attrs(player).get("CA", 50))
-	return amb + clampf((ca - 50.0) / 200.0, -0.05, 0.12)
-
-
-## The weekly wage a player demands to renew. Floored at his current wage (he never re-signs
-## for a cut), otherwise his market wage scaled by ambition. Rounded to £100.
+## The weekly wage a player demands to renew: HIS CURRENT TERMS, floored at his market
+## rate so a player on a below-table deal is not re-signed under it.
+##
+## CORRECTED 2026-08-01. This used to multiply his market wage by an invented "ambition"
+## ladder — 1.40 at 21 and under, down to 0.98 past 31, plus a CA kicker — so almost
+## every renewal opened with a demand 18-52% above what the man was already on, and the
+## OFFER form (which opens at his CURRENT yearly wage, `PlayerInfoScreen.begin_renew`)
+## was a rejection unless you stepped the wage up several times. Mats QA: "why is
+## contract renewal so much harder? Players demand way too much."
+##
+## The ladder was never source-backed — this file's own header says the demand MODEL is
+## ours — and the one witnessed renewal transaction contradicts it: at TOTAL level on the
+## real game, "offering his exact current terms accepted silently"
+## (`docs/re/renew_negotiation_re.md` §Mechanics witnessed, frame 28_offerresult). So the
+## demand is his current terms. The soft-floor band below still lets a LOWBALL be
+## refused, which is what the engine's own "%s has rejected your offer for renewal."
+## string is for.
 static func demanded_weekly(player: Dictionary, band: int) -> int:
-	var cur := current_weekly(player, band)
-	var asked := _round100(float(market_weekly(player, band)) * _ambition(player))
-	return maxi(cur, asked)
+	return maxi(current_weekly(player, band), market_weekly(player, band))
 
 
 ## The renewal offers the manager can table for a player (the RENEW screen rows). Monotonic

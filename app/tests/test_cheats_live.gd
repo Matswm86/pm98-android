@@ -39,9 +39,14 @@ func _run() -> bool:
 
 	# ---- A. THREE UP FRONT through the real week (4-3-3 fielded) -----------
 	var goals_a := _play_weeks(prem, league, leagues, clubs_by_id, true, "4-3-3", "Attacking")
-	ok = _assert(goals_a["min"] >= 6,
-		"cheat ON + 4-3-3: every week >= 6 manager goals (min %d over %d games)"
-		% [goals_a["min"], goals_a["games"]]) and ok
+	# FLOOR = 2 x Pm98StatMatch.cheat_chance_floor: the armed side's guaranteed haul is
+	# its floored chances a half, both halves, all converting (the keeper gate is skipped).
+	# The floor moved from the cave's 3 to 2 on 2026-08-01 (owner request), so the number
+	# is read off the engine rather than hard-coded.
+	var floor_goals: int = 2 * Pm98StatMatch.cheat_chance_floor
+	ok = _assert(goals_a["min"] >= floor_goals,
+		"cheat ON + 4-3-3: every week >= %d manager goals (min %d over %d games)"
+		% [floor_goals, goals_a["min"], goals_a["games"]]) and ok
 
 	# ---- A2. the SHAPE trigger on a squad WITHOUT three natural forwards ---
 	# The bug Mats reported twice: pick 4-3-3, see 4-3-3 on the board, turn the cheat
@@ -58,14 +63,14 @@ func _run() -> bool:
 		if int(g["min"]) < worst:
 			worst = int(g["min"])
 			worst_club = str((prem[i] as Dictionary).get("name", "?"))
-	ok = _assert(worst >= 6,
+	ok = _assert(worst >= floor_goals,
 		"the SHAPE alone arms it at EVERY Premier club on an attacking 4-3-3 "
 		+ "(worst %d, %s)" % [worst, worst_club]) and ok
 
 	# ---- B. MIXED PLAY variant (4-4-2 = only 2 FW, forwards trigger off) ---
 	var goals_b := _play_weeks(prem, league, leagues, clubs_by_id, true, "4-4-2", "Mixed")
-	ok = _assert(goals_b["min"] >= 6,
-		"cheat ON + MIXED PLAY on 4-4-2: every week >= 6 goals (min %d)"
+	ok = _assert(goals_b["min"] >= floor_goals,
+		"cheat ON + MIXED PLAY on 4-4-2: every week >= floor goals (min %d)"
 		% goals_b["min"]) and ok
 
 	# ---- C. cheat OFF control: same seed, stock scores -----------------------

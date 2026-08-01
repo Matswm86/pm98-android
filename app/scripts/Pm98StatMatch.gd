@@ -143,13 +143,30 @@ static var cheat_three_up_front := false
 ## identically to stock — the oracle fixtures are untouched.
 static var cheat_manager_side := -1
 
+## Does a MANAGER-SIDE trigger (three-forward SHAPE, or the MIXED PLAY lever) hold for
+## `cheat_manager_side`? Set alongside it by MatchSim and reset after. When it is false
+## the manager still arms on the EXE patch's own trigger — three natural forwards
+## actually selected — but nothing arms for the opponent either way.
+static var cheat_manager_forced := false
+
+## Chances the armed side is FLOORED at per half. The EXE cave writes **3**; the shipped
+## game runs at **2** on request (Mats QA 2026-08-01: "overall put goals per half to 2
+## instead of 3"). A deliberate divergence from MANAGER_HACK.EXE and the only one — it is
+## a cheat-tuning knob, inert with the switch off, so no stock behaviour moves.
+##
+## A `static var`, not a const, precisely so the PCode-oracle test can put it back to
+## CAVE_CHANCE_FLOOR and keep proving byte-parity with the EXE patch it ports.
+const CAVE_CHANCE_FLOOR := 3
+static var cheat_chance_floor := 2
+
 
 static func _player(side: int, idx: int) -> int:
 	return side * SIDE_STRIDE + idx * PLAYER_STRIDE
 
 
 ## Selected players with ROLE == 3 (ATT/FOR) in `side`'s XI — the cave's `att3` routine.
-## Evaluated per side, so an AI team fielding three forwards gets the same buff.
+## The EXE patch evaluates it per side; this port gates every trigger on
+## `cheat_manager_side` (see `_cheat_armed`), so only the manager's XI can arm it.
 static func _att_count(mem: Mem, side: int) -> int:
 	var n := 0
 	for i in range(11):
@@ -159,14 +176,22 @@ static func _att_count(mem: Mem, side: int) -> int:
 	return n
 
 
-## Is the cheat armed for `side`? Any trigger: three natural forwards fielded (the
-## MANAGER_HACK.EXE original, read off the match struct) or one of the manager-side
-## triggers MatchSim resolved into `cheat_manager_side` (a three-forward SHAPE, or the
-## MIXED PLAY lever).
+## Is the cheat armed for `side`? TWO conditions, both required:
+##   1. `side` is the MANAGER's side (`cheat_manager_side`, set per-simulate by
+##      MatchSim off the ratings dict's `is_manager` marker). An AI-vs-AI fixture
+##      leaves it at -1 and nothing arms.
+##   2. one of the three triggers holds — a three-forward SHAPE or the MIXED PLAY
+##      lever (both resolved by MatchSim into `cheat_manager_forced`), or three
+##      natural forwards actually fielded (the MANAGER_HACK.EXE original, read off
+##      the match struct here).
+## Condition 1 is the 2026-08-01 correction: the natural-role trigger used to be
+## evaluated for BOTH sides, so any AI club fielding three forwards got the buff.
 static func _cheat_armed(mem: Mem, side: int) -> bool:
 	if not cheat_three_up_front:
 		return false
-	return side == cheat_manager_side or _att_count(mem, side) >= 3
+	if side != cheat_manager_side:
+		return false
+	return cheat_manager_forced or _att_count(mem, side) >= 3
 
 
 # --- FUN_004510b0: append an event ------------------------------------------
@@ -468,12 +493,12 @@ static func _half_chances(mem: Mem, rng: Rng, seg: int, span: int) -> void:
 	# above has already run and consumed its draws; the cave only raises the result.
 	# H1/H2 only — the extra-time loops (`_et_half`) are NOT patched, as in the EXE.
 	if _cheat_armed(mem, 0):
-		c0 = maxi(c0, 3)
+		c0 = maxi(c0, cheat_chance_floor)
 	for _i in range(c0):
 		_resolve(mem, rng, 0, seg, ((rng.next() * span) >> 15) + 1)
 	var c1 := _chance_count(rng, avg1, avg0)
 	if _cheat_armed(mem, 1):
-		c1 = maxi(c1, 3)
+		c1 = maxi(c1, cheat_chance_floor)
 	for _i in range(c1):
 		_resolve(mem, rng, 1, seg, ((rng.next() * span) >> 15) + 1)
 

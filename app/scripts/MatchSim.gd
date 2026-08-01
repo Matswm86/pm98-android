@@ -84,10 +84,18 @@ static func simulate(rng: RandomNumberGenerator, rh: Dictionary, ra: Dictionary,
 		# can inherit it. The third trigger (3 natural forwards) needs no plumbing: the
 		# engine reads it off the match struct.
 		if Pm98StatMatch.cheat_three_up_front:
-			if bool(rh.get("front_three", false)) or bool(rh.get("mixed_play", false)):
+			# WHICH side is the manager's — `is_manager` is stamped by
+			# Career._ratings_for on his club alone. Every trigger, including the
+			# EXE patch's own natural-three-forwards one, is gated on this, so an
+			# AI-vs-AI fixture (neither dict marked) arms nothing at all.
+			if bool(rh.get("is_manager", false)):
 				Pm98StatMatch.cheat_manager_side = 0
-			elif bool(ra.get("front_three", false)) or bool(ra.get("mixed_play", false)):
+			elif bool(ra.get("is_manager", false)):
 				Pm98StatMatch.cheat_manager_side = 1
+			var mr: Dictionary = rh if Pm98StatMatch.cheat_manager_side == 0 else ra
+			Pm98StatMatch.cheat_manager_forced = \
+				Pm98StatMatch.cheat_manager_side >= 0 and \
+				(bool(mr.get("front_three", false)) or bool(mr.get("mixed_play", false)))
 		var mem := Pm98StatMatch.build_mem(xi_h, xi_a, tid_h, tid_a)
 		var prng := Pm98StatMatch.Rng.new(rng.randi())
 		var rep = null
@@ -104,6 +112,7 @@ static func simulate(rng: RandomNumberGenerator, rh: Dictionary, ra: Dictionary,
 			Pm98StatMatch.simulate_extra_time(mem, prng, rep, pids)
 		var sc := Pm98StatMatch.score(mem)
 		Pm98StatMatch.cheat_manager_side = -1
+		Pm98StatMatch.cheat_manager_forced = false
 		return {
 			"home_goals": int(sc.get(tid_h & 0xFFFF, 0)),
 			"away_goals": int(sc.get(tid_a & 0xFFFF, 0)),

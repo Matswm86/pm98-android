@@ -92,12 +92,24 @@ const ATT3 := {
 }
 
 
+## The ORACLE run is configured EXACTLY as MANAGER_HACK.EXE, so the banked emulator rows
+## above stay the assertion. Two port-side settings differ from the shipped game and are
+## restored here for that reason (both 2026-08-01):
+##   * `cheat_manager_side` — the shipped build gates every trigger on the MANAGER's side
+##     so an AI club fielding three forwards cannot collect the buff. The EXE patch has no
+##     such gate, so the oracle marks side 0 (the triggering side) as the manager's.
+##   * `cheat_chance_floor` — the shipped build floors the armed side at 2 chances a half
+##     on the owner's request; the cave writes 3, which is what these rows were traced at.
 func _run_one(sq: Dictionary, natt: int, cheat: bool) -> Dictionary:
 	Pm98StatMatch.cheat_three_up_front = cheat
+	Pm98StatMatch.cheat_manager_side = 0 if cheat else -1
+	Pm98StatMatch.cheat_chance_floor = Pm98StatMatch.CAVE_CHANCE_FLOOR
 	var rng := Pm98StatMatch.Rng.new(sq["seed"])
 	var mem := _build(sq["str0"], sq["str1"], sq["keeper"], sq["pass"], natt)
 	Pm98StatMatch.simulate(mem, rng, false, false)
 	Pm98StatMatch.cheat_three_up_front = false
+	Pm98StatMatch.cheat_manager_side = -1
+	Pm98StatMatch.cheat_chance_floor = 2
 	var sc := Pm98StatMatch.score(mem)
 	return {"rng": rng, "mem": mem, "s7": int(sc.get(0x07, 0)), "s19": int(sc.get(0x13, 0))}
 

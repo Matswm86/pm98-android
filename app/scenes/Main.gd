@@ -733,6 +733,7 @@ func _screens_shot() -> void:
 	_show_career()               # raise the hub beneath the overlays
 	await _settle()
 	var shots := [
+		["_show_results_screen", "results.png"],
 		["_show_league_table_screen", "league_table.png"],
 		["_show_lineup_screen", "lineup.png"],
 		["_show_squad_screen", "squad.png"],
@@ -1541,13 +1542,11 @@ func _open_renew_negotiation(player: Dictionary, pid: int, club: Dictionary, tie
 	var years := maxi(int(player.get("contract_term", 0)), int(player.get("contract_years", 0)))
 	if not scr.has_meta("renew_wired"):
 		scr.set_meta("renew_wired", true)
-		scr.offer_made.connect(func(offer_weekly: int, offer_years: int) -> void:
+		scr.offer_made.connect(func(offer_weekly: int, offer_years: int, clauses: Array) -> void:
 			AudioManager.ui_select()
-			var res := _career.renew(pid, offer_weekly)
-			if bool(res.get("ok", false)):
-				# honour the offered contract length (Career.renew fixes term at NEW_TERM_YEARS)
-				player["contract_term"] = offer_years
-				player["contract_years"] = offer_years
+			# Term AND clauses now go into Career.renew, which stamps them on the player;
+			# the old post-hoc term patch here is gone with the NEW_TERM_YEARS override.
+			var res := _career.renew(pid, offer_weekly, null, offer_years, clauses)
 			_career.save()
 			scr.end_renew()
 			scr.setup(player, club, tier, true, _career.is_listed(pid))
@@ -2227,12 +2226,30 @@ func _career_advance() -> void:
 				_pop_division_finals(func() -> void: _pop_cup_draw(func() -> void: _pop_month_awards(func() -> void: _pop_channel_tv(_pop_pending_team_offers))))))
 		return
 	var res := _career.advance_week(rng)   # ratings come from the live roster
+	# Every cup + European tie the manager's club played this week, in the order it was
+	# played. They used to resolve silently; now they present after the league match
+	# through the same flow, which is what makes European football playable at all.
+	var ties: Array = _career.take_pending_matches()
 	if res.is_empty():
-		_career.save()   # bye / season end: no presentation, save immediately
-		_show_career()   # refresh the hub in place
+		if ties.is_empty():
+			_career.save()   # bye / season end: no presentation, save immediately
+			_show_career()   # refresh the hub in place
+			_pop_division_finals(func() -> void: _pop_cup_draw(func() -> void: _pop_month_awards(func() -> void: _pop_channel_tv(_pop_pending_team_offers))))
+			return
+		_present_tie_chain(ties, 0)
+		return
+	_show_match_result(res, func() -> void: _present_tie_chain(ties, 0))
+
+
+## Present the queued cup / European ties one after another; when the last CONTINUE
+## lands, fall through to the ordinary post-week hub chain (autosave + the cards).
+func _present_tie_chain(ties: Array, i: int) -> void:
+	if i >= ties.size():
+		_career.save()   # the deferred week autosave, once the whole week has presented
+		_show_career()
 		_pop_division_finals(func() -> void: _pop_cup_draw(func() -> void: _pop_month_awards(func() -> void: _pop_channel_tv(_pop_pending_team_offers))))
 		return
-	_show_match_result(res)
+	_show_match_result(ties[i] as Dictionary, func() -> void: _present_tie_chain(ties, i + 1))
 
 ## The manager's match (B4): the running BRIEF + MATCH OPTIONS, whose RESULTS tap now surfaces
 ## the source-true FULL TIME read-out (MatchResultScreen; docs/re/match_flow_re.md). The BRIEF
@@ -2272,6 +2289,11 @@ func _show_match_result(res: Dictionary, on_finish: Callable = Callable()) -> vo
 		# The Charity Shield read-out reads "Charity"/"Final", not the friendly default.
 		hdr["status_top"] = "Charity"
 		hdr["status_bottom"] = "Final"
+	elif str(res.get("comp", "")) != "":
+		# A cup / European tie names its own competition and round on the chip, the way
+		# the Shield names itself, instead of borrowing the league's "Premier / Week N".
+		hdr["status_top"] = str(res["comp"])
+		hdr["status_bottom"] = str(res.get("comp_round", ""))
 	elif not bool(res.get("friendly", false)):
 		hdr["status_top"] = PMChrome._band_league(_career.league_name)
 		hdr["status_bottom"] = "Week %d" % _career.week
@@ -3413,6 +3435,9 @@ func _show_scout_screen() -> void:
 	var scr: ScoutScreen = load("res://scenes/ScoutScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
+	# Re-arm the form with the criteria the last search used, BEFORE setup() — which
+	# then re-applies the hired scout's own region reach over the restored boxes.
+	scr.restore_criteria(c.scout_criteria)
 	scr.setup(Staff.member_in_role(c.staff, Staff.SCOUT_ROLE), c.scout_searching(),
 		c.scout_results, c.club_name, c.manager_name, c.season, c.week + 1,
 		c.league_name, c.club_id, c.scout_found_total)
@@ -4922,8 +4947,16 @@ func _show_results_screen() -> void:
 	var scr: ResultsScreen = load("res://scenes/ResultsScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
+	# Every division the career simulates, so the bottom chips actually switch view.
+	var divs: Dictionary = {}
+	for t in [1, 2, 3, 4]:
+		if not _career.has_division(t):
+			continue
+		divs[t] = {"name": _career.league_name_for(t), "fixtures": _career.fixtures_for(t),
+			"scores": _career.scores_for(t), "names": _career.names_for(t)}
 	scr.setup(_match_header(), _career.league_name, _career.season,
-		_career.fixtures, _career.results, _career.week, _career.club_id, _career.club_names)
+		_career.fixtures, _career.results, _career.week, _career.club_id, _career.club_names,
+		_career.round_scores, divs, _career.tier)
 	scr.back_pressed.connect(func() -> void:
 		AudioManager.ui_select()
 		scr.queue_free())

@@ -89,13 +89,27 @@ func _run() -> bool:
 		_press(scr, PlayerInfoScreen.OFF_YEARS_UP.get_center())
 	ok = _assert(scr._offer_years == PlayerInfoScreen.OFF_YEARS_MAX, "years_up capped at max") and ok
 
-	# OFFER: a full press+release emits offer_made with the offered figures.
-	var made := [false, 0, 0]
-	scr.offer_made.connect(func(w: int, y: int) -> void:
-		made[0] = true; made[1] = w; made[2] = y)
+	# The four OFFER-panel clause boxes are EDITABLE (2026-08-01): they open on his current
+	# clauses and each tap toggles one. They used to mirror the CONTRACT panel below and
+	# ignore taps entirely (Mats QA: "adding or removing clauses doesn't work").
+	var cl_before: Array = scr._offer_clauses.duplicate()
+	var cb := Rect2(PlayerInfoScreen.CB_X, int(PlayerInfoScreen.OFF_CB_YS[0]), 11, 11)
+	_click(scr, cb.get_center())
+	ok = _assert(scr._offer_clauses.has(0) != cl_before.has(0),
+		"a clause checkbox tap toggles it") and ok
+	_click(scr, cb.get_center())
+	ok = _assert(scr._offer_clauses.has(0) == cl_before.has(0),
+		"tapping it again toggles it back") and ok
+
+	# OFFER: a full press+release emits offer_made with the offered figures + clauses.
+	scr._offer_clauses = [0, 3]
+	var made := [false, 0, 0, []]
+	scr.offer_made.connect(func(w: int, y: int, cl: Array) -> void:
+		made[0] = true; made[1] = w; made[2] = y; made[3] = cl)
 	_click(scr, PlayerInfoScreen.OFF_OFFER.get_center())
 	ok = _assert(made[0] and made[1] == int(round(float(scr._offer_yearly) / float(Contract.SEASON_WEEKS)))
-		and made[2] == scr._offer_years, "OFFER emits offer_made(weekly, years)") and ok
+		and made[2] == scr._offer_years, "OFFER emits offer_made(weekly, years, clauses)") and ok
+	ok = _assert((made[3] as Array) == [0, 3], "OFFER carries the offered clause rows") and ok
 
 	# CANCEL: emits renew_cancelled.
 	scr.begin_renew(cur, demand, 2)

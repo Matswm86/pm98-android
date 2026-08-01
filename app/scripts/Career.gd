@@ -161,6 +161,27 @@ var scout_found_total: int = 0          # how many the scan MATCHED before the e
                                         # (quality+2)*5 shortlist cap trimmed it (see
                                         # _scout_apply_cap); == scout_results.size() when
                                         # nothing was cut. Drives the OURS shortfall line.
+var round_scores: Dictionary = {}       # 1-based round -> Array of [home_id, away_id, hg, ag]
+                                        # for the MANAGER's own division. The RESULTS screen
+                                        # used to have the manager's own score and nothing
+                                        # else, because `results` is manager-only (Mats QA
+                                        # 2026-08-01: "the result screen doesn't really
+                                        # work"). Other tiers keep theirs in divisions[t].
+var pending_matches: Array = []         # cup / European ties the manager's club played this
+                                        # week, in the order they were played, each in the
+                                        # advance_week manager_res shape (+ comp / comp_round).
+                                        # Main drains them after the league match so every tie
+                                        # is WATCHED, not silently simulated. In-memory only:
+                                        # a week presents inside one call chain, and the
+                                        # deferred autosave lands after it (never persisted,
+                                        # same as manager_res).
+var scout_criteria: Dictionary = {}     # the LAST criteria the SENIOR scout was sent with.
+                                        # `scout_search` holds them only while a mission is in
+                                        # flight and is cleared when it lands, so the SCOUT
+                                        # screen came back blank next to the results it had
+                                        # produced (Mats QA 2026-08-01: "the criteria i used
+                                        # gets reset and I don't get to see what criteria it
+                                        # used"). Kept until the next SEARCH replaces it.
 var training_focus: Dictionary = {}      # pid:int -> focus row (Training.FOCUS_ROWS)
 var pending_alerts: Array = []          # queued hub "PREMIER MANAGER 98" alert texts; Main
                                         # raises + clears them when the hub next shows (the
@@ -351,10 +372,47 @@ var honours: Array = []
 # guessed at here -- every round replays.
 const PREMIER_ENTRY_ROUND := 3
 
+# THE DOMESTIC CUP CALENDAR (2026-08-01). Both cups used to spread their rounds EVENLY
+# across the league season, which put the F.A. Cup's ROUND 3 — the round the Premier
+# clubs enter, i.e. the manager's first tie — on 1 November, and the Coca-Cola FINAL in
+# mid-January (Mats QA: "Fa cup draw happens too soon. Round 3 in oktober?? Its suppose
+# to be december/January").
+#
+# The 1997-98 competition calendar the game simulates puts them here, and the port's own
+# week->date grammar (PMChrome.date_parts: week 1 = Sat 9 Aug 1997, +7 days a week) maps
+# each date onto a league week:
+#
+#   F.A. Cup    R1 15 Nov -> wk15   R2  6 Dec -> wk18   R3  3 Jan -> wk22
+#               R4 24 Jan -> wk25   R5 14 Feb -> wk28   QF  7 Mar -> wk31
+#               SF  4 Apr -> wk35   FINAL (16 May, past the league's last week) -> the
+#                                   season's final week
+#   Coca-Cola   R1 12 Aug -> wk1    R2 16 Sep -> wk6    R3 14 Oct -> wk10
+#               R4 18 Nov -> wk15   QF  6 Jan -> wk22   SF 27 Jan -> wk25
+#               FINAL 29 Mar -> wk34
+#
+# The port's bracket over 72 lower-division clubs + the 20 Premier entering at round 3
+# resolves to EIGHT rounds, which is exactly the F.A. Cup's own R1..FINAL, so that pin is
+# one-to-one. The Coca-Cola's real ladder is seven rounds, so ONE port-side round has no
+# real date; it takes the only slot with room (wk19, between 18 Nov and 6 Jan) and is
+# declared here rather than silently shifting a real one.
+#
+# DECLARED SOURCE: the 1997-98 competition calendar plus the owner's report of the
+# original's own behaviour — NOT read out of the ISO. The per-round week table lives in
+# PCF5DAT.PKF, which is not enumerable (SOURCE_INVENTORY §5 GAP#1), so this is the same
+# class of evidence as EURO_TAIL_FRACS, and is pinned the same way.
+const FA_CUP_WEEKS := [15, 18, 22, 25, 28, 31, 35, 38]
+const LEAGUE_CUP_WEEKS := [1, 6, 10, 15, 19, 22, 25, 34]
+const CUP_SEASON_WEEKS := 38          # the week numbers above are on a 38-round season
+
 const FA_CUP_OPTS := {
 	"name": "F.A. Cup", "legs": 1, "two_legged_final": false,
 	"label_scheme": "sequential", "qtr_label": "Qtr. Finals",
-	"prize_round": 0, "prize_winner": 0, "span_lo": 0.0, "span_hi": 1.0,
+	"prize_round": 0, "prize_winner": 0,
+	# Any round BEYOND the eight pinned ones (a deeper pyramid) is a qualifying round and
+	# spreads over the weeks before 15 November.
+	"span_lo": 0.0, "span_hi": 0.36,
+	"tail_fracs": [15.0 / 38.0, 18.0 / 38.0, 22.0 / 38.0, 25.0 / 38.0,
+		28.0 / 38.0, 31.0 / 38.0, 35.0 / 38.0, 1.0],
 }
 const LEAGUE_CUP_OPTS := {
 	"name": "Coca-Cola Cup", "legs": 1, "two_legged_final": false,
@@ -364,7 +422,11 @@ const LEAGUE_CUP_OPTS := {
 	# (the R4 list frame), and the final is a single match.
 	"semi_legs": 2,
 	"label_scheme": "sequential", "qtr_label": "Qtr Finals",
-	"prize_round": 0, "prize_winner": 0, "span_lo": 0.0, "span_hi": 0.7,
+	"prize_round": 0, "prize_winner": 0,
+	# A surplus round beyond the eight pinned ones runs before the 12 August first round.
+	"span_lo": 0.0, "span_hi": 0.02,
+	"tail_fracs": [1.0 / 38.0, 6.0 / 38.0, 10.0 / 38.0, 15.0 / 38.0,
+		19.0 / 38.0, 22.0 / 38.0, 25.0 / 38.0, 34.0 / 38.0],
 }
 
 # Charity Shield (champions v F.A. Cup winners, the season's curtain-raiser). RETIRED to
@@ -1038,6 +1100,9 @@ func season_fixtures() -> Array:
 func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -> Dictionary:
 	if season_over():
 		return {}
+	# A caller that never drained last week's queue (a headless rig, an interrupted flow)
+	# must not have this week's ties presented on top of stale ones.
+	pending_matches.clear()
 	# Snapshot this revision's positions BEFORE the round lands — the LEAGUE
 	# TABLES movement arrows compare against the previous revision (witnessed
 	# lt_wk2_premier: red/white position triangles at week 2).
@@ -1108,6 +1173,12 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 				"xi_home": xi_of_id.call(h), "xi_away": xi_of_id.call(a),
 				"report": res.get("report"), "report_ht": res.get("report_ht"),
 					"possession": res.get("possession", [])}   # scorers + real engine possession for the feed (not persisted)
+	# EVERY fixture's score, keyed by the 1-based round — what the RESULTS screen's nine
+	# plates are for. `results` only ever held the manager's own line.
+	var round_row: Array = []
+	for rr in round_results:
+		round_row.append([int(rr["h"]), int(rr["a"]), int(rr["hg"]), int(rr["ag"])])
+	round_scores[week + 1] = round_row
 	# Morale & fitness live through the round (docs/re/morale_re.md): the slot
 	# deltas + the result delta hit BOTH sides of every fixture, then the league
 	# table caps a high-flying squad's morale once 11 rounds are in. A derived
@@ -1300,8 +1371,10 @@ func _play_due_cup_rounds(rng: RandomNumberGenerator, clubs_override: Dictionary
 			# DRAW-THEN-PLAY (witnessed 2026-07-26, see Cup.draw_next_round): a round the
 			# original drew in an earlier week is already sitting in `pending_draw` and is
 			# consumed here; a competition's FIRST round has none, and pairs on the spot.
+			var queued_at := pending_matches.size()
 			var cr := Cup.play_round(cup, rng, ratings_fn, club_id, names_fn, xi_fn,
-				_cup_report_sink())
+				_cup_report_sink(str(cup.get("name", ""))))
+			_label_queued_matches(queued_at, str(cr.get("label", "")))
 			# ...and the NEXT round is drawn the moment this one resolves, which is what
 			# puts the SORTEO a week or more ahead of the ties it shows.
 			Cup.draw_next_round(cup, rng)
@@ -1327,8 +1400,11 @@ func _play_due_cup_rounds(rng: RandomNumberGenerator, clubs_override: Dictionary
 			continue
 		while Cup.round_due(eb, week):
 			var in_before := Cup.still_in(eb, club_id)
+			var eq_at := pending_matches.size()
 			var er := Cup.play_next(eb, rng, ratings_fn, club_id, names_fn, xi_fn,
-				_cup_report_sink())
+				_cup_report_sink(str((EURO_OPTS.get(key, {}) as Dictionary).get(
+					"name", eb.get("name", "")))))
+			_label_queued_matches(eq_at, str(er.get("label", "")))
 			# Same draw-then-play order as the domestic cups. `draw_next_round` is a no-op
 			# while the group phase is live, so the group matchdays raise no SORTEO.
 			Cup.draw_next_round(eb, rng)
@@ -1353,6 +1429,21 @@ func _play_due_cup_rounds(rng: RandomNumberGenerator, clubs_override: Dictionary
 			var et: Dictionary = er.get("manager_tie", {})
 			if _tie_is_home(et):
 				_post_home_match(str(key))
+
+
+## Stamp the round label (`"3rd Round"`, `"Quarter Final"`, …) onto the matches queued by
+## the round that just played — the sink cannot know it, because Cup only returns the label
+## once the whole round has resolved. Drives the FULL TIME read-out's phase chip.
+func _label_queued_matches(from: int, label: String) -> void:
+	for i in range(from, pending_matches.size()):
+		(pending_matches[i] as Dictionary)["comp_round"] = label
+
+
+## Take (and clear) the cup / European ties queued for presentation this week.
+func take_pending_matches() -> Array:
+	var out := pending_matches
+	pending_matches = []
+	return out
 
 
 ## Was the manager's club the HOME side of this tie? A two-legged tie hosts one leg each
@@ -1421,6 +1512,12 @@ func _ratings_for(id: int, clubs_override: Dictionary = {}) -> Dictionary:
 		# natural-role trigger).
 		r["mixed_play"] = mt.mentality == "Mixed"
 		r["front_three"] = Tactics.forward_slots(mt.formation) >= 3
+		# The side marker itself. Every THREE UP FRONT trigger — including the
+		# natural-three-forwards one the EXE patch reads off the match struct — is
+		# gated on this, so an AI club that happens to field three forwards no
+		# longer collects the buff (Mats QA 2026-08-01: "any way to make it so
+		# opponents don't get it too? Its really messing up scores").
+		r["is_manager"] = true
 		return r
 	if not rosters.has(id) and euro_ratings.has(id):
 		# A foreign European opponent: its frozen ratings (plus a name for the feed).
@@ -1859,6 +1956,9 @@ func _play_division_round(t: int, rng: RandomNumberGenerator) -> void:
 		return
 	dv["prev"] = _positions_of(standings_for(t))
 	var tbl: Dictionary = dv["table"]
+	var scores: Dictionary = dv.get("scores", {})
+	dv["scores"] = scores
+	var row: Array = []
 	for m in fx[played]:
 		var h := int(m[0])
 		var a := int(m[1])
@@ -1868,6 +1968,7 @@ func _play_division_round(t: int, rng: RandomNumberGenerator) -> void:
 		var ag := int(res["away_goals"])
 		_apply(tbl[h], hg, ag)
 		_apply(tbl[a], ag, hg)
+		row.append([h, a, hg, ag])
 		for g in res.get("goals", []):
 			var gd: Dictionary = g
 			if bool(gd.get("own_goal", false)):
@@ -1876,6 +1977,7 @@ func _play_division_round(t: int, rng: RandomNumberGenerator) -> void:
 				"scorer": str(gd.get("scorer", "?")),
 				"club": h if int(gd.get("scorer_side", 0)) == 0 else a,
 				"minute": int(gd.get("minute", 0)), "h": h, "a": a})
+	scores[played + 1] = row
 	dv["played"] = played + 1
 
 
@@ -2137,6 +2239,27 @@ func names_for(t: int) -> Dictionary:
 	return (divisions.get(t, {}) as Dictionary).get("names", {})
 
 
+## Round-robin fixture list for a tier (Array[round] of [home_id, away_id] pairs).
+func fixtures_for(t: int) -> Array:
+	if t == tier:
+		return fixtures
+	return (divisions.get(t, {}) as Dictionary).get("fixtures", [])
+
+
+## Every played score in a tier: 1-based round -> Array of [home_id, away_id, hg, ag].
+func scores_for(t: int) -> Dictionary:
+	if t == tier:
+		return round_scores
+	return (divisions.get(t, {}) as Dictionary).get("scores", {})
+
+
+## The display name of a tier's division ("Premier League", "Division One", …).
+func league_name_for(t: int) -> String:
+	if t == tier:
+		return league_name
+	return str((divisions.get(t, {}) as Dictionary).get("name", ""))
+
+
 ## GOAL SCORERS chart for a tier — witnessed division-scoped (lt_goalscorers_third:
 ## the button on a lower division's table opens THAT division's chart).
 func league_scorers_for(t: int) -> Array:
@@ -2206,9 +2329,29 @@ static func _scorer_rows(log: Array, legal_fn: Callable) -> Array:
 ## Charity Shield, so the career's friendlies had folded back nothing.
 ## The sink Cup calls for every match the manager's club plays in a cup tie. Cup fixtures
 ## bump the club MINUTES counter but NOT the TEAM TOTAL MP counter (`league = false`).
-func _cup_report_sink() -> Callable:
+func _cup_report_sink(comp := "") -> Callable:
 	return func(res: Dictionary, h: int, a: int, bump_club := true) -> void:
-		fold_match_stats(res, h, a, false, bump_club)
+		var mom := fold_match_stats(res, h, a, false, bump_club)
+		# ...and, since 2026-08-01, the tie is also QUEUED FOR PRESENTATION. Every cup
+		# and European match used to resolve silently inside advance_week and surface
+		# only as a line on RESULTS (Mats QA: "Im not playing any of the matches. Its
+		# just automatically skipped and results are shown in result screen"). The
+		# manager now watches each of his own ties through the same LINE-UPS -> BRIEF ->
+		# FULL TIME flow as a league Saturday. `bump_club == false` is a two-legged
+		# tie's extra time: the SAME fixture as leg 2, already queued, so it is not
+		# queued again.
+		if not bump_club:
+			return
+		pending_matches.append({
+			"home_id": h, "away_id": a,
+			"hg": int(res.get("home_goals", 0)), "ag": int(res.get("away_goals", 0)),
+			"manager_home": h == club_id,
+			"goals": res.get("goals", []), "motm_pid": mom,
+			"xi_home": _xi_for(h), "xi_away": _xi_for(a),
+			"report": res.get("report"), "report_ht": res.get("report_ht"),
+			"possession": res.get("possession", []),
+			"comp": comp, "comp_round": "",
+		})
 
 
 ## `bump_club` is false for a two-legged tie's extra time: the port simulates ET on its
@@ -2913,6 +3056,9 @@ func start_scout_search(criteria: Dictionary, foreign_clubs: Array = [],
 				frozen.append(frow)
 	scout_search = {"criteria": criteria.duplicate(true),
 		"due_week": week + SCOUT_SEARCH_WEEKS, "frozen": frozen}
+	# Survives the mission landing, so the SCOUT screen can re-arm its panel to the
+	# criteria that produced the rows it is showing.
+	scout_criteria = criteria.duplicate(true)
 
 func scout_searching() -> bool:
 	return not scout_search.is_empty()
@@ -4958,7 +5104,8 @@ func release(pid: int) -> Dictionary:
 ## NEGOTIATION: he accepts at/above his wage demand, may balk just below it, and refuses a
 ## lowball -- "%s has rejected your offer for renewal." On acceptance his term resets and his
 ## stored wage updates (so a raise flows into the live wage bill). {ok, msg, demanded}.
-func renew(pid: int, offer_weekly: int = -1, rng: RandomNumberGenerator = null) -> Dictionary:
+func renew(pid: int, offer_weekly: int = -1, rng: RandomNumberGenerator = null,
+		offer_years: int = -1, offer_clauses: Variant = null) -> Dictionary:
 	var player := _find_in(club_id, pid)
 	if player.is_empty():
 		return {"ok": false, "msg": "That player is not in your squad."}
@@ -4972,9 +5119,43 @@ func renew(pid: int, offer_weekly: int = -1, rng: RandomNumberGenerator = null) 
 		_log("%s has rejected your offer for renewal." % pname)
 		return {"ok": false, "msg": "%s has rejected your offer for renewal." % pname,
 			"demanded": int(verdict["demanded"])}
-	player["contract_years"] = Contract.NEW_TERM_YEARS
-	player["contract_term"] = Contract.NEW_TERM_YEARS
+	# The OFFERED term, not a constant. The form's YEARS stepper runs 1..5 and mirrors
+	# onto LEFT (offer_record_re.md §3) — the port used to throw the manager's chosen
+	# term away and stamp NEW_TERM_YEARS on every renewal.
+	var term := clampi(offer_years, OfferRecord.YEARS_MIN, OfferRecord.YEARS_MAX) \
+		if offer_years > 0 else Contract.NEW_TERM_YEARS
+	player["contract_years"] = term
+	player["contract_term"] = term
 	player["wage"] = offer_weekly
+	# ...and the OFFERED clauses. The four rows are the witnessed record fields
+	# (offer_record_re.md §5.1): 0 = Free if relegated (+0x10), 1 = Matches to renew
+	# (+0x1a), 2 = Scoring bonus (+0xc), 3 = House and car (+0x14). The engine's own
+	# rule that a term above one year zeroes the matches-to-renew target (@0x529e40)
+	# applies to a negotiated deal exactly as it does at generation.
+	if offer_clauses is Array:
+		var want: Array = []
+		for c in (offer_clauses as Array):
+			want.append(int(c))
+		if not OfferRecord.matches_clause_allowed(term):
+			want.erase(OfferRecord.CLAUSE_MATCHES_TO_RENEW)
+		want.sort()
+		player["clauses"] = want
+		if want.has(OfferRecord.CLAUSE_MATCHES_TO_RENEW):
+			player["clause_matches"] = OfferRecord.MATCHES_TO_RENEW
+			player["clause_apps"] = int(player.get("clause_apps", 0))
+		else:
+			player.erase("clause_matches")
+		if want.has(OfferRecord.CLAUSE_SCORING_BONUS):
+			# The generator's own striker-only figure (BONUS_HI / BONUS_LO by AV); a
+			# non-striker negotiating the clause in gets the AV band's figure too, since
+			# the position gate is a GENERATION rule, not a negotiation one.
+			if int(player.get("clause_bonus", 0)) <= 0:
+				var av := OfferRecord.av_of(player)
+				player["clause_bonus"] = OfferRecord.BONUS_HI if av >= OfferRecord.AV_CLAUSE_BOTH \
+					else OfferRecord.BONUS_LO
+			player["clause_goals"] = int(player.get("clause_goals", 0))
+		else:
+			player.erase("clause_bonus")
 	_log("%s has renewed his contract." % pname)
 	return {"ok": true, "msg": "%s has renewed his contract on £%s/wk." % [pname, _money(offer_weekly)],
 		"demanded": int(verdict["demanded"])}
@@ -5176,6 +5357,25 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	season_club_minutes.clear()
 	season_club_mp.clear()
 	results.clear()
+	# ...and so does the GOAL SCORERS ledger. `divisions` get a fresh `scorers: []` out
+	# of `_pyramid_rollover`, but the manager's OWN tier reads `scorer_log`, which was
+	# never cleared — so from season two the chart still led with season one's totals
+	# (Mats QA 2026-08-01: "top scorer list from season one"). `_capture_season_honours`
+	# and `_fold_comp_total` have already run at the top of this function, so nothing
+	# downstream still needs the old rows.
+	scorer_log.clear()
+	_month_goal_mark = {}
+	# Training focus is a pid -> row map and the original's mode byte +0xa9 survives
+	# season init (FUN_005825c0 touches morale/condition only), so RETAINED players keep
+	# their assignment. Players who retired, left on a free or were relegated out of the
+	# club do NOT — and their stale entries kept eating the coaches' TP caps, which is
+	# what made training look like it never reset.
+	var squad_pids := {}
+	for p in rosters.get(club_id, []):
+		squad_pids[int(p.get("id", -1))] = true
+	for pid in training_focus.keys():
+		if not squad_pids.has(int(pid)):
+			training_focus.erase(pid)
 	# The friendly slate clears for the new season; Main re-raises the preseason
 	# picker on rollover (WITNESSED: REFRUN R15 step 8, p0664 — "Preseason for
 	# Manchester Utd." opens 1998-99 with friendlies 31 Jul / 3 / 5 / 7 Aug 1998).
@@ -6169,7 +6369,7 @@ func to_dict() -> Dictionary:
 		"league_id": league_id,
 		"league_name": league_name, "season": season, "year": year, "week": week,
 		"fixtures": fixtures, "table": tbl, "results": results, "cash": cash,
-		"scorer_log": scorer_log,
+		"scorer_log": scorer_log, "round_scores": _str_keyed(round_scores),
 		"weekly_net": weekly_net, "objective_pos": objective_pos,
 		"ins_premiums": ins_premiums, "ins_hospitals": ins_hospitals,
 		"ins_wage_refund": ins_wage_refund, "ins_group3_income": ins_group3_income,
@@ -6191,6 +6391,7 @@ func to_dict() -> Dictionary:
 		"career_rng_state": (str(_career_rng.state) if _career_rng != null else career_rng_state),
 		"scout_search": scout_search, "scout_results": scout_results,
 		"scout_found_total": scout_found_total,
+		"scout_criteria": scout_criteria,
 		"pending_alerts": pending_alerts, "external_signed": _str_keyed(external_signed),
 		"pending_bids": pending_bids,
 		"staff": staff, "staff_pool": staff_pool,
@@ -6246,6 +6447,7 @@ func _divisions_to_dict() -> Dictionary:
 			"ids": dv["ids"], "names": _str_keyed(dv["names"]),
 			"fixtures": dv["fixtures"], "table": _str_keyed(dv["table"]),
 			"played": dv["played"], "scorers": dv["scorers"],
+			"scores": _str_keyed(dv.get("scores", {})),
 			"seed": _str_keyed(dv["seed"]), "prev": _str_keyed(dv["prev"])}
 	return out
 
@@ -6322,6 +6524,9 @@ static func from_dict(d: Dictionary) -> Career:
 	c.fixtures = d.get("fixtures", [])
 	c.results = d.get("results", [])
 	c.scorer_log = d.get("scorer_log", [])   # pre-goalscorers saves load with an empty chart
+	c.round_scores = {}                      # pre-2026-08-01 saves: rounds already played
+	for k in d.get("round_scores", {}):      # show blank cells, future ones fill in
+		c.round_scores[int(k)] = d["round_scores"][k]
 	c.cash = int(d.get("cash", 0))
 	c.weekly_net = int(d.get("weekly_net", 0))
 	c.ins_premiums = int(d.get("ins_premiums", 0))
@@ -6389,6 +6594,9 @@ static func from_dict(d: Dictionary) -> Career:
 	c.scout_search = d.get("scout_search", {})
 	c.scout_results = d.get("scout_results", [])
 	c.scout_found_total = int(d.get("scout_found_total", c.scout_results.size()))
+	# Pre-2026-08-01 saves fall back to the in-flight mission's own copy, so a save made
+	# while a scout was out still re-arms the panel; an idle one just opens blank as before.
+	c.scout_criteria = d.get("scout_criteria", (c.scout_search as Dictionary).get("criteria", {}))
 	c.pending_alerts = d.get("pending_alerts", [])
 	for k in d.get("external_signed", {}):
 		c.external_signed[int(k)] = true
@@ -6522,6 +6730,7 @@ static func from_dict(d: Dictionary) -> Career:
 			"names": _int_keyed(dv.get("names", {})), "fixtures": dv.get("fixtures", []),
 			"table": _int_keyed(dv.get("table", {})), "played": int(dv.get("played", 0)),
 			"scorers": dv.get("scorers", []), "seed": _int_keyed(dv.get("seed", {})),
+			"scores": _int_keyed(dv.get("scores", {})),
 			"prev": _int_keyed(dv.get("prev", {}))}
 	c.seed_pos = _int_keyed(d.get("seed_pos", {}))
 	c.table_prev = _int_keyed(d.get("table_prev", {}))

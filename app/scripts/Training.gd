@@ -400,7 +400,13 @@ static func develop_youth_week(rng: RandomNumberGenerator, youth: Array) -> Arra
 				if done:
 					pd["ready"] = true
 					news.append({"kind": "youth",
-						"text": "Your youth manager has informed you that %s is ready to be promoted to the first team squad."
+						# EXACT EXE string, MANAGER.EXE @0x261ab8 — it carries an explicit
+						# `\n` after "that". The port had flattened it to one line, and a
+						# one-line box measures ~700px wide: it centres on (317,237), so
+						# the OK button anchored at (w-6,h-6) landed OFF the 640x480
+						# surface and the modal could never be dismissed (Mats QA
+						# 2026-08-01: "goes outside of the screen so I cant press ok").
+						"text": "Your youth manager has informed you that\n%s is ready to be promoted to the first team squad."
 							% pd.get("name", "?")})
 				# The shared block, cap[*] = 0. Same mini() clamp as CORE4 above.
 				for a in TRAINABLE:

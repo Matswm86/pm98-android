@@ -1,5 +1,128 @@
 # PM98 Android — remaining-work inventory (refreshed 2026-08-01)
 
+## 0aaaaaaaaaaaaa. Closed 2026-08-01 (session s81) — THE OWNER'S PLAYTHROUGH LIST
+
+Ten reports off a live playthrough, each traced to code before anything was changed.
+
+### 1. THE YOUTH "READY TO BE PROMOTED" BOX TRAPPED THE GAME
+
+`MANAGER.EXE` @0x261ab8 carries the string with an explicit `\n` after "that". The port
+had flattened it to one line; PMAlert measures `w = ink + 31` and centres on (317,237), so
+a one-line box is ~700px wide and the OK button (anchored at `w-6, h-6`) landed off the
+640x480 surface — an undismissable modal. The string is restored to the EXE's own two
+lines, and `PMAlert._fit` is a **fail-safe** (not faithful behaviour: the original has no
+auto-wrap) that wraps any over-wide line and `push_warning`s, so a future missing `\n`
+shows up in the log instead of halting a career.
+
+### 2. EUROPEAN (AND CUP) TIES ARE PLAYED, NOT SKIPPED
+
+`advance_week` resolved the whole week in one call and returned only the LEAGUE fixture, so
+every F.A. Cup / Coca-Cola / European tie the manager's club played was simulated silently
+and surfaced only as a RESULTS line. `Career._cup_report_sink` now also queues each of his
+own matches into `pending_matches` (comp + round label, both XIs, the stat report, the
+possession split), `take_pending_matches` drains it, and `Main._present_tie_chain` presents
+each one through the same LINE-UPS -> BRIEF -> FULL TIME flow as a league Saturday, with the
+read-out's phase chip naming the competition and round. A two-legged tie presents BOTH legs
+and not its extra-time fold. Guard: `app/tests/test_playable_cup_ties.gd`.
+
+### 3. THE RESULTS SCREEN HAD EIGHT BLANK PLATES AND DEAD DIVISION CHIPS
+
+`Career.results` is a manager-only ledger, so `_score_for` could answer for exactly one
+fixture a round. `Career.round_scores` (and `divisions[t].scores`) now bank every fixture's
+score, keyed by the 1-based round, and both round-trip through the save. The four bottom
+DIVISION chips — measured off frame 038 at x 14/134/254/374, y 435..459 by scanning the
+plaques' black border columns — switch the table between the four divisions, keeping the
+same round where the schedule has one. The chrome bake lights the manager's own division
+permanently, so the SELECTED state for the other three is a declared port-side ring.
+
+### 4. THE GOAL SCORERS CHART CARRIED SEASON ONE INTO SEASON TWO
+
+`divisions[t].scorers` were rebuilt at the rollover but `scorer_log` — the manager's own
+tier — never was. Cleared alongside `results`/`season_stats`, with `_month_goal_mark`.
+Training focus is a `pid -> row` map and the original's mode byte survives season init
+(`FUN_005825c0` touches morale/condition only), so retained players keep their assignment;
+entries for players who retired or left are pruned, because they were still eating the
+coaches' TP caps, which is what made training look like it never reset.
+
+### 5. THREE UP FRONT ARMED FOR THE OPPONENT
+
+`_att_count` was evaluated per side, so any AI club fielding three natural forwards
+collected the cave's buff. Every trigger is now gated on `cheat_manager_side`, resolved by
+MatchSim from an `is_manager` marker `Career._ratings_for` stamps on the manager's club
+alone; an AI-vs-AI fixture arms nothing. The per-half chance floor moved from the cave's 3
+to **2** (`Pm98StatMatch.cheat_chance_floor`, owner request) — the ONE deliberate
+divergence from MANAGER_HACK.EXE, and `test_three_up_front` still proves byte-parity with
+the patch by putting `CAVE_CHANCE_FLOOR` back for the oracle run.
+
+### 6. CONTRACT RENEWAL: THE DEMAND, THE TERM AND THE CLAUSES
+
+Three separate defects behind "renewal is so much harder / clauses don't work":
+* `Contract.demanded_weekly` multiplied the market wage by an invented age+CA "ambition"
+  ladder (1.40 at 21 down to 0.98 past 31), so almost every renewal opened 18-52% above
+  what the man was already on — while the OFFER form opens at his CURRENT yearly wage. The
+  one witnessed renewal transaction contradicts it outright ("offering his exact current
+  terms accepted silently", `renew_negotiation_re.md` frame 28_offerresult). The ladder is
+  gone; the demand is his current terms, floored at his market rate. A genuine lowball
+  under the soft floor is still refused.
+* `Career.renew` stamped `NEW_TERM_YEARS` on every renewal and threw the form's YEARS
+  stepper away. It now honours the offered 1..5 term.
+* The OFFER panel's four clause boxes were a read-only mirror of the CONTRACT panel. They
+  are editable, ride the offer, and are stamped on the player — with the engine's own rule
+  that a term above one year clears MATCHES TO RENEW (@0x529e40).
+
+### 7. THE SCOUT'S CRITERIA SURVIVE HIS REPORT
+
+`scout_search` held them only while a mission was in flight, and a fresh ScoutScreen node
+is built on every entry, so the panel came back blank next to the rows it had produced.
+`Career.scout_criteria` persists the last search and `ScoutScreen.restore_criteria` re-arms
+every widget before `setup()` re-applies the hired scout's own region reach.
+
+### 8. THE DOMESTIC CUP CALENDAR
+
+Both cups spread their rounds EVENLY across the league season, which put the F.A. Cup's
+ROUND 3 — the round the Premier clubs enter — on 1 November and the Coca-Cola final in
+mid-January. Both are pinned to the 1997-98 competition calendar through the port's own
+week->date grammar: F.A. Cup R1 wk15 (15 Nov) ... **R3 wk22 (3 January)** ... FINAL at the
+season's last week; Coca-Cola R1 wk1 ... FINAL wk34 (28 Mar). The port's bracket resolves
+to eight rounds, which is exactly the F.A. Cup's own R1..FINAL, so that pin is one-to-one;
+the Coca-Cola's real ladder is seven, so ONE port-side round takes the only slot with room
+(wk19) and is declared rather than silently shifting a real one. DECLARED SOURCE: the
+1997-98 competition calendar plus the owner's report — the per-round week table lives in
+PCF5DAT.PKF, which is not enumerable (SOURCE_INVENTORY §5 GAP#1), so this is the same class
+of evidence as `EURO_TAIL_FRACS` and is pinned the same way.
+
+### 9. STADIUM EXPANSION — INVESTIGATED, NOT REPRODUCED
+
+The report was "the expansion works but doesn't affect ticket income, and the ground image
+never changes". Traced end to end and the chain is intact at every link: `_complete_work`
+raises `stadium_capacity`, `_recompute_weekly_net` follows, `_mgr_club` overrides the
+static GameDB figure, `FinanceModel.summary` scales attendance and `match_gate` with
+capacity, `_post_home_match` books that gate into `week_ledgers`, and
+`StadiumScreen.tier_for(capacity + headroom)` picks one of the twelve ESTADIO tiles.
+`test_stadium_works.gd` already pinned the picture and `weekly_net`; the one link it never
+pinned — the TICKETS line the club actually banks — is now an assertion too: over the same
+eight rounds on the same seed, a ground 20,000 seats bigger banks **£999,825 -> £1,637,325**.
+Note the picture only moves on a BAND cross: twelve tiles over 130,000 seats is ~11,800
+seats a band, so a +4,000 expansion legitimately leaves the tile alone unless it happens to
+straddle an edge.
+
+### 10. THE CUP-DRAW CHROME — WHAT ALREADY VARIES
+
+`CupDrawScreen` already switches on two axes the reference run witnessed: the competition
+(seven `sorteo_*` strips) and the LIST vs GRID panel form by tie count (REFRUN R8, >16 ties
+-> scrollable one-line list, <=16 -> the four-column grid), plus the EXE's own uppercase
+round plate. Only four draw frames exist in the RE corpus, and they are what those two axes
+were built from; a third per-round axis is not in evidence and is NOT invented here. If the
+original varies further, the next step is a wine capture of a semifinal / final draw.
+
+## STILL OPEN AFTER s81
+
+* The **3D / positional match engine (M5)** is in the repo and ships in the APK, but is not
+  wired into `MatchSim`: it is byte-exact only to clk 2836 + the first goal, and runs ~9
+  minutes per match in GDScript. `handoff-pm98-m5-s59-frontier-2836` step 5 is the wiring
+  step and it is blocked on performance, not on correctness.
+* Everything else carried from s80 is unchanged — see below.
+
 ## 0aaaaaaaaaaaa. Closed 2026-08-01 (session s80) — THE YOUTH CONTRACT CARD AND THE ARROW
 
 s80 resumed the youth work s79/E left mid-task (the box shut down with tasks 5-8 open).

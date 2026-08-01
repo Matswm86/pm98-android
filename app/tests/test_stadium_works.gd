@@ -83,6 +83,34 @@ func _run() -> bool:
 	var sm := FinanceModel.summary({"capacity": career.stadium_capacity, "players": career.my_squad()}, career.tier)
 	ok = _assert(int(sm["capacity"]) == cap0 + 5000, "finance sees the expanded capacity") and ok
 
+	# ...and so does the money the club ACTUALLY BANKS. weekly_net is a projection; the
+	# TICKETS line the FINANCES screen reads comes out of `week_ledgers`, posted per home
+	# matchday by `_post_home_match`. That last link was the one thing this test never
+	# pinned, and it is exactly the one the owner reported broken ("the expansion itself
+	# works, but doesn't affect ticket income", 2026-08-01). Same career, same RNG stream,
+	# same eight rounds, one ground 20,000 seats bigger.
+	var booked := func(c: Career) -> int:
+		var t := 0
+		for wl in c.week_ledgers:
+			t += int(((wl as Dictionary).get("income", {}) as Dictionary).get("TICKETS", 0))
+		return t
+	var c4 := Career.create(prem[0], league, prem, leagues)
+	var r4 := RandomNumberGenerator.new()
+	r4.seed = SEED
+	for _w4 in 8:
+		c4.advance_week(r4, clubs_by_id)
+	var small: int = booked.call(c4)
+	var c5 := Career.create(prem[0], league, prem, leagues)
+	c5.stadium_capacity += 20000
+	var r5 := RandomNumberGenerator.new()
+	r5.seed = SEED
+	for _w5 in 8:
+		c5.advance_week(r5, clubs_by_id)
+	var big: int = booked.call(c5)
+	ok = _assert(big > small,
+		"a bigger ground banks more TICKETS in the week ledger (£%d -> £%d over 8 rounds)"
+		% [small, big]) and ok
+
 	# Ceiling guard, re-pinned 2026-07-28 against the binary: `FUN_0051c2e0` @0x51c8e1
 	# disables a SEATS card when (card seats + capacity + HEADROOM) REACHES 0x249f0 =
 	# 150,000. The port refuses the same build, on the same sum, with the same `>=`.

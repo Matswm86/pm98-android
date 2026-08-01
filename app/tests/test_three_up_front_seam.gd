@@ -104,18 +104,26 @@ func _run() -> bool:
 
 	# 4: ON vs OFF on the same seed through MatchSim.simulate.
 	var was := Pm98StatMatch.cheat_three_up_front
-	var rh := {"att": 1.0, "def": 1.0}
+	# `is_manager` marks the HOME side as the manager's club: since 2026-08-01 that is
+	# what MatchSim reads to decide which side the cheat may arm for, so an AI opponent
+	# with three forwards no longer collects it.
+	var rh := {"att": 1.0, "def": 1.0, "is_manager": true}
+	var ra := {"att": 1.0, "def": 1.0}
 	Pm98StatMatch.cheat_three_up_front = false
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 20260726
-	var off := MatchSim.simulate(rng, rh, rh, xi_h, xi_a, 1, 2)
+	var off := MatchSim.simulate(rng, rh, ra, xi_h, xi_a, 1, 2)
 	Pm98StatMatch.cheat_three_up_front = true
 	rng = RandomNumberGenerator.new()
 	rng.seed = 20260726
-	var on := MatchSim.simulate(rng, rh, rh, xi_h, xi_a, 1, 2)
+	var on := MatchSim.simulate(rng, rh, ra, xi_h, xi_a, 1, 2)
 	Pm98StatMatch.cheat_three_up_front = was
-	ok = _assert(int(on.get("home_goals", -1)) == 6,
-		"flag ON: the armed side scores the cave's 6 (got %d-%d)" % [
+	# The floor is 2 chances a half since 2026-08-01 (Pm98StatMatch.cheat_chance_floor,
+	# owner request), so the armed side's guaranteed haul is 2 x the floor, not the
+	# cave's 6. The oracle test still proves the cave's own 3 byte-for-byte.
+	var floor_goals: int = 2 * Pm98StatMatch.cheat_chance_floor
+	ok = _assert(int(on.get("home_goals", -1)) == floor_goals,
+		"flag ON: the armed side scores the floor's %d (got %d-%d)" % [floor_goals,
 			int(on.get("home_goals", -1)), int(on.get("away_goals", -1))]) and ok
 	ok = _assert(int(off.get("home_goals", -1)) != 6 or
 		int(off.get("away_goals", -1)) != int(on.get("away_goals", -1)) or

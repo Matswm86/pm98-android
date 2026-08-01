@@ -42,7 +42,7 @@ signal sack_requested(player)
 signal training_requested(player)
 signal promote_requested(player)
 ## RENEW negotiation (TOTAL level): the OFFER form was submitted / cancelled.
-signal offer_made(weekly, years)
+signal offer_made(weekly, years, clauses)
 signal renew_cancelled
 
 const W := 640
@@ -236,6 +236,7 @@ var _check_on: Texture2D
 var _check_off: Texture2D
 var _offer_yearly := 0      # the offered YEARLY wage (the engine's own unit; stepped)
 var _offer_years := 0       # the offered contract length (stepped)
+var _offer_clauses: Array = []  # the offered clause row indices (toggled on the OFFER panel)
 var _cur_weekly := 0        # his current weekly (offer floor)
 var _demand_weekly := 0     # the wage he wants (for the caller's accept/reject)
 
@@ -309,6 +310,13 @@ func begin_renew(cur_weekly: int, demand_weekly: int, years: int) -> void:
 	_demand_weekly = demand_weekly
 	_offer_yearly = maxi(OfferRecord.MONEY_MIN, _yearly if _yearly > 0 else Contract.yearly(cur_weekly))
 	_offer_years = maxi(OFF_YEARS_MIN, years)
+	# The OFFER panel's four clause boxes open on his CURRENT clauses and are then the
+	# manager's to change — that is what a negotiation form is for. They used to be a
+	# read-only mirror of the CONTRACT panel below (Mats QA 2026-08-01: "adding or
+	# removing clauses doesn't work").
+	_offer_clauses = []
+	for c in _clauses():
+		_offer_clauses.append(int(c))
 	_press = ""
 	queue_redraw()
 
@@ -341,6 +349,11 @@ func _hit(d: Vector2) -> String:
 			return "years_up"
 		if OFF_YEARS_DN.has_point(d):
 			return "years_dn"
+		# The four OFFER-panel clause boxes. Grown to 16px so an 11x11 box is a usable
+		# touch target on a phone; they do not overlap anything else on the panel.
+		for ci in 4:
+			if Rect2(CB_X - 3, int(OFF_CB_YS[ci]) - 3, 17, 17).has_point(d):
+				return "clause_%d" % ci
 		if (BTN["ok"] as Rect2).has_point(d):
 			return "ok"
 		return ""
@@ -417,6 +430,12 @@ func _renew_input(e: InputEvent, d: Vector2) -> void:
 			"wage_dn": _offer_yearly = OfferRecord.step_down(_offer_yearly)
 			"years_up": _offer_years = OfferRecord.years_up(_offer_years)
 			"years_dn": _offer_years = OfferRecord.years_down(_offer_years)
+		if h.begins_with("clause_"):
+			var ci := int(h.substr(7))
+			if _offer_clauses.has(ci):
+				_offer_clauses.erase(ci)
+			else:
+				_offer_clauses.append(ci)
 		queue_redraw()
 		return
 	if not _down:
@@ -429,7 +448,8 @@ func _renew_input(e: InputEvent, d: Vector2) -> void:
 		match was:
 			# Career/Contract keep an integer weekly ledger figure; the offer itself is
 			# the engine's yearly value, converted only at the boundary.
-			"offer": offer_made.emit(int(round(float(_offer_yearly) / float(Contract.SEASON_WEEKS))), _offer_years)
+			"offer": offer_made.emit(int(round(float(_offer_yearly) / float(Contract.SEASON_WEEKS))),
+					_offer_years, _offer_clauses.duplicate())
 			"cancel": renew_cancelled.emit()
 			"ok": back_pressed.emit()
 
@@ -604,9 +624,9 @@ func _draw_offer() -> void:
 	_ctxt(_f8, OFF_MONEY_CX, OFF_FEE_Y, "£%s" % _money(_fee), C_GOLD, 11)
 	_ctxt(_f8, OFF_MONEY_CX, OFF_WAGE_Y, "£%s" % _money(_offer_yearly), C_WAGE, 11)
 	_ctxt(_f8, OFF_YEARS_C.x, OFF_YEARS_C.y, str(_offer_years), C_YEARS_INK, 11)
-	var on := _clauses()
+	# The OFFERED clause state, not his current one — these boxes are editable.
 	for i in 4:
-		var tex: Texture2D = _check_on if on.has(i) else _check_off
+		var tex: Texture2D = _check_on if _offer_clauses.has(i) else _check_off
 		if tex != null:
 			draw_texture(tex, Vector2(CB_X, OFF_CB_YS[i]))
 	# the bottom RENEW button stays ringed while the OFFER form is up (frame 25)
