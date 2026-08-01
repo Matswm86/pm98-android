@@ -19,11 +19,13 @@ Per doc it reports:
   whether its claims are anchored in the binary rather than in frames alone.
 * **evidence** — an explicit `Evidence:` line naming repo-relative artefacts, for the docs
   whose proof is none of the three above (a banked capture, an oracle runner, a witness
-  frame directory, an extraction tool). EVERY path on such a line is checked to exist, and
-  a path that does not resolve is a hard failure of this script — an evidence line that
-  points at nothing is worse than no evidence line. (`screenshots/` is gitignored, so a
-  path under it resolves on the capture box only; anything a GATE depends on belongs in
-  `tools/re/refs/`, which is tracked.)
+  frame directory, an extraction tool). Every path that is IN THE REPO is checked to exist
+  and a path that does not resolve is a hard failure of this script — an evidence line that
+  points at nothing is worse than no evidence line. Untracked paths (`extracted/`, most of
+  `screenshots/`) are counted but not asserted, because they cannot exist in a clean
+  checkout; anything a GATE depends on belongs in `tools/re/refs/`, which IS tracked and is
+  therefore still checked. The output is byte-identical either way, which is what the CI
+  step diffs it against.
 * **open** — how many times the doc flags its own gaps (`un-RE'd`, `unwitnessed`,
   `UNKNOWN`, `declared`, `OURS`, `honest gap`, `still open`, `inference`).
 
@@ -38,6 +40,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -102,6 +105,38 @@ OPEN_MARKERS = [
 ]
 
 
+def is_tracked(path: str) -> bool:
+    """Is this repo-relative path IN the repository (file or directory)?
+
+    The guard may only assert what a clean checkout contains. Some `Evidence:` paths point
+    at deliberately untracked material -- `extracted/` is the copyrighted game data, and
+    `screenshots/` is MOSTLY untracked while carrying a handful of committed subdirectories,
+    so classifying by top-level directory got both wrong (it failed CI on `extracted/` and
+    then passed a path under an untracked `screenshots/` subdir). `git ls-files` answers
+    exactly the right question and follows the repo instead of a hardcoded list.
+
+    Either way the path is COUNTED, so the index is byte-identical on the capture box and on
+    a clean runner -- which is what the CI diff compares. Only the existence assertion is
+    skipped. Anything a GATE depends on belongs in `tools/re/refs/`, which IS tracked and
+    therefore still checked.
+    """
+    if path in _TRACKED_CACHE:
+        return _TRACKED_CACHE[path]
+    try:
+        r = subprocess.run(
+            ["git", "-C", str(ROOT), "ls-files", "--", path],
+            capture_output=True, text=True,
+        )
+        tracked = bool(r.stdout.strip())
+    except (OSError, subprocess.SubprocessError):
+        tracked = True                      # no git: fall back to asserting existence
+    _TRACKED_CACHE[path] = tracked
+    return tracked
+
+
+_TRACKED_CACHE: dict[str, bool] = {}
+
+
 def tokens(stem: str) -> list[str]:
     """Screen tokens a doc name could be matched on: `scout_screen_re` -> scout, scout_screen."""
     s = stem.removesuffix("_re")
@@ -148,6 +183,13 @@ def main() -> int:
                 # bare filename is not checked, and an Evidence path must name its
                 # directory to be verified. Every doc in the tree already does.
                 if "/" not in path:
+                    continue
+                # An UNTRACKED path cannot exist in a clean checkout, so CI must not fail
+                # on one -- see is_tracked() for why this is asked of git rather than of a
+                # directory list. It is still counted, so the index is byte-identical here
+                # and on a runner; only the existence assertion is skipped.
+                if not is_tracked(path):
+                    ev.append(path)
                     continue
                 if not (ROOT / path).exists():
                     print(f"FAIL {d.name}: Evidence path does not exist: {path}", file=sys.stderr)
