@@ -229,6 +229,35 @@ func _btn_rect(name: String) -> Rect2:
 	var r: Array = b.get(name, [0, 0, 0, 0])
 	return Rect2(r[0], r[1], r[2], r[3])
 
+## WHICH of the six SEARCH CAPABILITIES a youth scout of this rating can search on.
+##
+## Measured, not argued: `tools/re/probe_youth_cap_mask.py` reads the star bar by GOLD AREA
+## (full glyph 13 px, half glyph 8) and the value cells by ink colour, over every youth-scout
+## frame the repo holds. Three scouts previously read as "2 stars" are all **1.5**, and all
+## three carry the same pair; the two high scouts (4.5 and 5.0) carry all six. So the mask
+## follows the RATING -- the earlier "per scout" reading came from a star bar counted by eye.
+##
+## ONLY the witnessed rungs are here. An unwitnessed rating returns `[]`, which every caller
+## reads as "no restriction known" and renders exactly as the port always has, so frame 047
+## stays at 0 px. Filling 2.0 .. 4.0 needs careers at those ratings, and inventing them is
+## precisely what this project does not do.
+const CAP_BY_STARS := {
+	1.5: ["HANDLING", "TACKLING"],
+	4.5: ["HANDLING", "PASSING", "DRIBBLING", "HEADING", "TACKLING", "SHOOTING"],
+	5.0: ["HANDLING", "PASSING", "DRIBBLING", "HEADING", "TACKLING", "SHOOTING"],
+}
+
+## The witnessed capability list for `stars`, or [] when that rating has never been seen
+## (and for "no scout", which the caller gates on separately).
+static func available_caps(stars: float) -> Array:
+	if stars < 0.0:
+		return []
+	# The star bar draws in half-star steps, so snap before the lookup: a 1.5 stored as
+	# 1.4999 must not silently fall through to "unrestricted".
+	var key: float = round(stars * 2.0) / 2.0
+	return (CAP_BY_STARS.get(key, []) as Array).duplicate()
+
+
 ## The six LED slots in cap_order: left col rows = HANDLING/DRIBBLING/TACKLING,
 ## right col = PASSING/HEADING/SHOOTING.
 func _led_rect(skill: String) -> Rect2:
@@ -330,6 +359,14 @@ func _on_input(e: InputEvent) -> void:
 		# scout and its LEDs are the baked "disabled" art)
 		if not _scout.is_empty():
 			var k := was.substr(4)
+			# An UNAVAILABLE capability's tap is REFUSED, not toggled -- witnessed on
+			# `tools/re/refs/youth-caps-2026-08-01/b9_02_leds_armed.png`, where six taps on a
+			# 1.5* scout's block left only HANDLING and TACKLING lit and the other four
+			# unmoved. Silently, with no alert: nothing in that frame pair says the original
+			# says anything, so the port says nothing either.
+			var avail := available_caps(float(_scout.get("stars", 0.0)))
+			if not avail.is_empty() and not avail.has(k):
+				return
 			_selected[k] = not bool(_selected.get(k, false))
 			caps_changed.emit(_selected.duplicate())
 			queue_redraw()
@@ -453,21 +490,41 @@ func _draw() -> void:
 	# all six YES with only three lit, and why a value that tracked the LED (tried and
 	# reverted here) fails 047 by 345 px.
 	#
-	# And it is NOT a star ladder, which is what s84 filed it as: J. Casson (2★) has
-	# {HANDLING, TACKLING} and s84's C. Dewhurst (2.0★) has {HANDLING, DRIBBLING, TACKLING}.
-	# Two scouts, same rating, different masks — so the mask is PER SCOUT. It is seeded
-	# somewhere in the hire path onto the same object `FUN_00575e80`/`FUN_0053e860` build
-	# (youth vtable 0x632fc8, `operator_new(0x28)`, +4 club / +6 quality / +7 weeks /
-	# +0x10..+0x24 the six flags `FUN_00575d90` ORs over), and THAT is the next step — not
-	# four careers at four ratings, which cannot answer a per-scout question.
-	# Until the seed is reversed the port keeps the 047 rendering, which is the witnessed
-	# behaviour for every all-available scout and is what the parity gate pins.
+	# ⚠ s85 went on to call it "PER SCOUT, not a star ladder", on the reading that J. Casson
+	# and C. Dewhurst were both 2★ with different masks. **That reading was wrong, and
+	# 2026-08-01 (s86) measured it rather than read it.** `tools/re/probe_youth_cap_mask.py`
+	# scores the star bar by GOLD AREA -- a full glyph is a 13-px diamond, a half glyph 8 --
+	# because run WIDTH cannot tell 1.5 from 2.0 (4 columns against 5) and the eye cannot
+	# either. Every youth-scout frame the repo holds:
+	#
+	#   | scout | measured | YES values |
+	#   |---|---|---|
+	#   | J. Casson    | **1.5★** | HANDLING, TACKLING |
+	#   | C. Dewhurst  | **1.5★** | HANDLING, TACKLING |
+	#   | S. Munt      | **1.5★** | HANDLING, TACKLING |
+	#   | C. Stump     | 4.5★ | all six |
+	#   | P. Mitchell  | 5.0★ | all six |
+	#
+	# So there are no two same-rating scouts with different masks: all three low scouts are
+	# 1.5★ and carry the IDENTICAL pair. The mask is a function of the RATING after all, and
+	# `CAP_BY_STARS` below is what is witnessed -- the two ends of the ladder and nothing
+	# between them. A rating with no row falls back to all-available, which is what the port
+	# already did everywhere and what keeps frame 047 at 0 px; the rungs between 1.5 and 4.5
+	# are NOT invented here, and a career at 2.0 / 3.0 / 3.5 is the capture that fills them.
 	var cap_rows: Array = _spec.get("cap_rows", [126, 139, 152])
 	var value_cx: Dictionary = _spec.get("cap_value_cx", {"left": 117, "right": 242})
+	var avail := available_caps(float(_scout.get("stars", 0.0)) if has_scout else -1.0)
+	var order: Array = _spec.get("cap_order", [])
+	# `cap_order` INTERLEAVES the two columns (`_led_rect`: even index = left, odd = right),
+	# so row i of the left column is order[2*i] and of the right column order[2*i + 1].
 	for side in ["left", "right"]:
-		for top in cap_rows:
-			_txt_center(_f8, float(value_cx.get(side, 117)), float(top) + 1.0,
-				"YES" if has_scout else "NO", c_yes if has_scout else c_no, 11)
+		for i in cap_rows.size():
+			var top: float = float(cap_rows[i])
+			var idx := i * 2 + (0 if side == "left" else 1)
+			var skill := str(order[idx]) if idx < order.size() else ""
+			var yes := has_scout and (avail.is_empty() or avail.has(skill))
+			_txt_center(_f8, float(value_cx.get(side, 117)), top + 1.0,
+				"YES" if yes else "NO", c_yes if yes else c_no, 11)
 
 	# --- LEDs: disabled art baked; available/lit sprites once a scout exists ---
 	if has_scout:
@@ -585,21 +642,34 @@ func _draw_rows() -> void:
 	var tx := float(rspec.get("text_x", 64))
 	var cols: Dictionary = rspec.get("col_cx", {})
 	var c_txt := _ci(Color8(0, 0, 0))
+	# The row's INKS, measured off the first witness of a FILLED roster row --
+	# `tools/re/refs/youth-roster-2026-08-01/b9_roster_signed_1998-10-03.png`, a signed
+	# prospect (`Burgess 20 19 20 21 20 [ROL] £5,000 3 3`). The row was black throughout in
+	# this port and it is not: the five parameter cells are the AV column's ORANGE, the money
+	# is the WAGE header's dark red and the two trailing figures are the YEARS header's blue.
+	# Same family as the PLAYERS FOUND panel s84 measured, with one difference worth stating
+	# plainly rather than smoothing over: SP / ST / AG / QU do NOT carry their own headers'
+	# slate (100,100,140) -- all five parameter values carry AV's (212,63,0).
+	var c_param := _ci(Color8(212, 63, 0))
+	var c_wage := _ci(Color8(150, 0, 0))
+	var c_years := _ci(Color8(42, 63, 170))
 	for i in mini(_youth.size(), nrows):
 		var p: Dictionary = _youth[i]
 		var y := float(y0 + i * pitch)
 		var attrs: Dictionary = p.get("attrs", {})
-		_txt_left(_f8, tx, y + 2.0, str(p.get("name", "")).to_upper(), c_txt, 11)
+		# NOT upper-cased -- the witness reads "Burgess", the same correction s84 had to make
+		# to the PLAYERS FOUND panel's name column.
+		_txt_left(_f8, tx, y + 2.0, str(p.get("name", "")), c_txt, 11)
 		if _mode == "parameters":
-			_txt_center(_f8, float(cols.get("SP", 352)), y + 2.0,
-				str(int(attrs.get("VE", 0))), c_txt, 11)
-			_txt_center(_f8, float(cols.get("ST", 375)), y + 2.0,
-				str(int(attrs.get("RE", 0))), c_txt, 11)
-			_txt_center(_f8, float(cols.get("AG", 398)), y + 2.0,
-				str(int(attrs.get("AG", 0))), c_txt, 11)
-			_txt_center(_f8, float(cols.get("QU", 421)), y + 2.0,
-				str(int(attrs.get("CA", 0))), c_txt, 11)
-		_txt_center(_f8, float(cols.get("AV", 287)), y + 2.0, str(Youth.ability(p)), c_txt, 11)
+			_txt_center(_f8, float(cols.get("SP", 187)), y + 2.0,
+				str(int(attrs.get("VE", 0))), c_param, 11)
+			_txt_center(_f8, float(cols.get("ST", 211)), y + 2.0,
+				str(int(attrs.get("RE", 0))), c_param, 11)
+			_txt_center(_f8, float(cols.get("AG", 237)), y + 2.0,
+				str(int(attrs.get("AG", 0))), c_param, 11)
+			_txt_center(_f8, float(cols.get("QU", 262)), y + 2.0,
+				str(int(attrs.get("CA", 0))), c_param, 11)
+		_txt_center(_f8, float(cols.get("AV", 287)), y + 2.0, str(Youth.ability(p)), c_param, 11)
 		var pf := PMChrome.iget(p, "posFine")
 		if pf >= 1 and pf <= 18:
 			var rol := PMChrome.camrol(pf)
@@ -617,10 +687,18 @@ func _draw_rows() -> void:
 		# youth player's card, where the source puts it.
 		var wage := int(p.get("contract_wage", 0))
 		if wage > 0:
-			_txt_center(_f8, float(cols.get("WAGE", 358)), y + 2.0, _money(wage), c_txt, 11)
+			_txt_center(_f8, float(cols.get("WAGE", 358)), y + 2.0, _money(wage), c_wage, 11)
+		# TWO figures under the single YEARS header, not one. Measured on the witness: blue
+		# ink at cx 406 and cx 432, while the header's own ink spans x396..441 — one label
+		# over two cells, which is why a single centred column landed between them. The pair
+		# is the youth card's own YEARS / LEFT (refrun p0771: YEARS 4 / LEFT 4).
+		# DECLARED: the witness row has 3 and 3, so it cannot say WHICH cell is which; the
+		# port puts YEARS left and LEFT right, following the card's own order.
 		var yrs := int(p.get("contract_years", 0))
 		if yrs > 0:
-			_txt_center(_f8, float(cols.get("YEARS", 418)), y + 2.0, str(yrs), c_txt, 11)
+			_txt_center(_f8, float(cols.get("YEARS", 406)), y + 2.0, str(yrs), c_years, 11)
+			var left := int(p.get("contract_left", yrs))
+			_txt_center(_f8, float(cols.get("LEFT", 432)), y + 2.0, str(left), c_years, 11)
 		var r := Rect2(tx - 8.0, y, 390.0, float(rh))
 		_row_rects.append({"pid": int(p.get("id", -1)), "rect": r})
 		if _press == "row:%d" % int(p.get("id", -1)):

@@ -104,6 +104,40 @@ func _run() -> void:
 	node.queue_redraw()
 	await _grab(dir, "youth_b9found.png")
 
+	# ---- B9's LAST gap: a FILLED YOUTH TEAM ROSTER row ------------------------------
+	# `tools/re/refs/youth-roster-2026-08-01/b9_roster_signed_1998-10-03.png` — the same
+	# Bolton W career after the prospect was actually SIGNED (the row tap raises the
+	# contract card and only OFFER puts him on the roster), Saturday 3 October 1998. Two
+	# frames of it 14 months apart differ by 1,672 px and every one of those is in the
+	# header date plaque, so the widget is stable and one cut is enough — the same test s84
+	# applied to the PLAYERS FOUND panel.
+	# Read off the frame: scout S. Munt 1.5* (so HANDLING / TACKLING only, the whole point
+	# of `CAP_BY_STARS`), manager H. Constantine 4.5* over "4 PLAYERS", the PLAYERS FOUND
+	# panel empty, PARAMETERS selected, and one row:
+	#   Burgess | SP 20 | ST 19 | AG 20 | QU 21 | AV 20 | ROL | £5,000 | 3 | 3
+	PMChrome.header_phase = "season"
+	PMChrome.header_date = {"wd": "Saturday", "day": "3", "mon": "October", "year": "1998"}
+	var staff_row := [
+		{"id": 1, "role": Staff.YOUTH_TEAM_SCOUT, "name": "S. Munt", "stars": 1.5,
+			"wage": 32000},
+		{"id": 2, "role": Staff.YOUTH_TEAM_MANAGER, "name": "H. Constantine", "stars": 4.5,
+			"wage": 36000},
+	]
+	# AV is `Youth.ability`, which averages the four; the frame's 20 is that average of
+	# 20 / 19 / 20 / 21.
+	var roster := [{
+		"id": 9101, "name": "Burgess", "age": 17, "posFine": 10,
+		"contract_wage": 5000, "contract_years": 3, "contract_left": 3,
+		"attrs": {"VE": 20, "RE": 19, "AG": 20, "CA": 21},
+	}]
+	node.setup(roster, staff_row, "mats", "Bolton W", "1998-99", 9, -1, false,
+		{"HANDLING": true, "TACKLING": true}, [])
+	node._mode = "parameters"
+	node._arrow_row = "parameters"
+	node._count_override = 4
+	node.queue_redraw()
+	await _grab(dir, "youth_b9roster.png")
+
 	print("SHOTS DONE")
 	quit(0)
 

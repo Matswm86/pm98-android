@@ -32,7 +32,23 @@ PAIRS = [
 # B9's own un-occluded witness of the FILLED list — a live wine capture, not a
 # walkthrough frame, so it carries its own directory.
 B9 = ROOT / "tools" / "re" / "refs" / "b9-players-found-2026-08-01"
-EXTRA_PAIRS = [("youth_b9found.png", B9 / "02_players_found_first.png")]
+B9ROW = ROOT / "tools" / "re" / "refs" / "youth-roster-2026-08-01"
+EXTRA_PAIRS = [
+    ("youth_b9found.png", B9 / "02_players_found_first.png"),
+]
+# B9's third and last gap: a roster row with a SIGNED prospect on it. Banked 2026-08-01
+# (s86) off the `season_youth_b9_sign` drive -- the plan s84 wrote for exactly this, which
+# had never reached a signature until this session's drive.
+#
+# REPORTED, NOT GATED, and the reason is stated rather than assumed: the row's INK and
+# COLUMN work is done off this frame (the five parameter cells are AV's orange, the money
+# is the WAGE header's dark red, the two trailing figures are the YEARS header's blue at
+# cx 406 / 432 under one label, and the name is NOT upper-cased), but the row PLATE and its
+# per-cell GRID are still the port's own -- the same bake `build_youth_found_list_from_frames.py`
+# did for the PLAYERS FOUND widget, not yet done for this one. Gating on it would paint the
+# whole build red for a bake that is scoped and named; reporting it keeps the number in
+# front of whoever picks it up.
+REPORT_ONLY = [("youth_b9roster.png", B9ROW / "b9_roster_signed_1998-10-03.png")]
 
 
 def main() -> int:
@@ -45,13 +61,15 @@ def main() -> int:
         heat_dir = Path(sys.argv[sys.argv.index("--heatmap-dir") + 1])
         heat_dir.mkdir(parents=True, exist_ok=True)
     ok = True
-    todo = [(s, FRAMES / f) for s, f in PAIRS] + EXTRA_PAIRS
+    todo = [(s, FRAMES / f) for s, f in PAIRS] + EXTRA_PAIRS + REPORT_ONLY
+    report_only = {s for s, _ in REPORT_ONLY}
     for shot_name, fp in todo:
         frame_name = fp.name
         sp = shot_dir / shot_name
+        only = shot_name in report_only
         if not sp.exists() or not fp.exists():
             print(f"[MISS] {shot_name} vs {frame_name}: file missing")
-            ok = False
+            ok = ok and only
             continue
         shot = np.asarray(Image.open(sp).convert("RGB")).astype(int)[:480, :640]
         frame = np.asarray(Image.open(fp).convert("RGB")).astype(int)[:480, :640]
@@ -64,10 +82,10 @@ def main() -> int:
         head = int(d[:BODY_Y].sum())
         body = d[BODY_Y:]
         n = int(body.sum())
-        status = "PASS" if n == 0 else "FAIL"
+        status = "PASS" if n == 0 else ("INFO" if only else "FAIL")
         print(f"[{status}] {shot_name} vs {frame_name}: body {n}px (header {head}px, not gated)")
         if n:
-            ok = False
+            ok = ok and only
             ys, xs = np.nonzero(body)
             # top mismatch clusters (coarse 20px bands) so drift is locatable
             import collections

@@ -250,13 +250,46 @@ white). Facts decoded pixel-level along the way:
   preseason 22 grey); excluded in the gate with that provenance.
 
 **Model wiring**: scout bar = `Staff.YOUTH_TEAM_SCOUT` hire, manager bar =
-`Staff.YOUTH_TEAM_MANAGER`; capabilities YES iff a scout is hired (the witnessed pair;
-a per-skill gradient is un-witnessed); LED taps toggle the search-skill selection;
+`Staff.YOUTH_TEAM_MANAGER`; capabilities YES iff the capability is AVAILABLE to the hired
+scout, which follows his STAR RATING — see §"The capability mask is a star ladder" below;
+LED taps toggle the search-skill selection, and a tap on an unavailable one is refused;
 SEARCH → `Career.start_youth_search(skills)` → `youth_search` ticks in `advance_week`
 and resolves with the MANAGER.EXE strings ("finished his search" / "...hasn't found");
 the searching state renders frame 047's message. Duration (`YOUTH_SEARCH_WEEKS` = 2)
 and the find-chance (0.25 + 0.11·stars) are OUR reconstruction — the strings-decoded
 loop is the game's, the numbers are not RE'd.
+
+## The capability mask is a star ladder (2026-08-01, s86 — correcting s85)
+
+Two sessions filed this wrongly, both times because the star bar was **counted by eye**. s84
+called it a rating ladder off one sample; s85 killed the ladder outright on "two 2★ scouts,
+two different masks" and re-filed it as per-scout, with a new RE question about where the
+HIRE path seeds `+0x10..+0x24`.
+
+`tools/re/probe_youth_cap_mask.py` measures instead. The star bar is scored by **gold AREA**
+— a full glyph is a 13-px diamond (columns 1,3,5,3,1) and a half glyph 8 — because run
+WIDTH cannot separate them (4 columns against 5) and neither can a glance:
+
+| scout | frame | measured | YES values |
+|---|---|---|---|
+| J. Casson | `refs/youth-caps-2026-08-01/b9_01_youth_before.png` | **1.5★** | HANDLING, TACKLING |
+| C. Dewhurst | s84's b9-sign drive, `probe_0028_04_youth_after.png` | **1.5★** | HANDLING, TACKLING |
+| S. Munt | `refs/youth-roster-2026-08-01/b9_roster_signed_1998-10-03.png` | **1.5★** | HANDLING, TACKLING |
+| C. Stump | `refs/b9-players-found-2026-08-01/02_players_found_first.png` | 4.5★ | all six |
+| P. Mitchell | walkthrough `047_164509.png` | 5.0★ | all six |
+
+So there is no pair of same-rating scouts with different masks, and the mask does follow the
+rating. s85's other two findings stand and are what make the table readable: the LED has
+THREE states (pink hatched = unavailable, dark maroon = available and unselected, bright +
+ring = selected), and the VALUE cell is YES iff the capability is AVAILABLE — which is why
+047 reads all six YES with only three lit.
+
+`YouthScreen.CAP_BY_STARS` carries the two witnessed ends and **nothing between them**; an
+unwitnessed rating returns `[]`, which every caller reads as "no restriction known" and
+renders exactly as the port always has (frame 047 stays 0 px). Gate
+`app/tests/test_youth_caps.gd` fails if a rung is added without a frame behind it. Filling
+2.0★..4.0★ needs careers at those ratings — or the HIRE-path seed, which would settle them
+from the binary instead.
 
 ---
 
