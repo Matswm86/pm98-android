@@ -223,7 +223,9 @@ def main() -> int:
     mx, my = MGR_STARS["x0"], MGR_STARS["y"]
     cut(im47, [mx, my, pitch, 11]).save(OUT_DIR / "star_a_blue.png")
     cut(im47, [mx + pitch, my, pitch, 11]).save(OUT_DIR / "star_b_blue.png")
-    cut(im47, [mx + 3 * pitch, my, pitch, 11]).save(OUT_DIR / "star_half_blue.png")
+    # The HALF glyphs are NOT cut here any more: there are four of them (two parities x
+    # two bar colours) and each has its own witness frame.
+    # -> tools/re/build_youth_star_halves_from_frames.py
 
     # 4) held-state ring sprites, cut VERBATIM at the exact frame-diff bounds
     #    (048 vs 047 = red ring on SEARCH; 088/089 vs 087 = white rings on

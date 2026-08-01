@@ -35,6 +35,7 @@ extends SceneTree
 const CLAUSE_MAN := 900001      # relegation clause + matches-to-renew met
 const RENEW_MAN := 900002       # matches-to-renew met, NO relegation clause
 const PLAIN_MAN := 900003       # relegation clause, no renewal clause
+const FILLER_BASE := 900100     # multi-year men that hold the 13-man floor clear
 
 
 func _initialize() -> void:
@@ -74,6 +75,19 @@ func _run(relegate: bool) -> bool:
 	# All three are 25 (well under RETIRE_AGE_OUTFIELD, so rung 0 cannot claim them) and
 	# all three are in their LAST contract year, so all three reach the release ladder.
 	var roster: Array = career.rosters[career.club_id]
+	# PAD FIRST, and the reason is a real flake this fixture used to carry: rung 2 of the
+	# ladder is the binary's own 13-man floor (`0x58ae55`, `cmp ecx,0xd / jb keep`), and it
+	# is counted DOWN as men leave. A season in which enough of the real squad expired or
+	# retired could push the count under thirteen before PLAINMAN was reached, so he was
+	# renewed by the floor instead of released by the clause and his line never appeared —
+	# a genuine engine rung firing on an under-specified fixture, not an engine bug. The
+	# padding men are on MULTI-year deals, so they never enter the ladder at all; they only
+	# guarantee that the floor cannot be the thing under test.
+	for i in 24:
+		var filler := _man(FILLER_BASE + i, "FILLER%d" % i, false, false)
+		filler["contract_years"] = 5
+		filler["contract_term"] = 5
+		roster.append(filler)
 	roster.append(_man(CLAUSE_MAN, "CLAUSEMAN", true, true))
 	roster.append(_man(RENEW_MAN, "RENEWMAN", false, true))
 	roster.append(_man(PLAIN_MAN, "PLAINMAN", true, false))

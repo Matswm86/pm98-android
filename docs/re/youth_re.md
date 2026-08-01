@@ -142,6 +142,85 @@ lines there: `%s has joined your Youth Team.` on accept, `The youth player %s ha
 rejected your offer.` on refusal. The engine re-parents him out of `0x26e4`, so the
 scout can never find him twice (`Career._youth_taken`).
 
+### 6. The SEARCH CAPABILITY mask — `0x53d379` and the jump table at `0x53d520`
+
+**Reversed 2026-08-01 (s87).** This was the last youth unknown, and three sessions had it
+wrong in a row: s84 called it a rating ladder on one sample, s85 called it "per scout, not
+a ladder" on a star bar counted by eye, and s86 measured the bar properly
+(`tools/re/probe_youth_cap_mask.py`) and got a ladder again — but with only its two ends
+witnessed, so the rungs between 1.5★ and 4.5★ were filed as "needs four more careers".
+
+They needed none. The tail of the YOUTH TEAM screen's constructor dispatches on the
+scout's quality byte:
+
+```
+0053d379  mov  eax, [esi+0x434]        ; the YOUTH TEAM SCOUT staff object, 0 = none
+0053d37f  test eax, eax
+0053d381  je   0x53d3d4                ; NO scout -> disable SEARCH and all six LEDs
+0053d385  mov  cl, byte ptr [eax+1]    ; q, the 1..10 quality byte (= stars x 2)
+0053d38a  dec  eax                     ; q-1
+0053d38b  cmp  eax, 7
+0053d38e  ja   0x53d439                ; q >= 9 -> disable NOTHING
+0053d394  jmp  dword ptr [eax*4 + 0x53d520]
+```
+
+`0x53d520` holds eight targets, and every arm falls THROUGH the ones below it — each
+disables exactly one widget with `FUN_005bf8c0(0, 1)`:
+
+| arm | disables | widget (x, y) | capability | reached by |
+|---|---|---|---|---|
+| `0x53d39b` | `[esi+0x1298]` | (20, 135) | TACKLING | q = 1, 2 |
+| `0x53d3aa` | `[esi+0x1ac8]` | (145, 99) | PASSING | q = 3 |
+| `0x53d3b9` | `[esi+0x0e80]` | (20, 117) | DRIBBLING | q = 4, 5 |
+| `0x53d3c8` | `[esi+0x16b0]` | (145, 117) | HEADING | q = 6 |
+| `0x53d42e` | `[esi+0x1ee0]` | (145, 135) | SHOOTING | q = 7, 8 |
+
+so the available set is:
+
+| q | stars | available |
+|---|---|---|
+| 1, 2 | 0.5★, 1.0★ | HANDLING |
+| 3 | 1.5★ | HANDLING, TACKLING |
+| 4, 5 | 2.0★, 2.5★ | + PASSING |
+| 6 | 3.0★ | + DRIBBLING |
+| 7, 8 | 3.5★, 4.0★ | + HEADING |
+| 9, 10 | 4.5★, 5.0★ | + SHOOTING (all six) |
+
+Three things fall out of the same read:
+
+* **`FUN_005bf8c0(0, 1)` DISABLES.** The no-scout arm proves the direction: it calls it on
+  the SEARCH button and all six LEDs, and frame 087 (a career with no staff) shows exactly
+  that state.
+* **The six widgets are a `0x418`-stride array from `[esi+0xa68]`**, and they are named by
+  the (x, y) their own constructors push — left column x=20 rows 99/117/135 =
+  HANDLING / DRIBBLING / TACKLING, right column x=145 = PASSING / HEADING / SHOOTING.
+* **The YES/NO value cell is AVAILABILITY, never selection.** `0x540604` reads bit 7 of the
+  widget's `+0xac` (`shr edx, 7 / not dl / test dl, 1`) and picks `"NO"` when it is set.
+  That is why frame 047 reads six YES with only three LEDs lit.
+
+The ladder reproduces all five witnessed scouts unchanged — 1.5★ → HANDLING + TACKLING,
+4.5★ and 5.0★ → all six — which is the check that it is the right table. Ported as
+`YouthScreen.CAPS_ENABLED_BY_QUALITY`, gated by `app/tests/test_youth_caps.gd` (61 checks)
+and by the three youth parity pairs at 0 px.
+
+### 7. Where the flags at `+0x10..+0x24` come from — and it is not the hire
+
+The same session settled the other half of s85's question. `operator_new(0x28)` +
+`*obj = 0x632fc8` happens at exactly two sites, and NEITHER is a hire:
+
+* **`0x53cd8f`** — the YOUTH TEAM screen's own constructor. It builds a working criteria
+  object and `0x53cdd6..0x53cde5` writes `ebx` (zeroed at `0x53cd1f`) into all six flags,
+  then `0x53ce63..0x53ce84` copies the club's stored object at `club+0x26c` over it if
+  there is one.
+* **`0x57c7f6`** — the SAVEGAME LOAD path. A presence byte gates the allocation, then
+  `FUN_00575fc0` reads the six flags back **one byte each** off the same stream.
+
+`FUN_0053ea10`, the youth-criteria ctor, sets `+7 = 0xff` (no search running), `+6 = 0`
+and all six flags to 0. So the six flags are **selection**, they start at zero, and the
+only thing that ever sets them is the player's own LED tap — `0x53d5e0` and its five
+siblings, each `[crit+N] = ([widget+0x3f4] >> 4) & 1`, with no availability guard, because
+an unavailable LED is a DISABLED widget that never toggles.
+
 ### What is left OURS, and named
 
 * **`Youth.SEARCH_SPEEDUP` = 2.** The owner's standing Android call (2026-07-24 owner
@@ -151,7 +230,11 @@ scout can never find him twice (`Career._youth_taken`).
 * **The refusal odds** in `Career.sign_youth_prospect` (the original's are driven by the
   same DB-backed negotiation as a senior offer, not yet reversed).
 * **The wonderkid / real-talent lane** — declared easter eggs, not part of the port.
-* **The PLAYERS FOUND panel's filled look** — still un-witnessed (no capture holds it).
+* ~~**The PLAYERS FOUND panel's filled look**~~ — **CLOSED s84**, and its EMPTY (idle) look
+  plus the roster row's plate and grid **CLOSED s87**; see
+  `tools/re/build_youth_found_list_from_frames.py` and
+  `tools/re/build_youth_rowgrid_from_frame.py`.
+* ~~**The SEARCH CAPABILITY mask's middle rungs**~~ — **CLOSED s87** from the binary, §6.
 
 ### What was DELETED as invented
 

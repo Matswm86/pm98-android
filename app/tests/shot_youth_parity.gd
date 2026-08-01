@@ -112,7 +112,7 @@ func _run() -> void:
 	# header date plaque, so the widget is stable and one cut is enough — the same test s84
 	# applied to the PLAYERS FOUND panel.
 	# Read off the frame: scout S. Munt 1.5* (so HANDLING / TACKLING only, the whole point
-	# of `CAP_BY_STARS`), manager H. Constantine 4.5* over "4 PLAYERS", the PLAYERS FOUND
+	# of the reversed capability ladder), manager H. Constantine 4.5* over "4 PLAYERS", the PLAYERS FOUND
 	# panel empty, PARAMETERS selected, and one row:
 	#   Burgess | SP 20 | ST 19 | AG 20 | QU 21 | AV 20 | ROL | £5,000 | 3 | 3
 	PMChrome.header_phase = "season"
@@ -125,8 +125,12 @@ func _run() -> void:
 	]
 	# AV is `Youth.ability`, which averages the four; the frame's 20 is that average of
 	# 20 / 19 / 20 / 21.
+	# posFine 1, not 10: the frame's ROL cell was matched against all eighteen camrol
+	# sprites and `camrol01` scores 0 mismatched opaque pixels while the next best scores
+	# 10 (tools/re/build_youth_rowgrid_from_frame.py's method). The row's ROL is read, not
+	# assumed.
 	var roster := [{
-		"id": 9101, "name": "Burgess", "age": 17, "posFine": 10,
+		"id": 9101, "name": "Burgess", "age": 17, "posFine": 1,
 		"contract_wage": 5000, "contract_years": 3, "contract_left": 3,
 		"attrs": {"VE": 20, "RE": 19, "AG": 20, "CA": 21},
 	}]

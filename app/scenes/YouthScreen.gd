@@ -77,12 +77,18 @@ var _star_a_purple: Texture2D
 var _star_b_purple: Texture2D
 var _star_a_blue: Texture2D
 var _star_b_blue: Texture2D
-var _star_half_blue: Texture2D
-var _star_half_purple: Texture2D     # cut from B9's 4.5* scout C. Stump (2026-08-01)
+# Four half-star glyphs, not two: the bar alternates and the HALF takes the parity of the
+# cell it lands on. `_a` = even cell, `_b` = odd. Witnesses in
+# tools/re/build_youth_star_halves_from_frames.py.
+var _star_half_blue_a: Texture2D
+var _star_half_blue_b: Texture2D
+var _star_half_purple_a: Texture2D
+var _star_half_purple_b: Texture2D
 var _arrow: Texture2D                # the PARAMETERS-slot arrow sprite
 var _arrow_rating: Texture2D         # the RATING-slot cut (11 of its 81 px re-dither)
 var _found_list: Texture2D           # the PLAYERS FOUND list widget, cut from B9's capture
 var _found_rowgrid: Texture2D        # its populated-row cell grid, for slots above the first
+var _row_grid: Texture2D             # the ROSTER row's populated plate + per-cell grid
 var _held: Dictionary = {}         # held-state ring sprites (frame-cut 048/088/089)
 
 var _f8: Font
@@ -144,6 +150,12 @@ const C_PF_AV := Color8(212, 63, 0)
 const C_PF_WAGE := Color8(150, 0, 0)
 const C_PF_AGE := Color8(42, 95, 170)
 
+## The roster row's text baseline inside its 12-px plate. The port drew at +2 and the
+## witness reads +3: every text cell of `b9_roster_signed_1998-10-03.png` -- the name, the
+## five parameters, the money and the two year figures -- carries the IDENTICAL ink-pixel
+## count as the port's and sits exactly ONE ROW LOWER, which is a baseline, not a face.
+const ROW_TEXT_DY := 3.0
+
 
 func _ready() -> void:
 	_body = load("res://art/screens/youth/youth_body.png")
@@ -156,12 +168,15 @@ func _ready() -> void:
 	_star_b_purple = load("res://art/screens/youth/star_b_purple.png")
 	_star_a_blue = load("res://art/screens/youth/star_a_blue.png")
 	_star_b_blue = load("res://art/screens/youth/star_b_blue.png")
-	_star_half_blue = load("res://art/screens/youth/star_half_blue.png")
-	_star_half_purple = load("res://art/screens/youth/star_half_purple.png")
+	_star_half_blue_a = load("res://art/screens/youth/star_half_blue_a.png")
+	_star_half_blue_b = load("res://art/screens/youth/star_half_blue_b.png")
+	_star_half_purple_a = load("res://art/screens/youth/star_half_purple_a.png")
+	_star_half_purple_b = load("res://art/screens/youth/star_half_purple_b.png")
 	_arrow = load("res://art/screens/youth/arrow.png")
 	_arrow_rating = load("res://art/screens/youth/arrow_rating.png")
 	_found_list = load("res://art/screens/youth/found_list.png")
 	_found_rowgrid = load("res://art/screens/youth/found_rowgrid.png")
+	_row_grid = load("res://art/screens/youth/row_grid.png")
 	for k in ["search_held", "rating_held", "return_held"]:
 		_held[k] = load("res://art/screens/youth/%s.png" % k)
 	_f8 = PMChrome.font("8")
@@ -231,31 +246,60 @@ func _btn_rect(name: String) -> Rect2:
 
 ## WHICH of the six SEARCH CAPABILITIES a youth scout of this rating can search on.
 ##
-## Measured, not argued: `tools/re/probe_youth_cap_mask.py` reads the star bar by GOLD AREA
-## (full glyph 13 px, half glyph 8) and the value cells by ink colour, over every youth-scout
-## frame the repo holds. Three scouts previously read as "2 stars" are all **1.5**, and all
-## three carry the same pair; the two high scouts (4.5 and 5.0) carry all six. So the mask
-## follows the RATING -- the earlier "per scout" reading came from a star bar counted by eye.
+## REVERSED FROM `MANAGER.EXE` 2026-08-01 (s87). This was the last youth unknown and it was
+## filed as "needs four more careers at 2.0 / 3.0 / 3.5"; it needed none. The rule is an
+## eight-entry JUMP TABLE at `0x53d520`, dispatched at the tail of the YOUTH TEAM screen's
+## constructor:
 ##
-## ONLY the witnessed rungs are here. An unwitnessed rating returns `[]`, which every caller
-## reads as "no restriction known" and renders exactly as the port always has, so frame 047
-## stays at 0 px. Filling 2.0 .. 4.0 needs careers at those ratings, and inventing them is
-## precisely what this project does not do.
-const CAP_BY_STARS := {
-	1.5: ["HANDLING", "TACKLING"],
-	4.5: ["HANDLING", "PASSING", "DRIBBLING", "HEADING", "TACKLING", "SHOOTING"],
-	5.0: ["HANDLING", "PASSING", "DRIBBLING", "HEADING", "TACKLING", "SHOOTING"],
-}
+##     0053d379  mov  eax, [esi+0x434]        ; the YOUTH TEAM SCOUT staff object, 0 = none
+##     0053d37f  test eax, eax
+##     0053d381  je   0x53d3d4                ; NO scout  -> disable SEARCH and all six
+##     0053d385  mov  cl, byte ptr [eax+1]    ; q, the 1..10 quality byte (= stars x 2)
+##     0053d38a  dec  eax                     ; q-1
+##     0053d38b  cmp  eax, 7
+##     0053d38e  ja   0x53d439                ; q >= 9  -> disable NOTHING
+##     0053d394  jmp  dword ptr [eax*4 + 0x53d520]
+##
+## Every arm falls THROUGH the ones below it, and each disables exactly one widget
+## (`FUN_005bf8c0(0, 1)` is the DISABLE call -- the no-scout arm proves the direction
+## against frame 087, where all six are dark):
+##
+##     0x53d39b  disable [esi+0x1298]  (20,135) TACKLING     q = 1, 2
+##     0x53d3aa  disable [esi+0x1ac8]  (145,99) PASSING      q = 3
+##     0x53d3b9  disable [esi+0x0e80]  (20,117) DRIBBLING    q = 4, 5
+##     0x53d3c8  disable [esi+0x16b0] (145,117) HEADING      q = 6
+##     0x53d42e  disable [esi+0x1ee0] (145,135) SHOOTING     q = 7, 8
+##
+## The six widgets are a 0x418-stride array from `[esi+0xa68]`, named by the (x, y) their
+## own constructors push, and it is bit 7 of each one's `+0xac` that the YES/NO value cell
+## reads (`0x540604`: `shr edx, 7 / not dl / test dl, 1` -> NO when the widget is disabled).
+## That is why frame 047 reads six YES with only three LEDs lit: the cell is AVAILABILITY,
+## never selection.
+##
+## The ladder reproduces all five witnessed scouts exactly, which is the check that it is
+## the right table: J. Casson / C. Dewhurst / S. Munt at 1.5* (q3) -> HANDLING + TACKLING,
+## C. Stump 4.5* (q9) and P. Mitchell 5.0* (q10) -> all six. Nothing between 1.5 and 4.5 is
+## invented any more; it is read.
+const CAP_ORDER_BY_QUALITY := ["HANDLING", "TACKLING", "PASSING", "DRIBBLING", "HEADING",
+	"SHOOTING"]
+## q (1..10) -> how many of CAP_ORDER_BY_QUALITY are enabled. Index 0 is q=1.
+const CAPS_ENABLED_BY_QUALITY := [1, 1, 2, 3, 3, 4, 5, 5, 6, 6]
 
-## The witnessed capability list for `stars`, or [] when that rating has never been seen
-## (and for "no scout", which the caller gates on separately).
+
+## The capabilities a scout of `stars` can search on. `stars < 0` means "no scout", which
+## the caller gates on separately; every caller reads `[]` as "no restriction known", and
+## with the ladder reversed that case now only happens for no-scout.
 static func available_caps(stars: float) -> Array:
 	if stars < 0.0:
 		return []
-	# The star bar draws in half-star steps, so snap before the lookup: a 1.5 stored as
-	# 1.4999 must not silently fall through to "unrestricted".
-	var key: float = round(stars * 2.0) / 2.0
-	return (CAP_BY_STARS.get(key, []) as Array).duplicate()
+	# `Staff.quality_byte`: the engine's own byte is round(stars * 2), clamped 0..10.
+	var q := clampi(int(round(stars * 2.0)), 0, 10)
+	if q < 1:
+		return []
+	if q > CAPS_ENABLED_BY_QUALITY.size():
+		q = CAPS_ENABLED_BY_QUALITY.size()
+	var n: int = CAPS_ENABLED_BY_QUALITY[q - 1]
+	return CAP_ORDER_BY_QUALITY.slice(0, n)
 
 
 ## The six LED slots in cap_order: left col rows = HANDLING/DRIBBLING/TACKLING,
@@ -420,15 +464,26 @@ func _txt_center(f: Font, cx: float, y_top: float, s: String, col: Color, sz: in
 
 ## Gold star row from the frame-cut sprites (pitch 11). The original alternates
 ## two sprite variants along the row (cells 1/3/5 = A, 2/4 = B — frame 047).
-func _stars(tex_a: Texture2D, tex_b: Texture2D, half_tex: Texture2D,
+##
+## The HALF glyph alternates too, and the port used to ignore that: it carried ONE half
+## sprite per bar colour and drew it at both parities, which is right only for the parity
+## its witness happened to have (purple was cut from C. Stump 4.5★ = cell 4 = A, blue from
+## G. Keeping 3.5★ = cell 3 = B). The roster witness carries the two missing phases —
+## S. Munt 1.5★ (purple, cell 1 = B) and H. Constantine 4.5★ (blue, cell 4 = A) — and the
+## port was 23 px out on one bar and 17 px on the other. `half_a` / `half_b` are the four
+## glyphs `tools/re/build_youth_star_halves_from_frames.py` cuts, and the half takes the
+## parity of the cell it lands on, exactly as a full star does.
+func _stars(tex_a: Texture2D, tex_b: Texture2D, half_a: Texture2D, half_b: Texture2D,
 		x0: float, y: float, rating: float) -> void:
 	var full := int(floor(rating))
 	for i in full:
 		var tex := tex_a if i % 2 == 0 else tex_b
 		if tex != null:
 			draw_texture(_tex(tex), Vector2(x0 + i * 11.0, y))
-	if rating - full >= 0.5 and half_tex != null:
-		draw_texture(_tex(half_tex), Vector2(x0 + full * 11.0, y))
+	if rating - full >= 0.5:
+		var half := half_a if full % 2 == 0 else half_b
+		if half != null:
+			draw_texture(_tex(half), Vector2(x0 + full * 11.0, y))
 
 ## Un-witnessed press feedback (PARAMETERS only): the 088/089-style white ring.
 func _ring(r: Rect2, col: Color) -> void:
@@ -469,8 +524,9 @@ func _draw() -> void:
 		var nx: Array = _spec.get("scout_name_xy", [141, 87])
 		_txt_left(_f8, float(nx[0]), float(nx[1]), str(_scout.get("name", "")), c_name, 11)
 		var st: Dictionary = _spec.get("scout_stars", {})
-		_stars(_star_a_purple, _star_b_purple, _star_half_purple, float(st.get("x0", 248)),
-			float(st.get("y", 85)), float(_scout.get("stars", 0.0)))
+		_stars(_star_a_purple, _star_b_purple, _star_half_purple_a, _star_half_purple_b,
+			float(st.get("x0", 248)), float(st.get("y", 85)),
+			float(_scout.get("stars", 0.0)))
 
 	# --- capability values: the witnessed NO (no scout) / YES (scout) pair,
 	#     ink-centred per cell (frame: NO/YES share cx 117 left / 242 right) ---
@@ -506,11 +562,13 @@ func _draw() -> void:
 	#   | P. Mitchell  | 5.0★ | all six |
 	#
 	# So there are no two same-rating scouts with different masks: all three low scouts are
-	# 1.5★ and carry the IDENTICAL pair. The mask is a function of the RATING after all, and
-	# `CAP_BY_STARS` below is what is witnessed -- the two ends of the ladder and nothing
-	# between them. A rating with no row falls back to all-available, which is what the port
-	# already did everywhere and what keeps frame 047 at 0 px; the rungs between 1.5 and 4.5
-	# are NOT invented here, and a career at 2.0 / 3.0 / 3.5 is the capture that fills them.
+	# 1.5★ and carry the IDENTICAL pair. The mask is a function of the RATING.
+	#
+	# ⚠ And 2026-08-01 (s87) stopped fitting it to the corpus and READ IT: the ladder is the
+	# eight-entry jump table at `0x53d520` that the screen's constructor dispatches on the
+	# scout's quality byte. `available_caps` carries the disassembly. All five witnessed
+	# scouts come out of it unchanged, so frame 047 and the two B9 frames stay at 0 px, and
+	# the rungs between 1.5★ and 4.5★ are no longer missing -- they never needed a capture.
 	var cap_rows: Array = _spec.get("cap_rows", [126, 139, 152])
 	var value_cx: Dictionary = _spec.get("cap_value_cx", {"left": 117, "right": 242})
 	var avail := available_caps(float(_scout.get("stars", 0.0)) if has_scout else -1.0)
@@ -522,13 +580,28 @@ func _draw() -> void:
 			var top: float = float(cap_rows[i])
 			var idx := i * 2 + (0 if side == "left" else 1)
 			var skill := str(order[idx]) if idx < order.size() else ""
+			# `avail` is empty ONLY for "no scout" now that the ladder is reversed, and
+			# `has_scout` already gates that -- but the fallback stays, because a scout whose
+			# quality byte is somehow out of 1..10 must render as the port always did rather
+			# than silently read NO on all six.
 			var yes := has_scout and (avail.is_empty() or avail.has(skill))
 			_txt_center(_f8, float(value_cx.get(side, 117)), top + 1.0,
 				"YES" if yes else "NO", c_yes if yes else c_no, 11)
 
 	# --- LEDs: disabled art baked; available/lit sprites once a scout exists ---
+	#
+	# An UNAVAILABLE capability keeps the PINK HATCHED art that youth_body.png bakes -- the
+	# port used to stamp the dark-maroon `led_avail` over all six the moment a scout existed,
+	# which is right only for a scout whose mask is unrestricted. Witnessed on
+	# `tools/re/refs/youth-roster-2026-08-01/b9_roster_signed_1998-10-03.png` (S. Munt 1.5*):
+	# HANDLING and TACKLING are dark maroon and the other FOUR are the hatched art, against a
+	# port that drew four dark-maroon chips there. Same rule reads frame 047 (P. Mitchell
+	# 5.0*, all six available -> three maroon + three lit) and `b9_01_youth_before.png`
+	# (J. Casson 1.5*) unchanged, so this is the one rule that fits every witness.
 	if has_scout:
 		for skill in _spec.get("cap_order", []):
+			if not (avail.is_empty() or avail.has(str(skill))):
+				continue      # UNAVAILABLE -> the baked hatched chip stands
 			var r := _led_rect(str(skill))
 			var tex := _led_lit if bool(_selected.get(str(skill), false)) else _led_avail
 			if tex != null:
@@ -539,7 +612,14 @@ func _draw() -> void:
 	# --- PLAYERS FOUND: the shortlist if the scout brought one back, else the
 	#     two witnessed messages verbatim ---
 	_found_rects.clear()
-	if has_scout and not _searching and not _found.is_empty():
+	# The LIST WIDGET is the panel's IDLE state, not its "has rows" state. The port only
+	# drew it when a prospect was on it, so a scout who had already delivered (and whose
+	# prospect was signed) left the panel as the bare black box the body art bakes. The
+	# roster witness shows otherwise: `b9_roster_signed_1998-10-03.png` has an EMPTY panel
+	# that still carries the PLAYER / AV ROL / WAGE / AGE header row, the six empty plates
+	# and the scrollbar. So the three panel states are: no scout -> the hire message,
+	# searching -> the searching message, otherwise -> the widget, filled or not.
+	if has_scout and not _searching:
 		_draw_found()
 	var msg: Array = []
 	if not has_scout:
@@ -565,8 +645,9 @@ func _draw() -> void:
 		var mx: Array = _spec.get("mgr_name_xy", [183, 248])
 		_txt_left(_f8, float(mx[0]), float(mx[1]), str(_ymgr.get("name", "")), c_name, 11)
 		var st2: Dictionary = _spec.get("mgr_stars", {})
-		_stars(_star_a_blue, _star_b_blue, _star_half_blue, float(st2.get("x0", 290)),
-			float(st2.get("y", 246)), float(_ymgr.get("stars", 0.0)))
+		_stars(_star_a_blue, _star_b_blue, _star_half_blue_a, _star_half_blue_b,
+			float(st2.get("x0", 290)), float(st2.get("y", 246)),
+			float(_ymgr.get("stars", 0.0)))
 		var n := _count_override if _count_override >= 0 else _youth.size()
 		var cxy: Array = _spec.get("count_xy", [376, 248])
 		_txt_left(_f8, float(cxy[0]), float(cxy[1]),
@@ -657,19 +738,30 @@ func _draw_rows() -> void:
 		var p: Dictionary = _youth[i]
 		var y := float(y0 + i * pitch)
 		var attrs: Dictionary = p.get("attrs", {})
+		# A POPULATED row is not the empty plate with text on it: it carries its own two
+		# rules, the nine cell dividers, the black-bordered ROL box and a DIFFERENT left
+		# chip (162 px apart from the empty one in the witness's own frame). All of it is
+		# the frame's pixels -- tools/re/build_youth_rowgrid_from_frame.py.
+		if _row_grid != null:
+			draw_texture(_tex(_row_grid), Vector2(14.0, y - 1.0))
 		# NOT upper-cased -- the witness reads "Burgess", the same correction s84 had to make
 		# to the PLAYERS FOUND panel's name column.
-		_txt_left(_f8, tx, y + 2.0, str(p.get("name", "")), c_txt, 11)
+		_txt_left(_f8, tx, y + ROW_TEXT_DY, str(p.get("name", "")), c_txt, 11)
 		if _mode == "parameters":
-			_txt_center(_f8, float(cols.get("SP", 187)), y + 2.0,
+			_txt_center(_f8, float(cols.get("SP", 187)), y + ROW_TEXT_DY,
 				str(int(attrs.get("VE", 0))), c_param, 11)
-			_txt_center(_f8, float(cols.get("ST", 211)), y + 2.0,
+			_txt_center(_f8, float(cols.get("ST", 211)), y + ROW_TEXT_DY,
 				str(int(attrs.get("RE", 0))), c_param, 11)
-			_txt_center(_f8, float(cols.get("AG", 237)), y + 2.0,
+			_txt_center(_f8, float(cols.get("AG", 237)), y + ROW_TEXT_DY,
 				str(int(attrs.get("AG", 0))), c_param, 11)
-			_txt_center(_f8, float(cols.get("QU", 262)), y + 2.0,
+			_txt_center(_f8, float(cols.get("QU", 262)), y + ROW_TEXT_DY,
 				str(int(attrs.get("CA", 0))), c_param, 11)
-		_txt_center(_f8, float(cols.get("AV", 287)), y + 2.0, str(Youth.ability(p)), c_param, 11)
+		# AV is the four-attribute AVERAGE, not CA. The witness settles it: its row reads
+		# SP 20 / ST 19 / AG 20 / QU 21 with AV **20**, and floor((20+19+20+21)/4) = 20
+		# while CA alone is 21. `_av` is the same average the PLAYERS FOUND panel and the
+		# OFFERS squad list use (28/28 pixel-verified there), so the game has one AV rule
+		# and this row obeys it. `Youth.ability` (= CA) is the ceiling, a different number.
+		_txt_center(_f8, float(cols.get("AV", 287)), y + ROW_TEXT_DY, str(_av(p)), c_param, 11)
 		var pf := PMChrome.iget(p, "posFine")
 		if pf >= 1 and pf <= 18:
 			var rol := PMChrome.camrol(pf)
@@ -677,9 +769,9 @@ func _draw_rows() -> void:
 				draw_texture(_tex(rol),
 					Vector2(floorf(float(cols.get("ROL", 312)) - 12.0), y - 1.0))
 			else:
-				_txt_center(_f8, float(cols.get("ROL", 312)), y + 2.0, str(p.get("pos", "")), c_txt, 11)
+				_txt_center(_f8, float(cols.get("ROL", 312)), y + ROW_TEXT_DY, str(p.get("pos", "")), c_txt, 11)
 		else:
-			_txt_center(_f8, float(cols.get("ROL", 312)), y + 2.0, str(p.get("pos", "")), c_txt, 11)
+			_txt_center(_f8, float(cols.get("ROL", 312)), y + ROW_TEXT_DY, str(p.get("pos", "")), c_txt, 11)
 		# WAGE / YEARS are REAL (witnessed 2026-08-01, refrun p0771: a youth player's card
 		# carries CLUB FEE £75,000 / YEARLY WAGE £15,000 / YEARS 4 / LEFT 4). The old
 		# "youth contracts are un-modelled" note was wrong and the columns are no longer
@@ -687,7 +779,7 @@ func _draw_rows() -> void:
 		# youth player's card, where the source puts it.
 		var wage := int(p.get("contract_wage", 0))
 		if wage > 0:
-			_txt_center(_f8, float(cols.get("WAGE", 358)), y + 2.0, _money(wage), c_wage, 11)
+			_txt_center(_f8, float(cols.get("WAGE", 358)), y + ROW_TEXT_DY, _money(wage), c_wage, 11)
 		# TWO figures under the single YEARS header, not one. Measured on the witness: blue
 		# ink at cx 406 and cx 432, while the header's own ink spans x396..441 — one label
 		# over two cells, which is why a single centred column landed between them. The pair
@@ -696,9 +788,9 @@ func _draw_rows() -> void:
 		# port puts YEARS left and LEFT right, following the card's own order.
 		var yrs := int(p.get("contract_years", 0))
 		if yrs > 0:
-			_txt_center(_f8, float(cols.get("YEARS", 406)), y + 2.0, str(yrs), c_years, 11)
+			_txt_center(_f8, float(cols.get("YEARS", 406)), y + ROW_TEXT_DY, str(yrs), c_years, 11)
 			var left := int(p.get("contract_left", yrs))
-			_txt_center(_f8, float(cols.get("LEFT", 432)), y + 2.0, str(left), c_years, 11)
+			_txt_center(_f8, float(cols.get("LEFT", 432)), y + ROW_TEXT_DY, str(left), c_years, 11)
 		var r := Rect2(tx - 8.0, y, 390.0, float(rh))
 		_row_rects.append({"pid": int(p.get("id", -1)), "rect": r})
 		if _press == "row:%d" % int(p.get("id", -1)):
@@ -721,10 +813,14 @@ func _draw_found() -> void:
 		var p: Dictionary = _found[i]
 		var pid := int(p.get("id", -1))
 		var r := Rect2(PF_ROW_X, y, PF_ROW_W, float(PF_ROW_H))
-		# Slot 0's grid is baked into found_list.png. Whether the grid belongs to the SLOT
-		# or to a POPULATED row cannot be told apart from one prospect, so the port stamps
-		# it per populated row — which reproduces the witness exactly. Declared in youth_re.
-		if i > 0 and _found_rowgrid != null:
+		# The grid belongs to the POPULATED ROW, not to the slot — SETTLED 2026-08-01 (s87)
+		# and no longer a declared guess. The IDLE witness
+		# `youth-roster-2026-08-01/b9_roster_signed_1998-10-03.png` is the same career with
+		# the panel EMPTY: it differs from the populated frame inside the list rect by
+		# 1,270 px, all of them in slot 0's grid band y119..132, and all SIX of its plates
+		# are flat (240,240,240). So `found_list.png` carries no grid at all and every
+		# populated row stamps its own — slot 0 included.
+		if _found_rowgrid != null:
 			draw_texture(_tex(_found_rowgrid), Vector2(PF_LIST_XY.x, y - 1.0))
 		if _press == "found:%d" % pid:
 			draw_rect(r, _ci(C_PF_ROW_SEL), true)

@@ -35,20 +35,22 @@ B9 = ROOT / "tools" / "re" / "refs" / "b9-players-found-2026-08-01"
 B9ROW = ROOT / "tools" / "re" / "refs" / "youth-roster-2026-08-01"
 EXTRA_PAIRS = [
     ("youth_b9found.png", B9 / "02_players_found_first.png"),
+    # B9's third and last gap, CLOSED 2026-08-01 (s87) and now GATED like the rest. It was
+    # REPORT-ONLY at 1,816 px while the row PLATE and per-cell GRID were still the port's
+    # own. Five defects fell out of closing it, every one measured off this frame:
+    #   * the row's PLATE, its nine cell DIVIDERS, the black-bordered ROL box and its own
+    #     LEFT CHIP (162 px apart from the empty row's) are now cut from the frame
+    #     (`tools/re/build_youth_rowgrid_from_frame.py`);
+    #   * AV is the four-attribute AVERAGE, not CA — the row reads 20/19/20/21 with AV 20;
+    #   * the row's text baseline is +3 inside the plate, not +2;
+    #   * NAME starts at x62 (not 59), WAGE centres on 359 (not 358), ST on 212 (not 211);
+    #   * the ROL icon is `camrol01`, matched 0-mismatch against all eighteen sprites.
+    # It also settled two things the panel above it had left open — see the module note
+    # in build_youth_found_list_from_frames.py (the cell grid belongs to the POPULATED row)
+    # and build_youth_star_halves_from_frames.py (the half star has TWO parities).
+    ("youth_b9roster.png", B9ROW / "b9_roster_signed_1998-10-03.png"),
 ]
-# B9's third and last gap: a roster row with a SIGNED prospect on it. Banked 2026-08-01
-# (s86) off the `season_youth_b9_sign` drive -- the plan s84 wrote for exactly this, which
-# had never reached a signature until this session's drive.
-#
-# REPORTED, NOT GATED, and the reason is stated rather than assumed: the row's INK and
-# COLUMN work is done off this frame (the five parameter cells are AV's orange, the money
-# is the WAGE header's dark red, the two trailing figures are the YEARS header's blue at
-# cx 406 / 432 under one label, and the name is NOT upper-cased), but the row PLATE and its
-# per-cell GRID are still the port's own -- the same bake `build_youth_found_list_from_frames.py`
-# did for the PLAYERS FOUND widget, not yet done for this one. Gating on it would paint the
-# whole build red for a bake that is scoped and named; reporting it keeps the number in
-# front of whoever picks it up.
-REPORT_ONLY = [("youth_b9roster.png", B9ROW / "b9_roster_signed_1998-10-03.png")]
+REPORT_ONLY: list[tuple[str, Path]] = []  # nothing is report-only any more
 
 
 def main() -> int:

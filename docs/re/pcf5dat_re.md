@@ -9,6 +9,30 @@ Evidence: `tools/re/enum_pcf5dat.py`
 The container probe, the disassembly below, and a byte read of the file itself. Source ISO:
 `~/backup/Div/premier manager 98.iso` (the pack is on the ISO only, never installed).
 
+## Re-verified 2026-08-01 (s87), because a later handoff re-opened it
+
+`handoff-pm98-throughput-cupdraw-capmask-2026-08-01` §7f carried *"`PCF5DAT.PKF` — 314 MB,
+ISO-only, never enumerated ... s85's note that it may unblock the whole 3D match view
+stands"*. That line is **stale**: it re-raises a question this document closed on
+2026-07-28. Both halves were re-measured from scratch rather than taken on trust, and both
+came back identical:
+
+* **One xref, and it is the CD check.** A raw scan of `MANAGER.EXE` for the little-endian
+  address of the string `0x658a60` finds exactly ONE occurrence, at file offset `0xf76ed`
+  = VA `0x4f82ed`. There is no second consumer to reverse.
+* **The signature is there, on the ISO itself.** Read straight out of
+  `~/backup/Div/premier manager 98.iso` at the file's own extent (ISO9660 LBA 279, so
+  `279*2048 + 0xecbf`): `44 2e 47 2e 43 2e` = `D.G.C.` — the six bytes `0x4f835c..0x4f837e`
+  compare.
+* **The container still does not parse.** `enum_pcf5dat.py` re-run over the extracted
+  314,854,588 bytes: `parse@0` stops immediately (`bad tag 0x0`), 39,356,660 candidate tag
+  positions, 37,072 with an in-bounds payload triple, 30 with a printable de-obfuscated
+  name, and **not one directory-like chain**.
+
+So it does not unblock the 3D match view, because the game never reads it for content. The
+3D path's real blocker is unchanged and is a DATA gap: the `Modelos\*.p3d` models are
+absent from both `pm98.iso` and `Premier_Manager_98.rar`.
+
 ## The claim this replaces
 
 `REMAINING.md` §P0-2 and `handoff-pm98-m5-wirein-lowdiv-drive-2026-07-28` §1b both carried:
