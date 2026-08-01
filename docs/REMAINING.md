@@ -63,6 +63,11 @@ generalise: the **EUROPEAN CUP's `QTR. FINALS` reads 1ST LEG / 2ND LEG**. The po
 builds European brackets with `legs: 2`, so this CONFIRMS it — but the corpus note said
 otherwise and would have led the next session to "fix" it the wrong way.
 
+Season 2 of the same drive added **European Cup `ROUND 2`** and **U.E.F.A. `1/32 FINALS`**,
+both 1ST LEG / 2ND LEG — so EVERY witnessed European round is two-legged. Note also that
+season 2's European Cup raised a `ROUND 2` draw and not the group form, so the group phase is
+not every season's entry route.
+
 🆕 **NEW OPEN ITEM — the European Cup GROUP DRAW is a screen FORM the port does not have.**
 `manutd_s1_eurocup_groups_1_8_final.png`: the header plate reads **GROUPS** in black on
 white, under it six group boxes in a 2×3 grid each with a green `GROUP <letter>` header and
@@ -100,16 +105,51 @@ men. 10/10 green.
 ### 8. NOT done in s87, said plainly
 
 * **The M5 goal-2 divergence** (26' against 24', right team, `2837 < clk < 8469`) —
-  untouched, and it is still the largest carried RE item.
-* **The 1-px on-sprite kit-edge pass** — not moved. The state is unchanged and precise: the
-  drop shadow is ported, the residual is an on-sprite TOP/LEFT highlight plus an interior
-  component, four models are dead, and s85's LUT inversion gives the shape any future model
-  has to hit — at the witness cell the original wrote **(56, 52, 64..72)** where the port
-  paints `(44,44,44)`. Attempting a rule without the pass located would be a guess.
-* **A SEMIFINAL / FINAL cup draw** — three drives have now tried. This one got as far as
-  F.A. Cup `ROUND 5`.
-* **The European Cup GROUP DRAW form** — newly witnessed this session, §4, not built.
+  **BLOCKED, and the blocker is the finding.** It is not a diffing job on data in hand: the
+  banked oracle STOPS at clk 2837 (`oracle_dartwatch_s59_1020_2837.jsonl`), and
+  `timeline.jsonl` is the `m4_poll` STRUCT poll, which can say goal 2 landed at 24' and
+  cannot name a first-disagreeing frame. It needs a fresh **~5,632-frame** `m5_rsp_capture`
+  over 2837..8469 on a box with **no other wine load** (the RSP stub takes ONE connection, a
+  client disconnect kills the game, a concurrent `wdbg_pid.sh` fails the attach with error
+  87). The exact command is in `docs/re/M5_S85_WATCH_PLAYSTATE_FULLTIME.md`. Still the
+  largest carried RE item.
+* **The 1-px on-sprite kit-edge pass** — **LOCATED, not closed** (§0a-s87.9 below). The rule
+  is still open; what changed is that the next step is a reading rather than a fit.
+* **A SEMIFINAL / FINAL cup draw** — **four** drives have now tried. s87's two seasons got as
+  far as F.A. Cup `ROUND 5`.
+* **The European Cup GROUP DRAW form** — newly witnessed this session, §4, not built. This
+  is the biggest single new BUILD item in the repo and it has a clean witness.
 * **The real-device pass** — still needs Mats and a phone.
+
+### 9. ⭐ AND THE KIT-EDGE PASS WAS LOCATED AFTER §8 WAS WRITTEN
+
+Five sessions called it "unlocated" and attacked it by fitting models to pixels. Three
+measurements, all from the binary:
+
+* **the knockout view's code is at `0x466000..0x4a1000`**, found from its own plate strings
+  (`AGGR.` `0x653f0c`, `1ST LEG` `0x653f1c`, `2ND LEG` `0x653f14`, `REPLAY` `0x653f24`). The
+  CUP DRAW screen is separate at **`0x4da000..0x4db000`** — `GROUPS` (`0x6570f8`) has exactly
+  ONE xref, `0x4da6a4`. The whole knockout RE was frame-derived and cited no VA;
+* **neither range calls the shadow blit.** A byte scan for `E8 rel32` targeting the thunk
+  `0x4b7f60` or the core `0x5cbea0` gives **74 call sites, lowest `0x4b29c0`** — above the
+  entire knockout family. Zero in either range;
+* **because the knockout kit is a WIDGET.** All 90 `RIDIESC`-bank fetches end in
+  `FUN_005c0d50(bank, 0, 0x20, 0x32, 0)`, and that function's neighbour **`0x5c0688` IS one
+  of the 74 shadow sites** — arguments from a per-item table (`[edx + eax*4 + 0x90]`) and the
+  widget's own **`+0x64` / `+0x66`**.
+
+**Next step:** decompile `FUN_005c0d50` and the paint around `0x5c0688`, recover what
+`+0x64` / `+0x66` and the `0x90` table hold, feed them into `PMShadow` with the site's own
+THR/cap. s85's LUT inversion says the answer must hit **(56, 52, 64..72)** where the port
+paints `(44,44,44)`.
+
+**A shipped constant is corrected:** `PMShadow.THR = 0x21` was documented as "the same at
+every witnessed site". It was, because only two sites had been enumerated. `0x4f4ee7` — a
+RIDI kit blit — pushes `0x10`, **`0x40`**, **`0xff`**. THR is the spread's per-step decay, so
+a different THR is a different ramp.
+
+This also upgrades §5: `KnockoutScreen` → `PMShadow` is killed on the **call graph**, not
+only on the reasoning that the blit cannot write inside a silhouette.
 
 ## 0b. Closed 2026-08-01 (session s86) — THE WATCH MATCH PLAYS AT SPEED, THE CUP DRAW'S AXIS IS FOUND, AND TWO EARLIER READINGS ARE CORRECTED
 
