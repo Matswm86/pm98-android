@@ -198,7 +198,8 @@ jobs:
                    test_channeltv_screen test_cam_ctrl \
                    test_fines test_youth test_youth_screen test_youth_offer_route \
                    test_relegation_clause \
-                   test_stoppage_time test_cup_round_legs test_youth_caps; do
+                   test_stoppage_time test_cup_round_legs test_youth_caps \
+                   test_cup test_europe; do
             echo "== $t"
             if ! "$GITHUB_WORKSPACE/godot" --headless --path . --script "res://tests/$t.gd" \
                 > "/tmp/$t.log" 2>&1; then
