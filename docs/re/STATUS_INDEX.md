@@ -7,10 +7,10 @@ line — and most docs do not carry one, so for most screens it pointed at nothi
 Since 2026-08-01 it delegates HERE instead: for every doc, the artefacts that can
 CONFIRM it, each of them checkable, and none of them a sentence someone guessed.
 
-* **135 docs**, 21 with a `Status:` line of their own.
+* **136 docs**, 22 with a `Status:` line of their own.
 * **37** are covered by a `diff_*_parity.py` render-diff gate — the
   strongest evidence here, since a gate compares the app to a captured frame.
-* **67** have a headless `test_*.gd` suite; **93** cite MANAGER.EXE
+* **67** have a headless `test_*.gd` suite; **94** cite MANAGER.EXE
   addresses, i.e. their claims are anchored in the binary and not only in frames.
 * **28** name their proof directly on an `Evidence:` line — for the plans,
   audits and M5 session notes, whose evidence is a banked capture, an oracle
@@ -56,6 +56,7 @@ nothing are the ones to distrust.
 | `M5_S57_SAMPLING_ANCHOR.md` | — | — | — | — | 13 | — | 1 |
 | `M5_S58_FRONTIER_1032.md` | — | — | — | — | — | 3 path(s) | — |
 | `M5_S59_FRONTIER_2836.md` | — | — | — | — | 9 | — | — |
+| `M5_S85_WATCH_PLAYSTATE_FULLTIME.md` | yes | — | — | — | 12 | — | — |
 | `M5_T1I9_B0040_INPUTS_PORTSIDE.md` | — | — | — | — | 1 | — | — |
 | `M5_T1I9_FIRST_STEP_TARGET.md` | — | — | — | — | 1 | — | — |
 | `M5_T1I9_KICKOFF_BALL_TRAJECTORY.md` | — | — | — | — | 1 | — | — |
@@ -84,7 +85,7 @@ nothing are the ones to distrust.
 | `database_screen_re.md` | yes | — | `test_database_card_screen.gd`, `test_database_screen.gd` | `DataBaseCardScreen.gd`, `DataBaseScreen.gd` | 69 | — | 4 |
 | `dbase_player_card_re.md` | — | `diff_dbase_card_parity.py` | — | — | — | — | 10 |
 | `directiva_screen_re.md` | — | — | `test_directiva_screen.gd` | `DirectivaScreen.gd` | 5 | — | 1 |
-| `euro_league_screen_re.md` | — | `diff_euroleague_parity.py`, `diff_finance_eurolabel_parity.py` | `test_euro_group_screen.gd`, `test_euro_stat_engine.gd` | `EuroGroupScreen.gd`, `EuroSupercupScreen.gd` | 22 | — | 5 |
+| `euro_league_screen_re.md` | — | `diff_euroleague_parity.py`, `diff_finance_eurolabel_parity.py` | `test_euro_group_screen.gd`, `test_euro_stat_engine.gd` | `EuroGroupScreen.gd`, `EuroSupercupScreen.gd` | 22 | — | 6 |
 | `euro_supercup_screen_re.md` | — | `diff_euroleague_parity.py`, `diff_finance_eurolabel_parity.py` | `test_euro_group_screen.gd`, `test_euro_stat_engine.gd` | `EuroGroupScreen.gd`, `EuroSupercupScreen.gd` | 7 | — | — |
 | `europe_re.md` | — | — | `test_europe.gd` | — | 1 | — | — |
 | `faces_re.md` | — | — | `test_faces.gd` | — | — | — | — |
@@ -131,7 +132,7 @@ nothing are the ones to distrust.
 | `promanager_career_screens_re.md` | — | — | — | — | 25 | — | — |
 | `renew_negotiation_re.md` | — | — | `test_player_info_renew.gd` | — | 4 | — | 1 |
 | `results_screen_re.md` | — | — | `test_results_screen.gd` | `CompResultScreen.gd`, `MatchResultScreen.gd` | — | — | 3 |
-| `retirement_re.md` | yes | — | `test_retirement.gd` | `Retirement.gd` | 53 | — | 2 |
+| `retirement_re.md` | yes | — | `test_retirement.gd` | `Retirement.gd` | 79 | — | 4 |
 | `rival_screen_re.md` | — | — | `test_rival_screen.gd` | `RivalScreen.gd` | 10 | — | 2 |
 | `sack_path_re.md` | yes | — | `test_sacking.gd`, `test_unsackable.gd` | — | 61 | — | 4 |
 | `savegame_dialog_re.md` | — | — | `test_savegame_dialog.gd` | `SaveGameDialog.gd` | — | — | 2 |
