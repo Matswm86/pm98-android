@@ -59,3 +59,47 @@ neither reached one: a Man Utd career driven from February 1998 was knocked out 
 before the tail of the ladder and its manager was sacked early in season 2. The draw only
 appears for a round the manager's own club is still in, so this is a matter of surviving to
 April, not of driving longer.
+
+## A THIRD career, 2026-08-01 (s87) — and it breaks the "one per-round axis" reading
+
+A Manchester Utd career started from scratch on this session's own drive
+(`plans/season_cupdraw_late.json`, display `:6`, `PM98_NO_RAISE=1`) banked six more, and two
+of them are things the corpus had never held:
+
+| file | competition | round plate | leg plates |
+|---|---|---|---|
+| `manutd_s1_eurocup_groups_1_8_final.png` | European Cup | **`1/8 FINAL`** | **BOTH BLANK** |
+| `manutd_s1_cocacola_round3.png` | Coca-Cola Cup | `ROUND 3` | MATCH / REPLAY |
+| `manutd_s1_facup_round3.png` | F.A. Cup | `ROUND 3` | MATCH / REPLAY |
+| `manutd_s1_facup_round4.png` | F.A. Cup | `ROUND 4` | MATCH / REPLAY |
+| `manutd_s1_eurocup_qtr_finals.png` | European Cup | `QTR. FINALS` | **1ST LEG / 2ND LEG** |
+| `manutd_s1_facup_round5.png` | F.A. Cup | **`ROUND 5`** | MATCH / REPLAY |
+
+**The leg plates are a COMPETITION axis as well as a round one.** s86's reading — "ROUND 2 is
+two-legged and ROUND 3 / ROUND 4 / QTR. FINALS are not" — was measured over four frames of
+the Coca-Cola Cup ALONE, and it is right about that competition. It does not generalise: the
+EUROPEAN CUP's `QTR. FINALS` reads **1ST LEG / 2ND LEG** while the Coca-Cola Cup's reads
+MATCH / REPLAY. The port already models this correctly (`Career` builds every European
+bracket with `legs: 2` and `Cup.draw_leg_plates` reads the tie), so this frame CONFIRMS the
+port rather than correcting it — but the corpus note had to be widened or the next session
+would have "fixed" the European Cup to one leg.
+
+**And the group draw is a SCREEN FORM the port does not have.**
+`manutd_s1_eurocup_groups_1_8_final.png` is the European Cup's group draw, and it is not the
+MATCHES layout with different content — it is a different right-hand panel:
+
+* the header plate reads **GROUPS** in BLACK on WHITE, where every other draw reads MATCHES
+  in white on the green plate;
+* under it are **six group boxes in a 2 x 3 grid**, each with its own green `GROUP <letter>`
+  header and four rows;
+* a filled row is `kit | club name | national flag` — the frame catches the draw mid-reveal
+  with GROUP A holding Sporting Port. / Real Madrid C.F. / Anorthosis / W.Lodz and B..F
+  still empty;
+* the bottom-left tie-detail card is **entirely blank**, leg plates included;
+* the round plate reads `1/8 FINAL`, which is the original's own header for the group phase
+  (`Round 1`..`Round 6` run under it).
+
+The port raises NO draw at all for the group stage — `Cup.draw_next_round` is a deliberate
+no-op while the group phase is live. That is now a witnessed gap with a frame behind it.
+
+Still missing after three drives: a **SEMIFINAL** and a **FINAL** draw.

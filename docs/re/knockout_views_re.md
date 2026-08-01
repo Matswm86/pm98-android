@@ -437,6 +437,46 @@ deviant silhouette). The buckets stay declared for the club-dependent remainder.
 The same bake should port to the OTHER ridi/kit sites (EuroGroupScreen's 24 group cells
 still carry ~1260 px/frame, OffersScreen's panel) — follow-up, same method.
 
+## `KnockoutScreen` -> `PMShadow`: KILLED 2026-08-01 (s87), not deferred an eighth time
+
+This refactor has been carried as "deferred" for seven sessions. It is not a scheduling
+problem; the proposal is **wrong**, and the two documents that kill it were already in the
+repo:
+
+* **`PMShadow`'s own header, derived leaf-for-leaf from `FUN_005cbea0`:** *"Because the mask
+  is only ever partial OUTSIDE the silhouette, and outside the silhouette the source index
+  is 0 (= palette black), every shadow pixel is the destination blended toward BLACK."*
+  The pass can darken the ring around a sprite. It cannot write anything INSIDE the
+  silhouette, and it cannot lighten.
+* **s62's classification of the bracket residual, and s85's measurement of it:** what is
+  left after the drop shadow is (2) *"a highlight applied to the sprite's own TOP/LEFT edge
+  pixels (not outside them)"*, taking LIGHT palette entries `(192,192,192)` /
+  `(160,160,164)` / `(144,144,144)`, plus (3) an interior component. s85 measured the rim as
+  **415 of 449 px INSIDE the exported sprite's own opaque mask**.
+
+An on-sprite lightening pass is the one thing `PMShadow` provably cannot be. So routing
+`KnockoutScreen`'s kit blits through it could not close the residual even if the plumbing
+were free, and s83's call-graph note ("`PMShadow` is not the universal answer for kit
+blits") was pointing at the same fact.
+
+**What would revive it:** locating the knockout view's own code in `MANAGER.EXE`. The whole
+knockout RE in this document is FRAME-derived and cites no VA at all, so nobody has ever
+checked whether the view even reaches the shadow thunk. The thunk's call sites are now
+enumerated -- **57 of them**, byte-scanned for `E8 rel32` targeting `0x4b7f60` rather than
+by a linear sweep (which desynchronises on this image and finds none):
+
+    0x4b29c0 0x4b2a53 0x4f45c3 0x4f4a06 0x4f4ee7 0x4f4f7d 0x4fe616 0x50f9e3
+    0x50fba1 0x515baf 0x515c36 0x520920 0x521207 0x5215ee 0x521a59 0x522710
+    0x522b3a 0x52304a 0x524c08 0x52e657 0x52e769 0x5308e0 0x5314f5 0x534753
+    0x53550b 0x535625 0x535739 0x53584d 0x535968 0x535a83 0x53715c 0x5371e6
+    0x537272 0x5372fe 0x53738a 0x537416 0x5374a2 0x53752e 0x5375b6 0x537633
+    0x540515 0x541335 0x543b50 0x54479a 0x5492f9 0x549679 0x5496f6 0x557bde
+    0x55a923 0x55ed1f 0x55ee58 0x55eec3 0x564294 0x56caef 0x56fa61 0x56fad4
+    0x574be2
+
+Identify the knockout view among them and the question becomes a measurement instead of an
+opinion. Until then the kit columns stay a declared bucket, which is what they already are.
+
 ## The outline pass, narrowed again (2026-07-26, s62) — it is a DROP SHADOW plus a highlight
 
 Classifying every differing pixel of all 16 bracket kit cells against the exact-decoded
