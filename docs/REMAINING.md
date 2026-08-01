@@ -121,9 +121,16 @@ does not do.
 The B9 drive stopped at step 56 on an UNKNOWN frame that was a real HALF TIME board
 carrying the TITLE SCREEN's logo strip in its top band — and every screen signature's ROI is
 `[136,16,284,28]`, inside that band. It was not a transition: 45 re-grabs over 54 s saw it,
-and so did a snapshot minutes later. `autodrive.repaint_nudge` now raises the window and
-moves the pointer inside it on the third failed attempt — both inert on every driven screen,
-where a click would not be: a click would have advanced past that board.
+and so did a snapshot minutes later. `autodrive.repaint_nudge` now moves the pointer inside
+the window on the third failed attempt — inert on every driven screen, where a click would
+not be: a click would have advanced past exactly the board that needed photographing.
+
+**And the driver must never pull the game window in front of the person using this box.**
+Mats works on this machine while a drive runs, and a `windowraise` on every synthetic click
+makes it unusable. `PM98_NO_RAISE=1` is the switch — `click.sh`, `autodrive.click` and
+`autodrive.repaint_nudge` all honour it — and **`arm_b9.sh` now exports it by default**, so
+a drive started the normal way never raises. Export it yourself if you invoke `autodrive.py`
+/ `boot.sh` / `nav_career.sh` directly.
 
 ## 0aaaaaaaaaaaaaaa. Closed 2026-08-01 (session s83) — THE BARRA PANEL, THE BAND'S SLANT, AND WHO ACTUALLY GETS PAID
 
