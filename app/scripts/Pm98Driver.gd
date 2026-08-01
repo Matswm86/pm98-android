@@ -84,6 +84,52 @@ static func _bvprobe(m: Dictionary, tag: String) -> void:
 		_bv_last = [vx, vy]
 
 
+# ---- PM98_TICK_PROF: where a tick's microseconds actually go ------------------------
+# A WATCHED match is real time iff the engine sustains 60 outer frames a second
+# (`MatchSimulador.ENGINE_FPS`), so "the engine is slow" is not actionable until the cost
+# is attributed to a named sub-pass. These accumulators do that. Gated on the env var and
+# read ONCE; when off the whole thing is one static-bool test per section, which is
+# nothing against a 22-player loop. Same posture as `PM98_WAIT_PROBE`.
+static var prof_on := false
+static var _prof_read := false
+static var prof: Dictionary = {}
+static var prof_ticks := 0
+
+static func prof_init() -> void:
+	_prof_read = true
+	prof_on = OS.has_environment("PM98_TICK_PROF")
+	prof.clear()
+	prof_ticks = 0
+
+
+static func _pmark() -> int:
+	if not _prof_read:
+		prof_init()
+	return Time.get_ticks_usec() if prof_on else 0
+
+
+static func _padd(key: String, t0: int) -> void:
+	if not prof_on:
+		return
+	prof[key] = int(prof.get(key, 0)) + (Time.get_ticks_usec() - t0)
+
+
+## The accumulated table as "key us calls" rows, slowest first, plus the per-tick average.
+static func prof_report() -> String:
+	var rows: Array = []
+	for k in prof.keys():
+		rows.append([str(k), int(prof[k])])
+	rows.sort_custom(func(a, b): return int(a[1]) > int(b[1]))
+	var out := "TICK PROFILE over %d ticks\n" % prof_ticks
+	var total := 0
+	for r in rows:
+		total += int(r[1])
+	for r in rows:
+		out += "  %-28s %9.3f s  %7.1f us/tick  %5.1f%%\n" % [r[0], int(r[1]) / 1e6,
+			float(r[1]) / maxf(prof_ticks, 1.0), 100.0 * int(r[1]) / maxf(total, 1.0)]
+	return out
+
+
 static func _g(d: Dictionary, off: int) -> int:
 	return int(d.get(off, 0))
 
@@ -199,18 +245,25 @@ static func tick(m: Dictionary, rng: MatchEngine.Pm98Rng) -> int:
 
 	# --- movement core (L180-208): all NO-RNG. Decide/relmatrix/markers/advance/nearest per
 	# team + the ball/keeper physics, then bump the 1024-frame ring counter. ---
+	prof_ticks += 1
 	_movement_core(m, int(m.get("ring", 0)), rng)
 	m["ring"] = (int(m.get("ring", 0)) + 1) & 0x3ff   # DAT_006d31bc = (DAT_006d31bc+1)&0x3ff
 	_bvprobe(m, "tick:after_movement_core")
 
 	# --- open-play / restart classification (L209-692): exactly one dispatch code fires. ---
+	var _pt2 := _pmark()
 	if _g(m, 0x448) == 0:
 		_classify_open_play(m, rng, b)
+	_padd("classify_open_play", _pt2)
 	_bvprobe(m, "tick:after_classify_open_play")
+	_pt2 = _pmark()
 	_stat_commentary_tail(m, rng, b)                  # the 3 commentary RNG timers (self-gates phase 0)
+	_padd("commentary_tail", _pt2)
 
 	# --- event-queue dequeue (L889) + the +0x454 cooldown decrement (L890-893). ---
+	_pt2 = _pmark()
 	_dequeue(m)                                        # FUN_00594570(0)
+	_padd("dequeue", _pt2)
 	_bvprobe(m, "tick:after_dequeue")
 	if _g(m, 0x454) > 1 and (_g(m, 0x461) & 0x80) == 0 and (_g(m, 0x160c) & 0xff) == 0:
 		m[0x454] = _i(_g(m, 0x454) - 1)
@@ -288,6 +341,7 @@ static func _movement_core(m: Dictionary, ring: int, rng = null) -> void:
 		return                                        # no match-init -> nothing to advance
 	var ctxs: Array = sim
 	_bvprobe(m, "mc:enter")
+	var _pt := _pmark()
 	# The NORMAL per-tick "decide" pass FUN_005b8bf0 dispatches player vtable+8. With the
 	# wine-corrected vtable base 0x639228, vtable+8 = FUN_005a4560 (the replay record/playback
 	# pass) -- a NO-OP on the live headless path -- NOT FUN_005a3400 (the real DECIDE, which is
@@ -297,13 +351,19 @@ static func _movement_core(m: Dictionary, ring: int, rng = null) -> void:
 	# ball/GK/ref DECIDE (+8) are replay snapshot -> NO-OP live.
 	for ctx in ctxs:
 		Pm98Movement.build_relationship_matrix(ctx)   # FUN_005b8690
+	_padd("relmatrix", _pt)
 	_bvprobe(m, "mc:after_relmatrix")
+	_pt = _pmark()
 	for ctx in ctxs:
 		Pm98Movement.assign_markers(ctx)              # FUN_005b94f0
+	_padd("assign_markers", _pt)
 	_bvprobe(m, "mc:after_markers")
+	_pt = _pmark()
 	for ctx in ctxs:
 		_advance_team(ctx, m, rng)                     # FUN_005b8c20 -> [vtable+0xc]=FUN_005a4600 (engine_tick)
+	_padd("advance_team", _pt)
 	_bvprobe(m, "mc:after_advance_teams")
+	_pt = _pmark()
 	# sub-entity ADVANCE (+0xc): ball physics + the 2 keepers (referee skipped, outcome-irrelevant).
 	var ball := _ball(m)
 	if not ball.is_empty():
@@ -311,9 +371,12 @@ static func _movement_core(m: Dictionary, ring: int, rng = null) -> void:
 	_bvprobe(m, "mc:after_ball_advance")
 	for k in _keepers(m):
 		Pm98Movement.keeper_advance(k)                # FUN_005a22d0 x2
+	_padd("ball+keepers", _pt)
 	_bvprobe(m, "mc:after_keeper_advance")
+	_pt = _pmark()
 	for ctx in ctxs:
 		Pm98Movement.select_nearest(ctx, 0)           # FUN_005b8ce0(0)
+	_padd("select_nearest", _pt)
 	_bvprobe(m, "mc:after_select_nearest")
 
 

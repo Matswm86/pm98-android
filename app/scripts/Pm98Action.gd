@@ -301,7 +301,9 @@ static func engine_tick(p: Dictionary, m: Dictionary, rng = null) -> void:
 			p[0x74] = nv if nv >= 0 else 0               # ((nv<0)-1) & nv == clamp >=0
 
 	# --- the per-player action / animation-phase advance (L72) ---
+	var _pt := Pm98Driver._pmark()
 	tick_action(p, m)
+	Pm98Driver._padd("  et:tick_action", _pt)
 	p[0x6c] = 0
 
 	# --- possession / touch counters (L73-79): phase 0 only (playback flag DAT_006d31c4==0 live) ---
@@ -315,7 +317,9 @@ static func engine_tick(p: Dictionary, m: Dictionary, rng = null) -> void:
 	if MatchEngine.Pm98Rng._log_on:
 		Pm98Driver._bvprobe(m, "et:after_tick_action a=0x%x" % _g(p, 0x40))
 	# --- the action-code switch (L80-236): exactly one arm fires (post-tick_action +0x40) ---
+	_pt = Pm98Driver._pmark()
 	_action_switch(p, m, gs, b, rng)
+	Pm98Driver._padd("  et:action_switch", _pt)
 	if MatchEngine.Pm98Rng._log_on:
 		Pm98Driver._bvprobe(m, "et:after_action_switch a=0x%x" % _g(p, 0x40))
 
@@ -338,14 +342,19 @@ static func engine_tick(p: Dictionary, m: Dictionary, rng = null) -> void:
 		p[4] = Pm98Trig._i32(_si(p, 4) + _idiv(_si(p, 0x94) - _si(p, 4), steps))
 		p[0xc] = Pm98Trig._i32(_si(p, 0xc) + _idiv(_si(p, 0x9c) - _si(p, 0xc), steps))
 	else:
+		_pt = Pm98Driver._pmark()
 		_movement_decision(p, m, gs, b, rng)
+		Pm98Driver._padd("  et:movement_decision", _pt)
 	if MatchEngine.Pm98Rng._log_on:
 		Pm98Driver._bvprobe(m, "et:after_move_or_decision a=0x%x" % _g(p, 0x40))
 
 	# --- LAB_005a4e5b (L376-425): the +0x40-gated 9490 lean + the 7260 ball-touch decision ---
 	var act := _g(p, 0x40)
+	_pt = Pm98Driver._pmark()
 	if act != 0x1d and act != 5 and act != 0x24 and (_g(m, 0x461) & 0x40) == 0:
 		_move_9490(p, rng)                               # FUN_005a9490 (lean, WIRED A+B+C)
+	Pm98Driver._padd("  et:move_9490", _pt)
+	_pt = Pm98Driver._pmark()
 	if _g(p, 0x2bc) == 0 and (_g(m, 0x461) & 0x40) == 0:
 		var run_7260 := true
 		if _g(m, 0x19a0) == 4:
@@ -356,8 +365,12 @@ static func engine_tick(p: Dictionary, m: Dictionary, rng = null) -> void:
 				if MatchEngine.Pm98Rng._log_on:
 					Pm98Driver._bvprobe(m, "et:after_move_7260 a=0x%x" % _g(p, 0x40))
 
+	Pm98Driver._padd("  et:move_7260", _pt)
+
 	# --- LAB_005a4fa2 (L426-465): the body-orient pass + the open-play power reset ---
+	_pt = Pm98Driver._pmark()
 	_move_8f20(p, _g(p, 0x34))                            # FUN_005a8f20 body-orient steer (WORD facing)
+	Pm98Driver._padd("  et:move_8f20", _pt)
 	if _highlight_active(p, m, gs):
 		if (_g(gs, 0x214) & 0xff) == 0 and _g(p, 0x40) >= 0 and _g(p, 0x40) <= 3:
 			p[0x58] = 0

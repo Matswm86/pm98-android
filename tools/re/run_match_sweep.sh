@@ -20,7 +20,10 @@
 #   peaks near 1 GB per run).
 set -uo pipefail
 cd "$(dirname "$0")/../.."   # repo root: tools/re -> tools -> .
-GODOT=${GODOT:-$HOME/godot462}
+# `godot462` was this box's binary when the harness was written; it is `godot4` now, and
+# `tools/run_tests.sh` has always used that. Fall back rather than pick one, so neither
+# box breaks (2026-08-01: the sweep had never been run, and this was why it could not be).
+GODOT=${GODOT:-$([ -x "$HOME/godot462" ] && echo "$HOME/godot462" || echo "$HOME/godot4")}
 N=${1:-50}
 NDET=${2:-5}
 JOBS=${3:-2}

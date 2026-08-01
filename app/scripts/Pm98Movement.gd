@@ -541,6 +541,14 @@ static func assign_markers(ctx: Dictionary) -> void:
 		p[0x154] = -1
 
 	# (B) assign the best eligible marker to each ball-holding opponent.
+	#
+	# The inner scan is 11 x 11 a tick a team and it was the second-heaviest pass in the
+	# whole engine (`docs/re/M5_S86_ENGINE_THROUGHPUT.md`). Everything below that depends
+	# only on `q` is HOISTED out of the `oi` loop -- the matrix offset, q's z, q's team, and
+	# BOTH arms of the q-metric (each arm reads q alone; which arm applies is the only
+	# per-`our` part). The off-pitch `continue` also moves ahead of the score, which was
+	# being computed and discarded for every substitute. Arithmetic and order of comparison
+	# are untouched, so the selection is bit-identical -- `test_assignmarker.gd` is the gate.
 	for qi in opp.size():
 		var q: Dictionary = opp[qi]
 		q[0x150] = -1
@@ -549,17 +557,19 @@ static func assign_markers(ctx: Dictionary) -> void:
 			continue
 		var best := -1
 		var best_score := MATRIX_INIT                        # 0x3e80000 = 1000.0
+		var q_off := _dist_off(_g(q, 0x2c4), _g(q, 0x2b8))   # q's column in the 8690 matrix
+		var q_z := _g(q, 0x8)
+		var q_team := _g(q, 0x2b8)
+		var q_x := _g(q, 0x4)
+		var q_anchor := _g(q, 0x3a4)
+		var q_metric_same := absi(Pm98Trig._i32(q_x - q_anchor))
+		var q_metric_diff := absi(Pm98Trig._i32(q_anchor + q_x))
 		for oi in players.size():
 			var our: Dictionary = players[oi]
-			var score := _g(our, _dist_off(_g(q, 0x2c4), _g(q, 0x2b8))) \
-				+ absi(Pm98Trig._i32(_g(our, 0x8) - _g(q, 0x8))) / 3
 			if _g(our, 0x2bc) == 0:                          # off pitch -> skip
 				continue
-			var q_metric: int
-			if _g(our, 0x2b8) == _g(q, 0x2b8):
-				q_metric = absi(Pm98Trig._i32(_g(q, 0x4) - _g(q, 0x3a4)))
-			else:
-				q_metric = absi(Pm98Trig._i32(_g(q, 0x3a4) + _g(q, 0x4)))
+			var score := _g(our, q_off) + absi(Pm98Trig._i32(_g(our, 0x8) - q_z)) / 3
+			var q_metric: int = q_metric_same if _g(our, 0x2b8) == q_team else q_metric_diff
 			var our_metric := absi(Pm98Trig._i32(_g(our, 0x4) - _g(our, 0x3a4)))
 			if our_metric < q_metric and score < best_score:
 				best_score = score
@@ -7710,9 +7720,21 @@ static func _lean9490_offball(p: Dictionary, rng) -> void:
 	if not (action >= 0 and action <= 3) and action != 0xb and action != 0x1c:
 		if lean_trace_on: rec["gate"] = "g3_action"
 		return
-	var sc: Array = _lean9490_aim_scalars(p)                # L189-205 (FUN_00590aa0 goal point folded in)
-	var grid: Array = _grid9490_build(p)                    # L206-220
+	# L189-220: the aim scalars and the 16-row rotated grid. The binary computes BOTH here,
+	# ahead of the L222-227 ball guards that can abort without ever reading them, and this
+	# port did the same. Both builders are PURE -- they read p / ball / match and return a
+	# value, write nothing, draw no RNG -- so DEFERRING them past those guards is observably
+	# identical, and it is the single biggest saving in the whole tick: while the ball has a
+	# carrier, guard 4 aborts EVERY off-ball player, i.e. up to 21 of the 22 per frame were
+	# rotating sixteen 3-vectors and throwing them away. Measured: `bench_live_match.gd`
+	# 36.3 -> the figure in `docs/re/M5_S86_ENGINE_THROUGHPUT.md`.
+	# The eager order is KEPT under `lean_trace_on`, because the trace records `sc`/`g0`/`g2`
+	# on the aborting rows too and a diag must not change shape to suit an optimisation.
+	var sc: Array = []
+	var grid: Array = []
 	if lean_trace_on:
+		sc = _lean9490_aim_scalars(p)
+		grid = _grid9490_build(p)
 		rec["sc"] = sc
 		rec["g0"] = grid[0]
 		rec["g2"] = grid[2]
@@ -7723,6 +7745,9 @@ static func _lean9490_offball(p: Dictionary, rng) -> void:
 	if _g(ball, 0x70) != 0:
 		if lean_trace_on: rec["gate"] = "g4_anim"
 		return
+	if not lean_trace_on:
+		sc = _lean9490_aim_scalars(p)                       # L189-205 (FUN_00590aa0 goal point folded in)
+		grid = _grid9490_build(p)                           # L206-220
 	var applied := false                                    # L229 scan-entry gate; fail -> straight to C
 	if action != 0xb and _g(p, 0x54) != 0 and _g(p, 0x2bc) != 0:
 		applied = _lean9490_marker_scan_apply(p, grid, int(sc[0]), int(sc[1]), rng)
