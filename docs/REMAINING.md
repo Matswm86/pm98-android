@@ -290,8 +290,14 @@ is what decides who can move it.
   team.** Stoppage time and the cross-seed `PM98_SEED` sweep are still unrun.
 * **B9's filled YOUTH TEAM roster row** — needs a SIGNED prospect.
   `plans/season_youth_b9_sign.json` drives it; roughly a season of wall clock.
-* **The per-round cup-draw chrome** — the corpus has twelve SORTEO frames and four round
-  labels, and **no semifinal or final draw at all** (see s81 §10 as amended).
+* **The per-round cup-draw chrome** — **advanced, s85.** The corpus had twelve SORTEO frames
+  and four round labels across three competitions, so the per-round axis was unanswerable.
+  This session's drive banked five more (`tools/re/refs/cupdraw-rounds-2026-08-01/`),
+  including **three new labels and a knockout-stage draw**: Coca-Cola `ROUND 2`, `ROUND 3`,
+  `ROUND 4` and **`QTR. FINALS`** — four rounds of the SAME competition from the SAME career,
+  which is exactly the comparison that was missing. Not yet analysed: a masked diff leaves
+  ~5,000 px, but the box contains the ANIMATED sorteo drum, so the drum has to be masked or
+  filmed before any of it counts. A **semifinal and a final** draw are still missing.
 * ~~**The SEARCH CAPABILITY star ladder.**~~ **s85: not a ladder, and not a capture item.
   The value cell is per-capability AVAILABILITY (frame 047 reads all six YES with only three
   LEDs selected) and the mask is PER SCOUT — two 2★ scouts, two different masks. It is an RE
