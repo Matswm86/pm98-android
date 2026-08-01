@@ -14,6 +14,10 @@
 # Usage: tools/re/wine/arm_b9.sh [manager_name]
 set -euo pipefail
 cd "$(dirname "$0")"
+# NEVER yank the wine desktop in front of the person using this box. Mats works on
+# this machine while a drive runs; a raise on every click makes it unusable. Set here
+# rather than left to the caller so a future session cannot forget it (2026-08-01).
+export PM98_NO_RAISE="${PM98_NO_RAISE:-1}"
 source ./env.sh
 
 NAME="${1:-mats}"
@@ -55,4 +59,4 @@ step 571 440            # back out of YOUTH TEAM
 step 577 450            # back out of SQUAD MANAGEMENT -> hub
 
 echo "armed; handing over to autodrive"
-exec python3 ./autodrive.py run plans/season_youth_b9.json
+exec python3 ./autodrive.py run "${PM98_B9_PLAN:-plans/season_youth_b9.json}"

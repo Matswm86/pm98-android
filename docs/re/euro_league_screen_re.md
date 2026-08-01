@@ -464,6 +464,43 @@ draws a kit over exactly as the original does. `_recover_leader_backdrop` in the
 **Effect:** the leader cell went **196 → 66 px** and the gate **864 → 734** per frame.
 What is left is the 1-px rim above, still un-reversed.
 
+### The 1-px rim — three models KILLED, and where it does come from (2026-08-01, s84)
+
+Still unlocated, but no longer merely untried. `tools/re/probe_kit_rim_models.py` measures
+the leader cell across all six group frames — **449 residual px** — and settles two things
+and kills three models.
+
+**Established:**
+
+* **The rim is ON the sprite, not beside it.** **415 of the 449** px lie inside the exported
+  NANOESC sprite's own opaque mask (group A alone: 60 of 66). So it is not a drop shadow,
+  an outline or a halo — it recolours pixels the sprite itself covers, which is why every
+  attempt to explain it as a pass drawn *under* the kit was looking in the wrong place.
+* **It comes out of the shadow blit's own quantiser.** The rim colours are palette entries
+  that are each other's **dither PARTNERS** in the reconstructed LUT: palette 13
+  `(59,85,130)` and palette 10 `(42,63,170)` are `table0[c]` / `table1[c]` for 27 shared
+  RGB565 cells, and both appear in the same sprite's rim at different absolute-screen
+  parities. So whatever draws it writes 24-bit colour and re-quantises through
+  `DAT_00675398` — the `FUN_005d5220` path. It is **not** a palette error, a wrong kit
+  bank, or an export bug, and those three explanations can stop being carried.
+
+**Killed** — each scored as "does SOME weight reproduce the original, given the port's own
+colour, the destination chrome and the screen parity". A model that cannot be fitted even
+with a free per-pixel weight is dead:
+
+| model | score |
+|---|---|
+| blended toward the DESTINATION chrome (an edge alpha) | 179 / 449 |
+| blended toward BLACK (the drop-shadow direction) | 264 / 449 |
+| blended toward WHITE (the "consistently lighter" reading) | 58 / 449 |
+
+The `toward-white` score is the arithmetic behind s83's correction of the old
+"consistently LIGHTER" note: the rim is not a lightening pass in any fittable sense.
+A fourth line the probe prints — blended toward one of its own eight neighbours, 396/449 —
+is **not** evidence and is labelled as such in the tool: eight neighbours × 65 weights is a
+large enough space that 88 % is what noise looks like, and its honest companion
+(exact-neighbour, 49/449) says so.
+
 ### ⭐ The BARRA MANAGER KIT was never a capture gap either — CLOSED 2026-08-01
 
 The old note below said the panel "has never been seen unoccluded". It had been: the six

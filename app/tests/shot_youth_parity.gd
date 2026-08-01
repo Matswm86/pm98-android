@@ -75,6 +75,35 @@ func _run() -> void:
 	await _grab(dir, "youth_048.png")
 	node._press = ""
 
+	# ---- B9: the FILLED PLAYERS FOUND list ------------------------------------------
+	# `tools/re/refs/b9-players-found-2026-08-01/02_players_found_first.png`
+	# — a TOTAL-level Bolton W career, Saturday 28 March 1998, Premier week 34, whose
+	# YOUTH TEAM SCOUT C. Stump (4.5*) has reported his first prospect. Every value below
+	# is read off that frame: all six capabilities YES, all six LEDs still LIT after the
+	# report, the manager P. Klachinsky (5*) over "4 PLAYERS" and an EMPTY roster, the
+	# PARAMETERS plaque selected — and one row, `Chapman  41  [ROL 10]  £5,000  19`.
+	PMChrome.header_phase = "season"
+	PMChrome.header_date = {"wd": "Saturday", "day": "28", "mon": "March", "year": "1998"}
+	var staff_b9 := [
+		{"id": 1, "role": Staff.YOUTH_TEAM_SCOUT, "name": "C. Stump", "stars": 4.5,
+			"wage": 32000},
+		{"id": 2, "role": Staff.YOUTH_TEAM_MANAGER, "name": "P. Klachinsky", "stars": 5.0,
+			"wage": 36000},
+	]
+	var found := [{
+		"id": 9001, "name": "Chapman", "age": 19, "posFine": 10, "contract_wage": 5000,
+		"attrs": {"VE": 41, "RE": 41, "AG": 41, "CA": 41},
+	}]
+	var lit := {}
+	for skill in ["HANDLING", "PASSING", "DRIBBLING", "HEADING", "TACKLING", "SHOOTING"]:
+		lit[skill] = true
+	node.setup([], staff_b9, "matts", "Bolton W", "1997-98", 34, -1, false, lit, found)
+	node._mode = "parameters"
+	node._arrow_row = "parameters"
+	node._count_override = 4
+	node.queue_redraw()
+	await _grab(dir, "youth_b9found.png")
+
 	print("SHOTS DONE")
 	quit(0)
 

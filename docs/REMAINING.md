@@ -1,5 +1,130 @@
 # PM98 Android — remaining-work inventory (refreshed 2026-08-01)
 
+## 0aaaaaaaaaaaaaaaa. Closed 2026-08-01 (session s84) — B9's FILLED PANEL, THE RIM'S THREE DEAD MODELS, AND A DELEGATION THAT POINTED AT NOTHING
+
+### 1. ⭐ B9's FILLED "PLAYERS FOUND" PANEL — CLOSED AT 0 px, AND THE FRAMES WERE ALREADY BANKED
+
+s83 left B9 as "driving time": the port had never seen the youth scout's report un-occluded,
+so the panel's list was drawn from refrun `p0759_UNKNOWN.png` — a frame with the
+contract-offer card **on top of it**. The card DIMS what it covers, so the inks read off it
+(AV `(132,26,26)`, WAGE `(100,0,0)`, AGE `(30,52,98)`) were the dimmed values, and the row
+plate, the cell grid and the scrollbar were not in evidence at all.
+
+**They did not need another drive.** s83's own run had already banked them: probes
+`0248`..`0597` of `season_youth_b9` are the YOUTH TEAM screen of a TOTAL-level Bolton W
+career with the scout's first report on it — `Chapman  41  [ROL]  £5,000  19` — and nothing
+over it. Two of them, 14 months apart, differ by 494 px and **every one of those is in the
+header date plaque**: the list rect is identical, so the widget is stable and one cut is
+enough. Both are now in the repo, TRACKED, at `tools/re/refs/b9-players-found-2026-08-01/`
+(`screenshots/` is gitignored, so anything a GATE depends on belongs in `refs/`),
+because the previous builder had been reading a session scratchpad that does not survive a
+reboot — the same lesson s80 learned about the youth arrow.
+
+`tools/re/build_youth_found_list_from_frames.py` cuts the widget verbatim into
+`found_list.png` + `found_rowgrid.png` and re-measures the frame's own invariants first
+(six plates on a 16-px pitch, the grid's four dividers, the two rules). Four things the
+render-diff then forced, each of them a measurement:
+
+* **the ROL cell is a 25x14 BLACK backing** — that is what the frame carries at every one
+  of the 82 px `camrol10` leaves transparent, and it is the same backing
+  `build_lineup_chrome_from_frames.py` already bakes under the LINE-UP camrol column. The
+  icon itself is the port's own sprite, matched at **0 of 268 opaque px**;
+* **each column's VALUE carries its own HEADER's ink** — AV `(212,63,0)`, WAGE `(150,0,0)`,
+  AGE `(42,95,170)`, name black, and the name is NOT upper-cased;
+* **the money column is the `euro8` face at 11**, not the bold list face. Identified by
+  SHAPE and reproducibly (`app/tests/shot_face_probe.gd` + `tools/re/probe_text_face.py`):
+  "£5,000" rendered in all eight extracted faces at 8/10/11/12 and XOR'd against the
+  witness cell's own 94-px ink mask — **euro8@11 is the only pair that scores 0**, and the
+  other 31 do not even share its bounding box;
+* **the scout bar's half star had no purple sprite.** `_stars` was called with `null` for
+  that row because no frame had ever shown a youth scout on a .5 rating; B9 hired
+  **C. Stump, 4.5**. Cut by `build_youth_star_half_purple_from_frame.py`, whose alpha comes
+  from the port's own render of the same screen without it.
+
+**`diff_youth_parity` is 6 of 6 at 0 px body**, the sixth being the new
+`youth_b9found` pair. `test_fines`, `test_youth`, `test_youth_screen`,
+`test_youth_offer_route` and `test_manager_panel` are added to the CI gate list.
+
+What is left of B9 is ONE gap and it is named: a filled YOUTH TEAM **roster** row, which
+needs the prospect SIGNED — the row tap raises the contract card and only OFFER puts him in
+the roster. `plans/season_youth_b9_sign.json` drives exactly that (row tap at (450,126), then
+OFFER by TEMPLATE match so it is a no-op on every probe with no card up).
+
+### 2. THE 1-px KIT RIM — TWO FACTS ESTABLISHED, THREE MODELS KILLED
+
+Still unlocated, but no longer merely untried. `tools/re/probe_kit_rim_models.py` measures
+the EURO GROUP leader cell over all six frames (449 residual px) and settles:
+
+* **the rim is ON the sprite** — 415 of 449 px are inside the exported NANOESC sprite's own
+  opaque mask. It is not a drop shadow, an outline or a halo, which is why every search for
+  a pass drawn *under* the kit was looking in the wrong place;
+* **it comes out of the shadow blit's own quantiser** — the rim colours are each other's
+  LUT **dither PARTNERS** (palette 13 `(59,85,130)` / palette 10 `(42,63,170)` share 27
+  RGB565 cells) and both appear in one sprite's rim at different screen parities. So it is
+  **not** a palette error, a wrong kit bank, or an export bug — three explanations that can
+  stop being carried.
+
+Killed, each scored as "does SOME weight reproduce the original, given the port's colour,
+the destination chrome and the parity": blended toward the chrome **179/449**, toward black
+**264/449**, toward white **58/449**. The last is the arithmetic behind s83's correction of
+the old "consistently LIGHTER" note.
+
+### 3. THE `Status:` DELEGATION POINTED AT NOTHING FOR 114 DOCS — REPOINTED, AND CI-GUARDED
+
+`REMAINING.md` delegated per-screen truth to "the `Status:` line at the top of each
+`docs/re/<screen>_re.md`", and only **21 of 135** docs carry one. Writing the other 114
+would be prose about prose and every sentence a guess. The delegation now points at
+`docs/re/STATUS_INDEX.md`, which DERIVES each doc's standing from its gate, suite, scene,
+EXE addresses and `Evidence:` paths — **0 of the 135 have no evidence link** (37 gated, 67
+with a headless suite, 93 binary-anchored, 28 with an explicit `Evidence:` line).
+
+The builder had been unrunnable: its `Evidence:` parser comma-split raw text, so any doc
+that annotated a path failed the whole script (`camera_motion_re.md`'s "…`MANAGER.EXE`
+(capstone, …)"), and its regex swallowed sibling `Raw:` / `Port:` lines whose paths are
+deliberately outside the repo. It now scans line by line, takes backticked spans, and
+verifies only tokens carrying a `/`. A **new CI step** regenerates the index and fails the
+build if it differs from the tracked one — so a rotted `Evidence:` path breaks the build
+instead of quietly making the delegation false again.
+
+### 4. THE M5 "WATCH-HARNESS SPIN" ENTRY WAS STALE — CORRECTED IN PLACE
+
+`M5_S59_FRONTIER_2836.md` still listed the harness spin as open item 1. It was closed
+2026-07-28 by `5b25acd`: it is the BOARD PAUSE, not the goal latch, and both missing pieces
+(`+0x1a1f` from the global pause byte, and the KICK OFF click as a nonzero pump result) are
+modelled by `Pm98Outer.next_pump_result`, which `run_match_from_struct.gd` raises on the
+frame after a pause-branch break. Two probes killed the `restart_handler` hypothesis rather
+than leaving it hanging, and a stall guard replaced the silent multi-hour hang. Goals 2-7
+attribution is now a RUN of that harness, not a fix to it.
+
+### 5. 🆕 OPEN — THE "SEARCH CAPABILITY" YES/NO BLOCK IS NOT ALWAYS ALL-YES
+
+`YouthScreen` draws the six SEARCH CAPABILITY values as **"the witnessed NO (no scout) /
+YES (scout) pair"** — all six YES the moment a youth scout exists. The s84 drive's own
+career contradicts that: with **C. Dewhurst (2.0★)** hired, the block reads
+**HANDLING / DRIBBLING / TACKLING = YES** and **PASSING / HEADING / SHOOTING = NO**, while
+s83's **C. Stump (4.5★)** career reads all six YES. Frame banked at
+`screenshots/wine-captures-2026-08-01-b9-sign-drive/probe_0028_04_youth_after.png`
+(and the same career's youth manager **S. Saxon 1.0★** reads "1 PLAYERS", which is
+`FUN_00578b80` case 10's q<3 band — an independent confirmation that the frame is sane).
+
+**Deliberately NOT fixed this session.** Two samples cannot fix a six-step ladder, and the
+2★ split is confounded: the three YES cells are exactly the LEFT COLUMN, so "the first
+three in `cap_order`" and "the left column" and "three unlocked by rating" are all
+consistent with it. `FUN_00578b80` is not the source — its YOUTH TEAM SCOUT arm is
+`0xffff` (no cap) in all five bands. The precedent for how to settle it is
+`ScoutScreen.REGION_STARS`: four careers at four ratings plus one bracketed step. That is
+what this needs, and inventing four thresholds from one frame is exactly what this project
+does not do.
+
+### 6. THE WINE DRIVER LOST A RUN TO A REPAINT, AND NO LONGER CAN
+
+The B9 drive stopped at step 56 on an UNKNOWN frame that was a real HALF TIME board
+carrying the TITLE SCREEN's logo strip in its top band — and every screen signature's ROI is
+`[136,16,284,28]`, inside that band. It was not a transition: 45 re-grabs over 54 s saw it,
+and so did a snapshot minutes later. `autodrive.repaint_nudge` now raises the window and
+moves the pointer inside it on the third failed attempt — both inert on every driven screen,
+where a click would not be: a click would have advanced past that board.
+
 ## 0aaaaaaaaaaaaaaa. Closed 2026-08-01 (session s83) — THE BARRA PANEL, THE BAND'S SLANT, AND WHO ACTUALLY GETS PAID
 
 Three of s82's carried items closed, each against a measurement rather than a theory, and
@@ -282,9 +407,24 @@ straddle an edge.
 `CupDrawScreen` already switches on two axes the reference run witnessed: the competition
 (seven `sorteo_*` strips) and the LIST vs GRID panel form by tie count (REFRUN R8, >16 ties
 -> scrollable one-line list, <=16 -> the four-column grid), plus the EXE's own uppercase
-round plate. Only four draw frames exist in the RE corpus, and they are what those two axes
-were built from; a third per-round axis is not in evidence and is NOT invented here. If the
+round plate. A third per-round axis is not in evidence and is NOT invented here. If the
 original varies further, the next step is a wine capture of a semifinal / final draw.
+
+**Counted 2026-08-01 (s84), because "only four draw frames exist in the RE corpus" was
+wrong — four are what the GATE uses, twelve are what exists.** Every SORTEO frame in the
+reference run, with its own round plate read off the frame:
+
+| frames | competition | round plate |
+|---|---|---|
+| p0125, p0126, p0127, p0131, p0132, p0133 | Coca-Cola Cup | `ROUND 3` |
+| p0380, p0381 | F.A. Cup | `ROUND 3` |
+| p0445, p0446 | F.A. Cup | `ROUND 4` |
+| p0744, p0747 | U.E.F.A. Cup | `1/16 FINAL` |
+
+So the corpus carries **four distinct round labels across three competitions and both panel
+forms, and no semifinal or final draw at all** — which is exactly the shape of evidence
+that cannot answer the per-round question either way. The item stays open on a capture, and
+it is now open on a *counted* corpus rather than a remembered one.
 
 ## STILL OPEN AFTER s81
 
@@ -1537,9 +1677,18 @@ This is the honest, full list. Nothing hidden.
 
 > The 2026-06-20 edition of this file was five weeks stale — it still listed the collision
 > builder, the match-tick driver, PKF sprite decompression and the season-end screens as
-> open, and all four have since landed. **Per-screen truth is the `Status:` line at the top
-> of each `docs/re/<screen>_re.md`, not this file.** This file is the map, they are the
-> territory.
+> open, and all four have since landed. **Per-screen truth is not this file** — it is
+> `docs/re/STATUS_INDEX.md`, which derives each doc's standing from its gate, suite, scene,
+> EXE addresses and `Evidence:` paths and fails loudly when one of those paths rots.
+> This file is the map, the docs are the territory, and the index is the survey.
+>
+> That delegation used to point at "the `Status:` line at the top of each
+> `docs/re/<screen>_re.md`" — and only **21 of 135** docs carry one, so for the other 114
+> it pointed at nothing. Writing 114 status sentences would be prose about prose and every
+> one of them would be a guess, which is exactly what this project does not do; the index
+> is the same delegation made checkable instead. **0 of the 135 docs now have no evidence
+> link at all** (37 gated, 67 with a headless suite, 93 binary-anchored, 28 with an
+> explicit `Evidence:` line).
 >
 > The 2026-07-26 rewrite still carried one stale line of its own — "SAVE GAME is still a
 > toast". It has not been a toast since 2026-07-18: `Main._menu_action` "save" opens the
@@ -2159,8 +2308,8 @@ mask) — it needs the APK on a phone, which this box cannot do.
 
 | question | file |
 |---|---|
-| is screen X faithful? | `docs/re/<screen>_re.md` `Status:` line |
-| ...and what backs that claim? | `docs/re/STATUS_INDEX.md` — every RE doc against its gate / suite / EXE addresses |
+| is screen X faithful? | `docs/re/STATUS_INDEX.md` — the DERIVED answer: every RE doc against its gate, suite, scene, EXE addresses and `Evidence:` paths. Rebuild with `python3 tools/re/build_status_index.py`; it exits non-zero if any `Evidence:` path has rotted |
+| ...and the doc's own sentence about it? | the `Status:` line at the top of `docs/re/<screen>_re.md`, where one exists (21 of 135). It is a convenience, NOT the delegation — see the note below |
 | which frame witnesses screen X? | `docs/re/WALKTHROUGH_MANIFEST.md` — all 636 frames named + who cites them |
 | what does the app do that the original does not (and vice versa)? | `docs/re/APP_VS_SPEC_AUDIT.md` |
 | what is decoded already? | `docs/re/EXACT_PORT_PLAN.md` §"Already decoded — cite, don't redo" |

@@ -133,6 +133,21 @@ jobs:
       # Android Gradle build template install is needed — the bundled android_debug.apk /
       # android_release.apk template is repackaged and signed with the matching keystore.
 
+      - name: RE evidence guard (docs/re/STATUS_INDEX.md is derived, and must still derive)
+        run: |
+          # docs/REMAINING.md delegates per-screen truth to STATUS_INDEX.md, which is
+          # GENERATED from each RE doc's gate / suite / scene / EXE addresses / Evidence:
+          # paths. The builder exits non-zero if any Evidence: path has rotted, so running
+          # it here is what keeps that delegation honest. Stdlib only — no pip install.
+          set -e
+          python3 tools/re/build_status_index.py --out /tmp/STATUS_INDEX.md
+          if ! diff -q /tmp/STATUS_INDEX.md docs/re/STATUS_INDEX.md > /dev/null; then
+            echo "::error::docs/re/STATUS_INDEX.md is stale — rerun tools/re/build_status_index.py"
+            diff docs/re/STATUS_INDEX.md /tmp/STATUS_INDEX.md | head -40
+            exit 1
+          fi
+          echo "RE evidence index is current and every Evidence: path resolves."
+
       - name: Pre-import project resources
         working-directory: app
         run: |
@@ -180,7 +195,8 @@ jobs:
                    test_mantoman test_shadow_blit test_manager_panel \
                    test_ground_preset test_live_match \
                    test_jug_render test_match_simulador \
-                   test_channeltv_screen test_cam_ctrl; do
+                   test_channeltv_screen test_cam_ctrl \
+                   test_fines test_youth test_youth_screen test_youth_offer_route; do
             echo "== $t"
             if ! "$GITHUB_WORKSPACE/godot" --headless --path . --script "res://tests/$t.gd" \
                 > "/tmp/$t.log" 2>&1; then

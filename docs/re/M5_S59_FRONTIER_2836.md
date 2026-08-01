@@ -97,8 +97,21 @@ spins after the first real goal. That harness-side loop is the next kill-test it
 
 ## Still open
 
-1. The WATCH-path harness spin above — Outer/pause-branch after a real goal fires;
-   engine-side full time is clean (dispatch 10 at clk 14400, final 1-3 raw).
+1. ~~The WATCH-path harness spin above~~ — **CLOSED 2026-07-28 by `5b25acd`**, and this
+   line is corrected here rather than left to mislead a later session. It was the BOARD
+   PAUSE, not the goal latch: under the dump's play-state 4 the wait loop breaks on the
+   goal's `+0x1a2c` and `_dequeue_flush` then CLEARS it, so the next step had nothing left
+   to break on and spun its whole 40,000-frame guard with the clock frozen. Two pieces of
+   real binary state were missing headless — `+0x1a1f` (set from the global pause byte
+   `DAT_00674cb3`, which is exactly what an events board sets) and the KICK OFF click,
+   which reaches `FUN_00593ab0` as a nonzero pump result whose skip path arms `+0x1a1e`.
+   `Pm98Outer.next_pump_result` is that injection point and `run_match_from_struct.gd`
+   raises both on the frame after a pause-branch break. Two probes settled what was left
+   instead of guessing: `PM98_TICK_PROBE` showed the driver returning 1 for eight ticks
+   then 0 forever with clk/phase/dispatch frozen, and `PM98_PROBE_RESTART` showed
+   `restart_handler` working when armed — so that hypothesis is killed, not hanging. A
+   STALL GUARD now reports a frozen clock after 3 steps instead of hanging for hours.
+   Goals 2-7 attribution is a RUN of that harness now, not a fix to it.
 2. The ps-9 chase geometry (fn_005aeda0 L121-170) — still deferred, RNG-free, returns
    directly (no tail).
 3. The cross-seed sweep (`PM98_SEED`) — still unrun.

@@ -50,8 +50,42 @@ SCENES = sorted((ROOT / "app" / "scenes").glob("*.gd")) + sorted(
 )
 
 ADDR = re.compile(r"0x[0-9a-fA-F]{6}")
-# `Evidence: path, path, ...` — repo-relative, backticks optional, one line, near the top.
-EVIDENCE = re.compile(r"^Evidence:\s*(.+)$", re.M)
+# `Evidence: path, path, ...` — repo-relative, near the top. The block runs from the
+# `Evidence:` keyword to the next blank line OR to the next `Keyword:` line, whichever
+# comes first: several docs wrap the list over two or three lines, and several follow it
+# with sibling keywords (`Port:`, `Gate:`, `Raw:`) whose paths are NOT this doc's evidence
+# — `Raw:` in particular names workspace captures under `~/MWM-AI/data/`, outside the repo.
+#
+# Inside the block, a BACKTICKED span is the path. Comma-splitting the raw text was the
+# earlier rule and it broke on any doc that annotates a path — `camera_motion_re.md`'s
+# "`…/MANAGER.EXE` (capstone, decoded per function entry)" split into a path with
+# " (capstone" glued on and failed the whole script. Backticks are how every doc in the
+# tree writes a path, so they are the rule now; a block with none falls back to
+# comma-splitting so a plain-text Evidence line still resolves.
+def evidence_block(body: str) -> str:
+    """The `Evidence:` keyword's own lines: from it to the next blank line or `Keyword:`.
+
+    Several docs wrap the list over two or three lines, and several follow it with SIBLING
+    keywords (`Port:`, `Gate:`, `Raw:`) whose paths are not this doc's evidence — `Raw:` in
+    particular names workspace captures under `~/MWM-AI/data/`, outside the repo entirely.
+    Scanned line by line rather than by regex, because the lazy-quantifier version of this
+    silently swallowed those sibling lines and failed the whole script on their paths.
+    """
+    lines = body.splitlines()
+    for i, line in enumerate(lines):
+        if not line.startswith("Evidence:"):
+            continue
+        out = [line[len("Evidence:"):]]
+        for nxt in lines[i + 1:]:
+            if not nxt.strip() or KEYWORD.match(nxt):
+                break
+            out.append(nxt)
+        return "\n".join(out)
+    return ""
+
+
+KEYWORD = re.compile(r"^[A-Z][A-Za-z ]{0,12}:")
+BACKTICKED = re.compile(r"`([^`]+)`")
 OPEN_MARKERS = [
     "un-RE'd",
     "unRE'd",
@@ -99,11 +133,21 @@ def main() -> int:
         scenes = sorted({s.name for s in SCENES if any(t in s.stem.lower() for t in toks)})
         has_status = body.startswith("#") and "\nStatus:" in body[:800]
         ev: list[str] = []
-        m = EVIDENCE.search(body)
-        if m:
-            for raw in m.group(1).split(","):
-                path = raw.strip().strip("`").strip().rstrip(".").strip("`")
-                if not path:
+        block = evidence_block(body)
+        if block:
+            # backticked spans anywhere in the block; else the FIRST line's comma list,
+            # which is where a plain-text Evidence line puts its paths (the lines under it
+            # are prose about them, and comma-splitting those produced sentences-as-paths)
+            raws = BACKTICKED.findall(block) or block.splitlines()[0].split(",")
+            for raw in raws:
+                path = raw.strip().strip("`").strip().rstrip(".").strip()
+                # Only tokens carrying a "/" are treated as repo paths. The backticks on an
+                # Evidence line also wrap things that are NOT files — `FUN_0057a980`,
+                # `MANAGER.EXE`, `RECURSOS.PKF` — and checking those as paths failed the
+                # script on docs that were perfectly well evidenced (`fines_re.md`). So a
+                # bare filename is not checked, and an Evidence path must name its
+                # directory to be verified. Every doc in the tree already does.
+                if "/" not in path:
                     continue
                 if not (ROOT / path).exists():
                     print(f"FAIL {d.name}: Evidence path does not exist: {path}", file=sys.stderr)
@@ -139,10 +183,10 @@ def main() -> int:
         "",
         "Status: GENERATED — rebuild with `python3 tools/re/build_status_index.py`.",
         "",
-        "`docs/REMAINING.md` delegates per-screen truth to each doc's own `Status:` line,",
-        "and the 2026-07-26 complete audit found only ~12 of 125 docs carry one. This is",
-        "what that delegation needs instead of 113 hand-written sentences: for every doc,",
-        "the artefacts that can CONFIRM it, each of them checkable.",
+        "`docs/REMAINING.md` used to delegate per-screen truth to each doc's own `Status:`",
+        "line — and most docs do not carry one, so for most screens it pointed at nothing.",
+        "Since 2026-08-01 it delegates HERE instead: for every doc, the artefacts that can",
+        "CONFIRM it, each of them checkable, and none of them a sentence someone guessed.",
         "",
         f"* **{n} docs**, {n_status} with a `Status:` line of their own.",
         f"* **{n_gate}** are covered by a `diff_*_parity.py` render-diff gate — the",
@@ -177,8 +221,11 @@ def main() -> int:
             )
         )
     a.out.write_text("\n".join(out) + "\n")
+    # CI writes the index to a scratch path and diffs it against the tracked one, so
+    # `--out` is not always inside the repo.
+    where = a.out.relative_to(ROOT) if a.out.is_relative_to(ROOT) else a.out
     print(
-        f"wrote {a.out.relative_to(ROOT)}: {n} docs, {n_gate} gated, {n_suite} suited, "
+        f"wrote {where}: {n} docs, {n_gate} gated, {n_suite} suited, "
         f"{n_bin} binary-anchored, {n_ev} with an Evidence: line, "
         f"{n_none} with no evidence link"
     )

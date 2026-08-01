@@ -92,6 +92,36 @@ def grab(e: dict, path: Path) -> Image.Image:
     return Image.open(path).convert("RGB")
 
 
+def repaint_nudge(e: dict) -> None:
+    """Force the game to repaint, WITHOUT touching its state.
+
+    Observed live 2026-08-01 (s84): the drive stopped on an UNKNOWN frame that was a real
+    HALF TIME board carrying the TITLE SCREEN's logo strip in its top band -- and every
+    screen signature's ROI is `[136,16,284,28]`, inside that band, so nothing matched. It
+    was not a transition: 45 re-grabs over 54 s all saw it, and a snapshot minutes later
+    still did. The band is simply a stale region wine never repainted, and the very next
+    click made it correct ("HALF TIME", Coca-Cola Cup Round 2, Wed 24 Sept 1997).
+
+    A CLICK is not an acceptable recovery -- it advances the game and would have skipped
+    that board. Raising + a pointer move inside the window are inert here (the original has
+    no hover state on any driven screen) and are what this sends.
+    """
+    wid = window_id(e)
+    ev = {"DISPLAY": e["display"], "PATH": "/usr/bin:/bin"}
+    cmds = [
+        ["xdotool", "mousemove", "--window", wid, "4", "4"],
+        ["xdotool", "mousemove", "--window", wid, "320", "240"],
+    ]
+    # PM98_NO_RAISE=1 (the same switch `click` honours) keeps the drive from yanking the
+    # game window in front of whatever Mats is doing on this box. A pointer move inside the
+    # window is enough to make wine repaint; the raise is only a stronger nudge.
+    if os.environ.get("PM98_NO_RAISE") != "1":
+        cmds.insert(0, ["xdotool", "windowraise", wid])
+    for cmd in cmds:
+        subprocess.run(cmd, check=False, env=ev)
+        time.sleep(0.3)
+
+
 def click(e: dict, x: int, y: int, n: int = 1, gap: float = 0.4) -> None:
     wid = window_id(e)
     ev = {"DISPLAY": e["display"], "PATH": "/usr/bin:/bin"}
@@ -438,6 +468,11 @@ def run_plan(plan_path: Path, max_steps: int, settle: float) -> int:
             name, best, ranked = identify(img, sigs)
             if name is not None:
                 break
+            # A stale top band reads as UNKNOWN forever (see repaint_nudge). Nudge on the
+            # third attempt: late enough that a genuine transition has settled by itself,
+            # early enough that the drive is not thrown away over a repaint.
+            if attempt == 2:
+                repaint_nudge(e)
             if attempt == 0 and plan.get("film_unknown", True):
                 film = subprocess.Popen(
                     ["bash", str(HERE / "film.sh"), f"unknown_{unknown:02d}",

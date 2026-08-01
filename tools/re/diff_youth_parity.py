@@ -29,6 +29,10 @@ PAIRS = [
     ("youth_047.png", "047_164509.png"),
     ("youth_048.png", "048_164510.png"),
 ]
+# B9's own un-occluded witness of the FILLED list — a live wine capture, not a
+# walkthrough frame, so it carries its own directory.
+B9 = ROOT / "tools" / "re" / "refs" / "b9-players-found-2026-08-01"
+EXTRA_PAIRS = [("youth_b9found.png", B9 / "02_players_found_first.png")]
 
 
 def main() -> int:
@@ -41,9 +45,10 @@ def main() -> int:
         heat_dir = Path(sys.argv[sys.argv.index("--heatmap-dir") + 1])
         heat_dir.mkdir(parents=True, exist_ok=True)
     ok = True
-    for shot_name, frame_name in PAIRS:
+    todo = [(s, FRAMES / f) for s, f in PAIRS] + EXTRA_PAIRS
+    for shot_name, fp in todo:
+        frame_name = fp.name
         sp = shot_dir / shot_name
-        fp = FRAMES / frame_name
         if not sp.exists() or not fp.exists():
             print(f"[MISS] {shot_name} vs {frame_name}: file missing")
             ok = False

@@ -1,0 +1,237 @@
+{
+ "out": "season_youth_b9_sign",
+ "note": "B9 CONTINUATION (2026-08-01, s84). The first two of B9's three visual gaps are CLOSED off the s83 drive's own frames -- a filled PLAYERS FOUND panel and the training chips are both in probe_0248..0597 of `season_youth_b9`, and the port now reproduces that screen at 0 px (`youth_b9found` in diff_youth_parity). The gap left is a filled YOUTH TEAM ROSTER row, which needs the prospect SIGNED: the row tap raises the contract-offer card (FUN_0053eaa0 -> FUN_00527000) and only pressing OFFER puts him in the roster. So this plan's probe taps the first PLAYERS FOUND row at (450,126) -- the row plate is x334..604, y120..131, measured off the witness -- and then presses OFFER by TEMPLATE match, so it is a no-op on every probe where no prospect has been found yet and no card is up. Cup draws are kept as well: the late-round (semifinal / final) draw chrome has never been captured and CupDrawScreen's per-round axis is unresolved without one.",
+ "keep": [
+  "alert_box",
+  "hub",
+  "cup_draw"
+ ],
+ "rules": {
+  "hub": {
+   "click": [
+    594,
+    268
+   ],
+   "settle": 1.2
+  },
+  "champion_card": {
+   "click": [
+    115,
+    352
+   ],
+   "settle": 1.2
+  },
+  "start_of_season": {
+   "click": [
+    573,
+    428
+   ],
+   "settle": 1.2
+  },
+  "teams_in_championships": {
+   "click": [
+    573,
+    451
+   ],
+   "settle": 1.2
+  },
+  "match_options": {
+   "click": [
+    478,
+    351
+   ],
+   "settle": 3.0
+  },
+  "prematch_lineups": {
+   "click": [
+    320,
+    240
+   ],
+   "settle": 3.0
+  },
+  "half_time": {
+   "click": [
+    536,
+    451
+   ],
+   "settle": 2.0
+  },
+  "full_time": {
+   "click": [
+    536,
+    451
+   ],
+   "settle": 2.0
+  },
+  "cup_draw": {
+   "click": [
+    551,
+    451
+   ],
+   "settle": 2.0
+  },
+  "manager_of_month": {
+   "click": [
+    573,
+    255
+   ],
+   "settle": 1.5
+  },
+  "player_of_month": {
+   "click": [
+    571,
+    359
+   ],
+   "settle": 1.5
+  },
+  "channel_tv": {
+   "click": [
+    505,
+    357
+   ],
+   "settle": 1.5
+  },
+  "lineup_screen": {
+   "swap_unavailable": true,
+   "click": [
+    592,
+    454
+   ],
+   "settle": 1.5
+  },
+  "alert_box": {
+   "click_alert_ok": true,
+   "settle": 1.2
+  },
+  "news_extra": {
+   "click": [
+    486,
+    38
+   ],
+   "settle": 1.5
+  },
+  "finance_screen": {
+   "click": [
+    568,
+    451
+   ],
+   "settle": 1.5
+  },
+  "team_offer": {
+   "click": [
+    492,
+    455
+   ],
+   "settle": 1.5
+  },
+  "league_tables_final": {
+   "click": [
+    573,
+    437
+   ],
+   "settle": 1.5
+  },
+  "the_championships": {
+   "click": [
+    573,
+    451
+   ],
+   "settle": 1.5
+  },
+  "end_of_season": {
+   "click": [
+    573,
+    437
+   ],
+   "settle": 1.5
+  },
+  "players_of_the_year": {
+   "click": [
+    557,
+    438
+   ],
+   "settle": 1.5
+  },
+  "preseason": {
+   "clicks": [
+    [
+     557,
+     346,
+     4
+    ],
+    [
+     570,
+     455
+    ]
+   ],
+   "settle": 3.0
+  }
+ },
+ "film_secs": 20,
+ "retries": 45,
+ "loop_breaker": {
+  "cycle": [
+   "hub",
+   "alert_box"
+  ],
+  "when": "hub",
+  "action": {
+   "click": [
+    480,
+    97
+   ],
+   "settle": 3.0
+  }
+ },
+ "keep_all": false,
+ "probe": {
+  "on": "hub",
+  "every": 3,
+  "steps": [
+   {
+    "click": [
+     234,
+     390
+    ],
+    "settle": 2.2
+   },
+   {
+    "click": [
+     579,
+     372
+    ],
+    "settle": 2.2,
+    "snap": "youth"
+   },
+   {
+    "click": [
+     450,
+     126
+    ],
+    "settle": 2.0
+   },
+   {
+    "click_template": "youth_offer_button.png",
+    "settle": 2.5
+   },
+   {
+    "settle": 1.5,
+    "snap": "youth_after"
+   },
+   {
+    "click": [
+     571,
+     440
+    ],
+    "settle": 1.8
+   },
+   {
+    "click": [
+     577,
+     450
+    ],
+    "settle": 1.8
+   }
+  ]
+ }
+}

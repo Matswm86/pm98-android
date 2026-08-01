@@ -4,8 +4,8 @@ Status: **CLOSED 2026-07-28 (s78).** Every competition's fee is now a read const
 the two DOMESTIC cups are a **proved null result**, not a gap.
 
 Evidence: `extracted/Premier Manager 98/MANAGER.EXE`, `tools/re/scan_alias_writes.py`,
-`tools/re/dump_tv_fee_table.py`. Supersedes `finance_screen_re.md`
-§"What is still not found".
+`tools/re/dump_tv_fee_table.py`.
+Supersedes: `docs/re/finance_screen_re.md` §"What is still not found".
 
 ## 1. Why the old search failed, and what replaced it
 

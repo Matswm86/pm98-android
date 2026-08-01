@@ -32,9 +32,12 @@ class_name YouthScreen
 ##                  Tapping an available LED row toggles that skill's selection.
 ##   SEARCH         disabled lettering baked; enabled sprite from 047; held = red
 ##                  ring (048). Emits search_pressed(skills) when armed.
-##   PLAYERS FOUND  the two witnessed messages verbatim; the panel's filled list
-##                  is un-witnessed and stays an honest gap (found youngsters land
-##                  in the roster via Career news — docs/re/youth_re.md).
+##   PLAYERS FOUND  the two witnessed messages verbatim when the list is empty; the
+##                  FILLED list is witnessed since 2026-08-01 by B9's own wine drive
+##                  (tools/re/refs/b9-players-found-2026-08-01/) and blitted from that
+##                  frame's own pixels — see the PF_* block below and
+##                  tools/re/build_youth_found_list_from_frames.py. Gate: the
+##                  `youth_b9found` pair in diff_youth_parity, 0 px.
 ##   manager bar    YOUTH TEAM MANAGER hire + "N PLAYERS" count (light blue).
 ##                  Frame 047 shows "3 PLAYERS" over an EMPTY row list — which
 ##                  counter that is is unresolved; live data uses youth.size()
@@ -75,12 +78,16 @@ var _star_b_purple: Texture2D
 var _star_a_blue: Texture2D
 var _star_b_blue: Texture2D
 var _star_half_blue: Texture2D
+var _star_half_purple: Texture2D     # cut from B9's 4.5* scout C. Stump (2026-08-01)
 var _arrow: Texture2D                # the PARAMETERS-slot arrow sprite
 var _arrow_rating: Texture2D         # the RATING-slot cut (11 of its 81 px re-dither)
+var _found_list: Texture2D           # the PLAYERS FOUND list widget, cut from B9's capture
+var _found_rowgrid: Texture2D        # its populated-row cell grid, for slots above the first
 var _held: Dictionary = {}         # held-state ring sprites (frame-cut 048/088/089)
 
 var _f8: Font
 var _f10: Font
+var _f_euro: Font        # euro8 — the PLAYERS FOUND money column's own face
 
 var _youth: Array = []
 var _scout: Dictionary = {}        # YOUTH TEAM SCOUT {name,stars,...}; {} = none
@@ -104,34 +111,38 @@ var _found: Array = []             # Career.youth_found — the PLAYERS FOUND sh
 var _found_rects: Array = []
 var _alert_img: Texture2D          # zero-LED SEARCH refusal (PMAlert render); null = none
 
-# PLAYERS FOUND, filled — WITNESSED 2026-08-01 in `screenshots/refrun-manutd-1997-98/
-# novel/p0759_UNKNOWN.png` (the reference run's own youth intake, 14 October 1998). The
-# panel is a LIST with a header strip, not the free-form message box the empty state
-# shows, and its columns are the game's own:
+# PLAYERS FOUND, filled — WITNESSED UN-OCCLUDED 2026-08-01 by B9's own wine drive,
+# `tools/re/refs/b9-players-found-2026-08-01/02_players_found_first.png`
+# (TOTAL-level Bolton W career, Saturday 28 March 1998, the scout's first report:
+# `Chapman  41  [ROL]  £5,000  19`). Its twin 14 months later differs by 494 px, every
+# one of them in the header date plaque — the list rect is identical, so the widget is
+# stable.
 #
-#     PLAYER            AV        ROL       WAGE        AGE
-#     black ink      dark red    black    dark red     navy
-#     ink from x357  cx 471      cx 496   cx 542       cx 591
+# The panel is a LIST: a header label row on white, six 12-px plates on a 16-px pitch,
+# a 1-px grey cell grid around the POPULATED row, and a scrollbar at x609..624. All of
+# it is cut verbatim into `found_list.png` / `found_rowgrid.png` by
+# `tools/re/build_youth_found_list_from_frames.py`, so the port BLITS the chrome and
+# draws only the five live cells over it.
 #
-# measured off the header glyph runs (AV (132,26,26) x464..478, WAGE (100,0,0) x527..557,
-# AGE (30,52,98) x581..602, the two black runs PLAYER and ROL inside x357..505). Header
-# glyph rows y105..115 on the panel grey (160,160,164); the first row sits under a black
-# rule at y121. The frame is partly covered by the contract-offer card it raised, so the
-# ROW fill colours below the header remain the app's own — declared, and B9's live
-# capture replaces them. This supersedes the invented "name / age / ability / star pips"
-# grammar, which had neither the right columns nor the right order.
-const PF_HDR_Y := 105.0
-const PF_ROW_Y0 := 123.0
+# This supersedes the values read off refrun `p0759_UNKNOWN.png`, which has the
+# contract-offer card on top of the panel — and the card DIMS what it covers, so its
+# AV (132,26,26) / WAGE (100,0,0) / AGE (30,52,98) were the dimmed inks. The real ones
+# are below, and each column's VALUE carries its own HEADER's ink.
+const PF_LIST_XY := Vector2(333, 105)
+const PF_ROW_Y0 := 120.0            # slot 0's plate top; its rules sit at y119 / y132
 const PF_ROW_PITCH := 16
-const PF_ROW_H := 13
-const PF_COL := {"PLAYER": 357.0, "AV": 471.0, "ROL": 496.0, "WAGE": 542.0, "AGE": 591.0}
-const C_PF_HDR_DARK := Color8(0, 0, 0)
-const C_PF_HDR_RED := Color8(132, 26, 26)
-const C_PF_HDR_BLUE := Color8(30, 52, 98)
-const C_PF_ROW := Color8(222, 228, 240)
+const PF_ROW_H := 12
+const PF_ROW_X := 334.0
+const PF_ROW_W := 271.0             # x334..x604
+const PF_ROW_SLOTS := 6
+const PF_NAME_X := 355.0            # the row's own pen; the header label's is x357
+const PF_ROL_X := 484.0             # the 25x14 camrol icon, drawn over the row's rules
+const PF_COL := {"AV": 471.0, "ROL": 496.0, "WAGE": 543.0, "AGE": 591.0}
 const C_PF_ROW_SEL := Color8(255, 226, 128)
 const C_PF_INK := Color8(0, 0, 0)
-const C_PF_AGE := Color8(0, 0, 128)
+const C_PF_AV := Color8(212, 63, 0)
+const C_PF_WAGE := Color8(150, 0, 0)
+const C_PF_AGE := Color8(42, 95, 170)
 
 
 func _ready() -> void:
@@ -146,12 +157,16 @@ func _ready() -> void:
 	_star_a_blue = load("res://art/screens/youth/star_a_blue.png")
 	_star_b_blue = load("res://art/screens/youth/star_b_blue.png")
 	_star_half_blue = load("res://art/screens/youth/star_half_blue.png")
+	_star_half_purple = load("res://art/screens/youth/star_half_purple.png")
 	_arrow = load("res://art/screens/youth/arrow.png")
 	_arrow_rating = load("res://art/screens/youth/arrow_rating.png")
+	_found_list = load("res://art/screens/youth/found_list.png")
+	_found_rowgrid = load("res://art/screens/youth/found_rowgrid.png")
 	for k in ["search_held", "rating_held", "return_held"]:
 		_held[k] = load("res://art/screens/youth/%s.png" % k)
 	_f8 = PMChrome.font("8")
 	_f10 = PMChrome.font("10")
+	_f_euro = PMChrome.font("euro8")
 	var f := FileAccess.open("res://art/screens/youth/youth_chrome.json", FileAccess.READ)
 	if f != null:
 		var parsed: Variant = JSON.parse_string(f.get_as_text())
@@ -417,7 +432,7 @@ func _draw() -> void:
 		var nx: Array = _spec.get("scout_name_xy", [141, 87])
 		_txt_left(_f8, float(nx[0]), float(nx[1]), str(_scout.get("name", "")), c_name, 11)
 		var st: Dictionary = _spec.get("scout_stars", {})
-		_stars(_star_a_purple, _star_b_purple, null, float(st.get("x0", 248)),
+		_stars(_star_a_purple, _star_b_purple, _star_half_purple, float(st.get("x0", 248)),
 			float(st.get("y", 85)), float(_scout.get("stars", 0.0)))
 
 	# --- capability values: the witnessed NO (no scout) / YES (scout) pair,
@@ -594,38 +609,43 @@ func _draw_rows() -> void:
 ## The panel's FILLED look is un-witnessed, so this is plain app grammar inside the
 ## frame-measured interior, flagged as reconstruction in docs/re/youth_re.md.
 func _draw_found() -> void:
-	var iv: Array = _spec.get("pf_interior", [326, 102, 302, 117])
-	# header strip — the witnessed five columns, in the witnessed inks
-	_txt_left(_f8, PF_COL["PLAYER"], PF_HDR_Y, "PLAYER", _ci(C_PF_HDR_DARK), 11)
-	_txt_center(_f8, PF_COL["AV"], PF_HDR_Y, "AV", _ci(C_PF_HDR_RED), 11)
-	_txt_center(_f8, PF_COL["ROL"], PF_HDR_Y, "ROL", _ci(C_PF_HDR_DARK), 11)
-	_txt_center(_f8, PF_COL["WAGE"], PF_HDR_Y, "WAGE", _ci(C_PF_HDR_RED), 11)
-	_txt_center(_f8, PF_COL["AGE"], PF_HDR_Y, "AGE", _ci(C_PF_HDR_BLUE), 11)
-	var x := float(iv[0]) + 4.0
-	var w := float(iv[2]) - 8.0
+	# The whole widget — header labels, the six plates, slot 0's cell grid, the scrollbar —
+	# is the frame's own pixels. Only the five live cells are drawn here.
+	if _found_list != null:
+		draw_texture(_tex(_found_list), PF_LIST_XY)
 	var y := PF_ROW_Y0
-	var limit := int((float(iv[1]) + float(iv[3]) - PF_ROW_Y0) / PF_ROW_PITCH)
-	for i in mini(_found.size(), maxi(1, limit)):
+	for i in mini(_found.size(), PF_ROW_SLOTS):
 		var p: Dictionary = _found[i]
 		var pid := int(p.get("id", -1))
-		var r := Rect2(x, y, w, PF_ROW_H)
-		var held := _press == "found:%d" % pid
-		draw_rect(r, _ci(C_PF_ROW_SEL if held else C_PF_ROW), true)
-		_txt_left(_f8, PF_COL["PLAYER"], y + 1.0, str(p.get("name", "")).to_upper(),
-			_ci(C_PF_INK), 11)
+		var r := Rect2(PF_ROW_X, y, PF_ROW_W, float(PF_ROW_H))
+		# Slot 0's grid is baked into found_list.png. Whether the grid belongs to the SLOT
+		# or to a POPULATED row cannot be told apart from one prospect, so the port stamps
+		# it per populated row — which reproduces the witness exactly. Declared in youth_re.
+		if i > 0 and _found_rowgrid != null:
+			draw_texture(_tex(_found_rowgrid), Vector2(PF_LIST_XY.x, y - 1.0))
+		if _press == "found:%d" % pid:
+			draw_rect(r, _ci(C_PF_ROW_SEL), true)
+		_txt_left(_f8, PF_NAME_X, y + 3.0, str(p.get("name", "")), _ci(C_PF_INK), 11)
 		# AV = floor((VE+RE+AG+CA)/4), the same average every other list in the game uses
 		# (scout_screen_re.md, verified 28/28 on the OFFERS squad list).
-		_txt_center(_f8, PF_COL["AV"], y + 1.0, str(_av(p)), _ci(C_PF_INK), 11)
+		_txt_center(_f8, PF_COL["AV"], y + 3.0, str(_av(p)), _ci(C_PF_AV), 11)
 		var pf := PMChrome.iget(p, "posFine")
 		var rol := PMChrome.camrol(pf) if pf >= 1 and pf <= 18 else null
 		if rol != null:
-			draw_texture(_tex(rol), Vector2(floorf(PF_COL["ROL"] - 12.0), y - 1.0))
+			draw_texture(_tex(rol), Vector2(PF_ROL_X, y - 1.0))
 		else:
-			_txt_center(_f8, PF_COL["ROL"], y + 1.0, str(p.get("pos", "")), _ci(C_PF_INK), 11)
+			_txt_center(_f8, PF_COL["ROL"], y + 3.0, str(p.get("pos", "")), _ci(C_PF_INK), 11)
+		# The money column is the EURO8 face at 11, not the bold list face the other four
+		# cells use. Identified by SHAPE, not by width, and reproducibly:
+		#   app/tests/shot_face_probe.gd + tools/re/probe_text_face.py
+		# render "£5,000" in all eight extracted faces at 8/10/11/12 and XOR each against
+		# the witness cell's own ink mask (y122..131, x526..558, 94 px). euro8@11 is the
+		# ONLY pair that scores 0; the other 31 do not even share its bounding box.
 		var wage := int(p.get("contract_wage", 0))
 		if wage > 0:
-			_txt_center(_f8, PF_COL["WAGE"], y + 1.0, _money(wage), _ci(C_PF_INK), 11)
-		_txt_center(_f8, PF_COL["AGE"], y + 1.0, str(int(p.get("age", 0))), _ci(C_PF_AGE), 11)
+			_txt_center(_f_euro, PF_COL["WAGE"], y + 2.0, _money(wage), _ci(C_PF_WAGE), 11,
+				"euro8", 8)
+		_txt_center(_f8, PF_COL["AGE"], y + 3.0, str(int(p.get("age", 0))), _ci(C_PF_AGE), 11)
 		_found_rects.append({"pid": pid, "rect": r})
 		y += PF_ROW_PITCH
 
