@@ -270,9 +270,18 @@ def alert_ok_point(img: Image.Image) -> tuple[int, int] | None:
 # medical cross at x181..189 plus "<n> WEEKS", a SUSPENSION a red card plus "MATCH".
 # The plate alone is NOT sufficient — a row the user has just tapped is repainted with the
 # selection blue over the plate, and that is exactly the row a swap has to find. The band
-# survives the selection, so it is the discriminator: dark gold is the only ink in that
-# column with B < 40 (every available row's band is a pastel or (100,100,140)).
+# survives the selection, so it is the discriminator.
 # Witnessed values: (85,63,0) plain, (170,127,0) and (170,159,0) under a modal's dim.
+#
+# 2026-08-01 FIX — "is there ANY dark-gold pixel in the band" was wrong and deadlocked a
+# 900-step drive on a real suspension (Man Utd, week 12, Giggs "1 MATCH"). The band column
+# overlaps the EN..QU **star** cells, and a star's own ink is (255,223,0) with its shading
+# at (212,191,0) and (170,127,0) — all B < 40 and all R > G > B, so EVERY row scored
+# unavailable, `lineup_swap_plan` could not find a replacement outside `bad`, and the driver
+# reported "no unavailable XI row to swap" while the game refused to advance the week.
+# The real discriminator is that the status band is a SOLID FILL and a star is a glyph:
+# the witnessed ban band runs x199..222 unbroken (24 px of (85,63,0)) where the densest
+# star row breaks every few pixels. So require a contiguous run.
 LINEUP_XI_Y = tuple(95 + 16 * i for i in range(11))
 LINEUP_SUB_Y = tuple(294 + 16 * i for i in range(5))
 LINEUP_RESERVE_Y = tuple(395 + 16 * i for i in range(4))
@@ -280,6 +289,7 @@ LINEUP_PLATE_X = 60
 LINEUP_NAME_X = 100
 LINEUP_GOLD = (212, 191, 85)
 LINEUP_BAND_X = (196, 233)   # the status-band column span
+LINEUP_BAND_RUN = 12         # px of unbroken dark gold; stars never reach it
 
 
 def _is_unavailable(a: np.ndarray, y: int) -> bool:
@@ -288,7 +298,14 @@ def _is_unavailable(a: np.ndarray, y: int) -> bool:
     band = a[max(0, y - 2):y + 7, LINEUP_BAND_X[0]:LINEUP_BAND_X[1]]
     gold = (band[..., 2] < 40) & (band[..., 0] >= 60) & (band[..., 0] > band[..., 1]) \
         & (band[..., 1] > band[..., 2])
-    return bool(gold.any())
+    # longest horizontal run of gold on any scanline of the band
+    for row in gold:
+        run = 0
+        for v in row:
+            run = run + 1 if v else 0
+            if run >= LINEUP_BAND_RUN:
+                return True
+    return False
 
 
 def unavailable_rows(img: Image.Image) -> dict:

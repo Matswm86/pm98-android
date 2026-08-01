@@ -37,6 +37,10 @@ signal back_pressed
 signal renew_requested(player)
 signal transfer_requested(player)
 signal sack_requested(player)
+## YOUTH card (`youth_actions`): the TRAINING / PROMOTE half of the source's own
+## youth button row. SACK reuses `sack_requested`, CANCEL reuses `back_pressed`.
+signal training_requested(player)
+signal promote_requested(player)
 ## RENEW negotiation (TOTAL level): the OFFER form was submitted / cancelled.
 signal offer_made(weekly, years)
 signal renew_cancelled
@@ -98,6 +102,41 @@ const BTN := {
 	"ok": Rect2(505, 383, 52, 25),
 }
 const OK_PR_XY := Vector2(503, 381)             # 081's held-OK ring cut
+
+# ---- the YOUTH card's own button row (FUN_005274d0, decompiled 2026-07-29) ----
+#
+# A YOUTH TEAM roster row opens this card through `FUN_0053ec40`, which calls
+# `FUN_005274d0` where a senior row calls `FUN_00526a60`. Same FICHA chrome, same card
+# origin, DIFFERENT buttons — and this row is the whole missing control surface: without
+# it there is no way to put a youngster into training and no way to promote him.
+#
+# Rects are the source's own `FUN_00436fb0(w,h)` / `FUN_00436fb0(x,y)` pairs, card-local,
+# lifted verbatim and shifted by CARD_POS (the same transform that reproduces the senior
+# row exactly: RENEW's local (85,325) + (76,58) == the witnessed Rect2(161,383,104,25)):
+#
+#   TRAINING  size (0x54,0x19) = 84x25   pos (0x34,0x149)  = (52,329)   widget id 0xda
+#   SACK      size (0x54,0x19) = 84x25   pos (0x8f,0x149)  = (143,329)  widget id 0x67
+#   PROMOTE   size (0x72,0x19) = 114x25  pos (0xea,0x149)  = (234,329)  widget id 0xdc
+#   CANCEL    size (0x6a,0x19) = 106x25  pos (0x172,0x149) = (370,329)  widget id 0x386
+#
+# Ink: the first three are drawn under `FUN_00437020(0xff,0xdf,0)` = gold (255,223,0);
+# CANCEL under `FUN_00437020(0xff,0,0)` = red (255,0,0).
+const BTN_YOUTH := {
+	"training": Rect2(128, 387, 84, 25),
+	"sack": Rect2(219, 387, 84, 25),
+	"promote": Rect2(310, 387, 114, 25),
+	"cancel": Rect2(446, 387, 106, 25),
+}
+## The four plates are the WITNESSED pixels, cut 1:1 out of p0771 by
+## tools/re/build_youth_card_buttons_from_frames.py (entry-flow doctrine). `promote_on`
+## and `training_off` are the two states no frame we hold shows and are declared
+## reconstructions — see that script's header.
+const YBTN_ART := {
+	"training": ["training_off", "training_on"],
+	"sack": ["sack_on", "sack_on"],
+	"promote": ["promote_off", "promote_on"],
+	"cancel": ["cancel_on", "cancel_on"],
+}
 
 # ---- RENEW negotiation OFFER panel (frame 25_renew, TOTAL level; renew_negotiation_re.md) ----
 # The OFFER panel replaces the identity/stat zone in renew mode. Static chrome = the frame-cut
@@ -173,6 +212,11 @@ var _club: Dictionary = {}
 var _tier: int = 1
 var _actions := false   # RENEW/TRANSFER/SACK live (manager's own squad player)
 var _listed := false    # player is on the transfer market -> banner + red TRANSFER outline
+# YOUTH card (FUN_005274d0): the TRAINING/SACK/PROMOTE/CANCEL row replaces the senior one.
+var _youth := false
+var _training_on := false   # FUN_0057cd30() > FUN_0057cd50(): a training slot is free
+var _promote_on := false    # CORE4 live == BASE on all four (the source's own gate)
+var _ybtn: Dictionary = {}  # youth button plates, by art name
 var _press := ""
 var _down := false  # a press was seen; release without it is the emulated-mouse twin
 ## The host screen LUT-dims itself while this card is up (SquadScreen); when it
@@ -204,6 +248,10 @@ func _ready() -> void:
 	_check_off = load("res://art/screens/ficha/renew_check_off.png")
 	_star_full = load("res://art/screens/teamoffer/star_full.png")
 	_star_half = load("res://art/screens/teamoffer/star_half.png")
+	for k in YBTN_ART:
+		for art in YBTN_ART[k]:
+			if not _ybtn.has(art):
+				_ybtn[art] = load("res://art/screens/youth_card/%s.png" % art)
 	_f8 = PMChrome.font("8")
 	_f10 = PMChrome.font("10")
 	_f12 = PMChrome.font("12")
@@ -230,6 +278,22 @@ func setup(player: Dictionary, club: Dictionary, tier: int = 1, actions_enabled 
 	_yearly = Contract.current_yearly(player, band)
 	_left = int(player.get("contract_years", 0))
 	_years = maxi(int(player.get("contract_term", 0)), _left)
+	queue_redraw()
+
+
+## Open this card as the YOUTH PLAYER card (`FUN_005274d0`): the button row becomes
+## TRAINING / SACK / PROMOTE / CANCEL. Both gates are the source's own:
+##   TRAINING greys when `FUN_0057cd30() <= FUN_0057cd50()` — the YOUTH TEAM MANAGER's
+##            capacity is already taken by youngsters carrying the 0x20 mode byte.
+##   PROMOTE  greys unless all four CORE4 live bytes (+0x9c..+0x9f) equal their BASE
+##            (+0xaa..+0xad), i.e. he has finished growing into his shipped rating.
+func setup_youth(player: Dictionary, club: Dictionary, staff: Array, youth: Array,
+		tier: int = 1) -> void:
+	setup(player, club, tier, false, false)
+	_youth = true
+	_promote_on = Training.youth_fully_grown(player)
+	_training_on = Training.youth_in_training_count(youth) \
+		< Staff.youth_training_capacity(staff)
 	queue_redraw()
 
 
@@ -280,6 +344,18 @@ func _hit(d: Vector2) -> String:
 		if (BTN["ok"] as Rect2).has_point(d):
 			return "ok"
 		return ""
+	if _youth:
+		# The source's own greying (FUN_005bf8c0(0,1)) makes a disabled button inert, so a
+		# greyed TRAINING / PROMOTE must not hit-test either.
+		for k in ["training", "sack", "promote", "cancel"]:
+			if not (BTN_YOUTH[k] as Rect2).has_point(d):
+				continue
+			if k == "training" and not _training_on:
+				return ""
+			if k == "promote" and not _promote_on:
+				return ""
+			return "y_" + k
+		return ""
 	if (BTN["ok"] as Rect2).has_point(d):
 		return "ok"
 	if _actions:
@@ -314,9 +390,15 @@ func _on_input(e: InputEvent) -> void:
 			"renew": renew_requested.emit(_p)
 			"transfer": transfer_requested.emit(_p)
 			"sack": sack_requested.emit(_p)
+			"y_training": training_requested.emit(_p)
+			"y_promote": promote_requested.emit(_p)
+			"y_sack": sack_requested.emit(_p)
 			_: back_pressed.emit()
 		return
-	back_pressed.emit()
+	# A youth card is only left through CANCEL — a tap on empty card space must not
+	# dismiss it, or the four-button row is unreachable on a fat-fingered tap.
+	if not _youth:
+		back_pressed.emit()
 
 
 ## RENEW OFFER form input: the ◄/► steppers fire on PRESS (repeatable); OFFER/CANCEL/OK act on
@@ -584,6 +666,9 @@ func _draw_clauses() -> void:
 ## behaviour). Held OK = the frame-cut ring; the same ring is extrapolated
 ## onto RENEW / TRANSFER / SACK (identical widget chrome, make-offer doctrine).
 func _draw_buttons() -> void:
+	if _youth:
+		_draw_youth_buttons()
+		return
 	if not _actions:
 		for k in ["renew", "transfer", "sack"]:
 			draw_rect(BTN[k] as Rect2, C_WHITE, true)
@@ -597,6 +682,27 @@ func _draw_buttons() -> void:
 		draw_texture(_ok_pr, OK_PR_XY)
 	elif _press != "" and _actions:
 		draw_rect((BTN[_press] as Rect2).grow(2.0), C_RING, false, 2.0)
+
+
+## The YOUTH card's own row (FUN_005274d0). The baked senior row underneath is covered
+## with card white first — the two rows sit at different y (325 vs 329 card-local), so the
+## senior plates would peek out from under the youth ones.
+func _draw_youth_buttons() -> void:
+	var cover := Rect2(BTN["renew"].position.x - 40.0, BTN["renew"].position.y - 2.0,
+		(BTN["ok"].position.x + BTN["ok"].size.x) - BTN["renew"].position.x + 60.0, 29.0)
+	draw_rect(cover, C_WHITE, true)
+	for k in ["training", "sack", "promote", "cancel"]:
+		var on := true
+		if k == "training":
+			on = _training_on
+		elif k == "promote":
+			on = _promote_on
+		var art: String = (YBTN_ART[k] as Array)[1 if on else 0]
+		var tex: Texture2D = _ybtn.get(art)
+		if tex != null:
+			draw_texture(tex, (BTN_YOUTH[k] as Rect2).position)
+		if _press == "y_" + k:
+			draw_rect((BTN_YOUTH[k] as Rect2).grow(2.0), C_RING, false, 2.0)
 
 
 func _money(v: int) -> String:

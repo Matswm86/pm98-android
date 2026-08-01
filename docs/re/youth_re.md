@@ -365,3 +365,225 @@ diff **0px on the body** vs their binding frames (087/088/089/047/048).
 `test_youth_screen.gd` (33 asserts) covers chrome json, state machine, LED geometry,
 SEARCH signal gating, and the Career search model; `test_youth.gd` (model) + the full
 37-file screen sweep stay green. Live render re-verified via `PM98_YOUTH_SHOT=1`.
+
+---
+
+## THE CONTROL SURFACE (Session E, 2026-08-01) — C1-C7
+
+Everything above models what happens to a youngster **once he is developing**. It never
+asked what starts him developing, and the answer is that nothing in the port did — which
+is exactly the owner report that opened this session ("the youth team still doesn't work,
+it's not exact like the original; youth training, offering of contract and promotion of a
+youth player must work like the original"). Four separate binary facts were missing.
+
+### C1. `FUN_00578b80` is the whole per-role capability table
+
+`FUN_0057cd70(role)` fetches a staff record and `FUN_00578b80` switches on its role index
+(`staff[0]`), reading the quality byte (`staff[1]`) through a five-band ladder
+(`<3 / 3-4 / 5-6 / 7-8 / 9-10`). Ported verbatim as `Staff._CAPACITY_BANDS`:
+
+| case | role | bands |
+|---|---|---|
+| 0-5 + default | the six TRAINERS | 1, 2, 3, 4, 5 |
+| 6 | PHYSIOTHERAPIST | 1, 2, 3, 4, 5 |
+| 7 | PSYCHOLOGIST | 2, 6, 10, 14, 18 |
+| 8, 9, 0xb | ASSISTANT / SCOUT / **YOUTH TEAM SCOUT** | `0xffff` (uncapped) |
+| 10 | **YOUTH TEAM MANAGER** | 1, 2, 2, 3, 4 |
+| 0xc | GROUNDSMAN | 70, 90, 100, 115, `0xffff` |
+
+The case order **is** `Staff.ROLE_KEYS`' order, which is the CLUB PERSONNEL screen's order
+— an independent check that the port's role list was already right.
+
+Two consequences the port had wrong:
+
+* **The YOUTH TEAM screen's "N PLAYERS" is the youth manager's TRAINING CAPACITY, not the
+  academy's size.** The app printed `youth.size()`. Both witnesses print **3** over an
+  **empty** roster: walkthrough frame 047 (G. Keeping, 3.5 stars, q=7) and a live capture
+  of a driven Man Utd career 2026-08-01 (B. Beckett, 4.0 stars, q=8) — the two halves of
+  case 10's `7-8 -> 3` band. The old note "which counter that is is unresolved" is closed.
+* `Training.skill_tp` was `floor(stars)`. That agrees with the table on whole stars (the
+  witnessed 4+2=6 cannot tell them apart) but is **one short on every half star**: a
+  3.5-star coach is q=7, which the ladder puts in the 4 band. Now `Staff.capacity_of`.
+
+### C2. A youngster only develops while he is IN TRAINING (`+0xa9 == 0x20`)
+
+The 0x20 growth branch is reached through the training-mode byte, and the **only** writer
+of that byte is the TRAINING button on a youth player's own card:
+
+```
+00527820  MOV  EAX,[ECX+0x434]        ; the selected player
+00527826  PUSH 0x1
+00527828  MOV  BYTE PTR [EAX+0xa9],0x20
+0052782f  CALL FUN_005bd200
+```
+
+`FUN_0057cd50` counts the club's youth carrying that byte (walking `club+0x3c`, next at
+`player+0x100`, testing `+0xa9 == 0x20`), and `FUN_005274d0` greys TRAINING when
+`FUN_0057cd30() <= FUN_0057cd50()` — capacity reached.
+
+**So an unassigned youngster does not grow one point, ever, and with no YOUTH TEAM MANAGER
+hired the capacity is 0 and nobody can be assigned at all.** The port grew every youth in
+the list unconditionally, which is why the academy felt like it "worked" and yet nothing
+about it matched the original. Ported as `Training.YOUTH_MODE` / the `in_training` flag,
+`Training.youth_in_training_count`, `Staff.youth_training_capacity` and
+`Career.set_youth_training`.
+
+### C3. PROMOTE reads the attributes, not a flag
+
+`FUN_005274d0` @0x5275ba greys PROMOTE unless all four CORE4 live bytes (`+0x9c..+0x9f`)
+equal their BASE twins (`+0xaa..+0xad`) — the same equality the growth branch tests before
+it reports him ready. `Training.youth_fully_grown` is now the gate, and
+`Career.promotable_youth` uses it, so a youngster who arrives already at his ceiling is
+promotable without waiting for a growth tick to set a flag.
+
+### C4. The YOUTH PLAYER card — `FUN_005274d0`
+
+A YOUTH TEAM roster row opens the FICHA card through `FUN_0053ec40` where a senior squad
+row opens `FUN_00526a60`. Same chrome, different buttons. The rects are the source's own
+`FUN_00436fb0(w,h)` / `FUN_00436fb0(x,y)` pairs, card-local, + the card origin (76,58) —
+the identical transform that reproduces the senior row exactly (RENEW's local (85,325) is
+the witnessed native (161,383,104,25)):
+
+| button | size | card-local pos | native | widget id |
+|---|---|---|---|---|
+| TRAINING | 84x25 | (52,329) | (128,387,84,25) | 0xda |
+| SACK | 84x25 | (143,329) | (219,387,84,25) | 0x67 |
+| PROMOTE | 114x25 | (234,329) | (310,387,114,25) | 0xdc |
+| CANCEL | 106x25 | (370,329) | (446,387,106,25) | 0x386 |
+
+**WITNESS `screenshots/refrun-manutd-1997-98/novel/p0771_UNKNOWN.png`** — the reference
+run's own youth player Darren SPINDLE, 20 October 1998. All four rects land pixel-exact:
+every crop is one clean plate, one dominant ink, no bleed. Inks: TRAINING **(0,255,0)**
+green, SACK **(166,202,240)** light blue, CANCEL **(255,0,0)** red — and CANCEL's red is
+the `FUN_00437020(0xff,0,0)` the decompile names for it. PROMOTE is **disabled** in that
+frame, exactly as C3 predicts for a youngster still short of BASE, rendered as a grey
+plate with its label in a two-colour `(x+y)`-parity dither of (255,223,85)/(255,255,170) —
+the washed form of its own `FUN_00437020(0xff,0xdf,0)` gold.
+
+Cut 1:1 by `tools/re/build_youth_card_buttons_from_frames.py`. The two states no frame
+holds — enabled PROMOTE and disabled TRAINING — are **declared reconstructions** built
+from the witnessed plate grammar plus the witnessed glyph masks; the engine's greying is a
+palette remap, not RGB arithmetic (0->128 but 80->160 and 128->192 is not one curve), so
+it cannot be derived. A live capture of either replaces them.
+
+### C5. Youth players DO have contracts
+
+The same frame kills the port's "youth contracts are un-modelled" note: SPINDLE's card
+carries **CLUB FEE £75,000 / YEARLY WAGE £15,000 / YEARS 4 / LEFT 4**. The YOUTH TEAM
+roster's WAGE and YEARS columns are no longer blank, and the invented in-row "PROMOTE" cue
+(B4) is **gone** — promotion lives on the card, where the source puts it. His stat block
+(SPEED 19 / STAMINA 19 / AGGRESSION 17 / QUALITY 19 / FITNESS 93 / MORAL 99, RATING 44)
+also re-confirms both the knock-down (§1) and the RATING formula: (19+19+17+19+93+99)/6.
+
+### C6. PLAYERS FOUND, filled — and the prospect's offer card
+
+**WITNESS `screenshots/refrun-manutd-1997-98/novel/p0759_UNKNOWN.png`**, 14 October 1998.
+Two gaps close at once:
+
+* The filled panel is a **list with a header strip**, not the message box the empty state
+  shows. Columns, measured off the header glyph runs:
+  `PLAYER` (black, ink from x357) · `AV` (132,26,26) cx471 · `ROL` (black) cx496 ·
+  `WAGE` (100,0,0) cx542 · `AGE` (30,52,98) cx591; glyph rows y105..115 on the panel grey
+  (160,160,164), first row under a black rule at y121. This supersedes the app's invented
+  "name / age / ability / star pips" grammar, which had neither the right columns nor the
+  right order. The frame is partly covered by the card it raised, so the row FILL colours
+  stay the app's own — still declared, still B9's to settle.
+* Tapping a found prospect raises the **contract-offer card** (`FUN_0053eaa0` ->
+  `FUN_00527000`), the same family as the senior scout's row tap: CLUB OFFER £0 / CLUB FEE
+  £75,000 / YEARLY WAGE £5,000 with steppers / YEARS 4 / the four clauses / CANCEL /
+  OFFER. SPINDLE signs at £15,000 (C5), so the wage is negotiated up from the £5,000 the
+  form opens at. The app used to sign silently on a row tap with a toast.
+
+  **Ported 2026-08-01.** `Main._show_youth_offer_card` raises `MakeOfferScreen` in its new
+  `no_club` mode — CLUB OFFER pinned to £0 with inert ◄►, because there is nobody to bid
+  to — seeded CLUB FEE £75,000 / YEARLY WAGE £5,000 / YEARS 4.
+  `Career.offer_youth_contract` resolves it: the refusal roll is the old
+  potential-vs-pull one with the wage buying down three quarters of it (meeting his demand
+  leaves only the residual, so a full offer can still be refused), and the negotiated terms
+  are stamped on him, which is what finally fills the roster's WAGE / YEARS columns.
+  `sign_youth_prospect` remains as the same call at the card's opening terms for the
+  automated paths. `test_youth_offer_route` drives the real Main UI: row tap -> card
+  mounts, on the witnessed terms, nobody signed behind it; the CLUB OFFER ◄► are dead and
+  the WAGE ◄► are not; OFFER lands the terms; CANCEL signs nobody. His £75,000 CLUB FEE is
+  a display constant — a single witness, and whether the engine varies it is un-RE'd.
+
+### C7. PROMOTE / SACK semantics
+
+* **PROMOTE** `FUN_00588180`: unlink from the youth list (`FUN_00588120`, `club+0x3c`,
+  count `+0x40`), then `FUN_00588d10` — assign the first free squad number, **seeded by
+  demarcación**: `pos == 0 (GK) ? 1 : pos == 3 (FW) ? 9 : 2`, scanning upward over a
+  256-slot used-map of the club's `+0xf8` bytes — and clear the training mode. Board:
+  `+0x2c += 5`, `+0x30 += 5`, `+0x34 += 1`, each clamped 0..1000.
+* **SACK** `FUN_00588e20`: the shared release path. For a youth (`sVar5 == 0x26e4`) it
+  does **not** merely re-parent him — it calls
+  `FUN_00576cd0(0x26e4, 0xc, (b9c+b9d+b9e+b9f)>>2, name, age+1)`, **birthing a replacement
+  into the pool** at the released man's own CORE4 average, one year older. That rebirth is
+  why the shipped 51 never run dry over a long career. Board: `+0x2c += 5`, `+0x30 -= 5`,
+  `+0x34 -= 1`.
+
+The three board stats are `team+0x2c` DIRECTORS CONFIDENCE / `+0x30` SUPPORTERS CONFIDENCE
+/ `+0x34` MANAGER RATING (`directiva_screen_re.md`), 0..1000, displayed /100. They are now
+stored on `Career` and moved by these deltas. **The DIRECTIVA screen still renders its own
+documented proxy** — rewiring it to the stored values is tracked separately so this change
+cannot move that screen's 0px parity shot.
+
+### C8. The PARAMETERS/RATING arrow MOVES
+
+`FUN_0053e760` invalidates `(0x1db,0x10a)-(0x1e4,0x11b)` = (475,266)-(484,283) and sets
+`DAT_00658a40 = 1`; `FUN_0053e7e0` invalidates `(0x1db,0x122)-(0x1e4,0x133)` =
+(475,290)-(484,307) and sets it to 0. Each handler repaints its own slot, which only makes
+sense if the arrow moves between them. Confirmed live on the driven career: with
+PARAMETERS selected the dark-red ink sits at x476..483 y266..281, and one tap on RATING
+moves it to y290..305 — the two rects the binary names, nothing else in the column
+changing. It had been baked into `youth_body.png` at the PARAMETERS slot and never moved.
+Un-baked and cut by `tools/re/build_youth_arrow_from_frames.py`, whose two witnesses now
+live in `screenshots/wine-captures-2026-08-01-youth-arrow/` so it stays re-runnable.
+
+**It is NOT the plaque mode.** The first port of this drove the arrow off `_mode` and the
+parity shots caught it: frame **047 carries the RATING plaque pair** — 0px against the
+live RATING witness y18 over *both* plaque rects (491,264,134,21) and (491,288,134,21) —
+**while its arrow sits at the PARAMETERS slot**. 087/088/089/047/048 and y17 all show the
+arrow at y266..282; only y18 has it at y290..306. So the plaques and the arrow are two
+separate axes, and the arrow has its own hit rects: exactly the two rects the handlers
+invalidate. What the arrow additionally selects is **un-RE'd** — the port defaults it to
+PARAMETERS, which is what every witnessed frame but y18 shows, and flips it on a tap in
+its own column. Flagged as hypothesis, not proof.
+
+**TWO sprites, not one moved.** 11 of the arrow's 81 ink px change colour between the
+slots: it is dithered against the panel and the two slots sit on different background
+bands. Stamping the PARAMETERS cut at the RATING slot is 11px wrong, so the tool cuts
+`arrow.png` and `arrow_rating.png` per slot, each exact. The cut takes ink as the
+pixel-difference of the two witnesses, not a hand-listed colour set — the first pass
+listed two colours and silently dropped 22 of the 81 px.
+
+A third witness says the same thing from another screen. The B9 drive's probe frames
+(`f0006`..`f0132`) landed on **LINE-UP**, which carries the same PARAMETERS/RATING plaque
+pair: RATING is lit *and* the panel below it is showing the RATING view (TEAM RATING 80 +
+Pallister's skill bars) — and the arrow still sits at the PARAMETERS slot. So the arrow is
+not the active-view indicator on that screen either, and the widget is shared, not
+youth-local. It is also not simply "points at the inactive one": 087 has PARAMETERS active
+with the arrow on PARAMETERS.
+
+All five YOUTH parity shots are back to **0px body** with the arrow live.
+
+### Verification
+
+`test_youth.gd`, `test_youth_loop.gd` (+ the new C1/C2/C3 blocks, 30 assertions),
+`test_youth_screen.gd`, `test_youth_prospects.gd`, `test_staff.gd`, `test_training.gd`,
+`test_career.gd`, `test_career_seed.gd`, `test_talents.gd` all pass. The new blocks pin:
+the full case-10 ladder q=1..10, the physio witness, the uncapped roles; that an untrained
+youngster does not move a point over 120 weeks while a trained one reaches BASE; that
+promotion clears the mode byte and frees the slot; the GK/FW/other number seeds; and both
+board-delta signs plus their save/load round-trip.
+
+**Still open**: the un-occluded filled PLAYERS FOUND and a filled roster row (B9), and the
+enabled-PROMOTE / disabled-TRAINING plates.
+
+**B9's drive did not fail on the sim — it failed on navigation.** It ran 207 steps deep
+(15 probes, into January 1998) and stopped on an unknown screen, but every probe frame it
+banked is the **LINE-UP** screen, not YOUTH: the plan's probe path opens with a hub click
+at (234,390) that does not reach SQUAD MANAGEMENT, and the follow-up (579,372) — which IS
+the YOUTH TEAM plaque *on SQUAD MANAGEMENT*, witnessed at y16 — lands on LINE-UP's TRAINING
+instead. Fix the hub coordinate first, live against the window; re-running the plan as it
+stands will burn another 200 steps for seven more LINE-UP frames. The wine career itself
+has no save (`drive_c/PM98/ACTLIGA` is empty), so a re-run restarts from a new career.

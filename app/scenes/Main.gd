@@ -2964,23 +2964,116 @@ func _show_youth_screen() -> void:
 	scr.caps_changed.connect(func(sel: Dictionary) -> void:
 		_career.youth_caps = sel
 		_career.save())
-	# PLAYERS FOUND row tap: offer the prospect a contract. He joins, or turns you down
-	# ("The youth player %s has rejected your offer.") — the owner's "the players they
-	# find are supposed to be clickable to offer a contract".
+	# PLAYERS FOUND row tap: raise the prospect's CONTRACT-OFFER card (FUN_0053eaa0 ->
+	# FUN_00527000), the same card family as the senior scout's row tap. This used to sign
+	# him silently with a toast, which lost the whole negotiation — the owner's "the
+	# players they find are supposed to be clickable to offer a contract".
 	scr.prospect_pressed.connect(func(pid: int) -> void:
 		AudioManager.ui_select()
-		var res := _career.sign_youth_prospect(int(pid))
-		_career.save()
-		refresh.call()
-		_toast(str(res.get("msg", ""))))
+		_show_youth_offer_card(int(pid), refresh))
+	# A roster row opens the YOUTH PLAYER card (FUN_0053ec40 -> FUN_005274d0), which is
+	# where TRAINING / SACK / PROMOTE actually live. The screen's own row tap used to fire
+	# a bare promote, which is why a youngster could never be put INTO training and so
+	# never grew at all.
 	scr.promote_requested.connect(func(pid: int) -> void:
-		_career.promote_youth(int(pid))
-		_career.save()
-		refresh.call()
-		_refresh_squad_overlay())
+		AudioManager.ui_select()
+		_open_youth_card(int(pid), refresh))
 	scr.back_pressed.connect(func() -> void:
 		scr.queue_free()
 		_refresh_squad_overlay())
+
+
+## The youth prospect's CONTRACT-OFFER card, raised by a PLAYERS FOUND row tap
+## (`FUN_0053eaa0` -> `FUN_00527000`). WITNESS refrun p0759, 14 Oct 1998: CLUB OFFER £0 /
+## CLUB FEE £75,000 / YEARLY WAGE £5,000 with steppers / YEARS 4 / the four clauses /
+## CANCEL / OFFER. There is no selling club, so the CLUB OFFER row is display-only
+## (MakeOfferScreen's `no_club`) and only the wage and the term are negotiable — SPINDLE
+## opens at the £5,000 floor and signs at £15,000 (youth_re.md C5/C6).
+func _show_youth_offer_card(pid: int, refresh: Callable) -> void:
+	var p: Dictionary = {}
+	for q in _career.youth_found:
+		if int((q as Dictionary).get("id", -1)) == pid:
+			p = q
+			break
+	if p.is_empty():
+		_toast("That youngster is no longer available.")
+		return
+	var card: MakeOfferScreen = load("res://scenes/MakeOfferScreen.gd").new()
+	card.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(card)
+	card.setup(p, {"id": -1, "name": ""}, Career.YOUTH_CLUB_FEE, _career.cash, {
+		"no_club": true,
+		"yearly_wage": Career.YOUTH_OPENING_WAGE,
+		"years": Career.YOUTH_OPENING_YEARS,
+		"clauses": [],
+	})
+	card.cancelled.connect(func() -> void:
+		AudioManager.ui_select()
+		card.queue_free())
+	# A youth prospect belongs to nobody, so there is nothing to loan him from.
+	card.loan_requested.connect(func() -> void:
+		AudioManager.ui_select()
+		_toast("%s has no club to loan him from." % str(p.get("name", "He"))))
+	card.offer_made.connect(func(_offer: int, yearly_wage: int, years: int,
+			_clauses: Array, _bonus: int) -> void:
+		AudioManager.ui_select()
+		var res := _career.offer_youth_contract(pid, yearly_wage, years)
+		_career.save()
+		card.queue_free()
+		refresh.call()
+		_toast(str(res.get("msg", ""))))
+
+
+## The YOUTH PLAYER card (`FUN_005274d0`), opened from a YOUTH TEAM roster row. The four
+## buttons are the source's own and so are both gates:
+##   TRAINING  puts him in the academy's training programme (the 0x20 mode byte) — the
+##             ONLY thing that makes a youngster develop. Greyed at the youth manager's
+##             capacity (Staff.youth_training_capacity).
+##   SACK      releases him; the pool gains a replacement (Career.sack_youth).
+##   PROMOTE   first team. Greyed until his CORE4 live values reach his shipped BASE.
+##   CANCEL    dismiss.
+func _open_youth_card(pid: int, refresh: Callable) -> void:
+	var p: Dictionary = {}
+	for q in _career.youth:
+		if int(q.get("id", -1)) == pid:
+			p = q
+			break
+	if p.is_empty():
+		return
+	var scr: PlayerInfoScreen = load("res://scenes/PlayerInfoScreen.gd").new()
+	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scr)
+	var club := _mgr_club()
+	var tier := TransferMarket.english_tier_of(club, GameDB.leagues)
+	scr.setup_youth(p, club, _career.staff, _career.youth, tier)
+	scr.back_pressed.connect(func() -> void:
+		scr.queue_free()
+		refresh.call())
+	scr.training_requested.connect(func(_pp: Dictionary) -> void:
+		AudioManager.ui_select()
+		var res := _career.set_youth_training(pid)
+		_career.save()
+		scr.setup_youth(p, club, _career.staff, _career.youth, tier)
+		refresh.call()
+		_toast(str(res.get("msg", ""))))
+	scr.promote_requested.connect(func(_pp: Dictionary) -> void:
+		AudioManager.ui_select()
+		var res := _career.promote_youth(pid)
+		_career.save()
+		if bool(res.get("ok", false)):
+			scr.queue_free()
+			_refresh_squad_overlay()
+		refresh.call()
+		_toast(str(res.get("msg", ""))))
+	scr.sack_requested.connect(func(_pp: Dictionary) -> void:
+		AudioManager.ui_select()
+		var res := _career.sack_youth(pid)
+		_career.save()
+		if bool(res.get("ok", false)):
+			scr.queue_free()
+		refresh.call()
+		_toast(str(res.get("msg", ""))))
+
 
 ## Re-feed the SQUAD overlay (if it's still mounted under the youth screen) the live roster,
 ## so a promotion shows up immediately when the youth screen closes.

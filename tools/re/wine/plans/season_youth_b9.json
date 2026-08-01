@@ -1,0 +1,221 @@
+{
+ "out": "season_youth_b9",
+ "note": "B9 (docs/re/youth_re.md): a Man Utd TOTAL-level career with YOUTH TEAM SCOUT R. Staples (4.5*) and YOUTH MANAGER B. Beckett (4*) hired and a six-LED search armed at 1 Aug 1997. Drive weeks until the scout reports; the probe snaps SQUAD -> YOUTH every 3rd hub so the filled PLAYERS FOUND panel is captured.",
+ "keep": [
+  "alert_box",
+  "hub"
+ ],
+ "rules": {
+  "hub": {
+   "click": [
+    594,
+    268
+   ],
+   "settle": 1.2
+  },
+  "champion_card": {
+   "click": [
+    115,
+    352
+   ],
+   "settle": 1.2
+  },
+  "start_of_season": {
+   "click": [
+    573,
+    428
+   ],
+   "settle": 1.2
+  },
+  "teams_in_championships": {
+   "click": [
+    573,
+    451
+   ],
+   "settle": 1.2
+  },
+  "match_options": {
+   "click": [
+    478,
+    351
+   ],
+   "settle": 3.0
+  },
+  "prematch_lineups": {
+   "click": [
+    320,
+    240
+   ],
+   "settle": 3.0
+  },
+  "half_time": {
+   "click": [
+    536,
+    451
+   ],
+   "settle": 2.0
+  },
+  "full_time": {
+   "click": [
+    536,
+    451
+   ],
+   "settle": 2.0
+  },
+  "cup_draw": {
+   "click": [
+    551,
+    451
+   ],
+   "settle": 2.0
+  },
+  "manager_of_month": {
+   "click": [
+    573,
+    255
+   ],
+   "settle": 1.5
+  },
+  "player_of_month": {
+   "click": [
+    571,
+    359
+   ],
+   "settle": 1.5
+  },
+  "channel_tv": {
+   "click": [
+    505,
+    357
+   ],
+   "settle": 1.5
+  },
+  "lineup_screen": {
+   "swap_unavailable": true,
+   "click": [
+    592,
+    454
+   ],
+   "settle": 1.5
+  },
+  "alert_box": {
+   "click_alert_ok": true,
+   "settle": 1.2
+  },
+  "news_extra": {
+   "click": [
+    486,
+    38
+   ],
+   "settle": 1.5
+  },
+  "finance_screen": {
+   "click": [
+    568,
+    451
+   ],
+   "settle": 1.5
+  },
+  "team_offer": {
+   "click": [
+    492,
+    455
+   ],
+   "settle": 1.5
+  },
+  "league_tables_final": {
+   "click": [
+    573,
+    437
+   ],
+   "settle": 1.5
+  },
+  "the_championships": {
+   "click": [
+    573,
+    451
+   ],
+   "settle": 1.5
+  },
+  "end_of_season": {
+   "click": [
+    573,
+    437
+   ],
+   "settle": 1.5
+  },
+  "players_of_the_year": {
+   "click": [
+    557,
+    438
+   ],
+   "settle": 1.5
+  },
+  "preseason": {
+   "clicks": [
+    [
+     557,
+     346,
+     4
+    ],
+    [
+     570,
+     455
+    ]
+   ],
+   "settle": 3.0
+  }
+ },
+ "film_secs": 20,
+ "retries": 45,
+ "loop_breaker": {
+  "cycle": [
+   "hub",
+   "alert_box"
+  ],
+  "when": "hub",
+  "action": {
+   "click": [
+    480,
+    97
+   ],
+   "settle": 3.0
+  }
+ },
+ "keep_all": false,
+ "probe": {
+  "on": "hub",
+  "every": 3,
+  "steps": [
+   {
+    "click": [
+     234,
+     390
+    ],
+    "settle": 2.2
+   },
+   {
+    "click": [
+     579,
+     372
+    ],
+    "settle": 2.2,
+    "snap": "youth"
+   },
+   {
+    "click": [
+     571,
+     440
+    ],
+    "settle": 1.8
+   },
+   {
+    "click": [
+     577,
+     450
+    ],
+    "settle": 1.8
+   }
+  ]
+ }
+}

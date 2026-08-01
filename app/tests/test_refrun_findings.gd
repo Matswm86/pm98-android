@@ -318,7 +318,11 @@ func _youth_training_speedup() -> bool:
 	for a in Training.TRAINABLE:
 		base[a] = 61
 		attrs[a] = 60
-	var youth: Array = [{"name": "Spindle", "attrs": attrs, "base_attrs": base, "fitness": 90}]
+	# `in_training` is the 0x20 mode byte the youth card's TRAINING button sets: only an
+	# ASSIGNED youngster develops at all (youth_re.md C2), so the odd-gap trap this test
+	# exists for is only reachable with him in the programme.
+	var youth: Array = [{"name": "Spindle", "attrs": attrs, "base_attrs": base,
+		"fitness": 90, "in_training": true}]
 	var ready := false
 	for _w in 200:
 		for n in Training.develop_youth_week(rng, youth):

@@ -120,6 +120,13 @@ var ground_grades: Dictionary = {}
 var ticket_price: float = 0.0     # board-set match ticket price (0 = tier default)
 var board_price: int = 0          # board-set advertising-board price (0 = tier default)
 var boards_sold_season: bool = false  # GROUND MATCH DAY: sponsor-board season offer taken
+# The three stored club stats the original keeps at `team+0x2c/+0x30/+0x34`, each 0..1000
+# and displayed /100 (docs/re/directiva_screen_re.md). Promoting or sacking a youth moves
+# them by the deltas `FUN_00588180` / `FUN_00588e20` apply — see `_board_delta`. They open
+# at the midpoint; the original's own opening values are un-RE'd (declared).
+var board_directors: int = 500
+var board_supporters: int = 500
+var board_rating: int = 500
 
 # Live transfer state: the division's squads mutate as players move, and persist
 # in the save -- the career, not GameDB, is the source of truth once you're managing.
@@ -2744,7 +2751,36 @@ func _scouted_youth_count() -> int:
 ## Offer a contract to one of the scout's finds (a PLAYERS FOUND row tap). He joins the
 ## youth setup, or refuses — the two outcomes the MANAGER.EXE strings describe. A raw
 ## prospect with a big ceiling is the likeliest to say no. {ok, msg}.
-func sign_youth_prospect(pid: int, rng: RandomNumberGenerator = null) -> Dictionary:
+## The CLUB FEE a youth prospect's offer card is stamped with. WITNESS refrun p0759 /
+## p0771 (14 Oct 1998): both the prospect's card and the signed SPINDLE's card read
+## £75,000. One witness only — whether the engine ever varies it is un-RE'd, so it is a
+## flat constant and declared as such (youth_re.md C5/C6).
+const YOUTH_CLUB_FEE := 75_000
+
+## The YEARLY WAGE the card opens at. It is the offer floor (OfferRecord.MONEY_MIN), and
+## SPINDLE signed at £15,000 — so the opening terms are a starting bid, not his price.
+const YOUTH_OPENING_WAGE := 5_000
+const YOUTH_OPENING_YEARS := 4
+
+
+## What the prospect wants per year. Un-RE'd (the card only proves he opens at £5,000 and
+## SPINDLE closed at £15,000, i.e. 3x the floor for a 44-rated 19-year-old). Modelled as
+## the floor scaled by his ceiling and softened by the YOUTH MANAGER's pull, which is the
+## same pull term the old silent-sign path already used.
+func youth_wage_demand(p: Dictionary) -> int:
+	var pot := float(Youth.potential_of(p))
+	var pull := maxf(0.5, Staff.youth_factor(staff))
+	var want := YOUTH_OPENING_WAGE * (1.0 + maxf(0.0, pot - 35.0) / 15.0) / pull
+	return int(round(want / 1000.0)) * 1000
+
+
+## Offer a PLAYERS FOUND prospect a contract (`FUN_0053eaa0` -> `FUN_00527000` -> the
+## shared offer path `FUN_0058a360`). He accepts, or answers with the engine's own string
+## "The youth player %s has rejected your offer." (0x663be8). Refusal falls as the offer
+## approaches his demand: meeting it removes the wage-driven part entirely and leaves only
+## the potential/pull residual the original's roll always had.
+func offer_youth_contract(pid: int, yearly_wage: int = YOUTH_OPENING_WAGE,
+		years: int = YOUTH_OPENING_YEARS, rng: RandomNumberGenerator = null) -> Dictionary:
 	var idx := -1
 	for i in youth_found.size():
 		if int((youth_found[i] as Dictionary).get("id", -2)) == pid:
@@ -2762,15 +2798,36 @@ func sign_youth_prospect(pid: int, rng: RandomNumberGenerator = null) -> Diction
 	var pot := float(Youth.potential_of(p))
 	var pull := Staff.youth_factor(staff)
 	var refuse := clampf((pot - 55.0) / 120.0 / maxf(0.5, pull), 0.0, 0.45)
+	# ...and is bought down by the wage. `shortfall` is 1.0 at the opening £5,000 and 0.0
+	# once the offer meets his demand; a quarter of the roll is potential/pull residual
+	# that money cannot buy off, so even a full offer can still be turned down.
+	var demand := youth_wage_demand(p)
+	var span := maxi(1, demand - YOUTH_OPENING_WAGE)
+	var shortfall := clampf(float(demand - yearly_wage) / float(span), 0.0, 1.0)
+	refuse *= 0.25 + 0.75 * shortfall
 	if rng.randf() < refuse:
 		youth_found.remove_at(idx)
 		_news("youth", "The youth player %s has rejected your offer." % nm)
 		return {"ok": false, "msg": "The youth player %s has rejected your offer." % nm}
 	youth_found.remove_at(idx)
-	youth.append(Youth.enrol(p, club_id))
+	var joined := Youth.enrol(p, club_id)
+	# The YOUTH TEAM roster's WAGE / YEARS columns are the card's negotiated terms
+	# (youth_re.md C5) — LEFT counts down with the senior contracts.
+	joined["contract_wage"] = maxi(YOUTH_OPENING_WAGE, yearly_wage)
+	joined["contract_years"] = clampi(years, OfferRecord.YEARS_MIN, OfferRecord.YEARS_MAX)
+	joined["contract_term"] = int(joined["contract_years"])
+	joined["wage"] = maxi(1, int(joined["contract_wage"]) / Contract.SEASON_WEEKS)
+	youth.append(joined)
 	_news("youth", "%s has joined your Youth Team." % nm)
 	_log("%s has joined your Youth Team." % nm)
 	return {"ok": true, "msg": "%s has joined your Youth Team." % nm}
+
+
+## The pre-card route, kept for the automated paths (and the loop tests) that sign a
+## prospect without opening the offer form: it is exactly `offer_youth_contract` at the
+## card's own opening terms.
+func sign_youth_prospect(pid: int, rng: RandomNumberGenerator = null) -> Dictionary:
+	return offer_youth_contract(pid, YOUTH_OPENING_WAGE, YOUTH_OPENING_YEARS, rng)
 
 
 # ---- the SENIOR scout search (SCOUT screen, docs/re/scout_screen_re.md) ----
@@ -3219,7 +3276,7 @@ func inject_due_talents(pool: Array, rng: RandomNumberGenerator = null) -> int:
 ## so he takes the lowest free dorsal instead. On a pad club (no real, unique
 ## numbering) this changes nothing: the set stays non-individuated and renders
 ## "-" exactly as before. [Mats QA 2026-07-26: talents must look like the squad]
-static func _assign_free_no(roster: Array, p: Dictionary) -> void:
+static func _assign_free_no(roster: Array, p: Dictionary, start := 1) -> void:
 	var v: Variant = p.get("squadNo")
 	if v != null and int(v) > 0:
 		return
@@ -3231,10 +3288,25 @@ static func _assign_free_no(roster: Array, p: Dictionary) -> void:
 	p["squadNo"] = 0
 	if used.is_empty():
 		return                       # pad club: he pads too
-	var n := 1
+	var n := maxi(1, start)
 	while used.has(n):
 		n += 1
 	p["squadNo"] = n
+
+
+## `FUN_00588d10` — the seed the engine starts its free-number scan from, off the
+## player's demarcación byte (+0x1c): 0 (GK) -> 1, 3 (FW) -> 9, anything else -> 2.
+## Decompiled as `pos == 0 ? 1 : (pos != 3 ? 2 : 9)`. It is only a SEED — the scan still
+## walks up to the first unused number, so a squad that already owns 1 and 9 pushes the
+## promoted keeper or striker onward exactly as the original does.
+static func squad_no_seed(p: Dictionary) -> int:
+	match str(p.get("pos", "")):
+		"GK":
+			return 1
+		"FW":
+			return 9
+		_:
+			return 2
 
 
 ## Best prospects first, so when a season delivers more talents than there is room
@@ -3312,10 +3384,86 @@ func _inject_free_talent(e: Dictionary, rng: RandomNumberGenerator, start_year: 
 	return true
 
 
-## The youth players the manager can promote right now (the youth manager has flagged
-## them ready). The screen badges these and offers PROMOTE.
+## The youth players the manager can promote right now. The engine's PROMOTE gate
+## (`FUN_005274d0` @0x5275ba) reads the ATTRIBUTES, not a stored flag: all four CORE4 live
+## bytes must equal their BASE twins. `Youth.is_ready` is the same condition recorded by
+## the growth branch when it fires, so the two agree — but the attribute test is the
+## authority, and it also covers a youngster who arrives already at his ceiling.
 func promotable_youth() -> Array:
-	return youth.filter(func(p): return Youth.is_ready(p))
+	return youth.filter(func(p): return Training.youth_fully_grown(p))
+
+
+## `FUN_00588180`'s and `FUN_00588e20`'s board effects. The original keeps three club
+## stats — `team+0x2c` DIRECTORS CONFIDENCE, `+0x30` SUPPORTERS CONFIDENCE, `+0x34`
+## MANAGER RATING (docs/re/directiva_screen_re.md) — each clamped to 0..1000. Promoting a
+## youngster is +5/+5/+1; sacking one is +5/-5/-1 (the board likes the saving, the crowd
+## and your standing do not). NOTE: the DIRECTIVA screen still renders its own documented
+## proxy; wiring it to these stored values is tracked separately so this change cannot
+## move that screen's 0px parity shot.
+const BOARD_STAT_MAX := 1000
+
+func _board_delta(directors: int, supporters: int, rating: int) -> void:
+	board_directors = clampi(board_directors + directors, 0, BOARD_STAT_MAX)
+	board_supporters = clampi(board_supporters + supporters, 0, BOARD_STAT_MAX)
+	board_rating = clampi(board_rating + rating, 0, BOARD_STAT_MAX)
+
+
+## The TRAINING button on a youth player's card (`0x527820`:
+## `mov byte [player+0xa9], 0x20`). It only puts a youngster IN — the engine's own row has
+## no way back out, and the button greys once the YOUTH TEAM MANAGER's capacity is full
+## (`FUN_005274d0`: `if (FUN_0057cd30() <= FUN_0057cd50()) grey`). A youngster who is not
+## in training does not develop at all.
+func set_youth_training(pid: int) -> Dictionary:
+	var p := _youth_by_id(pid)
+	if p.is_empty():
+		return {"ok": false, "msg": "That youngster is not in your youth team."}
+	if Training.youth_in_training(p):
+		return {"ok": true, "msg": "%s is already in training." % p.get("name", "?")}
+	var cap := Staff.youth_training_capacity(staff)
+	if Training.youth_in_training_count(youth) >= cap:
+		return {"ok": false, "msg": "Your youth manager cannot train any more players (%d)." % cap}
+	p["in_training"] = true
+	_news("youth", "%s has joined the youth training programme." % p.get("name", "?"))
+	return {"ok": true, "msg": "%s has joined the youth training programme." % p.get("name", "?")}
+
+
+func _youth_by_id(pid: int) -> Dictionary:
+	for p in youth:
+		if int(p.get("id", -2)) == pid:
+			return p
+	return {}
+
+
+## SACK a youth player — the youth half of the shared `FUN_00588e20`. He leaves the
+## academy, and the engine BIRTHS A REPLACEMENT into the 0x26e4 pool in his place
+## (`FUN_00576cd0(0x26e4, 0xc, (b9c+b9d+b9e+b9f)>>2, ..., age+1)`): a fresh record at the
+## sacked man's own CORE4 average, one year older. That rebirth is why the shipped pool
+## never runs dry over a long career.
+func sack_youth(pid: int) -> Dictionary:
+	var idx := -1
+	for i in youth.size():
+		if int(youth[i].get("id", -2)) == pid:
+			idx = i
+			break
+	if idx == -1:
+		return {"ok": false, "msg": "That youngster is not in your youth team."}
+	var p: Dictionary = youth[idx]
+	var nm := str(p.get("name", "?"))
+	youth.remove_at(idx)
+	_board_delta(5, -5, -1)
+	# the replacement record, born at his CORE4 average and a year older
+	var attrs: Dictionary = p.get("attrs", {})
+	var avg := 0
+	for a in ["VE", "RE", "AG", "CA"]:
+		avg += int(attrs.get(a, 0))
+	@warning_ignore("integer_division")
+	avg = avg / 4
+	youth_seq += 1
+	var born := Youth.rebirth(youth_seq, avg, int(p.get("age", 17)) + 1, career_rng())
+	youth_pool.append(born)
+	_news("youth", "%s has been released by your Youth Team." % nm)
+	_log("%s has been released from the youth team." % nm)
+	return {"ok": true, "msg": "%s has been released by your Youth Team." % nm}
 
 
 ## Promote a youth player into the first-team squad. He must be flagged ready, there must
@@ -3331,7 +3479,8 @@ func promote_youth(pid: int) -> Dictionary:
 	if idx == -1:
 		return {"ok": false, "msg": "That youngster is not in your youth team."}
 	var p: Dictionary = youth[idx]
-	if not Youth.is_ready(p):
+	# The engine's gate is the attribute equality, not a stored flag (FUN_005274d0).
+	if not Training.youth_fully_grown(p):
 		return {"ok": false, "msg": "%s is not ready for the first team yet." % p.get("name", "?")}
 	if my_squad().size() >= TransferMarket.SQUAD_MAX:
 		return {"ok": false, "msg": "Your squad is full (%d); make room before promoting." % TransferMarket.SQUAD_MAX}
@@ -3344,7 +3493,11 @@ func promote_youth(pid: int) -> Dictionary:
 	p["auto_renew"] = false
 	var form_rng := career_rng()   # S3: the ONE persisted career stream
 	Morale.ensure(p, form_rng)   # fresh dynamic form, like the season kickoff roll
-	_assign_free_no(rosters[club_id], p)
+	# FUN_00588d10: the free-number scan is SEEDED by his position (GK 1 / FW 9 / else 2),
+	# and the 0x20 training mode is cleared as he leaves the academy.
+	_assign_free_no(rosters[club_id], p, squad_no_seed(p))
+	p["in_training"] = false
+	_board_delta(5, 5, 1)          # FUN_00588180's +5 / +5 / +1
 	rosters[club_id].append(p)
 	_news("youth", "%s has been promoted to the first team squad." % p.get("name", "?"))
 	_log("%s has been promoted from the youth team." % p.get("name", "?"))
@@ -6033,6 +6186,8 @@ func to_dict() -> Dictionary:
 		"youth": youth,
 		"youth_seq": youth_seq, "youth_search": youth_search, "youth_found": youth_found,
 		"youth_caps": youth_caps,
+		"board_directors": board_directors, "board_supporters": board_supporters,
+		"board_rating": board_rating,
 		"career_rng_state": (str(_career_rng.state) if _career_rng != null else career_rng_state),
 		"scout_search": scout_search, "scout_results": scout_results,
 		"scout_found_total": scout_found_total,
@@ -6226,6 +6381,9 @@ static func from_dict(d: Dictionary) -> Career:
 	c.youth_search = d.get("youth_search", {})
 	c.youth_found = d.get("youth_found", [])
 	c.youth_caps = d.get("youth_caps", {})
+	c.board_directors = int(d.get("board_directors", 500))
+	c.board_supporters = int(d.get("board_supporters", 500))
+	c.board_rating = int(d.get("board_rating", 500))
 	c.career_rng_state = str(d.get("career_rng_state", ""))
 	# Pre-SCOUT-screen saves load idle with no results (inert until a search).
 	c.scout_search = d.get("scout_search", {})

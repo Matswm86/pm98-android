@@ -1,4 +1,76 @@
-# PM98 Android — remaining-work inventory (refreshed 2026-07-29)
+# PM98 Android — remaining-work inventory (refreshed 2026-08-01)
+
+## 0aaaaaaaaaaaa. Closed 2026-08-01 (session s80) — THE YOUTH CONTRACT CARD AND THE ARROW
+
+s80 resumed the youth work s79/E left mid-task (the box shut down with tasks 5-8 open).
+
+### 1. THE PLAYERS FOUND ROW TAP NOW RAISES THE CONTRACT-OFFER CARD
+
+`FUN_0053eaa0` -> `FUN_00527000`, the same card family as the senior scout's row tap. The
+app used to sign a prospect silently on the tap and print a toast, which threw away the
+whole negotiation. Witness `refrun p0759` (14 Oct 1998): CLUB OFFER **£0** / CLUB FEE
+£75,000 / YEARLY WAGE £5,000 with steppers / YEARS 4 / the four clauses / CANCEL / OFFER —
+and SPINDLE, the youngster it signed, carries YEARLY WAGE £15,000 on his own card, so the
+wage is negotiated UP from the £5,000 the form opens at.
+
+`MakeOfferScreen` gained a `no_club` mode (CLUB OFFER pinned to £0, its ◄► inert — there is
+nobody to bid to); `Career.offer_youth_contract` resolves it, with the refusal roll bought
+down by the wage and the negotiated terms stamped on the youngster, so the YOUTH TEAM
+roster's WAGE / YEARS columns finally fill. `sign_youth_prospect` survives as that call at
+the card's opening terms, so the automated paths are unchanged. New
+`test_youth_offer_route` drives the real Main UI end to end.
+
+### 2. ⭐ THE PARAMETERS/RATING ARROW — AND WHAT IT IS NOT
+
+s79 un-baked the arrow and drove it off `_mode`. The parity shots caught that: frame 047
+carries the RATING plaque pair (0px against the live RATING witness over both plaque rects)
+while its arrow sits at the PARAMETERS slot. The plaques and the arrow are **separate
+axes** — LINE-UP shows the same thing with the RATING view actually displayed. The arrow
+has its own hit rects (exactly the two the handlers invalidate) and defaults to PARAMETERS,
+which is what every witnessed frame but the live RATING tap shows. What else it selects is
+un-RE'd and flagged as such.
+
+Two further defects in the s79 cut: the ink was taken from a hand-listed pair of colours and
+silently dropped **22 of the 81 px** (the sprite is dithered and carries eight colours), and
+one sprite stamped at both slots is 11px wrong because the dither is against a different
+background band per slot. Now cut per slot by pixel-difference of the two witnesses, whose
+frames moved **into the repo** (`screenshots/wine-captures-2026-08-01-youth-arrow/`) — the
+builder had been reading a session scratchpad that does not survive a reboot.
+
+All five YOUTH parity shots: **0px body**.
+
+### 3. THE TEST SWEEP WAS LYING — 22 GREEN TESTS REPORTED AS FAILURES
+
+The ad-hoc sweep grepped stdout for `ALL PASS`. The suite has at least five green footers
+(`ALL PASS`, `<name>: PASS`, `ALL GREEN`, `ALL OK`, `MAKE-OFFER: ALL GREEN`), so 22 healthy
+tests read as failures. `tools/run_tests.sh` now gates on the **exit code**, which is what
+CI has always used.
+
+### 4. AND UNDER THE FALSE ALARMS, TWO REAL REGRESSIONS FROM s79
+
+Both were invisible while the harness was crying wolf on 22 green tests.
+
+* **`Staff.physio_capacity` returned 0 for every physio.** s79 generalised the case-6
+  ladder into the whole `FUN_00578b80` table keyed by `member.role`, but the physio's
+  callers hand in a bare `{"stars": 4.5}` — no role key — so the lookup missed and the
+  INJURIES band's "N PLAYERS" silently became nobody. `capacity_of` now takes an explicit
+  role override and each per-role entry point passes its own.
+* **`test_refrun_findings` R17's odd-gap trap stopped being reachable.** Its fixture
+  youngster is not in the training programme, and s79 correctly gated growth on the 0x20
+  mode byte, so he never grew and never reported ready. Fixture given `in_training`.
+
+### STILL OPEN from s79's list
+
+**B9 did not fail on the sim — it failed on navigation.** Its drive ran 207 steps (15
+probes, into January 1998), but every probe frame it banked is **LINE-UP**, not YOUTH: the
+plan's hub click at (234,390) does not reach SQUAD MANAGEMENT. Fix that coordinate live
+against the window before re-running, or it burns another 200 steps for seven more LINE-UP
+frames. The wine career has no save (`drive_c/PM98/ACTLIGA` is empty), so it restarts from
+a new career. Details in `docs/re/youth_re.md`.
+
+---
+
+# (previous inventory, refreshed 2026-07-29)
 
 ## 0aaaaaaaaaaa. Closed 2026-07-29 (session s79) — FIVE OWNER-REPORTED DEFECTS
 

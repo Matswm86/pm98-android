@@ -184,21 +184,73 @@ static func quality_byte(member: Dictionary) -> int:
 	return clampi(int(round(float(member.get("stars", 0.0)) * 2.0)), 0, QUALITY_BYTE_HI)
 
 
-## FUN_00578b80 case 6 — how many injured players a PHYSIOTHERAPIST can treat at once
-## ("N PLAYERS" on the INJURIES band).
-static func physio_capacity(member: Dictionary) -> int:
+# ---- FUN_00578b80: the whole per-role capability table -------------------
+#
+# `FUN_00578b80(staff)` switches on the record's role index (`staff[0]`) and reads the
+# quality byte (`staff[1]`) through a five-band ladder (<3 / 3-4 / 5-6 / 7-8 / 9-10).
+# Ported verbatim, band for band, from the decompilation (2026-07-29):
+#
+#   case 0..5 + default  (the six TRAINERS)      1, 2, 3, 4, 5
+#   case 6               PHYSIOTHERAPIST         1, 2, 3, 4, 5
+#   case 7               PSYCHOLOGIST            2, 6, 10, 14, 18
+#   case 8, 9, 0xb       ASSISTANT / SCOUT /     0xffff (no cap)
+#                        YOUTH TEAM SCOUT
+#   case 10              YOUTH TEAM MANAGER      1, 2, 2, 3, 4
+#   case 0xc             GROUNDSMAN              70, 90, 100, 115, 0xffff
+#
+# The role index is ROLE_KEYS' own order, which is the CLUB PERSONNEL screen's order and
+# the order the hire rail walks. Cross-checks: a 4.5-star physio (q = 9) reports
+# "5 PLAYERS" on the INJURIES band (live 2026-07-24); the YOUTH TEAM screen reports
+# "3 PLAYERS" for both a 3.5-star youth manager (walkthrough frame 047) and a 4.0-star
+# one (live capture 2026-07-29) over an EMPTY roster, which is case 10's q=7 and q=8
+# band sharing the value 3 — and settles that the counter is the MANAGER'S CAPACITY,
+# never the academy's size.
+const NO_CAP := 0xffff
+
+const _CAPACITY_BANDS := {
+	HANDLING: [1, 2, 3, 4, 5], PASSING: [1, 2, 3, 4, 5], DRIBBLING: [1, 2, 3, 4, 5],
+	HEADING: [1, 2, 3, 4, 5], TACKLING: [1, 2, 3, 4, 5], SHOOTING: [1, 2, 3, 4, 5],
+	PHYSIOTHERAPIST: [1, 2, 3, 4, 5],
+	PSYCHOLOGIST: [2, 6, 10, 14, 18],
+	ASSISTANT_MANAGER: [NO_CAP, NO_CAP, NO_CAP, NO_CAP, NO_CAP],
+	SCOUT_ROLE: [NO_CAP, NO_CAP, NO_CAP, NO_CAP, NO_CAP],
+	YOUTH_TEAM_MANAGER: [1, 2, 2, 3, 4],
+	YOUTH_TEAM_SCOUT: [NO_CAP, NO_CAP, NO_CAP, NO_CAP, NO_CAP],
+	GROUNDSMAN: [70, 90, 100, 115, NO_CAP],
+}
+
+## `FUN_00578b80` for a hired member. 0 when the post is empty (the engine never reaches
+## the table without a record, and every caller treats "no staff" as no capability).
+##
+## `role` overrides the record's own `role` field. The per-role entry points below pass it,
+## because a caller that has ALREADY resolved the post should not have to carry a role key
+## on the dict it hands in — `physio_capacity({"stars": 4.5})` is the shape the physio
+## tests and the INJURIES band use, and reading `member.role` there silently returned 0.
+static func capacity_of(member: Dictionary, role: String = "") -> int:
+	if member.is_empty():
+		return 0
+	var key := role if role != "" else str(member.get("role", ""))
+	var bands: Variant = _CAPACITY_BANDS.get(key)
+	if not (bands is Array):
+		return 0
 	var q := quality_byte(member)
 	if q <= 0:
 		return 0
-	if q < 3:
-		return 1
-	if q < 5:
-		return 2
-	if q < 7:
-		return 3
-	if q < 9:
-		return 4
-	return 5
+	var band := 0 if q < 3 else (1 if q < 5 else (2 if q < 7 else (3 if q < 9 else 4)))
+	return int((bands as Array)[band])
+
+
+## FUN_00578b80 case 6 — how many injured players a PHYSIOTHERAPIST can treat at once
+## ("N PLAYERS" on the INJURIES band).
+static func physio_capacity(member: Dictionary) -> int:
+	return capacity_of(member, PHYSIOTHERAPIST)
+
+
+## FUN_00578b80 case 10 — how many youngsters the YOUTH TEAM MANAGER can have in
+## TRAINING at once. This is the "N PLAYERS" the YOUTH TEAM screen prints beside his
+## name (frame 047 / live 2026-07-29), and the gate on the youth card's TRAINING button.
+static func youth_training_capacity(staff: Array) -> int:
+	return capacity_of(member_in_role(staff, YOUTH_TEAM_MANAGER), YOUTH_TEAM_MANAGER)
 
 ## An "A. Padmore" style forename-initial + surname — the witnessed hire-list format —
 ## drawn from the game's OWN name tables (name_pools.json). Surnames keep their table

@@ -140,6 +140,12 @@ var _checked := {"free": false, "matches": false, "scoring": false, "house": fal
 var _press := ""                    # arrow/button id while held
 var _hold_t := 0.0
 var _repeats := 0
+# A prospect with no selling club (the YOUTH TEAM scout's PLAYERS FOUND row). WITNESS
+# refrun p0759, 14 Oct 1998: that card reads CLUB OFFER **£0** against CLUB FEE £75,000 —
+# there is nobody to bid to, so the top row is a dead display and its ◄► are inert. Only
+# the wage, the term and the clauses are negotiable, which is why SPINDLE opens at the
+# £5,000 floor and signs at £15,000 (youth_re.md C5/C6).
+var _no_club := false
 
 
 func _ready() -> void:
@@ -205,7 +211,8 @@ func setup(player: Dictionary, selling_club: Dictionary, fee: int, cash: int,
 	# the floor by 4583ab0 and re-reported by the owner 2026-07-29 ("starts at 5000
 	# again"); the default lives here so no caller can lose it again. `test_offer_card`
 	# pins it.
-	_offer = maxi(FLOOR, int(seed.get("offer", maxi(FLOOR, fee))))
+	_no_club = bool(seed.get("no_club", false))
+	_offer = 0 if _no_club else maxi(FLOOR, int(seed.get("offer", maxi(FLOOR, fee))))
 	_wage_yearly = maxi(FLOOR, int(seed.get("yearly_wage", FLOOR)))
 	_years = clampi(int(seed.get("years", YEARS_MIN)), YEARS_MIN, YEARS_MAX)
 	_bonus = FLOOR
@@ -323,6 +330,8 @@ func _step(id: String) -> void:
 	var up := id.ends_with("_up")
 	match id.get_slice("_", 0):
 		"offer":
+			if _no_club:
+				return          # nobody to bid to: the row is display-only
 			# ceiling = available funds (cap hypothesis, make_offer_re.md)
 			_offer = OfferRecord.step_up(_offer, _cash) if up else OfferRecord.step_down(_offer)
 		"wage":

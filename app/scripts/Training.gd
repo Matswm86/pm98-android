@@ -326,8 +326,50 @@ const YOUTH_GAIN_GATE := 0x27    # rand(100) > 0x27 -> gain 1
 ## Set to 1 for the binary's own cadence.
 const YOUTH_GROWTH_SPEEDUP := 2
 
+## The player+0xa9 training-mode byte the 0x20 YOUTH branch is keyed off. A youngster
+## only reaches `case 0x20` while his mode byte HOLDS 0x20, and the ONLY thing that
+## writes it is the TRAINING button on his own card (`0x527820`:
+## `mov byte [player+0xa9], 0x20`). Promotion clears it back to 0 (`FUN_00588d10`).
+## So an unassigned youngster does not develop at all — he sits at the rating the DBC
+## loader knocked him down to until you put him in training. Carried on the port's
+## player dicts as the boolean `in_training`.
+const YOUTH_MODE := 0x20
+
+## Is this youngster in the academy's training programme (mode byte == 0x20)?
+static func youth_in_training(p: Dictionary) -> bool:
+	return bool(p.get("in_training", false))
+
+## The PROMOTE gate, `FUN_005274d0` @0x5275ba: the button is greyed unless all FOUR live
+## CORE4 bytes (+0x9c..+0x9f) equal their BASE twins (+0xaa..+0xad) — the same equality
+## the 0x20 growth branch tests before it reports him ready. So "ready" and "promotable"
+## are one condition in the engine, read off the attributes rather than a stored flag.
+static func youth_fully_grown(p: Dictionary) -> bool:
+	var av: Variant = p.get("attrs", {})
+	if not (av is Dictionary) or (av as Dictionary).is_empty():
+		return false
+	var attrs: Dictionary = av
+	var base := base_attrs(p)
+	for a in CORE4:
+		if int(attrs.get(a, 0)) != int(base.get(a, 0)):
+			return false
+	return true
+
+
+## `FUN_0057cd50` — how many of a club's youth carry the 0x20 mode byte right now. The
+## engine walks the club's youth list (`club+0x3c`, next at `player+0x100`) and counts
+## `player+0xa9 == 0x20`; the TRAINING button is greyed once this reaches the YOUTH TEAM
+## MANAGER's `FUN_00578b80` capacity (Staff.youth_training_capacity).
+static func youth_in_training_count(youth: Array) -> int:
+	var n := 0
+	for p in youth:
+		if youth_in_training(p):
+			n += 1
+	return n
+
+
 ## One WEEK of the 0x20 YOUTH branch over a youth list. Returns {kind, text} news for
 ## each youngster the youth manager reports ready. Mutates attrs/fitness/`ready`.
+## Only youngsters currently ASSIGNED to training (mode 0x20) develop — see YOUTH_MODE.
 static func develop_youth_week(rng: RandomNumberGenerator, youth: Array) -> Array:
 	var news: Array = []
 	for p in youth:
@@ -337,7 +379,7 @@ static func develop_youth_week(rng: RandomNumberGenerator, youth: Array) -> Arra
 			continue
 		var attrs: Dictionary = av
 		var base := base_attrs(pd)
-		if not bool(pd.get("ready", false)):
+		if youth_in_training(pd) and not bool(pd.get("ready", false)):
 			# YOUTH_GROWTH_SPEEDUP is ours; at 1 this is the binary's own +1.
 			var gain := YOUTH_GROWTH_SPEEDUP if rng.randi_range(0, 99) > YOUTH_GAIN_GATE else 0
 			if gain > 0:
@@ -369,10 +411,13 @@ static func develop_youth_week(rng: RandomNumberGenerator, youth: Array) -> Arra
 	return news
 
 
-## Training points for one skill = floor(that coach's stars); 0 with no coach hired.
+## Training points for one skill = that coach's `FUN_00578b80` capacity (cases 0-5:
+## q<3 -> 1, 3-4 -> 2, 5-6 -> 3, 7-8 -> 4, 9-10 -> 5); 0 with no coach hired. This used
+## to be `floor(stars)`, which agrees with the table on whole stars (the 4+2=6 witness
+## can't tell them apart) but is one short on every HALF star — a 3.5-star coach is
+## quality byte 7, which the engine's ladder puts in the 4 band, not 3.
 static func skill_tp(staff: Array, skill: String) -> int:
-	var m := Staff.member_in_role(staff, skill)
-	return 0 if m.is_empty() else int(floor(float(m.get("stars", 0.0))))
+	return Staff.capacity_of(Staff.member_in_role(staff, skill))
 
 
 ## TOTAL TRAINABLE PLAYERS = the sum of every hired skill coach's TP (witnessed 4+2=6).

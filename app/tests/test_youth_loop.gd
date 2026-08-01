@@ -64,6 +64,9 @@ func _run() -> bool:
 	ok = _b8_career_rng() and ok
 	ok = _b6_easter_eggs_dont_block() and ok
 	ok = _b3_ready_alert() and ok
+	ok = _c1_capacity_table() and ok
+	ok = _c2_training_gate() and ok
+	ok = _c3_promote_and_sack() and ok
 	print("\n%s" % ("ALL PASS" if ok else "FAILURES ABOVE"))
 	return ok
 
@@ -171,8 +174,9 @@ func _b3_ready_alert() -> bool:
 		"RM": 60, "RG": 60, "PA": 60, "TI": 60, "EN": 60, "PO": 20}
 	var base := attrs.duplicate()
 	base["VE"] = 60
+	# in_training: he is in the youth manager's programme, so the 0x20 branch reaches him.
 	c.youth = [{"id": 900500, "name": "NEARLY READY", "age": 17, "is_youth": true,
-		"ready": false, "clubId": c.club_id, "_from_youth_pool": 1,
+		"ready": false, "clubId": c.club_id, "_from_youth_pool": 1, "in_training": true,
 		"attrs": attrs, "attrs_base": base}]
 	c.pending_alerts = []
 	var rng := RandomNumberGenerator.new()
@@ -188,6 +192,119 @@ func _b3_ready_alert() -> bool:
 		if got:
 			break
 	ok = _assert(got, "B3: the READY report lands in pending_alerts") and ok
+	return ok
+
+
+# ---- C1: FUN_00578b80, the per-role capability table ---------------------
+
+func _c1_capacity_table() -> bool:
+	var ok := true
+	# case 10 (YOUTH TEAM MANAGER): 1, 2, 2, 3, 4 over the q<3 / 3-4 / 5-6 / 7-8 / 9-10
+	# bands. The 7-8 band's 3 is the number BOTH youth-screen witnesses print.
+	var want := {1: 1, 2: 1, 3: 2, 4: 2, 5: 2, 6: 2, 7: 3, 8: 3, 9: 4, 10: 4}
+	for q in want:
+		var m := {"role": Staff.YOUTH_TEAM_MANAGER, "stars": float(q) * 0.5}
+		var got := Staff.capacity_of(m)
+		ok = _assert(got == int(want[q]),
+			"C1: youth manager q=%d -> %d (got %d)" % [q, want[q], got]) and ok
+	# case 6 (PHYSIO) keeps its own witnessed ladder: a 4.5-star physio treats 5.
+	ok = _assert(Staff.capacity_of({"role": Staff.PHYSIOTHERAPIST, "stars": 4.5}) == 5,
+		"C1: 4.5-star physio treats 5 (the live 2026-07-24 witness)") and ok
+	# cases 8/9/0xb are uncapped
+	for r in [Staff.ASSISTANT_MANAGER, Staff.SCOUT_ROLE, Staff.YOUTH_TEAM_SCOUT]:
+		ok = _assert(Staff.capacity_of({"role": r, "stars": 1.0}) == Staff.NO_CAP,
+			"C1: %s is uncapped" % r) and ok
+	ok = _assert(Staff.capacity_of({}) == 0, "C1: an empty post has no capability") and ok
+	return ok
+
+
+# ---- C2: the 0x20 TRAINING gate ------------------------------------------
+
+func _c2_training_gate() -> bool:
+	var ok := true
+	var c := _fixture()
+	c.staff.append({"id": 9, "role": Staff.YOUTH_TEAM_MANAGER, "name": "M. HIGH",
+		"stars": 1.0, "wage": 7000})            # q = 2 -> capacity 1
+	ok = _assert(Staff.youth_training_capacity(c.staff) == 1,
+		"C2: a 1-star youth manager trains ONE") and ok
+	for i in 3:
+		c.youth.append({"id": 940000 + i, "name": "KID %d" % i, "age": 17,
+			"is_youth": true, "ready": false, "_from_youth_pool": 1,
+			"attrs": {"VE": 40, "RE": 40, "AG": 40, "CA": 40},
+			"attrs_base": {"VE": 80, "RE": 80, "AG": 80, "CA": 80}})
+	ok = _assert(bool(c.set_youth_training(940000).get("ok", false)),
+		"C2: the first youngster gets the slot") and ok
+	ok = _assert(not bool(c.set_youth_training(940001).get("ok", true)),
+		"C2: the second is refused at capacity") and ok
+	ok = _assert(Training.youth_in_training_count(c.youth) == 1,
+		"C2: exactly one carries the 0x20 mode") and ok
+	# only the assigned one grows
+	var rng := RandomNumberGenerator.new()
+	rng.seed = SEED
+	for _w in 120:
+		Training.develop_youth_week(rng, c.youth)
+	ok = _assert(int((c.youth[0]["attrs"] as Dictionary)["CA"]) == 80,
+		"C2: the trained youngster reaches BASE") and ok
+	ok = _assert(int((c.youth[1]["attrs"] as Dictionary)["CA"]) == 40,
+		"C2: an untrained one has not moved a point") and ok
+	# promotion frees the slot again (FUN_00588d10 clears the mode byte)
+	ok = _assert(bool(c.promote_youth(940000).get("ok", false)),
+		"C2: the grown one promotes") and ok
+	ok = _assert(Training.youth_in_training_count(c.youth) == 0,
+		"C2: promotion clears his 0x20 mode and frees the slot") and ok
+	ok = _assert(bool(c.set_youth_training(940001).get("ok", false)),
+		"C2: the next youngster can now be trained") and ok
+	return ok
+
+
+# ---- C3: FUN_00588180 promote / FUN_00588e20 sack -------------------------
+
+func _c3_promote_and_sack() -> bool:
+	var ok := true
+	var c := _fixture()
+	c.staff.append({"id": 9, "role": Staff.YOUTH_TEAM_MANAGER, "stars": 5.0, "wage": 50000})
+	var grown := {"VE": 80, "RE": 80, "AG": 80, "CA": 80}
+	c.youth.append({"id": 950001, "name": "KEEPER KID", "age": 18, "pos": "GK",
+		"is_youth": true, "_from_youth_pool": 1, "in_training": true,
+		"attrs": grown.duplicate(), "attrs_base": grown.duplicate()})
+	c.youth.append({"id": 950002, "name": "STRIKER KID", "age": 18, "pos": "FW",
+		"is_youth": true, "_from_youth_pool": 1, "in_training": true,
+		"attrs": grown.duplicate(), "attrs_base": grown.duplicate()})
+	# the PROMOTE gate reads the attributes, not a `ready` flag — neither dict has one
+	ok = _assert(c.promotable_youth().size() == 2,
+		"C3: CORE4 == BASE is the promote gate, with no `ready` flag set") and ok
+	# FUN_00588d10's seed: a keeper's scan starts at 1, a forward's at 9
+	ok = _assert(Career.squad_no_seed({"pos": "GK"}) == 1, "C3: GK seeds at 1") and ok
+	ok = _assert(Career.squad_no_seed({"pos": "FW"}) == 9, "C3: FW seeds at 9") and ok
+	ok = _assert(Career.squad_no_seed({"pos": "MF"}) == 2, "C3: everyone else seeds at 2") and ok
+	var d0 := c.board_directors
+	var s0 := c.board_supporters
+	var r0 := c.board_rating
+	ok = _assert(bool(c.promote_youth(950001).get("ok", false)), "C3: the keeper promotes") and ok
+	ok = _assert(c.board_directors == d0 + 5 and c.board_supporters == s0 + 5
+		and c.board_rating == r0 + 1, "C3: promotion is +5 / +5 / +1 on the board") and ok
+	# SACK: he leaves and the POOL gains a replacement in his place
+	var pool0 := c.youth_pool.size()
+	d0 = c.board_directors
+	s0 = c.board_supporters
+	r0 = c.board_rating
+	ok = _assert(bool(c.sack_youth(950002).get("ok", false)), "C3: the striker is sacked") and ok
+	ok = _assert(c.youth_pool.size() == pool0 + 1,
+		"C3: sacking births a replacement into the 0x26e4 pool") and ok
+	ok = _assert(c.board_directors == d0 + 5 and c.board_supporters == s0 - 5
+		and c.board_rating == r0 - 1, "C3: sacking is +5 / -5 / -1 on the board") and ok
+	var born: Dictionary = c.youth_pool[c.youth_pool.size() - 1]
+	ok = _assert(int(born.get("age", 0)) == 19,
+		"C3: the replacement is one year older (%d)" % int(born.get("age", 0))) and ok
+	ok = _assert(born.has("attrs_base"), "C3: and ships knocked down, like the shipped 51") and ok
+	# the board stats survive a save/load
+	var path := "user://career_youth_c3.json"
+	c.save(path)
+	var loaded := Career.load_save(path)
+	ok = _assert(loaded != null and loaded.board_directors == c.board_directors
+		and loaded.board_supporters == c.board_supporters
+		and loaded.board_rating == c.board_rating,
+		"C3: the three board stats round-trip save/load") and ok
 	return ok
 
 

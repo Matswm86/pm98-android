@@ -211,7 +211,9 @@ func _unit_develop() -> bool:
 	var ok := true
 	var rng := RandomNumberGenerator.new()
 	rng.seed = SEED
-	var kid := {"name": "KID", "age": 17, "ready": false,
+	# in_training: the 0x20 mode byte. A youngster who is NOT in the youth manager's
+	# training programme does not develop at all (Training.YOUTH_MODE) — asserted below.
+	var kid := {"name": "KID", "age": 17, "ready": false, "in_training": true,
 		"attrs": _flat_attrs(40), "attrs_base": _flat_attrs(70)}
 	var ready_news := 0
 	for _w in 200:
@@ -228,7 +230,8 @@ func _unit_develop() -> bool:
 	ok = _assert(ready_news == 1, "the youth manager reports it exactly once (%d)" % ready_news) and ok
 	# Growth is 60%, not every week: 200 weeks of a 30-point climb must not be
 	# 30 weeks' worth of luck, but it must not take the full 200 either.
-	var slow := {"name": "SLOW", "ready": false, "attrs": _flat_attrs(0), "attrs_base": _flat_attrs(99)}
+	var slow := {"name": "SLOW", "ready": false, "in_training": true,
+		"attrs": _flat_attrs(0), "attrs_base": _flat_attrs(99)}
 	var moved := 0
 	for _w in 100:
 		var before := int(slow["attrs"]["CA"])
@@ -237,10 +240,19 @@ func _unit_develop() -> bool:
 			moved += 1
 	ok = _assert(moved > 40 and moved < 80, "the weekly gain gate is ~60%% (%d/100)" % moved) and ok
 	# A player already at BASE holds.
-	var done := {"name": "DONE", "ready": true, "attrs": _flat_attrs(60), "attrs_base": _flat_attrs(60)}
+	var done := {"name": "DONE", "ready": true, "in_training": true,
+		"attrs": _flat_attrs(60), "attrs_base": _flat_attrs(60)}
 	for _w in 30:
 		Youth.develop_week(rng, [done])
 	ok = _assert(int(done["attrs"]["CA"]) == 60, "a finished youth holds at BASE") and ok
+	# THE GATE (0x527820 / FUN_00582760 case 0x20): no TRAINING assignment, no growth.
+	var idle := {"name": "IDLE", "ready": false,
+		"attrs": _flat_attrs(40), "attrs_base": _flat_attrs(90)}
+	for _w in 200:
+		Youth.develop_week(rng, [idle])
+	ok = _assert(int(idle["attrs"]["CA"]) == 40,
+		"a youth NOT in training never develops (%d)" % int(idle["attrs"]["CA"])) and ok
+	ok = _assert(not Youth.is_ready(idle), "and is never flagged ready") and ok
 	return ok
 
 
@@ -280,6 +292,19 @@ func _career_integration() -> bool:
 	ok = _assert(career.youth.size() == 0,
 		"career starts with an empty academy (witnessed orig/39)") and ok
 
+	# NO youth manager yet: FUN_0057cd30 returns 0 without a record in role 10, so
+	# `capacity <= count` holds at 0 <= 0 and TRAINING is greyed for everyone. Hiring one
+	# is what opens the programme — the engine's own dependency, not the port's.
+	ok = _assert(Staff.youth_training_capacity(career.staff) == 0,
+		"no YOUTH TEAM MANAGER -> no training capacity") and ok
+	career.staff = [{"id": 2, "role": Staff.YOUTH_TEAM_MANAGER, "name": "G. KEEPING",
+		"stars": 3.5, "wage": 30000}]
+	# q = 7 -> FUN_00578b80 case 10's 7-8 band -> 3, the "3 PLAYERS" both youth-screen
+	# witnesses print (walkthrough 047 at 3.5 stars, live capture at 4.0).
+	ok = _assert(Staff.youth_training_capacity(career.staff) == 3,
+		"a 3.5-star youth manager trains 3 (%d)"
+		% Staff.youth_training_capacity(career.staff)) and ok
+
 	# Sign three straight out of the pool, the way the PLAYERS FOUND panel does.
 	var rng := RandomNumberGenerator.new()
 	rng.seed = SEED
@@ -316,6 +341,10 @@ func _career_integration() -> bool:
 
 	# Grow one to his ceiling, then promote him.
 	var kid: Dictionary = career.youth[0]
+	# he has to be put INTO training first — that is the whole point of the card's
+	# TRAINING button, and without it the loop below moves nothing.
+	ok = _assert(bool(career.set_youth_training(int(kid["id"])).get("ok", false)),
+		"the TRAINING button puts him in the programme") and ok
 	for _w in 400:
 		Youth.develop_week(rng, [kid])
 	ok = _assert(Youth.is_ready(kid), "a signed youngster reaches his shipped ceiling") and ok

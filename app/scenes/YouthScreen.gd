@@ -75,6 +75,8 @@ var _star_b_purple: Texture2D
 var _star_a_blue: Texture2D
 var _star_b_blue: Texture2D
 var _star_half_blue: Texture2D
+var _arrow: Texture2D                # the PARAMETERS-slot arrow sprite
+var _arrow_rating: Texture2D         # the RATING-slot cut (11 of its 81 px re-dither)
 var _held: Dictionary = {}         # held-state ring sprites (frame-cut 048/088/089)
 
 var _f8: Font
@@ -86,6 +88,9 @@ var _ymgr: Dictionary = {}         # YOUTH TEAM MANAGER; {} = none
 var _searching := false            # a scout search is running (Career.youth_search)
 var _selected: Dictionary = {}     # skill key -> true (LED lit)
 var _mode := "parameters"          # "parameters" | "rating" (087 default)
+## The arrow's own slot — a SEPARATE axis from `_mode` (see the draw, and youth_re.md C8):
+## frame 047 has the RATING plaques with the arrow still on PARAMETERS.
+var _arrow_row := "parameters"     # "parameters" | "rating"
 var _manager := ""
 var _club := ""
 var _league := "Premier League"
@@ -99,16 +104,34 @@ var _found: Array = []             # Career.youth_found — the PLAYERS FOUND sh
 var _found_rects: Array = []
 var _alert_img: Texture2D          # zero-LED SEARCH refusal (PMAlert render); null = none
 
-# PLAYERS FOUND filled list. The panel interior is frame-measured (`pf_interior`); the
-# ROW grammar inside it is the app's, because the original's filled panel is not in any
-# frame we hold. Kept deliberately plain — name + ability + a potential star count — and
-# on the same 16px pitch as every other list in the game.
+# PLAYERS FOUND, filled — WITNESSED 2026-08-01 in `screenshots/refrun-manutd-1997-98/
+# novel/p0759_UNKNOWN.png` (the reference run's own youth intake, 14 October 1998). The
+# panel is a LIST with a header strip, not the free-form message box the empty state
+# shows, and its columns are the game's own:
+#
+#     PLAYER            AV        ROL       WAGE        AGE
+#     black ink      dark red    black    dark red     navy
+#     ink from x357  cx 471      cx 496   cx 542       cx 591
+#
+# measured off the header glyph runs (AV (132,26,26) x464..478, WAGE (100,0,0) x527..557,
+# AGE (30,52,98) x581..602, the two black runs PLAYER and ROL inside x357..505). Header
+# glyph rows y105..115 on the panel grey (160,160,164); the first row sits under a black
+# rule at y121. The frame is partly covered by the contract-offer card it raised, so the
+# ROW fill colours below the header remain the app's own — declared, and B9's live
+# capture replaces them. This supersedes the invented "name / age / ability / star pips"
+# grammar, which had neither the right columns nor the right order.
+const PF_HDR_Y := 105.0
+const PF_ROW_Y0 := 123.0
 const PF_ROW_PITCH := 16
 const PF_ROW_H := 13
+const PF_COL := {"PLAYER": 357.0, "AV": 471.0, "ROL": 496.0, "WAGE": 542.0, "AGE": 591.0}
+const C_PF_HDR_DARK := Color8(0, 0, 0)
+const C_PF_HDR_RED := Color8(132, 26, 26)
+const C_PF_HDR_BLUE := Color8(30, 52, 98)
 const C_PF_ROW := Color8(222, 228, 240)
 const C_PF_ROW_SEL := Color8(255, 226, 128)
 const C_PF_INK := Color8(0, 0, 0)
-const C_PF_STAR := Color8(196, 138, 0)
+const C_PF_AGE := Color8(0, 0, 128)
 
 
 func _ready() -> void:
@@ -123,6 +146,8 @@ func _ready() -> void:
 	_star_a_blue = load("res://art/screens/youth/star_a_blue.png")
 	_star_b_blue = load("res://art/screens/youth/star_b_blue.png")
 	_star_half_blue = load("res://art/screens/youth/star_half_blue.png")
+	_arrow = load("res://art/screens/youth/arrow.png")
+	_arrow_rating = load("res://art/screens/youth/arrow_rating.png")
 	for k in ["search_held", "rating_held", "return_held"]:
 		_held[k] = load("res://art/screens/youth/%s.png" % k)
 	_f8 = PMChrome.font("8")
@@ -212,6 +237,17 @@ func _led_card(skill: String) -> Rect2:
 func _hit(d: Vector2) -> String:
 	if _alert_img != null:
 		return "alert_ok"     # any tap answers the alert's OK (single-button box)
+	# the arrow's two slots are their own buttons (FUN_0053e760 / FUN_0053e7e0), left of
+	# the plaques and tested BEFORE them so the narrow column is not swallowed
+	var asp: Dictionary = _spec.get("arrow", {})
+	var ax := float(asp.get("x", 475))
+	var aw := float(asp.get("w", 11))
+	var ah := float(asp.get("h", 18))
+	for row in ["parameters", "rating"]:
+		var ay := float(asp.get("y_rating" if row == "rating" else "y_parameters",
+			290 if row == "rating" else 266))
+		if Rect2(ax, ay, aw, ah).has_point(d):
+			return "arrow:" + row
 	for bname in ["search", "parameters", "rating", "return"]:
 		if _btn_rect(bname).has_point(d):
 			return "btn:" + bname
@@ -249,6 +285,9 @@ func _on_input(e: InputEvent) -> void:
 		queue_redraw()
 	elif was == "btn:return":
 		back_pressed.emit()
+	elif was.begins_with("arrow:"):
+		_arrow_row = was.substr(6)
+		queue_redraw()
 	elif was == "btn:parameters":
 		_mode = "parameters"
 		queue_redraw()
@@ -446,6 +485,25 @@ func _draw() -> void:
 		if _plaq_rating_on != null:
 			draw_texture(_tex(_plaq_rating_on), _btn_rect("rating").position)
 
+	# --- the selection arrow MOVES between its two slots. `FUN_0053e760` invalidates
+	#     (475,266)-(484,283) and sets DAT_00658a40 = 1; `FUN_0053e7e0` invalidates
+	#     (475,290)-(484,307) and sets it to 0 — each repaints its OWN slot, which is only
+	#     meaningful if the arrow moves. Witnessed live 2026-08-01: y17 has it at 266, y18
+	#     at 290. It had been baked into youth_body.png at 266 and never moved.
+	#
+	#     It is NOT the plaque mode. Frame 047 carries the RATING plaque pair (0px against
+	#     y18 over both plaque rects) while its arrow sits at the PARAMETERS slot — so the
+	#     two are separate axes and the arrow has its own hit rects. What ELSE the arrow
+	#     selects is un-RE'd; it defaults to PARAMETERS, which is what every witnessed
+	#     frame shows. Hypothesis, flagged as such in youth_re.md C8.
+	var asp: Dictionary = _spec.get("arrow", {})
+	var rating_row := _arrow_row == "rating"
+	var atex: Texture2D = _arrow_rating if rating_row else _arrow
+	if atex != null:
+		var ay := float(asp.get("y_rating", 290)) if rating_row \
+			else float(asp.get("y_parameters", 266))
+		draw_texture(_tex(atex), Vector2(float(asp.get("x", 475)), ay))
+
 	# --- held states: frame-cut ring sprites (048 red SEARCH / 088 RATING /
 	#     089 RETURN); PARAMETERS press is un-witnessed -> white rect ring ---
 	if _press.begins_with("btn:"):
@@ -512,12 +570,17 @@ func _draw_rows() -> void:
 				_txt_center(_f8, float(cols.get("ROL", 312)), y + 2.0, str(p.get("pos", "")), c_txt, 11)
 		else:
 			_txt_center(_f8, float(cols.get("ROL", 312)), y + 2.0, str(p.get("pos", "")), c_txt, 11)
-		if Youth.is_ready(p):
-			# Declared OURS cue (B4): the READY/PROMOTE affordance is un-walked, so the
-			# cue borrows the EXE's own word in the screen's own YES-red, centred across
-			# the empty WAGE/YEARS band.
-			_txt_center(_f8, float(rspec.get("promote_cx", 388)), y + 2.0, "PROMOTE",
-				_ci(Color8(210, 0, 0)), 11)
+		# WAGE / YEARS are REAL (witnessed 2026-08-01, refrun p0771: a youth player's card
+		# carries CLUB FEE £75,000 / YEARLY WAGE £15,000 / YEARS 4 / LEFT 4). The old
+		# "youth contracts are un-modelled" note was wrong and the columns are no longer
+		# blank. The invented in-row "PROMOTE" cue (B4) is GONE: promotion lives on the
+		# youth player's card, where the source puts it.
+		var wage := int(p.get("contract_wage", 0))
+		if wage > 0:
+			_txt_center(_f8, float(cols.get("WAGE", 358)), y + 2.0, _money(wage), c_txt, 11)
+		var yrs := int(p.get("contract_years", 0))
+		if yrs > 0:
+			_txt_center(_f8, float(cols.get("YEARS", 418)), y + 2.0, str(yrs), c_txt, 11)
 		var r := Rect2(tx - 8.0, y, 390.0, float(rh))
 		_row_rects.append({"pid": int(p.get("id", -1)), "rect": r})
 		if _press == "row:%d" % int(p.get("id", -1)):
@@ -532,26 +595,62 @@ func _draw_rows() -> void:
 ## frame-measured interior, flagged as reconstruction in docs/re/youth_re.md.
 func _draw_found() -> void:
 	var iv: Array = _spec.get("pf_interior", [326, 102, 302, 117])
+	# header strip — the witnessed five columns, in the witnessed inks
+	_txt_left(_f8, PF_COL["PLAYER"], PF_HDR_Y, "PLAYER", _ci(C_PF_HDR_DARK), 11)
+	_txt_center(_f8, PF_COL["AV"], PF_HDR_Y, "AV", _ci(C_PF_HDR_RED), 11)
+	_txt_center(_f8, PF_COL["ROL"], PF_HDR_Y, "ROL", _ci(C_PF_HDR_DARK), 11)
+	_txt_center(_f8, PF_COL["WAGE"], PF_HDR_Y, "WAGE", _ci(C_PF_HDR_RED), 11)
+	_txt_center(_f8, PF_COL["AGE"], PF_HDR_Y, "AGE", _ci(C_PF_HDR_BLUE), 11)
 	var x := float(iv[0]) + 4.0
 	var w := float(iv[2]) - 8.0
-	var y := float(iv[1]) + 6.0
-	var limit := int((float(iv[3]) - 10.0) / PF_ROW_PITCH)
-	for i in mini(_found.size(), limit):
+	var y := PF_ROW_Y0
+	var limit := int((float(iv[1]) + float(iv[3]) - PF_ROW_Y0) / PF_ROW_PITCH)
+	for i in mini(_found.size(), maxi(1, limit)):
 		var p: Dictionary = _found[i]
 		var pid := int(p.get("id", -1))
 		var r := Rect2(x, y, w, PF_ROW_H)
 		var held := _press == "found:%d" % pid
 		draw_rect(r, _ci(C_PF_ROW_SEL if held else C_PF_ROW), true)
-		_txt_left(_f8, x + 4.0, y + 1.0, str(p.get("name", "")).to_upper(), _ci(C_PF_INK), 11)
-		_txt_center(_f8, x + w - 74.0, y + 1.0, str(p.get("age", 0)), _ci(C_PF_INK), 11)
-		_txt_center(_f8, x + w - 54.0, y + 1.0, str(Youth.ability(p)), _ci(C_PF_INK), 11)
-		# potential as 1-5 pips (the YOUTH screen's own star language, drawn plain
-		# because the panel has no witnessed star art of its own)
-		var pips := clampi(int(round(Youth.potential_of(p) / 20.0)), 1, 5)
-		for s in pips:
-			draw_rect(Rect2(x + w - 38.0 + s * 6.0, y + 4.0, 4.0, 5.0), _ci(C_PF_STAR), true)
+		_txt_left(_f8, PF_COL["PLAYER"], y + 1.0, str(p.get("name", "")).to_upper(),
+			_ci(C_PF_INK), 11)
+		# AV = floor((VE+RE+AG+CA)/4), the same average every other list in the game uses
+		# (scout_screen_re.md, verified 28/28 on the OFFERS squad list).
+		_txt_center(_f8, PF_COL["AV"], y + 1.0, str(_av(p)), _ci(C_PF_INK), 11)
+		var pf := PMChrome.iget(p, "posFine")
+		var rol := PMChrome.camrol(pf) if pf >= 1 and pf <= 18 else null
+		if rol != null:
+			draw_texture(_tex(rol), Vector2(floorf(PF_COL["ROL"] - 12.0), y - 1.0))
+		else:
+			_txt_center(_f8, PF_COL["ROL"], y + 1.0, str(p.get("pos", "")), _ci(C_PF_INK), 11)
+		var wage := int(p.get("contract_wage", 0))
+		if wage > 0:
+			_txt_center(_f8, PF_COL["WAGE"], y + 1.0, _money(wage), _ci(C_PF_INK), 11)
+		_txt_center(_f8, PF_COL["AGE"], y + 1.0, str(int(p.get("age", 0))), _ci(C_PF_AGE), 11)
 		_found_rects.append({"pid": pid, "rect": r})
 		y += PF_ROW_PITCH
+
+
+## AV = floor((VE+RE+AG+CA)/4) — the game's own squad-list average.
+func _av(p: Dictionary) -> int:
+	var a: Dictionary = p.get("attrs", {})
+	var s := 0
+	for k in ["VE", "RE", "AG", "CA"]:
+		s += int(a.get(k, 0))
+	@warning_ignore("integer_division")
+	return s / 4
+
+
+## "£15,000" — the card's own money grammar (witnessed refrun p0771).
+func _money(v: int) -> String:
+	var s := str(absi(v))
+	var out := ""
+	var c := 0
+	for i in range(s.length() - 1, -1, -1):
+		out = s[i] + out
+		c += 1
+		if c % 3 == 0 and i > 0:
+			out = "," + out
+	return "£" + out
 
 
 func _col(v: Variant) -> Color:

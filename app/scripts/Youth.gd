@@ -270,6 +270,32 @@ static func search_weeks(rng: RandomNumberGenerator, quality: int) -> int:
 	return maxi(1, int(ceil(float(w) / float(SEARCH_SPEEDUP))))
 
 
+## `FUN_00588e20`'s youth branch: sacking a youngster BIRTHS a replacement into the
+## 0x26e4 pool — `FUN_00576cd0(0x26e4, 0xc, (b9c+b9d+b9e+b9f)>>2, name, age+1)`, i.e. a
+## fresh record at the released man's own CORE4 average, one year older. He ships like any
+## pool record: the ten live bytes ARE his BASE at birth, so `degrade` then knocks him
+## down and his ceiling is the ability he was born with, exactly like the shipped 51.
+## The engine's own name/attribute spread inside `FUN_00576cd0` is not reversed, so the
+## name comes from the game's own tables and the spread reuses the regen lane — declared.
+static func rebirth(id: int, ability: int, age: int, rng: RandomNumberGenerator) -> Dictionary:
+	var ca := clampi(ability, ATTR_FLOOR, 99)
+	var is_gk := rng.randf() < GK_CHANCE
+	var p := {
+		"id": id,
+		"name": _gen_name(rng),
+		"age": age,
+		"isGK": is_gk,
+		"pos": random_pos(rng, is_gk),
+		"attrs": _make_attrs(rng, ca, is_gk),
+		"clubId": POOL_CLUB_ID,
+		"is_youth": true,
+		"ready": false,
+		"in_training": false,
+	}
+	degrade(p, rng)      # he enters the pool knocked down, like every shipped record
+	return p
+
+
 ## Stamp a pool record as a member of YOUR youth setup: the engine moves him out of club
 ## 0x26e4 and turns his training mode to 0x20, which is all "being in the academy" is.
 static func enrol(p: Dictionary, club_id: int) -> Dictionary:
