@@ -427,6 +427,15 @@ const LEAGUE_CUP_OPTS := {
 	# venues (docs/re/knockout_views_re.md). Earlier rounds keep single-leg + replay
 	# (the R4 list frame), and the final is a single match.
 	"semi_legs": 2,
+	# ROUND 2 is TWO-LEGGED, and this is a frame, not a memory of English football:
+	# `tools/re/refs/cupdraw-rounds-2026-08-01/keep_0019_cup_draw.png` is this competition's
+	# ROUND 2 draw and its bottom-left plates read **1ST LEG / 2ND LEG**, while the ROUND 3,
+	# ROUND 4 and QTR. FINALS draws banked from the SAME career all read MATCH / REPLAY
+	# (`tools/re/probe_cupdraw_per_round.py`: 397 px on the plates, 0 px anywhere else).
+	# The port played every round of this cup as one match, so a Coca-Cola second round
+	# resolved on one result where the original plays two. ROUND 1 is NOT witnessed and gets
+	# no entry -- it keeps the competition-wide rule rather than an assumed symmetry.
+	"round_legs_by_round": {2: 2},
 	"label_scheme": "sequential", "qtr_label": "Qtr Finals",
 	"prize_round": 0, "prize_winner": 0,
 	# A surplus round beyond the eight pinned ones runs before the 12 August first round.

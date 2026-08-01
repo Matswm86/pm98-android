@@ -135,6 +135,12 @@ static func create(club_ids: Array, total_weeks: int, opts: Dictionary = {}) -> 
 		# (docs/re/knockout_views_re.md) -- while its earlier rounds keep the
 		# single-leg + replay model the R4 list frame shows. 0 = no override.
 		"semi_legs": int(opts.get("semi_legs", 0)),
+		# Per-round override keyed by ROUND NUMBER, for the rounds a cup-draw frame has
+		# actually witnessed. The Coca-Cola Cup's ROUND 2 draw reads 1ST LEG / 2ND LEG while
+		# its ROUND 3 / ROUND 4 / QTR. FINALS draws from the same career read MATCH / REPLAY
+		# (`tools/re/probe_cupdraw_per_round.py`), which no single competition-wide `legs`
+		# can express. Empty = no override, i.e. every existing bracket is unchanged.
+		"round_legs_by_round": (opts.get("round_legs_by_round", {}) as Dictionary).duplicate(),
 		"label_scheme": str(opts.get("label_scheme", "facup")),
 		"qtr_label": str(opts.get("qtr_label", "Qtr. Finals")),
 		"prize_round": int(opts.get("prize_round", ROUND_PRIZE)),
@@ -449,6 +455,18 @@ static func _pair_round(b: Dictionary, rng: RandomNumberGenerator) -> Dictionary
 	var round_legs := 1 if (legs <= 1 or (start_count == 2 and not two_final)) else legs
 	if start_count == 4 and int(b.get("semi_legs", 0)) > 0:
 		round_legs = int(b.get("semi_legs", 0))
+	# PER-ROUND override, witnessed at the CUP DRAW screen. `legs` is one number for a whole
+	# competition and the Coca-Cola Cup is not one number: `tools/re/probe_cupdraw_per_round.py`
+	# scores four rounds of it from one career and the bottom-left plates read
+	# **1ST LEG / 2ND LEG at ROUND 2** and **MATCH / REPLAY at ROUND 3, ROUND 4 and
+	# QTR. FINALS** -- with every other pixel outside the round plate, the MATCHES panel and
+	# the animated drum identical across all four, so the plates are the competition's ONLY
+	# per-round axis and they are not decoration: they say how the tie is played.
+	# `round_legs_by_round` carries exactly what a frame witnessed and nothing else; a round
+	# with no entry keeps the rule above.
+	var per_round: Dictionary = b.get("round_legs_by_round", {})
+	if per_round.has(this_round):
+		round_legs = int(per_round[this_round])
 
 	# Open random draw of the survivors.
 	_shuffle(survivors, rng)
