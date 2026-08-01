@@ -658,15 +658,7 @@ func _draw_header() -> void:
 	_gdi_text(_f8, 11, str(_header.get("bottom", "")), PMChrome.HDR_NAME_BOT["S"],
 		PMChrome.HDR_NAME_BOT["y"], Color(1, 1, 1))
 	var cid := int(_header.get("club_id", -1))
-	var patch: Texture2D = null
-	if cid == 40 and ResourceLoader.exists("res://art/kits/header/40.png"):
-		patch = load("res://art/kits/header/40.png")
-	if patch != null:
-		draw_texture(patch, PMChrome.HDR_MGR_PATCH_XY)
-	else:
-		var nk := PMChrome.nano_kit(cid)
-		if nk != null:
-			draw_texture(nk, PMChrome.HDR_MGR_NANO_XY)
+	PMChrome.draw_manager_panel(self, cid)
 	for line in PMChrome.HDR_CAL_LINES:
 		_gdi_text(_f8, 11, str(_header.get(line["key"], "")), PMChrome.HDR_CAL_S,
 			line["y"], line["ink"])

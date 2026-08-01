@@ -446,9 +446,52 @@ black — plus a solid block over the sprite's right half. A lightening edge ble
 half-sprite block are two different causes, and neither is reversed. That is the real
 open item here, and it is stated as un-reversed rather than mis-attributed.
 
+### ⭐ The "solid block over the sprite's right half" was a BAKE gap — CLOSED 2026-08-01
+
+It is not a blit pass at all. The leader kit sits on the **left end of the black GROUP
+header band**, and that end is **slanted**: the band's left edge walks one pixel left every
+couple of rows (measured 97 at y186 down to 79 by y198). `build_euroleague_chrome_from_frames`
+pasted the empty-body desktop over the whole `HDR_KIT` rect, which deleted the part of that
+slant the kit does not cover.
+
+Recovered without inventing a pixel, because the six group frames have **six different
+leaders**: a position one leader's kit covers another's leaves bare, so the backdrop is
+whatever every frame that leaves it bare agrees on. Over the 24x32 cell that is **356
+positions witnessed, 6 split (the frames disagree, so they keep the wall paste) and 406
+never bare** — and the 406 are the silhouette every NANOESC kit shares, which the port
+draws a kit over exactly as the original does. `_recover_leader_backdrop` in the baker.
+
+**Effect:** the leader cell went **196 → 66 px** and the gate **864 → 734** per frame.
+What is left is the 1-px rim above, still un-reversed.
+
+### ⭐ The BARRA MANAGER KIT was never a capture gap either — CLOSED 2026-08-01
+
+The old note below said the panel "has never been seen unoccluded". It had been: the six
+frames on this page are a **BOLTON W** career in the same manager mode, and Man Utd's cut
+came from a Manchester Utd. career. Two careers occlude **different** pixels of the same
+panel, so between them they witness all but the 417 px both kits cover.
+
+Two measurements make it a derivation:
+
+1. the panel's kit half **is** the club's own NANOESC sprite at the panel-local anchor
+   `(6,7)` = screen `(114,15)` — Man Utd's exported `art/kits/nano/40.png` reproduces his
+   panel's kit region at **0 of 419 opaque px**;
+2. rebuilt as furniture + the club's own kit, the composite reproduces **Man Utd's panel at
+   0 px** and **Bolton's at 14** — and those 14 are pixels neither exported sprite covers,
+   i.e. the same un-reversed 1-px rim. Declared, not painted.
+
+`tools/re/build_manager_panel_from_frames.py` → `app/art/kits/header/panel.png`;
+`PMChrome.draw_manager_panel` is now the single draw path (`draw_header`, `ResultsScreen`,
+`KnockoutScreen`, `EuroGroupScreen` each used to carry their own club-40-only copy);
+gate `app/tests/test_manager_panel.gd`, in CI.
+
+**Effect: 649 → 14 px per frame**, here and on all fourteen `diff_knockout_parity` cases.
+This gate now reads **99 / 107 / 132 / 110 / 103 / 117** (was 864 / 873 / 896 / 876 / 875 / 881).
+
 The other buckets are already effectively clean: the four RIDIESC cells carry 16 / 0 / 5 / 0
-differing px per frame. And the barra manager kit (rect `(106,6,35x44)`, **649 px per frame**,
-three quarters of the whole residual) is not a rendering gap at all — it is a CAPTURE gap:
-`app/art/kits/header/40.png` is a verbatim cut of Man Utd's manager-mode panel, kit and
-panel furniture together, and no frame in the corpus shows that panel with any other club's
-kit, so the background behind it has never been seen unoccluded.
+differing px per frame. ~~And the barra manager kit (rect `(106,6,35x44)`, **649 px per
+frame**, three quarters of the whole residual) is not a rendering gap at all — it is a
+CAPTURE gap: `app/art/kits/header/40.png` is a verbatim cut of Man Utd's manager-mode panel,
+kit and panel furniture together, and no frame in the corpus shows that panel with any other
+club's kit, so the background behind it has never been seen unoccluded.~~ — **WRONG, and
+closed above.** `40.png` survives as the witness the rebuild is gated against.

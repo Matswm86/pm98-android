@@ -157,12 +157,15 @@ with no dither scores 428/751, and the best single-bias fit scores 683/751.
 | 48x64 opponent kit | 287 px | **56 px** |
 | bucket total | 944 / 947 | **92 / 94** |
 
-The markers are exact. The kit's remaining 56 px are **not** the shadow pass: they are
+The markers are exact. ~~The kit's remaining 56 px are **not** the shadow pass: they are
 pixels the original paints pure black and the port's `art/kits/<id>.png` has as
 transparent, i.e. the 48x64 MINIESC bank is missing content the original's sprite
-carries. Same count on both careers (Aston Villa and F.C. Barcelona), so it is
-structural to the bank, not to a club. That stays open under the existing 48x64 kit
-entry in `REMAINING.md`.
+carries.~~ — **WRONG, and closed the same day (s78).** It was never 56 px (15,
+re-measured), the original was never the one painting black (the PORT was), and the bank
+was never missing content: the vertical club plate is NINETEEN columns of black
+(x243..x261) and `build_mantoman_chrome_from_frames.py` filled x262 as well — kit-local
+x=33, the exact column of the residual. `diff_mantoman_parity.py` reports the kit rect at
+**0 px on both careers**, which is what this table's "56" row should read.
 
 ## 7. Using it
 
@@ -176,7 +179,15 @@ returns a cached `Texture2D` to draw **between** the background and the sprite.
 screen — the dither parity is resolved in screen space and may not be handed a
 panel-local frame.
 
-The screens that currently BAKE this pass from frames instead (`KnockoutScreen`'s
+~~The screens that currently BAKE this pass from frames instead (`KnockoutScreen`'s
 `kitwell_under_L/over_L` and `icon_under/over_sf*`, `PMChrome.panel_kit`'s per-screen
 banks) are still on their bakes; moving them onto this module is a separate pass, one
-gate at a time, and is listed in `REMAINING.md`.
+gate at a time, and is listed in `REMAINING.md`.~~ — **DO NOT. Measured 2026-08-01: those
+screens do not use this pass.** `FindRefsTo` lists all 53 call sites of the `FUN_004b7f60`
+thunk and **none** of them is in the knockout drawers' range — the `AGGR.` / `FINALIST`
+drawers sit at 0x46cd3f / 0x46f521 / 0x490a6c, and the nearest shadow-blit sites are
+0x4b29c0 and 0x4fe616. The s78 EuroGroupScreen experiment had already found this
+empirically (wiring `PMShadow` under its kits made the gate WORSE, 864 → 1048 px over six
+frames — `euro_league_screen_re.md`); the call graph is the reason. Whatever draws the
+48x64 / 24x32 kit ring on those screens is a **different, still unlocated** pass, and the
+position-constant bakes stay.

@@ -42,6 +42,11 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[2]
 REFS = ROOT / "tools/re/refs/knockout-2026-07-26"
 
+# 649 px on every case until 2026-08-01: the port drew Man Utd's whole captured panel for
+# club 40 and a bare NANOESC kit with no furniture for anybody else. The panel is FURNITURE
+# + the club's own kit, and the furniture was recovered from two careers that occlude
+# different pixels of it (tools/re/build_manager_panel_from_frames.py, gate
+# app/tests/test_manager_panel.gd). **14 px** now, all of it the un-reversed 1-px kit rim.
 BARRA_KIT = ("barra kit", 106, 6, 35, 44)
 SCROLL_COL = ("scrollbar", 478, 125, 16, 286)
 RAIL = ("rail", 500, 110, 140, 321)

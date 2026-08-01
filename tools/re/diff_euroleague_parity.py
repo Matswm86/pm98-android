@@ -24,10 +24,16 @@ REFS = ROOT / "tools/re/refs/euro-competitions-2026-07-25"
 LETTERS = "ABCDEF"
 
 # The kit rects, where the un-reversed engine blit lives:
-#   (106,6)   the BARRA manager kit -- a pre-existing hole shared with ResultsScreen: only
-#             Man Utd's 35x44 header patch has been cut, every other club falls back to the
-#             24x32 NANOESC kit, so a Bolton W barra differs by the whole blit
-#   (75,178)  the group leader's NANOESC kit  (79 of 419 opaque px: the outline shading)
+#   (106,6)   the BARRA manager kit -- 649 px until 2026-08-01, when the panel turned out
+#             to be FURNITURE + the club's own NANOESC kit and the furniture was recovered
+#             from two careers that occlude different pixels of it
+#             (tools/re/build_manager_panel_from_frames.py). Now 14 px: the un-reversed
+#             1-px kit rim below, on the pixels neither exported sprite covers.
+#   (75,178)  the group leader's NANOESC kit. 202 px until 2026-08-01; the "solid block
+#             over the sprite's right half" was the SLANTED left end of the black GROUP
+#             header band, which the chrome bake had pasted over
+#             (build_euroleague_chrome_from_frames._recover_leader_backdrop). Now 66 px,
+#             all of it the un-reversed 1-px lightening rim.
 #   the four RIDIESC results-row kits         (32 of 221 opaque px each, same pass)
 KITS = [(106, 6, 35, 44), (75, 178, 24, 32)] + [
     (x, y, 17, 20) for y in (274, 296) for x in (80, 301)

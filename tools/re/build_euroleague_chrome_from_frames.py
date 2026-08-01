@@ -106,6 +106,28 @@ WELL_IDS = {
 }
 
 
+# ---- the group LEADER's kit, and what is BEHIND it (2026-08-01) ----------------------
+# The leader kit sits on the LEFT END of the black GROUP header band, and that end is
+# SLANTED -- the band's left edge walks left as y grows, so a straight wall paste over the
+# whole kit rect deletes the part of the band the kit does not cover. That is the whole
+# "solid block over the sprite's right half" residual euro_league_screen_re.md recorded
+# (196-202 px of the cell), and it is a bake gap, not a blit pass: PMShadow was wired here
+# in s78 and made the gate WORSE.
+#
+# It is recovered without inventing a pixel. Each of the six frames has a DIFFERENT leader,
+# so a position one leader's kit covers another's leaves bare; take the colour every frame
+# that leaves it bare agrees on. Measured over the 26x32 cell: 420 positions are witnessed
+# this way and 6 are split (the frames disagree, so they stay on the wall paste); the
+# remaining 406 are the silhouette every NANOESC kit shares, which the port draws a kit
+# over at runtime exactly as the original does.
+LEADER_IDS = {"A": 1135, "B": 1124, "C": 1024, "D": 1021, "E": 44, "F": 1003}
+# The blit origin of that kit -- EuroGroupScreen.HDR_KIT_XY. It is NOT HDR_KIT's origin:
+# the wall-paste rect starts two rows lower, so coverage has to be read in the SPRITE's
+# own frame or every row is tested against the wrong row of the silhouette.
+LEADER_KIT_XY = (75, 178)
+LEADER_KIT_WH = (24, 32)
+
+
 def fill(im: Image.Image, x0: int, y0: int, x1: int, y1: int, col: tuple) -> None:
     for y in range(y0, y1 + 1):
         for x in range(x0, x1 + 1):
@@ -114,6 +136,37 @@ def fill(im: Image.Image, x0: int, y0: int, x1: int, y1: int, col: tuple) -> Non
 
 def paste_from(dst: Image.Image, src: Image.Image, x: int, y: int, w: int, h: int) -> None:
     dst.paste(src.crop((x, y, x + w, y + h)), (x, y))
+
+
+def _recover_leader_backdrop(base: Image.Image, frames: dict) -> None:
+    """Put back the slanted end of the black header band the wall paste just deleted.
+
+    Only positions at least one frame leaves bare AND all such frames agree on are
+    written; everything else keeps the wall paste. Prints the three counts so a future
+    frame set changing the balance is visible in the build log, not silent.
+    """
+    nanos = {L: Image.open(ROOT / f"app/art/kits/nano/{cid}.png").convert("RGBA")
+             for L, cid in LEADER_IDS.items()}
+    x, y = LEADER_KIT_XY
+    w, h = LEADER_KIT_WH
+    witnessed = split = covered = 0
+    for dy in range(h):
+        for dx in range(w):
+            seen = set()
+            for L in LETTERS:
+                n = nanos[L]
+                if dx < n.width and dy < n.height and n.getpixel((dx, dy))[3] != 0:
+                    continue                      # this leader's kit covers it
+                seen.add(frames[L].getpixel((x + dx, y + dy)))
+            if not seen:
+                covered += 1
+            elif len(seen) > 1:
+                split += 1
+            else:
+                witnessed += 1
+                base.putpixel((x + dx, y + dy), seen.pop())
+    print(f"  leader-kit backdrop: {witnessed} witnessed, {split} split (frames disagree), "
+          f"{covered} never bare (the shared silhouette)")
 
 
 def main() -> None:
@@ -126,6 +179,7 @@ def main() -> None:
     #    desktop, and let the per-letter plate cover the text.
     x, y, w, h = HDR_KIT
     paste_from(base, wall, x, y, w, h)
+    _recover_leader_backdrop(base, frames)
 
     fill(base, ROUND_PLATE[0], ROUND_PLATE[1], ROUND_PLATE[2], ROUND_PLATE[3], BG_ROUND)
 

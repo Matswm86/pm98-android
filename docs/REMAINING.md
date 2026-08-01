@@ -1,5 +1,94 @@
 # PM98 Android — remaining-work inventory (refreshed 2026-08-01)
 
+## 0aaaaaaaaaaaaaaa. Closed 2026-08-01 (session s83) — THE BARRA PANEL, THE BAND'S SLANT, AND WHO ACTUALLY GETS PAID
+
+Three of s82's carried items closed, each against a measurement rather than a theory, and
+two long-standing "un-closable" notes turned out to be wrong about their own evidence.
+
+### 1. ⭐ THE BARRA MANAGER PANEL — the port's single biggest parity bucket, 649 → 14 px
+
+Every screen that shows the manager-mode barra drew **Manchester Utd's whole captured
+panel** for club 40 and a **bare NANOESC kit with no furniture** for every other club. That
+cost **649 px per frame** on the EURO GROUP gate and on all **fourteen** knockout cases —
+more than the rest of those gates put together — and it had been filed as un-closable
+because "no frame in the corpus shows that panel with any other club's kit".
+
+It does. The six EURO GROUP frames are a **BOLTON W** career in the same manager mode, and
+`kits/header/40.png` was cut from a **Manchester Utd.** career. Two careers occlude
+*different* pixels of the same panel, so between them they witness all but the 417 px both
+kits cover. Two measurements make the rebuild a derivation:
+
+* the panel's kit half **is** the club's own NANOESC sprite at the panel-local anchor
+  `(6,7)` = screen `(114,15)` — the anchor the port already carried as its fallback:
+  Man Utd's exported `art/kits/nano/40.png` reproduces his panel's kit region at
+  **0 of 419 opaque px**;
+* furniture + the club's own kit reproduces **Man Utd's panel at 0 px** and **Bolton's at
+  14** — and those 14 are pixels neither exported sprite covers, i.e. the un-reversed 1-px
+  kit rim. Declared, not painted.
+
+`tools/re/build_manager_panel_from_frames.py` → `app/art/kits/header/panel.png`;
+`PMChrome.draw_manager_panel` is the single draw path now (`draw_header`, `ResultsScreen`,
+`KnockoutScreen` and `EuroGroupScreen` each carried their own club-40-only copy);
+gate `app/tests/test_manager_panel.gd`, added to the CI list. `40.png` stays as the witness
+the rebuild is gated against.
+
+### 2. ⭐ THE EURO GROUP LEADER KIT — the "solid block" was a BAKE gap, 196 → 66 px
+
+Not a blit pass. The leader kit sits on the **left end of the black GROUP header band**, and
+that end is **slanted** — measured, the band's left edge walks from x97 at y186 to x79 by
+y198. The chrome baker pasted the empty-body desktop over the whole kit rect and deleted the
+part of the slant the kit does not cover.
+
+Recovered with the same two-witness logic, six ways over: the six frames have six different
+leaders, so a position one leader's kit covers another's leaves bare. Over the 24x32 cell
+that is **356 witnessed, 6 split (kept on the wall paste), 406 never bare** — and the 406 are
+the silhouette every NANOESC kit shares, which the port draws a kit over exactly as the
+original does. `_recover_leader_backdrop` in `build_euroleague_chrome_from_frames.py`.
+
+**The EURO GROUP gate now reads 99 / 107 / 132 / 110 / 103 / 117 px** (was 864 / 873 / 896 /
+876 / 875 / 881). All fourteen knockout cases keep their 0-outside verdict with the barra
+bucket at 14.
+
+### 3. ⭐ WHO GETS PAID IN EUROPE — the port was paying three competitions, the original pays one
+
+s82 left this open ("the U.E.F.A. / C.W.C. prize money is unchanged pending a proper
+per-function scan of their blocks"). Scanned, and the answer is decisive:
+
+* the four "receives … from UEFA" strings exist **only** in the CEURO block
+  (0x653518..0x6536db). The CUEFA block (0x653878..0x6539a4) and the RECOPA block
+  (0x6539b0..0x653a10) carry none;
+* all six figures — £1m / £1.5m / £1.625m / £2m / £510k / £255k as float32 in the internal
+  ×200 unit — occur **only** inside `FUN_00454b00`;
+* `FUN_00454b00` has **no direct caller** and exactly **one** reference in the whole image:
+  vtable slot `0x6273a4`, index 41 of the **European Cup** vtable at `0x627300`, whose index
+  40 is `0x453eb0`, the function that names `%c:ACTLIGA\CEURO%03u.CPT`;
+* the Cup Winners' Cup's same-index method (`0x461610`, vtable base `0x627568`, index 40 =
+  `0x4612d0` = the RECOP template fn) contains no money at all, and the U.E.F.A. Cup's class
+  carries the empty base stub `0x404fa0` (`xor eax,eax; ret 4`).
+
+So **the U.E.F.A. Cup and the Cup Winners' Cup pay nothing** — no entry fee, no per-tie
+money, no milestones. `Career.EURO_PRIZE_COMPETITION` gates both the entry fee and the
+round payments; entering the other two raises news, not money.
+
+### 4. And one wrong lead closed for good
+
+The 48x64 knockout kit ring is **not** the `FUN_004b7f60` shadow pass. `FindRefsTo` lists
+all 53 call sites of that thunk and **none** is in the knockout drawers' range (the
+`AGGR.` / `FINALIST` drawers sit at 0x46cd3f / 0x46f521 / 0x490a6c; the nearest shadow-blit
+sites are 0x4b29c0 and 0x4fe616). That is the same negative result the s78 EuroGroupScreen
+experiment got empirically, now with the call graph behind it. The pass is still unlocated;
+the position-constant bake stays and the club-dependent remainder stays a declared bucket.
+
+### 5. Two entries below are STALE — read this first
+
+* §3's "still to build: the bracket / the semifinal cards / the final / the kit list" and
+  §5's per-club ground-grade note are both **closed** and kept only for their evidence
+  trail. `diff_knockout_parity.py` runs **14 cases, all "0 outside"**, and `club+0x50` was
+  reversed 2026-07-28 (it is the club's COMPETITION INDEX, computed by `FUN_0057a180`, not a
+  stored byte — `GroundPreset.gd`, gate `test_ground_preset.gd`, all 476 clubs seeded).
+  `stadium_screen_re.md`'s "WIRING follow-ups" are stale too: `works_ledger()` /
+  `works_total()` are passed and GROUND MATCH DAY is built.
+
 ## 0aaaaaaaaaaaaaa. Closed 2026-08-01 (session s82) — THE EIGHT COUNTERPART-LESS SCREENS
 
 The whole §B2 list of "original screens with NO app counterpart" is resolved, and it

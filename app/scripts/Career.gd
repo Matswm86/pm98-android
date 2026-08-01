@@ -501,6 +501,22 @@ const EURO_OPTS := {
 # docs/re/finance_constants.md). Per-match draw/win is collapsed to per-tie (legs are
 # abstracted into one tie), so a tie won pays the "win" figure; milestones pay on reaching
 # the round. Every rung below is a reversed figure carrying its own string.
+#
+# THE SCHEDULE IS THE EUROPEAN CUP'S ALONE -- established 2026-08-01 by the per-class scan
+# s82 left open, and the port had been paying it to all three European competitions:
+#   * the four "receives ... from UEFA" strings exist ONLY in the CEURO block
+#     (0x653518..0x6536db). The CUEFA block (0x653878..0x6539a4) and the RECOPA block
+#     (0x6539b0..0x653a10) carry none.
+#   * all six figures, as float32 in the internal x200 unit, occur ONLY inside
+#     `FUN_00454b00` (0x454e45 / 0x454e68 / 0x454e8a / 0x4550d6 / 0x4551f4 / 0x455204).
+#   * `FUN_00454b00` has NO direct caller and exactly ONE reference in the whole image:
+#     vtable slot 0x6273a4, index 41 of the EUROPEAN CUP vtable at 0x627300 -- whose
+#     index 40 is 0x453eb0, the function that names `%c:ACTLIGA\CEURO%03u.CPT`.
+#   * the Cup Winners' Cup's same-index method (0x461610, vtable base 0x627568, index 40 =
+#     0x4612d0 = the RECOP template fn) contains no money at all, and the U.E.F.A. Cup's
+#     class carries the empty base stub 0x404fa0 (`xor eax,eax; ret 4`).
+# So the U.E.F.A. Cup and the Cup Winners' Cup pay NOTHING, and that is measured, not assumed.
+const EURO_PRIZE_COMPETITION := "european_cup"
 const EURO_ENTRY := 1_000_000           # "1 million from UEFA for competing"
 const EURO_WIN := 510_000               # "510.000 for every match won"
 const EURO_DRAW := 255_000              # "255.000 for every draw match" (the group phase)
@@ -1437,7 +1453,10 @@ func _play_due_cup_rounds(rng: RandomNumberGenerator, clubs_override: Dictionary
 			_queue_cup_draw(eb)
 			for n in er["news"]:
 				_news(n["kind"], n["text"])
-			if str(er.get("phase", "")) == "group":
+			# Only the European Cup pays -- see EURO_PRIZE_COMPETITION for the scan.
+			if str(key) != EURO_PRIZE_COMPETITION:
+				pass
+			elif str(er.get("phase", "")) == "group":
 				# Group phase pays per match on the reversed UEFA per-match schedule (the
 				# figures the knockout collapses to per-tie), plus the last-8 bonus on
 				# qualifying through the group.
@@ -5942,11 +5961,15 @@ func mint_european_cups(euro_pool: Array, rng: RandomNumberGenerator,
 			opts["group_stage"] = EURO_GROUPS.duplicate()
 		euro[key] = Cup.create(field, fixtures.size(), opts)
 		if field.has(club_id):
-			_post_euro_points(EURO_ENTRY)
-			_news("cup", "Your club has entered the %s (1 million from UEFA for competing)."
-				% str(EURO_OPTS[key]["name"]))
-			if key == "european_cup":
+			# The £1m entry fee is the European Cup's too -- same scan, same function
+			# (EURO_PRIZE_COMPETITION). The other two entries are news, not money.
+			if key == EURO_PRIZE_COMPETITION:
+				_post_euro_points(EURO_ENTRY)
+				_news("cup", "Your club has entered the %s (1 million from UEFA for "
+					% str(EURO_OPTS[key]["name"]) + "competing).")
 				pending_alerts.append(EURO_ALERT_ENTRY)
+			else:
+				_news("cup", "Your club has entered the %s." % str(EURO_OPTS[key]["name"]))
 
 
 ## The Cup Winners' Cup seed: last season's F.A. Cup winners, or the league runners-up if

@@ -554,8 +554,28 @@ const HDR_STAT_TOP_Y := 14                    # black on (127,159,85)
 const HDR_STAT_BOT_Y := 32                    # white on (85,95,0)
 const HDR_KIT_HOME := Vector2(116, 10)        # RIDIESC 17x20, 1:1, no shadow
 const HDR_KIT_AWAY := Vector2(116, 30)
-const HDR_MGR_PATCH_XY := Vector2(108, 8)     # 058 manager-mode panel patch
-const HDR_MGR_NANO_XY := Vector2(114, 15)     # nano fallback for un-walked clubs
+const HDR_MGR_PATCH_XY := Vector2(108, 8)     # the manager-mode panel, any club
+## Where the club's own NANOESC kit sits inside that panel. Not a fallback anchor any
+## more: `art/kits/header/panel.png` is the panel with the KIT TAKEN OUT, so every club
+## is drawn the original's way -- furniture, then its own kit. Proven by
+## `tools/re/build_manager_panel_from_frames.py`: Man Utd's exported nano sprite
+## reproduces his captured panel's kit half at 0 of 419 px, and the rebuild reproduces
+## his whole panel at 0 px and the Bolton W career's at 14 (the un-reversed 1-px rim).
+const HDR_MGR_NANO_XY := Vector2(114, 15)
+
+## The barra's manager-mode panel for ANY club: the club-independent furniture, then the
+## club's own NANOESC kit in the well it leaves. Four screens draw this barra
+## (`draw_header` here, ResultsScreen, KnockoutScreen, EuroGroupScreen) and each used to
+## carry its own copy that only had art for Manchester Utd.
+static func draw_manager_panel(ci: CanvasItem, club_id: int) -> void:
+	if _hdr_mgr_patch == null and ResourceLoader.exists("res://art/kits/header/panel.png"):
+		_hdr_mgr_patch = load("res://art/kits/header/panel.png")
+	if _hdr_mgr_patch != null:
+		ci.draw_texture(_hdr_mgr_patch, HDR_MGR_PATCH_XY)
+	var nk := nano_kit(club_id)
+	if nk != null:
+		ci.draw_texture(nk, HDR_MGR_NANO_XY)
+
 
 static var _hdr_band: Texture2D = null
 static var _hdr_titles: Dictionary = {}
@@ -614,15 +634,10 @@ static func draw_match_header(ci: CanvasItem, title_key: String, h: Dictionary) 
 	_hdr_text(ci, f8, 11, str(h.get("bottom", "")), HDR_NAME_BOT["S"],
 		HDR_NAME_BOT["y"], Color(1, 1, 1))
 	if str(h.get("mode", "fixture")) == "manager":
-		if _hdr_mgr_patch == null and int(h.get("club_id", -1)) == 40 \
-				and ResourceLoader.exists("res://art/kits/header/40.png"):
-			_hdr_mgr_patch = load("res://art/kits/header/40.png")
-		if int(h.get("club_id", -1)) == 40 and _hdr_mgr_patch != null:
-			ci.draw_texture(_hdr_mgr_patch, HDR_MGR_PATCH_XY)
-		else:
-			var nk := nano_kit(int(h.get("club_id", -1)))
-			if nk != null:
-				ci.draw_texture(nk, HDR_MGR_NANO_XY)
+		# The panel is furniture + the club's OWN kit, for every club. The old path drew
+		# Man Utd's whole captured panel for club 40 and a bare kit with no furniture for
+		# anyone else, which cost 649 px per frame on every gate that shows this barra.
+		draw_manager_panel(ci, int(h.get("club_id", -1)))
 	else:
 		for pair in [[int(h.get("home_id", -1)), HDR_KIT_HOME],
 				[int(h.get("away_id", -1)), HDR_KIT_AWAY]]:
