@@ -7,12 +7,12 @@ line — and most docs do not carry one, so for most screens it pointed at nothi
 Since 2026-08-01 it delegates HERE instead: for every doc, the artefacts that can
 CONFIRM it, each of them checkable, and none of them a sentence someone guessed.
 
-* **136 docs**, 22 with a `Status:` line of their own.
+* **137 docs**, 23 with a `Status:` line of their own.
 * **37** are covered by a `diff_*_parity.py` render-diff gate — the
   strongest evidence here, since a gate compares the app to a captured frame.
 * **67** have a headless `test_*.gd` suite; **94** cite MANAGER.EXE
   addresses, i.e. their claims are anchored in the binary and not only in frames.
-* **28** name their proof directly on an `Evidence:` line — for the plans,
+* **29** name their proof directly on an `Evidence:` line — for the plans,
   audits and M5 session notes, whose evidence is a banked capture, an oracle
   runner or a witness directory rather than a screen gate. Every path on those
   lines is checked to exist by this script.
@@ -57,6 +57,7 @@ nothing are the ones to distrust.
 | `M5_S58_FRONTIER_1032.md` | — | — | — | — | — | 3 path(s) | — |
 | `M5_S59_FRONTIER_2836.md` | — | — | — | — | 9 | — | — |
 | `M5_S85_WATCH_PLAYSTATE_FULLTIME.md` | yes | — | — | — | 12 | — | — |
+| `M5_S86_ENGINE_THROUGHPUT.md` | yes | — | — | — | — | 6 path(s) | — |
 | `M5_T1I9_B0040_INPUTS_PORTSIDE.md` | — | — | — | — | 1 | — | — |
 | `M5_T1I9_FIRST_STEP_TARGET.md` | — | — | — | — | 1 | — | — |
 | `M5_T1I9_KICKOFF_BALL_TRAJECTORY.md` | — | — | — | — | 1 | — | — |
@@ -160,4 +161,4 @@ nothing are the ones to distrust.
 | `transfer_screen_re.md` | — | — | `test_transfer_screen.gd`, `test_transfers.gd` | `TransferMarket.gd`, `TransferScreen.gd` | 5 | — | 4 |
 | `transfer_value_re.md` | — | — | `test_transfer_screen.gd`, `test_transfers.gd` | `TransferMarket.gd`, `TransferScreen.gd` | 12 | — | 2 |
 | `wage_formula_re.md` | — | — | `test_wage_bills.gd` | — | — | — | 4 |
-| `youth_re.md` | — | `diff_youth_parity.py` | `test_youth.gd`, `test_youth_loop.gd` | `Youth.gd`, `YouthScreen.gd` | 6 | — | 20 |
+| `youth_re.md` | — | `diff_youth_parity.py` | `test_youth.gd`, `test_youth_caps.gd` | `Youth.gd`, `YouthScreen.gd` | 6 | — | 21 |

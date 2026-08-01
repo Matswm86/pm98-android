@@ -6,8 +6,9 @@ box against the 60 the view needs, i.e. a WATCHED match went from playing at 0.5
 time to 0.99x. Nothing about what the engine COMPUTES changed: the whole gain is work that
 was being done and thrown away.
 
-`Evidence:` `app/tests/bench_live_match.gd`, `app/scripts/Pm98Driver.gd` (`PM98_TICK_PROF`),
-`app/scripts/Pm98Movement.gd`, `docs/re/sim/fn_005a9490_*`, `tools/run_tests.sh`.
+Evidence: `app/tests/bench_live_match.gd`, `app/scripts/Pm98Driver.gd` (the `PM98_TICK_PROF`
+accumulators), `app/scripts/Pm98Movement.gd`, `app/tests/run_match_from_struct.gd`,
+`tools/re/run_match_sweep.sh`, `docs/re/sim/fn_00598740_FUN_00598740.c`
 
 ## 1. "Not wired into MatchSim" was the wrong frame, and the right number was never taken
 
