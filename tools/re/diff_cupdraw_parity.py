@@ -11,6 +11,11 @@ Four shots, four real MANAGER.EXE frames -- BOTH panel forms (REFRUN R8):
     cupdraw_10.png  vs  promanager-career-2026-07-16/10_fa_cup_draw_round1.png
                         F.A. Cup ROUND 1, 4 of 40 ties, MATCH / REPLAY plates
 
+  the GROUP form (s88)
+    cupdraw_groups.png vs refs/cupdraw-rounds-2026-08-01/manutd_s1_eurocup_groups_1_8_final.png
+                        European Cup 1/8 FINAL, the group draw mid-reveal: GROUP A's four
+                        clubs landed, B..F still empty
+
   the <=16-tie GRID form
     cupdraw_133.png vs  refs/refrun-manutd-1997-98/p0133_cup_draw.png
                         Coca-Cola Cup ROUND 3, all 16 ties, the manager's own tie on
@@ -50,6 +55,15 @@ CASES = [
         "cupdraw_747.png",
         ROOT / "tools" / "re" / "refs" / "refrun-manutd-1997-98" / "p0747_cup_draw.png",
     ),
+    (
+        "cupdraw_groups.png",
+        ROOT
+        / "tools"
+        / "re"
+        / "refs"
+        / "cupdraw-rounds-2026-08-01"
+        / "manutd_s1_eurocup_groups_1_8_final.png",
+    ),
 ]
 THRESH = 0.004  # <0.4% of the 640x480 frame after the documented exclusions
 
@@ -71,11 +85,30 @@ EXCLUDE = [
 #    state beyond the twelve stills -- a lead for the parked drum hunt, recorded in
 #    docs/re/cupdraw_screen_re.md, not something this change can resolve.
 GRID_EXCLUDE = [
-    (136, 76, 228, 168),   # the drum: a state none of the twelve BOMBO frames holds
-    (334, 51, 355, 419),   # home kit cells   -- no kit art fed to the shot
-    (601, 51, 622, 419),   # away kit cells
-    (33, 320, 110, 386),   # tie card, home kit panel
+    (136, 76, 228, 168),  # the drum: a state none of the twelve BOMBO frames holds
+    (334, 51, 355, 419),  # home kit cells   -- no kit art fed to the shot
+    (601, 51, 622, 419),  # away kit cells
+    (33, 320, 110, 386),  # tie card, home kit panel
     (236, 320, 287, 386),  # tie card, away kit panel
+]
+
+
+# The GROUP form's own exclusion, and it is ONE bucket with a named cause: the 1-px
+# on-sprite KIT EDGE pass, un-reversed since s62. Group A's four RIDIESC kits and four
+# MINIBAND flags each carry it -- the frame's edge pixels are the DESTINATION taken toward
+# a darker palette entry (a light row gives (44,44,44)/(80,80,80), the dark row
+# (40,60,80)/(60,80,100)), where the port paints the sprite's own (22,22,22). Measured, not
+# excused: 33/33/34 px of 221 opaque on the three identified kits and 8..11 of 140 on the
+# flags. Everything outside these eight sprites is expected at 0.
+GROUPS_EXCLUDE = [
+    (333, 77, 350, 97),  # group A row 0 kit  (17x20 RIDIESC)
+    (333, 102, 350, 122),  # row 1
+    (333, 127, 350, 147),  # row 2
+    (333, 152, 350, 172),  # row 3
+    (406, 89, 420, 98),  # group A row 0 flag (14x9 MINIBAND, rows 1..9)
+    (406, 114, 420, 123),  # row 1
+    (406, 139, 420, 148),  # row 2
+    (406, 164, 420, 173),  # row 3
 ]
 
 
@@ -91,6 +124,8 @@ def report(shot: Path, frame: Path, heat: str | None) -> float:
     rects = list(EXCLUDE)
     if shot.name in ("cupdraw_133.png", "cupdraw_747.png"):
         rects += GRID_EXCLUDE
+    if shot.name == "cupdraw_groups.png":
+        rects += GROUPS_EXCLUDE
     for x0, y0, x1, y1 in rects:
         m[y0:y1, x0:x1] = False
     net = float(m.mean())

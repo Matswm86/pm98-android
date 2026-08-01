@@ -77,7 +77,12 @@ func _row_wrap() -> void:
 ## `cap` clamps the spread, and it is the ONLY thing that differs between the two
 ## witnessed call sites.
 func _cap() -> void:
-	_ok(PMShadow.THR == 0x21, "thr is 0x21 at every witnessed call site")
+	# s88: NOT every site. `tools/re/probe_shadow_sites.py` reads all 74 and finds
+	# seventeen distinct (flags, thr, cap) triples; 0x21 is the value of the two sites this
+	# leaf was reversed from and of no other.
+	_ok(PMShadow.THR == 0x21, "thr is 0x21 at 0x50f9e3 and 0x50fba1 -- and only there")
+	_ok(PMShadow.FLAGS_SPREAD == 0x10 and PMShadow.FLAGS_EDGE == 0x20,
+		"the two flag words the 74 sites use: 0x10 spread (this leaf), 0x20 edge (not modelled)")
 	_ok(PMShadow.CAP_MARKER == 0x63, "FUN_0050f970 pushes cap 0x63")
 	_ok(PMShadow.CAP_KIT == 0x84, "FUN_0050fae0 pushes cap 0x84")
 	var w := 6

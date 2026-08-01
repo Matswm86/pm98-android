@@ -191,3 +191,105 @@ empirically (wiring `PMShadow` under its kits made the gate WORSE, 864 → 1048 
 frames — `euro_league_screen_re.md`); the call graph is the reason. Whatever draws the
 48x64 / 24x32 kit ring on those screens is a **different, still unlocated** pass, and the
 position-constant bakes stay.
+
+## Every call site, read — and the 0x20 arm (2026-08-02, s88)
+
+Status: the 74 sites are ENUMERATED with their arguments, `THR = 0x21` is confirmed as the
+value of exactly the two sites this leaf was reversed from, and the **other arm of
+`FUN_005cbea0` is identified**. The 1-px on-sprite kit edge is no longer "unlocated": it is
+the `flags = 0x20` arm, and what is left is one runtime-built table.
+
+`Evidence:` `tools/re/probe_shadow_sites.py`, `app/scripts/PMShadow.gd`,
+`extracted/Premier Manager 98/MANAGER.EXE` @0x5cbea0, @0x5d60a0, @0x5c0607, @0x5c0688,
+@0x5c0d50.
+
+### 1. The arguments, all 74 sites
+
+`probe_shadow_sites.py` byte-scans `.text` for `E8 rel32` targeting the thunk `0x4b7f60` or
+the core `0x5cbea0`, then decodes each caller FORWARDS with capstone from every start in a
+192-byte window and keeps the longest decode that lands exactly on the call — an image whose
+linear sweep desynchronises cannot be walked backwards, but a stream that hits the call on an
+instruction boundary is in sync with it by construction. **65 of 74 push all three leading
+arguments as immediates, in SEVENTEEN distinct triples:**
+
+| (flags, thr, cap) | sites | | (flags, thr, cap) | sites |
+|---|---|---|---|---|
+| `(0x10, 0x40, 0xff)` | 23 | | `(0x10, 0x20, 0xff)` | 2 |
+| `(0x10, 0x00, 0x00)` | 11 | | `(0x10, 0x50, 0xff)` | 2 |
+| `(0x20, 0x21, 0x5a)` | 9 | | `(0x20, 0x40, 0x80)` | 1 |
+| `(0x20, 0x21, 0x63)` | 4 | | `(0x20, 0x30, 0xff)` | 1 |
+| `(0x10, 0x30, 0xff)` | 4 | | `(0x10, 0x21, 0x63)` | 1 |
+| `(0x10, 0x32, 0x64)` | 4 | | `(0x10, 0x21, 0x84)` | 1 |
+| | | | `(0x10, 0x40, 0x80)` | 1 |
+| | | | `(0x20, 0x00, 0x00)` | 1 |
+
+The remaining 9 push registers or memory. The two sites `PMShadow` was written from are
+`0x50f9e3` (`0x10, 0x21, 0x63` — the man-to-man markers) and `0x50fba1`
+(`0x10, 0x21, 0x84` — the 48x64 kit); **no other site shares their thr**, and the modal
+value is `0x40`. So "THR is the same at every witnessed site" was true of the two that had
+been looked at and false of the image.
+
+### 2. `flags` selects between TWO passes, and only one of them is modelled
+
+`FUN_005cbea0`'s own branch, from the decompile:
+
+```
+if ((param_1 & 0x20) == 0) {
+    if ((param_1 & 0x10) != 0) { FUN_005d66f0(scratch, alpha); ... }      // <- the SPREAD arm
+} else {
+    FUN_005d66f0(scratch, 0x100);
+    if (...) FUN_005d60a0(alpha);                                          // <- the EDGE arm
+}
+... if thr != 0: FUN_005d6590(scratch, thr, cap, alpha)                    // the IIR spread
+... FUN_005d5220(dest, rect, scratch, src, ...)                            // the composite
+```
+
+`PMShadow` implements the `0x10` path. **Sixteen of the 74 sites are `0x20`**, and `0x20`
+runs `FUN_005d60a0` — which is not a spread at all:
+
+* it walks the mask and, for every NON-ZERO byte, builds a **12-bit neighbourhood code** from
+  twelve comparisons of `(alpha >> 8)` against the bytes at offsets
+  `+2s, +s, +s+1, +2, +1, +1-s, -2s, -s, -1-s, -2, -1, +s-1` (s = stride), with bit 0 forced
+  to 1;
+* and replaces the byte with **`DAT_006b5890[code] * 2 + 1`**.
+
+That is an EDGE / outline classifier, not a decay — which is exactly the shape of the
+residual the port has been failing to reproduce for six sessions: a partial alpha ON the
+sprite's own top/left edge, blending the sprite toward the DESTINATION, where a spread can
+only ever write outside the silhouette and only ever toward black.
+
+### 3. The kit widget is a 0x20 site — read, not inferred
+
+s87 located `0x5c0688` as a shadow call inside the RIDIESC picture widget's paint. Its flags
+word is not an immediate, so the enumeration above lists it as unresolved; the disassembly
+resolves it:
+
+```
+0x5c05eb  mov edx,[esi+0x70]                 ; the widget's list index
+0x5c05e8  mov eax,[esi+0x74]                 ; its item index
+0x5c05fa  mov edx,[esi+edx*8+0x360]          ; the record array  (FUN_005c0d50's own +0x360)
+0x5c0601  lea edi,[eax+eax*8]                ; 37 * eax ...
+0x5c0604  lea eax,[eax+edi*4]                ; ... i.e. the 0x94 record stride
+0x5c0607  mov di,WORD PTR [edx+eax*4+0x90]   ; record +0x90
+...
+0x5c0685  push edi                           ; -> param_1 = flags
+0x5c0688  call 0x5cbea0
+```
+
+and `FUN_005c0d50(bank, list, 0x20, 0x32, item)` is the setter that put `0x20` at record
+`+0x90` and `0x32` at `+0x92`, on all 90 RIDIESC-bank fetches. **So every RIDIESC kit blit in
+the game runs the EDGE arm with flags 0x20**, which is why fitting spread models to it never
+converged.
+
+The same reading names what `+0x64` / `+0x66` are: they are the two bytes the paint pushes as
+`param_2` / `param_3`, i.e. this widget's own **thr and cap**, per widget rather than per
+call site.
+
+### 4. What is left, precisely
+
+`DAT_006b5890` is at VA 0x6b5890. `.data` is VA 0x652000..0x6dc508 with only 0x15000 raw
+bytes, so anything above 0x667000 is uninitialised — **the LUT is built at runtime**, and the
+next step is to find the code that writes it, not to cut it out of the file. After that the
+0x20 arm is a direct transcription and the group-draw kits/flags
+(`docs/re/cupdraw_screen_re.md`, 33 px of 221 per kit, 8..11 of 140 per flag) are the ready
+made oracle for it, together with the EURO GROUP leader cell s84/s85 measured.

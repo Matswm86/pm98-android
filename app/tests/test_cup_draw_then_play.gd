@@ -94,7 +94,7 @@ func _run() -> bool:
 	Cup.draw_next_round(b, rng)
 	var pd: Dictionary = b["pending_draw"]
 	_a(Cup.draw_round_plate(b) == str(pd["label"]).to_upper()
-			or Cup.draw_round_plate(b) == "QTR FINALS",
+			or Cup.draw_round_plate(b) == "QTR. FINALS",
 		"draw_round_plate names the drawn round ('%s')" % Cup.draw_round_plate(b))
 	_a(Cup.draw_leg_plates(b) == ["MATCH", "REPLAY"],
 		"a single-leg round shows MATCH / REPLAY")

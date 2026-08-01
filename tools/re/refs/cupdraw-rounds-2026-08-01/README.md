@@ -117,3 +117,74 @@ entry route, so `manutd_s1_eurocup_groups_1_8_final.png` is the group draw and n
 "the European Cup's first draw".
 
 Still missing after four drives: a **SEMIFINAL** and a **FINAL** draw.
+
+## CORRECTED 2026-08-02 (s88) — three of these filenames were wrong, and the table with them
+
+The s87 rows above were written from the drive's own guesses at what each frame was. Read
+off the pixels instead (`tools/re/probe_cupdraw_labels.py`, which crops each plate's ink
+mask and XORs it against the port's own BMFont render, so a name is a 0-px match or it is
+reported unresolved), **three of the six s1 frames were filed under the wrong competition
+and round**. They have been RENAMED to what they actually are:
+
+| was called | actually is | now called |
+|---|---|---|
+| `manutd_s1_eurocup_qtr_finals.png` | F.A. Cup `ROUND 4` | `manutd_s1_facup_round4.png` |
+| `manutd_s1_facup_round3.png` | European Cup `QTR. FINALS` | `manutd_s1_eurocup_qtr_finals.png` |
+| `manutd_s1_facup_round4.png` | F.A. Cup `ROUND 3` | `manutd_s1_facup_round3.png` |
+
+The FINDINGS above survive the correction — a European Cup `QTR. FINALS` frame reading
+1ST LEG / 2ND LEG exists, an F.A. Cup `ROUND 4` frame reading MATCH / REPLAY exists, and
+every witnessed European round is still two-legged. What was wrong was which file each row
+pointed at, which is exactly the kind of error that makes the next session measure the wrong
+pixels.
+
+The full table, regenerated from the frames themselves (`python3
+tools/re/probe_cupdraw_labels.py`):
+
+| frame | competition | round plate | leg 1 | leg 2 |
+|---|---|---|---|---|
+| `keep_0019_cup_draw.png` | Coca-Cola Cup | `ROUND 2` | 1ST LEG | 2ND LEG |
+| `keep_0049_cup_draw.png` | Coca-Cola Cup | `ROUND 3` | MATCH | REPLAY |
+| `keep_0076_cup_draw.png` | Coca-Cola Cup | `ROUND 4` | MATCH | REPLAY |
+| `keep_0111_cup_draw.png` | Coca-Cola Cup | `QTR. FINALS` | MATCH | REPLAY |
+| `keep_0121_cup_draw.png` | F.A. Cup | `ROUND 3` | MATCH | REPLAY |
+| `manutd_s1_cocacola_round3.png` | Coca-Cola Cup | `ROUND 3` | MATCH | REPLAY |
+| `manutd_s1_eurocup_groups_1_8_final.png` | EUROPEAN CUP | `1/8 FINAL` | (blank) | (blank) |
+| `manutd_s1_eurocup_qtr_finals.png` | EUROPEAN CUP | `QTR. FINALS` | 1ST LEG | 2ND LEG |
+| `manutd_s1_facup_round3.png` | F.A. Cup | `ROUND 3` | MATCH | REPLAY |
+| `manutd_s1_facup_round4.png` | F.A. Cup | `ROUND 4` | MATCH | REPLAY |
+| `manutd_s1_facup_round5.png` | F.A. Cup | `ROUND 5` | MATCH | REPLAY |
+| `manutd_s2_cocacola_round2.png` | Coca-Cola Cup | `ROUND 2` | 1ST LEG | 2ND LEG |
+| `manutd_s2_eurocup_round2.png` | EUROPEAN CUP | `ROUND 2` | 1ST LEG | 2ND LEG |
+| `manutd_s2_facup_round3.png` | F.A. Cup | `ROUND 3` | MATCH | REPLAY |
+| `manutd_s2_uefa_1_32_finals.png` | UEFA CUP | `1/32 FINALS` | 1ST LEG | 2ND LEG |
+
+### Two things the reading settled that no one had asked
+
+* **The quarter-final plate keeps its full stop, and the port was dropping it.**
+  `Cup.draw_round_plate` normalised `QTR. FINALS` to `QTR FINALS` because the EXE carries
+  `QTR FINALS` at VA 0x653004. That string is the **COCA-COLA CUP's own** block — five
+  entries after `COCA-COLA CUP` at 0x652fe4 — and the Coca-Cola Cup's own quarter-final draw
+  (`keep_0111`) renders the plate **with** the dot, as does the European Cup's. So the plate
+  comes from the SHARED uppercase set at 0x652ab0 (`SEMIFINALS` / `QTR. FINALS` /
+  `1/8 FINAL` / `1/16 FINAL`), and the port has been printing a wrong string on every
+  quarter-final card it raised. Fixed s88; gates `test_cup_draw_then_play`,
+  `test_refrun_findings`, `test_europe`.
+* **The U.E.F.A. Cup has TWO title spellings on this screen and both are witnessed at 0 px.**
+  `p0747_cup_draw.png` (1/16 FINAL) reads `U.E.F.A. CUP`; `manutd_s2_uefa_1_32_finals.png`
+  (1/32 FINALS) reads `UEFA CUP`. The EXE carries both (`UEFA Cup` 0x652a78, `U.E.F.A. CUP`
+  0x652ad4). What selects between them is NOT reversed and is not guessed at here.
+
+### And the GROUP DRAW form is BUILT (s88)
+
+`manutd_s1_eurocup_groups_1_8_final.png` is now the binding frame of `CupDrawScreen`'s third
+panel form. Chrome `tools/re/build_groupdraw_chrome_from_frame.py`, geometry
+`tools/re/probe_groupdraw_frame.py`, render-diff case `cupdraw_groups.png` in
+`tools/re/diff_cupdraw_parity.py`, gate `app/tests/test_cupdraw_screen.gd` §7. It reproduces
+this frame at **1 differing pixel** outside the CONTINUE ball and the eight kit/flag sprites
+that carry the un-reversed 1-px on-sprite edge pass.
+
+Still missing after FIVE drives: a **SEMIFINAL** and a **FINAL** draw. The s88 drive resumed
+the s87 career at 30 January 1999 (Premier week 26, season 2) and Manchester Utd went out
+before the tail of the ladder again; the career rolled into a 1999/2000 preseason and the
+drive's PRESEASON rule dismissed it back to the title screen.

@@ -362,7 +362,7 @@ func _cup_draw_forms_and_route() -> bool:
 	scr.free()
 	# The plate label is the EXE's own uppercase form, and the leg plates follow the ROUND.
 	var single := {"rounds": [{"label": "Qtr. Finals", "ties": [{"home_id": 1, "away_id": 2}]}]}
-	ok = _assert(Cup.draw_round_plate(single) == "QTR FINALS",
+	ok = _assert(Cup.draw_round_plate(single) == "QTR. FINALS",
 		"the QTR FINALS plate is the EXE's own spelling") and ok
 	ok = _assert(Cup.draw_leg_plates(single) == ["MATCH", "REPLAY"],
 		"a single-match round shows MATCH / REPLAY") and ok

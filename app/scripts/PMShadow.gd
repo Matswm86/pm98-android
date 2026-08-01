@@ -32,16 +32,39 @@ class_name PMShadow
 ##
 ## Full record + the evidence for the reconstructed tables: `docs/re/shadow_blit_re.md`.
 
-## ⚠ NOT universal — corrected 2026-08-01 (s87). This was recorded as "the same at every
-## witnessed site", and it was, because only two sites had ever been enumerated. A byte scan
-## for `E8 rel32` targeting the thunk `0x4b7f60` or the core `0x5cbea0` finds **74 call
-## sites**, and `0x4f4ee7` — a RIDI kit blit — pushes `0x10`, **`0x40`**, **`0xff`**, i.e.
-## `thr = 0x40` / `cap = 0xff`. THR is the per-step decay of the spread, so a different THR
-## is a different ramp. Treat this as the MARKER/KIT sites' value, not the engine's.
-## See docs/re/knockout_views_re.md, "The 1-px kit-edge pass is LOCATED".
-const THR := 0x21          ## FUN_005cbea0 param_2 at FUN_0050f970 / FUN_0050fae0
+## ⚠ NOT universal, and now MEASURED at every site — s87 corrected the note, s88 closed it.
+## `tools/re/probe_shadow_sites.py` byte-scans `.text` for `E8 rel32` targeting the thunk
+## `0x4b7f60` or the core `0x5cbea0` (74 sites), then decodes each caller forwards with
+## capstone and reads the three leading pushes. **65 of the 74 push all three as immediates,
+## and they form SEVENTEEN distinct (flags, thr, cap) triples**, not one:
+##
+##     (0x10, 0x40, 0xff) x23   (0x10, 0x00, 0x00) x11   (0x20, 0x21, 0x5a) x9
+##     (0x20, 0x21, 0x63) x4    (0x10, 0x30, 0xff) x4    (0x10, 0x32, 0x64) x4
+##     (0x10, 0x20, 0xff) x2    (0x10, 0x50, 0xff) x2    (0x20, 0x40, 0x80) x1
+##     (0x20, 0x30, 0xff) x1    (0x10, 0x21, 0x63) x1    (0x10, 0x21, 0x84) x1
+##     (0x10, 0x40, 0x80) x1    (0x20, 0x00, 0x00) x1    + 9 sites pushing non-immediates
+##
+## So `THR` below is the value of the TWO sites this leaf was reversed from and of no other:
+## `0x50f9e3` (markers, cap 0x63) and `0x50fba1` (the 48x64 kit, cap 0x84). Any caller that
+## is not one of those two must pass its OWN site's thr and cap.
+##
+## ⚠ AND SIXTEEN SITES ARE A DIFFERENT PASS ENTIRELY. `flags = 0x20` takes the other arm of
+## `FUN_005cbea0` — `FUN_005d66f0(src, 0x100)` then **`FUN_005d60a0`**, a 12-neighbour
+## EDGE pass that rewrites each mask byte as `LUT[code] * 2 + 1` out of a 4096-entry table
+## at `DAT_006b5890` — where `flags = 0x10` takes the `FUN_005d6590` SPREAD this leaf
+## models. Nothing here implements the 0x20 arm yet, and it is the standing candidate for
+## the un-reversed 1-px on-sprite kit edge: `0x5c0688`, the RIDIESC picture widget's own
+## blit, is a 0x20 site (its flags word is `FUN_005c0d50`'s `param_4 = 0x20`, stored at
+## record `+0x90` and reloaded at `0x5c0607`). See docs/re/shadow_blit_re.md, "The 0x20
+## arm". `DAT_006b5890` is above `.data`'s raw end (0x667000), so the table is BUILT at
+## runtime and the next step is to find what writes it.
+const THR := 0x21          ## FUN_005cbea0 param_2 at 0x50f9e3 / 0x50fba1 ONLY
 const CAP_MARKER := 0x63   ## FUN_0050f970 -- the MAN-TO-MAN marking-line markers
 const CAP_KIT := 0x84      ## FUN_0050fae0 -- the 48x64 opponent kit
+## The measured flag words. 0x10 = the spread this leaf models; 0x20 = the edge pass it does
+## not. Callers should say which one their site is rather than assume.
+const FLAGS_SPREAD := 0x10
+const FLAGS_EDGE := 0x20
 
 const LUT_PATH := "res://data/shadow_lut.bin"
 

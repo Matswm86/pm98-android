@@ -1,6 +1,6 @@
 {
  "out": "season_cupdraw_late",
- "note": "LATE-ROUND CUP DRAWS (2026-08-01, s86). The cup-draw per-round axis is unanswerable on the corpus because it carries no SEMIFINAL and no FINAL draw -- twelve SORTEO frames across three competitions and, after s85's drive, five more Coca-Cola/F.A. Cup frames at ROUND 2/3/4 and QTR. FINALS. What is missing is the tail of the ladder. This plan does NOT start a career: it is pointed at the career already up in the wine desktop (Manchester Utd., Saturday 7 February 1998, Premier week 27), which is inside the F.A. Cup's own R5..FINAL window, and simply advances the weeks while keeping every cup_draw frame. No probe: the draws the sim raises by itself are exactly the frames wanted, and a probe detour is 7 extra clicks a hub visit for screens that are already at 0 px.",
+ "note": "LATE-ROUND CUP DRAWS (2026-08-01, s86). The cup-draw per-round axis is unanswerable on the corpus because it carries no SEMIFINAL and no FINAL draw -- twelve SORTEO frames across three competitions and, after s85's drive, five more Coca-Cola/F.A. Cup frames at ROUND 2/3/4 and QTR. FINALS. What is missing is the tail of the ladder. This plan does NOT start a career: it is pointed at the career already up in the wine desktop (Manchester Utd., Saturday 7 February 1998, Premier week 27), which is inside the F.A. Cup's own R5..FINAL window, and simply advances the weeks while keeping every cup_draw frame. No probe: the draws the sim raises by itself are exactly the frames wanted, and a probe detour is 7 extra clicks a hub visit for screens that are already at 0 px. s88: resumed against the SAME career two seasons on (30 Jan 1999). Season 2 reached no semifinal either -- Man Utd went out -- so the drive rolls into season 3; `preseason_rivals` is the same PRESEASON board with the rival-fixture list up, a second signature the old ROI scored at 0.89.",
  "keep": [
   "cup_draw",
   "alert_box"
@@ -157,6 +157,20 @@
     439
    ],
    "settle": 1.5
+  },
+  "preseason_rivals": {
+   "clicks": [
+    [
+     557,
+     346,
+     4
+    ],
+    [
+     570,
+     455
+    ]
+   ],
+   "settle": 3.0
   }
  },
  "film_secs": 20,

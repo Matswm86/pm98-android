@@ -366,3 +366,103 @@ BOLA frames stay unused.
   the frame's `(192,220,192)`. Present in the raw art comparison too, before any of our
   compositing; the two careers were captured on different wine sessions.
 * The CONTINUE rect `(489,436)-(614,470)` is excluded, per above.
+
+## The THIRD panel form — the EUROPEAN CUP GROUP DRAW (built 2026-08-02, s88)
+
+Status: **BUILT, 1 differing pixel** against its binding frame outside the CONTINUE ball and
+the eight kit/flag sprites that carry the un-reversed on-sprite edge pass. Open, and named:
+the round plate the port puts on this card, and the edge pass itself.
+
+`Evidence:` `tools/re/refs/cupdraw-rounds-2026-08-01/manutd_s1_eurocup_groups_1_8_final.png`,
+`tools/re/build_groupdraw_chrome_from_frame.py`, `tools/re/probe_groupdraw_frame.py`,
+`tools/re/probe_cupdraw_labels.py`, `app/scenes/CupDrawScreen.gd`,
+`app/tests/test_cupdraw_screen.gd`, `extracted/Premier Manager 98/MANAGER.EXE` @0x652ab0.
+
+### What it is
+
+The panel had two forms (the >16-tie LIST and the <=16-tie GRID). The European Cup's GROUP
+phase draws a third: the header plate reads **GROUPS** in black on flat white where the other
+two read MATCHES, and under it sit **six boxes in a 2x3 grid**, each a green `GROUP <letter>`
+header over four `kit | club | flag` rows. The bottom-left tie card is **entirely blank, leg
+plates included**, so this form draws neither.
+
+### Why one frame was enough
+
+The widget repeats six times and the witness catches the draw MID-REVEAL — group A holds its
+four clubs and B..F are empty. Measured, not assumed:
+
+* the five empty boxes' ROW BANDS are **pixel-identical to each other (0 px)**, so group C's
+  band IS the empty-row widget and is what group A's populated band is cleared with;
+* their headers differ from each other **only in the letter glyph**, so the plate under a
+  letter is whatever box does not ink that pixel (37 px of the 22x14 cell are inked by all
+  six and borrow in-row from the same plate row instead);
+* the frame agrees with the already-baked `chrome_grid.png` at **0 px** over the whole left
+  panel outside the picture window, the two text plates and the leg plates — which is what
+  makes taking the title/ROUND plate texture from that bake legitimate, and it is taken by
+  UNION (this frame's pixels everywhere it does not ink) rather than wholesale.
+
+### The geometry, all off the frame
+
+| | |
+|---|---|
+| GROUPS plate | white interior (334,23)-(622,49); proman12 BLACK, field sum **955**, pen top 30 |
+| boxes | x **326 / 483**, y **55 / 180 / 305**, each **149 x 121**, 2-px black border |
+| header | the word `GROUP` is CHROME (it never changes); the letter is proman12 WHITE at box-local **(119, 4)** |
+| rows | four, box-local y **20**, pitch **25**, height **24** |
+| kit | **RIDIESC 17x20** at box-local (7, row+2) — `app/art/kits/ridi/<club>.png` |
+| club | proman10, centred on box-local field sum **177**, pen top row+1; ink alternates (100,120,140) / (60,80,100) with the band, exactly as the GRID form's does |
+| flag | **MINIBAND 14x10** at box-local (80, row+14) — and only its **rows 1..9** are drawn |
+
+Club and country identified by matching the sprites, not by reading the names: group A is
+Sporting Port. (1076/PORTUGAL 47), Real Madrid C.F. (1003/SPAIN 22), Anorthosis
+(1223/CYPRUS 15), W.Lodz (1147/POLAND 46), each the port's own exported RIDI kit at 33-34
+mismatched px of 221 opaque — every one of them on the sprite's own edge.
+
+### Two things measured and NOT explained away
+
+* **The flag's top row is not drawn.** At (box+80, row+13) the frame carries flat row
+  background across all fourteen columns on all four of group A's rows, while rows 1..9 sit
+  at (box+80, row+14) and reproduce `art/flags/mini_%03d.png` to 8..11 px of 140. The port
+  blits `Rect2(0, 1, 14, 9)` because that is what the frame shows. Why the bank is 14x10 and
+  the blit nine rows is not reversed.
+* **The kits' and flags' remaining residual is the 1-px on-sprite EDGE pass** — the same open
+  item s62..s87 carry. It is the same signature here: where the port paints the sprite's own
+  (22,22,22) outline, the frame carries the DESTINATION taken darker, and WHICH darker
+  depends on the row band ((44,44,44)/(80,80,80) on the light row, (40,60,80)/(60,80,100) on
+  the dark one). Excluded by named rect in `diff_cupdraw_parity.py`, not painted over.
+
+### The round plate is the one thing this card cannot take from the witness
+
+The frame's plate reads **`1/8 FINAL`** — a round of sixteen — while this port's European Cup
+sends **eight** clubs into the knockout (six group winners plus the two best runners-up,
+which `docs/re/euro_league_screen_re.md` witnessed off the QTR FINALS view) and therefore
+names its first knockout round `QTR. FINALS`. That is a statement about the competition's
+FIELD SIZE, not about this screen, and nothing in the corpus pins the field, so
+`Cup.first_knockout_plate` derives the label from the port's own bracket and the discrepancy
+is recorded here rather than hardcoded away. Note the EXE carries `1/8 FINAL` at VA 0x652ac8,
+next to `SEMIFINALS` and `QTR. FINALS` — the shared uppercase plate set.
+
+### Wiring
+
+`Cup._draw_groups` arms `group_stage.pending_group_draw` when it seeds the groups;
+`Cup.take_group_draw` hands the six boxes over exactly once; `Career._queue_group_draw` puts
+it on the same hub-interrupt queue the knockout card uses, gated on the manager's club being
+in the competition; `Main._pop_cup_draw` resolves each club's PAISES code and mounts the
+form. It plays no reveal: the one-by-one cadence is witnessed only on the knockout grid, so
+the group card shows the finished draw rather than inventing an animation for it.
+
+## A SHIPPED STRING CORRECTED — `QTR. FINALS` keeps its full stop (s88)
+
+`draw_round_plate` normalised `QTR. FINALS` to `QTR FINALS`, citing the EXE block at VA
+0x652ffc. That block is the **COCA-COLA CUP's own** (it starts `COCA-COLA CUP` at 0x652fe4),
+and the Coca-Cola Cup's own witnessed quarter-final draw renders the plate WITH the dot
+(`keep_0111_cup_draw.png`, proman14, 0 px), as does the European Cup's
+(`manutd_s1_eurocup_qtr_finals.png`). The plate is drawn from the SHARED uppercase set at
+0x652ab0. So the port printed a wrong string on every quarter-final card it ever raised.
+Fixed, with `Career`'s European `qtr_label` moved from "Quarter Finals" to "Qtr. Finals";
+gates `test_cup_draw_then_play`, `test_refrun_findings`, `test_europe`.
+
+Recorded with it: the U.E.F.A. Cup has **two** witnessed title spellings on this screen —
+`U.E.F.A. CUP` on `p0747` (1/16 FINAL) and `UEFA CUP` on `manutd_s2_uefa_1_32_finals.png`
+(1/32 FINALS), both at 0 px, both strings present in the EXE. What selects between them is
+not reversed.

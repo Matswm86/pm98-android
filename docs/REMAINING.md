@@ -1,4 +1,108 @@
-# PM98 Android — remaining-work inventory (refreshed 2026-08-01)
+# PM98 Android — remaining-work inventory (refreshed 2026-08-02)
+
+## 0a-s88. Closed 2026-08-02 (session s88) — THE GROUP DRAW IS BUILT, THE KIT-EDGE PASS IS IDENTIFIED, AND THREE BANKED FRAMES WERE FILED UNDER THE WRONG NAMES
+
+### 1. ⭐ THE EUROPEAN CUP **GROUP DRAW** — the biggest carried BUILD item, BUILT at 1 px
+
+s87's newest open item was a screen FORM the port did not have. It is built, wired and gated,
+and it reproduces its binding frame at **1 differing pixel** outside the CONTINUE ball and
+the eight kit/flag sprites that carry the un-reversed edge pass (434 raw px, 1 net).
+
+One frame was enough because the widget repeats six times and five of the six are EMPTY:
+measured, the five empty boxes' ROW BANDS are **pixel-identical to each other (0 px)**, so
+group C's band IS the empty-row widget and is what group A's populated band was cleared with;
+their headers differ **only in the letter glyph**, so the plate under a letter is whatever box
+does not ink that pixel. And the frame agrees with the already-baked `chrome_grid.png` at
+**0 px** across the whole left panel outside the picture, the two text plates and the leg
+plates, which is what makes taking the plate texture from that bake legitimate.
+
+Geometry, all measured: boxes at x 326/483 and y 55/180/305, 149x121; four rows on a 25-px
+pitch; the kit is **RIDIESC 17x20** at box-local (7, row+2); the club name is **proman10**
+centred on box-local field sum **177**, ink alternating with the band exactly as the GRID
+form's does; the letter is proman12 white at box-local (119,4); the GROUPS plate is proman12
+BLACK centred on 955. Chrome `tools/re/build_groupdraw_chrome_from_frame.py`, geometry
+`tools/re/probe_groupdraw_frame.py`, gate `test_cupdraw_screen.gd` §7 + `test_europe.gd`.
+
+Wired, not just drawn: `Cup._draw_groups` arms the card when it seeds the groups,
+`Cup.take_group_draw` hands it over exactly once, `Career._queue_group_draw` puts it on the
+same hub-interrupt queue the knockout card uses (gated on the manager's club being in the
+competition) and `Main._pop_cup_draw` mounts it. It plays no reveal — that cadence is
+witnessed only on the knockout grid.
+
+**Two measurements recorded and NOT explained away:** the MINIBAND flag is blitted from its
+**row 1, nine rows** (at row+13 the frame is flat background across all fourteen columns on
+all four rows), and the frame's round plate reads `1/8 FINAL` — a round of sixteen — against
+this port's eight-club knockout, which is a statement about the competition's FIELD SIZE and
+is left as a discrepancy rather than hardcoded away.
+
+### 2. ⭐ THE 1-px ON-SPRITE KIT EDGE — IDENTIFIED. It is the OTHER arm of the blit
+
+Six sessions called it unlocated and attacked it by fitting models to pixels; s87 located the
+call site. s88 reads what that call site actually *does*, and the answer is that
+`PMShadow` implements the wrong arm.
+
+`FUN_005cbea0` branches on `param_1`: `& 0x10` runs `FUN_005d6590`, the IIR SPREAD the port
+models. `& 0x20` runs **`FUN_005d60a0`**, which is not a spread at all — it walks the mask
+and, for every non-zero byte, builds a **12-bit neighbourhood code** from twelve comparisons
+of `alpha >> 8` against its neighbours and replaces the byte with
+**`DAT_006b5890[code] * 2 + 1`**. That is an EDGE classifier producing partial alpha ON the
+sprite, blending it toward the DESTINATION — which is exactly the residual's shape, and the
+one thing a spread (outside the silhouette only, toward black only) can never be.
+
+And the kit widget is a 0x20 site, read rather than inferred: `0x5c0607` reloads the flags
+word from record `+0x90`, which is the `0x20` that `FUN_005c0d50(bank, list, 0x20, 0x32,
+item)` stored on all 90 RIDIESC fetches. The same reading names s87's `+0x64` / `+0x66`: they
+are the widget's own **thr and cap**.
+
+**What is left is one table.** `DAT_006b5890` sits above `.data`'s raw end (0x667000), so it
+is BUILT at runtime — the next step is to find what writes it, not to cut it out of the file.
+The group-draw kits (33 px of 221) and flags (8..11 of 140) are a ready-made oracle.
+Record: `docs/re/shadow_blit_re.md` §"Every call site, read — and the 0x20 arm".
+
+### 3. ⭐ `PMShadow.THR` — s87 corrected the note, s88 closed it with all 74 sites
+
+`tools/re/probe_shadow_sites.py` byte-scans for the 74 call sites and decodes each caller
+forwards with capstone (a backwards byte walk cannot do it — the instruction before the call
+is a `mov ecx`, and this image's linear sweep desynchronises). **65 of 74 push all three
+leading arguments as immediates, in SEVENTEEN distinct (flags, thr, cap) triples.** The modal
+one is `(0x10, 0x40, 0xff)` x23; `thr = 0x21` belongs to exactly the two sites this leaf was
+reversed from (`0x50f9e3`, `0x50fba1`) and to no other. **Sixteen sites are `flags = 0x20`**,
+i.e. the edge arm above.
+
+### 4. ⭐ THREE BANKED FRAMES WERE FILED UNDER THE WRONG NAMES — and now a tool reads them
+
+`tools/re/probe_cupdraw_labels.py` crops each SORTEO plate's ink mask and XORs it against the
+port's own BMFont render, so a label is a 0-px match or it is reported unresolved. Run over
+the s87 corpus it found **three of the six s1 frames misfiled**: the file called
+`manutd_s1_eurocup_qtr_finals.png` is an **F.A. Cup ROUND 4** draw, `manutd_s1_facup_round3.png`
+is the **European Cup QTR. FINALS**, and `..._facup_round4.png` is F.A. Cup ROUND 3. Renamed;
+the s87 FINDINGS survive (every witnessed European round is still two-legged) but the table
+pointed at the wrong files, which is how the next session measures the wrong pixels.
+
+**And it caught a shipped defect.** `Cup.draw_round_plate` normalised `QTR. FINALS` to
+`QTR FINALS`, citing the EXE block at VA 0x652ffc. That block is the **COCA-COLA CUP's own**
+(it starts `COCA-COLA CUP` at 0x652fe4) — and the Coca-Cola Cup's own quarter-final draw
+renders the plate **with** the dot, as does the European Cup's. The plate comes from the
+SHARED uppercase set at 0x652ab0 (`SEMIFINALS` / `QTR. FINALS` / `1/8 FINAL` / `1/16 FINAL`),
+so the port printed a wrong string on every quarter-final card it ever raised. Fixed, with
+`Career`'s European `qtr_label` moved from "Quarter Finals" to "Qtr. Finals".
+
+Recorded with it: the U.E.F.A. Cup has **two** witnessed title spellings on this screen —
+`U.E.F.A. CUP` on `p0747` and `UEFA CUP` on `manutd_s2_uefa_1_32_finals.png`, both at 0 px,
+both strings in the EXE. What selects between them is not reversed.
+
+### 5. NOT done in s88, said plainly
+
+* **A SEMIFINAL / FINAL cup draw** — a FIFTH drive failed. The s87 career was resumed at
+  30 January 1999 (Premier week 26, season 2) and Manchester Utd went out of the F.A. Cup
+  again; the career rolled into a 1999/2000 preseason on a PRESEASON board variant the
+  driver had never seen (taught as `preseason_rivals`), and the drive's own preseason rule
+  then dismissed it to the title screen. The frames it did bank are the ones above.
+* **The M5 goal-2 divergence** — untouched, and for the reason s87 named: it needs the wine
+  box to itself and the box was holding the cup-draw drive. Still the largest carried RE item
+  and the command is still in `docs/re/M5_S85_WATCH_PLAYSTATE_FULLTIME.md`.
+* **The 0x20 edge pass itself** — identified, not implemented. One runtime-built table away.
+* **The real-device pass** — still needs Mats and a phone.
 
 ## 0a-s87. Closed 2026-08-01 (session s87) — B9 CLOSES, THE CAPABILITY LADDER IS READ OFF THE BINARY, AND TWO CARRIED ITEMS TURN OUT NOT TO BE CAPTURE PROBLEMS
 

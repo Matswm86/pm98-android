@@ -148,6 +148,46 @@ func _run() -> void:
 	await process_frame
 	_check(bool(fired["continue"]), "CONTINUE works again once the draw is parked")
 
+	# 7. The GROUPS form (s88) — the European Cup group draw, the panel's third form.
+	# Every number here is the binding frame's own; the pens are re-derived from the same
+	# field sums the scene uses, so a changed constant fails here rather than silently in
+	# the render-diff.
+	_check(ResourceLoader.exists("res://art/screens/cupdraw/chrome_groups.png"),
+		"the GROUPS chrome ships")
+	_check(CupDrawScreen.GBOX_X == [326, 483] and CupDrawScreen.GBOX_Y == [55, 180, 305],
+		"six group boxes at the frame's own 2x3 anchors")
+	_check(CupDrawScreen.GROW_Y0 + CupDrawScreen.GROW_PITCH * (CupDrawScreen.GROW_N - 1)
+		+ CupDrawScreen.GROW_H == 119, "four rows on a 25px pitch end 2px inside the box")
+	var g12: Dictionary = PMFont.chars("proman12")
+	_check(_pen(CupDrawScreen.GROUPS_SUM, g12, "GROUPS") == 441,
+		"the GROUPS plate pen lands on the frame's x441")
+	_check(CupDrawScreen.GBOX_X[0] + CupDrawScreen.GBOX_LETTER.x == 445
+		and CupDrawScreen.GBOX_Y[0] + CupDrawScreen.GBOX_LETTER.y == 59,
+		"group A's letter pen lands on the frame's (445,59)")
+	var g10b: Dictionary = PMFont.chars("proman10")
+	var frame_pens := {"Sporting Port.": 364, "Real Madrid C.F.": 356,
+		"Anorthosis": 378, "W.Lodz": 390}
+	for name in frame_pens:
+		_check(_pen(CupDrawScreen.GBOX_X[0] * 2 + CupDrawScreen.GNAME_SUM, g10b, name)
+			== int(frame_pens[name]), "group row pen for \"%s\" is the frame's x%d"
+			% [name, int(frame_pens[name])])
+	_check(CupDrawScreen.GFLAG_SRC == Rect2(0, 1, 14, 9),
+		"the MINIBAND flag is blitted from its ROW 1, nine rows (measured, not assumed)")
+	var grp: CupDrawScreen = load("res://scenes/CupDrawScreen.gd").new()
+	root.add_child(grp)
+	grp.setup_groups("european_cup", "EUROPEAN CUP", "1/8 FINAL", [
+		{"letter": "A", "clubs": [{"name": "Sporting Port.", "club_id": 1076, "flag": 47}]},
+		{"letter": "B", "clubs": []},
+	])
+	await process_frame
+	_check(grp.is_groups(), "setup_groups puts the screen in the GROUPS form")
+	_check(grp._legs.is_empty() and grp._card.is_empty(),
+		"the GROUPS form draws neither leg plate nor tie card — the frame has both blank")
+	grp.setup("fa_cup", "F.A. Cup", "ROUND 1", [{"home": "A", "away": "B"}], 40,
+		["MATCH", "REPLAY"])
+	_check(not grp.is_groups(), "a knockout setup() leaves the GROUPS form")
+	grp.queue_free()
+
 	print("\n%s" % ("ALL PASS" if _fail == 0 else "%d FAILED" % _fail))
 	quit(0 if _fail == 0 else 1)
 

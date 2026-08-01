@@ -1,0 +1,112 @@
+{
+ "_source": "tools/re/refs/cupdraw-rounds-2026-08-01/manutd_s1_eurocup_groups_1_8_final.png",
+ "picture": [
+  31,
+  76,
+  260,
+  144
+ ],
+ "title_span": [
+  44,
+  34,
+  288,
+  58
+ ],
+ "round_span": [
+  44,
+  232,
+  288,
+  254
+ ],
+ "plate_white": [
+  334,
+  23,
+  622,
+  49
+ ],
+ "plate_sum": 955,
+ "plate_top": 30,
+ "box_x": [
+  326,
+  483
+ ],
+ "box_y": [
+  55,
+  180,
+  305
+ ],
+ "box_w": 149,
+ "box_h": 121,
+ "hdr_text": [
+  26,
+  4
+ ],
+ "hdr_letter": [
+  117,
+  4
+ ],
+ "row_y0": 20,
+ "row_pitch": 25,
+ "row_h": 24,
+ "rows": 4,
+ "kit_cell": [
+  2,
+  28
+ ],
+ "kit_at": [
+  7,
+  2
+ ],
+ "name_sum": 177,
+ "name_top": 1,
+ "flag_at": [
+  80,
+  14
+ ],
+ "flag_src_row0": 1,
+ "flag_rows": 9,
+ "c_row_bg": [
+  [
+   200,
+   220,
+   240
+  ],
+  [
+   160,
+   180,
+   200
+  ]
+ ],
+ "c_row_ink": [
+  [
+   100,
+   120,
+   140
+  ],
+  [
+   60,
+   80,
+   100
+  ]
+ ],
+ "c_kit_bg": [
+  100,
+  120,
+  140
+ ],
+ "c_hdr_text": [
+  100,
+  130,
+  10
+ ],
+ "c_hdr_letter": [
+  255,
+  255,
+  255
+ ],
+ "c_plate_ink": [
+  0,
+  0,
+  0
+ ]
+}

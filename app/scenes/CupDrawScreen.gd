@@ -173,6 +173,46 @@ const C_CARD_STADIUM := Color8(42, 191, 255)
 const CARD_KIT_L := Rect2(33, 325, 77, 56)
 const CARD_KIT_R := Rect2(236, 329, 51, 56)
 
+# ---- the GROUPS form, the European Cup's group phase (s88) -----------------
+## THE PANEL HAS A THIRD FORM and it is the group draw. Witness (banked s87, driven under
+## Wine from a Manchester Utd. career):
+## `tools/re/refs/cupdraw-rounds-2026-08-01/manutd_s1_eurocup_groups_1_8_final.png` --
+## European Cup, round plate `1/8 FINAL`, the draw MID-REVEAL with GROUP A's four clubs
+## landed and groups B..F still empty. Instead of MATCHES the right panel carries a white
+## header plate reading GROUPS over six boxes in a 2x3 grid, each a green `GROUP <letter>`
+## header over four `kit | club | flag` rows. The bottom-left tie card is entirely BLANK
+## on this form, LEG PLATES INCLUDED, so this form draws neither.
+##
+## Every number below is measured off that frame by
+## `tools/re/build_groupdraw_chrome_from_frame.py`, which also bakes `chrome_groups.png`.
+## The bake is exact because five of the six boxes are empty and their row bands are
+## pixel-identical to each other (0 px), so group C's band IS the empty widget and is what
+## group A's populated band was cleared with. The word GROUP never changes and stays in the
+## chrome, the same standing the green MATCHES header has; only the LETTER is drawn.
+const GROUPS_SUM := 955           # proman12, BLACK on the plate's flat white
+const GROUPS_TOP := 30
+const C_GROUPS := Color8(0, 0, 0)
+const GBOX_X := [326, 483]
+const GBOX_Y := [55, 180, 305]
+const GBOX_LETTER := Vector2i(119, 4)     # box-local pen of the group letter (proman12)
+const C_GBOX_LETTER := Color8(255, 255, 255)
+const GROW_Y0 := 20               # box-local y of row 0; four rows on a 25-px pitch
+const GROW_PITCH := 25
+const GROW_H := 24
+const GROW_N := 4
+const GKIT_AT := Vector2i(7, 2)   # box-local x, row-local y of the 17x20 RIDIESC kit
+const GNAME_SUM := 177            # box-local: pen = box_x + (177 - advance) / 2
+const GNAME_TOP := 1
+## The MINIBAND flag, and a measurement this port does not explain away: the screen blits
+## the sprite's rows 1..9 ONLY. At (box+80, row+13) the frame carries flat row background
+## across all fourteen columns on every one of group A's four rows, while rows 1..9 sit at
+## (box+80, row+14) and reproduce `art/flags/mini_%03d.png` to within the un-reversed 1-px
+## edge pass. Drawn exactly as measured.
+const GFLAG_AT := Vector2i(80, 14)
+const GFLAG_SRC := Rect2(0, 1, 14, 9)
+## The row ink alternates with the band, exactly as the GRID form's does.
+const C_GROW_INK := [Color8(100, 120, 140), Color8(60, 80, 100)]
+
 ## The five competitions MANAGER.EXE loads a SORTEO strip for on THIS screen, plus the
 ## two more that ship one in IMG.PKF (charity / supercup) for the single-tie finals.
 const STRIPS := {
@@ -187,14 +227,17 @@ const STRIPS := {
 
 var _chrome: Texture2D
 var _chrome_grid: Texture2D
+var _chrome_groups: Texture2D
 var _fondo: Texture2D
 var _bombo: Array[Texture2D] = []
 var _strip: Texture2D
 var _page10: Texture2D
 var _page14: Texture2D
+var _page12: Texture2D        # proman12 — the GROUPS plate and the box letters
 var _page12c: Texture2D       # calend12 — the card's two manager lines
 var _g10: Dictionary = {}
 var _g14: Dictionary = {}
+var _g12: Dictionary = {}
 var _g12c: Dictionary = {}
 
 var _title := ""                  # "Coca-Cola Cup" — the EXE's own spelling
@@ -222,11 +265,14 @@ var _own_club_id := -1            # the manager's club — its tie takes the dar
 var _own_manager := ""            # his name — it renders green on the card
 var _sel := -1                    # the tapped row, whose tie fills the detail card
 var _card: Dictionary = {}        # {home:{club,manager,stadium}, away:{...}} or {}
+## The GROUPS form: [{letter, clubs: [{name, club_id, flag}]}] or [] for the other forms.
+var _groups: Array = []
 
 
 func _ready() -> void:
 	_chrome = load("res://art/screens/cupdraw/chrome.png")
 	_chrome_grid = load("res://art/screens/cupdraw/chrome_grid.png")
+	_chrome_groups = load("res://art/screens/cupdraw/chrome_groups.png")
 	_fondo = load("res://art/screens/cupdraw/fondo.png")
 	for i in 12:
 		var t: Texture2D = load("res://art/screens/cupdraw/bombo%02d_opaque.png" % i)
@@ -240,9 +286,11 @@ func _ready() -> void:
 		_mano7_img = _mano[7].get_image()
 	_page10 = PMFont.page_texture("proman10")
 	_page14 = PMFont.page_texture("proman14")
+	_page12 = PMFont.page_texture("proman12")
 	_page12c = PMFont.page_texture("calend12")
 	_g10 = PMFont.chars("proman10")
 	_g14 = PMFont.chars("proman14")
+	_g12 = PMFont.chars("proman12")
 	_g12c = PMFont.chars("calend12")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2(W, H)
@@ -274,9 +322,38 @@ func setup(key: String, title: String, rnd: String, ties: Array, total: int,
 	_own_manager = own_manager
 	_sel = -1
 	_card = {}
+	_groups = []
 	var stem: String = str(STRIPS.get(key, "sorteo_facup"))
 	_strip = load("res://art/screens/cupdraw/%s.png" % stem)
 	queue_redraw()
+
+
+## Feed the European Cup's GROUP phase draw — the panel's third form.
+##   groups — [{letter: "A", clubs: [{name, club_id, flag}]}], up to four clubs a box and
+##            up to six boxes; a short list is a draw still in progress, which is exactly
+##            what the binding frame shows (group A full, B..F empty).
+## The leg plates and the tie-detail card stay blank on this form: the witness has them
+## blank, so nothing is drawn there rather than something being invented for them.
+func setup_groups(key: String, title: String, rnd: String, groups: Array) -> void:
+	_title = title
+	_round = rnd
+	_ties = []
+	_total = 0
+	_legs = []
+	_first = 0
+	_own_club_id = -1
+	_own_manager = ""
+	_sel = -1
+	_card = {}
+	_groups = groups
+	var stem: String = str(STRIPS.get(key, "sorteo_european_cup"))
+	_strip = load("res://art/screens/cupdraw/%s.png" % stem)
+	queue_redraw()
+
+
+## True while the screen is showing the group-phase draw rather than a knockout round.
+func is_groups() -> bool:
+	return not _groups.is_empty()
 
 
 ## True when the round is short enough for the original's GRID form. The switch is the
@@ -448,8 +525,9 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0), true)
 	var s := _scale()
 	draw_set_transform(_origin(s), 0.0, Vector2(s, s))
+	var groups := is_groups()
 	var grid := is_grid()
-	var chrome: Texture2D = _chrome_grid if grid else _chrome
+	var chrome: Texture2D = _chrome_groups if groups else (_chrome_grid if grid else _chrome)
 	if chrome != null:
 		draw_texture(chrome, Vector2.ZERO)
 
@@ -458,7 +536,9 @@ func _draw() -> void:
 	_txt_field(_page14, _g14, ROUND_SUM, ROUND_TOP, _round, C_ROUND)
 	for i in mini(_legs.size(), LEG_TOPS.size()):
 		_txt_field(_page10, _g10, LEG_SUM, int(LEG_TOPS[i]), str(_legs[i]), C_LEG)
-	if grid:
+	if groups:
+		_draw_groups()
+	elif grid:
 		_draw_grid()
 	else:
 		_draw_rows()
@@ -493,6 +573,35 @@ func _masked_ties() -> Array:
 				t["away_id"] = -1
 		out.append(t)
 	return out
+
+
+## The GROUPS form: the white GROUPS plate, then six boxes of four `kit | club | flag`
+## rows. The boxes, their green headers and the word GROUP are the chrome's; what is drawn
+## here is the per-box LETTER and, for each club that has landed, its RIDIESC kit, its name
+## centred on the box's own field and its MINIBAND flag.
+@warning_ignore("integer_division")
+func _draw_groups() -> void:
+	_txt_field(_page12, _g12, GROUPS_SUM, GROUPS_TOP, "GROUPS", C_GROUPS)
+	for g in mini(_groups.size(), GBOX_X.size() * GBOX_Y.size()):
+		var box: Dictionary = _groups[g]
+		var bx: int = int(GBOX_X[g % GBOX_X.size()])
+		var by: int = int(GBOX_Y[g / GBOX_X.size()])
+		_txt(_page12, _g12, bx + GBOX_LETTER.x, by + GBOX_LETTER.y,
+			str(box.get("letter", "")), C_GBOX_LETTER)
+		var clubs: Array = box.get("clubs", [])
+		for k in mini(clubs.size(), GROW_N):
+			var club: Dictionary = clubs[k]
+			var y := by + GROW_Y0 + GROW_PITCH * k
+			_txt_field(_page10, _g10, bx * 2 + GNAME_SUM, y + GNAME_TOP,
+				str(club.get("name", "")), C_GROW_INK[k & 1])
+			var kit := PMChrome.ridi_kit(int(club.get("club_id", -1)))
+			if kit != null:
+				draw_texture(kit, Vector2(bx + GKIT_AT.x, y + GKIT_AT.y))
+			var flag := PMChrome.mini_flag(club.get("flag", -1))
+			if flag != null:
+				draw_texture_rect_region(flag,
+					Rect2(bx + GFLAG_AT.x, y + GFLAG_AT.y, GFLAG_SRC.size.x, GFLAG_SRC.size.y),
+					GFLAG_SRC)
 
 
 ## The GRID form: sixteen four-column bands, home kit | home club | away club | away kit.

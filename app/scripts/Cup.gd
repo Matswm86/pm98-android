@@ -246,12 +246,22 @@ static func _survivors(b: Dictionary) -> Array:
 ## The three things CupDrawScreen needs off a bracket, kept here so the hub route and the
 ## live post-week route cannot drift apart.
 
-## The ROUND plate, in the EXE's own uppercase form (0x2523fc-0x252428: FINAL / QTR
-## FINALS / ROUND 4..1). The bracket's own label is uppercased and `QTR. FINALS`
-## normalised; a label that block does not carry (ROUND 5, SEMIFINALS) is uppercased
-## as-is rather than invented into one of the SEMIFINAL 1 / SEMIFINAL 2 plates, whose
-## selection rule is not reversed. The per-leg suffix is dropped -- the original carries
-## the leg on the bottom-left plates, not on this one.
+## The ROUND plate, in the EXE's own uppercase form. The bracket's own label is uppercased;
+## a label the EXE does not carry (ROUND 5 is one it does; SEMIFINALS it also does) is
+## uppercased as-is rather than invented into one of the SEMIFINAL 1 / SEMIFINAL 2 plates,
+## whose selection rule is not reversed. The per-leg suffix is dropped -- the original
+## carries the leg on the bottom-left plates, not on this one.
+##
+## CORRECTED 2026-08-02 (s88), by measurement rather than by string table. This used to
+## normalise `QTR. FINALS` to `QTR FINALS`, on the strength of the block at VA
+## 0x652ffc..0x653028 (`FINAL / QTR FINALS / ROUND 4..1`). That block is the **COCA-COLA
+## CUP's own**, five strings after `COCA-COLA CUP` at 0x652fe4 -- and the Coca-Cola Cup's
+## own witnessed quarter-final draw renders the plate WITH the dot
+## (`keep_0111_cup_draw.png`, proman14, 0 differing px), as does the European Cup's
+## (`manutd_s1_eurocup_qtr_finals.png`). So the plate is drawn from the SHARED uppercase
+## set at 0x652ab0 (`SEMIFINALS` / `QTR. FINALS` / `1/8 FINAL` / `1/16 FINAL`), not from
+## the per-competition block, and the port was dropping a full stop on every quarter-final
+## card it raised. Re-derivable: `tools/re/probe_cupdraw_labels.py`.
 static func draw_round_plate(b: Dictionary) -> String:
 	var rounds: Array = b.get("rounds", [])
 	var pd: Dictionary = b.get("pending_draw", {})
@@ -268,7 +278,24 @@ static func draw_round_plate(b: Dictionary) -> String:
 	for suffix in [" - 1ST", " - 2ND"]:
 		if label.ends_with(suffix):
 			label = label.substr(0, label.length() - suffix.length())
-	return "QTR FINALS" if label == "QTR. FINALS" else label
+	return label
+
+
+## The plate the GROUP DRAW carries: the label of the FIRST KNOCKOUT round the group phase
+## feeds, in the same uppercase form `draw_round_plate` uses. Derived from this bracket's
+## own knockout field (`n_groups * advance + best_runners_up`) rather than from a witness:
+## the binding frame reads `1/8 FINAL`, which is a round of sixteen, and this port's
+## European Cup sends eight clubs through. See `Career._queue_group_draw`.
+static func first_knockout_plate(b: Dictionary) -> String:
+	var gs: Dictionary = b.get("group_stage", {})
+	if gs.is_empty():
+		return ""
+	var field := int(gs.get("n_groups", 0)) * int(gs.get("advance", 1)) \
+		+ int(gs.get("best_runners_up", 0))
+	if field < 2:
+		return ""
+	var label := _label_for(b, field, 1).to_upper()
+	return label
 
 
 ## The two bottom-left plates. They follow THIS round, not the competition: the League
@@ -724,6 +751,30 @@ static func _draw_groups(gs: Dictionary, rng: RandomNumberGenerator) -> void:
 			table.append({"id": int(cid), "p": 0, "w": 0, "d": 0, "l": 0, "gf": 0, "ga": 0, "pts": 0})
 		groups.append({"clubs": clubs, "table": table, "results": []})
 	gs["groups"] = groups
+	# The group draw is a SORTEO of its own -- witnessed s87, built s88: the panel's third
+	# form, six `GROUP <letter>` boxes of four `kit | club | flag` rows
+	# (`manutd_s1_eurocup_groups_1_8_final.png`). It is raised ONCE, on the draw, so the
+	# flag is set here and consumed by `take_group_draw`.
+	gs["pending_group_draw"] = true
+
+
+## The GROUP DRAW's payload, once. Returns [{letter, clubs: [club_id]}] the first time it
+## is asked after the groups were seeded and [] every time after, so the card is raised on
+## the draw and never again. Letters are A.. in group order, which is the order the draw
+## itself filled them in.
+static func take_group_draw(b: Dictionary) -> Array:
+	var gs: Dictionary = b.get("group_stage", {})
+	if not bool(gs.get("pending_group_draw", false)):
+		return []
+	gs["pending_group_draw"] = false
+	var out: Array = []
+	var groups: Array = gs.get("groups", [])
+	for gi in groups.size():
+		out.append({
+			"letter": char("A".unicode_at(0) + gi),
+			"clubs": ((groups[gi] as Dictionary).get("clubs", []) as Array).duplicate(),
+		})
+	return out
 
 
 ## A double round-robin schedule for `n` (even) teams via the circle method: `n-1`

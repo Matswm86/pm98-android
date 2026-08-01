@@ -1404,6 +1404,46 @@ func _queue_cup_draw(b: Dictionary) -> void:
 	})
 
 
+## Queue the European GROUP DRAW's own SORTEO, once, on the matchday the groups are drawn
+## (`Cup.take_group_draw`). Same hub-interrupt chain as the knockout card and the same
+## participation gate: a competition the manager's club is not in raises nothing.
+##
+## The ROUND PLATE is the one thing this card cannot take from the witness. The binding
+## frame's plate reads `1/8 FINAL`, i.e. a round of SIXTEEN, while this port's European Cup
+## sends eight clubs into the knockout and therefore names its first knockout round
+## `Qtr. Finals`. That is a statement about the competition's FIELD SIZE, not about this
+## screen, and no frame in the corpus pins the field, so the plate carries the port's own
+## first knockout label and the discrepancy is recorded in docs/re/cupdraw_screen_re.md
+## rather than papered over by hardcoding the witness's string.
+##
+## The rows carry `club_id` and no flag: the PAISES code lives in `GameDB`, which a
+## `class_name` script cannot name at compile time, so `Main._pop_cup_draw` resolves it the
+## same way the EURO GROUP table already does.
+func _queue_group_draw(b: Dictionary) -> void:
+	var groups: Array = Cup.take_group_draw(b)
+	if groups.is_empty():
+		return
+	var mine := false
+	var view: Array = []
+	for g in groups:
+		var gd: Dictionary = g
+		var clubs: Array = []
+		for cid in (gd.get("clubs", []) as Array):
+			var id := int(cid)
+			if id == club_id:
+				mine = true
+			clubs.append({"name": _any_club_name(id), "club_id": id})
+		view.append({"letter": str(gd.get("letter", "")), "clubs": clubs})
+	if not mine:
+		return
+	pending_cup_draws.append({
+		"key": Cup.draw_art_key(b),
+		"title": str(b.get("name", "")),
+		"round": Cup.first_knockout_plate(b),
+		"groups": view,
+	})
+
+
 ## Play every due round of both cups (F.A. Cup + League Cup) whose scheduled week has
 ## been reached. The bracket dicts mutate in place, so this writes straight to the save.
 func _play_due_cup_rounds(rng: RandomNumberGenerator, clubs_override: Dictionary) -> void:
@@ -1460,6 +1500,7 @@ func _play_due_cup_rounds(rng: RandomNumberGenerator, clubs_override: Dictionary
 			# while the group phase is live, so the group matchdays raise no SORTEO.
 			Cup.draw_next_round(eb, rng)
 			_queue_cup_draw(eb)
+			_queue_group_draw(eb)
 			for n in er["news"]:
 				_news(n["kind"], n["text"])
 			# Only the European Cup pays -- see EURO_PRIZE_COMPETITION for the scan.
@@ -6002,7 +6043,7 @@ func mint_european_cups(euro_pool: Array, rng: RandomNumberGenerator,
 		cursor += need
 		var opts := {"name": str(EURO_OPTS[key]["name"]), "legs": 2,
 			"two_legged_final": false, "label_scheme": "sequential",
-			"qtr_label": "Quarter Finals", "prize_round": 0, "prize_winner": 0,
+			"qtr_label": "Qtr. Finals", "prize_round": 0, "prize_winner": 0,
 			# The European break — see EURO_TAIL_FRACS. Autumn rounds (or the six group
 			# matchdays) inside EURO_HEAD_SPAN, then QF/SF/Final in March..May.
 			"span_lo": EURO_HEAD_SPAN[0], "span_hi": EURO_HEAD_SPAN[1],

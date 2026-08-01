@@ -233,6 +233,37 @@ func _group_stage() -> bool:
 		if career.club_names.has(int(id)):
 			return str(career.club_names[int(id)])
 		return str(career.euro_names.get(int(id), "?"))
+
+	# The GROUP DRAW's own SORTEO (s88). Nothing is pending before the groups are seeded;
+	# the seeding arms it exactly once, six boxes lettered A..F of four clubs each, and a
+	# second ask returns nothing so the card cannot be raised twice.
+	ok = _assert(Cup.take_group_draw(b).is_empty(),
+		"no group draw is pending before the groups are seeded") and ok
+	Cup.play_group_matchday(b, rng, ratings_fn, career.club_id, names_fn)
+	var gd: Array = Cup.take_group_draw(b)
+	ok = _assert(gd.size() == 6, "the group draw carries six boxes (got %d)" % gd.size()) and ok
+	var letters_ok := true
+	var sizes_ok := true
+	var ids: Dictionary = {}
+	for gi in gd.size():
+		var box: Dictionary = gd[gi]
+		letters_ok = letters_ok and str(box.get("letter", "")) == ["A", "B", "C", "D", "E", "F"][gi]
+		var clubs: Array = box.get("clubs", [])
+		sizes_ok = sizes_ok and clubs.size() == 4
+		for cid in clubs:
+			ids[int(cid)] = true
+	ok = _assert(letters_ok, "the boxes are lettered A..F in group order") and ok
+	ok = _assert(sizes_ok, "every box carries its group's four clubs") and ok
+	ok = _assert(ids.size() == 24, "the six boxes name 24 distinct clubs") and ok
+	ok = _assert(Cup.take_group_draw(b).is_empty(),
+		"the group draw is consumed once — the card cannot be raised twice") and ok
+	# The plate names the FIRST KNOCKOUT round this bracket's own field produces. The
+	# binding frame reads `1/8 FINAL` (sixteen clubs) against this port's eight, which is a
+	# statement about the FIELD, recorded in docs/re/cupdraw_screen_re.md.
+	ok = _assert(Cup.first_knockout_plate(b) == "QTR. FINALS",
+		"the group draw's plate is the port's own first knockout label (got \"%s\")"
+		% Cup.first_knockout_plate(b)) and ok
+
 	var guard := 0
 	while not bool((b.get("group_stage", {}) as Dictionary).get("qualified", false)) and guard < 20:
 		Cup.play_group_matchday(b, rng, ratings_fn, career.club_id, names_fn)

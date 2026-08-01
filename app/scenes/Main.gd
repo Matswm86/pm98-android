@@ -897,6 +897,25 @@ func _cupdraw_shot() -> void:
 	scr.pin_drum(0)
 	await _settle()
 	_save_shot(dir, "cupdraw_747.png")
+	# ...and the GROUPS form (s88): the European Cup's group draw, mid-reveal, against
+	# `manutd_s1_eurocup_groups_1_8_final.png`. Group A has landed and B..F are still
+	# empty, which is what the frame shows; the drum is parked on BOMBO00 there.
+	scr.setup_groups("european_cup", "EUROPEAN CUP", "1/8 FINAL", [
+		{"letter": "A", "clubs": [
+			{"name": "Sporting Port.", "club_id": 1076, "flag": 47},
+			{"name": "Real Madrid C.F.", "club_id": 1003, "flag": 22},
+			{"name": "Anorthosis", "club_id": 1223, "flag": 15},
+			{"name": "W.Lodz", "club_id": 1147, "flag": 46},
+		]},
+		{"letter": "B", "clubs": []},
+		{"letter": "C", "clubs": []},
+		{"letter": "D", "clubs": []},
+		{"letter": "E", "clubs": []},
+		{"letter": "F", "clubs": []},
+	])
+	scr.pin_drum(0)
+	await _settle()
+	_save_shot(dir, "cupdraw_groups.png")
 	print("CUPDRAW-SHOT done")
 	get_tree().quit()
 
@@ -4685,6 +4704,29 @@ func _pop_cup_draw(after: Callable) -> void:
 	var scr: CupDrawScreen = load("res://scenes/CupDrawScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scr)
+	# The European GROUP DRAW is the same card in the panel's third form (s88): six
+	# `GROUP <letter>` boxes instead of MATCHES, no leg plates, no tie card, and no
+	# one-by-one reveal — the reveal's cadence is only witnessed on the knockout grid, so
+	# the group card shows the finished draw rather than inventing an animation for it.
+	if d.has("groups"):
+		var boxes: Array = []
+		for g in (d.get("groups", []) as Array):
+			var gd: Dictionary = g
+			var rows: Array = []
+			for c in (gd.get("clubs", []) as Array):
+				var cd: Dictionary = (c as Dictionary).duplicate()
+				cd["flag"] = int(GameDB.club(int(cd.get("club_id", -1))).get("countryCode", -1))
+				rows.append(cd)
+			boxes.append({"letter": str(gd.get("letter", "")), "clubs": rows})
+		scr.setup_groups(str(d.get("key", "european_cup")), str(d.get("title", "")),
+			str(d.get("round", "")), boxes)
+		var done := func() -> void:
+			AudioManager.ui_select()
+			scr.queue_free()
+			_pop_cup_draw(after)
+		scr.continue_pressed.connect(done)
+		scr.finish_pressed.connect(done)
+		return
 	var ties: Array = d.get("ties", [])
 	scr.setup(str(d.get("key", "fa_cup")), str(d.get("title", "")), str(d.get("round", "")),
 		ties, int(d.get("total", ties.size())), d.get("legs", ["MATCH", "REPLAY"]),
