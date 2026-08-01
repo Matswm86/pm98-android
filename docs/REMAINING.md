@@ -54,9 +54,15 @@ word from record `+0x90`, which is the `0x20` that `FUN_005c0d50(bank, list, 0x2
 item)` stored on all 90 RIDIESC fetches. The same reading names s87's `+0x64` / `+0x66`: they
 are the widget's own **thr and cap**.
 
-**What is left is one table.** `DAT_006b5890` sits above `.data`'s raw end (0x667000), so it
-is BUILT at runtime — the next step is to find what writes it, not to cut it out of the file.
-The group-draw kits (33 px of 221) and flags (8..11 of 140) are a ready-made oracle.
+**What is left is one table, and it has a NAME.** `DAT_006b5890` is above `.data`'s raw end,
+so it is built at runtime — by the graphics-init at `0x5c9760..0x5c9a02`, which looks for
+**`dat\aliasing.dat`**, reads 8192 bytes straight into it if present, and otherwise COMPUTES
+those 8192 bytes (`sum / count` per 13-bit code, out of accumulators fed with `0xff - d`) and
+**writes the file back out as a cache**. That file ships in neither `pm98.iso` nor the RAR,
+because it is generated. So the next step is either to let the original write it (create
+`dat/` in the wineprefix — done — and drive far enough for this init to run; the title screen
+is not far enough, tried) or to transcribe the generator at `0x5c98e9..0x5c99ad`. The
+group-draw kits (33 px of 221) and flags (8..11 of 140) are the ready-made oracle.
 Record: `docs/re/shadow_blit_re.md` §"Every call site, read — and the 0x20 arm".
 
 ### 3. ⭐ `PMShadow.THR` — s87 corrected the note, s88 closed it with all 74 sites
@@ -80,10 +86,10 @@ the s87 FINDINGS survive (every witnessed European round is still two-legged) bu
 pointed at the wrong files, which is how the next session measures the wrong pixels.
 
 **And it caught a shipped defect.** `Cup.draw_round_plate` normalised `QTR. FINALS` to
-`QTR FINALS`, citing the EXE block at VA 0x652ffc. That block is the **COCA-COLA CUP's own**
-(it starts `COCA-COLA CUP` at 0x652fe4) — and the Coca-Cola Cup's own quarter-final draw
+`QTR FINALS`, citing the EXE block at VA 0x653dfc. That block is the **COCA-COLA CUP's own**
+(it starts `COCA-COLA CUP` at 0x653de4) — and the Coca-Cola Cup's own quarter-final draw
 renders the plate **with** the dot, as does the European Cup's. The plate comes from the
-SHARED uppercase set at 0x652ab0 (`SEMIFINALS` / `QTR. FINALS` / `1/8 FINAL` / `1/16 FINAL`),
+SHARED uppercase set at 0x6538b0 (`SEMIFINALS` / `QTR. FINALS` / `1/8 FINAL` / `1/16 FINAL`),
 so the port printed a wrong string on every quarter-final card it ever raised. Fixed, with
 `Career`'s European `qtr_label` moved from "Quarter Finals" to "Qtr. Finals".
 

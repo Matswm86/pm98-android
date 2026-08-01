@@ -163,17 +163,17 @@ tools/re/probe_cupdraw_labels.py`):
 
 * **The quarter-final plate keeps its full stop, and the port was dropping it.**
   `Cup.draw_round_plate` normalised `QTR. FINALS` to `QTR FINALS` because the EXE carries
-  `QTR FINALS` at VA 0x653004. That string is the **COCA-COLA CUP's own** block — five
-  entries after `COCA-COLA CUP` at 0x652fe4 — and the Coca-Cola Cup's own quarter-final draw
+  `QTR FINALS` at VA 0x653e04. That string is the **COCA-COLA CUP's own** block — five
+  entries after `COCA-COLA CUP` at 0x653de4 — and the Coca-Cola Cup's own quarter-final draw
   (`keep_0111`) renders the plate **with** the dot, as does the European Cup's. So the plate
-  comes from the SHARED uppercase set at 0x652ab0 (`SEMIFINALS` / `QTR. FINALS` /
+  comes from the SHARED uppercase set at 0x6538b0 (`SEMIFINALS` / `QTR. FINALS` /
   `1/8 FINAL` / `1/16 FINAL`), and the port has been printing a wrong string on every
   quarter-final card it raised. Fixed s88; gates `test_cup_draw_then_play`,
   `test_refrun_findings`, `test_europe`.
 * **The U.E.F.A. Cup has TWO title spellings on this screen and both are witnessed at 0 px.**
   `p0747_cup_draw.png` (1/16 FINAL) reads `U.E.F.A. CUP`; `manutd_s2_uefa_1_32_finals.png`
-  (1/32 FINALS) reads `UEFA CUP`. The EXE carries both (`UEFA Cup` 0x652a78, `U.E.F.A. CUP`
-  0x652ad4). What selects between them is NOT reversed and is not guessed at here.
+  (1/32 FINALS) reads `UEFA CUP`. The EXE carries both (`UEFA Cup` 0x653878, `U.E.F.A. CUP`
+  0x6538d4). What selects between them is NOT reversed and is not guessed at here.
 
 ### And the GROUP DRAW form is BUILT (s88)
 

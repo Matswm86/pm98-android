@@ -43,8 +43,8 @@ LEGS = (
 )
 
 # Every string MANAGER.EXE carries for these plates, as the EXE spells them. The uppercase
-# ROUND set is the SHARED block at VA 0x652ab0 (`SEMIFINALS` / `QTR. FINALS` / `1/8 FINAL` /
-# `1/16 FINAL`) plus each competition's own (`COCA-COLA CUP`'s at 0x652ffc: `FINAL` /
+# ROUND set is the SHARED block at VA 0x6538b0 (`SEMIFINALS` / `QTR. FINALS` / `1/8 FINAL` /
+# `1/16 FINAL`) plus each competition's own (`COCA-COLA CUP`'s at 0x653dfc: `FINAL` /
 # `QTR FINALS` / `ROUND 4..1`). Both spellings of the quarter-final are offered so the
 # frames decide which one the screen actually uses -- they say `QTR. FINALS`, with the dot.
 # The U.E.F.A. Cup title is offered in both of the EXE's spellings for the same reason, and

@@ -376,7 +376,7 @@ the round plate the port puts on this card, and the edge pass itself.
 `Evidence:` `tools/re/refs/cupdraw-rounds-2026-08-01/manutd_s1_eurocup_groups_1_8_final.png`,
 `tools/re/build_groupdraw_chrome_from_frame.py`, `tools/re/probe_groupdraw_frame.py`,
 `tools/re/probe_cupdraw_labels.py`, `app/scenes/CupDrawScreen.gd`,
-`app/tests/test_cupdraw_screen.gd`, `extracted/Premier Manager 98/MANAGER.EXE` @0x652ab0.
+`app/tests/test_cupdraw_screen.gd`, `extracted/Premier Manager 98/MANAGER.EXE` @0x6538b0.
 
 ### What it is
 
@@ -439,7 +439,7 @@ which `docs/re/euro_league_screen_re.md` witnessed off the QTR FINALS view) and 
 names its first knockout round `QTR. FINALS`. That is a statement about the competition's
 FIELD SIZE, not about this screen, and nothing in the corpus pins the field, so
 `Cup.first_knockout_plate` derives the label from the port's own bracket and the discrepancy
-is recorded here rather than hardcoded away. Note the EXE carries `1/8 FINAL` at VA 0x652ac8,
+is recorded here rather than hardcoded away. Note the EXE carries `1/8 FINAL` at VA 0x6538c8,
 next to `SEMIFINALS` and `QTR. FINALS` — the shared uppercase plate set.
 
 ### Wiring
@@ -454,11 +454,11 @@ the group card shows the finished draw rather than inventing an animation for it
 ## A SHIPPED STRING CORRECTED — `QTR. FINALS` keeps its full stop (s88)
 
 `draw_round_plate` normalised `QTR. FINALS` to `QTR FINALS`, citing the EXE block at VA
-0x652ffc. That block is the **COCA-COLA CUP's own** (it starts `COCA-COLA CUP` at 0x652fe4),
+0x653dfc. That block is the **COCA-COLA CUP's own** (it starts `COCA-COLA CUP` at 0x653de4),
 and the Coca-Cola Cup's own witnessed quarter-final draw renders the plate WITH the dot
 (`keep_0111_cup_draw.png`, proman14, 0 px), as does the European Cup's
 (`manutd_s1_eurocup_qtr_finals.png`). The plate is drawn from the SHARED uppercase set at
-0x652ab0. So the port printed a wrong string on every quarter-final card it ever raised.
+0x6538b0. So the port printed a wrong string on every quarter-final card it ever raised.
 Fixed, with `Career`'s European `qtr_label` moved from "Quarter Finals" to "Qtr. Finals";
 gates `test_cup_draw_then_play`, `test_refrun_findings`, `test_europe`.
 

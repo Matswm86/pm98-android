@@ -254,12 +254,12 @@ static func _survivors(b: Dictionary) -> Array:
 ##
 ## CORRECTED 2026-08-02 (s88), by measurement rather than by string table. This used to
 ## normalise `QTR. FINALS` to `QTR FINALS`, on the strength of the block at VA
-## 0x652ffc..0x653028 (`FINAL / QTR FINALS / ROUND 4..1`). That block is the **COCA-COLA
-## CUP's own**, five strings after `COCA-COLA CUP` at 0x652fe4 -- and the Coca-Cola Cup's
+## 0x653dfc..0x653e28 (`FINAL / QTR FINALS / ROUND 4..1`). That block is the **COCA-COLA
+## CUP's own**, five strings after `COCA-COLA CUP` at 0x653de4 -- and the Coca-Cola Cup's
 ## own witnessed quarter-final draw renders the plate WITH the dot
 ## (`keep_0111_cup_draw.png`, proman14, 0 differing px), as does the European Cup's
 ## (`manutd_s1_eurocup_qtr_finals.png`). So the plate is drawn from the SHARED uppercase
-## set at 0x652ab0 (`SEMIFINALS` / `QTR. FINALS` / `1/8 FINAL` / `1/16 FINAL`), not from
+## set at 0x6538b0 (`SEMIFINALS` / `QTR. FINALS` / `1/8 FINAL` / `1/16 FINAL`), not from
 ## the per-competition block, and the port was dropping a full stop on every quarter-final
 ## card it raised. Re-derivable: `tools/re/probe_cupdraw_labels.py`.
 static func draw_round_plate(b: Dictionary) -> String:
