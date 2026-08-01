@@ -193,8 +193,8 @@ Declared divergences, unchanged by this pass:
 * the unmanaged-club release ladder (0x58AEDA..0x58AF35) is still the port's auto-renew
   simplification; only its retirement half is faithful. `player+0xa7`, `+0x23` and the
   float at `+0x74` are un-identified, and `DAT_00639038` is an unread float constant.
-* the relegation release clause (`player+0x7c`) is not wired: the port seeds contract
-  clauses (`OfferRecord.seed_clauses`) but has no clause byte at that offset yet.
+* ~~the relegation release clause (`player+0x7c`) is not wired~~ — **WIRED 2026-08-01,
+  see §6 below.**
 * `DAT_0066b1f4` and `DAT_00658a44` (the two globals that switch the whole pass off) are
   un-identified; the port behaves as if both are zero, which is the in-game path.
 * the original raises the sacking SCREEN mid-season; the port still dismisses at the
@@ -202,3 +202,98 @@ Declared divergences, unchanged by this pass:
 * the trailing newline on the at-a-loss string is dropped — `PMAlert` sizes its box at
   `72 + 10*lines`, and no frame of that alert survives in the repo to settle whether the
   original draws the empty line.
+
+## 6. The relegation release clause — "Free if relegated", CLOSED 2026-08-01
+
+`Evidence:` `app/tests/test_relegation_clause.gd`, `app/scripts/Retirement.gd`,
+`app/scripts/Career.gd`, `extracted/Premier Manager 98/MANAGER.EXE` @0x58ae5e.
+
+The clause had been settled on the ART side since 2026-07-24 — offer record `rec+0x10`
+(= `player+0x7c`), the first of the four PLAYER INFORMATION checkboxes, rendering at 0 px —
+and carried ever since as "what it DOES on relegation is still not found". The earlier
+search followed the OFFER-COMMIT path (`FUN_005889c0`) and found no consumer there, which
+is true and is why the item stayed open: **the consumer is not on the commit path at all,
+it is on the SEASON ROLLOVER.**
+
+### 6.1 The one consumer, and why "one" is a measurement
+
+`FUN_0058AC90` @0x58ae5e — rung 3 of the release ladder in §2:
+
+```
+0x58ae5e  mov eax,[esp+0x33c]      ; param_5: the club's new division index is worse
+0x58ae65  test eax,eax / je        ; not relegated -> fall to the matches-to-renew rung
+0x58ae69  mov eax,[esi+0x7c]       ; player+0x7c = rec+0x10 = "Free if relegated"
+0x58ae6c  test eax,eax / je        ; no clause -> fall to the matches-to-renew rung
+0x58ae70  mov byte [esi+0x84],0    ; record YEARS := 0
+0x58ae77  mov byte [esi+0x85],0    ; record LEFT  := 0
+0x58ae7e  mov ecx,[esi+4]          ; his display name
+0x58ae81  mov edx,[0x662d80]       ; -> 0x663254, the format string
+0x58ae8e  call [0x6233cc]          ; sprintf into a stack buffer
+0x58ae99  mov cx,word [esi+0x14]   ; his club id
+0x58aea3  call 0x585ee0            ; club lookup
+0x58aeaa  call 0x5793d0            ; the club's news sink
+0x58aeb6  call 0x57d2d0            ; post it
+0x58aebb  jmp 0x58af3b             ; the LEAVES tail: return 0, head count drops
+```
+
+`FUN_0057d2d0` @0x57d2ee returns immediately unless `club+0x5c != 0xffff`, so the line is
+raised only at a club with a human manager — the same sentinel the RETIRE arm uses, and
+the caller needs no gate of its own.
+
+**"The only consumer" is measured, not inferred from one function's absence.** A restarting
+linear sweep of the whole `.text` (`tools/re/dispscan.py`'s `sweep_text`, which does not
+truncate at the first data byte) finds **nine** `[reg+0x7c]` flag-test sites in the image:
+this one, four word-sized `cmp word ptr [ecx+0x7c],0` on an unrelated class (0x410350,
+0x41c1be, 0x425200, 0x42e9a0) and four C-runtime sites in 0x5e/0x5f. Everything else that
+touches displacement `0x7c` in the screen code is the widget-rect quadruple
+`+0x78/+0x7c/+0x80/+0x84`, which is a different struct. And because the record is also
+reachable through a POINTER (`lea ecx,[esi+0x6c]`, where the clause is `rec+0x10`), the
+same sweep was run on displacement `0x10` over 0x520000..0x5a0000: 23 flag-test sites, and
+every one is a list-node/pointer test or a club-id compare against the 0x26ae/0x26de/0x26e4
+sentinels. **No consumer reads the clause through a record pointer either.**
+
+### 6.2 What it does, exactly
+
+For a player at a club that has just gone DOWN a division, who has reached the release
+ladder at all — i.e. his contract has RUN OUT (0x58acb7 returns 1 for anyone with a year
+left), he is not already moving club, his club id is below 0x26ae, `DAT_0066b1f4` is 0 and
+the squad still holds at least `SQUAD_FLOOR` men — the clause zeroes his record's YEARS and
+LEFT, raises the binary's own line, and he LEAVES with a fresh offer record
+(`FUN_0058A0C0` on the LEAVES tail), i.e. into the free-agent market.
+
+So it is **not** an instant release on the day of relegation. It is a rung in the
+CONTRACT-EXPIRY ladder that guarantees the release once the season turns over — and it sits
+**before** the matches-to-renew rung (0x58aebd), so a man who has met his renewal clause and
+also holds this one still walks.
+
+The line is verbatim from `.data` 0x662d80 -> 0x663254, including the missing space in
+"himif" and the "if your were" typo:
+
+```
+%s, has left your team due to
+the clause in his contract freeing himif your were relegated.
+```
+
+### 6.3 The port
+
+`Retirement.RELEGATION_CLAUSE_MSG` + `Retirement.released_by_relegation_clause`;
+`Career._manager_relegated()` is `param_5` for the manager's own club, read from the FINAL
+TABLE before `_pyramid_rollover` moves anybody (the last `PYRAMID_ZONES[tier].down` places,
+and only where there is a tier below to fall into — the same test the rollover then acts on).
+
+**One ordering defect closed on the way in.** The port's ladder tested matches-to-renew
+BEFORE the 13-man floor; the binary tests the floor first (0x58ae55) and the renewal clause
+last (0x58aebd). While both rungs KEPT the player the swap was harmless, but it stops being
+harmless the moment a rung between them RELEASES — which is exactly rung 3. The port now
+runs the binary's order.
+
+Gate `app/tests/test_relegation_clause.gd` (in the CI list) drives two whole seasons and
+pins four things: the clause man leaves iff the club went down; a man with the renewal
+clause and no relegation clause always stays; the binary's own line is raised iff relegated;
+and the rung order, by giving the clause man a MET renewal clause — which under the port's
+old order would have kept him.
+
+**Still declared:** the clause is wired for the MANAGER'S club only. The rival-club ladder
+(0x58AEDA..0x58AF35) remains the port's auto-renew simplification, as recorded above, so a
+relegated AI club does not shed its clause-holders. That is the same declared scope as the
+rest of the unmanaged ladder, not a new gap.

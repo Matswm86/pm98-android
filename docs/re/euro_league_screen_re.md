@@ -532,3 +532,48 @@ CAPTURE gap: `app/art/kits/header/40.png` is a verbatim cut of Man Utd's manager
 kit and panel furniture together, and no frame in the corpus shows that panel with any other
 club's kit, so the background behind it has never been seen unoccluded.~~ — **WRONG, and
 closed above.** `40.png` survives as the witness the rebuild is gated against.
+
+### The 1-px rim — a fourth model killed, and the original's own colour recovered (2026-08-01, s85)
+
+`Evidence:` `tools/re/probe_kit_rim_invert.py`.
+
+Two results, neither of which needs the right pass to be known.
+
+**1. The LUT is invertible, so the original's 24-bit colour is recoverable.** s84 established
+that the rim colours are each other's dither PARTNERS. That is also an INVERSE: `DAT_00675398`
+is indexed by `RGB565 | (parity << 16)`, so a run that shows palette entry A at parity 0 and
+entry B at parity 1 was written as ONE colour, and the candidates are
+`cells(table0, A) & cells(table1, B)`.
+
+The witness is group A's cell row **y=2, x=9..12**: the port paints a flat `(44,44,44)` and
+the frame alternates `(70,40,80)` / `(46,69,82)` with x — constant input, alternating parity,
+two outputs, which is exactly what the dithered LUT does to one colour. Inverted, the
+intersection is **two cells**: the original wrote **(56, 52, 64..72)** there.
+
+That is a measurement of the ORIGINAL rather than a score of one of our guesses, and it is
+the value any future model has to reproduce.
+
+**2. The MINIESC downscale is KILLED.** `MINIESC.PKF`'s entries are 3100 bytes and
+`NANOESC.PKF`'s are 796; both carry the same 28-byte header, so the payloads are
+3072 = **48x64** and 768 = **24x32**. So MINIESC *is* the 48x64 kit bank the MAN-TO-MAN blit
+is documented against, and a 2:1 box downscale of it lands exactly on this cell — which would
+have explained a rim hugging the silhouette one pixel inside it, re-quantised through the
+parity LUT, with no pass at all. Scored over all 476 entries against group A's frame cell,
+the best match is **521 differing px of 768** against the port's plain NANOESC blit at
+**66**. The screen does not draw a downscaled MINIESC.
+
+**And one caveat on an earlier score.** `toward-chrome` (179/449) was fed
+`app/art/screens/euroleague/chrome.png`, whose pixels under the kit's own silhouette are a
+wall paste (§"406 never bare"), i.e. a guess exactly where the rim lives. Re-scored against
+the WITNESSED destination — the two-witness backdrop the six different leaders give — only
+**39** of the 449 residual px have a witnessed destination at all, and 35 of those fit an
+edge alpha; but the fitted weights are scattered across 0..256 (209, 212, 66, 47, 136, 82,
+…) rather than clustered, which is what a free parameter absorbing noise looks like. So the
+model is not resurrected, and the reason its original score was weak is recorded rather than
+left to be re-discovered.
+
+**Also settled, and it collapses two open items into one:** `docs/REMAINING.md` carried
+"the 48x64 on-sprite EDGE BEVEL" and "OffersScreen's panel" as separate un-reversed buckets.
+OffersScreen's panel is **already 0 px outside the kit sprites** (s69) and what is left
+inside its cells is this same on-sprite kit-edge residual. There is one open pass here, not
+three.

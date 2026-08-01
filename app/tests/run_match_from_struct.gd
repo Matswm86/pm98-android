@@ -45,7 +45,13 @@ const STEP_CAP := 60000
 const STRIDE := 0x3bc
 ## Consecutive outer steps with the clock frozen before the harness gives up and reports.
 ## 3 is enough: one step is a whole wait-loop, so three of them is thousands of dead ticks.
+## FUN_005943f0's state: WATCH, viewing, board down. See the KICK OFF block in _run().
+const WATCH_VIEWING_PS := 2
 const STALL_STEPS := 3
+## ...and the same guard for a LIVE-branch step, which is one frame, not one wait loop.
+## Sized above the longest legal run of non-phase-0 frames (a set-piece + its restart);
+## still far below a real deadlock, which never moves the clock again at all.
+const STALL_STEPS_LIVE := 4000
 
 
 ## PM98_SEEDTRACE=<path>: one line per outer step -- "step clk banked half rng.state" --
@@ -197,6 +203,27 @@ func _run() -> bool:
 			Pm98Outer.next_pump_result = 1
 			kickoffs += 1
 			board_up = true
+			# ...and the click DISMISSES THE BOARD, which is what play-state 4 is (2026-08-01).
+			# Leaving the dumped 4 in place for the whole match is what made this harness
+			# deadlock at the first non-kickoff restart: under play-state 4 every outer frame
+			# takes the PAUSE branch, whose wait loop breaks only on +0x1a19 / viewing /
+			# +0x1a2c-with-code / code 10 / +0x1a1f -- and its code test explicitly EXCLUDES
+			# codes 3 and 4. Nothing in that branch arms +0x1a1e either: the binary's own
+			# FUN_00593ab0 arms it ONLY on the nonzero-pump skip path (@0x593b3a `test eax,eax
+			# / je` returns with no arm when the pump is 0). So a faithful play-state-4 frame
+			# with no user input genuinely cannot leave a set-piece -- measured with
+			# PM98_WAIT_PROBE: after the clk-2837 goal the match played on to clk 3885, raised
+			# dispatch code 3, and then spun the full 40,000-frame guard with the clock frozen.
+			# The real game is not in play-state 4 there. 4 is the EVENT BOARD; a WATCH match
+			# in progress is play-state 2 (viewing), the state whose per-frame wait-loop break
+			# IS the WATCH pacing and the state Pm98Outer._replay_cut is gated on. The career
+			# layer owns +0xfa0 and drops it back to 2 when the board is dismissed, so the
+			# harness models that here, on the same click.
+			# COSTS NOTHING ON THE VALIDATED WINDOW: goal 1 still lands at clk 2837, bank 0,
+			# rng 1082620623 -- the reference's own first goal, bit for bit.
+			var sess: Variant = m.get(0x468, null)
+			if sess is Dictionary:
+				(sess as Dictionary)[0xfa0] = WATCH_VIEWING_PS
 		elif board_up:
 			# ...and the click CLEARS the pause. `restart_handler` only zeroes +0x1a1f on a
 			# KICKOFF (rtype 1); a GOAL restart is rtype 6, so leaving it set would make every
@@ -237,7 +264,14 @@ func _run() -> bool:
 		else:
 			frozen = 0
 			last_clk = now_clk
-		if frozen >= STALL_STEPS:
+		# The threshold depends on what ONE STEP IS. Under the pause/watch branch a step is a
+		# whole wait loop -- thousands of driver ticks -- so three of them frozen is already
+		# a dead match. Under the LIVE branch a step is a SINGLE frame, and the clock legally
+		# stands still for every frame that is not phase 0: the phase-2 kickoff alone eats ~24
+		# of them and a set-piece sequence eats hundreds. Three would fire on a healthy match.
+		var one_frame_steps: bool = not (Pm98Movement.play_state_eq(m, 4)
+			or Pm98Movement.play_state_eq(m, 0))
+		if frozen >= (STALL_STEPS_LIVE if one_frame_steps else STALL_STEPS):
 			var line := ("STALL after step %d: clk+banked frozen at %d for %d steps. "
 				+ "ph=%d disp=%d 1a1e=%d 1a1f=%d 1a2c=%d ps=%d score=%d-%d kickoffs=%d") % [
 				t, now_clk, frozen, _g(m, 0x448), _g(m, 0x1a38), _g(m, 0x1a1e), _g(m, 0x1a1f),

@@ -1,5 +1,132 @@
 # PM98 Android — remaining-work inventory (refreshed 2026-08-01)
 
+## 0aaaaaaaaaaaaaaaaa. Closed 2026-08-01 (session s85) — THE WATCH MATCH RUNS TO FULL TIME, THE CLAUSE FINDS ITS CONSUMER, AND TWO "CAPTURE" ITEMS TURN OUT NOT TO BE
+
+### 1. ⭐ THE M5 WATCH HARNESS REACHES FULL TIME — the blocker was the PLAY-STATE
+
+s84 filed goals 2-7 and full time as "a RUN of the harness, not a fix to it". They were
+not: **the harness could not reach them.** Run once, it reported goal 1 and then breached
+`WAIT_LOOP_GUARD`. Instrumented (new `PM98_WAIT_PROBE`), the picture is exact: after the
+clk-2837 goal the match restarted correctly, played on to **clk 3885**, raised **dispatch
+code 3** — a set-piece restart — and spun all 40,000 guard frames with the clock frozen.
+
+Two reasons, both read out of the binary:
+
+* the pause branch's wait loop breaks on `+0x1a19` / viewing / `+0x1a2c`-with-a-code /
+  `code == 10` / `+0x1a1f`, and **its code test explicitly excludes codes 3 and 4**;
+* nothing in that branch arms `+0x1a1e` either. `FUN_00593ab0` discards its driver tick's
+  return and reaches the arm ONLY via the nonzero-pump skip path (@0x593b3a `test eax,eax /
+  je` returns with no arm when the pump is 0).
+
+**So a faithful play-state-4 frame with no user input genuinely cannot leave a set-piece —
+which means the real game is not in play-state 4 there.** 4 is the EVENT BOARD, the state
+the frame-0 dump was taken in, before the user has clicked KICK OFF. A WATCH match in
+progress is play-state **2** (`FUN_005943f0`, viewing) — the state whose per-frame break IS
+the WATCH pacing and the state `Pm98Outer._replay_cut` is gated on, i.e. the very draws the
+s59 handoff says the WATCH path consumes and the raw loop does not.
+
+The harness's KICK OFF click is the click that DISMISSES that board, so it now drops
+`+0xfa0` to 2 on the same click. Result, for the first time:
+
+| | port | reference |
+|---|---|---|
+| goal 1 | **8' Aston Villa, clk 2837, rng 1082620623** | **8' Aston Villa, clk 2837** |
+| goal 2 | 26' Bolton W, clk 8469 | 24' Bolton W |
+| full time | **dispatch 10, 14400 + 14400, half 1** | full time |
+
+Goal 1 is unchanged bit for bit, so nothing here touched the window the nine oracle captures
+pin — cross-checked with `PM98_FORCE_PS=2` from frame 0, which gives the identical goal and
+the identical full time. **Goals 2-7 are now a RUN**, and goal 2 is the new frontier: right
+team, two minutes late, i.e. a divergence to localise in 2837 < clk < 8469. Record:
+`docs/re/M5_S85_WATCH_PLAYSTATE_FULLTIME.md`.
+
+Also fixed on the way: the stall guard's flat 3-step threshold fired on a healthy
+play-state-2 match at clk 0, because under the live branch one step is ONE FRAME and the
+clock legally stands still for every frame that is not phase 0 (`STALL_STEPS_LIVE`).
+
+### 2. ⭐ "FREE IF RELEGATED" — the consumer found, and it is the ONLY one
+
+Carried since 2026-07-24 as "the clause is settled as `rec+0x10` with a 0-px checkbox render;
+what it DOES on relegation is still not found". The earlier search followed the OFFER-COMMIT
+path (`FUN_005889c0`) and found nothing, which is true — **the consumer is on the SEASON
+ROLLOVER**: rung 3 of `FUN_0058AC90`'s release ladder @0x58ae5e. It zeroes the record's YEARS
+(`+0x84`) and LEFT (`+0x85`), posts `.data` 0x662d80 -> 0x663254 to the club's news (gated by
+`FUN_0057d2d0` on `club+0x5c != 0xffff`, so only a human-managed club sees it) and drops him
+to the LEAVES tail, where `FUN_0058A0C0` mints him a fresh offer record — the free-agent
+market.
+
+**"Only" is a measurement.** A restarting sweep of the whole `.text` finds nine `[reg+0x7c]`
+flag-test sites: this one, four word-sized tests on an unrelated class and four C-runtime
+sites. And because the record is also reachable as a pointer (`rec+0x10`), the same sweep ran
+on displacement `0x10` over 0x520000..0x5a0000: 23 sites, every one a list-node test or a
+club-id compare against the 0x26ae/0x26de/0x26e4 sentinels. No consumer reads it either way.
+
+So the clause is **not** an instant release on the day of relegation: it is a rung in the
+CONTRACT-EXPIRY ladder that guarantees the release once the season turns over — and it sits
+BEFORE the matches-to-renew rung, so a man who has met his renewal clause still walks.
+
+**One ordering defect closed with it.** The port tested matches-to-renew before the 13-man
+floor; the binary tests the floor first (0x58ae55) and the renewal clause last (0x58aebd).
+Harmless while both rungs KEEP — not harmless the moment a rung between them RELEASES.
+`Retirement.RELEGATION_CLAUSE_MSG` + `released_by_relegation_clause`,
+`Career._manager_relegated()`, gate `app/tests/test_relegation_clause.gd` (in CI), record
+`docs/re/retirement_re.md` §6. Declared: the manager's club only, the same scope as the rest
+of the unmanaged-club ladder.
+
+### 3. ⭐ THE "SEARCH CAPABILITY STAR LADDER" IS NOT A LADDER — and it is not a capture item
+
+s84 filed it as needing "several careers at several scout ratings, the way
+`ScoutScreen.REGION_STARS` was settled". Two frames put side by side kill that:
+
+* `screenshots/original-walkthrough-2026-07-02/047_164509.png` — P. Mitchell **5.0★**: all
+  six values YES, while only THREE LEDs are bright-with-a-ring and the other three are dark
+  maroon. So the value is not the selection;
+* `tools/re/refs/youth-caps-2026-08-01/b9_01_youth_before.png` (this session's own drive) —
+  J. Casson **2★**, the first time the screen opens and **before any click**: HANDLING and
+  TACKLING YES, the other four NO, and exactly those two LEDs are dark maroon while the other
+  four are the PINK HATCHED art. After six taps only those two go bright — **the other four
+  taps are refused**.
+
+So the LED has THREE states — pink hatched = UNAVAILABLE, dark maroon = available and
+unselected, bright + ring = selected — and the value cell is YES iff the capability is
+AVAILABLE. And it is **per scout, not per rating**: J. Casson (2★) has {HANDLING, TACKLING}
+and s84's C. Dewhurst (2.0★) has {HANDLING, DRIBBLING, TACKLING}. Two scouts, same rating,
+different masks. Four careers at four ratings cannot answer a per-scout question.
+
+The next step is named instead: the mask is seeded somewhere in the HIRE path onto the same
+object the search builds (youth vtable `0x632fc8`, `operator_new(0x28)`, `+4` club, `+6`
+quality, `+7` weeks, `+0x10..+0x24` the six flags `FUN_00575d90` ORs over). Until that seed
+is reversed the port keeps the 047 rendering — which is the witnessed behaviour for every
+all-available scout and is what `diff_youth_parity` pins at 0 px. A value that tracked the
+LED was tried this session and **reverted**: it fails 047 by 345 px.
+
+### 4. THE 1-px KIT RIM — a fourth model killed, and the original's own colour recovered
+
+`tools/re/probe_kit_rim_invert.py`, two results that do not need the pass to be known:
+
+* **the LUT is invertible.** `DAT_00675398` is indexed by `RGB565 | (parity << 16)`, so a run
+  showing palette entry A at parity 0 and B at parity 1 was written as ONE colour. Group A's
+  cell row y=2, x=9..12 — port a flat `(44,44,44)`, frame alternating `(70,40,80)` /
+  `(46,69,82)` — inverts to a **2-cell intersection: the original wrote (56, 52, 64..72)**.
+  That is a measurement of the ORIGINAL, and it is the number any future model has to hit;
+* **the MINIESC downscale is KILLED.** `MINIESC.PKF`'s entries are 3100 bytes against
+  `NANOESC.PKF`'s 796, same 28-byte header, so the payloads are 3072 = **48x64** and 768 =
+  **24x32** — MINIESC *is* the 48x64 bank, and a 2:1 box downscale of it lands exactly on this
+  cell. Scored over all 476 entries: best **521 differing px of 768**, against the port's
+  plain NANOESC blit at **66**.
+
+Also recorded: `toward-chrome`'s 179/449 was scored against a chrome whose pixels under the
+kit's own silhouette are a wall paste, i.e. a guess exactly where the rim lives. Re-scored on
+the WITNESSED backdrop only 39 of the 449 px have a witnessed destination at all; 35 fit an
+edge alpha but at weights scattered across 0..256, which is a free parameter absorbing noise.
+Reported, not claimed.
+
+**And it collapses three open items into one.** `OffersScreen's panel` is already 0 px
+outside the kit sprites (s69) and what is left inside its cells is this same on-sprite kit
+edge; the `48x64 on-sprite EDGE BEVEL` is the same family. There is ONE open pass here, not
+three.
+
+
 ## 0aaaaaaaaaaaaaaaa. Closed 2026-08-01 (session s84) — B9's FILLED PANEL, THE RIM'S THREE DEAD MODELS, AND A DELEGATION THAT POINTED AT NOTHING
 
 ### 1. ⭐ B9's FILLED "PLAYERS FOUND" PANEL — CLOSED AT 0 px, AND THE FRAMES WERE ALREADY BANKED
@@ -151,22 +278,39 @@ is what decides who can move it.
 
 **Blocked on CAPTURE / driving time**
 
-* The **M5 set-piece leaves** — goals 2-7, full time, stoppage time, the unrun cross-seed
-  sweep. The WATCH-harness blocker is gone (`5b25acd`); attribution is now a RUN.
+> **Four lines in this block were superseded on 2026-08-01 by s85
+> (§0aaaaaaaaaaaaaaaaa at the top). They are struck rather than deleted, because WHY each
+> was wrong is itself the finding.**
+
+* ~~The **M5 set-piece leaves** — attribution is now a RUN.~~ **s85: it was not a run. The
+  harness deadlocked on the first set-piece restart after goal 1 (dispatch code 3 at clk
+  3885) because the wait loop's break set excludes codes 3 and 4 and the pause branch never
+  arms `+0x1a1e`. Fixed by modelling the board dismissal. FULL TIME is attributed and goals
+  2-7 ARE now a run — goal 2 is the frontier at 26' against the reference's 24', right
+  team.** Stoppage time and the cross-seed `PM98_SEED` sweep are still unrun.
 * **B9's filled YOUTH TEAM roster row** — needs a SIGNED prospect.
   `plans/season_youth_b9_sign.json` drives it; roughly a season of wall clock.
 * **The per-round cup-draw chrome** — the corpus has twelve SORTEO frames and four round
   labels, and **no semifinal or final draw at all** (see s81 §10 as amended).
-* **The SEARCH CAPABILITY star ladder** — §5 above. Two samples cannot fix six steps;
-  settle it the way `ScoutScreen.REGION_STARS` was settled.
+* ~~**The SEARCH CAPABILITY star ladder.**~~ **s85: not a ladder, and not a capture item.
+  The value cell is per-capability AVAILABILITY (frame 047 reads all six YES with only three
+  LEDs selected) and the mask is PER SCOUT — two 2★ scouts, two different masks. It is an RE
+  item now, listed below.**
 
 **Blocked on RE — un-reversed, and said so rather than approximated**
 
-* **The 1-px kit rim pass.** §2 above: it is ON the sprite and it goes through the shadow
-  blit's quantiser; three blend models are dead; the pass is unlocated.
-* **The 48x64 on-sprite EDGE BEVEL** and **OffersScreen's panel**.
-* **What "Free if relegated" DOES.** The clause is settled as offer-record `rec+0x10` with a
-  0-px checkbox render; the offer-commit path (`FUN_005889c0`) carries no consumer of it.
+* **The 1-px kit rim pass.** §2 above plus s85 §4: it is ON the sprite, it goes through the
+  shadow blit's quantiser, **four** models are dead (toward-chrome / black / white and the
+  MINIESC 2:1 downscale), and the original's own 24-bit colour is now recoverable per pixel
+  by inverting the parity LUT. The pass is unlocated.
+* ~~**The 48x64 on-sprite EDGE BEVEL** and **OffersScreen's panel**.~~ **s85: both are the
+  same on-sprite kit-edge pass as the line above — OffersScreen's panel is already 0 px
+  outside the kit sprites. ONE open item, not three.**
+* 🆕 **The YOUTH SCOUT capability mask** (s85 §3). Where does the HIRE path seed the six
+  flags at `+0x10..+0x24` of the youth-scout object (vtable `0x632fc8`, `operator_new(0x28)`,
+  `+4` club / `+6` quality / `+7` weeks) that `FUN_00575d90` then ORs over?
+* ~~**What "Free if relegated" DOES.**~~ **CLOSED s85** — `FUN_0058AC90` @0x58ae5e, the only
+  consumer in the image. `docs/re/retirement_re.md` §6.
 * **`KnockoutScreen` → `PMShadow`** — deferred a fifth time. s83's call graph makes it
   weaker still: `PMShadow` is demonstrably not the universal answer for kit blits, so the
   refactor is not obviously even correct.

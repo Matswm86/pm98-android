@@ -437,6 +437,31 @@ func _draw() -> void:
 
 	# --- capability values: the witnessed NO (no scout) / YES (scout) pair,
 	#     ink-centred per cell (frame: NO/YES share cx 117 left / 242 right) ---
+	# ⚠ KNOWN-INCOMPLETE, and 2026-08-01 (s85) says WHY, which s84 could not.
+	# The value is the capability's AVAILABILITY to this scout, and the LED under it has
+	# THREE states, not two. Read off two frames side by side:
+	#   * `screenshots/original-walkthrough-2026-07-02/047_164509.png` — P. Mitchell 5.0★:
+	#     all six values YES, and the six LEDs are three DARK MAROON (HANDLING, TACKLING,
+	#     HEADING) and three BRIGHT RED WITH A RING (DRIBBLING, PASSING, SHOOTING);
+	#   * `tools/re/refs/youth-caps-2026-08-01/b9_01_youth_before.png` — J. Casson 2★, the
+	#     first time the screen is opened and BEFORE any click: HANDLING and TACKLING YES,
+	#     the other four NO, and exactly those two LEDs are dark maroon while the other four
+	#     are the PINK HATCHED art. After six taps (`b9_02_leds_armed.png`) only HANDLING and
+	#     TACKLING went bright-with-ring — the other four taps were REFUSED.
+	# So: pink hatched = UNAVAILABLE, dark maroon = available and unselected, bright + ring =
+	# selected. The value cell is YES iff the capability is available, which is why 047 reads
+	# all six YES with only three lit, and why a value that tracked the LED (tried and
+	# reverted here) fails 047 by 345 px.
+	#
+	# And it is NOT a star ladder, which is what s84 filed it as: J. Casson (2★) has
+	# {HANDLING, TACKLING} and s84's C. Dewhurst (2.0★) has {HANDLING, DRIBBLING, TACKLING}.
+	# Two scouts, same rating, different masks — so the mask is PER SCOUT. It is seeded
+	# somewhere in the hire path onto the same object `FUN_00575e80`/`FUN_0053e860` build
+	# (youth vtable 0x632fc8, `operator_new(0x28)`, +4 club / +6 quality / +7 weeks /
+	# +0x10..+0x24 the six flags `FUN_00575d90` ORs over), and THAT is the next step — not
+	# four careers at four ratings, which cannot answer a per-scout question.
+	# Until the seed is reversed the port keeps the 047 rendering, which is the witnessed
+	# behaviour for every all-available scout and is what the parity gate pins.
 	var cap_rows: Array = _spec.get("cap_rows", [126, 139, 152])
 	var value_cx: Dictionary = _spec.get("cap_value_cx", {"left": 117, "right": 242})
 	for side in ["left", "right"]:

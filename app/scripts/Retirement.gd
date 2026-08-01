@@ -72,6 +72,44 @@ const REBIRTH_RESTORED := ["VE", "RE", "AG", "EN"]
 # The news line, verbatim from .data 0x663a58 (the `%s` is the player's display name).
 const RETIRED_MSG := "%s, has retired and has left your club."
 
+# The RELEGATION RELEASE CLAUSE line, verbatim from .data 0x662d80 -> 0x663254 — including
+# the missing space in "himif" and the "if your were" typo, both of which are in the
+# shipped binary. The `%s` is the player's display name (player+0x4, pushed at 0x58ae7e).
+const RELEGATION_CLAUSE_MSG := "%s, has left your team due to\nthe clause in his contract freeing himif your were relegated."
+
+
+## FUN_0058ac90 @0x58ae5e — rung 3 of the release ladder, and the ONLY consumer of the
+## "Free if relegated" clause in the whole image (proved 2026-08-01 by an exhaustive
+## displacement scan: the nine `[reg+0x7c]` flag-test sites are this one plus four
+## word-sized tests on an unrelated class and four C-runtime sites, and there is no
+## record-pointer-relative `[reg+0x10]` flag test anywhere in 0x520000..0x5a0000).
+##
+##   0x58ae5e  mov eax,[esp+0x33c]      ; param_5 = the club went DOWN a division
+##   0x58ae65  test eax,eax / je        ; not relegated -> next rung
+##   0x58ae69  mov eax,[esi+0x7c]       ; player+0x7c = rec+0x10 = "Free if relegated"
+##   0x58ae6c  test eax,eax / je        ; clause absent -> next rung
+##   0x58ae70  mov byte [esi+0x84],0    ; record YEARS  := 0
+##   0x58ae77  mov byte [esi+0x85],0    ; record LEFT   := 0
+##   0x58ae7e..0x58aeb6                 ; sprintf 0x663254 and post it to the club's news
+##                                      ; (FUN_0057d2d0 @0x57d2ee returns early unless
+##                                      ;  club+0x5c != 0xffff, i.e. a human manager)
+##   0x58aebb  jmp the LEAVES tail      ; returns 0, so the caller's head count drops and
+##                                      ; FUN_0058a0c0 gives him a fresh offer record
+##
+## Note the GATES it inherits from the rungs above it: the man's contract must already have
+## RUN OUT (0x58acb7 returns 1 for anyone with a year left), he must not already be moving
+## club, and the squad must still hold >= SQUAD_FLOOR men (0x58ae55). So the clause is not
+## an instant release on the day of relegation — it is a rung in the CONTRACT-EXPIRY ladder
+## that guarantees the release once the season turns over, and it sits BEFORE the
+## matches-to-renew rung (0x58aebd), so it beats a clause that would otherwise renew him.
+static func released_by_relegation_clause(player: Dictionary, relegated: bool) -> bool:
+	if not relegated:
+		return false
+	var clauses: Variant = player.get("clauses")
+	if clauses is Array:
+		return (clauses as Array).has(OfferRecord.CLAUSE_FREE_IF_RELEGATED)
+	return false
+
 
 ## FUN_0058b020: the age at which THIS player retires.
 static func retire_age(player: Dictionary) -> int:

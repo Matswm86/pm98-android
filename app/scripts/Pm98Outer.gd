@@ -74,6 +74,26 @@ const PUMP_RESULT_HEADLESS := 0    # FUN_005bce40(0) modeled: no input, no quit 
 static var next_pump_result := -1
 const WAIT_LOOP_GUARD := 40000     # > 2 halves of ticks; breach = deadlock -> push_error
 
+## PM98_WAIT_PROBE=<n>: print the wait loop's own state every n frames (and for the first
+## eight). A breach of WAIT_LOOP_GUARD says only "the loop never broke"; the loop's break
+## set is (+0x1a19, viewing, +0x1a2c/code, code==10, +0x1a1f), and every one of them is a
+## field the driver tick may or may not have moved -- so the ONLY way to say which rung is
+## dead is to watch them. Off (0) by default and read once, so a live match pays nothing.
+static var _wait_probe_n := -1
+
+
+static func _wait_probe(m: Dictionary, guard: int) -> void:
+	if _wait_probe_n < 0:
+		_wait_probe_n = int(OS.get_environment("PM98_WAIT_PROBE"))
+	if _wait_probe_n <= 0:
+		return
+	if guard >= 8 and (guard % _wait_probe_n) != 0:
+		return
+	print("    [wait %d] clk=%d ph=%d disp=%d 1a19=%d 1a1e=%d 1a1f=%d 1a2c=%d 1a20=%d ps=%d 19a0=%d 27e8=%d 27ec=%d" % [
+		guard, _g(m, 0x450), _g(m, 0x448), _g(m, 0x1a38), _g(m, 0x1a19), _g(m, 0x1a1e),
+		_g(m, 0x1a1f), _g(m, 0x1a2c), _g(m, 0x1a20), Pm98Movement._play_state(m),
+		_g(m, 0x19a0), _g(m, 0x27e8), _g(m, 0x27ec)])
+
 
 static func _g(d: Dictionary, off: int) -> int:
 	return int(d.get(off, 0))
@@ -122,6 +142,7 @@ static func _pause_branch(m: Dictionary, rng: MatchEngine.Pm98Rng) -> bool:
 	var guard := 0
 	while true:
 		_wait_frame(m, rng)                              # FUN_00593ab0
+		_wait_probe(m, guard)
 		if (_g(m, 0x1a19) & 0xff) != 0 or viewing:
 			break
 		var code := _g(m, 0x1a38)

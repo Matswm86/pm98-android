@@ -2515,6 +2515,21 @@ func seasons_at_club() -> int:
 func _releg_count() -> int:
 	return int(SeasonSim.ZONES.get(tier, {"releg": 3}).get("releg", 3))
 
+## `FUN_0058ac90`'s `param_5` for the manager's own club: did the season just finished put
+## it DOWN a division? The caller (`FUN_0057a730`) sets the flag when the club's NEW
+## division index is worse than its old one, so this is exactly the test `_pyramid_rollover`
+## then acts on — the last `down` places of the final table, and only where there is a tier
+## below to fall into. Read BEFORE `_pyramid_rollover` moves anybody, which is the order the
+## original evaluates it in too (the contract pass runs against the already-decided move).
+func _manager_relegated() -> bool:
+	var down := int((PYRAMID_ZONES.get(tier, {"down": 0}) as Dictionary).get("down", 0))
+	if down <= 0:
+		return false
+	var rows := standings()
+	if rows.is_empty():
+		return false
+	return position() > rows.size() - down
+
 ## Did the manager lift a domestic cup this season (F.A. Cup or League Cup)?
 func _won_domestic_cup() -> bool:
 	return Cup.champion_id(fa_cup) == club_id or Cup.champion_id(league_cup) == club_id
@@ -5327,6 +5342,10 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	# decremented every time the callee returns 0) and refuses to release anyone once that
 	# count is under thirteen. Retirement is checked first and has no such floor.
 	var squad_n := (rosters.get(club_id, []) as Array).size()
+	# `FUN_0057a730`'s param_5: the club went DOWN a division. Read once, before
+	# `_pyramid_rollover` moves anybody -- it feeds rung 3 of the release ladder below.
+	var went_down := _manager_relegated()
+	var relegation_releases: Array = []
 	for p in rosters.get(club_id, []):
 		var yrs := int(p.get("contract_years", 1)) - 1
 		p["contract_years"] = yrs
@@ -5338,15 +5357,26 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 			retirees.append(p)
 			squad_n -= 1
 			continue
+		# The release ladder runs in the binary's own rung order (0x58ae41..0x58aecd): the
+		# 13-man floor FIRST, then the relegation clause, then matches-to-renew. The port
+		# used to test matches-to-renew before the floor -- harmless while both rungs KEEP,
+		# but wrong the moment a rung between them RELEASES, which is exactly rung 3.
+		# 0x58ae55: `cmp ecx,0xd / jb keep` -- never released below thirteen men.
+		if squad_n < Retirement.SQUAD_FLOOR:
+			_renew_expiring(p, rng, "squad")
+			continue
+		# 0x58ae5e: the RELEGATION RELEASE CLAUSE (rec+0x10, "Free if relegated"). The club
+		# went down and he has the clause, so his record's YEARS/LEFT are zeroed and he
+		# walks -- ahead of the matches-to-renew rung, which would otherwise have kept him.
+		if Retirement.released_by_relegation_clause(p, went_down):
+			relegation_releases.append(p)
+			squad_n -= 1
+			continue
 		# 0x58aebd: the MATCHES-TO-RENEW clause (rec+0x1a) renews the deal by itself once
 		# he has played its target this season -- player+0x86 != 0 && +0x86 <= +0x87.
 		var clause_n := int(p.get("clause_matches", 0))
 		if clause_n > 0 and int(p.get("clause_apps", 0)) >= clause_n:
 			_renew_expiring(p, rng, "clause")
-			continue
-		# 0x58ae55: `cmp ecx,0xd / jb keep` -- never released below thirteen men.
-		if squad_n < Retirement.SQUAD_FLOOR:
-			_renew_expiring(p, rng, "squad")
 			continue
 		# Contract up. An auto-renew player is re-signed at his demand if the club can fund the
 		# deal (a season's wage); otherwise -- and for everyone without auto-renew -- he leaves
@@ -5391,6 +5421,21 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 		p["value"] = 0            # 0x58ad9c: the managed-club branch zeroes the record's fee
 		Contract.stamp_wage(p, my_band())
 		free_agents.append(p)
+	# 0x58ae70..0x58aebb: the relegation clause zeroes the record's YEARS (+0x84) and LEFT
+	# (+0x85), posts the binary's own line to the club's news, and drops him -- the LEAVES
+	# tail then hands him to FUN_0058a0c0, which mints him a fresh offer record, i.e. he
+	# lands in the free-agent market exactly as an unrenewed leaver does.
+	for p in relegation_releases:
+		rosters[club_id].erase(p)
+		p["free_agent"] = true
+		p["contract_years"] = 0     # player+0x84
+		p["contract_term"] = 0      # player+0x85
+		p.erase("auto_renew")
+		free_agents.append(p)
+		var rel_line := Retirement.RELEGATION_CLAUSE_MSG % p.get("name", "?")
+		_news("contract", rel_line)
+		_log(rel_line)
+		pending_alerts.append(rel_line)
 	for p in leavers:
 		rosters[club_id].erase(p)
 		p["free_agent"] = true
