@@ -132,6 +132,56 @@ makes it unusable. `PM98_NO_RAISE=1` is the switch — `click.sh`, `autodrive.cl
 a drive started the normal way never raises. Export it yourself if you invoke `autodrive.py`
 / `boot.sh` / `nav_career.sh` directly.
 
+## STILL OPEN AFTER s84 — THE WHOLE CARRIED SET, IN ONE PLACE
+
+The list below had drifted to "STILL OPEN AFTER s81" three sessions back while the real
+carried items sat scattered through the per-session sections underneath. This is the
+complete set as of 2026-08-01, and each line says what KIND of blocker it is, because that
+is what decides who can move it.
+
+**Blocked on PERFORMANCE — the largest remaining functional gap**
+
+* The **M5 3D / positional engine is not wired into `MatchSim`**. It is in the repo and
+  ships in the APK, byte-exact over clk 1-2836 plus the first goal against nine banked
+  captures, and it runs **~9 minutes per match in GDScript**.
+  `handoff-pm98-m5-s59-frontier-2836` step 5 is the wiring step and it is blocked on speed,
+  not on correctness. Note the scope: every match the app PLAYS already runs on
+  `MatchSim.simulate`, which since s74 is the original's own stat engine — so this is the
+  fidelity of the match VIEW, not of results.
+
+**Blocked on CAPTURE / driving time**
+
+* The **M5 set-piece leaves** — goals 2-7, full time, stoppage time, the unrun cross-seed
+  sweep. The WATCH-harness blocker is gone (`5b25acd`); attribution is now a RUN.
+* **B9's filled YOUTH TEAM roster row** — needs a SIGNED prospect.
+  `plans/season_youth_b9_sign.json` drives it; roughly a season of wall clock.
+* **The per-round cup-draw chrome** — the corpus has twelve SORTEO frames and four round
+  labels, and **no semifinal or final draw at all** (see s81 §10 as amended).
+* **The SEARCH CAPABILITY star ladder** — §5 above. Two samples cannot fix six steps;
+  settle it the way `ScoutScreen.REGION_STARS` was settled.
+
+**Blocked on RE — un-reversed, and said so rather than approximated**
+
+* **The 1-px kit rim pass.** §2 above: it is ON the sprite and it goes through the shadow
+  blit's quantiser; three blend models are dead; the pass is unlocated.
+* **The 48x64 on-sprite EDGE BEVEL** and **OffersScreen's panel**.
+* **What "Free if relegated" DOES.** The clause is settled as offer-record `rec+0x10` with a
+  0-px checkbox render; the offer-commit path (`FUN_005889c0`) carries no consumer of it.
+* **`KnockoutScreen` → `PMShadow`** — deferred a fifth time. s83's call graph makes it
+  weaker still: `PMShadow` is demonstrably not the universal answer for kit blits, so the
+  refactor is not obviously even correct.
+
+**Closed as far as it can be — do not reopen**
+
+* **HIGHLIGHTS / the 3D match view's models** — a hard DATA gap. The `.p3d` files are absent
+  from BOTH `pm98.iso` and `Premier_Manager_98.rar`.
+* **The unmanaged-club release ladder** (`FUN_0057b6b0`) — fully reversed in s78 and
+  deliberately NOT ported: the port has no league-membership model to hang it on.
+
+**Needs Mats**
+
+* **The real-device pass.** There is no Android device on this box.
+
 ## 0aaaaaaaaaaaaaaa. Closed 2026-08-01 (session s83) — THE BARRA PANEL, THE BAND'S SLANT, AND WHO ACTUALLY GETS PAID
 
 Three of s82's carried items closed, each against a measurement rather than a theory, and
@@ -433,7 +483,7 @@ forms, and no semifinal or final draw at all** — which is exactly the shape of
 that cannot answer the per-round question either way. The item stays open on a capture, and
 it is now open on a *counted* corpus rather than a remembered one.
 
-## STILL OPEN AFTER s81
+## (superseded — see "STILL OPEN AFTER s84" at the top) STILL OPEN AFTER s81
 
 * The **3D / positional match engine (M5)** is in the repo and ships in the APK, but is not
   wired into `MatchSim`: it is byte-exact only to clk 2836 + the first goal, and runs ~9
