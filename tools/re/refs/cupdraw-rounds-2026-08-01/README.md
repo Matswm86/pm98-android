@@ -102,4 +102,18 @@ MATCHES layout with different content — it is a different right-hand panel:
 The port raises NO draw at all for the group stage — `Cup.draw_next_round` is a deliberate
 no-op while the group phase is live. That is now a witnessed gap with a frame behind it.
 
-Still missing after three drives: a **SEMIFINAL** and a **FINAL** draw.
+### Season 2 of the same career — two more European labels, both two-legged
+
+| file | competition | round plate | leg plates |
+|---|---|---|---|
+| `manutd_s2_eurocup_round2.png` | European Cup | **`ROUND 2`** | **1ST LEG / 2ND LEG** |
+| `manutd_s2_uefa_1_32_finals.png` | U.E.F.A. Cup | **`1/32 FINALS`** | **1ST LEG / 2ND LEG** |
+
+Two more new labels, and the European leg plates hold at both of them — so every witnessed
+European round is two-legged (`ROUND 2`, `1/32 FINALS`, `QTR. FINALS`) while every witnessed
+domestic round outside Coca-Cola `ROUND 2` is not. Note also that this season's European Cup
+raised a `ROUND 2` draw rather than the group form: the group phase is not every season's
+entry route, so `manutd_s1_eurocup_groups_1_8_final.png` is the group draw and not simply
+"the European Cup's first draw".
+
+Still missing after four drives: a **SEMIFINAL** and a **FINAL** draw.
