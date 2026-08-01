@@ -94,3 +94,40 @@ Z2 dartwatch captures). Stoppage time and the cross-seed `PM98_SEED` sweep are s
 **Unchanged:** the engine is still not the engine the app plays with. `MatchSim.simulate`
 is, and since s74 that IS the original's own stat engine, so this is the fidelity of the
 match VIEW, not of results.
+
+
+## What goal 2 actually needs — checked 2026-08-01 (s87), so the next session starts with the command
+
+The frontier note above says "a normal M5 localisation job". It is, but it cannot START
+until a piece of data exists that does not, and three sessions have now filed it as work
+rather than as a prerequisite. The banked oracle is:
+
+| trace | window |
+|---|---|
+| `oracle_freerun_s48*.jsonl` | clk 0..760 |
+| `oracle_dartwatch_s47a` .. `s58c` | 300..1032, in overlapping slices |
+| `oracle_dartwatch_s59_1020_2837.jsonl` (30.9 MB) | **1020..2837** |
+
+**There is no per-frame reference beyond clk 2837 at all** — 2837 is exactly where the
+validated window ends, because the traces were cut to it. `timeline.jsonl` covers the whole
+match but it is the `m4_poll` STRUCT poll: score, clock, dispatch, seed on change. It can
+say goal 2 landed at 24' and it cannot say which frame first disagrees.
+
+So localising goal 2 is not a diffing job on data in hand. It is:
+
+1. a fresh boot + nav to the SAME fixture (Aston Villa vs Bolton W) with the frame-0 seed
+   poked, i.e. the `m5_rsp_capture.py` path — **and the base MOVES with the WINEPREFIX path
+   length** (s53), so the stored candidates may miss and the fallback mem scan costs ~20 min
+   per 2 MB;
+2. `m5_rsp_capture.py <port> <lpid> <ref_json> <out> 8469 2837 8469` — the window is
+   **5,632 frames**, about 3x the s59 slice, so expect ~90 MB and a proportionally long run;
+3. then the usual per-frame diff against `run_match_from_struct.gd` to find the first
+   disagreeing frame.
+
+It also wants the box to itself: the RSP stub accepts exactly ONE connection, a client
+disconnect kills the game, and `wdbg_pid.sh` running concurrently makes the attach fail with
+error 87. It cannot share a box with a career drive on the same wineprefix.
+
+**Not attempted in s87** for exactly that reason — the box was holding a cup-draw career
+drive, a CI build and a second Claude session. Naming the blocker is the deliverable here;
+guessing at the divergence without the trace would not be.

@@ -437,6 +437,57 @@ deviant silhouette). The buckets stay declared for the club-dependent remainder.
 The same bake should port to the OTHER ridi/kit sites (EuroGroupScreen's 24 group cells
 still carry ~1260 px/frame, OffersScreen's panel) — follow-up, same method.
 
+## The 1-px kit-edge pass is LOCATED (2026-08-01, s87) — it is the picture WIDGET's own blit
+
+Five sessions have called this pass "unlocated" and attacked it by fitting models to the
+pixels. It was findable from the binary, and the route is short. Three facts, each measured:
+
+**1. The knockout view's own code is at `0x466000..0x4a1000`** — found from its plate strings
+rather than guessed. `AGGR.` (`0x653f0c`), `1ST LEG` (`0x653f1c`), `2ND LEG` (`0x653f14`) and
+`REPLAY` (`0x653f24`) have 10 / 25 / 25 / 10 xrefs and they cluster there. The CUP DRAW
+screen is separate, at **`0x4da000..0x4db000`** — `GROUPS` (`0x6570f8`) has exactly ONE xref,
+`0x4da6a4`, and the leg plates and round labels are its neighbours. The whole knockout RE in
+this document was frame-derived and cited no VA; it does now.
+
+**2. NEITHER range calls the shadow blit.** Byte-scanning `.text` for `E8 rel32` targeting
+`FUN_004b7f60` (the thunk) or `FUN_005cbea0` (the core) gives **74 call sites, and the lowest
+in the whole image is `0x4b29c0`** — above the entire knockout family. Zero in
+`0x466000..0x4a1000`, zero in `0x4da000..0x4db000`, zero in the round-label table at
+`0x45c000`. That is what kills the `PMShadow` refactor on the CALL GRAPH rather than on
+reasoning, and it also says the rim is not `FUN_004b7f60`.
+
+**3. Because the knockout kit is a WIDGET, not a blit.** At every one of the family's 90
+`RIDIESC`-bank fetches the pattern is the same (`0x49c8d0` is representative):
+
+```
+0049c8d9  call 0x585ee0            ; club record by id
+0049c8e0  call 0x579730            ; -> the RIDIESC bank (this+0x1c; MINIESC is 0x5796f0,
+                                   ;    NANOESC 0x579710, paths at 0x662110/20/30)
+...
+0049c97d  call [edx+0xc0]          ; the widget's own virtual setter
+0049c992  call 0x5c0d50            ; FUN_005c0d50(bank, 0, 0x20, 0x32, 0)
+```
+
+and `FUN_005c0d50`'s neighbour **`0x5c0688` is one of the 74 shadow call sites**. Its
+arguments are not constants: `edi` is a word read out of a per-item table
+(`[edx + eax*4 + 0x90]`) and two more come from the widget's OWN fields **`+0x64` and
+`+0x66`**. So the picture widget carries per-instance shadow parameters, and the knockout
+kit is configured with `0x20` / `0x32`.
+
+**And `PMShadow.THR` is not universal.** Its header says `0x21` is "the same at every
+witnessed site". The call at `0x4f4ee7` — a RIDI kit two instructions after its own
+`0x579730` fetch — pushes `0x10`, **`0x40`**, **`0xff`**, i.e. `thr = 0x40` and `cap = 0xff`,
+against the documented `(0x21, 0x63/0x84)`. THR is the per-step decay of the spread, so a
+different THR is a different ramp. The constant is per SITE, and the repo had only ever
+enumerated two sites.
+
+**The next step is now a reading, not a fit:** decompile `FUN_005c0d50` and the widget paint
+around `0x5c0688`, recover what `+0x64` / `+0x66` and the `0x90` table hold for the knockout
+kit's `0x20` / `0x32`, and feed those into the existing `PMShadow` machinery with the site's
+own THR/cap instead of the two hard-coded ones. s85's LUT inversion already says what the
+answer has to hit: at the witness cell the original wrote **(56, 52, 64..72)** where the port
+paints `(44,44,44)`.
+
 ## `KnockoutScreen` -> `PMShadow`: KILLED 2026-08-01 (s87), not deferred an eighth time
 
 This refactor has been carried as "deferred" for seven sessions. It is not a scheduling

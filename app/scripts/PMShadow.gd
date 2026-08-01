@@ -32,7 +32,14 @@ class_name PMShadow
 ##
 ## Full record + the evidence for the reconstructed tables: `docs/re/shadow_blit_re.md`.
 
-const THR := 0x21          ## FUN_005cbea0 param_2, the same at every witnessed site
+## ⚠ NOT universal — corrected 2026-08-01 (s87). This was recorded as "the same at every
+## witnessed site", and it was, because only two sites had ever been enumerated. A byte scan
+## for `E8 rel32` targeting the thunk `0x4b7f60` or the core `0x5cbea0` finds **74 call
+## sites**, and `0x4f4ee7` — a RIDI kit blit — pushes `0x10`, **`0x40`**, **`0xff`**, i.e.
+## `thr = 0x40` / `cap = 0xff`. THR is the per-step decay of the spread, so a different THR
+## is a different ramp. Treat this as the MARKER/KIT sites' value, not the engine's.
+## See docs/re/knockout_views_re.md, "The 1-px kit-edge pass is LOCATED".
+const THR := 0x21          ## FUN_005cbea0 param_2 at FUN_0050f970 / FUN_0050fae0
 const CAP_MARKER := 0x63   ## FUN_0050f970 -- the MAN-TO-MAN marking-line markers
 const CAP_KIT := 0x84      ## FUN_0050fae0 -- the 48x64 opponent kit
 
