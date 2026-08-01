@@ -288,6 +288,14 @@ jobs:
           set -euo pipefail
           # Work off the current tip of main, not this run's (possibly older) checkout,
           # so a concurrent push is a failed push rather than a silent revert.
+          #
+          # Discard the working tree first: the export step regenerates Godot's import
+          # caches, and any of them that is TRACKED leaves the tree dirty, which makes
+          # `git checkout -B` abort and fails the whole job AFTER the APK has already been
+          # uploaded (run 30694954895, 2026-08-01, on app/.godot/global_script_class_cache.cfg
+          # -- since untracked). This step only ever edits README.md, so nothing else in the
+          # tree is worth keeping.
+          git checkout -- . 2>/dev/null || true
           git fetch --depth=1 origin main
           git checkout -B _readme_bump FETCH_HEAD
           python3 - "$APK_FILE" <<'EOF'
