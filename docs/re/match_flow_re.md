@@ -34,7 +34,8 @@ anchored (98,116)) — every label is static chrome so nothing is redrawn. Frame
 absolute hit-rects (spec `match_options`): view row y 279..297 — WATCH(116,97) /
 HIGHLIGHTS(220,97) / BRIEF(325,97) / RESULTS(428,97); bottom row y 342..370 — CANCEL(323,102)
 / OK(430,102). Routing: WATCH→2D simulador, BRIEF→brief, RESULTS→brief seeked to 90',
-HIGHLIGHTS→honest note (3D `.p3d` absent from disc + .rar), CANCEL→dismiss, OK→confirm.
+HIGHLIGHTS→honest note (3D `.p3d` UNOPENED — s85: absent from the .rar, but the ISO's
+314 MB `PCF5DAT.PKF` has never been enumerated), CANCEL→dismiss, OK→confirm.
 
 ## BRIEF — geometry (frame 073, spec `brief`)
 

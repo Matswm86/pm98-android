@@ -87,11 +87,32 @@ don't mistake them for the picker (they have no push-imm xref from the match con
 
 3. **The 3D ENGINE highlights** (`3D ENGINE`/`HIGHLIGHTS` strings; models
    `Modelos\estadios\0011\estadio.p3d`, `cesped.p3d`, `balon.p3d`, `vallas.p3d`). **The `.p3d`
-   model data is absent from BOTH the `.rar` AND the CD ISO** — verified: 0 `.p3d` entries and no
-   `Modelos\` folder on `premier manager 98.iso` (CD top-level = CURSORES/DBDAT/DIRECTX/SFX/
-   SONIDOS/WINFONTS only). So the 3D layer cannot be ported from the available source; the 2D
-   GRAFICO view above is the faithful substitute for the graphic match. This is the ONLY part
-   that is genuinely out of reach with the source on hand.
+   model data is **UNOPENED, NOT ABSENT** — corrected 2026-08-01 (s85), and the correction
+   matters because "absent" retired the item and "unopened" does not.
+
+   What the old claim rested on was a FILE LISTING of the ISO: 0 `.p3d` entries, no `Modelos\`
+   folder. Both are true of the listing. But the ISO's biggest file by a factor of seven is
+   **`PCF5DAT.PKF`, 314,854,588 bytes** — more than half the disc, present ONLY on the ISO
+   (not in the `.rar`, not in the install), and **not enumerable with current tooling**
+   (`SOURCE_INVENTORY` §5 GAP#1, `tools/re/enum_pcf5dat.py`, `pcf5dat_re.md`). A listing that
+   cannot open the container it is standing next to cannot conclude absence, and a raw byte
+   search cannot either: PKF member names are obfuscated (`pkf_unpack.deobf_name`), so a
+   `Modelos\` string would not appear in the clear even if every model were in there.
+
+   What IS established, by a raw byte scan of both sources (2026-08-01):
+   * `Premier_Manager_98.rar` — **0** occurrences of `.p3d` and **0** of `modelos`. The RAR
+     genuinely does not carry them;
+   * `premier manager 98.iso` — **6** `.p3d` hits, and all six are in ONE place, offset
+     `0x17421400`: `MANAGER.EXE`'s own string table (`modelos\detail.p3d`, `Modelos\balon.p3d`,
+     `Modelos\cesped\cesped.p3d`, `Modelos\estadios\0011\vallas.p3d`,
+     `Modelos\estadios\0011\estadio.p3d`, plus a `-G.P3D` name pattern), sitting between
+     `DatSim\paletas\p96a0000.dat` and `Modelos\cesped\8.pal`. They are the loader's FILENAMES,
+     not directory entries.
+
+   So the honest status is: the engine names the models, the RAR does not have them, and
+   **nobody has looked inside the one 314 MB container that could**. Opening PCF5DAT.PKF is
+   the open item; until then the 2D GRAFICO view is the shipped substitute, and it is a
+   substitute for something unproven-missing rather than for something proven-gone.
 
 ## The rebuild — `app/scenes/MatchScreen.gd`
 

@@ -114,7 +114,7 @@ nothing are the ones to distrust.
 | `match_engine_re.md` | yes | — | `test_live_match.gd`, `test_match_init.gd` | `MatchCommentary.gd`, `MatchEngine.gd` | 52 | — | — |
 | `match_flow_re.md` | — | — | `test_live_match.gd`, `test_match_init.gd` | `MatchCommentary.gd`, `MatchEngine.gd` | — | — | 2 |
 | `match_header_re.md` | — | — | `test_live_match.gd`, `test_match_init.gd` | `MatchCommentary.gd`, `MatchEngine.gd` | — | — | 2 |
-| `match_view_re.md` | yes | — | `test_live_match.gd`, `test_match_init.gd` | `MatchCommentary.gd`, `MatchEngine.gd` | 30 | — | — |
+| `match_view_re.md` | yes | — | `test_live_match.gd`, `test_match_init.gd` | `MatchCommentary.gd`, `MatchEngine.gd` | 31 | — | — |
 | `matchday_flow_witness_re.md` | — | — | — | — | — | 2 path(s) | — |
 | `menu_screen_re.md` | — | — | `test_menu_screen.gd` | `MenuScreen.gd` | 7 | — | — |
 | `morale_re.md` | — | `diff_entry_parity.py` | `test_morale.gd` | `Morale.gd` | 1 | — | 3 |

@@ -470,7 +470,10 @@ is *markings*, not the cup draw); **SININFO** = the TITLE SCREEN's own art group
 **SELECCIONPRO** = the OFFERS SELECTION screen's arrows and info plate. **CREDITOS** has
 **zero references in either executable** — dead PC Fútbol 5 inheritance, so building one
 would be inventing a screen PM98 does not have. **HIGHLIGHTS** stays the unchanged hard data
-gap (the `.p3d` models are absent from both sources).
+gap **as of s84 — CORRECTED s85: the models are UNOPENED, not absent.** The ISO's
+`PCF5DAT.PKF` (314 MB, ISO-only, `SOURCE_INVENTORY` GAP#1) has never been enumerated, and
+PKF member names are obfuscated so a byte search cannot see into it. See
+`docs/re/match_view_re.md` §3.
 
 ### 3. THE EUROPEAN ENTRY ALERT — raised, and one figure corrected from its own string
 
@@ -1044,7 +1047,8 @@ on, and that is said rather than approximated. Record: `sack_path_re.md`.
 * **B9** — needs a driven career with a COMPLETED youth search (30-55 weeks), which has never
   been driven.
 * **The 48x64 on-sprite EDGE BEVEL** and **OffersScreen's panel** — un-reversed.
-* **HIGHLIGHTS** — unchanged DATA gap, the `.p3d` models are absent from the shipped files.
+* **HIGHLIGHTS** — DATA gap. **s85: "absent" was wrong — UNOPENED.** `PCF5DAT.PKF` (314 MB,
+  ISO-only) has never been enumerated.
 * **The real-device pass** — there is no Android device on this box. **This one needs Mats.**
 
 
