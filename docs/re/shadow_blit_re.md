@@ -384,6 +384,12 @@ Directionally right; not closed. Two things are still open and neither is the ta
   wineserver, own X display, own boot and career): all three dump the same 8,192 bytes,
   same sha256. WHERE the generator's input comes from is
   still not reversed — `letras.bmp` is in neither source and the load plainly succeeds;
-* the probe picks each row's kit by best match rather than by club, so its per-kit baseline
-  (87..135 wrong) is worse than the port's own render of that screen (33 of 221). Scoring
-  the pass against the PORT's render, not a best-match sprite, is the next step.
+* the probe picks each row's kit by best match rather than by club, and NO sprite in
+  `app/art/kits/ridi` gets those cells under 74 px even with the pass applied. The
+  geometry is not the suspect — the probe's constants are the port's own
+  (`CupDrawScreen.GBOX_Y[0] = 55`, `GROW_Y0 = 20`, `GROW_PITCH = 25`,
+  `GKIT_AT = (7, 2)`), and `PMChrome.ridi_kit` loads `art/kits/ridi/<club_id>.png`
+  verbatim with no recolour. So the open question is the SPRITE: which club id each
+  group-A row carries, and whether the port's RIDIESC bank even covers the European
+  clubs this draw shows. Score the pass against the PORT's own render of that screen,
+  with the club ids it actually feeds, before drawing any conclusion about the pass.
