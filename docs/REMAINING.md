@@ -898,7 +898,19 @@ a drive started the normal way never raises. Export it yourself if you invoke `a
 
 **Open — CAPTURE / driving time**
 
-* **A SEMIFINAL / FINAL cup draw.** No longer blocked on the roll. `build_hack_exe.py
+* **BUILD the SEMIFINAL panel form.** The witness the last six drives were short of is
+  banked (s91, `tools/re/refs/cupdraw-semifinals-2026-08-02/`): both leg variants, Coca-Cola
+  (`1ST LEG`/`2ND LEG`) and F.A. Cup (`MATCH`/`REPLAY`), and the two frames agree on the
+  geometry exactly. It is a THIRD panel form — the GRID row at a different pitch with a
+  black `SEMIFINAL 1` / `SEMIFINAL 2` plate above each tie, reusing `C_GRID_*` colours and
+  the `GRID_KIT_L`/`GRID_HOME`/`GRID_AWAY`/`GRID_KIT_R` columns. Full measured rects in
+  `cupdraw_screen_re.md` §"THE SEMIFINAL FORM — WITNESSED". Not built in s91 on purpose: the
+  project does not ship a panel on a measurement without the render-diff.
+* **A FINAL cup draw.** Still unwitnessed. Ten distinct round labels came out of the s91 run
+  and `FINAL` was not among them; that is consistent with `0x4dbee5`'s "exactly two ties"
+  guard and a final having one, but the run has not been driven past a cup final, so it is
+  NOT settled either way. Same instrument, longer drive.
+* **(closed as a blocker) A SEMIFINAL cup draw.** No longer blocked on the roll. `build_hack_exe.py
   --cheats=cupdraw_always,unsackable` builds a `MANAGER_CAP.EXE` whose one changed gate byte
   makes `FUN_004d9a00` paint every draw it is handed, whether or not the managed club is in
   it, without touching the draw itself (verified live on a Coca-Cola R1 draw Man Utd are not

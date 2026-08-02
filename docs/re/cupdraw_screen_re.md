@@ -538,6 +538,58 @@ into one of the SEMIFINAL 1 / SEMIFINAL 2 plates"). The labels and their draw si
 read; what is still missing is a WITNESS FRAME to render-diff against, so they stay unbuilt
 under the project's own rule rather than being shipped on a reading alone.
 
+## THE SEMIFINAL FORM — WITNESSED (2026-08-02, s91). Two frames, both leg variants
+
+`Evidence:` `tools/re/refs/cupdraw-semifinals-2026-08-02/`,
+`tools/hack/build_hack_exe.py` (`cupdraw_always`),
+`tools/re/wine/plans/season_semifinal_capture.json`.
+
+Six career drives had failed to bank this, because the gate above only paints a draw the
+managed club is in and no drive ever put Manchester Utd. into a semifinal. s91 stopped
+rolling the dice and patched the gate instead — one byte, `0x4d9b26` `jne` -> `jmp`, which
+changes whether the screen paints and nothing about what it paints (see
+`build_hack_exe.py`'s `cupdraw_always` block). Both semifinal leg variants fell out of a
+single Manchester Utd. season-1 drive:
+
+| ref | competition | legs | the draw |
+|---|---|---|---|
+| `cocacola_semifinals_2leg.png` | Coca-Cola Cup | `1ST LEG` / `2ND LEG` | Chelsea v Aston Villa, Barnsley v Liverpool |
+| `facup_semifinals_match_replay.png` | F.A. Cup | `MATCH` / `REPLAY` | Newcastle Utd v Crystal Pal., Manchester C v Nottingham F. |
+
+and with them `cupwinners_qtr_finals.png` (a Cup Winners' Cup QTR. FINALS, another round
+Man Utd are not in) and `cocacola_round1_nonparticipant.png` (the R1 draw that proved the
+instrument live on the run's very first screen). The round plate reads **`SEMIFINALS`**, not
+`SEMIFINAL 1` — those two strings are the two TIE plates on the right, one per tie.
+
+### The panel geometry, measured on both frames (they agree exactly)
+
+It is a THIRD panel form, and it is the GRID row at a different pitch with a label plate
+above each tie — not the 16-band grid and not the list:
+
+| | y | x |
+|---|---|---|
+| `SEMIFINAL 1` plate | 112..131 | the black bar; its ink runs 359..595 |
+| tie 1 row | interior 155..187, black borders at 153/154 and 188/189 | 334..622 |
+| `SEMIFINAL 2` plate | 261..280 | ink 359..595 |
+| tie 2 row | interior 307..339, borders at 305/306 and 340/341 | 334..622 |
+
+The tie row's cells and pens are the GRID form's own, unchanged: kit cell `(140,160,180)`,
+row band `(160,180,200)`, ink `(60,80,100)` — i.e. `C_GRID_KIT_BG[1]` / `C_GRID_BG[1]` /
+`C_GRID_INK[1]`, in the columns `GRID_KIT_L` / `GRID_HOME` / `GRID_AWAY` / `GRID_KIT_R`
+already in `CupDrawScreen.gd`.
+
+**Still NOT built**, deliberately: the form is measured but not shipped, because the project
+does not ship a panel on a measurement without the render-diff, and that is the next
+session's work rather than a rushed one at the end of this one. Everything it needs is
+above and in the refs directory.
+
+### And the FINAL draw is still unwitnessed
+
+Ten distinct round labels came out of the run — `ROUND 1..5`, `1/32 FINALS`, `1/16 FINAL`,
+`1/8 FINAL`, `QTR. FINALS`, `SEMIFINALS` — and no `FINAL`. That is consistent with the
+guard at `0x4dbee5` keying on "exactly two ties" and a final having one, but it is NOT
+settled: the run has not been driven past a cup final yet. Do not assume either way.
+
 ## The GROUP form closes at 5 px (2026-08-02, s90)
 
 `Evidence:` `tools/re/diff_cupdraw_parity.py`, `tools/re/probe_groupdraw_edge_render.py`,
