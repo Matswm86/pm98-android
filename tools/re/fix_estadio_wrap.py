@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 """Un-wrap the 12 GROUND stadium tiles: undo the export's column/row misregistration.
 
+⚠ OBSOLETE FOR THE SHIPPED TILES (s92). `tools/re/reexport_estadio_exact.py` re-exported
+all twelve through `pkf_image.dib_indices()` (the exact path), which restores the 640 px
+the unwrap PERMUTATION could never recover (rows 2/238/239 — the 0.83% black edge), and
+verifies 100.00% against eleven real renders across five tiers. The shipped tiles are NOT
+wrapped any more, so running this with --apply would corrupt them; --apply now refuses.
+Kept for the s55 measurement record.
+
 Usage: fix_estadio_wrap.py [--apply] [--verify]
 
 FINDING (s55, from the owner's 2026-07-23 GROUND captures). Every
@@ -85,6 +92,9 @@ def verify(tile4: np.ndarray) -> None:
 
 def main() -> None:
     apply = "--apply" in sys.argv
+    if apply:
+        sys.exit("REFUSED: the shipped tiles come from reexport_estadio_exact.py (s92) "
+                 "and are not wrapped — applying the unwrap would corrupt them.")
     tiles = sorted(ART.glob("estadio*.png"), key=lambda p: int(p.stem[7:]))
     if not tiles:
         sys.exit(f"no estadio tiles under {ART}")

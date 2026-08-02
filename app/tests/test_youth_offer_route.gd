@@ -96,13 +96,25 @@ func _run() -> void:
 	ok = _assert(card._wage_yearly > Career.YOUTH_OPENING_WAGE,
 		"but the WAGE ◄► still negotiate (£%d)" % card._wage_yearly) and ok
 
-	# ---- OFFER lands the negotiated terms on him ---------------------------
-	# Offer well over any demand so the wage-driven part of the refusal roll is gone; the
-	# potential/pull residual survives, so accept either answer and only pin the terms.
+	# ---- OFFER does NOT sign him on the spot — the answer comes next week ---
+	# (refrun p0759/p0760/p0770: offer Wed 14 Oct, still in PLAYERS FOUND that day,
+	# on the roster Tue 20 Oct.) Offer well over any demand so the wage-driven part of
+	# the refusal roll is gone; the potential/pull residual survives, so accept either
+	# answer and only pin the terms.
 	card.offer_made.emit(0, 50_000, 4, [], 0)
 	for _i in 8:
 		await process_frame
 	ok = _assert(_first(main, "MakeOfferScreen") == null, "OFFER dismisses the card") and ok
+	ok = _assert(c.youth.size() == before,
+		"OFFER does not sign him on the spot (the answer comes next week)") and ok
+	ok = _assert(c.youth_found.size() == 1,
+		"he stays in PLAYERS FOUND while he thinks it over (p0760)") and ok
+	ok = _assert(c.youth_offers.size() == 1
+		and int((c.youth_offers[0] as Dictionary).get("wage", 0)) == 50_000,
+		"the offer is recorded for the weekly tick") and ok
+	# The next weekly tick resolves the roll.
+	c._resolve_youth_offers(c.career_rng())
+	ok = _assert(c.youth_offers.is_empty(), "the weekly tick spends the offer") and ok
 	var joined := {}
 	for q in c.youth:
 		if int((q as Dictionary).get("id", -1)) == pid:

@@ -27,6 +27,7 @@ func _initialize() -> void:
 func _run() -> void:
 	# 1. Every asset the EXE names for this screen ships, plus the chrome bake.
 	var assets: Array[String] = ["res://art/screens/cupdraw/chrome.png",
+		"res://art/screens/cupdraw/chrome_semis.png",
 		"res://art/screens/cupdraw/fondo.png", "res://art/screens/cupdraw/stop0.png"]
 	for i in 12:
 		assets.append("res://art/screens/cupdraw/bombo%02d_opaque.png" % i)
@@ -186,6 +187,36 @@ func _run() -> void:
 	grp.setup("fa_cup", "F.A. Cup", "ROUND 1", [{"home": "A", "away": "B"}], 40,
 		["MATCH", "REPLAY"])
 	_check(not grp.is_groups(), "a knockout setup() leaves the GROUPS form")
+
+	# 8. The SEMIFINAL form (s91 witness, s92 build) — a round of exactly TWO ties.
+	grp.setup("league_cup", "Coca-Cola Cup", "SEMIFINALS", [
+		{"home": "Chelsea", "home_id": 49, "away": "Aston Villa", "away_id": 45},
+		{"home": "Barnsley", "home_id": 68, "away": "Liverpool", "away_id": 42},
+	], 2, ["1ST LEG", "2ND LEG"])
+	_check(grp.is_semis(), "a 2-tie round takes the SEMIFINAL form")
+	_check(grp._chrome_semis != null, "the SEMIFINAL chrome loaded")
+	# The measured geometry: rows interior 33 px at y155/307, cells at the frame's own
+	# columns, plates baked (so the form draws no round text of its own).
+	_check(CupDrawScreen.SEMIS_ROWS_Y == [155, 307] and CupDrawScreen.SEMIS_ROW_H == 33,
+		"tie rows at the measured y anchors, 33 rows tall")
+	_check(CupDrawScreen.SEMIS_HOME == [361, 476] and CupDrawScreen.SEMIS_AWAY == [479, 594],
+		"name cells on the measured columns")
+	# Name pens on the solved (S - adv) / 2 rule: every witnessed name reproduces.
+	for row2 in [["Chelsea", 392], ["Aston Villa", 501]]:
+		var s2 := CupDrawScreen.SEMIS_HOME if row2[0] == "Chelsea" else CupDrawScreen.SEMIS_AWAY
+		_check(_pen(int(s2[0]) + int(s2[1]), g10b, str(row2[0])) == int(row2[1]),
+			"semifinal name pen for %s == %d" % [row2[0], int(row2[1])])
+	# Row taps resolve for the tie card, exactly as the grid's do.
+	var sel := [-1]
+	grp.tie_selected.connect(func(r: int) -> void: sel[0] = r)
+	_tap(grp, Vector2(470, 320))
+	await process_frame
+	_check(sel[0] == 1, "a tap on tie 2's row selects it (got %d)" % sel[0])
+	# A FINAL (one tie) does NOT take this form: the plate guard needs exactly two
+	# and no final draw has been witnessed.
+	grp.setup("fa_cup", "F.A. Cup", "FINAL", [{"home": "A", "away": "B"}], 1,
+		["MATCH", "REPLAY"])
+	_check(not grp.is_semis(), "a 1-tie FINAL keeps the grid form")
 	grp.queue_free()
 
 	print("\n%s" % ("ALL PASS" if _fail == 0 else "%d FAILED" % _fail))

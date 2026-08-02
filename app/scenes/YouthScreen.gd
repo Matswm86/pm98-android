@@ -45,8 +45,9 @@ class_name YouthScreen
 ##   roster rows    11 grey rows (pitch 16). A FILLED row is un-witnessed: values
 ##                  render in the proman faces under the baked column headers
 ##                  (SP=VE ST=RE AG=AG QU=CA, AV, ROL=pos; WAGE/YEARS un-modelled,
-##                  left empty), documented as reconstruction. Tapping a READY
-##                  youngster emits promote_requested(pid) (interaction un-walked).
+##                  left empty), documented as reconstruction. Tapping ANY roster
+##                  row emits promote_requested(pid) — Main opens the YOUTH PLAYER
+##                  card, whose own buttons carry the TRAINING/PROMOTE gates.
 ##   PARAMETERS /   two-state toggle: baked = PARAMETERS selected (087); RATING
 ##   RATING         mode overlays the 047-cut plaque pair. With the witnessed
 ##                  empty roster the two modes are row-identical.
@@ -56,7 +57,7 @@ class_name YouthScreen
 signal search_pressed(skills: Array)   # SEARCH armed + tapped (skill keys, cap_order ids)
 signal caps_changed(selected: Dictionary)  # an LED toggled; Career persists the six flags
                                        # (the original's criteria object survives the screen)
-signal promote_requested(pid: int)     # tap a READY roster row (un-walked interaction)
+signal promote_requested(pid: int)     # tap a roster row -> the YOUTH PLAYER card
 signal prospect_pressed(pid: int)      # tap a PLAYERS FOUND row -> offer him a contract
 signal back_pressed                    # RETURN
 
@@ -417,9 +418,13 @@ func _on_input(e: InputEvent) -> void:
 	elif was.begins_with("found:"):
 		prospect_pressed.emit(int(was.substr(6)))
 	elif was.begins_with("row:"):
+		# EVERY roster row opens the YOUTH PLAYER card (FUN_0053ec40 -> FUN_005274d0) —
+		# that card is where TRAINING / SACK / PROMOTE live, with its own gates (witness
+		# p0771: TRAINING green, PROMOTE greyed). Gating the tap on ready-ness here made
+		# a newly signed youngster unopenable, so he could never be put into training.
 		var pid := int(was.substr(4))
 		for p in _youth:
-			if int(p.get("id", -1)) == pid and Youth.is_ready(p):
+			if int(p.get("id", -1)) == pid:
 				promote_requested.emit(pid)
 				break
 

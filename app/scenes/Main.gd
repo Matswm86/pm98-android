@@ -916,6 +916,23 @@ func _cupdraw_shot() -> void:
 	scr.pin_drum(0)
 	await _settle()
 	_save_shot(dir, "cupdraw_groups.png")
+	# ...and the SEMIFINAL form (s91), against BOTH banked leg variants. The drum holds
+	# BOMBO11 on both frames (0 px). The clubs carry their real ids so the NANOESC kit
+	# cells render — the frames witness the kits, unlike the p0133/p0747 grid shots.
+	scr.setup("league_cup", "Coca-Cola Cup", "SEMIFINALS", [
+		{"home": "Chelsea", "home_id": 49, "away": "Aston Villa", "away_id": 45},
+		{"home": "Barnsley", "home_id": 68, "away": "Liverpool", "away_id": 42},
+	], 2, ["1ST LEG", "2ND LEG"])
+	scr.pin_drum(11)
+	await _settle()
+	_save_shot(dir, "cupdraw_semis_cc.png")
+	scr.setup("fa_cup", "F.A. Cup", "SEMIFINALS", [
+		{"home": "Newcastle Utd", "home_id": 44, "away": "Crystal Pal.", "away_id": 63},
+		{"home": "Manchester C", "home_id": 60, "away": "Nottingham F.", "away_id": 41},
+	], 2, ["MATCH", "REPLAY"])
+	scr.pin_drum(11)
+	await _settle()
+	_save_shot(dir, "cupdraw_semis_fa.png")
 	print("CUPDRAW-SHOT done")
 	get_tree().quit()
 
@@ -2313,6 +2330,16 @@ func _show_match_result(res: Dictionary, on_finish: Callable = Callable()) -> vo
 		# the Shield names itself, instead of borrowing the league's "Premier / Week N".
 		hdr["status_top"] = str(res["comp"])
 		hdr["status_bottom"] = str(res.get("comp_round", ""))
+		# ...and its own DAY of the played week. The original never stacks a week's
+		# matches on one date: F.A. Cup ties are witnessed on a Sunday (R2, Sun 14 Dec
+		# 1997), Coca-Cola on a Monday (R4, Mon 1 Dec 1997), European ties on Wednesdays
+		# (17 Sep / 1 Oct 1997). The league keeps its Saturday.
+		var cpd := PMChrome.date_parts(_career.season, _career.week,
+			_comp_day_off(str(res["comp"])))
+		hdr["weekday"] = str(cpd["wd"])
+		hdr["day"] = str(cpd["day"])
+		hdr["month"] = str(cpd["mon"])
+		hdr["year"] = str(cpd["year"])
 	elif not bool(res.get("friendly", false)):
 		hdr["status_top"] = PMChrome._band_league(_career.league_name)
 		hdr["status_bottom"] = "Week %d" % _career.week
@@ -2349,6 +2376,21 @@ func _show_match_result(res: Dictionary, on_finish: Callable = Callable()) -> vo
 		_show_lineup_roll(int(res["home_id"]), int(res["away_id"]), open_match)
 	else:
 		open_match.call()
+
+## The day of the played week each competition's ties fall on, off that week's Saturday.
+## All witnessed on the original's own hub/results dates: F.A. Cup R2 Sun 14 Dec 1997,
+## Coca-Cola R4 Mon 1 Dec 1997, European group ties Wed 17 Sep + Wed 1 Oct 1997. The
+## league's own round keeps Saturday (day 0).
+static func _comp_day_off(comp: String) -> int:
+	if comp.begins_with("F.A."):
+		return 1                                   # Sunday
+	if comp.begins_with("Coca-Cola"):
+		return 2                                   # Monday
+	if comp.begins_with("European") or comp.begins_with("U.E.F.A.") \
+			or comp.begins_with("Cup Winners"):
+		return 4                                   # Wednesday
+	return 0
+
 
 ## Mount the pre-match XI-vs-XI photo roll (LineupRollScreen) for a fixture; a tap
 ## on the complete state tears it down and continues into the match via `on_done`.
@@ -3058,11 +3100,14 @@ func _show_youth_offer_card(pid: int, refresh: Callable) -> void:
 	card.offer_made.connect(func(_offer: int, yearly_wage: int, years: int,
 			_clauses: Array, _bonus: int) -> void:
 		AudioManager.ui_select()
+		# The answer comes NEXT WEEK (refrun p0759/p0760/p0770): the card just closes and
+		# the prospect stays in PLAYERS FOUND until the weekly tick resolves the offer.
 		var res := _career.offer_youth_contract(pid, yearly_wage, years)
 		_career.save()
 		card.queue_free()
 		refresh.call()
-		_toast(str(res.get("msg", ""))))
+		if str(res.get("msg", "")) != "":
+			_toast(str(res.get("msg", ""))))
 
 
 ## The YOUTH PLAYER card (`FUN_005274d0`), opened from a YOUTH TEAM roster row. The four
@@ -3845,7 +3890,7 @@ func _show_stadium_screen() -> void:
 	# PROGRESS ledger. Every improvement price now comes from the binary's own cost function
 	# (GroundCost / FUN_0057ddd0) keyed by the club's STATURE band — the value the original
 	# copies from club+0x58 into ground+0x24 — so all 476 clubs are priced, not just Man Utd.
-	scr.set_improve_state(_career.car_park_levels, _carpark_price(club), _career.works_ledger(),
+	scr.set_improve_state(_career.car_park_levels, 0, _career.works_ledger(),
 		_career.ground_grades, _career.works_total(), _career.my_band())
 	# The per-club FACILITIES / SERVICES item tables. Since 2026-07-28 EVERY club gets live
 	# grades / prices / weeks (GroundPreset: the binary's own starting-grade preset for the
@@ -3891,15 +3936,9 @@ func _refresh_matchday(scr: StadiumScreen, club: Dictionary) -> void:
 ## The witnessed GROUND MATCH DAY sponsor-board season-sale offer. Only Man Utd was captured
 ## (frame 06, £1,120,000); the offer is conditional per club in the original (finance_constants
 ## prices-screen +0x1e0 flag) and its value is data-driven, so every other club is an honest
-## gap (0 -> the offer block is hidden, ACCEPT inert). Mirrors _carpark_price's witness rule.
+## gap (0 -> the offer block is hidden, ACCEPT inert).
 func _board_sale_offer(club: Dictionary) -> int:
 	return 1_120_000 if str(club.get("name", "")).to_lower().contains("manchester utd") else 0
-
-## The witnessed CAR PARK per-level price. Only Man Utd was captured (frame 09, £2,975,000);
-## the cost fn is un-RE'd so every other club is an honest gap (0). SEATS proved these prices
-## ARE club-specific, so applying Man Utd's figure game-wide would be invention.
-func _carpark_price(club: Dictionary) -> int:
-	return 2_975_000 if str(club.get("name", "")).to_lower().contains("manchester utd") else 0
 
 ## The per-club FACILITIES / SERVICES item table, for `cat` in ("facilities" | "services").
 ##

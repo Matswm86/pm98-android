@@ -173,6 +173,36 @@ const C_CARD_STADIUM := Color8(42, 191, 255)
 const CARD_KIT_L := Rect2(33, 325, 77, 56)
 const CARD_KIT_R := Rect2(236, 329, 51, 56)
 
+# ---- the SEMIFINAL form, a round of exactly TWO ties (s91 witness, s92 build) ----
+## THE PANEL HAS A FOURTH FORM and it is the semifinal draw. The binary draws the
+## `SEMIFINAL 1` / `SEMIFINAL 2` plates (0x653ecc / 0x653ec0, at 0x4dbee5 / 0x4dbf49,
+## Proman12) when the round being drawn has exactly TWO ties (`[this+0x7798] == 2`).
+## Witnessed on both leg variants from one patched-gate drive
+## (`tools/re/refs/cupdraw-semifinals-2026-08-02/`): no MATCHES list, no grid — the
+## stadium backdrop with a black label plate over each tie's own GRID-form row. The
+## round plate reads `SEMIFINALS`; the two strings here are the TIE plates.
+## Plates + backdrop + row bands are baked (`chrome_semis.png`,
+## tools/re/build_semisdraw_chrome_from_frames.py); what is drawn is each landed club's
+## name and its NANOESC kit. Every number is measured on both frames (they agree):
+## plate ink field 359+595 in proman12, rows interior 33 px with the GRID form's own
+## tones, names in proman10 on the same (S - adv) / 2 rule.
+const SEMIS_ROWS_Y := [155, 307]      # tie row interior tops (33 rows tall each)
+const SEMIS_ROW_H := 33
+const SEMIS_KIT_L := [334, 359]       # cell interiors, inclusive x spans
+const SEMIS_HOME := [361, 476]
+const SEMIS_AWAY := [479, 594]
+const SEMIS_KIT_R := [596, 621]
+const SEMIS_PEN_TOP := 11             # name pen top inside the row interior (solved, 0 px)
+## The row kit is the 24x32 NANOESC bank blitted at the cell interior's own origin
+## (solved against all four witnessed kits), through the 0x20 EDGE + spread pass at
+## THIS site's own parameters: thr 0x40 / cap 0x80 — the attested `(0x20, 0x40, 0x80)`
+## triple of PMShadow's site survey. The sweep over every attested (thr, cap) pair
+## lands this one at 0 px on all four witnessed kits; the group form's (0x20, 0x80)
+## leaves 459.
+const SEMIS_KIT_AT := Vector2i(0, 0)
+const SEMIS_KIT_THR := 0x40
+const SEMIS_KIT_CAP := 0x80
+
 # ---- the GROUPS form, the European Cup's group phase (s88) -----------------
 ## THE PANEL HAS A THIRD FORM and it is the group draw. Witness (banked s87, driven under
 ## Wine from a Manchester Utd. career):
@@ -228,6 +258,7 @@ const STRIPS := {
 var _chrome: Texture2D
 var _chrome_grid: Texture2D
 var _chrome_groups: Texture2D
+var _chrome_semis: Texture2D
 var _fondo: Texture2D
 var _bombo: Array[Texture2D] = []
 var _strip: Texture2D
@@ -273,6 +304,7 @@ func _ready() -> void:
 	_chrome = load("res://art/screens/cupdraw/chrome.png")
 	_chrome_grid = load("res://art/screens/cupdraw/chrome_grid.png")
 	_chrome_groups = load("res://art/screens/cupdraw/chrome_groups.png")
+	_chrome_semis = load("res://art/screens/cupdraw/chrome_semis.png")
 	_fondo = load("res://art/screens/cupdraw/fondo.png")
 	for i in 12:
 		var t: Texture2D = load("res://art/screens/cupdraw/bombo%02d_opaque.png" % i)
@@ -354,6 +386,13 @@ func setup_groups(key: String, title: String, rnd: String, groups: Array) -> voi
 ## True while the screen is showing the group-phase draw rather than a knockout round.
 func is_groups() -> bool:
 	return not _groups.is_empty()
+
+
+## True when the round is a SEMIFINAL: exactly two ties, the binary's own plate guard
+## (`[this+0x7798] == 2`). A FINAL (one tie) is NOT this form — the guard also requires
+## it, and no final draw has been witnessed, so a 1-tie round keeps the grid.
+func is_semis() -> bool:
+	return _total == 2 and _groups.is_empty()
 
 
 ## True when the round is short enough for the original's GRID form. The switch is the
@@ -469,10 +508,16 @@ func _on_input(e: InputEvent) -> void:
 	queue_redraw()
 
 
-## The MATCHES row under a design-space point, or -1. Grid form only: the list form's
-## rows have no witnessed selected state beyond the same hover highlight, and no card
-## content was ever captured for one.
+## The MATCHES row under a design-space point, or -1. Grid + semifinal forms only: the
+## list form's rows have no witnessed selected state beyond the same hover highlight,
+## and no card content was ever captured for one.
 func _row_at(d: Vector2) -> int:
+	if is_semis():
+		for k in mini(2, _ties.size()):
+			if Rect2(SEMIS_KIT_L[0], int(SEMIS_ROWS_Y[k]),
+					SEMIS_KIT_R[1] - SEMIS_KIT_L[0] + 1, SEMIS_ROW_H).has_point(d):
+				return k
+		return -1
 	if not is_grid() or d.x < GRID_KIT_L[0] or d.x >= GRID_KIT_R[1]:
 		return -1
 	var r := int(floor((d.y - GRID_Y0) / float(GRID_PITCH)))
@@ -526,18 +571,26 @@ func _draw() -> void:
 	var s := _scale()
 	draw_set_transform(_origin(s), 0.0, Vector2(s, s))
 	var groups := is_groups()
+	var semis := is_semis()
 	var grid := is_grid()
-	var chrome: Texture2D = _chrome_groups if groups else (_chrome_grid if grid else _chrome)
+	var chrome: Texture2D = _chrome_groups if groups else (_chrome_semis if semis else
+		(_chrome_grid if grid else _chrome))
 	if chrome != null:
 		draw_texture(chrome, Vector2.ZERO)
 
 	_draw_picture()
 	_txt_field(_page14, _g14, TITLE_SUM, TITLE_TOP, _title, C_TITLE)
-	_txt_field(_page14, _g14, ROUND_SUM, ROUND_TOP, _round, C_ROUND)
+	if not semis:
+		# The semifinal chrome bakes its ROUND plate WITH the text: a 2-tie round always
+		# reads SEMIFINALS, and the plate text carries a dithered drop shadow that plain
+		# yellow ink cannot reproduce (37 px on the witness without it).
+		_txt_field(_page14, _g14, ROUND_SUM, ROUND_TOP, _round, C_ROUND)
 	for i in mini(_legs.size(), LEG_TOPS.size()):
 		_txt_field(_page10, _g10, LEG_SUM, int(LEG_TOPS[i]), str(_legs[i]), C_LEG)
 	if groups:
 		_draw_groups()
+	elif semis:
+		_draw_semis()
 	elif grid:
 		_draw_grid()
 	else:
@@ -659,6 +712,71 @@ func _group_flag(flag: Texture2D, at: Vector2i, code: int) -> void:
 		return
 	draw_texture_rect_region(t, Rect2(at.x, at.y, GFLAG_SRC.size.x, GFLAG_SRC.size.y),
 		GFLAG_SRC)
+
+
+## The SEMIFINAL form: two GRID-form rows at the measured pitch, each under its baked
+## `SEMIFINAL 1` / `SEMIFINAL 2` plate. What is drawn per landed club is its proman10
+## name centred on the cell's own field and its NANOESC kit through the 0x20 edge pass;
+## an un-landed side shows the cleared band, exactly as the grid's does. The own-tie
+## dark plate and the tapped-row white are the GRID form's witnessed states, carried
+## over to this form's rows — OURS, flagged: no semifinal frame shows either.
+func _draw_semis() -> void:
+	var ties := _masked_ties()
+	for k in mini(2, ties.size()):
+		var tie: Dictionary = ties[k]
+		var home := str(tie.get("home", ""))
+		var away := str(tie.get("away", ""))
+		if home == "" and away == "":
+			continue
+		var y: int = int(SEMIS_ROWS_Y[k])
+		var hid := int(tie.get("home_id", -1))
+		var aid := int(tie.get("away_id", -1))
+		var mine: bool = _own_club_id >= 0 and (hid == _own_club_id or aid == _own_club_id)
+		var ink: Color = C_GRID_INK[1]
+		if mine:
+			_fill_semis_row(y, C_GRID_OWN_BG, C_GRID_OWN_KIT_BG)
+			ink = C_GRID_OWN_INK
+		elif k == _sel:
+			_fill_semis_row(y, C_GRID_SEL_BG, C_GRID_SEL_BG)
+			ink = C_GRID_SEL_INK
+		var pen := y + SEMIS_PEN_TOP
+		if home != "":
+			_txt_field(_page10, _g10, SEMIS_HOME[0] + SEMIS_HOME[1], pen, home,
+				C_GRID_OWN_INK_MINE if (mine and hid == _own_club_id) else ink)
+			_semis_kit(SEMIS_KIT_L, y, hid)
+		if away != "":
+			_txt_field(_page10, _g10, SEMIS_AWAY[0] + SEMIS_AWAY[1], pen, away,
+				C_GRID_OWN_INK_MINE if (mine and aid == _own_club_id) else ink)
+			_semis_kit(SEMIS_KIT_R, y, aid)
+
+
+## Repaint one semifinal band cell by cell, sparing the black separators (the chrome's).
+func _fill_semis_row(y: int, bg: Color, kit_bg: Color) -> void:
+	draw_rect(Rect2(SEMIS_KIT_L[0], y, SEMIS_KIT_L[1] - SEMIS_KIT_L[0] + 1, SEMIS_ROW_H),
+		kit_bg, true)
+	draw_rect(Rect2(SEMIS_HOME[0], y, SEMIS_HOME[1] - SEMIS_HOME[0] + 1, SEMIS_ROW_H),
+		bg, true)
+	draw_rect(Rect2(SEMIS_AWAY[0], y, SEMIS_AWAY[1] - SEMIS_AWAY[0] + 1, SEMIS_ROW_H),
+		bg, true)
+	draw_rect(Rect2(SEMIS_KIT_R[0], y, SEMIS_KIT_R[1] - SEMIS_KIT_R[0] + 1, SEMIS_ROW_H),
+		kit_bg, true)
+
+
+## The 24x32 NANOESC kit at the cell interior's origin, through the 0x20 edge pass at
+## this site's own (thr 0x40, cap 0x80), against the baked chrome under it.
+func _semis_kit(cell: Array, y: int, club_id: int) -> void:
+	var kit := PMChrome.nano_kit(club_id)
+	if kit == null:
+		return
+	var at := Vector2i(int(cell[0]) + SEMIS_KIT_AT.x, y + SEMIS_KIT_AT.y)
+	if _chrome_semis == null:
+		draw_texture(kit, Vector2(at))
+		return
+	var bg := _chrome_semis.get_image().get_region(
+		Rect2i(at, Vector2i(kit.get_width(), kit.get_height())))
+	var t := PMShadow.edge_texture("skit%d@%d,%d" % [club_id, at.x, at.y],
+		bg, kit.get_image(), at, SEMIS_KIT_THR, SEMIS_KIT_CAP)
+	draw_texture(t if t != null else kit, Vector2(at))
 
 
 ## The GRID form: sixteen four-column bands, home kit | home club | away club | away kit.

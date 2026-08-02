@@ -106,6 +106,24 @@ func _run() -> void:
 	ok = _assert(caps_got.size() == 1 and bool((caps_got[0] as Dictionary).get("DRIBBLING", false)),
 		"B1: LED toggle emits the six flags") and ok
 
+	# --- a roster row tap opens the YOUTH PLAYER card for ANY youngster ---
+	# The card's own buttons carry the TRAINING/PROMOTE gates (witness p0771: TRAINING
+	# green, PROMOTE greyed), so the tap must fire for a NOT-ready youngster too — gating
+	# it on ready-ness made a new signing unopenable, so he could never enter training.
+	var row_got: Array = []
+	scr.promote_requested.connect(func(pid: int) -> void: row_got.append(pid))
+	scr._youth = [{"id": 900001, "name": "T. Rowtap", "ready": false}]
+	# headless never draws, so plant the row's tap rect the way _draw() would
+	scr._row_rects = [{"pid": 900001, "rect": Rect2(24, 120, 430, 16)}]
+	var re := InputEventMouseButton.new()
+	re.button_index = MOUSE_BUTTON_LEFT
+	re.pressed = false
+	re.position = Rect2(24, 120, 430, 16).get_center()
+	scr._press = "row:900001"
+	scr._on_input(re)
+	ok = _assert(row_got == [900001],
+		"a NOT-ready roster row still opens the YOUTH PLAYER card") and ok
+
 	# --- Career search model (strings-decoded loop) ---
 	var career := Career.new()
 	career.staff = staff

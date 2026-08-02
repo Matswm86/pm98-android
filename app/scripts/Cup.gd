@@ -124,7 +124,7 @@ static func create(club_ids: Array, total_weeks: int, opts: Dictionary = {}) -> 
 		# round_legs, byes, players}. {} when the next round has not been drawn yet.
 		"pending_draw": {},
 		"round_weeks": _schedule(total_weeks, num_rounds, span_lo, span_hi,
-			opts.get("tail_fracs", [])),
+			opts.get("tail_fracs", []), opts.get("tail_weeks", [])),
 		"champion_id": -1,
 		"n0": ids.size(),                  # starting field size (for labels)
 		"legs": int(opts.get("legs", 1)),
@@ -208,10 +208,32 @@ static func _num_rounds_with_entry(n: int, late_round: int, n_late: int) -> int:
 ## the European competitions need: an even spread is wrong for them, because the real
 ## calendar has a break — the early rounds run Sep..Dec and the quarter-finals onward are
 ## March..May. See `Career.EURO_TAIL_FRACS` for the witnesses those fractions come from.
+##
+## `tail_weeks`, when given, PINS the last rounds at those ABSOLUTE league weeks and wins
+## over `tail_fracs`. The domestic cups need this: their 1997-98 calendar is authored as
+## week NUMBERS (Career.FA_CUP_WEEKS / LEAGUE_CUP_WEEKS), and running those through the
+## fraction path re-scaled them by total_weeks/38 — every pinned week from January on
+## landed one week late, which is how the F.A. Cup R3 / Coca-Cola QF week (a real shared
+## week, 3 Jan + 6 Jan 1998) drifted onto other competitions' weeks.
 static func _schedule(total_weeks: int, num_rounds: int, span_lo := 0.0, span_hi := 1.0,
-		tail_fracs: Array = []) -> Array:
+		tail_fracs: Array = [], tail_weeks: Array = []) -> Array:
 	var out: Array = []
 	if num_rounds <= 0 or total_weeks <= 0:
+		return out
+	if not tail_weeks.is_empty():
+		var n_tail_w := mini(tail_weeks.size(), num_rounds)
+		var n_head_w := num_rounds - n_tail_w
+		var first_pin := clampi(int(tail_weeks[tail_weeks.size() - n_tail_w]), 1, total_weeks)
+		for k in range(n_head_w):
+			# Surplus early rounds (a deeper pyramid) spread over the weeks BEFORE the
+			# first pinned one.
+			var frac := float(k + 1) / float(n_head_w + 1)
+			_append_week(out, frac * float(first_pin - 1) / float(total_weeks), total_weeks)
+		for k in range(n_tail_w):
+			var w := clampi(int(tail_weeks[tail_weeks.size() - n_tail_w + k]), 1, total_weeks)
+			if not out.is_empty() and w <= int(out[-1]):
+				w = int(out[-1]) + 1            # keep strictly increasing
+			out.append(w)
 		return out
 	var n_tail := mini(tail_fracs.size(), num_rounds)
 	var n_head := num_rounds - n_tail

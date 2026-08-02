@@ -521,13 +521,16 @@ static func _star(ci: CanvasItem, cx: float, cy: float, rad: float, col: Color) 
 # ---- date --------------------------------------------------------------
 
 ## {wd, day, mon, year} for the displayed (1-based) week of a "YYYY-YY" season.
-static func date_parts(season: String, week_disp: int) -> Dictionary:
+## `day_off` shifts off that week's Saturday: the original plays each competition on its
+## own day of the week (F.A. Cup ties witnessed on a Sunday, Coca-Cola on a Monday,
+## European ties on Wednesdays), so a week's matches never share a date.
+static func date_parts(season: String, week_disp: int, day_off := 0) -> Dictionary:
 	var start_year := 1997
 	if season.length() >= 4 and season.substr(0, 4).is_valid_int():
 		start_year = int(season.substr(0, 4))
 	var t0 := Time.get_unix_time_from_datetime_dict(
 		{"year": start_year, "month": 8, "day": 9, "hour": 12, "minute": 0, "second": 0})
-	var t := int(t0) + (maxi(week_disp, 1) - 1) * 7 * 86400
+	var t := int(t0) + ((maxi(week_disp, 1) - 1) * 7 + day_off) * 86400
 	var d := Time.get_datetime_dict_from_unix_time(t)
 	return {"wd": _WD[int(d.get("weekday", 6))], "day": int(d.get("day", 9)),
 		"mon": _MON[int(d.get("month", 8))], "year": int(d.get("year", start_year))}

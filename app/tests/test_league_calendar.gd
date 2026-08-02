@@ -72,6 +72,39 @@ func _run() -> bool:
 	ok = _assert(c.pending_division_finals == [4, 2],
 		"queue = finished divisions only, lowest tier first") and ok
 
+	# 7. R13 ORDER (s92): `_queue_division_finals` must run AFTER the lower divisions'
+	#    rounds of the week. On a Premier career the 46-round divisions read P=44 when
+	#    the queue was built before `_advance_other_divisions`, so the pre-final-round
+	#    tables screen NEVER queued. Pin the call order in advance_week's own source.
+	var src := (load("res://scripts/Career.gd") as GDScript).source_code
+	var adv := src.find("func advance_week(")
+	var body := src.substr(adv, src.find("\nfunc ", adv + 10) - adv)
+	var at_queue := body.rfind("\t\t_queue_division_finals()")
+	var at_lower := body.find("\t_advance_other_divisions(")
+	ok = _assert(at_queue > at_lower and at_lower != -1,
+		"R13 queue runs after _advance_other_divisions in advance_week") and ok
+
+	# 8. The domestic cups land on the AUTHORED 1997-98 weeks, blank-week mapped —
+	#    not the old tail_fracs x 39/38 drift (F.A. R3 wk23, QF wk32...).
+	var host := Career.new()
+	for _i in 39:
+		host.fixtures.append([])
+	var late := {"round": Career.PREMIER_ENTRY_ROUND, "ids": [2000, 2001]}
+	var fa: Dictionary = host._cup_opts_on_calendar(Career.FA_CUP_OPTS, Career.FA_CUP_WEEKS)
+	fa["late_entry"] = late
+	var lc: Dictionary = host._cup_opts_on_calendar(Career.LEAGUE_CUP_OPTS,
+		Career.LEAGUE_CUP_WEEKS)
+	lc["late_entry"] = late
+	var ids72: Array = []
+	for i in 72:
+		ids72.append(3000 + i)
+	ok = _assert(Cup.create(ids72, 39, fa).get("round_weeks", []) ==
+		[15, 18, 22, 25, 28, 31, 35, 39],
+		"F.A. Cup rounds land on the authored 97-98 weeks (SF on the blank week 35)") and ok
+	ok = _assert(Cup.create(ids72, 39, lc).get("round_weeks", []) ==
+		[1, 6, 10, 15, 19, 22, 25, 34],
+		"Coca-Cola rounds land on the authored 97-98 weeks (FINAL wk34, 29 Mar)") and ok
+
 	print("\n%s" % ("ALL PASS" if ok else "FAILURES ABOVE"))
 	return ok
 
