@@ -83,7 +83,7 @@ nothing are the ones to distrust.
 | `contract_re.md` | — | — | `test_contract.gd`, `test_contract_warning.gd` | `Contract.gd` | — | — | 1 |
 | `crests_re.md` | — | — | — | — | — | 3 path(s) | — |
 | `cup_re.md` | — | `diff_cupdraw_parity.py`, `diff_supercup_parity.py` | `test_cup.gd`, `test_cup_draw_then_play.gd` | `Cup.gd`, `CupDrawScreen.gd` | — | — | — |
-| `cupdraw_screen_re.md` | yes | `diff_cupdraw_parity.py` | `test_cupdraw_screen.gd` | `CupDrawScreen.gd` | 35 | — | 9 |
+| `cupdraw_screen_re.md` | yes | `diff_cupdraw_parity.py` | `test_cupdraw_screen.gd` | `CupDrawScreen.gd` | 35 | — | 10 |
 | `database_screen_re.md` | yes | — | `test_database_card_screen.gd`, `test_database_screen.gd` | `DataBaseCardScreen.gd`, `DataBaseScreen.gd` | 69 | — | 4 |
 | `dbase_player_card_re.md` | — | `diff_dbase_card_parity.py` | — | — | — | — | 10 |
 | `directiva_screen_re.md` | — | — | `test_directiva_screen.gd` | `DirectivaScreen.gd` | 5 | — | 1 |
