@@ -22,7 +22,8 @@ Three decoded game assets, all under DBDAT/ (owned game files):
     (the Bakayoko FICHA reference), NORWAY == 44 (Berg), HOLLAND == 27 (Van der Gouw).
 
 Outputs:
-  * app/art/flags/flag_NNN.png  (one per BANDERAS entry, real VGA colours)
+  * app/art/flags/flag_NNN.png  (one per BANDERAS entry; `flag_palette()`, NOT the shared
+                                 VGA table -- `main` passes the same palette to both banks)
   * app/art/flags/mini_NNN.png  (one per MINIBAND entry, 14x10)
   * assets/country_codes.json   (the authoritative PAISES decode: byCode + byName)
 

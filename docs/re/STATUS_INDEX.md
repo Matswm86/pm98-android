@@ -7,7 +7,7 @@ line — and most docs do not carry one, so for most screens it pointed at nothi
 Since 2026-08-01 it delegates HERE instead: for every doc, the artefacts that can
 CONFIRM it, each of them checkable, and none of them a sentence someone guessed.
 
-* **137 docs**, 23 with a `Status:` line of their own.
+* **138 docs**, 24 with a `Status:` line of their own.
 * **37** are covered by a `diff_*_parity.py` render-diff gate — the
   strongest evidence here, since a gate compares the app to a captured frame.
 * **67** have a headless `test_*.gd` suite; **95** cite MANAGER.EXE
@@ -16,7 +16,7 @@ CONFIRM it, each of them checkable, and none of them a sentence someone guessed.
   audits and M5 session notes, whose evidence is a banked capture, an oracle
   runner or a witness directory rather than a screen gate. Every path on those
   lines is checked to exist by this script.
-* **0** have none of the four. That is the audit's real backlog: not the
+* **1** have none of the four. That is the audit's real backlog: not the
   missing sentence, the missing evidence.
 
 `open` counts a doc's OWN gap flags (`un-RE'd`, `unwitnessed`, `declared`, `OURS`,
@@ -131,6 +131,7 @@ nothing are the ones to distrust.
 | `positions_re.md` | — | — | — | — | 8 | — | — |
 | `pretemporada_screen_re.md` | — | — | — | — | 8 | — | 1 |
 | `promanager_career_screens_re.md` | — | — | — | — | 25 | — | — |
+| `realised_palette_re.md` | yes | — | — | — | — | — | — |
 | `renew_negotiation_re.md` | — | — | `test_player_info_renew.gd` | — | 4 | — | 1 |
 | `results_screen_re.md` | — | — | `test_results_screen.gd` | `CompResultScreen.gd`, `MatchResultScreen.gd` | — | — | 3 |
 | `retirement_re.md` | yes | — | `test_retirement.gd` | `Retirement.gd` | 79 | — | 4 |
