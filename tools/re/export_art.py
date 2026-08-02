@@ -57,6 +57,40 @@ def vga_palette() -> list[int]:
     return pal
 
 
+# The 20 slots Windows reserves in a 256-entry logical palette. A 256-colour Windows app
+# never gets them: the system writes them into the PHYSICAL palette whatever the app's own
+# palette says. Kept identical to `export_flags.WIN_STATIC`, which measured them.
+WIN_STATIC = {
+    0: (0, 0, 0), 1: (128, 0, 0), 2: (0, 128, 0), 3: (128, 128, 0), 4: (0, 0, 128),
+    5: (128, 0, 128), 6: (0, 128, 128), 7: (192, 192, 192), 8: (192, 220, 192),
+    9: (166, 202, 240), 246: (255, 251, 240), 247: (160, 160, 164), 248: (128, 128, 128),
+    249: (255, 0, 0), 250: (0, 255, 0), 251: (255, 255, 0), 252: (0, 0, 255),
+    253: (255, 0, 255), 254: (0, 255, 255), 255: (255, 255, 255),
+}
+
+
+def realised_palette() -> list[int]:
+    """The palette the RUNNING game realises — MANAGER.PAL plus the Windows statics.
+
+    This is what MANAGER.EXE actually paints in, and `vga_palette()` above is NOT
+    (docs/re/realised_palette_re.md). The two differ at 21 of 256 entries, and
+    `tools/re/probe_realised_palette_witness.py` decides between them with no free
+    parameter: none of the 21 VGA colours appears anywhere in the realised table, so a
+    frame either contains one or it does not. Over all 1,752 original captures in
+    `screenshots/` the count is **0 VGA pixels against 12,919,661 realised ones** — every
+    VGA hit in the corpus is inside a `parity-run*/app/` directory, i.e. the PORT's own
+    render of this very defect.
+
+    Not for art another executable draws: `app/art/faces/dbcard/` is Dbasewin's own
+    rendering under its own realised palette (`rc_dbase_image.py`), and it is unaffected —
+    it uses none of the 21 indices.
+    """
+    pal = riff_palette("MANAGER.PAL")
+    for i, (r, g, b) in WIN_STATIC.items():
+        pal[i * 3 : i * 3 + 3] = [r, g, b]
+    return pal
+
+
 def riff_palette(name: str) -> list[int]:
     """Parse a Microsoft RIFF 'PAL ' file (DAT.PKF) -> flat RGB list of 256."""
     for n, off, size in files_of((GAME / "DAT.PKF").read_bytes()):
@@ -98,7 +132,7 @@ def render(pkf: str, name: str, pal_name: str = "MANAGER.PAL",
         import pkf_image
 
         idx = pkf_image.dib_indices(bytes(raw))
-        pal = vga_palette() if (is_dm or force_vga) else riff_palette(pal_name)
+        pal = realised_palette() if (is_dm or force_vga) else riff_palette(pal_name)
         img = pkf_image.rgba(idx, pal, transparent if transparent is not None else is_dm)
         return img.resize((img.width * scale, img.height * scale), Image.NEAREST) if scale > 1 else img
     if is_dm:
@@ -106,11 +140,13 @@ def render(pkf: str, name: str, pal_name: str = "MANAGER.PAL",
     im = Image.open(io.BytesIO(bytes(raw)))
     im.load()
     im = im.convert("P")
-    # Palette: DM -> shared VGA; BM -> embedded if present else external RIFF.
-    # Some full-screen BM screens (FONDO*) carry a JUNK embedded palette and the real
-    # colours live in an external RIFF pal -- --force-pal overrides the embedded one.
+    # Palette: DM -> the palette the running game realises; BM -> embedded if present else
+    # external RIFF. Some full-screen BM screens (FONDO*) carry a JUNK embedded palette and
+    # the real colours live in an external RIFF pal -- --force-pal overrides the embedded one.
+    # Until 2026-08-02 (s91) the DM / force_vga arm used `vga_palette()`. That was wrong for
+    # everything MANAGER.EXE draws; see `realised_palette()` for the corpus-wide measurement.
     if is_dm or force_vga:
-        im.putpalette(vga_palette())
+        im.putpalette(realised_palette())
     elif force_pal or not _has_palette(im):
         im.putpalette(riff_palette(pal_name))
     rgba = im.convert("RGBA")

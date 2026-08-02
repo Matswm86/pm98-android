@@ -1,12 +1,15 @@
 # The realised palette — MANAGER.EXE draws in MANAGER.PAL, not the shared VGA table
 
-Status: **MEASURED and partly acted on (2026-08-02, s90).** Three banks are fixed and
-verified at 0 px; `export_art.render`'s general rule is now known to be wrong and the
-remaining sweep is named below rather than done.
+Status: **CLOSED (2026-08-02, s91).** Four banks were fixed against their own witnesses in
+s90; the general rule in `export_art.render` is now fixed too, and the 83 PNGs it had
+already mis-decoded are corrected. §4 carries the measurement that decided it and the exact
+limits of what the render-diff shows.
 
-`Evidence:` `tools/re/export_flags.py` (`flag_palette`), `tools/re/export_faces.py`,
-`tools/re/build_match_header_from_frames.py`, `tools/re/pkf_image.py` (`vga_palette`,
-`riff_palette`), `screenshots/original-walkthrough-2026-07-02/`.
+`Evidence:` `tools/re/probe_realised_palette_witness.py`,
+`tools/re/probe_realised_palette_scope.py`, `tools/re/fix_realised_palette.py`,
+`tools/re/export_art.py` (`realised_palette`), `tools/re/export_flags.py` (`flag_palette`),
+`tools/re/export_faces.py`, `tools/re/build_match_header_from_frames.py`,
+`tools/re/pkf_image.py`, `screenshots/` (all 1,752 original captures).
 
 ## 1. The two tables, and the 21 entries where they part
 
@@ -46,27 +49,80 @@ Each was found the same way and each was believed correct for the same reason: t
 exporter's own check had compared the DIB's *embedded* palette against the shared VGA table
 and stopped there, never asking about the third.
 
-## 4. What is NOT done — the sweep, named
+## 4. The sweep — DONE (2026-08-02, s91)
 
-`export_art.render` still selects `vga_palette()` for every `DM` sprite and every
+`export_art.render` selected `vga_palette()` for every `DM` sprite and every
 `force_vga=True` caller:
 
 ```
-    pal = vga_palette() if (is_dm or force_vga) else riff_palette(pal_name)
+    pal = vga_palette() if (is_dm or force_vga) else riff_palette(pal_name)   # WRONG
 ```
 
-Given §2 that rule is wrong for anything MANAGER.EXE draws, but flipping it blind would be
-exactly the guess this project does not make: each bank needs its own witness, because a
-bank that uses no affected index is unchanged either way and a bank drawn by another
-executable has a different answer again. The banks to walk, in the order their witnesses are
-easiest to find, are the `force_vga` callers — `export_competitions`, `export_faces`'s
-`_generic` (checked: no affected index, unchanged either way), `preview_menu` — plus every
-`DM` decode that reaches `app/art/`.
+s90 named this and did not flip it, on the rule that each bank needs its own witness. That
+rule is kept — what changed is that the witness is now available for **every index at
+once**, which decides every bank in one measurement instead of forty.
 
-Two cases are already settled and must not be swept up:
+### 4.1 The premise that makes a colour-level witness sufficient
+
+`tools/re/probe_realised_palette_scope.py` and
+`tools/re/probe_realised_palette_witness.py`. Both start from the same check, asserted at
+runtime rather than assumed: **none of the 21 VGA colours appears anywhere in the realised
+table.** So a pixel carrying one can only have come from that index decoded through the
+wrong table — there is no second way to produce it, and no free parameter to tune.
+
+### 4.2 The measurement
+
+Every original capture the project holds — **1,752 frames across 37 directories**, every
+screen, every competition, both executables:
+
+| | pixels |
+|---|---|
+| a colour that is a VGA-table entry at one of the 21 | **0** |
+| the realised colour at those same 21 | **12,919,661** |
+
+Not 0 "in the sampled frames": 0 in all of them. Every VGA hit anywhere under
+`screenshots/` is inside a `parity-run*/app/` directory — that is the PORT's own render of
+this very defect, which is corroboration, not a counterexample. Per index the split is in
+the tool's own output; the largest are 116 (0 vs 1,720,535), 85 (0 vs 1,648,145) and
+111 (0 vs 1,143,004).
+
+**The rule is now `realised_palette()`** for the `DM` / `force_vga` arm, in both the `exact`
+and the PIL path, with `vga_palette()` kept for the callers that genuinely want the shared
+table.
+
+### 4.3 The art that rule had already produced
+
+83 PNGs under `app/art/` carried a VGA-only colour, **43,022 px** in eleven banks — the
+NIVEL level plates, the twelve stadium plates, thirteen hub menu icons, twelve competition
+logos, the SORTEO drums and hands, DIRECTIVA, the EQUIPO WIN tactics chips, three DBASE
+icons and four loose backgrounds. They are corrected in place by
+`tools/re/fix_realised_palette.py`, a pure remap of the 21 colours.
+
+That remap is equivalent to a re-decode, and that equivalence is **checked, not asserted**:
+on the 7 files of `app/art/screens/cup/` that are plain exporter output, a forced re-export
+through the fixed `render()` is byte-identical to the remap. It is done that way rather than
+by re-running every exporter because the other 4 files in that same bank are hand-curated
+and `--force` discards the curation.
+
+### 4.4 What the render-diff does and does not show
+
+Stated plainly, because it is the honest shape of the evidence. `diff_entry_parity.py` over
+its eighteen binding pairs is **0 px before and 0 px after** (bar the two long-standing
+exclusions, the LineEdit caret and the FICHA demo photo). The walkthrough's binding frames
+do not happen to show the changed pixels — the level plates in their unselected state, the
+ground plates, the hub icons — so they neither confirm nor refute the change, and no parity
+gate regressed. Fifteen art-touching CI tests stay green.
+
+The evidence for the change is therefore §4.2's, which is **colour-level rather than
+sprite-level** — exactly the standard §5 below accepted for NANOESC, and for the same
+reason: a frame witnessing the specific sprite does not exist, while a corpus-wide
+falsification of the wrong table does.
+
+Two cases are settled and were NOT swept up:
 
 * **`app/art/faces/dbcard/`** is Dbasewin's own rendering under its own palette and asserts
-  0 px against two walked frames of its own. Two applications, two realised palettes.
+  0 px against two walked frames of its own. Two applications, two realised palettes. It
+  uses none of the 21 indices, so the sweep would not have touched it in any case.
 * **`_generic.png`** uses no affected index; `force_vga` there is a no-op, not a bug.
 
 ## 5. A fourth bank — NANOESC, and a witness that decides it (2026-08-02, s90)
