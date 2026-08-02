@@ -10,13 +10,13 @@ CONFIRM it, each of them checkable, and none of them a sentence someone guessed.
 * **139 docs**, 25 with a `Status:` line of their own.
 * **37** are covered by a `diff_*_parity.py` render-diff gate — the
   strongest evidence here, since a gate compares the app to a captured frame.
-* **67** have a headless `test_*.gd` suite; **95** cite MANAGER.EXE
+* **67** have a headless `test_*.gd` suite; **96** cite MANAGER.EXE
   addresses, i.e. their claims are anchored in the binary and not only in frames.
 * **29** name their proof directly on an `Evidence:` line — for the plans,
   audits and M5 session notes, whose evidence is a banked capture, an oracle
   runner or a witness directory rather than a screen gate. Every path on those
   lines is checked to exist by this script.
-* **2** have none of the four. That is the audit's real backlog: not the
+* **1** have none of the four. That is the audit's real backlog: not the
   missing sentence, the missing evidence.
 
 `open` counts a doc's OWN gap flags (`un-RE'd`, `unwitnessed`, `declared`, `OURS`,
@@ -58,7 +58,7 @@ nothing are the ones to distrust.
 | `M5_S59_FRONTIER_2836.md` | — | — | — | — | 9 | — | — |
 | `M5_S85_WATCH_PLAYSTATE_FULLTIME.md` | yes | — | — | — | 12 | — | — |
 | `M5_S86_ENGINE_THROUGHPUT.md` | yes | — | — | — | — | 6 path(s) | — |
-| `M5_S90_GOAL2_NOT_REPRODUCIBLE.md` | yes | — | — | — | — | — | — |
+| `M5_S90_GOAL2_NOT_REPRODUCIBLE.md` | yes | — | — | — | 12 | — | — |
 | `M5_T1I9_B0040_INPUTS_PORTSIDE.md` | — | — | — | — | 1 | — | — |
 | `M5_T1I9_FIRST_STEP_TARGET.md` | — | — | — | — | 1 | — | — |
 | `M5_T1I9_KICKOFF_BALL_TRAJECTORY.md` | — | — | — | — | 1 | — | — |
