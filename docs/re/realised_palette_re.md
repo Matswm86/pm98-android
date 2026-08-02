@@ -92,7 +92,15 @@ so the realised table is the one with the statics in it. Bank re-exported; 89 ki
 `test_manager_panel`, `test_knockout_layout`, `test_results_screen` and `test_cupdraw_screen`
 all still pass.
 
+Corroborated on the way, though it does not decide index 8 either: the port's SELECCION
+screen — the panel that blits the NANOESC kits 1:1 — was diffed against a fresh live capture
+of the original's own team-select screen taken this session, and comes out at **13 px over
+the whole 640x480 frame** once the two arrow buttons' state is masked. Those 13 are a single
+vertical line at x=390: the original's blinking text caret. Twenty kits, 0 px. What that
+confirms is the bank's geometry and its other 235 entries; **none of the twenty Premier
+clubs' nano kits uses index 8**, checked rather than assumed.
+
 Recorded rather than glossed: there is still no NANOESC *sprite* witness of an affected club
-— every banked barra frame is club 40 or 59 and neither touches index 8 — so this rides on
-the palette-level measurement above plus MINIESC's own 26-of-26-px index-8 finding, not on a
-frame of that kit.
+— every banked barra frame is club 40 or 59, and no club in the SELECCION grid touches index
+8 either — so this rides on the palette-level measurement above plus MINIESC's own
+26-of-26-px index-8 finding, not on a frame of that kit.
