@@ -306,13 +306,26 @@ def main() -> None:
     # keepers and the session, and `PM98_POKE_PLAYERS=1` writes them the way the match
     # scalars are already written. Pointer-looking pairs are skipped on both sides (they are
     # per-boot addresses), as is `_va` itself.
-    def _fields(src: dict) -> dict:
+    # The team-header dump stores `0x2ec` and `0x2ed` as single BYTES, not dwords — and
+    # `0x2ec` is dword-aligned, so the alignment filter below does not catch it. Comparing
+    # the live dword there against a byte is apples to oranges: it reported hdr1 as the one
+    # "mismatch" of the whole frame-0 diff purely because the live `+0x2ee` set-piece freeze
+    # byte sits in the same dword and the dump does not record `0x2ee` at all.
+    BYTE_FIELDS = {"0x2ec", "0x2ed"}
+
+    def _fields(src: dict, drop: set | None = None) -> dict:
         # `dwords` is the whole record where the dump has one (a player's is 0x0..0x3b8
         # contiguous, i.e. the entire 0x3bc stride). Unaligned keys are BYTE fields in the
-        # dump — 0x63 / 0x2d5 / 0x2ed and friends — and reading a dword there mixes three
-        # neighbours, so they are dropped rather than compared as dwords.
+        # dump — 0x63 / 0x2d5 / 0x2d9 and friends — and reading a dword there mixes three
+        # neighbours, so they are dropped rather than compared as dwords. `drop` handles the
+        # ALIGNED byte fields, which only the team headers have; a player's 0x2ec is a real
+        # dword and must not be dropped with them.
         d = dict(src.get("dwords", src))
-        return {k: v for k, v in d.items() if k.startswith("0x") and int(k, 16) % 4 == 0}
+        return {
+            k: v
+            for k, v in d.items()
+            if k.startswith("0x") and int(k, 16) % 4 == 0 and not (drop and k in drop)
+        }
 
     poke_players = os.environ.get("PM98_POKE_PLAYERS") == "1"
     full_bad: list = []
@@ -324,7 +337,7 @@ def main() -> None:
             for i in range(min(cnt, len(refs))):
                 targets.append((f"p{ti}.{i}", arr + i * PLAYER_STRIDE, _fields(refs[i])))
         for ti, h in enumerate(hdrs):
-            targets.append((f"hdr{ti}", h, _fields(ref["team_headers"][ti])))
+            targets.append((f"hdr{ti}", h, _fields(ref["team_headers"][ti], BYTE_FIELDS)))
         # `_va` in the dump is the REFERENCE boot's address and is useless here — every one
         # of these objects moves with the boot. The ball is `base + 0x1610` (the same address
         # `ball_row` reads) and the session is `*(base + 0x468)`. Using the stored `_va`
@@ -337,13 +350,22 @@ def main() -> None:
         # The two KEEPER objects are in the dump but not in this list: their live address is
         # not derivable from `base` by anything read so far, and guessing one would compare
         # against whatever happens to sit there. Named as a gap rather than approximated.
+        # ONE mread per object, not one per field. A player record is 239 dwords and there are
+        # 22 of them, so the naive `u32` loop is ~5,300 RSP round trips and took over a
+        # quarter of an hour on the first run; the whole span is 22 reads of 0x200 apiece.
         for name, base_addr, flds in targets:
+            if not flds:
+                continue
+            span = max(int(k, 16) for k in flds) + 4
+            try:
+                blob = mread(base_addr, span)
+            except OSError:
+                blob = b""
             for off_s, ref_v in flds.items():
                 off = int(off_s, 16)
-                try:
-                    live_v = u32(base_addr + off)
-                except OSError:
+                if off + 4 > len(blob):
                     continue
+                live_v = struct.unpack_from("<I", blob, off)[0]
                 ref_u = int(ref_v) & 0xFFFFFFFF
                 if live_v == ref_u or (looks_ptr(ref_u) and looks_ptr(live_v)):
                     continue

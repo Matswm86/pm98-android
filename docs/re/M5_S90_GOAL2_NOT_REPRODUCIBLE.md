@@ -26,20 +26,34 @@ the finding, and it is what makes the s87 plan unrunnable as written: there is n
 capture "the reference's per-frame 2837..8469" by re-driving the game, because re-driving the
 game does not produce the reference's match after clk 2837.
 
-## 2. It is not the frame-0 player state
+## 2. It is not the frame-0 state at all
 
 The obvious suspect is the s53 one — "the preseason condition roll can move the derived
 pace/stamina and the sim forks from tick 1" — and the capture already guards it with a
-five-field XI check. s90 widened that check to **every dword of every player record**, and
-the answer is no:
+five-field XI check. s90 widened that check to **every dword the frame-0 dump records**, of
+every object it can address, and the answer is no:
 
 * `xi_check` — 0 mismatches (the five fields it always tested);
-* the full diff — **0 mismatches across all 22 players**, each compared over the whole
-  0x0..0x3b8 contiguous dword dump, i.e. the entire 0x3bc stride.
+* the full diff — **0 mismatches**. All 22 player records over their whole 0x0..0x3b8
+  contiguous dword dump (the entire 0x3bc stride), both team headers, the ball at
+  `base + 0x1610` and the session at `*(base + 0x468)`.
 
-So at the moment of kick-off the 22 player records are byte-identical to the reference boot's,
-the 86 match scalars are poked (85 written, 1 already equal), and the LCG seed is poked. The
-divergence is not in what the capture restores.
+So at kick-off the state the reference dump describes is reproduced exactly: the players
+byte for byte, the 86 match scalars poked (85 written, 1 already equal), the LCG seed poked.
+**The divergence is not in anything the capture restores, and therefore poking more of it
+cannot fix it.** `PM98_POKE_PLAYERS=1` exists and is a no-op on a clean boot; that is the
+result, not a disappointment.
+
+Two measurement traps this had to walk through, both fixed in the tool so the next reader
+does not re-derive them:
+
+* `_va` in the dump is the REFERENCE boot's address. Comparing the ball at its stored `_va`
+  reported 32 phantom mismatches; the live ball is `base + 0x1610`.
+* the team-header dump stores `0x2ec` and `0x2ed` as single BYTES, and `0x2ec` is
+  dword-aligned so an alignment filter does not catch it. Comparing the live dword there
+  against a byte reported hdr1 as the one remaining "mismatch" — purely because the live
+  `+0x2ee` set-piece freeze byte shares that dword. **`0x2ee` is not in the dump at all**,
+  which is a real gap: the reference's freeze flag at frame 0 is unknown.
 
 ## 3. What the clock trace says about WHERE it goes wrong
 
