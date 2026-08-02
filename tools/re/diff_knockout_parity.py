@@ -46,7 +46,15 @@ REFS = ROOT / "tools/re/refs/knockout-2026-07-26"
 # club 40 and a bare NANOESC kit with no furniture for anybody else. The panel is FURNITURE
 # + the club's own kit, and the furniture was recovered from two careers that occlude
 # different pixels of it (tools/re/build_manager_panel_from_frames.py, gate
-# app/tests/test_manager_panel.gd). **14 px** now, all of it the un-reversed 1-px kit rim.
+# app/tests/test_manager_panel.gd). **14 px** now.
+#
+# CORRECTED 2026-08-02 (s90): those 14 px are NOT "the un-reversed 1-px kit rim". The 0x20
+# edge pass is reversed and shipped since s90, and applying it here makes this cell WORSE,
+# not better (14 -> 72 for the edge alone, 128..181 with any of the attested spreads) — so
+# this is not a 0x20 site. Split against the NANOESC sprite's own alpha, **all 14 are OFF
+# the sprite**: they are in the baked PANEL FURNITURE, which is exactly the two-career
+# occlusion gap the line above records. A third witnessed career that clears those pixels
+# closes this; nothing about the kit blit does.
 BARRA_KIT = ("barra kit", 106, 6, 35, 44)
 SCROLL_COL = ("scrollbar", 478, 125, 16, 286)
 RAIL = ("rail", 500, 110, 140, 321)

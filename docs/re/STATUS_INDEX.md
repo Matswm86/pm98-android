@@ -105,7 +105,7 @@ nothing are the ones to distrust.
 | `insurance_screen_re.md` | — | — | `test_insurance.gd`, `test_insurance_screen.gd` | `Insurance.gd`, `InsuranceScreen.gd` | — | — | 3 |
 | `jug_render_spec.md` | — | — | `test_jug_render.gd` | `JugKit.gd`, `JugRender.gd` | 67 | — | — |
 | `kit_palette_re.md` | yes | — | — | `JugKit.gd` | 5 | 5 path(s) | 2 |
-| `knockout_views_re.md` | — | `diff_knockout_parity.py`, `diff_scout_offers_parity.py` | `test_knockout_bracket.gd`, `test_knockout_layout.gd` | `KnockoutScreen.gd` | 77 | — | 43 |
+| `knockout_views_re.md` | — | `diff_knockout_parity.py`, `diff_scout_offers_parity.py` | `test_knockout_bracket.gd`, `test_knockout_layout.gd` | `KnockoutScreen.gd` | 77 | — | 44 |
 | `league_table_screen_re.md` | — | `diff_euroleague_parity.py` | `test_league_calendar.gd`, `test_league_screen.gd` | `LeagueTableScreen.gd` | — | — | 1 |
 | `lineup_screen_re.md` | — | `diff_lineup_ban_parity.py` | `test_brief_lineup.gd`, `test_lineup_roll.gd` | `LineupRollScreen.gd`, `LineupScreen.gd` | 2 | — | 2 |
 | `living_league_re.md` | — | — | `test_living_league.gd` | — | — | — | — |

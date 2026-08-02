@@ -904,3 +904,21 @@ paginator plate. That last one is the same declared band the decided BRACKET car
 paged-back frame the label plate's white surround reaches `x310..336` on rows 85 and 109
 where the live-phase frame the band was cut from has its black border. One witness of each
 state is not a rule, so it is declared rather than guessed at.
+
+## The barra panel's 14 px are the BAKE, not the kit rim (2026-08-02, s90)
+
+`Evidence:` `tools/re/diff_knockout_parity.py`, `tools/re/build_manager_panel_from_frames.py`,
+`app/art/kits/nano/59.png`, `tools/re/refs/knockout-2026-07-26/06_euroleague_round1_played.png`.
+
+Every knockout case carries a `barra kit` bucket of 14 px, labelled "the un-reversed 1-px kit
+rim". With the `0x20` edge pass reversed and shipped (`docs/re/shadow_blit_re.md`), that
+label is now testable, and it is wrong twice over:
+
+* applying the pass to this cell makes it WORSE — 14 -> 72 for the edge alone, and 128..181
+  with any of the attested spreads. This is not a `0x20` site;
+* split against the NANOESC sprite's own alpha, **all 14 px are OFF the sprite**. They sit in
+  the baked panel FURNITURE, which is the two-career occlusion gap
+  `build_manager_panel_from_frames.py` already records.
+
+So the bucket stays, with the right cause on it: a third witnessed career that clears those
+pixels closes it, and nothing about the kit blit will.
