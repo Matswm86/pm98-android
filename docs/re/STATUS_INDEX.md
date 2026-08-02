@@ -82,7 +82,7 @@ nothing are the ones to distrust.
 | `contract_re.md` | — | — | `test_contract.gd`, `test_contract_warning.gd` | `Contract.gd` | — | — | 1 |
 | `crests_re.md` | — | — | — | — | — | 3 path(s) | — |
 | `cup_re.md` | — | `diff_cupdraw_parity.py`, `diff_supercup_parity.py` | `test_cup.gd`, `test_cup_draw_then_play.gd` | `Cup.gd`, `CupDrawScreen.gd` | — | — | — |
-| `cupdraw_screen_re.md` | yes | `diff_cupdraw_parity.py` | `test_cupdraw_screen.gd` | `CupDrawScreen.gd` | 18 | — | 4 |
+| `cupdraw_screen_re.md` | yes | `diff_cupdraw_parity.py` | `test_cupdraw_screen.gd` | `CupDrawScreen.gd` | 35 | — | 8 |
 | `database_screen_re.md` | yes | — | `test_database_card_screen.gd`, `test_database_screen.gd` | `DataBaseCardScreen.gd`, `DataBaseScreen.gd` | 69 | — | 4 |
 | `dbase_player_card_re.md` | — | `diff_dbase_card_parity.py` | — | — | — | — | 10 |
 | `directiva_screen_re.md` | — | — | `test_directiva_screen.gd` | `DirectivaScreen.gd` | 5 | — | 1 |
@@ -143,7 +143,7 @@ nothing are the ones to distrust.
 | `seasonend_flow_re.md` | — | `diff_seasonend_year_parity.py` | — | — | 46 | — | — |
 | `seleccion_screen_re.md` | — | — | — | `SeleccionScreen.gd` | 1 | — | 1 |
 | `session_lineup_re.md` | — | — | — | — | 11 | — | 3 |
-| `shadow_blit_re.md` | yes | `diff_hub_circle_parity.py`, `diff_knockout_parity.py` | `test_shadow_blit.gd` | `PMShadow.gd` | 26 | 5 path(s) | 1 |
+| `shadow_blit_re.md` | yes | `diff_hub_circle_parity.py`, `diff_knockout_parity.py` | `test_shadow_blit.gd` | `PMShadow.gd` | 29 | 5 path(s) | 2 |
 | `squad_number_re.md` | — | — | `test_squad_screen.gd` | `SquadScreen.gd` | — | — | — |
 | `squad_screen_re.md` | — | — | `test_squad_screen.gd` | `SquadScreen.gd` | 3 | — | 1 |
 | `stadium_screen_re.md` | yes | — | `test_stadium_screen.gd`, `test_stadium_works.gd` | `StadiumScreen.gd` | 26 | — | 5 |

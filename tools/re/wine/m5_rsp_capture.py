@@ -419,7 +419,12 @@ def main() -> None:
             cont()
         fo.write(json.dumps({"event": "runup_done", "stops": runup, "clk": clk}) + "\n")
         print(f"RUN-UP done at clk={clk} after {runup} stops", flush=True)
-        r.cmd(f"z2,{base + 0x450:x},4", timeout=10)
+        # ⚠ Do NOT `z2` the clock watchpoint away. Measured 2026-08-02: the winedbg stub
+        # CLOSES THE CONNECTION on the remove, which kills the game — the run-up reached
+        # clk 2836 in 17,298 stops (against ~94,000 on the seed) and then died on the
+        # tidy-up. Leaving it armed costs one extra stop per frame, ~3% on top of the
+        # ~33 rand draws a tick, and every row carries its own `eip` so the clock stops
+        # are trivially separable in the diff.
 
     ok = r.cmd(f"Z2,{SEED_VA:x},4")
     fo.write(json.dumps({"event": "Z2", "reply": ok}) + "\n")
