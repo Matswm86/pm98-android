@@ -10,7 +10,7 @@ not come off my own disc.
 
 ## Download
 
-**[Get the APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-66c50a2.apk)**
+**[Get the APK](https://github.com/Matswm86/pm98-android/releases/download/latest/pm98-9d3d7f2.apk)**
 &nbsp;·&nbsp; [all builds](https://github.com/Matswm86/pm98-android/releases)
 &nbsp;·&nbsp; [pm98.mwmai.no](https://pm98.mwmai.no)
 
