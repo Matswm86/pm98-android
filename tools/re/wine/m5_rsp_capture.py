@@ -293,6 +293,84 @@ def main() -> None:
         fo.write(json.dumps({"event": "abort", "why": "xi_mismatch"}) + "\n")
         sys.exit(2)
 
+    # ---- 2c. THE FULL frame-0 player diff, and the poke (s90) ----
+    # The five fields above are not enough, and s90 has the counter-example. A clean boot
+    # passed `XI OK`, reproduced goal 1 BIT-EXACTLY — clk 2837, seed 1082620623, the banked
+    # reference's own value — and then scored its second goal at **clk 4582 (2-0)** where
+    # `capture2/timeline.jsonl` has **clk 7805 (1-1)**. Identical RNG state at goal 1 and a
+    # different match after it: something outside those five fields, and outside the 86 match
+    # scalars, differs at frame 0 and only starts to matter once the restart repositions the
+    # 22 players.
+    #
+    # So the check is widened to EVERY dumped field of every player, both team headers, both
+    # keepers and the session, and `PM98_POKE_PLAYERS=1` writes them the way the match
+    # scalars are already written. Pointer-looking pairs are skipped on both sides (they are
+    # per-boot addresses), as is `_va` itself.
+    def _fields(src: dict) -> dict:
+        # `dwords` is the whole record where the dump has one (a player's is 0x0..0x3b8
+        # contiguous, i.e. the entire 0x3bc stride). Unaligned keys are BYTE fields in the
+        # dump — 0x63 / 0x2d5 / 0x2ed and friends — and reading a dword there mixes three
+        # neighbours, so they are dropped rather than compared as dwords.
+        d = dict(src.get("dwords", src))
+        return {k: v for k, v in d.items() if k.startswith("0x") and int(k, 16) % 4 == 0}
+
+    poke_players = os.environ.get("PM98_POKE_PLAYERS") == "1"
+    full_bad: list = []
+    full_poked = 0
+    if not resume:
+        targets: list[tuple[str, int, dict]] = []
+        for ti, (arr, cnt) in enumerate(teams):
+            refs = ref["players"][ti]
+            for i in range(min(cnt, len(refs))):
+                targets.append((f"p{ti}.{i}", arr + i * PLAYER_STRIDE, _fields(refs[i])))
+        for ti, h in enumerate(hdrs):
+            targets.append((f"hdr{ti}", h, _fields(ref["team_headers"][ti])))
+        # `_va` in the dump is the REFERENCE boot's address and is useless here — every one
+        # of these objects moves with the boot. The ball is `base + 0x1610` (the same address
+        # `ball_row` reads) and the session is `*(base + 0x468)`. Using the stored `_va`
+        # reported 32 phantom ball mismatches on the first run, measured 2026-08-02.
+        targets.append(("ball", base + 0x1610, _fields(ref.get("ball") or {})))
+        try:
+            targets.append(("session", u32(base + 0x468), _fields(ref.get("session") or {})))
+        except OSError:
+            pass
+        # The two KEEPER objects are in the dump but not in this list: their live address is
+        # not derivable from `base` by anything read so far, and guessing one would compare
+        # against whatever happens to sit there. Named as a gap rather than approximated.
+        for name, base_addr, flds in targets:
+            for off_s, ref_v in flds.items():
+                off = int(off_s, 16)
+                try:
+                    live_v = u32(base_addr + off)
+                except OSError:
+                    continue
+                ref_u = int(ref_v) & 0xFFFFFFFF
+                if live_v == ref_u or (looks_ptr(ref_u) and looks_ptr(live_v)):
+                    continue
+                full_bad.append([name, off_s, hex(live_v), hex(ref_u)])
+                if poke_players:
+                    try:
+                        w32(base_addr + off, ref_u)
+                        full_poked += 1
+                    except OSError:
+                        pass
+    fo.write(
+        json.dumps(
+            {
+                "event": "frame0_full_diff",
+                "mismatches": len(full_bad),
+                "poked": full_poked,
+                "rows": full_bad[:200],
+            }
+        )
+        + "\n"
+    )
+    print(
+        f"FRAME0 FULL DIFF {len(full_bad)} mismatched fields"
+        + (f", poked {full_poked}" if poke_players else " (not poked; PM98_POKE_PLAYERS=1)"),
+        flush=True,
+    )
+
     def players_row() -> list:
         # Row: [team, idx, x, y, +0x13c, +0x17c, +0x180, face+0x34, yaw+0x64, spd+0x68,
         # curve+0x6c, +0x54, +0x58]. The first 7 keep the s44 layout (orbit_diff reads
