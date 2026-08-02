@@ -379,9 +379,10 @@ their row bands are pixel-identical, so the pixels under group A's kits are read
 group C's. With no free parameter it takes the four kits from **396 wrong pixels to 349**.
 Directionally right; not closed. Two things are still open and neither is the table:
 
-* ~~determinism across boots is unverified~~ — **CONFIRMED the same session**: a second,
-  fully isolated instance (copied wineprefix, own wineserver, own X display, own boot and
-  career) dumps the same 8,192 bytes, same sha256. WHERE the generator's input comes from is
+* ~~determinism across boots is unverified~~ — **CONFIRMED the same session on THREE
+  independent boots**, one of them a fully isolated instance (copied wineprefix, own
+  wineserver, own X display, own boot and career): all three dump the same 8,192 bytes,
+  same sha256. WHERE the generator's input comes from is
   still not reversed — `letras.bmp` is in neither source and the load plainly succeeds;
 * the probe picks each row's kit by best match rather than by club, so its per-kit baseline
   (87..135 wrong) is worse than the port's own render of that screen (33 of 221). Scoring

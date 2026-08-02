@@ -49,12 +49,13 @@ transcription makes about the bytes holds:
 
 ## What is NOT established
 
-* **Determinism across boots is CONFIRMED** (2026-08-02, same session). A second, fully
-  isolated instance — a `cp -a` copy of the wineprefix, its own wineserver, its own X
-  display, its own boot and career — dumps `guard 1`, 3,921 non-zero, 223 distinct and the
-  **same sha256**, byte for byte. So the bytes are a property of the program, not of a
-  session. (WHERE the generator's input surface comes from is still not reversed:
-  `letras.bmp` is in neither source, yet the load plainly succeeds.)
+* **Determinism across boots is CONFIRMED on THREE independent boots** (2026-08-02, same
+  session) — two fresh boots of this wineprefix and one FULLY isolated instance: a `cp -a`
+  copy of the prefix with its own wineserver, its own X display and its own boot and career.
+  All three dump `guard 1`, 3,921 non-zero, 223 distinct and the **same sha256**, byte for
+  byte. So the bytes are a property of the program, not of a session. (WHERE the generator's
+  input surface comes from is still not reversed: `letras.bmp` is in neither source, yet the
+  load plainly succeeds.)
 * **The pass is not closed.** `tools/re/probe_groupdraw_kit_edge.py` runs it against the one
   oracle with a witnessed destination (the group draw: five of six boxes are empty, so the
   pixels under group A's kits are readable off group C's band) and it **improves** the four

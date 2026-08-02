@@ -64,8 +64,8 @@ class_name PMShadow
 ## `m5_rsp_capture.py`). It is provably the generator's own output: rotation-invariant at
 ## 0 violations in 8,192, and monotone in popcount up to **253 for a fully-enclosed pixel**
 ## — a 2/256 nudge toward the destination on every interior pixel, which is where s84
-## measured 415 of 449 residual px to be. Determinism across boots is CONFIRMED: a second,
-## fully isolated instance dumps the same 8,192 bytes, same sha256. What still gates shipping
+## measured 415 of 449 residual px to be. Determinism across boots is CONFIRMED on THREE
+## independent boots (one a fully isolated instance): all dump the same 8,192 bytes, same sha256. What still gates shipping
 ## the pass is the render-diff, not the table. See docs/re/shadow_blit_re.md, "The 0x20 arm,
 ## RUN".
 const THR := 0x21          ## FUN_005cbea0 param_2 at 0x50f9e3 / 0x50fba1 ONLY

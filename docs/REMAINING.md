@@ -68,8 +68,8 @@ Record: `docs/re/shadow_blit_re.md` §"The 0x20 arm, RUN".
 ### 3. NOT done in s89, said plainly
 
 * **The edge pass is not shipped.** `PMShadow` still implements only the `0x10` spread.
-  Determinism was the gate and it is CLEARED — a second, fully isolated instance dumps the
-  same 8,192 bytes — so what remains is the render-diff: the probe scores against a
+  Determinism was the gate and it is CLEARED — three independent boots, one of them fully
+  isolated, all dump the same 8,192 bytes — so what remains is the render-diff: the probe scores against a
   best-match sprite rather than the port's own render of that screen, and no sprite in
   `app/art/kits/ridi` gets those cells under 74 px even with the model applied.
 * **The M5 goal-2 capture RAN but did not finish.** The prerequisite s87 named is no longer
@@ -746,7 +746,7 @@ a drive started the normal way never raises. Export it yourself if you invoke `a
 
 * **The 1-px on-sprite kit edge.** IDENTIFIED s88, TABLE EXTRACTED s89
   (`tools/re/refs/aliasing-2026-08-02/`). Two things left, neither of them the table:
-  determinism is CONFIRMED (a second, fully isolated boot dumps the same sha256), so what is
+  determinism is CONFIRMED (three independent boots, one fully isolated, all the same sha256), so what is
   left is the RENDER-DIFF. First score with a witnessed destination: 396 -> 349 wrong pixels
   over the four group-draw kits, improving on all four. It is not a close, and the reason is
   named: no sprite in `app/art/kits/ridi` reproduces those cells better than 74..125 px even
