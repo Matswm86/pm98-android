@@ -9,10 +9,16 @@
 # read s89). So the manager's club has to REACH a semifinal, which makes the strongest club
 # in the game the right pick and season 1 the best roll — the squad is still the real one.
 #
-# The blind drive does not manage the squad, so a career does not survive long: the s90 run
-# was relegated in season 1 and then sacked at the start of season 2 with "your squad does
-# not have the minimum number of players needed to play in any championship". Treat each run
-# as ONE season-1 roll and re-run rather than expecting a long career.
+# What the two s90 runs measured, so the next session budgets correctly. The drive never
+# manages the squad, and what that costs depends on where the club finishes:
+#   run 1  RELEGATED in season 1, then the start of season 2 came with "The Directors have
+#          decided to terminate your contract ... your squad does not have the minimum number
+#          of players needed to play in any championship" -> title screen, drive stops.
+#   run 2  stayed UP (Premier, week 41, 10 May 1998) and rolled into season 2.
+# So a run is at LEAST one season-1 roll -- three competitions, a real squad, ~1.5 h -- and
+# more only if the club survives. NEITHER run reached a semifinal draw: run 1 went out by the
+# 3rd round, run 2 reached the F.A. Cup 4th round (that draw PAINTED, so Man Utd were in it)
+# and no further draw followed.
 #
 # Coords are the proven ones (see nav_kickoff.sh + docs/re/matchday_flow_witness_re.md §8).
 # The team grid: 10 kits a row, alphabetical, so Manchester Utd. is #14 = row 2, column 4.

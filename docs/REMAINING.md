@@ -805,12 +805,15 @@ a drive started the normal way never raises. Export it yourself if you invoke `a
 * **A SEMIFINAL / FINAL cup draw.** `FUN_004d9a00` returns 0 without painting unless a
   human-managed club is in the drawn round's own tie/club array (`club+0x5c != 0xffff`,
   read s89), so the manager's club must BE in that semifinal. s90 adds the arithmetic that
-  was missing: a blind `autodrive` career does not survive to give repeated chances — it
-  never manages the squad, so season 1 ends in relegation and season 2 opens with the
-  Directors terminating the contract ("your squad does not have the minimum number of
-  players needed to play in any championship"), which drops to the title screen and stops
-  the drive. **Each run is ONE season-1 roll** — three competitions, a real squad, ~1.5 h —
-  so the way to more rolls is more runs. `tools/re/wine/nav_manutd_career.sh` sets one up.
+  was missing, from two runs. The drive never manages the squad, and what that costs depends
+  on where the club finishes: **run 1 was RELEGATED** in season 1 and the start of season 2
+  came with the Directors terminating the contract ("your squad does not have the minimum
+  number of players needed to play in any championship"), which drops to the title screen and
+  stops the drive; **run 2 stayed up** (Premier, week 41) and rolled into season 2. So a run
+  is at least one season-1 roll — three competitions, a real squad, ~1.5 h — and more only if
+  the club survives. **Neither run reached a semifinal**: run 1 went out by the 3rd round,
+  run 2 reached the F.A. Cup 4th round (the draw PAINTED, so Man Utd were in it) and no
+  further draw followed. `tools/re/wine/nav_manutd_career.sh` sets a run up.
 * **The M5 goal-2 divergence** (port clk 8469, reference two minutes earlier, right team).
   Tooling no longer gates it: `m5_rsp_capture.py` has the clock-watchpoint RUN-UP (s89), a
   raisable `PM98_MAX_STOPS`, `PM98_CLK_TRACE=1` for the cheap whole-window pass, and
