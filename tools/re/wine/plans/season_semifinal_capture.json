@@ -1,0 +1,193 @@
+{
+ "out": "season_semifinal_capture",
+ "note": "SEMIFINAL / FINAL CUP DRAW CAPTURE (2026-08-02, s91). Five career drives failed to bank a SEMIFINAL or FINAL draw because FUN_004d9a00 refuses to paint a draw the managed club is not in (s89's read gate, club+0x5c != 0xffff) -- and two Man Utd runs (s90) were RELEGATED in season 1 without reaching one. This run stops gambling on the roll: it boots MANAGER_CAP.EXE, built by `build_hack_exe.py --cheats=cupdraw_always,unsackable`, which flips that ONE gate byte (0x4d9b26 jne -> jmp) plus the three board-dismissal branches. The gate sets no state and the tie/club array the screen then renders is the sim's own, so every frame banked is MANAGER.EXE painting a REAL draw with REAL clubs -- verified live on the very first screen of this run, a Coca-Cola Cup ROUND 1 draw of Luton T./Wycombe W./Bristol City/Colchester U./Chester C./Oldham Ath, a round Manchester Utd. is not in and the stock EXE would have painted nothing for. `unsackable` is here so a relegation cannot end the drive before the later rounds. The port keeps the real gate; this is a capture instrument only.",
+ "keep": [
+  "cup_draw",
+  "alert_box"
+ ],
+ "rules": {
+  "hub": {
+   "click": [
+    594,
+    268
+   ],
+   "settle": 1.2
+  },
+  "champion_card": {
+   "click": [
+    115,
+    352
+   ],
+   "settle": 1.2
+  },
+  "start_of_season": {
+   "click": [
+    573,
+    428
+   ],
+   "settle": 1.2
+  },
+  "teams_in_championships": {
+   "click": [
+    573,
+    451
+   ],
+   "settle": 1.2
+  },
+  "match_options": {
+   "click": [
+    478,
+    351
+   ],
+   "settle": 3.0
+  },
+  "prematch_lineups": {
+   "click": [
+    320,
+    240
+   ],
+   "settle": 3.0
+  },
+  "half_time": {
+   "click": [
+    536,
+    451
+   ],
+   "settle": 2.0
+  },
+  "full_time": {
+   "click": [
+    536,
+    451
+   ],
+   "settle": 2.0
+  },
+  "cup_draw": {
+   "click": [
+    551,
+    451
+   ],
+   "settle": 2.0
+  },
+  "manager_of_month": {
+   "click": [
+    573,
+    255
+   ],
+   "settle": 1.5
+  },
+  "player_of_month": {
+   "click": [
+    571,
+    359
+   ],
+   "settle": 1.5
+  },
+  "channel_tv": {
+   "click": [
+    505,
+    357
+   ],
+   "settle": 1.5
+  },
+  "lineup_screen": {
+   "swap_unavailable": true,
+   "click": [
+    592,
+    454
+   ],
+   "settle": 1.5
+  },
+  "alert_box": {
+   "click_alert_ok": true,
+   "settle": 1.2
+  },
+  "news_extra": {
+   "click": [
+    486,
+    38
+   ],
+   "settle": 1.5
+  },
+  "finance_screen": {
+   "click": [
+    568,
+    451
+   ],
+   "settle": 1.5
+  },
+  "league_tables_final": {
+   "click": [
+    573,
+    437
+   ],
+   "settle": 1.5
+  },
+  "end_of_season": {
+   "click": [
+    573,
+    437
+   ],
+   "settle": 1.5
+  },
+  "preseason": {
+   "clicks": [
+    [
+     557,
+     346,
+     4
+    ],
+    [
+     570,
+     455
+    ]
+   ],
+   "settle": 3.0
+  },
+  "the_championships": {
+   "click": [
+    573,
+    451
+   ],
+   "settle": 1.5
+  },
+  "players_of_the_year": {
+   "click": [
+    558,
+    439
+   ],
+   "settle": 1.5
+  },
+  "preseason_rivals": {
+   "clicks": [
+    [
+     557,
+     346,
+     4
+    ],
+    [
+     570,
+     455
+    ]
+   ],
+   "settle": 3.0
+  }
+ },
+ "film_secs": 20,
+ "retries": 45,
+ "loop_breaker": {
+  "cycle": [
+   "hub",
+   "alert_box"
+  ],
+  "when": "hub",
+  "action": {
+   "click": [
+    480,
+    97
+   ],
+   "settle": 3.0
+  }
+ },
+ "keep_all": false
+}

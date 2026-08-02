@@ -2,11 +2,14 @@
 """Build MANAGER_HACK.EXE — the PM98 cheat patches, applied to a COPY of the owned
 MANAGER.EXE (the original is never modified).
 
-Two cheats, selected with `--cheats=` (default: both):
+Three patches, selected with `--cheats=` (default: the two cheats, NOT the instrument):
 
   three_forwards  "three forwards = the keeper cannot save, and you always get at least
                   three chances a half" — the statistical (BRIEF/RESULT) engine.
   unsackable      the board can never dismiss you — FUN_00545fd0's three tests.
+  cupdraw_always  a CAPTURE INSTRUMENT, opt-in: paint every cup draw regardless of whether
+                  a managed club is in it — FUN_004d9a00's participation gate. See its
+                  block below; it changes no draw, only whether the draw is painted.
 
 Usage:
     build_hack_exe.py [SRC_EXE] [DST_EXE] [--cheats=three_forwards,unsackable]
@@ -115,7 +118,31 @@ UNSACKABLE_SITES = [
     ("squad", 0x546067, 0x73, 0x5460A8),  # jae  club+0x28 (squad size) >= 0x10
 ]
 JMP_REL8 = 0xEB
-ALL_CHEATS = ("three_forwards", "unsackable")
+
+# --- cupdraw_always: FUN_004d9a00's participation gate ----------------------
+# NOT a gameplay cheat — a CAPTURE INSTRUMENT (2026-08-02, s91). The cup-draw screen
+# `FUN_004d9a00` scans the round it is about to draw and returns 0 without painting
+# unless one of the clubs in it is human-managed (`club + 0x5c != 0xffff`, s89,
+# docs/re/cupdraw_screen_re.md §"THE PARTICIPATION GATE"). That gate is the ORIGINAL's
+# own and the port reproduces it faithfully — which is exactly why the SEMIFINAL 1 /
+# SEMIFINAL 2 plates at 0x4dbee5 / 0x4dbf49 have no witness frame: five career drives
+# failed to put the managed club into a semifinal.
+#
+# Flipping the gate's `jne` to `jmp` makes the screen paint every draw it is handed.
+# It changes NOTHING about the draw itself: the gate runs to completion, sets no state,
+# and the tie/club array the screen then renders is the sim's own. So a frame captured
+# through this patch is MANAGER.EXE painting a real semifinal with real clubs — a
+# legitimate witness — and the shipped port keeps the real gate.
+#
+#   004d9b24  85 db           test ebx, ebx      ; ebx = "a managed club is in this draw"
+#   004d9b26  75 07           jne  0x4d9b2f      ; -> build the screen
+#   004d9b28  33 c0           xor  eax, eax
+#   004d9b2a  e9 cf 27 00 00  jmp  0x4dc2fe      ; the shared epilogue: return 0, draw nothing
+CUPDRAW_GATE = ("gate", 0x4D9B26, 0x75, 0x4D9B2F)  # (name, VA, stock opcode, target)
+
+ALL_CHEATS = ("three_forwards", "unsackable", "cupdraw_always")
+# `cupdraw_always` is opt-in: it is a capture instrument, not part of "the cheats".
+DEFAULT_CHEATS = ("three_forwards", "unsackable")
 
 
 class Asm:
@@ -279,10 +306,35 @@ def patch_unsackable(data: bytearray) -> None:
         print(f"  unsackable/{name:<8} {va:#x}: {opcode:#04x} -> 0xeb (jmp {target:#x})")
 
 
+def patch_cupdraw_always(data: bytearray) -> None:
+    """Flip FUN_004d9a00's participation gate to an unconditional jump.
+
+    Same assertion discipline as `patch_unsackable`: the stock opcode AND the decoded
+    target must both match, and the two instructions the gate falls through to
+    (`xor eax, eax` / `jmp 0x4dc2fe`) are checked too, so a different build cannot be
+    silently mispatched into the middle of the screen builder.
+    """
+    name, va, opcode, target = CUPDRAW_GATE
+    off = va_to_off(va)
+    if data[off] != opcode:
+        raise SystemExit(
+            f"cupdraw_always/{name}: opcode at {va:#x} is {data[off]:#04x}, expected {opcode:#04x}"
+        )
+    got = va + 2 + struct.unpack_from("<b", data, off + 1)[0]
+    if got != target:
+        raise SystemExit(f"cupdraw_always/{name}: {va:#x} jumps to {got:#x}, expected {target:#x}")
+    if bytes(data[off - 2 : off]) != b"\x85\xdb":  # test ebx, ebx
+        raise SystemExit(f"cupdraw_always/{name}: {va - 2:#x} is not `test ebx, ebx`")
+    if bytes(data[off + 2 : off + 9]) != b"\x33\xc0\xe9\xcf\x27\x00\x00":  # xor eax,eax / jmp
+        raise SystemExit(f"cupdraw_always/{name}: {va + 2:#x} is not the return-0 epilogue")
+    data[off] = JMP_REL8
+    print(f"  cupdraw_always/{name:<8} {va:#x}: {opcode:#04x} -> 0xeb (jmp {target:#x})")
+
+
 def main() -> int:
     argv = [a for a in sys.argv[1:] if not a.startswith("--")]
     opts = [a for a in sys.argv[1:] if a.startswith("--")]
-    cheats = list(ALL_CHEATS)
+    cheats = list(DEFAULT_CHEATS)
     for o in opts:
         if o.startswith("--cheats="):
             cheats = [c.strip() for c in o.split("=", 1)[1].split(",") if c.strip()]
@@ -299,6 +351,9 @@ def main() -> int:
 
     if "unsackable" in cheats:
         patch_unsackable(data)
+
+    if "cupdraw_always" in cheats:
+        patch_cupdraw_always(data)
 
     if "three_forwards" not in cheats:
         dst.write_bytes(bytes(data))
