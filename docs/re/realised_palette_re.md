@@ -68,3 +68,31 @@ Two cases are already settled and must not be swept up:
 * **`app/art/faces/dbcard/`** is Dbasewin's own rendering under its own palette and asserts
   0 px against two walked frames of its own. Two applications, two realised palettes.
 * **`_generic.png`** uses no affected index; `force_vga` there is a no-op, not a bug.
+
+## 5. A fourth bank — NANOESC, and a witness that decides it (2026-08-02, s90)
+
+`map_crests.py` exports MINIESC and NANOESC three lines apart, and the 2026-07-27 fix landed
+on MINIESC only: `flag_palette()` for the 48x64 kits, plain `riff_palette("MANAGER.PAL")`
+for the 24x32 nano ones. Those two tables differ at exactly **one** index — **8**, the
+Windows static "money green" — and **89 of the 476 NANOESC kits use it**, rendering
+`(192,227,192)` where the running game shows `(192,220,192)`.
+
+The docstring claimed the nano bank was "verified SAD-0.0 vs walkthrough frames 008/013
+under MANAGER.PAL", which is true and does not decide the question: those frames' clubs use
+no index-8 pixel. The frames themselves do decide it, on the colour rather than the sprite:
+
+| frame | `(192,227,192)` MANAGER.PAL's own index 8 | `(192,220,192)` the Windows static |
+|---|---|---|
+| 008 (three captures) | **0 px** | 166 / 563 / 2,527 |
+| 009 (three captures) | **0 px** | 166 / 563 / 2,527 |
+| 013 (three captures) | **0 px** | 152 / 11 / 1 |
+
+MANAGER.EXE never paints MANAGER.PAL's raw index 8 and paints the static thousands of times,
+so the realised table is the one with the statics in it. Bank re-exported; 89 kits changed;
+`test_manager_panel`, `test_knockout_layout`, `test_results_screen` and `test_cupdraw_screen`
+all still pass.
+
+Recorded rather than glossed: there is still no NANOESC *sprite* witness of an affected club
+— every banked barra frame is club 40 or 59 and neither touches index 8 — so this rides on
+the palette-level measurement above plus MINIESC's own 26-of-26-px index-8 finding, not on a
+frame of that kit.

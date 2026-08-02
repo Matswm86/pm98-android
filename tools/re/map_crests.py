@@ -238,11 +238,11 @@ def export_kits(id_to_code: dict[str, str]) -> None:
     """Render each mapped club's MINIESC kit (48x64, corrected VGA palette, index0
     transparent) to app/art/kits/<club_id>.png, plus its NANOESC full kit (24x32
     shirt+shorts+shadow — the art the SELECCION/PRESEASON panels blit 1:1, verified
-    SAD-0.0 vs walkthrough frames 008/013 under MANAGER.PAL) to
+    SAD-0.0 vs walkthrough frames 008/013; those frames' clubs use no Windows-static
+    index, so that check did not decide the palette — see the note at the decode) to
     app/art/kits/nano/<club_id>.png. NANOESC entries are palette-less OS/2-core
     DIBs -> export_icons.decode_dib. Runs only where the owned PKFs exist
     (extracted/ is gitignored); the PNGs are committed, CI just regenerates .import."""
-    from export_art import riff_palette  # noqa: PLC0415 - tool-local import
     from export_flags import flag_palette  # noqa: PLC0415 - tool-local import
     from export_icons import decode_dib  # noqa: PLC0415 - tool-local import
     from pkf_unpack import parse  # noqa: PLC0415 - tool-local import
@@ -258,7 +258,6 @@ def export_kits(id_to_code: dict[str, str]) -> None:
             nano[r["name"]] = bytes(buf[off : off + size])
         if r.get("end"):
             break
-    pal = riff_palette("MANAGER.PAL")
     # MINIESC decodes through the REALISED palette -- MANAGER.PAL + the 20 Windows
     # static entries -- NOT the shared VGA table. Same bug family the MINIBAND flags
     # had (export_flags.flag_palette): measured on the 16 bracket witness kit cells
@@ -285,7 +284,19 @@ def export_kits(id_to_code: dict[str, str]) -> None:
         idx = pkf_image.dib_indices(mini_buf[off : off + size])
         img = pkf_image.rgba(idx, realized_flat, transparent=True)
         img.save(KITS_DIR / f"{cid}.png")
-        decode_dib(nano[f"EQ96{code}.BMP"], pal).save(nano_dir / f"{cid}.png")
+        # NANOESC takes the SAME realised palette. It was left on plain MANAGER.PAL when the
+        # line above was fixed on 2026-07-27, which is one entry short: `riff_palette` and
+        # `flag_palette` differ at exactly ONE index, **8**, and that is the Windows static
+        # "money green" — a property of the realised system palette under Windows, not of any
+        # particular archive, so it applies to every 8bpp DIB this executable blits. The
+        # MINIESC measurement above pins the mechanism at 26 of 26 pixels on that very index.
+        # **89 of the 476 NANOESC kits use index 8** and were rendering (192,227,192) where
+        # the running game shows (192,220,192).
+        #
+        # Said plainly: there is no NANOESC witness of an affected club yet. Every banked
+        # barra frame is club 40 or 59 and neither touches index 8, so this rides on the
+        # mechanism and on MINIESC's measurement rather than on a frame of its own.
+        decode_dib(nano[f"EQ96{code}.BMP"], realized_flat).save(nano_dir / f"{cid}.png")
     print(f"exported {len(id_to_code)} kit PNG pairs -> {KITS_DIR.relative_to(ROOT)} (+nano/)")
 
 
