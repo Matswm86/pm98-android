@@ -793,35 +793,45 @@ makes it unusable. `PM98_NO_RAISE=1` is the switch — `click.sh`, `autodrive.cl
 a drive started the normal way never raises. Export it yourself if you invoke `autodrive.py`
 / `boot.sh` / `nav_career.sh` directly.
 
-## STILL OPEN AFTER s89 — THE WHOLE CARRIED SET, IN ONE PLACE
+## STILL OPEN AFTER s90 — THE WHOLE CARRIED SET, IN ONE PLACE
 
-> **REWRITTEN 2026-08-02 (s89).** Two of s88's four open items moved. The cup-draw item is
-> no longer "read the binary first" — it is read, the port's gate is the original's own, and
-> what is left is a pure capture. The kit-edge item is no longer "one table away" — the
-> table is extracted and validated, and what is left is a determinism check and a render-diff.
+> **REWRITTEN 2026-08-02 (s90).** The kit-edge item is CLOSED at 0 px and off this list; the
+> two capture items are unchanged in kind but no longer blocked on tooling. One NEW item is
+> here, and it is here because closing the kit edge found it: three sprite banks were baked
+> against the wrong palette, and the rule that produced them is still in place for the rest.
 
 **Open — CAPTURE / driving time**
 
-* **A SEMIFINAL / FINAL cup draw.** FIVE drives have failed, and s89 settles WHY they had
-  to: `FUN_004d9a00` returns 0 without painting unless a human-managed club is in the drawn
-  round's own tie/club array (`club+0x5c != 0xffff`), so the manager's club must BE in that
-  semifinal. This is a capture, not a reading, and it is the port's own gate confirmed.
-* **The M5 goal-2 divergence** (26' against 24', right team, 2837 < clk < 8469). The blocker
-  s87 named — "no per-frame reference beyond clk 2837" — is being removed rather than
-  restated: `m5_rsp_capture.py` now has a clock-watchpoint RUN-UP and a raisable stop cap,
-  and s89 ran it. What exists is a PREFIX of the window; the run needs hours it did not get.
-  Command and gotchas in `docs/re/M5_S85_WATCH_PLAYSTATE_FULLTIME.md`.
+* **A SEMIFINAL / FINAL cup draw.** `FUN_004d9a00` returns 0 without painting unless a
+  human-managed club is in the drawn round's own tie/club array (`club+0x5c != 0xffff`,
+  read s89), so the manager's club must BE in that semifinal. s90 adds the arithmetic that
+  was missing: a blind `autodrive` career does not survive to give repeated chances — it
+  never manages the squad, so season 1 ends in relegation and season 2 opens with the
+  Directors terminating the contract ("your squad does not have the minimum number of
+  players needed to play in any championship"), which drops to the title screen and stops
+  the drive. **Each run is ONE season-1 roll** — three competitions, a real squad, ~1.5 h —
+  so the way to more rolls is more runs. `tools/re/wine/nav_manutd_career.sh` sets one up.
+* **The M5 goal-2 divergence** (port clk 8469, reference two minutes earlier, right team).
+  Tooling no longer gates it: `m5_rsp_capture.py` has the clock-watchpoint RUN-UP (s89), a
+  raisable `PM98_MAX_STOPS`, `PM98_CLK_TRACE=1` for the cheap whole-window pass, and
+  `resume_watchdog.py` to click KICK OFF at the WATCH segment pauses a capture could never
+  answer before. What is left is wall clock: the cheap trace runs at ~15-30 clk/min under
+  load, so 2837..8469 is several hours, and the expensive per-frame capture that actually
+  LOCALISES the divergence is a narrow window after it. `m5_clktrace_diff.py` records what
+  the cheap trace can and cannot decide — the reference's goal CLOCK yes, per-tick seed
+  equality no.
 
-**Open — RE**
+**Open — RE (NEW, s90)**
 
-* **The 1-px on-sprite kit edge.** IDENTIFIED s88, TABLE EXTRACTED s89
-  (`tools/re/refs/aliasing-2026-08-02/`). Two things left, neither of them the table:
-  determinism is CONFIRMED (three independent boots, one fully isolated, all the same sha256), so what is
-  left is the RENDER-DIFF. First score with a witnessed destination: 396 -> 349 wrong pixels
-  over the four group-draw kits, improving on all four. It is not a close, and the reason is
-  named: no sprite in `app/art/kits/ridi` reproduces those cells better than 74..125 px even
-  under the model, so the probe's sprite or geometry identification is wrong, not necessarily
-  the pass. Score it against the port's OWN render of that screen next. See §0a-s89.2.
+* **The realised-palette sweep.** `docs/re/realised_palette_re.md`. Every frame MANAGER.EXE
+  paints is entirely MANAGER.PAL + the Windows statics, and 25 of 25 sampled walkthrough
+  frames carry colours the shared VGA table at `DAT.PKF +0x5CA` does not contain. Three
+  banks have been found wrong this way and fixed against their own witnesses (MINIBAND
+  flags 07-26, RIDIESC kits s90, the face banks s90), but `export_art.render` still picks
+  `vga_palette()` for every `DM` sprite and every `force_vga` caller. Flipping that rule
+  blind would be a guess: each bank needs its own witness, and two cases must NOT be swept
+  up (`faces/dbcard/` is Dbasewin's own correct rendering; `_generic.png` uses no affected
+  index).
 
 **Needs Mats**
 
