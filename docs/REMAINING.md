@@ -642,7 +642,57 @@ makes it unusable. `PM98_NO_RAISE=1` is the switch — `click.sh`, `autodrive.cl
 a drive started the normal way never raises. Export it yourself if you invoke `autodrive.py`
 / `boot.sh` / `nav_career.sh` directly.
 
-## STILL OPEN AFTER s84 — THE WHOLE CARRIED SET, IN ONE PLACE
+## STILL OPEN AFTER s88 — THE WHOLE CARRIED SET, IN ONE PLACE
+
+> **REWRITTEN 2026-08-02 (s88).** The block below carried a heading of "after s84" and three
+> entries that s85/s86 had already closed — the positional engine "not wired into MatchSim"
+> (it IS wired, and has been since the M5 wire-in: `Main` builds a `Pm98LiveMatch` for a
+> WATCHED fixture, s86 §1), stoppage time "unrun" (pinned, s86 §2) and the cross-seed
+> `PM98_SEED` sweep "unrun" (16/16 reached full time, s86 §6). They are gone. What is left is
+> **four** open items and **two** that are closed as far as they can be.
+
+**Open — CAPTURE / driving time**
+
+* **A SEMIFINAL / FINAL cup draw.** FIVE drives have now failed. ⚠ **The reason every one of
+  them was framed as "survive to April" is an ASSUMPTION, and it is the port's own.**
+  `Career._queue_cup_draw` gates the card on the manager's club still being in the
+  competition and its own comment says so plainly: *"DECLARED OURS: no frame shows what the
+  original does for a non-participant"*. The refs README then restated that gate as if it
+  were a fact about the original, and five drives were planned around it.
+  What the corpus actually has is NEGATIVE evidence, one career deep: the s88 drive ran 98
+  steps from 30 Jan 1999 through the season end and preseason — 15 matches, three final
+  league tables, a champion card — with Man Utd out of both domestic cups, and banked **zero
+  `cup_draw` screens** (the signature is taught and `cup_draw` is in the plan's `keep` list,
+  so one would have been caught). Consistent with the gate; not proof of it.
+  **Settle it by reading the binary before driving a sixth career.** The CUP DRAW screen's
+  code range is known (`0x4da000..0x4db000`, s87) and so is its only `GROUPS` xref
+  (`0x4da6a4`); the question is whether the raise site tests the manager's club at all. If it
+  does not, the capture stops needing a surviving club and becomes "drive any career to
+  April", which is a completely different job.
+* **The M5 goal-2 divergence** (26' against 24', right team, 2837 < clk < 8469). Needs a
+  fresh ~5,632-frame `m5_rsp_capture` run on a box with NO other wine load, then a per-frame
+  diff. Command in `docs/re/M5_S85_WATCH_PLAYSTATE_FULLTIME.md`. Largest carried RE item.
+
+**Open — RE**
+
+* **The 1-px on-sprite kit edge.** IDENTIFIED s88 as `FUN_005cbea0`'s `0x20` arm
+  (`FUN_005d60a0`, a 12-neighbour classifier over `DAT_006b5890`). What is left is the table,
+  which is the generated `dat\aliasing.dat`. See §0a-s88.2.
+
+**Needs Mats**
+
+* **The real-device pass.** There is no Android device on this box.
+
+**Closed as far as it can be — DO NOT REOPEN**
+
+* **HIGHLIGHTS / the 3D match view's models** — a hard DATA gap: the `.p3d` files are absent
+  from BOTH `pm98.iso` and `Premier_Manager_98.rar`. `PCF5DAT.PKF` was re-measured from
+  scratch in s87 and is a CD-presence check, not a container.
+* **The unmanaged-club release ladder** (`FUN_0057b6b0`) — fully reversed in s78 and
+  deliberately NOT ported: the port has no league-membership model to hang it on.
+
+## SUPERSEDED — the pre-s88 carried set, kept for its evidence trail
+
 
 The list below had drifted to "STILL OPEN AFTER s81" three sessions back while the real
 carried items sat scattered through the per-session sections underneath. This is the

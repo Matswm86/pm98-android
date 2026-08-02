@@ -184,7 +184,16 @@ panel form. Chrome `tools/re/build_groupdraw_chrome_from_frame.py`, geometry
 this frame at **1 differing pixel** outside the CONTINUE ball and the eight kit/flag sprites
 that carry the un-reversed 1-px on-sprite edge pass.
 
-Still missing after FIVE drives: a **SEMIFINAL** and a **FINAL** draw. The s88 drive resumed
+Still missing after FIVE drives: a **SEMIFINAL** and a **FINAL** draw.
+
+⚠ **And the reason they keep being missed may be an assumption, not a fact.** The line above
+("the draw only appears for a round the manager's own club is still in, so this is a matter
+of surviving to April") restates the PORT's gate — `Career._queue_cup_draw`, whose own
+comment says *"DECLARED OURS: no frame shows what the original does for a non-participant"*.
+No frame in this corpus establishes it. The s88 drive is one career's worth of negative
+evidence for it (98 steps, 30 Jan 1999 to preseason, Man Utd out of both cups, zero
+`cup_draw` frames) and no more than that. Read the raise site in the CUP DRAW screen's code
+range (`0x4da000..0x4db000`) before planning a sixth drive around it. The s88 drive resumed
 the s87 career at 30 January 1999 (Premier week 26, season 2) and Manchester Utd went out
 before the tail of the ladder again; the career rolled into a 1999/2000 preseason and the
 drive's PRESEASON rule dismissed it back to the title screen.
