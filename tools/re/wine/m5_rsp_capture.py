@@ -49,7 +49,9 @@ PTAIL_OFF, PTAIL_LEN = 0x2B8, 0x24
 # (FUN_005b8a60 designations, player POINTERS) and the set-piece freeze flag +0x2ee.
 GS_OFF, GS_LEN = 0x1FC, 0xF4
 STORE_EIP_SKIP = 0x5EC255  # rand() entry LOAD twin stop — not the draw
-MAX_STOPS = 40000
+MAX_STOPS = int(os.environ.get("PM98_MAX_STOPS", "40000"))  # s89: the 2837..8469
+# window needs ~186,000 rand stops, so the old flat cap ENDED the run mid-window and
+# reported 'done'. Raise it deliberately per run rather than silently truncating.
 
 
 def looks_ptr(v: int) -> bool:
@@ -355,12 +357,24 @@ def main() -> None:
         row += [struct.unpack_from("<i", b, off)[0] for off in (0x74, 0x78, 0x7C)]
         return row
 
-    # ---- 3. Z2 seed watch ----
-    ok = r.cmd(f"Z2,{SEED_VA:x},4")
-    fo.write(json.dumps({"event": "Z2", "reply": ok}) + "\n")
-    if ok != "OK":
-        print(f"Z2 REJECTED: {ok!r}", flush=True)
-        sys.exit(1)
+    # ---- 2b. the ALIASING table, read on this same connection (s89) ----
+    # `DAT_006b5890` is the 8,192-entry edge-classifier table `FUN_005d60a0` looks each
+    # 13-bit neighbourhood code up in, and `DAT_006b7920` is the graphics-init's run-once
+    # guard. Both are .bss, so a static read cannot answer what they hold at runtime, and
+    # the stub takes exactly ONE connection — so the read rides along with the capture
+    # rather than costing its own boot. 8 KB is ~16 round trips.
+    try:
+        guard = mread(0x6B7920, 1)[0]
+        alias = mread(0x6B5890, 0x2000)
+        Path(out).with_suffix(".aliasing.bin").write_bytes(alias)
+        fo.write(json.dumps({
+            "event": "aliasing", "guard": guard, "nonzero": sum(1 for b in alias if b),
+            "distinct": len(set(alias)),
+        }) + "\n")
+        print(f"ALIASING guard={guard} nonzero={sum(1 for b in alias if b)}/8192 "
+              f"distinct={len(set(alias))}", flush=True)
+    except OSError as exc:  # a read failure must not cost the capture
+        fo.write(json.dumps({"event": "aliasing_failed", "err": str(exc)}) + "\n")
 
     def t_regs(st: str) -> dict:
         import re as _re
@@ -374,8 +388,48 @@ def main() -> None:
         payload = "vCont;c"
         r.s.sendall(f"${payload}#{sum(payload.encode()) % 256:02x}".encode())
 
+    # ---- 3. RUN-UP on the CLOCK, then Z2 seed watch (s89) ----
+    # The seed watchpoint traps every rand() draw — about 33 stops per clock tick — so
+    # reaching a window that starts at clk 2837 costs ~94,000 stops of pure fast-forward
+    # before the first row worth keeping. That is why the 2837..8469 capture had never
+    # been run. The clock at `base+0x450` moves ONCE per frame, so watching IT instead
+    # costs one stop per tick. The watchpoint is an observation, not a game input:
+    # swapping which address is watched cannot change what the match computes.
+    if win_lo > 2:
+        ok = r.cmd(f"Z2,{base + 0x450:x},4")
+        fo.write(json.dumps({"event": "Z2_clock", "reply": ok}) + "\n")
+        if ok != "OK":
+            print(f"Z2 clock REJECTED: {ok!r}", flush=True)
+            sys.exit(1)
+        print(f"RUN-UP on the clock to clk {win_lo} — click KICK OFF", flush=True)
+        cont()
+        runup = 0
+        while True:
+            try:
+                r.wait_stop()
+            except ConnectionError:
+                fo.write(json.dumps({"event": "stub_closed_runup"}) + "\n")
+                return
+            runup += 1
+            clk = u32(base + 0x450)
+            if runup % 200 == 0:
+                print(f"run-up {runup} clk={clk}", flush=True)
+            if clk >= win_lo - 1:
+                break
+            cont()
+        fo.write(json.dumps({"event": "runup_done", "stops": runup, "clk": clk}) + "\n")
+        print(f"RUN-UP done at clk={clk} after {runup} stops", flush=True)
+        r.cmd(f"z2,{base + 0x450:x},4", timeout=10)
+
+    ok = r.cmd(f"Z2,{SEED_VA:x},4")
+    fo.write(json.dumps({"event": "Z2", "reply": ok}) + "\n")
+    if ok != "OK":
+        print(f"Z2 REJECTED: {ok!r}", flush=True)
+        sys.exit(1)
+
     print(
-        f"ARMED @{SEED_VA:#x} win=[{win_lo},{win_hi}] stop_clk={stop_clk} — click KICK OFF",
+        f"ARMED @{SEED_VA:#x} win=[{win_lo},{win_hi}] stop_clk={stop_clk}"
+        + ("" if win_lo > 2 else " — click KICK OFF"),
         flush=True,
     )
     cont()

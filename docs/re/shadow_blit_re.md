@@ -293,3 +293,96 @@ next step is to find the code that writes it, not to cut it out of the file. Aft
 0x20 arm is a direct transcription and the group-draw kits/flags
 (`docs/re/cupdraw_screen_re.md`, 33 px of 221 per kit, 8..11 of 140 per flag) are the ready
 made oracle for it, together with the EURO GROUP leader cell s84/s85 measured.
+
+## The 0x20 arm, RUN — the table is out of the running original (2026-08-02, s89)
+
+`Evidence:` `extracted/Premier Manager 98/MANAGER.EXE` @0x5cbea0, @0x5d60a0,
+@0x5c9762..0x5c9a02; `tools/re/build_aliasing_table.py`, `tools/re/probe_kit_edge_pass.py`,
+`tools/re/probe_groupdraw_kit_edge.py`, `tools/re/refs/aliasing-2026-08-02/`.
+
+s88 left this "one runtime-built table away". The table is now in hand, and two of s88's
+numbers are corrected on the way.
+
+### 1. The code is THIRTEEN bits, and the table is 8,192 entries — not twelve and 4,096
+
+`FUN_005d60a0` makes **twelve** comparisons and then executes `stc; rcl ebx,1`, so bit 0 is
+hardwired to 1 (the centre pixel is known non-zero — the loop only enters on a non-zero
+byte). The code is 13 bits, `DAT_006b5890` is `0x2000` bytes, and the generator's own
+`mov edx, 0x2000` accumulator init says the same. The offsets, MSB first:
+
+    bit12 2W  bit11 W  bit10 W+1  bit9 2  bit8 1  bit7 1-W  bit6 -2W
+    bit5  -W  bit4 -1-W  bit3 -2  bit2 -1  bit1 W-1  bit0 = 1
+
+`W` is the mask surface's STRIDE (`[esi+0x1c]`), the walk starts at `pixels + 2*(W+1)` and
+runs `(H-4)*W - 4` bytes. One quirk, transcribed rather than tidied away: the neighbour test
+is `cmp ch, byte [edi+off]`, and `ch` is the LOOP COUNTER's own high byte, not a constant.
+For a 0/255 mask it is only ever 0..2, so it is exactly "the neighbour is non-zero", but a
+faithful port keeps it.
+
+### 2. `FUN_005cbea0`'s argument map, corrected
+
+The probe's `(flags, thr, cap)` triples are the first three pushes, and only `flags` was
+right about what it does:
+
+```
+if (flags & 3)  FUN_005d6820(src, flags & 3)                 # rotate/flip
+if (flags & 0x20) { FUN_005d66f0(mask, src, 0x100)           # silhouette at full alpha
+                    FUN_005d60a0(mask, arg1 ? 0x100 : alpha) }  # THE EDGE PASS
+else if (flags & 0x10) FUN_005d66f0(mask, src, arg1 ? 0x100 : alpha)
+if (arg1) FUN_005d6590(mask, mask, arg1, arg2, alpha)        # THE SPREAD, in place
+```
+
+So `arg1` is the SPREAD's threshold and gates whether the spread runs at all; `arg2` is its
+cap; the alpha is a LATER argument (`[esp+0xe8]`). A `0x20` site with `arg1 != 0` runs BOTH
+passes, edge first. `FUN_005d60a0`'s own tail scale is skipped whenever its parameter is
+`0x100`, which is exactly the case at every site that also spreads.
+
+### 3. Where the table comes from — and why it is not in either source
+
+The graphics-init at `0x5c9762` is guarded by a run-once byte at `0x6b7920`. It looks for
+`dat\aliasing.dat` (`FUN_005ec1d0`), reads 8,192 bytes straight into `DAT_006b5890` if it is
+there, and otherwise loads **`letras.bmp`** and computes them:
+
+* thirteen offsets in the SAME order as the classifier's bits, `[0, W-1, -1, -2, -1-W, -W,
+  -2W, 1-W, 1, 2, W+1, W, 2W]` — the two readings agree bit for bit, which is the strongest
+  cross-check either of them has;
+* 8,192 `(sum, count)` pairs with **`count` initialised to 1**;
+* per pixel, `code = Σ_k (p[i+offs[k]] >= 0x80) << k`, then FOUR rounds of
+  `sum[c] += d; count[c] += 1; sum[c ^ 0x1fff] += 0xff - d; count[c ^ 0x1fff] += 1`, with
+  `c` re-mapped between rounds by `T(c) = (c & 1) | ((c >> 3) & 0x3fe) | ((c & 0xe) << 9)`;
+* `table[c] = sum[c] // count[c]`, then the file is written out as a cache.
+
+**Neither `letras.bmp` nor `dat\aliasing.dat` ships** — measured over the install, all six
+PKFs, `pm98.iso` and `Premier_Manager_98.rar` (`build_aliasing_table.py --check-sources`).
+The ISO's two `letras` hits are MANAGER.EXE's own string literal. And the running game does
+not write the cache either: after a full boot + career + match nav, `dat/` is still empty.
+
+### 4. So it was read out of the process, and it is provably the generator's own output
+
+`m5_rsp_capture.py` now dumps `0x6b5890..+0x2000` and the guard over the RSP stub it already
+holds. Guard `1`, table 3,921 non-zero of 8,192, 223 distinct. Three structural predictions
+of the transcription all hold — **rotation invariance at 0 violations in 8,192**, the
+`count = 1` signature (616 complementary pairs summing to exactly 127, i.e. `255//2` and
+`0//2`), and monotonicity in popcount from 1.0 at zero bits to **253 at thirteen**. The
+bytes and the full argument are in `tools/re/refs/aliasing-2026-08-02/`.
+
+**253, not 255, is the finding.** Every fully-enclosed pixel of every `0x20`-blitted sprite
+is nudged 2/256 toward the destination — which is the one thing a spread can never do, is
+where s84 measured 415 of 449 residual pixels to be, and is exactly the magnitude that flips
+a pixel through the `DAT_00675398` dither.
+
+### 5. What it scores, said plainly
+
+`probe_groupdraw_kit_edge.py` runs the pass on the GROUP DRAW's four RIDIESC kits — the only
+kit oracle with a WITNESSED destination, because five of the six group boxes are empty and
+their row bands are pixel-identical, so the pixels under group A's kits are readable off
+group C's. With no free parameter it takes the four kits from **396 wrong pixels to 349**.
+Directionally right; not closed. Two things are still open and neither is the table:
+
+* ~~determinism across boots is unverified~~ — **CONFIRMED the same session**: a second,
+  fully isolated instance (copied wineprefix, own wineserver, own X display, own boot and
+  career) dumps the same 8,192 bytes, same sha256. WHERE the generator's input comes from is
+  still not reversed — `letras.bmp` is in neither source and the load plainly succeeds;
+* the probe picks each row's kit by best match rather than by club, so its per-kit baseline
+  (87..135 wrong) is worse than the port's own render of that screen (33 of 221). Scoring
+  the pass against the PORT's render, not a best-match sprite, is the next step.

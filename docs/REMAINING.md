@@ -1,5 +1,86 @@
 # PM98 Android — remaining-work inventory (refreshed 2026-08-02)
 
+## 0a-s89. Closed 2026-08-02 (session s89) — THE CUP-DRAW GATE IS THE ORIGINAL'S OWN, AND THE EDGE-PASS TABLE IS OUT OF THE RUNNING GAME
+
+### 1. ⭐ THE CUP DRAW'S PARTICIPATION GATE — READ, not declared
+
+s88 wrote "⚠ do not plan a sixth drive before reading the binary", because five career
+drives had been planned around a rule that was the PORT's own: `Career._queue_cup_draw`'s
+comment said *"DECLARED OURS: no frame shows what the original does for a non-participant"*
+and the refs README restated it as fact. **It is read now, and the port is right.**
+
+The screen is `FUN_004d9a00` (`0x4d9a00..0x4dc31b`, `ret 0x1c`), found by recursive descent
+(`tools/re/funcs.py`) rather than by a call scan — s87's range `0x4da000..0x4db000` is the
+MIDDLE of one 3,038-instruction function, and the only route to the `GROUPS` xref is the
+six-arm switch at `0x4d9aca`. The identification is a string list, not an inference: FINISH,
+CONTINUE, GROUPS, MATCHES, 1ST LEG / 2ND LEG / MATCH / REPLAY, SEMIFINAL 1 / SEMIFINAL 2 and
+every `img\sorteo\frames\*.bmp`.
+
+Before it draws anything it scans the draw. Two arms — the knockout one walks the round's
+TIE array (stride `0xbc`, club ids at `+0x38`/`+0x3a`), the group one walks a flat club-id
+WORD array — and each resolves every club and tests **`club + 0x5c != 0xffff`**, the same
+human-managed predicate `FUN_0057d2d0` gates club news on. Then:
+
+    0x4d9b24  test ebx, ebx / jne 0x4d9b2f      ; a managed club is in this draw -> draw it
+    0x4d9b28  xor eax, eax / jmp 0x4dc2fe       ; otherwise return 0 and paint NOTHING
+
+The port tests `pd.players.has(club_id)` — the drawn round's own player list — which is the
+same test on the same data. **So a SEMIFINAL or FINAL draw genuinely cannot be captured by
+driving any career to April: the manager's club has to BE in that semifinal.** The five
+drives were not mis-framed, only unlucky. Probe `tools/re/probe_cupdraw_raise_site.py`,
+record `docs/re/cupdraw_screen_re.md` §"THE PARTICIPATION GATE".
+
+Read with it, and NOT built: `SEMIFINAL 1` / `SEMIFINAL 2` are drawn at `0x4dbee5` /
+`0x4dbf49` in Proman12, guarded by "the round has exactly two ties". The labels and their
+sites are now known; there is still no witness frame to render-diff, so they stay unbuilt.
+
+### 2. ⭐ THE 0x20 EDGE PASS — the table is IN HAND, out of the running original
+
+s88 left it "one runtime-built table away". Two of its numbers are corrected and the table
+is extracted.
+
+* **The code is 13 bits and the table is 8,192 entries**, not 12 and 4,096: `FUN_005d60a0`
+  makes twelve comparisons and then `stc; rcl ebx,1`, hardwiring bit 0 to 1.
+* **`FUN_005cbea0`'s arguments are not (flags, thr, cap).** `arg1` is the SPREAD's threshold
+  and gates whether the spread runs at all, `arg2` its cap, and the alpha is a much later
+  argument. A `0x20` site with `arg1 != 0` runs BOTH passes, edge first.
+* **`letras.bmp` — the generator's input — ships in NEITHER source.** Not loose, not in any
+  of the six PKFs, not on `pm98.iso` (its two `letras` hits are the EXE's own literal), not
+  in the RAR; and no `dat/aliasing.dat` in either. The running game does not write the cache
+  either: after a full boot + career + match nav, `dat/` is still empty.
+* **So it was read out of the process.** `m5_rsp_capture.py` now dumps `0x6b5890..+0x2000`
+  and the run-once guard on the RSP connection it already holds. Guard 1; 3,921 of 8,192
+  non-zero; 223 distinct. Bytes + argument: `tools/re/refs/aliasing-2026-08-02/`.
+* **It is provably the generator's own output**, against three predictions of the
+  transcription (`tools/re/build_aliasing_table.py`): rotation invariance at **0 violations
+  in 8,192**; the `count = 1` init showing up as 616 complementary pairs summing to exactly
+  127 (`255//2` and `0//2`); and monotonicity in popcount from 1.0 to **253 at thirteen bits**.
+* **253, not 255, is the finding**: every fully-enclosed pixel is nudged 2/256 toward the
+  destination — the one thing a spread cannot do, exactly where s84 measured 415 of 449
+  residual px, and exactly the magnitude that flips a pixel through the dither.
+
+**Scored, and NOT closed.** `tools/re/probe_groupdraw_kit_edge.py` runs the pass against the
+only kit oracle with a WITNESSED destination (the group draw — five of six boxes are empty
+and pixel-identical, so what is under group A's kits is readable off group C's) and with no
+free parameter takes the four kits from **396 wrong pixels to 349**. Directionally right.
+Record: `docs/re/shadow_blit_re.md` §"The 0x20 arm, RUN".
+
+### 3. NOT done in s89, said plainly
+
+* **The edge pass is not shipped.** `PMShadow` still implements only the `0x10` spread.
+  Determinism was the gate and it is CLEARED — a second, fully isolated instance dumps the
+  same 8,192 bytes — so what remains is the render-diff: the probe scores against a
+  best-match sprite rather than the port's own render of that screen, and no sprite in
+  `app/art/kits/ridi` gets those cells under 74 px even with the model applied.
+* **The M5 goal-2 capture RAN but did not finish.** The prerequisite s87 named is no longer
+  missing tooling: `m5_rsp_capture.py` gained a clock-watchpoint RUN-UP (the seed watchpoint
+  traps ~33 times a tick, so reaching clk 2837 cost ~94,000 stops of pure fast-forward and
+  is why this had never been attempted) and its silent 40,000-stop cap is now
+  `PM98_MAX_STOPS`. What it captured is a PREFIX of 2837..8469, not the whole window.
+* **A SEMIFINAL / FINAL cup draw** — still a capture, and now known to require a surviving
+  club (§1). No sixth drive was run.
+* **The real-device pass** — still needs Mats and a phone.
+
 ## 0a-s88. Closed 2026-08-02 (session s88) — THE GROUP DRAW IS BUILT, THE KIT-EDGE PASS IS IDENTIFIED, AND THREE BANKED FRAMES WERE FILED UNDER THE WRONG NAMES
 
 ### 1. ⭐ THE EUROPEAN CUP **GROUP DRAW** — the biggest carried BUILD item, BUILT at 1 px
@@ -642,42 +723,35 @@ makes it unusable. `PM98_NO_RAISE=1` is the switch — `click.sh`, `autodrive.cl
 a drive started the normal way never raises. Export it yourself if you invoke `autodrive.py`
 / `boot.sh` / `nav_career.sh` directly.
 
-## STILL OPEN AFTER s88 — THE WHOLE CARRIED SET, IN ONE PLACE
+## STILL OPEN AFTER s89 — THE WHOLE CARRIED SET, IN ONE PLACE
 
-> **REWRITTEN 2026-08-02 (s88).** The block below carried a heading of "after s84" and three
-> entries that s85/s86 had already closed — the positional engine "not wired into MatchSim"
-> (it IS wired, and has been since the M5 wire-in: `Main` builds a `Pm98LiveMatch` for a
-> WATCHED fixture, s86 §1), stoppage time "unrun" (pinned, s86 §2) and the cross-seed
-> `PM98_SEED` sweep "unrun" (16/16 reached full time, s86 §6). They are gone. What is left is
-> **four** open items and **two** that are closed as far as they can be.
+> **REWRITTEN 2026-08-02 (s89).** Two of s88's four open items moved. The cup-draw item is
+> no longer "read the binary first" — it is read, the port's gate is the original's own, and
+> what is left is a pure capture. The kit-edge item is no longer "one table away" — the
+> table is extracted and validated, and what is left is a determinism check and a render-diff.
 
 **Open — CAPTURE / driving time**
 
-* **A SEMIFINAL / FINAL cup draw.** FIVE drives have now failed. ⚠ **The reason every one of
-  them was framed as "survive to April" is an ASSUMPTION, and it is the port's own.**
-  `Career._queue_cup_draw` gates the card on the manager's club still being in the
-  competition and its own comment says so plainly: *"DECLARED OURS: no frame shows what the
-  original does for a non-participant"*. The refs README then restated that gate as if it
-  were a fact about the original, and five drives were planned around it.
-  What the corpus actually has is NEGATIVE evidence, one career deep: the s88 drive ran 98
-  steps from 30 Jan 1999 through the season end and preseason — 15 matches, three final
-  league tables, a champion card — with Man Utd out of both domestic cups, and banked **zero
-  `cup_draw` screens** (the signature is taught and `cup_draw` is in the plan's `keep` list,
-  so one would have been caught). Consistent with the gate; not proof of it.
-  **Settle it by reading the binary before driving a sixth career.** The CUP DRAW screen's
-  code range is known (`0x4da000..0x4db000`, s87) and so is its only `GROUPS` xref
-  (`0x4da6a4`); the question is whether the raise site tests the manager's club at all. If it
-  does not, the capture stops needing a surviving club and becomes "drive any career to
-  April", which is a completely different job.
-* **The M5 goal-2 divergence** (26' against 24', right team, 2837 < clk < 8469). Needs a
-  fresh ~5,632-frame `m5_rsp_capture` run on a box with NO other wine load, then a per-frame
-  diff. Command in `docs/re/M5_S85_WATCH_PLAYSTATE_FULLTIME.md`. Largest carried RE item.
+* **A SEMIFINAL / FINAL cup draw.** FIVE drives have failed, and s89 settles WHY they had
+  to: `FUN_004d9a00` returns 0 without painting unless a human-managed club is in the drawn
+  round's own tie/club array (`club+0x5c != 0xffff`), so the manager's club must BE in that
+  semifinal. This is a capture, not a reading, and it is the port's own gate confirmed.
+* **The M5 goal-2 divergence** (26' against 24', right team, 2837 < clk < 8469). The blocker
+  s87 named — "no per-frame reference beyond clk 2837" — is being removed rather than
+  restated: `m5_rsp_capture.py` now has a clock-watchpoint RUN-UP and a raisable stop cap,
+  and s89 ran it. What exists is a PREFIX of the window; the run needs hours it did not get.
+  Command and gotchas in `docs/re/M5_S85_WATCH_PLAYSTATE_FULLTIME.md`.
 
 **Open — RE**
 
-* **The 1-px on-sprite kit edge.** IDENTIFIED s88 as `FUN_005cbea0`'s `0x20` arm
-  (`FUN_005d60a0`, a 12-neighbour classifier over `DAT_006b5890`). What is left is the table,
-  which is the generated `dat\aliasing.dat`. See §0a-s88.2.
+* **The 1-px on-sprite kit edge.** IDENTIFIED s88, TABLE EXTRACTED s89
+  (`tools/re/refs/aliasing-2026-08-02/`). Two things left, neither of them the table:
+  determinism is CONFIRMED (a second, fully isolated boot dumps the same sha256), so what is
+  left is the RENDER-DIFF. First score with a witnessed destination: 396 -> 349 wrong pixels
+  over the four group-draw kits, improving on all four. It is not a close, and the reason is
+  named: no sprite in `app/art/kits/ridi` reproduces those cells better than 74..125 px even
+  under the model, so the probe's sprite or geometry identification is wrong, not necessarily
+  the pass. Score it against the port's OWN render of that screen next. See §0a-s89.2.
 
 **Needs Mats**
 

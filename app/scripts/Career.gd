@@ -1368,11 +1368,17 @@ func _queue_cup_draw(b: Dictionary) -> void:
 	# ...and only for a competition the manager's club is STILL IN. The card is a hub
 	# INTERRUPT, so raising it for a cup you are out of (or never entered) stops the week
 	# for a draw that cannot involve you — owner-reported 2026-07-29, on the European
-	# quarter-finals of a career with no European place at all. DECLARED OURS: no frame
-	# shows what the original does for a non-participant (the reference run's club was in
-	# the European Cup and both domestic cups all season, so every draw it saw was its
-	# own). The bracket itself is unchanged and every round stays readable on the
-	# KNOCKOUT screen — only the unprompted card is gated.
+	# quarter-finals of a career with no European place at all.
+	#
+	# READ OFF THE BINARY 2026-08-02 (s89) — this was carried as "DECLARED OURS" for four
+	# days and it is the ORIGINAL's own rule. The SORTEO screen `FUN_004d9a00` scans the
+	# draw before it draws anything: the knockout arm walks the round's tie array (stride
+	# 0xbc, club ids at +0x38/+0x3a) and the group arm walks the flat club-id array, and
+	# each resolves every club and tests `club+0x5c != 0xffff` — the same human-managed
+	# predicate `FUN_0057d2d0` gates club news on. If no club in the draw is managed,
+	# @0x4d9b24 returns 0 and paints nothing. See `docs/re/cupdraw_screen_re.md`
+	# §"THE PARTICIPATION GATE". The bracket itself is unchanged and every round stays
+	# readable on the KNOCKOUT screen — only the unprompted card is gated.
 	#
 	# The test is the DRAWN ROUND's own player list, not `Cup.still_in`: the domestic cups
 	# hold the Premier clubs out until Round 3 (`late_entry`), so a survivors test would

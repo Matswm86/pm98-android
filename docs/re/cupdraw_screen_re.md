@@ -466,3 +466,74 @@ Recorded with it: the U.E.F.A. Cup has **two** witnessed title spellings on this
 `U.E.F.A. CUP` on `p0747` (1/16 FINAL) and `UEFA CUP` on `manutd_s2_uefa_1_32_finals.png`
 (1/32 FINALS), both at 0 px, both strings present in the EXE. What selects between them is
 not reversed.
+
+## THE PARTICIPATION GATE — READ OFF THE BINARY (s89). It was never "DECLARED OURS"
+
+`Evidence:` `extracted/Premier Manager 98/MANAGER.EXE` @0x4d9a00..0x4d9b2a (capstone,
+`tools/re/funcs.py` recursive descent), `tools/re/probe_cupdraw_raise_site.py`,
+`app/scripts/Career.gd::_queue_cup_draw`.
+
+Five career drives failed to bank a SEMIFINAL or FINAL draw, and every one of them was
+planned around "the draw only appears for a round your own club is still in". That
+sentence was the PORT's own rule. `_queue_cup_draw`'s comment said so plainly — *"DECLARED
+OURS: no frame shows what the original does for a non-participant"* — and the refs README
+then restated it as a fact about the original. s88 filed "read the binary before driving a
+sixth career". This is that reading, and **the port's gate is the original's own**.
+
+### Finding the screen
+
+The screen is `FUN_004d9a00`, `0x4d9a00..0x4dc31b`, `ret 0x1c` (seven stack arguments plus
+`this`). It could not be found by the usual route — a byte scan for `E8 rel32` landing in
+the s87 range `0x4da000..0x4db000` returns exactly ONE target, and none from outside it —
+because the range is the MIDDLE of one 3,038-instruction function whose entry sits below it
+and whose flow reaches `GROUPS` only through the six-arm switch at `0x4d9aca`
+(`jmp dword ptr [eax*4 + 0x4dc320]`). `tools/re/funcs.py` walks that flow; the identification
+is then not an inference but a string list — the function references `FINISH`, `CONTINUE`,
+`GROUPS`, `MATCHES`, `1ST LEG` / `2ND LEG` / `MATCH` / `REPLAY`, `SEMIFINAL 1` /
+`SEMIFINAL 2`, and all of `img\sorteo\frames\{fondo,Bombo00..11,Bola0..3,Mano0..7}.bmp`.
+
+### The gate itself
+
+The first thing the screen does, before it draws anything, is decide whether it is going to
+draw at all. It has **two arms**, on the seventh argument (`esi`):
+
+* **`esi == 0` — the KNOCKOUT form.** `edi` is the round's TIE array, stride `0xbc`, with
+  the two club ids at `+0x38` and `+0x3a`, and the count is the halved first argument. For
+  every non-zero club id it resolves the club record (`FUN_00585ee0` on the club store at
+  `0x66c0d0`, then `FUN_005793d0`) and tests **`club + 0x5c != 0xffff`**;
+* **`esi != 0` — the GROUP form.** `esi` is a flat array of club id WORDs and the first
+  argument is its length (stored at `[this+0x2160]`, with `length / 4` at `[this+0x2164]`
+  — four clubs to a group). The same club-record resolution and the same `+0x5c` test runs
+  over every entry.
+
+Either arm leaves `ebx = 1` iff at least one club in the draw is human-managed, and then:
+
+```
+0x4d9b24  test ebx, ebx
+0x4d9b26  jne  0x4d9b2f     ; a human-managed club is in this draw -> build the screen
+0x4d9b28  xor  eax, eax
+0x4d9b2a  jmp  0x4dc2fe     ; the shared epilogue: return 0, draw NOTHING
+```
+
+`club + 0x5c != 0xffff` is the same human-managed-club predicate `FUN_0057d2d0` gates club
+news on (s85, the relegation-clause ladder). With one manager it is exactly "the manager's
+club is in this draw".
+
+**So the port is right, and right for the right reason.** `_queue_cup_draw` tests
+`pd.players.has(club_id)` — the DRAWN ROUND's own player list, not `Cup.still_in` — and the
+binary tests the drawn round's own tie/club array, not a competition-membership field. The
+"DECLARED OURS" hedge is retired; the rule is cited.
+
+**And it settles the capture.** A SEMIFINAL or FINAL draw cannot be banked by driving any
+career to April: the manager's club has to BE in that semifinal. Five drives were not
+unlucky in their framing, only in their results.
+
+### A form the port does not have, now readable
+
+`SEMIFINAL 1` (`0x653ecc`) and `SEMIFINAL 2` (`0x653ec0`) are drawn at `0x4dbee5` and
+`0x4dbf49`, both in `Proman12`, guarded by `[this+0x7798] == 2 && [this+0x779c] == 0` —
+i.e. when the round being drawn has exactly TWO ties. `Cup.gd` deliberately does not invent
+those plates ("a label the EXE does not carry ... is uppercased as-is rather than invented
+into one of the SEMIFINAL 1 / SEMIFINAL 2 plates"). The labels and their draw sites are now
+read; what is still missing is a WITNESS FRAME to render-diff against, so they stay unbuilt
+under the project's own rule rather than being shipped on a reading alone.

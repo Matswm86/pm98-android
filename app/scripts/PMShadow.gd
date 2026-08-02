@@ -49,15 +49,25 @@ class_name PMShadow
 ## is not one of those two must pass its OWN site's thr and cap.
 ##
 ## ⚠ AND SIXTEEN SITES ARE A DIFFERENT PASS ENTIRELY. `flags = 0x20` takes the other arm of
-## `FUN_005cbea0` — `FUN_005d66f0(src, 0x100)` then **`FUN_005d60a0`**, a 12-neighbour
-## EDGE pass that rewrites each mask byte as `LUT[code] * 2 + 1` out of a 4096-entry table
-## at `DAT_006b5890` — where `flags = 0x10` takes the `FUN_005d6590` SPREAD this leaf
-## models. Nothing here implements the 0x20 arm yet, and it is the standing candidate for
-## the un-reversed 1-px on-sprite kit edge: `0x5c0688`, the RIDIESC picture widget's own
-## blit, is a 0x20 site (its flags word is `FUN_005c0d50`'s `param_4 = 0x20`, stored at
-## record `+0x90` and reloaded at `0x5c0607`). See docs/re/shadow_blit_re.md, "The 0x20
-## arm". `DAT_006b5890` is above `.data`'s raw end (0x667000), so the table is BUILT at
-## runtime and the next step is to find what writes it.
+## `FUN_005cbea0` — `FUN_005d66f0(src, 0x100)` then **`FUN_005d60a0`**, an EDGE pass that
+## rewrites each mask byte as `table[code] * 2 + 1` — where `flags = 0x10` takes the
+## `FUN_005d6590` SPREAD this leaf models. Nothing here implements the 0x20 arm yet, and it
+## is the standing candidate for the un-reversed 1-px on-sprite kit edge: `0x5c0688`, the
+## RIDIESC picture widget's own blit, is a 0x20 site (its flags word is `FUN_005c0d50`'s
+## `param_4 = 0x20`, stored at record `+0x90` and reloaded at `0x5c0607`).
+##
+## s89 corrects two numbers and removes the blocker. The code is **13 bits and the table is
+## 8,192 entries**, not 12 and 4,096: the leaf makes twelve comparisons and then `stc; rcl`,
+## so bit 0 is hardwired to 1. `DAT_006b5890` is `.bss`, built by the graphics-init at
+## 0x5c9762 from `letras.bmp` — which ships in NEITHER source — so it was read out of the
+## RUNNING original instead (`tools/re/refs/aliasing-2026-08-02/`, dumped by
+## `m5_rsp_capture.py`). It is provably the generator's own output: rotation-invariant at
+## 0 violations in 8,192, and monotone in popcount up to **253 for a fully-enclosed pixel**
+## — a 2/256 nudge toward the destination on every interior pixel, which is where s84
+## measured 415 of 449 residual px to be. Determinism across boots is CONFIRMED: a second,
+## fully isolated instance dumps the same 8,192 bytes, same sha256. What still gates shipping
+## the pass is the render-diff, not the table. See docs/re/shadow_blit_re.md, "The 0x20 arm,
+## RUN".
 const THR := 0x21          ## FUN_005cbea0 param_2 at 0x50f9e3 / 0x50fba1 ONLY
 const CAP_MARKER := 0x63   ## FUN_0050f970 -- the MAN-TO-MAN marking-line markers
 const CAP_KIT := 0x84      ## FUN_0050fae0 -- the 48x64 opponent kit
