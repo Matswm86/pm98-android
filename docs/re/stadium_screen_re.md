@@ -145,8 +145,21 @@ panel(bx, by)  <-  tile[(by + (2 if bx < 64 else 1)) % 240][(bx + 256) % 320]
 — columns rotated by 256 with the row offset stepping by one across the wrap, i.e. a flat-buffer
 misregistration, not a clean column roll (a plain roll fixes columns 64…319 and leaves 0…63 at
 80% differing). **And the tile is drawn at y = 146, not the 148 read off frame 172**, so
-`SCENE_BOX` is now `Rect2(299, 146, 320, 240)`. Result on the live app render: picture panel
-**98.15% pixel-exact / 0.83% >8**, whole GROUND screen 54.5% → 78.0% exact.
+`SCENE_BOX` is now `Rect2(299, 146, 320, 240)`.
+
+**SUPERSEDED at the tile level (2026-08-02, s92): the picture panel is now 100.00%
+pixel-exact.** The unwrap was a PERMUTATION of the decoded pixels, so it could never restore
+the 640 px whose content the misregistered decode never read at all — rows 2 (x≥64), 238
+(x<64) and 239, which held the DIB's own black scanlines instead and rendered as a thin black
+edge along the picture's top and bottom (the 0.83% residual below, the owner's "stadium art
+is NOT FIXED"). The content IS in `RECURSOS.PKF`: `tools/re/reexport_estadio_exact.py`
+re-exports all twelve tiles through `pkf_image.dib_indices()` (the exact path, offset 54) on
+the realised palette, corrects the decode's measured two-row shift ([2 black scanlines] +
+decode rows 0..237 — the black top rows are witnessed on every frame of all five witnessed
+tiers), and verifies **100.00% exact, 0 px >8, on all ELEVEN real-render witnesses across
+five capacity tiers** (tiers 0/1/2/3/4). `fix_estadio_wrap.py --apply` now refuses — the
+shipped tiles are no longer wrapped. Tiles 5, 7, 8, 9, 11 and the byte-identical 6/10 pair
+still have no render witness; they carry the same decode and the same reconstruction.
 
 Tool: `tools/re/fix_estadio_wrap.py` (`--apply` rewrites the tiles, `--verify` re-measures).
 **Scope caveat (narrowed 2026-07-26 evening):** tier 4 was the only tile with a real render to
@@ -187,10 +200,12 @@ is being read as an offset.
   tier = from that capacity. (STALE NOTE CORRECTED 2026-07-26: **476/476** clubs carry a real
   `capacity` in `game_db.json` since the EQUIPOS byte-exact decode — the old "15/476 …
   FinanceModel._CAP fallback" line described the pre-decode DB; `_CAP` is dead fallback now.)
-- **HONEST GAPS (blank, never fabricated):** **CAR PARK spaces** and **PITCH quality** are in
-  no `game_db.json` field. The prior build's parking = `capacity/27` and pitch = "NORMAL" were
-  fabrications; both value cells are now left blank. **TOTAL IMPROVEMENTS** money = £0 (an
-  in-progress expansion's £cost is not threaded to this screen — see WIRING).
+- **(STALE NOTE CORRECTED 2026-08-02, s92):** the "CAR PARK spaces / PITCH quality blank"
+  honest-gap below described the pre-`GroundCost`/`GroundPreset` build. Both cells render
+  for every club now: `StadiumScreen.set_improve_state` takes
+  `GroundCost.car_park_price(cost_tier)` (the reversed `FUN_0057ddd0` table, which
+  reproduces the witnessed Man Utd £2,975,000 exactly) and Main always passes the club's
+  band. The old fabricated `capacity/27` parking and "NORMAL" pitch stay dead.
 
 ## The chrome bake
 `tools/re/build_stadium_chrome_from_frames.py` cuts the two panels + four buttons opaque from

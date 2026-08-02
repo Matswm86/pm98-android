@@ -578,10 +578,26 @@ row band `(160,180,200)`, ink `(60,80,100)` — i.e. `C_GRID_KIT_BG[1]` / `C_GRI
 `C_GRID_INK[1]`, in the columns `GRID_KIT_L` / `GRID_HOME` / `GRID_AWAY` / `GRID_KIT_R`
 already in `CupDrawScreen.gd`.
 
-**Still NOT built**, deliberately: the form is measured but not shipped, because the project
-does not ship a panel on a measurement without the render-diff, and that is the next
-session's work rather than a rushed one at the end of this one. Everything it needs is
-above and in the refs directory.
+**BUILT (2026-08-02, s92), render-diffed against BOTH frames.** `CupDrawScreen.is_semis()`
+switches on exactly two ties; `chrome_semis.png`
+(`tools/re/build_semisdraw_chrome_from_frames.py`, cross-checked 0 px between the two
+frames' bakes) carries the backdrop, both plates WITH their text, the ROUND plate with its
+own `SEMIFINALS` (the plate text has a dithered drop shadow plain ink cannot reproduce —
+37 px without it), and the cleared row bands. The dynamic layer, all solved to 0 px:
+
+* names in proman10, pen `(S - adv) / 2` on the cell interiors' own field sums
+  (`SEMIS_HOME` 361+476, `SEMIS_AWAY` 479+594), pen top interior+11 — every one of the
+  eight witnessed names reproduces exactly;
+* the kit is the **24x32 NANOESC bank** at the cell interior's origin, through the 0x20
+  EDGE + spread pass at **thr 0x40 / cap 0x80** — the attested `(0x20, 0x40, 0x80)` triple
+  of the site survey. The sweep over every attested (thr, cap) pair lands this one at 0 px
+  over the Coca-Cola frame's four kits; the group form's (0x20, 0x80) leaves 459.
+
+`diff_cupdraw_parity` gates both frames: the Coca-Cola witness at **0 px**, the F.A. at
+**2 px**, both Newcastle-kit edge pixels the Python replica of the leaf reproduces — a
+real un-reversed corner of the 13-bit edge classifier on that one sprite, recorded as a
+named exclusion like the GROUPS flag ROW 0. The own-tie plate and tapped-row states are
+the GRID form's, carried onto these rows — OURS, flagged: no semifinal frame shows either.
 
 ### And the FINAL draw is still unwitnessed
 

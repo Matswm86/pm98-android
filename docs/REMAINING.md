@@ -1,5 +1,77 @@
 # PM98 Android — remaining-work inventory (refreshed 2026-08-02)
 
+## 0a-s92. Closed 2026-08-02 (session s92) — THE SEMIFINAL FORM SHIPS AT 0 px, THE CUP CALENDAR LANDS ON ITS AUTHORED WEEKS, AND THE YOUTH LOOP BECOMES PLAYABLE
+
+### 1. ⭐ THE SEMIFINAL PANEL FORM — BUILT and render-diffed against both banked frames
+
+`CupDrawScreen.is_semis()` (exactly two ties, the binary's own `[this+0x7798] == 2` plate
+guard) mounts `chrome_semis.png` — baked by `tools/re/build_semisdraw_chrome_from_frames.py`
+from the s91 witnesses, cross-checked 0 px between the two frames' bakes. Solved to zero:
+the name pens (`proman10`, field sums 361+476 / 479+594, pen top interior+11 — all eight
+witnessed names exact), the ROUND plate baked WITH its `SEMIFINALS` (the plate text carries
+a dithered drop shadow plain ink cannot paint — 37 px without it), and the row kit: the
+**24x32 NANOESC bank through the 0x20 EDGE pass at thr 0x40 / cap 0x80** — the attested
+`(0x20, 0x40, 0x80)` site triple, picked by a sweep over every attested pair (0 px vs 459
+for the group form's own 0x20/0x80). `diff_cupdraw_parity` gains both cases: Coca-Cola
+**0 px**, F.A. **2 px** (Newcastle kit, reproduced by the Python replica of the leaf — an
+un-reversed corner of the 13-bit edge classifier, named exclusion like the GROUPS flag
+ROW 0). `test_cupdraw_screen` §8 pins the form switch, geometry, pens, row taps, and that
+a 1-tie FINAL does NOT take this form (unwitnessed — do not assume).
+
+### 2. THE DOMESTIC CUP CALENDAR LANDS ON ITS AUTHORED WEEKS — the ×39/38 drift is dead
+
+The authored 1997-98 tables (`FA_CUP_WEEKS` / `LEAGUE_CUP_WEEKS`) were dead constants: the
+live schedule ran them through `tail_fracs` (week/38) × 39, drifting every January-onward
+round one week late (F.A. R3 wk23, R4 wk26, QF wk32, SF wk36; the pinned FA/CC shared weeks
+15/22/25 — REAL shared weeks, 3+6 Jan 1998 — smeared onto mismatched weeks). `Cup._schedule`
+now takes `tail_weeks` (absolute weeks, wins over `tail_fracs`); `Career._cup_opts_on_calendar`
+maps the authored tables onto the 39-slot grid — a week past `BLANK_LEAGUE_WEEK` shifts one
+later, so the F.A. SEMIFINALS land ON the blank week (the real 4-5 Apr 1998 weekend has no
+league round) and the FINAL takes the season's last week. Result: FA `[15,18,22,25,28,31,35,39]`,
+CC `[1,6,10,15,19,22,25,34]` — the authored calendar verbatim. A 46-round lower-division
+career keeps the proportional fraction path unchanged. `test_league_calendar` §8 pins both.
+
+### 3. EVERY COMPETITION PLAYS ON ITS OWN DAY — the one-Saturday pile-up is gone
+
+The owner's report ("suddenly I had 3 matches on the same day and played them all —
+Coca-Cola, league, FA Cup and Europe") had two causes: the drift above, and every presented
+match stamping the league's Saturday. The original never stacks a week's matches on one
+date — witnessed on its own hub/results dates: F.A. Cup R2 **Sun** 14 Dec 1997, Coca-Cola
+R4 **Mon** 1 Dec 1997, European ties **Wed** 17 Sep + 1 Oct 1997. `PMChrome.date_parts`
+gains a `day_off`; `Main._show_match_result` stamps each cup/European tie's read-out with
+its competition's witnessed day (F.A. +1, Coca-Cola +2, Europe +4; league keeps Saturday).
+Same-week co-scheduling REMAINS where the real calendar has it (F.A. R3 Sat + CC QF the
+following Tue was January 1998's own shape). Still a declared abstraction: both legs of a
+two-legged tie resolve in the one scheduled week (Cup.gd header, unchanged).
+
+### 4. THE R13 PRE-FINAL-ROUND DIVISIONS SCREEN — restored on Premier careers
+
+`_queue_division_finals()` ran BEFORE `_advance_other_divisions()` in the same
+`advance_week`, so on a Premier career the 46-round divisions still read P=44 when the
+queue was built at week 38 — nothing queued, and the witnessed "final tables of the
+divisions that have already finished" screen before the last round NEVER appeared (a
+lower-division career was unaffected, which is why the R12/R13 witnesses passed). The call
+is moved after the lower divisions' rounds; `test_league_calendar` §7 pins the order in
+`advance_week`'s own source.
+
+### 5. THE YOUTH LOOP IS PLAYABLE — the card opens, and the answer comes next week
+
+Two defects, both against the repo's own evidence:
+
+* **Any roster row now opens the YOUTH PLAYER card.** `YouthScreen`'s row tap was gated on
+  `Youth.is_ready`, so a newly signed youngster could never be opened → never put into
+  TRAINING (the card is the only writer of the 0x20 mode) → never grew → never became
+  ready. The card's own buttons carry the gates (witness p0771: TRAINING green, PROMOTE
+  greyed), so the tap fires for every youngster. `test_youth_screen` pins it.
+* **The contract answer lands the FOLLOWING week.** `offer_youth_contract` rolled
+  accept/reject inline; the refrun shows the offer card Wed 14 Oct 1998, the prospect
+  STILL in PLAYERS FOUND with an empty roster that same day (p0760), and him on the roster
+  Tue 20 Oct (p0770; FINDINGS R17 "contract offered, then 'has joined your Youth Team'
+  two matches later"). Offers now record into `Career.youth_offers` (persisted) and
+  `_resolve_youth_offers` runs the roll on the next weekly tick; both answers ride
+  `pending_alerts` with the EXE's own strings. `sign_youth_prospect` (the automated/test
+  path) collapses the wait. `test_youth_offer_route` re-pins the whole flow.
+
 ## 0a-s91. Closed 2026-08-02 (session s91) — THE PALETTE SWEEP CLOSES, THE CUP-DRAW GATE BECOMES A CAPTURE INSTRUMENT, AND M5's CANDIDATE 3 DIES
 
 ### 1. ⭐ THE REALISED-PALETTE SWEEP — DONE, and decided in one measurement
@@ -890,22 +962,16 @@ makes it unusable. `PM98_NO_RAISE=1` is the switch — `click.sh`, `autodrive.cl
 a drive started the normal way never raises. Export it yourself if you invoke `autodrive.py`
 / `boot.sh` / `nav_career.sh` directly.
 
-## STILL OPEN AFTER s91 — THE WHOLE CARRIED SET, IN ONE PLACE
+## STILL OPEN AFTER s92 — THE WHOLE CARRIED SET, IN ONE PLACE
 
-> **REWRITTEN 2026-08-02 (s91).** The realised-palette sweep is CLOSED and off this list.
-> The cup-draw item is no longer a lottery — the gate is patched and the run only needs wall
-> clock. The M5 item is narrower by one dead candidate.
+> **REWRITTEN 2026-08-02 (s92).** s92 closed the SEMIFINAL panel build (0 px on both
+> banked frames, one named 2-px Newcastle-kit exclusion), fixed the domestic cup calendar
+> drift (the authored 1997-98 week tables are now the live schedule), gave every
+> competition its own witnessed match DAY, restored the R13 pre-final-round divisions
+> screen on Premier careers, and made the youth loop playable end to end (any roster row
+> opens the card; the contract answer lands the FOLLOWING week, the refrun's own cadence).
 
 **Open — CAPTURE / driving time**
-
-* **BUILD the SEMIFINAL panel form.** The witness the last six drives were short of is
-  banked (s91, `tools/re/refs/cupdraw-semifinals-2026-08-02/`): both leg variants, Coca-Cola
-  (`1ST LEG`/`2ND LEG`) and F.A. Cup (`MATCH`/`REPLAY`), and the two frames agree on the
-  geometry exactly. It is a THIRD panel form — the GRID row at a different pitch with a
-  black `SEMIFINAL 1` / `SEMIFINAL 2` plate above each tie, reusing `C_GRID_*` colours and
-  the `GRID_KIT_L`/`GRID_HOME`/`GRID_AWAY`/`GRID_KIT_R` columns. Full measured rects in
-  `cupdraw_screen_re.md` §"THE SEMIFINAL FORM — WITNESSED". Not built in s91 on purpose: the
-  project does not ship a panel on a measurement without the render-diff.
 * **A FINAL cup draw.** Still unwitnessed. Ten distinct round labels came out of the s91 run
   and `FINAL` was not among them; that is consistent with `0x4dbee5`'s "exactly two ties"
   guard and a final having one, but the run has not been driven past a cup final, so it is
