@@ -389,11 +389,15 @@ func _draw() -> void:
 
 
 func _draw_header() -> void:
-	# borderless 32x32 BIGFOTO block over the name bar's left end, only when the
-	# face art exists (Taylor: photoId with no art in the bank -> none, baked look)
-	var face := PMChrome.face(_p.get("photoId"))
+	# Borderless 32x32 block over the name bar's left end, only when the face art exists
+	# (Taylor: photoId with no art in the bank -> none, baked look).
+	#
+	# The MINIFOTO thumbnail blitted 1:1, not the 124x182 BIGFOTO squashed into the rect —
+	# measured 2026-08-02 on this screen's own binding frame `make_offer_card.png`, photo
+	# block (128,47) 32x32: the MINI bank matches at **0 px**, the downscaled BIG at 974.
+	var face := PMChrome.mini_face(_p.get("photoId"))
 	if face != null:
-		draw_texture_rect(face, PHOTO_RECT, false)
+		draw_texture(face, PHOTO_RECT.position)
 	# single-struck PROMAN12 — the face's natural weight IS the frame's bold look
 	_txt(_f12, NAME_XY.x, NAME_XY.y, PMChrome.card_name(_p), C_WHITE, 13)
 	var word := str(POS_WORD.get(str(_p.get("pos", "")), ""))

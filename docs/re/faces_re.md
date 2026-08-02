@@ -73,3 +73,53 @@ Verified **by looking** — the join's output rendered and eyeballed, not just c
 
 International/continental squads use the compact record format; their photoId offset is
 not yet decoded (only English clubs carry `photoId` today, and BIGFOTO covers 72 clubs).
+
+## The palette was wrong, and so was which bank the cards blit (2026-08-02, s90)
+
+`Evidence:` `tools/re/export_faces.py`, `app/scenes/PlayerInfoScreen.gd`,
+`app/scenes/MakeOfferScreen.gd`, `screenshots/original-walkthrough-2026-07-02/079_154615.png`
+(+ 081 / 084), `screenshots/transfer-offers-2026-07-02/make_offer_card.png`.
+
+Two defects, and the second was invisible while the first stood.
+
+### 1. Not the shared VGA table — MANAGER.PAL plus the Windows statics
+
+The table above says both banks take "the shared 256-colour VGA palette (`DAT.PKF+0x5ca`),
+the same one every other PM98 bitmap uses", and the check behind it was "garbage under
+embedded, a clean photo under VGA". That compared the DIB's own junk palette against VGA and
+never asked the third question. Measured on the FICHA card's 32x32 photo block in the
+walkthrough's own frames (079 / 081 / 084, rect (130,68)):
+
+| | |
+|---|---|
+| colours in the block NOT in the shared VGA table | **5** |
+| colours in the block NOT in MANAGER.PAL + the Windows statics | **0** |
+
+and re-indexing the exported `mini/8432.png` through MANAGER.PAL takes it from **138 wrong
+px of 1024 to 0**. All three witnesses now match their bank entry at 0 px. This is the same
+defect `export_flags.flag_palette` documents for the MINIBAND flags and s90 found again in
+the RIDIESC kit bank: 21 of the 256 entries differ and every sampled face uses one.
+
+`_generic.png` still decodes through `force_vga` and that is not an oversight — it uses no
+affected index, so the two tables give the same bytes.
+
+**The DATABASE card's `faces/dbcard/` bank is a separate, correct thing and must not be
+folded into this one.** That card is drawn by `Dbasewin.exe`, which realises its own palette
+(the embedded table of `RC_DBASE::LIGA_ESTRELLAS.BMP`), and its bake already asserts 0 px
+against two walked frames. Two applications, two realised palettes; the note in
+`build_dbase_card_chrome_from_frames.py` that "the existing FICHA bank is a DIFFERENT
+rendering" had spotted the symptom without naming the cause.
+
+### 2. The card photo is the MINI blitted 1:1, not the BIG squashed
+
+`PlayerInfoScreen` and `MakeOfferScreen` both drew `PMChrome.face()` — the 124x182 BIGFOTO —
+scaled into a 32x32 rect. Against the binding frames:
+
+| | FICHA (130,68) | MAKE OFFER (128,47) |
+|---|---|---|
+| `mini_face()` blitted 1:1 | **0 px** | **0 px** |
+| `face()` downscaled to 32x32 | 974 | 974 |
+
+Both now blit the mini. The port's own FICHA render matches `mini/3371.png` at 0 px over the
+1,024-px block. `TeamOfferScreen` is NOT this case and is left alone: its block is 35x35 with
+a 33x33 interior and its own comment records the original downscaling the BIGFOTO there.

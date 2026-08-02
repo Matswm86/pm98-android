@@ -18,6 +18,11 @@ at all (it only banks `runup_done`), so a jsonl watcher spends the whole ~50-min
 run-up believing the match is paused and clicking into a live game. The log gets a line
 every 200 stops in both phases, which is the heartbeat that actually covers the run.
 
+Set `stall_secs` well above the log's own cadence, not just above it. The clk-trace prints
+every 200 frames, which at the measured ~200 frames/min is a line a minute — a 120 s
+threshold fired once on a healthy run (measured 2026-08-02) and put a click into a live
+match. 300 s leaves the real thing, a board pause with the log completely dead, unmistakable.
+
 Usage: resume_watchdog.py <progress.log> <log> [stall_secs] [max_secs]
 Env: DISPLAY, PM98_DESKTOP (the window is "<PM98_DESKTOP> - Wine desktop").
 """

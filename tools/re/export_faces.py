@@ -8,14 +8,27 @@ data season; NNNNN == the 5-digit player id == EQUIPOS's `photoId`, decoded in
   * `DBDAT/BIGFOTO/EQ96<DDNN>.PKF` -- the big 124x182 profile photos, one PKF per
     club (DDNN == the club crest code, same as MINIESC/BIGFOTO; 72 clubs have a
     bank). These are standard "BM" Windows DIBs that carry a JUNK embedded palette
-    (random noise); the real colours come from the shared 256-colour VGA palette
-    (DAT.PKF+0x5ca), exactly like every other PM98 bitmap -- so render = export_art
-    with force_vga, opaque (these are full-frame photos, index 0 is a real colour).
+    (random noise), so the colours come from whatever palette is REALISED.
   * `DBDAT/MINIFOTO.PKF` -- the 32x32 squad-list thumbnails (690), a CUSTOM mini
     format: a 26-byte "BM"-tagged stub header whose width/height/bpp fields are
     GARBAGE, followed by 1024 bytes of raw 8-bit indices at offset 26, stored
-    BOTTOM-UP, coloured with the same shared VGA palette. (Pillow misparses the stub
-    and yields an all-zero frame, so the mini is decoded by hand here.)
+    BOTTOM-UP. (Pillow misparses the stub and yields an all-zero frame, so the mini
+    is decoded by hand here.)
+
+THE REALISED PALETTE IS `MANAGER.PAL` + THE WINDOWS STATICS, NOT THE SHARED VGA TABLE
+at `DAT.PKF +0x5ca`. Both banks were exported through the VGA table because the doc's
+own check -- "garbage under embedded, a clean photo under VGA" -- compared the embedded
+palette against VGA and never asked the third question. Measured 2026-08-02 on the FICHA
+card's 32x32 photo block in the walkthrough's own frames (079/081/084, rect (130,68)
+32x32):
+
+    colours in the block that are NOT in the shared VGA table      5
+    colours in the block that are NOT in MANAGER.PAL + statics     0
+
+and re-indexing the exported `mini/8432.png` through MANAGER.PAL takes it from **138
+wrong px of 1024 to 0**. This is the same defect `export_flags.flag_palette` documents
+for the MINIBAND flags and s90 found again in the RIDIESC kit bank; 21 of the 256
+entries differ, and every sampled face uses at least one of them.
 
 Generic fallback: `IMG.PKF::FOTO_GENERAL.BMP` -- the silhouette the original shows
 for any player whose photoId has no bank entry. Exported to `_generic.png`.
@@ -39,6 +52,7 @@ import sys
 from pathlib import Path
 
 import export_art as ea
+from export_flags import flag_palette
 from PIL import Image, ImageFile
 from pkf_unpack import GAME, files_of
 
@@ -51,16 +65,24 @@ MANIFEST = ROOT / "app" / "data" / "face_index.json"
 BIGFOTO = GAME / "DBDAT" / "BIGFOTO"
 
 
+def realised_palette() -> list[int]:
+    """MANAGER.PAL + the 20 Windows statics, flat RGB -- the palette the running game
+    shows these banks in. `export_flags.flag_palette` proved the table on the MINIBAND
+    flags; the module docstring records the FICHA-card measurement that pins it here."""
+    return [v for rgb in flag_palette() for v in rgb]
+
+
 def photo_id(entry_name: str) -> int:
     """`J9601851.BMP` -> 1851 (drop the J and the 96 season prefix; last 5 digits)."""
     return int(entry_name[1:].split(".")[0]) % 100000
 
 
 def export_big(english_only: bool) -> set[int]:
-    """Full-frame profile photo under the shared VGA palette (the embedded palette is
-    junk). Saved as an indexed (P-mode) PNG -- lossless and ~2.4x smaller than RGB,
-    since the source is already 256-colour."""
-    pal = ea.vga_palette()
+    """Full-frame profile photo under the REALISED palette (the embedded one is junk;
+    see the module docstring for why it is not the shared VGA table either). Saved as an
+    indexed (P-mode) PNG -- lossless and ~2.4x smaller than RGB, since the source is
+    already 256-colour."""
+    pal = realised_palette()
     ids: set[int] = set()
     for pkf in sorted(BIGFOTO.glob("EQ96*.PKF")):
         code = pkf.stem[4:]  # EQ960301 -> 0301
@@ -83,7 +105,7 @@ def export_big(english_only: bool) -> set[int]:
 
 def export_mini() -> set[int]:
     """Hand-decode the 32x32 bottom-up raw-index minis (Pillow can't parse the stub)."""
-    pal = ea.vga_palette()
+    pal = realised_palette()
     buf = (GAME / "DBDAT" / "MINIFOTO.PKF").read_bytes()
     ids: set[int] = set()
     for name, off, size in files_of(buf):

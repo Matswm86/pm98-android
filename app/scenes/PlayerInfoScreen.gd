@@ -527,11 +527,17 @@ func _draw() -> void:
 
 
 func _draw_header() -> void:
-	# borderless 32x32 BIGFOTO block left of the name bar, only when face art
-	# exists (photo-less players show none — frame truth; kernel un-RE'd)
-	var face := PMChrome.face(_p.get("photoId"))
+	# Borderless 32x32 block left of the name bar, only when face art exists
+	# (photo-less players show none — frame truth; kernel un-RE'd).
+	#
+	# It is the MINIFOTO thumbnail blitted 1:1, NOT the 124x182 BIGFOTO squashed into the
+	# rect. Measured 2026-08-02 against the walkthrough's own FICHA frames (079/081/084,
+	# rect (130,68) 32x32): the MINI bank matches at **0 px**, the downscaled BIG at 974.
+	# The mistake was invisible until the face banks were re-baked against MANAGER.PAL,
+	# because both banks were wrong in the same direction.
+	var face := PMChrome.mini_face(_p.get("photoId"))
 	if face != null:
-		draw_texture_rect(face, PHOTO_RECT, false)
+		draw_texture(face, PHOTO_RECT.position)
 	# single-struck PROMAN12 — the face's natural weight IS the frame's bold look
 	_txt(_f12, NAME_XY.x, NAME_XY.y, PMChrome.card_name(_p), C_WHITE, 13)
 	# The POSITION word sits in the identity zone the OFFER panel replaces -> hide it in renew mode.
