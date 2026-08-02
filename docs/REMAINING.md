@@ -1,5 +1,96 @@
 # PM98 Android — remaining-work inventory (refreshed 2026-08-02)
 
+## 0a-s91. Closed 2026-08-02 (session s91) — THE PALETTE SWEEP CLOSES, THE CUP-DRAW GATE BECOMES A CAPTURE INSTRUMENT, AND M5's CANDIDATE 3 DIES
+
+### 1. ⭐ THE REALISED-PALETTE SWEEP — DONE, and decided in one measurement
+
+s90 named this and deliberately did not do it: `export_art.render` still picked
+`vga_palette()` for every `DM` sprite and every `force_vga` caller, and the rule was
+"each bank needs its own witness". The rule is kept. What changed is that a witness now
+exists for **every affected index at once**, which decides every bank in one pass.
+
+`tools/re/probe_realised_palette_witness.py` starts from a premise it asserts rather than
+assumes — **none of the 21 VGA colours appears anywhere in the realised table** — so a frame
+either carries one or it does not, with no free parameter. Over **every original capture the
+project holds, 1,752 frames in 37 directories**:
+
+| | px |
+|---|---|
+| a VGA-table colour at one of the 21 indices | **0** |
+| the realised colour at those same 21 | **12,919,661** |
+
+Every VGA hit anywhere under `screenshots/` is inside a `parity-run*/app/` directory — the
+PORT's own render of this defect, which is corroboration and not a counterexample.
+
+`export_art` gains `realised_palette()` (MANAGER.PAL + the 20 Windows statics) and the
+`DM`/`force_vga` arm now uses it in both the `exact` and the PIL path.
+`tools/re/probe_realised_palette_scope.py` scoped the damage off the PKFs;
+`tools/re/fix_realised_palette.py` repaired it: **83 PNGs, 43,022 px**, in eleven banks —
+NIVEL level plates, twelve stadium plates, thirteen hub menu icons, twelve competition
+logos, the SORTEO drums and hands, DIRECTIVA, the EQUIPO WIN tactics chips, three DBASE
+icons and four loose backgrounds. The repair is a pure remap of the 21 colours, and its
+equivalence to a re-decode is **checked, not asserted**: on the 7 files of
+`app/art/screens/cup/` that are plain exporter output, a forced re-export through the fixed
+`render()` is byte-identical to it. It is done that way because the other 4 files in that
+same bank are hand-curated and `--force` discards the curation.
+
+**What the render-diff does and does not show, said plainly.** `diff_entry_parity.py` over
+its eighteen binding pairs is 0 px **before and after** — the walkthrough's binding frames
+do not happen to show the changed pixels, so they neither confirm nor refute the change; no
+parity gate regressed and fifteen art-touching CI tests stay green. The evidence for the
+change is the corpus measurement above, which is colour-level rather than sprite-level —
+the same standard `realised_palette_re.md` §5 accepted for NANOESC, for the same reason.
+⚠ Godot caches imported textures: an art change is invisible to a shot until
+`godot --headless --import .` has run, and the parity shots must be rendered at native res
+(`xvfb-run -s "-screen 0 640x480x24" ... --resolution 640x480`, `PM98_SHOT_DIR=`) or every
+pair mis-sizes at 736x552.
+
+### 2. ⭐ THE SEMIFINAL / FINAL CUP DRAW — stop gambling, patch the gate
+
+Five career drives had failed to bank one, because `FUN_004d9a00` returns 0 without painting
+unless a human-managed club is in the drawn round (s89), and s90's two Man Utd runs were
+both RELEGATED in season 1 without reaching a semifinal. A sixth roll of the same dice was
+the only plan on the table and it is a poor one.
+
+`build_hack_exe.py --cheats=cupdraw_always` replaces it. The gate is
+
+```
+004d9b24  85 db   test ebx, ebx
+004d9b26  75 07   jne 0x4d9b2f     ; -> 0xEB, an unconditional jmp
+```
+
+one byte, asserted against the stock opcode, its decoded target, the preceding
+`test ebx, ebx` and the following return-0 epilogue before it is written. The gate sets no
+state and the tie/club array the screen then renders is the sim's own, so a frame captured
+through it is MANAGER.EXE painting a REAL draw with REAL clubs. **Verified live on the first
+screen of the run**: a Coca-Cola Cup ROUND 1 draw of Luton T. / Wycombe W. / Bristol City /
+Colchester U. / Chester C. / Oldham Ath — a round Manchester Utd. are not in and the stock
+EXE would have painted nothing for. `unsackable` rides along so a relegation cannot end the
+drive. The port keeps the real gate; this is a capture instrument, opt-in, and NOT in the
+builder's default cheat set. `boot.sh` gains `PM98_EXE` to select it; plan
+`plans/season_semifinal_capture.json`.
+
+### 3. THE M5 GOAL-2 ITEM — candidate 3 is REFUTED
+
+`docs/re/M5_S90_GOAL2_NOT_REPRODUCIBLE.md` §5. Candidate 3 was the one that would have
+retired the item ("the reference is one sample of a timing family, because the KICK OFF
+click timing feeds the RNG"), so it was taken first. It does not survive.
+
+`tools/re/wine/m5_idle_seed_poll.py` reads the match LCG (`FUN_005ec250` on `DAT_006d3184`,
+`seed*0x015a4e35 + 0x269ec3`) out of a live isolated boot while the game sits with **no
+input**: unchanged over 5 x 5 s on the title screen, and unchanged over 5 x 5 s at the
+reference fixture's own KICK OFF screen — the exact screen `autoresume.py` clicks. **Zero
+draws consumed while paused.** And the mechanism behind the candidate is refuted with it:
+`MANAGER.EXE` imports exactly one timer (`WINMM!timeGetTime`, no `GetTickCount`, no
+`QueryPerformanceCounter`), and the main-loop site at `0x5bdfd6` is a fixed ~16 ms frame
+LIMITER with a busy-wait, not an elapsed-time catch-up. No path has been found by which wall
+clock or input timing reaches the match stream at all.
+
+That leaves candidates 1 and 2, and points harder at 2: if nothing external feeds the sim
+and every dword the dump records matches, the difference has to live in the state that was
+NOT compared — the two KEEPER objects, whose live address is still not derivable from
+`base`. The cheapest next move is finding that pointer, not another capture.
+
 ## 0a-s90. Closed 2026-08-02 (session s90) — THE 0x20 EDGE PASS SHIPS AT 0 px, AND IT WAS SITTING ON A PALETTE BUG
 
 ### 1. ⭐ THE 1-px ON-SPRITE KIT EDGE — CLOSED, and the group draw with it
@@ -793,53 +884,40 @@ makes it unusable. `PM98_NO_RAISE=1` is the switch — `click.sh`, `autodrive.cl
 a drive started the normal way never raises. Export it yourself if you invoke `autodrive.py`
 / `boot.sh` / `nav_career.sh` directly.
 
-## STILL OPEN AFTER s90 — THE WHOLE CARRIED SET, IN ONE PLACE
+## STILL OPEN AFTER s91 — THE WHOLE CARRIED SET, IN ONE PLACE
 
-> **REWRITTEN 2026-08-02 (s90).** The kit-edge item is CLOSED at 0 px and off this list; the
-> two capture items are unchanged in kind but no longer blocked on tooling. One NEW item is
-> here, and it is here because closing the kit edge found it: three sprite banks were baked
-> against the wrong palette, and the rule that produced them is still in place for the rest.
+> **REWRITTEN 2026-08-02 (s91).** The realised-palette sweep is CLOSED and off this list.
+> The cup-draw item is no longer a lottery — the gate is patched and the run only needs wall
+> clock. The M5 item is narrower by one dead candidate.
 
 **Open — CAPTURE / driving time**
 
-* **A SEMIFINAL / FINAL cup draw.** `FUN_004d9a00` returns 0 without painting unless a
-  human-managed club is in the drawn round's own tie/club array (`club+0x5c != 0xffff`,
-  read s89), so the manager's club must BE in that semifinal. s90 adds the arithmetic that
-  was missing, from two runs. The drive never manages the squad, and **both runs were
-  RELEGATED in season 1** — with Manchester Utd., the strongest club in the game. They differ
-  only in how the career ends: run 1's season 2 opened with the Directors terminating the
-  contract ("your squad does not have the minimum number of players needed to play in any
-  championship") and the drive stopped at the title screen; run 2's opened in the FIRST
-  DIVISION with the relegation clause stripping players. **Season 1 is the roll that counts**
-  — a real squad, the Premier League and all three cups, ~1.5 h — and after relegation the
-  cups are a much longer shot. **Neither run reached a semifinal**: run 1 went out by the 3rd
-  round, run 2 reached the F.A. Cup 4th round (the draw PAINTED, so Man Utd were in it) and
-  no further draw followed. `tools/re/wine/nav_manutd_career.sh` sets a run up.
+* **A SEMIFINAL / FINAL cup draw.** No longer blocked on the roll. `build_hack_exe.py
+  --cheats=cupdraw_always,unsackable` builds a `MANAGER_CAP.EXE` whose one changed gate byte
+  makes `FUN_004d9a00` paint every draw it is handed, whether or not the managed club is in
+  it, without touching the draw itself (verified live on a Coca-Cola R1 draw Man Utd are not
+  in). Run it with `PM98_EXE=MANAGER_CAP.EXE bash tools/re/wine/boot.sh`, then
+  `nav_manutd_career.sh`, then `autodrive.py run plans/season_semifinal_capture.json`; every
+  `cup_draw` frame is kept. s91's run reached the Coca-Cola Cup R2 draw and banked 32 draw
+  frames before the session ended; a semifinal is ~Feb (Coca-Cola) / ~Apr (F.A. Cup), so the
+  run wants a few uninterrupted hours and CPU contention (a second wine instance, a Godot
+  import) slows it materially. ⚠ Read the DIVISION off the hub's top-right plate, not the
+  week number.
 * **The M5 goal-2 divergence** (port clk 8469, reference two minutes earlier, right team).
-  Tooling no longer gates it: `m5_rsp_capture.py` has the clock-watchpoint RUN-UP (s89), a
-  raisable `PM98_MAX_STOPS`, `PM98_CLK_TRACE=1` for the cheap whole-window pass, and
-  `resume_watchdog.py` to click KICK OFF at the WATCH segment pauses a capture could never
-  answer before. What is left is wall clock: the cheap trace runs at ~15-30 clk/min under
-  load, so 2837..8469 is several hours, and the expensive per-frame capture that actually
-  LOCALISES the divergence is a narrow window after it. `m5_clktrace_diff.py` records what
-  the cheap trace can and cannot decide — the reference's goal CLOCK yes, per-tick seed
-  equality no.
-
-**Open — RE (NEW, s90)**
-
-* **The realised-palette sweep.** `docs/re/realised_palette_re.md`. Every frame MANAGER.EXE
-  paints is entirely MANAGER.PAL + the Windows statics, and 25 of 25 sampled walkthrough
-  frames carry colours the shared VGA table at `DAT.PKF +0x5CA` does not contain. Three
-  banks have been found wrong this way and fixed against their own witnesses (MINIBAND
-  flags 07-26, RIDIESC kits s90, the face banks s90), but `export_art.render` still picks
-  `vga_palette()` for every `DM` sprite and every `force_vga` caller. Flipping that rule
-  blind would be a guess: each bank needs its own witness, and two cases must NOT be swept
-  up (`faces/dbcard/` is Dbasewin's own correct rendering; `_generic.png` uses no affected
-  index).
+  **Candidate 3 is refuted (s91)** — the LCG consumes nothing while the game waits for a
+  click, and the main loop is a fixed 16 ms limiter rather than an elapsed-time catch-up, so
+  no timing path into the match stream has been found. The next move is NOT another capture:
+  it is finding the two KEEPER objects' live address so §2's frame-0 diff can cover them,
+  because that is the only state the diff does not reach. Only if that is clean does
+  candidate 1's seed-watchpoint window around clk 2837 earn its wall clock. Tooling is all
+  in place: `m5_rsp_capture.py` (clock-watchpoint RUN-UP, `PM98_CLK_TRACE=1`, raisable
+  `PM98_MAX_STOPS`), `resume_watchdog.py`, `m5_idle_seed_poll.py`, `m5_clktrace_diff.py`.
 
 **Needs Mats**
 
-* **The real-device pass.** There is no Android device on this box.
+* **The real-device pass.** There is no Android device on this box and no adb/emulator
+  either — checked, not assumed. Install the newest `pm98-*.apk` from the README link or
+  pm98.mwmai.no. Everything s90 and s91 shipped is art and data that only shows on a panel.
 
 **Closed as far as it can be — DO NOT REOPEN**
 
