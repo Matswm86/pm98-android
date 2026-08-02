@@ -1,5 +1,9 @@
 # M5 s90 — a fresh boot does NOT reproduce the reference past clk 2837
 
+> **s91 update, §5:** candidate 3 — "the reference is one sample of a timing family" — is
+> **REFUTED** by measurement, and the wall-clock mechanism behind it is refuted with it. The
+> item is narrower now, and points at candidate 2. Read §5 before planning anything here.
+
 Status: **the s87 plan for goal 2 has a prerequisite that is now measured and FAILS.** The
 plan was "boot, nav to the same fixture, poke the frame-0 seed, capture 2837..8469, diff the
 port against it". A clean boot reproduces goal 1 BIT-EXACTLY and then plays a different
@@ -89,3 +93,67 @@ Not "re-run the capture for longer". The three candidates, in the order they can
 Until one of those three is settled, "the port's goal 2 is two minutes late" is not a defect
 statement about the engine. It is a comparison against a target that has not been shown to be
 reproducible.
+
+## 5. s91 — candidate 3 is REFUTED, and so is the whole "wall clock feeds the sim" class
+
+`Evidence:` `tools/re/wine/m5_idle_seed_poll.py` run against a live isolated boot;
+`MANAGER.EXE` @0x5bdfd6, @0x5ec250.
+
+Candidate 3 was the one that would have retired the item, so it was taken first. It does not
+survive, and neither does the mechanism behind it.
+
+### 5.1 The RNG does not advance while the game waits for the click
+
+The match RNG is `FUN_005ec250`, a plain LCG on `DAT_006d3184`
+(`seed = seed * 0x015a4e35 + 0x269ec3`, returning `(seed >> 16) & 0x7fff`), with `0x5ec230`
+and `0x5ec240` as its setter and getter and 340 call sites. Because it is an LCG the number
+of draws between two observed seeds is recoverable exactly, so "did the stream move" is a
+measurement, not an impression.
+
+A fresh boot in an isolated prefix was driven to the reference fixture's KICK OFF screen —
+Aston Villa v Bolton W, the exact screen `autoresume.py` clicks — and the seed was read six
+times over 25 s with **no input at all**:
+
+| screen | idle intervals | seed |
+|---|---|---|
+| the title screen | 5 x 5 s | `0x0762a12b`, unchanged every time |
+| the reference fixture's KICK OFF | 5 x 5 s | `0x2153b03d`, unchanged every time |
+
+**Zero draws consumed while paused.** So how long `capture2` sat at a segment boundary
+before its KICK OFF click cannot have moved the stream, and `capture2`'s timeline is not
+"one sample of a timing family" for that reason. Candidate 3 is dead as written.
+
+### 5.2 And the frame loop is a LIMITER, not a catch-up
+
+The obvious remaining way for wall clock to reach the sim is a variable-step main loop, and
+the binary says it is not one. `MANAGER.EXE` imports exactly one timer, `WINMM!timeGetTime`
+(no `GetTickCount`, no `QueryPerformanceCounter`), at 19 sites; the one in the main loop,
+beside the `PeekMessageA` pump at `0x5bd095`, reads:
+
+```
+005bdfd6  call dword ptr [0x6234bc]   ; timeGetTime
+005bdfdc  mov  ebx, [esp+0x28]        ; the previous frame's stamp
+005bdfe2  sub  ecx, ebx
+005bdfe4  cmp  ecx, 0x10
+005bdfe7  jae  0x5bdff8               ; >= 16 ms already gone -> go
+005bdfe9  call dword ptr [0x6234bc]   ; else BUSY-WAIT until it is
+005bdff6  jb   0x5bdfe9
+```
+
+That is a fixed ~16 ms floor per frame with a spin, and there is no "advance N steps for the
+elapsed time" arm anywhere near it. A loaded machine renders the same number of frames per
+game clock, just later. Combined with §5.1, **no path has been found by which wall clock or
+input timing reaches the match stream at all.**
+
+### 5.3 What this leaves
+
+Candidate 3 is out; candidate 1 (the restart's own draw count) and candidate 2 (state the
+frame-0 dump does not carry) are both still live, and §2's "0 mismatches" now points harder
+at candidate 2 — because if nothing external feeds the sim and the compared state is
+identical, then the state that was NOT compared is where the difference has to live. The
+named gap is the two KEEPER objects, whose live address is not derivable from `base` by
+anything read so far, plus `+0x2ee` (the set-piece freeze byte, absent from the dump).
+
+The cheapest next move is therefore **not** another capture: it is finding the keeper
+pointer in the match struct so §2's diff can cover them. Only if that comes back clean does
+candidate 1's seed-watchpoint window around clk 2837 become worth its wall clock.
