@@ -40,6 +40,12 @@ do not happen to show the changed pixels, so they neither confirm nor refute the
 parity gate regressed and fifteen art-touching CI tests stay green. The evidence for the
 change is the corpus measurement above, which is colour-level rather than sprite-level —
 the same standard `realised_palette_re.md` §5 accepted for NANOESC, for the same reason.
+
+One gate DID move against a real frame: `diff_cupdraw_parity.py`'s group form was **5 raw
+px** at the end of s90 ("the flags' 4, plus one pre-existing stray at (189,114)") and is now
+**4** — `x=406, y=89/114/139/164`, the flags' own ROW 0. The stray at (189,114) is gone, and
+`cupdraw` is one of the eleven banks the sweep touched. All four cup-draw forms still PASS.
+
 ⚠ Godot caches imported textures: an art change is invisible to a shot until
 `godot --headless --import .` has run, and the parity shots must be rendered at native res
 (`xvfb-run -s "-screen 0 640x480x24" ... --resolution 640x480`, `PM98_SHOT_DIR=`) or every

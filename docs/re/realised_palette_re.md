@@ -113,6 +113,13 @@ do not happen to show the changed pixels — the level plates in their unselecte
 ground plates, the hub icons — so they neither confirm nor refute the change, and no parity
 gate regressed. Fifteen art-touching CI tests stay green.
 
+One gate did MOVE, and against a real original frame. `diff_cupdraw_parity.py`'s group form
+was **5 raw px** at the end of s90 — "the flags' 4, plus one pre-existing stray at
+(189,114)". After the sweep it is **4**, and the four are `x=406, y=89/114/139/164`: the
+flags' own ROW 0, the row this widget does not draw. **The stray at (189,114) is gone**, and
+the `cupdraw` bank is one of the eleven the sweep touched. All four cup-draw forms still
+PASS at 0.000% excluded.
+
 The evidence for the change is therefore §4.2's, which is **colour-level rather than
 sprite-level** — exactly the standard §5 below accepted for NANOESC, and for the same
 reason: a frame witnessing the specific sprite does not exist, while a corpus-wide
