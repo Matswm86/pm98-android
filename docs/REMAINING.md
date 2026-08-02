@@ -1,5 +1,75 @@
 # PM98 Android — remaining-work inventory (refreshed 2026-08-02)
 
+## 0a-s90. Closed 2026-08-02 (session s90) — THE 0x20 EDGE PASS SHIPS AT 0 px, AND IT WAS SITTING ON A PALETTE BUG
+
+### 1. ⭐ THE 1-px ON-SPRITE KIT EDGE — CLOSED, and the group draw with it
+
+s89 left one instruction: *score the pass against the PORT's own render of that screen,
+with the club ids it actually feeds, before drawing any conclusion.* Done. The conclusion
+is a close, and the route to it went through a defect that had nothing to do with the pass.
+
+**The sprite identification was never wrong.** `Main.gd`'s CUPDRAW shot already feeds group
+A as 1076 / 1003 / 1223 / 1147 — Sporting Port., Real Madrid C.F., Anorthosis, W.Lodz, the
+four names printed on the frame — and scoring against those four files reproduces s89's
+own 396 px exactly. The best-match search had been picking the right sprites all along; what
+s89 read as "no sprite gets under 74 px" was two other faults stacked.
+
+**Split by the sprite's own alpha, they come apart:**
+
+| | on-sprite | off-sprite |
+|---|---|---|
+| Sporting Port. (1076) | **82** of 221 | 53 of 119 |
+| the other three | 33 / 33 / 34 | 54 / 53 / 54 |
+
+* the ~54 px OUTSIDE each silhouette are a dithered drop shadow the port did not draw at
+  all — `0x5c0688` is a `0x20` site and `FUN_005cbea0` runs the `FUN_005d6590` spread
+  AFTER the edge whenever `thr != 0`, so this widget paints BOTH passes;
+* Sporting's extra 49 are a **PALETTE bug**: `ridi/1076.png` renders `(66,104,44)` where
+  the frame shows `(17,127,43)`, and those are palette **index 120 in two different
+  tables**. The RIDIESC DIBs carry no colour table, so
+  `build_match_header_from_frames.py` decoding them through the shared VGA table at
+  `DAT.PKF +0x5CA` was the identical mistake `export_flags.flag_palette` had already
+  documented and fixed for the MINIBAND flags. **21 of 256 entries differ; 91 of the 476
+  kits use one of the 21.** Re-baked through `flag_palette()`: Sporting 82 -> 31, the other
+  three unmoved, knockout kit lists 68 -> 56 and 64 -> 56, EURO LEAGUE groups B/C/F
+  107 -> 104 / 132 -> 114 / 117 -> 116, and nothing anywhere regressed.
+
+**Then the pass, scored on the port's own render** (`probe_groupdraw_edge_render.py`):
+345 plain -> 256 edge-only (on-sprite 131 -> 42) -> **0 px at edge + spread(thr 0x20,
+cap 0x80)**, on all four kits, 884 sprite px and 476 background px. `thr`/`cap` are pushed
+as REGISTERS at this site so they cannot be read off the call; the sweep is over byte values
+the other sites attest and the frame picks by a wide margin (0 against 10 for the nearest
+neighbour on either axis, 250+ two steps away). The ORDER is the decompile's — edge first,
+spread reading the edge's own output — and running it any other way scores 102 at best.
+
+**Shipped:** `PMShadow.edge_mask` / `edge_blit` / `edge_texture`, `app/data/aliasing.bin`
+(sha256 `401e3411…0636`), `CupDrawScreen._group_kit` / `._group_flag`. The MINIBAND flags
+take the same pass, 37 -> 4 px. `diff_cupdraw_parity.py` loses its four KIT exclusion rects
+and the whole 640x480 group-draw frame is **5 raw px**, against 434. All 45 CI tests pass.
+
+### 2. THE M5 GOAL-2 CAPTURE — the run-up bug is fixed and the window is streaming
+
+s89's run died on the watchpoint REMOVE; that is gone, and the run-up reproduced its 17,298
+stops to clk 2836 exactly. Two pieces of tooling the window needed and did not have:
+
+* **`PM98_CLK_TRACE=1`** (`m5_rsp_capture.py`): stay on the CLOCK watchpoint for the whole
+  window and bank one cheap row per write instead of 22 player rows. The full-row rate s59
+  measured puts 2837..8469 at over half a day; this is hours, and it carries the SCORE, so
+  it answers "at which clock did the reference score goal 2" without the expensive capture.
+* **`resume_watchdog.py`**: `autoresume.py` reads `/proc/<lpid>/mem`, which is Yama-blocked
+  here, and the RSP stub takes ONE connection which the capture holds — so a WATCH segment
+  pause during a capture had no driver at all (s59 stalled at clk 2837 for exactly this and
+  was stopped by hand). The watchdog watches the capture's own progress LOG and clicks KICK
+  OFF when it goes idle. Point it at the log, not the jsonl: the run-up banks no rows.
+
+**Measured, and it corrects a tempting shortcut**: `m5_clktrace_diff.py` states plainly that
+per-tick seed equality is NOT a divergence test — the clock is written 6 times per tick and
+the tick carries ~33 rand() draws, so the trace samples under a fifth of the stream. What
+the trace does show is structural and real: at clk 2837 the original writes the clock 65
+times where the port takes 433 outer steps, and the goal-1 seed `0x40877acf` is in the
+intersection. The two agree at the goal and pace the post-goal restart completely
+differently.
+
 ## 0a-s89. Closed 2026-08-02 (session s89) — THE CUP-DRAW GATE IS THE ORIGINAL'S OWN, AND THE EDGE-PASS TABLE IS OUT OF THE RUNNING GAME
 
 ### 1. ⭐ THE CUP DRAW'S PARTICIPATION GATE — READ, not declared

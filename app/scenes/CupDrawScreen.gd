@@ -596,12 +596,69 @@ func _draw_groups() -> void:
 				str(club.get("name", "")), C_GROW_INK[k & 1])
 			var kit := PMChrome.ridi_kit(int(club.get("club_id", -1)))
 			if kit != null:
-				draw_texture(kit, Vector2(bx + GKIT_AT.x, y + GKIT_AT.y))
+				_group_kit(kit, Vector2i(bx + GKIT_AT.x, y + GKIT_AT.y),
+					int(club.get("club_id", -1)))
 			var flag := PMChrome.mini_flag(club.get("flag", -1))
 			if flag != null:
-				draw_texture_rect_region(flag,
-					Rect2(bx + GFLAG_AT.x, y + GFLAG_AT.y, GFLAG_SRC.size.x, GFLAG_SRC.size.y),
-					GFLAG_SRC)
+				_group_flag(flag, Vector2i(bx + GFLAG_AT.x, y + GFLAG_AT.y),
+					int(club.get("flag", -1)))
+
+
+## The group draw's kit is not a plain blit. `0x5c0688` — the RIDIESC picture widget's own
+## call into `FUN_005cbea0` — is a `flags = 0x20` site, so it runs the EDGE pass
+## (`FUN_005d60a0`) and then the same IIR spread the 0x10 arm uses: a darkened rim INSIDE
+## the silhouette and a dithered drop shadow down-and-right OUTSIDE it. The chrome under
+## the cell is the empty row widget, which is exactly what `chrome_groups.png` carries.
+##
+## `tools/re/probe_groupdraw_edge_render.py` grades this against the real frame
+## `manutd_s1_eurocup_groups_1_8_final.png`: all four of group A's kits land at **0 px**,
+## against 345 for the plain blit this replaces.
+const GKIT_THR := 0x20   # site 0x5c0688 pushes thr/cap as registers; see PMShadow's note
+const GKIT_CAP := 0x80
+
+
+func _group_kit(kit: Texture2D, at: Vector2i, club_id: int) -> void:
+	if _chrome_groups == null:
+		draw_texture(kit, Vector2(at))
+		return
+	var bg := _chrome_groups.get_image().get_region(
+		Rect2i(at, Vector2i(kit.get_width(), kit.get_height())))
+	var t := PMShadow.edge_texture("gkit%d@%d,%d" % [club_id, at.x, at.y],
+		bg, kit.get_image(), at, GKIT_THR, GKIT_CAP)
+	draw_texture(t if t != null else kit, Vector2(at))
+
+
+## The MINIBAND flag beside the name goes through the same widget and the same pass. It is
+## scored the same way and lands at **4 px over the four rows**, against 37 for the plain
+## blit. The residual is the sprite's ROW 0, which this screen does not draw at all (the
+## chrome builder records that measurement and does not explain it) — so the pass's top row
+## is computed against a destination that is not on screen, and its bottom neighbours
+## inherit that. Recorded rather than tuned away.
+func _group_flag(flag: Texture2D, at: Vector2i, code: int) -> void:
+	if _chrome_groups == null:
+		draw_texture_rect_region(flag,
+			Rect2(at.x, at.y, GFLAG_SRC.size.x, GFLAG_SRC.size.y), GFLAG_SRC)
+		return
+	var si := flag.get_image()
+	var bg := Image.create(si.get_width(), si.get_height(), false, Image.FORMAT_RGBA8)
+	var chrome := _chrome_groups.get_image()
+	# The blit's own origin is one row ABOVE the drawn band, because the screen takes the
+	# sprite from row 1 (GFLAG_SRC.position.y).
+	var org := Vector2i(at.x, at.y - int(GFLAG_SRC.position.y))
+	for yy in si.get_height():
+		for xx in si.get_width():
+			var cy: int = org.y + yy
+			var cx: int = org.x + xx
+			if cx < chrome.get_width() and cy >= 0 and cy < chrome.get_height():
+				bg.set_pixel(xx, yy, chrome.get_pixel(cx, cy))
+	var t := PMShadow.edge_texture("gflag%d@%d,%d" % [code, org.x, org.y],
+		bg, si, org, GKIT_THR, GKIT_CAP)
+	if t == null:
+		draw_texture_rect_region(flag,
+			Rect2(at.x, at.y, GFLAG_SRC.size.x, GFLAG_SRC.size.y), GFLAG_SRC)
+		return
+	draw_texture_rect_region(t, Rect2(at.x, at.y, GFLAG_SRC.size.x, GFLAG_SRC.size.y),
+		GFLAG_SRC)
 
 
 ## The GRID form: sixteen four-column bands, home kit | home club | away club | away kit.

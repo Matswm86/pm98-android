@@ -426,6 +426,43 @@ def main() -> None:
         # ~33 rand draws a tick, and every row carries its own `eip` so the clock stops
         # are trivially separable in the diff.
 
+        # PM98_CLK_TRACE=1 (s90): stay on the CLOCK watchpoint for the whole window and
+        # log one cheap row per frame instead of arming the seed. A full in-window row
+        # costs ~44 RSP round trips (22 players + gs + ball) and s59 measured the result
+        # at ~1 clk / 9 s, so 2837..8469 is ~14 h of wall clock. The FIRST disagreeing
+        # frame does not need any of that: the port's own PM98_SEEDTRACE emits
+        # "step clk banked half rng.state" per outer step, and one outer step is one
+        # frame under play-state 2, so (clk, seed) per frame is directly comparable and
+        # brackets the divergence in ~5,600 stops. Localise cheap, then re-capture the
+        # narrow window with the full rows.
+        if os.environ.get("PM98_CLK_TRACE") == "1":
+            print(f"CLK-TRACE {win_lo}..{stop_clk} on the clock watchpoint", flush=True)
+            frames = 0
+            while True:
+                cont()
+                try:
+                    st = r.wait_stop()
+                except ConnectionError:
+                    fo.write(json.dumps({"event": "stub_closed_clktrace"}) + "\n")
+                    break
+                frames += 1
+                clk = u32(base + 0x450)
+                fo.write(json.dumps({
+                    "f": frames, "clk": clk, "seed": u32(SEED_VA),
+                    "banked": u32(base + 0x19A8), "half": u32(base + 0x19A0),
+                    "ph": u32(base + 0x448), "disp": u32(base + 0x1A38),
+                    "sc": [u32(base + 0x478), u32(base + 0x798)],
+                    "eip": hex(t_regs(st).get(8, 0)),
+                }) + "\n")
+                if frames % 200 == 0:
+                    print(f"clk-trace f={frames} clk={clk}", flush=True)
+                if clk > stop_clk or frames >= MAX_STOPS:
+                    fo.write(json.dumps({
+                        "event": "clktrace_done", "frames": frames, "clk": clk}) + "\n")
+                    print(f"CLK-TRACE done f={frames} clk={clk}", flush=True)
+                    break
+            return
+
     ok = r.cmd(f"Z2,{SEED_VA:x},4")
     fo.write(json.dumps({"event": "Z2", "reply": ok}) + "\n")
     if ok != "OK":

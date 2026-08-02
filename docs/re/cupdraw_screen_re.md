@@ -537,3 +537,29 @@ those plates ("a label the EXE does not carry ... is uppercased as-is rather tha
 into one of the SEMIFINAL 1 / SEMIFINAL 2 plates"). The labels and their draw sites are now
 read; what is still missing is a WITNESS FRAME to render-diff against, so they stay unbuilt
 under the project's own rule rather than being shipped on a reading alone.
+
+## The GROUP form closes at 5 px (2026-08-02, s90)
+
+`Evidence:` `tools/re/diff_cupdraw_parity.py`, `tools/re/probe_groupdraw_edge_render.py`,
+`app/scenes/CupDrawScreen.gd`, `docs/re/shadow_blit_re.md` §"The 0x20 arm, SHIPPED".
+
+The form shipped in s88 with **433 px** parked in one exclusion bucket — group A's four
+RIDIESC kits and four MINIBAND flags, "the un-reversed 1-px on-sprite kit edge". Scoring
+the pass against the port's own render, as s89 said to, closed it and turned up a second
+defect underneath:
+
+| | kits + flags |
+|---|---|
+| s88 as shipped | 433 px |
+| the `ridi` bank re-baked against MANAGER.PAL, not the shared VGA table | 382 |
+| + the `0x20` EDGE + spread pass on the four kits (thr 0x20, cap 0x80) | 37 — all four kits at **0** |
+| + the same pass on the four flags | **4** |
+
+The four KIT rects are gone from `GROUPS_EXCLUDE`. The whole 640x480 frame is **5 raw px**:
+the flags' 4, plus one pre-existing stray at (189,114). The flags' residual is the sprite's
+ROW 0 — the row this screen does not draw at all (recorded above as measured and still
+unexplained), so the pass's top row is computed over a destination that is not on screen.
+
+The kits are drawn by `CupDrawScreen._group_kit` through `PMShadow.edge_texture`, and the
+flags by `._group_flag` with the blit origin one row above the drawn band, because
+`GFLAG_SRC` starts at the sprite's row 1.

@@ -79,7 +79,7 @@ from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pkf_unpack as pk  # noqa: E402
-from export_art import vga_palette  # noqa: E402
+from export_flags import flag_palette  # noqa: E402
 from export_icons import decode_dib  # noqa: E402
 from fnt_to_bmfont import WINFONTS, Fnt  # noqa: E402
 
@@ -327,7 +327,24 @@ def main() -> None:
     kx0, ky0, kx1, ky1 = KIT_ZONE
     codes = club_kit_codes()
     ridi_buf, ridi_ents = pkf_entries(DBDAT / "RIDIESC.PKF")
-    pal = vga_palette()
+    # The RIDIESC DIBs carry no colour table of their own, so the colours come from
+    # whatever palette is REALISED — the same situation `export_flags.flag_palette` already
+    # settled for the MINIBAND flags, and the same wrong answer was in place here: the
+    # shared VGA table at DAT.PKF +0x5CA. Twenty-one of its 256 entries disagree with
+    # MANAGER.PAL + the Windows statics, and 91 of the 476 kits use one of the twenty-one.
+    #
+    # Measured on the group-draw frame `manutd_s1_eurocup_groups_1_8_final.png`, whose
+    # Sporting Port. kit (EQ960602) is the only one of its four that touches an affected
+    # index (120: VGA (66,104,44), realised (17,127,43)):
+    #
+    #     shared VGA (DAT.PKF +0x5CA)      82 differing on-sprite px of 221
+    #     MANAGER.PAL + Windows statics    31   -- i.e. the un-ported 1-px edge pass alone,
+    #                                             which the other three kits also carry
+    #                                             (33 / 33 / 34)
+    #
+    # The six fixture witnesses below still assert SAD=0 either way: none of clubs 1000 /
+    # 40 / 1301 / 1021 uses an affected index, so that gate never had an opinion on this.
+    pal = [v for rgb in flag_palette() for v in rgb]  # decode_dib wants it flat
 
     def ridi_kit(cid: int) -> np.ndarray | None:
         code = codes.get(cid)

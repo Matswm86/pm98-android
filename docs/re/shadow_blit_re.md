@@ -393,3 +393,96 @@ Directionally right; not closed. Two things are still open and neither is the ta
   group-A row carries, and whether the port's RIDIESC bank even covers the European
   clubs this draw shows. Score the pass against the PORT's own render of that screen,
   with the club ids it actually feeds, before drawing any conclusion about the pass.
+
+## The 0x20 arm, SHIPPED — 0 px, and it was hiding a palette bug (2026-08-02, s90)
+
+`Evidence:` `tools/re/probe_groupdraw_edge_render.py`, `tools/re/diff_cupdraw_parity.py`,
+`app/scripts/PMShadow.gd`, `app/scenes/CupDrawScreen.gd`, `tools/re/build_match_header_from_frames.py`,
+`extracted/Premier Manager 98/MANAGER.EXE` @0x5cbea0, @0x5d60a0, @0x5d6590, @0x5c0688.
+
+§5 above asked for exactly one thing before any conclusion: *score the pass against the
+PORT's own render of that screen, with the club ids it actually feeds.* Done, and the answer
+is a close — but only after the render-diff turned up a defect that had nothing to do with
+the pass and was inflating every number in §5.
+
+### 1. The sprite was never the suspect it looked like
+
+`Main.gd`'s CUPDRAW shot already feeds group A as club ids **1076 / 1003 / 1223 / 1147** —
+Sporting Port., Real Madrid C.F., Anorthosis, W.Lodz, the four names printed on the frame —
+and `PMChrome.ridi_kit` loads `art/kits/ridi/<club_id>.png` for each. Scored against those
+four files instead of a best match, the plain blit is wrong on **135 / 87 / 86 / 88** px,
+which is the same 396 §5 reports: the best-match search had been picking the right sprites
+all along.
+
+Splitting that residual by the sprite's own alpha is what breaks it open:
+
+| | on-sprite | off-sprite |
+|---|---|---|
+| Sporting Port. (1076) | **82** of 221 | 53 of 119 |
+| the other three | 33 / 33 / 34 | 54 / 53 / 54 |
+
+Two different faults, neither of them "no sprite gets under 74 px".
+
+### 2. The off-sprite half is the SPREAD, at a site nobody had read as a 0x20 site
+
+The ~54 px per cell outside the silhouette are a dithered drop shadow down and to the right,
+which the port did not draw at all here. `0x5c0688` — the RIDIESC picture widget's own call
+into `FUN_005cbea0`, whose flags word is `FUN_005c0d50`'s `param_4` at record `+0x90` — is
+a `0x20` site, and `FUN_005cbea0` runs the `FUN_005d6590` spread AFTER the edge whenever
+`thr != 0`. So this widget paints BOTH passes, and the group draw is the screen that shows
+it: rim inside, shadow outside.
+
+### 3. Sporting's extra 49 px were a PALETTE bug, and it is 91 kits wide
+
+The port's `ridi/1076.png` renders its hoops `(66,104,44)`; the frame shows `(17,127,43)`.
+Neither is a blend of the other — they are **palette index 120 in two different tables**.
+The RIDIESC DIBs carry no colour table, so the colours come from whatever palette is
+realised, and `build_match_header_from_frames.py` was decoding them through the shared VGA
+table at `DAT.PKF +0x5CA`. That is the identical mistake `export_flags.flag_palette` had
+already documented and fixed for the MINIBAND flags ("this used to use the shared VGA table
+… and that is WRONG for the flags"), and nobody had asked the same question of the kits.
+
+**21 of the 256 entries disagree between the two tables, and 91 of the 476 kits use one of
+the 21.** Re-baked through `flag_palette()` (MANAGER.PAL + the Windows statics), Sporting's
+on-sprite residual goes **82 -> 31** and the other three do not move, which is what a
+palette fix should look like. The six fixture witnesses still assert SAD=0 either way —
+none of clubs 1000 / 40 / 1301 / 1021 touches an affected index, so that gate never had an
+opinion on this. The knockout kit lists (`uefa` 68 -> 56, `cwc` 64 -> 56) and the EURO
+LEAGUE groups (B 107 -> 104, C 132 -> 114, F 117 -> 116) improved with it, and nothing
+anywhere regressed.
+
+### 4. The pass, scored against the port's own render
+
+`probe_groupdraw_edge_render.py`, over group A's four kit cells (884 sprite px and 476
+background px in all), reading its destination out of the port's own render of group C:
+
+| | wrong px |
+|---|---|
+| port render, plain blit | 345 |
+| edge only, no spread | 256 (on-sprite **131 -> 42**) |
+| edge + spread(thr 0x21, cap 0x63) | 210 |
+| edge + spread(thr 0x40, cap 0x80) | 178 |
+| **edge + spread(thr 0x20, cap 0x80)** | **0** |
+
+`thr` and `cap` are pushed as REGISTERS at `0x5c0688`, so unlike the 65 immediate-pushing
+sites they cannot be read off the call, and they are not fitted either: the sweep is over
+byte values the other sites attest (`thr` 0x20 at the two `(0x10, 0x20, 0xff)` sites, `cap`
+0x80 at `(0x20, 0x40, 0x80)`), and the frame picks between them by a wide margin — 0 px
+against 10 for the nearest neighbour on either axis and 250+ two steps away. The ORDER is
+the decompile's, not a choice: edge first, spread second, and the spread reads the edge's
+own output as its neighbours. Running them the other way round, or on separate masks,
+scores 102 at best.
+
+### 5. Shipped
+
+`PMShadow.edge_mask` / `edge_blit` / `edge_texture` implement the arm; `app/data/aliasing.bin`
+ships the table (sha256 `401e3411…0636`, the bytes read out of the running original);
+`CupDrawScreen._group_kit` and `._group_flag` call it at thr 0x20 / cap 0x80. The MINIBAND
+flags take the same pass and go **37 -> 4** px over the four rows.
+
+`diff_cupdraw_parity.py`'s GROUPS exclusion list loses its four KIT rects entirely. The
+whole 640x480 group-draw frame is now **5 raw px**, against 434 before: the flags' 4 and one
+pre-existing stray at (189,114). The flags' 4 has a named cause and is not budget — this
+screen draws the MINIBAND sprite from ROW 1 and its row 0 lands nowhere (measured in
+`build_groupdraw_chrome_from_frame.py` and still unexplained), so the pass's top row is
+computed over a destination that is not on screen.

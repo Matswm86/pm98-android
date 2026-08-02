@@ -93,18 +93,24 @@ GRID_EXCLUDE = [
 ]
 
 
-# The GROUP form's own exclusion, and it is ONE bucket with a named cause: the 1-px
-# on-sprite KIT EDGE pass, un-reversed since s62. Group A's four RIDIESC kits and four
-# MINIBAND flags each carry it -- the frame's edge pixels are the DESTINATION taken toward
-# a darker palette entry (a light row gives (44,44,44)/(80,80,80), the dark row
-# (40,60,80)/(60,80,100)), where the port paints the sprite's own (22,22,22). Measured, not
-# excused: 33/33/34 px of 221 opaque on the three identified kits and 8..11 of 140 on the
-# flags. Everything outside these eight sprites is expected at 0.
+# The GROUP form carried ONE exclusion bucket -- the un-reversed 1-px on-sprite KIT EDGE
+# pass -- over group A's four RIDIESC kits and four MINIBAND flags, 433 px in all. It is
+# reversed now (`PMShadow.edge_blit`, the `flags = 0x20` arm of `FUN_005cbea0`: the
+# `FUN_005d60a0` edge classifier over the table read out of the running original, then the
+# same IIR spread the 0x10 arm uses, at this site's thr 0x20 / cap 0x80), and two defects it
+# was hiding came out with it:
+#
+#     port render, kits + flags, before      433 px
+#     ridi bank re-baked against MANAGER.PAL 382   (21 of 256 VGA entries are wrong for a
+#                                                   realised sprite; 91 of 476 kits use one)
+#     + the 0x20 edge pass on the kits        37   (all four kits at 0)
+#     + the same pass on the flags             4
+#
+# So the four KIT rects are gone from this list. What is left is the flags' own 4 px, and
+# its cause is named rather than budgeted: this screen draws the MINIBAND sprite from ROW 1
+# and its row 0 lands nowhere (measured in `build_groupdraw_chrome_from_frame.py`, and still
+# unexplained), so the pass's top row is computed over a destination that is not on screen.
 GROUPS_EXCLUDE = [
-    (333, 77, 350, 97),  # group A row 0 kit  (17x20 RIDIESC)
-    (333, 102, 350, 122),  # row 1
-    (333, 127, 350, 147),  # row 2
-    (333, 152, 350, 172),  # row 3
     (406, 89, 420, 98),  # group A row 0 flag (14x9 MINIBAND, rows 1..9)
     (406, 114, 420, 123),  # row 1
     (406, 139, 420, 148),  # row 2
