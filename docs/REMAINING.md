@@ -805,15 +805,16 @@ a drive started the normal way never raises. Export it yourself if you invoke `a
 * **A SEMIFINAL / FINAL cup draw.** `FUN_004d9a00` returns 0 without painting unless a
   human-managed club is in the drawn round's own tie/club array (`club+0x5c != 0xffff`,
   read s89), so the manager's club must BE in that semifinal. s90 adds the arithmetic that
-  was missing, from two runs. The drive never manages the squad, and what that costs depends
-  on where the club finishes: **run 1 was RELEGATED** in season 1 and the start of season 2
-  came with the Directors terminating the contract ("your squad does not have the minimum
-  number of players needed to play in any championship"), which drops to the title screen and
-  stops the drive; **run 2 stayed up** (Premier, week 41) and rolled into season 2. So a run
-  is at least one season-1 roll — three competitions, a real squad, ~1.5 h — and more only if
-  the club survives. **Neither run reached a semifinal**: run 1 went out by the 3rd round,
-  run 2 reached the F.A. Cup 4th round (the draw PAINTED, so Man Utd were in it) and no
-  further draw followed. `tools/re/wine/nav_manutd_career.sh` sets a run up.
+  was missing, from two runs. The drive never manages the squad, and **both runs were
+  RELEGATED in season 1** — with Manchester Utd., the strongest club in the game. They differ
+  only in how the career ends: run 1's season 2 opened with the Directors terminating the
+  contract ("your squad does not have the minimum number of players needed to play in any
+  championship") and the drive stopped at the title screen; run 2's opened in the FIRST
+  DIVISION with the relegation clause stripping players. **Season 1 is the roll that counts**
+  — a real squad, the Premier League and all three cups, ~1.5 h — and after relegation the
+  cups are a much longer shot. **Neither run reached a semifinal**: run 1 went out by the 3rd
+  round, run 2 reached the F.A. Cup 4th round (the draw PAINTED, so Man Utd were in it) and
+  no further draw followed. `tools/re/wine/nav_manutd_career.sh` sets a run up.
 * **The M5 goal-2 divergence** (port clk 8469, reference two minutes earlier, right team).
   Tooling no longer gates it: `m5_rsp_capture.py` has the clock-watchpoint RUN-UP (s89), a
   raisable `PM98_MAX_STOPS`, `PM98_CLK_TRACE=1` for the cheap whole-window pass, and
