@@ -1,4 +1,74 @@
-# PM98 Android — remaining-work inventory (refreshed 2026-08-02)
+# PM98 Android — remaining-work inventory (refreshed 2026-08-05)
+
+## 0a-s93. Closed 2026-08-05 (session s93) — THE HUB SITS BETWEEN A WEEK'S MATCHES, THE FINALS PLAY AFTER THE LEAGUE, AND THE YOUTH CARD ANSWERS ITS TAPS
+
+The owner's 2026-08-05 build feedback, four reports, all reproduced on the real objects
+first (`app/tests/diag_owner_report_2026_08_05.gd`, kept as the regression probe).
+
+### 1. ONE CONTINUE = ONE MATCH — the hub returns between a week's matches
+
+The week's cup/European ties used to chain back-to-back after the league match on a single
+CONTINUE ("I'm playing 3 matches in a row until I'm put back in the home screen"). The
+original returns to the hub between them — its own refrun hub frames sit on Sun 3 Aug,
+Wed 17 Sep, Mon 31 Aug, and R6 pins the hub badge as "the competition context of the NEXT
+fixture". Now: `Career.pending_matches` is a persisted queue (`take_next_pending_match`
+pops ONE; the queue survives save/load minus the non-JSON stat Reports);
+`Main._career_advance` presents one match per CONTINUE with `_after_week_match` raising
+the hub in between; the hub's plaque bands read the next tie's competition + round
+(`PMChrome.header_phase = "comp"`, "Euro. Cup" is the one witnessed short form) and the
+calendar sheet its own day (F.A. Sun / Coca-Cola Mon / Europe Wed). The post-week cards
+(SORTEO, awards, fines, channelTV, offers) wait for the week's LAST match, matching the
+witnessed order. Render-proven: `PM98_RAILS_SHOT` banks `rails_midweek_hub.png` — the hub
+on **Wed 18 March 1998** with **U.E.F.A. Cup / Qtr. Finals** bands and the tie's clubs in
+the next-fixture stack. Still a declared abstraction: both legs of a two-legged tie (and
+a drawn tie's replay) resolve in the one scheduled week, so they present as consecutive
+continues on the same week.
+
+### 2. THE LEAGUE FINISHES FIRST — the F.A. and European FINALS take a CUP TAIL week
+
+The F.A. FINAL and all three European finals sat on week 39, the league's own last round
+("F.A. cup is even on same date as a league match. League is suppose to finish before the
+finals"). He is right, and so is the real calendar: the 1997-98 league ran out 10 May, the
+finals 16/13/20 May. `Cup._schedule` gains `final_week` (pins the LAST round, may lie past
+the grid); `_mint_domestic_cups` and `mint_european_cups` set it to week 40 — the CUP TAIL
+week. FA now `[15,18,22,25,28,31,35,40]`; Coca-Cola keeps its authored `[...,34]` (real:
+29 Mar); euro group matchdays and the witnessed March QF / SF weeks are untouched.
+`Career.season_over()` grants the tail week ONLY to a manager still alive in such a final
+(`_cup_tail_pending`); `_advance_cup_tail` plays it (no league round, no wages — the
+post-league money model is un-witnessed); `pending_tail_final` feeds the hub badge and
+next-fixture stack before it. Everyone else ends at week 39 and the leftover finals
+resolve in `finish_outstanding_cups` — called by `Main._show_end_of_season` and
+`advance_season` before the champion cards / honours read the brackets (the witnessed
+"FINAL still undecided at week 38 ... played inside the season-end sequence").
+`test_league_calendar` §8/§9 pin the schedule and the tail-week state machine.
+
+### 3. THE YOUTH CARD'S TRAINING TAP HAS A VISIBLE ANSWER — and the capacity is readable
+
+The model was never broken (diag: a 1.0★ youth manager trains 1, a 3.5★ trains 3, a 5.0★
+trains 4 — FUN_00578b80 case 10's own band). What the owner hit was invisible mechanics:
+
+* a SUCCESSFUL TRAINING tap's only feedback was a toast to the footer, which the
+  fullscreen card covers — "the training button doesn't seem to have a function". The
+  card now greys TRAINING the moment the player carries the 0x20 mode (the button's only
+  action — put him IN — is spent), so the tap visibly answers. p0771 (TRAINING green on a
+  not-yet-training youngster) still reproduces.
+* the second youngster "can only be sacked" = TRAINING greyed at the manager's capacity +
+  PROMOTE greyed until grown — the source's own gates, but unreadable because the YOUTH
+  TEAM screen printed the ACADEMY SIZE beside the youth manager. The witnessed counter is
+  his CAPACITY (G. Keeping 3.5★ "3 PLAYERS" over an empty roster, frame 047 + live
+  2026-07-29; M. Williamson 5.0★ "4 PLAYERS", refrun R17) — it now prints
+  `Staff.youth_training_capacity`. All 7 `diff_youth_parity` pairs still 0 px.
+
+### 4. THE RESULTS RAIL — every chip opens its real view, none opens a blank SORTEO
+
+The rail WAS wired (s91) and works mid-season — `PM98_RAILS_SHOT` proves every chip at
+week 25 (F.A./Coca-Cola/CWC/UEFA → knockout views, euro → EURO. LEAGUE, intercont → its
+result card). What the owner hit was the early-season state: an UNDRAWN bracket (F.A.
+first round is week 15, the euro draws September) mounted the SORTEO card with an EMPTY
+view — no round plate, no ties. `_open_rail_competition` now gates on
+`_bracket_has_view` (a played round, a pending draw, or drawn groups); before that the
+chip is inert exactly like the original's dimmed chips. Supercup/Intercontinental chips
+stay inert until their one-off finals exist (December/March), unchanged.
 
 ## 0a-s92. Closed 2026-08-02 (session s92) — THE SEMIFINAL FORM SHIPS AT 0 px, THE CUP CALENDAR LANDS ON ITS AUTHORED WEEKS, AND THE YOUTH LOOP BECOMES PLAYABLE
 
