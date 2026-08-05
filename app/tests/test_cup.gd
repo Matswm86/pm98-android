@@ -294,7 +294,11 @@ func _career_integration() -> bool:
 	var rng := RandomNumberGenerator.new(); rng.seed = SEED
 	while not career.season_over():
 		career.advance_week(rng)
-	ok = _assert(Cup.champion_id(career.fa_cup) != -1, "the F.A. Cup finishes within the league season") and ok
+	# The F.A. FINAL sits on the CUP TAIL week now (after the league — owner report
+	# 2026-08-05); a manager not in it ends at week 39 and the final resolves in the
+	# season-end path, exactly as Main._show_end_of_season does.
+	career.finish_outstanding_cups(rng)
+	ok = _assert(Cup.champion_id(career.fa_cup) != -1, "the F.A. Cup finishes by season end") and ok
 	ok = _assert(Cup.champion_id(career.league_cup) != -1, "the League Cup finishes within the season") and ok
 	var cup_news := 0
 	for n in career.news_log:

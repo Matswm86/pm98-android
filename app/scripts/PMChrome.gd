@@ -670,8 +670,13 @@ static var _hdr_sheet: Texture2D = null
 static var _hdr_plaque: Texture2D = null
 static var _hdr_ident: Texture2D = null
 ## Career phase for the plaque bands: "" = in season (league / Week N — witnessed
-## "Premier"/"Week 1"), "preseason" = the witnessed "Preseason"/"Preparation".
+## "Premier"/"Week 1"), "preseason" = the witnessed "Preseason"/"Preparation",
+## "charity" = "Charity"/"Final", "comp" = the next queued cup/European tie's own
+## competition + round (refrun p0110: "Euro. Cup / 1/8 Final" on the Wed 17 Sep hub —
+## the badge is the NEXT fixture's competition context, R6).
 static var header_phase := ""
+static var header_comp_top := ""       # "comp" phase: the competition band label
+static var header_comp_bottom := ""    # "comp" phase: the round band label
 ## Optional date override for the calendar sheet (date_from_iso shape) — the
 ## original shows the pending FRIENDLY's date during preseason, not the week date.
 static var header_date: Dictionary = {}
@@ -766,11 +771,15 @@ static func draw_sheet_band_texts(ci: CanvasItem, league: String, season: String
 		top_txt = "Preseason"
 	elif header_phase == "charity":
 		top_txt = "Charity"       # the Charity Shield fixture plaque (witnessed "Charity"/"Final")
+	elif header_phase == "comp":
+		top_txt = header_comp_top # the next queued tie's competition ("Euro. Cup", R6)
 	var bot_txt := ""
 	if header_phase == "preseason":
 		bot_txt = "Preparation"
 	elif header_phase == "charity":
 		bot_txt = "Final"
+	elif header_phase == "comp":
+		bot_txt = header_comp_bottom
 	elif week_disp > 0:
 		bot_txt = "Week %d" % week_disp
 	_band_txt(ci, 26, top_txt, C_BAND1_INK)

@@ -70,6 +70,7 @@ func _ready() -> void:
 			and not OS.has_environment("PM98_MATCHOPTS_SHOT") and not OS.has_environment("PM98_PLAYERACT_SHOT") \
 			and not OS.has_environment("PM98_CUPDRAW_SHOT") \
 			and not OS.has_environment("PM98_GROUNDACT_SHOT") \
+			and not OS.has_environment("PM98_RAILS_SHOT") \
 			and not OS.has_environment("PM98_LIVEWATCH_SHOT"):
 		_devshot()
 
@@ -129,6 +130,9 @@ func _boot() -> void:
 		return
 	if OS.has_environment("PM98_OPTIONS_SHOT"):
 		_options_shot()
+		return
+	if OS.has_environment("PM98_RAILS_SHOT"):
+		_rails_shot()
 		return
 	var boot_shot := OS.has_environment("PM98_BOOT_SHOT")
 	if boot_shot or not OS.has_environment("PM98_SHOT_DIR"):
@@ -546,6 +550,79 @@ func _youth_shot() -> void:
 	_save_shot(dir, "youth.png")
 	print("YOUTH-SHOT done youth=%d ready=%d club=%s" % [
 		(_career.youth as Array).size(), _career.promotable_youth().size(), _career.club_name])
+	get_tree().quit()
+
+
+## OWNER REPORT PROBE 2026-08-05 ("in the result screen I cant look any other cups than
+## euro league"): drive the REAL RESULTS rail — every chip, through ResultsScreen's own
+## input handler — at two career depths, and capture what actually mounts after each tap.
+## Run as the NORMAL app under Xvfb+GL: PM98_RAILS_SHOT=1.
+func _rails_shot() -> void:
+	var dir := OS.get_environment("PM98_SHOT_DIR")
+	if GameDB.leagues.is_empty():
+		print("RAILS-SHOT no leagues loaded")
+		get_tree().quit()
+		return
+	var lg: Dictionary = GameDB.leagues[0]
+	var clubs := GameDB.clubs_in_league(lg["id"])
+	clubs.sort_custom(func(a, b): return a["name"] < b["name"])
+	_begin_career("Manager", lg, clubs[0])
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 717171
+	for depth in [5, 25]:
+		while _career.week < depth and not _career.season_over():
+			_career.advance_week(rng)
+			_career.take_pending_matches()
+		_show_career()
+		await _settle()
+		_show_results_screen()
+		await _settle()
+		var scr: ResultsScreen = null
+		for c in get_children():
+			if c is ResultsScreen:
+				scr = c
+		if scr == null:
+			print("RAILS-SHOT wk%d: ResultsScreen did not mount" % _career.week)
+			get_tree().quit()
+			return
+		_save_shot(dir, "rails_wk%02d_00_results.png" % _career.week)
+		var before := get_child_count()
+		for chip in ResultsScreen.CHIP_TOP:
+			var at := Vector2(ResultsScreen.CHIP_X + ResultsScreen.CHIP_W / 2.0,
+				int(ResultsScreen.CHIP_TOP[chip]) + ResultsScreen.CHIP_H / 2.0)
+			for pressed in [true, false]:
+				var e := InputEventMouseButton.new()
+				e.button_index = MOUSE_BUTTON_LEFT
+				e.pressed = pressed
+				e.position = at
+				scr._on_input(e)
+			await _settle()
+			var opened: Array = []
+			for i in range(before, get_child_count()):
+				opened.append(get_child(i).get_class() + ":" + str(get_child(i).get_script().resource_path.get_file()))
+			print("RAILS-SHOT wk%d chip %-9s -> %s" % [_career.week, chip,
+				"NOTHING" if opened.is_empty() else str(opened)])
+			_save_shot(dir, "rails_wk%02d_%s.png" % [_career.week, chip])
+			while get_child_count() > before:
+				var top := get_child(get_child_count() - 1)
+				remove_child(top)
+				top.queue_free()
+			await _settle()
+		scr.queue_free()
+		await _settle()
+	# THE MIDWEEK HUB: advance until a cup/European tie is queued, then raise the hub —
+	# the between-matches state the owner never had (badge = the tie's competition and
+	# round, sheet = its own day of the week, next-fixture stack = the tie's clubs).
+	while not _career.has_pending_matches() and not _career.season_over():
+		_career.advance_week(rng)
+	var nt := _career.next_pending_match()
+	_show_career()
+	await _settle()
+	print("RAILS-SHOT midweek hub wk%d: phase=%s band=[%s / %s] tie=%s %s" % [
+		_career.week, PMChrome.header_phase, PMChrome.header_comp_top,
+		PMChrome.header_comp_bottom, str(nt.get("comp", "?")), str(nt.get("comp_round", ""))])
+	_save_shot(dir, "rails_midweek_hub.png")
+	print("RAILS-SHOT done")
 	get_tree().quit()
 
 
@@ -2130,12 +2207,31 @@ func _mount_hub() -> void:
 	# "Preseason"/"Preparation" and the calendar sheet shows the pending
 	# FRIENDLY's date (wine captures 2026-07-12); in season, league + Week N.
 	var pf := c.pending_friendly()
+	var pt := c.next_pending_match()
 	if not pf.is_empty():
 		PMChrome.header_phase = "preseason"
 		PMChrome.header_date = PMChrome.date_from_iso(str(pf.get("date", "")))
 	elif not c.pending_charity_shield().is_empty():
 		PMChrome.header_phase = "charity"   # the Charity Shield fixture plaque ("Charity"/"Final")
 		PMChrome.header_date = {}
+	elif not pt.is_empty():
+		# Between a week's matches: the plaque bands read the NEXT tie's competition and
+		# round ("Euro. Cup / 1/8 Final" — refrun p0110/R6), and the calendar sheet its
+		# own day of the played week (F.A. Sun / Coca-Cola Mon / Europe Wed).
+		PMChrome.header_phase = "comp"
+		PMChrome.header_comp_top = _band_comp(str(pt.get("comp", "")))
+		PMChrome.header_comp_bottom = str(pt.get("comp_round", ""))
+		PMChrome.header_date = PMChrome.date_parts(c.season, c.week,
+			_comp_day_off(str(pt.get("comp", ""))))
+	elif not c.pending_tail_final().is_empty():
+		# League done, a final ahead on the cup tail week: the badge is that final's
+		# competition context, the sheet its own day of the tail week.
+		var tf := c.pending_tail_final()
+		PMChrome.header_phase = "comp"
+		PMChrome.header_comp_top = _band_comp(str(tf.get("comp", "")))
+		PMChrome.header_comp_bottom = str(tf.get("round", ""))
+		PMChrome.header_date = PMChrome.date_parts(c.season, c.week + 1,
+			_comp_day_off(str(tf.get("comp", ""))))
 	else:
 		PMChrome.header_phase = ""
 		PMChrome.header_date = {}
@@ -2262,30 +2358,41 @@ func _career_advance() -> void:
 				_pop_division_finals(func() -> void: _pop_cup_draw(func() -> void: _pop_month_awards(func() -> void: _pop_fines(func() -> void: _pop_channel_tv(_pop_pending_team_offers)))))))
 		return
 	var res := _career.advance_week(rng)   # ratings come from the live roster
-	# Every cup + European tie the manager's club played this week, in the order it was
-	# played. They used to resolve silently; now they present after the league match
-	# through the same flow, which is what makes European football playable at all.
-	var ties: Array = _career.take_pending_matches()
+	# Every cup + European tie the manager's club played this week stays QUEUED on the
+	# career: the original returns to the hub between a week's matches (the refrun's own
+	# hub frames sit on Sun 3 Aug, Wed 17 Sep, Mon 31 Aug — the hub date walks the match
+	# days), so each tie presents on its OWN hub CONTINUE, never chained. They used to
+	# resolve silently, then (2026-08-01..08-02) chained back-to-back on one CONTINUE —
+	# the owner's "I'm playing 3 matches in a row" report.
 	if res.is_empty():
-		if ties.is_empty():
+		if not _career.has_pending_matches():
 			_career.save()   # bye / season end: no presentation, save immediately
 			_show_career()   # refresh the hub in place
 			_pop_division_finals(func() -> void: _pop_cup_draw(func() -> void: _pop_month_awards(func() -> void: _pop_fines(func() -> void: _pop_channel_tv(_pop_pending_team_offers)))))
 			return
-		_present_tie_chain(ties, 0)
+		_present_next_pending_match()
 		return
-	_show_match_result(res, func() -> void: _present_tie_chain(ties, 0))
+	_show_match_result(res, _after_week_match)
 
 
-## Present the queued cup / European ties one after another; when the last CONTINUE
-## lands, fall through to the ordinary post-week hub chain (autosave + the cards).
-func _present_tie_chain(ties: Array, i: int) -> void:
-	if i >= ties.size():
-		_career.save()   # the deferred week autosave, once the whole week has presented
-		_show_career()
+## Present ONE queued cup / European tie (a hub CONTINUE each), then return to the hub.
+func _present_next_pending_match() -> void:
+	var tie := _career.take_next_pending_match()
+	if tie.is_empty():
+		_after_week_match()
+		return
+	_show_match_result(tie, _after_week_match)
+
+
+## After any of the week's matches presents: save (the queue is persisted, so an EXIT
+## here resumes mid-week), raise the hub — its badge/date show the NEXT queued tie if
+## one remains — and run the post-week hub cards only once the whole week has presented
+## (the SORTEO is witnessed raising on the hub AFTER the cup round played).
+func _after_week_match() -> void:
+	_career.save()
+	_show_career()
+	if not _career.has_pending_matches():
 		_pop_division_finals(func() -> void: _pop_cup_draw(func() -> void: _pop_month_awards(func() -> void: _pop_fines(func() -> void: _pop_channel_tv(_pop_pending_team_offers)))))
-		return
-	_show_match_result(ties[i] as Dictionary, func() -> void: _present_tie_chain(ties, i + 1))
 
 ## The manager's match (B4): the running BRIEF + MATCH OPTIONS, whose RESULTS tap now surfaces
 ## the source-true FULL TIME read-out (MatchResultScreen; docs/re/match_flow_re.md). The BRIEF
@@ -2390,6 +2497,13 @@ static func _comp_day_off(comp: String) -> int:
 			or comp.begins_with("Cup Winners"):
 		return 4                                   # Wednesday
 	return 0
+
+
+## The hub plaque band's short form of a competition name. "Euro. Cup" is the witnessed
+## one (refrun p0110/R6: "Euro. Cup / 1/8 Final"); no other competition's band short form
+## is witnessed, so the rest print their own names verbatim.
+static func _band_comp(comp: String) -> String:
+	return "Euro. Cup" if comp == "European Cup" else comp
 
 
 ## Mount the pre-match XI-vs-XI photo roll (LineupRollScreen) for a fixture; a tap
@@ -2882,6 +2996,15 @@ func _next_fixture() -> Array:
 	var sh := _career.pending_charity_shield()
 	if not sh.is_empty():
 		return [int(sh["champ_id"]), int(sh["fa_id"])]
+	# Between a week's matches the next fixture is the next QUEUED tie — the refrun pins
+	# the hub badge as "the competition context of the NEXT fixture" (R6 note).
+	var pt := _career.next_pending_match()
+	if not pt.is_empty():
+		return [int(pt["home_id"]), int(pt["away_id"])]
+	# The league is done but a final waits on the cup tail week: it IS the next fixture.
+	var tf := _career.pending_tail_final()
+	if not tf.is_empty():
+		return [int(tf["home_id"]), int(tf["away_id"])]
 	return _career.manager_fixture()
 
 func _match_header() -> Dictionary:
@@ -4022,22 +4145,22 @@ func _open_competition(act: String) -> void:
 func _open_rail_competition(chip: String) -> void:
 	match chip:
 		"facup":
-			if not _career.fa_cup.is_empty():
+			if _bracket_has_view(_career.fa_cup):
 				_open_competition("facup")
 		"cocacola":
-			if not _career.league_cup.is_empty():
+			if _bracket_has_view(_career.league_cup):
 				_open_competition("lcup")
 		"charity":
 			if not _career.charity_shield.is_empty():
 				_open_competition("charity")
 		"euro":
-			if _career.euro.has("european_cup"):
+			if _bracket_has_view(_career.euro.get("european_cup", {})):
 				_open_competition("euro:european_cup")
 		"cwc":
-			if _career.euro.has("cup_winners_cup"):
+			if _bracket_has_view(_career.euro.get("cup_winners_cup", {})):
 				_open_competition("euro:cup_winners_cup")
 		"uefa":
-			if _career.euro.has("uefa_cup"):
+			if _bracket_has_view(_career.euro.get("uefa_cup", {})):
 				_open_competition("euro:uefa_cup")
 		"supercup":
 			if not _career.supercup.is_empty():
@@ -4045,6 +4168,21 @@ func _open_rail_competition(chip: String) -> void:
 		"intercont":
 			if not _career.intercontinental.is_empty():
 				_open_competition("intercont")
+
+
+## A bracket has something to SHOW once a round has been played, a draw is pending, or
+## its groups are drawn. Before that (the F.A. Cup's first round is week 15; the euro
+## draws are September) the chip stays inert like the original's dimmed chips — it used
+## to mount the SORTEO card with an EMPTY view (no round plate, no ties), which is the
+## owner's 2026-08-05 "not possible to view" report at an early-season week.
+func _bracket_has_view(b: Dictionary) -> bool:
+	if b.is_empty():
+		return false
+	if not (b.get("rounds", []) as Array).is_empty():
+		return true
+	if not (b.get("pending_draw", {}) as Dictionary).is_empty():
+		return true
+	return not Cup.group_tables(b).is_empty()
 
 ## The trophy art path for a European competition.
 func _euro_emblem(key: String) -> String:
@@ -4888,7 +5026,12 @@ func _menu_action(action: String, scr: MenuScreen) -> void:
 		"fixtures": _show_fixtures_screen()
 		"opponent": _show_opponent(scr)
 		"continue":
-			if _career.season_over():
+			if _career.has_pending_matches():
+				# A tie from the week just played is still waiting — the hub sits between
+				# a week's matches now, and CONTINUE presents the next one, never a new
+				# week (and never the end-of-season while a final is unpresented).
+				_present_next_pending_match()
+			elif _career.season_over():
 				_push(_show_end_of_season)
 			elif _next_fixture().is_empty():
 				_career_advance()          # bye week: no match -> no MATCH OPTIONS
@@ -5381,6 +5524,12 @@ func _show_deal_result(msg: String) -> void:
 ## consequences -- a sacking or a job offer -- and then through the original's own modal
 ## alert box, not a screen of its own.
 func _show_end_of_season() -> void:
+	# Other clubs' finals on the cup tail week the manager never plays (the F.A. and
+	# European finals now land AFTER the last league round) resolve here, before the
+	# champion cards read the brackets — "the FINAL was still undecided at week 38 ...
+	# played inside the season-end sequence" (knockout_views_re witness).
+	_career.finish_outstanding_cups(_career.career_rng())
+	_career.save()
 	_career.queue_season_end_champion_cards()
 	_season_end_step(0)
 

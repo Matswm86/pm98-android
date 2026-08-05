@@ -124,7 +124,8 @@ static func create(club_ids: Array, total_weeks: int, opts: Dictionary = {}) -> 
 		# round_legs, byes, players}. {} when the next round has not been drawn yet.
 		"pending_draw": {},
 		"round_weeks": _schedule(total_weeks, num_rounds, span_lo, span_hi,
-			opts.get("tail_fracs", []), opts.get("tail_weeks", [])),
+			opts.get("tail_fracs", []), opts.get("tail_weeks", []),
+			int(opts.get("final_week", 0))),
 		"champion_id": -1,
 		"n0": ids.size(),                  # starting field size (for labels)
 		"legs": int(opts.get("legs", 1)),
@@ -215,8 +216,22 @@ static func _num_rounds_with_entry(n: int, late_round: int, n_late: int) -> int:
 ## fraction path re-scaled them by total_weeks/38 — every pinned week from January on
 ## landed one week late, which is how the F.A. Cup R3 / Coca-Cola QF week (a real shared
 ## week, 3 Jan + 6 Jan 1998) drifted onto other competitions' weeks.
+## `final_week`, when > 0, pins the LAST round at that absolute week AFTER the spread —
+## and it may lie past `total_weeks`. The league finishes before the F.A. Cup and
+## European finals (owner report 2026-08-05 + the real 1997-98 run-out: league 10 May,
+## F.A. FINAL 16 May, C.W.C. 13 May, European Cup 20 May), so those finals take the
+## cup tail week `total_weeks + 1`, which Career plays after the last league round.
 static func _schedule(total_weeks: int, num_rounds: int, span_lo := 0.0, span_hi := 1.0,
-		tail_fracs: Array = [], tail_weeks: Array = []) -> Array:
+		tail_fracs: Array = [], tail_weeks: Array = [], final_week := 0) -> Array:
+	var out := _schedule_spread(total_weeks, num_rounds, span_lo, span_hi,
+		tail_fracs, tail_weeks)
+	if final_week > 0 and not out.is_empty():
+		out[-1] = maxi(final_week, int(out[-1]))
+	return out
+
+
+static func _schedule_spread(total_weeks: int, num_rounds: int, span_lo := 0.0,
+		span_hi := 1.0, tail_fracs: Array = [], tail_weeks: Array = []) -> Array:
 	var out: Array = []
 	if num_rounds <= 0 or total_weeks <= 0:
 		return out

@@ -1034,12 +1034,38 @@ static func _league_fixtures(ids: Array) -> Array:
 		fx.insert(BLANK_LEAGUE_WEEK - 1, [])
 	return fx
 
+## The season runs one CUP TAIL week past the league grid when the manager's club is
+## still alive in a final scheduled there (F.A. FINAL + the European finals — see
+## `final_week` in _mint_domestic_cups / mint_european_cups). A career with no such
+## final ends where the league does, exactly as before.
 func season_over() -> bool:
-	return week >= fixtures.size()
+	if week < fixtures.size():
+		return false
+	return not _cup_tail_pending()
 
-## [home_id, away_id] for the manager's match this week, or [] on a bye.
+
+## A bracket the manager is still in, undecided, with a round scheduled past the league
+## grid and past the weeks already played — the condition that buys the cup tail week.
+func _cup_tail_pending() -> bool:
+	var brackets: Array = [fa_cup, league_cup]
+	for key in euro:
+		brackets.append(euro[key])
+	for b in brackets:
+		var bd: Dictionary = b
+		if bd.is_empty() or int(bd.get("champion_id", -1)) != -1:
+			continue
+		if not Cup.still_in(bd, club_id):
+			continue
+		var weeks: Array = bd.get("round_weeks", [])
+		if not weeks.is_empty() and int(weeks.back()) > fixtures.size() \
+				and int(weeks.back()) > week:
+			return true
+	return false
+
+
+## [home_id, away_id] for the manager's match this week, or [] on a bye / the cup tail.
 func manager_fixture() -> Array:
-	if season_over():
+	if week >= fixtures.size():
 		return []
 	for m in fixtures[week]:
 		if int(m[0]) == club_id or int(m[1]) == club_id:
@@ -1157,8 +1183,12 @@ func season_fixtures() -> Array:
 ## `clubs_by_id` maps id -> full club dict (for ratings). Returns the manager's
 ## result {home_id, away_id, hg, ag, manager_home} or {} on a bye / season end.
 func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -> Dictionary:
-	if season_over():
-		return {}
+	if week >= fixtures.size():
+		# Past the league grid: the CUP TAIL week (the F.A. / European finals play after
+		# the league's last round), or nothing at all.
+		if season_over():
+			return {}
+		return _advance_cup_tail(rng, clubs_override)
 	# A caller that never drained last week's queue (a headless rig, an interrupted flow)
 	# must not have this week's ties presented on top of stale ones.
 	pending_matches.clear()
@@ -1572,6 +1602,78 @@ func take_pending_matches() -> Array:
 	var out := pending_matches
 	pending_matches = []
 	return out
+
+
+func has_pending_matches() -> bool:
+	return not pending_matches.is_empty()
+
+
+## Peek the next queued tie without consuming it (the hub's between-matches badge/date).
+func next_pending_match() -> Dictionary:
+	return pending_matches[0] if not pending_matches.is_empty() else {}
+
+
+## Pop ONE queued tie for presentation — the original returns to the hub between a
+## week's matches (refrun hub witnesses on Sun 3 Aug / Wed 17 Sep / Mon 31 Aug: the hub
+## date walks the week's own match days), so each tie is its own CONTINUE.
+func take_next_pending_match() -> Dictionary:
+	return pending_matches.pop_front() if not pending_matches.is_empty() else {}
+
+
+## The manager's still-unplayed final on the cup tail week, for the hub's next-fixture
+## stack and badge once the league is done: {comp, round, home_id, away_id}, or {}.
+## The pairing comes off the bracket's own pending draw (the final is drawn the moment
+## the semifinals resolve).
+func pending_tail_final() -> Dictionary:
+	if week < fixtures.size():
+		return {}
+	var comps: Array = [["F.A. Cup", fa_cup], ["Coca-Cola Cup", league_cup]]
+	for key in euro:
+		comps.append([str((euro[key] as Dictionary).get("name", key)), euro[key]])
+	for pair in comps:
+		var b: Dictionary = pair[1]
+		if b.is_empty() or int(b.get("champion_id", -1)) != -1 \
+				or not Cup.still_in(b, club_id):
+			continue
+		var weeks: Array = b.get("round_weeks", [])
+		if weeks.is_empty() or int(weeks.back()) <= fixtures.size() \
+				or int(weeks.back()) <= week:
+			continue
+		var pd: Dictionary = b.get("pending_draw", {})
+		var players: Array = pd.get("players", [])
+		if players.size() >= 2:
+			return {"comp": str(pair[0]), "round": str(pd.get("label", "Final")),
+				"home_id": int(players[0]), "away_id": int(players[1])}
+	return {}
+
+
+## The CUP TAIL week: the league is done; only the finals scheduled past the grid play
+## (F.A. FINAL Sat, European finals Wed — `final_week`). No league round, no wages, no
+## division rounds — the original's post-league run-out is only its finals, and the
+## after-season money model is un-witnessed, so nothing else is charged or ticked here.
+func _advance_cup_tail(rng: RandomNumberGenerator, clubs_override: Dictionary) -> Dictionary:
+	pending_matches.clear()
+	week += 1
+	_play_due_cup_rounds(rng, clubs_override)
+	_close_week_books()   # the final's own matchday postings close like any week's
+	if season_over():
+		finished = true
+	return {}
+
+
+## Resolve every still-undecided cup/European bracket to a champion — the season-end
+## sequence needs all eight honours before the champion cards present ("the FINAL was
+## still undecided at week 38 ... played inside the season-end sequence"). Runs the same
+## _play_due_cup_rounds path with the clock forced past every scheduled week, so news,
+## prizes and honours land exactly as a played week's would. Ties are NOT queued for
+## presentation (the manager's own finals were already played on the cup tail week;
+## anything left here is other clubs' football).
+func finish_outstanding_cups(rng: RandomNumberGenerator) -> void:
+	var wk := week
+	week = 9999
+	_play_due_cup_rounds(rng, {})
+	week = wk
+	pending_matches.clear()
 
 
 ## Was the manager's club the HOME side of this tie? A two-legged tie hosts one leg each
@@ -5452,6 +5554,12 @@ func _money(n: int) -> String:
 ## a free. Fixtures, table and objective are rebuilt from the current squads.
 func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool: Array = [],
 		sa_champion: Dictionary = {}, talent_pool: Array = []) -> void:
+	if rng == null:
+		rng = career_rng()   # S3: the ONE persisted career stream
+	# Any final still undecided (other clubs' finals on the cup tail week the manager
+	# never plays) resolves BEFORE the honours are captured, or the champion cards and
+	# next season's seeds would read -1.
+	finish_outstanding_cups(rng)
 	# Fold the finished season's per-competition record into the career total while
 	# results/brackets still hold it (MANAGER HISTORY's TOTAL view).
 	_fold_comp_total()
@@ -6124,9 +6232,14 @@ func mint_european_cups(euro_pool: Array, rng: RandomNumberGenerator,
 			"two_legged_final": false, "label_scheme": "sequential",
 			"qtr_label": "Qtr. Finals", "prize_round": 0, "prize_winner": 0,
 			# The European break — see EURO_TAIL_FRACS. Autumn rounds (or the six group
-			# matchdays) inside EURO_HEAD_SPAN, then QF/SF/Final in March..May.
+			# matchdays) inside EURO_HEAD_SPAN, then QF/SF in March..April — and the
+			# FINAL on the cup tail week, AFTER the league's last round ("the FINAL was
+			# still undecided at week 38 in BOTH seasons and is played inside the
+			# season-end sequence" — the knockout_views_re witness; the real 1998 finals
+			# were 6/13/20 May, all past the league).
 			"span_lo": EURO_HEAD_SPAN[0], "span_hi": EURO_HEAD_SPAN[1],
-			"tail_fracs": EURO_TAIL_FRACS.duplicate()}
+			"tail_fracs": EURO_TAIL_FRACS.duplicate(),
+			"final_week": fixtures.size() + 1}
 		# Only the European Cup runs a group phase: 24 clubs into six groups of four,
 		# double round-robin (`Round 1`..`Round 6` under the original's `1/8 FINALS`
 		# header), then the six winners plus the two best runners-up into the quarter
@@ -6364,14 +6477,19 @@ func _mint_domestic_cups(div_ids: Array) -> void:
 			if not rest.has(int(v)):
 				rest.append(int(v))
 	if rest.is_empty() or top.is_empty():
-		fa_cup = Cup.create(div_ids, fixtures.size(), _cup_opts_on_calendar(FA_CUP_OPTS,
-			FA_CUP_WEEKS))
+		var fa0: Dictionary = _cup_opts_on_calendar(FA_CUP_OPTS, FA_CUP_WEEKS)
+		fa0["final_week"] = fixtures.size() + 1
+		fa_cup = Cup.create(div_ids, fixtures.size(), fa0)
 		league_cup = Cup.create(div_ids, fixtures.size(), _cup_opts_on_calendar(
 			LEAGUE_CUP_OPTS, LEAGUE_CUP_WEEKS))
 		return
 	var entry := {"round": PREMIER_ENTRY_ROUND, "ids": top}
 	var fa: Dictionary = _cup_opts_on_calendar(FA_CUP_OPTS, FA_CUP_WEEKS)
 	fa["late_entry"] = entry
+	# The F.A. FINAL plays on the cup tail week, AFTER the league's last round — the
+	# owner's 2026-08-05 report and the real 1997-98 run-out (league done 10 May, the
+	# final Sat 16 May). The Coca-Cola FINAL keeps its authored week 34 (real 29 Mar).
+	fa["final_week"] = fixtures.size() + 1
 	var lc: Dictionary = _cup_opts_on_calendar(LEAGUE_CUP_OPTS, LEAGUE_CUP_WEEKS)
 	lc["late_entry"] = entry
 	fa_cup = Cup.create(rest, fixtures.size(), fa)
@@ -6733,6 +6851,11 @@ func to_dict() -> Dictionary:
 		"pending_champion_cards": pending_champion_cards, "sa_champion_id": sa_champion_id,
 		"pending_channel_tv": pending_channel_tv, "pending_fines": pending_fines,
 		"pending_division_finals": pending_division_finals,
+		# The week's still-unpresented cup/European ties (the hub returns between a
+		# week's matches now, so a save can land mid-week). The per-player stat Report
+		# objects are not JSON; the read-out's STATISTICS falls back gracefully without
+		# them, so they are dropped here rather than serialized.
+		"pending_matches": _pending_matches_to_dict(),
 		"euro_winner_cup": euro_winner_cup, "euro_winner_cwc": euro_winner_cwc,
 		"euro_winner_uefa": euro_winner_uefa,
 		"euro_winner_ratings": _str_keyed(euro_winner_ratings),
@@ -6753,6 +6876,18 @@ func to_dict() -> Dictionary:
 		"season_club_mp": _str_keyed(season_club_mp),
 		"wages_live": true,   # marker: weekly_net excludes player wages (drawn live). See from_dict.
 	}
+
+
+## JSON-safe copy of the presentation queue: the Pm98StatStore.Report objects under
+## "report"/"report_ht" are dropped (Objects, not JSON); everything else is plain data.
+func _pending_matches_to_dict() -> Array:
+	var out: Array = []
+	for m in pending_matches:
+		var c: Dictionary = (m as Dictionary).duplicate()
+		c.erase("report")
+		c.erase("report_ht")
+		out.append(c)
+	return out
 
 
 ## JSON-safe copy of the pyramid state (string keys throughout).
@@ -6916,6 +7051,9 @@ static func from_dict(d: Dictionary) -> Career:
 	# while a scout was out still re-arms the panel; an idle one just opens blank as before.
 	c.scout_criteria = d.get("scout_criteria", (c.scout_search as Dictionary).get("criteria", {}))
 	c.pending_alerts = d.get("pending_alerts", [])
+	# A save made between a week's matches re-arms the unpresented ties (older saves
+	# load with none, exactly as before).
+	c.pending_matches = d.get("pending_matches", [])
 	for k in d.get("external_signed", {}):
 		c.external_signed[int(k)] = true
 	c.pending_bids = d.get("pending_bids", [])   # pre-delay saves load with none pending

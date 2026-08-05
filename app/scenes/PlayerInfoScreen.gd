@@ -293,7 +293,12 @@ func setup_youth(player: Dictionary, club: Dictionary, staff: Array, youth: Arra
 	setup(player, club, tier, false, false)
 	_youth = true
 	_promote_on = Training.youth_fully_grown(player)
-	_training_on = Training.youth_in_training_count(youth) \
+	# ...and a youngster ALREADY carrying the 0x20 mode greys it too: the button's only
+	# action (put him IN) is spent, and greying is the card's visible answer to the tap —
+	# the owner's 2026-08-05 "the training button doesn't seem to have a function" was a
+	# SUCCESSFUL tap whose only feedback went to the footer the fullscreen card covers.
+	_training_on = not Training.youth_in_training(player) \
+		and Training.youth_in_training_count(youth) \
 		< Staff.youth_training_capacity(staff)
 	queue_redraw()
 

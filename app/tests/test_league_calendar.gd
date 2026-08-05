@@ -85,13 +85,16 @@ func _run() -> bool:
 		"R13 queue runs after _advance_other_divisions in advance_week") and ok
 
 	# 8. The domestic cups land on the AUTHORED 1997-98 weeks, blank-week mapped —
-	#    not the old tail_fracs x 39/38 drift (F.A. R3 wk23, QF wk32...).
+	#    not the old tail_fracs x 39/38 drift (F.A. R3 wk23, QF wk32...). The F.A.
+	#    FINAL takes the CUP TAIL week 40, AFTER the league's last round (owner report
+	#    2026-08-05 + the real run-out: league done 10 May 1998, the final 16 May).
 	var host := Career.new()
 	for _i in 39:
 		host.fixtures.append([])
 	var late := {"round": Career.PREMIER_ENTRY_ROUND, "ids": [2000, 2001]}
 	var fa: Dictionary = host._cup_opts_on_calendar(Career.FA_CUP_OPTS, Career.FA_CUP_WEEKS)
 	fa["late_entry"] = late
+	fa["final_week"] = 40
 	var lc: Dictionary = host._cup_opts_on_calendar(Career.LEAGUE_CUP_OPTS,
 		Career.LEAGUE_CUP_WEEKS)
 	lc["late_entry"] = late
@@ -99,11 +102,48 @@ func _run() -> bool:
 	for i in 72:
 		ids72.append(3000 + i)
 	ok = _assert(Cup.create(ids72, 39, fa).get("round_weeks", []) ==
-		[15, 18, 22, 25, 28, 31, 35, 39],
-		"F.A. Cup rounds land on the authored 97-98 weeks (SF on the blank week 35)") and ok
+		[15, 18, 22, 25, 28, 31, 35, 40],
+		"F.A. Cup rounds on the authored 97-98 weeks, FINAL on tail week 40") and ok
 	ok = _assert(Cup.create(ids72, 39, lc).get("round_weeks", []) ==
 		[1, 6, 10, 15, 19, 22, 25, 34],
 		"Coca-Cola rounds land on the authored 97-98 weeks (FINAL wk34, 29 Mar)") and ok
+
+	# 9. THE CUP TAIL WEEK: a manager alive in a final scheduled past the league grid
+	#    gets ONE more week (season_over false at week 39), the tail advance plays the
+	#    final, and the season then ends. A knocked-out manager's season ends at 39.
+	var t := Career.new()
+	t.club_id = 7000
+	for _i in 39:
+		t.fixtures.append([])
+	t.week = 39
+	t.fa_cup = {"name": "F.A. Cup", "champion_id": -1, "survivors": [7000, 7001],
+		"rounds": [{"label": "Semifinals", "ties": []}],
+		"pending_draw": {"label": "Final", "round": 8, "round_legs": 1, "byes": [],
+			"players": [7000, 7001]},
+		"round_weeks": [15, 18, 22, 25, 28, 31, 35, 40], "n0": 72, "legs": 1,
+		"two_legged_final": false, "semi_legs": 0, "round_legs_by_round": {},
+		"label_scheme": "sequential", "qtr_label": "Qtr. Finals",
+		"prize_round": 0, "prize_winner": 0, "group_stage": {}, "late_ids": [],
+		"late_round": 0}
+	ok = _assert(not t.season_over(),
+		"a finalist's season is NOT over at week 39 (the tail week waits)") and ok
+	var tf := t.pending_tail_final()
+	ok = _assert(str(tf.get("comp", "")) == "F.A. Cup" and int(tf.get("home_id", -1)) == 7000,
+		"pending_tail_final names the F.A. Cup pairing for the hub") and ok
+	var rng2 := RandomNumberGenerator.new()
+	rng2.seed = 99
+	t.club_names[7000] = "Mine"
+	t.club_names[7001] = "Theirs"
+	t.rosters[7000] = []
+	var res := t.advance_week(rng2)
+	ok = _assert(res.is_empty() and t.week == 40, "the tail advance is a no-league week") and ok
+	ok = _assert(int(t.fa_cup.get("champion_id", -1)) != -1,
+		"the F.A. FINAL resolved on the tail week") and ok
+	ok = _assert(t.season_over(), "and the season is over once the final is played") and ok
+	t.fa_cup["champion_id"] = -1
+	t.fa_cup["survivors"] = [7001, 7002]   # knocked out: no tail week for this manager
+	t.week = 39
+	ok = _assert(t.season_over(), "a knocked-out manager's season still ends at week 39") and ok
 
 	print("\n%s" % ("ALL PASS" if ok else "FAILURES ABOVE"))
 	return ok

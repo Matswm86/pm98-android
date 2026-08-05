@@ -194,6 +194,9 @@ func _run() -> bool:
 				stale += 1
 				print("     stale card: %s %s (played %s)" % [card.get("title"), card.get("round"), str(played)])
 		career.pending_cup_draws.clear()
+	# The F.A. FINAL plays on the cup tail week / season-end path now (2026-08-05):
+	# resolve it exactly as Main._show_end_of_season does before the completion asserts.
+	career.finish_outstanding_cups(crng)
 	_a(cards > 0, "the season raised cup draws (%d)" % cards)
 	_a(stale == 0, "no SORTEO named a round that was already played (%d stale)" % stale)
 	for cup in [career.fa_cup, career.league_cup]:

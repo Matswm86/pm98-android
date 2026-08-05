@@ -653,7 +653,14 @@ func _draw() -> void:
 		_stars(_star_a_blue, _star_b_blue, _star_half_blue_a, _star_half_blue_b,
 			float(st2.get("x0", 290)), float(st2.get("y", 246)),
 			float(_ymgr.get("stars", 0.0)))
-		var n := _count_override if _count_override >= 0 else _youth.size()
+		# "N PLAYERS" is the manager's TRAINING CAPACITY, never the academy's size —
+		# settled by three witnesses: G. Keeping 3.5★ "3 PLAYERS" over an EMPTY roster
+		# (frame 047 + live 2026-07-29), M. Williamson 5.0★ "4 PLAYERS" (refrun R17),
+		# both exactly FUN_00578b80 case 10's band (Staff.youth_training_capacity).
+		# The port drew _youth.size() here, which is why the capacity mechanic gating
+		# the youth card's TRAINING button was invisible (owner report 2026-08-05).
+		var n := _count_override if _count_override >= 0 \
+			else Staff.capacity_of(_ymgr, Staff.YOUTH_TEAM_MANAGER)
 		var cxy: Array = _spec.get("count_xy", [376, 248])
 		_txt_left(_f8, float(cxy[0]), float(cxy[1]),
 			"%d PLAYER%s" % [n, "" if n == 1 else "S"], c_count, 11)

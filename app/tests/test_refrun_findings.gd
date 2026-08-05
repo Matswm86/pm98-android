@@ -190,6 +190,8 @@ func _domestic_cup_shape() -> bool:
 	rng.seed = SEED
 	while not career.season_over():
 		career.advance_week(rng)
+	# The F.A. FINAL plays on the cup tail week / season-end path now (2026-08-05).
+	career.finish_outstanding_cups(rng)
 	var labels: Array = []
 	for r in career.fa_cup["rounds"]:
 		labels.append(str((r as Dictionary)["label"]))
