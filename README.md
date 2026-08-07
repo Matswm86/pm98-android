@@ -41,6 +41,19 @@ Pick a club, take over, run it week by week.
   scorers and managers, then next pre-season.
 - Ten save slots. Landscape, scaled to whatever phone you have.
 
+## On a phone
+
+The 1998 game was drawn for a mouse, so the phone build adds three touch conveniences on top —
+none of them changes a pixel of the original screens:
+
+- **Pinch to zoom.** Two fingers zoom the whole screen up to 3x and pan it around; pinch back
+  out (or just keep pinching in) and it snaps home. Every tap still lands exactly where it
+  shows.
+- **Drag to scroll.** Any list — the squad, the line-up reserves, offers, the scout's results,
+  a player's history — scrolls under your finger. The original's own scroll arrows still work.
+- **Forgiving arrows.** The 1998 scroll steppers are around 12 pixels; a finger tap a few
+  pixels off still takes them.
+
 ## Screenshots
 
 <p>

@@ -6119,3 +6119,71 @@ func _fmt_int(n: int) -> String:
 		if c % 3 == 0 and i > 0:
 			out = "," + out
 	return out
+
+
+# ---- pinch zoom (phone) ---------------------------------------------------
+# The PC game is 640x480 on a desktop monitor; on a 5-6" panel the smallest
+# text (proman8) is ~1.5 mm tall. TWO-FINGER pinch zooms the whole faithful
+# canvas 1x..3x and two-finger drag pans it — a pure VIEW transform on this
+# root Control, so every child screen renders and hit-tests through it
+# unchanged (Godot transforms gui_input through the parent chain). Nothing is
+# redrawn, rescaled or re-laid-out: the art stays the original's own pixels.
+# One-finger input is untouched; while a pinch is live every pointer event is
+# swallowed so a screen never sees the second finger as a tap.
+
+const _ZOOM_MAX := 3.0
+const _ZOOM_SNAP := 1.06        # below this, snap home to exactly 1:1
+
+var _pz_touches: Dictionary = {}   # touch index -> viewport position
+var _pz_active := false            # a pinch is live; swallow pointers until all up
+var _pz_base_dist := 0.0
+var _pz_base_zoom := 1.0
+
+func _input(e: InputEvent) -> void:
+	if e is InputEventScreenTouch:
+		if e.pressed:
+			_pz_touches[e.index] = e.position
+			if _pz_touches.size() == 2:
+				_pz_active = true
+				_pz_base_zoom = scale.x
+				var ps: Array = _pz_touches.values()
+				_pz_base_dist = maxf(1.0, ps[0].distance_to(ps[1]))
+		else:
+			_pz_touches.erase(e.index)
+			if _pz_touches.is_empty() and _pz_active:
+				_pz_active = false
+				get_viewport().set_input_as_handled()
+				return
+	elif e is InputEventScreenDrag:
+		if _pz_touches.has(e.index):
+			var prev_mid := _pz_mid()
+			_pz_touches[e.index] = e.position
+			if _pz_active and _pz_touches.size() >= 2:
+				_pz_apply(prev_mid)
+	# While pinching, no pointer event (nor its emulated-mouse twin) may reach
+	# a screen — otherwise finger 2 taps whatever it lands on.
+	if _pz_active and (e is InputEventScreenTouch or e is InputEventScreenDrag
+			or e is InputEventMouseButton or e is InputEventMouseMotion):
+		get_viewport().set_input_as_handled()
+
+func _pz_mid() -> Vector2:
+	var m := Vector2.ZERO
+	for p in _pz_touches.values():
+		m += p as Vector2
+	return m / maxf(1.0, float(_pz_touches.size()))
+
+func _pz_apply(prev_mid: Vector2) -> void:
+	var ps: Array = _pz_touches.values()
+	var dist := maxf(1.0, (ps[0] as Vector2).distance_to(ps[1] as Vector2))
+	var z := clampf(_pz_base_zoom * dist / _pz_base_dist, 1.0, _ZOOM_MAX)
+	if z < _ZOOM_SNAP:
+		z = 1.0
+	var mid := _pz_mid()
+	# Keep the canvas point under the fingers' midpoint fixed while the zoom
+	# changes, then track the midpoint's own travel (two-finger pan).
+	var old_z := scale.x
+	position = mid - (prev_mid - position) * (z / old_z)
+	scale = Vector2(z, z)
+	# The zoomed canvas must always cover the viewport: position in [size*(1-z), 0].
+	var lim := size * (1.0 - z)
+	position = position.clamp(lim, Vector2.ZERO)

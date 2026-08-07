@@ -67,6 +67,7 @@ var _scroll := 0
 var _f8: Font
 var _f10: Font
 var _f12: Font
+var _drag := PMTouch.Drag.new()  # drag-to-scroll (input layer only)
 
 
 func _ready() -> void:
@@ -115,11 +116,23 @@ func _to_design(p: Vector2) -> Vector2:
 
 
 func _on_input(e: InputEvent) -> void:
+	if e is InputEventScreenDrag or e is InputEventMouseMotion:
+		# PMTouch drag-to-scroll: whole rows at ROW_PITCH
+		var rows := _drag.take_rows(_to_design(e.position).y, ROW_PITCH)
+		if rows != 0:
+			_scroll = clampi(_scroll + rows, 0, maxi(0, _rows().size() - ROWS_VISIBLE))
+			queue_redraw()
+		return
 	if not (e is InputEventScreenTouch or e is InputEventMouseButton):
 		return
-	if not e.pressed:
-		return
 	var p := _to_design(e.position)
+	if e.pressed:
+		# arm only over the list rows, never on a button (PMTouch)
+		_drag.press(p.y, p.y > ROW_Y0
+			and not BTN_RETURN.has_point(p) and not BTN_PAGE.has_point(p))
+		return
+	if _drag.release():
+		return    # the gesture scrolled (or dup release) — no tap dispatch
 	if BTN_RETURN.has_point(p):
 		back_pressed.emit()
 	elif BTN_PAGE.has_point(p):

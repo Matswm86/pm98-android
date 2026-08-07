@@ -131,6 +131,10 @@ const KL_TEXT_TOP_DY := 6
 # ---- the scrollbar ---------------------------------------------------------------
 const SCROLL_XY := Vector2(478, 125)
 const SCROLL_TROUGH := [172, 394]        # its interior, in screen rows
+## PMTouch drag-to-scroll arms over the compact LIST's body only (input layer, no pixels).
+## The scrolling list always shows 16 rows in the full 255 px body, so the row pitch is
+## FULL_BODY_H / MAX_ROWS.
+const LIST_DRAG_RECT := Rect2(PANEL_X0, BODY_TOP, PANEL_X1 - PANEL_X0 + 1, FULL_BODY_H)
 
 # ---- the BRACKET layout (docs/re/knockout_views_re.md, re-measured 2026-07-26) -----
 ## Any 4-tie round. Four panels x20..477 at these tops (pitch 80); one baked 458x72
@@ -330,6 +334,7 @@ var _offset := 0
 var _has_prev := false
 var _has_next := false
 var _press := ""
+var _drag := PMTouch.Drag.new()          # LIST drag-to-scroll (input only)
 
 
 func _ready() -> void:
@@ -523,6 +528,15 @@ func _target_at(d: Vector2) -> String:
 func _on_input(e: InputEvent) -> void:
 	if PMChrome.is_emulated_pointer_dup(e):
 		return
+	if e is InputEventScreenDrag or e is InputEventMouseMotion:
+		# PMTouch drag over the compact LIST: whole rows at the full body's own pitch.
+		var mp: Vector2 = (e as InputEventMouse).position if e is InputEventMouse \
+			else (e as InputEventScreenDrag).position
+		var rows := _drag.take_rows(_to_design(mp).y, FULL_BODY_H / float(MAX_ROWS))
+		if rows != 0:
+			_offset = clampi(_offset + rows, 0, maxi(0, _ties.size() - MAX_ROWS))
+			queue_redraw()
+		return
 	var pressed := (e is InputEventMouseButton and (e as InputEventMouseButton).pressed) \
 		or (e is InputEventScreenTouch and (e as InputEventScreenTouch).pressed)
 	var released := (e is InputEventMouseButton and not (e as InputEventMouseButton).pressed) \
@@ -531,9 +545,17 @@ func _on_input(e: InputEvent) -> void:
 		return
 	var pos: Vector2 = (e as InputEventMouse).position if e is InputEventMouse \
 		else (e as InputEventScreenTouch).position
-	var t := _target_at(_to_design(pos))
+	var d := _to_design(pos)
+	var t := _target_at(d)
 	if pressed:
+		# Arm the drag over the scrollable list body only — never on a button/chip/pager.
+		_drag.press(d.y, _layout == "list" and _ties.size() > MAX_ROWS
+			and t == "" and LIST_DRAG_RECT.has_point(d))
 		_press = t
+		queue_redraw()
+		return
+	if _drag.release():
+		_press = ""                      # the gesture was a scroll (or a dup) — no tap
 		queue_redraw()
 		return
 	_press = ""

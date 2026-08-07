@@ -1,4 +1,85 @@
-# PM98 Android — remaining-work inventory (refreshed 2026-08-05)
+# PM98 Android — remaining-work inventory (refreshed 2026-08-07)
+
+## 0a-s94. Closed 2026-08-07 (session s94) — THE PHONE CAN REACH EVERY CONTROL: PINCH ZOOM, DRAG-TO-SCROLL ON ALL TWELVE LISTS, AND FORGIVING STEPPERS
+
+The owner's report was about REACH, not fidelity: *"difficult to see everything and push every
+scroll bar pointer"*. Premier Manager 98 was drawn for a mouse on a desktop monitor — its scroll
+steppers are 15-16 design px, which is ~2 mm on a phone panel, and proman8 body text is ~1.5 mm.
+Nothing about that is wrong in the port; it is the original's own geometry, and the locked rule
+says the geometry does not move. So the whole session is an **INPUT LAYER on top of unchanged
+art** — every parity gate re-run below proves not one pixel moved.
+
+### 1. ⭐ PINCH TO ZOOM — a view transform on the root, so every screen inherits it free
+
+`Main._input` (new, at the file's tail) tracks `InputEventScreenTouch` indices; the second finger
+arms a pinch. `_pz_apply` scales the root `Control` 1.0..3.0x and positions it so the canvas point
+under the fingers' midpoint stays FIXED, then tracks that midpoint's own travel — pinch and pan in
+one gesture. Below 1.06x it snaps to exactly 1.0 so a stray pinch always returns home, and the
+position is clamped to `size * (1 - z) .. 0` so the zoomed canvas can never expose a gap.
+
+Why this costs nothing in fidelity: Godot routes `gui_input` through the parent chain's transform,
+so a child screen keeps hit-testing in its own 640x480 design space and keeps drawing its own
+pixels. There is no re-layout, no re-scale of art, no second code path. `test_touch_assist` gates
+exactly that invariant: tap unzoomed, record the design point, zoom 2x anchored on it, tap the same
+window point — the child must report the SAME design point (it does, to <0.5 px).
+
+While a pinch is live every pointer event is swallowed (`set_input_as_handled`), so the second
+finger can never land as a tap on whatever it happens to be over.
+
+### 2. ⭐ DRAG-TO-SCROLL ON ALL TWELVE SCROLLING SCREENS
+
+`app/scripts/PMTouch.gd` (new) extracts the pattern `BrowseScreen` already carried:
+`Drag.press(y, over_list)` / `.update(y)` / `.take_rows(y, pitch)` / `.release()`, with
+`DRAG_SLOP = 6.0` design px separating a tap from a scroll. `take_rows` carries the sub-row
+remainder so a slow drag still accumulates. `release()` returns TRUE when the gesture was a scroll,
+and the screen then skips its tap dispatch entirely.
+
+Wired into: `CupDrawScreen` (LIST form), `DataBaseCardScreen` (prose AND career rows, each at its
+own pitch), `HonoursScreen`, `InsuranceScreen` (per-section), `KnockoutScreen` (compact list),
+`LineupScreen` (the RESERVES tail, through its existing clamp), `ManagerHistoryScreen`,
+`OffersScreen`, `ScoutScreen` (results), `SquadScreen` (per-section), `TrainingScreen`
+(per-section bars). `BrowseScreen` already had it.
+
+Two invariants held everywhere: the drag ARMS only over the rows region (a press on a button or a
+stepper never scrolls), and **tap dispatch moved from press to release** on the screens that
+dispatched on press — so a drag that starts on a row cannot also fire that row. The pattern is
+duplicate-safe by construction against `emulate_mouse_from_touch`: the emulated twin arrives at the
+same position (delta 0) and the second `release()` returns TRUE and is swallowed. No screen needed
+an `is_emulated_pointer_dup` guard added for this.
+
+### 3. FORGIVING STEPPERS — `PMTouch.near()`, input-side only
+
+The original's scroll arrows are 16x16 and 16x15. `PMTouch.near(rect, p)` grows a hit rect by
+5 px on every side, applied ONLY where the grown rect cannot reach another interactive target —
+checked per site, not assumed: `ManagerHistoryScreen` (16x15 pair, 180 px apart), `OffersScreen`
+(rows end x586 vs stepper x615), `ScoutScreen` (rows end x473 vs x478, and rows are hit-tested
+first), `InsuranceScreen` (per section), `TrainingScreen` (bars end x286 vs x313; a band's two
+grown arrow rects stay >= 4 px apart). The drawn arrows are untouched.
+
+### 4. Gates run — the art did not move, and that is measured rather than claimed
+
+* **49/49 tests green** (the 46-test CI list + new `test_touch_assist` + `test_pointer_dup` +
+  `test_manager_history_screen`).
+* **Parity, all 0 px**: youth 7/7 body 0 px; `diff_entry_parity` 18/18 (LINEUP included);
+  `diff_managerhistory_parity` 2/2 at 0 px; `diff_knockout_parity` 6/6 0 outside its named
+  exclusions; `diff_offers_selection_parity` 5/5 at 0 px; `diff_dbase_card_parity` 0 px total.
+* `test_touch_assist` also asserts that **all twelve** scrolling screens declare a `PMTouch.Drag`
+  and consume `InputEventScreenDrag` — so a thirteenth scrolling screen cannot be added later and
+  silently ship un-draggable.
+* ⚠ **Two harnesses fail, and they fail identically on clean HEAD** (verified by stashing):
+  `shot_dbase_card_tapthrough` (a freed lambda capture in the harness itself) and
+  `shot_squad_card_tapthrough` (2 RETURN assertions). Pre-existing, NOT caused by this session,
+  and neither is in the CI gate list. Filed here rather than fixed.
+
+### 5. NOT done in s94, said plainly
+
+* **The real-device pass is still owed** and is now the gate that matters most: everything above is
+  a TOUCH feature and this box has no Android device, no adb and no emulator. Headless tests prove
+  the arithmetic and the parity shots prove the art; only a phone proves the feel.
+* Zoom is deliberately NOT persisted across screens or saved — un-witnessed behaviour, and the
+  original has no zoom at all. It resets when the app restarts.
+* Nothing in the carried RE set moved (M5 goal-2, the FINAL cup draw, FACILITIES/SERVICES bodies).
+
 
 ## 0a-s93. Closed 2026-08-05 (session s93) — THE HUB SITS BETWEEN A WEEK'S MATCHES, THE FINALS PLAY AFTER THE LEAGUE, AND THE YOUTH CARD ANSWERS ITS TAPS
 

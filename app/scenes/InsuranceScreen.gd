@@ -151,6 +151,8 @@ var _header: Dictionary = {}
 var _sections: Array = []              # {key, y0, slots, players}
 var _scroll := {}                      # key -> first visible index
 var _press := ""
+var _drag := PMTouch.Drag.new()        # drag-to-scroll (PMTouch pattern)
+var _drag_key := ""                    # section the drag armed over
 var _modal_pid := -1                   # >= 0 while the POLICY modal is up
 var _modal_p: Dictionary = {}
 var _pending := -1                     # tapped group this modal session (-1 = none)
@@ -269,26 +271,56 @@ func _hit(d: Vector2) -> String:
 			if Rect2(ARROW_X, top, 29, ROW_BOX_H).has_point(d):
 				return "row:%s:%d" % [key, i]
 		if players.size() > slots:
-			if Rect2(SCR_X, y0, SCR_W, 16).has_point(d):
+			# 16px steppers: PMTouch-grown hit rects (grown rects stay clear of
+			# rows, RETURN and the neighbour sections' steppers)
+			if PMTouch.near(Rect2(SCR_X, y0, SCR_W, 16), d):
 				return "up:" + key
-			if Rect2(SCR_X, _sect_end(s) - 14, SCR_W, 15).has_point(d):
+			if PMTouch.near(Rect2(SCR_X, _sect_end(s) - 14, SCR_W, 15), d):
 				return "dn:" + key
 	if R_RETURN.has_point(d):
 		return "return"
 	return ""
 
 
+## Section whose row band contains `d` (scrollbar column excluded) — the
+## drag-to-scroll arm region; "" over buttons/steppers/RETURN/modal.
+func _sect_at(d: Vector2) -> String:
+	if d.x < STRIP_X or d.x >= SCR_X:
+		return ""
+	for s in _sections:
+		if d.y >= int(s["y0"]) and d.y <= _sect_end(s):
+			return str(s["key"])
+	return ""
+
+
 func _on_input(e: InputEvent) -> void:
+	# PMTouch drag-to-scroll on the armed section; taps dispatch on RELEASE.
+	if e is InputEventScreenDrag or e is InputEventMouseMotion:
+		var dm := _to_design(e.position)
+		var rows := _drag.take_rows(dm.y, float(ROW_PITCH))
+		if _drag.moved and _press != "":
+			_press = ""
+			queue_redraw()
+		if rows != 0 and _drag_key != "":
+			var ds := _sect(_drag_key)
+			var dlim := maxi(0, (ds["players"] as Array).size() - int(ds["slots"]))
+			_scroll[_drag_key] = clampi(int(_scroll[_drag_key]) + rows, 0, dlim)
+			queue_redraw()
+		return
 	if not (e is InputEventMouseButton or e is InputEventScreenTouch):
 		return
 	var d := _to_design(e.position)
 	if e.pressed:
+		_drag_key = _sect_at(d) if _modal_pid < 0 else ""
+		_drag.press(d.y, _drag_key != "")
 		_press = _hit(d)
 		queue_redraw()
 		return
 	var was := _press
 	_press = ""
 	queue_redraw()
+	if _drag.release():
+		return                     # the gesture was a scroll, not a tap
 	if was == "" or was != _hit(d):
 		return
 	var parts := was.split(":")

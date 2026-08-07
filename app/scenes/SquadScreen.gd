@@ -129,6 +129,8 @@ var _nos_ok := false
 var _youth_enabled := false
 var _press := ""
 var _down := false  # a press was seen; release without it is the emulated-mouse twin
+var _drag := PMTouch.Drag.new()  # drag-to-scroll (input layer only)
+var _drag_sect := ""             # the section band the drag pressed on
 var _rows: Array = []
 var _listed: Dictionary = {}              # pid:int -> true, the manager's transfer-listed players
 var _header: Dictionary = {}
@@ -209,7 +211,23 @@ func _scroll_section(key: String, delta: int) -> void:
 		_sect_scroll[key] = cur
 		queue_redraw()
 
+## Section slot band under a design-space y, or "" (label bands + panel gaps miss).
+func _sect_at_y(y: float) -> String:
+	for sec in _sections():
+		var key := str(sec["key"])
+		var slot: Dictionary = SECT_SLOTS.get(key, SECT_SLOTS["OUT"])
+		if y >= int(slot["top"]) and y < int(slot["top"]) + int(slot["rows"]) * ROW_PITCH:
+			return key
+	return ""
+
+
 func _on_input(e: InputEvent) -> void:
+	if e is InputEventScreenDrag or e is InputEventMouseMotion:
+		# PMTouch drag-to-scroll: whole rows at ROW_PITCH, in the pressed section
+		var rows := _drag.take_rows(_to_design(e.position).y, ROW_PITCH)
+		if rows != 0 and _drag_sect != "":
+			_scroll_section(_drag_sect, rows)
+		return
 	var pos := Vector2.ZERO
 	var pressed := false
 	var tap := false
@@ -225,9 +243,20 @@ func _on_input(e: InputEvent) -> void:
 		return
 	if pressed:
 		_down = true
-		_press = _hit(_to_design(pos))
+		var dp := _to_design(pos)
+		_press = _hit(dp)
+		# arm the drag only over the player-row bands, never on a button/stepper (PMTouch)
+		_drag_sect = _sect_at_y(dp.y) \
+			if _press == "" and dp.x >= ROW_X and dp.x < ROW_X + ROW_W else ""
+		_drag.press(dp.y, _drag_sect != "")
 		queue_redraw()
 	else:
+		if _drag.release():
+			# the gesture scrolled (or dup release) — no tap dispatch
+			_down = false
+			_press = ""
+			queue_redraw()
+			return
 		# One release per press: with emulate_mouse_from_touch (Android default) every
 		# touch also arrives as an emulated mouse event; without this gate a row tap
 		# fired twice (second release hit the empty-space back_pressed fall-through and

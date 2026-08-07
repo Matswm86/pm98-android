@@ -64,6 +64,9 @@ const BTN_RETURN := Rect2(506, 442, 114, 28)
 const SCROLL_UP := Rect2(584, 124, 28, 26)
 const SCROLL_DN := Rect2(584, 384, 28, 26)
 const TRACK := Rect2(584, 150, 28, 234)
+# prose/career content region = the drag-to-scroll arm rect (PMTouch; left of
+# the scrollbar, below the tabs, above the bottom band)
+const R_BODY := Rect2(189, 128, 395, 265)
 # PERSONAL DATA value anchors (frame-measured; PROMAN10 white unless noted)
 const PD_BP_XY := Vector2(196, 170)
 const PD_DATE_XY := Vector2(513, 170)
@@ -118,6 +121,7 @@ var _tab_ok: Array = [false, false, false, false, false, false, false]  # sentin
 var _view := "pdata"                   # pdata | one of TAB_KEYS | notes
 var _scroll := 0                       # prose line / career row offset
 var _press := ""
+var _drag := PMTouch.Drag.new()        # drag-to-scroll (PMTouch pattern)
 var _tex: Dictionary = {}
 var _f8: Font
 var _f10: Font
@@ -283,6 +287,19 @@ func _hit(d: Vector2) -> String:
 
 
 func _on_input(e: InputEvent) -> void:
+	# PMTouch drag-to-scroll over the prose/career body (active view's pitch);
+	# taps dispatch on RELEASE.
+	if e is InputEventScreenDrag or e is InputEventMouseMotion:
+		var dm := _to_design(e.position)
+		var pitch := CAR_ROW_H if _view == "career" else PROSE_PITCH
+		var rows := _drag.take_rows(dm.y, float(pitch))
+		if _drag.moved and _press != "":
+			_press = ""
+			queue_redraw()
+		if rows != 0:
+			_scroll = clampi(_scroll + rows, 0, _max_scroll())
+			queue_redraw()
+		return
 	var pos := Vector2.ZERO
 	var pressed := false
 	if e is InputEventMouseButton:
@@ -295,6 +312,7 @@ func _on_input(e: InputEvent) -> void:
 		return
 	var d := _to_design(pos)
 	if pressed:
+		_drag.press(d.y, R_BODY.has_point(d))
 		_press = _hit(d)
 		queue_redraw()
 		return
@@ -302,6 +320,8 @@ func _on_input(e: InputEvent) -> void:
 	_press = ""
 	var hit := _hit(d)
 	queue_redraw()
+	if _drag.release():
+		return                     # the gesture was a scroll, not a tap
 	if hit == "" or hit != was:
 		return
 	if hit == "return":

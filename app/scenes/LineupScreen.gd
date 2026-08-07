@@ -141,6 +141,7 @@ var _header: Dictionary = {}
 var _by_id: Dictionary = {}
 var _scroll := 0
 var _press := ""
+var _drag := PMTouch.Drag.new()   # touch drag-to-scroll over the roster table
 var _sel_pid := -1          # selected player id (-1 none)
 var _rating_view := true    # RATING active (chrome default); false = PARAMETERS
 var _entry_xi: Array = []   # XI snapshot at setup() — the UNDO baseline
@@ -459,10 +460,24 @@ func _on_input(e: InputEvent) -> void:
 		pressed = (e as InputEventScreenTouch).pressed
 		tap = true
 	if not tap:
+		# drag-to-scroll (PMTouch): whole 16px rows through the RESERVES-tail model
+		if e is InputEventScreenDrag or e is InputEventMouseMotion:
+			var rows := _drag.take_rows(_to_design(e.position).y, float(ROW_PITCH))
+			if rows != 0:
+				_scroll += rows
+				_clamp_scroll()
+				queue_redraw()
 		return
 	if pressed:
-		_press = _hit(_to_design(pos))
+		var d := _to_design(pos)
+		var h := _hit(d)
+		# arm over the roster table only; a press on a stepper must not arm (PMTouch)
+		_drag.press(d.y, TABLE.has_point(d) and h != "up" and h != "down")
+		_press = h
 	else:
+		if _drag.release():   # the gesture was a scroll (or a dup release) — no tap
+			_press = ""
+			return
 		var a := _hit(_to_design(pos))
 		var was := _press
 		_press = ""

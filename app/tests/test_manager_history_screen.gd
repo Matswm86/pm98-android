@@ -34,32 +34,45 @@ func _run() -> void:
 	ok = _assert(scr._total_rows == zeros, "empty totals fall back to season rows") and ok
 
 	# TOTAL toggles on tap inside its plate, back off on a second tap.
-	scr._on_input(_tap(560, 328))
+	_click(scr, 560, 328)
 	ok = _assert(scr._total_on, "TOTAL tap toggles ON") and ok
-	scr._on_input(_tap(560, 328))
+	_click(scr, 560, 328)
 	ok = _assert(not scr._total_on, "TOTAL tap toggles OFF") and ok
 
 	# RETURN emits back_pressed.
 	var backs := [0]
 	scr.back_pressed.connect(func() -> void: backs[0] += 1)
-	scr._on_input(_tap(558, 452))
+	_click(scr, 558, 452)
 	ok = _assert(backs[0] == 1, "RETURN emits back_pressed") and ok
 
 	# Scroll clamps: 13 visible rows, no scroll with one spell.
-	scr._on_input(_tap(462, 283))   # down arrow
+	_click(scr, 462, 283)   # down arrow
 	ok = _assert(scr._scroll == 0, "no scroll with 1 spell") and ok
 	var many: Array = []
 	for i in range(15):
 		many.append({"team": "Club %d" % i, "division": "3rd Div.", "pos": "1st",
 			"obj": "", "directors": "", "public": ""})
 	scr.setup("mwm", many, zeros)
-	scr._on_input(_tap(462, 283))
+	_click(scr, 462, 283)
 	ok = _assert(scr._scroll == 1, "down arrow scrolls") and ok
-	scr._on_input(_tap(462, 283))
-	scr._on_input(_tap(462, 283))
+	_click(scr, 462, 283)
+	_click(scr, 462, 283)
 	ok = _assert(scr._scroll == 2, "scroll clamps at spells-13") and ok
-	scr._on_input(_tap(462, 103))   # up arrow
+	_click(scr, 462, 103)   # up arrow
 	ok = _assert(scr._scroll == 1, "up arrow scrolls back") and ok
+
+	# PMTouch drag on the spells table: >slop travel scrolls rows, and the release
+	# is swallowed (no tap dispatch on the gesture's end point).
+	scr.setup("mwm", many, zeros)
+	scr._on_input(_tap(200, 250, true))
+	scr._on_input(_motion(200, 240))    # 10 px > DRAG_SLOP: the crossing is swallowed
+	scr._on_input(_motion(200, 210))    # 30 px up = 2 rows down the list (pitch 15)
+	ok = _assert(scr._scroll == 2, "drag scrolls 2 rows (pitch 15)") and ok
+	scr._on_input(_tap(200, 210, false))
+	ok = _assert(scr._scroll == 2, "drag release keeps the scroll") and ok
+	var backs2: int = backs[0]
+	_click(scr, 558, 452)
+	ok = _assert(backs[0] == backs2 + 1, "a plain tap still dispatches after a drag") and ok
 
 	# --- Career.competition_record math (real data, no estimates) ---
 	var c := Career.new()
@@ -123,12 +136,25 @@ func _run() -> void:
 	quit(0 if ok else 1)
 
 
-func _tap(x: float, y: float) -> InputEventMouseButton:
+func _tap(x: float, y: float, pressed := true) -> InputEventMouseButton:
 	var e := InputEventMouseButton.new()
-	e.pressed = true
+	e.pressed = pressed
 	e.button_index = MOUSE_BUTTON_LEFT
 	e.position = Vector2(x, y)
 	return e
+
+
+func _motion(x: float, y: float) -> InputEventMouseMotion:
+	var e := InputEventMouseMotion.new()
+	e.position = Vector2(x, y)
+	return e
+
+
+## Full tap = press + release at the same point (tap dispatch moved to release
+## with the PMTouch drag-to-scroll layer).
+func _click(scr: ManagerHistoryScreen, x: float, y: float) -> void:
+	scr._on_input(_tap(x, y, true))
+	scr._on_input(_tap(x, y, false))
 
 
 func _assert(cond: bool, what: String) -> bool:

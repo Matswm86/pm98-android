@@ -143,6 +143,8 @@ var _by_id: Dictionary = {}
 var _buckets: Dictionary = {}         # section key -> Array[player]
 var _sel_pid := -1
 var _press := ""
+var _drag := PMTouch.Drag.new()       # grid drag-to-scroll (input layer only)
+var _drag_key := ""                   # the section band the drag armed over
 var _alert_img: Texture2D             # modal PM98 box (refusals); null = none
 var _alert_box := Rect2i()
 
@@ -294,10 +296,12 @@ func _scroll_hit(d: Vector2) -> String:
 		var by := int(band[0])
 		var bh := int(band[1])
 		var first := _first_of(key)
-		if first > 0 and Rect2(SCROLL_X, by, SCROLL_W, SCROLL_BTN_H).has_point(d):
+		# 16x16 steppers, PMTouch-grown: the bars stop at x286 against SCROLL_X
+		# (313), and a band's two grown arrow rects stay >= 4 px apart.
+		if first > 0 and PMTouch.near(Rect2(SCROLL_X, by, SCROLL_W, SCROLL_BTN_H), d):
 			return "scroll:%s:-1" % key
 		if first + slots < bucket.size() \
-				and Rect2(SCROLL_X, by + bh - SCROLL_BTN_H, SCROLL_W, SCROLL_BTN_H).has_point(d):
+				and PMTouch.near(Rect2(SCROLL_X, by + bh - SCROLL_BTN_H, SCROLL_W, SCROLL_BTN_H), d):
 			return "scroll:%s:1" % key
 	return ""
 
@@ -326,7 +330,29 @@ func _hit(d: Vector2) -> String:
 
 # ---- input ----------------------------------------------------------------
 
+## The section band a design point sits in (bar column only, so the scrollbar
+## column at SCROLL_X is excluded), or "". The drag-to-scroll arm region.
+func _sect_at(d: Vector2) -> String:
+	if d.x < BAR_X0 or d.x >= BAR_X0 + BAR_W:
+		return ""
+	for sect in SECT:
+		var tops: Array = sect["tops"]
+		if d.y >= float(tops[0]) and d.y < float(tops[tops.size() - 1]) + BAR_H:
+			return str(sect["key"])
+	return ""
+
+
 func _on_input(e: InputEvent) -> void:
+	# PMTouch drag-to-scroll inside the pressed section's own bar band; the grid
+	# bars sit on a 16 px pitch. Taps already dispatch on release.
+	if e is InputEventScreenDrag or e is InputEventMouseMotion:
+		var rows := _drag.take_rows(_to_design(e.position).y, 16.0)
+		if _drag.moved and _press != "":
+			_press = ""                  # a scroll is not a press
+			queue_redraw()
+		if rows != 0 and _drag_key != "":
+			_scroll_by(_drag_key, rows)
+		return
 	if not (e is InputEventMouseButton or e is InputEventScreenTouch):
 		return
 	# a finger tap arrives twice (emulated mouse + real touch) — the grid select and
@@ -336,6 +362,14 @@ func _on_input(e: InputEvent) -> void:
 	var d := _to_design(e.position)
 	if e.pressed:
 		_press = _hit(d)
+		# Arm over a section's player bars only — never on a stepper, the FOCUS
+		# boxes or a button, and never under the alert box (PMTouch).
+		_drag_key = _sect_at(d) if _alert_img == null and _scroll_hit(d) == "" else ""
+		_drag.press(d.y, _drag_key != "")
+		queue_redraw()
+		return
+	if _drag.release():
+		_press = ""                      # the gesture scrolled (or a dup) — no tap
 		queue_redraw()
 		return
 	var was := _press

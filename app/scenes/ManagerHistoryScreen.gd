@@ -70,6 +70,8 @@ const BTN_RETURN := Rect2(508, 440, 100, 26)
 const BTN_SCROLL_UP := Rect2(455, 96, 16, 15)
 const BTN_SCROLL_DOWN := Rect2(455, 276, 16, 15)
 const PLAQUE := Rect2(366, 21, 151, 16)
+# Spells-table interior (cells x20..453, ROWS_VISIBLE rows) — the drag-arm zone.
+const LIST_RECT := Rect2(20, ROW_Y0, 434, ROWS_VISIBLE * ROW_PITCH)
 
 var _body: Texture2D
 var _total_on_tex: Texture2D
@@ -82,6 +84,7 @@ var _season_rows: Dictionary = {}   # comp key -> {pla,win,dr,los,gf,ga}
 var _total_rows: Dictionary = {}    # comp key -> same shape, career totals
 var _total_on: bool = false
 var _scroll: int = 0
+var _drag := PMTouch.Drag.new()  # drag-to-scroll (input layer only)
 
 
 func _ready() -> void:
@@ -120,11 +123,22 @@ func _to_design(p: Vector2) -> Vector2:
 
 
 func _on_input(e: InputEvent) -> void:
+	if e is InputEventScreenDrag or e is InputEventMouseMotion:
+		# PMTouch drag-to-scroll: whole spell rows at ROW_PITCH
+		var rows := _drag.take_rows(_to_design(e.position).y, ROW_PITCH)
+		if rows != 0:
+			_set_scroll(_scroll + rows)
+		return
 	if not (e is InputEventScreenTouch or e is InputEventMouseButton):
 		return
-	if not e.pressed:
-		return
 	var p := _to_design(e.position)
+	if e.pressed:
+		# arm only over the spells table, never on a control (PMTouch)
+		_drag.press(p.y, LIST_RECT.has_point(p)
+			and not PMTouch.near(BTN_SCROLL_UP, p) and not PMTouch.near(BTN_SCROLL_DOWN, p))
+		return
+	if _drag.release():
+		return    # the gesture scrolled (or dup release) — no tap dispatch
 	if BTN_RETURN.has_point(p):
 		back_pressed.emit()
 	elif PLAQUE.has_point(p):
@@ -132,9 +146,9 @@ func _on_input(e: InputEvent) -> void:
 	elif BTN_TOTAL.has_point(p):
 		_total_on = not _total_on
 		queue_redraw()
-	elif BTN_SCROLL_UP.has_point(p):
+	elif PMTouch.near(BTN_SCROLL_UP, p):     # 16x15 stepper, grown hit (PMTouch)
 		_set_scroll(_scroll - 1)
-	elif BTN_SCROLL_DOWN.has_point(p):
+	elif PMTouch.near(BTN_SCROLL_DOWN, p):
 		_set_scroll(_scroll + 1)
 
 

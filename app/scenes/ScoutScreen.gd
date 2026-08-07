@@ -299,6 +299,7 @@ var _sort_desc := true
 var _found_total := 0            # pre-cap match count (Career.scout_found_total)
 var _instant := false            # the shown rows came from the instant name lookup
 var _alert_img: Texture2D        # options alert (PMAlert render); null = none
+var _drag := PMTouch.Drag.new()  # results-list drag-to-scroll (input layer only)
 var _hover_row := -1             # the row under the finger (the original's rollover), -1 none
 var _press := ""
 var _row_flag_cache := {}
@@ -555,11 +556,12 @@ func _hit(d: Vector2) -> String:
 		var r := _row_at(d)
 		if r >= 0:
 			return "row:%d" % r
-		if d.x >= SB_X and d.x <= SB_X + 16:
-			if d.y >= ROW_Y0 and d.y < SB_TRACK_Y0:
-				return "scroll_up"
-			if d.y >= SB_DN_Y and d.y <= SB_DN_Y + 16:
-				return "scroll_dn"
+		# 16px steppers, PMTouch-grown: the rows are hit-tested above and stop at
+		# ROW_X1 (473) against SB_X (478), so the grown rects reach nothing else.
+		if PMTouch.near(Rect2(SB_X, ROW_Y0, 16, SB_TRACK_Y0 - ROW_Y0), d):
+			return "scroll_up"
+		if PMTouch.near(Rect2(SB_X, SB_DN_Y, 16, 16), d):
+			return "scroll_dn"
 	return ""
 
 
@@ -602,6 +604,17 @@ func _row_at(d: Vector2) -> int:
 
 
 func _on_input(e: InputEvent) -> void:
+	# PMTouch drag-to-scroll over the RESULTS rows; taps dispatch on release.
+	if e is InputEventScreenDrag or e is InputEventMouseMotion:
+		var rows := _drag.take_rows(_to_design(e.position).y, float(ROW_PITCH))
+		if _drag.moved and _hover_row >= 0:
+			_hover_row = -1              # a scroll is not a rollover
+			_press = ""
+			queue_redraw()
+		if rows != 0:
+			_first = clampi(_first + rows, 0, maxi(0, _results.size() - N_ROWS))
+			queue_redraw()
+		return
 	var pos := Vector2.ZERO
 	var pressed := false
 	var tap := false
@@ -615,12 +628,23 @@ func _on_input(e: InputEvent) -> void:
 		tap = true
 	if not tap:
 		return
-	var a := _hit(_to_design(pos))
+	var d := _to_design(pos)
+	var a := _hit(d)
 	if pressed:
+		# Arm the drag over the results rows only — never on a LED/arrow/stepper,
+		# and never while the OURS panel or an alert is up (PMTouch).
+		_drag.press(d.y, a.begins_with("row:") and not _ours_open
+			and _alert_img == null and not _searching)
 		_press = a
 		# the rollover: held on a row = the original's pointer over that row
 		_hover_row = int(a.substr(4)) if a.begins_with("row:") else -1
 		if _hover_row >= 0:
+			queue_redraw()
+		return
+	if _drag.release():
+		_press = ""                      # the gesture scrolled (or a dup) — no tap
+		if _hover_row >= 0:
+			_hover_row = -1
 			queue_redraw()
 		return
 	var was := _press

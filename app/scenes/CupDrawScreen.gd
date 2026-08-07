@@ -132,6 +132,10 @@ const C_THUMB_B := [Color8(120, 140, 160), Color8(120, 140, 160), Color8(100, 12
 const BTN_FINISH := Rect2(350, 440, 112, 24)
 const BTN_CONTINUE := Rect2(492, 438, 118, 28)
 
+## PMTouch drag-to-scroll arms over the LIST form's rows only: the MATCHES band left of
+## the scrollbar. Input layer — nothing drawn moves.
+const LIST_RECT := Rect2(326, LIST_Y0, SCROLL_X - 326, LIST_PITCH * LIST_ROWS)
+
 # ---- the GRID form, <= 16 ties (REFRUN R8) ---------------------------------
 const GRID_MAX := 16          # the switch: <= 16 ties -> grid, more -> the list above
 const GRID_ROWS_N := 16       # the grid always paints sixteen bands, drawn or not
@@ -280,6 +284,7 @@ var _first := 0                   # first visible row
 var _spin := 0.0                  # drum animation phase (seconds; reveal only)
 var _pinned := -1                 # pin_drum's frame, or -1
 var _press := ""
+var _drag := PMTouch.Drag.new()   # LIST-form drag-to-scroll (input only)
 # The one-by-one reveal (see the docstring): a flattened list of the clubs in draw
 # order; _reveal_step of them have LANDED in MATCHES, the one at _reveal_step is on
 # the hand's slip. Inactive (-1 total) outside a reveal — the parked, finished state.
@@ -483,6 +488,15 @@ func _to_design(p: Vector2) -> Vector2:
 
 
 func _on_input(e: InputEvent) -> void:
+	if e is InputEventScreenDrag or e is InputEventMouseMotion:
+		# PMTouch drag over the LIST form: whole rows at the list's own pitch.
+		if _reveal_on:
+			return
+		var rows := _drag.take_rows(_to_design(e.position).y, LIST_PITCH)
+		if rows != 0:
+			_first = clampi(_first + rows, 0, maxi(0, _ties.size() - LIST_ROWS))
+			queue_redraw()
+		return
 	if not (e is InputEventScreenTouch or e is InputEventMouseButton):
 		return
 	# During the reveal any tap completes the draw instantly (OURS, flagged) — the
@@ -493,9 +507,15 @@ func _on_input(e: InputEvent) -> void:
 		return
 	var d := _to_design(e.position)
 	if e.pressed:
+		# Arm the drag over the scrolling LIST rows only (grid/semis/groups don't scroll).
+		_drag.press(d.y, not is_grid() and LIST_RECT.has_point(d))
 		_press = "finish" if BTN_FINISH.has_point(d) else \
 			("continue" if BTN_CONTINUE.has_point(d) else "")
 	else:
+		if _drag.release():
+			_press = ""             # the gesture was a scroll (or a dup) — no tap
+			queue_redraw()
+			return
 		if _press == "finish" and BTN_FINISH.has_point(d):
 			finish_pressed.emit()
 		elif _press == "continue" and BTN_CONTINUE.has_point(d):

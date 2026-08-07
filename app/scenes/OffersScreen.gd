@@ -80,6 +80,8 @@ const SB_UP_Y := 105
 const SB_TRACK_Y0 := 121
 const SB_TRACK_Y1 := 311
 const SB_DN_Y := 311
+# rows region = the drag-to-scroll arm rect (PMTouch; excludes the scrollbar)
+const R_LIST := Rect2(ROW_X0, ROW_Y0, ROW_X1 - ROW_X0, N_ROWS * ROW_PITCH)
 const C_NUM := Color8(0, 0, 128)
 const C_NAME := Color8(0, 0, 0)
 const C_AV := Color8(212, 63, 0)
@@ -142,6 +144,7 @@ var _rows: Array = []          # display rows {player, num}
 var _first := 0
 var _last_pick := ""
 var _press := ""
+var _drag := PMTouch.Drag.new()
 
 var _leagues: Array = []
 var _clubs_of: Callable
@@ -338,11 +341,11 @@ func _target_at(d: Vector2) -> String:
 		var r := _row_at(d)
 		if r >= 0:
 			return "row:%d" % r
-		if d.x >= SB_X and d.x <= SB_X + 16:
-			if d.y >= SB_UP_Y and d.y < SB_TRACK_Y0:
-				return "scroll_up"
-			if d.y >= SB_DN_Y and d.y <= SB_DN_Y + 16:
-				return "scroll_dn"
+		# 16x16 steppers: PMTouch-grown hit rects (nothing interactive nearby)
+		if PMTouch.near(Rect2(SB_X, SB_UP_Y, 16, 16), d):
+			return "scroll_up"
+		if PMTouch.near(Rect2(SB_X, SB_DN_Y, 16, 16), d):
+			return "scroll_dn"
 	return ""
 
 
@@ -357,16 +360,30 @@ func _row_at(d: Vector2) -> int:
 
 
 func _on_input(e: InputEvent) -> void:
+	# PMTouch drag-to-scroll over the squad rows; taps dispatch on RELEASE.
+	if e is InputEventScreenDrag or e is InputEventMouseMotion:
+		var dm := _to_design(e.position)
+		var rows := _drag.take_rows(dm.y, float(ROW_PITCH))
+		if _drag.moved and _press != "":
+			_press = ""              # a scroll is not a press (browse precedent)
+			queue_redraw()
+		if rows != 0:
+			_first = clampi(_first + rows, 0, maxi(0, _rows.size() - N_ROWS))
+			queue_redraw()
+		return
 	if not (e is InputEventMouseButton or e is InputEventScreenTouch):
 		return
 	var d := _to_design(e.position)
 	if e.pressed:
+		_drag.press(d.y, R_LIST.has_point(d))
 		_press = _target_at(d)
 		queue_redraw()
 		return
 	var was := _press
 	_press = ""
 	queue_redraw()
+	if _drag.release():
+		return                       # the gesture was a scroll, not a tap
 	if was == "" or was != _target_at(d):
 		return
 	_route_target(was)
