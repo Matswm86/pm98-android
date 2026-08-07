@@ -71,6 +71,7 @@ func _ready() -> void:
 			and not OS.has_environment("PM98_CUPDRAW_SHOT") \
 			and not OS.has_environment("PM98_GROUNDACT_SHOT") \
 			and not OS.has_environment("PM98_RAILS_SHOT") \
+			and not OS.has_environment("PM98_TOUCHZOOM_SHOT") \
 			and not OS.has_environment("PM98_LIVEWATCH_SHOT"):
 		_devshot()
 
