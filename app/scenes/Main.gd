@@ -5759,21 +5759,17 @@ func _show_year_award(title: String, rows: Dictionary, after: Callable) -> void:
 
 
 ## The board's decision, AFTER the sequence. The original has no verdict screen, so this
-## raises nothing at all in the ordinary case -- it goes straight to the new preseason.
-## A sacking or a job offer still has to reach the manager somehow; both go through the
-## original's own modal alert box on the hub, and the offer list is the app's own screen.
+## raises nothing at all -- it goes straight to the new preseason. A sacking reaches the
+## manager through the WEEKLY hub run's own modal alert (docs/re/sack_path_re.md), never
+## here.
 func _season_end_board() -> void:
-	var rv := _career.board_review()
-	# NOTE (2026-07-28): the board does NOT sack at a season's end in the original. Every
-	# dismissal it has is raised by the WEEKLY hub run `FUN_00545fd0` and ends the career
-	# there and then (`_show_career` above; docs/re/sack_path_re.md). The port's old
-	# end-of-season SACK_GAP verdict and its post-sack JOB OFFERS mount are both gone --
-	# the offers list survives only as the HEADHUNT route, which is the app's own
-	# multi-club extension and is flagged as such.
-	if bool(rv["headhunted"]):
-		_generate_offers(true)
-		_show_job_offers()
-		return
+	_career.board_review()   # reputation move only; raises no screen
+	# NOTE (2026-08-25): the HEADHUNT branch that used to mount OFFERS SELECTION here is
+	# gone (owner report: at a lower-division club with a lenient objective it fired
+	# nearly every season, and the screen's decline path never advanced the season, so
+	# the manager was FORCED to change clubs at each rollover -- top-flight clubs' tight
+	# objectives never tripped it, an asymmetry the original does not have). MANAGER.EXE
+	# has no end-of-season job-offer interruption at all; the season rolls straight over.
 	_next_season()
 
 

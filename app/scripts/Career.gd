@@ -2874,8 +2874,13 @@ func board_review() -> Dictionary:
 		# left for the season review is the reputation move and the headhunt -- the app's
 		# own multi-club extension. `sacked` here only reports a sack that has ALREADY
 		# happened, so a review run after one still reads true.
-		var rng := career_rng()   # S3: the ONE persisted career stream
-		headhunt_pending = not sacked and Manager.headhunted(finished_pos, objective_pos, reputation, rng)
+		# HEADHUNT RETIRED (2026-08-25): the end-of-season offer interruption was the
+		# port's own multi-club extension, not MANAGER.EXE behavior, and its gap trigger
+		# fired nearly every season at lower-division clubs with lenient objectives
+		# (owner report, Watford) while top-flight objectives never tripped it. The
+		# field stays for save compatibility and always reads false; Manager.headhunted
+		# survives as tested pure math only.
+		headhunt_pending = false
 		if sacked:
 			reputation = Manager.apply_delta(reputation, Manager.REP_SACK)
 		_rep_year = year
