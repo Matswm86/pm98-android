@@ -383,6 +383,13 @@ func _hit(d: Vector2) -> String:
 # ---- input ---------------------------------------------------------------
 
 func _on_input(e: InputEvent) -> void:
+	# Drop the emulated-mouse duplicate of a finger tap (PMChrome doc + measurement).
+	# Without this every device tap runs this handler TWICE, and the dropdown-bar
+	# branch closes the bar unconditionally on release -- the emulated release shut
+	# the bar the same instant the real tap opened it, so its icons were untappable
+	# on Android (owner report 2026-08-25). Desktop mouse events are untouched.
+	if PMChrome.is_emulated_pointer_dup(e):
+		return
 	var pos := Vector2.ZERO
 	var pressed := false
 	var tap := false

@@ -116,6 +116,13 @@ func _slider_set(which: String, d: Vector2) -> void:
 
 
 func _on_input(e: InputEvent) -> void:
+	# Drop the emulated-mouse duplicate of a finger tap (PMChrome doc + measurement).
+	# The X-box toggles below fire on ANY release with no press-matching, so the
+	# duplicated release flipped every toggle twice -- back to where it started --
+	# and MUSIC / SOUND FX / cheat switches looked dead on Android (owner report
+	# 2026-08-25, same class as the 07-24 TeamOfferScreen chip).
+	if PMChrome.is_emulated_pointer_dup(e):
+		return
 	var d := Vector2.ZERO
 	var pressed := false
 	var motion := false
