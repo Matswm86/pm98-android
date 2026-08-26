@@ -146,6 +146,7 @@ func _run() -> bool:
 		ok = _assert(dup == 0,
 			"S%d: season-end walk re-shows no lower-division table" % season_i) and ok
 		# Main._next_season's order: stamp the COMING year, sync arrivals + regens, roll.
+		var tier_before := career.tier
 		gdb.stamp_season_ages(1996 + career.year + 1)
 		Talent.sync_static_clubs(clubs_by_id, pool, 1996 + career.year + 1)
 		var regens := Retirement.sync_static_clubs(clubs_by_id, 1996 + career.year + 1)
@@ -153,6 +154,25 @@ func _run() -> bool:
 		career.advance_season(leagues, rng)
 		print("-- after rollover %d: %s (tier %d), season %s --" % [season_i,
 			career.league_name, career.tier, career.season])
+		print("  board: \"%s\" (pos<=%d, band %d)" % [career.objective_text,
+			career.objective_pos, career.expectation_band()])
+		# Witnessed cohort rule (all six 1997 movers): promoted -> "Avoid Relegation"
+		# (bottom band, so the weekly sack ladder can never fire on a 7th-place side);
+		# relegated -> "Promotion" (top band). Which way Barnet went varies with the
+		# loader's own randomized null-record substitutions, so assert on the movement.
+		var bottom := {1: 3, 2: 6, 3: 9, 4: 12}
+		var top := {1: 0, 2: 4, 3: 7, 4: 10}
+		if career.tier < tier_before:
+			ok = _assert(career.objective_text == "Avoid Relegation"
+				and career.expectation_band() == int(bottom[career.tier]),
+				"promoted: board says \"%s\" band %d (wants Avoid Relegation/%d)" %
+				[career.objective_text, career.expectation_band(), int(bottom[career.tier])]) and ok
+		elif career.tier > tier_before:
+			var want := "Champion" if career.tier == 1 else "Promotion"
+			ok = _assert(career.objective_text == want
+				and career.expectation_band() == int(top[career.tier]),
+				"relegated: board says \"%s\" band %d (wants %s/%d)" %
+				[career.objective_text, career.expectation_band(), want, int(top[career.tier])]) and ok
 		var own2: Array = career.my_squad()
 		for s2 in [_sample("own[0]", own2[0] if not own2.is_empty() else {}),
 				_sample("staticManUtd", static_eng), _sample("Aimar(River)", aimar)]:
@@ -160,6 +180,20 @@ func _run() -> bool:
 
 	ok = _assert(int(aimar.get("age", -1)) == 20,
 		"Aimar aged 18 -> 20 across two rollovers (got %d)" % int(aimar.get("age", -1))) and ok
+
+	# The RELEGATED arm, unit-style (the sim only relegates Barnet on some seeds): a club
+	# dropped into Division One opens on "Promotion" (Boro/Forest/Sunderland, s29..s32).
+	var cx := Career.new()
+	cx.tier = 2
+	cx._moved_at_rollover = -1
+	var fake: Array = []
+	for i in 24:
+		fake.append({"id": 9000 + i, "name": "C%d" % i, "players": []})
+	cx._set_objective({}, {"id": "eng_div1", "name": "Division One", "tier": 2}, fake, leagues)
+	ok = _assert(cx.objective_text == "Promotion" and cx.expectation_band() == 4,
+		"relegated into Div 1: board says \"%s\" band %d (wants Promotion/4)" %
+		[cx.objective_text, cx.expectation_band()]) and ok
+
 
 	# ---- FOREIGN TALENT ARRIVALS (world history, 2026-08-26) ------------------------
 	# After two rollovers the year is 1999: 1998 + 1999 debutants stand at their real

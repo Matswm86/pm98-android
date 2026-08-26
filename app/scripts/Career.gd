@@ -362,6 +362,9 @@ var manager_history: Array = []         # past spells [{club, league, from_seaso
 var pending_offers: Array = []          # job offers currently on the table (built by Main from GameDB)
 var sacked: bool = false                # set at season end when the board dismisses you
 var sack_reason: String = ""            # "relegated" / "missed" (for the end-of-season message)
+# +1 promoted / -1 relegated / 0 stayed at the LAST pyramid rollover; set by
+# _pyramid_rollover, consumed (and zeroed) by _set_objective in the same advance_season.
+var _moved_at_rollover: int = 0
 var headhunt_pending: bool = false      # a stronger club is courting you after a strong season
 var spell_start_year: int = 1           # the career `year` you joined the current club
 var comp_total: Dictionary = {}         # career-total per-competition record (MANAGER HISTORY
@@ -946,17 +949,25 @@ func _set_objective(club: Dictionary, league: Dictionary, league_clubs: Array, l
 		objective_text = label
 		objective_pos = _objective_pos_for(label, league_clubs.size())
 		return
-	# No witnessed label — the season-2+ board, and any non-English club. The RANK is
-	# still the app's own strength-ranked rule (the original's assignment rule is un-RE'd),
-	# but the LABEL has to be one of the game's own five categories, because that is the
-	# only kind of thing the original's board ever issues (START OF SEASON, all four
-	# divisions witnessed 2026-07-19). Until 2026-07-29 the fallback shipped its own prose
-	# instead — "Finish 13 or higher", "Avoid relegation" with a small r — which is audit
-	# finding O1, and which also broke `expectation_band()`: no fallback string is a key of
-	# BOARD_BAND_OF_LABEL, so from season two on every band lookup returned -1 and the board
-	# review, the sack ladder and the improvement test all ran on the -1 arm.
-	var obj := objective_for(club_id, league_id, league_clubs, leagues)
-	objective_text = objective_label(int(obj["pos"]), league_clubs.size(), tier)
+	# No witnessed label — the season-2+ board, and any non-English club. A club that
+	# just MOVED division takes the witnessed cohort label, because the 1997-98 board
+	# table pins it: ALL THREE promoted Premier clubs (Barnsley / Bolton / Crystal Pal.)
+	# open on "Avoid Relegation" — squad strength notwithstanding — and ALL THREE
+	# relegated Division One arrivals (Middlesbrough / Nottm Forest / Sunderland) on
+	# "Promotion" (club_economy.json, frames s29..s32). Deriving a promoted club's label
+	# from squad strength instead handed a well-built newcomer "U.E.F.A." (band 1, bar
+	# pos > 8), and the binary-exact weekly ladder then SACKED a side on its way to
+	# finishing 7th (tester report 2026-08-26). Stayers keep the strength-ranked rule
+	# (the original's assignment for them is un-RE'd; labels stay the game's own five —
+	# audit O1: any other string broke expectation_band's BOARD_BAND_OF_LABEL lookup).
+	if _moved_at_rollover > 0:
+		objective_text = "Avoid Relegation"
+	elif _moved_at_rollover < 0:
+		objective_text = "Champion" if tier == 1 else "Promotion"
+	else:
+		var obj := objective_for(club_id, league_id, league_clubs, leagues)
+		objective_text = objective_label(int(obj["pos"]), league_clubs.size(), tier)
+	_moved_at_rollover = 0
 	objective_pos = _objective_pos_for(objective_text, league_clubs.size())
 
 
@@ -2424,6 +2435,9 @@ func _pyramid_rollover(rng: RandomNumberGenerator) -> void:
 			new_rosters[int(id)] = _seed_squad(_div_clubs.get(int(id), {"players": []}))
 	rosters = new_rosters
 	club_names = new_names
+	# Which way the manager's club just moved (+1 promoted / -1 relegated / 0 stayed):
+	# consumed by _set_objective's season-2+ fallback within this same advance_season.
+	_moved_at_rollover = 1 if new_tier < tier else (-1 if new_tier > tier else 0)
 	tier = new_tier
 	league_id = str((defs[new_tier] as Dictionary)["league_id"])
 	league_name = str((defs[new_tier] as Dictionary)["name"])
