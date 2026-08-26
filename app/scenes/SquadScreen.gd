@@ -187,11 +187,13 @@ func _hit(d: Vector2) -> String:
 		return "youth"
 	if RETURN_BTN.has_point(d):
 		return "return"
+	# The 17px stepper cells take PMTouch's grown rect (input-side only): the closest
+	# up/down pair sits 13px apart (GK 92+17..122), so HIT_SLOP=5 never overlaps.
 	for key in SECT_SLOTS:
 		var slot: Dictionary = SECT_SLOTS[key]
-		if Rect2(SB_X, int(slot["up"]), SB_W, SB_H).has_point(d):
+		if PMTouch.near(Rect2(SB_X, int(slot["up"]), SB_W, SB_H), d):
 			return "up:%s" % key
-		if Rect2(SB_X, int(slot["down"]), SB_W, SB_H).has_point(d):
+		if PMTouch.near(Rect2(SB_X, int(slot["down"]), SB_W, SB_H), d):
 			return "down:%s" % key
 	return ""
 

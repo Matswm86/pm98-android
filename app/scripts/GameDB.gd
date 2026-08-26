@@ -126,6 +126,25 @@ func _apply_real_managers() -> void:
 			c["manager"] = str(table[str(c.get("name", ""))])
 
 
+## AGE-AT-READ, the binary's own basis: the original never STORES a player's age — it
+## computes SEASON-START year − birthYear on every read, off the global season year
+## (FUN_00584b50 `mov eax,0x7cd; sub eax,[player+0xfc]`; docs/re/offer_record_re.md:87,
+## docs/re/transfer_value_re.md). The port bakes `age` into the record instead, and until
+## 2026-08-26 nothing ever re-derived it, so every player outside the manager's live
+## division — all 384 foreign clubs included — stayed frozen at his 1997 age forever
+## (Aimar at River: 18 in season 2005). Main calls this on career create / load / season
+## rollover; every read site keeps reading `age` and the whole world ages. Records whose
+## birthYear the extractor nulled keep their loader-substituted age (the binary
+## substitutes exactly those). Career rosters hold DEEP COPIES (+1 at rollover, the same
+## arithmetic: shipped age == 1997 − birthYear for all 8,600 dated records), untouched.
+func stamp_season_ages(start_year: int) -> void:
+	for c in clubs:
+		for p in c.get("players", []):
+			var by: Variant = p.get("birthYear")
+			if by != null:
+				p["age"] = start_year - int(by)
+
+
 func season() -> String:
 	return meta.get("season", "?")
 

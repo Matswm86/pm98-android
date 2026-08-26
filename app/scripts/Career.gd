@@ -114,6 +114,11 @@ var stadium_headroom: int = 0
 var works: Array = []
 var car_park_levels: Array = [1, 1, 1, 1]
 var ground_grades: Dictionary = {}
+# The nine STARTING grades (GroundPreset ledger order), snapshotted when the club is taken.
+# The original seeds the ground ONCE, in the club ctor (`FUN_0057d780` off club+0x50 at NEW
+# GAME) — promotion never re-grades a ground. Deriving from the live league_id instead made
+# a promoted club's un-upgraded items jump to the higher division's preset for free.
+var ground_seed: Array = []
 # Board-set match ticket price, in POUNDS AND PENCE -- the original's own default is
 # £7.50 a head (FinanceModel.TICKET_DEFAULT, measured exactly off two FULL TIME stadium
 # panels), so this cannot be a whole-pound integer without losing the witness.
@@ -317,6 +322,12 @@ var pending_fines: Dictionary = {}
 # league round, BEFORE the last one is played — the divisions that have already
 # finished (lower divisions run ahead, R12). Drained by Main's post-week chain.
 var pending_division_finals: Array = []
+# Tiers whose final table HAS been presented this season — by the mid-week R13 chain or
+# by the season-end walk. Keeps a table from showing twice (the season-end step used to
+# re-show every tracked division), and lets a division that finishes EARLY (a Premier
+# table under a Third Division career ends ~8 weeks before the manager's own season)
+# present as it finishes rather than in a late season-end dump. Reset each season.
+var division_finals_shown: Array = []
 ## Knockout rounds whose draw the hub still has to raise, oldest first (REFRUN R4). The
 ## original raises the pixel-exact SORTEO screen UNPROMPTED when a round is drawn; the
 ## port had the screen at 0 differing pixels and NO live caller at all. Each entry is
@@ -765,6 +776,7 @@ func _init_club(club: Dictionary, league: Dictionary, league_clubs: Array, leagu
 	works = []
 	car_park_levels = [1, 1, 1, 1]
 	ground_grades = {}
+	ground_seed = GroundPreset.grades_for_league(league_id)
 	scout_search = {}
 	scout_results = []
 	youth_search = {}
@@ -777,6 +789,7 @@ func _init_club(club: Dictionary, league: Dictionary, league_clubs: Array, leagu
 	pending_channel_tv = {}
 	pending_fines = {}
 	pending_division_finals = []
+	division_finals_shown = []
 	pending_cup_draws = []
 	pending_champion_cards = []
 	sa_champion_id = -1
@@ -1384,14 +1397,13 @@ func advance_week(rng: RandomNumberGenerator, clubs_override: Dictionary = {}) -
 	# pyramid). Placed last so the pre-existing draw order within a week is
 	# untouched for reproducibility.
 	_advance_other_divisions(rng)
-	# R13: the finished divisions' final tables, presented BEFORE the manager's own last
-	# round (witnessed — "after Premier game 37 the original goes straight to the final
-	# tables of the divisions that have already finished"). This must run AFTER
-	# `_advance_other_divisions` so the lower divisions' rounds of THIS week are already
-	# in `played` — queued before it, a Premier career's 46-round divisions still read
-	# P=44 and the screen never appeared.
-	if week == total_weeks() - 1:
-		_queue_division_finals()
+	# R13: a finished division's final table, presented AS IT FINISHES (witnessed for a
+	# Premier career after game 37, when the other three complete). Checked EVERY week —
+	# under a lower-division career the Premier's 38 rounds complete weeks before the
+	# manager's own 46, and the old week==total_weeks()-1 gate sat on the table for that
+	# whole gap, then duplicated it into the season-end walk. Runs AFTER
+	# `_advance_other_divisions` so this week's rounds are already in `played`.
+	_queue_division_finals()
 	# Close the week's books LAST, so every posting this week made -- wages, the matchday
 	# take, insurance, cup ties, transfers -- is inside the record before the
 	# running-at-a-loss counter reads it (REFRUN R5/R9/R16).
@@ -4215,12 +4227,15 @@ func _post_matchday_income(res: Dictionary) -> void:
 # standard, which is why five driven careers never saw this card either way.
 
 ## The current grade of one GroundPreset item, seeded from the club's own preset and then
-## overridden by any completed works — the same read StadiumScreen makes.
+## overridden by any completed works — the same read StadiumScreen makes. The override
+## ledger keys are begin_work's cats — "facility"/"service", SINGULAR (the plural read
+## missed every completed upgrade, so a built floodlight kept fining until 2026-08-26).
 func _fine_grade_of(cat: String, key: int) -> int:
-	var vec := GroundPreset.grades_for_league(league_id)
+	var vec := ground_seed if not ground_seed.is_empty() \
+		else GroundPreset.grades_for_league(league_id)
 	var idx := key + (GroundPreset.SERVICE_GRADE_OFFSET if cat == "services" else 0)
 	var seed_grade := int(vec[idx]) if idx >= 0 and idx < vec.size() else 0
-	return ground_grade(cat, key, seed_grade)
+	return ground_grade("service" if cat == "services" else "facility", key, seed_grade)
 
 
 ## Levy every fine one played match in `comp_key` earns. Called once per match the
@@ -4442,21 +4457,34 @@ func _tick_contract_warning() -> void:
 	pending_alerts.append(SEASON_END_MSG if auto_renew else CONTRACT_WARN_MSG)
 
 
-## R13 (witnessed): after the penultimate league round the original presents the
-## FINAL tables of every division that has already completed its rounds — blank
-## club plate, the division in the badge — BEFORE the last round is played (p0638:
-## Third Division P=46, dated 2/5/1998, shown before the Premier's last match).
-## Lowest tier first (they finish first, R12). Never the manager's own division.
+## R13 (witnessed): the original presents each division's FINAL table AS THAT DIVISION
+## FINISHES — blank club plate, the division in the badge (p0638: Third Division P=46,
+## dated 2/5/1998, shown before the Premier's last match). For a Premier career the
+## other three finish on the penultimate week, which is the witnessed frame; a lower-
+## division career sees the Premier's table ~8 weeks early instead of a late dump (the
+## old single week==total_weeks()-1 trigger). Lowest tier first (they finish first,
+## R12). Never the manager's own division. A tier queues ONCE (division_finals_shown).
 func _queue_division_finals() -> void:
-	pending_division_finals = []
 	for t in [4, 3, 2, 1]:
-		if int(t) == tier:
+		if int(t) == tier or division_finals_shown.has(int(t)) \
+				or pending_division_finals.has(int(t)):
 			continue
 		var dv: Dictionary = divisions.get(int(t), {})
 		if dv.is_empty():
 			continue
 		if int(dv.get("played", 0)) >= int((dv.get("fixtures", []) as Array).size()):
 			pending_division_finals.append(int(t))
+
+
+## Pop the next due final-table tier for the hub to present, recording it as shown so
+## neither the mid-week chain nor the season-end walk shows it twice. -1 = none due.
+func take_division_final() -> int:
+	if pending_division_finals.is_empty():
+		return -1
+	var t := int(pending_division_finals.pop_front())
+	if not division_finals_shown.has(t):
+		division_finals_shown.append(t)
+	return t
 
 func my_squad() -> Array:
 	return rosters.get(club_id, [])
@@ -5180,8 +5208,9 @@ func players_of_year() -> Dictionary:
 
 
 ## Queue the season's champion cards, in the ORIGINAL's own order (REFRUN R15 step 2):
-## U.E.F.A. Cup -> Premier League -> Cup Winner's Cup -> F.A. Cup -> European Cup. Only
-## competitions whose CARD ART is witnessed get a card -- the Premier League, European Cup
+## U.E.F.A. Cup -> Premier League -> Cup Winner's Cup -> F.A. Cup -> European Cup ->
+## Coca-Cola Cup. Only competitions whose CARD ART is witnessed get a card -- the
+## Premier League, European Cup
 ## and Cup Winners' Cup frames were never captured, so those are skipped rather than drawn
 ## on a borrowed trophy (CharityShieldScreen.has_card is the gate, on the UI side).
 func queue_season_end_champion_cards() -> void:
@@ -5743,6 +5772,8 @@ func advance_season(leagues: Array, rng: RandomNumberGenerator = null, euro_pool
 	finished = false
 	season_opened = false   # the week-0 chain (shield card + START OF SEASON) re-runs
 	boards_sold_season = false   # a fresh sponsor-board season offer becomes available again
+	pending_division_finals = []
+	division_finals_shown = []   # every division's final table becomes presentable again
 	_reset_insurance_ledger()    # the FINANCES insurance lines are season-to-date
 	# The finance year is 52 weeks (FinanceModel.SEASON_WEEKS): a new season opens fresh
 	# books and a cleared running-at-a-loss counter.
@@ -6817,6 +6848,7 @@ func to_dict() -> Dictionary:
 		"tactics": tactics, "tier": tier, "rosters": ros, "club_names": nms,
 		"stadium_capacity": stadium_capacity, "stadium_headroom": stadium_headroom, "works": works,
 		"car_park_levels": car_park_levels, "ground_grades": ground_grades,
+		"ground_seed": ground_seed,
 		"ticket_price": ticket_price, "board_price": board_price,
 		"boards_sold_season": boards_sold_season,
 		"transfer_listed": listed, "sale_offers": offers,
@@ -6856,6 +6888,7 @@ func to_dict() -> Dictionary:
 		"pending_champion_cards": pending_champion_cards, "sa_champion_id": sa_champion_id,
 		"pending_channel_tv": pending_channel_tv, "pending_fines": pending_fines,
 		"pending_division_finals": pending_division_finals,
+		"division_finals_shown": division_finals_shown,
 		# The week's still-unpresented cup/European ties (the hub returns between a
 		# week's matches now, so a save can land mid-week). The per-player stat Report
 		# objects are not JSON; the read-out's STATISTICS falls back gracefully without
@@ -7023,6 +7056,12 @@ static func from_dict(d: Dictionary) -> Career:
 	var gg: Dictionary = d.get("ground_grades", {})
 	for k in gg:
 		c.ground_grades[str(k)] = int(gg[k])
+	c.ground_seed = []
+	for v in d.get("ground_seed", []):
+		c.ground_seed.append(int(v))
+	if c.ground_seed.size() != 9:
+		# Pre-2026-08-26 save: best available seed is the club's CURRENT league preset.
+		c.ground_seed = GroundPreset.grades_for_league(c.league_id)
 	c.ticket_price = float(d.get("ticket_price", 0.0))
 	c.board_price = int(d.get("board_price", 0))
 	c.boards_sold_season = bool(d.get("boards_sold_season", false))
@@ -7131,6 +7170,8 @@ static func from_dict(d: Dictionary) -> Career:
 	c.pending_fines = d.get("pending_fines", {})
 	for t in d.get("pending_division_finals", []):
 		c.pending_division_finals.append(int(t))
+	for t in d.get("division_finals_shown", []):
+		c.division_finals_shown.append(int(t))
 	c.euro_winner_cup = int(d.get("euro_winner_cup", -1))
 	c.euro_winner_uefa = int(d.get("euro_winner_uefa", -1))
 	c.euro_winner_cwc = int(d.get("euro_winner_cwc", -1))

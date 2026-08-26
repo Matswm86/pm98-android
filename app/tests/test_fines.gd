@@ -148,6 +148,31 @@ func _run() -> void:
 	ok = _assert(p1.size() == 1 and str((p1[0] as Dictionary)["id"]) == "floodlights",
 		"floodlights grade 1 still fails the Premier's >= 2") and ok
 
+	# ---- Career's own read: completed works CLEAR the fine (2026-08-26 regression) ----
+	# The override ledger keys are begin_work's cats — "facility"/"service", SINGULAR. The
+	# fine read used the plural and missed every completed upgrade, so a Third Division
+	# club that BUILT floodlights kept paying the £15,000 F.A. Cup fine forever.
+	var c := Career.new()
+	c.league_id = "eng_div3"
+	c.ground_seed = GroundPreset.grades_for_league(c.league_id)
+	var pre := Fines.for_match("fa_cup", c.league_id, c._fine_grade_of)
+	ok = _assert(pre.size() == 1 and int((pre[0] as Dictionary)["pounds"]) == 15_000,
+		"an unimproved Third Division ground pays the F.A. Cup floodlight fine") and ok
+	c._complete_work({"cat": "facility", "key": 0, "label": "FLOODLIGHTS",
+		"effect": {"grade": 1}})
+	ok = _assert(Fines.for_match("fa_cup", c.league_id, c._fine_grade_of).is_empty(),
+		"BUILT floodlights clear the F.A. Cup fine (the plural-key read missed them)") and ok
+	# Promotion must NOT re-seed the ground from the new division's preset: with the
+	# career now in the Premier, the un-upgraded items still read their Third Division
+	# zeros (four fines) and the built grade-1 floodlights still fail the >= 2 bar.
+	c.league_id = "eng_prem"
+	ok = _assert(Fines.for_match("league", c.league_id, c._fine_grade_of).size() == 5,
+		"a promoted club keeps its own ground, not the new division's preset") and ok
+	c._complete_work({"cat": "service", "key": 0, "label": "SICKROOM",
+		"effect": {"grade": 1}})
+	ok = _assert(Fines.for_match("league", c.league_id, c._fine_grade_of).size() == 4,
+		"a completed SERVICE work (medical) clears its Premier fine too") and ok
+
 	# ---- the card ----------------------------------------------------------------
 	ok = _assert(FinesScreen.PANEL == Vector2i(111, 82),
 		"panel origin (111,82) = FUN_00436fb0(0x6f,0x52)") and ok

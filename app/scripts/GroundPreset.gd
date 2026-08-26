@@ -135,9 +135,12 @@ const SERVICE_GRADE_OFFSET := 5
 ## `band` is the club's stature band (`Career.band_of`, the port's `club+0x58`). At the top
 ## grade the original shows £0 / 0 weeks, which is exactly what the witnesses print, so that
 ## is what an exhausted item returns.
-static func items(cat: String, league_id: String, band: int) -> Array:
+## `seed` (optional) overrides the league-derived starting grades with the career's own
+## snapshot (Career.ground_seed) — the ground is seeded once at new game, so a promoted
+## club must NOT re-derive from its new division's preset.
+static func items(cat: String, league_id: String, band: int, seed: Array = []) -> Array:
 	var templates: Array = SERVICE_ITEMS if cat == "services" else FACILITY_ITEMS
-	var grade_vec := grades_for_league(league_id)
+	var grade_vec := seed if seed.size() == 9 else grades_for_league(league_id)
 	var base := SERVICE_GRADE_OFFSET if cat == "services" else 0
 	var out: Array = []
 	for i in templates.size():

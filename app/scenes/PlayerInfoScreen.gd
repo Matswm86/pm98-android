@@ -346,13 +346,15 @@ func _hit(d: Vector2) -> String:
 			return "offer"
 		if OFF_CANCEL.has_point(d):
 			return "cancel"
-		if OFF_WAGE_UP.has_point(d):
+		# 14px-tall spin arrows take PMTouch's grown rect (input-side only); the four
+		# rects sit >= 32px apart so HIT_SLOP=5 never overlaps a neighbour.
+		if PMTouch.near(OFF_WAGE_UP, d):
 			return "wage_up"
-		if OFF_WAGE_DN.has_point(d):
+		if PMTouch.near(OFF_WAGE_DN, d):
 			return "wage_dn"
-		if OFF_YEARS_UP.has_point(d):
+		if PMTouch.near(OFF_YEARS_UP, d):
 			return "years_up"
-		if OFF_YEARS_DN.has_point(d):
+		if PMTouch.near(OFF_YEARS_DN, d):
 			return "years_dn"
 		# The four OFFER-panel clause boxes. Grown to 16px so an 11x11 box is a usable
 		# touch target on a phone; they do not overlap anything else on the panel.

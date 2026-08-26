@@ -79,7 +79,7 @@ func _run() -> bool:
 	var src := (load("res://scripts/Career.gd") as GDScript).source_code
 	var adv := src.find("func advance_week(")
 	var body := src.substr(adv, src.find("\nfunc ", adv + 10) - adv)
-	var at_queue := body.rfind("\t\t_queue_division_finals()")
+	var at_queue := body.rfind("\t_queue_division_finals()")
 	var at_lower := body.find("\t_advance_other_divisions(")
 	ok = _assert(at_queue > at_lower and at_lower != -1,
 		"R13 queue runs after _advance_other_divisions in advance_week") and ok

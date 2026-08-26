@@ -1861,6 +1861,10 @@ func _home_select(item: Dictionary) -> void:
 func _continue_career() -> void:
 	_career = Career.load_save()
 	if _career != null:
+		# The world's ages track THIS career's season year (the binary derives age from
+		# its global year on every read — GameDB.stamp_season_ages). Absolute re-stamp,
+		# so a career loaded after another one's later seasons reads its own year.
+		GameDB.stamp_season_ages(1996 + _career.year)
 		# GROUND heal for older saves: capacity 0 would collapse to `0 + added`
 		# the moment a works completed (the pre-works default relied on a
 		# display-side fallback only), and headroom did not exist before
@@ -2075,6 +2079,9 @@ func _begin_career(manager_name: String, league: Dictionary, club: Dictionary,
 		preseason_rivals: Array = []) -> void:
 	AudioManager.ui_select()
 	var league_clubs := GameDB.clubs_in_league(league["id"])
+	# BEFORE create: rosters deep-copy the static records, so a new career must read
+	# year-1 ages even when an earlier career this session stamped a later year.
+	GameDB.stamp_season_ages(1997)
 	_career = Career.create(club, league, league_clubs, GameDB.leagues, _pyramid_context())
 	_career.youth_pool = Youth.pool_of(GameDB.clubs_by_id)   # the shipped 0x26e4 pool
 	_career.euro_xis = _true_xi_index()   # shipped TRUE XIs -> euro ties on the stat engine (S5)
@@ -4073,7 +4080,8 @@ func _board_sale_offer(club: Dictionary) -> int:
 ## reproduces every one of the 9 captured Man Utd rows exactly (`test_ground_preset.gd`), so
 ## the old "captured club only, everyone else an empty gap" fallback is gone.
 func _ground_items(club: Dictionary, cat: String) -> Array:
-	return GroundPreset.items(cat, str(club.get("leagueId", "")), _career.my_band())
+	return GroundPreset.items(cat, str(club.get("leagueId", "")), _career.my_band(),
+		_career.ground_seed)
 
 ## A SEATS offer card was ticked on the in-screen IMPROVEMENTS view: run the real Career
 ## expansion (start_works enforces cash + ceiling), persist, and re-mount the GROUND screen
@@ -4853,7 +4861,11 @@ func _pop_division_finals(after: Callable) -> void:
 		if after.is_valid():
 			after.call()
 		return
-	var t := int((_career.pending_division_finals as Array).pop_front())
+	var t := _career.take_division_final()
+	if t < 0:
+		if after.is_valid():
+			after.call()
+		return
 	_career.save()
 	var scr: LeagueTableScreen = load("res://scenes/LeagueTableScreen.gd").new()
 	scr.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -5558,14 +5570,19 @@ func _season_end_step(step: int) -> void:
 			_season_end_board()
 
 
-## Step 1: the final table of every division, raised unprompted with a BLANK manager
-## plate and the division in the badge (REFRUN R13). Lower divisions finish first (R12),
-## so they are presented first, the manager's own division last.
+## Step 1: the final tables, raised unprompted with a BLANK manager plate and the
+## division in the badge (REFRUN R13/R15). The OTHER divisions were already presented
+## as they finished (the mid-week R13 chain, Career.division_finals_shown) — re-listing
+## them here showed every lower-division table twice. The manager's own division, and
+## any tracked division the chain somehow never presented, still show; own tier last.
 func _season_end_final_tables(after: Callable) -> void:
 	var tiers: Array = []
 	for t in [4, 3, 2, 1]:
-		if t == _career.tier or _career.has_division(t):
+		if t == _career.tier:
 			tiers.append(t)
+		elif _career.has_division(t) and not _career.division_finals_shown.has(t):
+			tiers.append(t)
+			_career.division_finals_shown.append(t)
 	_season_end_next_table(tiers, 0, after)
 
 
@@ -5790,6 +5807,11 @@ func _next_season() -> void:
 	# TalentDB's pool rides along: real talents due in the new season arrive (empty
 	# pool -- no talent_pool.json -- injects nothing and the rollover is vanilla).
 	var rng := _career.career_rng()   # S3: the ONE persisted career stream
+	# The static world ages with the season year (age = start_year − birthYear at every
+	# read in the binary): foreign clubs, off-tier English clubs, the youth pool. Stamped
+	# at the COMING year BEFORE the rollover, because _pyramid_rollover seeds any club
+	# arriving in the manager's division from these records after its own aging pass ran.
+	GameDB.stamp_season_ages(1996 + _career.year + 1)
 	_career.advance_season(GameDB.leagues, rng, _euro_pool(), _sa_champion(), TalentDB.talents)
 	_career.save()
 	_show_preseason_rollover()
