@@ -168,6 +168,71 @@ static func rebirth(player: Dictionary, rng: RandomNumberGenerator, new_id: int)
 	return player
 
 
+## Regen ids live above every other band (seniors ~8k, talents 600k, free 700k) and are
+## STABLE: base.id*10+ordinal is injective, so the same man regens to the same id in
+## every career — which is what lets Career.external_signed keep hiding a bought regen.
+const REGEN_ID_BASE := 2_000_000
+
+
+## WORLD-HISTORY REGENS for the STATIC club records (2026-08-26). The binary's rollover
+## pass (FUN_0057A730 -> FUN_0058AC90 -> FUN_0058B030) walks EVERY real club — ids
+## 38..1383, Milan and River included; the `>= 0x26ae` KEEP gate only shields the pseudo
+## containers (0x26ae special / 0x26de free pool / 0x26e4 youth pool — the id table
+## proves sack_path_re.md's "= a FOREIGN club" comment wrong). An unmanaged retiree is
+## reborn IN PLACE at his own club: Weah's Milan slot becomes a new 10-12-years-younger
+## man with a fresh name, keeping the record's skills. The live-division lane already
+## does this for rosters; this pass covers the static records (foreign clubs, and
+## off-tier English clubs between their visits to the manager's division).
+##
+## DERIVED + IDEMPOTENT, the stamp_season_ages pattern: the first rebirth stashes the
+## record's shipped identity in `regen_base`; every sync restores it and re-applies the
+## rebirth chain due by `start_year` from a per-record seeded RNG, so the same year
+## yields the same man in every career and a NEW 1997 career gets the originals back.
+## Timing is the binary's own outcome: nothing before the 1998 rollover (`0x7cd <
+## DAT_0066b18c` gates the whole pass out of season one), and the shipped over-age
+## veterans go at 1998 because _seed_squad's witnessed rule puts them on one-year deals.
+## Declared divergence: beyond that first year the binary retires on CONTRACT EXPIRY at
+## the age bar; static records carry no ticking contract, so the bar alone decides
+## (drift at most one short veteran term). Returns the number of rebirths applied.
+static func sync_static_clubs(clubs_by_id: Dictionary, start_year: int) -> int:
+	var n := 0
+	for cid in clubs_by_id:
+		if int(cid) == Youth.POOL_CLUB_ID:
+			continue                     # the binary's 0x26ae..0x26e4 KEEP gate
+		for p in (clubs_by_id[cid] as Dictionary).get("players", []):
+			var rec: Dictionary = p
+			var base: Dictionary = rec.get("regen_base", {})
+			if not base.is_empty():      # restore the shipped man before re-deriving
+				rec["birthYear"] = int(base["birthYear"])
+				rec["name"] = str(base["name"])
+				rec["legalName"] = str(base["legalName"])
+				rec["id"] = int(base["id"])
+				rec["squadNo"] = base["squadNo"]   # verbatim: null = never individuated
+				rec.erase("reborn")
+			if rec.get("birthYear") == null:
+				continue                 # undated record: the substituted age stands
+			var births := 0
+			if start_year >= 1998:
+				var rng := RandomNumberGenerator.new()
+				rng.seed = hash("regen|%d" % int(rec.get("id", 0)))
+				while start_year - int(rec["birthYear"]) >= retire_age(rec):
+					if base.is_empty():
+						base = {"birthYear": int(rec["birthYear"]),
+							"name": str(rec.get("name", "?")),
+							"legalName": str(rec.get("legalName", rec.get("name", "?"))),
+							"id": int(rec.get("id", 0)),
+							"squadNo": rec.get("squadNo")}
+						rec["regen_base"] = base
+					births += 1
+					rebirth(rec, rng, REGEN_ID_BASE + int(base["id"]) * 10 + births)
+					n += 1
+			if births > 0 or not base.is_empty():
+				rec["age"] = start_year - int(rec["birthYear"])
+			if births == 0 and not base.is_empty():
+				rec.erase("regen_base")  # an earlier year again: the original stands
+	return n
+
+
 ## `true` when the position band is the keeper band (player+0x1c == 0).
 static func _is_gk(player: Dictionary) -> bool:
 	if player.get("isGK") != null:

@@ -1866,8 +1866,10 @@ func _continue_career() -> void:
 		# so a career loaded after another one's later seasons reads its own year.
 		GameDB.stamp_season_ages(1996 + _career.year)
 		# ...and the foreign clubs' real-history arrivals rebuild for the same year
-		# (derived, so the strip-and-refill matches this save exactly).
+		# (derived, so the strip-and-refill matches this save exactly), then the
+		# over-age statics regen in place (the binary's FUN_0058B030, Weah -> a new man).
 		Talent.sync_static_clubs(GameDB.clubs_by_id, TalentDB.talents, 1996 + _career.year)
+		Retirement.sync_static_clubs(GameDB.clubs_by_id, 1996 + _career.year)
 		# GROUND heal for older saves: capacity 0 would collapse to `0 + added`
 		# the moment a works completed (the pre-works default relied on a
 		# display-side fallback only), and headroom did not exist before
@@ -2087,6 +2089,7 @@ func _begin_career(manager_name: String, league: Dictionary, club: Dictionary,
 	# the foreign clubs must hold NO arrival from a prior career's future seasons.
 	GameDB.stamp_season_ages(1997)
 	Talent.sync_static_clubs(GameDB.clubs_by_id, TalentDB.talents, 1997)
+	Retirement.sync_static_clubs(GameDB.clubs_by_id, 1997)   # restores any regen'd original
 	_career = Career.create(club, league, league_clubs, GameDB.leagues, _pyramid_context())
 	_career.youth_pool = Youth.pool_of(GameDB.clubs_by_id)   # the shipped 0x26e4 pool
 	_career.euro_xis = _true_xi_index()   # shipped TRUE XIs -> euro ties on the stat engine (S5)
@@ -5819,7 +5822,9 @@ func _next_season() -> void:
 	GameDB.stamp_season_ages(1996 + _career.year + 1)
 	# Foreign clubs receive the coming season's real-history arrivals (Ronaldinho at
 	# Gremio in 1998-99); the English-club entries stay with advance_season's live lane.
+	# Then the statics' retirees regen in place, the binary's own ageing intake.
 	Talent.sync_static_clubs(GameDB.clubs_by_id, TalentDB.talents, 1996 + _career.year + 1)
+	Retirement.sync_static_clubs(GameDB.clubs_by_id, 1996 + _career.year + 1)
 	_career.advance_season(GameDB.leagues, rng, _euro_pool(), _sa_champion(), TalentDB.talents)
 	_career.save()
 	_show_preseason_rollover()
