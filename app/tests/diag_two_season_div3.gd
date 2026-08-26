@@ -61,8 +61,14 @@ func _run() -> bool:
 		if typeof(parsed) == TYPE_DICTIONARY:
 			seeds = parsed.get("seeds", {})
 
+	var tdb: Node = get_root().get_node_or_null("TalentDB")
+	if tdb != null and (tdb.talents as Array).is_empty():
+		tdb._load()
+	var pool: Array = tdb.talents if tdb != null else []
+
 	# Main._begin_career's order: stamp year-1 ages BEFORE create (rosters deep-copy).
 	gdb.stamp_season_ages(1997)
+	Talent.sync_static_clubs(clubs_by_id, pool, 1997)
 	var club: Dictionary = div3[0]
 	var career := Career.create(club, league, div3, leagues, {"divisions": divs, "seeds": seeds})
 	career.players_age = true
@@ -138,8 +144,9 @@ func _run() -> bool:
 				dup += 1
 		ok = _assert(dup == 0,
 			"S%d: season-end walk re-shows no lower-division table" % season_i) and ok
-		# Main._next_season's order: stamp the COMING year, then roll over.
+		# Main._next_season's order: stamp the COMING year, sync arrivals, roll over.
 		gdb.stamp_season_ages(1996 + career.year + 1)
+		Talent.sync_static_clubs(clubs_by_id, pool, 1996 + career.year + 1)
 		career.advance_season(leagues, rng)
 		print("-- after rollover %d: %s (tier %d), season %s --" % [season_i,
 			career.league_name, career.tier, career.season])
@@ -150,6 +157,34 @@ func _run() -> bool:
 
 	ok = _assert(int(aimar.get("age", -1)) == 20,
 		"Aimar aged 18 -> 20 across two rollovers (got %d)" % int(aimar.get("age", -1))) and ok
+
+	# ---- FOREIGN TALENT ARRIVALS (world history, 2026-08-26) ------------------------
+	# After two rollovers the year is 1999: 1998 + 1999 debutants stand at their real
+	# clubs — Ronaldinho (b.1980) at Gremio, D'Alessandro at River — with derived ages.
+	var find_at := func(club_name: String, legal: String) -> Dictionary:
+		for c in all:
+			if str(c.get("name", "")) == club_name:
+				for p in c.get("players", []):
+					if str(p.get("legalName", "")) == legal:
+						return p
+		return {}
+	var dinho: Dictionary = find_at.call("Gremio", "RONALDO DE ASSIS MOREIRA")
+	ok = _assert(not dinho.is_empty() and bool(dinho.get("talent_arrival", false)),
+		"Ronaldinho arrived at Gremio by 1999") and ok
+	ok = _assert(int(dinho.get("age", -1)) == 1999 - 1980,
+		"...aged 19 in 1999-2000 (got %d)" % int(dinho.get("age", -1))) and ok
+	ok = _assert(not (find_at.call("River", "ANDRES D'ALESSANDRO") as Dictionary).is_empty(),
+		"D'Alessandro arrived at River") and ok
+	# Idempotence: a second sync at the same year adds nothing.
+	var n1 := Talent.sync_static_clubs(clubs_by_id, pool, 1996 + career.year)
+	var n2 := Talent.sync_static_clubs(clubs_by_id, pool, 1996 + career.year)
+	ok = _assert(n1 == n2 and n1 > 0,
+		"talent sync idempotent (%d arrivals both passes)" % n1) and ok
+	# A NEW 1997 career strips every future arrival (Main._begin_career's reset).
+	Talent.sync_static_clubs(clubs_by_id, pool, 1997)
+	ok = _assert((find_at.call("Gremio", "RONALDO DE ASSIS MOREIRA") as Dictionary).is_empty(),
+		"1997 reset removes future arrivals (Ronaldinho gone again)") and ok
+	Talent.sync_static_clubs(clubs_by_id, pool, 1996 + career.year)   # restore for any later reads
 	ok = _assert(fines_seen.is_empty(),
 		"BUILT floodlights: zero fines across two seasons (got %d)" % fines_seen.size()) and ok
 	for s3 in fines_seen:

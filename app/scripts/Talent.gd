@@ -245,6 +245,52 @@ static func make_youth(e: Dictionary, rng: RandomNumberGenerator, start_year: in
 	}
 
 
+## WORLD HISTORY for the STATIC (foreign) clubs. 10,574 of the pool's club-routed
+## talents target the 307 clubs outside the English pyramid — clubs that never enter
+## Career.rosters, so the live-division lane (`Career._inject_talent`) skipped every
+## one of them forever and Ronaldinho never turned up at Gremio. This lane rebuilds
+## those arrivals DERIVED and IDEMPOTENT, like GameDB.stamp_season_ages: each call
+## strips every previously synced arrival (the `talent_arrival` tag) and re-adds all
+## entries due by `start_year`, so a new 1997 career sees none of a prior career's
+## future and a re-sync never duplicates. Attrs draw from a per-entry seeded RNG, so
+## the same talent is the same player in every career. English-club entries are left
+## to the live lane (they inject into rosters, with news + the used-ledger); a bought
+## talent stays bought — Career.external_signed hides his re-synced static row by pid.
+## Returns the number of talents now standing at their static clubs.
+static func sync_static_clubs(clubs_by_id: Dictionary, pool: Array, start_year: int) -> int:
+	for cid in clubs_by_id:
+		var players: Array = (clubs_by_id[cid] as Dictionary).get("players", [])
+		for i in range(players.size() - 1, -1, -1):
+			if bool((players[i] as Dictionary).get("talent_arrival", false)):
+				players.remove_at(i)
+	var n := 0
+	for e in pool:
+		if not (e is Dictionary):
+			continue
+		var entry: Dictionary = e
+		if str(entry.get("route", "club")) != "club":
+			continue
+		var dy := _int(entry.get("debutYear"), 0)
+		if dy <= 0 or dy > start_year:
+			continue
+		var club: Dictionary = clubs_by_id.get(club_of(entry), {})
+		# Foreign = no leagueId; an EMPTY squad is the "Free players" container
+		# (GameDB._is_placeholder), never a destination.
+		if club.is_empty() or club.get("leagueId") != null:
+			continue
+		var squad: Array = club.get("players", [])
+		if squad.is_empty():
+			continue
+		var rng := RandomNumberGenerator.new()
+		rng.seed = hash(key_of(entry)) ^ 0x7A1E97
+		var band := TransferMarket.stature_of(squad, 1)
+		var p := make_senior(entry, rng, start_year, band)
+		p["talent_arrival"] = true
+		squad.append(p)
+		n += 1
+	return n
+
+
 ## The easter-egg lane's BASE block (B6 2026-07-27): the byte-exact academy growth
 ## (`Training.develop_youth_week`) climbs LIVE attrs toward `attrs_base` and stops dead,
 ## so a talent whose BASE equalled his intake attrs would never grow at all — his
