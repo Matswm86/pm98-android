@@ -5,7 +5,7 @@ extends SceneTree
 ## Real reference (correct-seed capture): slot-9 @clk0 (-26214,-39); slot-8 @clk12 (-21415,-80668).
 ## Run: ~/godot462 --headless --path app --script res://tests/diag_m5_kickplace.gd
 
-const REF_DIR := "/home/mats/MWM-AI/data/pm98-m4-oracle/capture2"
+const REF_DIR := "/home/mm/MWM/data/pm98-m4-oracle/capture2"
 const STRUCT_JSON := REF_DIR + "/frame0_struct_import.json"
 const FRAME0_SEED := 0xea0d2a8d
 

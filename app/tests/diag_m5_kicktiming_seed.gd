@@ -4,7 +4,7 @@ extends SceneTree
 ## AT ITS KICK can be compared to silicon's captured seed at the kick (0x41e701f, 126 draws in).
 ## Same-seed-at-kick == same draw count == RNG lockstep despite the tick-count offset.
 ##   ~/godot462 --headless --path app --script res://tests/diag_m5_kicktiming_seed.gd
-const REF_DIR := "/home/mats/MWM-AI/data/pm98-m4-oracle/steertgt_2026-07-15"
+const REF_DIR := "/home/mm/MWM/data/pm98-m4-oracle/steertgt_2026-07-15"
 const STRUCT_JSON := REF_DIR + "/frame0_struct_import.json"
 const FRAME0_SEED := 0xc357aa2c
 const TICK_CAP := 120

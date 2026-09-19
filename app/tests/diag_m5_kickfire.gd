@@ -6,7 +6,7 @@ extends SceneTree
 ## GOAL: name the exact tick + draw where move_dispatch's r2 roll fires kick_setup, and compare
 ## the port's windup schedule (should be 180->156 over ~24 ticks, kick at ~etick 27) to silicon.
 ##   ~/godot462 --headless --path app --script res://tests/diag_m5_kickfire.gd
-const REF_DIR := "/home/mats/MWM-AI/data/pm98-m4-oracle/steertgt_2026-07-15"
+const REF_DIR := "/home/mm/MWM/data/pm98-m4-oracle/steertgt_2026-07-15"
 const STRUCT_JSON := REF_DIR + "/frame0_struct_import.json"
 const FRAME0_SEED := 0xc357aa2c
 const TICK_CAP := 60

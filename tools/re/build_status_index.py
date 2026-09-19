@@ -57,7 +57,7 @@ ADDR = re.compile(r"0x[0-9a-fA-F]{6}")
 # `Evidence:` keyword to the next blank line OR to the next `Keyword:` line, whichever
 # comes first: several docs wrap the list over two or three lines, and several follow it
 # with sibling keywords (`Port:`, `Gate:`, `Raw:`) whose paths are NOT this doc's evidence
-# — `Raw:` in particular names workspace captures under `~/MWM-AI/data/`, outside the repo.
+# — `Raw:` in particular names workspace captures under `~/MWM/data/`, outside the repo.
 #
 # Inside the block, a BACKTICKED span is the path. Comma-splitting the raw text was the
 # earlier rule and it broke on any doc that annotates a path — `camera_motion_re.md`'s
@@ -70,7 +70,7 @@ def evidence_block(body: str) -> str:
 
     Several docs wrap the list over two or three lines, and several follow it with SIBLING
     keywords (`Port:`, `Gate:`, `Raw:`) whose paths are not this doc's evidence — `Raw:` in
-    particular names workspace captures under `~/MWM-AI/data/`, outside the repo entirely.
+    particular names workspace captures under `~/MWM/data/`, outside the repo entirely.
     Scanned line by line rather than by regex, because the lazy-quantifier version of this
     silently swallowed those sibling lines and failed the whole script on their paths.
     """

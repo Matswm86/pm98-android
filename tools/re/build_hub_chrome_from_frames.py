@@ -3,7 +3,7 @@
 
 Binding frames (owned game, captured live from MANAGER.EXE under wine):
   screenshots/parity-run-2026-07-16/orig/73_hub_wk1.png   hub, player AWAY (wk 1)
-  ~/MWM-AI/data/pm98-refs/real-gallery/ma_6.png           hub, player HOME
+  ~/MWM/data/pm98-refs/real-gallery/ma_6.png           hub, player HOME
 
 The centre circle is STATE-STYLED in the original: the PLAYER's half draws
 dark slate boxes with white text, the CPU half pale mottled boxes with black

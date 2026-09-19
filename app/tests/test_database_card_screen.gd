@@ -8,7 +8,7 @@ extends SceneTree
 ## docs/re/dbase_player_card_re.md), the tab-disable SENTINEL (all-false _tab_ok)
 ## dead-clicks a disabled tab while an enabled one still switches _view, RETURN
 ## fires back_pressed, and PRINT is the documented no-op (mobile has no printer).
-##   cd /home/mats/MWM-AI/projects/pm98-android && timeout 150 /home/mats/godot4 \
+##   cd /home/mm/MWM/projects/pm98-android && timeout 150 /home/mats/godot4 \
 ##     --headless --path app --script res://tests/test_database_card_screen.gd
 
 

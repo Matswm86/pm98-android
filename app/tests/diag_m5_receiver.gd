@@ -4,7 +4,7 @@ extends SceneTree
 ## team(+0x2b8), ball pos+vel+ctrl, m+0x19a0 orient, and the move65a0_trace tag for the receiver.
 ## Run: ~/godot462 --headless --path app --script res://tests/diag_m5_receiver.gd
 
-const REF_DIR := "/home/mats/MWM-AI/data/pm98-m4-oracle/capture2"
+const REF_DIR := "/home/mm/MWM/data/pm98-m4-oracle/capture2"
 const STRUCT_JSON := REF_DIR + "/frame0_struct_import.json"
 const FRAME0_SEED := 0xea0d2a8d
 const TICK_CAP := 45

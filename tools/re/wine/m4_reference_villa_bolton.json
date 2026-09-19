@@ -63,10 +63,10 @@
   ],
   "final_seed_state": 1855796696,
   "artifacts_outside_git": {
-    "frame0_matstruct_region": "~/MWM-AI/data/pm98-m4-oracle/frame0_matstruct_region_03b20000.bin",
-    "frame0_maps": "~/MWM-AI/data/pm98-m4-oracle/frame0_maps.txt",
-    "internal_timeline_jsonl": "~/MWM-AI/data/pm98-m4-oracle/timeline.jsonl",
-    "fulltime_png": "~/MWM-AI/data/pm98-m4-oracle/fulltime.png"
+    "frame0_matstruct_region": "~/MWM/data/pm98-m4-oracle/frame0_matstruct_region_03b20000.bin",
+    "frame0_maps": "~/MWM/data/pm98-m4-oracle/frame0_maps.txt",
+    "internal_timeline_jsonl": "~/MWM/data/pm98-m4-oracle/timeline.jsonl",
+    "fulltime_png": "~/MWM/data/pm98-m4-oracle/fulltime.png"
   },
   "perturbation_caveat_resolved_2026-07-07": "SETTLED by tools/re/wine/m4_clean_rerun_villa_bolton.json -- a same-fixture drive with ZERO winedbg breakpoints held during play reached a coherent FULL TIME (dispatch 10), and the internal score-read method agreed with the on-screen scoreboard (0-1). Nothing indicates the read-only breakpoints held over minutes 0-21 corrupted this banked 2-2. NB the clean run is a DIFFERENT seed so its scoreline (0-1) is not the 2-2; exact-reproduction still needs seed-poking (caveat 3).",
   "caveats": [

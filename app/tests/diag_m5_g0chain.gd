@@ -7,7 +7,7 @@ extends SceneTree
 ## REAL FUN_0058fda0 under the PCode emu (run_ballpredict_oracle.sh) to compare buffers bit-for-bit.
 ## Run: ~/godot462 --headless --path app --script res://tests/diag_m5_g0chain.gd
 
-const REF_DIR := "/home/mats/MWM-AI/data/pm98-m4-oracle/capture2"
+const REF_DIR := "/home/mm/MWM/data/pm98-m4-oracle/capture2"
 const STRUCT_JSON := REF_DIR + "/frame0_struct_import.json"
 const FRAME0_SEED := 0xea0d2a8d
 const TICK_CAP := 40

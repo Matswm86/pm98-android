@@ -50,9 +50,9 @@
   ],
   "gotcha_found_this_run": "In the 2D WATCH view a center-pitch click opens the player/substitution overlay, which is MODAL and pauses the sim clock; autoresume's old center-nudge fallback triggered it and trapped the driver at 81'. Fix: autoresume now clicks ONLY the KICK OFF button (nudge removed). The overlay is dismissed by a click on an empty pitch corner (e.g. 155,460 / 60,180); after dismissal the sim resumes to FT.",
   "artifacts_outside_git": {
-    "clean_timeline_jsonl": "~/MWM-AI/data/pm98-m4-oracle/clean_timeline.jsonl (13825 rows)",
-    "clean_fulltime_png": "~/MWM-AI/data/pm98-m4-oracle/clean_fulltime.png",
-    "clean_pre_kickoff_json": "~/MWM-AI/data/pm98-m4-oracle/clean_pre_kickoff.json",
-    "clean_full_time_json": "~/MWM-AI/data/pm98-m4-oracle/clean_full_time.json"
+    "clean_timeline_jsonl": "~/MWM/data/pm98-m4-oracle/clean_timeline.jsonl (13825 rows)",
+    "clean_fulltime_png": "~/MWM/data/pm98-m4-oracle/clean_fulltime.png",
+    "clean_pre_kickoff_json": "~/MWM/data/pm98-m4-oracle/clean_pre_kickoff.json",
+    "clean_full_time_json": "~/MWM/data/pm98-m4-oracle/clean_full_time.json"
   }
 }

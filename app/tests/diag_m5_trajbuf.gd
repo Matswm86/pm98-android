@@ -4,7 +4,7 @@ extends SceneTree
 # all-zero slots -> gate-4 catch zone tests rot(-p.pos,-facing) for every row. Dumps, per tick
 # clk 5-14: whether ball has key 0x114 (slot 0), raw slots 0 and 2, and the built grid[0]/grid[2]
 # for the ball's nearest player.
-const REF_DIR := "/home/mats/MWM-AI/data/pm98-m4-oracle/capture2"
+const REF_DIR := "/home/mm/MWM/data/pm98-m4-oracle/capture2"
 const STRUCT_JSON := REF_DIR + "/frame0_struct_import.json"
 const FRAME0_SEED := 0xea0d2a8d
 func _init() -> void: _run(); quit(0)

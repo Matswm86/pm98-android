@@ -37,7 +37,7 @@ extends SceneTree
 ##
 ## Run: ~/godot462 --headless --path app --script res://tests/run_match_from_struct.gd
 
-const REF_DIR := "/home/mats/MWM-AI/data/pm98-m4-oracle/capture2"
+const REF_DIR := "/home/mm/MWM/data/pm98-m4-oracle/capture2"
 const STRUCT_JSON := REF_DIR + "/frame0_struct_import.json"
 const REF_JSON := REF_DIR + "/m5_reference_villa_bolton_5_2.json"
 const FRAME0_SEED := 0xea0d2a8d

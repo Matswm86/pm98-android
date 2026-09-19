@@ -11,7 +11,7 @@ extends SceneTree
 ##
 ## Run: ~/godot462 --headless --path app --script res://tests/diag_m5_dart209.gd
 
-const REF_DIR := "/home/mats/MWM-AI/data/pm98-m4-oracle/capture2"
+const REF_DIR := "/home/mm/MWM/data/pm98-m4-oracle/capture2"
 const STRUCT_JSON := REF_DIR + "/frame0_struct_import.json"
 ## s55: PM98_SEED overrides the frame-0 LCG seed so the port can mirror a cross-seed silicon
 ## capture (m5_rsp_capture.py honours the same variable). Everything else stays the reference

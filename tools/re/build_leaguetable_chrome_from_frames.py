@@ -10,7 +10,7 @@ BINDING SOURCE — READ THIS.
   never appears (the closest, "STATISTICS FOR MANCHESTER UTD", is the player-stats
   screen, not the league table). So per the doctrine, the binding source falls back to
   the genuine PC capture:
-      /home/mats/MWM-AI/data/pm98-refs/real-gallery/ma_10.png   (640x480, native)
+      /home/mm/MWM/data/pm98-refs/real-gallery/ma_10.png   (640x480, native)
   cross-checked against hires_league_table.jpg (same screen, 474x355 JPEG). Both show
   the SAME single witnessed state: Premier, Week 17, Man Utd top. Lower divisions are
   NOT witnessed anywhere -> the baked chrome (PREMIER LEAGUE subtitle, Premier-selected
@@ -42,6 +42,7 @@ the accompanying RE doc.
 """
 from __future__ import annotations
 
+import os
 import json
 import sys
 from pathlib import Path
@@ -50,7 +51,7 @@ import numpy as np
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[2]
-FRAME = Path("/home/mats/MWM-AI/data/pm98-refs/real-gallery/ma_10.png")
+FRAME = Path(os.path.expanduser("~/MWM/data/pm98-refs/real-gallery/ma_10.png"))
 OUT_DIR = ROOT / "app/art/screens/leaguetable"
 OUT_PNG = OUT_DIR / "chrome.png"
 OUT_JSON = OUT_DIR / "leaguetable_chrome.json"

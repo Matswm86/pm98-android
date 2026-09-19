@@ -1,6 +1,6 @@
 #!/bin/bash
 # Watch the PM98 Wine window and save a PNG every time the screen content changes.
-OUT=/home/mats/MWM-AI/projects/pm98-android/screenshots/original-walkthrough-2026-07-02
+OUT=$HOME/MWM/projects/pm98-android/screenshots/original-walkthrough-2026-07-02
 mkdir -p "$OUT"
 last=""
 i=0
