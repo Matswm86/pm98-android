@@ -33,7 +33,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[2]
 F_AWAY = ROOT / "screenshots/parity-run-2026-07-16/orig/73_hub_wk1.png"
-F_HOME = Path.home() / "MWM-AI/data/pm98-refs/real-gallery/ma_6.png"
+F_HOME = Path.home() / "MWM/data/pm98-refs/real-gallery/ma_6.png"
 OUT = ROOT / "app/art/screens"
 
 # Pass 1 -- box interiors, same-column cycling: (zone x0,y0,x1,y1), (src rows).

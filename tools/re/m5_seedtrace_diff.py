@@ -17,7 +17,7 @@ import json
 import sys
 from pathlib import Path
 
-DEFAULT_ORACLE = Path.home() / "MWM-AI/data/pm98-m4-oracle/capture2/timeline.jsonl"
+DEFAULT_ORACLE = Path.home() / "MWM/data/pm98-m4-oracle/capture2/timeline.jsonl"
 
 
 def main() -> int:

@@ -10,8 +10,8 @@ left-panel body so it composites over chrome.png + improvements.png (shared titl
 from PIL import Image
 import sys, pathlib
 
-SRC = pathlib.Path.home()/"MWM-AI/projects/pm98-android/screenshots/user-captures-2026-07-23-ground-squad-transfer/09_07-54-47.png"
-OUT = pathlib.Path.home()/"MWM-AI/projects/pm98-android/app/art/screens/stadium/carpark.png"
+SRC = pathlib.Path.home()/"MWM/projects/pm98-android/screenshots/user-captures-2026-07-23-ground-squad-transfer/09_07-54-47.png"
+OUT = pathlib.Path.home()/"MWM/projects/pm98-android/app/art/screens/stadium/carpark.png"
 X0, Y0 = 641, 196                 # native game origin in the desktop capture
 
 # left-panel body opaque window (below the shared IMPROVEMENTS title + 4 tabs)
