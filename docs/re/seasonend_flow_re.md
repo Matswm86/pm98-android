@@ -3,7 +3,7 @@
 Closes the un-chased item from `sack_path_re.md` ("which screens
 `FUN_004f9800`/`FUN_004f98c0` mount was not chased") and the "screens NOT
 witnessed, mechanism unknown" caveat in `promanager_career_screens_re.md`.
-Method: Ghidra 12.1.2 headless (`~/ghidra-projects/pm98`, MANAGER.EXE,
+Method: Ghidra 12.1.2 headless (`~/MWM/data/ghidra-projects/pm98`, MANAGER.EXE,
 readOnly, DecompileAt.java) + vtable/string dumps straight from the PE
 (`.wineprefix/drive_c/PM98/MANAGER.EXE`). Every address below was read from
 the binary this session; nothing inferred from memory.

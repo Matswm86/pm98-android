@@ -110,7 +110,7 @@ Both are wrong in a KNOWN direction; the fix is §6, not a re-tuned exponent.
 ## 8. Reproduce
 `python3 tools/re/probe_value_witness.py` (35-witness decode + full field dump).
 EXE leads re-run with the `ghidra_scripts/` headless harness against
-`~/ghidra-projects/pm98` (program `MANAGER.EXE`).
+`~/MWM/data/ghidra-projects/pm98` (program `MANAGER.EXE`).
 
 ## 9. EXE trace 2026-07-22b — the "seeded roster pass" model is DISPROVEN
 

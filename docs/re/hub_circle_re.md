@@ -164,7 +164,7 @@ Manager-League domestic careers still never show them.
 
 - Strings: `strings -n 2 -t x MANAGER.EXE` ("CPU" file 0x25c920 → VA
   0x65e320; "PL " 0x25c924 → 0x65e324; "%ld" → 0x652f00; fonts as above).
-- Refs: headless Ghidra 12.1.2 `~/ghidra-projects/pm98 -process MANAGER.EXE
+- Refs: headless Ghidra 12.1.2 `~/MWM/data/ghidra-projects/pm98 -process MANAGER.EXE
   -readOnly` + FindRefsTo/DecompileAt/DumpAsm (tools/re/ghidra_scripts);
   DecompileAt force-creates the undefined-region function at 0x549240.
   Remember `-process MANAGER.EXE` (headless defaults to dbasewin.exe).

@@ -23,7 +23,7 @@ docs/shots/
 .DS_Store
 .re-venv/
 
-# ── Ghidra RE: project lives OUTSIDE the repo (~/ghidra-projects/pm98, ~45MB).
+# ── Ghidra RE: project lives OUTSIDE the repo (~/MWM/data/ghidra-projects/pm98, ~45MB).
 # The decompiled C dumps (docs/re/{decompiled,sim,flow}/*.c) + tooling (tools/re/)
 # + findings (docs/re/*.md) ARE committed as the saved analysis for next session.
 

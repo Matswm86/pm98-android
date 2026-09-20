@@ -40,7 +40,7 @@ for row in "${MATRIX[@]}"; do
   sed -e "s/__PANG__/$PANG/" -e "s/__TANG__/$TANG/" -e "s/__POS__/$POS/" \
       -e "s/__ENGAGED__/$ENGAGED/" -e "s/__SKILL__/$SKILL/" -e "s/__HDR__/$HDR/" \
       "$TMPL" > "$SPECDIR/_tree_run.spec"
-  "$GHIDRA" ~/ghidra-projects pm98 -process MANAGER.EXE -noanalysis \
+  "$GHIDRA" ~/MWM/data/ghidra-projects pm98 -process MANAGER.EXE -noanalysis \
     -scriptPath tools/re/ghidra_scripts \
     -postScript PcodeEmu.java "$SPECDIR/_tree_run.spec" "$SPECDIR/_tree_run.out" \
     >/dev/null 2>&1 || true

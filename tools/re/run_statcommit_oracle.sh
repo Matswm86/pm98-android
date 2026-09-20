@@ -206,7 +206,7 @@ run_emu() {
   local try
   for try in 1 2 3; do
     : > "$ROUT"
-    "$GHIDRA" ~/ghidra-projects pm98 -process MANAGER.EXE -noanalysis \
+    "$GHIDRA" ~/MWM/data/ghidra-projects pm98 -process MANAGER.EXE -noanalysis \
       -scriptPath tools/re/ghidra_scripts \
       -postScript PcodeEmu.java "$SPEC" "$ROUT" >/dev/null 2>&1 || true
     grep -qE 'CALL 0 (RET|HALT)' "$ROUT" && return 0

@@ -65,7 +65,7 @@ for row in "${MATRIX[@]}"; do
   read -r NAME ENTRY X Y Z ANGLE <<<"$row"
   emit_spec "$ENTRY" "$X" "$Y" "$Z" "$ANGLE"
   : > "$ROUT"
-  "$GHIDRA" ~/ghidra-projects pm98 -process MANAGER.EXE -noanalysis \
+  "$GHIDRA" ~/MWM/data/ghidra-projects pm98 -process MANAGER.EXE -noanalysis \
     -scriptPath tools/re/ghidra_scripts \
     -postScript PcodeEmu.java "$SPEC" "$ROUT" >/dev/null 2>&1 || true
   L=$(grep -E 'CALL 0 (RET|HALT)' "$ROUT" | head -1)

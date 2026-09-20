@@ -2,7 +2,7 @@
 
 Closes the APP_VS_SPEC_AUDIT "REMAINING GAP: MO" (owner call 2026-07-02: "morale IS
 in MANAGER.EXE — RE it"). Reversed 2026-07-03 with Ghidra `DecompileAt` against
-`~/ghidra-projects/pm98` + the new batch PCode oracle `tools/re/ghidra_scripts/
+`~/MWM/data/ghidra-projects/pm98` + the new batch PCode oracle `tools/re/ghidra_scripts/
 SweepEmu.java`. Ported to `app/scripts/Morale.gd`. Every constant below was read
 from the binary; the result-delta matrix was EMULATED out of the real code
 (600/600 clean returns), not transcribed by hand.

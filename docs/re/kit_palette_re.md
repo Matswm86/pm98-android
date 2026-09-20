@@ -7,7 +7,7 @@ Evidence: `tools/re/export_jug_bank.py`, `app/scripts/JugKit.gd`,
 `app/tests/test_jug_render.gd`, `tools/re/refs/kit-2026-07-28/`,
 `extracted/Premier Manager 98/MANAGER.EXE`
 
-Method: Ghidra 12.1.2 headless (`~/ghidra-projects/pm98`, `DecompileAt.java`) on
+Method: Ghidra 12.1.2 headless (`~/MWM/data/ghidra-projects/pm98`, `DecompileAt.java`) on
 `FUN_005b63e0` / `FUN_005a2830` / `FUN_005a5460` / `FUN_005d34a0` / `FUN_005caae0`, plus
 `objdump -M intel -b pei-i386` on `FUN_005923f0` (whose stack frame Ghidra cannot recover),
 plus the extracted `DATSIM.PKF` / `DAT.PKF`.

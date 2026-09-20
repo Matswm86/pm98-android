@@ -3,7 +3,7 @@
 The centred white card the magnifying-glass opens over the LINE-UP / SQUAD (reference:
 `screens/player_info_ref.jpg`). Renderer = `FUN_0052e0d0` (label layout) reading the player
 struct at `*(screen+0x54)`. Reversed 2026-06-26 with Ghidra (`tools/re/ghidra_scripts/
-DecompileAt.java` against `~/ghidra-projects/pm98`) + capstone. Ported to
+DecompileAt.java` against `~/MWM/data/ghidra-projects/pm98`) + capstone. Ported to
 `app/scenes/PlayerInfoScreen.gd`.
 
 ## Physical stats — stored METRIC, two bytes after the birth-year anchor

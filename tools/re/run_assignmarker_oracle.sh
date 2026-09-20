@@ -142,7 +142,7 @@ FIX=(
 
 run_emu() {
   : > "$ROUT"
-  "$GHIDRA" ~/ghidra-projects pm98 -process MANAGER.EXE -noanalysis \
+  "$GHIDRA" ~/MWM/data/ghidra-projects pm98 -process MANAGER.EXE -noanalysis \
     -scriptPath tools/re/ghidra_scripts \
     -postScript PcodeEmu.java "$SPEC" "$ROUT" >/dev/null 2>&1 || true
 }

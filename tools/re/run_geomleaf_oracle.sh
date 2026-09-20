@@ -24,7 +24,7 @@ THIS=0x00200000; OUTV=0x00210000; BV=0x00220000
 poke() { printf 'mem 0x%08x 4 0x%08x\n' "$1" $(( $2 & 0xffffffff )); }
 run() {
   : > "$ROUT"
-  "$GHIDRA" ~/ghidra-projects pm98 -process MANAGER.EXE -noanalysis \
+  "$GHIDRA" ~/MWM/data/ghidra-projects pm98 -process MANAGER.EXE -noanalysis \
     -scriptPath tools/re/ghidra_scripts \
     -postScript PcodeEmu.java "$SPEC" "$ROUT" >/dev/null 2>&1 || true
   grep -E 'CALL 0 (RET|HALT)' "$ROUT" | head -1

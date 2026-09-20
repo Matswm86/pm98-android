@@ -31,7 +31,7 @@ ROUT=$SPECDIR/_event_run.out
 
 run_emu() {
   : > "$ROUT"   # clear: a spec-parse failure must not leak the previous fixture
-  "$GHIDRA" ~/ghidra-projects pm98 -process MANAGER.EXE -noanalysis \
+  "$GHIDRA" ~/MWM/data/ghidra-projects pm98 -process MANAGER.EXE -noanalysis \
     -scriptPath tools/re/ghidra_scripts \
     -postScript PcodeEmu.java "$SPEC" "$ROUT" >/dev/null 2>&1 || true
 }

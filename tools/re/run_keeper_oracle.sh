@@ -98,7 +98,7 @@ for row in "${MATRIX[@]}"; do
   read -r NAME X Y Z F61 KEEPER KX KY KZ K2B8 K3A4 POSS <<<"$row"
   emit_spec "$X" "$Y" "$Z" "$F61" "$KEEPER" "$KX" "$KY" "$KZ" "$K2B8" "$K3A4" "$POSS"
   : > "$ROUT"   # clear: a spec-parse failure must not leak the previous fixture's result
-  "$GHIDRA" ~/ghidra-projects pm98 -process MANAGER.EXE -noanalysis \
+  "$GHIDRA" ~/MWM/data/ghidra-projects pm98 -process MANAGER.EXE -noanalysis \
     -scriptPath tools/re/ghidra_scripts \
     -postScript PcodeEmu.java "$SPEC" "$ROUT" >/dev/null 2>&1 || true
   S=$(grep -E 'CALL 0 (RET|HALT)' "$ROUT" | head -1)

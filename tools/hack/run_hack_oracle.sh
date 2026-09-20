@@ -102,7 +102,7 @@ EOF
 
 run_emu() {  # $1 = program name in the ghidra project
   : > "$ROUT"
-  "$GHIDRA" ~/ghidra-projects pm98 -process "$1" -noanalysis \
+  "$GHIDRA" ~/MWM/data/ghidra-projects pm98 -process "$1" -noanalysis \
     -scriptPath tools/re/ghidra_scripts \
     -postScript PcodeEmu.java "$SPEC" "$ROUT" >/dev/null 2>&1 || true
 }

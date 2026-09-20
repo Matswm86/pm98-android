@@ -32,7 +32,7 @@ text = open(src).read().replace(
 open(dst, 'w').write(text)
 PY
 
-run() { "$GHIDRA" ~/ghidra-projects pm98 -process MANAGER.EXE -noanalysis \
+run() { "$GHIDRA" ~/MWM/data/ghidra-projects pm98 -process MANAGER.EXE -noanalysis \
           -scriptPath tools/re/ghidra_scripts -postScript PcodeEmu.java "$1" "$2" \
           >/dev/null 2>&1 || true; }
 stream() { grep -oE 'TRACE rng #[0-9]+ step=[0-9]+ EAX=[0-9]+' "$1" | grep -oE 'EAX=[0-9]+' \

@@ -12,7 +12,7 @@ echo "# ATTR  gate_draw(EAX@5aeee2)  permil(EAX@5aeeff)  threshold(EDX@5aeeff)" 
 for ATTR in "$@"; do
   HEX=$(printf '0x%x' "$ATTR")
   sed "s/__ATTR__/$HEX/" "$TMPL" > "$SPECDIR/_gate_run.spec"
-  "$GHIDRA" ~/ghidra-projects pm98 -process MANAGER.EXE -noanalysis \
+  "$GHIDRA" ~/MWM/data/ghidra-projects pm98 -process MANAGER.EXE -noanalysis \
     -scriptPath tools/re/ghidra_scripts \
     -postScript PcodeEmu.java "$SPECDIR/_gate_run.spec" "$SPECDIR/_gate_run.out" \
     >/dev/null 2>&1 || true

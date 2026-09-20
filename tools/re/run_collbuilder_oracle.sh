@@ -93,7 +93,7 @@ pk() { printf 'mem 0x%08x 4 0x%08x\n' "$1" $(( $2 & 0xffffffff )); }
 } > "$SPEC"
 
 : > "$ROUT"
-"$GHIDRA" ~/ghidra-projects pm98 -process MANAGER.EXE -noanalysis \
+"$GHIDRA" ~/MWM/data/ghidra-projects pm98 -process MANAGER.EXE -noanalysis \
   -scriptPath tools/re/ghidra_scripts -postScript PcodeEmu.java "$SPEC" "$ROUT" >/dev/null 2>&1 || true
 L=$(grep -E 'CALL 0 (RET|HALT)' "$ROUT" | head -1)
 

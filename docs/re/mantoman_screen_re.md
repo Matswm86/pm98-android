@@ -8,7 +8,7 @@ Evidence: `screenshots/parity-run-2026-07-16/orig/66_mantoman_match.png`,
 `extracted/Premier Manager 98/MANAGER.EXE`,
 `extracted/Premier Manager 98/RECURSOS.PKF`.
 
-Method: Ghidra 12.1.2 headless (`~/ghidra-projects/pm98`, `DecompileAt.java`) plus
+Method: Ghidra 12.1.2 headless (`~/MWM/data/ghidra-projects/pm98`, `DecompileAt.java`) plus
 capstone linear disassembly through `tools/re/pe.py`. Every address below was read
 out of the binary in this session; every pixel figure was measured on the frames.
 

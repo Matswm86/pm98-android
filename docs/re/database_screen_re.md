@@ -651,7 +651,7 @@ the `pm98_stay_true_to_original` rule forbids.
   (likewise `ASCENDIDO.BMP`→`dbase_youth.png`, `BAJA.BMP`→`dbase_absence.png`).
 - Decode DB text pools: `cd tools/re && python3 dmlt_decode.py` (all 3) or `dmlt_decode.py PAISES.30`.
 - dbasewin decompilations live in `docs/re/decompiled/dbasewin/` (Point/Rect/SetFont/blit + `FUN_0042aba0`).
-- Decompile dbasewin: `~/ghidra_12.1.2_PUBLIC/support/analyzeHeadless ~/ghidra-projects pm98
+- Decompile dbasewin: `~/ghidra_12.1.2_PUBLIC/support/analyzeHeadless ~/MWM/data/ghidra-projects pm98
   -process dbasewin.exe -noanalysis -scriptPath tools/re/ghidra_scripts -postScript
   DecompileAt.java /tmp/claude-1000 0xVA`. objdump: `objdump -d -M intel -b pei-i386
   --start-address=0xVA --stop-address=0xVA "extracted/Premier Manager 98/Dbasewin.exe"`.

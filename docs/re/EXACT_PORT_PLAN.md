@@ -1137,6 +1137,6 @@ a `5b70e0; 5b73a0` pair; the 5b8bf0/5b8c20 vtable loops are driven from 0x598b35
 exact-parity asserts, boot+grep SCRIPT ERROR.
 
 ## Tooling (present 2026-06-17)
-Ghidra 12.1.2 `~/ghidra_12.1.2_PUBLIC` + project `~/ghidra-projects/pm98.rep` +
+Ghidra 12.1.2 `~/ghidra_12.1.2_PUBLIC` + project `~/MWM/data/ghidra-projects/pm98.rep` +
 `tools/re/ghidra_scripts/*.java`; `objdump`, `wine`, python `capstone` 5.0.7. No radare2.
 DATSIM.PKF = match-VIEW art (per `match_view_re.md`), NOT sim math — confirm before chasing.

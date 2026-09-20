@@ -13,7 +13,7 @@ post-sack surface** (§"Post-sack surface RESOLVED") plus the previously
 un-chased internals: what increments +0x224, what sets +0x294, and what
 DAT_0066b1e8 is (§"Sack internals decoded").
 
-Method: Ghidra 12.1.2 headless (`~/ghidra-projects/pm98`, DecompileAt.java) +
+Method: Ghidra 12.1.2 headless (`~/MWM/data/ghidra-projects/pm98`, DecompileAt.java) +
 raw byte scans of `extracted/Premier Manager 98/MANAGER.EXE`. Every address
 below was read from the binary this session; nothing is inferred from memory.
 

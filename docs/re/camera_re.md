@@ -5,7 +5,7 @@ Status: **REVERSED 2026-07-28. The motion is NOT yet ported** — said plainly i
 Evidence: `extracted/Premier Manager 98/MANAGER.EXE`, `tools/re/refs/watch-2026-07-28/`,
 `app/scripts/Pm98Camera.gd`
 
-Method: Ghidra 12.1.2 headless (`~/ghidra-projects/pm98`, `DecompileAt.java`) on `FUN_005f5850`
+Method: Ghidra 12.1.2 headless (`~/MWM/data/ghidra-projects/pm98`, `DecompileAt.java`) on `FUN_005f5850`
 / `FUN_005f5740` / `FUN_005f57a0` / `FUN_005f57e0` / `FUN_005f5800` / `FUN_005f5820` /
 `FUN_005f5840` / `FUN_005f6230` / `FUN_005ee080` / `FUN_005ee170` / `FUN_005ee670` /
 `FUN_005edfa0` / `FUN_005edf90`, plus `objdump -M intel -b pei-i386` over the display driver at

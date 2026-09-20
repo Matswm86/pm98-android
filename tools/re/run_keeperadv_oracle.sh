@@ -73,7 +73,7 @@ for row in "${MATRIX[@]}"; do
   read -r NAME TEAM KX KY VEL BX BY LINE <<<"$row"
   emit_spec "$TEAM" "$KX" "$KY" "$VEL" "$BX" "$BY" "$LINE"
   : > "$ROUT"
-  "$GHIDRA" ~/ghidra-projects pm98 -process MANAGER.EXE -noanalysis \
+  "$GHIDRA" ~/MWM/data/ghidra-projects pm98 -process MANAGER.EXE -noanalysis \
     -scriptPath tools/re/ghidra_scripts \
     -postScript PcodeEmu.java "$SPEC" "$ROUT" >/dev/null 2>&1 || true
   LINE_OUT=$(grep -E 'CALL 0 (RET|HALT)' "$ROUT" | head -1)

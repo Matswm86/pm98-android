@@ -4,7 +4,7 @@ Status: **engine located, mapped, RNG reconstructed (verified), scoring path
 decoded, faithful per-shot model folded into `app/scripts/MatchEngine.gd`.**
 All addresses are virtual
 addresses in `extracted/Premier Manager 98/MANAGER.EXE`, derived from the Ghidra
-12.1.2 analysis at `~/ghidra-projects/pm98` (decompiled C dumps under
+12.1.2 analysis at `~/MWM/data/ghidra-projects/pm98` (decompiled C dumps under
 `docs/re/{decompiled,sim,flow}/`). Tooling: `tools/re/*.py` + `tools/re/ghidra_scripts/*.java`.
 
 ## Headline finding (corrects the placeholder engine's assumptions)
