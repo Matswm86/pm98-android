@@ -96,7 +96,7 @@
     592,
     454
    ],
-   "settle": 1.5
+   "settle": 3.0
   },
   "alert_box": {
    "click_alert_ok": true,
@@ -171,6 +171,13 @@
     ]
    ],
    "settle": 3.0
+  },
+  "xi_faces": {
+   "click": [
+    320,
+    460
+   ],
+   "settle": 2.0
   }
  },
  "film_secs": 20,
@@ -186,7 +193,7 @@
     480,
     97
    ],
-   "settle": 3.0
+   "settle": 8.0
   }
  },
  "keep_all": false
