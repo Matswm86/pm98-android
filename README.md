@@ -25,7 +25,7 @@ page.
 
 Pick a club, take over, run it week by week.
 
-- All 92 English clubs, plus 384 more from Europe and South America, and around 8,000 players on
+- All 92 English clubs, plus 384 more from Europe and South America, and around 9,500 players on
   their original ratings.
 - Line-up and tactics: the XI on the pitch, the formation, marking, set-piece takers.
 - Transfers, counter-offers, contracts and renewals, the scout, the youth academy, and all
@@ -51,7 +51,7 @@ none of them changes a pixel of the original screens:
   shows.
 - **Drag to scroll.** Any list — the squad, the line-up reserves, offers, the scout's results,
   a player's history — scrolls under your finger. The original's own scroll arrows still work.
-- **Forgiving arrows.** The 1998 scroll steppers are around 12 pixels; a finger tap a few
+- **Forgiving arrows.** The 1998 scroll steppers are around 16 pixels; a finger tap a few
   pixels off still takes them.
 
 ## Screenshots
@@ -97,7 +97,7 @@ the red, a results review gone against you, a squad under sixteen men: those are
 that end a career in this game, and none of them will.
 
 **Three up front.** Pick a shape with three up front (4-3-3, 3-4-3, 4-2-4, 5-2-3) and the match
-engine stops pretending: your chance count is floored and the opposing keeper stops saving. Six
+engine stops pretending: your chance count is floored and the opposing keeper stops saving. Four
 goals a game unless the dice give you more. A Mixed Play mentality arms it too, as does actually
 fielding three natural forwards in any shape. The row says **ARMED** when the coming match will
 get it and **IDLE** when the switch is on but nothing has triggered. Instant results only,
