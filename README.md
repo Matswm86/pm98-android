@@ -1,12 +1,14 @@
 # PM98
 
-<img src="screens/title.png" alt="The Premier Manager 98 front-door menu" width="320" align="right"/>
-
 Premier Manager 98 on Android. I own the PC game, I took my own copy apart, and this is what
 came out of it: the same screens, the same clubs, the same players, on a phone.
 
 Hobby project. Nothing is sold, nothing is monetised, and no game data ships in here that did
 not come off my own disc.
+
+<img src="screens/title.png" alt="The Premier Manager 98 front-door menu" width="480"/>
+
+<sub>The front-door menu, as the app draws it.</sub>
 
 ## Download
 
@@ -43,14 +45,14 @@ Pick a club, take over, run it week by week.
 
 ## On a phone
 
-The 1998 game was drawn for a mouse, so the phone build adds three touch conveniences on top —
-none of them changes a pixel of the original screens:
+The 1998 game was drawn for a mouse, so the phone build adds three touch conveniences on top.
+None of them changes a pixel of the original screens:
 
 - **Pinch to zoom.** Two fingers zoom the whole screen up to 3x and pan it around; pinch back
   out (or just keep pinching in) and it snaps home. Every tap still lands exactly where it
   shows.
-- **Drag to scroll.** Any list — the squad, the line-up reserves, offers, the scout's results,
-  a player's history — scrolls under your finger. The original's own scroll arrows still work.
+- **Drag to scroll.** Any list (the squad, the line-up reserves, offers, the scout's results,
+  a player's history) scrolls under your finger. The original's own scroll arrows still work.
 - **Forgiving arrows.** The 1998 scroll steppers are around 16 pixels; a finger tap a few
   pixels off still takes them.
 
@@ -103,12 +105,15 @@ fielding three natural forwards in any shape. The row says **ARMED** when the co
 get it and **IDLE** when the switch is on but nothing has triggered. Instant results only,
 watched matches play normally.
 
-## Built with
+## How it works
 
-Godot 4, and the APK is built in GitHub Actions. `tools/` is the Python that decodes the
-original's archives, fonts and database and diffs the app's screens against captured frames.
-`docs/` is the write-up of how the original actually works, one file per screen. `web/` is the
-project page.
+PM98 is a Godot 4.6 project written in GDScript. It draws on the original's own 640x480 canvas
+and letterboxes that to the phone in landscape, so a screen is the original's layout at the
+original's pixels. `tools/` is the Python that decodes the original's archives, fonts and
+database from my own copy of the game and diffs the app's screens against captured frames; the
+app loads the clubs, players, fees and wages from the JSON it produces. `docs/` is the write-up
+of how the original actually works, one file per screen. The APK is built headless in GitHub
+Actions on each push to main, and `web/` is the project page, plain static files.
 
 ## Legal
 
